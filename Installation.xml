@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GAMEAPP gamename="nmtoken">
+    <BOOTCLASS classname="nmtoken">
+        <PARAMETER tag="nmtoken" value="nmtoken" />
+    </BOOTCLASS>
+    <USERMANAGER clientclass="nmtoken" serverclass="nmtoken">
+        <PARAMETER tag="nmtoken" value="nmtoken" />
+        <LOGINMODULE classname="nmtoken" />
+    </USERMANAGER>
+</GAMEAPP>

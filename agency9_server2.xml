@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GAMEAPP gamename="AGENCY9">
+    <USERMANAGER serverclass="com.sun.gi.comm.users.TCPIPUserManager">
+        <PARAMETER tag="host" value="localhost" />
+        <PARAMETER tag="port" value="1150" />
+    </USERMANAGER>
+</GAMEAPP>

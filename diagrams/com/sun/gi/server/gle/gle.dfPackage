@@ -1,0 +1,73 @@
+package id4tfovdirrhcnedirrhgp6;
+
+/**
+@version 2.0
+@physicalPackage
+@__modelType diagram 
+*/
+class diagram {
+/**
+@__ref <oiref:design#Class#id4nnhtdirrhcnedirrhgqa.diagram:oiref><oihard>
+@__modelType reference
+@__fqn <oiref:#Package#com.sun.gi.server.gle.impl:oiref> 
+*/
+class reference {
+}/**
+@__ref <oiref:java#Class#com.sun.gi.server.gle.ObjectReference:oiref><oihard>
+@__modelType reference 
+*/
+class reference15 {
+}/**
+@__ref <oiref:java#Class#com.sun.gi.server.gle.Executor:oiref><oihard>
+@__modelType reference 
+*/
+class reference16 {
+}/**
+@__ref <oiref:java#Class#com.sun.gi.server.gle.Task:oiref><oihard>
+@__modelType reference 
+*/
+class reference17 {
+}/**
+@__ref <oiref:java#Class#com.sun.gi.server.gle.TaskPrivate:oiref><oihard>
+@__modelType reference 
+*/
+class reference18 {
+}/**
+@__ref <oiref:java#Class#com.sun.gi.server.gle.Kernel:oiref><oihard>
+@__modelType reference 
+*/
+class reference19 {
+}/**
+@__ref <oiref:java#Class#com.sun.gi.server.gle.TimeStampInterrupt:oiref><oihard>
+@__modelType reference 
+*/
+class reference1 {
+}/**
+@__ref <oiref:java#Class#com.sun.gi.server.gle.TaskAbortException:oiref><oihard>
+@__modelType reference 
+*/
+class reference2 {
+}/**
+@__ref <oiref:java#Class#com.sun.gi.server.gle.TaskQueue:oiref><oihard>
+@__modelType reference 
+*/
+class reference4 {
+}}/**
+@__tags
+@shapeType ClassDiagram 
+*/
+class __tags {
+}/**
+@__options 
+*/
+class __options {
+}/**
+@__positions <oigroup:<oiref:java#Class#com.sun.gi.server.gle.ObjectReference:oiref>=10,10,119,149,1:oigroup>
+<oigroup:<oiref:java#Class#com.sun.gi.server.gle.Executor:oiref>=149,10,117,101,1:oigroup>
+<oigroup:<oiref:java#Class#com.sun.gi.server.gle.TaskPrivate:oiref>=286,10,106,146,1:oigroup>
+<oigroup:<oiref:design#Class#id4nnhtdirrhcnedirrhgqa.diagram:oiref>=10,390,161,152,1:oigroup>
+<oigroup:<oiref:java#Class#com.sun.gi.server.gle.Kernel:oiref>=227,190,126,133,1:oigroup>
+<oigroup:<oiref:java#Class#com.sun.gi.server.gle.Task:oiref>=10,190,197,165,1:oigroup> 
+*/
+class __positions {
+}

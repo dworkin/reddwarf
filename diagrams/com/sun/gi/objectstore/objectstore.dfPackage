@@ -1,0 +1,34 @@
+package idk0lndmimdaqtdmimdkhb;
+
+/**
+@version 2.0
+@physicalPackage
+@__modelType diagram 
+*/
+class diagram {
+/**
+@__ref <oiref:design#Class#id41l1sdmimdaqtdmimdki5.diagram:oiref><oihard>
+@__modelType reference
+@__fqn <oiref:#Package#com.sun.gi.objectstore.impl:oiref> 
+*/
+class reference {
+}/**
+@__ref <oiref:design#Class#id31kwkdmimdaqtdmimdkip.diagram:oiref><oihard>
+@__modelType reference
+@__fqn <oiref:#Package#com.sun.gi.objectstore.test:oiref> 
+*/
+class reference18 {
+}}/**
+@__tags
+@shapeType ClassDiagram 
+*/
+class __tags {
+}/**
+@__options 
+*/
+class __options {
+}/**
+@__positions 
+*/
+class __positions {
+}

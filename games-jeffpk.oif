@@ -1,0 +1,755 @@
+{
+    Content = (
+        {
+            ccex = t;
+            cnd = {
+                ID = _C_AWTClasses;
+                Name = "AWT classes";
+                Operation = OR;
+                PatternList = (
+                    java.awt.*,
+                    sun.awt.*,
+                    sun.java2d.*,
+                    com.apple.mrj.internal.awt.*
+                );
+            };
+            cpu = f;
+            grp = f;
+            mem = f;
+        },
+        {
+            ccex = t;
+            cnd = {
+                ID = _Y_ApacheJServ;
+                Name = "Apache JServ";
+                Operation = OR;
+                PatternList = ( org.apache.java.*, org.apache.jserv.* );
+            };
+            cpu = f;
+            grp = f;
+            mem = f;
+        },
+        {
+            ccex = t;
+            cnd = {
+                ID = _N_Orion;
+                Name = Orion;
+                Operation = OR;
+                PatternList = ( com.orionserver.*, com.evermind.*, javax.servlet.* );
+            };
+            cpu = f;
+            grp = f;
+            mem = f;
+        },
+        {
+            ccex = t;
+            cnd = {
+                ID = _F_BEAWebLogic;
+                Name = "WebLogic classes";
+                Operation = OR;
+                PatternList = (
+                    weblogic.*,
+                    com.bea.interop.*,
+                    com.bea.java2com.*,
+                    com.bea.jcom.*,
+                    com.bea.jvm.*,
+                    com.bea.utils.*,
+                    com.beasys.*,
+                    com.sun.management.jmx.*,
+                    "$Proxy*",
+                    com.sun.naming.*,
+                    com.sun.mail.*,
+                    com.sun.jndi.*,
+                    com.sun.activation.*,
+                    com.sun.rsajca.*,
+                    LDAP*,
+                    utils.*,
+                    jsp_servlet.*,
+                    javax.servlet.*
+                );
+            };
+            cpu = f;
+            grp = f;
+            mem = f;
+        },
+        {
+            ccex = t;
+            cnd = {
+                ID = _D_BES5;
+                Name = "BES Classes";
+                Operation = OR;
+                PatternList = (
+                    com.borland.enterprise.*,
+                    com.borland.datastore.*,
+                    com.borland.product.*,
+                    com.borland.dx.*,
+                    com.borland.compiler.*,
+                    com.borland.jbuilder.*,
+                    com.borland.sanctuary.*,
+                    com.borland.javamaker.*,
+                    com.borland.dbswing.*,
+                    com.borland.dbtools.*,
+                    com.borland.jb.*,
+                    com.borland.ejb.*,
+                    com.borland.jbcl.*,
+                    com.borland.sql.*,
+                    com.borland.jdbcx.*,
+                    com.borland.javax.*,
+                    com.borland.jss.*,
+                    com.borland.primetime.*,
+                    com.borland.product.*,
+                    com.borland.security.*,
+                    com.borland.xml.*,
+                    com.borland.jafa.*,
+                    com.borland.management.*,
+                    com.borland.console.*,
+                    com.inprise.*,
+                    com.visigenic.*,
+                    com.borland.catalina.*,
+                    com.borland.java.*,
+                    com.borland.vbroker.*,
+                    com.borland.appclient.*,
+                    flexlm.*,
+                    javax.servlet.*
+                );
+            };
+            cpu = f;
+            grp = f;
+            mem = f;
+        },
+        {
+            ccex = t;
+            cnd = {
+                ID = _O_SYBASEJaguar;
+                Name = "Sybase Jaguar";
+                Operation = OR;
+                PatternList = ( com.sybase.*, javax.servlet.* );
+            };
+            cpu = f;
+            grp = f;
+            mem = f;
+        },
+        {
+            ccex = t;
+            cnd = {
+                ID = _Q_Resin;
+                Name = Resin;
+                Operation = OR;
+                PatternList = (
+                    com.caucho.ejb.*,
+                    com.caucho.persist.*,
+                    com.caucho.burlap.*,
+                    com.caucho.hessian.*,
+                    com.caucho.util.*,
+                    com.caucho.iiop.*,
+                    com.caucho.jms.*,
+                    com.caucho.es.*,
+                    com.caucho.vfs.*,
+                    com.caucho.java.*,
+                    com.caucho.regexp.*,
+                    com.caucho.xml.*,
+                    com.caucho.eswrap.*,
+                    com.caucho.sql.*,
+                    com.caucho.transaction.*,
+                    com.caucho.xsl.*,
+                    com.caucho.transform.*,
+                    com.caucho.xpath.*,
+                    com.caucho.jsp.*,
+                    com.caucho.server.*,
+                    com.caucho.http.*,
+                    com.caucho.security.*,
+                    com.caucho.naming.*,
+                    com.caucho.tools.*,
+                    com.caucho.webutil.*,
+                    com.caucho.jslib.*,
+                    com.caucho.services.*,
+                    com.caucho.web.*,
+                    com.caucho.graphics.*,
+                    com.caucho.jdbc.*,
+                    _ejb.*_EJB*,
+                    _jsbean.*,
+                    javax.servlet.*
+                );
+            };
+            cpu = f;
+            grp = f;
+            mem = f;
+        },
+        {
+            ccex = t;
+            cnd = {
+                ID = _G_IBMWebSphere;
+                Name = "IBM WebSphere";
+                Operation = OR;
+                PatternList = (
+                    com.ibm.asn1.*,
+                    com.ibm.cfwk.*,
+                    com.ibm.gsk_sslight.*,
+                    com.ibm.sslight.*,
+                    com.ibm.util.*,
+                    com.ibm.ejs.*,
+                    com.ibm.db.*,
+                    com.ibm.ivj.*,
+                    com.ibm.debug.*,
+                    com.ibm.websphere.*,
+                    com.ibm.gsk.*,
+                    com.ibm.servlet.*,
+                    com.ibm.asn1.*,
+                    com.ibm.ldap.*,
+                    db.*,
+                    jdbc.*,
+                    com.ibm.ivb.*,
+                    com.ibm.ejb.*,
+                    com.ibm.cs.*,
+                    com.ibm.WAS35sslight.*,
+                    com.ibm.CORBA.*,
+                    com.ibm.IExtendedSecurity*,
+                    com.ibm.ISecurity*,
+                    com.ibm.NamingStringSyntax.*,
+                    com.ibm.ras.*,
+                    com.ibm.Security*,
+                    com.ibm.som.*,
+                    com.ibm.WebSphereSecurity.*,
+                    com.ibm.WebSphereSecurityImpl.*,
+                    com.ibm.vap.*,
+                    com.ibm.webtools.runtime.*,
+                    com.ibm.rmi.*,
+                    com.ibm.org.*,
+                    com.ibm.ws.*,
+                    com.ibm.connector2.*,
+                    com.ibm.etools.*,
+                    com.ibm.sw.*,
+                    com.ibm.gryphon.*,
+                    com.ibm.gryphonimpl.*,
+                    com.ibm.CBUtils.*,
+                    com.ibm.idl.*,
+                    com.ibm.ivf.*,
+                    com.ibm.xmi.*,
+                    com.ibm.ExtendedNaming.*,
+                    com.ibm.Wsn*,
+                    com.ibm.trl.*,
+                    com.ibm.uddi.*,
+                    com.ibm.vap.*,
+                    com.ibm.psh.*,
+                    com.ibm.dom.*,
+                    com.ibm.jsse.*,
+                    com.ibm.crypto.*,
+                    com.ibm.sslite.*,
+                    com.ibm.security.*,
+                    com.ibm.net.*,
+                    com.ibm.misc.*,
+                    com.ibm.logging.*,
+                    com.ibm.db2j.*,
+                    com.ibm.CSIv2Security.*,
+                    com.tivoli.*,
+                    db2j.*,
+                    javax.servlet.*
+                );
+            };
+            cpu = f;
+            grp = f;
+            mem = f;
+        },
+        {
+            ccex = t;
+            cnd = {
+                ID = _P_ATGDynamo;
+                Name = "ATG Dynamo";
+                Operation = OR;
+                PatternList = ( atg.*, javax.servlet.* );
+            };
+            cpu = f;
+            grp = f;
+            mem = f;
+        },
+        {
+            ccex = t;
+            cnd = {
+                ID = _A_JavaCoreClasses;
+                Name = "Java core classes";
+                Operation = OR;
+                PatternList = (
+                    java.*,
+                    javax.*,
+                    org.omg.*,
+                    org.ietf.*,
+                    sun.*,
+                    sunw.*,
+                    com.sun.security.*,
+                    com.sun.corba.*,
+                    com.sun.rsasign.*,
+                    com.sun.rsajca.*,
+                    com.sun.java.*,
+                    com.sun.org.*,
+                    com.sun.media.*,
+                    com.sun.image.*,
+                    com.sun.imageio.*,
+                    com.sun.rmi.*,
+                    com.sun.mail.*,
+                    com.sun.tools.*,
+                    com.sun.jdi.*,
+                    com.sun.activation.*,
+                    com.sun.javadoc.*,
+                    com.ibm.jvm.*
+                );
+            };
+            cpu = f;
+            grp = f;
+            mem = f;
+        },
+        {
+            ccex = t;
+            cnd = {
+                ID = _E_XMLClasses;
+                Name = "XML classes";
+                Operation = OR;
+                PatternList = (
+                    org.xml.*,
+                    org.w3c.*,
+                    javax.xml.*,
+                    org.apache.xerces.*,
+                    org.apache.xml.*,
+                    org.apache.xalan.*,
+                    org.apache.cocoon.*,
+                    org.apache.crimson.*,
+                    org.apache.xpath.*,
+                    com.sun.xml.*,
+                    org.apache.soap.*,
+                    org.apache.html.*,
+                    org.apache.wml.*,
+                    org.jdom.*,
+                    org.dom4j.*,
+                    com.ibm.xml.*
+                );
+            };
+            cpu = f;
+            grp = f;
+            mem = f;
+        },
+        {
+            ccex = t;
+            cnd = {
+                ID = _G_IBMDB2Client;
+                Name = "IBM DB2 Client";
+                Operation = OR;
+                PatternList = ( COM.ibm.db2.* );
+            };
+            cpu = f;
+            grp = f;
+            mem = f;
+        },
+        {
+            ccex = t;
+            cnd = {
+                ID = _B_JavaLang;
+                Name = "Java language classes";
+                Operation = OR;
+                PatternList = ( java.lang.* );
+            };
+            cpu = f;
+            grp = f;
+            mem = f;
+        },
+        {
+            ccex = t;
+            cnd = {
+                ID = _I_iPlanetWS;
+                Name = "iPlanet WS";
+                Operation = OR;
+                PatternList = ( com.iplanet.*, javax.servlet.* );
+            };
+            cpu = f;
+            grp = f;
+            mem = f;
+        },
+        {
+            ccex = t;
+            cnd = {
+                ID = _W_Iona;
+                Name = "Iona iPortal";
+                Operation = OR;
+                PatternList = ( com.iona.*, javax.servlet.* );
+            };
+            cpu = f;
+            grp = f;
+            mem = f;
+        },
+        {
+            ccex = t;
+            cnd = {
+                ID = _L_SilverStream;
+                Name = SilverStream;
+                Operation = OR;
+                PatternList = ( com.sssw.*, javax.servlet.* );
+            };
+            cpu = f;
+            grp = f;
+            mem = f;
+        },
+        {
+            ccex = t;
+            cnd = {
+                ID = _M_JBoss;
+                Name = JBoss;
+                Operation = OR;
+                PatternList = (
+                    org.jboss.*,
+                    org.jbossmq.*,
+                    org.enhydra.*,
+                    org.hsql.*,
+                    org.jnp.*,
+                    org.opentools.*,
+                    "$Proxy*",
+                    javax.servlet.*
+                );
+            };
+            cpu = f;
+            grp = f;
+            mem = f;
+        },
+        {
+            ccex = t;
+            cnd = {
+                ID = _D_SwingClasses;
+                Name = "Swing classes";
+                Operation = OR;
+                PatternList = (
+                    com.sun.java.swing.*,
+                    com.sun.java.accessibility.*,
+                    javax.swing.*,
+                    javax.accessibility.*,
+                    com.apple.mrj.swing.*
+                );
+            };
+            cpu = f;
+            grp = f;
+            mem = f;
+        },
+        {
+            ccex = t;
+            cnd = {
+                ID = _J_MacromediaJRun;
+                Name = "Macromedia JRun";
+                Operation = OR;
+                PatternList = ( com.livesoftware.*, allaire.jrun.*, javax.servlet.* );
+            };
+            cpu = f;
+            grp = f;
+            mem = f;
+        },
+        {
+            ccex = t;
+            cnd = {
+                ID = _K_Oracle9i;
+                Name = Oracle9i;
+                Operation = OR;
+                PatternList = ( com.evermind.*, org.apache.jserv.*, javax.servlet.* );
+            };
+            cpu = f;
+            grp = f;
+            mem = f;
+        },
+        {
+            ccex = t;
+            cnd = {
+                ID = _H_JakartaTomcat;
+                Name = "Jakarta Tomcat";
+                Operation = OR;
+                PatternList = (
+                    org.apache.tomcat.*,
+                    org.apache.catalina.*,
+                    org.apache.coyote.*,
+                    org.apache.tools.*,
+                    org.apache.jasper.*,
+                    org.apache.ajp.*,
+                    org.apache.naming.*,
+                    org.apache.commons.*,
+                    com.sun.naming.*,
+                    javax.servlet.*
+                );
+            };
+            cpu = f;
+            grp = f;
+            mem = f;
+        },
+        {
+            ccex = t;
+            cnd = {
+                ID = _O_JUnit;
+                Name = JUnit;
+                Operation = OR;
+                PatternList = ( junit.*, com.borland.jbuilder.unittest.* );
+            };
+            cpu = f;
+            grp = f;
+            mem = f;
+        },
+        {
+            ccex = t;
+            cnd = {
+                ID = _G_Ant;
+                Name = Ant;
+                Operation = OR;
+                PatternList = ( org.apache.tools.ant.*, org.apache.tools.tar.* );
+            };
+            cpu = f;
+            grp = f;
+            mem = f;
+        },
+        {
+            ccex = t;
+            cnd = {
+                ID = Z_JBoss3rdParty;
+                Name = "JBoss 3rd party classes";
+                Operation = OR;
+                PatternList = (
+                    sun.tools.*,
+                    com.sun.naming.*,
+                    com.sun.management.*,
+                    javax.naming.*,
+                    org.apache.log4j.*,
+                    org.hsqldb.*
+                );
+                ReadOnly = FALSE;
+            };
+            cpu = f;
+            grp = f;
+            mem = f;
+        },
+        {
+            ccex = t;
+            cnd = {
+                ID = Z_Resin3rdpartyXML;
+                Name = "Resin 3rd party XML classes";
+                Operation = OR;
+                PatternList = ( _xsl.* );
+                ReadOnly = FALSE;
+            };
+            cpu = f;
+            grp = f;
+            mem = f;
+        },
+        {
+            ccex = t;
+            cnd = {
+                ID = Z_BES3rdParty;
+                Name = "BES 3rd party classes";
+                Operation = OR;
+                PatternList = (
+                    com.sun.server.*,
+                    com.sun.net.*,
+                    com.sun.crypto.*,
+                    com.sun.jndi.*,
+                    com.sun.mail.*,
+                    com.sun.security.*,
+                    org.omg.CORBA.*,
+                    org.omg.PortableServer.*,
+                    org.omg.PortableInterceptor.*,
+                    org.omg.CosEventComm.*,
+                    org.omg.CosNaming.*,
+                    org.omg.CosTransactions.*,
+                    org.omg.firewall.*,
+                    org.omg.Messaging.*,
+                    org.omg.IOP.*,
+                    org.omg.CSIIOP.*,
+                    org.omg.SSLIOP.*,
+                    org.omg.GSSUP.*,
+                    gnu.regexp.*,
+                    COM.rsa.*,
+                    progress.message.*,
+                    HTTPClient.*,
+                    com.mortbay.*,
+                    org.apache.turbine.*,
+                    org.apache.java.*,
+                    org.apache.fop.*
+                );
+                ReadOnly = FALSE;
+            };
+            cpu = f;
+            grp = f;
+            mem = f;
+        },
+        {
+            ccex = t;
+            cnd = {
+                ID = Z_Orion3rdParty;
+                Name = "Orion 3rd party classes";
+                Operation = OR;
+                PatternList = (
+                    sun.tools.*,
+                    com.sun.naming.*,
+                    javax.naming.*,
+                    com.sun.activation.*,
+                    com.sun.net.ssl.*,
+                    com.sun.mail.*,
+                    COM.rsa.*
+                );
+                ReadOnly = FALSE;
+            };
+            cpu = f;
+            grp = f;
+            mem = f;
+        },
+        {
+            ccex = t;
+            cnd = {
+                ID = Z_Weblogic3rdParty;
+                Name = "WebLogic 3rd party classes";
+                Operation = OR;
+                PatternList = (
+                    COM.rsa.*,
+                    bsh.*,
+                    antlr.*,
+                    com.adventnet.*,
+                    com.rsa.*,
+                    com.octetstring.*,
+                    com.certicom.*,
+                    com.asn1c.*,
+                    com.linar.*,
+                    org.mozilla.*,
+                    com.sun.naming.*,
+                    com.sun.management.*,
+                    com.sun.activation.*,
+                    javax.naming.*,
+                    com.sun.net.*,
+                    com.sun.crypto.*,
+                    COM.jrockit.*
+                );
+                ReadOnly = FALSE;
+            };
+            cpu = f;
+            grp = f;
+            mem = f;
+        },
+        {
+            ccex = t;
+            cnd = {
+                ID = Z_Cloudscape;
+                Name = "Cloudscape JDBC Driver classes";
+                Operation = OR;
+                PatternList = (
+                    c8e.*,
+                    COM.cloudscape.*,
+                    COM.objectspace.*,
+                    com.objectspace.*
+                );
+                ReadOnly = FALSE;
+            };
+            cpu = f;
+            grp = f;
+            mem = f;
+        },
+        {
+            ccex = t;
+            cnd = {
+                ID = 1018649724232;
+                Name = "PointBase JDBC Driver classes";
+                Operation = OR;
+                PatternList = ( com.pointbase.* );
+                ReadOnly = FALSE;
+            };
+            cpu = f;
+            grp = f;
+            mem = f;
+        },
+        {
+            ccex = t;
+            cnd = {
+                ID = Z_WebSphere3rdParty;
+                Name = "WebSphere 3rd party classes";
+                Operation = OR;
+                PatternList = (
+                    com.klg.*,
+                    tcl.*,
+                    com.oroinc.*,
+                    com.ibm.bsf.*,
+                    org.mozilla.*,
+                    com.netscape.javascript.*,
+                    com.lotus.xml.*,
+                    com.lotus.xpath.*,
+                    com.lotus.xsl.*,
+                    com.merant.sequelink.*,
+                    demo.asn1.*,
+                    iaik.asn1*,
+                    iaik.pkcs.*,
+                    iaik.security.*,
+                    iaik.utils.*,
+                    iaik.x509.*,
+                    javax.crypto.*,
+                    iaik.java.security.*,
+                    javax.ejb.*,
+                    javax.naming.*,
+                    com.sun.naming.internal.*,
+                    javax.sql.*,
+                    javax.transaction.*,
+                    org.omg.CORBA.*,
+                    org.omg.CosNaming.*,
+                    org.omg.CosPropertyService.*,
+                    org.omg.CosTransactions.*,
+                    org.omg.Security*,
+                    org.omg.SendingContext.*,
+                    org.omg.stub.*,
+                    com.sun.server.*,
+                    com.sun.web.util.*,
+                    com.sun.jsp.*,
+                    org.apache.jasper,
+                    intersolv.jdbc.*
+                );
+                ReadOnly = FALSE;
+            };
+            cpu = f;
+            grp = f;
+            mem = f;
+        },
+        {
+            ccex = t;
+            cnd = {
+                ID = Z_EJBStubsSkels;
+                Name = "EJB stubs and skels";
+                Operation = OR;
+                PatternList = (
+                    *_Impl,
+                    *_EOImpl,
+                    *_HomeImpl,
+                    *_CMP_RDBMS,
+                    *_LocalHomeImpl,
+                    *_ELOImpl,
+                    *_WLStub,
+                    *_WLSkel,
+                    *._*_Stub,
+                    *._*_BaseStub,
+                    *._*_Tie,
+                    *._*_Skel,
+                    *Home_*,
+                    *HomeBean_*,
+                    *EJB_*,
+                    *EJBInjectorImpl_*,
+                    *EJBExtractor_*,
+                    *EJBCacheEntryImpl_*,
+                    *EJBAdaptorBinding_*,
+                    *BeanInjectorImpl_*,
+                    *BeanExtractor_*,
+                    *BeanCacheEntryImpl_*,
+                    *BeanAdaptorBinding_*,
+                    *EJBFunctionSet_*
+                );
+            };
+            cpu = f;
+            grp = f;
+            mem = f;
+        },
+        {
+            ccex = t;
+            cnd = {
+                ID = Z_Resin3rdParty;
+                Name = "Resin 3rd party classes";
+                Operation = OR;
+                PatternList = ( sun.tools.*, com.sun.naming.*, javax.naming.* );
+                ReadOnly = FALSE;
+            };
+            cpu = f;
+            grp = f;
+            mem = f;
+        }
+    );
+}

@@ -1,0 +1,50 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<html>
+<head><!--
+  Copyright (c) 2004 
+  All Rights Reserved.
+--></head>
+
+<body bgcolor="white">Begin with a one sentence summary about this package.
+Follow with the remainder of your description.
+
+<h2>Package Specification</h2>
+This package contains the code code for the Communications layer (tier 1) of 
+the Sun Game Server Technology.
+
+The Communications layer is divided up into 3 sub functions. Routing, 
+User Managers and Discovery.  There is a seperate sub-package for each.
+
+<b>Discovery:</b> Discovery is the process of the client finding a User Manager 
+to connect to.  It is the first step in the connection process.  Discoverers are
+pluggable.  The common interfaces a discovery module must implement and and all 
+of the different Sun supplied modules live in the discovery sub-package.
+
+<b>User Manager:</b> The User Managers encapsulate the connection protocols for 
+all the different kinds of devices that can connect to the game server.  The
+rest of the Game Server stack is 100% agnostic to how the client is connected.
+User managers are also pluggable and one game session in the logic layer 
+can support multiple different simultaneous communciations layer User Managers.
+
+The common interfaces a UserManager module must implement and and all 
+of the different Sun supplied modules live in the users sub-package.
+
+<b>Routing:</b> The routing code facilitates the movement of data between
+clients and to and from client and server in a scalable and fault-tolerant 
+manner.   The interfaces that define the connection betwene the router and the
+rest of the system as well as the source code of the current implementation
+reside in the routing package.
+
+
+<ul>
+  <li><a href="">hyperlink</a>
+</ul>
+
+<h2>Related Documentation</h2>
+
+<ul>
+  <li><a href="">hyperlink</a>
+</ul>
+
+<!-- Put @see and @since tags here. --></body>
+</html>

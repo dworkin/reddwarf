@@ -1,0 +1,566 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nodeSet version="1.0">
+    <view uin="id4fme2djdgt8ikdjdhu6h5.diagram">
+        <property name="$metaclass" value="Sequence Diagram"/>
+        <property name="@version" value="2.0"/>
+        <property name="@url" value="element://model:project::/jdt:e_method:src:com.sun.gi.AbstractAdhocClient.$$constructor$$:$$constructor$$~Qcom.sun.gi.channels.ChannelManager;~Qjava.lang.String;~Qjava.lang.String;~[B;"/>
+        <property name="@__options" value="toolbar.group.Tools.expanded = true&#10;toolbar.buttonRunCount = 2&#10;toolbar.group.#DEFAULT.expanded = true&#10;toolbar.group.system.expanded = true&#10;scrollX = 0&#10;scrollY = 0&#10;zoomFactor = 1.0&#10;"/>
+        <reference referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node350">
+            <property name="$shortcutReference" value="true"/>
+            <property name="seq_bounds" value="1213,30,91,700"/>
+            <property name="seq_bounds_setted_by_user" value="true"/>
+            <property name="bounds" value="1213,30,91,700"/>
+            <property name="bounds_setted_by_user" value="true"/>
+            <reference referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node350.node:id4fme2djdgt8ikdjdhu6h5.node350">
+                <property name="seq_bounds" value="989,410,14,20"/>
+            </reference>
+        </reference>
+        <reference referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333">
+            <property name="$shortcutReference" value="true"/>
+            <property name="seq_bounds" value="366,100,93,630"/>
+            <property name="seq_bounds_setted_by_user" value="true"/>
+            <property name="bounds" value="366,100,93,630"/>
+            <property name="bounds_setted_by_user" value="true"/>
+            <reference referencedUin="design:link:::id4fme2djdgt8ikdjdhu6h5.node333.link353:id4fme2djdgt8ikdjdhu6h5.node333"/>
+            <reference referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333.node349:id4fme2djdgt8ikdjdhu6h5.node333">
+                <property name="initialInstant" value="390"/>
+                <property name="processingDuration" value="130"/>
+                <property name="seq_bounds" value="456,390,14,130"/>
+            </reference>
+            <reference referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333.node:id4fme2djdgt8ikdjdhu6h5.node333">
+                <property name="seq_bounds" value="438,135,14,515"/>
+            </reference>
+            <reference referencedUin="design:link:::id4fme2djdgt8ikdjdhu6h5.node333.link339:id4fme2djdgt8ikdjdhu6h5.node333"/>
+            <reference referencedUin="design:link:::id4fme2djdgt8ikdjdhu6h5.node333.link360:id4fme2djdgt8ikdjdhu6h5.node333">
+                <property name="sendingInstant" value="570"/>
+                <property name="processingDuration" value="20"/>
+                <property name="seq_sourceAnchor" value="428,570"/>
+                <property name="seq_bendpoints" value=""/>
+                <property name="seq_targetAnchor" value="900,570"/>
+                <property name="sourceAnchor" value="428,570"/>
+                <property name="bendpoints" value=""/>
+                <property name="targetAnchor" value="900,570"/>
+            </reference>
+            <reference referencedUin="design:link:::id4fme2djdgt8ikdjdhu6h5.node333.link365:id4fme2djdgt8ikdjdhu6h5.node333"/>
+            <reference referencedUin="design:link:::id4fme2djdgt8ikdjdhu6h5.node333.link344:id4fme2djdgt8ikdjdhu6h5.node333">
+                <property name="sendingInstant" value="290"/>
+                <property name="processingDuration" value="20"/>
+                <property name="seq_sourceAnchor" value="419,290"/>
+                <property name="seq_bendpoints" value=""/>
+                <property name="seq_targetAnchor" value="900,290"/>
+                <property name="sourceAnchor" value="419,290"/>
+                <property name="bendpoints" value=""/>
+                <property name="targetAnchor" value="900,290"/>
+            </reference>
+            <reference referencedUin="design:link:::id4fme2djdgt8ikdjdhu6h5.node333.link342:id4fme2djdgt8ikdjdhu6h5.node333">
+                <property name="sendingInstant" value="235"/>
+                <property name="processingDuration" value="50"/>
+                <property name="seq_sourceAnchor" value="419,235"/>
+                <property name="seq_bendpoints" value=""/>
+                <property name="seq_targetAnchor" value="1011,235"/>
+                <property name="sourceAnchor" value="419,235"/>
+                <property name="bendpoints" value=""/>
+                <property name="targetAnchor" value="1011,235"/>
+            </reference>
+            <reference referencedUin="design:link:::id4fme2djdgt8ikdjdhu6h5.node333.link357:id4fme2djdgt8ikdjdhu6h5.node333">
+                <property name="sendingInstant" value="490"/>
+                <property name="processingDuration" value="20"/>
+                <property name="seq_sourceAnchor" value="437,490"/>
+                <property name="seq_bendpoints" value=""/>
+                <property name="seq_targetAnchor" value="900,490"/>
+                <property name="sourceAnchor" value="437,490"/>
+                <property name="bendpoints" value=""/>
+                <property name="targetAnchor" value="900,490"/>
+            </reference>
+            <reference referencedUin="design:link:::id4fme2djdgt8ikdjdhu6h5.node333.link347:id4fme2djdgt8ikdjdhu6h5.node333">
+                <property name="sendingInstant" value="350"/>
+                <property name="processingDuration" value="20"/>
+                <property name="seq_sourceAnchor" value="428,350"/>
+                <property name="seq_bendpoints" value=""/>
+                <property name="seq_targetAnchor" value="900,350"/>
+                <property name="sourceAnchor" value="428,350"/>
+                <property name="bendpoints" value=""/>
+                <property name="targetAnchor" value="900,350"/>
+            </reference>
+            <reference referencedUin="design:link:::id4fme2djdgt8ikdjdhu6h5.node333.link354:id4fme2djdgt8ikdjdhu6h5.node333">
+                <property name="sendingInstant" value="450"/>
+                <property name="processingDuration" value="20"/>
+                <property name="seq_sourceAnchor" value="437,450"/>
+                <property name="seq_bendpoints" value="437,444,477,444,477,456"/>
+                <property name="seq_targetAnchor" value="446,456"/>
+                <property name="seq_bounds_setted_by_user" value="true"/>
+                <property name="sourceAnchor" value="437,450"/>
+                <property name="bendpoints" value="437,444,477,444,477,456"/>
+                <property name="targetAnchor" value="446,456"/>
+                <property name="bounds_setted_by_user" value="true"/>
+            </reference>
+            <reference referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333.node359:id4fme2djdgt8ikdjdhu6h5.node333">
+                <property name="initialInstant" value="550"/>
+                <property name="processingDuration" value="90"/>
+                <property name="seq_bounds" value="447,550,14,90"/>
+            </reference>
+            <reference referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333.node355:id4fme2djdgt8ikdjdhu6h5.node333">
+                <property name="seq_bounds" value="465,450,14,20"/>
+            </reference>
+            <reference referencedUin="design:link:::id4fme2djdgt8ikdjdhu6h5.node333.link343:id4fme2djdgt8ikdjdhu6h5.node333"/>
+            <reference referencedUin="design:link:::id4fme2djdgt8ikdjdhu6h5.node333.link338:id4fme2djdgt8ikdjdhu6h5.node333">
+                <property name="sendingInstant" value="195"/>
+                <property name="processingDuration" value="20"/>
+                <property name="seq_sourceAnchor" value="419,195"/>
+                <property name="seq_bendpoints" value=""/>
+                <property name="seq_targetAnchor" value="900,195"/>
+                <property name="sourceAnchor" value="419,195"/>
+                <property name="bendpoints" value=""/>
+                <property name="targetAnchor" value="900,195"/>
+            </reference>
+            <reference referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333.node346:id4fme2djdgt8ikdjdhu6h5.node333">
+                <property name="initialInstant" value="330"/>
+                <property name="processingDuration" value="200"/>
+                <property name="seq_bounds" value="447,330,14,200"/>
+            </reference>
+            <reference referencedUin="design:link:::id4fme2djdgt8ikdjdhu6h5.node333.link364:id4fme2djdgt8ikdjdhu6h5.node333">
+                <property name="sendingInstant" value="610"/>
+                <property name="processingDuration" value="20"/>
+                <property name="seq_sourceAnchor" value="428,610"/>
+                <property name="seq_bendpoints" value=""/>
+                <property name="seq_targetAnchor" value="1370,610"/>
+                <property name="sourceAnchor" value="428,610"/>
+                <property name="bendpoints" value=""/>
+                <property name="targetAnchor" value="1370,610"/>
+            </reference>
+            <reference referencedUin="design:link:::id4fme2djdgt8ikdjdhu6h5.node333.link356:id4fme2djdgt8ikdjdhu6h5.node333"/>
+            <reference referencedUin="design:link:::id4fme2djdgt8ikdjdhu6h5.node333.link352:id4fme2djdgt8ikdjdhu6h5.node333">
+                <property name="sendingInstant" value="410"/>
+                <property name="processingDuration" value="20"/>
+                <property name="seq_sourceAnchor" value="437,410"/>
+                <property name="seq_bendpoints" value=""/>
+                <property name="seq_targetAnchor" value="1251,410"/>
+                <property name="sourceAnchor" value="437,410"/>
+                <property name="bendpoints" value=""/>
+                <property name="targetAnchor" value="1251,410"/>
+            </reference>
+        </reference>
+        <reference referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node">
+            <property name="$shortcutReference" value="true"/>
+            <property name="seq_bounds" value="30,30,60,700"/>
+            <property name="seq_bounds_setted_by_user" value="true"/>
+            <property name="bounds" value="30,30,60,700"/>
+            <property name="bounds_setted_by_user" value="true"/>
+            <reference referencedUin="design:link:::id4fme2djdgt8ikdjdhu6h5.node.link335:id4fme2djdgt8ikdjdhu6h5.node"/>
+            <reference referencedUin="design:link:::id4fme2djdgt8ikdjdhu6h5.node.link:id4fme2djdgt8ikdjdhu6h5.node">
+                <property name="sendingInstant" value="135"/>
+                <property name="processingDuration" value="515"/>
+                <property name="seq_sourceAnchor" value="67,135"/>
+                <property name="seq_bendpoints" value=""/>
+                <property name="seq_targetAnchor" value="366,135"/>
+                <property name="sourceAnchor" value="67,135"/>
+                <property name="bendpoints" value=""/>
+                <property name="targetAnchor" value="366,135"/>
+            </reference>
+        </reference>
+        <reference referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node340">
+            <property name="$shortcutReference" value="true"/>
+            <property name="seq_bounds" value="1011,200,179,530"/>
+            <property name="seq_bounds_setted_by_user" value="true"/>
+            <property name="bounds" value="1011,200,179,530"/>
+            <property name="bounds_setted_by_user" value="true"/>
+            <reference referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node340.node:id4fme2djdgt8ikdjdhu6h5.node340">
+                <property name="seq_bounds" value="945,235,14,50"/>
+            </reference>
+        </reference>
+        <reference referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node336">
+            <property name="$shortcutReference" value="true"/>
+            <property name="seq_bounds" value="827,30,161,700"/>
+            <property name="seq_bounds_setted_by_user" value="true"/>
+            <property name="bounds" value="827,30,161,700"/>
+            <property name="bounds_setted_by_user" value="true"/>
+            <reference referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node336.node348:id4fme2djdgt8ikdjdhu6h5.node336">
+                <property name="seq_bounds" value="873,350,14,20"/>
+            </reference>
+            <reference referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node336.node358:id4fme2djdgt8ikdjdhu6h5.node336">
+                <property name="seq_bounds" value="873,490,14,20"/>
+            </reference>
+            <reference referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node336.node345:id4fme2djdgt8ikdjdhu6h5.node336">
+                <property name="seq_bounds" value="873,290,14,20"/>
+            </reference>
+            <reference referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node336.node361:id4fme2djdgt8ikdjdhu6h5.node336">
+                <property name="seq_bounds" value="873,570,14,20"/>
+            </reference>
+            <reference referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node336.node:id4fme2djdgt8ikdjdhu6h5.node336">
+                <property name="seq_bounds" value="873,195,14,20"/>
+            </reference>
+        </reference>
+        <reference referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node362">
+            <property name="$shortcutReference" value="true"/>
+            <property name="seq_bounds" value="1327,30,101,700"/>
+            <property name="seq_bounds_setted_by_user" value="true"/>
+            <property name="bounds" value="1327,30,101,700"/>
+            <property name="bounds_setted_by_user" value="true"/>
+            <reference referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node362.node:id4fme2djdgt8ikdjdhu6h5.node362">
+                <property name="seq_bounds" value="1101,610,14,20"/>
+            </reference>
+        </reference>
+    </view>
+    <node uin="id4fme2djdgt8ikdjdhu6h5.node">
+        <property name="$metaclass" value="Object"/>
+        <property name="$name" value="Object1"/>
+        <property name="@stereotype" value="actor"/>
+        <property name="diagram_uniqe_name" value="design:view:::id4fme2djdgt8ikdjdhu6h5.diagram"/>
+        <link uin="id4fme2djdgt8ikdjdhu6h5.node.link">
+            <property name="$metaclass" value="Message Link"/>
+            <property name="diagram_uniqe_name" value="design:view:::id4fme2djdgt8ikdjdhu6h5.diagram"/>
+            <property name="@operationNameAsText" value="'&lt;constructor&gt;(ChannelManager,String,String,byte[])'"/>
+            <property name="creation" value="true"/>
+            <property name="normalizedIndex" value="0.5"/>
+            <property name="activationUid" value="design:node:::id4fme2djdgt8ikdjdhu6h5.node333.node:id4fme2djdgt8ikdjdhu6h5.node333"/>
+            <link uin="id4fme2djdgt8ikdjdhu6h5.node.link.operation">
+                <property name="$metaclass" value="Dependency Link"/>
+                <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node.link:id4fme2djdgt8ikdjdhu6h5.node" role="Client"/>
+                <participant referencedUin="jdt:e_method:src:com.sun.gi.AbstractAdhocClient.$$constructor$$:$$constructor$$~Qcom.sun.gi.channels.ChannelManager;~Qjava.lang.String;~Qjava.lang.String;~[B;" role="Supplier"/>
+            </link>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node" role="Client"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333" role="Supplier"/>
+        </link>
+        <link uin="id4fme2djdgt8ikdjdhu6h5.node.link335">
+            <property name="$metaclass" value="Messages Link"/>
+            <property name="diagram_uniqe_name" value="design:view:::id4fme2djdgt8ikdjdhu6h5.diagram"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node" role="Client"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333" role="Supplier"/>
+        </link>
+    </node>
+    <node uin="id4fme2djdgt8ikdjdhu6h5.node333">
+        <property name="$metaclass" value="Object"/>
+        <property name="$name" value="initial"/>
+        <property name="diagram_uniqe_name" value="design:view:::id4fme2djdgt8ikdjdhu6h5.diagram"/>
+        <link uin="id4fme2djdgt8ikdjdhu6h5.node333.link">
+            <property name="$metaclass" value="Dependency Link"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333" role="Client"/>
+            <participant referencedUin="jdt:e_class:src:com.sun.gi.AbstractAdhocClient" role="Supplier"/>
+        </link>
+        <node uin="id4fme2djdgt8ikdjdhu6h5.node333.node">
+            <property name="$metaclass" value="Activation"/>
+            <property name="$name" value="Activation1"/>
+            <property name="messageUid" value="design:link:::id4fme2djdgt8ikdjdhu6h5.node.link:id4fme2djdgt8ikdjdhu6h5.node"/>
+            <property name="diagram_uniqe_name" value="design:view:::id4fme2djdgt8ikdjdhu6h5.diagram"/>
+        </node>
+        <link uin="id4fme2djdgt8ikdjdhu6h5.node333.link338">
+            <property name="$metaclass" value="Message Link"/>
+            <property name="diagram_uniqe_name" value="design:view:::id4fme2djdgt8ikdjdhu6h5.diagram"/>
+            <property name="@operationNameAsText" value="'loginPlayer(String,String,byte[]):Key'"/>
+            <property name="arguments" value="player, password, loginData"/>
+            <property name="return" value="playerKey"/>
+            <property name="normalizedIndex" value="0.16666667"/>
+            <property name="predecessorUid" value="design:link:::id4fme2djdgt8ikdjdhu6h5.node.link:id4fme2djdgt8ikdjdhu6h5.node"/>
+            <property name="activationUid" value="design:node:::id4fme2djdgt8ikdjdhu6h5.node336.node:id4fme2djdgt8ikdjdhu6h5.node336"/>
+            <link uin="id4fme2djdgt8ikdjdhu6h5.node333.link338.operation">
+                <property name="$metaclass" value="Dependency Link"/>
+                <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333.link338:id4fme2djdgt8ikdjdhu6h5.node333" role="Client"/>
+                <participant referencedUin="jdt:e_method:src:com.sun.gi.channels.ChannelManager.loginPlayer:loginPlayer~Qjava.lang.String;~Qjava.lang.String;~[B;" role="Supplier"/>
+            </link>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333" role="Client"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node336" role="Supplier"/>
+        </link>
+        <link uin="id4fme2djdgt8ikdjdhu6h5.node333.link339">
+            <property name="$metaclass" value="Messages Link"/>
+            <property name="diagram_uniqe_name" value="design:view:::id4fme2djdgt8ikdjdhu6h5.diagram"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333" role="Client"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node336" role="Supplier"/>
+        </link>
+        <link uin="id4fme2djdgt8ikdjdhu6h5.node333.link342">
+            <property name="$metaclass" value="Message Link"/>
+            <property name="diagram_uniqe_name" value="design:view:::id4fme2djdgt8ikdjdhu6h5.diagram"/>
+            <property name="creation" value="true"/>
+            <property name="normalizedIndex" value="0.33333334"/>
+            <property name="predecessorUid" value="design:link:::id4fme2djdgt8ikdjdhu6h5.node.link:id4fme2djdgt8ikdjdhu6h5.node"/>
+            <property name="activationUid" value="design:node:::id4fme2djdgt8ikdjdhu6h5.node340.node:id4fme2djdgt8ikdjdhu6h5.node340"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333" role="Client"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node340" role="Supplier"/>
+        </link>
+        <link uin="id4fme2djdgt8ikdjdhu6h5.node333.link343">
+            <property name="$metaclass" value="Messages Link"/>
+            <property name="diagram_uniqe_name" value="design:view:::id4fme2djdgt8ikdjdhu6h5.diagram"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333" role="Client"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node340" role="Supplier"/>
+        </link>
+        <link uin="id4fme2djdgt8ikdjdhu6h5.node333.link344">
+            <property name="$metaclass" value="Message Link"/>
+            <property name="diagram_uniqe_name" value="design:view:::id4fme2djdgt8ikdjdhu6h5.diagram"/>
+            <property name="@operationNameAsText" value="'listChannels():long[]'"/>
+            <property name="return" value="channelIDs"/>
+            <property name="normalizedIndex" value="0.5"/>
+            <property name="predecessorUid" value="design:link:::id4fme2djdgt8ikdjdhu6h5.node.link:id4fme2djdgt8ikdjdhu6h5.node"/>
+            <property name="activationUid" value="design:node:::id4fme2djdgt8ikdjdhu6h5.node336.node345:id4fme2djdgt8ikdjdhu6h5.node336"/>
+            <link uin="id4fme2djdgt8ikdjdhu6h5.node333.link344.operation">
+                <property name="$metaclass" value="Dependency Link"/>
+                <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333.link344:id4fme2djdgt8ikdjdhu6h5.node333" role="Client"/>
+                <participant referencedUin="jdt:e_method:src:com.sun.gi.channels.ChannelManager.listChannels:listChannels" role="Supplier"/>
+            </link>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333" role="Client"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node336" role="Supplier"/>
+        </link>
+        <node uin="id4fme2djdgt8ikdjdhu6h5.node333.node346">
+            <property value="Iteration Block" name="$metaclass"/>
+            <property name="iteration" value="int i=0;i&lt;channelIDs.length;i++"/>
+            <property name="$name" value="StatementBlock1"/>
+            <property name="blockType" value="for"/>
+            <property name="diagram_uniqe_name" value="design:view:::id4fme2djdgt8ikdjdhu6h5.diagram"/>
+            <property name="normalizedIndex" value="0.6666667"/>
+            <property name="predecessorUid" value="design:link:::id4fme2djdgt8ikdjdhu6h5.node.link:id4fme2djdgt8ikdjdhu6h5.node"/>
+        </node>
+        <link uin="id4fme2djdgt8ikdjdhu6h5.node333.link347">
+            <property name="$metaclass" value="Message Link"/>
+            <property name="diagram_uniqe_name" value="design:view:::id4fme2djdgt8ikdjdhu6h5.diagram"/>
+            <property name="@operationNameAsText" value="'getChannelName(long):String'"/>
+            <property name="arguments" value="channelIDs[i]"/>
+            <property name="normalizedIndex" value="0.33333334"/>
+            <property name="predecessorUid" value="design:node:::id4fme2djdgt8ikdjdhu6h5.node333.node346:id4fme2djdgt8ikdjdhu6h5.node333"/>
+            <property name="activationUid" value="design:node:::id4fme2djdgt8ikdjdhu6h5.node336.node348:id4fme2djdgt8ikdjdhu6h5.node336"/>
+            <link uin="id4fme2djdgt8ikdjdhu6h5.node333.link347.operation">
+                <property name="$metaclass" value="Dependency Link"/>
+                <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333.link347:id4fme2djdgt8ikdjdhu6h5.node333" role="Client"/>
+                <participant referencedUin="jdt:e_method:src:com.sun.gi.channels.ChannelManager.getChannelName:getChannelName~J;" role="Supplier"/>
+            </link>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333" role="Client"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node336" role="Supplier"/>
+        </link>
+        <node uin="id4fme2djdgt8ikdjdhu6h5.node333.node349">
+            <property value="Conditional Block" name="$metaclass"/>
+            <property name="condition" value="manager.getChannelName(channelIDs[i]).equals(&quot;#chat&quot;)"/>
+            <property name="$name" value="StatementBlock2"/>
+            <property name="blockType" value="if"/>
+            <property name="diagram_uniqe_name" value="design:view:::id4fme2djdgt8ikdjdhu6h5.diagram"/>
+            <property name="normalizedIndex" value="0.6666667"/>
+            <property name="predecessorUid" value="design:node:::id4fme2djdgt8ikdjdhu6h5.node333.node346:id4fme2djdgt8ikdjdhu6h5.node333"/>
+        </node>
+        <link uin="id4fme2djdgt8ikdjdhu6h5.node333.link352">
+            <property name="$metaclass" value="Message Link"/>
+            <property name="diagram_uniqe_name" value="design:view:::id4fme2djdgt8ikdjdhu6h5.diagram"/>
+            <property name="@operationNameAsText" value="'getID():long'"/>
+            <property name="normalizedIndex" value="0.25"/>
+            <property name="predecessorUid" value="design:node:::id4fme2djdgt8ikdjdhu6h5.node333.node349:id4fme2djdgt8ikdjdhu6h5.node333"/>
+            <property name="activationUid" value="design:node:::id4fme2djdgt8ikdjdhu6h5.node350.node:id4fme2djdgt8ikdjdhu6h5.node350"/>
+            <link uin="id4fme2djdgt8ikdjdhu6h5.node333.link352.operation">
+                <property name="$metaclass" value="Dependency Link"/>
+                <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333.link352:id4fme2djdgt8ikdjdhu6h5.node333" role="Client"/>
+                <participant referencedUin="jdt:e_method:src:com.sun.gi.channels.Key.getID:getID" role="Supplier"/>
+            </link>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333" role="Client"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node350" role="Supplier"/>
+        </link>
+        <link uin="id4fme2djdgt8ikdjdhu6h5.node333.link353">
+            <property name="$metaclass" value="Messages Link"/>
+            <property name="diagram_uniqe_name" value="design:view:::id4fme2djdgt8ikdjdhu6h5.diagram"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333" role="Client"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node350" role="Supplier"/>
+        </link>
+        <link uin="id4fme2djdgt8ikdjdhu6h5.node333.link354">
+            <property name="$metaclass" value="Message Link"/>
+            <property name="diagram_uniqe_name" value="design:view:::id4fme2djdgt8ikdjdhu6h5.diagram"/>
+            <property name="@operationNameAsText" value="'getJoinData():byte[]'"/>
+            <property name="normalizedIndex" value="0.5"/>
+            <property name="predecessorUid" value="design:node:::id4fme2djdgt8ikdjdhu6h5.node333.node349:id4fme2djdgt8ikdjdhu6h5.node333"/>
+            <property name="activationUid" value="design:node:::id4fme2djdgt8ikdjdhu6h5.node333.node355:id4fme2djdgt8ikdjdhu6h5.node333"/>
+            <link uin="id4fme2djdgt8ikdjdhu6h5.node333.link354.operation">
+                <property name="$metaclass" value="Dependency Link"/>
+                <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333.link354:id4fme2djdgt8ikdjdhu6h5.node333" role="Client"/>
+                <participant referencedUin="jdt:e_method:src:com.sun.gi.AbstractAdhocClient.getJoinData:getJoinData" role="Supplier"/>
+            </link>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333" role="Client"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333" role="Supplier"/>
+        </link>
+        <node uin="id4fme2djdgt8ikdjdhu6h5.node333.node355">
+            <property name="$metaclass" value="Activation"/>
+            <property name="$name" value="Activation7"/>
+            <property name="messageUid" value="design:link:::id4fme2djdgt8ikdjdhu6h5.node333.link354:id4fme2djdgt8ikdjdhu6h5.node333"/>
+            <property name="diagram_uniqe_name" value="design:view:::id4fme2djdgt8ikdjdhu6h5.diagram"/>
+        </node>
+        <link uin="id4fme2djdgt8ikdjdhu6h5.node333.link356">
+            <property name="$metaclass" value="Messages Link"/>
+            <property name="diagram_uniqe_name" value="design:view:::id4fme2djdgt8ikdjdhu6h5.diagram"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333" role="Client"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333" role="Supplier"/>
+        </link>
+        <link uin="id4fme2djdgt8ikdjdhu6h5.node333.link357">
+            <property name="$metaclass" value="Message Link"/>
+            <property name="diagram_uniqe_name" value="design:view:::id4fme2djdgt8ikdjdhu6h5.diagram"/>
+            <property name="@operationNameAsText" value="'joinChannelRequest(long,long,byte[],ChannelListener):void'"/>
+            <property name="arguments" value="channelIDs[i], playerKey.getID(), getJoinData(), chatListener"/>
+            <property name="normalizedIndex" value="0.75"/>
+            <property name="predecessorUid" value="design:node:::id4fme2djdgt8ikdjdhu6h5.node333.node349:id4fme2djdgt8ikdjdhu6h5.node333"/>
+            <property name="activationUid" value="design:node:::id4fme2djdgt8ikdjdhu6h5.node336.node358:id4fme2djdgt8ikdjdhu6h5.node336"/>
+            <link uin="id4fme2djdgt8ikdjdhu6h5.node333.link357.operation">
+                <property name="$metaclass" value="Dependency Link"/>
+                <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333.link357:id4fme2djdgt8ikdjdhu6h5.node333" role="Client"/>
+                <participant referencedUin="jdt:e_method:src:com.sun.gi.channels.ChannelManager.joinChannelRequest:joinChannelRequest~J;~J;~[B;~Qcom.sun.gi.channels.ChannelListener;" role="Supplier"/>
+            </link>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333" role="Client"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node336" role="Supplier"/>
+        </link>
+        <node uin="id4fme2djdgt8ikdjdhu6h5.node333.node359">
+            <property value="Conditional Block" name="$metaclass"/>
+            <property name="condition" value="!found"/>
+            <property name="$name" value="StatementBlock3"/>
+            <property name="blockType" value="if"/>
+            <property name="diagram_uniqe_name" value="design:view:::id4fme2djdgt8ikdjdhu6h5.diagram"/>
+            <property name="normalizedIndex" value="0.8333333"/>
+            <property name="predecessorUid" value="design:link:::id4fme2djdgt8ikdjdhu6h5.node.link:id4fme2djdgt8ikdjdhu6h5.node"/>
+        </node>
+        <link uin="id4fme2djdgt8ikdjdhu6h5.node333.link360">
+            <property name="$metaclass" value="Message Link"/>
+            <property name="diagram_uniqe_name" value="design:view:::id4fme2djdgt8ikdjdhu6h5.diagram"/>
+            <property name="@operationNameAsText" value="'createChannel(String,byte[],boolean,boolean,boolean,ChannelListener):Key'"/>
+            <property name="arguments" value="&quot;#chat&quot;, (byte[])null, false, false, false, chatListener"/>
+            <property name="return" value="channelKey"/>
+            <property name="normalizedIndex" value="0.33333334"/>
+            <property name="predecessorUid" value="design:node:::id4fme2djdgt8ikdjdhu6h5.node333.node359:id4fme2djdgt8ikdjdhu6h5.node333"/>
+            <property name="activationUid" value="design:node:::id4fme2djdgt8ikdjdhu6h5.node336.node361:id4fme2djdgt8ikdjdhu6h5.node336"/>
+            <link uin="id4fme2djdgt8ikdjdhu6h5.node333.link360.operation">
+                <property name="$metaclass" value="Dependency Link"/>
+                <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333.link360:id4fme2djdgt8ikdjdhu6h5.node333" role="Client"/>
+                <participant referencedUin="jdt:e_method:src:com.sun.gi.channels.ChannelManager.createChannel:createChannel~Qjava.lang.String;~[B;~Z;~Z;~Z;~Qcom.sun.gi.channels.ChannelListener;" role="Supplier"/>
+            </link>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333" role="Client"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node336" role="Supplier"/>
+        </link>
+        <link uin="id4fme2djdgt8ikdjdhu6h5.node333.link364">
+            <property name="$metaclass" value="Message Link"/>
+            <property name="diagram_uniqe_name" value="design:view:::id4fme2djdgt8ikdjdhu6h5.diagram"/>
+            <property name="@operationNameAsText" value="'getID():long'"/>
+            <property name="return" value="chatChannelID"/>
+            <property name="normalizedIndex" value="0.6666667"/>
+            <property name="predecessorUid" value="design:node:::id4fme2djdgt8ikdjdhu6h5.node333.node359:id4fme2djdgt8ikdjdhu6h5.node333"/>
+            <property name="activationUid" value="design:node:::id4fme2djdgt8ikdjdhu6h5.node362.node:id4fme2djdgt8ikdjdhu6h5.node362"/>
+            <link uin="id4fme2djdgt8ikdjdhu6h5.node333.link364.operation">
+                <property name="$metaclass" value="Dependency Link"/>
+                <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333.link364:id4fme2djdgt8ikdjdhu6h5.node333" role="Client"/>
+                <participant referencedUin="jdt:e_method:src:com.sun.gi.channels.Key.getID:getID" role="Supplier"/>
+            </link>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333" role="Client"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node362" role="Supplier"/>
+        </link>
+        <link uin="id4fme2djdgt8ikdjdhu6h5.node333.link365">
+            <property name="$metaclass" value="Messages Link"/>
+            <property name="diagram_uniqe_name" value="design:view:::id4fme2djdgt8ikdjdhu6h5.diagram"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333" role="Client"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node362" role="Supplier"/>
+        </link>
+        <link uin="Lyi6gn3dqvg1elkd3ydjh">
+            <property name="$metaclass" value="Messages Link"/>
+            <property name="$name" value="CollaborationLink"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333" role="Client"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node" role="Supplier"/>
+        </link>
+    </node>
+    <node uin="id4fme2djdgt8ikdjdhu6h5.node336">
+        <property name="$metaclass" value="Object"/>
+        <property name="$name" value="manager"/>
+        <property name="diagram_uniqe_name" value="design:view:::id4fme2djdgt8ikdjdhu6h5.diagram"/>
+        <link uin="id4fme2djdgt8ikdjdhu6h5.node336.link">
+            <property name="$metaclass" value="Dependency Link"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node336" role="Client"/>
+            <participant referencedUin="jdt:e_class:src:com.sun.gi.channels.ChannelManager" role="Supplier"/>
+        </link>
+        <node uin="id4fme2djdgt8ikdjdhu6h5.node336.node">
+            <property name="$metaclass" value="Activation"/>
+            <property name="$name" value="Activation2"/>
+            <property name="messageUid" value="design:link:::id4fme2djdgt8ikdjdhu6h5.node333.link338:id4fme2djdgt8ikdjdhu6h5.node333"/>
+            <property name="diagram_uniqe_name" value="design:view:::id4fme2djdgt8ikdjdhu6h5.diagram"/>
+        </node>
+        <node uin="id4fme2djdgt8ikdjdhu6h5.node336.node345">
+            <property name="$metaclass" value="Activation"/>
+            <property name="$name" value="Activation4"/>
+            <property name="messageUid" value="design:link:::id4fme2djdgt8ikdjdhu6h5.node333.link344:id4fme2djdgt8ikdjdhu6h5.node333"/>
+            <property name="diagram_uniqe_name" value="design:view:::id4fme2djdgt8ikdjdhu6h5.diagram"/>
+        </node>
+        <node uin="id4fme2djdgt8ikdjdhu6h5.node336.node348">
+            <property name="$metaclass" value="Activation"/>
+            <property name="$name" value="Activation5"/>
+            <property name="messageUid" value="design:link:::id4fme2djdgt8ikdjdhu6h5.node333.link347:id4fme2djdgt8ikdjdhu6h5.node333"/>
+            <property name="diagram_uniqe_name" value="design:view:::id4fme2djdgt8ikdjdhu6h5.diagram"/>
+        </node>
+        <node uin="id4fme2djdgt8ikdjdhu6h5.node336.node358">
+            <property name="$metaclass" value="Activation"/>
+            <property name="$name" value="Activation8"/>
+            <property name="messageUid" value="design:link:::id4fme2djdgt8ikdjdhu6h5.node333.link357:id4fme2djdgt8ikdjdhu6h5.node333"/>
+            <property name="diagram_uniqe_name" value="design:view:::id4fme2djdgt8ikdjdhu6h5.diagram"/>
+        </node>
+        <node uin="id4fme2djdgt8ikdjdhu6h5.node336.node361">
+            <property name="$metaclass" value="Activation"/>
+            <property name="$name" value="Activation9"/>
+            <property name="messageUid" value="design:link:::id4fme2djdgt8ikdjdhu6h5.node333.link360:id4fme2djdgt8ikdjdhu6h5.node333"/>
+            <property name="diagram_uniqe_name" value="design:view:::id4fme2djdgt8ikdjdhu6h5.diagram"/>
+        </node>
+        <link uin="Lyi6gn3dqvg1elk921gyt">
+            <property name="$metaclass" value="Messages Link"/>
+            <property name="$name" value="CollaborationLink"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node336" role="Client"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333" role="Supplier"/>
+        </link>
+    </node>
+    <node uin="id4fme2djdgt8ikdjdhu6h5.node340">
+        <property name="$metaclass" value="Object"/>
+        <property name="$name" value="chatListener"/>
+        <property name="diagram_uniqe_name" value="design:view:::id4fme2djdgt8ikdjdhu6h5.diagram"/>
+        <link uin="id4fme2djdgt8ikdjdhu6h5.node340.link">
+            <property name="$metaclass" value="Dependency Link"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node340" role="Client"/>
+            <participant referencedUin="jdt:e_class:src:com.sun.gi.channels.ChannelListener" role="Supplier"/>
+        </link>
+        <node uin="id4fme2djdgt8ikdjdhu6h5.node340.node">
+            <property name="$metaclass" value="Activation"/>
+            <property name="$name" value="Activation3"/>
+            <property name="messageUid" value="design:link:::id4fme2djdgt8ikdjdhu6h5.node333.link342:id4fme2djdgt8ikdjdhu6h5.node333"/>
+            <property name="diagram_uniqe_name" value="design:view:::id4fme2djdgt8ikdjdhu6h5.diagram"/>
+        </node>
+        <link uin="Lyi6gn3dqvg1elk-hzusey">
+            <property name="$metaclass" value="Messages Link"/>
+            <property name="$name" value="CollaborationLink"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node340" role="Client"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333" role="Supplier"/>
+        </link>
+    </node>
+    <node uin="id4fme2djdgt8ikdjdhu6h5.node350">
+        <property name="$metaclass" value="Object"/>
+        <property name="$name" value="playerKey"/>
+        <property name="diagram_uniqe_name" value="design:view:::id4fme2djdgt8ikdjdhu6h5.diagram"/>
+        <link uin="id4fme2djdgt8ikdjdhu6h5.node350.link">
+            <property name="$metaclass" value="Dependency Link"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node350" role="Client"/>
+            <participant referencedUin="jdt:e_class:src:com.sun.gi.channels.Key" role="Supplier"/>
+        </link>
+        <node uin="id4fme2djdgt8ikdjdhu6h5.node350.node">
+            <property name="$metaclass" value="Activation"/>
+            <property name="$name" value="Activation6"/>
+            <property name="messageUid" value="design:link:::id4fme2djdgt8ikdjdhu6h5.node333.link352:id4fme2djdgt8ikdjdhu6h5.node333"/>
+            <property name="diagram_uniqe_name" value="design:view:::id4fme2djdgt8ikdjdhu6h5.diagram"/>
+        </node>
+        <link uin="Lyi6gn3dqvg1elk-40q3oc">
+            <property name="$metaclass" value="Messages Link"/>
+            <property name="$name" value="CollaborationLink"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node350" role="Client"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333" role="Supplier"/>
+        </link>
+    </node>
+    <node uin="id4fme2djdgt8ikdjdhu6h5.node362">
+        <property name="$metaclass" value="Object"/>
+        <property name="$name" value="channelKey"/>
+        <property name="diagram_uniqe_name" value="design:view:::id4fme2djdgt8ikdjdhu6h5.diagram"/>
+        <link uin="id4fme2djdgt8ikdjdhu6h5.node362.link">
+            <property name="$metaclass" value="Dependency Link"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node362" role="Client"/>
+            <participant referencedUin="jdt:e_class:src:com.sun.gi.channels.Key" role="Supplier"/>
+        </link>
+        <node uin="id4fme2djdgt8ikdjdhu6h5.node362.node">
+            <property name="$metaclass" value="Activation"/>
+            <property name="$name" value="Activation10"/>
+            <property name="messageUid" value="design:link:::id4fme2djdgt8ikdjdhu6h5.node333.link364:id4fme2djdgt8ikdjdhu6h5.node333"/>
+            <property name="diagram_uniqe_name" value="design:view:::id4fme2djdgt8ikdjdhu6h5.diagram"/>
+        </node>
+        <link uin="Lyi6gn3dqvg1elkbc2a3u">
+            <property name="$metaclass" value="Messages Link"/>
+            <property name="$name" value="CollaborationLink"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node362" role="Client"/>
+            <participant referencedUin="design:node:::id4fme2djdgt8ikdjdhu6h5.node333" role="Supplier"/>
+        </link>
+    </node>
+</nodeSet>

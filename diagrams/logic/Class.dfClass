@@ -1,0 +1,28 @@
+package id1hetzd85a23vzd85a33vg;
+
+/**
+@version 2.0
+@__modelType diagram 
+*/
+class diagram {
+/**
+@__ref <oiref:java#Class#logic.SimTask:oiref><oihard>
+@__modelType reference
+@__imported 
+*/
+class reference {
+}}/**
+
+@__tags
+@shapeType ClassDiagram 
+*/
+class __tags {
+}/**
+@__options 
+*/
+class __options {
+}/**
+@__positions <oigroup:<oiref:java#Class#logic.SimTask:oiref>=112,140,194,283,0:oigroup>
+*/
+class __positions {
+}

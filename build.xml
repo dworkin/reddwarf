@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--Exported by JBuilder on Sep 15, 2003 12:20:02 PM-->
+<!--It is RECOMMENDED that JBuilder builds and Ant builds done with
+this exported Ant file be kept separate and be written to different
+directories. For example, the JBuilder output directory might be "classes"
+and the Ant output directory might be "classes.ant".-->
+<project basedir="." default="rebuild" name="games-jeffpk.jpx">
+  <property name="jbuilder.home" value="C:/JBuilder9"/>
+  <property name="Tomcat.home" value="${jbuilder.home}/thirdparty/jakarta-tomcat-4.0.6-LE-jdk14"/>
+  <property name="jdk.home" value="${jbuilder.home}/jdk1.4"/>
+  <property name="dest" value="classes.ant"/>
+  <property name="Generated.Source" value="${dest}/Temporary_Files"/>
+  <property name="JRMS.home" value="."/>
+  <property name="src" value="${JRMS.home}/src"/>
+  <path id="project.class.path">
+    <pathelement location="${dest}"/>
+    <pathelement location="${JRMS.home}/jrms1.1.jar"/>
+    <pathelement location="${jdk.home}/demo/jfc/Java2D/Java2Demo.jar"/>
+    <pathelement location="${jdk.home}/demo/plugin/jfc/Java2D/Java2Demo.jar"/>
+    <pathelement location="${jdk.home}/jre/lib/charsets.jar"/>
+    <pathelement location="${jdk.home}/jre/lib/ext/Coroutine4Java.jar"/>
+    <pathelement location="${jdk.home}/jre/lib/ext/dnsns.jar"/>
+    <pathelement location="${jdk.home}/jre/lib/ext/ldapsec.jar"/>
+    <pathelement location="${jdk.home}/jre/lib/ext/localedata.jar"/>
+    <pathelement location="${jdk.home}/jre/lib/ext/sunjce_provider.jar"/>
+    <pathelement location="${jdk.home}/jre/lib/im/indicim.jar"/>
+    <pathelement location="${jdk.home}/jre/lib/jaws.jar"/>
+    <pathelement location="${jdk.home}/jre/lib/jce.jar"/>
+    <pathelement location="${jdk.home}/jre/lib/jsse.jar"/>
+    <pathelement location="${jdk.home}/jre/lib/rt.jar"/>
+    <pathelement location="${jdk.home}/jre/lib/sunrsasign.jar"/>
+    <pathelement location="${jdk.home}/lib/dt.jar"/>
+    <pathelement location="${jdk.home}/lib/htmlconverter.jar"/>
+    <pathelement location="${jdk.home}/lib/tools.jar"/>
+  </path>
+  <path id="jspc.class.path">
+    <pathelement location="${Tomcat.home}/lib/jasper-compiler.jar"/>
+    <pathelement location="${Tomcat.home}/lib/jasper-runtime.jar"/>
+    <pathelement location="${Tomcat.home}/lib/naming-factory.jar"/>
+    <pathelement location="${Tomcat.home}/common/lib/servlet.jar"/>
+  </path>
+  <!--Patternset to exclude files from the output directory:-->
+  <patternset id="dest.exclude">
+    <exclude name="Temporary_Files/"/>
+    <exclude name="Generated Source/"/>
+    <exclude name="package cache/"/>
+    <exclude name="dependency cache/"/>
+    <exclude name="jsp cache/"/>
+  </patternset>
+  <target depends="init" name="javacompile">
+    <javac bootclasspathref="project.class.path" debug="true" deprecation="true" destdir="${dest}" nowarn="false" target="1.2">
+      <src path="${src}"/>
+      <src path="${Generated.Source}"/>
+    </javac>
+  </target>
+  <target name="resource">
+    <copy todir="${dest}">
+      <fileset dir="${src}">
+        <include name="**/*.jpe"/>
+        <include name="**/*.jpeg"/>
+        <include name="**/*.rmf"/>
+        <include name="**/*.wav"/>
+        <include name="**/*.mid"/>
+        <include name="**/*.midi"/>
+        <include name="**/*.au"/>
+        <include name="**/*.gif"/>
+        <include name="**/*.png"/>
+        <include name="**/*.jpg"/>
+        <include name="**/*.aiff"/>
+        <include name="**/*.properties"/>
+      </fileset>
+    </copy>
+  </target>
+  <target name="javadoc">
+    <javadoc destdir="${JRMS.home}/www/channels" package="true" packagenames="com.sun.gi.channels">
+      <fileset dir="${src}"/>
+    </javadoc>
+  </target>
+  <target name="ant">
+    <ant antfile="${JRMS.home}/build.xml" dir="${JRMS.home}"/>
+  </target>
+  <target depends="cleanup" name="clean"/>
+  <target name="precompile"/>
+  <target depends="javacompile" name="compile"/>
+  <target depends="external" name="postcompile"/>
+  <target depends="javadoc,resource" name="package"/>
+  <target name="deploy"/>
+  <target depends="precompile,compile,postcompile,package,deploy" name="make"/>
+  <target depends="clean,make" name="rebuild"/>
+  <target name="cleanup">
+    <delete failonerror="false" includeemptydirs="true">
+      <fileset dir="${dest}"/>
+    </delete>
+  </target>
+  <target name="init">
+    <mkdir dir="${dest}"/>
+    <mkdir dir="${Generated.Source}"/>
+  </target>
+  <target name="external">
+    <exec dir="${dest}" executable="rmic " failonerror="true">
+      <arg line="com.sun.gi.channels.impl.UniprocessChannelServer com.sun.gi.channels.impl.UniprocessChannelManager"/>
+    </exec>
+  </target>
+</project>

@@ -1,0 +1,56 @@
+package id248y4dirrhcnedirrhgoc;
+
+/**
+@version 2.0
+@physicalPackage
+@__modelType diagram 
+*/
+class diagram {
+/**
+@__ref <oiref:design#Class#id21bizdirrhcnedirrhgow.diagram:oiref><oihard>
+@__modelType reference
+@__fqn <oiref:#Package#com.sun.gi.server:oiref> 
+*/
+class reference {
+}/**
+@__ref <oiref:design#Class#id3l4gydirrhcnedirrhgs8.diagram:oiref><oihard>
+@__modelType reference
+@__fqn <oiref:#Package#com.sun.gi.utils:oiref> 
+*/
+class reference20 {
+}/**
+@__ref <oiref:design#Class#id2z5jxdirrhcnedirrjm6q.diagram:oiref><oihard>
+@__modelType reference
+@__fqn <oiref:#Package#com.sun.gi.channels:oiref> 
+*/
+class reference21 {
+}/**
+@__ref <oiref:java#Class#com.sun.gi.AbstractClient:oiref><oihard>
+@__modelType reference 
+*/
+class reference22 {
+}/**
+@__ref <oiref:java#Class#com.sun.gi.AbstractAdhocClient:oiref><oihard>
+@__modelType reference 
+*/
+class reference26 {
+}/**
+@__ref <oiref:design#Class#idk0lndmimdaqtdmimdkhb.diagram:oiref><oihard>
+@__modelType reference
+@__fqn <oiref:#Package#com.sun.gi.objectstore:oiref> 
+*/
+class reference16 {
+}}/**
+@__tags
+@shapeType ClassDiagram 
+*/
+class __tags {
+}/**
+@__options 
+*/
+class __options {
+}/**
+@__positions <oigroup:<oiref:design#Class#id21bizdirrhcnedirrhgow.diagram:oiref>=10,10,164,225,1:oigroup> 
+*/
+class __positions {
+}
