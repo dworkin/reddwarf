@@ -24,11 +24,11 @@ import java.util.Set;
 
 class ManagerRecord
     implements Comparable {
-  UUID mid;
+  SGSUUID mid;
   long lastHBtime;
   List users = new LinkedList();
 
-  public ManagerRecord(UUID id) {
+  public ManagerRecord(SGSUUID id) {
     mid = id;
   }
 
@@ -86,7 +86,7 @@ class AppRecord {
 
 public class JRMSCommCtrlManager
     implements Runnable, LRMPSocketListener {
-  private UUID mgrID;
+  private SGSUUID mgrID;
   private PrimaryChannelManager pcm;
   private LRMPTransportProfile tp;
   private static InetAddress address = null;
@@ -259,7 +259,7 @@ public class JRMSCommCtrlManager
    *
    * @param uUID UUID
    */
-  private void firePeerRemoved(UUID uUID) {
+  private void firePeerRemoved(SGSUUID uUID) {
     synchronized (listeners) {
       for (Iterator i = listeners.iterator(); i.hasNext(); ) {
         ( (JRMSCtrlListener) i.next()).peerRemoved(uUID);
@@ -463,7 +463,7 @@ public class JRMSCommCtrlManager
       byte op = ois.readByte();
       switch (op) {
         case OP_CTRL_HEARTBEAT:
-          UUID hbguid = (UUID) ois.readObject();
+          SGSUUID hbguid = (SGSUUID) ois.readObject();
           doHeartbeatRecieved(hbguid);
           break;
         case OP_CTRL_NEW_USER:
@@ -522,7 +522,7 @@ public class JRMSCommCtrlManager
   /**
    * doMgrIntro
    */
-  private void doMgrIntro(UUID introMgrID, JRMSUserID[] ids) {
+  private void doMgrIntro(SGSUUID introMgrID, JRMSUserID[] ids) {
     if (introMgrID == mgrID) {
       return; // its just us
     }
@@ -690,7 +690,7 @@ public class JRMSCommCtrlManager
      * @param hbguid UUID
      */
 
-    private void doHeartbeatRecieved(UUID mid) {
+    private void doHeartbeatRecieved(SGSUUID mid) {
       if (mid == mgrID) { // just us
         return;
       }

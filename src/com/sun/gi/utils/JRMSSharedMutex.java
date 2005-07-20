@@ -27,7 +27,7 @@ public class JRMSSharedMutex implements SharedMutex, JRMSSharedObjectBase {
   private JRMSSharedDataManager mgr;
   private String name;
   private int state = STATE_UNLOCKED;
-  private UUID currentOwner = null;
+  private SGSUUID currentOwner = null;
   Set acksReceived = new TreeSet();
 
   private static final boolean DEBUG = false;
@@ -78,7 +78,7 @@ public class JRMSSharedMutex implements SharedMutex, JRMSSharedObjectBase {
   }
 
 
-  private synchronized void addAck(UUID ackingUUID) {
+  private synchronized void addAck(SGSUUID ackingUUID) {
     if (DEBUG) {
       System.out.println("Adding ACK from "+ackingUUID);
     }
@@ -88,7 +88,7 @@ public class JRMSSharedMutex implements SharedMutex, JRMSSharedObjectBase {
     }
   }
 
-  private synchronized void doNak(UUID nakingUID) {
+  private synchronized void doNak(SGSUUID nakingUID) {
     if (DEBUG) {
       System.out.println("doing Nak from "+nakingUID);
     }
@@ -98,7 +98,7 @@ public class JRMSSharedMutex implements SharedMutex, JRMSSharedObjectBase {
     }
   }
 
-  private synchronized void doRelease(UUID nakingUID) {
+  private synchronized void doRelease(SGSUUID nakingUID) {
     if (DEBUG) {
       System.out.println("doing a release from "+nakingUID);
     }
@@ -115,23 +115,23 @@ public class JRMSSharedMutex implements SharedMutex, JRMSSharedObjectBase {
     mgr.sendLockRelease(name);
   }
 
-  public void dataRequest(UUID uuid) {
+  public void dataRequest(SGSUUID uuid) {
     System.err.println("ERROR:  Mutex recieved a data request!");
   }
 
-  public void dataAssertion(UUID uuid, byte[] data) {
+  public void dataAssertion(SGSUUID uuid, byte[] data) {
      System.err.println("ERROR:  Mutex recieved a data assertion");
   }
 
-  public void lockAck(UUID uuid) {
+  public void lockAck(SGSUUID uuid) {
        addAck(uuid);
   }
 
-  public void lockNak(UUID uuid) {
+  public void lockNak(SGSUUID uuid) {
         doNak(uuid);
   }
 
-  public synchronized void lockReq(UUID uuid) {
+  public synchronized void lockReq(SGSUUID uuid) {
     if (DEBUG) {
       System.out.println("Lock requested by " + uuid + " our state == " + state
                          +" our UUID = "+mgr.getUUID());
@@ -154,7 +154,7 @@ public class JRMSSharedMutex implements SharedMutex, JRMSSharedObjectBase {
   }
 
 
-  public void lockRelease(UUID uuid) {
+  public void lockRelease(SGSUUID uuid) {
        doRelease(uuid);
   }
 }

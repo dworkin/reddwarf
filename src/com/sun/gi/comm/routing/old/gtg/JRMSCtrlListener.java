@@ -17,14 +17,14 @@ public interface JRMSCtrlListener {
    *
    * @param mid UUID
    */
-  public void peerAdded(UUID mid);
+  public void peerAdded(SGSUUID mid);
 
   /**
    * peerRemoved
    *
    * @param uUID UUID
    */
-  public void peerRemoved(UUID uUID);
+  public void peerRemoved(SGSUUID uUID);
 
   public void channelAdded(String appname, String channame, JRMSChannelID cid);
 

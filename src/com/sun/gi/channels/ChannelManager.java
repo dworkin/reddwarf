@@ -10,7 +10,7 @@ package com.sun.gi.channels;
  */
 
 import java.io.IOException;
-import com.sun.gi.utils.UUID;
+import com.sun.gi.utils.SGSUUID;
 
 public interface ChannelManager {
 
@@ -26,7 +26,7 @@ public interface ChannelManager {
      * (The format and details are system dependant.)
      * @return This returns a player Key used to identify the player for
      * permissions purposes for the duration of this session.*/
-    public Key loginPlayer(UUID appID, String playerName, String password,
+    public Key loginPlayer(SGSUUID appID, String playerName, String password,
                            byte[] playerInfo,ChannelManagerListener listener);
     /**
      * This method is invoked in order to create a packet channel. The channel

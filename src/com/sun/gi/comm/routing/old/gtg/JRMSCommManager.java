@@ -21,7 +21,7 @@ import java.io.*;
 import java.net.DatagramPacket;
 import java.util.Map;
 import java.util.HashMap;
-import com.sun.gi.utils.UUID;
+import com.sun.gi.utils.SGSUUID;
 import com.sun.gi.utils.StatisticalUUID;
 import java.util.List;
 import java.util.ArrayList;
@@ -211,7 +211,7 @@ public class JRMSCommManager
 
   // callbacks from CTRL manager
 
-  public void peerAdded(UUID mid) {
+  public void peerAdded(SGSUUID mid) {
     // currrently do nothing, just means another Ctrl manager came up
     // all handled in CtrlManager
     if (DEBUGPEERS) {
@@ -219,7 +219,7 @@ public class JRMSCommManager
     }
   }
 
-  public void peerRemoved(UUID uUID) {
+  public void peerRemoved(SGSUUID uUID) {
     // currrently do nothing, just means another Ctrl manager went away
     // all handled in CtrlManager
     if (DEBUGPEERS) {

@@ -1,6 +1,6 @@
 package com.sun.gi.utils;
 
-import com.sun.gi.utils.UUID;
+import com.sun.gi.utils.SGSUUID;
 
 /**
  * <p>Title: </p>
@@ -12,5 +12,5 @@ import com.sun.gi.utils.UUID;
  */
 
 public interface JRMSChannelRosterManagerListener {
-  public void pktArrived(UUID uuid, byte[] buff);
+  public void pktArrived(SGSUUID uuid, byte[] buff);
 }

@@ -18,11 +18,11 @@ import com.sun.gi.utils.*;
 
 public class LRMPTransportChannel implements TransportChannel {
   private String name;
-  UUID uuID;
+  SGSUUID uuID;
   private LRMPTransportManager transportManager;
   private List listeners = new ArrayList();
 
-  LRMPTransportChannel(String channelName,UUID id,
+  LRMPTransportChannel(String channelName,SGSUUID id,
                               LRMPTransportManager mgr) {
     name = channelName;
     uuID = id;

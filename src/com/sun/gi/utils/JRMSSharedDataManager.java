@@ -14,7 +14,7 @@ import com.sun.multicast.reliable.channel.PrimaryChannelManager;
 import com.sun.multicast.reliable.channel.ChannelManagerFinder;
 import com.sun.multicast.reliable.channel.Channel;
 import java.net.InetAddress;
-import com.sun.gi.utils.UUID;
+import com.sun.gi.utils.SGSUUID;
 import java.io.ByteArrayInputStream;
 import java.io.ObjectInputStream;
 import java.io.*;
@@ -29,7 +29,7 @@ public class JRMSSharedDataManager
   private static String addr = "224.100.100.224";
   private PrimaryChannelManager pcm;
   private Channel channel;
-  private UUID guid;
+  private SGSUUID guid;
   private JRMSChannelRosterManager rosterManager;
   // op codes
   static final int OP_LOCK_REQ = 0;
@@ -69,7 +69,7 @@ public class JRMSSharedDataManager
     return mutex;
   }
 
-  public void pktArrived(UUID uuid, byte[] buff) {
+  public void pktArrived(SGSUUID uuid, byte[] buff) {
     int strlen = 0;
     try {
       ByteArrayInputStream bais = new ByteArrayInputStream(buff);
@@ -125,7 +125,7 @@ public class JRMSSharedDataManager
     }
   }
 
-  public UUID getUUID() {
+  public SGSUUID getUUID() {
     return guid;
   }
 

@@ -8,7 +8,7 @@ import com.sun.gi.comm.routing.*;
 import com.sun.gi.utils.*;
 
 public class NOHBUserID implements UserID{
-  UUID id;
+  SGSUUID id;
 
   public NOHBUserID() {
     id = new StatisticalUUID();

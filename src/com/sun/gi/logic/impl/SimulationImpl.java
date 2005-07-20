@@ -8,7 +8,7 @@ import com.sun.gi.comm.routing.*;
 import com.sun.gi.logic.*;
 import com.sun.gi.objectstore.*;
 import com.sun.multicast.util.*;
-import com.sun.gi.comm.users.UserManagerListener;
+
 
 /**
  * <p>Title: </p>
@@ -20,7 +20,7 @@ import com.sun.gi.comm.users.UserManagerListener;
  */
 
 public class SimulationImpl
-    implements Simulation, UserManagerListener {
+    implements Simulation {
   SimKernel kernel;
   long appID;
   ClassLoader loader;

@@ -5,7 +5,6 @@ import java.util.StringTokenizer;
 
 import java.util.Map;
 import java.util.HashMap;
-import com.sun.gi.framework.install.xml.GAMEAPP;
 import java.util.List;
 import java.util.Set;
 import java.util.Collection;
@@ -42,9 +41,9 @@ public class InstallationFile implements InstallationLoader {
         StringTokenizer tok = new StringTokenizer(inline);
         int appID = Integer.parseInt(tok.nextToken());
         String fname = tok.nextToken();
-        GAMEAPP installation = GAMEAPP.unmarshal(fname);
-        InstallRec rec = new InstallRec(appID, installation);
-        idToInstallRec.put(new Integer(appID), rec);
+        //GAMEAPP installation = GAMEAPP.unmarshal(fname);
+        //InstallRec rec = new InstallRec(appID, installation);
+        //idToInstallRec.put(new Integer(appID), rec);
       }
       inline = rdr.readLine();
     }

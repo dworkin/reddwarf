@@ -77,14 +77,14 @@ public class LRMPTransportManager
     byte op = buff.get();
     switch (op) {
       case OP_CHANNEL_ANNOUNCE:
-        UUID uuID = new StatisticalUUID();
+        SGSUUID uuID = new StatisticalUUID();
         uuID.read(buff);
         int strsize = buff.limit() - buff.position();
         byte[] strbytes = new byte[strsize];
         buff.get(strbytes);
         String chanName = new String(strbytes);
         synchronized(idMap){
-          UUID oldID = (UUID) idMap.reverseGet(chanName);
+          SGSUUID oldID = (SGSUUID) idMap.reverseGet(chanName);
           boolean accept = true;
           boolean propose = false;
           if ((oldID != null) && (uuID.compareTo(oldID)>0)){
@@ -141,7 +141,7 @@ public class LRMPTransportManager
       IOException {
     LRMPTransportChannel chan;
     synchronized (idMap) {
-      UUID chanID = (UUID) idMap.reverseGet(channelName);
+      SGSUUID chanID = (SGSUUID) idMap.reverseGet(channelName);
       if (chanID == null) {
         chanID = new StatisticalUUID();
         idMap.put(chanID, channelName);
@@ -163,7 +163,7 @@ public class LRMPTransportManager
    * @param chanID UUID
    * @param channelName String
    */
-  private void proposeID(UUID chanID, String channelName) {
+  private void proposeID(SGSUUID chanID, String channelName) {
     ByteBuffer outbuff = ByteBuffer.allocate(channelName.length()+17);
     outbuff.put(OP_CHANNEL_ANNOUNCE);
     chanID.write(outbuff);
@@ -188,7 +188,7 @@ public class LRMPTransportManager
 
 
   // for use by LRMPTransportChannel
-  void sendData(UUID uuid, ByteBuffer data) throws IOException {
+  void sendData(SGSUUID uuid, ByteBuffer data) throws IOException {
     data.flip();
     int sz = data.remaining() + 17;
     ByteBuffer outbuff = ByteBuffer.allocate(sz);
@@ -204,7 +204,7 @@ public class LRMPTransportManager
    * @param uuID UUID
    * @param byteBuffers ByteBuffer[]
    */
-  public void sendData(UUID uuID, ByteBuffer[] byteBuffers) {
+  public void sendData(SGSUUID uuID, ByteBuffer[] byteBuffers) {
     int sz = uuID.ioByteSize()+1;
     for(int i=0;i<byteBuffers.length;i++){
       byteBuffers[i].flip();

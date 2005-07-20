@@ -12,10 +12,10 @@ import java.io.ObjectInputStream;
  */
 
 public interface JRMSSharedObjectBase {
-  public void dataRequest(UUID uuid);
-  public void dataAssertion(UUID uuid, byte[] data);
-  public void lockAck(UUID uuid);
-  public void lockNak(UUID uuid);
-  public void lockReq(UUID uuid);
-  public void lockRelease(UUID uuid);
+  public void dataRequest(SGSUUID uuid);
+  public void dataAssertion(SGSUUID uuid, byte[] data);
+  public void lockAck(SGSUUID uuid);
+  public void lockNak(SGSUUID uuid);
+  public void lockReq(SGSUUID uuid);
+  public void lockRelease(SGSUUID uuid);
 }

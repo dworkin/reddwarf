@@ -14,7 +14,7 @@ import java.security.*;
  */
 
 public class StatisticalUUID
-    implements UUID {
+    implements SGSUUID {
   transient static SecureRandom random = null;
   private long randomValue;
   private long timeValue;

@@ -106,6 +106,7 @@ public class SimKernelImpl
   }
 
 
+  /** Legacy code , should be dead
   // main to start server
   public static void main(String[] args) {
     String installfile;
@@ -118,7 +119,7 @@ public class SimKernelImpl
       installfile = args[0];
     }
     try {
-      Router router =  new NOHBRouter();
+      Router router = null;  
       SimKernelImpl simKernelImpl1 = new SimKernelImpl(new TTObjectStore(),
           new InstallFileSimFinder(new File(installfile)),router);
       // start proxy server
@@ -127,6 +128,8 @@ public class SimKernelImpl
       ex.printStackTrace();
     }
   }
+   */
+  
 
 
 

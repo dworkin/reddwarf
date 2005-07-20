@@ -1,6 +1,6 @@
 package com.sun.gi.utils;
 
-import com.sun.gi.utils.UUID;
+import com.sun.gi.utils.SGSUUID;
 import com.sun.multicast.reliable.channel.Channel;
 import com.sun.multicast.reliable.transport.*;
 import com.sun.gi.utils.StatisticalUUID;
@@ -31,7 +31,7 @@ import com.sun.multicast.reliable.channel.ChannelManagerFinder;
  */
 
 public class JRMSChannelRosterManager {
-  private UUID myUUID;
+  private SGSUUID myUUID;
   private RMPacketSocket ps;
   static final int HEARTBEATMILLIS = 500;
   private static final byte OP_HEARTBEAT = 0;
@@ -101,11 +101,11 @@ public class JRMSChannelRosterManager {
             byte op = ois.readByte();
             switch (op) {
               case OP_HEARTBEAT:
-                UUID uuid = (UUID) ois.readObject();
+                SGSUUID uuid = (SGSUUID) ois.readObject();
                 doHeartbeat(uuid);
                 break;
               case OP_DATAPKT:
-                uuid = (UUID) ois.readObject();
+                uuid = (SGSUUID) ois.readObject();
                 byte[] buff = new byte[ois.available()];
                 ois.read(buff, 0, buff.length);
                 doData(uuid,buff);
@@ -123,7 +123,7 @@ public class JRMSChannelRosterManager {
     }.start();
   }
 
-  private void doHeartbeat(UUID uuid){
+  private void doHeartbeat(SGSUUID uuid){
     roster.put(uuid,new Long(System.currentTimeMillis()));
   }
 
@@ -160,11 +160,11 @@ public class JRMSChannelRosterManager {
     listeners.add(l);
   }
 
-  private void doData(UUID uuid, byte[] buff){
+  private void doData(SGSUUID uuid, byte[] buff){
     fireDataArrived(uuid, buff);
   }
 
-  private void fireDataArrived(UUID uuid, byte[] buff) {
+  private void fireDataArrived(SGSUUID uuid, byte[] buff) {
     for(Iterator i = listeners.iterator();i.hasNext();){
       ((JRMSChannelRosterManagerListener)i.next()).pktArrived(uuid,buff);
     }
@@ -193,7 +193,7 @@ public class JRMSChannelRosterManager {
       String intro = "Joining channel message from "+crm.myUUID+" : Hello!";
       crm.sendData(intro.getBytes());
       crm.addListener(new JRMSChannelRosterManagerListener() {
-        public void pktArrived(UUID uuid, byte[] buff){
+        public void pktArrived(SGSUUID uuid, byte[] buff){
           synchronized(printMutex){
             System.out.println("MSG FROM "+uuid+": "+new String(buff));
           }

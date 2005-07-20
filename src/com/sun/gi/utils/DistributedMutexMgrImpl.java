@@ -57,7 +57,7 @@ public class DistributedMutexMgrImpl
   MutexLists lists = new MutexLists();
   ReliableMulticaster rmc;
   Set peerSet = new TreeSet();
-  UUID uuid = new StatisticalUUID();
+  SGSUUID uuid = new StatisticalUUID();
 
   private List listeners = new ArrayList();
   private static final boolean DEBUG = false;
@@ -198,7 +198,7 @@ public class DistributedMutexMgrImpl
     }
   }
 
-  private void sendLockNAK(Object mutexid, UUID senderID) {
+  private void sendLockNAK(Object mutexid, SGSUUID senderID) {
     if (DEBUG) {
       System.out.println("Send lock naq.");
     }
@@ -221,7 +221,7 @@ public class DistributedMutexMgrImpl
     }
   }
 
-  private void sendLockACK(Object mutexid, UUID senderID) {
+  private void sendLockACK(Object mutexid, SGSUUID senderID) {
     if (DEBUG) {
       System.out.println("Send lock ack.");
     }
@@ -294,7 +294,7 @@ public class DistributedMutexMgrImpl
         pkt.getOffset(), pkt.getLength());
     try {
       ois = new ObjectInputStream(bais);
-      UUID senderID = (UUID) ois.readObject();
+      SGSUUID senderID = (SGSUUID) ois.readObject();
       byte opcode = ois.readByte();
       //System.out.println("Got packet, op =" + opcode);
       switch (opcode) {
@@ -334,7 +334,7 @@ public class DistributedMutexMgrImpl
       case OP_ACKLOCK:
         mutexid = ois.readObject();
         lookuprec = new MutexLookup(mutexid);
-        UUID ownerid = (UUID) ois.readObject();
+        SGSUUID ownerid = (SGSUUID) ois.readObject();
         if (uuid.equals(ownerid)) { // ack is for us
           int idx = lists.pendingMutexes.indexOf(lookuprec);
           if (idx >= 0) {
@@ -347,7 +347,7 @@ public class DistributedMutexMgrImpl
       case OP_NAKLOCK:
         mutexid = ois.readObject();
         lookuprec = new MutexLookup(mutexid);
-        ownerid = (UUID) ois.readObject();
+        ownerid = (SGSUUID) ois.readObject();
         if (uuid.equals(ownerid)) { // nak is for us
           int idx = lists.pendingMutexes.indexOf(lookuprec);
           if (idx >= 0) {
@@ -393,7 +393,7 @@ private void doRelease(DistributedMutexImpl mutex) {
   sendLockReq(mutex.id, mutex.tieBreaker);
 }
 
-private void doLockBlocked(UUID id, DistributedMutexImpl localMutex) {
+private void doLockBlocked(SGSUUID id, DistributedMutexImpl localMutex) {
   localMutex.setBlockedOn(id);
   synchronized (lists) {
     lists.pendingMutexes.remove(localMutex);

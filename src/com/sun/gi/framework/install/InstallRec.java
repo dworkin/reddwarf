@@ -2,7 +2,6 @@ package com.sun.gi.framework.install;
 
 import java.util.*;
 
-import com.sun.gi.framework.install.xml.*;
 
 /**
  * <p>Title: </p>
@@ -28,20 +27,9 @@ public class InstallRec {
    * @param i int
    * @param iNSTALLATION INSTALLATION
    */
-  public InstallRec(int id, GAMEAPP gameapp) {
+  public InstallRec(int id) {
     this.id = id;
-    name = gameapp.getGamename();
-    BOOTCLASS bcl = gameapp.getBOOTCLASS();
-    if (bcl != null) {
-      bootClass = bcl.getClassname();
-      bootClassParameters = makeParameterMap(bcl.getPARAMETERList());
-    }
-    for(Iterator iter = gameapp.getUSERMANAGERList().iterator();iter.hasNext();){
-      USERMANAGER umgr = (USERMANAGER)iter.next();
-      UserMgrRec umgrRec = new UserMgrRec(umgr);
-      userManagers.add(umgrRec);
-    }
-
+   
   }
 
   /**
@@ -51,15 +39,7 @@ public class InstallRec {
    * @return Map
    */
   public static Map makeParameterMap(List paramList) {
-    if (paramList == null) {
-      return null;
-    }
-    Map map = new HashMap();
-    for(Iterator i = paramList.iterator();i.hasNext();){
-      PARAMETER p = (PARAMETER)i.next();
-      map.put(p.getTag(),p.getValue());
-    }
-    return map;
+    return null;
   }
 
   /**

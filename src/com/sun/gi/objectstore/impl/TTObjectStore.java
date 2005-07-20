@@ -13,7 +13,7 @@ import com.sun.gi.objectstore.Transaction;
  */
 
 import java.sql.*;
-import com.timesten.sql.*;
+//import com.timesten.sql.*;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.List;

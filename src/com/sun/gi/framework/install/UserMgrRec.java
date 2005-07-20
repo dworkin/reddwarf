@@ -2,7 +2,6 @@ package com.sun.gi.framework.install;
 
 import java.util.*;
 
-import com.sun.gi.framework.install.xml.*;
 
 /**
  * <p>Title: </p>
@@ -17,20 +16,14 @@ public class UserMgrRec {
   String serverclass;
   Map parameters = new HashMap();
   List loginModules = new ArrayList();
-  public UserMgrRec() {
-  }
-
+ 
   /**
    * UserMgrRec
    *
    * @param uSERMANAGER USERMANAGER
    */
-  public UserMgrRec(USERMANAGER uSERMANAGER) {
-    serverclass = uSERMANAGER.getServerclass();
-    parameters = InstallRec.makeParameterMap(uSERMANAGER.getPARAMETERList());
-    for(Iterator i = uSERMANAGER.getLOGINMODULEList().iterator();i.hasNext();){
-      loginModules.add(new LoginModuleRec((LOGINMODULE)i.next()));
-    }
+  public UserMgrRec() {
+   
   }
 
   /**

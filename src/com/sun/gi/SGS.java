@@ -26,7 +26,7 @@ import com.sun.gi.framework.status.ReportManager;
 import com.sun.gi.framework.interconnect.TransportManager;
 import com.sun.gi.framework.interconnect.impl.LRMPTransportManager;
 import com.sun.gi.framework.status.impl.ReportManagerImpl;
-import com.sun.gi.utils.UUID;
+import com.sun.gi.utils.SGSUUID;
 import com.sun.gi.utils.StatisticalUUID;
 import com.sun.gi.framework.status.StatusReport;
 import com.sun.gi.framework.status.ReportUpdater;
@@ -36,7 +36,7 @@ public class SGS {
   ReportManager reportManager;
   TransportManager transportManager;
   ReportUpdater reportUpdater;
-  UUID sliceID = new StatisticalUUID();
+  SGSUUID sliceID = new StatisticalUUID();
   private String installFile = "Install.txt";
   private static final long REPORTTTL = 1000;
   public SGS() {

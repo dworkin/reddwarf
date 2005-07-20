@@ -3,7 +3,7 @@ package com.sun.gi.comm.routing.old.gtg;
 import com.sun.gi.comm.routing.old.ChannelID;
 import java.io.Serializable;
 import com.sun.gi.utils.StatisticalUUID;
-import com.sun.gi.utils.UUID;
+import com.sun.gi.utils.SGSUUID;
 
 /**
  * <p>Title: </p>
@@ -15,7 +15,7 @@ import com.sun.gi.utils.UUID;
  */
 
 public class JRMSChannelID implements ChannelID, Comparable, Serializable {
-  UUID uuid;
+  SGSUUID uuid;
 
   public JRMSChannelID() {
     uuid = new StatisticalUUID();

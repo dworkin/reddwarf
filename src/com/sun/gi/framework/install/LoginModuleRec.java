@@ -1,6 +1,6 @@
 package com.sun.gi.framework.install;
 
-import com.sun.gi.framework.install.xml.*;
+
 
 /**
  * <p>Title: </p>
@@ -13,16 +13,14 @@ import com.sun.gi.framework.install.xml.*;
 
 public class LoginModuleRec {
   String classname;
-  public LoginModuleRec() {
-  }
-
+  
   /**
    * LoginModuleRec
    *
    * @param lOGINMODULE LOGINMODULE
    */
-  public LoginModuleRec(LOGINMODULE lOGINMODULE) {
-    classname = lOGINMODULE.getClassname();
+  public LoginModuleRec() {
+   
   }
 
   /**

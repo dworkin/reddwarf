@@ -106,12 +106,12 @@ public class JRMSSharedData implements SharedData, JRMSSharedObjectBase {
     }
   }
 
-  public void dataRequest(UUID uuid) {
+  public void dataRequest(SGSUUID uuid) {
     //System.out.println("Data requested, sending data.");
     sendCurrentValue();
   }
 
-  public synchronized void dataAssertion(UUID uuid, byte[] data) {
+  public synchronized void dataAssertion(SGSUUID uuid, byte[] data) {
     //System.out.println("Recieved data assertion");
     if (mutex.getState() == JRMSSharedMutex.STATE_LOCKED) { // we have our own idea of the value
       return;
@@ -132,19 +132,19 @@ public class JRMSSharedData implements SharedData, JRMSSharedObjectBase {
     }
   }
 
-  public void lockAck(UUID uuid) {
+  public void lockAck(SGSUUID uuid) {
      System.err.println("ERROR:  Data recieved a mutex ack!");
   }
 
-  public void lockNak(UUID uuid) {
+  public void lockNak(SGSUUID uuid) {
      System.err.println("ERROR:  Data recieved a mutex nak!");
   }
 
-  public void lockReq(UUID uuid) {
+  public void lockReq(SGSUUID uuid) {
      System.err.println("ERROR:  Data recieved a mutex req!");
   }
 
-  public void lockRelease(UUID uuid) {
+  public void lockRelease(SGSUUID uuid) {
      System.err.println("ERROR:  Data recieved a mutex release!");
   }
 }

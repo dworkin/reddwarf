@@ -23,7 +23,7 @@ public class DistributedMutexImpl
   boolean interrupted;
   private long startTime = 0;
   private long timeout = 0;
-  private UUID blockedOn;
+  private SGSUUID blockedOn;
   public DistributedMutexImpl() {
   }
 
@@ -70,7 +70,7 @@ public class DistributedMutexImpl
     return id;
   }
 
-  public void lockAck(UUID senderID, Set currentPeerSet) {
+  public void lockAck(SGSUUID senderID, Set currentPeerSet) {
     acksReceived.add(senderID);
     ackTest(currentPeerSet);
   }
@@ -85,7 +85,7 @@ public class DistributedMutexImpl
 
   }
 
-  public void lockNAK(UUID senderID) {
+  public void lockNAK(SGSUUID senderID) {
     // currently does nothing
   }
 
@@ -118,11 +118,11 @@ public class DistributedMutexImpl
     return startTime < (currentTime + timeout);
   }
 
-  public UUID getBlockedOn() {
+  public SGSUUID getBlockedOn() {
     return blockedOn;
   }
 
-  public void setBlockedOn(UUID id){
+  public void setBlockedOn(SGSUUID id){
     blockedOn = id;
   }
 

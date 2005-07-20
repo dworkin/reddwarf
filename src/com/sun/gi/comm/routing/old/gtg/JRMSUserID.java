@@ -2,15 +2,15 @@ package com.sun.gi.comm.routing.old.gtg;
 
 import com.sun.gi.utils.StatisticalUUID;
 import com.sun.gi.comm.routing.old.UserID;
-import com.sun.gi.utils.UUID;
+import com.sun.gi.utils.SGSUUID;
 import java.io.Serializable;
 
 public class JRMSUserID implements UserID, Comparable, Serializable {
-  UUID managerID;
+  SGSUUID managerID;
   String appname;
-  UUID userID;
+  SGSUUID userID;
 
-  public JRMSUserID(UUID mgr, String appname) {
+  public JRMSUserID(SGSUUID mgr, String appname) {
     managerID = mgr;
     this.appname=appname;
     userID = new StatisticalUUID();
