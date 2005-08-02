@@ -95,7 +95,11 @@ public class SGS {
     installationReport.setParameter(
         statusBlockName, "name", game.getName());
     int umgrCount = 0;
+    
+    // create simulation container for game
 
+    
+    // create user managers
     for (Iterator i = game.listUserManagers(); i.hasNext(); ) {
       UserMgrRec umgrRec = (UserMgrRec) i.next();
       String serverClassName = umgrRec.getServerClassName();
@@ -139,10 +143,10 @@ public class SGS {
         }
         // add client to list
 
+        
+        // need to start boot method in container if it has one here.
 
-        // need to start boot method in kernel if it has one here.
-
-        // now announce it
+        
       }
       catch (Exception ex) {
         ex.printStackTrace();
