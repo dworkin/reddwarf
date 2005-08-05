@@ -12,7 +12,7 @@ public interface TransportListener {
    *
    * @param tCPTransport TCPTransport
    */
-  public void disconnected(TCPTransport tCPTransport);
+  public void disconnected();
 
   /**
    * reconnectKeyReceived
@@ -20,7 +20,7 @@ public interface TransportListener {
    * @param tCPTransport TCPTransport
    * @param key byte[]
    */
-  public void reconnectKeyReceived(TCPTransport tCPTransport, byte[] user, byte[] key);
+  public void reconnectKeyReceived(byte[] user, byte[] key);
 
   /**
    * userLeft
@@ -28,7 +28,7 @@ public interface TransportListener {
    * @param tCPTransport TCPTransport
    * @param user byte[]
    */
-  public void userLeft(TCPTransport tCPTransport, byte[] user);
+  public void userLeft(byte[] user);
 
   /**
    * userJoined
@@ -36,14 +36,31 @@ public interface TransportListener {
    * @param tCPTransport TCPTransport
    * @param user byte[]
    */
-  public void userJoined(TCPTransport tCPTransport, byte[] user);
+  public void userJoined(byte[] user);
+  
+  
+  /**
+   * userLeftChannel
+   *
+   * @param tCPTransport TCPTransport
+   * @param user byte[]
+   */
+  public void userLeftChannel(byte[] chanID, byte[] user);
+
+  /**
+   * userJoined
+   *
+   * @param tCPTransport TCPTransport
+   * @param user byte[]
+   */
+  public void userJoinedChannel(byte[] chanID, byte[] user);
 
   /**
    * userRejected
    *
    * @param tCPTransport TCPTransport
    */
-  public void userRejected(TCPTransport tCPTransport, String reason);
+  public void userRejected(String reason);
 
   /**
    * userAccepted
@@ -51,7 +68,7 @@ public interface TransportListener {
    * @param tCPTransport TCPTransport
    * @param user byte[]
    */
-  public void userAccepted(TCPTransport tCPTransport, byte[] user);
+  public void userAccepted(byte[] user);
 
   /**
    * validationResponse
@@ -59,7 +76,7 @@ public interface TransportListener {
    * @param tCPTransport TCPTransport
    * @param cbs Callback[]
    */
-  public void validationResponse(TCPTransport tCPTransport, Callback[] cbs);
+  public void validationResponse(Callback[] cbs);
 
   /**
    * validationRequest
@@ -67,7 +84,7 @@ public interface TransportListener {
    * @param tCPTransport TCPTransport
    * @param cbs Callback[]
    */
-  public void validationRequest(TCPTransport tCPTransport, Callback[] cbs);
+  public void validationRequest(Callback[] cbs);
 
   /**
    * reconnectRequest
@@ -76,7 +93,7 @@ public interface TransportListener {
    * @param user byte[]
    * @param key byte[]
    */
-  public void reconnectRequest(TCPTransport tCPTransport, byte[] user,
+  public void reconnectRequest(byte[] user,
                                byte[] key);
 
   /**
@@ -84,7 +101,17 @@ public interface TransportListener {
    *
    * @param tCPTransport TCPTransport
    */
-  public void connectRequest(TCPTransport tCPTransport);
+  public void connectRequest();
+  
+  /**
+   * channelJoinRequest
+   *
+   * 
+   */
+  
+  public void channelJoinReq(String chanName, byte[] user);
+  
+  
 
   /**
    * broadcastMsgReceived
@@ -93,7 +120,7 @@ public interface TransportListener {
    * @param from byte[]
    * @param databuff ByteBuffer
    */
-  public void broadcastMsgReceived(boolean reliable, byte[] from,
+  public void broadcastMsgReceived(byte[] chanID, boolean reliable, byte[] from,
                                    ByteBuffer databuff);
 
   /**
@@ -104,7 +131,7 @@ public interface TransportListener {
    * @param tolist byte[][]
    * @param databuff ByteBuffer
    */
-  public void multicastMsgReceived(boolean reliable, byte[] from,
+  public void multicastMsgReceived(byte[] chanID, boolean reliable, byte[] from,
                                    byte[][] tolist, ByteBuffer databuff);
 
   /**
@@ -115,7 +142,7 @@ public interface TransportListener {
    * @param to byte[]
    * @param databuff ByteBuffer
    */
-  public void unicastMsgReceived(boolean reliable, byte[] from, byte[] to,
+  public void unicastMsgReceived(byte[] chanID, boolean reliable, byte[] from, byte[] to,
                                  ByteBuffer databuff);
 
 }

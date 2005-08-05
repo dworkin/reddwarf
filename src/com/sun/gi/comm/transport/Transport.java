@@ -8,17 +8,17 @@ import javax.security.auth.callback.UnsupportedCallbackException;
 public interface Transport {
   public void addListener(TransportListener l);
 
-  public void sendUnicastMsg(byte[] from,
+  public void sendUnicastMsg(byte[] chanID, byte[] from,
                              byte[] to,
                              boolean reliable, ByteBuffer data) throws
       IOException;
 
-  public void sendMulticastMsg(byte[] from,
+  public void sendMulticastMsg(byte[] chanID, byte[] from,
                                byte[][] to,
                                boolean reliable,
                                ByteBuffer data) throws IOException;
 
-  public void sendBroadcastMsg(byte[] from,
+  public void sendBroadcastMsg(byte[] chanID, byte[] from,
                                boolean reliable,
                                ByteBuffer data) throws IOException;
 
@@ -42,6 +42,12 @@ public interface Transport {
   public void sendUserJoined(byte[] user) throws IOException;
 
   public void sendUserLeft(byte[] user) throws IOException;
+  
+  public void sendUserJoinChan(String chanName, byte[] user) throws IOException;
+  
+  public void sendUserJoinedChannel(byte[] chanID, byte[] user) throws IOException;
+  
+  public void sendUserLeftChannel(byte[] chanID, byte[] user) throws IOException;
 
   public void sendReconnectKey(byte[] user, byte[] key) throws IOException;
 
