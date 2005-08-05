@@ -1,4 +1,4 @@
-package com.sun.gi.comm.users.client;
+package com.sun.gi.comm.users.client.umanager;
 
 import java.io.*;
 import java.nio.*;
@@ -9,6 +9,7 @@ import com.sun.gi.comm.discovery.*;
 import com.sun.gi.comm.transport.*;
 import com.sun.gi.comm.transport.impl.*;
 import com.sun.gi.utils.nio.*;
+import com.sun.gi.comm.users.client.*;
 
 public class TCPIPUserManagerClient
     implements UserManagerClient, TransportListener, NIOSocketManagerListener {

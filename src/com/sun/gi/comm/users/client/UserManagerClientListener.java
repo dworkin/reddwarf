@@ -21,6 +21,5 @@ public interface UserManagerClientListener {
   public void loginAccepted(byte[] userID);
   public void loginRejected(String message);
   public void userAdded(byte[] userID);
-  public void userDropped(byte[] userID);
-  public void dataReceived(byte[] from,ByteBuffer data);
+  public void userDropped(byte[] userID); 
 }

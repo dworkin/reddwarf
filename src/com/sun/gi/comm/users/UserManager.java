@@ -18,7 +18,8 @@ import com.sun.gi.comm.validation.*;
  */
 
 public interface UserManager extends RouterListener {
-
+    
+ 
   /***
    *  sets the login validator
    *

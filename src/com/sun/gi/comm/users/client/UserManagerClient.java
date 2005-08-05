@@ -15,30 +15,20 @@ import com.sun.gi.comm.discovery.*;
  */
 
 public interface UserManagerClient {
-  /**
+    
+    /**
    * connect
    *
    * @param choice DiscoveredUserManager
    */
-  public void connect(DiscoveredUserManager choice);
-
-  /**
-   * addListener
-   *
-   * @param listener UserManagerClientListener
-   */
-  public void addListener(UserManagerClientListener listener);
-
-  public void sendMulticastData(byte[] from,byte[][] to, ByteBuffer buff,
-                       boolean reliable);
-
-  public void broadcastData(byte[] from, ByteBuffer buff,
-                       boolean reliable);
-
+    
+  public void connect(DiscoveredUserManager choice,UserManagerClientListener listener);  
   public void login();
   public void validationDataResponse(Callback[] cbs);
   public void logout();
-
+  public SGSChannel joinChannel(String channelName);
+  public void sendToServer(byte[] from, ByteBuffer buff,
+                       boolean reliable);
 
   /**
    * reconnectLogin
@@ -47,15 +37,7 @@ public interface UserManagerClient {
    */
   public void reconnectLogin(byte[] userID, byte[] reconnectionKey);
 
-  /**
-   * sendData
-   *
-   * @param fromID byte[]
-   * @param toID byte[]
-   * @param buff ByteBuffer
-   * @param reliable boolean
-   */
-  public void sendUnicastData(byte[] fromID, byte[] toID, ByteBuffer buff,
-                       boolean reliable);
+  
+ 
 
 }

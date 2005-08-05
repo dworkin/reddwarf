@@ -24,11 +24,6 @@ public interface ClientConnectionManagerListener {
    */
   public void userLeft(byte[] userID);
 
-  /**
-   * userLeft
-   *
-   * @param userID byte[]
-   */
-  public void failOverInProgress(byte[] userID);
+  
 
 }
