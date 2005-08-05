@@ -50,25 +50,6 @@ public class TCPIPUserManagerClient
   }
 
   /**
-   * sendData
-   *
-   * @param from byte[]
-   * @param to byte[]
-   * @param buff ByteBuffer
-   * @param reliable boolean
-   * @todo Implement this com.sun.gi.comm.users.client.UserManagerClient method
-   */
-  public void sendMulticastData(byte[] from, byte[][] to, ByteBuffer buff,
-                       boolean reliable) {
-    try {
-      transport.sendMulticastMsg(from, to, reliable, buff);
-    }
-    catch (IOException ex) {
-      ex.printStackTrace();
-    }
-  }
-
-  /**
    * login
    *
    * @todo Implement this com.sun.gi.comm.users.client.UserManagerClient method
@@ -128,38 +109,8 @@ public class TCPIPUserManagerClient
     }
   }
 
-  // TransportListener methods
-  /**
-   * reconnectLogin
-   *
-   * @param reconnectionKey long
-   */
-  public void reconnectLogin(long reconnectionKey) {
-    throw new UnsupportedOperationException();
-  }
 
-  /**
-   * broadcastMsgReceived
-   *
-   * @param reliable boolean
-   * @param from byte[]
-   * @param databuff ByteBuffer
-   */
-  public void broadcastMsgReceived(boolean reliable, byte[] from,
-                                   ByteBuffer databuff) {
-    for (Iterator i = listeners.iterator(); i.hasNext(); ) {
-      ( (UserManagerClientListener) i.next()).dataReceived(from, databuff);
-    }
-  }
-
-  /**
-   * connectRequest
-   *
-   * @param tCPTransport TCPTransport
-   */
-  public void connectRequest(TCPTransport tCPTransport) {
-    throw new UnsupportedOperationException();
-  }
+ 
 
   /**
    * connected
