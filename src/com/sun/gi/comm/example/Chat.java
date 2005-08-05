@@ -4,7 +4,7 @@ import javax.swing.UIManager;
 import java.awt.*;
 import com.sun.gi.comm.users.client.ClientConnectionManager;
 import com.sun.gi.comm.discovery.impl.URLDiscoverer;
-import com.sun.gi.comm.users.client.DefaultUserManagerPolicy;
+import com.sun.gi.comm.users.client.impl.DefaultUserManagerPolicy;
 import java.net.URL;
 import java.net.*;
 import com.sun.gi.comm.users.client.ClientConnectionManagerListener;
