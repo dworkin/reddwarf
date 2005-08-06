@@ -143,20 +143,7 @@ public class TCPIPUserManagerClient
     }
   }
 
-  /**
-   * multicastMsgReceived
-   *
-   * @param reliable boolean
-   * @param from byte[]
-   * @param tolist byte[][]
-   * @param databuff ByteBuffer
-   */
-  public void multicastMsgReceived(boolean reliable, byte[] from,
-                                   byte[][] tolist, ByteBuffer databuff) {
-    for (Iterator i = listeners.iterator(); i.hasNext(); ) {
-      ( (UserManagerClientListener) i.next()).dataReceived(from, databuff);
-    }
-  }
+  
 
   /**
    * reconnectKeyReceived
@@ -183,20 +170,6 @@ public class TCPIPUserManagerClient
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * unicastMsgReceived
-   *
-   * @param reliable boolean
-   * @param from byte[]
-   * @param to byte[]
-   * @param databuff ByteBuffer
-   */
-  public void unicastMsgReceived(boolean reliable, byte[] from, byte[] to,
-                                 ByteBuffer databuff) {
-    for (Iterator i = listeners.iterator(); i.hasNext(); ) {
-      ( (UserManagerClientListener) i.next()).dataReceived(from, databuff);
-    }
-  }
 
   /**
    * userAccepted
@@ -268,32 +241,9 @@ public class TCPIPUserManagerClient
     throw new UnsupportedOperationException();
   }
 
-  /**
-   * broadcastData
-   *
-   * @param from byte[]
-   * @param buff ByteBuffer
-   * @param reliable boolean
-   */
-  public void broadcastData(byte[] from, ByteBuffer buff, boolean reliable) {
-    try {
-      transport.sendBroadcastMsg(from, reliable, buff);
-    }
-    catch (IOException ex) {
-      ex.printStackTrace();
-    }
+  
 
-  }
-
-  /**
-   * newTCPConnection
-   *
-   * @param connection NIOTCPConnection
-   */
-  public void newTCPConnection(NIOTCPConnection connection) {
-    throw new UnsupportedOperationException();
-  }
-
+  
   /**
    * connected
    *
@@ -320,22 +270,70 @@ public class TCPIPUserManagerClient
     }
   }
 
-  /**
-   * sendData
-   *
-   * @param fromID byte[]
-   * @param toID byte[]
-   * @param buff ByteBuffer
-   * @param reliable boolean
-   */
-  public void sendUnicastData(byte[] fromID, byte[] toID, ByteBuffer buff,
-                       boolean reliable) {
-    try {
-      transport.sendUnicastMsg(fromID, toID, reliable, buff);
-    }
-    catch (IOException ex) {
-      ex.printStackTrace();
+    public void userRejected(String reason) {
     }
 
-  }
+    public void joinChannel(String channelName) {
+    }
+
+    public void channelJoinReq(String chanName, byte[] user) {
+    }
+
+    public void channelJoined(String chanName, byte[] chanID) {
+    }
+
+    public void broadcastMsgReceived(byte[] chanID, boolean reliable, byte[] from, ByteBuffer databuff) {
+    }
+
+    public void multicastMsgReceived(byte[] chanID, boolean reliable, byte[] from, byte[][] tolist, ByteBuffer databuff) {
+    }
+
+    public void unicastMsgReceived(byte[] chanID, boolean reliable, byte[] from, byte[] to, ByteBuffer databuff) {
+    }
+
+    public void userLeft(byte[] user) {
+    }
+
+    public void userJoined(byte[] user) {
+    }
+
+    public void userAccepted(byte[] user) {
+    }
+
+    public void validationResponse(Callback[] cbs) {
+    }
+
+    public void validationRequest(Callback[] cbs) {
+    }
+
+    public void connect(DiscoveredUserManager choice, UserManagerClientListener listener) {
+    }
+
+    public void sendToServer(byte[] from, ByteBuffer buff, boolean reliable) {
+    }
+
+    public void userLeftChannel(byte[] chanID, byte[] user) {
+    }
+
+    public void userJoinedChannel(byte[] chanID, byte[] user) {
+    }
+
+    public void connectRequest() {
+    }
+
+    public void disconnected() {
+    }
+
+    public void reconnectKeyReceived(byte[] user, byte[] key) {
+    }
+
+    public void reconnectRequest(byte[] user, byte[] key) {
+    }
+
+    public void newTCPConnection(NIOTCPConnection connection) {
+        throw new UnsupportedOperationException("This is not a server socket.");
+    }
+
+    
+  
 }
