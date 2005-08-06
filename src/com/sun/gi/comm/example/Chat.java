@@ -5,13 +5,13 @@ import java.awt.*;
 import com.sun.gi.comm.users.client.ClientConnectionManager;
 import com.sun.gi.comm.discovery.impl.URLDiscoverer;
 import com.sun.gi.comm.users.client.impl.DefaultUserManagerPolicy;
-import java.net.URL;
 import java.net.*;
 import com.sun.gi.comm.users.client.ClientConnectionManagerListener;
 import java.nio.ByteBuffer;
 import javax.security.auth.callback.Callback;
 import java.io.File;
 import com.sun.gi.comm.users.client.*;
+import com.sun.gi.comm.users.client.impl.ClientConnectionManagerImpl;
 
 /**
  *
@@ -55,7 +55,7 @@ public class Chat implements ClientConnectionManagerListener {
     frame.setVisible(true);
     // start login process
     try {
-      mgr = new ClientConnectionManager(1,
+      mgr = new ClientConnectionManagerImpl(1,
           new URLDiscoverer(new File("Discovery.xml").toURL()),
           new DefaultUserManagerPolicy());
     }

@@ -25,5 +25,6 @@ public interface ClientConnectionManagerListener {
   public void userLeft(byte[] userID);
 
   
-
+  public void joinedChannel(SGSChannel channel);
+  
 }

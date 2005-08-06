@@ -111,6 +111,8 @@ public interface TransportListener {
   
   public void channelJoinReq(String chanName, byte[] user);
   
+  public void channelJoined(String chanName, byte[] chanID);
+  
   
 
   /**

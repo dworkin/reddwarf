@@ -22,4 +22,5 @@ public interface SGSChannel {
     public void sendMulticast(byte[][] to, ByteBuffer data, boolean reliable);
     public void send(ByteBuffer data, boolean reliable);
     public void leaveChannel();
+    public String getChannelName();
 }

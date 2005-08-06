@@ -26,6 +26,7 @@ public class TCPTransport
     private static final byte OP_USER_JOINED_CHAN = 13;
     private static final byte OP_USER_LEFT_CHAN = 14;
     private static final byte OP_REQ_JOIN_CHAN = 15;
+    private static final byte OP_JOINED_CHAN = 16;
     
     
     private NIOTCPConnection conn;
@@ -55,6 +56,19 @@ public class TCPTransport
             hdr.put(namebytes);
             hdr.put( (byte) userID.length);
             hdr.put(userID);
+            conn.send(hdr);
+        }
+    }
+    
+     public synchronized void sendJoinedChan(String chanName, byte[] chanID) throws IOException {
+        synchronized (hdr) {
+            hdr.clear();
+            hdr.put(OP_REQ_JOIN_CHAN);
+            byte[] namebytes = chanName.getBytes();
+            hdr.put((byte) namebytes.length);
+            hdr.put(namebytes);
+            hdr.put( (byte) chanID.length);
+            hdr.put(chanID);
             conn.send(hdr);
         }
     }
@@ -395,6 +409,15 @@ public class TCPTransport
                 buff.get(user);
                 fireReqJoinChan(new String(namebytes),user);
                 break;
+            case OP_JOINED_CHAN:
+                namelength = buff.get();
+                namebytes = new byte[namelength];
+                buff.get(namebytes);
+                chanIDlen = buff.get();
+                chanID = new byte[chanIDlen];
+                buff.get(chanID);
+                fireJoinedChan(new String(namebytes),chanID);
+                break;                
             default:
                 System.out.println("WARNING:Invalid op recieved from client: " + op +
                         " ignored.");
@@ -569,17 +592,16 @@ public class TCPTransport
         }
     }
     
-     /**
-     * fireUnicastMsg
-     *
-     * @param reliable boolean
-     * @param from byte[]
-     * @param to byte[]
-     * @param databuff ByteBuffer
-     */
+    
     private void fireReqJoinChan(String name, byte[] user) {
         for (Iterator i = listeners.iterator(); i.hasNext(); ) {
             ( (TransportListener) i.next()).channelJoinReq(name,user);
+        }
+    }
+    
+    private void fireJoinedChan(String name, byte[] chanID) {
+        for (Iterator i = listeners.iterator(); i.hasNext(); ) {
+            ( (TransportListener) i.next()).channelJoined(name,chanID);
         }
     }
     

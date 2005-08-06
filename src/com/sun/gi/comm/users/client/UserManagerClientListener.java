@@ -22,4 +22,5 @@ public interface UserManagerClientListener {
   public void loginRejected(String message);
   public void userAdded(byte[] userID);
   public void userDropped(byte[] userID); 
+  public void joinedChannel(SGSChannel channel);
 }
