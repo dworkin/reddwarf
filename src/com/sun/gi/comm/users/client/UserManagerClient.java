@@ -26,7 +26,7 @@ public interface UserManagerClient {
   public void login();
   public void validationDataResponse(Callback[] cbs);
   public void logout();
-  public void joinChannel(String channelName);
+  public void joinChannel(byte[] user, String channelName);
   public void sendToServer(byte[] from, ByteBuffer buff,
                        boolean reliable);
 

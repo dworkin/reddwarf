@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<GAMEAPP gamename="CHAT">
-    <USERMANAGER serverclass="com.sun.gi.comm.users.TCPIPUserManager">
-        <PARAMETER tag="host" value="10.5.34.10" />
-        <PARAMETER tag="port" value="1139" />
-    </USERMANAGER>
-</GAMEAPP>
-
