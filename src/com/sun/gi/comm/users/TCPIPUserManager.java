@@ -85,6 +85,27 @@ public class TCPIPUserManager
     return params;
   }
 
+  /**
+   * sendDataToUser
+   *
+   * @param id UserID
+   * @param from UserID
+   * @param buff ByteBuffer
+   * @param reliable boolean
+   */
+  public void sendDataToUser(UserID id, UserID from, ByteBuffer buff,
+                             boolean reliable) {
+    Transport transport = (Transport)idToTransport.get(id);
+    if (transport != null) {
+      try {
+        transport.sendUnicastMsg(from.toByteArray(), id.toByteArray(), reliable,
+                                 buff);
+      }
+      catch (IOException ex) {
+        ex.printStackTrace();
+      }
+    }
+  }
 
   /**
    * setUserValidatorFactory
@@ -324,13 +345,13 @@ public class TCPIPUserManager
    * @param data ByteBuffer
    * @param realiable boolean
    */
-  public void dataArrived(ChannelID chan, UserID to, UserID from, ByteBuffer data,
+  public void dataArrived(UserID to, UserID from, ByteBuffer data,
                           boolean reliable) {
     data.position(data.limit());
     Transport transport = (Transport) idToTransport.get(to);
     if (transport != null) { //one of ours
       try {
-        transport.sendUnicastMsg(chan.toByteArray, from.toByteArray(), to.toByteArray(), reliable,
+        transport.sendUnicastMsg(from.toByteArray(), to.toByteArray(), reliable,
                                  data.duplicate());
       }
       catch (IOException ex) {
@@ -434,6 +455,25 @@ public class TCPIPUserManager
   public void userAdded(UserID userID) {
   }
 
-  
+  /**
+   * broadcastDataArrived
+   *
+   * @param from UserID
+   * @param buff ByteBuffer
+   * @param reliable boolean
+   */
+  public void broadcastDataArrived(UserID from, ByteBuffer buff,
+                                   boolean reliable) {
+    buff.position(buff.limit());
+    for(Iterator i = idToTransport.values().iterator();i.hasNext();){
+      try {
+        ( (Transport) i.next()).sendBroadcastMsg(from.toByteArray(), reliable,
+                                                 buff.duplicate());
+      }
+      catch (IOException ex) {
+        ex.printStackTrace();
+      }
+    }
+  }
 
 }

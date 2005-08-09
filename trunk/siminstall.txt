@@ -1,9 +1,0 @@
-# This file tells the logic server where to find the classes for all
-# installed apps.  It is a table of entries of the form:
-#  <app name>, <app id>, <boot class name>, <colon seperated class path>
-# entries must be typed all on one line.
-#
-
-TrivialBoot, 1, com.sun.gi.logic.test.trivial.TrivialBoot,\CVSROOT\games-jeffpk\logic_tests.jar
-CommTest, 2, com.sun.gi.logic.test.comm.CommTestBoot,\CVSROOT\games-jeffpk\comm_test.jar
-WURMDEMO, 3, com.sun.gi.demo.WurmBoot,\CVSROOT\games-jeffpk\wurm_server.jar

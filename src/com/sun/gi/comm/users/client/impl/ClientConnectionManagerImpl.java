@@ -118,7 +118,7 @@ public class ClientConnectionManagerImpl
     }
     
     public void openChannel(String channelName) {
-        umanager.joinChannel(myID,channelName);
+        umanager.joinChannel(channelName);
     }
     
     public void sendToServer(ByteBuffer buff, boolean reliable) {

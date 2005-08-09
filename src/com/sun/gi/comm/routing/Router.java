@@ -33,10 +33,36 @@ public interface Router {
    * @param id UserID The ID to dispose.
    */
   public void disposeUser(UserID id);
-  
-  public RouterChannel openChannel(String name);
 
-  
+  /**
+   * This call distributes a message to a single UserIDs.
+   * @param targets UserID[] The UserIDs to receive the message.
+   * @param from UserID The UserID who sent the message (a return address.)
+   * @param message byte[] A byte array containing the data to be sent.
+   */
+  public void unicastData(UserID target,UserID from,
+                           ByteBuffer message, boolean reliable);
+
+
+  /**
+   * This call distributes a message to a set of UserIDs.
+   * @param targets UserID[] The UserIDs to receive the message.
+   * @param from UserID The UserID who sent the message (a return address.)
+   * @param message byte[] A byte array containing the data to be sent.
+   */
+  public void multicastData(UserID[] targets,UserID from,
+                           ByteBuffer message, boolean reliable);
+
+ /**
+   * This call distributes a message to all users in a game.
+   * If targets is a 0 length array then this method will broadcast to all
+   * connected users.
+   * @param from UserID The UserID who sent the message (a return address.)
+   * @param message byte[] A byte array containing the data to be sent.
+   */
+  public void broadcastData(UserID from,
+                           ByteBuffer message, boolean reliable);
+
   /**
    * This call adds a listener to be informed when data arrives or when a
    * user ID is destroyed.
