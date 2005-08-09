@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<DISCOVERY>
+    <GAME id="1" name="Chat">
+        <USERMANAGER clientclass=
+          "com.sun.gi.comm.users.client.TCPIPUserManagerClient">
+            <PARAMETER tag="host" value="10.5.34.10" />
+            <PARAMETER tag="port" value="1139" />
+        </USERMANAGER>
+        <USERMANAGER clientclass=
+          "com.sun.gi.comm.users.client.TCPIPUserManagerClient">
+            <PARAMETER tag="host" value="10.5.34.10" />
+            <PARAMETER tag="port" value="1149" />
+        </USERMANAGER>
+    </GAME>
+</DISCOVERY>

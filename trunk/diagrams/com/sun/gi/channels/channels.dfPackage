@@ -1,0 +1,64 @@
+package id2z5jxdirrhcnedirrjm6q;
+
+/**
+@version 2.0
+@physicalPackage
+@__modelType diagram 
+*/
+class diagram {
+/**
+@__ref <oiref:java#Class#com.sun.gi.channels.ChannelListener:oiref><oihard>
+@__modelType reference 
+*/
+class reference {
+}/**
+@__ref <oiref:java#Class#com.sun.gi.channels.ChannelManager:oiref><oihard>
+@__modelType reference 
+*/
+class reference22 {
+}/**
+@__ref <oiref:java#Class#com.sun.gi.channels.ChannelManagerListener:oiref><oihard>
+@__modelType reference 
+*/
+class reference23 {
+}/**
+@__ref <oiref:java#Class#com.sun.gi.channels.Key:oiref><oihard>
+@__modelType reference 
+*/
+class reference24 {
+}/**
+@__ref <oiref:java#Class#com.sun.gi.channels.Packet:oiref><oihard>
+@__modelType reference 
+*/
+class reference25 {
+}/**
+@__ref <oiref:java#Class#com.sun.gi.channels.PacketMismatchException:oiref><oihard>
+@__modelType reference 
+*/
+class reference26 {
+}/**
+@__ref <oiref:design#Class#id3immodjkab44kdjkadi0s.diagram:oiref><oihard>
+@__modelType reference
+@__fqn <oiref:#Package#com.sun.gi.channels.impl:oiref> 
+*/
+class reference1 {
+}/**
+@__ref <oiref:design#Class#id29sladmimdaqtdmimdkdf.diagram:oiref><oihard>
+@__modelType reference
+@__fqn <oiref:#Package#com.sun.gi.channels.test:oiref> 
+*/
+class reference15 {
+}}/**
+@__tags
+@shapeType ClassDiagram 
+*/
+class __tags {
+}/**
+@__options 
+*/
+class __options {
+}/**
+@__positions 
+*/
+class __positions {
+}

@@ -1,0 +1,1 @@
+cmd /k java  -cp SGSServer.jar com.sun.gi.DiscoveryServer

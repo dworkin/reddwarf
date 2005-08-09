@@ -1,0 +1,39 @@
+package idzf3kdirrhcnedirrhgry;
+
+/**
+@version 2.0
+@physicalPackage
+@__modelType diagram 
+*/
+class diagram {
+/**
+@__ref <oiref:java#Class#com.sun.gi.server.ostore.TimestampException:oiref><oihard>
+@__modelType reference 
+*/
+class reference {
+}/**
+@__ref <oiref:java#Class#com.sun.gi.server.ostore.Transaction:oiref><oihard>
+@__modelType reference 
+*/
+class reference11 {
+}/**
+@__ref <oiref:java#Class#com.sun.gi.server.ostore.ObjectStore:oiref><oihard>
+@__modelType reference 
+*/
+class reference12 {
+}}/**
+@__tags
+@shapeType ClassDiagram 
+*/
+class __tags {
+}/**
+@__options 
+*/
+class __options {
+}/**
+@__positions <oigroup:<oiref:java#Class#com.sun.gi.server.ostore.ObjectStore:oiref>=167,10,190,149,1:oigroup>
+<oigroup:<oiref:java#Class#com.sun.gi.server.ostore.Transaction:oiref>=10,150,119,213,1:oigroup>
+<oigroup:<oiref:java#Class#com.sun.gi.server.ostore.TimestampException:oiref>=10,10,137,101,1:oigroup> 
+*/
+class __positions {
+}

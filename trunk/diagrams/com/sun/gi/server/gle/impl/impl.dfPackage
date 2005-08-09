@@ -1,0 +1,46 @@
+package id4nnhtdirrhcnedirrhgqa;
+
+/**
+@version 2.0
+@physicalPackage
+@__modelType diagram 
+*/
+class diagram {
+/**
+@__ref <oiref:java#Class#com.sun.gi.server.gle.impl.GLEAppContext:oiref><oihard>
+@__modelType reference 
+*/
+class reference {
+}/**
+@__ref <oiref:java#Class#com.sun.gi.server.gle.impl.GLETask:oiref><oihard>
+@__modelType reference 
+*/
+class reference27 {
+}/**
+@__ref <oiref:java#Class#com.sun.gi.server.gle.impl.GLEObjectReference:oiref><oihard>
+@__modelType reference 
+*/
+class reference28 {
+}/**
+@__ref <oiref:java#Class#com.sun.gi.server.gle.impl.GLERuntime:oiref><oihard>
+@__modelType reference 
+*/
+class reference3 {
+}}/**
+@__tags
+@shapeType ClassDiagram 
+*/
+class __tags {
+}/**
+@__options 
+*/
+class __options {
+}/**
+@__positions <oigroup:<oiref:java#Class#com.sun.gi.server.gle.impl.GLERuntime:oiref>=667,289,141,158,1:oigroup>
+<oigroup:<oiref:java#Class#com.sun.gi.server.gle.impl.CommandLineProcessor:oiref>=167,330,161,142,1:oigroup>
+<oigroup:<oiref:java#Class#com.sun.gi.server.gle.impl.GLEObjectReference:oiref>=10,330,137,174,1:oigroup>
+<oigroup:<oiref:java#Class#com.sun.gi.server.gle.impl.GLEAppContext:oiref>=10,10,182,222,1:oigroup>
+<oigroup:<oiref:java#Class#com.sun.gi.server.gle.impl.GLETask:oiref>=212,10,200,302,1:oigroup>
+*/
+class __positions {
+}

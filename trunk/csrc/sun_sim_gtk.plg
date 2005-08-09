@@ -1,0 +1,16 @@
+--------------------Configuration: sun_sim_gtk - Win32 Debug--------------------
+Begining build with project "C:\CVSROOT\games-jeffpk\csrc\sun_sim_gtk.dsp", with item "sun_sim_gtk.c"
+Active configuration is Win32 (x86) Console Application (based on Win32 (x86) Console Application)
+
+
+Creating temp file "C:\DOCUME~1\Jeff\LOCALS~1\Temp\RSP32E0.tmp" with contents </nologo /MLd /W3 /Gm /GX /Zi /Od /D "WIN32" /D "_DEBUG" /D "_CONSOLE" /D "_MBCS" /Fp"Debug/sun_sim_gtk.pch" /YX /Fo"Debug/" /Fd"Debug/" /FD /c 
+"C:\CVSROOT\games-jeffpk\csrc\sun_sim_gtk.c"
+>
+Creating command line "cl.exe @C:\DOCUME~1\Jeff\LOCALS~1\Temp\RSP32E0.tmp" 
+Compiling...
+sun_sim_gtk.c
+C:\CVSROOT\games-jeffpk\csrc\sun_sim_gtk.c(72) : warning C4013: 'memset' undefined; assuming extern returning int
+
+
+
+sun_sim_gtk.obj - 0 error(s), 1 warning(s)
