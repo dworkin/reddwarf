@@ -1,4 +1,0 @@
-1) A State-Machine based method for implementing destributed mutexes ontop of
-a reliable multicast transport.
-
-2)
