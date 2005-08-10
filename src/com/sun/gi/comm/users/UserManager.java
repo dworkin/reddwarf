@@ -34,7 +34,7 @@ public interface UserManager extends RouterListener {
    * @param length int length of data
    * @param reliable boolean whether or not reliable delivery is necessary
    */
-  public void sendDataToUser(UserID id,UserID from, ByteBuffer buff,boolean reliable);
+  public void sendDataToUser(ChannelID cid, UserID id,UserID from, ByteBuffer buff,boolean reliable);
 
   /**
    * getClientClassname
