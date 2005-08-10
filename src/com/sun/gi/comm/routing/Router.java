@@ -1,5 +1,6 @@
 package com.sun.gi.comm.routing;
 
+import java.io.IOException;
 import java.nio.*;
 
 import javax.security.auth.callback.Callback;
@@ -32,8 +33,9 @@ public interface Router {
 	 * This call is made in order to allocate a new unqiue UserID.
 	 * 
 	 * @return UserID The new ID
+	 * @throws IOException 
 	 */
-	public UserID registerUser(SGSUser user) throws InstantiationException;
+	public void registerUser(SGSUser user) throws InstantiationException, IOException;
 
 	/**
 	 * This call is used to free a UserID that is no longer needed.
@@ -67,17 +69,10 @@ public interface Router {
 	 * @return boolean true if key is valid, false if key is not
 	 */
 
-	public boolean reregisterUser(SGSUser user, byte[] user, byte[] key);
+	public boolean reregisterUser(SGSUser user, byte[] userid, byte[] key);
 
-	/**
-	 * initializeIDkey
-	 * 
-	 * @param newID
-	 *            UserID
-	 */
-	public byte[] initializeIDKey(UserID id);
 
-	public void validationResponse(TCPIPUser user, Callback[] cbs);
+	public void validationResponse(TCPIPUser user, Callback[] cbs) throws InstantiationException, IOException;
 
 	public void sendBroadcastMessage(byte[] chanID, UserID userID, ByteBuffer databuff, boolean reliable);
 
@@ -85,8 +80,5 @@ public interface Router {
 
 	public void sendUnicastMessage(byte[] chanID, UserID userID, byte[] to, ByteBuffer databuff);
 	
-	public UserID makeUserID(byte[] id);
 	
-	public ChannelID makeChannelID(byte[] id);
-
 }

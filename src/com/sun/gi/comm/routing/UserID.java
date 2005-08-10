@@ -5,6 +5,7 @@ import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.io.InputStream;
 import com.sun.gi.utils.Communicable;
+import com.sun.gi.utils.StatisticalUUID;
 
 /**
  * This is an opaque type that represents a user connection to the router
@@ -19,6 +20,12 @@ import com.sun.gi.utils.Communicable;
  * @author Jeff Kesselman
  * @version 1.0
  */
-public interface UserID extends Comparable, Serializable, Communicable {
-
+public class UserID extends StatisticalUUID {
+	
+	public UserID() throws InstantiationException {
+		super()
+	}
+	public UserID(byte[] ba) throws InstantiationException {
+		super(ba);
+	}
 }
