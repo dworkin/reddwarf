@@ -146,5 +146,7 @@ public interface TransportListener {
    */
   public void unicastMsgReceived(byte[] chanID, boolean reliable, byte[] from, byte[] to,
                                  ByteBuffer databuff);
+  
+  public void sendBuffers(ByteBuffer[] buff);
 
 }

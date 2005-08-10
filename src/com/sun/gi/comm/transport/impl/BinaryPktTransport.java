@@ -9,7 +9,7 @@ import com.sun.gi.comm.transport.*;
 import com.sun.gi.comm.validation.*;
 import com.sun.gi.utils.nio.*;
 
-public class TCPTransport
+public class BinaryPktTransport
         implements Transport, NIOTCPConnectionListener {
     private static final byte OP_UNICAST_MSG = 1;
     private static final byte OP_MULTICAST_MSG = 2;
@@ -29,18 +29,15 @@ public class TCPTransport
     private static final byte OP_JOINED_CHAN = 16;
     
     
-    private NIOTCPConnection conn;
     private ByteBuffer hdr;
     private ByteBuffer[] sendArray = new ByteBuffer[2];
     private List listeners = new ArrayList();
-    private boolean ready = false;
     private static final boolean TRACEON = false;
     
-    public TCPTransport(NIOTCPConnection conn){
+    public BinaryPktTransport(){
         hdr = ByteBuffer.allocate(2048);
         sendArray[0] = hdr;
-        this.conn = conn;
-        conn.addListener(this);
+        
     }
     
     public void addListener(TransportListener l) {
@@ -56,7 +53,7 @@ public class TCPTransport
             hdr.put(namebytes);
             hdr.put( (byte) userID.length);
             hdr.put(userID);
-            conn.send(hdr);
+            fireSendBuffers(hdr);
         }
     }
     
@@ -69,7 +66,7 @@ public class TCPTransport
             hdr.put(namebytes);
             hdr.put( (byte) chanID.length);
             hdr.put(chanID);
-            conn.send(hdr);
+            fireSendBuffers(hdr);
         }
     }
     
@@ -92,7 +89,7 @@ public class TCPTransport
             hdr.put( (byte) to.length);
             hdr.put(to);
             sendArray[1] = data;
-            conn.send(sendArray);
+            fireSendBuffers(sendArray);
         }
     }
     
@@ -117,7 +114,7 @@ public class TCPTransport
                 hdr.put(to[i]);
             }
             sendArray[1] = data;
-            conn.send(sendArray);
+            fireSendBuffers(sendArray);
         }
     }
     
@@ -135,7 +132,7 @@ public class TCPTransport
             hdr.put( (byte) from.length);
             hdr.put(from);
             sendArray[1] = data;
-            conn.send(sendArray);
+            fireSendBuffers(sendArray);
         }
     }
     
@@ -143,7 +140,7 @@ public class TCPTransport
         synchronized (hdr) {
             hdr.clear();
             hdr.put(OP_CONNECT_REQ);
-            conn.send(hdr);
+            fireSendBuffers(hdr);
         }
     }
     
@@ -154,7 +151,7 @@ public class TCPTransport
             hdr.put(OP_USER_ACCEPTED);
             hdr.put( (byte) newID.length);
             hdr.put(newID);
-            conn.send(hdr);
+            fireSendBuffers(hdr);
         }
     }
     
@@ -165,7 +162,7 @@ public class TCPTransport
             byte[] msgbytes = message.getBytes();
             hdr.putInt(msgbytes.length);
             hdr.put(msgbytes);
-            conn.send(hdr);
+            fireSendBuffers(hdr);
         }
     }
     
@@ -179,7 +176,7 @@ public class TCPTransport
             hdr.put(from);
             hdr.put((byte)reconnectionKey.length);
             hdr.put(reconnectionKey);
-            conn.send(hdr);
+            fireSendBuffers(hdr);
         }
     }
     
@@ -189,7 +186,7 @@ public class TCPTransport
             hdr.clear();
             hdr.put(OP_VALIDATION_REQ);
             ValidationDataProtocol.makeRequestData(hdr, cbs);
-            conn.send(hdr);
+            fireSendBuffers(hdr);
         }
     }
     
@@ -199,7 +196,7 @@ public class TCPTransport
             hdr.clear();
             hdr.put(OP_VALIDATION_RESP);
             ValidationDataProtocol.makeRequestData(hdr, cbs);
-            conn.send(hdr);
+            fireSendBuffers(hdr);
         }
     }
     
@@ -209,7 +206,7 @@ public class TCPTransport
             hdr.put(OP_USER_JOINED);
             hdr.put( (byte) user.length);
             hdr.put(user);
-            conn.send(hdr);
+            fireSendBuffers(hdr);
         }
     }
     
@@ -219,7 +216,7 @@ public class TCPTransport
             hdr.put(OP_USER_LEFT);
             hdr.put( (byte) user.length);
             hdr.put(user);
-            conn.send(hdr);
+            fireSendBuffers(hdr);
         }
     }
     
@@ -231,7 +228,7 @@ public class TCPTransport
             hdr.put(chanID);
             hdr.put( (byte) user.length);
             hdr.put(user);
-            conn.send(hdr);
+            fireSendBuffers(hdr);
         }
     }
     
@@ -243,7 +240,7 @@ public class TCPTransport
             hdr.put(chanID);
             hdr.put( (byte) user.length);
             hdr.put(user);
-            conn.send(hdr);
+            fireSendBuffers(hdr);
         }
     }
     
@@ -256,13 +253,29 @@ public class TCPTransport
             hdr.put(id);
             hdr.put( (byte) key.length);
             hdr.put(key);
-            conn.send(hdr);
+            fireSendBuffers(hdr);
         }
     }
     
     //NIOTCPConnectionListener
     
-    /**
+    private void fireSendBuffers(ByteBuffer buff){
+    	fireSendBuffers(new ByteBuffer[] {buff});
+    }
+    
+    private void fireSendBuffers(ByteBuffer[] buffs) {
+    	ByteBuffer[] dup = new ByteBuffer[buffs.length];
+		for(Iterator i=listeners.iterator();i.hasNext();){
+			for(int i2=0;i2<buffs.length;i2++){
+				dup[i2] = buffs[i2].duplicate();
+				dup[i2].order(buffs[i2].order());
+			}
+			((TransportListener)(i.next())).sendBuffers(dup);
+		}
+		
+	}
+
+	/**
      * disconnected
      *
      * @param nIOTCPConnection NIOTCPConnection
