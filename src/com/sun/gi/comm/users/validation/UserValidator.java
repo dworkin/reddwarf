@@ -1,8 +1,6 @@
-package com.sun.gi.comm.validation;
+package com.sun.gi.comm.users.validation;
 
-import javax.security.auth.Subject;
 import javax.security.auth.callback.Callback;
-import java.nio.ByteBuffer;
 
 public interface UserValidator {
  public Callback[] nextDataRequest();

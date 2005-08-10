@@ -1,4 +1,4 @@
-package com.sun.gi.comm.users.client;
+package com.sun.gi.comm.users.server;
 
 import java.nio.*;
 import javax.security.auth.callback.*;

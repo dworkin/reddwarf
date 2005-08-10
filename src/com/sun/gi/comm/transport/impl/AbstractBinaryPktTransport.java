@@ -5,11 +5,12 @@ import java.nio.*;
 import java.util.*;
 import javax.security.auth.callback.*;
 
-import com.sun.gi.comm.transport.*;
-import com.sun.gi.comm.validation.*;
-import com.sun.gi.utils.nio.*;
+import com.sun.gi.comm.transport.Transport;
+import com.sun.gi.utils.nio.NIOTCPConnectionListener;
 
-public class BinaryPktTransport
+
+
+public abstract class AbstractBinaryPktTransport
         implements Transport, NIOTCPConnectionListener {
     private static final byte OP_UNICAST_MSG = 1;
     private static final byte OP_MULTICAST_MSG = 2;
@@ -31,18 +32,15 @@ public class BinaryPktTransport
     
     private ByteBuffer hdr;
     private ByteBuffer[] sendArray = new ByteBuffer[2];
-    private List listeners = new ArrayList();
     private static final boolean TRACEON = false;
     
-    public BinaryPktTransport(){
+    public AbstractBinaryPktTransport(){
         hdr = ByteBuffer.allocate(2048);
         sendArray[0] = hdr;
         
     }
     
-    public void addListener(TransportListener l) {
-        listeners.add(l);
-    }
+    
     
     public synchronized void sendUserJoinChan(String chanName, byte[] userID) throws IOException {
         synchronized (hdr) {
@@ -53,7 +51,7 @@ public class BinaryPktTransport
             hdr.put(namebytes);
             hdr.put( (byte) userID.length);
             hdr.put(userID);
-            fireSendBuffers(hdr);
+            sendBuffers(hdr);
         }
     }
     
@@ -66,7 +64,7 @@ public class BinaryPktTransport
             hdr.put(namebytes);
             hdr.put( (byte) chanID.length);
             hdr.put(chanID);
-            fireSendBuffers(hdr);
+            sendBuffers(hdr);
         }
     }
     
@@ -89,7 +87,7 @@ public class BinaryPktTransport
             hdr.put( (byte) to.length);
             hdr.put(to);
             sendArray[1] = data;
-            fireSendBuffers(sendArray);
+            sendBuffers(sendArray);
         }
     }
     
@@ -114,7 +112,7 @@ public class BinaryPktTransport
                 hdr.put(to[i]);
             }
             sendArray[1] = data;
-            fireSendBuffers(sendArray);
+            sendBuffers(sendArray);
         }
     }
     
@@ -132,7 +130,7 @@ public class BinaryPktTransport
             hdr.put( (byte) from.length);
             hdr.put(from);
             sendArray[1] = data;
-            fireSendBuffers(sendArray);
+            sendBuffers(sendArray);
         }
     }
     
@@ -140,7 +138,7 @@ public class BinaryPktTransport
         synchronized (hdr) {
             hdr.clear();
             hdr.put(OP_CONNECT_REQ);
-            fireSendBuffers(hdr);
+            sendBuffers(hdr);
         }
     }
     
@@ -151,7 +149,7 @@ public class BinaryPktTransport
             hdr.put(OP_USER_ACCEPTED);
             hdr.put( (byte) newID.length);
             hdr.put(newID);
-            fireSendBuffers(hdr);
+            sendBuffers(hdr);
         }
     }
     
@@ -162,7 +160,7 @@ public class BinaryPktTransport
             byte[] msgbytes = message.getBytes();
             hdr.putInt(msgbytes.length);
             hdr.put(msgbytes);
-            fireSendBuffers(hdr);
+            sendBuffers(hdr);
         }
     }
     
@@ -176,7 +174,7 @@ public class BinaryPktTransport
             hdr.put(from);
             hdr.put((byte)reconnectionKey.length);
             hdr.put(reconnectionKey);
-            fireSendBuffers(hdr);
+            sendBuffers(hdr);
         }
     }
     
@@ -186,7 +184,7 @@ public class BinaryPktTransport
             hdr.clear();
             hdr.put(OP_VALIDATION_REQ);
             ValidationDataProtocol.makeRequestData(hdr, cbs);
-            fireSendBuffers(hdr);
+            sendBuffers(hdr);
         }
     }
     
@@ -196,7 +194,7 @@ public class BinaryPktTransport
             hdr.clear();
             hdr.put(OP_VALIDATION_RESP);
             ValidationDataProtocol.makeRequestData(hdr, cbs);
-            fireSendBuffers(hdr);
+            sendBuffers(hdr);
         }
     }
     
@@ -206,7 +204,7 @@ public class BinaryPktTransport
             hdr.put(OP_USER_JOINED);
             hdr.put( (byte) user.length);
             hdr.put(user);
-            fireSendBuffers(hdr);
+            sendBuffers(hdr);
         }
     }
     
@@ -216,7 +214,7 @@ public class BinaryPktTransport
             hdr.put(OP_USER_LEFT);
             hdr.put( (byte) user.length);
             hdr.put(user);
-            fireSendBuffers(hdr);
+            sendBuffers(hdr);
         }
     }
     
@@ -228,7 +226,7 @@ public class BinaryPktTransport
             hdr.put(chanID);
             hdr.put( (byte) user.length);
             hdr.put(user);
-            fireSendBuffers(hdr);
+            sendBuffers(hdr);
         }
     }
     
@@ -240,7 +238,7 @@ public class BinaryPktTransport
             hdr.put(chanID);
             hdr.put( (byte) user.length);
             hdr.put(user);
-            fireSendBuffers(hdr);
+            sendBuffers(hdr);
         }
     }
     
@@ -253,46 +251,32 @@ public class BinaryPktTransport
             hdr.put(id);
             hdr.put( (byte) key.length);
             hdr.put(key);
-            fireSendBuffers(hdr);
+            sendBuffers(hdr);
         }
     }
     
     //NIOTCPConnectionListener
     
-    private void fireSendBuffers(ByteBuffer buff){
-    	fireSendBuffers(new ByteBuffer[] {buff});
+    private void sendBuffers(ByteBuffer buff){
+    	sendBuffers(new ByteBuffer[] {buff});
     }
     
-    private void fireSendBuffers(ByteBuffer[] buffs) {
-    	ByteBuffer[] dup = new ByteBuffer[buffs.length];
-		for(Iterator i=listeners.iterator();i.hasNext();){
-			for(int i2=0;i2<buffs.length;i2++){
-				dup[i2] = buffs[i2].duplicate();
-				dup[i2].order(buffs[i2].order());
-			}
-			((TransportListener)(i.next())).sendBuffers(dup);
-		}
-		
-	}
-
-	/**
-     * disconnected
-     *
-     * @param nIOTCPConnection NIOTCPConnection
-     */
-    public void disconnected(NIOTCPConnection nIOTCPConnection) {
-        for (Iterator i = listeners.iterator(); i.hasNext(); ) {
-            ( (TransportListener) i.next()).disconnected();
-        }
-    }
+    protected abstract void sendBuffers(ByteBuffer[] buffs);
     
+    
+    public boolean isLoginPkt(ByteBuffer buff){
+    	int pos = buff.position();
+    	byte op = buff.get();
+    	buff.position(pos);
+    	return op == OP_CONNECT_REQ;
+    }
     /**
      * packetReceived
      *
      * @param conn NIOTCPConnection
      * @param inputBuffer ByteBuffer
      */
-    public void packetReceived(NIOTCPConnection conn, ByteBuffer buff) {
+    public void packetReceived(ByteBuffer buff) {
         byte op = buff.get();
         if (TRACEON){
             System.out.println("Recieved op: " + op);
@@ -311,7 +295,7 @@ public class BinaryPktTransport
                 byte[] to = new byte[tolen];
                 buff.get(to);
                 ByteBuffer databuff = buff.slice();
-                fireUnicastMsg(reliable, chanID, from, to, databuff);
+                rcvUnicastMsg(reliable, chanID, from, to, databuff);
                 break;
             case OP_MULTICAST_MSG:
                 reliable = (buff.get() == 1);
@@ -329,7 +313,7 @@ public class BinaryPktTransport
                     buff.get(tolist[i]);
                 }
                 databuff = buff.slice();
-                fireMultiicastMsg(reliable, chanID, from, tolist, databuff);
+                rcvMultiicastMsg(reliable, chanID, from, tolist, databuff);
                 break;
             case OP_BROADCAST_MSG:
                 reliable = (buff.get() == 1);
@@ -340,7 +324,7 @@ public class BinaryPktTransport
                 from = new byte[fromlen];
                 buff.get(from);
                 databuff = buff.slice();
-                fireBroadcastMsg(reliable, chanID, from, databuff);
+                rcvBroadcastMsg(reliable, chanID, from, databuff);
                 break;
             case OP_RECONNECT_REQ:
                 int usrlen = buff.get();
@@ -349,42 +333,42 @@ public class BinaryPktTransport
                 int keylen = buff.get();
                 byte[] key = new byte[keylen];
                 buff.get(key);
-                fireReconnectReq(user, key);
+                rcvReconnectReq(user, key);
                 break;
             case OP_CONNECT_REQ:
-                fireConnectReq();
+                rcvConnectReq();
                 break;
             case OP_VALIDATION_REQ:
                 Callback[] cbs = ValidationDataProtocol.unpackRequestData(buff);
-                fireValidationReq(cbs);
+                rcvValidationReq(cbs);
                 break;
             case OP_VALIDATION_RESP:
                 cbs = ValidationDataProtocol.unpackRequestData(buff);
-                fireValidationResp(cbs);
+                rcvValidationResp(cbs);
                 break;
             case OP_USER_ACCEPTED:
                 usrlen = buff.get();
                 user = new byte[usrlen];
                 buff.get(user);
-                fireUserAccepted(user);
+                rcvUserAccepted(user);
                 break;
             case OP_USER_REJECTED:
                 int bytelen = buff.getInt();
                 byte[] msgbytes = new byte[bytelen];
                 buff.get(msgbytes);
-                fireUserRejected(new String(msgbytes));
+                rcvUserRejected(new String(msgbytes));
                 break;
             case OP_USER_JOINED:
                 usrlen = buff.get();
                 user = new byte[usrlen];
                 buff.get(user);
-                fireUserJoined(user);
+                rcvUserJoined(user);
                 break;
             case OP_USER_LEFT:
                 usrlen = buff.get();
                 user = new byte[usrlen];
                 buff.get(user);
-                fireUserLeft(user);
+                rcvUserLeft(user);
                 break;
             case OP_USER_JOINED_CHAN:
                 chanIDlen = buff.get();
@@ -393,7 +377,7 @@ public class BinaryPktTransport
                 usrlen = buff.get();
                 user = new byte[usrlen];
                 buff.get(user);
-                fireUserJoinedChan(chanID, user);
+                rcvUserJoinedChan(chanID, user);
                 break;
             case OP_USER_LEFT_CHAN:
                 chanIDlen = buff.get();
@@ -402,7 +386,7 @@ public class BinaryPktTransport
                 usrlen = buff.get();
                 user = new byte[usrlen];
                 buff.get(user);
-                fireUserLeftChan(chanID, user);
+                rcvUserLeftChan(chanID, user);
                 break;
             case OP_RECONNECT_KEY:
                 usrlen = buff.get();
@@ -411,7 +395,7 @@ public class BinaryPktTransport
                 keylen = buff.get();
                 key = new byte[keylen];
                 buff.get(key);
-                fireReconnectKeyRecieved(user,key);
+                rcvReconnectKey(user,key);
                 break;
             case OP_REQ_JOIN_CHAN:
                 byte namelength = buff.get();
@@ -420,7 +404,7 @@ public class BinaryPktTransport
                 usrlen = buff.get();
                 user = new byte[usrlen];
                 buff.get(user);
-                fireReqJoinChan(new String(namebytes),user);
+                rcvReqJoinChan(new String(namebytes),user);
                 break;
             case OP_JOINED_CHAN:
                 namelength = buff.get();
@@ -429,7 +413,7 @@ public class BinaryPktTransport
                 chanIDlen = buff.get();
                 chanID = new byte[chanIDlen];
                 buff.get(chanID);
-                fireJoinedChan(new String(namebytes),chanID);
+                rcvJoinedChan(new String(namebytes),chanID);
                 break;                
             default:
                 System.out.println("WARNING:Invalid op recieved from client: " + op +
@@ -443,98 +427,60 @@ public class BinaryPktTransport
      *
      * @param key byte[]
      */
-    private void fireReconnectKeyRecieved(byte[] user, byte[] key) {
-        for (Iterator i = listeners.iterator(); i.hasNext(); ) {
-            ( (TransportListener) i.next()).reconnectKeyReceived(user, key);
-        }
-        
-    }
+    protected abstract void recvReconnectKey(byte[] user, byte[] key);
     
     /**
      * fireUserLeft
      *
      * @param user byte[]
      */
-    private void fireUserLeft(byte[] user) {
-        for (Iterator i = listeners.iterator(); i.hasNext(); ) {
-            ( (TransportListener) i.next()).userLeft(user);
-        }
-    }
+    protected abstract void rcvUserLeft(byte[] user);
     
     /**
      * fireUserJoinedChan
      *
      * @param user byte[]
      */
-    private void fireUserJoinedChan(byte[] chanID, byte[] user) {
-        for (Iterator i = listeners.iterator(); i.hasNext(); ) {
-            ( (TransportListener) i.next()).userJoinedChannel(chanID, user);
-        }
-    }
+    protected abstract void rcvJoinedChan(byte[] chanID, byte[] user); 
     
     /**
      * fireUserLeftChan
      *
      * @param user byte[]
      */
-    private void fireUserLeftChan(byte[] chanID, byte[] user) {
-        for (Iterator i = listeners.iterator(); i.hasNext(); ) {
-            ( (TransportListener) i.next()).userLeftChannel(chanID, user);
-        }
-    }
+    protected abstract void rcvLeftChan(byte[] chanID, byte[] user);
     
     /**
      * fireUserJoined
      *
      * @param user byte[]
      */
-    private void fireUserJoined(byte[] user) {
-        for (Iterator i = listeners.iterator(); i.hasNext(); ) {
-            ( (TransportListener) i.next()).userJoined(user);
-        }
-    }
+    protected abstract void rcvUserJoined(byte[] user);
     
     /**
      * fireUserRejected
      */
-    private void fireUserRejected(String message) {
-        for (Iterator i = listeners.iterator(); i.hasNext(); ) {
-            ( (TransportListener) i.next()).userRejected(message);
-        }
-    }
-    
+    protected abstract void rcvUserRejected(String message);
     /**
      * fireUserAccepted
      *
      * @param user byte[]
      */
-    private void fireUserAccepted(byte[] user) {
-        for (Iterator i = listeners.iterator(); i.hasNext(); ) {
-            ( (TransportListener) i.next()).userAccepted(user);
-        }
-    }
+    protected abstract void rcvUserAccepted(byte[] user);
     
     /**
      * fireValidationResp
      *
      * @param cbs Callback[]
      */
-    private void fireValidationResp(Callback[] cbs) {
-        for (Iterator i = listeners.iterator(); i.hasNext(); ) {
-            ( (TransportListener) i.next()).validationResponse(cbs);
-        }
-    }
+    protected abstract void rcvValidationResp(Callback[] cbs);
     
     /**
      * fireValidationReq
      *
      * @param cbs Callback[]
      */
-    private void fireValidationReq(Callback[] cbs) {
-        for (Iterator i = listeners.iterator(); i.hasNext(); ) {
-            ( (TransportListener) i.next()).validationRequest(cbs);
-        }
-    }
+    protected abstract void rcvValidationReq(Callback[] cbs);
     
     /**
      * fireReconnectReq
@@ -542,20 +488,12 @@ public class BinaryPktTransport
      * @param user byte[]
      * @param key byte[]
      */
-    private void fireReconnectReq(byte[] user, byte[] key) {
-        for (Iterator i = listeners.iterator(); i.hasNext(); ) {
-            ( (TransportListener) i.next()).reconnectRequest(user, key);
-        }
-    }
+    protected abstract void rcvReconnectReq(byte[] user, byte[] key);
     
     /**
      * fireConnectReq
      */
-    private void fireConnectReq() {
-        for (Iterator i = listeners.iterator(); i.hasNext(); ) {
-            ( (TransportListener) i.next()).connectRequest();
-        }
-    }
+    protected abstract void rcvConnectReq();
     
     /**
      * fireBroadcastMsg
@@ -564,14 +502,8 @@ public class BinaryPktTransport
      * @param from byte[]
      * @param databuff ByteBuffer
      */
-    private void fireBroadcastMsg(boolean reliable, byte[] chanID, byte[] from,
-            ByteBuffer databuff) {
-        for (Iterator i = listeners.iterator(); i.hasNext(); ) {
-            ( (TransportListener) i.next()).broadcastMsgReceived(chanID,reliable, from,
-                    databuff.duplicate());
-        }
-        
-    }
+    protected abstract void rcvBroadcastMsg(boolean reliable, byte[] chanID, byte[] from,
+            ByteBuffer databuff);
     
     /**
      * fireMultiicastMsg
@@ -581,13 +513,8 @@ public class BinaryPktTransport
      * @param tolist byte[][]
      * @param databuff ByteBuffer
      */
-    private void fireMultiicastMsg(boolean reliable, byte[] chanID, byte[] from, byte[][] tolist,
-            ByteBuffer databuff) {
-        for (Iterator i = listeners.iterator(); i.hasNext(); ) {
-            ( (TransportListener) i.next()).multicastMsgReceived(chanID,reliable,
-                    from,tolist,databuff.duplicate());
-        }
-    }
+    protected abstract void rcvMulticastMsg(boolean reliable, byte[] chanID, byte[] from, byte[][] tolist,
+            ByteBuffer databuff);
     
     /**
      * fireUnicastMsg
@@ -597,34 +524,16 @@ public class BinaryPktTransport
      * @param to byte[]
      * @param databuff ByteBuffer
      */
-    private void fireUnicastMsg(boolean reliable, byte[] chanID, byte[] from, byte[] to,
-            ByteBuffer databuff) {
-        for (Iterator i = listeners.iterator(); i.hasNext(); ) {
-            ( (TransportListener) i.next()).unicastMsgReceived(chanID,reliable,
-                    from,to,databuff.duplicate());
-        }
-    }
+    protected abstract void rcvUnicastMsg(boolean reliable, byte[] chanID, byte[] from, byte[] to,
+            ByteBuffer databuff);
     
+    protected abstract void rcvReqJoinChan(String name, byte[] user); 
     
-    private void fireReqJoinChan(String name, byte[] user) {
-        for (Iterator i = listeners.iterator(); i.hasNext(); ) {
-            ( (TransportListener) i.next()).channelJoinReq(name,user);
-        }
-    }
-    
-    private void fireJoinedChan(String name, byte[] chanID) {
-        for (Iterator i = listeners.iterator(); i.hasNext(); ) {
-            ( (TransportListener) i.next()).channelJoined(name,chanID);
-        }
-    }
+    protected abstract void rcvJoinedChan(String name, byte[] chanID);
     
     /**
      * disconnect
      */
-    public void disconnect() throws IOException {
-        conn.disconnect();
-    }
-    
-    
+    protected abstract void disconnect();    
     
 }

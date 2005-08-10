@@ -1,34 +1,26 @@
-package com.sun.gi.comm.users;
+package com.sun.gi.comm.users.server;
 
-import java.io.*;
-import java.nio.*;
-import java.nio.channels.*;
-import java.util.*;
 
-import com.sun.gi.comm.routing.*;
-import com.sun.gi.utils.nio.*;
-import com.sun.gi.comm.validation.UserValidator;
-import com.sun.gi.comm.validation.UserValidatorFactory;
-import com.sun.gi.utils.ReversableMap;
+import java.nio.ByteBuffer;
+import java.util.HashMap;
+import java.util.Map;
+
+import com.sun.gi.comm.routing.ChannelID;
+import com.sun.gi.comm.routing.Router;
+import com.sun.gi.comm.routing.RouterListener;
 import com.sun.gi.comm.routing.UserID;
-import com.sun.gi.comm.transport.TransportListener;
-import com.sun.gi.comm.transport.impl.TCPTransport;
-import javax.security.auth.callback.Callback;
-import com.sun.gi.comm.transport.Transport;
-import sun.security.validator.Validator;
-import javax.security.auth.callback.*;
-import java.util.Map.Entry;
+import com.sun.gi.comm.users.validation.UserValidatorFactory;
+import com.sun.gi.utils.ReversableMap;
+import com.sun.gi.utils.nio.NIOSocketManager;
+import com.sun.gi.utils.nio.NIOSocketManagerListener;
+import com.sun.gi.utils.nio.NIOTCPConnection;
 
 public class TCPIPUserManager
-    implements UserManager, RouterListener, NIOSocketManagerListener,
+    implements NIOSocketManagerListener, UserManager, RouterListener 
    {
   Router router;
   long gameID;
-  ReversableMap idToConnectionMap = new ReversableMap();
-
-  UserValidatorFactory validatorFactory;
-  private ReversableMap idToTransport = new ReversableMap();
-  private Map validatorMap = new HashMap();
+  UserValidatorFactory validatorFactory;  
   private String host="localhost";
   private int port=1139;
   private NIOSocketManager socketMgr;
@@ -65,26 +57,71 @@ public class TCPIPUserManager
 
 
   /**
-   * getClientClassname
-   *
-   * @return String
-   */
+	 * getClientClassname
+	 * 
+	 * @return String
+	 */
   public String getClientClassname() {
     return "com.sun.gi.comm.users.client.TCPIPUserManagerClient";
   }
 
   /**
-   * getClientParams
-   *
-   * @return Map
-   */
+	 * getClientParams
+	 * 
+	 * @return Map
+	 */
   public Map getClientParams() {
-    Map params = new HashMap();
+    Map<String,String> params = new HashMap<String,String>();
     params.put("host",host);
     params.put("port",Integer.toString(port));
     return params;
   }
 
-  
+public void newTCPConnection(NIOTCPConnection connection) {
+	TCPIPTransport conn = new TCPIPTransport(connection);
+	
+}
+
+public void connected(NIOTCPConnection connection) {
+	// TODO Auto-generated method stub
+	
+}
+
+public void connectionFailed(NIOTCPConnection connection) {
+	// TODO Auto-generated method stub
+	
+}
+
+public void sendDataToUser(ChannelID cid, UserID id, UserID from, ByteBuffer buff, boolean reliable) {
+	// TODO Auto-generated method stub
+	
+}
+
+public void dataArrived(UserID to, UserID from, ByteBuffer data, boolean realiable) {
+	// TODO Auto-generated method stub
+	
+}
+
+public void userDropped(UserID userID) {
+	// TODO Auto-generated method stub
+	
+}
+
+public void userAdded(UserID userID) {
+	// TODO Auto-generated method stub
+	
+}
+
+public void newUserKey(UserID userID, byte[] key) {
+	// TODO Auto-generated method stub
+	
+}
+
+public void broadcastDataArrived(UserID from, ByteBuffer buff, boolean reliable) {
+	// TODO Auto-generated method stub
+	
+}
+
+ 
 
 }

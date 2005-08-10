@@ -1,4 +1,4 @@
-package com.sun.gi.comm.validation;
+package com.sun.gi.comm.users.validation;
 
 import java.nio.ByteBuffer;
 import javax.security.auth.callback.Callback;

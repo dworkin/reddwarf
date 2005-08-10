@@ -1,4 +1,4 @@
-package com.sun.gi.comm.users;
+package com.sun.gi.comm.users.server;
 
 import java.nio.*;
 import java.util.*;
