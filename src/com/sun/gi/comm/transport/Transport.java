@@ -5,8 +5,8 @@ import java.io.IOException;
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.UnsupportedCallbackException;
 
-public interface Transport {
-  public void addListener(TransportListener l);
+public interface Protocol {
+  
 
   public void sendUnicastMsg(byte[] chanID, byte[] from,
                              byte[] to,
