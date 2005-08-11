@@ -67,18 +67,15 @@ public interface Router {
 	 *            router
 	 * @param key2 
 	 * @return boolean true if key is valid, false if key is not
+	 * @throws IOException 
+	 * @throws InstantiationException 
 	 */
 
-	public boolean reregisterUser(SGSUser user, byte[] userid, byte[] key);
+	public boolean reregisterUser(SGSUser user, byte[] userid, byte[] key) throws InstantiationException, IOException;
 
 
 	public void validationResponse(TCPIPUser user, Callback[] cbs) throws InstantiationException, IOException;
 
-	public void sendBroadcastMessage(byte[] chanID, UserID userID, ByteBuffer databuff, boolean reliable);
-
-	public void sendMulticastMessage(byte[] chanID, UserID userID, byte[][] tolist, ByteBuffer databuff, boolean reliable);
-
-	public void sendUnicastMessage(byte[] chanID, UserID userID, byte[] to, ByteBuffer databuff);
 	
 	
 }

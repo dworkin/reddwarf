@@ -20,6 +20,8 @@ import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.comm.users.server.TCPIPUser;
 import com.sun.gi.comm.users.validation.UserValidator;
 import com.sun.gi.comm.users.validation.UserValidatorFactory;
+import com.sun.gi.framework.interconnect.TransportChannel;
+import com.sun.gi.framework.interconnect.TransportChannelListener;
 import com.sun.gi.framework.interconnect.TransportManager;
 import com.sun.gi.utils.types.BYTEARRAY;
 
@@ -27,7 +29,9 @@ public class RouterImpl implements Router {
 
 	private Map<UserID,SGSUser> userMap = new HashMap<UserID,SGSUser>();
 	private TransportManager transportManager;	
+	private TransportChannel routerControlChannel;
 	private Map<ChannelID,SGSChannel> channelMap = new HashMap<ChannelID,SGSChannel>();
+	private Map<String,SGSChannel> channelNameMap = new HashMap<String,SGSChannel>();
 	private Map<UserID,BYTEARRAY> currentKeys = new HashMap<UserID,BYTEARRAY>();
 	private Map<UserID,BYTEARRAY> previousKeys = new HashMap<UserID,BYTEARRAY>();	
 	private Map<SGSUser,UserValidator> validators = new HashMap<SGSUser,UserValidator>();
@@ -37,9 +41,23 @@ public class RouterImpl implements Router {
 	
 	
 
-	public RouterImpl(TransportManager cmgr, UserValidatorFactory vFactory){
+	public RouterImpl(TransportManager cmgr, UserValidatorFactory vFactory) throws IOException{
 		transportManager = cmgr;
 		validatorFactory = vFactory;
+		routerControlChannel = transportManager.openChannel("__SGS_ROUTER_CONTROL");
+		routerControlChannel.addListener(new TransportChannelListener() {
+
+			public void dataArrived(ByteBuffer buff) {
+				// TODO Auto-generated method stub
+				
+			}
+
+			public void channelClosed() {
+				// TODO Auto-generated method stub
+				
+			}
+			
+		});
 	}
 
 	public void registerUser(SGSUser user) throws InstantiationException, IOException {
@@ -89,13 +107,25 @@ public class RouterImpl implements Router {
 	}
 
 	public SGSChannel openChannel(String channelName) {
-		ChannelImpl chan = new ChannelImpl(this,channelName);
-		channelMap .put(chan.channelID(),chan);
-		return chan;
+		SGSChannel sgschan = channelNameMap.get(channelName);
+		if (sgschan == null){
+			TransportChannel tchan;
+			try {
+				tchan = transportManager.openChannel(channelName);
+			} catch (IOException e) {				
+				e.printStackTrace();
+				return null;
+			}
+			SGSChannel chan = new ChannelImpl(tchan);
+			channelMap.put(chan.channelID(),chan);
+			channelNameMap.put(channelName,chan);
+		}
+		return sgschan;
 	}
 
 
-	public boolean reregisterUser(SGSUser user, byte[] userid, byte[] key) {
+	public boolean reregisterUser(SGSUser user, byte[] userid, byte[] key)
+			throws InstantiationException, IOException {
 		UserID id;
 		try {
 			id = new UserID(userid);
@@ -106,12 +136,8 @@ public class RouterImpl implements Router {
 		BYTEARRAY currentKey = currentKeys.get(id);
 		BYTEARRAY previousKey = previousKeys.get(id);
 		if ((currentKey.equals(key))|| (previousKey.equals(key))){
-			try {
 				registerUser(user,id);
-			} catch (InstantiationException e) {				
-				e.printStackTrace();
-				return false;
-			}
+		
 			return true;
 		}
 		return false;
@@ -124,28 +150,7 @@ public class RouterImpl implements Router {
 		
 	}
 
-	public void sendBroadcastMessage(ChannelID chanID, UserID userID, ByteBuffer databuff, boolean reliable) {
-		SGSChannel chan = channelMap.get(chanID);
-		synchronized(hdr){
-			hdr.clear();
-			hdr.put((byte)OPCODE.BroadcastMessage.ordinal());
-			hdr.put(reliable?0:1);
-			
-		}
-		chan.broadcastData(userID,databuff.duplicate(),reliable);
-		
-	}
-
-	public void sendMulticastMessage(ChannelID chanID, UserID userID, byte[][] tolist, ByteBuffer databuff, boolean reliable) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	public void sendUnicastMessage(ChannelID chanID, UserID userID, byte[] to, ByteBuffer databuff) {
-		// TODO Auto-generated method stub
-		
-	}
-
+	
 	
 
 }

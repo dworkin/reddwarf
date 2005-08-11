@@ -51,6 +51,7 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 			transportChannel.sendData(buffs);
 		}
 		
+		
 	}
 
 	public void multicastData(UserID from, UserID[] tolist, ByteBuffer message, boolean reliable) {
@@ -185,7 +186,9 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 	private void sendToLocalUser(byte[] frombytes, byte[] tobytes, ByteBuffer buff, boolean reliable) {
 		try {
 			SGSUser user = localUsers.get(new UserID(tobytes));
-			user.sendMsg(localIDbytes,frombytes,reliable,buff);
+			if (user != null){ // our user
+				user.sendMsg(localIDbytes,frombytes,reliable,buff);
+			}
 		} catch (InstantiationException e) {
 			e.printStackTrace();
 		} catch (IOException e) {
