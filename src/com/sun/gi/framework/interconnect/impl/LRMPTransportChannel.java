@@ -79,4 +79,9 @@ public class LRMPTransportChannel implements TransportChannel {
      transportManager.sendData(uuID,byteBuffers);
   }
 
+public void close() {
+	// TODO Auto-generated method stub
+	
+}
+
 }

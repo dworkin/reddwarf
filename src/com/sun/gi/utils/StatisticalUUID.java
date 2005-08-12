@@ -18,6 +18,11 @@ public class StatisticalUUID
   transient static SecureRandom random = null;
   private long randomValue;
   private long timeValue;
+  
+  public StatisticalUUID(long time, long tiebreaker){
+	  timeValue = time;
+	  randomValue = tiebreaker;
+  }
 
   public StatisticalUUID() {
     if (random == null) {

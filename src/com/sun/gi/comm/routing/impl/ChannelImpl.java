@@ -23,17 +23,20 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 	private ByteBuffer hdr = ByteBuffer.allocate(1024);
 	private ByteBuffer[] buffs = new ByteBuffer[2];
 	private Map<UserID,SGSUser> localUsers = new HashMap<UserID,SGSUser>();
+	private RouterImpl router;
 	
 	private enum OPCODE {
-		UserJoinedChan, UserLeftChan, UnicastMessage, MulticastMessage, BroadcastMessage,
+		UserJoinedChan, UserLeftChan, 
+		UnicastMessage, MulticastMessage, BroadcastMessage
 	}
 	
-	
-	public ChannelImpl(TransportChannel chan) {
+	// only instanceable by ChannelImpl
+	ChannelImpl(RouterImpl r, TransportChannel chan) throws IOException {
 		transportChannel = chan;
 		localID = new ChannelID();
 		localIDbytes = localID.toByteArray();
-		buffs[0]=hdr;
+		buffs[0]=hdr;		
+		router = r;
 	}
 
 	public void unicastData(UserID from, UserID to, ByteBuffer message, boolean reliable) {
@@ -104,9 +107,26 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 		}
 		
 	}
+	
+	public void leave(SGSUser user) {
+		localUsers.remove(user.getUserID());
+		synchronized(hdr){
+			hdr.clear();
+			hdr.put((byte)OPCODE.UserJoinedChan.ordinal());
+			byte[] userbytes = user.getUserID().toByteArray();
+			hdr.putInt(userbytes.length);
+			hdr.put(userbytes);			
+			buffs[1] = null;
+			try {
+				transportChannel.sendData(hdr);
+			} catch (IOException e) {				
+				e.printStackTrace();
+			}
+		}
+	}
 
 	public ChannelID channelID() {
-		return local_id;
+		return localID;
 	}
 
 	//	 Transport Channel Listener
@@ -215,8 +235,16 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 	public void channelClosed() {
 		for(SGSUser user : localUsers.values()){
 			user.sendLeftChan(localIDbytes);
-		}		
+		}	
+		router.closeChannel(this);
 	}
+
+	// only for use by RouterImpl
+	Object getName() {
+		return transportChannel.getName();
+	}
+
+	
 
 	
 }

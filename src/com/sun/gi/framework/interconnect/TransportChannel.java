@@ -30,4 +30,6 @@ public interface TransportChannel {
    * @param byteBuffers ByteBuffer[]
    */
   public void sendData(ByteBuffer[] byteBuffers);
+  
+  public void close();
 }

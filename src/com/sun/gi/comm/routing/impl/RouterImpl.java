@@ -23,9 +23,11 @@ import com.sun.gi.comm.users.validation.UserValidatorFactory;
 import com.sun.gi.framework.interconnect.TransportChannel;
 import com.sun.gi.framework.interconnect.TransportChannelListener;
 import com.sun.gi.framework.interconnect.TransportManager;
+import com.sun.gi.framework.logging.SGSERRORCODES;
 import com.sun.gi.utils.types.BYTEARRAY;
 
 public class RouterImpl implements Router {
+	static private final UserID serverID = new ChannelID(-1,-1);
 
 	private Map<UserID,SGSUser> userMap = new HashMap<UserID,SGSUser>();
 	private TransportManager transportManager;	
@@ -38,7 +40,7 @@ public class RouterImpl implements Router {
 	private UserValidatorFactory validatorFactory;
 	private ByteBuffer hdr = ByteBuffer.allocate(256);
 	
-	
+	private enum OPCODE {UserJoined,UserLeft};
 	
 
 	public RouterImpl(TransportManager cmgr, UserValidatorFactory vFactory) throws IOException{
@@ -48,16 +50,56 @@ public class RouterImpl implements Router {
 		routerControlChannel.addListener(new TransportChannelListener() {
 
 			public void dataArrived(ByteBuffer buff) {
-				// TODO Auto-generated method stub
+				OPCODE opcode = OPCODE.values()[(int)buff.get()];
+				switch (opcode){
+					case UserJoined:
+						int idlen = buff.getInt();
+						byte[] idbytes = new byte[idlen];
+						buff.get(idbytes);
+						reportUserJoined(idbytes);
+						break;
+					case UserLeft:
+						idlen = buff.getInt();
+						idbytes = new byte[idlen];
+						buff.get(idbytes);
+						reportUserLeft(idbytes);
+						break;
+				}
 				
 			}
 
+			
+
 			public void channelClosed() {
-				// TODO Auto-generated method stub
-				
+				SGSERRORCODES.FatalErrors.RouterFailure.fail("Router control channel failed.");				
 			}
 			
 		});
+	}
+	
+	private void reportUserLeft(byte[] uidbytes) {
+		for(SGSUser user : userMap.values()){
+			try {
+				user.sendUserLeft(uidbytes);
+			} catch (IOException e) {
+				System.out.println("Exception sending UserLeft to user id="+user.getUserID());
+				e.printStackTrace();
+			}
+		}
+
+		
+	}
+
+	private void reportUserJoined(byte[] uidbytes) {
+		for(SGSUser user : userMap.values()){
+			try {
+				user.sendUserJoined(uidbytes);
+			} catch (IOException e) {
+				System.out.println("Exception sending UserJOined to user id="+user.getUserID());
+				e.printStackTrace();
+			}
+		}
+		
 	}
 
 	public void registerUser(SGSUser user) throws InstantiationException, IOException {
@@ -91,7 +133,19 @@ public class RouterImpl implements Router {
 	}
 
 	private void fireUserJoined(UserID uid) {
-		// TODO
+		byte[] uidbytes = uid.toByteArray();
+		synchronized(hdr){
+			hdr.clear();
+			hdr.put((byte)OPCODE.UserJoined.ordinal());
+		
+			hdr.putInt(uidbytes.length);
+			hdr.put(uidbytes);
+			try {
+				routerControlChannel.sendData(hdr);
+			} catch (IOException e) {				
+				e.printStackTrace();
+			}
+		}
 		
 	}
 
@@ -101,8 +155,19 @@ public class RouterImpl implements Router {
 		fireUserLeft(id);
 	}
 
-	private void fireUserLeft(UserID id) {
-		// TODO Auto-generated method stub
+	private void fireUserLeft(UserID uid) {
+		byte[] uidbytes = uid.toByteArray();
+		synchronized(hdr){
+			hdr.clear();
+			hdr.put((byte)OPCODE.UserLeft.ordinal());		
+			hdr.putInt(uidbytes.length);
+			hdr.put(uidbytes);
+			try {
+				routerControlChannel.sendData(hdr);
+			} catch (IOException e) {				
+				e.printStackTrace();
+			}
+		}
 		
 	}
 
@@ -116,11 +181,21 @@ public class RouterImpl implements Router {
 				e.printStackTrace();
 				return null;
 			}
-			SGSChannel chan = new ChannelImpl(tchan);
-			channelMap.put(chan.channelID(),chan);
-			channelNameMap.put(channelName,chan);
+			SGSChannel chan;
+			try {
+				chan = new ChannelImpl(tchan);
+				channelMap.put(chan.channelID(),chan);
+				channelNameMap.put(channelName,chan);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}		
 		}
 		return sgschan;
+	}
+	
+	protected void closeChannel(ChannelImpl channel){
+		channelNameMap.remove(channel.getName());
+		channelMap.remove(channel.channelID());
 	}
 
 
