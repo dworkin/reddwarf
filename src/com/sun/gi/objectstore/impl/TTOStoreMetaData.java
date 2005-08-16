@@ -1,5 +1,7 @@
 package com.sun.gi.objectstore.impl;
 
+import com.sun.gi.objectstore.OStoreMetaData;
+
 /**
  * <p>Title: </p>
  * <p>Description: </p>
