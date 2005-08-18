@@ -11,26 +11,28 @@ package com.sun.gi;
  * @author Jeff Kesselman
  * @version 1.0
  */
-import java.io.*;
-import java.lang.reflect.*;
-import java.util.*;
-
-import com.sun.gi.comm.routing.*;
-import com.sun.gi.comm.users.*;
-import com.sun.gi.comm.validation.impl.*;
-import com.sun.gi.framework.install.*;
-
-import com.sun.gi.comm.discovery.Advertisement;
+import java.io.File;
+import java.lang.reflect.Constructor;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
 import java.util.Map.Entry;
-import com.sun.gi.framework.status.ReportManager;
+
+import com.sun.gi.comm.routing.Router;
+import com.sun.gi.comm.users.server.UserManager;
+import com.sun.gi.framework.install.InstallRec;
+import com.sun.gi.framework.install.InstallationFile;
+import com.sun.gi.framework.install.InstallationLoader;
+import com.sun.gi.framework.install.LoginModuleRec;
+import com.sun.gi.framework.install.UserMgrRec;
 import com.sun.gi.framework.interconnect.TransportManager;
 import com.sun.gi.framework.interconnect.impl.LRMPTransportManager;
+import com.sun.gi.framework.status.ReportManager;
+import com.sun.gi.framework.status.ReportUpdater;
+import com.sun.gi.framework.status.StatusReport;
 import com.sun.gi.framework.status.impl.ReportManagerImpl;
 import com.sun.gi.utils.SGSUUID;
 import com.sun.gi.utils.StatisticalUUID;
-import com.sun.gi.framework.status.StatusReport;
-import com.sun.gi.framework.status.ReportUpdater;
-import com.sun.gi.comm.routing.nohb.NOHBRouter;
 
 public class SGS {
   ReportManager reportManager;
