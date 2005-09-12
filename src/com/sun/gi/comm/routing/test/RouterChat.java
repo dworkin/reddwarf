@@ -4,7 +4,11 @@ import java.awt.BorderLayout;
 import java.awt.Container;
 import java.awt.FlowLayout;
 import java.awt.GridLayout;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.io.IOException;
 
+import javax.swing.JButton;
 import javax.swing.JDesktopPane;
 import javax.swing.JFrame;
 import javax.swing.JList;
@@ -13,43 +17,53 @@ import javax.swing.JScrollPane;
 
 import javax.swing.JLabel;
 import com.sun.gi.comm.routing.Router;
+import com.sun.gi.comm.routing.SGSUser;
+import com.sun.gi.comm.routing.impl.RouterImpl;
+import com.sun.gi.framework.interconnect.impl.LRMPTransportManager;
+import javax.swing.JOptionPane;
 
 public class RouterChat extends JFrame{
 
 	private Router router;
-	
-	private JList foreignUserList;
-	private JList localUserList;
 	private JDesktopPane desktop;
 	
 	public RouterChat(){
 		Container c = getContentPane();
-		c.setLayout(new BorderLayout());
-		localUserList = new JList();
-		JScrollPane localUserScroll = new JScrollPane(localUserList);
-		foreignUserList = new JList();
-		JScrollPane foreignUserScroll = new JScrollPane(foreignUserList);
-		JPanel listPanel = new JPanel();
-		FlowLayout fl = new FlowLayout();
-		listPanel.setLayout(fl);
-		JPanel localPanel = new JPanel();
-		localPanel.setLayout(new BorderLayout());
-		localPanel.add(new JLabel("Local Users"),BorderLayout.NORTH);
-		localPanel.add(localUserScroll,BorderLayout.CENTER);
-		JPanel foreignPanel = new JPanel();
-		foreignPanel.setLayout(new BorderLayout());
-		foreignPanel.add(new JLabel("Foreign Users"),BorderLayout.NORTH);
-		foreignPanel.add(foreignUserScroll,BorderLayout.CENTER);
-		listPanel.add(localPanel);
-		listPanel.add(foreignPanel);
-		c.add(listPanel,BorderLayout.EAST);	
+		c.setLayout(new BorderLayout());	
 		desktop = new JDesktopPane();
 		desktop.setSize(550,480);
 		c.add(desktop,BorderLayout.CENTER);
+		JPanel controlPanel = new JPanel();
+		controlPanel.setLayout(new GridLayout(0,1));
+		JButton newUserButton = new JButton("New User");
+		newUserButton.addActionListener(new ActionListener() {
+
+			public void actionPerformed(ActionEvent e) {
+				newLocalUser();
+				
+			}
+			
+		});
+		controlPanel.add(newUserButton);
+		c.add(controlPanel,BorderLayout.SOUTH);
 		setSize(640,480);
 		this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		setVisible(true);
 		// start router
+		try {
+			router = new RouterImpl(new LRMPTransportManager(),null);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			System.exit(1);
+		}
+		
+	}
+	protected void newLocalUser() {
+		String username = JOptionPane.showInputDialog(this,"Enter User Name");
+		RCUser user = new RCUser(router,username);
+		desktop.add(user);
+		
 	}
 	/**
 	 * @param args

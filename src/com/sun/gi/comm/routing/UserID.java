@@ -23,7 +23,7 @@ import com.sun.gi.utils.StatisticalUUID;
 public class UserID extends StatisticalUUID {
 	
 	public UserID() throws InstantiationException {
-		super()
+		super();
 	}
 	public UserID(byte[] ba) throws InstantiationException {
 		super(ba);

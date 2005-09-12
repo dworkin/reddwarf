@@ -47,14 +47,7 @@ public interface Router {
 
 	public SGSChannel openChannel(String channelName);
 
-	/**
-	 * This call adds a listener to be informed when data arrives or when a user
-	 * ID is destroyed.
-	 * 
-	 * @param listener
-	 *            RouterListener The object to call back on.
-	 */
-	public void addRouterListener(RouterListener listener);
+	
 
 	/**
 	 * /** This call is made in order to reattach an already created user thatw

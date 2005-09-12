@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.UUID;
 
 import javax.security.auth.callback.Callback;
 
@@ -24,10 +25,11 @@ import com.sun.gi.framework.interconnect.TransportChannel;
 import com.sun.gi.framework.interconnect.TransportChannelListener;
 import com.sun.gi.framework.interconnect.TransportManager;
 import com.sun.gi.framework.logging.SGSERRORCODES;
+import com.sun.gi.utils.SGSUUID;
+import com.sun.gi.utils.StatisticalUUID;
 import com.sun.gi.utils.types.BYTEARRAY;
 
 public class RouterImpl implements Router {
-	static private final UserID serverID = new ChannelID(-1,-1);
 
 	private Map<UserID,SGSUser> userMap = new HashMap<UserID,SGSUser>();
 	private TransportManager transportManager;	
@@ -40,7 +42,7 @@ public class RouterImpl implements Router {
 	private UserValidatorFactory validatorFactory;
 	private ByteBuffer hdr = ByteBuffer.allocate(256);
 	
-	private enum OPCODE {UserJoined,UserLeft};
+	private enum OPCODE {UserJoined,UserLeft,UserJoinedChannel,UserLeftChannel};
 	
 
 	public RouterImpl(TransportManager cmgr, UserValidatorFactory vFactory) throws IOException{
@@ -64,6 +66,10 @@ public class RouterImpl implements Router {
 						buff.get(idbytes);
 						reportUserLeft(idbytes);
 						break;
+					case UserJoinedChannel:
+						break;
+					case UserLeftChannel:
+						break;
 				}
 				
 			}
@@ -80,7 +86,7 @@ public class RouterImpl implements Router {
 	private void reportUserLeft(byte[] uidbytes) {
 		for(SGSUser user : userMap.values()){
 			try {
-				user.sendUserLeft(uidbytes);
+				user.userLeftSystem(uidbytes);
 			} catch (IOException e) {
 				System.out.println("Exception sending UserLeft to user id="+user.getUserID());
 				e.printStackTrace();
@@ -93,7 +99,7 @@ public class RouterImpl implements Router {
 	private void reportUserJoined(byte[] uidbytes) {
 		for(SGSUser user : userMap.values()){
 			try {
-				user.sendUserJoined(uidbytes);
+				user.userJoinedSystem(uidbytes);
 			} catch (IOException e) {
 				System.out.println("Exception sending UserJOined to user id="+user.getUserID());
 				e.printStackTrace();
@@ -104,9 +110,13 @@ public class RouterImpl implements Router {
 
 	public void registerUser(SGSUser user) throws InstantiationException, IOException {
 		//must validate user first
-		UserValidator uv = validatorFactory.newValidator();
-		validators.put(user,uv);
-		doValidator(user, uv);
+		if (validatorFactory!=null){
+			UserValidator uv = validatorFactory.newValidator();
+			validators.put(user,uv);
+			doValidator(user, uv);
+		} else {
+			registerUser(user,new UserID());
+		}
 	}
 	
 	private void doValidator(SGSUser user, UserValidator validator) throws InstantiationException, IOException {		
@@ -116,10 +126,10 @@ public class RouterImpl implements Router {
 		} else {
 			Callback[] cbs = validator.nextDataRequest();
 			if (cbs != null) {
-				user.sendValidationRequest(cbs);
+				user.validationRequested(cbs);
 			} else {
 				validators.remove(user);
-				user.sendUserRejected("Validation failed!");
+				user.invalidated("Validation failed!");
 			}
 		}
 			
@@ -127,9 +137,15 @@ public class RouterImpl implements Router {
 	
 	private void registerUser(SGSUser user, UserID uid) throws InstantiationException, IOException {
 		user.setUserID(uid);
-		userMap.put(uid,user);
+		user.validated();		
+		userMap.put(uid,user);		
 		fireUserJoined(uid);
-		user.sendUserAccepted();
+		// send already connected users to new joiner
+		for(UserID existingUser : userMap.keySet()){
+			if (existingUser != uid){
+				user.userJoinedSystem(existingUser.toByteArray());
+			}
+		}
 	}
 
 	private void fireUserJoined(UserID uid) {
@@ -152,7 +168,18 @@ public class RouterImpl implements Router {
 	public void deregisterUser(SGSUser user) {
 		UserID id = user.getUserID();
 		userMap.remove(id);
+		user.disconnected();
 		fireUserLeft(id);
+		for(SGSUser localUser : userMap.values()){
+			if (localUser != user){
+				try {
+					localUser.userLeftSystem(id.toByteArray());
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+		}
 	}
 
 	private void fireUserLeft(UserID uid) {
@@ -181,11 +208,10 @@ public class RouterImpl implements Router {
 				e.printStackTrace();
 				return null;
 			}
-			SGSChannel chan;
 			try {
-				chan = new ChannelImpl(tchan);
-				channelMap.put(chan.channelID(),chan);
-				channelNameMap.put(channelName,chan);
+				sgschan = new ChannelImpl(this,tchan);
+				channelMap.put(sgschan.channelID(),sgschan);
+				channelNameMap.put(channelName,sgschan);				
 			} catch (IOException e) {
 				e.printStackTrace();
 			}		

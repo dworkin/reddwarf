@@ -30,7 +30,7 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 		UnicastMessage, MulticastMessage, BroadcastMessage
 	}
 	
-	// only instanceable by ChannelImpl
+	// only instanceable by RouterImpl
 	ChannelImpl(RouterImpl r, TransportChannel chan) throws IOException {
 		transportChannel = chan;
 		localID = new ChannelID();
@@ -67,7 +67,7 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 			hdr.put(frombytes);
 			hdr.putInt(tolist.length);
 			for(int i=0;i<tolist.length;i++){
-				byte[] tobytes = to[i].toByteArray();
+				byte[] tobytes = tolist[i].toByteArray();
 				hdr.putInt(tobytes.length);
 				hdr.put(tobytes);
 			}
@@ -91,7 +91,6 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 	}
 
 	public void join(SGSUser user) {
-		localUsers.put(user.getUserID(),user);
 		synchronized(hdr){
 			hdr.clear();
 			hdr.put((byte)OPCODE.UserJoinedChan.ordinal());
@@ -104,16 +103,26 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 			} catch (IOException e) {				
 				e.printStackTrace();
 			}
+		}		
+		try {
+			user.joinedChan(this);
+			for(SGSUser existingUser : localUsers.values()){
+				user.userJoinedChannel(localIDbytes, existingUser.getUserID().toByteArray());
+			}
+			sendJoinToLocalUsers(user.getUserID().toByteArray());
+			localUsers.put(user.getUserID(),user);
+		} catch (IOException e) {			
+			e.printStackTrace();
 		}
 		
 	}
 	
 	public void leave(SGSUser user) {
 		localUsers.remove(user.getUserID());
+		byte[] userbytes = user.getUserID().toByteArray();
 		synchronized(hdr){
 			hdr.clear();
-			hdr.put((byte)OPCODE.UserJoinedChan.ordinal());
-			byte[] userbytes = user.getUserID().toByteArray();
+			hdr.put((byte)OPCODE.UserJoinedChan.ordinal());	
 			hdr.putInt(userbytes.length);
 			hdr.put(userbytes);			
 			buffs[1] = null;
@@ -123,6 +132,12 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 				e.printStackTrace();
 			}
 		}
+		try {
+			user.leftChan(this);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		sendLeaveToLocalUsers(userbytes);
 	}
 
 	public ChannelID channelID() {
@@ -185,7 +200,7 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 	private void sendLeaveToLocalUsers(byte[] frombytes) {		
 		for(SGSUser user : localUsers.values()){
 			try {
-				user.sendUserLeftChannel(localIDbytes,frombytes);
+				user.userLeftChannel(localIDbytes,frombytes);
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
@@ -196,7 +211,7 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 	private void sendJoinToLocalUsers(byte[] frombytes) {
 		for(SGSUser user : localUsers.values()){
 			try {
-				user.sendUserJoinedChannel(localIDbytes,frombytes);
+				user.userJoinedChannel(localIDbytes,frombytes);
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
@@ -207,7 +222,7 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 		try {
 			SGSUser user = localUsers.get(new UserID(tobytes));
 			if (user != null){ // our user
-				user.sendMsg(localIDbytes,frombytes,reliable,buff);
+				user.msgReceived(localIDbytes,frombytes,reliable,buff);
 			}
 		} catch (InstantiationException e) {
 			e.printStackTrace();
@@ -234,13 +249,17 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 
 	public void channelClosed() {
 		for(SGSUser user : localUsers.values()){
-			user.sendLeftChan(localIDbytes);
+			try {
+				user.leftChan(this);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
 		}	
 		router.closeChannel(this);
 	}
 
 	// only for use by RouterImpl
-	Object getName() {
+	public String getName() {
 		return transportChannel.getName();
 	}
 
