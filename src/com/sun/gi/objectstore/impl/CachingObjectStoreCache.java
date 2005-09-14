@@ -24,21 +24,20 @@ class CachingObjectStoreCache {
     static final int DEFAULT_CACHE_SIZE = 32;
     static final int UPDATE_NOCHANGE = -1;
     static final int UPDATE_NONE = 0;
-    static final int UPDATE_LOCK = 1;
     static final int UPDATE_CREATE = 2;
     static final int UPDATE_DESTROY = 3;
     
     class Entry {
         int updateMode = UPDATE_NONE;
-        long id;
+        Long idObj;
         String name;
         Serializable sobj;
         private Entry(
-                int updateMode, long id, String name, Serializable sobj) {
+                int updateMode, Long idObj, String name, Serializable sobj) {
             if (updateMode != UPDATE_NOCHANGE) {
                 this.updateMode = updateMode;
             }
-            this.id = id;
+            this.idObj = idObj;
             this.name = name;
             this.sobj = sobj;
         }
@@ -89,9 +88,7 @@ class CachingObjectStoreCache {
                     } else {
                         // if not, add the new entry
                         sourceEntry.updateMode = UPDATE_NONE;
-                        idMap.put(idObj, sourceEntry);
-                        objMap.put(sourceEntry.sobj, sourceEntry);
-                        nameMap.put(sourceEntry.name, sourceEntry);
+                        put(sourceEntry);
                     }
                 }
             }
@@ -110,6 +107,15 @@ class CachingObjectStoreCache {
         }
     }
     
+    Entry put(Entry entry) {
+        synchronized (this) {
+            idMap.put(entry.idObj, entry);
+            objMap.put(entry.sobj, entry);
+            nameMap.put(entry.name, entry);
+        }
+        return entry;
+    }
+    
     Entry put(long id, String name, Serializable sobj) {
         return put(UPDATE_NONE, id, name, sobj);
     }
@@ -120,10 +126,7 @@ class CachingObjectStoreCache {
         synchronized (this) {
             cacheObj = (Entry)idMap.get(name);
             if (cacheObj == null) {
-                cacheObj = new Entry(updateMode, id, name, sobj);
-                idMap.put(idObj, cacheObj);
-                objMap.put(sobj, cacheObj);
-                nameMap.put(name, cacheObj);
+                cacheObj = put(new Entry(updateMode, id, name, sobj));
             } else {
                 // it's possible that the entry is there with no obj
                 if (updateMode != UPDATE_NOCHANGE) {
@@ -149,14 +152,14 @@ class CachingObjectStoreCache {
     long getID(String name) {
         synchronized (this) {
             Entry cacheObj = nameMap.get(name);
-            return (cacheObj != null) ? cacheObj.id : -1;
+            return (cacheObj != null) ? cacheObj.idObj.longValue() : -1;
         }
     }
     
     long getID(Serializable sobj) {
         synchronized (this) {
             Entry cacheObj = objMap.get(sobj);
-            return (cacheObj != null) ? cacheObj.id : -1;
+            return (cacheObj != null) ? cacheObj.idObj.longValue() : -1;
         }
     }
 }

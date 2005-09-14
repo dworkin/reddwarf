@@ -25,8 +25,6 @@ import java.util.HashSet;
 public class CachingObjectStore implements ObjectStore {
     
     private ObjectStore store;
-    private ObjectIDManager oidManager;
-    private long nextID;
     
     // global cache for objects
     CachingObjectStoreCache cache;
@@ -61,8 +59,6 @@ public class CachingObjectStore implements ObjectStore {
         this.cache = new CachingObjectStoreCache(128);
         this.idLockMap = new HashMap(16);
         this.transLockMap = new HashMap(16);
-        oidManager = new PureOStoreIDManager(store);
-        nextID = oidManager.getNextID();
     }
     
     ObjectStore getStore() {
@@ -92,10 +88,6 @@ public class CachingObjectStore implements ObjectStore {
     public OStoreMetaData lockMetaData(Transaction trans) {
         OStoreMetaData metaData = store.lockMetaData(trans);
         return metaData;
-    }
-    
-    synchronized long nextObjectID() {
-        return nextID++;
     }
     
     boolean checkAndLock(CachingObjectStoreTransaction trans, long id) {

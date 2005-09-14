@@ -48,7 +48,7 @@ public class CachingObjectStoreTransaction implements Transaction {
     }
     
     public long create(Serializable object, String name) {
-        long id = cstore.nextObjectID();
+        long id = trans.create(object, name);
         Entry cacheObj = cache.put(UPDATE_CREATE, id, name, object);
         synchronized (updateSet) {
             updateSet.add(cacheObj);
@@ -73,22 +73,46 @@ public class CachingObjectStoreTransaction implements Transaction {
             return cacheObj.sobj;
         } else {
             Serializable sobj = trans.peek(objectID);
-            cache.put(UPDATE_NONE, objectID, null, sobj);
+            // place peeked object in global cache only
+            cstore.cache.put(UPDATE_NONE, objectID, null, sobj);
             return sobj;
         }
     }
     
     public Serializable lock(long objectID) throws DeadlockException {
         synchronized (this) {
+            Serializable sobj = null;
             // first check to see if object is locked
             // if not, then lock it
             // note that checkAndLock needs to be atomic
             boolean success = cstore.checkAndLock(this, objectID);
-            if (!success) {
+            if (success) {
+                Entry cacheObj = cache.get(objectID);
+                if (cacheObj == null) {
+                    cacheObj = cstore.cache.get(objectID);
+                    // move the object from global to local cache
+                    if (cacheObj != null) {
+                        cache.put(cacheObj);
+                        sobj = cacheObj.sobj;
+                    }
+                }
+                // if not in any cache, need to lock it from database
+                if (sobj == null) {
+                    sobj = trans.lock(objectID);
+                    if (sobj != null) {
+                        cacheObj = cache.put(UPDATE_NONE, objectID, null, sobj);
+                    }
+                }
+                if (cacheObj != null) {
+                    synchronized (updateSet) {
+                        updateSet.add(cacheObj);
+                    }
+                }
+            } else {
                 // let the underlying transaction worry about deadlock
-                trans.lock(objectID);
+                sobj = trans.lock(objectID);
             }
-            return peek(objectID);
+            return sobj;
         }
     }
     
@@ -103,7 +127,8 @@ public class CachingObjectStoreTransaction implements Transaction {
         } else {
             id = trans.lookup(name);
             if (id >= 0) {
-                cache.put(id, name, null);
+                // place lookup object in global cache only
+                cstore.cache.put(id, name, null);
             }
             return id;
         }
@@ -120,13 +145,8 @@ public class CachingObjectStoreTransaction implements Transaction {
         synchronized (this) {
             synchronized (updateSet) {
                 for (Entry cacheObj : updateSet) {
-                    switch (cacheObj.updateMode) {
-                        case UPDATE_CREATE:
-                            trans.create(cacheObj.sobj, cacheObj.name);
-                            break;
-                        case UPDATE_DESTROY:
-                            trans.destroy(cacheObj.id);
-                            break;
+                    if (cacheObj.updateMode == UPDATE_DESTROY) {
+                        trans.destroy(cacheObj.idObj.longValue());
                     }
                     
                 }
@@ -150,7 +170,8 @@ public class CachingObjectStoreTransaction implements Transaction {
         if (id < 0) {
             id = trans.lookupObject(sobj);
             if (id >= 0) {
-                cache.put(UPDATE_NONE, id, null, sobj);
+                // place lookup object in global cache only
+                cstore.cache.put(UPDATE_NONE, id, null, sobj);
             }
         }
         return id;
