@@ -11,13 +11,17 @@
 package com.sun.gi.objectstore.impl;
 
 import java.io.Serializable;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import com.sun.gi.objectstore.DeadlockException;
 import com.sun.gi.objectstore.ObjectStore;
 import com.sun.gi.objectstore.Transaction;
-import com.sun.gi.objectstore.impl.CachingObjectStore.CacheObject;
-import static com.sun.gi.objectstore.impl.CachingObjectStore.*;
+import com.sun.gi.objectstore.impl.CachingObjectStore.CachingObjectStoreLock;
+import com.sun.gi.objectstore.impl.CachingObjectStore.CachingObjectStoreLockException;
+import com.sun.gi.objectstore.impl.CachingObjectStoreCache;
+import com.sun.gi.objectstore.impl.CachingObjectStoreCache.Entry;
+import static com.sun.gi.objectstore.impl.CachingObjectStoreCache.*;
 
 /**
  *
@@ -25,26 +29,27 @@ import static com.sun.gi.objectstore.impl.CachingObjectStore.*;
  */
 public class CachingObjectStoreTransaction implements Transaction {
     
+    CachingObjectStoreCache cache;
     private CachingObjectStore cstore;
     private ObjectStore store;
     private Transaction trans;
-    private HashSet<CacheObject> updateSet;
+    private HashSet<Entry> updateSet;
     
     /**
      * Creates a new instance of CachingObjectStoreTransaction
      */
     CachingObjectStoreTransaction(
-            CachingObjectStore cstore, Transaction trans) {
+            CachingObjectStore cstore, Transaction trans, int cacheSize) {
         this.cstore = cstore;
         this.store = cstore.getStore();
         this.trans = trans;
-        this.updateSet = new HashSet<CacheObject>(8);
+        this.cache = new CachingObjectStoreCache(cacheSize);
+        this.updateSet = new HashSet<Entry>(16);
     }
     
     public long create(Serializable object, String name) {
         long id = cstore.nextObjectID();
-        CacheObject cacheObj =
-                cstore.put(UPDATE_CREATE, id, name, object);
+        Entry cacheObj = cache.put(UPDATE_CREATE, id, name, object);
         synchronized (updateSet) {
             updateSet.add(cacheObj);
         }
@@ -52,82 +57,96 @@ public class CachingObjectStoreTransaction implements Transaction {
     }
     
     public void destroy(long objectID) {
-        CacheObject cacheObj =
-                cstore.put(UPDATE_DESTROY, objectID, null, null);
+        Entry cacheObj = cache.put(UPDATE_DESTROY, objectID, null, null);
         synchronized (updateSet) {
             updateSet.add(cacheObj);
         }
     }
     
     public Serializable peek(long objectID) {
-        CacheObject cacheObj = cstore.get(objectID);
+        // read from transaction cache first, then global cache
+        Entry cacheObj = cache.get(objectID);
+        if (cacheObj == null) {
+            cacheObj = cstore.cache.get(objectID);
+        }
         if (cacheObj != null) {
             return cacheObj.sobj;
         } else {
             Serializable sobj = trans.peek(objectID);
-            cstore.put(UPDATE_NONE, objectID, null, sobj);
+            cache.put(UPDATE_NONE, objectID, null, sobj);
             return sobj;
         }
     }
     
     public Serializable lock(long objectID) throws DeadlockException {
-        Serializable sobj = null;
-        boolean locked = false;
-        CacheObject cacheObj = cstore.get(objectID);
-        if (cacheObj == null) {
-            sobj = trans.lock(objectID);
-        } else {
-            sobj = cacheObj.sobj;
-            locked = (cacheObj.updateMode == UPDATE_LOCK);
-        }
-        // lock it if haven't done so
-        if (sobj != null && !locked) {
-            trans.lock(cacheObj.id);
-            cacheObj = cstore.put(UPDATE_LOCK, objectID, null, sobj);
-            synchronized (updateSet) {
-                updateSet.add(cacheObj);
+        synchronized (this) {
+            try {
+                cstore.lock(this, objectID);
+                
+                Entry cacheObj = cache.get(objectID);
+                if (cacheObj == null) {
+                    cacheObj = cstore.cache.get(objectID);
+                }
+                if (cacheObj != null) {
+                    return cacheObj.sobj;
+                } else {
+                    Serializable sobj = trans.lock(objectID);
+                    cacheObj = cache.put(UPDATE_LOCK, objectID, null, sobj);
+                    synchronized (updateSet) {
+                        updateSet.add(cacheObj);
+                    }
+                    return sobj;
+                }
+            } catch (CachingObjectStoreLockException lockE) {
+                lockE.printStackTrace();
+                return null;
             }
         }
-        return sobj;
     }
     
     public long lookup(String name) {
-        long id = cstore.getID(name);
+        // read from local cache first, then global cache
+        long id = cache.getID(name);
+        if (id == -1) {
+            id = cstore.cache.getID(name);
+        }
         if (id != -1) {
             return id;
         } else {
             id = trans.lookup(name);
             if (id >= 0) {
-                cstore.put(id, name, null);
+                cache.put(id, name, null);
             }
             return id;
         }
     }
     
     public void abort() {
-        trans.abort();
+        synchronized (this) {
+            cstore.unlockAll(this); // clear all locks
+            trans.abort();
+        }
     }
     
     public void commit() {
-        // register all items
-        synchronized (updateSet) {
-            for (Iterator updates = updateSet.iterator();
-            updates.hasNext(); ) {
-                CacheObject cacheObj =
-                        (CacheObject) updates.next();
-                switch (cacheObj.updateMode) {
-                    case UPDATE_CREATE:
-                        trans.create(cacheObj.sobj, cacheObj.name);
-                        break;
-                    case UPDATE_DESTROY:
-                        trans.destroy(cacheObj.id);
-                        break;
+        synchronized (this) {
+            synchronized (updateSet) {
+                for (Entry cacheObj : updateSet) {
+                    switch (cacheObj.updateMode) {
+                        case UPDATE_CREATE:
+                            trans.create(cacheObj.sobj, cacheObj.name);
+                            break;
+                        case UPDATE_DESTROY:
+                            trans.destroy(cacheObj.id);
+                            break;
+                    }
+                    
                 }
-                
+                updateSet.clear();
+                cstore.commit(this); // finish my transaction
             }
-            updateSet.clear();
+            trans.commit();
         }
-        trans.commit();
     }
     
     public long getCurrentAppID() {
@@ -135,11 +154,15 @@ public class CachingObjectStoreTransaction implements Transaction {
     }
     
     public long lookupObject(Serializable sobj) {
-        long id = cstore.getID(sobj);
+        // read from local cache first, then global cache
+        long id = cache.getID(sobj);
+        if (id < 0) {
+            id = cstore.cache.getID(sobj);
+        }
         if (id < 0) {
             id = trans.lookupObject(sobj);
             if (id >= 0) {
-                cstore.put(id, null, sobj);
+                cache.put(UPDATE_NONE, id, null, sobj);
             }
         }
         return id;

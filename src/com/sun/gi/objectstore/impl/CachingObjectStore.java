@@ -12,156 +12,159 @@ package com.sun.gi.objectstore.impl;
 
 import com.sun.gi.objectstore.ObjectStore;
 import com.sun.gi.objectstore.Transaction;
+import com.sun.gi.objectstore.impl.CachingObjectStoreCache.Entry;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 
 /**
  *
  * @author sundt2
  */
 public class CachingObjectStore implements ObjectStore {
-
-    static final int DEFAULT_CACHE_SIZE = 64;
-
-    static final int UPDATE_NOCHANGE = -1;
-    static final int UPDATE_NONE = 0;
-    static final int UPDATE_LOCK = 1;
-    static final int UPDATE_CREATE = 2;
-    static final int UPDATE_DESTROY = 3;
-
-    private Object mapLock = new Object();
-    private Object updateLock = new Object();
+    
     private ObjectStore store;
     private ObjectIDManager oidManager;
     private long nextID;
-    private HashMap<Long, CacheObject> idMap;
-    private HashMap<String, CacheObject> nameMap;
-    private HashMap<Serializable, CacheObject> objMap;
-
-    class CacheObject {
-        int updateMode = UPDATE_NONE;
-        long id;
-        String name;
-        Serializable sobj;
-        private CacheObject(
-            int updateMode, long id, String name, Serializable sobj) {
-            if (updateMode != UPDATE_NOCHANGE) {
-                this.updateMode = updateMode;
-            }
-            this.id = id;
-            this.name = name;
-            this.sobj = sobj;
+    
+    // global cache for objects
+    CachingObjectStoreCache cache;
+    // global set of locks by objectID
+    private HashMap<Long, CachingObjectStoreLock> idLockMap;
+    // global set of list of locks held by each transaction
+    private HashMap<CachingObjectStoreTransaction, ArrayList<CachingObjectStoreLock>> transLockMap;
+    
+    class CachingObjectStoreLock {
+        CachingObjectStoreTransaction trans;
+        Long idObj;
+        long time;
+        CachingObjectStoreLock(CachingObjectStoreTransaction trans, Long idObj) {
+            this.trans = trans;
+            this.idObj = idObj;
+            this.time = System.currentTimeMillis();
         }
     }
-
+    
+    class CachingObjectStoreLockException extends Exception {
+        CachingObjectStoreLock lock;
+        CachingObjectStoreLockException(
+                CachingObjectStoreLock lock) {
+            super("Lock already acquired");
+            this.lock = lock;
+        }
+    }
+    
     /** Creates a new instance of CachingObjectStore */
     public CachingObjectStore(ObjectStore store, int cacheSize) {
         this.store = store;
+        this.cache = new CachingObjectStoreCache(128);
+        this.idLockMap = new HashMap(16);
+        this.transLockMap = new HashMap(16);
         oidManager = new PureOStoreIDManager(store);
         nextID = oidManager.getNextID();
-
-        int myCacheSize =
-            (cacheSize <= 0) ? DEFAULT_CACHE_SIZE : cacheSize;
-        idMap = new HashMap<Long, CacheObject>(myCacheSize);
-        nameMap = new HashMap<String, CacheObject>(myCacheSize);
-        objMap = new HashMap<Serializable, CacheObject>(myCacheSize);
     }
-
+    
     ObjectStore getStore() {
         return store;
     }
-
+    
     public Transaction newTransaction(long appID, ClassLoader loader) {
         Transaction trans = store.newTransaction(appID, loader);
-        return new CachingObjectStoreTransaction(this, trans);
+        return new CachingObjectStoreTransaction(this, trans, -1);
     }
-
-    public void clear() {
-        synchronized (mapLock) {
-            store.clear();
-            idMap.clear();
-            nameMap.clear();
-            objMap.clear();
-        }
+    
+    public synchronized void clear() {
+        cache.clear();
+        idLockMap.clear();
+        transLockMap.clear();
     }
-
+    
     public long getTimestampTimeout() {
         return store.getTimestampTimeout();
     }
-
+    
     public OStoreMetaData peekMetaData(Transaction trans) {
         OStoreMetaData metaData = store.peekMetaData(trans);
         return metaData;
     }
-
+    
     public OStoreMetaData lockMetaData(Transaction trans) {
         OStoreMetaData metaData = store.lockMetaData(trans);
         return metaData;
     }
-
+    
     synchronized long nextObjectID() {
         return nextID++;
     }
-
-    void remove(long id) {
-        synchronized (mapLock) {
+    
+    CachingObjectStoreLock lock(CachingObjectStoreTransaction trans, long id)
+    throws CachingObjectStoreLockException {
+        synchronized (idLockMap) {
             Long idObj = new Long(id);
-            CacheObject cacheObj = (CacheObject)idMap.get(idObj);
-            if (cacheObj != null) {
-                idMap.remove(idObj);
-                objMap.remove(cacheObj.sobj);
-                nameMap.remove(cacheObj.name);
+            CachingObjectStoreLock lock = idLockMap.get(idObj);
+            if (lock != null) {
+                // if object is already lock, check to see if it is locked by current trans
+                if (lock.trans == trans) {
+                    return lock; // if so, no op and return
+                } else {
+                    // otherwise throw exception
+                    throw new CachingObjectStoreLockException(lock);
+                }
+            }
+            // if no lock yet, then create it and put it into maps
+            lock = new CachingObjectStoreLock(trans, idObj);
+            idLockMap.put(idObj, lock);
+            ArrayList transLockList = transLockMap.get(trans);
+            if (transLockList == null) {
+                transLockList = new ArrayList<CachingObjectStoreLock>(8);
+                transLockMap.put(trans, transLockList);
+            }
+            transLockList.add(lock);
+            return lock;
+        }
+    }
+    
+    CachingObjectStoreLock getLock(CachingObjectStoreTransaction trans, long id) {
+        synchronized (idLockMap) {
+            Long idObj = new Long(id);
+            return idLockMap.get(idObj);
+        }
+    }
+    
+    void unlock(CachingObjectStoreTransaction trans, long id) {
+        synchronized (idLockMap) {
+            Long idObj = new Long(id);
+            CachingObjectStoreLock lock = idLockMap.get(idObj);
+            if (lock != null) {
+                idLockMap.remove(idObj);
+                ArrayList<CachingObjectStoreLock> lockList = transLockMap.get(trans);
+                // remove the lock entry from the transaction
+                if (lockList != null) {
+                    lockList.remove(lock);
+                }
             }
         }
     }
-
-    CacheObject put(long id, String name, Serializable sobj) {
-        return put(UPDATE_NONE, id, name, sobj);
-    }
-
-    CacheObject put(int updateMode, long id, String name, Serializable sobj) {
-        Long idObj = new Long(id);
-        CacheObject cacheObj = null;
-        synchronized (mapLock) {
-            cacheObj = (CacheObject)idMap.get(name);
-            if (cacheObj == null) {
-                cacheObj = new CacheObject(updateMode, id, name, sobj);
-                idMap.put(idObj, cacheObj);
-                objMap.put(sobj, cacheObj);
-                nameMap.put(name, cacheObj);
-            } else {
-                // it's possible that the entry is there with no obj
-                if (updateMode != UPDATE_NOCHANGE) {
-                    cacheObj.updateMode = updateMode;
+    
+    void unlockAll(CachingObjectStoreTransaction trans) {
+        synchronized (idLockMap) {
+            // remove all locks
+            ArrayList<CachingObjectStoreLock> lockList = transLockMap.get(trans);
+            if (lockList != null) {
+                for (CachingObjectStoreLock lock : lockList) {
+                    idLockMap.remove(lock.idObj);
                 }
-                if (name != null) {
-                    cacheObj.name = name;
-                }
-                if (sobj != null) {
-                    cacheObj.sobj = sobj;
-                }
+                transLockMap.remove(trans);
             }
         }
-        return cacheObj;
     }
-
-    CacheObject get(long id) {
-        synchronized (mapLock) {
-            return idMap.get(new Long(id));
+    
+    void commit(CachingObjectStoreTransaction trans) {
+        synchronized (idLockMap) {
+            unlockAll(trans);
+            cache.merge(trans.cache);
         }
     }
-
-    long getID(String name) {
-        synchronized (mapLock) {
-            CacheObject cacheObj = nameMap.get(name);
-            return (cacheObj != null) ? cacheObj.id : -1;
-        }
-    }
-
-    long getID(Serializable sobj) {
-        synchronized (mapLock) {
-            CacheObject cacheObj = objMap.get(sobj);
-            return (cacheObj != null) ? cacheObj.id : -1;
-        }
-    }
+    
 }
