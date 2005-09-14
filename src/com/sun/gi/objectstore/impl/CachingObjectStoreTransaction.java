@@ -80,27 +80,15 @@ public class CachingObjectStoreTransaction implements Transaction {
     
     public Serializable lock(long objectID) throws DeadlockException {
         synchronized (this) {
-            try {
-                cstore.lock(this, objectID);
-                
-                Entry cacheObj = cache.get(objectID);
-                if (cacheObj == null) {
-                    cacheObj = cstore.cache.get(objectID);
-                }
-                if (cacheObj != null) {
-                    return cacheObj.sobj;
-                } else {
-                    Serializable sobj = trans.lock(objectID);
-                    cacheObj = cache.put(UPDATE_LOCK, objectID, null, sobj);
-                    synchronized (updateSet) {
-                        updateSet.add(cacheObj);
-                    }
-                    return sobj;
-                }
-            } catch (CachingObjectStoreLockException lockE) {
-                lockE.printStackTrace();
-                return null;
+            // first check to see if object is locked
+            // if not, then lock it
+            // note that checkAndLock needs to be atomic
+            boolean success = cstore.checkAndLock(this, objectID);
+            if (!success) {
+                // let the underlying transaction worry about deadlock
+                trans.lock(objectID);
             }
+            return peek(objectID);
         }
     }
     

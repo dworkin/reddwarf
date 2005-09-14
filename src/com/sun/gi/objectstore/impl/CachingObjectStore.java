@@ -98,19 +98,14 @@ public class CachingObjectStore implements ObjectStore {
         return nextID++;
     }
     
-    CachingObjectStoreLock lock(CachingObjectStoreTransaction trans, long id)
-    throws CachingObjectStoreLockException {
+    boolean checkAndLock(CachingObjectStoreTransaction trans, long id) {
         synchronized (idLockMap) {
             Long idObj = new Long(id);
             CachingObjectStoreLock lock = idLockMap.get(idObj);
             if (lock != null) {
                 // if object is already lock, check to see if it is locked by current trans
-                if (lock.trans == trans) {
-                    return lock; // if so, no op and return
-                } else {
-                    // otherwise throw exception
-                    throw new CachingObjectStoreLockException(lock);
-                }
+                // success is if it is locked by current transaction
+                return (lock.trans == trans);
             }
             // if no lock yet, then create it and put it into maps
             lock = new CachingObjectStoreLock(trans, idObj);
@@ -121,14 +116,7 @@ public class CachingObjectStore implements ObjectStore {
                 transLockMap.put(trans, transLockList);
             }
             transLockList.add(lock);
-            return lock;
-        }
-    }
-    
-    CachingObjectStoreLock getLock(CachingObjectStoreTransaction trans, long id) {
-        synchronized (idLockMap) {
-            Long idObj = new Long(id);
-            return idLockMap.get(idObj);
+            return true;
         }
     }
     
@@ -162,8 +150,8 @@ public class CachingObjectStore implements ObjectStore {
     
     void commit(CachingObjectStoreTransaction trans) {
         synchronized (idLockMap) {
-            unlockAll(trans);
             cache.merge(trans.cache);
+            unlockAll(trans);
         }
     }
     
