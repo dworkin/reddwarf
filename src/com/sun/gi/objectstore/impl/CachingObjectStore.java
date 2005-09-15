@@ -76,6 +76,10 @@ public class CachingObjectStore implements ObjectStore {
         transLockMap.clear();
     }
     
+    public long getObjectID() {
+        return store.getObjectID();
+    }
+    
     public long getTimestampTimeout() {
         return store.getTimestampTimeout();
     }

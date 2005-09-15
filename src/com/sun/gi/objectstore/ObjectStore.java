@@ -12,6 +12,8 @@ public interface ObjectStore {
 
   public long getTimestampTimeout();
 
+  public long getObjectID();
+  
   public OStoreMetaData peekMetaData(Transaction trans);
 
   public OStoreMetaData lockMetaData(Transaction trans);

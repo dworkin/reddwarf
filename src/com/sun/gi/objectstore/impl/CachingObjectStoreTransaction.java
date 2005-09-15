@@ -49,11 +49,20 @@ public class CachingObjectStoreTransaction implements Transaction {
     
     public long create(Serializable object, String name) {
         long id = trans.create(object, name);
-        Entry cacheObj = cache.put(UPDATE_CREATE, id, name, object);
+        Entry cacheObj = cache.put(UPDATE_NONE, id, name, object);
         synchronized (updateSet) {
             updateSet.add(cacheObj);
         }
         return id;
+    }
+    
+    public boolean create(long objectID, Serializable object, String name) {
+        long id = cstore.getObjectID();
+        Entry cacheObj = cache.put(UPDATE_CREATE, id, name, object);
+        synchronized (updateSet) {
+            updateSet.add(cacheObj);
+        }
+        return true;
     }
     
     public void destroy(long objectID) {
@@ -147,8 +156,9 @@ public class CachingObjectStoreTransaction implements Transaction {
                 for (Entry cacheObj : updateSet) {
                     if (cacheObj.updateMode == UPDATE_DESTROY) {
                         trans.destroy(cacheObj.idObj.longValue());
-                    }
-                    
+                    } else if (cacheObj.updateMode == UPDATE_CREATE) {
+                        trans.create(cacheObj.idObj.longValue(), cacheObj.sobj, cacheObj.name);
+                    }                    
                 }
                 updateSet.clear();
                 cstore.commit(this); // finish my transaction

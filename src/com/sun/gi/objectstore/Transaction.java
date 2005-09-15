@@ -13,6 +13,7 @@ import java.io.*;
 
 public interface Transaction {
     public long create(Serializable object, String name);
+    public boolean create(long objectID, Serializable object, String name);
     public void destroy(long objectID);
     public Serializable peek(long objectID);
     public Serializable lock(long objectID) throws DeadlockException;
