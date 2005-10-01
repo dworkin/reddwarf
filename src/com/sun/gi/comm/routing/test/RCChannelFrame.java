@@ -42,12 +42,16 @@ public class RCChannelFrame extends JInternalFrame {
 		userListPanel.add(new JLabel("Channel Users"), BorderLayout.NORTH);
 		userListPanel.add(new JScrollPane(userList), BorderLayout.CENTER);
 		c.add(userListPanel, BorderLayout.EAST);
-		c.add(new JScrollPane(textOut), BorderLayout.CENTER);
+		JPanel ioPanel = new JPanel();
+		ioPanel.setLayout(new BorderLayout());
+		ioPanel.add(new JScrollPane(textOut), BorderLayout.CENTER);
+		ioPanel.add(textIn,BorderLayout.SOUTH);
 		textIn.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				doTextIn();
 			}
-		});
+		});		
+		c.add(ioPanel,BorderLayout.CENTER);
 		setVisible(true);
 
 	}

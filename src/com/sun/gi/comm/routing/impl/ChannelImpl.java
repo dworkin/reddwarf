@@ -53,6 +53,8 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 			buffs[1] = message;
 			transportChannel.sendData(buffs);
 		}
+		message.flip();
+		sendToLocalUser(from.toByteArray(),to.toByteArray(),message,reliable);
 		
 		
 	}
@@ -74,6 +76,12 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 			buffs[1] = message;
 			transportChannel.sendData(buffs);
 		}
+		byte[][] toArray = new byte[tolist.length];
+		for(int i=0;i<toArray.length;i++){
+			toArray[i] = tolist[i].toByteArray();
+		}
+		message.flip();
+		multicastToLocalUsers(from.toByteArray(),toArray,message,reliable);
 		
 	}
 
@@ -88,6 +96,8 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 			buffs[1] = message;
 			transportChannel.sendData(buffs);
 		}
+		message.flip();
+		broadcastToLocalUsers(from.toByteArray(),message,reliable);
 	}
 
 	public void join(SGSUser user) {
@@ -222,7 +232,7 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 		try {
 			SGSUser user = localUsers.get(new UserID(tobytes));
 			if (user != null){ // our user
-				user.msgReceived(localIDbytes,frombytes,reliable,buff);
+				user.msgReceived(localIDbytes,frombytes,reliable,buff.duplicate());
 			}
 		} catch (InstantiationException e) {
 			e.printStackTrace();
