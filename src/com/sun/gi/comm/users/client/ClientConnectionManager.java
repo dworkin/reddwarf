@@ -7,6 +7,8 @@ import java.util.Set;
 import java.util.HashSet;
 import java.nio.ByteBuffer;
 import javax.security.auth.callback.Callback;
+
+import com.sun.gi.comm.routing.SGSChannel;
 import com.sun.gi.comm.validation.ValidationDataProtocol;
 
 public interface ClientConnectionManager

@@ -11,7 +11,7 @@ import com.sun.gi.utils.nio.NIOTCPConnectionListener;
 
 
 
-public abstract class AbstrackBinaryPktProtocol
+public abstract class AbstractBinaryPktProtocol 
         implements TransportProtocol, NIOTCPConnectionListener {
     private static final byte OP_UNICAST_MSG = 1;
     private static final byte OP_MULTICAST_MSG = 2;

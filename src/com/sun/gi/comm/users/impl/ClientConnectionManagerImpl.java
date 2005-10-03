@@ -1,4 +1,4 @@
-package com.sun.gi.comm.users.client.impl;
+package com.sun.gi.comm.users.impl;
 
 import com.sun.gi.comm.discovery.Discoverer;
 import com.sun.gi.comm.discovery.DiscoveredGame;
