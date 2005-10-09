@@ -16,4 +16,8 @@ public class ChannelID extends StatisticalUUID {
 	public ChannelID(long time, long tiebreaker){
 		super(time,tiebreaker);
 	}
+	
+	public ChannelID(byte[] bytes) throws InstantiationException{
+		super(bytes);
+	}
 }

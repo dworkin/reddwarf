@@ -1,11 +1,12 @@
 package com.sun.gi.comm.routing;
 
 import java.io.IOException;
-import java.nio.*;
 
 import javax.security.auth.callback.Callback;
 
-import com.sun.gi.comm.users.server.TCPIPUser;
+import com.sun.gi.comm.users.server.SGSUser;
+
+
 
 /**
  * This interface defines the fundemental functionality of a Router. Routers
@@ -45,30 +46,9 @@ public interface Router {
 	 */
 	public void deregisterUser(SGSUser user);
 
-	public SGSChannel openChannel(String channelName);
+	public SGSChannel openChannel(String channelName);	
 
-	
-
-	/**
-	 * /** This call is made in order to reattach an already created user thatw
-	 * as dropped or moved from a different router
-	 * 
-	 * @param newid
-	 *            UserID The user ID
-	 * @param key
-	 *            long A time limited reconnect key previously granted by a
-	 *            router
-	 * @param key2 
-	 * @return boolean true if key is valid, false if key is not
-	 * @throws IOException 
-	 * @throws InstantiationException 
-	 */
-
-	public boolean reregisterUser(SGSUser user, byte[] userid, byte[] key) throws InstantiationException, IOException;
-
-
-	public void validationResponse(TCPIPUser user, Callback[] cbs) throws InstantiationException, IOException;
-
+	public boolean validateReconnectKey(UserID user, byte[] key);
 	
 	
 }

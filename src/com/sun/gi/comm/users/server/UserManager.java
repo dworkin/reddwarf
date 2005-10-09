@@ -19,7 +19,7 @@ import com.sun.gi.comm.users.validation.UserValidatorFactory;
  * @version 1.0
  */
 
-public interface UserManager extends RouterListener {
+public interface UserManager  {
     
  
   /***

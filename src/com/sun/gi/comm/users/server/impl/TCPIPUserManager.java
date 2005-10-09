@@ -42,7 +42,6 @@ public class TCPIPUserManager
 
   private void init () throws
       InstantiationException {
-    router.addRouterListener(this);
     System.out.println("Starting TCPIP User Manager on host " + host + " port " + port );
     try {
       socketMgr = new NIOSocketManager();

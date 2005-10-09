@@ -10,8 +10,8 @@ import java.nio.ByteBuffer;
 
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.SGSChannel;
-import com.sun.gi.comm.routing.SGSUser;
 import com.sun.gi.comm.routing.UserID;
+import com.sun.gi.comm.users.server.SGSUser;
 import com.sun.gi.framework.interconnect.TransportChannel;
 import com.sun.gi.framework.interconnect.TransportChannelListener;
 import com.sun.gi.utils.types.BYTEARRAY;
