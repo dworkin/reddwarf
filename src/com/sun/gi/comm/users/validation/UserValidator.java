@@ -6,4 +6,6 @@ public interface UserValidator {
  public Callback[] nextDataRequest();
  public void dataResponse(Callback[] buff);
  public boolean authenticated();
+public void reset();
+
 }
