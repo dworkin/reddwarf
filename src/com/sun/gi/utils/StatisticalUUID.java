@@ -70,18 +70,40 @@ public class StatisticalUUID
   }
 
   public int compareTo(Object object) {
+	long otherTime=0;
+	long otherRand=0;
+	if (object instanceof StatisticalUUID){
+		StatisticalUUID other = (StatisticalUUID) object;
+		otherTime = other.timeValue;
+		otherRand = other.randomValue;
+	} else if (object instanceof byte[]){
+		byte[] bs = (byte[])object;
+		otherRand = ((( (long) bs[0])&0xFF) << 56) | ( (( (long) bs[1])&0xFF) << 48) |
+        ( (( (long) bs[2])&0xFF) << 40) |
+        ( (( (long) bs[3])&0xFF) << 32) |
+        ( (( (long) bs[4])&0xFF) << 24) | ( (( (long) bs[5])&0xFF) << 16) |
+        ( (( (long) bs[6])&0xFF) << 8) | ((long) bs[7]&0xFF);
+		otherTime = ((( (long) bs[8])&0xFF) << 56) | ( (( (long) bs[9])&0xFF) << 48) |
+        ( (( (long) bs[10])&0xFF) << 40) |
+        ( (( (long) bs[11])&0xFF) << 32) |
+        ( (( (long) bs[12])&0xFF) << 24) | ( (( (long) bs[13])&0xFF) << 16) |
+        ( (( (long) bs[14])&0xFF) << 8) | ((long) bs[15]&0xFF);
+	} else {
+		throw new RuntimeException(
+				"Statistical UUID may only be compared to same or a byte[]");
+	}
     StatisticalUUID other = (StatisticalUUID) object;
-    if (timeValue < other.timeValue) {
+    if (timeValue < otherTime) {
       return -1;
     }
-    else if (timeValue > other.timeValue) {
+    else if (timeValue > otherTime) {
       return 1;
     }
     else {
-      if (randomValue < other.randomValue) {
+      if (randomValue < otherRand) {
         return -1;
       }
-      else if (randomValue > other.randomValue) {
+      else if (randomValue > otherRand) {
         return 1;
       }
     }
@@ -100,9 +122,7 @@ public class StatisticalUUID
   }
 
   public boolean equals(Object obj) {
-    StatisticalUUID other = (StatisticalUUID) obj;
-    return ( (timeValue == other.timeValue) &&
-            (randomValue == other.randomValue));
+    return ( compareTo(obj)==0);
   }
 
   /**

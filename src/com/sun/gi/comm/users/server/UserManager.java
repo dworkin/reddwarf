@@ -11,8 +11,11 @@ import com.sun.gi.comm.users.validation.UserValidatorFactory;
 /**
  *
  * <p>Title: UserManager</p>
- * <p>Description: This interface defines the primary class necessary to
- * implement to create a user manager. </p>
+ * <p>Description: This interface defines the primary class necessary to implement the server side of a 
+ * Darkstar UserManager.  A user manager is responsible for creating a SGSUser for each legitimately logged in
+ * user and reigstering it with the Router.  It is strongly recommended that implementors use the provided 
+ * SGSUserImpl class for their SGSUsers. 
+ * </p>
  * <p>Copyright: Copyright (c) 2004</p>
  * <p>Company: Sun Microsystems, TMI</p>
  * @author Jeff Kesselman
@@ -29,14 +32,7 @@ public interface UserManager  {
    */
   public void setUserValidatorFactory(UserValidatorFactory validatorFactory);
 
-  /**
-   * called by the router to transfer data to the user.
-   * @param id UserID User to send data to
-   * @param buff byte[] data to send to user.
-   * @param length int length of data
-   * @param reliable boolean whether or not reliable delivery is necessary
-   */
-  public void sendDataToUser(ChannelID cid, UserID id,UserID from, ByteBuffer buff,boolean reliable);
+  
 
   /**
    * getClientClassname

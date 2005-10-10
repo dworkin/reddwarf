@@ -9,6 +9,8 @@ import javax.security.auth.callback.UnsupportedCallbackException;
 
 
 public interface TransportProtocol {
+	
+	public void packetReceived(ByteBuffer buff);
 
 	public void sendUserJoinChan(String chanName, byte[] userID)
 			throws IOException;
@@ -161,6 +163,12 @@ public interface TransportProtocol {
 
 	public void deliverReconnectKey(byte[] id, byte[] key) throws IOException;
 
+	/*
+	 * 
+	 */
+	
+	public void deliverServerID(byte[] bs);
+	
 	public void setClient(TransportProtocolClient client);
 
 	public void setServer(TransportProtocolServer server);
@@ -168,4 +176,8 @@ public interface TransportProtocol {
 	public void setTransmitter(TransportProtocolTransmitter xmitter);
 
 	public void deliverDisconnected(byte[] bs);
+
+	public boolean isLoginPkt(ByteBuffer inputBuffer);
+
+	
 }
