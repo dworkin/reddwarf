@@ -1,4 +1,4 @@
-package com.sun.gi.comm.users.client.umanager;
+package com.sun.gi.comm.users.client.impl;
 
 import java.io.*;
 import java.nio.*;
@@ -12,9 +12,8 @@ import com.sun.gi.utils.nio.*;
 import com.sun.gi.comm.users.client.*;
 
 public class TCPIPUserManagerClient
-        implements UserManagerClient, TransportListener, NIOSocketManagerListener {
+        implements UserManagerClient, NIOSocketManagerListener  {
     NIOSocketManager mgr;
-    TCPTransport transport;
     List<UserManagerClientListener> listeners = new ArrayList<UserManagerClientListener>();
     
     public TCPIPUserManagerClient() throws InstantiationException {

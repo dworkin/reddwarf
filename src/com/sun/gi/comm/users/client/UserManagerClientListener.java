@@ -1,7 +1,6 @@
-package com.sun.gi.comm.users.server;
+package com.sun.gi.comm.users.client;
 
 
-import java.nio.ByteBuffer;
 import javax.security.auth.callback.Callback;
 
 /**
@@ -22,5 +21,5 @@ public interface UserManagerClientListener {
   public void loginRejected(String message);
   public void userAdded(byte[] userID);
   public void userDropped(byte[] userID); 
-  public void joinedChannel(SGSChannel channel);
+  public void joinedChannel(ClientChannel channel);
 }
