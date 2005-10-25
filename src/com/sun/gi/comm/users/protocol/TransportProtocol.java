@@ -5,22 +5,20 @@ import java.io.IOException;
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.UnsupportedCallbackException;
 
-
-
-
 public interface TransportProtocol {
-	
+
 	public void packetReceived(ByteBuffer buff);
 
-	public void sendUserJoinChan(String chanName, byte[] userID)
-			throws IOException;
+	public void sendLoginRequest();
+
+	public void sendLogoutRequest();
 
 	/**
 	 * Call this method from the client to send a unicast message
 	 */
 
-	public void sendUnicastMsg(byte[] chanID, byte[] from, byte[] to,
-			boolean reliable, ByteBuffer data) throws IOException;
+	public void sendUnicastMsg(byte[] chanID, byte[] to, boolean reliable,
+			ByteBuffer data) throws IOException;
 
 	/**
 	 * Call this method from the server to deliver a unicast message to the
@@ -34,8 +32,8 @@ public interface TransportProtocol {
 	 * Call this method from the client to send a multicast message
 	 */
 
-	public void sendMulticastMsg(byte[] chanID, byte[] from, byte[][] to,
-			boolean reliable, ByteBuffer data) throws IOException;
+	public void sendMulticastMsg(byte[] chanID, byte[][] to, boolean reliable,
+			ByteBuffer data) throws IOException;
 
 	/**
 	 * Call this method from the server to deliver a multicast message to the
@@ -45,11 +43,14 @@ public interface TransportProtocol {
 	public void deliverMulticastMsg(byte[] chanID, byte[] from, byte[][] to,
 			boolean reliable, ByteBuffer data) throws IOException;
 
+	public void sendServerMsg(boolean reliable, ByteBuffer data)
+			throws IOException;
+
 	/**
 	 * Call this method from the client to send a multicast message
 	 */
 
-	public void sendBroadcastMsg(byte[] chanID, byte[] from, boolean reliable,
+	public void sendBroadcastMsg(byte[] chanID, boolean reliable,
 			ByteBuffer data) throws IOException;
 
 	/**
@@ -118,8 +119,7 @@ public interface TransportProtocol {
 	 * Call this method from the client to req a user be joiend to a channel
 	 */
 
-	public void sendUserJoinChannel(byte[] chanID, byte[] user)
-			throws IOException;
+	public void sendJoinChannelReq(String channelName) throws IOException;
 
 	/**
 	 * Call this method from the server to notify client of user joining channel
@@ -128,18 +128,18 @@ public interface TransportProtocol {
 	public void deliverUserJoinedChannel(byte[] chanID, byte[] user)
 			throws IOException;
 
-	
 	/**
-	 * Call this method from the server to notify client of itself joining channel
+	 * Call this method from the server to notify client of itself joining
+	 * channel
 	 */
 
-	public void deliverJoinedChannel(byte[] chanID)
-			throws IOException;
+	public void deliverJoinedChannel(byte[] chanID) throws IOException;
+
 	/**
 	 * Call this method from the client to leave a channel
 	 */
 
-	public void sendUserLeaveChannel(byte[] chanID, byte[] user)
+	public void sendLeaveChannelReq(byte[] chanID, byte[] user)
 			throws IOException;
 
 	/**
@@ -150,11 +150,11 @@ public interface TransportProtocol {
 			throws IOException;
 
 	/**
-	 * Call this method from the server to notify client of itself leaving channel
+	 * Call this method from the server to notify client of itself leaving
+	 * channel
 	 */
 
-	public void deliverLeftChannel(byte[] chanID)
-			throws IOException;
+	public void deliverLeftChannel(byte[] chanID) throws IOException;
 
 	/*
 	 * call this method from the server to send a reconenct key update to the
@@ -166,9 +166,9 @@ public interface TransportProtocol {
 	/*
 	 * 
 	 */
-	
+
 	public void deliverServerID(byte[] bs);
-	
+
 	public void setClient(TransportProtocolClient client);
 
 	public void setServer(TransportProtocolServer server);
@@ -179,5 +179,4 @@ public interface TransportProtocol {
 
 	public boolean isLoginPkt(ByteBuffer inputBuffer);
 
-	
 }

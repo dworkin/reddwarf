@@ -1,336 +1,232 @@
 package com.sun.gi.comm.users.client.impl;
 
-import java.io.*;
-import java.nio.*;
-import java.util.*;
-import javax.security.auth.callback.*;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 
-import com.sun.gi.comm.discovery.*;
-import com.sun.gi.comm.transport.*;
-import com.sun.gi.comm.transport.impl.*;
-import com.sun.gi.utils.nio.*;
-import com.sun.gi.comm.users.client.*;
+import javax.security.auth.callback.Callback;
+
+import com.sun.gi.comm.discovery.DiscoveredUserManager;
+import com.sun.gi.comm.users.client.UserManagerClient;
+import com.sun.gi.comm.users.client.UserManagerClientListener;
+import com.sun.gi.comm.users.protocol.TransportProtocol;
+import com.sun.gi.comm.users.protocol.TransportProtocolClient;
+import com.sun.gi.comm.users.protocol.TransportProtocolTransmitter;
+import com.sun.gi.comm.users.protocol.impl.BinaryPktProtocol;
+import com.sun.gi.utils.nio.NIOSocketManager;
+import com.sun.gi.utils.nio.NIOSocketManagerListener;
+import com.sun.gi.utils.nio.NIOTCPConnection;
+import com.sun.gi.utils.nio.NIOTCPConnectionListener;
+
+/**
+ * 
+ * <p>
+ * Title: TCPIPUserManagerClient
+ * <p>
+ * Description: This class implements a simple TCP/IP based UserManager. It is
+ * intended to serve both as a basic UserManager and as an example for the
+ * creation of other UserManagers
+ * </p>
+ * <p>
+ * Copyright: Copyright (c) Oct 24, 2005 Sun Microsystems, Inc.
+ * </p>
+ * <p>
+ * Company: Sun Microsystems
+ * </p>
+ * 
+ * @author Jeffrey P. Kesselman
+ * @version 1.0
+ */
 
 public class TCPIPUserManagerClient
-        implements UserManagerClient, NIOSocketManagerListener  {
+        implements UserManagerClient, NIOSocketManagerListener, TransportProtocolClient    {
     NIOSocketManager mgr;
-    List<UserManagerClientListener> listeners = new ArrayList<UserManagerClientListener>();
+    UserManagerClientListener listener;
+    TransportProtocol protocol;
     
+    /**
+	 * Default constructor
+	 * 
+	 * @throws InstantiationException
+	 */
     public TCPIPUserManagerClient() throws InstantiationException {
         try {
             mgr = new NIOSocketManager();
             mgr.addListener(this);
+            protocol = new BinaryPktProtocol();
+            protocol.setClient(this);
         } catch (IOException ex) {
             throw new InstantiationException(ex.getMessage());
         }
     }
     
-    /**
-     *
-     * @param choice DiscoveredUserManager
-     * @todo Implement this com.sun.gi.comm.users.client.UserManagerClient method
-     */
-    public void connect(DiscoveredUserManager choice) {
-        String host = choice.getParameter("host");
-        int port = Integer.parseInt(choice.getParameter("port"));
-        System.out.println("Attempting to connect to a TCPIP User Manager on host " +
-                host + " port " + port);
-        mgr.makeTCPConnectionTo(host, port);
-    }
-    
-    /**
-     *
-     * @param listener UserManagerClientListener
-     * @todo Implement this com.sun.gi.comm.users.client.UserManagerClient method
-     */
-    public void addListener(UserManagerClientListener listener) {
-        listeners.add(listener);
-    }
-    
-    /**
-     * login
-     *
-     * @todo Implement this com.sun.gi.comm.users.client.UserManagerClient method
-     */
-    public void login() {
-        try {
-            transport.sendConnectionRequest();
-        } catch (IOException ex) {
-            ex.printStackTrace();
-        }
-    }
-    
-    /**
-     * validationDataResponse
-     *
-     * @param data ByteBuffer
-     * @todo Implement this com.sun.gi.comm.users.client.UserManagerClient method
-     */
-    public void validationDataResponse(Callback[] cbs) {
-        try {
-            transport.sendValidationResponse(cbs);
-        } catch (IOException ex) {
-            ex.printStackTrace();
-        } catch (UnsupportedCallbackException ex) {
-            ex.printStackTrace();
-        }
-    }
-    
-   
-    
-    /**
-     * logout
-     *
-     * @todo Implement this com.sun.gi.comm.users.client.UserManagerClient method
-     */
-    public void logout() {
-        try {
-            transport.disconnect();
-        } catch (IOException ex) {
-            ex.printStackTrace();
-        }
-    }
-    
-    /**
-     *
-     * @param reconnectionKey long
-     * @todo Implement this com.sun.gi.comm.users.client.UserManagerClient method
-     */
-    public void reconnectLogin(byte[] userID, byte[] reconnectionKey) {
-        try {
-            transport.sendReconnectRequest(userID, reconnectionKey);
-        } catch (IOException ex) {
-            ex.printStackTrace();
-        }
-    }
-    
-    
-    
-    
-    /**
-     * connected
-     *
-     * @param tCPTransport TCPTransport
-     */
-    public void connected(TCPTransport tCPTransport) {
         
-    }
-    
-    /**
-     * connectionFailed
-     *
-     * @param tCPTransport TCPTransport
-     */
-    public void connectionFailed(TCPTransport tCPTransport) {
-        for (Iterator i = listeners.iterator(); i.hasNext(); ) {
-            ( (UserManagerClientListener) i.next()).disconnected();
-        }
-    }
-    
-    /**
-     * disconnected
-     *
-     * @param tCPTransport TCPTransport
-     */
-    public void disconnected(TCPTransport tCPTransport) {
-        for (Iterator i = listeners.iterator(); i.hasNext(); ) {
-            ( (UserManagerClientListener) i.next()).disconnected();
-        }
-    }
-    
-    
-    
-    /**
-     * reconnectKeyReceived
-     *
-     * @param tCPTransport TCPTransport
-     * @param key byte[]
-     */
-    public void reconnectKeyReceived(TCPTransport tCPTransport, byte[] user,
-            byte[] key) {
-        for (Iterator i = listeners.iterator(); i.hasNext(); ) {
-            ( (UserManagerClientListener) i.next()).newConnectionKeyIssued(key);
-        }
-    }
-    
-    /**
-     * reconnectRequest
-     *
-     * @param tCPTransport TCPTransport
-     * @param user byte[]
-     * @param key byte[]
-     */
-    public void reconnectRequest(TCPTransport tCPTransport, byte[] user,
-            byte[] key) {
-        throw new UnsupportedOperationException();
-    }
-    
-    
-    /**
-     * userAccepted
-     *
-     * @param tCPTransport TCPTransport
-     * @param user byte[]
-     */
-    public void userAccepted(TCPTransport tCPTransport, byte[] user) {
-        for (Iterator i = listeners.iterator(); i.hasNext(); ) {
-            ( (UserManagerClientListener) i.next()).loginAccepted(user);
-        }
-    }
-    
-    /**
-     * userJoined
-     *
-     * @param tCPTransport TCPTransport
-     * @param user byte[]
-     */
-    public void userJoined(TCPTransport tCPTransport, byte[] user) {
-        for (Iterator i = listeners.iterator(); i.hasNext(); ) {
-            ( (UserManagerClientListener) i.next()).userAdded(user);
-        }
-    }
-    
-    /**
-     * userLeft
-     *
-     * @param tCPTransport TCPTransport
-     * @param user byte[]
-     */
-    public void userLeft(TCPTransport tCPTransport, byte[] user) {
-        for (Iterator i = listeners.iterator(); i.hasNext(); ) {
-            ( (UserManagerClientListener) i.next()).userDropped(user);
-        }
-    }
-    
-    /**
-     * userRejected
-     *
-     * @param tCPTransport TCPTransport
-     */
-    public void userRejected(TCPTransport tCPTransport, String message) {
-        for (Iterator i = listeners.iterator(); i.hasNext(); ) {
-            ( (UserManagerClientListener) i.next()).loginRejected(message);
-        }
-        
-    }
-    
-    /**
-     * validationRequest
-     *
-     * @param tCPTransport TCPTransport
-     * @param cbs Callback[]
-     */
-    public void validationRequest(TCPTransport tCPTransport, Callback[] cbs) {
-        for (Iterator i = listeners.iterator(); i.hasNext(); ) {
-            ( (UserManagerClientListener) i.next()).validationDataRequest(cbs);
-        }
-    }
-    
-    /**
-     * validationResponse
-     *
-     * @param tCPTransport TCPTransport
-     * @param cbs Callback[]
-     */
-    public void validationResponse(TCPTransport tCPTransport, Callback[] cbs) {
-        throw new UnsupportedOperationException();
-    }
-    
-    
-    
-    
-    /**
-     * connected
-     *
-     * @param connection NIOTCPConnection
-     */
-    public void connected(NIOTCPConnection connection) {
-        System.out.println("connected");
-        transport = new TCPTransport(connection);
-        transport.addListener(this);
-        for (Iterator i = listeners.iterator(); i.hasNext(); ) {
-            ( (UserManagerClientListener) i.next()).connected();
-        }
-    }
-    
-    /**
-     * connectionFailed
-     *
-     * @param connection NIOTCPConnection
-     */
-    public void connectionFailed(NIOTCPConnection connection) {
-        System.out.println("Failed to connect!");
-        for (Iterator i = listeners.iterator(); i.hasNext(); ) {
-            ( (UserManagerClientListener) i.next()).disconnected();
-        }
-    }
-    
-    public void userRejected(String reason) {
-        for (Iterator i = listeners.iterator(); i.hasNext(); ) {
-            ( (UserManagerClientListener) i.next()).loginRejected(reason);
-        }
-    }
-    
-    
-    
-    public void channelJoinReq(String chanName, byte[] user) {
-    }
-    
-    public void channelJoined(String chanName, byte[] chanID) {
-    }
-    
-    public void broadcastMsgReceived(byte[] chanID, boolean reliable, byte[] from, ByteBuffer databuff) {
-    }
-    
-    public void multicastMsgReceived(byte[] chanID, boolean reliable, byte[] from, byte[][] tolist, ByteBuffer databuff) {
-    }
-    
-    public void unicastMsgReceived(byte[] chanID, boolean reliable, byte[] from, byte[] to, ByteBuffer databuff) {
-    }
-    
-    public void userLeft(byte[] user) {
-    }
-    
-    public void userJoined(byte[] user) {
-    }
-    
-    public void userAccepted(byte[] user) {
-    }
-    
-    public void validationResponse(Callback[] cbs) {
-    }
-    
-    public void validationRequest(Callback[] cbs) {
-    }
-    
-    public void connect(DiscoveredUserManager choice, UserManagerClientListener listener) {
-    }
-    
-    public void sendToServer(byte[] from, ByteBuffer buff, boolean reliable) {
-    }
-    
-    public void userLeftChannel(byte[] chanID, byte[] user) {
-    }
-    
-    public void userJoinedChannel(byte[] chanID, byte[] user) {
-    }
-    
-    public void connectRequest() {
-    }
-    
-    public void disconnected() {
-    }
-    
-    public void reconnectKeyReceived(byte[] user, byte[] key) {
-    }
-    
-    public void reconnectRequest(byte[] user, byte[] key) {
-    }
-    
-    public void newTCPConnection(NIOTCPConnection connection) {
-        throw new UnsupportedOperationException("This is not a server socket.");
-    }
-    
+    /*
+	 * Not implemented because this class does not accept incoming TCP
+	 * connections
+	 */
+	public void newTCPConnection(NIOTCPConnection connection) {
+		throw new UnsupportedOperationException();
+	}
+
+	public void connected(final NIOTCPConnection connection) {
+		protocol.setTransmitter(new TransportProtocolTransmitter(){
+			public void sendBuffers(ByteBuffer[] buffs) {
+				try {
+					connection.send(buffs);
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}				
+			}
+		});	
+		connection.addListener(new NIOTCPConnectionListener(){
+			public void packetReceived(NIOTCPConnection conn, ByteBuffer inputBuffer) {
+				protocol.packetReceived(inputBuffer);
+				
+			}
+
+			public void disconnected(NIOTCPConnection nIOTCPConnection) {
+				connectionDropped();
+				
+			}});
+		listener.connected();
+
+	}
+
+	private void connectionDropped() {
+		listener.disconnected();		
+	}
+
+
+	public void connectionFailed(NIOTCPConnection connection) {
+		listener.disconnected();
+		
+	}
+
+
+	public void rcvUnicastMsg(boolean reliable, byte[] chanID, byte[] from, byte[] to, ByteBuffer databuff) {
+		listener.recvdData(chanID,from,databuff,reliable);
+		
+	}
+
+
+	public void rcvMulticastMsg(boolean reliable, byte[] chanID, byte[] from, byte[][] tolist, ByteBuffer databuff) {
+		listener.recvdData(chanID,from,databuff,reliable);
+		
+	}
+
+
+	public void rcvBroadcastMsg(boolean reliable, byte[] chanID, byte[] from, ByteBuffer databuff) {
+		listener.recvdData(chanID,from,databuff,reliable);
+		
+	}
+
+
+	public void rcvValidationReq(Callback[] cbs) {
+		listener.validationDataRequest(cbs);
+		
+	}
+
+
+	public void rcvUserAccepted(byte[] user) {
+		listener.loginAccepted(user);
+		
+	}
+
+
+	public void rcvUserRejected(String message) {
+		listener.loginRejected(message);
+		
+	}
+
+
+	public void rcvUserJoined(byte[] user) {
+		listener.userAdded(user);
+		
+	}
+
+
+	public void rcvUserLeft(byte[] user) {
+		listener.userDropped(user);
+		
+	}
+
+
+	public void rcvUserJoinedChan(byte[] chanID, byte[] user) {
+		listener.userJoinedChannel(chanID,user);
+		
+	}
+
+
+	public void rcvUserLeftChan(byte[] chanID, byte[] user) {
+		listener.userLeftChannel(chanID,user);
+		
+	}
+
+
+	public void rcvReconnectKey(byte[] user, byte[] key) {
+		listener.newConnectionKeyIssued(key);
+		
+	}
+
+
+	public void rcvJoinedChan(byte[] chanID) {
+		listener.joinedChannel(chanID);
+		
+	}
+
+
+	public void rcvLeftChan(byte[] chanID) {
+		listener.leftChannel(chanID);
+		
+	}
+
+
+	public void connect(DiscoveredUserManager choice, UserManagerClientListener listener) {
+		this.listener= listener;
+		String host = choice.getParameter("host");
+	    int port = Integer.parseInt(choice.getParameter("port"));
+	    System.out.println("Attempting to connect to a TCPIP User Manager on host " +
+	                host + " port " + port);
+	    mgr.makeTCPConnectionTo(host, port);
+		
+	}
+
+
+	public void login() {
+		protocol.sendLoginRequest();		
+	}
+
+
+	public void validationDataResponse(Callback[] cbs) {
+		protocol.sendValidationResponse(cbs);
+		
+	}
+
+
+	public void logout() {
+		protocol.sendLogoutRequest();		
+	}
+
+
+	public void joinChannel(String channelName) {
+		protocol.sendJoinChannelReq(channelName);
+		
+	}
+
+
+	public void sendToServer(ByteBuffer buff, boolean reliable) {
+		protocol.sendServerMsg(reliable,buff);
+		
+	}
+
+
+	public void reconnectLogin(byte[] userID, byte[] reconnectionKey) {
+		protocol.sendReconnectRequest(userID,reconnectionKey);
+		
+	}
     
     
 }

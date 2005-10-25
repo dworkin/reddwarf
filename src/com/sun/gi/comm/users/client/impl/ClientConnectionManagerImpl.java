@@ -1,14 +1,27 @@
-package com.sun.gi.comm.users.impl;
+package com.sun.gi.comm.users.client.impl;
 
 import com.sun.gi.comm.discovery.Discoverer;
 import com.sun.gi.comm.discovery.DiscoveredGame;
 import com.sun.gi.comm.discovery.DiscoveredUserManager;
+
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.HashSet;
 import java.nio.ByteBuffer;
 import javax.security.auth.callback.Callback;
-import com.sun.gi.comm.users.client.*;
+
+import com.sun.gi.comm.users.client.ClientAlreadyConnectedException;
+import com.sun.gi.comm.users.client.ClientChannel;
+import com.sun.gi.comm.users.client.ClientConnectionManager;
+import com.sun.gi.comm.users.client.ClientConnectionManagerListener;
+import com.sun.gi.comm.users.client.UserManagerClient;
+import com.sun.gi.comm.users.client.UserManagerClientListener;
+import com.sun.gi.comm.users.client.UserManagerPolicy;
 import com.sun.gi.comm.users.client.impl.DefaultUserManagerPolicy;
+import com.sun.gi.utils.types.BYTEARRAY;
+
+
 
 public class ClientConnectionManagerImpl
         implements ClientConnectionManager, UserManagerClientListener {
@@ -17,14 +30,13 @@ public class ClientConnectionManagerImpl
     private UserManagerClient umanager;
     private Class umanagerClass;
     private boolean done = false;
-    private ByteBuffer validationData = null;
     private String gameName;
-    private int gameID;
     private byte[] reconnectionKey = null;
     private ClientConnectionManagerListener listener;
     private byte[] myID;
     private boolean reconnecting = false;
     private boolean connected = false;
+    private Map<BYTEARRAY,ClientChannelImpl> channelMap = new HashMap<BYTEARRAY,ClientChannelImpl>();
     
     public ClientConnectionManagerImpl(String gameName, Discoverer disco) {
         this(gameName, disco, new DefaultUserManagerPolicy());
@@ -50,7 +62,7 @@ public class ClientConnectionManagerImpl
         if (umgrs == null) {
             return null;
         }
-        Set names = new HashSet();
+        Set<String> names = new HashSet<String>();
         for (int j = 0; j < umgrs.length; j++) {
             names.add(umgrs[j].getClientClass());
         }
@@ -83,7 +95,7 @@ public class ClientConnectionManagerImpl
                     "when already connected.");
         }
         try {
-            umanagerClass = getClass().forName(userManagerClassName);
+            umanagerClass = Class.forName(userManagerClassName);
             umanager = (UserManagerClient) umanagerClass.newInstance();
         } catch (Exception ex) {
             ex.printStackTrace();
@@ -122,7 +134,7 @@ public class ClientConnectionManagerImpl
     }
     
     public void sendToServer(ByteBuffer buff, boolean reliable) {
-        umanager.sendToServer(myID, buff,reliable);
+        umanager.sendToServer(buff,reliable);
         
     }
     
@@ -168,7 +180,7 @@ public class ClientConnectionManagerImpl
     /**
      * validationDataRequest
      *
-     * @param dataRequest ByteBuffer
+     * 
      */
     public void validationDataRequest(Callback[] cbs) {
         listener.validationRequest(cbs);
@@ -189,7 +201,7 @@ public class ClientConnectionManagerImpl
     /**
      * loginRejected
      *
-     * @param userID ByteBuffer
+     * 
      */
     public void loginRejected(String message) {
         listener.connectionRefused(message);
@@ -223,9 +235,34 @@ public class ClientConnectionManagerImpl
         System.arraycopy(key,0,reconnectionKey,0,key.length);
     }
     
-    public void joinedChannel(SGSChannel channel) {
-        listener.joinedChannel(channel);
+    public void joinedChannel(String name, byte[] channelID) {
+    	ClientChannelImpl chan = new ClientChannelImpl(this, name, channelID);
+    	channelMap.put(new BYTEARRAY(channelID),chan);
+        listener.joinedChannel(chan);
     }
+
+	public void leftChannel(byte[] channelID) {
+		ClientChannelImpl chan = channelMap.remove(new BYTEARRAY(channelID));
+		chan.channelClosed();
+		
+	}
+
+	public void userJoinedChannel(byte[] channelID, byte[] userID) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	public void userLeftChannel(byte[] channelID, byte[] userID) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	public void recvdData(byte[] chanID, byte[] from, ByteBuffer data, boolean reliable) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	
     
     
     
