@@ -85,6 +85,8 @@ public interface ClientConnectionManager
    * @param reliable Whether this data should be transmitted reliably or not.
    */
   public void sendToServer(ByteBuffer buff,boolean reliable);
+  
+  
  
   /**
    * This method is called to open a channel.  Once opened the channel is returned for

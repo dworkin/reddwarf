@@ -30,8 +30,6 @@ public interface ClientConnectionManagerListener {
   public void connected(byte[] myID);
   public void connectionRefused(String message);
   public void disconnected();
-  public void dataRecieved(byte[] from, ByteBuffer data);
-
   /**
    * <p>This event is fired when a user joins the game.</p>  
    * When a client initially connects to the game it will receive a userJoined callback for

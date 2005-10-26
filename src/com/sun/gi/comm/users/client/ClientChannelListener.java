@@ -30,5 +30,7 @@ public interface ClientChannelListener {
 	 * @param reliable Whether this packet was sent reliably or unreliably.
 	 */
 	public void dataArrived(byte[] from, ByteBuffer data, boolean reliable);
+	
+	public void channelClosed();
 }
 

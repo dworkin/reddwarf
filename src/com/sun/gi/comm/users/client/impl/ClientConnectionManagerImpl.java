@@ -262,6 +262,23 @@ public class ClientConnectionManagerImpl
 		
 	}
 
+	/*  The below are all package private and intended just for use by ClientChannelImpl */
+	
+	void sendUnicastData(byte[] id, byte[] to, ByteBuffer data, boolean reliable) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	void sendMulticastData(byte[] id, byte[][] to, ByteBuffer data, boolean reliable) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	void sendBroadcastData(byte[] id, ByteBuffer data, boolean reliable) {
+		// TODO Auto-generated method stub
+		
+	}
+
 	
     
     
