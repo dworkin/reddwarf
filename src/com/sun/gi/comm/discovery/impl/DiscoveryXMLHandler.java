@@ -79,7 +79,18 @@ public class DiscoveryXMLHandler extends DefaultHandler {
 	static public void main(String[] args){
 		try {
 			SAXParser parser = SAXParserFactory.newInstance().newSAXParser();
-			parser.parse(new File("FakeDiscovery.xml"),new DiscoveryXMLHandler());
+			DiscoveryXMLHandler hdlr = new DiscoveryXMLHandler();
+			parser.parse(new File("FakeDiscovery.xml"),hdlr);
+			for(DiscoveredGame game : hdlr.discoveredGames()){
+				System.out.println("Game: "+game.getName()+" ("+game.getId()+")");
+				for(DiscoveredUserManager mgr : game.getUserManagers()){
+					System.out.println("    User Manager:"+mgr.getClientClass());
+					for(DiscoveredLoginModule mod : mgr.getLoginModules()){
+						System.out.println("        Login Module: "+mod.getClassName());
+					}
+				}
+			}
+			
 		} catch (ParserConfigurationException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

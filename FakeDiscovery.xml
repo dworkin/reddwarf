@@ -10,6 +10,7 @@
           "com.sun.gi.comm.users.client.TCPIPUserManagerClient">
             <PARAMETER tag="host" value="10.5.34.10" />
             <PARAMETER tag="port" value="1149" />
+            <LOGINMODULE moduleclass="com.sun.gi.users.validation.FlatFileLoginModule" />
         </USERMANAGER>
     </GAME>
 </DISCOVERY>
