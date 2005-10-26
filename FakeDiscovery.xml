@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <DISCOVERY>
-    <GAME id="1" name="Chat">
+    <GAME id="1" name="ChatTest">
         <USERMANAGER clientclass=
           "com.sun.gi.comm.users.client.TCPIPUserManagerClient">
             <PARAMETER tag="host" value="10.5.34.10" />
