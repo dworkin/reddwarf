@@ -47,7 +47,10 @@ public class URLDiscoverer implements Discoverer {
 			try {
 				SAXParser parser = SAXParserFactory.newInstance()
 						.newSAXParser();
-				parser.parse(content,new DiscoveryXMLHandler());
+				DiscoveryXMLHandler hdlr = new DiscoveryXMLHandler();
+				parser.parse(content,hdlr);
+				return hdlr.discoveredGames();
+				
 			} catch (ParserConfigurationException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();			
@@ -62,13 +65,10 @@ public class URLDiscoverer implements Discoverer {
 	}
 
 	static public void main(String[] args) {
-		String discname = "http://10.5.34.12/discovery.xml";
-		if (args.length == 1) {
-			discname = args[0];
-		}
+		
 
 		try {
-			URLDiscoverer disco = new URLDiscoverer(new URL(discname));
+			URLDiscoverer disco = new URLDiscoverer(new File("FakeDiscovery.xml").toURI().toURL());
 			DiscoveredGame[] games = disco.games();
 			System.out.println("Discovered " + games.length + " games.");
 		} catch (MalformedURLException ex) {
