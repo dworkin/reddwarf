@@ -64,7 +64,7 @@ public class TCPIPUserManager implements NIOSocketManagerListener, UserManager
 	 * @return String
 	 */
 	public String getClientClassname() {
-		return "com.sun.gi.comm.users.client.TCPIPUserManagerClient";
+		return "com.sun.gi.comm.users.client.impl.TCPIPUserManagerClient";
 	}
 
 	/**

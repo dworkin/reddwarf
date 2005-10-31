@@ -19,12 +19,14 @@ import java.util.Set;
 import java.util.Map.Entry;
 
 import com.sun.gi.comm.routing.Router;
+import com.sun.gi.comm.routing.impl.RouterImpl;
 import com.sun.gi.comm.users.server.UserManager;
-import com.sun.gi.framework.install.InstallRec;
-import com.sun.gi.framework.install.InstallationFile;
+import com.sun.gi.comm.users.validation.impl.LoginModuleValidatorFactory;
+import com.sun.gi.framework.install.DeploymentRec;
 import com.sun.gi.framework.install.InstallationLoader;
 import com.sun.gi.framework.install.LoginModuleRec;
 import com.sun.gi.framework.install.UserMgrRec;
+import com.sun.gi.framework.install.impl.InstallationFile;
 import com.sun.gi.framework.interconnect.TransportManager;
 import com.sun.gi.framework.interconnect.impl.LRMPTransportManager;
 import com.sun.gi.framework.status.ReportManager;
@@ -48,8 +50,7 @@ public class SGS {
         installFile = installProperty;
       }
       InstallationLoader installation =
-          new InstallationFile(new File(System.getProperty("user.dir") +
-                                        File.separator + installFile));
+          new InstallationFile(new File(installFile));
       // start framework services
       transportManager = new LRMPTransportManager();
       reportManager = new ReportManagerImpl(transportManager, REPORTTTL);
@@ -57,8 +58,7 @@ public class SGS {
       StatusReport installationReport =
           reportManager.makeNewReport("_SGS_discover_" + sliceID);
       installationReport.setParameter("game", "count", "0");
-      for (Iterator i = installation.listGames().iterator(); i.hasNext(); ) {
-        InstallRec game = (InstallRec) i.next();
+      for (DeploymentRec game : installation.listGames()) {
         startupGame(transportManager, game, installationReport);
       }
       reportUpdater = new ReportUpdater(reportManager);
@@ -78,11 +78,11 @@ public class SGS {
    * @param game InstallRec
    */
   private Router startupGame(TransportManager transportManager,
-                             InstallRec game, StatusReport installationReport) {
+                             DeploymentRec game, StatusReport installationReport) {
     Router router = null;
     int gameID = game.getID();
     try {
-      router = new NOHBRouter(transportManager, gameID);
+      router = new RouterImpl(transportManager);
     } catch (Exception e){
       e.printStackTrace();
       return null;
@@ -102,8 +102,7 @@ public class SGS {
 
     
     // create user managers
-    for (Iterator i = game.listUserManagers(); i.hasNext(); ) {
-      UserMgrRec umgrRec = (UserMgrRec) i.next();
+    for (UserMgrRec umgrRec : game.getUserManagers()) {      
       String serverClassName = umgrRec.getServerClassName();
       String umgrBlock = statusBlockName + ".umgr." + umgrCount;
       umgrCount++;
@@ -135,8 +134,7 @@ public class SGS {
         if (umgrRec.hasLoginModules()) {
           LoginModuleValidatorFactory validatorFactory = new
               LoginModuleValidatorFactory();
-          for (Iterator i2 = umgrRec.listLoginModules(); i2.hasNext(); ) {
-            LoginModuleRec lmoduleRec = (LoginModuleRec) i2.next();
+          for (LoginModuleRec lmoduleRec : umgrRec.getLoginModules() ) {            
             String loginModuleClassname = lmoduleRec.getModuleClassName();
             Class loginModuleClass = Class.forName(loginModuleClassname);
             validatorFactory.addLoginModule(loginModuleClass);

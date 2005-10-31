@@ -45,7 +45,7 @@ public class DefaultUserManagerPolicy implements UserManagerPolicy{
     DiscoveredUserManager[] mgrs = game.getUserManagers();
     List<DiscoveredUserManager> umgrs = new ArrayList<DiscoveredUserManager>();
     for(DiscoveredUserManager mgr: mgrs){
-    	if (mgr.getClass().getName().equals(umanagerName)){
+    	if (mgr.getClientClass().equals(umanagerName)){
     		umgrs.add(mgr);
     	}
     }

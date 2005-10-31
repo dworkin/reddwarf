@@ -67,7 +67,7 @@ public class BinaryPktProtocol
      * Call this method from the client to indicate that the user wishes to join a channel
      */
     
-    public synchronized void sendUserJoinChan(String chanName, byte[] userID) throws IOException {
+    public synchronized void sendJoinChanRequest(String chanName, byte[] userID) throws IOException {
         synchronized (hdr) {
             hdr.clear();
             hdr.put((byte)OPCODE.REQ_JOIN_CHAN.ordinal());
@@ -242,7 +242,7 @@ public class BinaryPktProtocol
      * Call this method from the client to start a login
      */
     
-    public void sendConnectionRequest() throws IOException {
+    public void sendLoginRequest() throws IOException {
         synchronized (hdr) {
             hdr.clear();
             hdr.put((byte)OPCODE.CONNECT_REQ.ordinal());
@@ -353,21 +353,7 @@ public class BinaryPktProtocol
         }
     }
     
-    /**
-     * Call this method from the client to req a user be joiend to a channel
-     */
     
-    public void sendUserJoinChannel(byte[] chanID, byte[] user) throws IOException {
-        synchronized (hdr) {
-            hdr.clear();
-            hdr.put((byte)OPCODE.REQ_JOIN_CHAN.ordinal());
-            hdr.put((byte)chanID.length);
-            hdr.put(chanID);
-            hdr.put( (byte) user.length);
-            hdr.put(user);
-            sendBuffers(hdr);
-        }
-    }
     
     
     
@@ -404,7 +390,7 @@ public class BinaryPktProtocol
      * Call this method from the client to leave a channel
      */
     
-    public void sendUserLeaveChannel(byte[] chanID, byte[] user) throws IOException {
+    public void sendLeaveChanReq(byte[] chanID, byte[] user) throws IOException {
         synchronized (hdr) {
             hdr.clear();
             hdr.put((byte)OPCODE.REQ_LEAVE_CHAN.ordinal());
@@ -705,6 +691,14 @@ public class BinaryPktProtocol
 		this.xmitter = xmitter;
 		
 	}
+
+
+	public void sendLogoutRequest() throws IOException {
+		// TODO Auto-generated method stub
+		
+	}
+
+
 
 
 

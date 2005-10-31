@@ -1,4 +1,4 @@
-package com.sun.gi.comm.validation.impl;
+package com.sun.gi.comm.users.validation.impl;
 
 import java.nio.*;
 import javax.security.auth.*;

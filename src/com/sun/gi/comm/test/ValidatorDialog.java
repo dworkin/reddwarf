@@ -8,6 +8,7 @@ import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 import javax.security.auth.callback.Callback;
@@ -82,13 +83,40 @@ public class ValidatorDialog extends JDialog{
 			} else if (cb instanceof TextOutputCallback ){
 				TextOutputCallback tcb = (TextOutputCallback)cb;
 				validationPanel.add(new JLabel(tcb.getMessage()));	
+				
 			}
 		}
 		setVisible(true);
 	}
 
 	protected void transcribeToCallbacks() {
-		// TODO Auto-generated method stub
+		Iterator iter = dataFields.iterator();
+		for(Callback cb : callbacks){
+			if (cb instanceof ChoiceCallback){
+				//note this is really wrong, should allow for multiple select
+				ChoiceCallback ccb = (ChoiceCallback)cb;
+				JComboBox combo = (JComboBox) iter.next();
+				ccb.setSelectedIndex(combo.getSelectedIndex());				
+			} else if (cb instanceof ConfirmationCallback) {
+				ConfirmationCallback ccb = (ConfirmationCallback)cb;
+				JComboBox combo = (JComboBox) iter.next();
+				ccb.setSelectedIndex(combo.getSelectedIndex());
+			} else if (cb instanceof NameCallback){
+				NameCallback ncb= (NameCallback)cb;				
+				JTextField nameField = (JTextField)iter.next();
+				ncb.setName(nameField.getText());
+			} else if (cb instanceof PasswordCallback){
+				PasswordCallback ncb= (PasswordCallback)cb;
+				JPasswordField passwordField = (JPasswordField)iter.next();
+				ncb.setPassword(passwordField.getPassword());
+			} else if (cb instanceof TextInputCallback){
+				TextInputCallback tcb = (TextInputCallback)cb;				
+				JTextField textField = (JTextField)iter.next();
+				tcb.setText(textField.getText());			
+			} else if (cb instanceof TextOutputCallback ){
+				// no response required				
+			}
+		}
 		
 	}
 }

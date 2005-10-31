@@ -33,7 +33,7 @@ public class RouterImpl implements Router {
 	private enum OPCODE {UserJoined,UserLeft,UserJoinedChannel,UserLeftChannel};
 	
 
-	public RouterImpl(TransportManager cmgr, UserValidatorFactory vFactory) throws IOException{
+	public RouterImpl(TransportManager cmgr) throws IOException{
 		transportManager = cmgr;
 		
 		routerControlChannel = transportManager.openChannel("__SGS_ROUTER_CONTROL");
@@ -196,7 +196,6 @@ public class RouterImpl implements Router {
 		return false;
 	}
 
-	
 	
 
 }

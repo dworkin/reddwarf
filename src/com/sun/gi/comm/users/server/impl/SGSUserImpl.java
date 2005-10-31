@@ -1,7 +1,6 @@
 package com.sun.gi.comm.users.server.impl;
 
 import java.io.IOException;
-import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
@@ -12,19 +11,13 @@ import javax.security.auth.callback.UnsupportedCallbackException;
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.Router;
 import com.sun.gi.comm.routing.SGSChannel;
-
 import com.sun.gi.comm.routing.UserID;
-import com.sun.gi.comm.users.impl.TCPIPTransportListener;
 import com.sun.gi.comm.users.protocol.TransportProtocol;
 import com.sun.gi.comm.users.protocol.TransportProtocolServer;
 import com.sun.gi.comm.users.protocol.TransportProtocolTransmitter;
 import com.sun.gi.comm.users.protocol.impl.BinaryPktProtocol;
 import com.sun.gi.comm.users.server.SGSUser;
 import com.sun.gi.comm.users.validation.UserValidator;
-import com.sun.gi.utils.nio.NIOTCPConnection;
-import com.sun.gi.utils.nio.NIOTCPConnectionListener;
-import com.sun.gi.utils.types.BYTEARRAY;
-import com.sun.multicast.util.UnimplementedOperationException;
 
 public class SGSUserImpl implements SGSUser, TransportProtocolServer {
 	private Router router;

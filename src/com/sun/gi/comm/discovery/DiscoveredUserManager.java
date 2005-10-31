@@ -12,5 +12,4 @@ package com.sun.gi.comm.discovery;
 public interface DiscoveredUserManager {
   public String getClientClass();
   public String getParameter(String tag);
-  public DiscoveredLoginModule[] getLoginModules();
 }

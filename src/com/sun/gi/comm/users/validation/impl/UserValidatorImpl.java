@@ -1,11 +1,12 @@
-package com.sun.gi.comm.validation.impl;
+package com.sun.gi.comm.users.validation.impl;
 
-import java.nio.*;
-import javax.security.auth.*;
-import javax.security.auth.callback.*;
-import javax.security.auth.spi.*;
+import javax.security.auth.Subject;
+import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.UnsupportedCallbackException;
+import javax.security.auth.spi.LoginModule;
 
-import com.sun.gi.comm.validation.*;
+import com.sun.gi.comm.users.validation.UserValidator;
+import com.sun.multicast.util.UnimplementedOperationException;
 
 /**
  * <p>Title: </p>
@@ -93,5 +94,10 @@ public class UserValidatorImpl implements UserValidator {
     return loginHandler.nextDataRequest();
 
   }
+
+  public void reset() {
+	throw new UnimplementedOperationException();
+  }
+	
 
 }

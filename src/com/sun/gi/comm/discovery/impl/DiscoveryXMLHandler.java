@@ -14,7 +14,6 @@ import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
 import com.sun.gi.comm.discovery.DiscoveredGame;
-import com.sun.gi.comm.discovery.DiscoveredLoginModule;
 import com.sun.gi.comm.discovery.DiscoveredUserManager;
 
 
@@ -23,7 +22,6 @@ public class DiscoveryXMLHandler extends DefaultHandler {
 	DiscoveredGame[] games;
 	List<DiscoveredGameImpl> gameList = new ArrayList<DiscoveredGameImpl>();
 	List<DiscoveredUserManagerImpl> userManagerList = new ArrayList<DiscoveredUserManagerImpl>();
-	List<DiscoveredLoginModuleImpl> loginModuleList = new ArrayList<DiscoveredLoginModuleImpl>();
 
 	public void startElement(String uri, String localName, String qName,			
 			Attributes attributes) throws SAXException {
@@ -40,14 +38,10 @@ public class DiscoveryXMLHandler extends DefaultHandler {
 		} else if (qName.equalsIgnoreCase("USERMANAGER")){
 			String clientClassname = attributes.getValue("clientclass");
 			userManagerList.add(new DiscoveredUserManagerImpl(clientClassname));
-			loginModuleList.clear();
 		} else if (qName.equalsIgnoreCase("PARAMETER")){
 			String tag = attributes.getValue("tag");
 			String value = attributes.getValue("value");
 			userManagerList.get(userManagerList.size()-1).addParameter(tag,value);
-		} else if (qName.equalsIgnoreCase("LOGINMODULE")){
-			String className = attributes.getValue("moduleclass");
-			loginModuleList.add(new DiscoveredLoginModuleImpl(className));
 		}
 	}
 	
@@ -65,13 +59,8 @@ public class DiscoveryXMLHandler extends DefaultHandler {
 			gameList.get(gameList.size()-1).setUserManagers(mgrs);
 			userManagerList.clear();
 		} else if (qName.equalsIgnoreCase("USERMANAGER")){
-			DiscoveredLoginModule[] modules = new DiscoveredLoginModule[loginModuleList.size()];
-			loginModuleList.toArray(modules);
-			userManagerList.get(userManagerList.size()-1).setLoginModules(modules);
-			loginModuleList.clear();
-		} else if (qName.equalsIgnoreCase("PARAMETER")){
 			// no action needed
-		} else if (qName.equalsIgnoreCase("LOGINMODULE")){
+		} else if (qName.equalsIgnoreCase("PARAMETER")){
 			// no action needed
 		}
 	}
@@ -84,10 +73,7 @@ public class DiscoveryXMLHandler extends DefaultHandler {
 			for(DiscoveredGame game : hdlr.discoveredGames()){
 				System.out.println("Game: "+game.getName()+" ("+game.getId()+")");
 				for(DiscoveredUserManager mgr : game.getUserManagers()){
-					System.out.println("    User Manager:"+mgr.getClientClass());
-					for(DiscoveredLoginModule mod : mgr.getLoginModules()){
-						System.out.println("        Login Module: "+mod.getClassName());
-					}
+					System.out.println("    User Manager:"+mgr.getClientClass());					
 				}
 			}
 			

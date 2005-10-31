@@ -20,8 +20,8 @@ public class DiscoveredUserManagerImpl implements DiscoveredUserManager{
     * @param class Class
     */
    String clientClass;
-   Map parameters = new HashMap();
-   DiscoveredLoginModule[] modules;
+   Map<String,String> parameters = new HashMap<String,String>();
+  
    public DiscoveredUserManagerImpl(String clientClass) {
      this.clientClass = clientClass;
    }
@@ -55,22 +55,6 @@ public class DiscoveredUserManagerImpl implements DiscoveredUserManager{
     parameters.put(tag,value);
   }
 
-  /**
-   * setLoginModules
-   *
-   * @param modules DiscoveredLoginModule[]
-   */
-  public void setLoginModules(DiscoveredLoginModule[] modules) {
-    this.modules = modules;
-  }
-
-  /**
-   * discoveredLoginModules
-   *
-   * @return DiscoveredLoginModule[]
-   */
-  public DiscoveredLoginModule[] getLoginModules() {
-    return modules;
-  }
+  
 
 }

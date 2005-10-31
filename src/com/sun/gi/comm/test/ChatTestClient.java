@@ -80,6 +80,12 @@ public class ChatTestClient extends JFrame implements ClientConnectionManagerLis
 				
 			}});
 		openChannelButton = new JButton("Open Channel");
+		openChannelButton.addActionListener(new ActionListener(){
+			public void actionPerformed(ActionEvent e) {
+				String channelName = JOptionPane.showInputDialog(ChatTestClient.this,"Enter channel name");
+				mgr.openChannel(channelName);
+			}
+		});
 		buttonPanel.add(loginButton);
 		buttonPanel.add(openChannelButton);
 		pack();

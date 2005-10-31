@@ -1,8 +1,10 @@
-package com.sun.gi.comm.validation.impl;
+package com.sun.gi.comm.users.validation.impl;
 
-import com.sun.gi.comm.validation.*;
-import java.util.List;
 import java.util.ArrayList;
+import java.util.List;
+
+import com.sun.gi.comm.users.validation.UserValidator;
+import com.sun.gi.comm.users.validation.UserValidatorFactory;
 
 /**
  * <p>Title: </p>
@@ -14,12 +16,14 @@ import java.util.ArrayList;
  */
 
 public class LoginModuleValidatorFactory implements UserValidatorFactory {
-  List classes = new ArrayList();
+  List<Class> classes = new ArrayList<Class>();
+  
   public LoginModuleValidatorFactory() {
   }
+  
   public UserValidator newValidator() {
-    /**@todo Implement this com.sun.gi.comm.validation.UserValidatorFactory method*/
-    throw new java.lang.UnsupportedOperationException("Method newValidator() not yet implemented.");
+	 Class[] ca = new Class[classes.size()];
+	 return new UserValidatorImpl(classes.toArray(ca)); 
   }
 
   /**

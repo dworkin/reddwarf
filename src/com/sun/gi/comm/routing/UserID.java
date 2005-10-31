@@ -28,4 +28,12 @@ public class UserID extends StatisticalUUID {
 	public UserID(byte[] ba) throws InstantiationException {
 		super(ba);
 	}
+	
+	private UserID(long time, long rand){
+		super(time,rand);
+	}
+	
+	public static UserID getLogicEngineID(){
+		return new UserID(-1,-1);
+	}
 }

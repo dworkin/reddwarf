@@ -9,9 +9,9 @@ public interface TransportProtocol {
 
 	public void packetReceived(ByteBuffer buff);
 
-	public void sendLoginRequest();
+	public void sendLoginRequest() throws IOException;
 
-	public void sendLogoutRequest();
+	public void sendLogoutRequest() throws IOException;
 
 	/**
 	 * Call this method from the client to send a unicast message
@@ -61,11 +61,7 @@ public interface TransportProtocol {
 	public void deliverBroadcastMsg(byte[] chanID, byte[] from,
 			boolean reliable, ByteBuffer data) throws IOException;
 
-	/**
-	 * Call this method from the client to start a login
-	 */
-
-	public void sendConnectionRequest() throws IOException;
+	
 
 	/**
 	 * Call this method from the server to indcate successful login

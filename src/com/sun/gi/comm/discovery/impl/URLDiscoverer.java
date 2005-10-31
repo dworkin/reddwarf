@@ -1,10 +1,11 @@
 package com.sun.gi.comm.discovery.impl;
 
-import com.sun.gi.comm.discovery.DiscoveredGame;
-import java.net.URLConnection;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.MalformedURLException;
 import java.net.URL;
-import java.io.*;
-import java.net.*;
+import java.net.URLConnection;
 
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.parsers.SAXParser;
@@ -12,7 +13,7 @@ import javax.xml.parsers.SAXParserFactory;
 
 import org.xml.sax.SAXException;
 
-import com.sun.gi.comm.discovery.DiscoveredLoginModule;
+import com.sun.gi.comm.discovery.DiscoveredGame;
 import com.sun.gi.comm.discovery.Discoverer;
 
 ;

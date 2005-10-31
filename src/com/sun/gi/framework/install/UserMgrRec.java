@@ -1,67 +1,37 @@
 package com.sun.gi.framework.install;
 
-import java.util.*;
+import java.util.List;
 
+public interface UserMgrRec {
 
-/**
- * <p>Title: </p>
- * <p>Description: </p>
- * <p>Copyright: Copyright (c) 2004</p>
- * <p>Company: </p>
- * @author not attributable
- * @version 1.0
- */
+	/**
+	 * getServerClassName
+	 *
+	 * @return String
+	 */
+	public String getServerClassName();
 
-public class UserMgrRec {
-  String serverclass;
-  Map parameters = new HashMap();
-  List loginModules = new ArrayList();
- 
-  /**
-   * UserMgrRec
-   *
-   * @param uSERMANAGER USERMANAGER
-   */
-  public UserMgrRec() {
-   
-  }
+	/**
+	 * getParameterMap
+	 *
+	 * @return Object
+	 */
+	public String getParameter(String tag);
 
-  /**
-   * getServerClassName
-   *
-   * @return String
-   */
-  public String getServerClassName() {
-    return serverclass;
-  }
+	/**
+	 * listLoginModules
+	 *
+	 * @return Iterator
+	 */
+	public List<LoginModuleRec> getLoginModules();
 
-  /**
-   * getParameterMap
-   *
-   * @return Object
-   */
-  public Map getParameterMap() {
-    return parameters;
-  }
+	/**
+	 * hasLoginModules
+	 *
+	 * @return boolean
+	 */
+	public boolean hasLoginModules();
 
-  /**
-   * listLoginModules
-   *
-   * @return Iterator
-   */
-  public Iterator listLoginModules() {
-    return loginModules.iterator();
-  }
-
-  /**
-   * hasLoginModules
-   *
-   * @return boolean
-   */
-  public boolean hasLoginModules() {
-    return loginModules.size()>0;
-  }
-
-
+	public Object getParameterMap();
 
 }

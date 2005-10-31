@@ -16,7 +16,7 @@ import java.util.Collection;
 public interface InstallationLoader {
   /**
    *
-   * @return List a list of InstallRec records
+   * @return List a list of DeploymentRec records
    */
-  public Collection listGames();
+  public Collection<DeploymentRec> listGames();
 }

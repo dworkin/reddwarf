@@ -1,4 +1,4 @@
-package com.sun.gi.comm.validation;
+package com.sun.gi.comm.users.validation.impl;
 
 import java.io.*;
 import java.net.*;
@@ -67,7 +67,7 @@ public class FlatFileLoginModule
     String passwdFile = System.getProperty("flatfilelogin.passwordURL");
     if (passwdFile == null){
       try {
-        passwdURL = new File("passwd.txt").toURL();
+        passwdURL = new File("passwd.txt").toURI().toURL();
       }
       catch (MalformedURLException ex) {
         ex.printStackTrace();

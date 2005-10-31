@@ -2,15 +2,9 @@
 <DISCOVERY>
     <GAME id="1" name="ChatTest">
         <USERMANAGER clientclass=
-          "com.sun.gi.comm.users.client.TCPIPUserManagerClient">
-            <PARAMETER tag="host" value="10.5.34.10" />
-            <PARAMETER tag="port" value="1139" />
-        </USERMANAGER>
-        <USERMANAGER clientclass=
-          "com.sun.gi.comm.users.client.TCPIPUserManagerClient">
-            <PARAMETER tag="host" value="10.5.34.10" />
-            <PARAMETER tag="port" value="1149" />
-            <LOGINMODULE moduleclass="com.sun.gi.users.validation.FlatFileLoginModule" />
-        </USERMANAGER>
+          "com.sun.gi.comm.users.client.impl.TCPIPUserManagerClient">
+            <PARAMETER tag="host" value="127.0.0.1" />
+            <PARAMETER tag="port" value="1140" />
+        </USERMANAGER>       
     </GAME>
 </DISCOVERY>

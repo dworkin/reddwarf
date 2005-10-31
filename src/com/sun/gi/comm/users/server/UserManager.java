@@ -1,9 +1,7 @@
 package com.sun.gi.comm.users.server;
 
-import java.nio.*;
-import java.util.*;
+import java.util.Map;
 
-import com.sun.gi.comm.routing.*;
 import com.sun.gi.comm.users.validation.UserValidatorFactory;
 
 
