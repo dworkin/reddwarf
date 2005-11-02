@@ -5,6 +5,7 @@ import java.io.*;
 import java.util.*;
 import com.sun.gi.utils.SharedDataManager;
 import com.sun.gi.utils.SharedData;
+import com.sun.gi.objectstore.OStoreMetaData;
 import com.sun.gi.objectstore.ObjectStore;
 import com.sun.gi.objectstore.Transaction;
 

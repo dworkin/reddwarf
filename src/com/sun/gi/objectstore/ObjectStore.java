@@ -2,7 +2,6 @@
 
 package com.sun.gi.objectstore;
 
-import com.sun.gi.objectstore.impl.OStoreMetaData;
 
 public interface ObjectStore {
   public static final long INVALID_ID = Long.MIN_VALUE;

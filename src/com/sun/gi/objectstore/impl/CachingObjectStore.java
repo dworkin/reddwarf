@@ -10,6 +10,7 @@
 
 package com.sun.gi.objectstore.impl;
 
+import com.sun.gi.objectstore.OStoreMetaData;
 import com.sun.gi.objectstore.ObjectStore;
 import com.sun.gi.objectstore.Transaction;
 import com.sun.gi.objectstore.impl.CachingObjectStoreCache.Entry;
