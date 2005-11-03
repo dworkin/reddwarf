@@ -671,20 +671,14 @@ public class BinaryPktProtocol
             case REQ_JOIN_CHAN:
             	chanIDlen = buff.get();
                 chanID = new byte[chanIDlen];
-                buff.get(chanID);
-                usrlen = buff.get();
-                user = new byte[usrlen];
-                buff.get(user);
-                server.rcvReqJoinChan(chanID,user);
+                buff.get(chanID);                
+                server.rcvReqJoinChan(chanID);
                 break;
             case REQ_LEAVE_CHAN:               
                 chanIDlen = buff.get();
                 chanID = new byte[chanIDlen];
                 buff.get(chanID);
-                usrlen = buff.get();
-                user = new byte[usrlen];
-                buff.get(user);
-                server.rcvReqJoinChan(chanID,user);
+                server.rcvReqLeaveChan(chanID);
                 break; 
             case DISCONNECT_REQ:
             	break;

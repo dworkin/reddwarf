@@ -94,14 +94,14 @@ public class SGSUserImpl implements SGSUser, TransportProtocolServer {
 
 	// TransportProtoclServer callbacks
 
-	public void rcvUnicastMsg(boolean reliable, byte[] chanID, byte[] from,
+	public void rcvUnicastMsg(boolean reliable, byte[] chanID, 
 			byte[] to, ByteBuffer databuff) {
 		SGSChannel chan;
 		try {
 			chan = channelMap.get(new ChannelID(chanID));
 			// should never be NULL, if it is we want an exception to figure out
 			// why
-			chan.unicastData(new UserID(from), new UserID(to), databuff,
+			chan.unicastData(userID, new UserID(to), databuff,
 					reliable);
 		} catch (InstantiationException e) {
 			// TODO Auto-generated catch block
@@ -110,7 +110,7 @@ public class SGSUserImpl implements SGSUser, TransportProtocolServer {
 
 	}
 
-	public void rcvMulticastMsg(boolean reliable, byte[] chanID, byte[] from,
+	public void rcvMulticastMsg(boolean reliable, byte[] chanID,
 			byte[][] tolist, ByteBuffer databuff) {
 		SGSChannel chan;
 		try {
@@ -122,20 +122,20 @@ public class SGSUserImpl implements SGSUser, TransportProtocolServer {
 			}
 			// should never be NULL, if it is we want an exception to figure out
 			// why
-			chan.multicastData(new UserID(from), ids, databuff, reliable);
+			chan.multicastData(userID, ids, databuff, reliable);
 		} catch (InstantiationException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
 
-	public void rcvBroadcastMsg(boolean reliable, byte[] chanID, byte[] from,
+	public void rcvBroadcastMsg(boolean reliable, byte[] chanID, 
 			ByteBuffer databuff) {
 		try {
 			SGSChannel chan = channelMap.get(new ChannelID(chanID));
 			// should never be NULL, if it is we want an exception to figure out
 			// why
-			chan.broadcastData(new UserID(from), databuff, reliable);
+			chan.broadcastData(userID, databuff, reliable);
 		} catch (InstantiationException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -209,9 +209,21 @@ public class SGSUserImpl implements SGSUser, TransportProtocolServer {
 		}
 
 	}
+	
 
-	public void rcvReqJoinChan(byte[] chanID, byte[] user) {
+	public void rcvServerMsg(boolean reliable, ByteBuffer databuff) {
+		router.serverMessage(reliable,databuff);
+		
+	}
+
+	public void rcvReqJoinChan(byte[] chanID) {
 		// TODO Auto-generated method stub
+		
+	}
+
+	public void rcvReqLeaveChan(byte[] chanID) {
+		// TODO Auto-generated method stub
+		
 	}
 
 }

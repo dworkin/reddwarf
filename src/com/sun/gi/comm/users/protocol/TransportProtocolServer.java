@@ -19,7 +19,9 @@ public interface TransportProtocolServer {
 
 	void rcvValidationResp(Callback[] cbs);
 
-	void rcvReqJoinChan(byte[] chanID, byte[] user);
+	void rcvReqJoinChan(byte[] chanID);
+	
+	void rcvReqLeaveChan(byte[] chanID);
 
 	void rcvServerMsg(boolean reliable,  ByteBuffer databuff);
 		  

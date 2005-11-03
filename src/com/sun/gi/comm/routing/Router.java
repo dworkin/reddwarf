@@ -1,6 +1,7 @@
 package com.sun.gi.comm.routing;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 import javax.security.auth.callback.Callback;
 
@@ -49,6 +50,8 @@ public interface Router {
 	public SGSChannel openChannel(String channelName);	
 
 	public boolean validateReconnectKey(UserID user, byte[] key);
+
+	public void serverMessage(boolean reliable, ByteBuffer databuff);
 	
 	
 }
