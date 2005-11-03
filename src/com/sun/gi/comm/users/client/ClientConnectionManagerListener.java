@@ -13,6 +13,7 @@ package com.sun.gi.comm.users.client;
  */
 
 import java.nio.*;
+
 import javax.security.auth.callback.*;
 
 /**
@@ -60,5 +61,12 @@ public interface ClientConnectionManagerListener {
    */
   
   public void joinedChannel(ClientChannel channel);
+  
+  /**
+   * <p>This event is fired to let the listener know a data packet has arrived on the channel.</p> 
+   * @param from
+   * @param data
+   */
+  public void dataRecieved(byte[] from, ByteBuffer data);
   
 }

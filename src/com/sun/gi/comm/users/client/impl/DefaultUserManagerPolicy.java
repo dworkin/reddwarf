@@ -3,10 +3,9 @@ package com.sun.gi.comm.users.client.impl;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.sun.gi.comm.discovery.DiscoveredUserManager;
-import com.sun.gi.comm.discovery.Discoverer;
 import com.sun.gi.comm.discovery.DiscoveredGame;
-import com.sun.gi.comm.users.client.*;
+import com.sun.gi.comm.discovery.DiscoveredUserManager;
+import com.sun.gi.comm.users.client.UserManagerPolicy;
 
 /**
  * 

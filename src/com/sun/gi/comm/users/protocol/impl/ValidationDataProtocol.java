@@ -1,4 +1,4 @@
-package com.sun.gi.comm.users.validation;
+package com.sun.gi.comm.users.protocol.impl;
 
 import java.nio.ByteBuffer;
 import javax.security.auth.callback.Callback;
@@ -60,7 +60,7 @@ public class ValidationDataProtocol {
   public static Callback[] unpackRequestData(ByteBuffer requestData) {
     ByteBuffer buff = requestData;
     int callbackCount = buff.getInt();
-    List callbackList = new ArrayList();
+    List<Callback> callbackList = new ArrayList<Callback>();
     for (int i = 0; i < callbackCount; i++) {
       Callback currentCallback = null;
       byte cbType = buff.get();

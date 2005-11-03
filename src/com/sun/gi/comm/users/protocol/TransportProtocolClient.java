@@ -33,6 +33,8 @@ public interface TransportProtocolClient {
 
 	void rcvLeftChan(byte[] chanID);
 
+	void rcvUserDisconnected(byte[] chanID);
+
  
 
 }

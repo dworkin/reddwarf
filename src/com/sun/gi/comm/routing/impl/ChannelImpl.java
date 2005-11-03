@@ -76,7 +76,7 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 			buffs[1] = message;
 			transportChannel.sendData(buffs);
 		}
-		byte[][] toArray = new byte[tolist.length];
+		byte[][] toArray = new byte[tolist.length][];
 		for(int i=0;i<toArray.length;i++){
 			toArray[i] = tolist[i].toByteArray();
 		}
@@ -271,9 +271,7 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 	// only for use by RouterImpl
 	public String getName() {
 		return transportChannel.getName();
-	}
-
-	
+	}	
 
 	
 }

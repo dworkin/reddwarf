@@ -69,4 +69,19 @@ public class ClientChannelImpl implements ClientChannel {
 		
 	}
 
+	public void userJoined(byte[] userID) {
+		listener.playerJoined(userID);
+		
+	}
+
+	public void userLeft(byte[] userID) {
+		listener.playerLeft(userID);
+		
+	}
+
+	public void dataReceived(byte[] from, ByteBuffer data, boolean reliable) {
+		listener.dataArrived(from,data,reliable);
+		
+	}
+
 }

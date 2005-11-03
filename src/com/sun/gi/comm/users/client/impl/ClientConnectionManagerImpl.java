@@ -1,26 +1,23 @@
 package com.sun.gi.comm.users.client.impl;
 
-import com.sun.gi.comm.discovery.Discoverer;
-import com.sun.gi.comm.discovery.DiscoveredGame;
-import com.sun.gi.comm.discovery.DiscoveredUserManager;
-
+import java.nio.ByteBuffer;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.HashSet;
-import java.nio.ByteBuffer;
+
 import javax.security.auth.callback.Callback;
 
+import com.sun.gi.comm.discovery.DiscoveredGame;
+import com.sun.gi.comm.discovery.DiscoveredUserManager;
+import com.sun.gi.comm.discovery.Discoverer;
 import com.sun.gi.comm.users.client.ClientAlreadyConnectedException;
-import com.sun.gi.comm.users.client.ClientChannel;
 import com.sun.gi.comm.users.client.ClientConnectionManager;
 import com.sun.gi.comm.users.client.ClientConnectionManagerListener;
 import com.sun.gi.comm.users.client.UserManagerClient;
 import com.sun.gi.comm.users.client.UserManagerClientListener;
 import com.sun.gi.comm.users.client.UserManagerPolicy;
-import com.sun.gi.comm.users.client.impl.DefaultUserManagerPolicy;
 import com.sun.gi.utils.types.BYTEARRAY;
-
 
 
 public class ClientConnectionManagerImpl
@@ -248,18 +245,19 @@ public class ClientConnectionManagerImpl
 	}
 
 	public void userJoinedChannel(byte[] channelID, byte[] userID) {
-		// TODO Auto-generated method stub
-		
+		ClientChannelImpl chan = channelMap.get(new BYTEARRAY(channelID));
+		chan.userJoined(userID);
 	}
 
 	public void userLeftChannel(byte[] channelID, byte[] userID) {
-		// TODO Auto-generated method stub
+		ClientChannelImpl chan = channelMap.get(new BYTEARRAY(channelID));
+		chan.userLeft(userID);
 		
 	}
 
 	public void recvdData(byte[] chanID, byte[] from, ByteBuffer data, boolean reliable) {
-		// TODO Auto-generated method stub
-		
+		ClientChannelImpl chan = channelMap.get(new BYTEARRAY(chanID));
+		chan.dataReceived(from,data,reliable);
 	}
 
 	/*  The below are all package private and intended just for use by ClientChannelImpl */
@@ -275,6 +273,11 @@ public class ClientConnectionManagerImpl
 	}
 
 	void sendBroadcastData(byte[] id, ByteBuffer data, boolean reliable) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	public void joinedChannel(byte[] channelID) {
 		// TODO Auto-generated method stub
 		
 	}

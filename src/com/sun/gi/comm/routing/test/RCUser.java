@@ -16,19 +16,19 @@ import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JDesktopPane;
 import javax.swing.JInternalFrame;
+import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.JLabel;
 import javax.swing.JScrollPane;
 
-import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.Router;
 import com.sun.gi.comm.routing.SGSChannel;
-import com.sun.gi.comm.routing.SGSUser;
 import com.sun.gi.comm.routing.UserID;
+import com.sun.gi.comm.users.server.SGSUser;
 import com.sun.gi.utils.types.BYTEARRAY;
 
+@SuppressWarnings("serial")
 public class RCUser extends JInternalFrame implements SGSUser {
 	private JDesktopPane desktop;
 	private Map<BYTEARRAY,RCChannelFrame> channelMap = new HashMap<BYTEARRAY,RCChannelFrame>();
@@ -219,6 +219,11 @@ public class RCUser extends JInternalFrame implements SGSUser {
 		connectButton.setEnabled(true);
 		((DefaultListModel)userList.getModel()).clear();
 		status.repaint();
+		
+	}
+
+	public void deregistered() {
+		// TODO Auto-generated method stub
 		
 	}
 

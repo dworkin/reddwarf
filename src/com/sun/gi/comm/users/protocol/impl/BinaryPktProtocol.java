@@ -26,6 +26,7 @@ public class BinaryPktProtocol
 							RCV_BROADCAST,  // serv to client broadcast msg
 							SEND_UNICAST, // client to server unicast msg
 							RCV_UNICAST, // server to client unicast msg
+							SEND_SERVER_MSG, // client to GLE
 							CONNECT_REQ, // client to server login
 							RECONNECT_REQ, //client to server fail-over login
 							DISCONNECT_REQ, //client to server logout request
@@ -35,6 +36,7 @@ public class BinaryPktProtocol
 							USER_REJECTED, //server to client failed login
 							USER_JOINED, // server to client notification of user logging in
 							USER_LEFT, //server to client notification of user logging out
+							USER_DISCONNECTED, //this user is being disconnected
 							USER_JOINED_CHAN, // server to client notification of other user joining
 							USER_LEFT_CHAN, //server to client notification of other user leaving channel
 							RCV_RECONNECT_KEY, //server to client reconnect key notification
@@ -67,15 +69,13 @@ public class BinaryPktProtocol
      * Call this method from the client to indicate that the user wishes to join a channel
      */
     
-    public synchronized void sendJoinChanRequest(String chanName, byte[] userID) throws IOException {
+    public synchronized void sendJoinChannelReq(String chanName) throws IOException {
         synchronized (hdr) {
             hdr.clear();
             hdr.put((byte)OPCODE.REQ_JOIN_CHAN.ordinal());
             byte[] namebytes = chanName.getBytes();
             hdr.put((byte) namebytes.length);
-            hdr.put(namebytes);
-            hdr.put( (byte) userID.length);
-            hdr.put(userID);
+            hdr.put(namebytes);         
             sendBuffers(hdr);
         }
     }
@@ -86,7 +86,7 @@ public class BinaryPktProtocol
       * Call this method from the client to send a unicast message 
       */
      
-    public synchronized void sendUnicastMsg(byte[] chanID, byte[] from,
+    public synchronized void sendUnicastMsg(byte[] chanID, 
             byte[] to,
             boolean reliable, ByteBuffer data) throws
             IOException {
@@ -99,9 +99,7 @@ public class BinaryPktProtocol
             hdr.put((byte)OPCODE.SEND_UNICAST.ordinal());
             hdr.put( (byte) (reliable ? 1 : 0));
             hdr.put((byte) chanID.length);
-            hdr.put(chanID);
-            hdr.put( (byte) from.length);
-            hdr.put(from);
+            hdr.put(chanID);           
             hdr.put( (byte) to.length);
             hdr.put(to);
             sendArray[1] = data;
@@ -140,7 +138,7 @@ public class BinaryPktProtocol
      * Call this method from the client to send a multicast message 
      */
     
-    public synchronized void sendMulticastMsg(byte[] chanID, byte[] from,
+    public synchronized void sendMulticastMsg(byte[] chanID, 
             byte[][] to,
             boolean reliable,
             ByteBuffer data) throws IOException {
@@ -153,8 +151,6 @@ public class BinaryPktProtocol
             hdr.put( (byte) (reliable ? 1 : 0));
             hdr.put((byte)chanID.length);
             hdr.put(chanID);
-            hdr.put( (byte) from.length);
-            hdr.put(from);
             hdr.put( (byte) to.length);
             for (int i = 0; i < to.length; i++) {
                 hdr.put( (byte) (to[i].length));
@@ -198,7 +194,7 @@ public class BinaryPktProtocol
      * Call this method from the client to send a multicast message 
      */
     
-    public synchronized void sendBroadcastMsg(byte[] chanID, byte[] from,
+    public synchronized void sendBroadcastMsg(byte[] chanID, 
             boolean reliable,
             ByteBuffer data) throws IOException {
         // buffers coming into here should be in "written" state and full
@@ -209,8 +205,6 @@ public class BinaryPktProtocol
             hdr.put( (byte) (reliable ? 1 : 0));
             hdr.put((byte)chanID.length);
             hdr.put(chanID);
-            hdr.put( (byte) from.length);
-            hdr.put(from);
             sendArray[1] = data;
             sendBuffers(sendArray);
         }
@@ -233,6 +227,20 @@ public class BinaryPktProtocol
             hdr.put(chanID);
             hdr.put( (byte) from.length);
             hdr.put(from);
+            sendArray[1] = data;
+            sendBuffers(sendArray);
+        }
+    }
+    
+    public synchronized void sendServerMsg(
+            boolean reliable,
+            ByteBuffer data) throws IOException {
+        // buffers coming into here should be in "written" state and full
+        // position == limit
+        synchronized (hdr) {
+            hdr.clear();
+            hdr.put((byte)OPCODE.SEND_SERVER_MSG.ordinal());
+            hdr.put( (byte) (reliable ? 1 : 0));                       
             sendArray[1] = data;
             sendBuffers(sendArray);
         }
@@ -275,6 +283,20 @@ public class BinaryPktProtocol
             byte[] msgbytes = message.getBytes();
             hdr.putInt(msgbytes.length);
             hdr.put(msgbytes);
+            sendBuffers(hdr);
+        }
+    }
+    
+    /**
+     * Call this method from the server to indcate logout success
+     */
+    
+    public void deliverUserDisconnected(byte[] userID) throws IOException {
+        synchronized (hdr) {
+            hdr.clear();
+            hdr.put((byte)OPCODE.USER_DISCONNECTED.ordinal());     
+            hdr.put((byte)userID.length);
+            hdr.put(userID);
             sendBuffers(hdr);
         }
     }
@@ -390,7 +412,7 @@ public class BinaryPktProtocol
      * Call this method from the client to leave a channel
      */
     
-    public void sendLeaveChanReq(byte[] chanID, byte[] user) throws IOException {
+    public void sendLeaveChannelReq(byte[] chanID, byte[] user) throws IOException {
         synchronized (hdr) {
             hdr.clear();
             hdr.put((byte)OPCODE.REQ_LEAVE_CHAN.ordinal());
@@ -447,11 +469,11 @@ public class BinaryPktProtocol
         }
     }
     
-    private void sendBuffers(Buffer buff){
-    	xmitter.sendBuffers(new Buffer[] {buff});
+    private void sendBuffers(ByteBuffer buff){
+    	xmitter.sendBuffers(new ByteBuffer[] {buff});
     }
     
-    private void sendBuffers(Buffer[] buffs){
+    private void sendBuffers(ByteBuffer[] buffs){
     	xmitter.sendBuffers(buffs);
     }
     
@@ -482,23 +504,20 @@ public class BinaryPktProtocol
                 boolean reliable = (buff.get() == 1);
                 byte chanIDlen = buff.get();
                 byte[] chanID = new byte[chanIDlen];
-                buff.get(chanID);
-                byte fromlen = buff.get();
-                byte[] from = new byte[fromlen];
-                buff.get(from);
+                buff.get(chanID);                 
                 byte tolen = buff.get();
                 byte[] to = new byte[tolen];
                 buff.get(to);
                 ByteBuffer databuff = buff.slice();
-                server.rcvUnicastMsg(reliable, chanID, from, to, databuff);
+                server.rcvUnicastMsg(reliable, chanID, to, databuff);
                 break;
             case RCV_UNICAST:
                 reliable = (buff.get() == 1);
                 chanIDlen = buff.get();
                 chanID = new byte[chanIDlen];
-                buff.get(chanID);
-                fromlen = buff.get();
-                from = new byte[fromlen];
+                buff.get(chanID);  
+                int fromlen = buff.get();
+                byte[] from = new byte[fromlen];
                 buff.get(from);
                 tolen = buff.get();
                 to = new byte[tolen];
@@ -511,9 +530,6 @@ public class BinaryPktProtocol
                 chanIDlen = buff.get();
                 chanID = new byte[chanIDlen];
                 buff.get(chanID);
-                fromlen = buff.get();
-                from = new byte[fromlen];
-                buff.get(from);
                 byte tocount = buff.get();
                 byte[][] tolist = new byte[tocount][];
                 for (int i = 0; i < tocount; i++) {
@@ -522,7 +538,7 @@ public class BinaryPktProtocol
                     buff.get(tolist[i]);
                 }
                 databuff = buff.slice();
-                server.rcvMulticastMsg(reliable, chanID, from, tolist, databuff);
+                server.rcvMulticastMsg(reliable, chanID,  tolist, databuff);
                 break;
             case RCV_MULTICAST:
                 reliable = (buff.get() == 1);
@@ -546,12 +562,9 @@ public class BinaryPktProtocol
                 reliable = (buff.get() == 1);
                 chanIDlen = buff.get();
                 chanID = new byte[chanIDlen];
-                buff.get(chanID);
-                fromlen = buff.get();
-                from = new byte[fromlen];
-                buff.get(from);
+                buff.get(chanID);                
                 databuff = buff.slice();
-                server.rcvBroadcastMsg(reliable, chanID, from, databuff);
+                server.rcvBroadcastMsg(reliable, chanID,  databuff);
                 break;
             case RCV_BROADCAST:
                 reliable = (buff.get() == 1);
@@ -563,7 +576,15 @@ public class BinaryPktProtocol
                 buff.get(from);
                 databuff = buff.slice();
                 client.rcvBroadcastMsg(reliable, chanID, from, databuff);
-                break;    
+                break;   
+            case SEND_SERVER_MSG:
+                reliable = (buff.get() == 1);                
+                fromlen = buff.get();
+                from = new byte[fromlen];
+                buff.get(from);
+                databuff = buff.slice();
+                server.rcvServerMsg(reliable,databuff);
+                break;
             case RECONNECT_REQ:
                 int usrlen = buff.get();
                 byte[] user = new byte[usrlen];
@@ -667,6 +688,12 @@ public class BinaryPktProtocol
                 break; 
             case DISCONNECT_REQ:
             	break;
+            case USER_DISCONNECTED:
+            	usrlen = buff.get();
+                user = new byte[usrlen];
+                buff.get(user);
+                client.rcvUserDisconnected(user);
+                break;
             default:
                 System.out.println("WARNING:Invalid op recieved from client: " + op +
                         " ignored.");

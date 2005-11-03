@@ -2,10 +2,9 @@ package com.sun.gi.comm.users.client.impl;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.List;
 
 import javax.security.auth.callback.Callback;
+import javax.security.auth.callback.UnsupportedCallbackException;
 
 import com.sun.gi.comm.discovery.DiscoveredUserManager;
 import com.sun.gi.comm.users.client.UserManagerClient;
@@ -182,6 +181,11 @@ public class TCPIPUserManagerClient
 		listener.leftChannel(chanID);
 		
 	}
+	
+	public void rcvUserDisconnected(byte[] chanID) {
+		listener.disconnected();
+		
+	}
 
 
 	public void connect(DiscoveredUserManager choice, UserManagerClientListener listener) {
@@ -196,37 +200,73 @@ public class TCPIPUserManagerClient
 
 
 	public void login() {
-		protocol.sendLoginRequest();		
+		try {
+			protocol.sendLoginRequest();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}		
 	}
 
 
 	public void validationDataResponse(Callback[] cbs) {
-		protocol.sendValidationResponse(cbs);
+		try {
+			protocol.sendValidationResponse(cbs);
+		} catch (UnsupportedCallbackException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 		
 	}
 
 
 	public void logout() {
-		protocol.sendLogoutRequest();		
+		try {
+			protocol.sendLogoutRequest();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}		
 	}
 
 
 	public void joinChannel(String channelName) {
-		protocol.sendJoinChannelReq(channelName);
+		try {
+			protocol.sendJoinChannelReq(channelName);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 		
 	}
 
 
 	public void sendToServer(ByteBuffer buff, boolean reliable) {
-		protocol.sendServerMsg(reliable,buff);
+		try {
+			protocol.sendServerMsg(reliable,buff);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 		
 	}
 
 
 	public void reconnectLogin(byte[] userID, byte[] reconnectionKey) {
-		protocol.sendReconnectRequest(userID,reconnectionKey);
+		try {
+			protocol.sendReconnectRequest(userID,reconnectionKey);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 		
 	}
+
+
+	
     
     
 }

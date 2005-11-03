@@ -162,8 +162,7 @@ public interface TransportProtocol {
 	/*
 	 * 
 	 */
-
-	public void deliverServerID(byte[] bs);
+	
 
 	public void setClient(TransportProtocolClient client);
 
@@ -171,7 +170,7 @@ public interface TransportProtocol {
 
 	public void setTransmitter(TransportProtocolTransmitter xmitter);
 
-	public void deliverDisconnected(byte[] bs);
+	public void deliverUserDisconnected(byte[] bs) throws IOException;
 
 	public boolean isLoginPkt(ByteBuffer inputBuffer);
 

@@ -2,7 +2,6 @@ package com.sun.gi.comm.routing.test;
 
 import java.awt.BorderLayout;
 import java.awt.Container;
-import java.awt.FlowLayout;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -11,17 +10,14 @@ import java.io.IOException;
 import javax.swing.JButton;
 import javax.swing.JDesktopPane;
 import javax.swing.JFrame;
-import javax.swing.JList;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.JScrollPane;
 
-import javax.swing.JLabel;
 import com.sun.gi.comm.routing.Router;
-import com.sun.gi.comm.routing.SGSUser;
 import com.sun.gi.comm.routing.impl.RouterImpl;
 import com.sun.gi.framework.interconnect.impl.LRMPTransportManager;
-import javax.swing.JOptionPane;
 
+@SuppressWarnings("serial")
 public class RouterChat extends JFrame{
 
 	private Router router;
@@ -51,7 +47,7 @@ public class RouterChat extends JFrame{
 		setVisible(true);
 		// start router
 		try {
-			router = new RouterImpl(new LRMPTransportManager(),null);
+			router = new RouterImpl(new LRMPTransportManager());
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
