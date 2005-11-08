@@ -234,7 +234,7 @@ public class TCPIPUserManagerClient
 
 	public void logout() {
 		try {
-			protocol.sendLogoutRequest();
+			protocol.sendLogoutRequest();	
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

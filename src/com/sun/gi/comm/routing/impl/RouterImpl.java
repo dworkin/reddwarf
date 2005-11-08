@@ -109,8 +109,7 @@ public class RouterImpl implements Router {
 		userMap.put(user.getUserID(),user);		
 		fireUserJoined(user.getUserID());
 		reportUserJoined(user.getUserID().toByteArray());
-		// send already connected users to new joiner
-		byte[] userIDbytes = user.getUserID().toByteArray();
+		// send already connected users to new joiner		
 		for(UserID oldUserID: userMap.keySet()){			
 			if (oldUserID != user.getUserID()){
 				user.userJoinedSystem(oldUserID.toByteArray());					

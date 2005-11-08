@@ -713,8 +713,7 @@ public class BinaryPktProtocol
 
 
 	public void sendLogoutRequest() throws IOException {
-		// TODO Auto-generated method stub
-		
+		xmitter.closeConnection();		
 	}
 
 

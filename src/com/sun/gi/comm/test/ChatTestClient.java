@@ -5,6 +5,8 @@ import java.awt.Container;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.WindowEvent;
+import java.awt.event.WindowStateListener;
 import java.io.File;
 import java.net.MalformedURLException;
 import java.nio.ByteBuffer;
@@ -91,8 +93,7 @@ public class ChatTestClient extends JFrame implements ClientConnectionManagerLis
 		buttonPanel.add(openChannelButton);
 		pack();
 		setSize(800,600);
-		setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-		setVisible(true);
+		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		// start connection process.
 		try {
 			mgr = new ClientConnectionManagerImpl("ChatTest",new URLDiscoverer(new File("FakeDiscovery.xml").toURI().toURL()));
@@ -102,6 +103,13 @@ public class ChatTestClient extends JFrame implements ClientConnectionManagerLis
 			e.printStackTrace();
 			System.exit(2);
 		} 
+		this.addWindowStateListener(new WindowStateListener(){
+			public void windowStateChanged(WindowEvent arg0) {
+				if(arg0.getNewState() == WindowEvent.WINDOW_CLOSED){
+					mgr.disconnect();					
+				}				
+			}});
+		setVisible(true);
 	}
 	
 	public void validationRequest(Callback[] callbacks) {
