@@ -143,6 +143,7 @@ public class ValidationDataProtocol {
 				strbytes = new byte[strlen];
 				buff.get(strbytes);
 				prompt = new String(strbytes);
+				boolean echoOn = (buff.get()==1)?true:false;
 				strlen = buff.getInt();
 				strbytes = new byte[strlen];
 				buff.get(strbytes);

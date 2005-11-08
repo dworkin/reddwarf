@@ -193,8 +193,12 @@ public class SGSUserImpl implements SGSUser, TransportProtocolServer {
 				// TODO need to disconnet the connection
 			} else { // go on
 				validatorCounter++;
-				validators[validatorCounter].reset(subject);
-				cb = validators[validatorCounter].nextDataRequest();
+				if (validatorCounter<validators.length){
+					validators[validatorCounter].reset(subject);
+					cb = validators[validatorCounter].nextDataRequest();
+				} else {
+					cb = null;
+				}
 			}
 		}
 		if (cb == null){ // we have done them all and are authenticated

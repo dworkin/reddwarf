@@ -279,7 +279,7 @@ public class BinaryPktProtocol
     public void deliverUserRejected(String message) throws IOException {
         synchronized (hdr) {
             hdr.clear();
-            hdr.put((byte)OPCODE.USER_ACCEPTED.ordinal());
+            hdr.put((byte)OPCODE.USER_REJECTED.ordinal());
             byte[] msgbytes = message.getBytes();
             hdr.putInt(msgbytes.length);
             hdr.put(msgbytes);
@@ -299,6 +299,7 @@ public class BinaryPktProtocol
             hdr.put(userID);
             sendBuffers(hdr);
         }
+        xmitter.closeConnection();
     }
     
     /**

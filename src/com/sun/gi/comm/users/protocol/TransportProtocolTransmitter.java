@@ -6,4 +6,5 @@ import java.nio.ByteBuffer;
 
 public interface TransportProtocolTransmitter {
 	public void sendBuffers(ByteBuffer[] buffs);
+	public void closeConnection();
 }

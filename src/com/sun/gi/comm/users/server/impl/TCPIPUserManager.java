@@ -95,6 +95,18 @@ public class TCPIPUserManager implements NIOSocketManagerListener, UserManager
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}				
+			}
+
+			public void closeConnection() {
+				try {
+					if (TRACE){
+						System.out.println("Server disconnecting user");
+					}
+					connection.disconnect();
+				} catch (IOException e) {					
+					e.printStackTrace();
+				}
+				
 			}			
 		}, validatorFactory.newValidators());
 		connection.addListener(new NIOTCPConnectionListener(){

@@ -79,6 +79,15 @@ public class TCPIPUserManagerClient
 					e.printStackTrace();
 				}				
 			}
+
+			public void closeConnection() {
+				try {
+					connection.disconnect();
+				} catch (IOException e) {					
+					e.printStackTrace();
+				}
+				
+			}
 		});	
 		connection.addListener(new NIOTCPConnectionListener(){
 			public void packetReceived(NIOTCPConnection conn, ByteBuffer inputBuffer) {
