@@ -84,9 +84,18 @@ public class RouterImpl implements Router {
 	}
 
 	private void reportUserJoined(byte[] uidbytes) {
+		UserID sentID=null;
+		try {
+			sentID = new UserID(uidbytes);
+		} catch (InstantiationException e1) {			
+			e1.printStackTrace();
+			return;
+		}
 		for(SGSUser user : userMap.values()){
-			try {
-				user.userJoinedSystem(uidbytes);
+			try {		
+				if (!user.getUserID().equals(sentID)){
+					user.userJoinedSystem(uidbytes);
+				}
 			} catch (IOException e) {
 				System.out.println("Exception sending UserJOined to user id="+user.getUserID());
 				e.printStackTrace();
@@ -95,13 +104,16 @@ public class RouterImpl implements Router {
 		
 	}
 
-	public void registerUser(SGSUser user) throws InstantiationException, IOException {			
+	public void registerUser(SGSUser user) 
+		throws InstantiationException, IOException {		
 		userMap.put(user.getUserID(),user);		
 		fireUserJoined(user.getUserID());
+		reportUserJoined(user.getUserID().toByteArray());
 		// send already connected users to new joiner
-		for(UserID existingUser : userMap.keySet()){
-			if (existingUser != user.getUserID()){
-				user.userJoinedSystem(existingUser.toByteArray());
+		byte[] userIDbytes = user.getUserID().toByteArray();
+		for(UserID oldUserID: userMap.keySet()){			
+			if (oldUserID != user.getUserID()){
+				user.userJoinedSystem(oldUserID.toByteArray());					
 			}
 		}		
 	}

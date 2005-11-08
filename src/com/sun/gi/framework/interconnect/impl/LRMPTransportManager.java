@@ -45,7 +45,7 @@ public class LRMPTransportManager
       tp.setOrdered(true);
       tp.setTTL( ttl);
       cmgr = new LRMPSocketManager(tp);
-      cmgr.setEcho(true);
+      cmgr.setEcho(false); //was TRUE, make sure all logic still works
       cmgr.addListener(this);
     }
     catch (Exception e) {

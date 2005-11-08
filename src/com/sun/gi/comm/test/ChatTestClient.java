@@ -27,6 +27,7 @@ import com.sun.gi.comm.users.client.ClientConnectionManager;
 import com.sun.gi.comm.users.client.ClientConnectionManagerListener;
 import com.sun.gi.comm.users.client.impl.ClientConnectionManagerImpl;
 import com.sun.gi.utils.types.BYTEARRAY;
+import com.sun.gi.utils.types.StringUtils;
 
 @SuppressWarnings("serial")
 public class ChatTestClient extends JFrame implements ClientConnectionManagerListener{
@@ -90,14 +91,14 @@ public class ChatTestClient extends JFrame implements ClientConnectionManagerLis
 		buttonPanel.add(openChannelButton);
 		pack();
 		setSize(800,600);
+		setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 		setVisible(true);
 		// start connection process.
 		try {
 			mgr = new ClientConnectionManagerImpl("ChatTest",new URLDiscoverer(new File("FakeDiscovery.xml").toURI().toURL()));
 			mgr.setListener(this);
 			
-		} catch (MalformedURLException e) {
-			// TODO Auto-generated catch block
+		} catch (MalformedURLException e) {			
 			e.printStackTrace();
 			System.exit(2);
 		} 
@@ -111,6 +112,7 @@ public class ChatTestClient extends JFrame implements ClientConnectionManagerLis
 	
 	public void connected(byte[] myID) {
 		statusMessage.setText("Status: Connected");
+		setTitle("Chat Test Client: "+StringUtils.bytesToHex(myID));
 		loginButton.setText("Logout");
 		loginButton.setEnabled(true);
 		
