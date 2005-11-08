@@ -14,7 +14,7 @@ import java.awt.BorderLayout;
 import com.sun.gi.utils.CommandLineWindow;
 import com.sun.gi.server.ostore.ObjectStore;
 import com.sun.gi.utils.CommandLineWindowListener;
-import com.sun.gi.utils.StringUtils;
+import com.sun.gi.utils.types.StringUtils;
 import com.sun.gi.server.ostore.Transaction;
 import java.io.Serializable;
 import java.util.List;

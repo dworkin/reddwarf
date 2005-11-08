@@ -54,7 +54,7 @@ public class ChatTestClient extends JFrame implements ClientConnectionManagerLis
 		JPanel eastPanel = new JPanel();
 		eastPanel.setLayout(new BorderLayout());
 		eastPanel.add(new JLabel("Users"),BorderLayout.NORTH);
-		userList = new JList();
+		userList = new JList(new DefaultListModel());
 		eastPanel.add(new JScrollPane(userList),BorderLayout.CENTER);
 		c.add(eastPanel,BorderLayout.EAST);
 		buttonPanel.setLayout(new GridLayout(1,0));

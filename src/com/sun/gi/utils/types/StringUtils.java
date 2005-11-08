@@ -1,4 +1,4 @@
-package com.sun.gi.utils;
+package com.sun.gi.utils.types;
 
 /**
  * <p>Title: </p>
