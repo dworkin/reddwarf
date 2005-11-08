@@ -21,11 +21,12 @@ import java.util.Map.Entry;
 import com.sun.gi.comm.routing.Router;
 import com.sun.gi.comm.routing.impl.RouterImpl;
 import com.sun.gi.comm.users.server.UserManager;
-import com.sun.gi.comm.users.validation.impl.LoginModuleValidatorFactory;
+import com.sun.gi.comm.users.validation.UserValidatorFactory;
+import com.sun.gi.comm.users.validation.impl.UserValidatorFactoryImpl;
 import com.sun.gi.framework.install.DeploymentRec;
 import com.sun.gi.framework.install.InstallationLoader;
-import com.sun.gi.framework.install.LoginModuleRec;
 import com.sun.gi.framework.install.UserMgrRec;
+import com.sun.gi.framework.install.ValidatorRec;
 import com.sun.gi.framework.install.impl.InstallationFile;
 import com.sun.gi.framework.interconnect.TransportManager;
 import com.sun.gi.framework.interconnect.impl.LRMPTransportManager;
@@ -131,13 +132,12 @@ public class SGS {
               (String) entry.getValue());
           c++;
         }
-        if (umgrRec.hasLoginModules()) {
-          LoginModuleValidatorFactory validatorFactory = new
-              LoginModuleValidatorFactory();
-          for (LoginModuleRec lmoduleRec : umgrRec.getLoginModules() ) {            
-            String loginModuleClassname = lmoduleRec.getModuleClassName();
+        if (umgrRec.hasValidatorModules()) {
+          UserValidatorFactory validatorFactory = new UserValidatorFactoryImpl();
+          for (ValidatorRec lmoduleRec : umgrRec.getValidatorModules() ) {            
+            String loginModuleClassname = lmoduleRec.getValidatorClassName();
             Class loginModuleClass = Class.forName(loginModuleClassname);
-            validatorFactory.addLoginModule(loginModuleClass);
+            validatorFactory.addLoginModule(loginModuleClass,lmoduleRec.getParameterMap());
           }
           umgr.setUserValidatorFactory(validatorFactory);
         }
@@ -145,7 +145,6 @@ public class SGS {
 
         
         // need to start boot method in container if it has one here.
-
         
       }
       catch (Exception ex) {

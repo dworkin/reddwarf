@@ -12,7 +12,7 @@ import java.util.Collection;
 
 import com.sun.gi.framework.install.DeploymentRec;
 import com.sun.gi.framework.install.InstallationLoader;
-import com.sun.gi.framework.install.LoginModuleRec;
+import com.sun.gi.framework.install.ValidatorRec;
 import com.sun.gi.framework.install.UserMgrRec;
 
 /**
@@ -75,10 +75,10 @@ public class InstallationFile implements InstallationLoader {
 		InstallationLoader inst = new InstallationFile(new File(args[0]));
 		for(DeploymentRec game : inst.listGames()){			
 			System.out.println("Game: "+game.getName());
-			for(UserMgrRec mgr : game.getUserManagers()){
+			for(UserMgrRec mgr : game.getUserManagers()){ 
 				System.out.println("    User Manager:"+mgr.getServerClassName());
-				for(LoginModuleRec mod : mgr.getLoginModules()){
-						System.out.println("        Login Module: "+mod.getModuleClassName());
+				for(ValidatorRec mod : mgr.getValidatorModules()){
+						System.out.println("        Login Module: "+mod.getValidatorClassName());
 				}
 			}
 		}

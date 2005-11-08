@@ -2,7 +2,7 @@ package com.sun.gi.framework.install.impl;
 
 import java.util.*;
 
-import com.sun.gi.framework.install.LoginModuleRec;
+import com.sun.gi.framework.install.ValidatorRec;
 import com.sun.gi.framework.install.UserMgrRec;
 
 
@@ -18,7 +18,7 @@ import com.sun.gi.framework.install.UserMgrRec;
 public class UserMgrRecImpl implements UserMgrRec {
   String serverclass;
   Map<String,String> parameters = new HashMap<String,String>();
-  List<LoginModuleRec> loginModules = new ArrayList<LoginModuleRec>();
+  List<ValidatorRec> validatorModules = new ArrayList<ValidatorRec>();
  
   /**
    * UserMgrRec
@@ -36,7 +36,7 @@ public class UserMgrRecImpl implements UserMgrRec {
     return serverclass;
   }
 
-  public void addParameter(String tag, String value){
+  public void setParameter(String tag, String value){
 	  parameters.put(tag,value);
   }
   /* (non-Javadoc)
@@ -46,21 +46,21 @@ public class UserMgrRecImpl implements UserMgrRec {
     return parameters.get(tag);
   }
 
-  public void addLoginModule(LoginModuleRec lmrec){
-	  loginModules.add(lmrec);
+  public void addValidatorModule(ValidatorRec lmrec){
+	  validatorModules.add(lmrec);
   }
   /* (non-Javadoc)
  * @see com.sun.gi.framework.install.UserMgrRec#listLoginModules()
  */
-  public List<LoginModuleRec> getLoginModules() {
-    return loginModules;
+  public List<ValidatorRec> getValidatorModules() {
+    return validatorModules;
   }
 
   /* (non-Javadoc)
  * @see com.sun.gi.framework.install.UserMgrRec#hasLoginModules()
  */
-  public boolean hasLoginModules() {
-    return loginModules.size()>0;
+  public boolean hasValidatorModules() {
+    return validatorModules.size()>0;
   }
 
 public Map<String,String> getParameterMap() {

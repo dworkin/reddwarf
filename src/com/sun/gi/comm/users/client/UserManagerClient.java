@@ -79,6 +79,34 @@ public interface UserManagerClient {
    */
   public void sendToServer(ByteBuffer buff,
                        boolean reliable);
+  
+  /**
+   * This method sends a packet to another user on the given channel
+   * @param chanID The comm channel to put the packet on
+   * @param to The user the apcket is destined for
+   * @param data The packet itself
+   * @param realiable Whether delivery gaurantees are required
+   */
+  public void sendUnicastMsg(byte[] chanID, byte[] to, ByteBuffer data, boolean realiable);
+  
+  /**
+   * This method sends a packet to a list of users on the given channel
+   * @param chanID The comm channel to put the packet on
+   * @param to An array of user IDs that the packet is destined for
+   * @param data The packet itself
+   * @param realiable Whether delivery gaurantees are required
+   */
+  
+  public void sendMulticastMsg(byte[] chanID, byte[][] to, ByteBuffer data, boolean realiable);
+  
+  /**
+   * This method sends a packet to all other users on the given channel
+   * @param chanID The comm channel to put the packet on
+   * @param data The packet itself
+   * @param realiable Whether delivery gaurantees are required
+   */
+  
+  public void sendBroadcastMsg(byte[] chanID,  ByteBuffer data, boolean realiable);
 
   /**
    * This is called when a user is dropped from its connection point.  (This could be

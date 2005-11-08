@@ -169,14 +169,5 @@ public class SimTaskImpl implements SimTask {
     return makeReference(trans.create(simObject,name));
   }
 
-  /**
-   * getRefID
-   *
-   * @deprecated
-   * @param wurmBoot WurmBoot
-   * @return long
-   */
-  public long getRefID(Serializable sobj) {
-    return trans.lookupObject(sobj);
-  }
+  
 }

@@ -23,14 +23,14 @@ public interface UserMgrRec {
 	 *
 	 * @return Iterator
 	 */
-	public List<LoginModuleRec> getLoginModules();
+	public List<ValidatorRec> getValidatorModules();
 
 	/**
 	 * hasLoginModules
 	 *
 	 * @return boolean
 	 */
-	public boolean hasLoginModules();
+	public boolean hasValidatorModules();
 
 	public Object getParameterMap();
 

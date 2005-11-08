@@ -135,7 +135,7 @@ public interface TransportProtocol {
 	 * Call this method from the client to leave a channel
 	 */
 
-	public void sendLeaveChannelReq(byte[] chanID, byte[] user)
+	public void sendLeaveChannelReq(byte[] chanID)
 			throws IOException;
 
 	/**

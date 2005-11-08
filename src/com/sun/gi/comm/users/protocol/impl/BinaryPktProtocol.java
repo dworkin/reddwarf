@@ -412,14 +412,11 @@ public class BinaryPktProtocol
      * Call this method from the client to leave a channel
      */
     
-    public void sendLeaveChannelReq(byte[] chanID, byte[] user) throws IOException {
+    public void sendLeaveChannelReq(byte[] chanID) throws IOException {
         synchronized (hdr) {
             hdr.clear();
             hdr.put((byte)OPCODE.REQ_LEAVE_CHAN.ordinal());
-            hdr.put((byte)chanID.length);
-            hdr.put(chanID);
-            hdr.put( (byte) user.length);
-            hdr.put(user);
+            hdr.put((byte)chanID.length);            
             sendBuffers(hdr);
         }
     }
@@ -669,15 +666,15 @@ public class BinaryPktProtocol
                 client.rcvReconnectKey(user,key);
                 break;
             case REQ_JOIN_CHAN:
-            	chanIDlen = buff.get();
-                chanID = new byte[chanIDlen];
-                buff.get(chanID);                
-                server.rcvReqJoinChan(chanID);
+            	int namelen = buff.get();
+            	byte[] namearray = new byte[namelen];
+            	buff.get(namearray);
+                server.rcvReqJoinChan(new String(namearray));
                 break;
             case REQ_LEAVE_CHAN:               
                 chanIDlen = buff.get();
                 chanID = new byte[chanIDlen];
-                buff.get(chanID);
+                buff.get(chanID);                
                 server.rcvReqLeaveChan(chanID);
                 break; 
             case DISCONNECT_REQ:

@@ -14,7 +14,7 @@ import javax.xml.parsers.SAXParserFactory;
 import org.xml.sax.SAXException;
 
 import com.sun.gi.framework.install.DeploymentRec;
-import com.sun.gi.framework.install.LoginModuleRec;
+import com.sun.gi.framework.install.ValidatorRec;
 import com.sun.gi.framework.install.UserMgrRec;
 
 
@@ -72,8 +72,8 @@ public class URLDeploymentReader {
 				System.out.println("Game: "+game.getName());
 				for(UserMgrRec mgr : game.getUserManagers()){
 					System.out.println("    User Manager:"+mgr.getServerClassName());
-					for(LoginModuleRec mod : mgr.getLoginModules()){
-							System.out.println("        Login Module: "+mod.getModuleClassName());
+					for(ValidatorRec mod : mgr.getValidatorModules()){
+							System.out.println("        Validator Module: "+mod.getValidatorClassName());
 					}
 				}
 			} catch (MalformedURLException e) {

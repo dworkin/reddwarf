@@ -12,10 +12,11 @@ import com.sun.gi.comm.users.validation.UserValidatorFactory;
 import com.sun.gi.utils.nio.NIOSocketManager;
 import com.sun.gi.utils.nio.NIOSocketManagerListener;
 import com.sun.gi.utils.nio.NIOTCPConnection;
+import com.sun.gi.utils.nio.NIOTCPConnectionListener;
 
 public class TCPIPUserManager implements NIOSocketManagerListener, UserManager
 	{
-	
+	private static final boolean TRACE = true;
 
 	Router router;
 
@@ -80,16 +81,38 @@ public class TCPIPUserManager implements NIOSocketManagerListener, UserManager
 	}
 
 	public void newTCPConnection(final NIOTCPConnection connection) {
-		new SGSUserImpl(router, new TransportProtocolTransmitter() {
+		if (TRACE){
+			System.out.println("New TCP connection received by server");
+		}
+		final SGSUserImpl user = new SGSUserImpl(router, new TransportProtocolTransmitter() {
 			public void sendBuffers(ByteBuffer[] buffs) {
 				try {
+					if (TRACE){
+						System.out.println("Server sending opcode: "+buffs[0].get(0));
+					}
 					connection.send(buffs);
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}				
 			}			
-		}, validatorFactory.newValidator());		
+		}, validatorFactory.newValidators());
+		connection.addListener(new NIOTCPConnectionListener(){
+
+			public void packetReceived(NIOTCPConnection conn, ByteBuffer inputBuffer) {
+				if (TRACE){
+					System.out.println("Server receievd opcode: "+inputBuffer.get(0));
+				}
+				user.packetReceived(inputBuffer);			
+			}
+
+			public void disconnected(NIOTCPConnection nIOTCPConnection) {
+				if (TRACE){
+					System.out.println("Server sees socket disconnection");
+				}
+				user.disconnected();					
+			}});
+		
 	}
 /*
  *  This callback method is not implemented because a UserManager never initiates a connection

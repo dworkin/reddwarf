@@ -106,17 +106,7 @@ public interface SimTask {
    * @return SOReference A SOReference that references the newly created GLO
    */
   public SOReference createSO(Serializable simObject, String name);
-
-  /**
-   * This method exposes the underlying ID used to reference an object.
-   * NOTE:  This doesnt seem to be a good diea and I'm not certain
-   * what uses it.  I need to look into that.  In the mean while its
-   * deprecated
-   *
-   * @param sobject  Serializable GLO to look up the ref ID for.
-   * @deprecated
-   */
-  public long getRefID(Serializable sobject);
+  
 
   // data access functions
   // These functions are used by games to get data from the ObjectStore

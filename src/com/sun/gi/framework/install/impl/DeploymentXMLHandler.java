@@ -12,7 +12,7 @@ import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
 import com.sun.gi.framework.install.DeploymentRec;
-import com.sun.gi.framework.install.LoginModuleRec;
+import com.sun.gi.framework.install.ValidatorRec;
 import com.sun.gi.framework.install.UserMgrRec;
 
 
@@ -20,11 +20,14 @@ import com.sun.gi.framework.install.UserMgrRec;
 public class DeploymentXMLHandler extends DefaultHandler {
 	DeploymentRecImpl drec;
 	UserMgrRecImpl umrec;
+	ValidatorRecImpl vrec;
+	boolean inValidator;
 	
 	public void startElement(String uri, String localName, String qName,			
 			Attributes attributes) throws SAXException {
 				
 		if (qName.equalsIgnoreCase("GAMEAPP")){ // start of game record
+			inValidator = false; // clean up if previous was  ill formed
 			String gameName = attributes.getValue("gamename");
 			drec = new DeploymentRecImpl(gameName);
 		} else if (qName.equalsIgnoreCase("USERMANAGER")){
@@ -33,10 +36,16 @@ public class DeploymentXMLHandler extends DefaultHandler {
 		} else if (qName.equalsIgnoreCase("PARAMETER")){
 			String tag = attributes.getValue("tag");
 			String value = attributes.getValue("value");
-			umrec.addParameter(tag,value);
-		} else if (qName.equalsIgnoreCase("LOGINMODULE")){
+			if (!inValidator){
+				umrec.setParameter(tag,value);
+			} else { //validator param
+				vrec.setParameter(tag,value);
+			}
+		} else if (qName.equalsIgnoreCase("VALIDATOR")){
+			inValidator = true;
 			String className = attributes.getValue("moduleclass");
-			umrec.addLoginModule(new LoginModuleRecImpl(className));
+			vrec = new ValidatorRecImpl(className);
+			umrec.addValidatorModule(vrec);
 		}
 	}
 	
@@ -50,8 +59,8 @@ public class DeploymentXMLHandler extends DefaultHandler {
 			drec.addUserManager(umrec);
 		} else if (qName.equalsIgnoreCase("PARAMETER")){
 			// no action needed
-		} else if (qName.equalsIgnoreCase("LOGINMODULE")){
-			// no action needed
+		} else if (qName.equalsIgnoreCase("VALIDATOR")){
+			inValidator = false;
 		}
 	}
 	
@@ -68,8 +77,8 @@ public class DeploymentXMLHandler extends DefaultHandler {
 			System.out.println("Game: "+game.getName());
 			for(UserMgrRec mgr : game.getUserManagers()){
 				System.out.println("    User Manager:"+mgr.getServerClassName());
-				for(LoginModuleRec mod : mgr.getLoginModules()){
-						System.out.println("        Login Module: "+mod.getModuleClassName());
+				for(ValidatorRec mod : mgr.getValidatorModules()){
+						System.out.println("        Login Module: "+mod.getValidatorClassName());
 				}
 			}
 			

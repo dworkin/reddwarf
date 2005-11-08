@@ -5,6 +5,7 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 
+import javax.security.auth.Subject;
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.UnsupportedCallbackException;
 
@@ -21,22 +22,29 @@ import com.sun.gi.comm.users.validation.UserValidator;
 
 public class SGSUserImpl implements SGSUser, TransportProtocolServer {
 	private Router router;
-
+	private Subject subject;
 	private UserID userID;
 
 	private Map<ChannelID, SGSChannel> channelMap = new HashMap<ChannelID, SGSChannel>();
 
 	private TransportProtocol transport;
 
-	private UserValidator validator;
+	private UserValidator[] validators;
+	private int validatorCounter; 
 
 	public SGSUserImpl(Router router, TransportProtocolTransmitter xmitter,
-			UserValidator validator) {
-		this.validator = validator;
+			UserValidator[] validators) {
+		this.validators = validators;
 		this.router = router;
 		transport = new BinaryPktProtocol();
 		transport.setTransmitter(xmitter);
 		transport.setServer(this);
+		try {
+			userID = new UserID();
+		} catch (InstantiationException e) {
+			
+			e.printStackTrace();
+		}
 	}
 
 	public void joinedChan(SGSChannel channel) throws IOException {
@@ -144,53 +152,74 @@ public class SGSUserImpl implements SGSUser, TransportProtocolServer {
 
 	public void rcvConnectReq() {
 		try {
-			if (validator == null) {
+			if (validators == null) {
 				router.registerUser(this);
-
-			} else {
-				validator.reset();
-				if (validator.authenticated()) { // no tests
-					router.registerUser(this);
-				} else {
-					Callback[] cbs = validator.nextDataRequest();
-					transport.deliverValidationRequest(cbs);
-				}
+				transport.deliverUserAccepted(userID.toByteArray());
+			} else {				
+				startValidation();
 			}
 		} catch (InstantiationException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (UnsupportedCallbackException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 
 	}
 
-	public void rcvValidationResp(Callback[] cbs) {
-		try {
-			validator.dataResponse(cbs);
-			if (validator.authenticated()) {
-				router.registerUser(this);
-			} else {
-				cbs = validator.nextDataRequest();
-				if (cbs == null) { // no more authentication
-					transport.deliverUserRejected("Validation failure");
-				} else {
-					transport.deliverValidationRequest(cbs);
+	/**
+	 * 
+	 */
+	private void startValidation() {
+		validatorCounter = 0;
+		subject = new Subject();		
+		doValidationReq();
+	}
+
+	/**
+	 * @return
+	 */
+	private void doValidationReq() {
+		Callback[] cb = validators[validatorCounter].nextDataRequest();
+		while ((cb == null)&&(validatorCounter<validators.length)){
+			if (!validators[validatorCounter].authenticated()){ // rejected
+				try {
+					transport.deliverUserRejected("Validation failed");
+					return;
+				} catch (IOException e) {					
+					e.printStackTrace();
 				}
+				// TODO need to disconnet the connection
+			} else { // go on
+				validatorCounter++;
+				validators[validatorCounter].reset(subject);
+				cb = validators[validatorCounter].nextDataRequest();
 			}
-		} catch (IOException e) {
-			e.printStackTrace();
-		} catch (InstantiationException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (UnsupportedCallbackException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
 		}
+		if (cb == null){ // we have done them all and are authenticated
+			try {
+				router.registerUser(this);
+				transport.deliverUserAccepted(userID.toByteArray());
+			} catch (InstantiationException e) {				
+				e.printStackTrace();
+			} catch (IOException e) {				
+				e.printStackTrace();
+			}			
+		} else { // next CBs to request
+			try {
+				transport.deliverValidationRequest(cb);
+			} catch (UnsupportedCallbackException e) {				
+				e.printStackTrace();
+			} catch (IOException e) {				
+				e.printStackTrace();
+			}
+		}
+	}
+
+	public void rcvValidationResp(Callback[] cbs) {
+		validators[validatorCounter].dataResponse(cbs);
+		doValidationReq();
 	}
 
 	public void rcvReconnectReq(byte[] user, byte[] key) {
@@ -212,18 +241,42 @@ public class SGSUserImpl implements SGSUser, TransportProtocolServer {
 	
 
 	public void rcvServerMsg(boolean reliable, ByteBuffer databuff) {
-		router.serverMessage(reliable,databuff);
+		router.serverMessage(reliable,userID,databuff);
 		
 	}
-
-	public void rcvReqJoinChan(byte[] chanID) {
-		// TODO Auto-generated method stub
-		
-	}
+	
 
 	public void rcvReqLeaveChan(byte[] chanID) {
-		// TODO Auto-generated method stub
+		try {
+			SGSChannel chan = channelMap.get(new ChannelID(chanID));
+			chan.leave(this);
+		} catch (InstantiationException e) {			
+			e.printStackTrace();
+		}
 		
+	}
+
+	public void rcvReqJoinChan(String channame) {
+		router.openChannel(channame);		
+	}
+
+	/**
+	 * This method is used to pass packet data arrivign on the raw connection
+	 * to be processed by the user.
+	 * @param inputBuffer
+	 */
+	protected void packetReceived(ByteBuffer inputBuffer) {
+		transport.packetReceived(inputBuffer);		
+	}
+
+	/**
+	 * This method is called by the raw connection to indicate that the
+	 * conenction has been lost.
+	 */
+	protected void disconnected() {
+		// TODO currently this just immediately dereigsters user.  
+		// This must be modified for fail-over when we support multiple stacks
+		router.deregisterUser(this);		
 	}
 
 }

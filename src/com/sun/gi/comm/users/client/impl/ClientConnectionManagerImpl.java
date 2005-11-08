@@ -142,8 +142,9 @@ public class ClientConnectionManagerImpl
      * @param from ByteBuffer
      * @param data ByteBuffer
      */
-    public void dataReceived(byte[] from, ByteBuffer data) {
-        listener.dataRecieved(from, data);
+    public void dataReceived(byte[] chanID, byte[] from, ByteBuffer data, boolean reliable) {
+       ClientChannelImpl chan = channelMap.get(new BYTEARRAY(chanID));
+       chan.dataReceived(from,data,reliable);
     }
     
     /**
@@ -263,7 +264,7 @@ public class ClientConnectionManagerImpl
 	/*  The below are all package private and intended just for use by ClientChannelImpl */
 	
 	void sendUnicastData(byte[] id, byte[] to, ByteBuffer data, boolean reliable) {
-		// TODO Auto-generated method stub
+		
 		
 	}
 

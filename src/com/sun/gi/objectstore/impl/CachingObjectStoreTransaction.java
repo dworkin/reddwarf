@@ -171,6 +171,10 @@ public class CachingObjectStoreTransaction implements Transaction {
         return trans.getCurrentAppID();
     }
     
+    /*
+     * depcrecated and removed 
+     *
+     *
     public long lookupObject(Serializable sobj) {
         // read from local cache first, then global cache
         long id = cache.getID(sobj);
@@ -186,4 +190,5 @@ public class CachingObjectStoreTransaction implements Transaction {
         }
         return id;
     }
+    */
 }

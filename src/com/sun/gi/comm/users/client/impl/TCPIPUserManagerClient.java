@@ -266,6 +266,39 @@ public class TCPIPUserManagerClient
 	}
 
 
+	public void sendUnicastMsg(byte[] chanID, byte[] to, ByteBuffer data, boolean reliable) {
+		try {
+			protocol.sendUnicastMsg(chanID,to,reliable,data);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+	}
+
+
+	public void sendMulticastMsg(byte[] chanID, byte[][] to, ByteBuffer data, boolean reliable) {
+		try {
+			protocol.sendMulticastMsg(chanID,to,reliable,data);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+	}
+
+
+	public void sendBroadcastMsg(byte[] chanID, ByteBuffer data, boolean reliable) {
+		try {
+			protocol.sendBroadcastMsg(chanID,reliable,data);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+	}
+
+
 	
     
     

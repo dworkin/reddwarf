@@ -5,14 +5,12 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 
-
-
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.Router;
+import com.sun.gi.comm.routing.RouterListener;
 import com.sun.gi.comm.routing.SGSChannel;
 import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.comm.users.server.SGSUser;
-import com.sun.gi.comm.users.validation.UserValidatorFactory;
 import com.sun.gi.framework.interconnect.TransportChannel;
 import com.sun.gi.framework.interconnect.TransportChannelListener;
 import com.sun.gi.framework.interconnect.TransportManager;
@@ -29,6 +27,7 @@ public class RouterImpl implements Router {
 	private Map<UserID,BYTEARRAY> currentKeys = new HashMap<UserID,BYTEARRAY>();
 	private Map<UserID,BYTEARRAY> previousKeys = new HashMap<UserID,BYTEARRAY>();	
 	private ByteBuffer hdr = ByteBuffer.allocate(256);
+	private RouterListener listener;
 	
 	private enum OPCODE {UserJoined,UserLeft,UserJoinedChannel,UserLeftChannel};
 	
@@ -104,7 +103,7 @@ public class RouterImpl implements Router {
 			if (existingUser != user.getUserID()){
 				user.userJoinedSystem(existingUser.toByteArray());
 			}
-		}
+		}		
 	}
 
 	private void fireUserJoined(UserID uid) {
@@ -194,6 +193,15 @@ public class RouterImpl implements Router {
 			return true;
 		} 
 		return false;
+	}
+	
+	public void setRouterListener(RouterListener l){
+		listener = l;
+	}
+
+	public void serverMessage(boolean reliable, UserID userID, ByteBuffer databuff) {
+		listener.serverMessage(userID,databuff,reliable);
+		
 	}
 
 	

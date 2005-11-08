@@ -51,7 +51,7 @@ public interface Router {
 
 	public boolean validateReconnectKey(UserID user, byte[] key);
 
-	public void serverMessage(boolean reliable, ByteBuffer databuff);
+	public void serverMessage(boolean reliable, UserID userID, ByteBuffer databuff);
 	
 	
 }

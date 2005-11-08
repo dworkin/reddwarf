@@ -86,6 +86,7 @@ public class ValidatorDialog extends JDialog{
 				
 			}
 		}
+		pack();
 		setVisible(true);
 	}
 
