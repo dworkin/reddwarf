@@ -49,7 +49,7 @@ public class SGSUserImpl implements SGSUser, TransportProtocolServer {
 
 	public void joinedChan(SGSChannel channel) throws IOException {
 		channelMap.put(channel.channelID(), channel);
-		transport.deliverJoinedChannel(channel.channelID().toByteArray());
+		transport.deliverJoinedChannel(channel.getName(),channel.channelID().toByteArray());
 	}
 
 	public void leftChan(SGSChannel channel) throws IOException {
@@ -261,7 +261,17 @@ public class SGSUserImpl implements SGSUser, TransportProtocolServer {
 	}
 
 	public void rcvReqJoinChan(String channame) {
-		router.openChannel(channame);		
+		SGSChannel chan = router.openChannel(channame);
+		if (chan != null){
+			channelMap.put(chan.channelID(),chan);
+			try {
+				transport.deliverJoinedChannel(channame,
+						chan.channelID().toByteArray());
+			} catch (IOException e) {				
+				e.printStackTrace();
+			}
+		}
+		chan.join(this);
 	}
 
 	/**

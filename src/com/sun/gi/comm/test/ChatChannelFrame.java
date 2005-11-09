@@ -50,6 +50,8 @@ public class ChatChannelFrame extends JInternalFrame implements ClientChannelLis
 				chan.sendBroadcastData(ByteBuffer.wrap(inputField.getText().getBytes()),true);
 				inputField.setText("");
 			}});
+		setSize(400,400);
+		setVisible(true);
 		
 	}
 	public void playerJoined(byte[] playerID) {

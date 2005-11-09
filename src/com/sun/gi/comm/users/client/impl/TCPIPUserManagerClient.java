@@ -180,8 +180,8 @@ public class TCPIPUserManagerClient
 	}
 
 
-	public void rcvJoinedChan(byte[] chanID) {
-		listener.joinedChannel(chanID);
+	public void rcvJoinedChan(String name, byte[] chanID) {
+		listener.joinedChannel(name,chanID);
 		
 	}
 

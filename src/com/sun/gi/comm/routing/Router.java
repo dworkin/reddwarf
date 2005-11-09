@@ -47,7 +47,7 @@ public interface Router {
 	 */
 	public void deregisterUser(SGSUser user);
 
-	public SGSChannel openChannel(String channelName);	
+	public SGSChannel openChannel( String channelName);	
 
 	public boolean validateReconnectKey(UserID user, byte[] key);
 

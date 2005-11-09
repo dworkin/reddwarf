@@ -103,6 +103,27 @@ public class RouterImpl implements Router {
 		}
 		
 	}
+	
+	private void reportUserJoinedChannel(byte[] chanID, byte[] uidbytes) {
+		UserID sentID=null;
+		try {
+			sentID = new UserID(uidbytes);
+		} catch (InstantiationException e1) {			
+			e1.printStackTrace();
+			return;
+		}
+		for(SGSUser user : userMap.values()){
+			try {		
+				if (!user.getUserID().equals(sentID)){
+					user.userJoinedChannel(chanID, uidbytes);
+				}
+			} catch (IOException e) {
+				System.out.println("Exception sending UserJOined to user id="+user.getUserID());
+				e.printStackTrace();
+			}
+		}
+		
+	}
 
 	public void registerUser(SGSUser user) 
 		throws InstantiationException, IOException {		
@@ -125,6 +146,25 @@ public class RouterImpl implements Router {
 		
 			hdr.putInt(uidbytes.length);
 			hdr.put(uidbytes);
+			try {
+				routerControlChannel.sendData(hdr);
+			} catch (IOException e) {				
+				e.printStackTrace();
+			}
+		}
+		
+	}
+	
+	private void fireUserJoinedChannel(ChannelID cid, UserID uid) {
+		byte[] uidbytes = uid.toByteArray();
+		byte[] cidbytes = cid.toByteArray();
+		synchronized(hdr){
+			hdr.clear();
+			hdr.put((byte)OPCODE.UserJoinedChannel.ordinal());		
+			hdr.putInt(uidbytes.length);
+			hdr.put(uidbytes);
+			hdr.putInt(cidbytes.length);
+			hdr.put(cidbytes);
 			try {
 				routerControlChannel.sendData(hdr);
 			} catch (IOException e) {				
@@ -184,7 +224,7 @@ public class RouterImpl implements Router {
 			} catch (IOException e) {
 				e.printStackTrace();
 			}		
-		}
+		}		
 		return sgschan;
 	}
 	

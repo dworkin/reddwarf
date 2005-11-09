@@ -129,7 +129,7 @@ public interface TransportProtocol {
 	 * channel
 	 */
 
-	public void deliverJoinedChannel(byte[] chanID) throws IOException;
+	public void deliverJoinedChannel(String name, byte[] chanID) throws IOException;
 
 	/**
 	 * Call this method from the client to leave a channel

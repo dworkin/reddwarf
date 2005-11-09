@@ -277,12 +277,7 @@ public class ClientConnectionManagerImpl
 		// TODO Auto-generated method stub
 		
 	}
-
-	public void joinedChannel(byte[] channelID) {
-		// TODO Auto-generated method stub
-		
-	}
-
+	
 	
     
     

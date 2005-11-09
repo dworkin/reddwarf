@@ -149,8 +149,9 @@ public class ChatTestClient extends JFrame implements ClientConnectionManagerLis
 		userList.repaint();
 	}
 	public void joinedChannel(ClientChannel channel) {
-		desktop.add(new ChatChannelFrame(channel));
-		
+		ChatChannelFrame cframe = new ChatChannelFrame(channel);
+		desktop.add(cframe);
+		desktop.repaint();		
 	}
 	
 	/**

@@ -400,12 +400,16 @@ public class BinaryPktProtocol
      * Call this method from the server to notify client of itself joining channel
      */
     
-    public void deliverJoinedChannel(byte[] chanID) throws IOException {
+    
+    public void deliverJoinedChannel(String channelName, byte[] chanID) throws IOException {
         synchronized (hdr) {
             hdr.clear();
             hdr.put((byte)OPCODE.JOINED_CHAN.ordinal());
             hdr.put((byte)chanID.length);
             hdr.put(chanID);
+            byte[] namebytes = channelName.getBytes();
+            hdr.putInt(namebytes.length);
+            hdr.put(namebytes);
             sendBuffers(hdr);
         }
     }
@@ -649,7 +653,10 @@ public class BinaryPktProtocol
                 chanIDlen = buff.get();
                 chanID = new byte[chanIDlen];
                 buff.get(chanID);
-                client.rcvJoinedChan(chanID);
+                int namelen = buff.getInt();
+                byte[] namebytes = new byte[namelen];
+                buff.get(namebytes);
+                client.rcvJoinedChan(new String(namebytes),chanID);
                 break;
             case LEFT_CHAN:
                 chanIDlen = buff.get();
@@ -667,7 +674,7 @@ public class BinaryPktProtocol
                 client.rcvReconnectKey(user,key);
                 break;
             case REQ_JOIN_CHAN:
-            	int namelen = buff.get();
+            	namelen = buff.get();
             	byte[] namearray = new byte[namelen];
             	buff.get(namearray);
                 server.rcvReqJoinChan(new String(namearray));

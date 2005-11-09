@@ -74,7 +74,7 @@ public interface UserManagerClientListener {
    * This event informs the event listener of the successful openign of a channel.
    * @param channelID The ID of the newly joined channel
    */
-  public void joinedChannel(byte[] channelID);
+  public void joinedChannel(String name, byte[] channelID);
   
   /**
    * This callback informs the user that they have left or been removed from a channel.
