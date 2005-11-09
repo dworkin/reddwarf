@@ -38,19 +38,20 @@ public class ChatChannelFrame extends JInternalFrame implements ClientChannelLis
 		eastPanel.add(new JLabel("Users"),BorderLayout.NORTH);
 		userList = new JList(new DefaultListModel());
 		eastPanel.add(new JScrollPane(userList),BorderLayout.CENTER);
-		JPanel southPanel = new JPanel();
+		JPanel southPanel = new JPanel();		
 		c.add(southPanel,BorderLayout.SOUTH);
 		southPanel.setLayout(new GridLayout(1,0));
 		inputField = new JTextField();
 		southPanel.add(inputField);
 		outputArea = new JTextArea();
-		c.add(outputArea,BorderLayout.SOUTH);
+		c.add(new JScrollPane(outputArea),BorderLayout.CENTER);
 		inputField.addActionListener(new ActionListener(){
 			public void actionPerformed(ActionEvent e) {
 				chan.sendBroadcastData(ByteBuffer.wrap(inputField.getText().getBytes()),true);
 				inputField.setText("");
 			}});
 		setSize(400,400);
+		setResizable(true);
 		setVisible(true);
 		
 	}

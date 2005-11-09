@@ -89,6 +89,7 @@ public class ChatTestClient extends JFrame implements ClientConnectionManagerLis
 				mgr.openChannel(channelName);
 			}
 		});
+		openChannelButton.setEnabled(false);
 		buttonPanel.add(loginButton);
 		buttonPanel.add(openChannelButton);
 		pack();
@@ -123,6 +124,7 @@ public class ChatTestClient extends JFrame implements ClientConnectionManagerLis
 		setTitle("Chat Test Client: "+StringUtils.bytesToHex(myID));
 		loginButton.setText("Logout");
 		loginButton.setEnabled(true);
+		openChannelButton.setEnabled(true);
 		
 	}
 	public void connectionRefused(String message) {
@@ -133,7 +135,8 @@ public class ChatTestClient extends JFrame implements ClientConnectionManagerLis
 	public void disconnected() {
 		statusMessage.setText("Status: logged out");	
 		loginButton.setText("Login");
-		loginButton.setEnabled(true);		
+		loginButton.setEnabled(true);	
+		openChannelButton.setEnabled(false);
 	}
 	
 	

@@ -177,6 +177,9 @@ public class RouterImpl implements Router {
 	public void deregisterUser(SGSUser user) {
 		UserID id = user.getUserID();
 		userMap.remove(id);
+		for (SGSChannel chan : channelMap.values()){
+			chan.leave(user);
+		}
 		user.deregistered();
 		fireUserLeft(id);
 		for(SGSUser localUser : userMap.values()){
