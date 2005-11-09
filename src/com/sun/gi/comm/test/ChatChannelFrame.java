@@ -29,13 +29,14 @@ public class ChatChannelFrame extends JInternalFrame implements ClientChannelLis
 	public ChatChannelFrame(ClientChannel channel){
 		super("Channel: "+channel.getName());
 		chan = channel;
+		chan.setListener(this);
 		Container c = getContentPane();
 		c.setLayout(new BorderLayout());
 		JPanel eastPanel = new JPanel();
 		eastPanel.setLayout(new BorderLayout());
 		c.add(eastPanel,BorderLayout.EAST);
 		eastPanel.add(new JLabel("Users"),BorderLayout.NORTH);
-		userList = new JList();
+		userList = new JList(new DefaultListModel());
 		eastPanel.add(new JScrollPane(userList),BorderLayout.CENTER);
 		JPanel southPanel = new JPanel();
 		c.add(southPanel,BorderLayout.SOUTH);
@@ -45,7 +46,6 @@ public class ChatChannelFrame extends JInternalFrame implements ClientChannelLis
 		outputArea = new JTextArea();
 		c.add(outputArea,BorderLayout.SOUTH);
 		inputField.addActionListener(new ActionListener(){
-
 			public void actionPerformed(ActionEvent e) {
 				chan.sendBroadcastData(ByteBuffer.wrap(inputField.getText().getBytes()),true);
 				inputField.setText("");

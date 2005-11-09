@@ -261,16 +261,7 @@ public class SGSUserImpl implements SGSUser, TransportProtocolServer {
 	}
 
 	public void rcvReqJoinChan(String channame) {
-		SGSChannel chan = router.openChannel(channame);
-		if (chan != null){
-			channelMap.put(chan.channelID(),chan);
-			try {
-				transport.deliverJoinedChannel(channame,
-						chan.channelID().toByteArray());
-			} catch (IOException e) {				
-				e.printStackTrace();
-			}
-		}
+		SGSChannel chan = router.openChannel(channame);		
 		chan.join(this);
 	}
 
