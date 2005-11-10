@@ -1,6 +1,7 @@
 package com.sun.gi.comm.test;
 
 import java.awt.BorderLayout;
+import java.awt.Component;
 import java.awt.Container;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
@@ -15,6 +16,7 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
+import javax.swing.ListCellRenderer;
 
 import com.sun.gi.comm.users.client.ClientChannel;
 import com.sun.gi.comm.users.client.ClientChannelListener;
@@ -40,6 +42,13 @@ public class ChatChannelFrame extends JInternalFrame implements ClientChannelLis
 		c.add(eastPanel,BorderLayout.EAST);
 		eastPanel.add(new JLabel("Users"),BorderLayout.NORTH);
 		userList = new JList(new DefaultListModel());
+		userList.setCellRenderer(new ListCellRenderer(){
+			JLabel text = new JLabel();
+			public Component getListCellRendererComponent(JList arg0, Object arg1, int arg2, boolean arg3, boolean arg4) {
+				byte[] data = ((BYTEARRAY)arg1).data();
+				text.setText(StringUtils.bytesToHex(data,data.length-4));
+				return text;
+			}});
 		eastPanel.add(new JScrollPane(userList),BorderLayout.CENTER);
 		JPanel southPanel = new JPanel();		
 		c.add(southPanel,BorderLayout.SOUTH);

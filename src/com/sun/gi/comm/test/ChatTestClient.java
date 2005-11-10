@@ -1,6 +1,7 @@
 package com.sun.gi.comm.test;
 
 import java.awt.BorderLayout;
+import java.awt.Component;
 import java.awt.Container;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
@@ -24,6 +25,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.DefaultListModel;
+import javax.swing.ListCellRenderer;
 import javax.swing.ListSelectionModel;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
@@ -94,6 +96,13 @@ public class ChatTestClient extends JFrame implements
 
 			}
 		});
+		userList.setCellRenderer(new ListCellRenderer(){
+			JLabel text = new JLabel();
+			public Component getListCellRendererComponent(JList arg0, Object arg1, int arg2, boolean arg3, boolean arg4) {
+				byte[] data = ((BYTEARRAY)arg1).data();
+				text.setText(StringUtils.bytesToHex(data,data.length-4));
+				return text;
+			}});
 		eastPanel.add(new JScrollPane(userList), BorderLayout.CENTER);
 		c.add(eastPanel, BorderLayout.EAST);
 		buttonPanel.setLayout(new GridLayout(1, 0));
