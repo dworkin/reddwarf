@@ -174,8 +174,8 @@ public class TCPIPUserManagerClient
 	}
 
 
-	public void rcvReconnectKey(byte[] user, byte[] key) {
-		listener.newConnectionKeyIssued(key);
+	public void rcvReconnectKey(byte[] user, byte[] key, long ttl) {
+		listener.newConnectionKeyIssued(key, ttl);
 		
 	}
 
