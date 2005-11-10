@@ -98,7 +98,7 @@ public class TCPIPUserManagerClient
 			public void disconnected(NIOTCPConnection nIOTCPConnection) {
 				connectionDropped();
 				
-			}});
+			}});		
 		listener.connected();
 
 	}

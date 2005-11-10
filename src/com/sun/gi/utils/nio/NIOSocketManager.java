@@ -287,11 +287,16 @@ public class NIOSocketManager
     NIOTCPConnection conn =
         (NIOTCPConnection) chanToConnObject.get(chan);
     try {
-      int trycount = 0;
-      while(!chan.finishConnect()){
+      int trycount = 0;      
+      while(true){ // break to exit    
         if ((trycount%10 )==0){
           System.out.println("awaiting conenction completion.");
         }
+        if (chan.isConnectionPending()){
+        	if (chan.finishConnect()){
+        		break;
+        	}
+      	}
         trycount++;
         try {
           Thread.sleep(100);

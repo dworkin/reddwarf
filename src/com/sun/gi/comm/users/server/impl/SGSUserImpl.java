@@ -30,7 +30,9 @@ public class SGSUserImpl implements SGSUser, TransportProtocolServer {
 	private TransportProtocol transport;
 
 	private UserValidator[] validators;
-	private int validatorCounter; 
+	private int validatorCounter;
+	private boolean connected = true;
+	private boolean TRACE = true; 
 
 	public SGSUserImpl(Router router, TransportProtocolTransmitter xmitter,
 			UserValidator[] validators) {
@@ -54,7 +56,9 @@ public class SGSUserImpl implements SGSUser, TransportProtocolServer {
 
 	public void leftChan(SGSChannel channel) throws IOException {
 		channelMap.remove(channel.channelID());
-		transport.deliverLeftChannel(channel.channelID().toByteArray());
+		if (connected ){
+			transport.deliverLeftChannel(channel.channelID().toByteArray());
+		}
 
 	}
 
@@ -109,7 +113,8 @@ public class SGSUserImpl implements SGSUser, TransportProtocolServer {
 			chan = channelMap.get(new ChannelID(chanID));
 			// should never be NULL, if it is we want an exception to figure out
 			// why
-			chan.unicastData(userID, new UserID(to), databuff,
+			databuff.flip();
+			chan.unicastData(userID, new UserID(to), databuff.duplicate(),
 					reliable);
 		} catch (InstantiationException e) {
 			// TODO Auto-generated catch block
@@ -130,7 +135,8 @@ public class SGSUserImpl implements SGSUser, TransportProtocolServer {
 			}
 			// should never be NULL, if it is we want an exception to figure out
 			// why
-			chan.multicastData(userID, ids, databuff, reliable);
+			databuff.flip();
+			chan.multicastData(userID, ids, databuff.duplicate(), reliable);
 		} catch (InstantiationException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -142,8 +148,10 @@ public class SGSUserImpl implements SGSUser, TransportProtocolServer {
 		try {
 			SGSChannel chan = channelMap.get(new ChannelID(chanID));
 			// should never be NULL, if it is we want an exception to figure out
-			// why
-			chan.broadcastData(userID, databuff, reliable);
+			// why						
+			ByteBuffer newbuff = databuff.duplicate();
+			newbuff.position(newbuff.limit());
+			chan.broadcastData(userID, newbuff, reliable);
 		} catch (InstantiationException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -279,6 +287,7 @@ public class SGSUserImpl implements SGSUser, TransportProtocolServer {
 	 * conenction has been lost.
 	 */
 	protected void disconnected() {
+		connected = false; 
 		// TODO currently this just immediately dereigsters user.  
 		// This must be modified for fail-over when we support multiple stacks
 		router.deregisterUser(this);		

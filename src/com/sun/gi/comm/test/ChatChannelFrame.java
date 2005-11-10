@@ -18,6 +18,7 @@ import javax.swing.JTextField;
 
 import com.sun.gi.comm.users.client.ClientChannel;
 import com.sun.gi.comm.users.client.ClientChannelListener;
+import com.sun.gi.utils.types.StringUtils;
 import com.sun.gi.utils.types.BYTEARRAY;
 
 @SuppressWarnings("serial")
@@ -26,8 +27,10 @@ public class ChatChannelFrame extends JInternalFrame implements ClientChannelLis
 	JList userList;
 	JTextField inputField;
 	JTextArea outputArea;
+	ByteBuffer outbuff;
 	public ChatChannelFrame(ClientChannel channel){
 		super("Channel: "+channel.getName());
+		outbuff = ByteBuffer.allocate(2048);
 		chan = channel;
 		chan.setListener(this);
 		Container c = getContentPane();
@@ -47,7 +50,9 @@ public class ChatChannelFrame extends JInternalFrame implements ClientChannelLis
 		c.add(new JScrollPane(outputArea),BorderLayout.CENTER);
 		inputField.addActionListener(new ActionListener(){
 			public void actionPerformed(ActionEvent e) {
-				chan.sendBroadcastData(ByteBuffer.wrap(inputField.getText().getBytes()),true);
+				outbuff.clear();
+				outbuff.put(inputField.getText().getBytes());
+				chan.sendBroadcastData(outbuff,true);
 				inputField.setText("");
 			}});
 		setSize(400,400);
@@ -64,8 +69,10 @@ public class ChatChannelFrame extends JInternalFrame implements ClientChannelLis
 		DefaultListModel mdl = (DefaultListModel)userList.getModel();
 		mdl.removeElement(new BYTEARRAY(playerID));		
 	}
-	public void dataArrived(byte[] from, ByteBuffer data, boolean reliable) {
-		outputArea.append(new BYTEARRAY(from).toString()+": "+ new String(data.array()));	
+	public void dataArrived(byte[] from, ByteBuffer data, boolean reliable){	
+		byte[] textb =new byte[data.remaining()];
+		data.get(textb);
+		outputArea.append(StringUtils.bytesToHex(from,from.length-4)+": "+ new String(textb)+"\n");	
 	}
 	public void channelClosed() {
 		getDesktopPane().remove(this);

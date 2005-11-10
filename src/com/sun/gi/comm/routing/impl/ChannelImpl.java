@@ -96,7 +96,6 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 			buffs[1] = message;
 			transportChannel.sendData(buffs);
 		}
-		message.flip();
 		broadcastToLocalUsers(from.toByteArray(),message,reliable);
 	}
 
@@ -142,9 +141,9 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 				e.printStackTrace();
 			}
 		}
-		try {
+		try {			
 			user.leftChan(this);
-		} catch (IOException e) {
+		} catch (IOException e) {		
 			e.printStackTrace();
 		}
 		sendLeaveToLocalUsers(userbytes);

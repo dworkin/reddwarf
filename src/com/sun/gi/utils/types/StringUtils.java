@@ -36,12 +36,16 @@ public class StringUtils {
         return (String[])plist.toArray(retarray);
     }
 
-    public static String bytesToHex(byte[] bytes){
+    public static String bytesToHex(byte[] bytes,int start, int length){
       StringBuffer buff = new StringBuffer();
-      for(int i=0;i<bytes.length;i++){
-        buff.append(byteToHex(bytes[i]));
+      for(int i=0;i<length;i++){
+        buff.append(byteToHex(bytes[i+start]));
       }
       return buff.toString();
+    }
+    
+    public static String bytesToHex(byte[] bytes){
+    	return bytesToHex(bytes,0,bytes.length);
     }
 
     private static String[] hexDigits = {"A","B","C","D","E","F"};
@@ -65,6 +69,15 @@ public class StringUtils {
      }
      return buff.toString();
    }
+
+	/**
+	 * @param from
+	 * @param i
+	 * @return
+	 */
+	public static String bytesToHex(byte[] from, int i) {
+		return bytesToHex(from,i,from.length-i);
+	}
 
 
 

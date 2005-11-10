@@ -52,6 +52,9 @@ public class NIOTCPConnection {
    */
   public void dataArrived() throws IOException {
     int bytesRead=-1;
+    if (!chan.isConnected()){
+    	return;
+    }
     do {
       if (currentPacketSize == -1) {// getting size
         bytesRead = chan.read(sizeHeader);
