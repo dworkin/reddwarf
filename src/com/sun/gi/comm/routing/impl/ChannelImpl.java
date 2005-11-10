@@ -54,9 +54,7 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 			transportChannel.sendData(buffs);
 		}
 		message.flip();
-		sendToLocalUser(from.toByteArray(),to.toByteArray(),message,reliable);
-		
-		
+		sendToLocalUser(from.toByteArray(),to.toByteArray(),message,reliable);			
 	}
 
 	public void multicastData(UserID from, UserID[] tolist, ByteBuffer message, boolean reliable) {
@@ -250,10 +248,19 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 	}
 
 	private void broadcastToLocalUsers(byte[] frombytes, ByteBuffer buff, boolean reliable) {
-		for(SGSUser user : localUsers.values()){
-			sendToLocalUser(frombytes,user.getUserID().toByteArray(),buff,reliable);
+		UserID fromID;
+		try {
+			fromID = new UserID(frombytes);
+			for(SGSUser user : localUsers.values()){
+				if (!user.getUserID().equals(fromID)){// dont echo to sender
+					sendToLocalUser(frombytes,user.getUserID().toByteArray(),buff,reliable);
+				}
+			}
+		} catch (InstantiationException e) {
+			
+			e.printStackTrace();
 		}
-		
+				
 	}
 
 	public void channelClosed() {
