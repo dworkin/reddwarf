@@ -52,8 +52,7 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 			hdr.put(tobytes);
 			buffs[1] = message;
 			transportChannel.sendData(buffs);
-		}
-		message.flip();
+		}	
 		sendToLocalUser(from.toByteArray(),to.toByteArray(),message,reliable);			
 	}
 
@@ -78,7 +77,6 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 		for(int i=0;i<toArray.length;i++){
 			toArray[i] = tolist[i].toByteArray();
 		}
-		message.flip();
 		multicastToLocalUsers(from.toByteArray(),toArray,message,reliable);
 		
 	}
