@@ -5,6 +5,9 @@ import java.awt.Container;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowStateListener;
 import java.io.File;
@@ -21,10 +24,14 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.DefaultListModel;
+import javax.swing.ListSelectionModel;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
 
 import com.sun.gi.comm.discovery.impl.URLDiscoverer;
 import com.sun.gi.comm.users.client.ClientAlreadyConnectedException;
 import com.sun.gi.comm.users.client.ClientChannel;
+import com.sun.gi.comm.users.client.ClientChannelListener;
 import com.sun.gi.comm.users.client.ClientConnectionManager;
 import com.sun.gi.comm.users.client.ClientConnectionManagerListener;
 import com.sun.gi.comm.users.client.impl.ClientConnectionManagerImpl;
@@ -39,6 +46,9 @@ public class ChatTestClient extends JFrame implements ClientConnectionManagerLis
 	JDesktopPane desktop;
 	JList userList;
 	ClientConnectionManager mgr;
+	ClientChannel dccChannel;
+	private static String DCC_CHAN_NAME = "__DCC_Chan";
+	
 	public ChatTestClient(){
 		// build interface
 		super();
@@ -58,6 +68,15 @@ public class ChatTestClient extends JFrame implements ClientConnectionManagerLis
 		eastPanel.setLayout(new BorderLayout());
 		eastPanel.add(new JLabel("Users"),BorderLayout.NORTH);
 		userList = new JList(new DefaultListModel());
+		userList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+		userList.addMouseListener(new MouseAdapter(){
+			public void mouseClicked(MouseEvent evt) {
+				if (evt.getClickCount()>1){
+					doDCCMessage();
+				}
+				
+			}
+		});
 		eastPanel.add(new JScrollPane(userList),BorderLayout.CENTER);
 		c.add(eastPanel,BorderLayout.EAST);
 		buttonPanel.setLayout(new GridLayout(1,0));
@@ -113,6 +132,19 @@ public class ChatTestClient extends JFrame implements ClientConnectionManagerLis
 		setVisible(true);
 	}
 	
+	/**
+	 * 
+	 */
+	protected void doDCCMessage() {
+		BYTEARRAY ba = (BYTEARRAY)userList.getSelectedValue();
+		String message = JOptionPane.showInputDialog(this,
+				"Enter private message:");
+		ByteBuffer out = ByteBuffer.allocate(message.length());
+		out.put(message.getBytes());
+		dccChannel.sendUnicastData(ba.data(),out,true);
+		
+	}
+
 	public void validationRequest(Callback[] callbacks) {
 		statusMessage.setText("Status: Validating...");
 		new ValidatorDialog(this,callbacks);
@@ -125,7 +157,7 @@ public class ChatTestClient extends JFrame implements ClientConnectionManagerLis
 		loginButton.setText("Logout");
 		loginButton.setEnabled(true);
 		openChannelButton.setEnabled(true);
-		
+		mgr.openChannel(DCC_CHAN_NAME );
 	}
 	public void connectionRefused(String message) {
 		statusMessage.setText("Status: Connection refused. ("+message+")");	
@@ -152,9 +184,38 @@ public class ChatTestClient extends JFrame implements ClientConnectionManagerLis
 		userList.repaint();
 	}
 	public void joinedChannel(ClientChannel channel) {
-		ChatChannelFrame cframe = new ChatChannelFrame(channel);
-		desktop.add(cframe);
-		desktop.repaint();		
+		if (channel.getName().equals(DCC_CHAN_NAME)){
+			dccChannel = channel;
+			dccChannel.setListener(new ClientChannelListener() {
+
+				public void playerJoined(byte[] playerID) {
+					// TODO Auto-generated method stub
+					
+				}
+
+				public void playerLeft(byte[] playerID) {
+					// TODO Auto-generated method stub
+					
+				}
+
+				public void dataArrived(byte[] from, ByteBuffer data, boolean reliable) {
+					byte[] bytes = new byte[data.remaining()];
+					data.get(bytes);
+					JOptionPane.showMessageDialog(ChatTestClient.this,new String(bytes)
+							,"Message from "+StringUtils.bytesToHex(from,from.length-4),
+							JOptionPane.INFORMATION_MESSAGE);
+					
+				}
+
+				public void channelClosed() {
+					// TODO Auto-generated method stub
+					
+				}});
+		} else {
+			ChatChannelFrame cframe = new ChatChannelFrame(channel);
+			desktop.add(cframe);
+			desktop.repaint();
+		}
 	}
 	
 	/**
@@ -163,6 +224,22 @@ public class ChatTestClient extends JFrame implements ClientConnectionManagerLis
 	public static void main(String[] args) {
 		new ChatTestClient();
 
+	}
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.comm.users.client.ClientConnectionManagerListener#failOverInProgress()
+	 */
+	public void failOverInProgress() {
+		// TODO Auto-generated method stub
+		
+	}
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.comm.users.client.ClientConnectionManagerListener#reconnected()
+	 */
+	public void reconnected() {
+		// TODO Auto-generated method stub
+		
 	}
 
 }

@@ -32,8 +32,11 @@ public interface UserManagerClientListener {
    * This callback informs the event listener of the issuance of a 
    * new time-limited reconnection key.
    * @param key The reconnection key.
+   * @param ttl The number of seconds this key is valid for.  Note
+   * that this is seconds from time of issue and so is a maximum not
+   * an absolute measure due to delays in delivery.
    */
-  public void newConnectionKeyIssued(byte[] key);
+  public void newConnectionKeyIssued(byte[] key, long ttl);
   /**
    * This event informs the event listener that further information is
    * needed in order to validate the user.

@@ -187,7 +187,7 @@ public class RCUser extends JInternalFrame implements SGSUser {
 
 	}
 
-	public void reconnectKeyReceived(byte[] key) throws IOException {
+	public void reconnectKeyReceived(byte[] key, long ttl) throws IOException {
 		// TODO Auto-generated method stub
 
 	}

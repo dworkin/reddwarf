@@ -30,6 +30,8 @@ public interface ClientConnectionManagerListener {
   public void validationRequest(Callback[] callbacks);
   public void connected(byte[] myID);
   public void connectionRefused(String message);
+  public void failOverInProgress();
+  public void reconnected();
   public void disconnected();
   /**
    * <p>This event is fired when a user joins the game.</p>  

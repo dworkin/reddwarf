@@ -27,7 +27,7 @@ public interface TransportProtocolClient {
 
 	void rcvUserLeftChan(byte[] chanID, byte[] user);
 
-	void rcvReconnectKey(byte[] user, byte[] key);
+	void rcvReconnectKey(byte[] user, byte[] key, long ttl);
 
 	void rcvJoinedChan(String chanName, byte[] chanID);
 

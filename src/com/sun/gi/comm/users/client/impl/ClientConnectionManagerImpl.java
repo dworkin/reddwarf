@@ -34,6 +34,7 @@ public class ClientConnectionManagerImpl
     private boolean reconnecting = false;
     private boolean connected = false;
     private Map<BYTEARRAY,ClientChannelImpl> channelMap = new HashMap<BYTEARRAY,ClientChannelImpl>();
+	private long keyTimeout;
     
     public ClientConnectionManagerImpl(String gameName, Discoverer disco) {
         this(gameName, disco, new DefaultUserManagerPolicy());
@@ -228,9 +229,10 @@ public class ClientConnectionManagerImpl
      *
      * @param key long
      */
-    public void newConnectionKeyIssued(byte[] key) {
+    public void newConnectionKeyIssued(byte[] key, long ttl) {
         reconnectionKey = new byte[key.length];
         System.arraycopy(key,0,reconnectionKey,0,key.length);
+        keyTimeout = System.currentTimeMillis()+ttl;
     }
     
     public void joinedChannel(String name, byte[] channelID) {

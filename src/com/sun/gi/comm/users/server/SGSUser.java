@@ -26,7 +26,7 @@ public interface SGSUser {
 	    
 	    public void userLeftChannel(byte[] channel, byte[] user) throws IOException ;
 	    	    
-	    public void reconnectKeyReceived(byte[] key) throws IOException ;
+	    public void reconnectKeyReceived(byte[] key, long ttl) throws IOException ;
 	    
 	    UserID getUserID();
 		public void deregistered();

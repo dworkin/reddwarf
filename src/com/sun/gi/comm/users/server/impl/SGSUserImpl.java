@@ -90,8 +90,8 @@ public class SGSUserImpl implements SGSUser, TransportProtocolServer {
 
 	}
 
-	public void reconnectKeyReceived(byte[] key) throws IOException {
-		transport.deliverReconnectKey(userID.toByteArray(), key);
+	public void reconnectKeyReceived(byte[] key, long ttl) throws IOException {
+		transport.deliverReconnectKey(userID.toByteArray(), key, ttl);
 
 	}
 
@@ -113,9 +113,9 @@ public class SGSUserImpl implements SGSUser, TransportProtocolServer {
 			chan = channelMap.get(new ChannelID(chanID));
 			// should never be NULL, if it is we want an exception to figure out
 			// why
-			databuff.flip();
-			chan.unicastData(userID, new UserID(to), databuff.duplicate(),
-					reliable);
+			ByteBuffer newbuff = databuff.duplicate();
+			newbuff.position(newbuff.limit());
+			chan.unicastData(userID, new UserID(to), newbuff, reliable);
 		} catch (InstantiationException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -135,8 +135,9 @@ public class SGSUserImpl implements SGSUser, TransportProtocolServer {
 			}
 			// should never be NULL, if it is we want an exception to figure out
 			// why
-			databuff.flip();
-			chan.multicastData(userID, ids, databuff.duplicate(), reliable);
+			ByteBuffer newbuff = databuff.duplicate();
+			newbuff.position(newbuff.limit());
+			chan.multicastData(userID, ids, newbuff, reliable);
 		} catch (InstantiationException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

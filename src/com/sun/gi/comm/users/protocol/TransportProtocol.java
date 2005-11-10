@@ -157,7 +157,7 @@ public interface TransportProtocol {
 	 * client
 	 */
 
-	public void deliverReconnectKey(byte[] id, byte[] key) throws IOException;
+	public void deliverReconnectKey(byte[] id, byte[] key, long ttl) throws IOException;
 
 	/*
 	 * 

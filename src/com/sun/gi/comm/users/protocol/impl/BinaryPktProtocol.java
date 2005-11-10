@@ -459,7 +459,8 @@ public class BinaryPktProtocol
     /**
      * call this method from the server to send a reconenct key update to the client
      */
-    public void deliverReconnectKey(byte[] id, byte[] key) throws IOException {
+    public void deliverReconnectKey(byte[] id, byte[] key,
+    		long ttl) throws IOException {
         synchronized (hdr) {
             hdr.clear();
             hdr.put((byte)OPCODE.RCV_RECONNECT_KEY.ordinal());
@@ -467,6 +468,7 @@ public class BinaryPktProtocol
             hdr.put(id);
             hdr.put( (byte) key.length);
             hdr.put(key);
+            hdr.putLong(ttl);
             sendBuffers(hdr);
         }
     }
@@ -671,7 +673,8 @@ public class BinaryPktProtocol
                 keylen = buff.get();
                 key = new byte[keylen];
                 buff.get(key);
-                client.rcvReconnectKey(user,key);
+                long ttl = buff.getLong();
+                client.rcvReconnectKey(user,key,ttl);
                 break;
             case REQ_JOIN_CHAN:
             	namelen = buff.get();
