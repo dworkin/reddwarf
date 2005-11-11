@@ -34,7 +34,7 @@ public class ClientConnectionManagerImpl
     private boolean reconnecting = false;
     private boolean connected = false;
     private Map<BYTEARRAY,ClientChannelImpl> channelMap = new HashMap<BYTEARRAY,ClientChannelImpl>();
-	private long keyTimeout;
+	private long keyTimeout=0;
     
     public ClientConnectionManagerImpl(String gameName, Discoverer disco) {
         this(gameName, disco, new DefaultUserManagerPolicy());
@@ -106,15 +106,19 @@ public class ClientConnectionManagerImpl
         DiscoveredGame game = discoverGame(gameName);
         DiscoveredUserManager choice = policy.choose(game,
                 umanager.getClass().getName());
-        umanager.connect(choice,this);
-        return true;
+        return umanager.connect(choice,this);
+       
     }
     
     /**
      * reconnect
      */
     private boolean reconnect() {
-        return connect(umanager);
+    	boolean umgrConnected  = false;
+    	while(!umgrConnected && (keyTimeout>System.currentTimeMillis())){
+    		umgrConnected = connect(umanager);
+    	}
+    	return umgrConnected;
     }
     
     public void disconnect() {
@@ -153,7 +157,8 @@ public class ClientConnectionManagerImpl
      */
     public void disconnected() {
         connected = false;
-        if (!done) {
+        if ((!done)&&(keyTimeout<System.currentTimeMillis())) {
+        	listener.failOverInProgress();
             reconnect();
         } else {
             listener.disconnected();
@@ -167,7 +172,7 @@ public class ClientConnectionManagerImpl
      */
     public void connected() {
         connected = true;
-        if (!reconnecting) {
+        if (!reconnecting || (keyTimeout>System.currentTimeMillis())) {
             umanager.login();
         } else {
             umanager.reconnectLogin(myID, reconnectionKey);

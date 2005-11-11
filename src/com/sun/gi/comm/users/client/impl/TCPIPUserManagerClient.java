@@ -197,13 +197,13 @@ public class TCPIPUserManagerClient
 	}
 
 
-	public void connect(DiscoveredUserManager choice, UserManagerClientListener listener) {
-		this.listener= listener;
+	public boolean connect(DiscoveredUserManager choice, UserManagerClientListener listener) {
+		this.listener= listener;		
 		String host = choice.getParameter("host");
 	    int port = Integer.parseInt(choice.getParameter("port"));
 	    System.out.println("Attempting to connect to a TCPIP User Manager on host " +
 	                host + " port " + port);
-	    mgr.makeTCPConnectionTo(host, port);
+	    return (mgr.makeTCPConnectionTo(host, port)!=null);
 		
 	}
 

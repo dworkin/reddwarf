@@ -33,9 +33,10 @@ public interface UserManagerClient {
    * instance of a UserManager
    * @param listener An obejct to recieve the communication events,
    * @see UserManagerClientListener
+   * @return true if connection started, false if it fails
    */
     
-  public void connect(DiscoveredUserManager choice,UserManagerClientListener listener);
+  public boolean connect(DiscoveredUserManager choice,UserManagerClientListener listener);
   
   /**
    * This method initiates the login procedure.

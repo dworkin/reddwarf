@@ -13,6 +13,7 @@ package com.sun.gi;
  */
 import java.io.File;
 import java.lang.reflect.Constructor;
+import java.net.URL;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -28,6 +29,7 @@ import com.sun.gi.framework.install.InstallationLoader;
 import com.sun.gi.framework.install.UserMgrRec;
 import com.sun.gi.framework.install.ValidatorRec;
 import com.sun.gi.framework.install.impl.InstallationFile;
+import com.sun.gi.framework.install.impl.InstallationURL;
 import com.sun.gi.framework.interconnect.TransportManager;
 import com.sun.gi.framework.interconnect.impl.LRMPTransportManager;
 import com.sun.gi.framework.status.ReportManager;
@@ -42,16 +44,16 @@ public class SGS {
   TransportManager transportManager;
   ReportUpdater reportUpdater;
   SGSUUID sliceID = new StatisticalUUID();
-  private String installFile = "Install.txt";
+  private String installFile = "file:Install.txt";
   private static final long REPORTTTL = 1000;
   public SGS() {
     try {
-      String installProperty = System.getProperty("sgs.framework.installfile");
+      String installProperty = System.getProperty("sgs.framework.installurl");
       if (installProperty!=null) {
         installFile = installProperty;
       }
       InstallationLoader installation =
-          new InstallationFile(new File(installFile));
+          new InstallationURL(new URL(installFile));
       // start framework services
       transportManager = new LRMPTransportManager();
       reportManager = new ReportManagerImpl(transportManager, REPORTTTL);
@@ -158,6 +160,9 @@ public class SGS {
   }
 
   static public void main(String[] args) {
+	if (args.length>0){
+		System.setProperty("sgs.framework.installurl",args[0]);
+	}
     new SGS();
 
   }
