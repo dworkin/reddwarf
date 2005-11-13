@@ -1,0 +1,4 @@
+#This file describes the games installed into thi back end as a list on one line entries
+#The entries make up a 2 column able as follows
+#Game ID		URL Location of deployment XML
+1				file:chattest_deployment2.xml
