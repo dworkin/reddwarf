@@ -136,24 +136,31 @@ public class RouterImpl implements Router {
 			previousKeys.clear();
 			previousKeys.putAll(currentKeys);
 			currentKeys.clear();
-			for (Entry<UserID, SGSUser> entry : userMap.entrySet()) {
-				UserID uid = entry.getKey();
-				SGSUser user = entry.getValue();
-				SGSUUID key = new StatisticalUUID();
-				BYTEARRAY keybytes = new BYTEARRAY(key.toByteArray());
-				currentKeys.put(uid, keybytes);
-				try {
-					user
-							.reconnectKeyReceived(keybytes.data(),
-									keySecondsToLive);
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-				fireConnectKey(uid, keybytes);
-
+			for (SGSUser user : userMap.values()) {								
+				issueNewKey(user);				
 			}
 		}
 
+	}
+
+	/**
+	 * @param user
+	 */
+	private void issueNewKey(SGSUser user) {
+		synchronized(currentKeys){
+			SGSUUID key = new StatisticalUUID();
+			BYTEARRAY keybytes = new BYTEARRAY(key.toByteArray());
+			currentKeys.put(user.getUserID(), keybytes);
+			try {
+				user
+						.reconnectKeyReceived(keybytes.data(),
+								keySecondsToLive);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			fireConnectKey(user.getUserID(), keybytes);
+		}
+		
 	}
 
 	/**
@@ -240,6 +247,7 @@ public class RouterImpl implements Router {
 			IOException {
 		userMap.put(user.getUserID(), user);
 		fireUserJoined(user.getUserID());
+		issueNewKey(user);
 		reportUserJoined(user.getUserID().toByteArray());
 		// send already connected users to new joiner
 		for (UserID oldUserID : userMap.keySet()) {

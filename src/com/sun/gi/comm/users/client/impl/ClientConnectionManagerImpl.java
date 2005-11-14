@@ -26,7 +26,6 @@ public class ClientConnectionManagerImpl
     UserManagerPolicy policy;
     private UserManagerClient umanager;
     private Class umanagerClass;
-    private boolean done = false;
     private String gameName;
     private byte[] reconnectionKey = null;
     private ClientConnectionManagerListener listener;
@@ -103,10 +102,20 @@ public class ClientConnectionManagerImpl
     }
     
     private boolean connect(UserManagerClient umanager) {
+    	reconnecting = false;
         DiscoveredGame game = discoverGame(gameName);
         DiscoveredUserManager choice = policy.choose(game,
                 umanager.getClass().getName());
-        return umanager.connect(choice,this);
+        int retries=0;
+        while((retries++<10) && (!umanager.connect(choice,this))){
+        	try {
+				Thread.sleep(100);
+			} catch (InterruptedException e) {
+				
+				e.printStackTrace();
+			}
+        }
+        return (retries<11);
        
     }
     
@@ -115,14 +124,19 @@ public class ClientConnectionManagerImpl
      */
     private boolean reconnect() {
     	boolean umgrConnected  = false;
+    	reconnecting = true;
     	while(!umgrConnected && (keyTimeout>System.currentTimeMillis())){
     		umgrConnected = connect(umanager);
+    		try {
+				Thread.sleep(10);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
     	}
     	return umgrConnected;
     }
     
     public void disconnect() {
-        done = true;
         reconnecting = false;
         umanager.logout();
     }
@@ -157,7 +171,7 @@ public class ClientConnectionManagerImpl
      */
     public void disconnected() {
         connected = false;
-        if ((!done)&&(keyTimeout<System.currentTimeMillis())) {
+        if (keyTimeout>System.currentTimeMillis()) {
         	listener.failOverInProgress();
             reconnect();
         } else {
@@ -175,10 +189,8 @@ public class ClientConnectionManagerImpl
         if (!reconnecting || (keyTimeout>System.currentTimeMillis())) {
             umanager.login();
         } else {
-            umanager.reconnectLogin(myID, reconnectionKey);
-        }
-        done = false;
-        reconnecting = true;
+            umanager.reconnectLogin(myID, reconnectionKey);           
+        }       
     }
     
     /**
@@ -237,7 +249,7 @@ public class ClientConnectionManagerImpl
     public void newConnectionKeyIssued(byte[] key, long ttl) {
         reconnectionKey = new byte[key.length];
         System.arraycopy(key,0,reconnectionKey,0,key.length);
-        keyTimeout = System.currentTimeMillis()+ttl;
+        keyTimeout = System.currentTimeMillis()+(ttl*1000);
     }
     
     public void joinedChannel(String name, byte[] channelID) {
