@@ -45,17 +45,52 @@ public interface ClientConnectionManager
   /**
    * This method is called to make a connection to a game in the Darkstar backend.
    * A return value of TRUE only means that a connection can be attempted, not that connection has sucessfully 
-   * completed.  To know when you are fully connected, use the ClientConnectionManagerListener.
-   * @see ClientConnectionManagerListener
+   * completed.   To know when you are fully connected, use the ClientConnectionManagerListener.
+   * 
+   * Because a server may linger in the discovery data for a period after it actually dies,
+   * or may otherwise be unavailable even though it is in the discovery list,
+   * the API will try to initiate multiple connection attempts before
+   * giving up and returning false.  The number of attempts it tries, and the tiem it sleeps
+   * between attempts are controlled by the system properties "sgs.clientconnmgr.connattempts" and
+   * "sgs.clientconnmgr.connwait".  If these are unset default values of 10 attempst and 100ms are used. 
    * 
    * @param userManagerClassName The FQCN of the UserManager to connect to. 
    * @return TRUE if conenction can be attempted, FALSE if not. (For instance
    * if the named userManagerClassName is not supported by the game.) 
    *  
    * @throws ClientAlreadyConnectedException if the ClientConnection Manager is already connected to a game.
+   * @see ClientConnectionManagerListener
    */
 
   public boolean connect(String userManagerClassName) throws 
+          ClientAlreadyConnectedException;  
+  
+  
+  /**
+   * This method is called to make a connection to a game in the Darkstar backend.
+   * A return value of TRUE only means that a connection can be attempted, not that connection has sucessfully 
+   * completed.  To know when you are fully connected, use the ClientConnectionManagerListener.
+   * 
+   * To know when you are fully connected, use the ClientConnectionManagerListener.
+   * Because a sever may linger in the discovery data for a period after it actually dies,
+   * or may otherwise be unavailable, the API will try to initiate multiple connection attempts before
+   * giving up and returning false.  The number of attempts it tries, and the tiem it sleeps
+   * between attempts is controlled by the second and third parameter. 
+   * 
+   * 
+   * 
+   * @param userManagerClassName The FQCN of the UserManager to connect to.
+   * @param connectAttempts The number of times to try to connect before returning false
+   * @param the numerb of ms to sleep between connect attempts.
+   * @return TRUE if conenction can be attempted, FALSE if not. (For instance
+   * if the named userManagerClassName is not supported by the game.) 
+   *  
+   * @throws ClientAlreadyConnectedException if the ClientConnection Manager is already connected to a game.
+   * @see ClientConnectionManagerListener
+   */
+  
+  public boolean connect(String userManagerClassName,int connectAttempts,
+		  long msBetweenAttempts)throws 
           ClientAlreadyConnectedException;  
   
   /**

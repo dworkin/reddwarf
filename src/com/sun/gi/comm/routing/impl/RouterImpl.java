@@ -41,12 +41,15 @@ public class RouterImpl implements Router {
 	private ByteBuffer hdr = ByteBuffer.allocate(256);
 
 	private RouterListener listener;
+	private static final boolean TRACEKEYS=true;
 
 	protected int keySecondsToLive;
 
 	private enum OPCODE {
 		UserJoined, UserLeft, UserJoinedChannel, UserLeftChannel, ReconnectKey
 	};
+	
+
 
 	public RouterImpl(TransportManager cmgr) throws IOException {
 		transportManager = cmgr;
@@ -54,7 +57,6 @@ public class RouterImpl implements Router {
 		routerControlChannel = transportManager
 				.openChannel("__SGS_ROUTER_CONTROL");
 		routerControlChannel.addListener(new TransportChannelListener() {
-
 			public void dataArrived(ByteBuffer buff) {
 				OPCODE opcode = OPCODE.values()[(int) buff.get()];
 				switch (opcode) {
@@ -89,6 +91,10 @@ public class RouterImpl implements Router {
 						synchronized (currentKeys) {
 							currentKeys.put(uid,ba);
 						}
+						if (TRACEKEYS){
+							System.out.println("Received key "+ba.toHex()+
+									" for user "+uid.toString());
+						}
 					} catch (InstantiationException e) {
 						e.printStackTrace();
 					}
@@ -118,7 +124,7 @@ public class RouterImpl implements Router {
 					} catch (InterruptedException e) {
 						e.printStackTrace();
 					}
-					if (lastTicTime + (keySecondsToLive * 1000) <= System
+					if (lastTicTime + (keySecondsToLive * 1000) >= System
 							.currentTimeMillis()) {
 						issueNewKeys();
 						lastTicTime = System.currentTimeMillis();
@@ -152,13 +158,16 @@ public class RouterImpl implements Router {
 			BYTEARRAY keybytes = new BYTEARRAY(key.toByteArray());
 			currentKeys.put(user.getUserID(), keybytes);
 			try {
-				user
-						.reconnectKeyReceived(keybytes.data(),
+				user.reconnectKeyReceived(keybytes.data(),
 								keySecondsToLive);
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
 			fireConnectKey(user.getUserID(), keybytes);
+			if (TRACEKEYS){
+				System.out.println("Generated key "+keybytes.toString()+
+						" for user "+user.toString());
+			}
 		}
 		
 	}
@@ -358,12 +367,27 @@ public class RouterImpl implements Router {
 	public boolean validateReconnectKey(UserID uid, byte[] key) {
 		synchronized (currentKeys) {
 			BYTEARRAY currentKey = currentKeys.get(uid);
+			if (currentKey == null){
+				if (TRACEKEYS){
+					System.out.println("No key available for ID: "+uid.toString());
+				}
+				return false;
+			}
 			if (currentKey.equals(key)) {
+				if (TRACEKEYS){
+					System.out.println("Current Key validated for ID: "+uid.toString());
+				}
 				return true;
 			}
 			BYTEARRAY pastKey = previousKeys.get(uid);
-			if (pastKey.equals(key)) {
+			if ((pastKey!=null)&&(pastKey.equals(key))) {
+				if (TRACEKEYS){
+					System.out.println("Past Key validated for ID: "+uid.toString());
+				}
 				return true;
+			}
+			if (TRACEKEYS){
+				System.out.println("Incorrect Key for ID: "+uid.toString());
 			}
 			return false;
 		}

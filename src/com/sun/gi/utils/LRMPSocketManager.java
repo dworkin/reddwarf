@@ -52,6 +52,9 @@ public class LRMPSocketManager
       if (echo) {
         packetArrived(packet);
       }
+      if (DEBUGPKTS){
+    	  System.out.println("LRMPTRansportMgr sent packet");
+      }
     }
     catch (Exception ex) {
       ex.printStackTrace();
@@ -79,7 +82,10 @@ public class LRMPSocketManager
       DatagramPacket inpkt = null;
       try {
         inpkt = ps.receive();
-        packetArrived(inpkt);
+        if (DEBUGPKTS){
+      	  System.out.println("LRMPTRansportMgr sent packet");
+        }
+        packetArrived(inpkt);        
       }
       catch (SessionDoneException ex) {
         ex.printStackTrace();

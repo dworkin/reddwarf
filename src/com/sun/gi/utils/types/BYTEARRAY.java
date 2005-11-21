@@ -16,7 +16,12 @@ public class BYTEARRAY implements Comparable {
 	 * @return int
 	 */
 	public int compareTo(Object o) {
-		byte[] otherdata = ((BYTEARRAY) o).data;
+		byte[] otherdata;
+		if (o instanceof byte[]){
+			otherdata = (byte[])o;
+		} else {
+			otherdata = ((BYTEARRAY) o).data;
+		}
 		if (data.length < otherdata.length) {
 			return -1;
 		} else if (data.length > otherdata.length) {

@@ -64,7 +64,7 @@ public interface UserManagerClient {
    * This method send a request to join a channel.  (The ClientConnectionManager calls this
    * "opening" a channel.  The terms in this case are synonymous.)
    * 
-   * @param user The ID of the user wanting to open the channel.
+   * 
    * @param channelName The name of the channel to open.
    */
   public void joinChannel(String channelName);
@@ -74,7 +74,7 @@ public interface UserManagerClient {
    * It will be handled by whatever Game Logic Object (GLO) has been registered to handle data
    * packets arriving from this particualr user.
    * 
-   * @param from ID of user sending the data
+   *
    * @param buff the data itself.
    * @param reliable
    */

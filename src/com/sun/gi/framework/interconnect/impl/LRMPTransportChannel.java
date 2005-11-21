@@ -20,7 +20,8 @@ public class LRMPTransportChannel implements TransportChannel {
   private String name;
   SGSUUID uuID;
   private LRMPTransportManager transportManager;
-  private List listeners = new ArrayList();
+  private List<TransportChannelListener> listeners = 
+	  new ArrayList<TransportChannelListener>();
 
   LRMPTransportChannel(String channelName,SGSUUID id,
                               LRMPTransportManager mgr) {

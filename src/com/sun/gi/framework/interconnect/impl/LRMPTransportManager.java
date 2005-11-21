@@ -23,6 +23,8 @@ public class LRMPTransportManager
   private static final byte OP_DATA = 3;
   private Map chanMap = new HashMap();
   private Map oldChanMap = new HashMap();
+  private boolean echo=false;
+private boolean TRACE=false;
 
   public LRMPTransportManager() {
     String prop = System.getProperty("sgs.lrmp.mcastaddress");
@@ -45,7 +47,7 @@ public class LRMPTransportManager
       tp.setOrdered(true);
       tp.setTTL( ttl);
       cmgr = new LRMPSocketManager(tp);
-      cmgr.setEcho(false); //was TRUE, make sure all logic still works
+      cmgr.setEcho(false);
       cmgr.addListener(this);
     }
     catch (Exception e) {
@@ -73,8 +75,11 @@ public class LRMPTransportManager
   public void packetArrived(LRMPSocketManager lRMPSocketManager,
                             DatagramPacket inpkt) {
     ByteBuffer buff = ByteBuffer.wrap(inpkt.getData(),
-                                      inpkt.getOffset(), inpkt.getLength());
+                                      inpkt.getOffset(), inpkt.getLength());    
     byte op = buff.get();
+    if (TRACE){
+    	System.out.println("Processing transport pkt opcode: "+op);
+    }
     switch (op) {
       case OP_CHANNEL_ANNOUNCE:
         SGSUUID uuID = new StatisticalUUID();
@@ -164,11 +169,11 @@ public class LRMPTransportManager
    * @param channelName String
    */
   private void proposeID(SGSUUID chanID, String channelName) {
-    ByteBuffer outbuff = ByteBuffer.allocate(channelName.length()+17);
+    ByteBuffer outbuff = ByteBuffer.allocate(channelName.length()+chanID.ioByteSize()+1);
     outbuff.put(OP_CHANNEL_ANNOUNCE);
     chanID.write(outbuff);
     outbuff.put(channelName.getBytes());
-    cmgr.send(new DatagramPacket(outbuff.array(),channelName.length()+17));
+    cmgr.send(new DatagramPacket(outbuff.array(),outbuff.array().length));
   }
 
   /**
@@ -190,8 +195,8 @@ public class LRMPTransportManager
   // for use by LRMPTransportChannel
   void sendData(SGSUUID uuid, ByteBuffer data) throws IOException {
     data.flip();
-    int sz = data.remaining() + 17;
-    ByteBuffer outbuff = ByteBuffer.allocate(sz);
+    int sz = data.remaining() + uuid.ioByteSize()+1;
+    ByteBuffer outbuff = ByteBuffer.allocate(sz);    
     outbuff.put(OP_DATA);
     uuid.write(outbuff);
     outbuff.put(data);
