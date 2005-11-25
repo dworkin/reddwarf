@@ -26,6 +26,20 @@ public interface DeploymentRec {
 	 * @return String
 	 */
 	public String getName();
+	
+	/**
+	 * getClasspathURL
+	 *
+	 * @return String
+	 */
+	public String getClasspathURL();
+	
+	/**
+	 * getBootClass
+	 *
+	 * @return String
+	 */
+	public String getBootClass();
 
 	/**
 	 * getDescription

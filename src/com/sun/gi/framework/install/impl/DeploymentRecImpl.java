@@ -27,6 +27,7 @@ public class DeploymentRecImpl implements DeploymentRec {
 	int id;
 
 	String name;
+	String classpathURL=null;
 
 	String bootClass = null;
 
@@ -36,6 +37,7 @@ public class DeploymentRecImpl implements DeploymentRec {
 
 	/**
 	 * InstallRec
+	 * @param gameURL 
 	 * 
 	 * @param i
 	 *            int
@@ -44,7 +46,12 @@ public class DeploymentRecImpl implements DeploymentRec {
 	 */
 	public DeploymentRecImpl(String gameName) {
 		name = gameName;
-
+		
+	}
+	
+	public void setGLEapp(String bootClassFQDN, String classpathURL){
+		bootClass = bootClassFQDN;
+		this.classpathURL = classpathURL;
 	}
 
 	/**
@@ -105,6 +112,17 @@ public class DeploymentRecImpl implements DeploymentRec {
 	public int getID() {
 
 		return id;
+	}
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.framework.install.DeploymentRec#getClasspathURL()
+	 */
+	public String getClasspathURL() {
+		return classpathURL;
+	}
+	
+	public String getBootClass(){
+		return bootClass;
 	}
 
 }

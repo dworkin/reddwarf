@@ -25,18 +25,7 @@ public class SimThreadImpl extends Thread implements SimThread {
     this.start();
   }
 
-  public synchronized void execute(SimTask task) {
-    while(this.task != null) {
-      try {
-        wait();
-      }
-      catch (InterruptedException ex) {
-        ex.printStackTrace();
-      }
-    }
-    this.task = task;
-    notifyAll();
-  }
+  
 
   public void run(){
     do {

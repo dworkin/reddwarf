@@ -2,9 +2,13 @@ package com.sun.gi.logic.impl;
 
 import java.io.*;
 import java.lang.reflect.*;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.util.*;
 
 import com.sun.gi.comm.routing.*;
+import com.sun.gi.framework.install.DeploymentRec;
 import com.sun.gi.logic.*;
 import com.sun.gi.objectstore.*;
 import com.sun.multicast.util.*;
@@ -22,31 +26,43 @@ import com.sun.multicast.util.*;
 public class SimulationImpl
     implements Simulation {
   SimKernel kernel;
+  Router router;
   long appID;
   ClassLoader loader;
   private List userListeners = new ArrayList();
   private String appName;
   private Map userDataListeners = new HashMap();
 
-  public SimulationImpl(SimKernel kernel, String appName, long appID,
-                        Class bootclass) {
-    //Thread.currentThread().setContextClassLoader(bootclass.getClassLoader());
+  public SimulationImpl(SimKernel kernel, Router router, DeploymentRec game) throws InstantiationException {  
     this.kernel = kernel;
-    this.appName = appName;
-    Method startMethod;
+    this.appName = game.getName();
+    this.router = router;
+    try {
+		loader = new URLClassLoader(new URL[] {new URL(game.getClasspathURL())});
+	} catch (MalformedURLException e) {		
+		e.printStackTrace();
+		throw new InstantiationException(e.getMessage());
+	}
+    Class bootclass=null;
+	try {
+		bootclass = loader.loadClass(game.getBootClass());
+	} catch (ClassNotFoundException e) {		
+		e.printStackTrace();
+		throw new InstantiationException(e.getMessage());
+	}
+    Method startMethod=null;
     try {
       startMethod = bootclass.getMethod("boot", new Class[] {SimTask.class});
     }
     catch (NoSuchMethodException ex) {
-      System.err.println("Class BOOT in sim has no method: void boot(SimTask)");
-      return;
+      throw new InstantiationException("Boot class in sim has no method: void boot(SimTask)");
     }
     if (appID == -1) {
       System.err.println("ERROR: Sim BOOT class must define: " +
                          "public static long SIMID = <n> where <n> >= 0");
       return;
     }
-    this.appID = appID;
+    this.appID = game.getID();
     // check for boot object. it it doesnt exist, then create it
     Transaction trans = kernel.getOstore().newTransaction(appID,
         bootclass.getClassLoader());
@@ -58,19 +74,23 @@ public class SimulationImpl
       }
       catch (IllegalAccessException ex1) {
         ex1.printStackTrace();
-        return;
-      }
-      catch (InstantiationException ex1) {
-        ex1.printStackTrace();
-        return;
-      }
+        throw new InstantiationException(ex1.getMessage());
+      }      
     }
     trans.commit();
     loader = bootclass.getClassLoader();
-    kernel.queueTask(newTask(bootObjectID, startMethod, new Object[] {}));
+    queueTask(newTask(bootObjectID, startMethod, new Object[] {}));
   }
 
   /**
+ * @param task
+ */
+private void queueTask(SimTask task) {
+	// TODO Auto-generated method stub
+	
+}
+
+/**
    * addUserListener
    *
    * @param ref SOReference
@@ -105,7 +125,7 @@ public class SimulationImpl
       Object[] params = {id,data};
       for (Iterator i = userListeners.iterator(); i.hasNext(); ) {
         long objID = ( (Long) i.next()).longValue();
-        kernel.queueTask(newTask(objID, userJoinedMethod, params));
+        queueTask(newTask(objID, userJoinedMethod, params));
       }
     }
     catch (ClassNotFoundException ex) {
@@ -133,7 +153,7 @@ public class SimulationImpl
           id};
       for (Iterator i = userListeners.iterator(); i.hasNext(); ) {
         long objID = ( (Long) i.next()).longValue();
-        kernel.queueTask(newTask(objID, userJoinedMethod, params));
+        queueTask(newTask(objID, userJoinedMethod, params));
       }
     }
     catch (ClassNotFoundException ex) {
@@ -183,7 +203,7 @@ public class SimulationImpl
       List listeners = (List) userDataListeners.get(from);
       for (Iterator i = listeners.iterator(); i.hasNext(); ) {
         long objID = ( (Long) i.next()).longValue();
-        kernel.queueTask(newTask(objID, userJoinedMethod, params));
+        queueTask(newTask(objID, userJoinedMethod, params));
       }
     }
     catch (ClassNotFoundException ex) {

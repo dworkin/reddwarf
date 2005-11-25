@@ -28,8 +28,12 @@ public class DeploymentXMLHandler extends DefaultHandler {
 				
 		if (qName.equalsIgnoreCase("GAMEAPP")){ // start of game record
 			inValidator = false; // clean up if previous was  ill formed
-			String gameName = attributes.getValue("gamename");
+			String gameName = attributes.getValue("gamename");			
 			drec = new DeploymentRecImpl(gameName);
+		} else if (qName.equalsIgnoreCase("GLEAPP")){
+			String bootClass = attributes.getValue("bootclass");
+			String classpathURL = attributes.getValue("classpathURL");
+			drec.setGLEapp(bootClass,classpathURL);
 		} else if (qName.equalsIgnoreCase("USERMANAGER")){
 			String serverClassname = attributes.getValue("serverclass");
 			umrec = new UserMgrRecImpl(serverClassname);

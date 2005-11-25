@@ -25,21 +25,7 @@ public interface SimKernel {
    */
   public Transaction newTransaction(long appID, ClassLoader loader);
 
-  /**
-   * Queues a task for execution by the kernel.
-   * @param simTask SimTask The task to be executed.
-   */
-  public void queueTask(SimTask simTask);
-  /**
-   * Gets a thread to use for the execution of a SimTask
-   * @return SimThread The thread.
-   */
-  public SimThread getSimThread();
-  /**
-   * Returns the ObjectStore in use by this game.
-   * @return ObjectStore The Objectstore.
-   */
-  public ObjectStore getOstore();
+  
   /**
    * This method creates a new user in the back end and returns a USerID
    * representing it.  It can be used by back end logic to create "virtual users."
@@ -54,5 +40,11 @@ public interface SimKernel {
    * @param from UserID the userID the data came from (return address)
    * @param bs byte[] the data to transmit
    */
-  public void sendData(UserID[] targets, UserID from, byte[] bs);
+  public void sendData(ChannelID cid, UserID[] targets, UserID from, byte[] bs);
+
+
+/**
+ * @return
+ */
+public ObjectStore getOstore();
 }
