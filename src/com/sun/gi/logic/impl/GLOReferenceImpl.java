@@ -3,7 +3,7 @@ package com.sun.gi.logic.impl;
 import java.io.Serializable;
 import java.io.ObjectInputStream;
 import java.io.IOException;
-import com.sun.gi.logic.SOReference;
+import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask;
 
 /**
@@ -15,12 +15,12 @@ import com.sun.gi.logic.SimTask;
  * @version 1.0
  */
 
-public class SOReferenceImpl implements SOReference, Serializable {
+public class GLOReferenceImpl implements GLOReference, Serializable {
   long objID;
   transient boolean peeked;
   transient Serializable objectCache;
 
-  public SOReferenceImpl(long id) {
+  public GLOReferenceImpl(long id) {
     objID = id;
     objectCache = null;
   }
@@ -60,7 +60,7 @@ public class SOReferenceImpl implements SOReference, Serializable {
    *
    * @return SOReference
    */
-  public SOReference shallowCopy() {
-    return new SOReferenceImpl(objID);
+  public GLOReference shallowCopy() {
+    return new GLOReferenceImpl(objID);
   }
 }

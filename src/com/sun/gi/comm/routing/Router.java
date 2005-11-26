@@ -31,6 +31,8 @@ import com.sun.gi.comm.users.server.SGSUser;
  * @version 1.0
  */
 public interface Router {
+	UserID getServerID();
+
 	/**
 	 * This call is made in order to allocate a new unqiue UserID.
 	 * 
@@ -47,7 +49,9 @@ public interface Router {
 	 */
 	public void deregisterUser(SGSUser user);
 
-	public SGSChannel openChannel( String channelName);	
+	public SGSChannel openChannel( String channelName);
+	
+	public SGSChannel getChannel(ChannelID id);
 
 	public boolean validateReconnectKey(UserID user, byte[] key);
 

@@ -36,7 +36,7 @@ public interface SimTask {
    * @return SOReference an SO references that may be used by another GLO
    */
 
-  public SOReference makeReference(long id);
+  public GLOReference makeReference(long id);
 
   /**
    * Gets the transaction associated with this SimTask.  A SimTask
@@ -61,7 +61,7 @@ public interface SimTask {
    * The listening GLO must implement the SimUserListener interface.
    * @param ref SOReference A reference to the GLO to be registered.
    */
-  public void addUserListener(SOReference ref);
+  public void addUserListener(GLOReference ref);
 
   /**
    * This function registers a GLO as a listener to data packet arrival
@@ -74,7 +74,7 @@ public interface SimTask {
    * @param ref SOReference A reference to the GLO to be registered.
    */
 
-  public void addUserDataListener(UserID id, SOReference ref);
+  public void addUserDataListener(UserID id, GLOReference ref);
 
 
   /**
@@ -105,7 +105,7 @@ public interface SimTask {
    * object, or null.
    * @return SOReference A SOReference that references the newly created GLO
    */
-  public SOReference createSO(Serializable simObject, String name);
+  public GLOReference createSO(Serializable simObject, String name);
   
 
   // data access functions
@@ -121,6 +121,6 @@ public interface SimTask {
    * @param soName String The symbolic name to look up.
    * @return SOReference A reference to the GLo if found, null if not found.
    */
-  public SOReference findSO(String soName);
+  public GLOReference findSO(String soName);
 
 }

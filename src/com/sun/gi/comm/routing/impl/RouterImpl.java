@@ -337,6 +337,10 @@ public class RouterImpl implements Router {
 		}
 
 	}
+	
+	public SGSChannel getChannel(ChannelID id){
+		return channelMap.get(id);
+	}
 
 	public SGSChannel openChannel(String channelName) {
 		SGSChannel sgschan = channelNameMap.get(channelName);

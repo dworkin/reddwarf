@@ -1,6 +1,9 @@
 package com.sun.gi.logic;
 
 import java.io.Serializable;
+
+import javax.security.auth.Subject;
+
 import com.sun.gi.comm.routing.UserID;
 
 /**
@@ -19,9 +22,9 @@ public interface SimUserListener extends Serializable{
    * joins the game.
    * @param task SimTask  the SimTask context.
    * @param uid UserID The ID of the user joining.
-   * @param loginData byte[] The login data passed by the user.
+   * @param subject A javax.auth Subject that contains details such as authorizations
    */
-  public void userJoined(SimTask task, UserID uid, byte[] loginData);
+  public void userJoined(SimTask task, UserID uid, Subject subject);
   /**
    *  This method is the start method of a task queued when a user
    *  leavses the game.
@@ -29,4 +32,5 @@ public interface SimUserListener extends Serializable{
    * @param uid UserID The ID of the user leaving the game.
    */
   public void userLeft(SimTask task,UserID uid);
+  
 }

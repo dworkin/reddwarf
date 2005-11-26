@@ -4,7 +4,7 @@ import com.sun.gi.logic.SimBoot;
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.SimUserListener;
 import com.sun.gi.comm.routing.UserID;
-import com.sun.gi.logic.SOReference;
+import com.sun.gi.logic.GLOReference;
 import java.util.List;
 import java.util.ArrayList;
 
@@ -22,7 +22,7 @@ public class CommTestBoot implements SimBoot, SimUserListener{
     if (myUserID == null){ // only assign when booted for first time
       myUserID = task.createUser();
     }
-    SOReference thisobj = task.findSO("BOOT");
+    GLOReference thisobj = task.findSO("BOOT");
     task.addUserListener(thisobj);
   }
 

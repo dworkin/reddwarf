@@ -28,7 +28,7 @@ public interface Simulation {
    */
 
 
-  public void addUserListener(SOReference ref);
+  public void addUserListener(GLOReference ref);
 
   /**
    * This call creates a SimTask object that can then be queued for executon.
@@ -38,7 +38,7 @@ public interface Simulation {
    * @param params Object[] The parameters to pass to that method.
    * @return SimTask The created SimTask.
    */
-  public SimTask newTask(SOReference ref, String methodName, Object[] params);
+  public SimTask newTask(GLOReference ref, String methodName, Object[] params);
 
   /**
    * Thsi method returns the string that has been assigend as the name of the
@@ -47,12 +47,7 @@ public interface Simulation {
    */
   public String getAppName();
 
-  /**
-   * getName
-   * @deprecated
-   * @return String
-   */
-  public String getName();
+  
 
   /**
    * This method returns the long integer ID that was assigend to this game app
@@ -88,6 +83,6 @@ public interface Simulation {
    * @param ref SOReference The reference to the GLO to actually handle the
    * events.
    */
-  public void addUserDataListener(UserID id, SOReference ref);
+  public void addUserDataListener(UserID id, GLOReference ref);
 
 }

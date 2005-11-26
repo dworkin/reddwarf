@@ -1,6 +1,8 @@
 package com.sun.gi.logic;
 
 import java.io.Serializable;
+
+import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
 
 /**
@@ -23,4 +25,8 @@ public interface SimUserDataListener extends Serializable{
    * @param data byte[] the data sent.
    */
   public void userDataReceived(SimTask task, UserID to, UserID from, byte[] data);
+  
+  public void userJoinedChannel(ChannelID cid, UserID uid);
+  
+  public void userLeftChannel(ChannelID cid, UserID uid);
 }

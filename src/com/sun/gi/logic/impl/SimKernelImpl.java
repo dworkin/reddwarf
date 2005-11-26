@@ -6,7 +6,7 @@ import java.util.Map;
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.Router;
 import com.sun.gi.comm.routing.UserID;
-import com.sun.gi.logic.SOReference;
+import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimFinder;
 import com.sun.gi.logic.SimKernel;
 import com.sun.gi.logic.SimThread;

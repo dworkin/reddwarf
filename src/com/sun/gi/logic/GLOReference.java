@@ -19,7 +19,7 @@ import java.io.Serializable;
  * @version 1.0
  */
 
-public interface SOReference {
+public interface GLOReference {
   /**
    * This method locks the referenced GLO for write and returns a reference to
    * an in memory instantiation of it.  Multiple get() calls on SOReferences
@@ -44,5 +44,5 @@ public interface SOReference {
    * GLO.
    * @return SOReference the new SOReference.
    */
-  public SOReference shallowCopy();
+  public GLOReference shallowCopy();
 }

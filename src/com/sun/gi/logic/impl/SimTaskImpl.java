@@ -6,7 +6,7 @@ import java.io.Serializable;
 import java.lang.reflect.*;
 import com.sun.gi.objectstore.DeadlockException;
 import com.sun.gi.logic.SimTask;
-import com.sun.gi.logic.SOReference;
+import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.Simulation;
 import com.sun.gi.comm.routing.UserID;
 import java.util.Iterator;
@@ -38,7 +38,7 @@ class OutputRecord {
 
 public class SimTaskImpl implements SimTask {
   private Transaction trans ;
-  private SOReference startObject;
+  private GLOReference startObject;
   private Method startMethod;
   private Object[] startArgs;
   private ClassLoader loader;
@@ -96,8 +96,8 @@ public class SimTaskImpl implements SimTask {
     }
   }
 
-  public SOReference makeReference(long id) {
-    return new SOReferenceImpl(id);
+  public GLOReference makeReference(long id) {
+    return new GLOReferenceImpl(id);
   }
 
   public Transaction getTransaction() {
@@ -115,7 +115,7 @@ public class SimTaskImpl implements SimTask {
    * @param ref SOReference
    * @return long
    */
-  public void addUserListener(SOReference ref) {
+  public void addUserListener(GLOReference ref) {
     simulation.addUserListener(ref);
   }
 
@@ -125,7 +125,7 @@ public class SimTaskImpl implements SimTask {
    * @param soName String
    * @return SOReference
    */
-  public SOReference findSO(String soName) {
+  public GLOReference findSO(String soName) {
     return makeReference(trans.lookup(soName));
   }
 
@@ -155,7 +155,7 @@ public class SimTaskImpl implements SimTask {
    *
    * @param ref SOReference
    */
-  public void addUserDataListener(UserID user, SOReference ref) {
+  public void addUserDataListener(UserID user, GLOReference ref) {
     simulation.addUserDataListener(user, ref);
   }
 
@@ -165,7 +165,7 @@ public class SimTaskImpl implements SimTask {
    * @param wurmPlayer WurmPlayer
    * @return SOReference
    */
-  public SOReference createSO(Serializable simObject,String name) {
+  public GLOReference createSO(Serializable simObject,String name) {
     return makeReference(trans.create(simObject,name));
   }
 
