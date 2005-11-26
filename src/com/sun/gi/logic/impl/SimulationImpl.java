@@ -47,8 +47,8 @@ public class SimulationImpl implements Simulation {
 
 	private String appName;
 
-	private Map<UserID,List<Long>> userDataListeners = new HashMap<UserID,List<Long>>();
-	
+	private Map<UserID, List<Long>> userDataListeners = new HashMap<UserID, List<Long>>();
+
 	private Map<ChannelID, List<Long>> channelListeners = new HashMap<ChannelID, List<Long>>();
 
 	private List<SimTask> taskQueue = new LinkedList<SimTask>();
@@ -100,9 +100,47 @@ public class SimulationImpl implements Simulation {
 			}
 		}
 		trans.commit();
+		router.addRouterListener(new RouterListener() {
+			public void serverMessage(UserID from, ByteBuffer data,
+					boolean reliable) {
+				fireServerMessage(from, data);
+			}
 
+			public void userJoined(UserID uid, Subject subject) {
+				fireUserJoined(uid, subject);
+			}
+
+			public void userLeft(UserID uid) {
+				fireUserLeft(uid);
+			}
+
+			public void userJoinedChannel(UserID uid, ChannelID cid) {
+				fireUserJoinedChannel(uid, cid);
+			}
+
+			public void userLeftChannel(UserID uid, ChannelID cid) {
+				fireUserLeftChannel(uid, cid);
+			}
+
+			public void channelDataPacket(ChannelID cid, UserID from,
+					ByteBuffer buff) {
+				fireChannelDataPacket(cid, from, buff);
+			}
+
+		});
 		loader = bootclass.getClassLoader();
 		queueTask(newTask(bootObjectID, startMethod, new Object[] {}));
+	}
+
+	/**
+	 * @param cid
+	 * @param from
+	 * @param buff
+	 */
+	protected void fireChannelDataPacket(ChannelID cid, UserID from,
+			ByteBuffer buff) {
+		// TODO Auto-generated method stub
+
 	}
 
 	/**
@@ -207,39 +245,7 @@ public class SimulationImpl implements Simulation {
 		return appID;
 	}
 
-	
 
-	/**
-	 * channelDataArrived
-	 * 
-	 * @param cid
-	 *            ChannelID
-	 * @param from
-	 *            UserID
-	 * @param data
-	 *            byte[]
-	 */
-	public void receivedHostData(UserID from, byte[] data) {
-		try {
-			Method userJoinedMethod = loader.loadClass(
-					"com.sun.gi.logic.SimUserDataListener").getMethod(
-					"userDataReceived",
-					new Class[] { SimTask.class, UserID.class, byte[].class });
-			Object[] params = { from, data };
-			List listeners = (List) userDataListeners.get(from);
-			for (Iterator i = listeners.iterator(); i.hasNext();) {
-				long objID = ((Long) i.next()).longValue();
-				queueTask(newTask(objID, userJoinedMethod, params));
-			}
-		} catch (ClassNotFoundException ex) {
-			ex.printStackTrace();
-		} catch (SecurityException ex) {
-			ex.printStackTrace();
-		} catch (NoSuchMethodException ex) {
-			ex.printStackTrace();
-		}
-
-	}
 
 	/**
 	 * createUser
@@ -333,5 +339,141 @@ public class SimulationImpl implements Simulation {
 		}
 		channelListenersList.add(new Long(((GLOReferenceImpl) ref).objID));
 	}
-	
+
+	/**
+	 * @param uid
+	 * @param cid
+	 */
+	protected void fireUserLeftChannel(UserID uid, ChannelID cid) {
+		List<Long> listenerIDs = userDataListeners.get(uid);
+		if (listenerIDs != null) {
+			try {
+				Method userLeftChannelMethod = loader.loadClass(
+						"com.sun.gi.logic.SimUserDataListener").getMethod(
+						"userLeftChannel",
+						new Class[] { SimTask.class, ChannelID.class,
+								UserID.class });
+				Object[] params = { cid, uid };
+				for (Long gloID : listenerIDs) {
+					queueTask(newTask(gloID, userLeftChannelMethod, params));
+				}
+			} catch (SecurityException e) {
+
+				e.printStackTrace();
+			} catch (NoSuchMethodException e) {
+
+				e.printStackTrace();
+			} catch (ClassNotFoundException e) {
+
+				e.printStackTrace();
+			}
+		}
+
+	}
+
+	/**
+	 * @param uid
+	 * @param cid
+	 */
+	protected void fireUserJoinedChannel(UserID uid, ChannelID cid) {
+		List<Long> listenerIDs = userDataListeners.get(uid);
+		if (listenerIDs != null) {
+			try {
+				Method userLeftChannelMethod = loader.loadClass(
+						"com.sun.gi.logic.SimUserDataListener").getMethod(
+						"userJoinedChannel",
+						new Class[] { SimTask.class, ChannelID.class,
+								UserID.class });
+				Object[] params = { cid, uid };
+				for (Long gloID : listenerIDs) {
+					queueTask(newTask(gloID, userLeftChannelMethod, params));
+				}
+			} catch (SecurityException e) {
+
+				e.printStackTrace();
+			} catch (NoSuchMethodException e) {
+
+				e.printStackTrace();
+			} catch (ClassNotFoundException e) {
+
+				e.printStackTrace();
+			}
+		}
+
+	}
+
+	/**
+	 * @param uid
+	 */
+	protected void fireUserLeft(UserID uid) {
+
+		try {
+			Method userLeftChannelMethod = loader.loadClass(
+					"com.sun.gi.logic.SimUserListener").getMethod("userLeft",
+					new Class[] { SimTask.class, UserID.class });
+			Object[] params = { uid };
+			for (Long gloID : userListeners) {
+				queueTask(newTask(gloID, userLeftChannelMethod, params));
+			}
+		} catch (SecurityException e) {
+
+			e.printStackTrace();
+		} catch (NoSuchMethodException e) {
+
+			e.printStackTrace();
+		} catch (ClassNotFoundException e) {
+
+			e.printStackTrace();
+		}
+
+	}
+
+	/**
+	 * @param uid
+	 * @param subject
+	 */
+	protected void fireUserJoined(UserID uid, Subject subject) {
+
+		try {
+			Method userLeftChannelMethod = loader.loadClass(
+					"com.sun.gi.logic.SimUserListener").getMethod("userJoined",
+					new Class[] { SimTask.class, UserID.class, Subject.class });
+			Object[] params = { uid,subject };
+			for (Long gloID : userListeners) {
+				queueTask(newTask(gloID, userLeftChannelMethod, params));
+			}
+		} catch (SecurityException e) {
+
+			e.printStackTrace();
+		} catch (NoSuchMethodException e) {
+
+			e.printStackTrace();
+		} catch (ClassNotFoundException e) {
+
+			e.printStackTrace();
+		}
+
+	}
+
+	protected void fireServerMessage(UserID from, byte[] data){
+		try {
+			Method userJoinedMethod = loader.loadClass(
+					"com.sun.gi.logic.SimUserDataListener").getMethod(
+					"userDataReceived",
+					new Class[] { SimTask.class, UserID.class, byte[].class });
+			Object[] params = { from, data };
+			List listeners = (List) userDataListeners.get(from);
+			for (Iterator i = listeners.iterator(); i.hasNext();) {
+				long objID = ((Long) i.next()).longValue();
+				queueTask(newTask(objID, userJoinedMethod, params));
+			}
+		} catch (ClassNotFoundException ex) {
+			ex.printStackTrace();
+		} catch (SecurityException ex) {
+			ex.printStackTrace();
+		} catch (NoSuchMethodException ex) {
+			ex.printStackTrace();
+		}
+	}
+
 }

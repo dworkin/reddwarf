@@ -102,7 +102,7 @@ public class RCUser extends JInternalFrame implements SGSUser {
 
 	protected void doConnect() {
 		try {
-			myRouter.registerUser(this);
+			myRouter.registerUser(this,null);
 		} catch (InstantiationException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
