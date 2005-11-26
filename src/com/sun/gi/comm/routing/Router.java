@@ -3,6 +3,7 @@ package com.sun.gi.comm.routing;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import javax.security.auth.Subject;
 import javax.security.auth.callback.Callback;
 
 import com.sun.gi.comm.users.server.SGSUser;
@@ -35,11 +36,12 @@ public interface Router {
 
 	/**
 	 * This call is made in order to allocate a new unqiue UserID.
+	 * @param subject 
 	 * 
 	 * @return UserID The new ID
 	 * @throws IOException 
 	 */
-	public void registerUser(SGSUser user) throws InstantiationException, IOException;
+	public void registerUser(SGSUser user, Subject subject) throws InstantiationException, IOException;
 
 	/**
 	 * This call is used to free a UserID that is no longer needed.
@@ -57,5 +59,5 @@ public interface Router {
 
 	public void serverMessage(boolean reliable, UserID userID, ByteBuffer databuff);
 	
-	
+	public void addRouterListener(RouterListener listener);
 }

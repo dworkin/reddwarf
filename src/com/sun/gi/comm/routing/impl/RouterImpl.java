@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import javax.security.auth.Subject;
+
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.Router;
 import com.sun.gi.comm.routing.RouterListener;
@@ -40,7 +42,7 @@ public class RouterImpl implements Router {
 
 	private ByteBuffer hdr = ByteBuffer.allocate(256);
 
-	private RouterListener listener;
+	private List<RouterListener> listeners = new ArrayList();
 	private static final boolean TRACEKEYS=true;
 
 	protected int keySecondsToLive;
@@ -163,7 +165,7 @@ public class RouterImpl implements Router {
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
-			fireConnectKey(user.getUserID(), keybytes);
+			xmitConnectKey(user.getUserID(), keybytes);
 			if (TRACEKEYS){
 				System.out.println("Generated key "+keybytes.toString()+
 						" for user "+user.toString());
@@ -176,7 +178,7 @@ public class RouterImpl implements Router {
 	 * @param uid
 	 * @param keybytes	 
 	 */
-	private void fireConnectKey(UserID uid, BYTEARRAY key) {
+	private void xmitConnectKey(UserID uid, BYTEARRAY key) {
 		byte[] uidbytes = uid.toByteArray();
 		byte[] keybytes = key.data();
 		synchronized (hdr) {
@@ -252,12 +254,13 @@ public class RouterImpl implements Router {
 
 	}
 
-	public void registerUser(SGSUser user) throws InstantiationException,
+	public void registerUser(SGSUser user, Subject subject) throws InstantiationException,
 			IOException {
 		userMap.put(user.getUserID(), user);
-		fireUserJoined(user.getUserID());
+		xmitUserJoined(user.getUserID());
 		issueNewKey(user);
 		reportUserJoined(user.getUserID().toByteArray());
+		fireUserJoined(user.getUserID(), subject);
 		// send already connected users to new joiner
 		for (UserID oldUserID : userMap.keySet()) {
 			if (oldUserID != user.getUserID()) {
@@ -266,7 +269,7 @@ public class RouterImpl implements Router {
 		}
 	}
 
-	private void fireUserJoined(UserID uid) {
+	private void xmitUserJoined(UserID uid) {
 		byte[] uidbytes = uid.toByteArray();
 		synchronized (hdr) {
 			hdr.clear();
@@ -283,7 +286,7 @@ public class RouterImpl implements Router {
 
 	}
 
-	private void fireUserJoinedChannel(ChannelID cid, UserID uid) {
+	private void xmitUserJoinedChannel(ChannelID cid, UserID uid) {
 		byte[] uidbytes = uid.toByteArray();
 		byte[] cidbytes = cid.toByteArray();
 		synchronized (hdr) {
@@ -309,6 +312,7 @@ public class RouterImpl implements Router {
 			chan.leave(user);
 		}
 		user.deregistered();
+		xmitUserLeft(id);
 		fireUserLeft(id);
 		for (SGSUser localUser : userMap.values()) {
 			if (localUser != user) {
@@ -322,7 +326,7 @@ public class RouterImpl implements Router {
 		}
 	}
 
-	private void fireUserLeft(UserID uid) {
+	private void xmitUserLeft(UserID uid) {
 		byte[] uidbytes = uid.toByteArray();
 		synchronized (hdr) {
 			hdr.clear();
@@ -397,14 +401,45 @@ public class RouterImpl implements Router {
 		}
 	}
 
-	public void setRouterListener(RouterListener l) {
-		listener = l;
+	public void addRouterListener(RouterListener l) {
+		listeners.add(l);
 	}
 
 	public void serverMessage(boolean reliable, UserID userID,
 			ByteBuffer databuff) {
-		listener.serverMessage(userID, databuff, reliable);
-
+		for(RouterListener listener : listeners){
+			listener.serverMessage(userID, databuff, reliable);
+		}
+	}
+	
+	public void fireUserJoined(UserID uid, Subject subject){
+		for(RouterListener listener : listeners){
+			listener.userJoined(uid,subject);
+		}
+	}
+	
+	public void fireUserLeft(UserID uid){
+		for(RouterListener listener : listeners){
+			listener.userLeft(uid);
+		}
+	}
+	
+	public void fireUserJoinedChannel(UserID uid, ChannelID cid){
+		for(RouterListener listener : listeners){
+			listener.userJoinedChannel(uid,cid);
+		}
+	}
+	
+	public void fireUserLeftChannel(UserID uid, ChannelID cid){
+		for(RouterListener listener : listeners){
+			listener.userLeftChannel(uid,cid);
+		}
+	}
+	
+	public void fireChannelDataPacket(ChannelID cid, UserID from, ByteBuffer buff){
+		for(RouterListener listener : listeners){
+			listener.channelDataPacket(cid,from,buff);
+		}
 	}
 
 	

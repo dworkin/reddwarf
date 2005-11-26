@@ -100,6 +100,7 @@ public class SimulationImpl implements Simulation {
 			}
 		}
 		trans.commit();
+
 		loader = bootclass.getClassLoader();
 		queueTask(newTask(bootObjectID, startMethod, new Object[] {}));
 	}

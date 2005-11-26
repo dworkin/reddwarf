@@ -160,9 +160,10 @@ public class SGSUserImpl implements SGSUser, TransportProtocolServer {
 	}
 
 	public void rcvConnectReq() {
+		subject = new Subject();	
 		try {
 			if (validators == null) {
-				router.registerUser(this);
+				router.registerUser(this,subject);
 				transport.deliverUserAccepted(userID.toByteArray());
 			} else {				
 				startValidation();
@@ -181,8 +182,7 @@ public class SGSUserImpl implements SGSUser, TransportProtocolServer {
 	 * 
 	 */
 	private void startValidation() {
-		validatorCounter = 0;
-		subject = new Subject();		
+		validatorCounter = 0;		
 		doValidationReq();
 	}
 
@@ -213,7 +213,7 @@ public class SGSUserImpl implements SGSUser, TransportProtocolServer {
 		if (cb == null){ // we have done them all and are authenticated
 			try {				
 				transport.deliverUserAccepted(userID.toByteArray());
-				router.registerUser(this);
+				router.registerUser(this,subject);
 			} catch (InstantiationException e) {				
 				e.printStackTrace();
 			} catch (IOException e) {				
@@ -239,7 +239,7 @@ public class SGSUserImpl implements SGSUser, TransportProtocolServer {
 		try {
 			userID = new UserID(user);
 			if (router.validateReconnectKey(userID, key)) {
-				router.registerUser(this);
+				router.registerUser(this,subject);
 			} else {
 				transport.deliverUserRejected("Reconnect key failure");
 			}
