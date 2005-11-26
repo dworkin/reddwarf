@@ -35,6 +35,11 @@ public interface TransportProtocolClient {
 
 	void rcvUserDisconnected(byte[] chanID);
 
+	/**
+	 * @param user
+	 */
+	void recvServerID(byte[] user);
+
  
 
 }

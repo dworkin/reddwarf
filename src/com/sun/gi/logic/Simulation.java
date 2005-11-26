@@ -1,5 +1,7 @@
 package com.sun.gi.logic;
 
+import java.nio.ByteBuffer;
+
 import com.sun.gi.comm.routing.*;
 import com.sun.gi.comm.routing.UserID;
 
@@ -29,6 +31,28 @@ public interface Simulation {
 
 
   public void addUserListener(GLOReference ref);
+  
+  /**
+   * This is called  by the SimTask to actually register a user data listener.
+   * For more information see the SimTask class.
+   *
+   * @param id UserID The user ID associated with this listener.
+   * @param ref SOReference The reference to the GLO to actually handle the
+   * events.
+   */
+  public void addUserDataListener(UserID id, GLOReference ref);
+  
+  
+  /**
+   * This calls add a GLO as a listener to the data being sent  on a channel.
+   * Its should be used very judiciously as the clients chatting abck and forth can
+   * easily over-whelm the server.  The usual way to get data to the server is directly from the
+   * sending user using addUserDataListener above.  This is more for "evesdropping" where
+   * necessary.
+   * @param ref  A GLORerence to the GLO to get the callback.
+   * @see addUserDataListener
+   */
+  public void addChannelListener(ChannelID cid, GLOReference ref);
 
   /**
    * This call creates a SimTask object that can then be queued for executon.
@@ -59,30 +83,40 @@ public interface Simulation {
 
 
   /**
-   * This method is called by the SimTask method to actually create the user
-   * when needed.
-   * @return UserID The user ID of the created user.
-   */
-  public UserID createUser();
+	 * sendMulticastData
+	 * 
+	 * @param cid
+	 * @param targets
+	 * @param buff
+	 * @param reliable
+	 */
+	public void sendMulticastData(ChannelID cid, UserID[] targets,
+			ByteBuffer buff, boolean reliable);
 
-  /**
-   * This method is called by the SimTask in order to pass a data send up
-   * the chain to the kernel and eventually the router.
-   *
-   * @param to UserID[]  IDs of users to send the data to.
-   * @param from UserID ID of user who sent the data (return address)
-   * @param bs byte[] The data to send.
-   */
-  public void sendData(UserID[] to, UserID from, byte[] bs);
+	/**
+	 * sendUnicastData
+	 * 
+	 * @param cid
+	 * @param target
+	 * @param buff
+	 * @param reliable
+	 */
+	public void sendUnicastData(ChannelID cid, UserID target, ByteBuffer buff,
+			boolean reliable);
+	/**
+	 * sendBroadcastData
+	 * 
+	 * @param cid
+	 * @param target
+	 * @param buff
+	 * @param reliable
+	 */
 
-  /**
-   * This is called  by the SimTask to actually register a user data listener.
-   * For more information see the SimTask class.
-   *
-   * @param id UserID The user ID associated with this listener.
-   * @param ref SOReference The reference to the GLO to actually handle the
-   * events.
-   */
-  public void addUserDataListener(UserID id, GLOReference ref);
+	public void sendBroadcastData(ChannelID cid, UserID target,
+			ByteBuffer buff, boolean reliable);
+
+
+
+  
 
 }

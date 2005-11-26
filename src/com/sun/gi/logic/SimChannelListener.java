@@ -16,8 +16,8 @@ import com.sun.gi.comm.routing.UserID;
 /**
  *
  * <p>Title: SimChannelListener.java</p>
- * <p>Description: This method is used by GLOs that want to evesdrop on data flow.  It 
- * should be used judiciously as the data flow between clients cna easily over-whelm 
+ * <p>Description: This interface is used by GLOs that want to evesdrop on data flow.  It 
+ * should be used judiciously as the data flow between clients can easily over-whelm 
  * the server.</p>
  * <p>Copyright: Copyright (c) 2004 Sun Microsystems, Inc.</p>
  * <p>Company: Sun Microsystems, Inc</p>

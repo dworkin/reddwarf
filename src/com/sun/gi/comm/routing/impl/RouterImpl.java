@@ -23,7 +23,7 @@ import com.sun.gi.utils.StatisticalUUID;
 import com.sun.gi.utils.types.BYTEARRAY;
 
 public class RouterImpl implements Router {
-
+	
 	private Map<UserID, SGSUser> userMap = new HashMap<UserID, SGSUser>();
 
 	private TransportManager transportManager;
@@ -406,5 +406,7 @@ public class RouterImpl implements Router {
 		listener.serverMessage(userID, databuff, reliable);
 
 	}
+
+	
 
 }

@@ -308,6 +308,14 @@ public class TCPIPUserManagerClient
 	}
 
 
+	/* (non-Javadoc)
+	 * @see com.sun.gi.comm.users.protocol.TransportProtocolClient#recvServerID(byte[])
+	 */
+	public void recvServerID(byte[] user) {
+		listener.recvServerID(user);		
+	}
+
+
 	
     
     

@@ -47,7 +47,9 @@ public class SimulationImpl implements Simulation {
 
 	private String appName;
 
-	private Map<UserID,List> userDataListeners = new HashMap<UserID,List>();
+	private Map<UserID,List<Long>> userDataListeners = new HashMap<UserID,List<Long>>();
+	
+	private Map<ChannelID, List<Long>> channelListeners = new HashMap<ChannelID, List<Long>>();
 
 	private List<SimTask> taskQueue = new LinkedList<SimTask>();
 
@@ -204,15 +206,7 @@ public class SimulationImpl implements Simulation {
 		return appID;
 	}
 
-	/**
-	 * getName
-	 * 
-	 * @deprecated
-	 * @return String
-	 */
-	public String getName() {
-		return appName;
-	}
+	
 
 	/**
 	 * channelDataArrived
@@ -273,7 +267,7 @@ public class SimulationImpl implements Simulation {
 	public void sendMulticastData(ChannelID cid, UserID[] targets,
 			ByteBuffer buff, boolean reliable) {
 		SGSChannel channel = router.getChannel(cid);
-		channel.multicastData(router.getServerID(), targets, buff, reliable);
+		channel.multicastData(UserID.SERVER_ID, targets, buff, reliable);
 	}
 
 	/**
@@ -287,7 +281,7 @@ public class SimulationImpl implements Simulation {
 	public void sendUnicastData(ChannelID cid, UserID target, ByteBuffer buff,
 			boolean reliable) {
 		SGSChannel channel = router.getChannel(cid);
-		channel.unicastData(router.getServerID(), target, buff, reliable);
+		channel.unicastData(UserID.SERVER_ID, target, buff, reliable);
 	}
 
 	/**
@@ -302,7 +296,7 @@ public class SimulationImpl implements Simulation {
 	public void sendBroadcastData(ChannelID cid, UserID target,
 			ByteBuffer buff, boolean reliable) {
 		SGSChannel channel = router.getChannel(cid);
-		channel.unicastData(router.getServerID(), target, buff, reliable);
+		channel.unicastData(UserID.SERVER_ID, target, buff, reliable);
 	}
 
 	/**
@@ -322,15 +316,21 @@ public class SimulationImpl implements Simulation {
 		dataListeners.add(new Long(((GLOReferenceImpl) ref).objID));
 	}
 
-	/*
-	 * (non-Javadoc)
+	/**
+	 * addUserDataListener
 	 * 
-	 * @see com.sun.gi.logic.Simulation#sendData(com.sun.gi.comm.routing.UserID[],
-	 *      com.sun.gi.comm.routing.UserID, byte[])
+	 * @param id
+	 *            UserID
+	 * @param ref
+	 *            SOReference
 	 */
-	public void sendData(UserID[] to, UserID from, byte[] bs) {
-		// TODO Auto-generated method stub
-
+	public void addChannelListener(ChannelID id, GLOReference ref) {
+		List<Long> channelListenersList = channelListeners.get(id);
+		if (channelListenersList == null) {
+			channelListenersList = new ArrayList();
+			channelListeners.put(id, channelListenersList);
+		}
+		channelListenersList.add(new Long(((GLOReferenceImpl) ref).objID));
 	}
-
+	
 }

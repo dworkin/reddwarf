@@ -31,7 +31,7 @@ import com.sun.gi.comm.users.server.SGSUser;
  * @version 1.0
  */
 public interface Router {
-	UserID getServerID();
+	
 
 	/**
 	 * This call is made in order to allocate a new unqiue UserID.

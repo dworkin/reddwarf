@@ -43,7 +43,8 @@ public class BinaryPktProtocol
 							REQ_JOIN_CHAN,  // client to server request to join a channel
 							JOINED_CHAN, // Server to client notification of user joining a channel
 							REQ_LEAVE_CHAN, // client to server req to leave a channel
-							LEFT_CHAN // server to client notification of user leaving a channel
+							LEFT_CHAN, // server to client notification of user leaving a channel
+							SERVER_ID // used to send the bit pattern to identify a packet from the GLE
 	}
 	
     private ByteBuffer hdr;
@@ -62,6 +63,21 @@ public class BinaryPktProtocol
         hdr = ByteBuffer.allocate(2048);
         sendArray[0] = hdr;
         
+    }
+    
+    public void deliverServerID(byte[] server_userid){
+    	if (TRACEON){
+            System.out.println("sending server userID to client");
+        }
+        System.out.flush();
+        synchronized (hdr) {
+            hdr.clear();
+            hdr.put((byte)OPCODE.SERVER_ID.ordinal());
+         
+            hdr.put((byte) server_userid.length);
+            hdr.put(server_userid);           
+            sendBuffers(hdr);
+        }
     }
     
     
@@ -696,8 +712,14 @@ public class BinaryPktProtocol
                 buff.get(user);
                 client.rcvUserDisconnected(user);
                 break;
+            case SERVER_ID:
+            	usrlen = buff.get();
+            	user = new byte[usrlen];
+            	buff.get(user);
+            	client.recvServerID(user);
+            	break;
             default:
-                System.out.println("WARNING:Invalid op recieved from client: " + op +
+                System.out.println("WARNING:Invalid op recieved: " + op +
                         " ignored.");
                 break;
         }

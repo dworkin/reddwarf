@@ -132,5 +132,11 @@ public interface ClientConnectionManager
    */
   public void openChannel(String channelName);
 
-
+  /**
+   * This method is called on the "from" userid of an arriving apcket to find otu if the packet is from the 
+   * Darkstar back-end.  If true, it came from the app on the server, if false it came from another user.  
+   * @param userid userid to test
+   * @return true if userid is the server's user id, false if its a client id
+   */
+  public boolean isServerID(byte[] userid);
 }

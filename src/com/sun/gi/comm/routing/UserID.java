@@ -21,6 +21,7 @@ import com.sun.gi.utils.StatisticalUUID;
  * @version 1.0
  */
 public class UserID extends StatisticalUUID {
+	public static final UserID SERVER_ID = getLogicEngineID();
 	
 	public UserID() throws InstantiationException {
 		super();

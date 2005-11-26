@@ -21,9 +21,12 @@ import com.sun.gi.utils.types.BYTEARRAY;
 
 public class ClientConnectionManagerImpl implements ClientConnectionManager,
 		UserManagerClientListener {
-	Discoverer discoverer;
+	
+	private byte[] server_id;
+	
+	private Discoverer discoverer;
 
-	UserManagerPolicy policy;
+	private UserManagerPolicy policy;
 
 	private UserManagerClient umanager;
 
@@ -337,6 +340,26 @@ public class ClientConnectionManagerImpl implements ClientConnectionManager,
 	void sendBroadcastData(byte[] chanID, ByteBuffer data, boolean reliable) {
 		umanager.sendBroadcastMsg(chanID, data, reliable);
 
+	}
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.comm.users.client.UserManagerClientListener#recvServerID(byte[])
+	 */
+	public void recvServerID(byte[] user) {
+		server_id = user;
+		
+	}
+	
+	public boolean isServerID(byte[] userid){
+		if (userid.length!=server_id.length){
+			return false;
+		}
+		for(int i=0;i<server_id.length;i++){
+			if (server_id[i]!=userid[i]){
+				return false;
+			}
+		}
+		return true;
 	}
 
 }

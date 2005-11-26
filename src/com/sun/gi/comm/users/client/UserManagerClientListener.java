@@ -112,6 +112,10 @@ public interface UserManagerClientListener {
    */
   
   public void recvdData(byte[] chanID, byte[] from, ByteBuffer data,boolean reliable);
+/**
+ * @param user
+ */
+	public void recvServerID(byte[] user);
   
   
 }
