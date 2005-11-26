@@ -40,4 +40,10 @@ public interface SimKernel {
 	 * @return
 	 */
 	public ObjectStore getOstore();
+	
+	public void addSimulation(Simulation sim);
+	
+	public void simHasNewTask();
+
+	public void removeSimulation(Simulation sim);
 }

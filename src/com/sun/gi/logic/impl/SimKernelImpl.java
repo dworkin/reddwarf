@@ -105,6 +105,13 @@ public SimKernelImpl(ObjectStore ostore) {
 	public void addSimulation(Simulation sim) {
 		synchronized (simList) {
 			simList.add(sim);
+			simList.notify();
+		}
+	}
+	
+	public void simHasNewTask(){
+		synchronized(simList){
+			simList.notify();
 		}
 	}
 

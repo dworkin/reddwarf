@@ -130,6 +130,7 @@ public class SimulationImpl implements Simulation {
 		});
 		loader = bootclass.getClassLoader();
 		queueTask(newTask(bootObjectID, startMethod, new Object[] {}));
+		kernel.addSimulation(this);
 	}
 
 	/**
@@ -150,17 +151,8 @@ public class SimulationImpl implements Simulation {
 		synchronized (taskQueue) {
 			taskQueue.add(task);
 		}
+		kernel.simHasNewTask();
 
-	}
-
-	public void doATask() {
-		SimTask task = null;
-		synchronized (taskQueue) {
-			task = taskQueue.remove(0);
-		}
-		if (!task.execute()) {
-			queueTask(task);
-		}
 	}
 
 	/**
@@ -247,12 +239,7 @@ public class SimulationImpl implements Simulation {
 
 
 
-	/**
-	 * createUser
-	 */
-	public UserID createUser() {
-		return kernel.createUser();
-	}
+	
 
 	/**
 	 * getAppName
@@ -455,13 +442,13 @@ public class SimulationImpl implements Simulation {
 
 	}
 
-	protected void fireServerMessage(UserID from, byte[] data){
+	protected void fireServerMessage(UserID from, ByteBuffer data){
 		try {
 			Method userJoinedMethod = loader.loadClass(
 					"com.sun.gi.logic.SimUserDataListener").getMethod(
 					"userDataReceived",
-					new Class[] { SimTask.class, UserID.class, byte[].class });
-			Object[] params = { from, data };
+					new Class[] { SimTask.class, UserID.class, ByteBuffer.class });
+			Object[] params = { from, data.duplicate() };
 			List listeners = (List) userDataListeners.get(from);
 			for (Iterator i = listeners.iterator(); i.hasNext();) {
 				long objID = ((Long) i.next()).longValue();
@@ -473,6 +460,23 @@ public class SimulationImpl implements Simulation {
 			ex.printStackTrace();
 		} catch (NoSuchMethodException ex) {
 			ex.printStackTrace();
+		}
+	}
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.logic.Simulation#hasTasks()
+	 */
+	public boolean hasTasks() {
+		// TODO Auto-generated method stub
+		return !taskQueue.isEmpty();
+	}
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.logic.Simulation#nextTask()
+	 */
+	public SimTask nextTask() {
+		synchronized(taskQueue){		
+			return taskQueue.remove(0);
 		}
 	}
 
