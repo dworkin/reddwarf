@@ -1,19 +1,22 @@
 package com.sun.gi.logic.impl;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.Router;
 import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.logic.GLOReference;
-import com.sun.gi.logic.SimFinder;
 import com.sun.gi.logic.SimKernel;
 import com.sun.gi.logic.SimThread;
+import com.sun.gi.logic.SimTask;
+import com.sun.gi.logic.Simulation;
 import com.sun.gi.objectstore.ObjectStore;
 import com.sun.gi.objectstore.Transaction;
 import com.sun.multicast.util.UnimplementedOperationException;
-
 
 /**
  * <p>
@@ -36,48 +39,87 @@ import com.sun.multicast.util.UnimplementedOperationException;
 public class SimKernelImpl implements SimKernel {
 	private ObjectStore ostore;
 
-	
+	private List<Simulation> simList = new ArrayList<Simulation>();
 
-	public SimKernelImpl(ObjectStore ostore) {
+	private List<SimThreadImpl> threadPool = new LinkedList<SimThreadImpl>();
+
+public SimKernelImpl(ObjectStore ostore) {
 		this.ostore = ostore;
+		int startingPoolSize = 3;
+		String poolSzStr = System.getProperty("sgs.kernel.thread_pool_sz");
+		if (poolSzStr!=null ){
+			startingPoolSize  = Integer.parseInt(poolSzStr);
+		}
+		for(int i=0;i<startingPoolSize;i++){
+			threadPool.add(new SimThreadImpl(this));
+		}
+		// round robin assign threads to tasks from our sim list
+		// this could be a palce where we add prioritization later
+		// ALternately each sim could be wrappedin an isolate that handled its own threads
+		// for MVM
 		
+		new Thread(new Runnable(){
+			public void run() {
+				while(true){
+					
+					synchronized(simList){				
+						boolean tasksAvailable = false;
+						while (!tasksAvailable){
+							for(Simulation sim : simList){
+								if (sim.hasTasks()){
+									tasksAvailable = true;
+									break;
+								}
+							}
+							if (!tasksAvailable){
+								try {
+									simList.wait();
+								} catch (InterruptedException e) {									
+									e.printStackTrace();
+								}
+							}
+						}	
+						for(Simulation sim : simList){
+							synchronized(threadPool){
+								if (threadPool.size()>0){
+									if (sim.hasTasks()){
+										SimTask task = sim.nextTask();
+										SimThread thread = threadPool.remove(0);
+										thread.execute(task);
+									}
+								} else {
+									try {
+										threadPool.wait();
+									} catch (InterruptedException e) {										
+										e.printStackTrace();
+									}
+								}
+							}
+						}
+					}					
+				}
+			}
+		}).start();	
+	}
 
+	public void addSimulation(Simulation sim) {
+		synchronized (simList) {
+			simList.add(sim);
+		}
+	}
+
+	public void removeSimulation(Simulation sim) {
+		synchronized (simList) {
+			simList.remove(sim);
+		}
 	}
 
 	public Transaction newTransaction(long appID, ClassLoader loader) {
 		return ostore.newTransaction(appID, loader);
 	}
 
-	public SimThread getSimThread() {
-		SimThread st = new SimThreadImpl(this);
-		return st;
-	}
-
 	public ObjectStore getOstore() {
 		return ostore;
-	}
-
-	
-	/**
-	 * createUser
-	 */
-	public UserID createUser() {
-		// return router.createUser();
-		throw new UnimplementedOperationException();
-	}
-
-	/**
-	 * sendData
-	 * 
-	 * @param targets
-	 *            UserID[]
-	 * @param from
-	 *            UserID
-	 * @param bs
-	 *            byte[]
-	 */
-	public void sendData(ChannelID cid, UserID[] targets, UserID from, byte[] bs) {
-		throw new UnimplementedOperationException();
 	}
 
 }

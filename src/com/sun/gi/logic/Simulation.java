@@ -16,6 +16,7 @@ import com.sun.gi.comm.routing.UserID;
  * @version 1.0
  */
 
+
 public interface Simulation {
   /**
    * This call adds an object as a listener for users joining or leaving this
@@ -114,6 +115,11 @@ public interface Simulation {
 
 	public void sendBroadcastData(ChannelID cid, UserID target,
 			ByteBuffer buff, boolean reliable);
+	
+	
+	public boolean hasTasks();
+	
+	public SimTask nextTask();
 
 
 
