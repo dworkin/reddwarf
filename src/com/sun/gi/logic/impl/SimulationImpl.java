@@ -147,7 +147,7 @@ public class SimulationImpl implements Simulation {
 	/**
 	 * @param task
 	 */
-	private void queueTask(SimTask task) {
+	public void queueTask(SimTask task) {
 		synchronized (taskQueue) {
 			taskQueue.add(task);
 		}
@@ -468,7 +468,9 @@ public class SimulationImpl implements Simulation {
 	 */
 	public boolean hasTasks() {
 		// TODO Auto-generated method stub
-		return !taskQueue.isEmpty();
+		synchronized(taskQueue){
+			return !taskQueue.isEmpty();
+		}
 	}
 
 	/* (non-Javadoc)
@@ -479,5 +481,7 @@ public class SimulationImpl implements Simulation {
 			return taskQueue.remove(0);
 		}
 	}
+
+
 
 }

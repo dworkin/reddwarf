@@ -51,7 +51,7 @@ public SimKernelImpl(ObjectStore ostore) {
 			startingPoolSize  = Integer.parseInt(poolSzStr);
 		}
 		for(int i=0;i<startingPoolSize;i++){
-			threadPool.add(new SimThreadImpl(this));
+			new SimThreadImpl(this);
 		}
 		// round robin assign threads to tasks from our sim list
 		// this could be a palce where we add prioritization later
@@ -127,6 +127,16 @@ public SimKernelImpl(ObjectStore ostore) {
 
 	public ObjectStore getOstore() {
 		return ostore;
+	}
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.logic.SimKernel#returnToThreadPool(com.sun.gi.logic.impl.SimThreadImpl)
+	 */
+	public void returnToThreadPool(SimThreadImpl impl) {
+		synchronized(threadPool){
+			threadPool.add(impl);
+		}
+		
 	}
 
 }

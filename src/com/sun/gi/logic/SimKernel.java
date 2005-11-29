@@ -1,6 +1,7 @@
 package com.sun.gi.logic;
 
 import com.sun.gi.comm.routing.*;
+import com.sun.gi.logic.impl.SimThreadImpl;
 import com.sun.gi.objectstore.*;
 
 /**
@@ -46,4 +47,9 @@ public interface SimKernel {
 	public void simHasNewTask();
 
 	public void removeSimulation(Simulation sim);
+
+	/**
+	 * @param impl
+	 */
+	public void returnToThreadPool(SimThreadImpl impl);
 }

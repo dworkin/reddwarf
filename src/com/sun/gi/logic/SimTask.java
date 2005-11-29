@@ -3,6 +3,7 @@
 package com.sun.gi.logic;
 
 import java.io.*;
+import java.nio.ByteBuffer;
 
 import com.sun.gi.comm.routing.*;
 import com.sun.gi.objectstore.*;
@@ -22,9 +23,9 @@ public interface SimTask {
   /**
    * Called to transfer the calling thread of control to the execution
    * of the task.
-   * @return boolean true if task completed, false if task was aborted
+   * 
    */
-  public boolean execute();
+  public void execute();
 
   /**
    * This is a utility call used by other parts of the system.
@@ -86,15 +87,10 @@ public interface SimTask {
    * @param from UserID the sender's id (return address)
    * @param bs byte[] the data packet to send.
    */
-  public void sendData(UserID[]  to, UserID from, byte[] bs);
+  public void sendData(ChannelID cid, UserID[]  to, UserID from, ByteBuffer data,
+		  boolean reliable);
 
-  /**
-   * This method can be called by the game code to create a virtual User
-   * that can send and recieve data.
-   *
-   * @return UserID The ID of the user created.
-   */
-  public UserID createUser();
+  
 
   /**
    * This method is called to create a GLO is the objectstore

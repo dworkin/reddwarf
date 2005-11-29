@@ -3,7 +3,7 @@ package com.sun.gi.logic;
 import java.nio.ByteBuffer;
 
 import com.sun.gi.comm.routing.*;
-import com.sun.gi.comm.routing.UserID;
+import com.sun.gi.logic.impl.SimTaskImpl;
 
 /**
  * <p>Title: Simulation</p>
@@ -120,6 +120,13 @@ public interface Simulation {
 	public boolean hasTasks();
 	
 	public SimTask nextTask();
+
+	/**
+	 * @param impl
+	 */
+	public void queueTask(SimTask impl);
+
+	
 
 
 

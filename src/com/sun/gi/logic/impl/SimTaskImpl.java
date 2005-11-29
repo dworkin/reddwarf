@@ -1,13 +1,17 @@
 package com.sun.gi.logic.impl;
 
+
 import com.sun.gi.objectstore.Transaction;
 import java.lang.reflect.Method;
 import java.io.Serializable;
 import java.lang.reflect.*;
+import java.nio.ByteBuffer;
+
 import com.sun.gi.objectstore.DeadlockException;
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.Simulation;
+import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
 import java.util.Iterator;
 import java.util.List;
@@ -25,29 +29,36 @@ import java.util.ArrayList;
 class OutputRecord {
   UserID[] targets;
   UserID uid;
-  byte[] data;
+  ByteBuffer data;
+  boolean reliable;
+  ChannelID channel;
 
-  public OutputRecord(UserID[] to, UserID userID,byte[] buff){
-    uid = userID;
-    data = new byte[buff.length];
-    System.arraycopy(buff,0,data,0,buff.length);
+
+  public OutputRecord(ChannelID cid, UserID[] to,ByteBuffer buff,
+		  boolean reliableFlag){
+	channel = cid;     
+    data = ByteBuffer.allocate(buff.capacity());
+    buff.flip(); // flip for read
+    data.put(buff);
+    reliable = reliableFlag;
     targets = new UserID[to.length];
     System.arraycopy(to,0,targets,0,to.length);
   }
 }
 
 public class SimTaskImpl implements SimTask {
+  private Simulation sim;	
   private Transaction trans ;
   private GLOReference startObject;
   private Method startMethod;
   private Object[] startArgs;
-  private ClassLoader loader;
   private Simulation simulation;
-  private List outputList = new ArrayList();
+  private List<OutputRecord> outputList = new ArrayList<OutputRecord>();
 
   public SimTaskImpl(Simulation sim, ClassLoader loader,
                      Transaction trans, long startObjectID,
                      Method startMethod, Object[] startArgs) {
+	this.simulation = sim;  
     this.startObject = this.makeReference(startObjectID);
     this.startMethod = startMethod;
     this.trans = trans;
@@ -56,10 +67,10 @@ public class SimTaskImpl implements SimTask {
     newargs[0] = this;
     System.arraycopy(startArgs,0,newargs,1,startArgs.length);
     this.startArgs = newargs;
-    this.loader = loader;
+
   }
 
-  public boolean execute() {
+  public void execute() {
       Serializable runobj =  startObject.get(this);
       outputList.clear();
       try {
@@ -80,10 +91,9 @@ public class SimTaskImpl implements SimTask {
         trans.abort();
       } catch (DeadlockException de) {
         outputList.clear();
-        return false; // needs to be rescheduled
+        sim.queueTask(this); // requeue for later execution
       }
       outputList.clear();
-      return true; // don't reschedule, finished or fatal error
   }
 
   /**
@@ -92,7 +102,8 @@ public class SimTaskImpl implements SimTask {
   private void doOutput() {
     for(Iterator i = outputList.iterator();i.hasNext();){
       OutputRecord rec = (OutputRecord)i.next();
-      simulation.sendData(rec.targets,rec.uid,rec.data);
+      simulation.sendMulticastData(rec.channel, rec.targets,rec.data,
+    		  rec.reliable);
     }
   }
 
@@ -137,18 +148,11 @@ public class SimTaskImpl implements SimTask {
    * @param from UserID
    * @param bs byte[]
    */
-  public void sendData(UserID[] to, UserID from, byte[] bs) {
-    outputList.add(new OutputRecord(to,from,bs));
+  public void sendData(ChannelID cid, UserID[] to, UserID from,ByteBuffer bs, boolean reliable) {
+    outputList.add(new OutputRecord(cid, to,bs,reliable));
   }
 
-  /**
-   * createUser
-   *
-   * @return UserID
-   */
-  public UserID createUser() {
-    return simulation.createUser();
-  }
+  
 
   /**
    * addUserDataListener
