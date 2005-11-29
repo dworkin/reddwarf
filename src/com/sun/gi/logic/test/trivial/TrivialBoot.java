@@ -13,11 +13,16 @@ import com.sun.gi.logic.SimTask;
  */
 
 public class TrivialBoot implements SimBoot {
-  public TrivialBoot() {
-  }
+  /**
+	 * 
+	 */
+	private static final long serialVersionUID = 1L;
 
-  public void boot(SimTask task,boolean firstBoot) {
-    System.out.println("Ran TrivialBoot.boot");
-  }
+	public TrivialBoot() {
+	}
+
+	public void boot(SimTask task,boolean firstBoot) {
+		System.out.println("Ran TrivialBoot.boot");
+	}
 
 }

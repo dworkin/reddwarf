@@ -64,7 +64,7 @@ public class SimThreadImpl extends Thread implements SimThread {
 	 */
 	public void execute(SimTask task) {
 		synchronized(this){
-			if (this!=null){
+			if (this.task!=null){
 				throw new RuntimeException("Illegal attempt to reuse thread that is not finished");
 			}
 			this.task = task;

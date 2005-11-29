@@ -75,7 +75,7 @@ public class SimulationImpl implements Simulation {
 		Method startMethod = null;
 		try {
 			startMethod = bootclass.getMethod("boot",
-					new Class[] { SimTask.class });
+					new Class[] { SimTask.class, boolean.class });
 		} catch (NoSuchMethodException ex) {
 			throw new InstantiationException(
 					"Boot class in sim has no method: void boot(SimTask)");
@@ -89,11 +89,13 @@ public class SimulationImpl implements Simulation {
 		// check for boot object. it it doesnt exist, then create it
 		Transaction trans = kernel.getOstore().newTransaction(appID,
 				bootclass.getClassLoader());
+		boolean firstTime = false;
 		long bootObjectID = trans.lookup("BOOT");
 		if (bootObjectID == ObjectStore.INVALID_ID) { // doesnt exist
 			try {
 				bootObjectID = trans.create((Serializable) bootclass
 						.newInstance(), "BOOT");
+				firstTime = true;
 			} catch (IllegalAccessException ex1) {
 				ex1.printStackTrace();
 				throw new InstantiationException(ex1.getMessage());
@@ -129,7 +131,7 @@ public class SimulationImpl implements Simulation {
 
 		});
 		loader = bootclass.getClassLoader();
-		queueTask(newTask(bootObjectID, startMethod, new Object[] {}));
+		queueTask(newTask(bootObjectID, startMethod, new Object[] {firstTime}));
 		kernel.addSimulation(this);
 	}
 

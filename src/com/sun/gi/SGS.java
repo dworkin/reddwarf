@@ -12,9 +12,7 @@ package com.sun.gi;
  * @version 1.0
  */
 import java.lang.reflect.Constructor;
-import java.net.MalformedURLException;
 import java.net.URL;
-import java.net.URLClassLoader;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -125,8 +123,14 @@ public class SGS {
 
 		// create simulation container for game
 	
-		
-		Simulation sim = new SimulationImpl(kernel,router, game);
+		Simulation sim=null;
+		try {
+			sim = new SimulationImpl(kernel,router, game);
+		} catch (InstantiationException e) {
+			
+			e.printStackTrace();
+			return null;
+		}
 
 		// create user managers
 		for (UserMgrRec umgrRec : game.getUserManagers()) {
