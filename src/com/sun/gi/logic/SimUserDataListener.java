@@ -2,6 +2,7 @@ package com.sun.gi.logic;
 
 import java.io.Serializable;
 
+import com.sun.corba.se.impl.ior.ByteBuffer;
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
 
