@@ -182,7 +182,8 @@ public class SGSUserImpl implements SGSUser, TransportProtocolServer {
 	 * 
 	 */
 	private void startValidation() {
-		validatorCounter = 0;		
+		validatorCounter = 0;	
+		validators[0].reset(subject);
 		doValidationReq();
 	}
 
