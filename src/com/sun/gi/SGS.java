@@ -65,6 +65,9 @@ public class SGS {
 
 		try {
 			ostore = new CachingObjectStore(new DerbyObjectStore(), 128);
+			if (System.getProperty("sgs.ostore.startclean").equalsIgnoreCase("true")){
+				ostore.clear();
+			}
 			kernel = new SimKernelImpl(ostore);
 			String installProperty = System
 					.getProperty("sgs.framework.installurl");
@@ -192,8 +195,19 @@ public class SGS {
 	}
 
 	static public void main(String[] args) {
-		if (args.length > 0) {
-			System.setProperty("sgs.framework.installurl", args[0]);
+		for(int i=0;i<args.length;i++){
+			if (args[i].charAt(0)=='-'){
+				switch(args[i].charAt(1)){
+					case 'i':
+					case 'I':
+						System.setProperty("sgs.framework.installurl", args[++i]);
+					break;	
+					case 'c':
+					case 'C':
+						System.setProperty("sgs.ostore.startclean","true");
+					break;
+				}				
+			}			
 		}
 		new SGS();
 

@@ -79,12 +79,7 @@ public class SimulationImpl implements Simulation {
 		} catch (NoSuchMethodException ex) {
 			throw new InstantiationException(
 					"Boot class in sim has no method: void boot(SimTask)");
-		}
-		if (appID == -1) {
-			System.err.println("ERROR: Sim BOOT class must define: "
-					+ "public static long SIMID = <n> where <n> >= 0");
-			return;
-		}
+		}		
 		this.appID = game.getID();
 		// check for boot object. it it doesnt exist, then create it
 		Transaction trans = kernel.getOstore().newTransaction(appID,

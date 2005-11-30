@@ -75,6 +75,7 @@ public class CachingObjectStore implements ObjectStore {
         cache.clear();
         idLockMap.clear();
         transLockMap.clear();
+        store.clear();
     }
     
     public long getObjectID() {

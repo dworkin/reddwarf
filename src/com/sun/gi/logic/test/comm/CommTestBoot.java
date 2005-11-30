@@ -8,33 +8,24 @@ import com.sun.gi.logic.GLOReference;
 import java.util.List;
 import java.util.ArrayList;
 
+import javax.security.auth.Subject;
+
 public class CommTestBoot implements SimBoot, SimUserListener{
   private static final long serialVersionUID = -560245896319031239L;  // turn off version checking
   UserID myUserID = null;
-  List users = new ArrayList();
+  List<UserID> users = new ArrayList<UserID>();
   /**
    * boot
    *
    * @param task SimTask
    */
   public void boot(SimTask task, boolean firstBoot) {
-    System.out.println("Booting comm test, appid = "+task.getAppID());
-    if (myUserID == null){ // only assign when booted for first time
-      myUserID = task.createUser();
-    }
+    System.out.println("Booting comm test, appid = "+task.getAppID());    
     GLOReference thisobj = task.findSO("BOOT");
     task.addUserListener(thisobj);
   }
 
-  /**
-   * userJoined
-   *
-   * @param uid UserID
-   */
-  public void userJoined(SimTask task, UserID uid,byte[] data) {
-    System.out.println("User joined server: "+uid);
-    users.add(uid);
-  }
+  
 
   /**
    * userLeft
@@ -46,23 +37,18 @@ public class CommTestBoot implements SimBoot, SimUserListener{
      users.remove(uid);
   }
 
+  
 
-
-
-  /**
-   * userDataReceived
-   *
-   * @param task SimTask
-   * @param uid UserID
-   * @param data byte[]
-   */
-  public void userDataReceived(SimTask task, UserID uid, byte[] data) {
-    String txt = new String(data);
-    if (!uid.equals(myUserID)) {
-      System.out.println("Data Arrived from ("+uid+") " + txt);
-    }
-    UserID[] ua = new UserID[users.size()];
-    users.toArray(ua);
-    task.sendData(ua,myUserID,("Echo: "+txt).getBytes());
+/* (non-Javadoc)
+ * @see com.sun.gi.logic.SimUserListener#userJoined(com.sun.gi.logic.SimTask, com.sun.gi.comm.routing.UserID, javax.security.auth.Subject)
+ */
+  public void userJoined(SimTask task, UserID uid, Subject subject) {
+	System.out.print("User Joined server: "+uid+" ( ");
+	for(Object cred : subject.getPublicCredentials()){
+		System.out.print(cred+" ");
+		
+	}
+	System.out.println(")");
+    users.remove(uid);	
   }
 }
