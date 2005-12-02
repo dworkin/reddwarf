@@ -44,7 +44,7 @@ public class SimulationImpl implements Simulation {
 	ClassLoader loader;
 
 	private List<Long> userListeners = new ArrayList<Long>();
-
+	
 	private String appName;
 
 	private Map<UserID, List<Long>> userDataListeners = new HashMap<UserID, List<Long>>();
@@ -156,11 +156,12 @@ public class SimulationImpl implements Simulation {
 	 * addUserListener
 	 * 
 	 * @param ref
-	 *            SOReference
+	 *       
 	 */
 	public void addUserListener(GLOReference ref) {
 		userListeners.add(new Long(((GLOReferenceImpl) ref).objID));
 	}
+	
 
 	// internal
 	private SimTask newTask(long startObject, Method startMethod,

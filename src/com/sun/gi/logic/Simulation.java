@@ -20,7 +20,7 @@ import com.sun.gi.logic.impl.SimTaskImpl;
 public interface Simulation {
   /**
    * This call adds an object as a listener for users joining or leaving this
-   * particular game app.  When an event is ocurred, a SmTask is queued for each
+   * particular game app.  When an event ocurrs, a SmTask is queued for each
    * listenr that will invoke the apropriate event method on the listening
    * GLO.
    *

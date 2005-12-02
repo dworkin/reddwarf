@@ -56,16 +56,23 @@ public class SGS {
 	SimKernel kernel;
 
 	ObjectStore ostore;
+	private boolean verbose = false;
 
 	private String installFile = "file:Install.txt";
 
 	private static final long REPORTTTL = 1000;
 
 	public SGS() {
-
+		String verboseString = System.getProperty("sgs.framework.verbose");		
+		if (verboseString != null){
+			verbose = verboseString.equalsIgnoreCase("true");
+		}
 		try {
 			ostore = new CachingObjectStore(new DerbyObjectStore(), 128);
 			if (System.getProperty("sgs.ostore.startclean").equalsIgnoreCase("true")){
+				if (verbose){
+					System.out.println("Clearing Object Store");
+				}
 				ostore.clear();
 			}
 			kernel = new SimKernelImpl(ostore);
@@ -73,6 +80,9 @@ public class SGS {
 					.getProperty("sgs.framework.installurl");
 			if (installProperty != null) {
 				installFile = installProperty;
+			}
+			if (verbose){
+				System.out.println("Loading configuration from: "+installFile);
 			}
 			InstallationLoader installation = new InstallationURL(new URL(
 					installFile));
@@ -198,6 +208,10 @@ public class SGS {
 		for(int i=0;i<args.length;i++){
 			if (args[i].charAt(0)=='-'){
 				switch(args[i].charAt(1)){
+					case 'v':
+					case 'V':
+						System.setProperty("sgs.framework.verbose","true");
+						break;
 					case 'i':
 					case 'I':
 						System.setProperty("sgs.framework.installurl", args[++i]);

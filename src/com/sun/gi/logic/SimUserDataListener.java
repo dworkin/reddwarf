@@ -25,7 +25,7 @@ public interface SimUserDataListener extends Serializable{
    * @param from UserID the UserID the data came from
    * @param data byte[] the data sent.
    */
-  public void userDataReceived(SimTask task, UserID to, UserID from, ByteBuffer data);
+  public void userDataReceived(SimTask task, UserID from, ByteBuffer data);
   
   public void userJoinedChannel(ChannelID cid, UserID uid);
   
