@@ -166,8 +166,7 @@ public class SimulationImpl implements Simulation {
 	// internal
 	private SimTask newTask(long startObject, Method startMethod,
 			Object[] params) {
-		return new SimTaskImpl(this, loader, kernel.newTransaction(appID,
-				loader), startObject, startMethod, params);
+		return new SimTaskImpl(this, loader, startObject, startMethod, params);
 	}
 
 	// external

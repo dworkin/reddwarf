@@ -10,18 +10,16 @@
 
 package com.sun.gi.objectstore.impl;
 
+import static com.sun.gi.objectstore.impl.CachingObjectStoreCache.UPDATE_CREATE;
+import static com.sun.gi.objectstore.impl.CachingObjectStoreCache.UPDATE_DESTROY;
+import static com.sun.gi.objectstore.impl.CachingObjectStoreCache.UPDATE_NONE;
+
 import java.io.Serializable;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
+
 import com.sun.gi.objectstore.DeadlockException;
-import com.sun.gi.objectstore.ObjectStore;
 import com.sun.gi.objectstore.Transaction;
-import com.sun.gi.objectstore.impl.CachingObjectStore.CachingObjectStoreLock;
-import com.sun.gi.objectstore.impl.CachingObjectStore.CachingObjectStoreLockException;
-import com.sun.gi.objectstore.impl.CachingObjectStoreCache;
 import com.sun.gi.objectstore.impl.CachingObjectStoreCache.Entry;
-import static com.sun.gi.objectstore.impl.CachingObjectStoreCache.*;
 
 /**
  *
@@ -31,7 +29,6 @@ public class CachingObjectStoreTransaction implements Transaction {
     
     CachingObjectStoreCache cache;
     private CachingObjectStore cstore;
-    private ObjectStore store;
     private Transaction trans;
     private HashSet<Entry> updateSet;
     
@@ -40,8 +37,7 @@ public class CachingObjectStoreTransaction implements Transaction {
      */
     CachingObjectStoreTransaction(
             CachingObjectStore cstore, Transaction trans, int cacheSize) {
-        this.cstore = cstore;
-        this.store = cstore.getStore();
+        this.cstore = cstore; 
         this.trans = trans;
         this.cache = new CachingObjectStoreCache(cacheSize);
         this.updateSet = new HashSet<Entry>(16);
@@ -74,9 +70,9 @@ public class CachingObjectStoreTransaction implements Transaction {
     
     public Serializable peek(long objectID) {
         // read from transaction cache first, then global cache
-        Entry cacheObj = cache.get(objectID);
+        Entry cacheObj = cache.get(trans.getCurrentAppID(),objectID);
         if (cacheObj == null) {
-            cacheObj = cstore.cache.get(objectID);
+            cacheObj = cstore.cache.get(trans.getCurrentAppID(),objectID);
         }
         if (cacheObj != null) {
             return cacheObj.sobj;
@@ -96,9 +92,9 @@ public class CachingObjectStoreTransaction implements Transaction {
             // note that checkAndLock needs to be atomic
             boolean success = cstore.checkAndLock(this, objectID);
             if (success) {
-                Entry cacheObj = cache.get(objectID);
+                Entry cacheObj = cache.get(trans.getCurrentAppID(),objectID);
                 if (cacheObj == null) {
-                    cacheObj = cstore.cache.get(objectID);
+                    cacheObj = cstore.cache.get(trans.getCurrentAppID(),objectID);
                     // move the object from global to local cache
                     if (cacheObj != null) {
                         cache.put(cacheObj);
@@ -127,9 +123,9 @@ public class CachingObjectStoreTransaction implements Transaction {
     
     public long lookup(String name) {
         // read from local cache first, then global cache
-        long id = cache.getID(name);
+        long id = cache.getID(trans.getCurrentAppID(),name);
         if (id == -1) {
-            id = cstore.cache.getID(name);
+            id = cstore.cache.getID(trans.getCurrentAppID(),name);
         }
         if (id != -1) {
             return id;
@@ -137,7 +133,7 @@ public class CachingObjectStoreTransaction implements Transaction {
             id = trans.lookup(name);
             if (id >= 0) {
                 // place lookup object in global cache only
-                cstore.cache.put(id, name, null);
+                cstore.cache.put(trans.getCurrentAppID(), id, name, null);
             }
             return id;
         }
@@ -155,9 +151,9 @@ public class CachingObjectStoreTransaction implements Transaction {
             synchronized (updateSet) {
                 for (Entry cacheObj : updateSet) {
                     if (cacheObj.updateMode == UPDATE_DESTROY) {
-                        trans.destroy(cacheObj.idObj.longValue());
+                        trans.destroy(cacheObj.id.idObj);
                     } else if (cacheObj.updateMode == UPDATE_CREATE) {
-                        trans.create(cacheObj.idObj.longValue(), cacheObj.sobj, cacheObj.name);
+                        trans.create(cacheObj.id.idObj, cacheObj.sobj, cacheObj.name);
                     }                    
                 }
                 updateSet.clear();

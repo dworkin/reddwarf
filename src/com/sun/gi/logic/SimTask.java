@@ -25,7 +25,7 @@ public interface SimTask {
    * of the task.
    * 
    */
-  public void execute();
+  public void execute(ObjectStore ostore);
 
   /**
    * This is a utility call used by other parts of the system.

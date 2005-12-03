@@ -1,6 +1,7 @@
 package com.sun.gi.logic.impl;
 
 
+import com.sun.gi.objectstore.ObjectStore;
 import com.sun.gi.objectstore.Transaction;
 import java.lang.reflect.Method;
 import java.io.Serializable;
@@ -46,22 +47,22 @@ class OutputRecord {
   }
 }
 
-public class SimTaskImpl implements SimTask {
-  private Simulation sim;	
+public class SimTaskImpl implements SimTask {  
   private Transaction trans ;
   private GLOReference startObject;
   private Method startMethod;
   private Object[] startArgs;
   private Simulation simulation;
+  private ClassLoader loader;
   private List<OutputRecord> outputList = new ArrayList<OutputRecord>();
 
-  public SimTaskImpl(Simulation sim, ClassLoader loader,
-                     Transaction trans, long startObjectID,
+  public SimTaskImpl(Simulation sim, ClassLoader loader, long startObjectID,
                      Method startMethod, Object[] startArgs) {
 	this.simulation = sim;  
     this.startObject = this.makeReference(startObjectID);
     this.startMethod = startMethod;
-    this.trans = trans;
+    this.loader = loader;
+
     this.simulation = sim;
     Object newargs[] = new Object[startArgs.length+1];
     newargs[0] = this;
@@ -70,7 +71,8 @@ public class SimTaskImpl implements SimTask {
 
   }
 
-  public void execute() {
+  public void execute(ObjectStore ostore) {
+	  this.trans=ostore.newTransaction(simulation.getAppID(),loader);
       Serializable runobj =  startObject.get(this);
       outputList.clear();
       try {
@@ -83,6 +85,10 @@ public class SimTaskImpl implements SimTask {
         trans.abort();
       }
       catch (IllegalArgumentException ex) {
+    	  System.err.println("Exception on task execution:");
+    	  System.err.println("Class of target:" +runobj.getClass());
+    	  System.err.println("Name of method: "+startMethod.getName());
+    	  System.err.println("Class of method: "+startMethod.getDeclaringClass());
         ex.printStackTrace();
         trans.abort();
       }
@@ -91,7 +97,7 @@ public class SimTaskImpl implements SimTask {
         trans.abort();
       } catch (DeadlockException de) {
         outputList.clear();
-        sim.queueTask(this); // requeue for later execution
+        simulation.queueTask(this); // requeue for later execution
       }
       outputList.clear();
   }

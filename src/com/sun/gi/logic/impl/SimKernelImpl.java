@@ -51,7 +51,7 @@ public SimKernelImpl(ObjectStore ostore) {
 			startingPoolSize  = Integer.parseInt(poolSzStr);
 		}
 		for(int i=0;i<startingPoolSize;i++){
-			new SimThreadImpl(this);
+			new SimThreadImpl(this,ostore);
 		}
 		// round robin assign threads to tasks from our sim list
 		// this could be a palce where we add prioritization later

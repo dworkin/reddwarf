@@ -3,6 +3,8 @@ package com.sun.gi.logic.impl;
 import com.sun.gi.logic.SimThread;
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.SimKernel;
+import com.sun.gi.objectstore.ObjectStore;
+import com.sun.gi.objectstore.Transaction;
 
 /**
  * <p>
@@ -25,17 +27,18 @@ import com.sun.gi.logic.SimKernel;
 public class SimThreadImpl extends Thread implements SimThread {
 	SimTask task = null;
 
-	private boolean result;
-
 	private SimKernel kernel;
 
 	private boolean reused = true;
+	private ObjectStore ostore;
 
-	public SimThreadImpl(SimKernel kernel) {
+	public SimThreadImpl(SimKernel kernel,ObjectStore ostore) {
 		super();
 		this.kernel = kernel;
+		this.ostore = ostore;
+	
 		this.start();
-	}
+	}	
 
 	public void run() {
 		do {
@@ -49,7 +52,7 @@ public class SimThreadImpl extends Thread implements SimThread {
 					}
 				}
 			}	
-			task.execute();
+			task.execute(ostore);
 			synchronized (this) {
 				task = null;
 				notifyAll();

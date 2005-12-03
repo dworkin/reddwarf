@@ -29,21 +29,63 @@ class CachingObjectStoreCache {
     
     class Entry {
         int updateMode = UPDATE_NONE;
-        Long idObj;
+        FullyQualifiedID id;
         String name;
         Serializable sobj;
         private Entry(
-                int updateMode, Long idObj, String name, Serializable sobj) {
+                int updateMode, FullyQualifiedID id, String name, Serializable sobj) {
             if (updateMode != UPDATE_NOCHANGE) {
                 this.updateMode = updateMode;
             }
-            this.idObj = idObj;
+            this.id = id;
             this.name = name;
             this.sobj = sobj;
         }
     }
     
-    private HashMap<Long, Entry> idMap;
+    class FullyQualifiedID implements Comparable{
+    	long idObj;
+    	long idApp;
+    	
+    	public FullyQualifiedID(long appID, long objID){
+    		idApp = appID;
+    		idObj = objID;
+    	}
+
+		/* (non-Javadoc)
+		 * @see java.lang.Comparable#compareTo(T)
+		 */
+		public int compareTo(Object arg0) {
+			FullyQualifiedID other = (FullyQualifiedID)arg0;
+			if (idApp<other.idApp){
+				return -1;
+			} else if (idApp>other.idApp) {
+				return 1;
+			} else if (idObj<other.idObj){
+				return -1;
+			} else if (idObj>other.idObj){
+				return 1;
+			} else {
+				return 0;
+			}
+		}
+    	
+		public boolean equals(Object other){
+			return compareTo(other)==0;
+		}
+		
+		/* (non-Javadoc)
+		 * @see java.lang.Object#hashCode()
+		 */
+		@Override
+		public int hashCode() {
+			return (new Long(idApp)).hashCode() ^
+				     (new Long(idObj)).hashCode();			
+		}
+    	
+    }
+    
+    private HashMap<FullyQualifiedID, Entry> idMap;
     private HashMap<String, Entry> nameMap;
     private HashMap<Serializable, Entry> objMap;
     
@@ -53,7 +95,7 @@ class CachingObjectStoreCache {
     CachingObjectStoreCache(int cacheSize) {
         int myCacheSize =
                 (cacheSize <= 0) ? DEFAULT_CACHE_SIZE : cacheSize;
-        idMap = new HashMap<Long, Entry>(myCacheSize);
+        idMap = new HashMap<FullyQualifiedID, Entry>(myCacheSize);
         nameMap = new HashMap<String, Entry>(myCacheSize);
         objMap = new HashMap<Serializable, Entry>(myCacheSize);
     }
@@ -71,13 +113,13 @@ class CachingObjectStoreCache {
             // currently this copies all entries from source
             // we may or may not want to do this;
             // the only goal is to make sure the 2 copies are consistent
-            for (Long idObj : source.idMap.keySet()) {
-                Entry entry = idMap.get(idObj);
-                Entry sourceEntry = source.idMap.get(idObj);
+            for (FullyQualifiedID fqid : source.idMap.keySet()) {
+                Entry entry = idMap.get(fqid);
+                Entry sourceEntry = source.idMap.get(fqid);
                 // take care not to merge destroyed objects
                 if (sourceEntry.updateMode == UPDATE_DESTROY) {
                     if (entry != null) {
-                        remove(idObj.longValue());
+                        remove(fqid);
                     }
                 } else {
                     if (entry != null) {
@@ -95,12 +137,19 @@ class CachingObjectStoreCache {
         }
     }
     
-    void remove(long id) {
+    /**
+	 * @param fqid
+	 */
+	public void remove(long appid, long objid) {
+		remove(new FullyQualifiedID(appid,objid));
+		
+	}
+
+	private void remove(FullyQualifiedID id) {
         synchronized (this) {
-            Long idObj = new Long(id);
-            Entry cacheObj = (Entry)idMap.get(idObj);
+            Entry cacheObj = (Entry)idMap.get(id);
             if (cacheObj != null) {
-                idMap.remove(idObj);
+                idMap.remove(id);
                 objMap.remove(cacheObj.sobj);
                 nameMap.remove(cacheObj.name);
             }
@@ -109,20 +158,21 @@ class CachingObjectStoreCache {
     
     Entry put(Entry entry) {
         synchronized (this) {
-            idMap.put(entry.idObj, entry);
+            idMap.put(entry.id, entry);
             objMap.put(entry.sobj, entry);
-            nameMap.put(entry.name, entry);
+            nameMap.put(entry.name+"_"+entry.id.idApp, entry);
         }
         return entry;
     }
     
-    Entry put(long id, String name, Serializable sobj) {
-        return put(UPDATE_NONE, id, name, sobj);
+    Entry put(long appid, long id, String name, Serializable sobj) {
+        return put(UPDATE_NONE, appid, id, name, sobj);
     }
     
-    Entry put(int updateMode, long id, String name, Serializable sobj) {
-        Long idObj = new Long(id);
+    Entry put(int updateMode, long appid, long objid, String name, Serializable sobj) {
+        FullyQualifiedID id = new FullyQualifiedID(appid,objid);
         Entry cacheObj = null;
+        name += "_"+appid;
         synchronized (this) {
             cacheObj = (Entry)idMap.get(name);
             if (cacheObj == null) {
@@ -143,23 +193,30 @@ class CachingObjectStoreCache {
         return cacheObj;
     }
     
-    Entry get(long id) {
+    Entry get(long appid, long id) {
         synchronized (this) {
-            return idMap.get(new Long(id));
+            return idMap.get(new FullyQualifiedID(appid,id));
         }
     }
     
-    long getID(String name) {
+    long getID(long appid, String name) {
         synchronized (this) {
-            Entry cacheObj = nameMap.get(name);
-            return (cacheObj != null) ? cacheObj.idObj.longValue() : -1;
+            Entry cacheObj = nameMap.get(name+"_"+appid);
+            return (cacheObj != null) ? cacheObj.id.idObj: -1;
         }
     }
     
     long getID(Serializable sobj) {
         synchronized (this) {
             Entry cacheObj = objMap.get(sobj);
-            return (cacheObj != null) ? cacheObj.idObj.longValue() : -1;
+            return (cacheObj != null) ? cacheObj.id.idObj: -1;
+        }
+    }
+    
+    long getAppID(Serializable sobj) {
+        synchronized (this) {
+            Entry cacheObj = objMap.get(sobj);
+            return (cacheObj != null) ? cacheObj.id.idApp: -1;
         }
     }
 }
