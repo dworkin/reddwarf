@@ -1,6 +1,6 @@
 package com.sun.gi.logic.test.comm;
 
-import com.sun.corba.se.impl.ior.ByteBuffer;
+import java.nio.ByteBuffer;
 import com.sun.gi.logic.SimBoot;
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.SimUserDataListener;
@@ -60,7 +60,6 @@ public class CommTestBoot implements SimBoot, SimUserListener,
 		System.out.print("User Joined server: " + uid + " ( ");
 		for (Object cred : subject.getPublicCredentials()) {
 			System.out.print(cred + " ");
-
 		}
 		System.out.println(")");
 		users.add(uid);
@@ -76,7 +75,7 @@ public class CommTestBoot implements SimBoot, SimUserListener,
 	 */
 	public void userDataReceived(SimTask task, UserID from, ByteBuffer data) {
 		System.out.println("Data from user " + from + ": "
-				+ new String(data.toArray()));
+				+ new String(data.array(),data.arrayOffset(),data.limit()));
 	}
 
 	/*

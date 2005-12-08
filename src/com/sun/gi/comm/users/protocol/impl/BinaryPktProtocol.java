@@ -248,15 +248,14 @@ public class BinaryPktProtocol
         }
     }
     
-    public synchronized void sendServerMsg(
-            boolean reliable,
+    public synchronized void sendServerMsg(boolean reliable,
             ByteBuffer data) throws IOException {
         // buffers coming into here should be in "written" state and full
         // position == limit
         synchronized (hdr) {
             hdr.clear();
             hdr.put((byte)OPCODE.SEND_SERVER_MSG.ordinal());
-            hdr.put( (byte) (reliable ? 1 : 0));                       
+            hdr.put( (byte) (reliable ? 1 : 0));               
             sendArray[1] = data;
             sendBuffers(sendArray);
         }
@@ -598,10 +597,7 @@ public class BinaryPktProtocol
                 client.rcvBroadcastMsg(reliable, chanID, from, databuff);
                 break;   
             case SEND_SERVER_MSG:
-                reliable = (buff.get() == 1);                
-                fromlen = buff.get();
-                from = new byte[fromlen];
-                buff.get(from);
+                reliable = (buff.get() == 1);                              
                 databuff = buff.slice();
                 server.rcvServerMsg(reliable,databuff);
                 break;

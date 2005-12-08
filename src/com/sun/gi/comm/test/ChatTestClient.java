@@ -16,6 +16,7 @@ import java.net.MalformedURLException;
 import java.nio.ByteBuffer;
 
 import javax.security.auth.callback.Callback;
+import javax.swing.AbstractButton;
 import javax.swing.JButton;
 import javax.swing.JDesktopPane;
 import javax.swing.JFrame;
@@ -58,6 +59,8 @@ public class ChatTestClient extends JFrame implements
 	ClientChannel dccChannel;
 
 	private JButton dccButton;
+
+	private JButton serverSendButton;
 
 	private static String DCC_CHAN_NAME = "__DCC_Chan";
 
@@ -140,6 +143,19 @@ public class ChatTestClient extends JFrame implements
 			}
 		});
 		openChannelButton.setEnabled(false);
+		serverSendButton = new JButton("Send to Server");
+		serverSendButton.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent arg0) {
+				Object[] targets = userList.getSelectedValues();
+				if (targets != null) {
+					String message = JOptionPane.showInputDialog(
+							ChatTestClient.this,
+							"Enter server message:");					
+					doServerMessage(message);
+				}
+			}
+		});
+		serverSendButton.setEnabled(false);
 		dccButton = new JButton("Send Multi-DCC ");
 		dccButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
@@ -159,6 +175,7 @@ public class ChatTestClient extends JFrame implements
 		dccButton.setEnabled(false);
 		buttonPanel.add(loginButton);
 		buttonPanel.add(openChannelButton);
+		buttonPanel.add(serverSendButton);
 		buttonPanel.add(dccButton);
 		pack();
 		setSize(800, 600);
@@ -182,6 +199,16 @@ public class ChatTestClient extends JFrame implements
 			}
 		});
 		setVisible(true);
+	}
+
+	/**
+	 * @param message
+	 */
+	protected void doServerMessage(String message) {
+		ByteBuffer out = ByteBuffer.allocate(message.length());
+		out.put(message.getBytes());
+		mgr.sendToServer(out,true);
+		
 	}
 
 	/**
@@ -218,6 +245,7 @@ public class ChatTestClient extends JFrame implements
 		loginButton.setEnabled(true);
 		openChannelButton.setEnabled(true);
 		dccButton.setEnabled(true);
+		serverSendButton.setEnabled(true);
 		mgr.openChannel(DCC_CHAN_NAME);
 	}
 
@@ -233,6 +261,7 @@ public class ChatTestClient extends JFrame implements
 		loginButton.setEnabled(true);
 		openChannelButton.setEnabled(false);
 		dccButton.setEnabled(false);
+		serverSendButton.setEnabled(false);
 	}
 
 	public void userJoined(byte[] userID) {
