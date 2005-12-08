@@ -479,6 +479,13 @@ public class SimulationImpl implements Simulation {
 		}
 	}
 
+	/* (non-Javadoc)
+	 * @see com.sun.gi.logic.Simulation#openChannel(java.lang.String)
+	 */
+	public ChannelID openChannel(String name) {
+		return router.openChannel(name).channelID();
+	}
+
 
 
 }

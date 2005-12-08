@@ -154,7 +154,7 @@ public class SimTaskImpl implements SimTask {
    * @param from UserID
    * @param bs byte[]
    */
-  public void sendData(ChannelID cid, UserID[] to, UserID from,ByteBuffer bs, boolean reliable) {
+  public void sendData(ChannelID cid, UserID[] to, ByteBuffer bs, boolean reliable) {
     outputList.add(new OutputRecord(cid, to,bs,reliable));
   }
 
@@ -168,6 +168,14 @@ public class SimTaskImpl implements SimTask {
   public void addUserDataListener(UserID user, GLOReference ref) {
     simulation.addUserDataListener(user, ref);
   }
+  
+  /* (non-Javadoc)
+   * @see com.sun.gi.logic.SimTask#addChannelListener(com.sun.gi.comm.routing.ChannelID, com.sun.gi.logic.GLOReference)
+   */
+  public void addChannelListener(ChannelID cid, GLOReference ref) {
+  	simulation.addChannelListener(cid,ref);
+  }
+
 
   /**
    * createSO
@@ -178,6 +186,16 @@ public class SimTaskImpl implements SimTask {
   public GLOReference createSO(Serializable simObject,String name) {
     return makeReference(trans.create(simObject,name));
   }
+
+
+
+
+/* (non-Javadoc)
+ * @see com.sun.gi.logic.SimTask#openChannel(java.lang.String)
+ */
+public ChannelID openChannel(String string) {
+	return simulation.openChannel(string);
+}
 
   
 }

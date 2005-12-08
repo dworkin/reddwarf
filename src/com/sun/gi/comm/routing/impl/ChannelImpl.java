@@ -115,7 +115,8 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 				user.userJoinedChannel(localIDbytes, existingUser.getUserID().toByteArray());
 			}
 			sendJoinToLocalUsers(user.getUserID().toByteArray());
-			localUsers.put(user.getUserID(),user);
+			localUsers.put(user.getUserID(),user);	
+			router.userJoinedChan(this,user);
 		} catch (IOException e) {			
 			e.printStackTrace();
 		}
@@ -143,6 +144,7 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 			e.printStackTrace();
 		}
 		sendLeaveToLocalUsers(userbytes);
+		router.userLeftChan(this,user);
 	}
 
 	public ChannelID channelID() {

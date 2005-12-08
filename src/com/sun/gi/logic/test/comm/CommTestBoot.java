@@ -2,6 +2,7 @@ package com.sun.gi.logic.test.comm;
 
 import java.nio.ByteBuffer;
 import com.sun.gi.logic.SimBoot;
+import com.sun.gi.logic.SimChannelListener;
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.SimUserDataListener;
 import com.sun.gi.logic.SimUserListener;
@@ -14,7 +15,7 @@ import java.util.ArrayList;
 import javax.security.auth.Subject;
 
 public class CommTestBoot implements SimBoot, SimUserListener,
-		SimUserDataListener {
+		SimUserDataListener, SimChannelListener {
 	private static final long serialVersionUID = -560245896319031239L; // turn
 																		// off
 																		// version
@@ -36,6 +37,8 @@ public class CommTestBoot implements SimBoot, SimUserListener,
 		System.out.println("Booting comm test, appid = " + task.getAppID());
 		thisobj = task.findSO("BOOT");
 		task.addUserListener(thisobj);
+		ChannelID cid = task.openChannel("echo");
+		task.addChannelListener(cid,thisobj);
 
 	}
 
@@ -84,7 +87,7 @@ public class CommTestBoot implements SimBoot, SimUserListener,
 	 * @see com.sun.gi.logic.SimUserDataListener#userJoinedChannel(com.sun.gi.comm.routing.ChannelID,
 	 *      com.sun.gi.comm.routing.UserID)
 	 */
-	public void userJoinedChannel(ChannelID cid, UserID uid) {
+	public void userJoinedChannel(SimTask task, ChannelID cid, UserID uid) {
 		System.out.println("User " + cid + " joined channel " + uid);
 
 	}
@@ -95,8 +98,16 @@ public class CommTestBoot implements SimBoot, SimUserListener,
 	 * @see com.sun.gi.logic.SimUserDataListener#userLeftChannel(com.sun.gi.comm.routing.ChannelID,
 	 *      com.sun.gi.comm.routing.UserID)
 	 */
-	public void userLeftChannel(ChannelID cid, UserID uid) {
+	public void userLeftChannel(SimTask task, ChannelID cid, UserID uid) {
 		System.out.println("User " + cid + " left channel " + uid);
 
+	}
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.logic.SimChannelListener#dataArrived(com.sun.gi.comm.routing.UserID, java.nio.ByteBuffer)
+	 */
+	public void dataArrived(SimTask task, ChannelID cid, UserID from, ByteBuffer buff) {
+		task.sendData(cid,new UserID[] {from},buff,true);
+		
 	}
 }

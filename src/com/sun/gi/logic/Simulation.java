@@ -41,7 +41,7 @@ public interface Simulation {
    * @param ref SOReference The reference to the GLO to actually handle the
    * events.
    */
-  public void addUserDataListener(UserID id, GLOReference ref);
+  public void addUserDataListener(UserID cid, GLOReference ref);
   
   
   /**
@@ -125,6 +125,12 @@ public interface Simulation {
 	 * @param impl
 	 */
 	public void queueTask(SimTask impl);
+
+	/**
+	 * @param string
+	 * @return
+	 */
+	public ChannelID openChannel(String string);
 
 	
 

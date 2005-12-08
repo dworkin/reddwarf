@@ -11,6 +11,7 @@ package com.sun.gi.logic;
 
 import java.nio.ByteBuffer;
 
+import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
 
 /**
@@ -25,5 +26,5 @@ import com.sun.gi.comm.routing.UserID;
  * @version 1.0
  */
 public interface SimChannelListener {
-	public void dataArrived(UserID from, ByteBuffer buff);
+	public void dataArrived(SimTask task, ChannelID id, UserID from, ByteBuffer buff);
 }

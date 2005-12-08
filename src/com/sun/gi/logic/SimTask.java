@@ -6,6 +6,7 @@ import java.io.*;
 import java.nio.ByteBuffer;
 
 import com.sun.gi.comm.routing.*;
+import com.sun.gi.logic.test.comm.CommTestBoot;
 import com.sun.gi.objectstore.*;
 
 /**
@@ -76,6 +77,11 @@ public interface SimTask {
    */
 
   public void addUserDataListener(UserID id, GLOReference ref);
+  
+  /**
+   * @param boot
+   */
+  public void addChannelListener(ChannelID id, GLOReference ref);
 
 
   /**
@@ -87,7 +93,7 @@ public interface SimTask {
    * @param from UserID the sender's id (return address)
    * @param bs byte[] the data packet to send.
    */
-  public void sendData(ChannelID cid, UserID[]  to, UserID from, ByteBuffer data,
+  public void sendData(ChannelID cid, UserID[]  to, ByteBuffer data,
 		  boolean reliable);
 
   
@@ -118,5 +124,14 @@ public interface SimTask {
    * @return SOReference A reference to the GLo if found, null if not found.
    */
   public GLOReference findSO(String soName);
+
+/**
+ * This method opens a comm channel and returns an ID for it
+ * @param string
+ * @return
+ */
+	public ChannelID openChannel(String string);
+
+
 
 }

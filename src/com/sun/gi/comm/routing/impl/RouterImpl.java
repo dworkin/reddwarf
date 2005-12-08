@@ -2,6 +2,7 @@ package com.sun.gi.comm.routing.impl;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channel;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -232,6 +233,7 @@ public class RouterImpl implements Router {
 
 	}
 
+	/*
 	private void reportUserJoinedChannel(byte[] chanID, byte[] uidbytes) {
 		UserID sentID = null;
 		try {
@@ -252,7 +254,7 @@ public class RouterImpl implements Router {
 			}
 		}
 
-	}
+	}*/
 
 	public void registerUser(SGSUser user, Subject subject) throws InstantiationException,
 			IOException {
@@ -292,6 +294,25 @@ public class RouterImpl implements Router {
 		synchronized (hdr) {
 			hdr.clear();
 			hdr.put((byte) OPCODE.UserJoinedChannel.ordinal());
+			hdr.putInt(uidbytes.length);
+			hdr.put(uidbytes);
+			hdr.putInt(cidbytes.length);
+			hdr.put(cidbytes);
+			try {
+				routerControlChannel.sendData(hdr);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+
+	}
+	
+	private void xmitUserLeftChannel(ChannelID cid, UserID uid) {
+		byte[] uidbytes = uid.toByteArray();
+		byte[] cidbytes = cid.toByteArray();
+		synchronized (hdr) {
+			hdr.clear();
+			hdr.put((byte) OPCODE.UserLeftChannel.ordinal());
 			hdr.putInt(uidbytes.length);
 			hdr.put(uidbytes);
 			hdr.putInt(cidbytes.length);
@@ -441,6 +462,28 @@ public class RouterImpl implements Router {
 			listener.channelDataPacket(cid,from,buff);
 		}
 	}
+
+	/**
+	 * @param impl
+	 * @param user
+	 */
+	public void userJoinedChan(ChannelImpl chan, SGSUser user) {
+		xmitUserJoinedChannel(chan.channelID(),user.getUserID());
+		fireUserJoinedChannel(user.getUserID(),chan.channelID());
+		
+	}
+
+	/**
+	 * @param impl
+	 * @param user
+	 */
+	public void userLeftChan(ChannelImpl chan, SGSUser user) {
+		xmitUserLeftChannel(chan.channelID(),user.getUserID());
+		fireUserLeftChannel(user.getUserID(),chan.channelID());
+		
+	}
+
+	
 
 	
 
