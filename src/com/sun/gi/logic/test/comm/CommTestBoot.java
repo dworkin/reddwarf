@@ -107,6 +107,8 @@ public class CommTestBoot implements SimBoot, SimUserListener,
 	 * @see com.sun.gi.logic.SimChannelListener#dataArrived(com.sun.gi.comm.routing.UserID, java.nio.ByteBuffer)
 	 */
 	public void dataArrived(SimTask task, ChannelID cid, UserID from, ByteBuffer buff) {
+		System.out.println("Echoing: " +new String(buff.array(),buff.arrayOffset(),
+				buff.limit()));
 		task.sendData(cid,new UserID[] {from},buff,true);
 		
 	}

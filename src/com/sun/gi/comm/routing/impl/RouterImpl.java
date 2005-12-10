@@ -459,7 +459,7 @@ public class RouterImpl implements Router {
 	
 	public void fireChannelDataPacket(ChannelID cid, UserID from, ByteBuffer buff){
 		for(RouterListener listener : listeners){
-			listener.channelDataPacket(cid,from,buff);
+			listener.channelDataPacket(cid,from,buff.duplicate());
 		}
 	}
 
@@ -481,6 +481,11 @@ public class RouterImpl implements Router {
 		xmitUserLeftChannel(chan.channelID(),user.getUserID());
 		fireUserLeftChannel(user.getUserID(),chan.channelID());
 		
+	}
+	
+	public void channelDataPacket(ChannelImpl chan, UserID from, ByteBuffer data,
+			boolean reliable){
+		fireChannelDataPacket(chan.channelID(),from,data);
 	}
 
 	

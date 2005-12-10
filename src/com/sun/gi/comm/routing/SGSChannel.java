@@ -52,6 +52,15 @@ public interface SGSChannel {
 	public ChannelID channelID();
 	
 	public String getName();
+
+	/**
+	 * @param server_id
+	 * @param targets
+	 * @param buff
+	 * @param reliable
+	 */
+	public void multicastData(UserID server_id, UserID[] targets, ByteBuffer buff, boolean reliable,
+			boolean sendToListeners);
 	
 	
 

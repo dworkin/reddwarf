@@ -105,9 +105,8 @@ public class SimTaskImpl implements SimTask {
   /**
    * doOutput
    */
-  private void doOutput() {
-    for(Iterator i = outputList.iterator();i.hasNext();){
-      OutputRecord rec = (OutputRecord)i.next();
+  private void doOutput() {  
+    for(OutputRecord rec : outputList){     
       simulation.sendMulticastData(rec.channel, rec.targets,rec.data,
     		  rec.reliable);
     }

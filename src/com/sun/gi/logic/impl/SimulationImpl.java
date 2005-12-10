@@ -44,7 +44,7 @@ public class SimulationImpl implements Simulation {
 	ClassLoader loader;
 
 	private List<Long> userListeners = new ArrayList<Long>();
-	
+
 	private String appName;
 
 	private Map<UserID, List<Long>> userDataListeners = new HashMap<UserID, List<Long>>();
@@ -74,12 +74,12 @@ public class SimulationImpl implements Simulation {
 		}
 		Method startMethod = null;
 		try {
-			startMethod = bootclass.getMethod("boot",
-					new Class[] { SimTask.class, boolean.class });
+			startMethod = bootclass.getMethod("boot", new Class[] {
+					SimTask.class, boolean.class });
 		} catch (NoSuchMethodException ex) {
 			throw new InstantiationException(
 					"Boot class in sim has no method: void boot(SimTask)");
-		}		
+		}
 		this.appID = game.getID();
 		// check for boot object. it it doesnt exist, then create it
 		Transaction trans = kernel.getOstore().newTransaction(appID,
@@ -126,7 +126,7 @@ public class SimulationImpl implements Simulation {
 
 		});
 		loader = bootclass.getClassLoader();
-		queueTask(newTask(bootObjectID, startMethod, new Object[] {firstTime}));
+		queueTask(newTask(bootObjectID, startMethod, new Object[] { firstTime }));
 		kernel.addSimulation(this);
 	}
 
@@ -137,8 +137,23 @@ public class SimulationImpl implements Simulation {
 	 */
 	protected void fireChannelDataPacket(ChannelID cid, UserID from,
 			ByteBuffer buff) {
-		// TODO Auto-generated method stub
-
+		List<Long> listeners = channelListeners.get(cid);
+		if (listeners != null) {
+			Method m;
+			try {
+				m = SimChannelListener.class.getMethod("dataArrived",
+						SimTask.class, ChannelID.class, UserID.class,
+						ByteBuffer.class);
+				for (Long uid : listeners) {
+					queueTask(newTask(uid.longValue(), m, new Object[] { cid,
+							from, buff }));
+				}
+			} catch (SecurityException e) {
+				e.printStackTrace();
+			} catch (NoSuchMethodException e) {
+				e.printStackTrace();
+			}
+		}
 	}
 
 	/**
@@ -156,12 +171,11 @@ public class SimulationImpl implements Simulation {
 	 * addUserListener
 	 * 
 	 * @param ref
-	 *       
+	 * 
 	 */
 	public void addUserListener(GLOReference ref) {
 		userListeners.add(new Long(((GLOReferenceImpl) ref).objID));
 	}
-	
 
 	// internal
 	private SimTask newTask(long startObject, Method startMethod,
@@ -234,10 +248,6 @@ public class SimulationImpl implements Simulation {
 		return appID;
 	}
 
-
-
-	
-
 	/**
 	 * getAppName
 	 * 
@@ -258,7 +268,7 @@ public class SimulationImpl implements Simulation {
 	public void sendMulticastData(ChannelID cid, UserID[] targets,
 			ByteBuffer buff, boolean reliable) {
 		SGSChannel channel = router.getChannel(cid);
-		channel.multicastData(UserID.SERVER_ID, targets, buff, reliable);
+		channel.multicastData(UserID.SERVER_ID, targets, buff, reliable, false);
 	}
 
 	/**
@@ -422,7 +432,7 @@ public class SimulationImpl implements Simulation {
 			Method userLeftChannelMethod = loader.loadClass(
 					"com.sun.gi.logic.SimUserListener").getMethod("userJoined",
 					new Class[] { SimTask.class, UserID.class, Subject.class });
-			Object[] params = { uid,subject };
+			Object[] params = { uid, subject };
 			for (Long gloID : userListeners) {
 				queueTask(newTask(gloID, userLeftChannelMethod, params));
 			}
@@ -439,12 +449,14 @@ public class SimulationImpl implements Simulation {
 
 	}
 
-	protected void fireServerMessage(UserID from, ByteBuffer data){
+	protected void fireServerMessage(UserID from, ByteBuffer data) {
 		try {
 			Method userJoinedMethod = loader.loadClass(
-					"com.sun.gi.logic.SimUserDataListener").getMethod(
-					"userDataReceived",
-					new Class[] { SimTask.class, UserID.class, ByteBuffer.class });
+					"com.sun.gi.logic.SimUserDataListener")
+					.getMethod(
+							"userDataReceived",
+							new Class[] { SimTask.class, UserID.class,
+									ByteBuffer.class });
 			Object[] params = { from, data.duplicate() };
 			List listeners = (List) userDataListeners.get(from);
 			for (Iterator i = listeners.iterator(); i.hasNext();) {
@@ -460,32 +472,36 @@ public class SimulationImpl implements Simulation {
 		}
 	}
 
-	/* (non-Javadoc)
+	/*
+	 * (non-Javadoc)
+	 * 
 	 * @see com.sun.gi.logic.Simulation#hasTasks()
 	 */
 	public boolean hasTasks() {
 		// TODO Auto-generated method stub
-		synchronized(taskQueue){
+		synchronized (taskQueue) {
 			return !taskQueue.isEmpty();
 		}
 	}
 
-	/* (non-Javadoc)
+	/*
+	 * (non-Javadoc)
+	 * 
 	 * @see com.sun.gi.logic.Simulation#nextTask()
 	 */
 	public SimTask nextTask() {
-		synchronized(taskQueue){		
+		synchronized (taskQueue) {
 			return taskQueue.remove(0);
 		}
 	}
 
-	/* (non-Javadoc)
+	/*
+	 * (non-Javadoc)
+	 * 
 	 * @see com.sun.gi.logic.Simulation#openChannel(java.lang.String)
 	 */
 	public ChannelID openChannel(String name) {
 		return router.openChannel(name).channelID();
 	}
-
-
 
 }

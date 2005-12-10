@@ -53,10 +53,16 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 			buffs[1] = message;
 			transportChannel.sendData(buffs);
 		}	
-		sendToLocalUser(from.toByteArray(),to.toByteArray(),message,reliable);			
+		sendToLocalUser(from.toByteArray(),to.toByteArray(),message,reliable);	
+		router.channelDataPacket(this,from,message,reliable);
 	}
-
+	
 	public void multicastData(UserID from, UserID[] tolist, ByteBuffer message, boolean reliable) {
+		multicastData(from,tolist,message,reliable,true);
+	}
+	
+	public void multicastData(UserID from, UserID[] tolist, ByteBuffer message, boolean reliable,
+			boolean sendToListeners) {
 		synchronized(hdr){
 			hdr.clear();
 			hdr.put((byte)OPCODE.MulticastMessage.ordinal());
@@ -78,7 +84,9 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 			toArray[i] = tolist[i].toByteArray();
 		}
 		multicastToLocalUsers(from.toByteArray(),toArray,message,reliable);
-		
+		if (sendToListeners){
+			router.channelDataPacket(this,from,message,reliable);
+		}
 	}
 
 	public void broadcastData(UserID from, ByteBuffer message, boolean reliable) {
@@ -93,6 +101,7 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 			transportChannel.sendData(buffs);
 		}
 		broadcastToLocalUsers(from.toByteArray(),message,reliable);
+		router.channelDataPacket(this,from,message,reliable);
 	}
 
 	public void join(SGSUser user) {
