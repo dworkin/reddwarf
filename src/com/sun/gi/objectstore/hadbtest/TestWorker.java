@@ -2,7 +2,7 @@
  * Copyright 2005, Sun Microsystems, Inc. All Rights Reserved. 
  */
 
-package com.sun.gi.objectstore.load;
+package com.sun.gi.objectstore.hadbtest;
 
 /**
  * @author Daniel Ellard
@@ -20,12 +20,12 @@ public class TestWorker implements Runnable {
 
     public void run() {
 
-	// System.out.println("starting up " + myName + ": whoopee");
+	System.out.println("starting up " + myName + ": whoopee");
 	lastWake = System.currentTimeMillis();
 
 	String log = "";
 	try {
-	    for (int i = 0; i < 20; i++) {
+	    for (int i = 0; i < 10; i++) {
 		Thread.sleep(mySleep);
 		long currTime = System.currentTimeMillis();
 		long diff = currTime - lastWake;
@@ -33,19 +33,14 @@ public class TestWorker implements Runnable {
 		log += "awake " + myName + "at " + diff +
 			" vs. " + mySleep + " drift " + drift + "\n";
 		lastWake = currTime;
-		printer();
 	    }
 	}
 	catch (Exception e) {
 	    System.out.println("bye" + myName);
 	    return;
 	}
-	// System.out.println(log);
+	System.out.println(log);
 	return;
-    }
-
-    private void printer() {
-	// System.out.println ("WHOOO");
     }
 }
 

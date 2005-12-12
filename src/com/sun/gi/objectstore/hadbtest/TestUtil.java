@@ -24,11 +24,11 @@ public class TestUtil {
      * @return an {@link ObjectStore ObjectStore}.
      */
 
-    public static ObjectStore connect(boolean clear) {
+    public static DerbyObjectStore connect(boolean clear) {
 
 	// &&& DJE: The (10, 20) are magic.  Do they mean anything?.
 
-	ObjectStore ostore = new DerbyObjectStore(10, 20);
+	DerbyObjectStore ostore = new DerbyObjectStore(10, 20);
 
 	if (clear) {
 	    System.out.println("Clearing object store");

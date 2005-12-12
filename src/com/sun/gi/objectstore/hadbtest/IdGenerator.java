@@ -2,7 +2,7 @@
  * Copyright 2005, Sun Microsystems, Inc. All Rights Reserved. 
  */
 
-package com.sun.gi.objectstore.load;
+package com.sun.gi.objectstore.hadbtest;
 
 /**
  * Generates unique per-instance <code>long</code> identifiers.  <p>

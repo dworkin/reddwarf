@@ -2,7 +2,7 @@
  * Copyright 2005, Sun Microsystems, Inc. All Rights Reserved. 
  */
 
-package com.sun.gi.objectstore.load;
+package com.sun.gi.objectstore.hadbtest;
 
 import com.sun.gi.objectstore.ObjectStore;
 
