@@ -32,7 +32,7 @@ public class Test2 {
 
 
 	for (int i = 0; i < 4; i++) {
-	    TestClientOwnConn t = new TestClientOwnConn(i);
+	    TestClientSharedConn t = new TestClientSharedConn(i, os);
 	    Thread thread = new Thread(t);
 	    thread.start();
 	}

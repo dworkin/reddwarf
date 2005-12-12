@@ -19,12 +19,13 @@ class ClientTest3 implements Runnable {
     private final long clientId;
     private long lastWake;
     private long mySleep = 50;
-    private long iters = 5;
+    private long iters = 100;
     private long[][] oidClusters;
-    private int numPeeks = 1;
-    private int numLocks = 1;
+    private int numPeeks = 4;
+    private int numLocks = 2;
     private int numPromotedPeeks = 1;
     private Random r = new Random();
+    private boolean verbose = false;
 
     public ClientTest3(long clientId, DerbyObjectStore os, long[][] oidClusters) {
 	this.os = os;
@@ -37,7 +38,7 @@ class ClientTest3 implements Runnable {
 	lastWake = System.currentTimeMillis();
 
 	for (int i = 0; i < iters; i++) {
-	    doRandomTransaction();
+	    doRandomTransaction(verbose);
 	}
 
 	return;
@@ -53,7 +54,7 @@ class ClientTest3 implements Runnable {
 	this.numPromotedPeeks = numPromotedPeeks;
     }
 
-    private void doRandomTransaction() {
+    private void doRandomTransaction(boolean verbose) {
 	int cluster = r.nextInt(oidClusters.length);
 
 	long[][] participants = FakeAppUtil.pickRandomParticipants(
@@ -65,17 +66,33 @@ class ClientTest3 implements Runnable {
 
 	Transaction trans = (Transaction) new DerbyObjectStoreTransaction(os);
 
+	if (verbose) { System.out.println("peeks: "); }
+
 	for (int i = 0; i < peekOids.length; i++) {
+	    if (verbose) { System.out.print(peekOids[i] + " "); }
 	    trans.peek(peekOids[i]); 
 	}
+	if (verbose) { System.out.println(); }
+
+	if (verbose) { System.out.println("peekPromoted: "); }
 	for (int i = 0; i < promotedPeekOids.length; i++) {
+	    if (verbose) { System.out.print(promotedPeekOids[i] + " "); }
 	    trans.peek(promotedPeekOids[i]); 
 	}
+	if (verbose) { System.out.println(); }
+
+	if (verbose) { System.out.println("locks: "); }
 	for (int i = 0; i < lockOids.length; i++) {
+	    if (verbose) { System.out.print(lockOids[i] + " "); }
 	    trans.lock(lockOids[i]); 
 	}
+	if (verbose) { System.out.println(); }
+
+	if (verbose) { System.out.println("promotedToLock: "); }
 	for (int i = 0; i < promotedPeekOids.length; i++) {
+	    if (verbose) { System.out.print(promotedPeekOids[i] + " "); }
 	    trans.lock(promotedPeekOids[i]); 
 	}
+	if (verbose) { System.out.println(); }
     }
 }
