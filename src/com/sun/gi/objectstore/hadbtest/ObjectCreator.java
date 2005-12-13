@@ -89,13 +89,28 @@ public class ObjectCreator {
 
 	long[] newOIDs = new long[count];
 
-	Transaction trans = beginTransaction(appId);
+	/*
+	 * There's something wrong with adding more than a certain
+	 * number of new objects in a single transaction.  So they are
+	 * chunked, and we never create more than chunkSize without
+	 * committing them.
+	 *
+	 * Even this may fail, if the individual objects are large
+	 * enough.  There is some magic number (around 5BM?) that
+	 * Derby transactions must not exceed.
+	 */
 
-	for (int i = 0; i < count; i++) {
-	    newOIDs[i] = addToTrans(trans, appId);
+	int chunkSize = 100;
+	for (int base = 0; base < count; base += chunkSize) {
+	    System.out.println("chunk base: " + base);
+	    Transaction trans = beginTransaction(appId);
+
+	    for (int i = 0; i + base < count && i < chunkSize; i++) {
+		newOIDs[i + base] = addFillerObj(trans, appId);
+	    }
+
+	    commitTransaction(trans);
 	}
-
-	commitTransaction(trans);
 
 	if (selfId) {
 	    for (int i = 0; i < count; i++) {
@@ -123,7 +138,7 @@ public class ObjectCreator {
 
 	Transaction trans = beginTransaction(appId);
 
-	long newOID = addToTrans(trans, appId);
+	long newOID = addFillerObj(trans, appId);
 
 	commitTransaction(trans);
 
@@ -175,7 +190,7 @@ public class ObjectCreator {
      * @return the OID of the new object.
      */
 
-    protected long addToTrans(Transaction trans, long appId) {
+    protected long addFillerObj(Transaction trans, long appId) {
 	long myVal;
 
 	synchronized(this) {

@@ -19,7 +19,7 @@ class ClientTest3 implements Runnable {
     private final long clientId;
     private long lastWake;
     private long mySleep = 50;
-    private long iters = 100;
+    private long iters = 5000;
     private long[][] oidClusters;
     private int numPeeks = 4;
     private int numLocks = 2;
@@ -38,6 +38,9 @@ class ClientTest3 implements Runnable {
 	lastWake = System.currentTimeMillis();
 
 	for (int i = 0; i < iters; i++) {
+	    if (i % 50 == 0) {
+		System.out.println("at count " + i);
+	    }
 	    doRandomTransaction(verbose);
 	}
 
@@ -94,5 +97,7 @@ class ClientTest3 implements Runnable {
 	    trans.lock(promotedPeekOids[i]); 
 	}
 	if (verbose) { System.out.println(); }
+
+	trans.commit();
     }
 }

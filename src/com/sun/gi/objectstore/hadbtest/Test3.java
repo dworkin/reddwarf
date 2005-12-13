@@ -40,7 +40,7 @@ public class Test3 {
 	 */
 
 	ObjectCreator creator = new ObjectCreator(os, 0, null, params.objSize);
-	long[] oids = creator.createNewBunch(params.numObjs, 1, true);
+	long[] oids = creator.createNewBunch(params.numObjs, 1, false);
 
 	long[][] clusters;
 	try {
