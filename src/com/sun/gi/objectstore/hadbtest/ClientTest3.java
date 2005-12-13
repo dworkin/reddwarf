@@ -67,7 +67,7 @@ class ClientTest3 implements Runnable {
 	long[] lockOids = participants[1];
 	long[] promotedPeekOids = participants[2];
 
-	Transaction trans = (Transaction) new DerbyObjectStoreTransaction(os);
+	Transaction trans = os.newTransaction(10, null);
 
 	if (verbose) { System.out.println("peeks: "); }
 
