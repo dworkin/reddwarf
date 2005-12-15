@@ -504,4 +504,11 @@ public class SimulationImpl implements Simulation {
 		return router.openChannel(name).channelID();
 	}
 
+	/* (non-Javadoc)
+	 * @see com.sun.gi.logic.Simulation#registerTimerEvent(com.sun.gi.logic.GLOReference, long, boolean)
+	 */
+	public long registerTimerEvent(GLOReference ref, long delay, boolean repeat) {
+		return kernel.registerTimerEvent(this,ref,delay,repeat);
+	}
+
 }

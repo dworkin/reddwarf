@@ -9,6 +9,7 @@ import java.util.Map;
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.Router;
 import com.sun.gi.comm.routing.UserID;
+import com.sun.gi.framework.timer.TimerManager;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimKernel;
 import com.sun.gi.logic.SimThread;
@@ -38,6 +39,7 @@ import com.sun.multicast.util.UnimplementedOperationException;
 
 public class SimKernelImpl implements SimKernel {
 	private ObjectStore ostore;
+	private TimerManager timerManager;
 
 	private List<Simulation> simList = new ArrayList<Simulation>();
 
@@ -137,6 +139,19 @@ public SimKernelImpl(ObjectStore ostore) {
 			threadPool.add(impl);
 		}
 		
+	}
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.logic.SimKernel#setTimerManager(com.sun.gi.framework.timer.TimerManager)
+	 */
+	public void setTimerManager(TimerManager timerManager) {
+		this.timerManager = timerManager;
+		
+	}
+	
+	public long registerTimerEvent(Simulation sim, GLOReference ref, long delay,
+			boolean repeat){
+		return timerManager.registerEvent(sim,((GLOReferenceImpl)ref).objID,delay,repeat);
 	}
 
 }

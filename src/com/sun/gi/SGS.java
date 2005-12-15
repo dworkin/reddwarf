@@ -34,6 +34,8 @@ import com.sun.gi.framework.status.ReportManager;
 import com.sun.gi.framework.status.ReportUpdater;
 import com.sun.gi.framework.status.StatusReport;
 import com.sun.gi.framework.status.impl.ReportManagerImpl;
+import com.sun.gi.framework.timer.TimerManager;
+import com.sun.gi.framework.timer.impl.TimerManagerImpl;
 import com.sun.gi.logic.SimKernel;
 import com.sun.gi.logic.Simulation;
 import com.sun.gi.logic.impl.SimKernelImpl;
@@ -46,6 +48,7 @@ import com.sun.gi.utils.StatisticalUUID;
 
 public class SGS {
 	ReportManager reportManager;
+	TimerManager timerManager;
 
 	TransportManager transportManager;
 
@@ -89,6 +92,13 @@ public class SGS {
 			// start framework services
 			transportManager = new LRMPTransportManager();
 			reportManager = new ReportManagerImpl(transportManager, REPORTTTL);
+			long heartbeat = 1000; // 1 sec heartbeat default
+			String hbprop = System.getProperty("sgs.framework.timer.heartbeat");
+			if (hbprop!= null){
+				heartbeat = Long.parseLong(hbprop);
+			}
+			timerManager = new TimerManagerImpl(heartbeat);
+			kernel.setTimerManager(timerManager);
 			// start game services
 			StatusReport installationReport = reportManager
 					.makeNewReport("_SGS_discover_" + sliceID);

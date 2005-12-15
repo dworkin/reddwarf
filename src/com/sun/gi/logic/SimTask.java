@@ -6,6 +6,7 @@ import java.io.*;
 import java.nio.ByteBuffer;
 
 import com.sun.gi.comm.routing.*;
+import com.sun.gi.logic.impl.GLOReferenceImpl;
 import com.sun.gi.logic.test.comm.CommTestBoot;
 import com.sun.gi.objectstore.*;
 
@@ -131,7 +132,16 @@ public interface SimTask {
  * @return
  */
 	public ChannelID openChannel(String string);
+	
+	/**
+	 * 
+	 * @param ref
+	 * @param delay
+	 * @param repeat
+	 * @return
+	 */
 
+	public long registerTimerEvent(long delay, boolean repeat, GLOReference ref);
 
 
 }

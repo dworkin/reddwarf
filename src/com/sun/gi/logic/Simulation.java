@@ -3,6 +3,7 @@ package com.sun.gi.logic;
 import java.nio.ByteBuffer;
 
 import com.sun.gi.comm.routing.*;
+import com.sun.gi.logic.impl.GLOReferenceImpl;
 import com.sun.gi.logic.impl.SimTaskImpl;
 
 /**
@@ -132,10 +133,8 @@ public interface Simulation {
 	 */
 	public ChannelID openChannel(String string);
 
-	
-
-
-
+	public long registerTimerEvent(GLOReference ref, long delay,
+			boolean repeat);
   
 
 }
