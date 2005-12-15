@@ -184,8 +184,8 @@ public class SimulationImpl implements Simulation {
 	}
 
 	// external
-	public SimTask newTask(GLOReference ref, String methodName, Object[] params) {
-		throw new UnimplementedOperationException("not implemented yet");
+	public SimTask newTask(GLOReference ref, Method method, Object[] params) {
+		return newTask(((GLOReferenceImpl) ref).objID,method,params);
 
 	}
 

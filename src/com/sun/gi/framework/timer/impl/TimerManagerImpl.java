@@ -19,6 +19,7 @@ import java.util.PriorityQueue;
 import com.sun.gi.framework.timer.TimerManager;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask;
+import com.sun.gi.logic.SimTimerListener;
 import com.sun.gi.logic.Simulation;
 import com.sun.gi.logic.impl.GLOReferenceImpl;
 
@@ -42,6 +43,7 @@ import com.sun.gi.logic.impl.GLOReferenceImpl;
  */
 public class TimerManagerImpl implements TimerManager {
 	private static long nextID = 0;
+	private final Method callbackMethod;
 
 	class TimerRec implements Comparable {
 		long evtID;
@@ -87,7 +89,18 @@ public class TimerManagerImpl implements TimerManager {
 
 	PriorityQueue<TimerRec> queue = new PriorityQueue<TimerRec>();
 
-	public TimerManagerImpl(final long heartbeat) {
+	public TimerManagerImpl(final long heartbeat) throws InstantiationException {
+		try {
+			callbackMethod = SimTimerListener.class.getMethod("timerEvent",
+					new Class[]{SimTask.class,long.class});
+		} catch (SecurityException e1) {			
+			e1.printStackTrace();
+			throw new InstantiationException();
+		} catch (NoSuchMethodException e1) {			
+			e1.printStackTrace();
+			throw new InstantiationException();
+		}
+		                                                                  
 		new Thread(new Runnable() {
 
 			public void run() {
@@ -100,7 +113,7 @@ public class TimerManagerImpl implements TimerManager {
 							if (rec.triggerTime <= time) { // do event
 								rec.sim.queueTask(rec.sim.newTask(
 										new GLOReferenceImpl(rec.objID),
-										"timerEvent",
+										callbackMethod,
 										new Object[] { rec.evtID }));
 								if (rec.repeatTime > 0) {
 									rec.triggerTime = time + rec.repeatTime;

@@ -1,5 +1,6 @@
 package com.sun.gi.logic;
 
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 
 import com.sun.gi.comm.routing.*;
@@ -60,11 +61,11 @@ public interface Simulation {
    * This call creates a SimTask object that can then be queued for executon.
    *
    * @param ref SOReference A reference to the GLO to invoke to start the task.
-   * @param methodName String The name of the method to invoke on the GLO.
+   * @param methodToCall The method to invoke on the GLO.
    * @param params Object[] The parameters to pass to that method.
    * @return SimTask The created SimTask.
    */
-  public SimTask newTask(GLOReference ref, String methodName, Object[] params);
+  public SimTask newTask(GLOReference ref, Method methodToCall, Object[] params);
 
   /**
    * Thsi method returns the string that has been assigend as the name of the

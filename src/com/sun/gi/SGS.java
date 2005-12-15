@@ -97,7 +97,7 @@ public class SGS {
 			if (hbprop!= null){
 				heartbeat = Long.parseLong(hbprop);
 			}
-			timerManager = new TimerManagerImpl(heartbeat);
+			timerManager = new TimerManagerImpl(heartbeat); 
 			kernel.setTimerManager(timerManager);
 			// start game services
 			StatusReport installationReport = reportManager

@@ -7,11 +7,10 @@
  * @author Jeff Kesselman
  * @version 1.0
  */
-package com.sun.gi.framework.timer;
+package com.sun.gi.logic;
 
 import java.io.Serializable;
 
-import com.sun.gi.logic.SimTask;
 
 /**
  *
@@ -22,6 +21,6 @@ import com.sun.gi.logic.SimTask;
  * @author Jeff Kesselman
  * @version 1.0
  */
-public interface TimerManagerListener extends Serializable {
+public interface SimTimerListener extends Serializable {
 	public void timerEvent(SimTask task, long eventID);
 }
