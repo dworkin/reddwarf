@@ -12,6 +12,7 @@ package com.sun.gi.framework.timer;
 import java.lang.reflect.Method;
 
 import com.sun.gi.logic.SimTask;
+import com.sun.gi.logic.Simulation;
 
 /**
  *
@@ -30,6 +31,13 @@ public interface TimerManager {
 	 * If repeating is set true it will be queued again in the same number of MS and
 	 * continue doing that until removed.
 	 * 
+	 * Timer events are *not* persistant nor ditributed.  They need to be set up by the Boot 
+	 * object of the app and always run local to the slice they are registered on.  
+	 * We have provided a destributed and persistant timer GLO library runs of this local timer
+	 * in app space to allow for destributed processing of persistant events.
+	 * 
+	 * @see com.sun.gi.gloutils.Timer
+	 * 
 	 * The system will make a best-effort to queue the task as close to the requested 
 	 * time as possible.  Note that actual execution is then up to the code that handles
 	 * executing queued tasks.
@@ -39,16 +47,13 @@ public interface TimerManager {
 	 * of that tick.  (eg, a 500 ms request at the default tick rate of 1sec (1000ms) will mean
 	 * an actual event frequency of approximately 1/sec.)
 	 * 
-	 * @param appID The ID of the Simulation the event belongs to.
-	 * @param startObjectID The ID of the target object
-	 * @param startMethod The name of the method to invoke
-	 * @param startArgs The arguments to pass to the method
-	 * @param delayTime The time in ns to delay before queuint the event.
-	 * @param repeating If false, this is a one shot, else it repeats
+	 * @param sim The simulation who is requesting this timer event
+	 * @param startObjectID ID of a GLO that implements TimerManagerListener to receive the event
+	 * @param delay The time in ns to delay before queuint the event.
+	 * @param repeat If false, this is a one shot, else it repeats
 	 * @returns an ID for the event
 	 */
-	public long registerEvent(long appID,long startObjectID,
-            Method startMethod, Object[] startArgs, long startTime, boolean repeating);
+	public long registerEvent(Simulation sim, long startObjectID, long delay, boolean repeat);
 	
 	/**
 	 * Removes a task from the lost of timed events.
