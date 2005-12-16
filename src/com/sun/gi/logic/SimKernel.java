@@ -2,6 +2,7 @@ package com.sun.gi.logic;
 
 import com.sun.gi.comm.routing.*;
 import com.sun.gi.framework.timer.TimerManager;
+import com.sun.gi.logic.Simulation.ACCESS_TYPE;
 import com.sun.gi.logic.impl.GLOReferenceImpl;
 import com.sun.gi.logic.impl.SimThreadImpl;
 import com.sun.gi.objectstore.*;
@@ -62,12 +63,13 @@ public interface SimKernel {
 	
 	/**
 	 * 
+	 * @param access 
 	 * @param sim
 	 * @param ref
 	 * @param delay
 	 * @param repeat
 	 * @return
 	 */
-	public long registerTimerEvent(Simulation sim, GLOReference ref, long delay,
+	public long registerTimerEvent(ACCESS_TYPE access, Simulation sim, GLOReference ref, long delay,
 			boolean repeat);
 }

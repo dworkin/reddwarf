@@ -15,6 +15,7 @@ import com.sun.gi.logic.SimKernel;
 import com.sun.gi.logic.SimThread;
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.Simulation;
+import com.sun.gi.logic.Simulation.ACCESS_TYPE;
 import com.sun.gi.objectstore.ObjectStore;
 import com.sun.gi.objectstore.Transaction;
 import com.sun.multicast.util.UnimplementedOperationException;
@@ -149,9 +150,9 @@ public SimKernelImpl(ObjectStore ostore) {
 		
 	}
 	
-	public long registerTimerEvent(Simulation sim, GLOReference ref, long delay,
+	public long registerTimerEvent(ACCESS_TYPE access, Simulation sim, GLOReference ref, long delay,
 			boolean repeat){
-		return timerManager.registerEvent(sim,((GLOReferenceImpl)ref).objID,delay,repeat);
+		return timerManager.registerEvent(sim,access, ((GLOReferenceImpl)ref).objID,delay,repeat);
 	}
 
 }

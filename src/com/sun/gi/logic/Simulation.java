@@ -150,7 +150,7 @@ public interface Simulation {
 	 */
 	public ChannelID openChannel(String string);
 
-	public long registerTimerEvent(GLOReference ref, long delay,
+	public long registerTimerEvent(ACCESS_TYPE access, GLOReference ref, long delay,
 			boolean repeat);
   
 

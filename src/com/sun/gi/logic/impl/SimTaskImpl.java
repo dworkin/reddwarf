@@ -257,8 +257,8 @@ public class SimTaskImpl implements SimTask {
 	 * @see com.sun.gi.logic.SimTask#registerTimerEvent(long, boolean,
 	 *      com.sun.gi.logic.GLOReference)
 	 */
-	public long registerTimerEvent(long delay, boolean repeat, GLOReference ref) {
-		return simulation.registerTimerEvent(ref, delay, repeat);
+	public long registerTimerEvent(ACCESS_TYPE access, long delay, boolean repeat, GLOReference ref) {
+		return simulation.registerTimerEvent(access, ref, delay, repeat);
 	}
 
 	/* (non-Javadoc)
@@ -266,6 +266,14 @@ public class SimTaskImpl implements SimTask {
 	 */
 	public void registerGLOID(long objID, Serializable glo) {
 		gloIDMap.put(glo,new Long(objID));		
+	}
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.logic.SimTask#registerTimerEvent(com.sun.gi.logic.Simulation.ACCESS_TYPE, long, boolean, com.sun.gi.logic.GLOReference)
+	 */
+	public long registerTimerEvent(long delay, boolean repeat, GLOReference reference) {
+		return registerTimerEvent(ACCESS_TYPE.GET,delay,repeat,reference);
+		
 	}
 
 	

@@ -13,6 +13,7 @@ import java.lang.reflect.Method;
 
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.Simulation;
+import com.sun.gi.logic.Simulation.ACCESS_TYPE;
 
 /**
  *
@@ -48,12 +49,13 @@ public interface TimerManager {
 	 * an actual event frequency of approximately 1/sec.)
 	 * 
 	 * @param sim The simulation who is requesting this timer event
+	 * @param access 
 	 * @param startObjectID ID of a GLO that implements TimerManagerListener to receive the event
 	 * @param delay The time in ns to delay before queuint the event.
 	 * @param repeat If false, this is a one shot, else it repeats
 	 * @returns an ID for the event
 	 */
-	public long registerEvent(Simulation sim, long startObjectID, long delay, boolean repeat);
+	public long registerEvent(Simulation sim, ACCESS_TYPE access, long startObjectID, long delay, boolean repeat);
 	
 	/**
 	 * Removes a task from the lost of timed events.

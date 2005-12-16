@@ -7,6 +7,7 @@ import java.nio.ByteBuffer;
 
 import com.sun.gi.comm.routing.*;
 import com.sun.gi.gloutils.pdtimer.PDTimer;
+import com.sun.gi.logic.Simulation.ACCESS_TYPE;
 import com.sun.gi.logic.impl.GLOReferenceImpl;
 import com.sun.gi.logic.test.comm.CommTestBoot;
 import com.sun.gi.objectstore.*;
@@ -143,6 +144,14 @@ public interface SimTask {
 	 */
 
 	public long registerTimerEvent(long delay, boolean repeat, GLOReference ref);
+	
+	/**
+	 * @param access
+	 * @param l
+	 * @param b
+	 * @param reference
+	 */
+	public long registerTimerEvent(ACCESS_TYPE access, long l, boolean b, GLOReference reference);
 
 	/**
 	 * @param timer
@@ -152,4 +161,6 @@ public interface SimTask {
 	public GLOReference makeReference(Serializable glo) throws InstantiationException;
 
 	public void registerGLOID(long objID,Serializable glo);
+
+	
 }

@@ -21,6 +21,7 @@ import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.SimTimerListener;
 import com.sun.gi.logic.Simulation;
+import com.sun.gi.logic.Simulation.ACCESS_TYPE;
 import com.sun.gi.logic.impl.GLOReferenceImpl;
 
 /**
@@ -54,11 +55,12 @@ public class TimerManagerImpl implements TimerManager {
 		long repeatTime;
 
 		Simulation sim;
+		ACCESS_TYPE accessType;
 
 		long objID;
 
 		public TimerRec(long delay, boolean repeating, Simulation sim,
-				long objID) {
+				ACCESS_TYPE access, long objID) {
 			evtID = nextID++;
 			triggerTime = System.currentTimeMillis() + delay;
 			if (repeating) {
@@ -68,6 +70,7 @@ public class TimerManagerImpl implements TimerManager {
 			}
 			this.sim = sim;
 			this.objID = objID;
+			accessType = access;
 		}
 
 		/*
@@ -112,7 +115,7 @@ public class TimerManagerImpl implements TimerManager {
 								.hasNext();) {
 							TimerRec rec = i.next();
 							if (rec.triggerTime <= time) { // do event
-								rec.sim.queueTask(rec.sim.newTask(
+								rec.sim.queueTask(rec.sim.newTask(rec.accessType,
 										new GLOReferenceImpl(rec.objID),
 										callbackMethod,
 										new Object[] { rec.evtID }));
@@ -146,9 +149,9 @@ public class TimerManagerImpl implements TimerManager {
 	 * @see com.sun.gi.framework.timer.TimerManager#registerEvent(long, long,
 	 *      java.lang.reflect.Method, java.lang.Object[], long, boolean)
 	 */
-	public long registerEvent(Simulation sim, long startObjectID, long delay,
+	public long registerEvent(Simulation sim, ACCESS_TYPE access, long startObjectID, long delay,
 			boolean repeat) {
-		TimerRec rec = new TimerRec(delay, repeat, sim, startObjectID);
+		TimerRec rec = new TimerRec(delay, repeat, sim, access, startObjectID);
 		synchronized (queue) {
 			queue.add(rec);
 		}

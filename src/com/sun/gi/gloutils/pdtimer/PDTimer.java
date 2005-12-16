@@ -14,6 +14,7 @@ import java.util.TreeMap;
 
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.SimTimerListener;
+import com.sun.gi.logic.Simulation.ACCESS_TYPE;
 
 /**
  *
@@ -32,7 +33,7 @@ public class PDTimer implements SimTimerListener {
 	
 	public void start(SimTask task,long heartbeat){
 		try {
-			task.registerTimerEvent(heartbeat*1000,true,task.makeReference(this));
+			task.registerTimerEvent(ACCESS_TYPE.PEEK,heartbeat*1000,true,task.makeReference(this));
 		} catch (InstantiationException e) {			
 			e.printStackTrace();
 		}
