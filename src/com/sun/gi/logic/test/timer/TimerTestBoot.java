@@ -9,6 +9,7 @@
  */
 package com.sun.gi.logic.test.timer;
 
+import com.sun.gi.gloutils.pdtimer.PDTimer;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimBoot;
 import com.sun.gi.logic.SimTask;
@@ -24,7 +25,7 @@ import com.sun.gi.logic.SimTimerListener;
  * @version 1.0
  */
 public class TimerTestBoot implements SimBoot, SimTimerListener {
-
+	GLOReference pdTimer = null;
 	long oneSecEvent;
 	long tenSecEvent;
 	long fiveSecEvent;
@@ -33,10 +34,26 @@ public class TimerTestBoot implements SimBoot, SimTimerListener {
 	 * @see com.sun.gi.logic.SimBoot#boot(com.sun.gi.logic.SimTask, boolean)
 	 */
 	public void boot(SimTask task, boolean firstBoot) {
-		GLOReference thisobj = task.findSO("BOOT");
-		oneSecEvent = task.registerTimerEvent(1000l,true,thisobj);
-		fiveSecEvent = task.registerTimerEvent(5000l,false,thisobj);
-		tenSecEvent = task.registerTimerEvent(10000l,true,thisobj);
+		System.out.println("TimerTestBoot running");
+		try {
+			GLOReference thisobj = task.makeReference(this);
+			/*
+			oneSecEvent = task.registerTimerEvent(1000l,true,thisobj);
+			fiveSecEvent = task.registerTimerEvent(5000l,false,thisobj);
+			tenSecEvent = task.registerTimerEvent(10000l,true,thisobj);
+			*/
+			PDTimer timer;
+			if (pdTimer==null){ // not instantiated yet
+				timer = new PDTimer();
+				pdTimer = task.createSO(timer,null);
+			} else {
+				timer=(PDTimer)pdTimer.get(task);
+			}
+			timer.start(task,1);
+		} catch (InstantiationException e) {			
+			e.printStackTrace();
+		}		
+
 	}
 
 	/* (non-Javadoc)

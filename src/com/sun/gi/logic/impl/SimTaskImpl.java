@@ -13,9 +13,12 @@ import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.Simulation;
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
+
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.Map;
 
 /**
  * <p>
@@ -72,6 +75,8 @@ public class SimTaskImpl implements SimTask {
 	private ClassLoader loader;
 
 	private List<OutputRecord> outputList = new ArrayList<OutputRecord>();
+	
+	private Map<Serializable,Long> gloIDMap = new HashMap<Serializable,Long>();
 
 	public SimTaskImpl(Simulation sim, ClassLoader loader, long startObjectID,
 			Method startMethod, Object[] startArgs) {
@@ -89,9 +94,10 @@ public class SimTaskImpl implements SimTask {
 	}
 
 	public void execute(ObjectStore ostore) {
-		this.trans = ostore.newTransaction(simulation.getAppID(), loader);
-		Serializable runobj = startObject.get(this);
+		this.trans = ostore.newTransaction(simulation.getAppID(), loader);		
 		outputList.clear();
+		gloIDMap.clear();
+		Serializable runobj = startObject.get(this);
 		try {
 			startMethod.invoke(runobj, startArgs);
 			doOutput();
@@ -129,6 +135,17 @@ public class SimTaskImpl implements SimTask {
 
 	public GLOReference makeReference(long id) {
 		return new GLOReferenceImpl(id);
+	}
+	
+	/* (non-Javadoc)
+	 * @see com.sun.gi.logic.SimTask#makeReference(java.io.Serializable)
+	 */
+	public GLOReference makeReference(Serializable glo) throws InstantiationException {		
+		Long idl = gloIDMap.get(glo);
+		if (idl == null){
+			throw new InstantiationException("Have no ID for supposed GLO ");
+		}
+		return makeReference(idl.longValue());
 	}
 
 	public Transaction getTransaction() {
@@ -204,7 +221,10 @@ public class SimTaskImpl implements SimTask {
 	 * @return SOReference
 	 */
 	public GLOReference createSO(Serializable simObject, String name) {
-		return makeReference(trans.create(simObject, name));
+		
+		GLOReferenceImpl ref = (GLOReferenceImpl) makeReference(trans.create(simObject, name));
+		registerGLOID(ref.objID,simObject);
+		return ref;
 	}
 
 	/*
@@ -225,5 +245,14 @@ public class SimTaskImpl implements SimTask {
 	public long registerTimerEvent(long delay, boolean repeat, GLOReference ref) {
 		return simulation.registerTimerEvent(ref, delay, repeat);
 	}
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.logic.SimTask#registerGLOID(long, java.io.Serializable)
+	 */
+	public void registerGLOID(long objID, Serializable glo) {
+		gloIDMap.put(glo,new Long(objID));		
+	}
+
+	
 
 }

@@ -41,6 +41,7 @@ public class GLOReferenceImpl implements GLOReference, Serializable {
   public Serializable get(SimTask task) {
     if ((objectCache == null)||(peeked == true)) {
       objectCache = task.getTransaction().lock(objID);
+      task.registerGLOID(objID,objectCache);
       peeked = false;
     }
     return objectCache;
@@ -50,6 +51,7 @@ public class GLOReferenceImpl implements GLOReference, Serializable {
   public Serializable peek(SimTask task) {
     if (objectCache == null) {
       objectCache = task.getTransaction().peek(objID);
+      task.registerGLOID(objID,objectCache);
       peeked = true;
     }
     return objectCache;

@@ -43,6 +43,7 @@ import com.sun.gi.logic.impl.GLOReferenceImpl;
  */
 public class TimerManagerImpl implements TimerManager {
 	private static long nextID = 0;
+
 	private final Method callbackMethod;
 
 	class TimerRec implements Comparable {
@@ -92,21 +93,21 @@ public class TimerManagerImpl implements TimerManager {
 	public TimerManagerImpl(final long heartbeat) throws InstantiationException {
 		try {
 			callbackMethod = SimTimerListener.class.getMethod("timerEvent",
-					new Class[]{SimTask.class,long.class});
-		} catch (SecurityException e1) {			
+					new Class[] { SimTask.class, long.class });
+		} catch (SecurityException e1) {
 			e1.printStackTrace();
 			throw new InstantiationException();
-		} catch (NoSuchMethodException e1) {			
+		} catch (NoSuchMethodException e1) {
 			e1.printStackTrace();
 			throw new InstantiationException();
 		}
-		                                                                  
+
 		new Thread(new Runnable() {
 
 			public void run() {
 				while (true) {
-					synchronized (queue) {
-						long time = System.currentTimeMillis();
+					long time = System.currentTimeMillis();
+					synchronized (queue) {						
 						for (Iterator<TimerRec> i = queue.iterator(); i
 								.hasNext();) {
 							TimerRec rec = i.next();
@@ -124,13 +125,13 @@ public class TimerManagerImpl implements TimerManager {
 								break;
 							}
 						}
-						while (time + heartbeat > System.currentTimeMillis()) {
-							try {
-								Thread.sleep((time + heartbeat)
-										- System.currentTimeMillis());
-							} catch (InterruptedException e) {
-								e.printStackTrace();
-							}
+					}
+					while (time + heartbeat > System.currentTimeMillis()) {
+						try {
+							Thread.sleep((time + heartbeat)
+									- System.currentTimeMillis());
+						} catch (InterruptedException e) {
+							e.printStackTrace();
 						}
 					}
 				}
