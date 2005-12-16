@@ -1,20 +1,33 @@
 package com.sun.gi.logic.impl;
 
-import java.io.*;
-import java.lang.reflect.*;
+import java.io.Serializable;
+import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 
 import javax.security.auth.Subject;
 
-import com.sun.gi.comm.routing.*;
+import com.sun.gi.comm.routing.ChannelID;
+import com.sun.gi.comm.routing.Router;
+import com.sun.gi.comm.routing.RouterListener;
+import com.sun.gi.comm.routing.SGSChannel;
+import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.framework.install.DeploymentRec;
-import com.sun.gi.logic.*;
-import com.sun.gi.objectstore.*;
-import com.sun.multicast.util.*;
+import com.sun.gi.logic.GLOReference;
+import com.sun.gi.logic.SimChannelListener;
+import com.sun.gi.logic.SimKernel;
+import com.sun.gi.logic.SimTask;
+import com.sun.gi.logic.Simulation;
+import com.sun.gi.objectstore.ObjectStore;
+import com.sun.gi.objectstore.Transaction;
 
 /**
  * <p>
@@ -178,14 +191,14 @@ public class SimulationImpl implements Simulation {
 	}
 
 	// internal
-	private SimTask newTask(long startObject, Method startMethod,
+	private SimTask newTask(ACCESS_TYPE access,long startObject, Method startMethod,
 			Object[] params) {
-		return new SimTaskImpl(this, loader, startObject, startMethod, params);
+		return new SimTaskImpl(this, loader, access, startObject, startMethod, params);
 	}
 
 	// external
-	public SimTask newTask(GLOReference ref, Method method, Object[] params) {
-		return newTask(((GLOReferenceImpl) ref).objID,method,params);
+	public SimTask newTask(ACCESS_TYPE access, GLOReference ref, Method method, Object[] params) {
+		return newTask(access,((GLOReferenceImpl) ref).objID,method,params);
 
 	}
 
@@ -309,9 +322,9 @@ public class SimulationImpl implements Simulation {
 	 *            SOReference
 	 */
 	public void addUserDataListener(UserID id, GLOReference ref) {
-		List dataListeners = (List) userDataListeners.get(id);
+		List<Long> dataListeners = userDataListeners.get(id);
 		if (dataListeners == null) {
-			dataListeners = new ArrayList();
+			dataListeners = new ArrayList<Long>();
 			userDataListeners.put(id, dataListeners);
 		}
 		dataListeners.add(new Long(((GLOReferenceImpl) ref).objID));
@@ -328,7 +341,7 @@ public class SimulationImpl implements Simulation {
 	public void addChannelListener(ChannelID id, GLOReference ref) {
 		List<Long> channelListenersList = channelListeners.get(id);
 		if (channelListenersList == null) {
-			channelListenersList = new ArrayList();
+			channelListenersList = new ArrayList<Long>();
 			channelListeners.put(id, channelListenersList);
 		}
 		channelListenersList.add(new Long(((GLOReferenceImpl) ref).objID));
@@ -472,6 +485,16 @@ public class SimulationImpl implements Simulation {
 		}
 	}
 
+	/**
+	 * @param objID
+	 * @param userJoinedMethod
+	 * @param params
+	 * @return
+	 */
+	public SimTask newTask(long objID, Method method, Object[] params) {
+		return newTask(ACCESS_TYPE.GET,objID,method,params);
+	}
+
 	/*
 	 * (non-Javadoc)
 	 * 
@@ -509,6 +532,13 @@ public class SimulationImpl implements Simulation {
 	 */
 	public long registerTimerEvent(GLOReference ref, long delay, boolean repeat) {
 		return kernel.registerTimerEvent(this,ref,delay,repeat);
+	}
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.logic.Simulation#newTask(com.sun.gi.logic.Simulation.AccessType, com.sun.gi.logic.GLOReference, java.lang.reflect.Method, java.lang.Object[])
+	 */
+	public SimTask newTask(GLOReference ref, Method methodToCall, Object[] params) {		
+		return newTask(ACCESS_TYPE.GET,ref,methodToCall,params);
 	}
 
 }

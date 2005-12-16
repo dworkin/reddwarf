@@ -3,9 +3,8 @@ package com.sun.gi.logic;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 
-import com.sun.gi.comm.routing.*;
-import com.sun.gi.logic.impl.GLOReferenceImpl;
-import com.sun.gi.logic.impl.SimTaskImpl;
+import com.sun.gi.comm.routing.ChannelID;
+import com.sun.gi.comm.routing.UserID;
 
 /**
  * <p>Title: Simulation</p>
@@ -20,6 +19,7 @@ import com.sun.gi.logic.impl.SimTaskImpl;
 
 
 public interface Simulation {
+	public enum ACCESS_TYPE {GET,PEEK,ATTEMPT};
   /**
    * This call adds an object as a listener for users joining or leaving this
    * particular game app.  When an event ocurrs, a SmTask is queued for each
@@ -59,6 +59,7 @@ public interface Simulation {
 
   /**
    * This call creates a SimTask object that can then be queued for executon.
+   * The AccessType for the target object will be ACCESS_GET
    *
    * @param ref SOReference A reference to the GLO to invoke to start the task.
    * @param methodToCall The method to invoke on the GLO.
@@ -66,6 +67,21 @@ public interface Simulation {
    * @return SimTask The created SimTask.
    */
   public SimTask newTask(GLOReference ref, Method methodToCall, Object[] params);
+  
+  /**
+   * This call creates a SimTask object that can then be queued for executon.
+   * The target object will be fetched from the ObjectStore for execution according to the passed
+   * in AccessType.  ACCESS_GET will wait for a lock on ref.  ACCESS_PEEK will
+   * fetch the last comitted value of ref as a task-local copy.  ACCESS_ATTEMPT
+   * will try to lock the object, if it cannot then the entire task will be discared.
+   *
+   * @param access The kind of access to use to fetch ref for execution(see above).
+   * @param ref SOReference A reference to the GLO to invoke to start the task.
+   * @param methodToCall The method to invoke on the GLO.
+   * @param params Object[] The parameters to pass to that method.
+   * @return SimTask The created SimTask.
+   */
+  public SimTask newTask(ACCESS_TYPE access, GLOReference ref, Method methodToCall, Object[] params);
 
   /**
    * Thsi method returns the string that has been assigend as the name of the

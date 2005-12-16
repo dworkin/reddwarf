@@ -38,6 +38,17 @@ public interface GLOReference {
    * @return Serializable The task local instance.
    */
   public Serializable peek(SimTask task);
+  
+  
+  /**
+   * This method is like a get() except that it does not block.
+   * Instead, if the object is already locked, it simply returns null
+   * objectstore.  Multiple calls to peek() on SOReferences that reference the
+   * same GLO will return the same task-local copy
+   * @param task SimTask  The SimTask context
+   * @return Serializable The in memory instance of the GLO or null.
+  */
+ public Serializable attempt(SimTask task);
 
   /**
    * This method makes a copy of an SOReference that references the same
@@ -45,4 +56,5 @@ public interface GLOReference {
    * @return SOReference the new SOReference.
    */
   public GLOReference shallowCopy();
+
 }

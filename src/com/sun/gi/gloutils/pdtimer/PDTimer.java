@@ -9,6 +9,9 @@
  */
 package com.sun.gi.gloutils.pdtimer;
 
+import java.util.SortedMap;
+import java.util.TreeMap;
+
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.SimTimerListener;
 

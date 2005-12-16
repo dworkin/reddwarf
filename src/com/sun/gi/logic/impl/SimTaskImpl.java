@@ -1,24 +1,23 @@
 package com.sun.gi.logic.impl;
 
-import com.sun.gi.objectstore.ObjectStore;
-import com.sun.gi.objectstore.Transaction;
-import java.lang.reflect.Method;
 import java.io.Serializable;
-import java.lang.reflect.*;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
-import com.sun.gi.objectstore.DeadlockException;
-import com.sun.gi.logic.SimTask;
-import com.sun.gi.logic.GLOReference;
-import com.sun.gi.logic.Simulation;
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
-
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Map;
+import com.sun.gi.logic.GLOReference;
+import com.sun.gi.logic.SimTask;
+import com.sun.gi.logic.Simulation;
+import com.sun.gi.logic.Simulation.ACCESS_TYPE;
+import com.sun.gi.objectstore.DeadlockException;
+import com.sun.gi.objectstore.ObjectStore;
+import com.sun.gi.objectstore.Transaction;
 
 /**
  * <p>
@@ -48,7 +47,7 @@ class OutputRecord {
 	boolean reliable;
 
 	ChannelID channel;
-
+		
 	public OutputRecord(ChannelID cid, UserID[] to, ByteBuffer buff,
 			boolean reliableFlag) {
 		channel = cid;
@@ -63,6 +62,7 @@ class OutputRecord {
 
 public class SimTaskImpl implements SimTask {
 	private Transaction trans;
+	private Simulation.ACCESS_TYPE accessType;
 
 	private GLOReference startObject;
 
@@ -78,13 +78,13 @@ public class SimTaskImpl implements SimTask {
 	
 	private Map<Serializable,Long> gloIDMap = new HashMap<Serializable,Long>();
 
-	public SimTaskImpl(Simulation sim, ClassLoader loader, long startObjectID,
+	public SimTaskImpl(Simulation sim, ClassLoader loader, ACCESS_TYPE access, long startObjectID,
 			Method startMethod, Object[] startArgs) {
 		this.simulation = sim;
 		this.startObject = this.makeReference(startObjectID);
 		this.startMethod = startMethod;
 		this.loader = loader;
-
+		this.accessType = access;
 		this.simulation = sim;
 		Object newargs[] = new Object[startArgs.length + 1];
 		newargs[0] = this;
@@ -97,7 +97,22 @@ public class SimTaskImpl implements SimTask {
 		this.trans = ostore.newTransaction(simulation.getAppID(), loader);		
 		outputList.clear();
 		gloIDMap.clear();
-		Serializable runobj = startObject.get(this);
+		Serializable runobj = null;
+		switch (accessType){
+			case GET:
+				runobj = startObject.get(this);
+				break;
+			case PEEK:
+				runobj = startObject.peek(this);
+				break;
+			case ATTEMPT:
+				runobj = startObject.attempt(this);
+				if (runobj == null){ // attempt failed
+					trans.abort();
+					return;
+				}
+				break;
+		}
 		try {
 			startMethod.invoke(runobj, startArgs);
 			doOutput();
