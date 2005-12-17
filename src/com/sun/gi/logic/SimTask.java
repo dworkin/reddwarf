@@ -165,13 +165,24 @@ public interface SimTask {
 	public void registerGLOID(long objID,Serializable glo);
 
 	/**
-	 * @param get
-	 * @param reference
-	 * @param string
-	 * @param cleanupList
+	 * 
+	 * @param accessType
+	 * @param target
+	 * @param method
+	 * @param parameters
 	 */
 	public void queueTask(ACCESS_TYPE accessType, GLOReference target, Method method,
 			Object[] parameters);
+	
+	/**
+	 * 
+	 * @param target
+	 * @param method
+	 * @param parameters
+	 */
+	public void queueTask(GLOReference target, Method method,
+			Object[] parameters);
+
 
 	
 }
