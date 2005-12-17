@@ -276,6 +276,14 @@ public class SimTaskImpl implements SimTask {
 		
 	}
 
+	/* (non-Javadoc)
+	 * @see com.sun.gi.logic.SimTask#queueTask(com.sun.gi.logic.Simulation.ACCESS_TYPE, com.sun.gi.logic.GLOReference, java.lang.String, java.lang.Object[])
+	 */
+	public void queueTask(ACCESS_TYPE accessType, GLOReference target, Method method, Object[] parameters) {		
+		simulation.queueTask(simulation.newTask(accessType,target,method,parameters));
+		
+	}
+
 	
 
 }

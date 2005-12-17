@@ -12,6 +12,7 @@ package com.sun.gi.gloutils.pdtimer;
 import java.util.SortedMap;
 import java.util.TreeMap;
 
+import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.SimTimerListener;
 import com.sun.gi.logic.Simulation.ACCESS_TYPE;
@@ -30,21 +31,43 @@ import com.sun.gi.logic.Simulation.ACCESS_TYPE;
  * @version 1.0
  */
 public class PDTimer implements SimTimerListener {
-	
+	GLOReference timerListRef=null;
 	public void start(SimTask task,long heartbeat){
+		if (timerListRef == null){ // first time
+			PDTimerEventList list = new PDTimerEventList();
+			timerListRef = task.createSO(list,null);
+		}
 		try {
 			task.registerTimerEvent(ACCESS_TYPE.PEEK,heartbeat*1000,true,task.makeReference(this));
 		} catch (InstantiationException e) {			
 			e.printStackTrace();
-		}
+		}		
 	}
 	
 	/* (non-Javadoc)
 	 * @see com.sun.gi.logic.SimTimerListener#timerEvent(com.sun.gi.logic.SimTask, long)
 	 */
 	public void timerEvent(SimTask task, long eventID) {
+		// NOte that when this is called we have just been PEEKed.
+		// Thsi is intentional to prvent needless blocking by the different
+		// slices all servicing timer events
 		System.out.println("pd timer tick");
-		
+		PDTimerEventList eventList = (PDTimerEventList)timerListRef.peek(task);
+		eventList.tick(task,System.currentTimeMillis());		
+	}
+	
+	public GLOReference addTimerEvent(SimTask task, ACCESS_TYPE access, long delay,boolean repeat,
+			GLOReference target, String methodName, Object[] parameters){
+		PDTimerEvent evnt = new PDTimerEvent(access,delay,repeat,target,methodName,parameters);
+		GLOReference evntRef = task.createSO(evnt,null);
+		PDTimerEventList list = (PDTimerEventList)timerListRef.get(task);
+		list.addEvent(task,evntRef);
+		return evntRef;
+	}
+	
+	public void removeTimerEvent(SimTask task,GLOReference eventRef){
+		PDTimerEventList list = (PDTimerEventList)timerListRef.get(task);
+		list.removeEvent(eventRef);
 	}
 
 	

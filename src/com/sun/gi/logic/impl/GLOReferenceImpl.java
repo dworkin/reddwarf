@@ -24,7 +24,7 @@ import com.sun.gi.logic.SimTask;
  * @version 1.0
  */
 
-public class GLOReferenceImpl implements GLOReference, Serializable {
+public class GLOReferenceImpl implements GLOReference, Serializable, Comparable {
 	long objID;
 
 	transient boolean peeked;
@@ -45,6 +45,14 @@ public class GLOReferenceImpl implements GLOReference, Serializable {
 			ClassNotFoundException {
 		in.defaultReadObject();
 		initTransients();
+	}
+	
+	/* (non-Javadoc)
+	 * @see com.sun.gi.logic.GLOReference#delete(com.sun.gi.logic.SimTask)
+	 */
+	public void delete(SimTask task) {
+		task.getTransaction().destroy(objID);
+		
 	}
 
 	public Serializable get(SimTask task) {
@@ -83,4 +91,24 @@ public class GLOReferenceImpl implements GLOReference, Serializable {
 		throw new UnsupportedOperationException("Not yet implemented");
 		// return null;
 	}
+
+	/* (non-Javadoc)
+	 * @see java.lang.Comparable#compareTo(T)
+	 */
+	public int compareTo(Object arg0) {
+		GLOReferenceImpl other = (GLOReferenceImpl)arg0;
+		if (objID< other.objID ){
+			return -1;
+		} else if (objID > other.objID) {
+			return 1;
+		} else {
+			return 0;
+		}
+	}
+	
+	public boolean equals(Object other){
+		return (compareTo(other)==0);
+	}
+
+	
 }

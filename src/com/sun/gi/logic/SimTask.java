@@ -3,7 +3,9 @@
 package com.sun.gi.logic;
 
 import java.io.*;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
+import java.util.List;
 
 import com.sun.gi.comm.routing.*;
 import com.sun.gi.gloutils.pdtimer.PDTimer;
@@ -161,6 +163,15 @@ public interface SimTask {
 	public GLOReference makeReference(Serializable glo) throws InstantiationException;
 
 	public void registerGLOID(long objID,Serializable glo);
+
+	/**
+	 * @param get
+	 * @param reference
+	 * @param string
+	 * @param cleanupList
+	 */
+	public void queueTask(ACCESS_TYPE accessType, GLOReference target, Method method,
+			Object[] parameters);
 
 	
 }

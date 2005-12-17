@@ -56,5 +56,9 @@ public interface GLOReference {
    * @return SOReference the new SOReference.
    */
   public GLOReference shallowCopy();
+/**
+ * @param task
+ */
+	public void delete(SimTask task);
 
 }
