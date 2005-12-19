@@ -1,0 +1,75 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN">
+<!--NewPage-->
+<HTML>
+<HEAD>
+<TITLE>
+Java(tm) Reliable Multicast(tm) Service version 1.1
+</TITLE>
+<LINK REL ="stylesheet" TYPE="text/css" HREF="stylesheet.css" TITLE="Style">
+</HEAD>
+<BODY BGCOLOR="white">
+A set of packages enabling application 
+developers to take advantage of emerging reliable multicast (RM) technologies across any 
+IP network.
+<BR>
+<P>These packages provide for sending data to receivers over IP multicast transport sessions 
+(channels). Receivers can choose the channels they want and filter out those they don't. 
+Administrators can impose access controls on channels, filtering access by user, time of 
+day, or content.
+
+<P>While TRAM, a strong reliable multicast transport protocol, is included the transport sub-package
+ also includes 
+a set of APIs that allows new protocols to be plugged in and used by existing  
+applications with little or no change to the applications.
+
+<P>A channel is a multicast transport session that conveys data from one or more senders to 
+one or more receivers. This is conceptually similar to an IP multicast group, but reliable 
+delivery, security, and other features may be added on.  One more component completes the 
+model. Each channel has one or more channel managers that are responsible for creating and 
+destroying the channel, configuring it, and managing channel membership (that is, who can 
+send and receive on it). 
+
+<P>These are the basic components in the model: channels, senders, receivers, and 
+channel managers.
+
+<P>The transport system is responsible for providing a reliable multicast transport. It may be 
+used directly by the application or indirectly through the channel management system.  The
+transport system is composed of two parts, a set of protocol-independent transport APIs and 
+one or more transport protocols.
+
+<P>Many different reliable multicast transport protocols have been developed and many more are on 
+the way. Therefore, this package defines a Multicast Transport Application Programmer Interface (MTAPI) 
+that channel managers, senders, and receivers may use to configure transport protocols and send 
+and receive data using them.
+
+<P>The Tree-Based Reliable Transport Protocol (TRAM) is a reliable multicast protocol designed to 
+support bulk data 
+transfer with a single sender and multiple receivers. TRAM uses dynamic trees to implement local 
+error recovery to scale to a very large number of receivers without imposing a serious burden on 
+the sender. It also includes congestion control and other techniques necessary to operate efficiently 
+and fairly with other protocols across the wide variety of link and client characteristics that make 
+up the Internet.
+
+<P>The channel management system is responsible for creating, configuring, and destroying channels upon 
+request. The Channel Management Application Programmer Interface (CMAPI) is used to create, manage, and 
+destroy channels.  Here is a description of the process.
+
+<P>First, a channel manager is asked to create the channel. Then the channel is configured to specify the 
+channel name, transport protocol to be used, etc. Finally, the channel is enabled. This allows senders 
+and receivers to use the channel.
+
+<P>To access an existing channel, a sender or receiver must contact a channel manager and query it for a 
+list of accessible channels. Then it may request to subscribe to or publish on one of these channels. 
+If access control permits, the channel manager will send appropriate parameters which the receiver may 
+use to subscribe to that channel.
+
+<P>A channel may be configured with one or more dynamic filters. A dynamic filter is a piece of Java code 
+that runs on a receiver and processes the data in a channel, transforming it in some way. For instance, a 
+dynamic filter can block access to entertainment channels during working hours. It can also highlight 
+stories that match a user's interest profile.
+
+<P>Dynamic filters are delivered to receivers when they register for a channel. Different receivers may 
+receive different filters, based on access control or preferences.
+
+</BODY>
+</HTML>

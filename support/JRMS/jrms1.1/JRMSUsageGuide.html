@@ -1,0 +1,513 @@
+<HTML>
+<HEAD>
+   <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+   <META NAME="GENERATOR" CONTENT="Mozilla/4.03 [en] (WinNT; I) [Netscape]">
+   <TITLE>A Quick Guide to Writing JRMS Applications</TITLE>
+</HEAD>
+<BODY BGCOLOR="#FFFFFF">
+
+<H1>A Quick Guide to writing JRMS applications</H1>
+
+<H2>1. Introduction</H2>
+JRMS stands for Java Reliable Multicast Service. It is a Java library for
+building reliable multicast applications. In this quick guide, we provide
+various tips to help you write an application using JRMS.  We first walk
+through fragments from a real application to illustrate how to use some
+of the key objects in the JRMS package.  JRMS has many auto-configuration
+features for ease of use; however, at times, it is necessary or desirable
+to resort to manual configuration.  This is explained in the following
+section.  Finally, we also explain the <a href="#addingNewProtocol" >steps</a>
+involved to add a new transport protocol into the JRMS framework.
+
+<H2>2. Example application</H2>
+
+<H3>2.1 Overview</H3>
+
+This simple example application involves a sender transmitting data to
+one or more receivers. To help conceptualize, we list the logical steps
+the sender and receivers perform:
+
+<BR><BR>
+<TABLE BORDER=1 COLS=2 WIDTH="100%" >
+
+<TR>
+  <TD><B>Sender</B></TD>
+  <TD><B>Receiver</B></TD>
+</TR>
+
+<TR>
+  <TD>
+    <a href="#s1"><i>(S1)</i></a> Create a transport profile<p>
+    <a href="#s23"><i>(S2)</i></a> Create a channel
+       and fill out channel information:
+      <UL compact>
+	<LI>description</LI>
+	<LI>transport profile</LI>
+	<LI>start time</LI>
+	<LI>etc.</LI>
+      </UL>
+    <a href="#s23"><i>(S3)</i></a> Advertise the channel<p>
+    <a href="#s456"><i>(S4)</i></a> Create a multicast socket (with
+      transport profile)<p>
+    <a href="#s456"><i>(S5)</i></a> Send data<p>
+    <a href="#s456"><i>(S6)</i></a> Close socket
+  </TD>
+
+  <TD>
+    <a href="#r123"><i>(R1)</i></a> Listen for channel advertisements<p>
+    <a href="#r123"><i>(R2)</i></a> For each advertised channel,
+      check if it is of interest<p>
+    <a href="#r123"><i>(R3)</i></a> For the selected channel:
+      <UL>
+	<LI>extract the transport profile</LI>
+	<LI>extract the start time</LI>
+	<LI>etc.</LI>
+      </UL>
+    <a href="#r456"><i>(R4)</i></a> Create a multicast socket (with
+      transport profile)<p>
+    <a href="#r456"><i>(R5)</i></a> Receive data<p>
+    <a href="#r456"><i>(R6)</i></a> If SessionDoneException detected,
+    close socket
+  </TD>
+</TR>
+</TABLE>
+
+<P>We refer to steps 1-4 as the <I>set-up phase</I>, and step 6 as the
+<i>tear-down</i> phase. 
+
+<P>There are considerable details and variations: for example, what is
+in the transport profile? Is the data sent as a stream, or in logical blocks?
+Is data sent continuously (file transfer) or with interleaving gaps (publish
+and subscribe)? When does the sender stop advertising? We will try to cover
+some of these below.
+
+<H3>2.2 Classes used</H3>
+Using the JRMS API means importing and instantiating the JRMS classes.
+In the example application, some of the classes used are:
+<PRE>
+        import com.sun.multicast.allocation.MulticastAddressManager;
+
+	import com.sun.multicast.reliable.channel.ChannelManagerFinder;
+	import com.sun.multicast.reliable.channel.PrimaryChannelManager;
+	import com.sun.multicast.reliable.channel.Channel;
+
+	import com.sun.multicast.reliable.transport.TransportProfile;
+	import com.sun.multicast.reliable.transport.tram.TRAMTransportProfile;
+	import com.sun.multicast.reliable.transport.RMPacketSocket;
+
+	import java.net.InetAddress;
+	import java.net.DatagramPacket;
+</PRE>
+TRAM is used here as an example transport; JRMS supports multiple transports.
+Documentation on the com.sun.multicast classes can be found from the JRMS javadoc pages.
+
+<BR><BR><BR>
+<H3>2.3 JRMS Javadoc Guide</H3>
+<TABLE BORDER=1 COLS=2 WIDTH="70%" >
+<TR><TD><B>com.sun.multicast.allocation</B></TD>
+<TD>multicast address management</TD></TR>
+<TR><TD><B>com.sun.multicast.advertising</B></TD>
+<TD>advertising facilities</TD></TR>
+<TR><TD><B>com.sun.multicast.reliable</B></TD>
+<TD>general JRMS exceptions</TD></TR>
+<TR><TD><B>com.sun.multicast.reliable.channel</B></TD>
+<TD>channel interfaces, classes, and events</TD></TR>
+<TR><TD><B>com.sun.multicast.reliable.sample_code</B></TD>
+<TD>documentation and source code for several sample applications</TD></TR>
+<TR><TD><B>com.sun.multicast.reliable.simple</B></TD>
+<TD>basic objects for simple applications</TD></TR>
+<TR><TD><B>com.sun.multicast.reliable.transport</B></TD>
+<TD>top-level transport interfaces</TD></TR>
+<TR><TD><B>com.sun.multicast.reliable.transport.lrmp</B></TD>
+<TD>LRMP transport</TD></TR>
+<TR><TD><B>com.sun.multicast.reliable.transport.tram</B></TD>
+<TD>TRAM transport</TD></TR>
+<TR><TD><B>com.sun.multicast.reliable.transport.um</B></TD>
+<TD>Unreliable multicast transport</TD></TR>
+<TR><TD><B>com.sun.multicast.util</B></TD>
+<TD>JRMS utilities</TD></TR>
+</TABLE><BR><BR>
+
+<a name="s1"></a>
+<H3>2.4 Creating a transport profile</H3>
+The <I>transport profile </I>is a very important channel parameter. The
+transport profile dictates which transport is used for multicast, and contains
+various transport parameters, such as multicast address, maximum data rate and
+if data delivery is ordered. The following code fragment illustrates step (S1):
+<PRE>
+	private TransportProfile tp;
+	private InetAddress addr;
+	private int port;
+        private Scope scope;
+	
+	// first, allocate one multicast address
+
+
+        MulticastAddressManager mam = MulticastAddressManager.getMulticastAddressManager();
+        if (scope == null) {
+            scope = mam.getScopeList(IPv4AddressType.getAddressType()).findScopeForTTL(ttl);
+            if (scope == null)
+		throw new IOException("No scope for requested TTL");
+        }
+
+        /* get an address with a long duration */
+        Lease lease = mam.allocateAddresses(null, scope, (int) ttl,
+                    1, startTime, startTime, duration, -1, null);
+        InetAddress addr = ((IPv4Address) lease.getAddresses().
+                    getFirstAddress()).toInetAddress();
+
+        // create a TRAM transport profile
+	// other transports, such as UM, LRMP, can be used instead of TRAM	
+	tp = new TRAMTransportProfile(addr,port);
+
+	// set multicast session scope	
+	tp.setTTL(ttl);
+
+	// enable ordered delivery
+	tp.setOrdered(true);
+
+        // set maximum rate of data transfer
+	tp.setMaximumSpeed(speed);
+
+	// and set any other transport-specific parameters
+	...
+
+</PRE>
+
+<a name="s23"></a>
+<H3>2.5 Creating a channel</H3>
+The channel is created by first finding a primary
+channel manager and then using it to create a channel:
+<PRE>
+	// create a channel
+	private PrimaryChannelManager pcm;
+	private Channel channel;
+	pcm = ChannelManagerFinder.getPrimaryChannelManager(null);
+	channel = pcm.createChannel();
+	channel.setChannelName(channelName);
+	channel.setApplicationName(applicationName);
+	channel.setTransportProfile(tp);
+	channel.setAbstract(someBlurbAboutThisChannel);
+	channel.setAdvertisingRequested(true);
+
+	// plus any other channel parameters
+	...
+
+	// once enabled, configuration is complete and advertisement can start
+	channel.setEnabled(true);
+</PRE>
+Note, the parameter passed to <tt>getPrimaryChannelManager</tt> is a reference to
+the primary channel manager.  When null is specified, the local channel
+manager is returned.
+
+These code fragments illustrate steps (S2) and (S3). Note the lines
+<tt>setTransportProfile</tt> and <tt>setAdvertisingRequested</tt>;
+the former provides the transport mechanism, and the latter gets the channel
+advertised so that receivers can find out about it.
+
+<a name="r123"></a>
+<H3>2.6 Receiver's set-up phase</H3>
+At a receiver, the application uses the static <tt>ChannelManagerFinder</tt>
+to get a primary channel manager, which is then used to check advertised
+channels. The application then selects the ones it is interested in:
+<PRE>
+	// find the channel of interest
+	private PrimaryChannelManager pcm;
+	private Channel channel;
+	pcm = ChannelManagerFinder.getPrimaryChannelManager(null);
+	
+	// channel lookup is by channelName and applicationName
+	// since more than one may match, need to determine the right one
+	long channelids[] = pcm.getChannelList(channelName, applicationName);
+	
+	// loop through the following to find the channel of interest
+	channel = pcm.getChannel(channelids[i]);
+
+	// apply application-specific criteria
+	checkInterest(channel);
+	...
+</PRE>
+
+In order to receive data, the application needs the transport profile:
+<PRE>
+	// extract the transport profile from the advertised channel
+	tp = channel.getTransportProfile();
+</PRE>
+The transport profile that was originally created by the sender has been
+made part of the channel which through advertisement became known to the
+local channel manager.  This explains how the receiver gets hold of the
+sender's transport profile.
+
+The above code fragments illustrated the receiver's set-up phase,
+steps (R1)-(R3).
+
+<a name="s456"></a>
+<H3>2.7 Socket and data</H3>
+In order to send and receive data, the sender and receiver
+both create sockets using the transport profile. This is what the sender does:
+<PRE>
+	private RMPacketSocket ms;
+	private DatagramPacket sendPacket;
+	byte[]	senddata = new byte[PACKET_SIZE];
+	
+	// create socket
+	ms = channel.createRMPacketSocket(tp, TransportProfile.SENDER);
+	// or directly using tp
+	// ms = tp.createRMPacketSocket(TransportProfile.SENDER);
+
+	// data transmission
+	// repeat the following according to application needs
+	preparePacket(senddata);
+	sendPacket = new DatagramPacket(senddata, senddata.length);
+	ms.send(sendPacket);
+	...
+
+	// teardown phase
+	ms.close();
+
+	// stop advertising this channel
+	// this can be done earlier, e.g. after data transmission starts
+	channel.setAdvertisingRequested(false);
+</PRE>
+Note there are a couple of ways to create a socket, either using the channel's
+<tt>createRMPacketSocket</tt> method, or using the transport profile's
+<tt>createRMPacketSocket</tt> method. 
+Usually, the sockets are created using channel methods.  Channels provide 
+more services to applications, such as security and filtering mechanisms.
+A very simple application that does not need channel features can use methods
+of the transport profile to create sockets.
+
+<a name="r456"></a>This is what the receiver does:
+<PRE>
+	private RMPacketSocket ms;
+	private DatagramPacket recvPacket;
+
+	// create socket
+	ms = channel.createRMPacketSocket(tp, TransportProfile.RECEIVER);
+
+	// data reception
+	// loop through the following until end of transmission recognized
+	try {
+		recvPacket = ms.receive();
+		// application-specific processing
+		consumePacket(recvPacket);
+	} catch ( SessionDoneException e ) {
+		// teardown phase
+		ms.close();
+	} catch ( JRMSException e) {
+		System.out.println("...");
+	}
+</PRE>
+Note, the use of exceptions to dispatch different return conditions is
+a very basic Java feature.  For the sake of simplicity, we have not used
+exceptions in the example code fragments, except in the above case where
+we have illustrated the use of a couple of them.
+The JRMS API contains a set of common exceptions supported by its
+implementations.
+
+<H3>2.8 Stream socket interface</H3>
+It is also possible to use a stream socket interface. In that case, the
+sending and receiving are in terms of reading and writing to a stream interface.
+At the sender side:
+<PRE>
+	// create stream socket
+	ms = channel.createRMStreamSocket(tp, TransportProfile.SENDER);
+	// or directly
+	// ms = tp.createMRStreamSocket(TransportProfile.SENDER);
+	OutputStream s = ms.getOutputStream();
+
+	// data transmission
+	// use whatever stream write method that's convenient, e.g.
+	s.write("hello");
+	...
+	// send
+	s.flush();
+
+	// teardown phase
+	ms.close();
+	channel.setAdvertisingRequested(false);
+</PRE>
+Equivalently, at the receiver:
+<PRE>
+	// create stream socket at receiver
+	ms = channel.createRMStreamSocket(tp, TransportProfile.RECEIVER);
+	// or directly
+	// ms = tp.createMRStreamSocket(TransportProfile.RECEIVER);
+	InputStream s = ms.getInputStream();
+
+	// data reception
+	// use whatever read method that's convenient
+	byte message[] = new byte[SIZE];
+	int len = s.read(message);
+	...
+
+	// teardown phase
+	ms.close();
+</PRE>
+<br><br>
+
+<a name="configurations"></a>
+<H2>3. Operational Tips</H2>
+JRMS provides many auto-configuration features.  For example, information
+about a multicast session (channel) is broadcasted using SAP (Session
+Announcement Protocol).  This means little or no configuration needs to be
+done to the receivers before the multicast session can begin.  When using
+the TRAM protocol, the receivers automatically organize themselves into
+a repair tree to provide reliability service.
+
+<p>This section explains various manual configuration tips when it
+is desirable/necessary to override autoconfiguration.
+
+<H3>3.1 Storing channel parameters in a file</H3>
+
+The SAP message size has some limits, when exceeded they would not traverse
+beyond the local network.  Sometimes, network managers do not want to
+allow SAP in their networks.  In such situations, the channel can be
+created and stored in a file.  Note, this is much easier than storing the
+channel parameters one by one into a file.  The receiver application fetches
+the file somehow (e.g. via the web, or file sharing) and restores the
+channel object.
+
+The methods to file and read a channel are implemented as part of the
+LocalPCM object (which implements the PrimaryChannelManager interface).
+The created channel must be cast into a LocalChannel.  LocalChannel is
+a serializable implementation of Channel (some strictly local parameters
+of LocalChannel are declared transient to make it serializable).
+
+The following code fragment illustrate how to store a channel in a file:
+
+<PRE>
+	// Get a LocalPCM
+	LocalPCM m = 
+          (LocalPCM) ChannelManagerFinder.getPrimaryChannelManager(null);
+          
+        // Create a serializable channel (LocalChannel) and fill in the
+        // parameters, including the transport profile
+	LocalChannel c = (LocalChannel) m.createChannel();
+	c.setChannelName(channelName);
+	c.setApplicationName(applicationName); 
+	InetAddress mcastAddress = InetAddress.getByName(address);
+	tp = new TRAMTransportProfile(mcastAddress, port);
+	tp.setMaxDataRate(speed);
+	tp.setTTL(ttl);
+	tp.setOrdered(true);    
+	c.setTransportProfile(tp);
+	c.setEnabled(true);
+	
+	// Use the LocalPCM fileChannel method to store the channel in
+	// a file.  Here, the ChannelName is used as the file name.
+	m.fileChannel(c, channelName);
+</PRE>
+
+And this is how you read it back:
+
+<PRE>
+	LocalPCM m =
+	  (LocalPCM) ChannelManagerFinder.getChannelManager(null);
+	LocalChannel c = (LocalChannel) cm.readChannel(channelFileName);
+        TransportProfile tp = c.getTransportProfile();
+</PRE>
+
+For many situations, it is convenient to create a channel once and use
+it again and again.  For example, your application distributes daily news
+continuously.  The sender and receivers can be restarted at different times
+and it is not convenient to use SAP.  Then a channel can be created and
+posted on a web page (or a well-known directory if file sharing is
+available).  Both the sender and receivers read the channel from the same
+place.  The side-effect, in this case, is that the different sessions will
+have the same session Id.
+
+<p>In the <b>simple</b> package, there is a SimpleChannel program that lets
+you create a simple channel with a few of the essential parameters that
+you can enter on the command line.
+
+<H3>3.2 Static repair tree configuration</H3>
+
+There is some limited capability for configurating the repair tree.
+If you follow the steps below, you can control which repair head a
+particular receiver uses.
+
+<ol>
+  <li> When you prepare the transport profile, add the following step:
+  <pre>
+  tp.setTreeFormationPreference(TRAMTRansportProfile.TREE_FORM_HAMTHA_STATIC_R) </pre>
+  This tells all the receivers that the session is using HAMTHA method for
+  for tree formation, and reading a static file is allowed.  (HAMTHA stands
+  for "Head Advertisement before data starts and Member Triggered Head
+  Advertisement after data started", which is the default method).
+  <p>
+  <li> For each receiver that needs to have a specific repair head, create
+  a file, named jrmstree.cfg (in the application's directory), that
+  contains the following line:
+  <pre>
+  [head's ip address] [ttl from head]   </pre>
+  The ip address is in the a.b.c.d form, and the ttl is the number of hops
+  (in terms of multicast) the receiver is away from the head (e.g. equal to
+  1 if both hosts are on the same LAN).  If you allow a number of possible
+  repair heads, you can include a number of lines in the file.
+  <p>
+  <li> For each receiver that must serve as a head, create a file, named
+  jrmstree.cfg (in the application's directory), that contains the
+  following line:
+  <pre>
+  [local host's ip address] 0  </pre>
+  If this receiver must have a specific parent, then it must contain an
+  additional line as described above.
+</ol>
+
+This is often found useful when setting up a long-term service, or during
+testing.
+
+<a name="addingNewProtocol"></a>
+<H2>4. Importing new transport protocols into JRMS</H2>
+
+The following describes the procedure to add a new transport protocol 
+into the JRMS environment.
+<OL>
+<LI> Select a package name for the transport protocol to be added.
+     For example:
+     <pre>  <code>     com.mycompany.newprotocolName </code> </pre>
+
+<LI> Implement a transport profile class for the new transport. Note
+     that the transport profile class implements the interface
+     specified in TransportProfile.java.
+     
+<LI> Depending on the protocol, implement any one or both of the 
+     following interfaces.
+     <UL>
+	      <LI> RMPacketSocket.java
+	      <LI> RMStreamSocket.java
+     </UL>
+ 
+<LI> Implement an RMStatistics interface (optional).
+
+<LI> Compile the package. Applications will have to import the
+     new transport package to use it.
+
+</OL><BR>
+<B>Transport Profile Variable Names</B><BR>
+Here is a suggestion about variable names in the transport
+profile class.  This class defines a set of parameters used by your
+transport, for example:
+<pre>
+	Transport name and version
+	Multicast Address
+	Multicast Port
+	Ordered Delivery Available
+	MultiSender Support Available
+	AuthenticationSecurity Specifications
+	Maximum Data Rate
+</pre>
+While the names of these parameters may be long externally, it is
+helpful to use shortened variable names internally.  The reason is that
+these names get carried in the serialized form of the transport profile
+sent in channel advertisements.  Using shorter variable names helps avoid 
+exceeding the packet size limit imposed by the advertising protocol.  
+The following is an example definition:
+<pre>
+	private int mr = DEFAULT_MAX_RATE;
+	public int getMaximumDataRate() { return mr; }
+	public void setMaximumDataRate(int rate) { mr = rate; }	
+</pre>
+</BODY>
+</HTML>

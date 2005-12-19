@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html lang="en-us" xml:lang="en-us">
+<head>
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type" />
+<meta name="copyright" content="(C) Copyright 2005" />
+<meta name="DC.rights.owner" content="(C) Copyright 2005" />
+<meta content="public" name="security" />
+<meta content="index,follow" name="Robots" />
+<meta http-equiv="PICS-Label" content='(PICS-1.1 "http://www.icra.org/ratingsv02.html" l gen true r (cz 1 lz 1 nz 1 oz 1 vz 1) "http://www.rsac.org/ratingsv01.html" l gen true r (n 0 s 0 v 0 l 0) "http://www.classify.org/safesurf/" l gen true r (SS~~000 1))' />
+<meta content="task" name="DC.Type" />
+<meta name="DC.Title" content="Accessing databases within a jar file using the classpath" />
+<meta content="Accessing read-only databases from classpath, Read-only databases, putting in classpath" name="DC.subject" />
+<meta content="Accessing read-only databases from classpath, Read-only databases, putting in classpath" name="keywords" />
+<meta scheme="URI" name="DC.Relation" content="cdevdeploy15325.html" />
+<meta scheme="URI" name="DC.Relation" content="tdevdeploy26887.html" />
+<meta scheme="URI" name="DC.Relation" content="tdevdeploy19136.html" />
+<meta scheme="URI" name="DC.Relation" content="tdevdeploy33704.html" />
+<meta scheme="URI" name="DC.Relation" content="cdevdeploy11201.html" />
+<meta scheme="URI" name="DC.Relation" content="cdevdeploy82529.html" />
+<meta scheme="URI" name="DC.Relation" content="cdevdeploy18716.html" />
+<meta scheme="URI" name="DC.Relation" content="cdevdeploy856333.html" />
+<meta content="XHTML" name="DC.Format" />
+<meta content="tdevdeploy39856" name="DC.Identifier" />
+<meta content="en-us" name="DC.Language" />
+<link href="commonltr.css" type="text/css" rel="stylesheet" />
+<title>Accessing databases within a jar file using the classpath</title>
+</head>
+<body id="tdevdeploy39856"><a name="tdevdeploy39856"><!-- --></a>
+
+
+<h1 class="topictitle1">Accessing databases within a jar file using the classpath</h1>
+
+
+<div>
+<div class="section"> <p>Once an archive containing one or more <span>Derby</span> databases
+has been created it can be placed in the classpath. This allows access to
+a database from within an application without the application's knowing the
+path of the archive. When jar or zip files are part of the classpath, you
+do not have to specify the jar subsubprotocol to connect to them.</p>
+ <p>To
+access a database in a zip or jar file in the classpath:</p>
+</div>
+
+<ol>
+<li class="stepexpand"><span>Set the classpath to include the jar or zip file before starting
+up <span>Derby</span>:</span> <pre>CLASSPATH="C:\dbs.jar;%CLASSPATH%"</pre>
+
+</li>
+
+<li class="stepexpand"><span>Connect to a database within the jar or zip file with one of the
+following connection URLs:</span> <pre><strong>Standard syntax:</strong>
+jdbc:derby:/<em>databasePathWithinArchive</em></pre>
+<pre><strong>Syntax with subsubprotocol:</strong>
+jdbc:derby:classpath:/<em>databasePathWithinArchive</em></pre>
+
+</li>
+
+</ol>
+
+<div class="section"> <p>For example:</p>
+<pre>jdbc:derby:/products/boiledfood
+jdbc:derby:classpath:/products/boiledfood</pre>
+</div>
+
+</div>
+
+<div>
+<ul class="ullinks">
+<li class="ulchildlink"><strong><a href="cdevdeploy18716.html">Connecting to databases with ambiguous paths to databases in the file system</a></strong><br />
+</li>
+<li class="ulchildlink"><strong><a href="cdevdeploy856333.html">Connecting to databases when the path is ambiguous because of databases in the classpath</a></strong><br />
+</li>
+</ul>
+
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a href="cdevdeploy15325.html" title="You can create Derby databases for use on read-only media such as CD-ROMs.">Creating Derby databases for read-only use</a></div>
+</div>
+<div class="relconcepts"><strong>Related concepts</strong><br />
+<div><a href="cdevdeploy11201.html" title="">Accessing a read-only database in a zip/jar file</a></div>
+<div><a href="cdevdeploy82529.html" title="">Databases on read-only media and DatabaseMetaData</a></div>
+</div>
+<div class="reltasks"><strong>Related tasks</strong><br />
+<div><a href="tdevdeploy26887.html" title="">Creating and preparing the database for read-only use</a></div>
+<div><a href="tdevdeploy19136.html" title="">Deploying the database on the read-only media</a></div>
+<div><a href="tdevdeploy33704.html" title="">Transferring read-only databases to archive (jar or zip) files</a></div>
+</div>
+</div>
+</body>
+</html>

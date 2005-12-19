@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html lang="en-us" xml:lang="en-us">
+<head>
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type" />
+<meta name="copyright" content="(C) Copyright 2005" />
+<meta name="DC.rights.owner" content="(C) Copyright 2005" />
+<meta content="public" name="security" />
+<meta content="index,follow" name="Robots" />
+<meta http-equiv="PICS-Label" content='(PICS-1.1 "http://www.icra.org/ratingsv02.html" l gen true r (cz 1 lz 1 nz 1 oz 1 vz 1) "http://www.rsac.org/ratingsv01.html" l gen true r (n 0 s 0 v 0 l 0) "http://www.classify.org/safesurf/" l gen true r (SS~~000 1))' />
+<meta content="concept" name="DC.Type" />
+<meta name="DC.Title" content="Setting the access mode for particular users" />
+<meta content="Access, full (read-write) versus read-only" name="DC.subject" />
+<meta content="Access, full (read-write) versus read-only" name="keywords" />
+<meta scheme="URI" name="DC.Relation" content="cdevcsecure866060.html" />
+<meta scheme="URI" name="DC.Relation" content="cdevcsecure865818.html" />
+<meta scheme="URI" name="DC.Relation" content="rdevcsecure935.html" />
+<meta scheme="URI" name="DC.Relation" content="rdevcsecure379.html" />
+<meta content="XHTML" name="DC.Format" />
+<meta content="cdevcsecure865880" name="DC.Identifier" />
+<meta content="en-us" name="DC.Language" />
+<link href="commonltr.css" type="text/css" rel="stylesheet" />
+<title>Setting the access mode for particular users</title>
+</head>
+<body id="cdevcsecure865880"><a name="cdevcsecure865880"><!-- --></a>
+
+
+<h1 class="topictitle1">Setting the access mode for particular users</h1>
+
+
+<div>
+<p>To specify which particular users have full (read-write) access to a database,
+use the <em>derby.database.fullAccessUsers</em> property. For example:</p>
+
+<pre>CALL SYSCS_UTIL.SYSCS_SET_DATABASE_PROPERTY(
+    'derby.database.fullAccessUsers', 'sa,mary')</pre>
+
+<p>To specify which particular users have read-only access to a database,
+use the <em>derby.database.readOnlyAccessUsers</em> property. For example:</p>
+
+<pre>CALL SYSCS_UTIL.SYSCS_SET_DATABASE_PROPERTY(
+    'derby.database.readOnlyAccessUsers', 'guest,"Fred!"')</pre>
+
+<p>For these properties, you specify users as a comma-separated list (no spaces
+between the comma and the next user).</p>
+
+<p>For users not specified with either property the access is specified by
+the <em>derby.database.defaultConnectionMode</em> property.</p>
+
+<div class="note"><span class="notetitle">Note: </span>It is possible to configure a database so that it cannot be changed
+(or even accessed) using the <em>derby.database.defaultConnectionMode</em> property.
+If you set this property to <samp class="codeph"><em>noAccess</em></samp> or <samp class="codeph"><em>readOnlyAccess</em></samp>,
+be sure to allow at least one user full access.</div>
+
+<p>See the Javadoc for the utility or <a href="rdevcsecure131.html#rdevcsecure131">Examples of user authorization</a> for
+more details.</p>
+
+</div>
+
+<div>
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a href="cdevcsecure866060.html" title="">Setting user authorization</a></div>
+</div>
+<div class="relconcepts"><strong>Related concepts</strong><br />
+<div><a href="cdevcsecure865818.html" title="">Setting the default access mode</a></div>
+</div>
+<div class="relref"><strong>Related reference</strong><br />
+<div><a href="rdevcsecure935.html" title="">Notes on user authorization</a></div>
+<div><a href="rdevcsecure379.html" title="">User authorization exceptions</a></div>
+</div>
+</div>
+</body>
+</html>

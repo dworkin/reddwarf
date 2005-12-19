@@ -1,7 +1,7 @@
 package com.sun.gi.objectstore.test;
 
 import com.sun.gi.objectstore.ObjectStore;
-import com.sun.gi.objectstore.impl.TTObjectStore;
+import com.sun.gi.objectstore.impl.DerbyObjectStore;
 import com.sun.gi.objectstore.Transaction;
 import java.io.Serializable;
 import com.sun.gi.objectstore.DeadlockException;
@@ -38,7 +38,7 @@ public class OstoreTest {
   }
 
   public static void main(String[] args) {
-    ObjectStore ostore = new TTObjectStore(10,20);
+    ObjectStore ostore = new DerbyObjectStore(10,20);
     System.out.println("Clearing object store");
     ostore.clear();
     System.out.println("Assigning transactions.");

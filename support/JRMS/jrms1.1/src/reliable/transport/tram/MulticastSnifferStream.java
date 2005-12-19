@@ -1,0 +1,128 @@
+/* 
+ * Copyright (c) 2001, Sun Microsystems Laboratories 
+ * All rights reserved. 
+ * 
+ * Redistribution and use in source and binary forms, 
+ * with or without modification, are permitted provided 
+ * that the following conditions are met: 
+ * 
+ *     Redistributions of source code must retain the 
+ *     above copyright notice, this list of conditions 
+ *     and the following disclaimer. 
+ *             
+ *     Redistributions in binary form must reproduce 
+ *     the above copyright notice, this list of conditions 
+ *     and the following disclaimer in the documentation 
+ *     and/or other materials provided with the distribution. 
+ *             
+ *     Neither the name of Sun Microsystems, Inc. nor 
+ *     the names of its contributors may be used to endorse 
+ *     or promote products derived from this software without 
+ *     specific prior written permission. 
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND 
+ * CONTRIBUTORS ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, 
+ * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF 
+ * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+ * DISCLAIMED. IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE 
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, 
+ * OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, 
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, 
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND 
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, 
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY 
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF 
+ * THE POSSIBILITY OF SUCH DAMAGE. 
+ */
+
+/*
+ * MulticastSnifferStream
+ * 
+ * Module Description:
+ * 
+ * This module implements the receiving side of a multicast application.
+ * It creates a transport profile for the TRAM Multicast protocol
+ * setting the address, port.
+ */
+package com.sun.multicast.reliable.transport.tram;
+
+import java.net.*;
+import java.io.*;
+import java.awt.Dimension;
+import java.awt.Button;
+import com.sun.multicast.util.Util;
+import com.sun.multicast.reliable.transport.InvalidMulticastAddressException;
+import com.sun.multicast.reliable.transport.TransportProfile;
+
+class MulticastSnifferStream {
+
+    public static void main(String[] args) {
+        InetAddress ia = null;
+        byte buffer[];
+        int port = 0;
+        int length = 0;
+        int packetNumber = 0;
+        int packetLength = 0;
+        DatagramPacket dp = null;
+        long nextPacket = 1;
+        int uport = 0;
+        BrickLayer brickLayer = new BrickLayer(new Dimension(600, 600), 0, 
+                                               "Receiver Brick Layer");
+
+        /* Read the address and port from the command line */
+
+        try {
+            ia = InetAddress.getByName(args[0]);
+            port = Integer.parseInt(args[1]);
+
+            if (args.length > 2) {
+                uport = Integer.parseInt(args[2]);
+            } 
+        } catch (Exception e) {
+            System.out.println(e);
+            System.out.println(
+		"Usage: java MulticastSniffer address port");
+            System.exit(1);
+        }
+
+        /*
+         * Create a new transport Profile with the multicast address and port
+         * specified in the command line. Create a new RMSocket with the
+         * TransportProfile.
+         */
+        TRAMStreamSocket so = null;
+
+        try {
+            TRAMTransportProfile tp = new TRAMTransportProfile(ia, port);
+
+            tp.setOrdered(true);
+
+            if (uport != 0) {
+                tp.setUnicastPort(uport);
+            } 
+
+            so = (TRAMStreamSocket)
+		tp.createRMStreamSocket(TransportProfile.RECEIVER);
+
+            InputStream is = so.getInputStream();
+
+            while (true) {
+                brickLayer.putBrick(is);
+            }
+        } catch (EOFException eof) {
+            System.out.println(eof);
+            System.out.println("Closing the Socket");
+            so.close();
+            System.out.println("Sniffer Exiting");
+            System.exit(1);
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.err.println(e);
+            System.exit(1);
+        }
+
+        System.out.println("Done!!!");
+    }
+
+}
+

@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html lang="en-us" xml:lang="en-us">
+<head>
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type" />
+<meta name="copyright" content="(C) Copyright 2005" />
+<meta name="DC.rights.owner" content="(C) Copyright 2005" />
+<meta content="public" name="security" />
+<meta content="index,follow" name="Robots" />
+<meta http-equiv="PICS-Label" content='(PICS-1.1 "http://www.icra.org/ratingsv02.html" l gen true r (cz 1 lz 1 nz 1 oz 1 vz 1) "http://www.rsac.org/ratingsv01.html" l gen true r (n 0 s 0 v 0 l 0) "http://www.classify.org/safesurf/" l gen true r (SS~~000 1))' />
+<meta content="concept" name="DC.Type" />
+<meta name="DC.Title" content="Bulk import/export requirements and considerations" />
+<meta scheme="URI" name="DC.Relation" content="ctoolsimport13648.html" />
+<meta scheme="URI" name="DC.Relation" content="ctoolsimport98264.html" />
+<meta content="XHTML" name="DC.Format" />
+<meta content="ctoolsimport27052" name="DC.Identifier" />
+<meta content="en-us" name="DC.Language" />
+<link href="commonltr.css" type="text/css" rel="stylesheet" />
+<title>Bulk import/export requirements and considerations</title>
+</head>
+<body id="ctoolsimport27052"><a name="ctoolsimport27052"><!-- --></a>
+
+
+<h1 class="topictitle1">Bulk import/export requirements and considerations</h1>
+
+
+<div>
+<dl>
+<dt class="dlterm">The table must exist.</dt>
+
+<dd>For you to import data into a table, the table must already exist in <span>Derby</span>.
+The table does not have to be empty. If the table is not empty, bulk import
+performs single inserts which results in slower performance.</dd>
+
+<dt class="dlterm">Create indexes and primary key, foreign key, and unique constraints
+first.</dt>
+
+<dd> To avoid a separate create index step, create indexes and primary keys
+on tables before you import data. However, if your memory and disk spaces
+resources are limited, you can build the indexes and primary keys after importing
+data.</dd>
+
+<dt class="dlterm">Data types.</dt>
+
+<dd>You can import and export only data of the non-binary, <em>built-in</em> data types. <span>Derby</span> implicitly converts the strings to the
+data type of the receiving column. If any of the implicit conversions fail,
+the whole import is aborted. For example, "3+7" cannot be converted
+into an integer. An export that encounters a runtime error stops. 
+<div class="note"><span class="notetitle">Note: </span>You cannot import or export the binary data types: BLOB, CLOB, CHAR FOR BIT
+DATA, VARCHAR FOR BIT DATA, or LONG VARCHAR FOR BIT DATA. </div>
+</dd>
+
+<dt class="dlterm">Locking during import.</dt>
+
+<dd>Import procedures use the same isolation level as the connection in
+which they are executed to insert data into tables. During import, the entire
+table is exclusively locked irrespective of the isolation level.</dd>
+
+<dt class="dlterm">Locking during export.</dt>
+
+<dd>Export procedures use the same isolation level as the connection in
+which they are executed to fetch data from tables.</dd>
+
+<dt class="dlterm">Import behavior on tables with triggers.</dt>
+
+<dd>The import procedure fires INSERT triggers when data is appended to
+the table. The REPLACE option is not allowed when triggers are enabled on
+the table.</dd>
+
+<dt class="dlterm">Restrictions on the REPLACE option.</dt>
+
+<dd>If a table that receives imported data already contains data, you can
+either replace or append to the existing data. You can use the REPLACE option
+on tables that have dependent tables, but the replaced data must maintain
+referential integrity, otherwise the import operation will be rolled back.
+You cannot use the REPLACE option if the table has enabled triggers.</dd>
+
+<dt class="dlterm">Restrictions on tables.</dt>
+
+<dd>You cannot use import procedures to import data into a system table
+or a declared temporary table.</dd>
+
+</dl>
+
+</div>
+<div>
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a href="ctoolsimport13648.html" title="">Bulk Import/Export overview</a></div>
+</div>
+<div class="relconcepts"><strong>Related concepts</strong><br />
+<div><a href="ctoolsimport98264.html" title="">Options for running the import and export procedures</a></div>
+</div>
+</div>
+</body>
+</html>

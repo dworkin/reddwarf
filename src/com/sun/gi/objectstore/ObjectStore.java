@@ -86,4 +86,11 @@ public interface ObjectStore {
    */
   public OStoreMetaData lockMetaData(Transaction trans);
 
+  // DJE
+  public void returnTransaction(Transaction trans);
+  public void tstampChanged(long objectID);
+  public void waitForTstampChange(long objectID);
+  public void setObjectHolder(long objectID, Transaction trans);
+  public void tstampInterrupt(long objectID);
+
 }

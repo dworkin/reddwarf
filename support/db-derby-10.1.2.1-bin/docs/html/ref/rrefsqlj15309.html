@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html lang="en-us" xml:lang="en-us">
+<head>
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type" />
+<meta name="copyright" content="(C) Copyright 2005" />
+<meta name="DC.rights.owner" content="(C) Copyright 2005" />
+<meta content="public" name="security" />
+<meta content="index,follow" name="Robots" />
+<meta http-equiv="PICS-Label" content='(PICS-1.1 "http://www.icra.org/ratingsv02.html" l gen true r (cz 1 lz 1 nz 1 oz 1 vz 1) "http://www.rsac.org/ratingsv01.html" l gen true r (n 0 s 0 v 0 l 0) "http://www.classify.org/safesurf/" l gen true r (SS~~000 1))' />
+<meta content="reference" name="DC.Type" />
+<meta name="DC.Title" content="WHERE CURRENT OF clause" />
+<meta content="WHERE CURRENT OF clause" name="DC.subject" />
+<meta content="WHERE CURRENT OF clause" name="keywords" />
+<meta scheme="URI" name="DC.Relation" content="crefsqlj39374.html" />
+<meta scheme="URI" name="DC.Relation" content="crefsqlj22771.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj81859.html" />
+<meta scheme="URI" name="DC.Relation" content="crefsqlj95081.html" />
+<meta scheme="URI" name="DC.Relation" content="crefsqlj80721.html" />
+<meta scheme="URI" name="DC.Relation" content="crefsqljrenamestatements.html" />
+<meta scheme="URI" name="DC.Relation" content="crefsqlj35312.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefcallprocedure.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj13590.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefdeclaretemptable.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj35981.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj31783.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj21583.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj32654.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj14854.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj35034.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj40774.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj29840.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj18922.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj40506.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj13658.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj21571.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj57522.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefscalarsubquery.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefselectexpression.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj41360.html" />
+<meta scheme="URI" name="DC.Relation" content="rreftableexpression.html" />
+<meta scheme="URI" name="DC.Relation" content="rreftablesubquery.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj26498.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj11277.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj33602.html" />
+<meta content="XHTML" name="DC.Format" />
+<meta content="rrefsqlj15309" name="DC.Identifier" />
+<meta content="en-us" name="DC.Language" />
+<link href="commonltr.css" type="text/css" rel="stylesheet" />
+<title>WHERE CURRENT OF clause</title>
+</head>
+<body id="rrefsqlj15309"><a name="rrefsqlj15309"><!-- --></a>
+
+
+<h1 class="topictitle1">WHERE CURRENT OF clause</h1>
+
+<div>
+<div class="section">
+<p>The WHERE CURRENT OF clause is a clause in some UPDATE and DELETE
+statements. It allows you to perform positioned updates and deletes on updatable
+cursors. For more information about updatable cursors, see <a href="rrefsqlj41360.html#rrefsqlj41360">SELECT statement</a>.</p>
+</div>
+
+<div class="section"><h4 class="sectiontitle">Syntax</h4>
+<pre><strong>WHERE CURRENT OF <em><a href="rrefcursorname.html#rrefcursorname">cursor-Name</a></em></strong></pre>
+
+</div>
+
+<div class="example">
+<pre>Statement s = conn.createStatement();
+s.setCursorName("AirlinesResults");
+ResultSet rs = conn.executeQuery(
+    "SELECT Airline, basic_rate " +
+    "FROM Airlines FOR UPDATE OF basic_rate");
+Statement s2 = conn.createStatement();
+s2.executeUpdate("UPDATE Airlines SET basic_rate = basic_rate " +
+    "+ .25 WHERE CURRENT OF AirlinesResults");</pre>
+
+</div>
+</div>
+<div>
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a href="crefsqlj39374.html" title="">Statements</a></div>
+</div>
+<div class="relconcepts"><strong>Related concepts</strong><br />
+<div><a href="crefsqlj22771.html" title="">Interaction with the dependency system</a></div>
+<div><a href="crefsqlj95081.html" title="">CREATE statements</a></div>
+<div><a href="crefsqlj80721.html" title="">DROP Statements</a></div>
+<div><a href="crefsqljrenamestatements.html" title="">RENAME statements</a></div>
+<div><a href="crefsqlj35312.html" title="">SET statements</a></div>
+</div>
+<div class="relref"><strong>Related reference</strong><br />
+<div><a href="rrefsqlj81859.html" title="">ALTER TABLE statement</a></div>
+<div><a href="rrefcallprocedure.html" title="">CALL (PROCEDURE)</a></div>
+<div><a href="rrefsqlj13590.html" title="">CONSTRAINT clause</a></div>
+<div><a href="rrefdeclaretemptable.html" title="">DECLARE GLOBAL TEMPORARY TABLE statement</a></div>
+<div><a href="rrefsqlj35981.html" title="">DELETE statement</a></div>
+<div><a href="rrefsqlj31783.html" title="">FOR UPDATE clause</a></div>
+<div><a href="rrefsqlj21583.html" title="">FROM clause</a></div>
+<div><a href="rrefsqlj32654.html" title="">GROUP BY clause</a></div>
+<div><a href="rrefsqlj14854.html" title="">HAVING clause</a></div>
+<div><a href="rrefsqlj35034.html" title="">INNER JOIN</a></div>
+<div><a href="rrefsqlj40774.html" title="">INSERT statement</a></div>
+<div><a href="rrefsqlj29840.html" title="">JOIN operation</a></div>
+<div><a href="rrefsqlj18922.html" title="">LEFT OUTER JOIN</a></div>
+<div><a href="rrefsqlj40506.html" title="">LOCK TABLE statement</a></div>
+<div><a href="rrefsqlj13658.html" title="">ORDER BY clause</a></div>
+<div><a href="rrefsqlj21571.html" title="">Query</a></div>
+<div><a href="rrefsqlj57522.html" title="">RIGHT OUTER JOIN</a></div>
+<div><a href="rrefscalarsubquery.html" title="">ScalarSubquery</a></div>
+<div><a href="rrefselectexpression.html" title="">SelectExpression</a></div>
+<div><a href="rrefsqlj41360.html" title="">SELECT statement</a></div>
+<div><a href="rreftableexpression.html" title="">TableExpression</a></div>
+<div><a href="rreftablesubquery.html" title="">TableSubquery</a></div>
+<div><a href="rrefsqlj26498.html" title="">UPDATE statement</a></div>
+<div><a href="rrefsqlj11277.html" title="">VALUES expression</a></div>
+<div><a href="rrefsqlj33602.html" title="">WHERE clause</a></div>
+</div>
+</div>
+</body>
+</html>

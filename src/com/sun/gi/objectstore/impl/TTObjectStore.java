@@ -279,7 +279,7 @@ public class TTObjectStore
     return trans;
   }
 
-  public void returnTransaction(TTObjectStoreTransaction trans) {
+  public void returnTransaction(Transaction trans) {
     synchronized (transactionPool) {
       transactionPool.add(trans);
       transactionPool.notify();
@@ -370,7 +370,7 @@ public class TTObjectStore
   }
 
   public void setObjectHolder(long objectID,
-                              TTObjectStoreTransaction trans) {
+                              Transaction trans) {
     objectHolder.put(new Long(objectID), trans);
   }
 

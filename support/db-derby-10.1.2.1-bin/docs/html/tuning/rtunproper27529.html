@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html lang="en-us" xml:lang="en-us">
+<head>
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type" />
+<meta name="copyright" content="(C) Copyright 2005" />
+<meta name="DC.rights.owner" content="(C) Copyright 2005" />
+<meta content="public" name="security" />
+<meta content="index,follow" name="Robots" />
+<meta http-equiv="PICS-Label" content='(PICS-1.1 "http://www.icra.org/ratingsv02.html" l gen true r (cz 1 lz 1 nz 1 oz 1 vz 1) "http://www.rsac.org/ratingsv01.html" l gen true r (n 0 s 0 v 0 l 0) "http://www.classify.org/safesurf/" l gen true r (SS~~000 1))' />
+<meta content="reference" name="DC.Type" />
+<meta name="DC.Title" content="derby.storage.initialPages" />
+<meta content="derby.storage.initialPages, Database pages, preallocating" name="DC.subject" />
+<meta content="derby.storage.initialPages, Database pages, preallocating" name="keywords" />
+<meta scheme="URI" name="DC.Relation" content="ctunproper22250.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunsearchauthdn.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunsearchauthpw.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper26978.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper37341.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper13766.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper25581.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper27467.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper24846.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper81405.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper25025.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper24390.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper39325.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper13217.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper43414.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper43517.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper10607.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper23835.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper40346.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper98166.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper46141.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunstorminrecsize.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper81359.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper28026.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper40688.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper34037.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper33027.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper18151.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper35028.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper26985.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproperdurability.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper32066.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper27355.html" />
+<meta content="XHTML" name="DC.Format" />
+<meta content="rtunproper27529" name="DC.Identifier" />
+<meta content="en-us" name="DC.Language" />
+<link href="commonltr.css" type="text/css" rel="stylesheet" />
+<title>derby.storage.initialPages</title>
+</head>
+<body id="rtunproper27529"><a name="rtunproper27529"><!-- --></a>
+
+
+<h1 class="topictitle1">derby.storage.initialPages</h1>
+
+<div>
+<div class="section"><h4 class="sectiontitle">Function</h4>
+<p>The on-disk size of a <span>Derby</span> table grows by one page at a time until
+eight pages of user data (or nine pages of total disk use, one is used for
+overhead) have been allocated. Then it will grow by eight pages at a time
+if possible.</p>
+
+<p>A <span>Derby</span> table or index can be created with a number of pages already
+pre-allocated. To do so, specify the property prior to the CREATE TABLE or
+CREATE INDEX statement.</p>
+
+<p>Define the number of user pages the table or index is to be created with.
+The purpose of this property is to preallocate a table or index of reasonable
+size if the user expects that a large amount of data will be inserted into
+the table or index. A table or index that has the pre-allocated pages will
+enjoy a small performance improvement over a table or index that has no pre-allocated
+pages when the data are loaded.</p>
+
+<div class="p">The total desired size of the table or index should be  
+<pre><strong>(1+derby.storage.initialPages) * derby.storage.pageSize bytes.</strong></pre>
+</div>
+
+<p>When you create a table or an index after setting this property, <span>Derby</span>
+attempts to preallocate the requested number of user pages. However, the operations
+do not fail even if they are unable to preallocate the requested number of
+pages, as long as they allocate at least one page.</p>
+
+</div>
+
+<div class="section"><h4 class="sectiontitle">Default</h4>
+<p>1 page.</p>
+
+</div>
+
+<div class="section"><h4 class="sectiontitle">Minimum value</h4>
+<p>The minimum number of <em>initialPages</em> is 1. </p>
+
+</div>
+
+<div class="section"><h4 class="sectiontitle">Maximum value</h4>
+<p>The maximum number of <em>initialPages</em> is 1000.</p>
+
+</div>
+
+<div class="example"><h4 class="sectiontitle">Example</h4>
+<pre><strong>-- system-wide property 
+derby.storage.initialPages=30
+
+-- database-wide property 
+CALL SYSCS_UTIL.SYSCS_SET_DATABASE_PROPERTY( 
+'derby.storage.initialPages', '30') </strong></pre>
+
+</div>
+</div>
+<div>
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a href="ctunproper22250.html" title="">Derby properties</a></div>
+</div>
+<div class="relref"><strong>Related reference</strong><br />
+<div><a href="rtunsearchauthdn.html" title="">derby.authentication.ldap.searchAuthDN</a></div>
+<div><a href="rtunsearchauthpw.html" title="">derby.authentication.ldap.searchAuthPW</a></div>
+<div><a href="rtunproper26978.html" title="">derby.authentication.ldap.searchBase</a></div>
+<div><a href="rtunproper37341.html" title="">derby.authentication.ldap.searchFilter</a></div>
+<div><a href="rtunproper13766.html" title="">derby.authentication.provider</a></div>
+<div><a href="rtunproper25581.html" title="">derby.authentication.server</a></div>
+<div><a href="rtunproper27467.html" title="">derby.connection.requireAuthentication</a></div>
+<div><a href="rtunproper24846.html" title="">derby.database.defaultConnectionMode</a></div>
+<div><a href="rtunproper81405.html" title="">derby.database.forceDatabaseLock</a></div>
+<div><a href="rtunproper25025.html" title="">derby.database.fullAccessUsers</a></div>
+<div><a href="rtunproper24390.html" title="">derby.database.propertiesOnly</a></div>
+<div><a href="rtunproper39325.html" title="">derby.database.readOnlyAccessUsers</a></div>
+<div><a href="rtunproper13217.html" title="">derby.infolog.append</a></div>
+<div><a href="rtunproper43414.html" title="">derby.language.logQueryPlan</a></div>
+<div><a href="rtunproper43517.html" title="">derby.language.logStatementText</a></div>
+<div><a href="rtunproper10607.html" title="">derby.locks.deadlockTimeout</a></div>
+<div><a href="rtunproper23835.html" title="">derby.locks.deadlockTrace</a></div>
+<div><a href="rtunproper40346.html" title="">derby.locks.escalationThreshold</a></div>
+<div><a href="rtunproper98166.html" title="">derby.locks.monitor</a></div>
+<div><a href="rtunproper46141.html" title="">derby.locks.waitTimeout</a></div>
+<div><a href="rtunstorminrecsize.html" title="">derby.storage.minimumRecordSize</a></div>
+<div><a href="rtunproper81359.html" title="">derby.storage.pageCacheSize</a></div>
+<div><a href="rtunproper28026.html" title="">derby.storage.pageReservedSpace</a></div>
+<div><a href="rtunproper40688.html" title="">derby.storage.pageSize</a></div>
+<div><a href="rtunproper34037.html" title="">derby.storage.tempDirectory</a></div>
+<div><a href="rtunproper33027.html" title="">derby.stream.error.field</a></div>
+<div><a href="rtunproper18151.html" title="">derby.stream.error.file</a></div>
+<div><a href="rtunproper35028.html" title="">derby.stream.error.method</a></div>
+<div><a href="rtunproper26985.html" title="">derby.stream.error.logSeverityLevel</a></div>
+<div><a href="rtunproperdurability.html" title="">derby.system.durability</a></div>
+<div><a href="rtunproper32066.html" title="">derby.system.home</a></div>
+<div><a href="rtunproper27355.html" title="">derby.user.UserName</a></div>
+</div>
+</div>
+</body>
+</html>

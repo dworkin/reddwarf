@@ -1,0 +1,289 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html lang="en-us" xml:lang="en-us">
+<head>
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type" />
+<meta name="copyright" content="(C) Copyright 2005" />
+<meta name="DC.rights.owner" content="(C) Copyright 2005" />
+<meta content="public" name="security" />
+<meta content="index,follow" name="Robots" />
+<meta http-equiv="PICS-Label" content='(PICS-1.1 "http://www.icra.org/ratingsv02.html" l gen true r (cz 1 lz 1 nz 1 oz 1 vz 1) "http://www.rsac.org/ratingsv01.html" l gen true r (n 0 s 0 v 0 l 0) "http://www.classify.org/safesurf/" l gen true r (SS~~000 1))' />
+<meta content="reference" name="DC.Type" />
+<meta name="DC.Title" content="ALTER TABLE statement" />
+<meta content="ALTER TABLE statement, Compressing tables, Tables, altering, compressing, Columns, adding, Constraints, dropping, Defaults, Adding Columns, Adding Constraints, Dropping Constraints, setting, changing lock granularity for, Data types, modifying" name="DC.subject" />
+<meta content="ALTER TABLE statement, Compressing tables, Tables, altering, compressing, Columns, adding, Constraints, dropping, Defaults, Adding Columns, Adding Constraints, Dropping Constraints, setting, changing lock granularity for, Data types, modifying" name="keywords" />
+<meta scheme="URI" name="DC.Relation" content="crefsqlj39374.html" />
+<meta scheme="URI" name="DC.Relation" content="crefsqlj22771.html" />
+<meta scheme="URI" name="DC.Relation" content="crefsqlj95081.html" />
+<meta scheme="URI" name="DC.Relation" content="crefsqlj80721.html" />
+<meta scheme="URI" name="DC.Relation" content="crefsqljrenamestatements.html" />
+<meta scheme="URI" name="DC.Relation" content="crefsqlj35312.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefcallprocedure.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj13590.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefdeclaretemptable.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj35981.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj31783.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj21583.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj32654.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj14854.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj35034.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj40774.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj29840.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj18922.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj40506.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj13658.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj21571.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj57522.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefscalarsubquery.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefselectexpression.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj41360.html" />
+<meta scheme="URI" name="DC.Relation" content="rreftableexpression.html" />
+<meta scheme="URI" name="DC.Relation" content="rreftablesubquery.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj26498.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj11277.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj33602.html" />
+<meta scheme="URI" name="DC.Relation" content="rrefsqlj15309.html" />
+<meta content="XHTML" name="DC.Format" />
+<meta content="rrefsqlj81859" name="DC.Identifier" />
+<meta content="en-us" name="DC.Language" />
+<link href="commonltr.css" type="text/css" rel="stylesheet" />
+<title>ALTER TABLE statement</title>
+</head>
+<body id="rrefsqlj81859"><a name="rrefsqlj81859"><!-- --></a>
+
+
+<h1 class="topictitle1">ALTER TABLE statement</h1>
+
+
+<div>
+<div class="section"><div class="p">The ALTER TABLE statement allows you to:   <ul>
+<li>add a column to a table</li>
+
+<li>add a constraint to a table</li>
+
+<li>drop an existing constraint from a table</li>
+
+<li>increase the width of a VARCHAR, CHAR VARYING, and CHARACTER VARYING column</li>
+
+<li>override row-level locking for the table (or drop the override)</li>
+
+</ul>
+</div>
+</div>
+
+<div class="section"><h4 class="sectiontitle">Syntax</h4><pre><strong>ALTER TABLE <em><a href="rreftablename.html#rreftablename">table-Name</a></em>
+{
+    ADD COLUMN <em><a href="rrefsqlj81859.html#rrefsqlj81859__rrefaltercolumndef">column-definition</a></em> |
+    ADD <em><a href="rrefsqlj13590.html#rrefsqlj13590">CONSTRAINT clause</a></em> |
+    DROP { PRIMARY KEY | FOREIGN KEY constraint-name | UNIQUE 
+	 constraint-name | CHECK constraint-name | CONSTRAINT constraint-name }
+    ALTER <em><a href="rrefsqlj81859.html#rrefsqlj81859__rrefsqlj37860">column-alteration</a></em> |
+    LOCKSIZE { ROW | TABLE }
+}</strong></pre>
+</div>
+
+<div class="example" id="rrefsqlj81859__rrefaltercolumndef"><a name="rrefsqlj81859__rrefaltercolumndef"><!-- --></a><h4 class="sectiontitle">column-definition</h4> <pre><strong><em><a href="rrefsimplecolumnname.html#rrefsimplecolumnname">Simple-column-Name</a></em> <em>DataType</em>
+[ <em><a href="rrefsqlj16095.html#rrefsqlj16095">Column-level-constraint</a></em> ]*
+[ [ WITH ] DEFAULT {<em>ConstantExpression</em> | NULL } ]</strong></pre>
+</div>
+
+<div class="example" id="rrefsqlj81859__rrefsqlj37860"><a name="rrefsqlj81859__rrefsqlj37860"><!-- --></a><h4 class="sectiontitle">column-alteration</h4><pre><strong><em>column-Name</em> SET DATA TYPE VARCHAR(integer) |
+<em>column-name</em> SET INCREMENT BY integer-constant</strong> </pre>
+</div>
+
+<div class="section"><p>In the column-alteration, SET INCREMENT BY integer-constant, specifies
+the interval between consecutive values of the identity column. The next value
+to be generated for the identity column will be determined from the last assigned
+value with the increment applied. The column must already be defined with
+the IDENTITY attribute.</p>
+<p>ALTER TABLE does not affect any view that references
+the table being altered. This includes views that have an "*" in their SELECT
+list. You must drop and re-create those views if you wish them to return the
+new columns.</p>
+</div>
+
+<div class="section"><h4 class="sectiontitle">Adding columns</h4><p>The syntax for the <em><a href="rrefsqlj81859.html#rrefsqlj81859__rrefaltercolumndef">column-definition</a></em> for a new column is the same as for a column in a CREATE TABLE statement.
+This means that a column constraint can be placed on the new column within
+the ALTER TABLE ADD COLUMN statement. However, a column with a NOT NULL constraint
+can be added to an existing table if you give
+a default value; otherwise, an exception is thrown when the ALTER TABLE statement
+is executed. </p>
+<p>Just as in CREATE TABLE, if the column definition includes
+a unique or primary key constraint, the column cannot contain null values,
+so the NOT NULL attribute must also be specified (SQLSTATE 42831).</p>
+<div class="note"><span class="notetitle">Note: </span>If
+a table has an UPDATE trigger without an explicit column list, adding a column
+to that table in effect adds that column to the implicit update column list
+upon which the trigger is defined, and all references to transition variables
+are invalidated so that they pick up the new column.</div>
+</div>
+
+<div class="section"><h4 class="sectiontitle">Adding constraints</h4><div class="p">ALTER TABLE ADD CONSTRAINT adds
+a table-level constraint to an existing table. Any supported table-level constraint
+type can be added via ALTER TABLE. The following limitations exist on adding
+a constraint to an existing table:   <ul>
+<li>When adding a foreign key or check constraint to an existing table, <span>Derby</span> checks the table to make
+sure existing rows satisfy the constraint. If any row is invalid, <span>Derby</span> throws
+a statement exception and the constraint is not added.</li>
+
+<li>All columns included in a primary key must contain non null data and be
+unique.   <p>ALTER TABLE ADD UNIQUE or PRIMARY KEY provide a shorthand method
+of defining a primary key composed of a single column. If PRIMARY KEY is specified
+in the definition of column C, the effect is the same as if the PRIMARY KEY(C)
+clause were specified as a separate clause. The column cannot contain null
+values, so the NOT NULL attribute must also be specified.</p>
+</li>
+
+</ul>
+</div>
+<p>For information on the syntax of constraints, see <a href="rrefsqlj13590.html#rrefsqlj13590">CONSTRAINT clause</a>.
+Use the syntax for table-level constraint when adding a constraint with the
+ADD TABLE ADD CONSTRAINT syntax.</p>
+</div>
+
+<div class="section"><h4 class="sectiontitle">Dropping constraints</h4><p>ALTER TABLE DROP CONSTRAINT
+drops a constraint on an existing table. To drop an unnamed constraint, you
+must specify the generated constraint name stored in <em>SYS.SYSCONSTRAINTS</em> as
+a delimited identifier.</p>
+<p>Dropping a primary key, unique, or foreign key
+constraint drops the physical index that enforces the constraint (also known
+as a <em>backing index</em>).</p>
+</div>
+
+<div class="section"><h4 class="sectiontitle">Modifying columns</h4><div class="p">The <em><a href="rrefsqlj81859.html#rrefsqlj81859__rrefsqlj37860">column-alteration</a></em> allows
+you to alter the named column in the following ways:   <ul>
+<li>Increasing the length of an existing VARCHAR column. CHARACTER VARYING
+or CHAR VARYING can be used as synonyms for the VARCHAR keyword. <p>To increase
+the width of a column of these types, specify the data type and new size after
+the column name.</p>
+<p>You are not allowed to decrease the width or to change
+the data type. You are not allowed to increase the width of a column that
+is part of a primary or unique key referenced by a foreign key constraint
+or that is part of a foreign key constraint.</p>
+</li>
+
+<li>Specifying the interval between consecutive values of the identity column.<p>To
+set an interval between consecutive values of the identity column, specify
+the integer-constant. You must previously define the column with the IDENTITY
+attribute (SQLSTATE 42837). If there are existing rows in the table, the values
+in the column for which the SET INCREMENT default was added do not change.</p>
+</li>
+
+</ul>
+</div>
+</div>
+
+<div class="section"><h4 class="sectiontitle">Setting defaults</h4><p>You can specify a default value
+for a new column. A default value is the value that is inserted into a column
+if no other value is specified. If not explicitly specified, the default value
+of a column is NULL. If you add a default to a new column, existing rows in
+the table gain the default value in the new column.</p>
+<p>For more information
+about defaults, see <a href="rrefsqlj24513.html#rrefsqlj24513">CREATE TABLE statement</a>.</p>
+</div>
+
+<div class="section"><h4 class="sectiontitle">Changing the lock granularity for the table</h4><p>The
+LOCKSIZE clause allows you to override row-level locking for the specific
+table, if your system uses the default setting of row-level locking. (If your
+system is set for table-level locking, you cannot change the locking granularity
+to row-level locking, although <span>Derby</span> allows
+you to use the LOCKSIZE clause in such a situation without throwing an exception.)
+To override row-level locking for the specific table, set locking for the
+table to TABLE. If you created the table with table-level locking granularity,
+you can change locking back to ROW with the LOCKSIZE clause in the ALTER TABLE
+STATEMENT. For information about why this is sometimes useful, see <cite><span><em>Tuning Derby</em></span></cite>.</p>
+</div>
+
+<div class="section"><h4 class="sectiontitle">Examples</h4><pre><strong><span>-- Add a new column with a column-level constraint
+-- to an existing table
+-- An exception will be thrown if the table
+-- contains any rows
+-- since the newcol will be initialized to NULL
+-- in all existing rows in the table</span>
+ALTER TABLE CITIES ADD COLUMN REGION VARCHAR(26)
+CONSTRAINT NEW_CONSTRAINT CHECK (REGION IS NOT NULL);
+
+<span>-- Add a new unique constraint to an existing table
+-- An exception will be thrown if duplicate keys are found</span>
+ALTER TABLE SAMP.DEPARTMENT
+ADD CONSTRAINT NEW_UNIQUE UNIQUE (DEPTNO);
+
+<span>-- add a new foreign key constraint to the
+-- Cities table. Each row in Cities is checked
+-- to make sure it satisfied the constraints.
+-- if any rows don't satisfy the constraint, the
+-- constraint is not added</span>
+ALTER TABLE CITIES ADD CONSTRAINT COUNTRY_FK
+Foreign Key (COUNTRY) REFERENCES COUNTRIES (COUNTRY);
+
+<span>-- Add a primary key constraint to a table
+-- First, create a new table</span>
+CREATE TABLE ACTIVITIES (CITY_ID INT NOT NULL,
+SEASON CHAR(2), ACTIVITY VARCHAR(32) NOT NULL);
+<span>-- You will not be able to add this constraint if the
+-- columns you are including in the primary key have
+-- null data or duplicate values.</span>
+ALTER TABLE Activities ADD PRIMARY KEY (city_id, activity);
+
+<span>-- Drop a primary key constraint from the CITIES table
+</span>
+ALTER TABLE Cities DROP CONSTRAINT Cities_PK;
+<span>-- Drop a foreign key constraint from the CITIES table</span>
+ALTER TABLE Cities DROP CONSTRAINT COUNTRIES_FK;
+<span>-- add a DEPTNO column with a default value of 1</span>
+ALTER TABLE SAMP.EMP_ACT ADD COLUMN DEPTNO INT DEFAULT 1;
+<span>-- increase the width of a VARCHAR column</span>
+ALTER TABLE SAMP.EMP_PHOTO ALTER PHOTO_FORMAT SET DATA TYPE VARCHAR(30);
+<span>-- change the lock granularity of a table</span>
+ALTER TABLE SAMP.SALES LOCKSIZE TABLE;</strong></pre>
+</div>
+
+<div class="section"><h4 class="sectiontitle">Results</h4><p>An ALTER TABLE statement causes all statements
+that are dependent on the table being altered to be recompiled before their
+next execution. ALTER TABLE is not allowed if there are any open cursors that
+reference the table being altered.</p>
+</div>
+
+</div>
+
+<div>
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a href="crefsqlj39374.html" title="">Statements</a></div>
+</div>
+<div class="relconcepts"><strong>Related concepts</strong><br />
+<div><a href="crefsqlj22771.html" title="">Interaction with the dependency system</a></div>
+<div><a href="crefsqlj95081.html" title="">CREATE statements</a></div>
+<div><a href="crefsqlj80721.html" title="">DROP Statements</a></div>
+<div><a href="crefsqljrenamestatements.html" title="">RENAME statements</a></div>
+<div><a href="crefsqlj35312.html" title="">SET statements</a></div>
+</div>
+<div class="relref"><strong>Related reference</strong><br />
+<div><a href="rrefcallprocedure.html" title="">CALL (PROCEDURE)</a></div>
+<div><a href="rrefsqlj13590.html" title="">CONSTRAINT clause</a></div>
+<div><a href="rrefdeclaretemptable.html" title="">DECLARE GLOBAL TEMPORARY TABLE statement</a></div>
+<div><a href="rrefsqlj35981.html" title="">DELETE statement</a></div>
+<div><a href="rrefsqlj31783.html" title="">FOR UPDATE clause</a></div>
+<div><a href="rrefsqlj21583.html" title="">FROM clause</a></div>
+<div><a href="rrefsqlj32654.html" title="">GROUP BY clause</a></div>
+<div><a href="rrefsqlj14854.html" title="">HAVING clause</a></div>
+<div><a href="rrefsqlj35034.html" title="">INNER JOIN</a></div>
+<div><a href="rrefsqlj40774.html" title="">INSERT statement</a></div>
+<div><a href="rrefsqlj29840.html" title="">JOIN operation</a></div>
+<div><a href="rrefsqlj18922.html" title="">LEFT OUTER JOIN</a></div>
+<div><a href="rrefsqlj40506.html" title="">LOCK TABLE statement</a></div>
+<div><a href="rrefsqlj13658.html" title="">ORDER BY clause</a></div>
+<div><a href="rrefsqlj21571.html" title="">Query</a></div>
+<div><a href="rrefsqlj57522.html" title="">RIGHT OUTER JOIN</a></div>
+<div><a href="rrefscalarsubquery.html" title="">ScalarSubquery</a></div>
+<div><a href="rrefselectexpression.html" title="">SelectExpression</a></div>
+<div><a href="rrefsqlj41360.html" title="">SELECT statement</a></div>
+<div><a href="rreftableexpression.html" title="">TableExpression</a></div>
+<div><a href="rreftablesubquery.html" title="">TableSubquery</a></div>
+<div><a href="rrefsqlj26498.html" title="">UPDATE statement</a></div>
+<div><a href="rrefsqlj11277.html" title="">VALUES expression</a></div>
+<div><a href="rrefsqlj33602.html" title="">WHERE clause</a></div>
+<div><a href="rrefsqlj15309.html" title="">WHERE CURRENT OF clause</a></div>
+</div>
+</div>
+</body>
+</html>

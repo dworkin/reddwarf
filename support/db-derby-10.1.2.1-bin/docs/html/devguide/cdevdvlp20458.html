@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html lang="en-us" xml:lang="en-us">
+<head>
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type" />
+<meta name="copyright" content="(C) Copyright 2005" />
+<meta name="DC.rights.owner" content="(C) Copyright 2005" />
+<meta content="public" name="security" />
+<meta content="index,follow" name="Robots" />
+<meta http-equiv="PICS-Label" content='(PICS-1.1 "http://www.icra.org/ratingsv02.html" l gen true r (cz 1 lz 1 nz 1 oz 1 vz 1) "http://www.rsac.org/ratingsv01.html" l gen true r (n 0 s 0 v 0 l 0) "http://www.classify.org/safesurf/" l gen true r (SS~~000 1))' />
+<meta content="concept" name="DC.Type" />
+<meta name="DC.Title" content="Double-booting system behavior" />
+<meta scheme="URI" name="DC.Relation" content="cdevdvlp27610.html" />
+<meta scheme="URI" name="DC.Relation" content="cdevdvlp96597.html" />
+<meta scheme="URI" name="DC.Relation" content="cdevdvlp27715.html" />
+<meta scheme="URI" name="DC.Relation" content="tdevdvlp20349.html" />
+<meta scheme="URI" name="DC.Relation" content="cdevdvlp13018.html" />
+<meta scheme="URI" name="DC.Relation" content="cdevdvlp25889.html" />
+<meta scheme="URI" name="DC.Relation" content="cdevdvlp39943.html" />
+<meta scheme="URI" name="DC.Relation" content="cdevdvlp19297.html" />
+<meta content="XHTML" name="DC.Format" />
+<meta content="cdevdvlp20458" name="DC.Identifier" />
+<meta content="en-us" name="DC.Language" />
+<link href="commonltr.css" type="text/css" rel="stylesheet" />
+<title>Double-booting system behavior</title>
+</head>
+<body id="cdevdvlp20458"><a name="cdevdvlp20458"><!-- --></a>
+
+
+<h1 class="topictitle1">Double-booting system behavior</h1>
+
+
+<div>
+<p><span>Derby</span> attempts to prevent two instances of <span>Derby</span> from booting
+the same database by using a file called <em>db.lck</em> inside
+the database directory (see "The Database Directory").</p>
+
+<p>On all platforms running with a JDK of 1.4 or higher, <span>Derby</span> can successfully
+prevent a second instance of <span>Derby</span> from booting the database and thus prevents
+corruption.</p>
+
+<p>On some platforms running with a JDK lower than 1.4, <span>Derby</span> may prevent
+a second instance of <span>Derby</span> from booting the database (previous to JDK 1.4
+the ability to do this was OS dependent).</p>
+
+<p>If this is the case, you will see an <em>SQLException</em> like
+the following:</p>
+
+<pre>ERROR XJ040: Failed to start database 'sample', see the next exception for details.
+ERROR XSDB6: Another instance of <span>Derby</span> might have already booted
+the databaseC:\databases\sample. 
+</pre>
+
+<p>The error is also written to the error log.</p>
+
+<p>If you are running a JVM prior to 1.4, <span>Derby</span> issues a warning message on
+some platforms if an instance of <span>Derby</span> attempts to boot a database that already
+has a running instance of <span>Derby</span> attached to it. However, it does not prevent
+the second instance from booting, and thus potentially corrupting, the database.
+(You can change this behavior with the property <samp class="codeph"><em>derby.database.forceDatabaseLock</em></samp>.)</p>
+
+<p>If a warning message has been issued, corruption might already have occurred.
+Corruption can occur even if one of the two booting systems has "readonly"
+access to the database.</p>
+
+<p>The warning message looks like this:</p>
+
+<pre>
+WARNING: <span>Derby</span> 
+(instance 80000000-00d2-3265-de92-000a0a0a0200) is
+attempting to boot the database /export/home/sky/wombat
+even though <span>Derby</span>
+(instance 80000000-00d2-3265-8abf-000a0a0a0200) might still be active.
+Only one instance of <span>Derby</span>
+should boot a database at a time. Severe and non-recoverable corruption can
+result and might have already occurred.</pre>
+
+<p>The warning is also written to the error log.</p>
+
+<p> If you see this warning, you should close the connection and exit the
+JVM, minimizing the risk of a corruption. Close all instances of <span>Derby</span>,
+then restart one instance of <span>Derby</span> and shut down the database properly
+so that the <em>db.lck</em> file can be removed. The warning
+message continues to appear until a proper shutdown of the <span>Derby</span> system
+can delete the <em>db.lck</em> file.</p>
+
+<p>When developing applications, you might want to configure <span>Derby</span> to
+append to the log. Doing so will help you detect when you have inadvertently
+started more than one instance of <span>Derby</span> in the same system. For example,
+when the <em>derby.infolog.append</em> property is set to true
+for a system, booting two instances of <span>Derby</span> in the same system produces
+the following in the log:</p>
+
+<pre>Sat Aug 14 09:42:51 PDT 2005:
+Booting <span>Derby</span> version <span>Apache Derby</span> - 10.0.0.1 - (29612): 
+
+instance 80000000-00d2-1c87-7586-000a0a0b1300 on database at
+directory C:\tutorial_system\sample
+------------------------------------------------------------
+Sat Aug 14 09:42:59 PDT 2005:
+Booting <span>Derby</span> version <span>Apache Derby</span> - 10.0.0.1 - (29612):
+instance 80000000-00d2-1c87-9143-000a0a0b1300 on database at
+directory C:\tutorial_system\HelloWorldDB</pre>
+
+<p><span>Derby</span> allows you to boot databases that are not in the system directory.
+While this might seem more convenient, check that you do not boot the same
+database with two JVMs. If you need to access a single database from more
+than one JVM, you will need to put a server solution in place. You can allow
+multiple JVMs that need to access that database to connect to the server.
+The <span>Derby</span> Network Server is provided as a server solution. See the <cite><span><em>Derby Server and Administration Guide</em></span></cite> for more information on the Network Server.</p>
+
+</div>
+<div>
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a href="cdevdvlp27610.html" title="">Derby system</a></div>
+</div>
+<div class="relconcepts"><strong>Related concepts</strong><br />
+<div><a href="cdevdvlp96597.html" title="">One Derby instance for each Java Virtual Machine</a></div>
+<div><a href="cdevdvlp27715.html" title="">Booting databases</a></div>
+<div><a href="cdevdvlp13018.html" title="">Defining the system directory</a></div>
+<div><a href="cdevdvlp25889.html" title="">The error log</a></div>
+<div><a href="cdevdvlp39943.html" title="">derby.properties</a></div>
+<div><a href="cdevdvlp19297.html" title="">Recommended practices</a></div>
+</div>
+<div class="reltasks"><strong>Related tasks</strong><br />
+<div><a href="tdevdvlp20349.html" title="">Shutting down the system</a></div>
+</div>
+</div>
+</body>
+</html>

@@ -8,8 +8,8 @@
     &buildfile;
     <path id="project.classpath">
         <pathelement location="bin"/>
-        <pathelement location="/home/jeffpk/Java Technologies/JRMS/jrms1.1/classes.jar"/>
-        <pathelement location="/home/jeffpk/Java Technologies/db-derby-10.1.2.1-bin/lib/derby.jar"/>
+        <pathelement location="support/JRMS/jrms1.1/classes.jar"/>
+        <pathelement location="support/db-derby-10.1.2.1-bin/lib/derby.jar"/>
     </path>
     <target name="init">
         <mkdir dir="bin"/>

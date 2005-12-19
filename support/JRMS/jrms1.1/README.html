@@ -1,0 +1,216 @@
+<HTML>
+<HEAD>
+   <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+   <META NAME="GENERATOR" CONTENT="Mozilla/4.03 [en] (WinNT; I) [Netscape]">
+   <TITLE>JRMS 1.1 Release Notes </TITLE>
+</HEAD>
+<BODY BGCOLOR="#FFFFFF">
+
+<H1>JRMS 1.1 Release Notes </H1>
+<p>
+JRMS is a set of Java libraries for building multicast applications.  
+It was developed by 
+<a href="http://www.sun.com/research" > Sun Microsystems Laboratories</a>.  
+
+<p>
+This release of JRMS has been tested on Solaris 2.5.1, 2.6, and 2.7,
+and Windows NT 4.0.  It is 100% Pure Java, and is compatible with
+any platform that supports Java 2.  
+
+<p>
+      If you want to jump right in, add the <b>classes.jar</b> file to your
+CLASSPATH and try <a href="#slingerApp">running</a> the SlingerSwing sample 
+application. 
+<p><BR>
+
+<hr>
+<a name="install"> <H2>JRMS Package Installation Procedures </H2> </a>
+<p>
+This release consists of the following directories and files:
+
+<pre>
+  
+classes.jar     JRMSUsageGuide.html    README.html
+javadoc         LICENSE.TXT            src
+
+</pre>
+
+<p>
+The <b>javadoc</b> directory includes all of the java API html files.  
+The license terms you agreed to are in <b>LICENSE.TXT</b>.
+The <b>src</b> directory contains all of the sources and a top level Makefile.
+<p>
+The <b>classes.jar</b> file contains all of the Java class files.  Copy
+this file to all systems on which you want to run JRMS applications 
+and add the classes.jar and its directory path to your CLASSPATH
+environment variable.  
+<p>
+<hr>
+<p>
+<H2>Writing Your Own JRMS Application</H2>
+<p>
+The best way to get started with JRMS is to read the
+<a href="JRMSUsageGuide.html"> Quick Guide</a> to Writing JRMS Applications.
+More detailed information can be found in the <a href="#docs"> JRMS documents</a>.
+<p><BR>
+
+<hr>
+<a name="slingerApp"> <H2>Building the JRMS Code</H2></a>
+<p>
+
+To build the code, be sure that you have paths to your JDK and JCE in your CLASSPATH.  Also add the jrms1.1/classes directory to the CLASSPATH.  This directory is automatically built when you build JRMS.  Then, from the <b>src</b> directory, type 'make'.
+<p><BR>
+
+<hr>
+<a name="slingerApp"> <H2>Running the SlingerSwing sample application</H2></a>
+<p>
+
+Change directory to jrms1.1/src/reliable/sample_code/slingerSwing.
+The SlingerSwing program requires that the <b>images</b> directory be in the
+current the directory.
+
+The application is then started with the command:
+<pre>
+       <b>    % java com.sun.multicast.reliable.applications.slinger.SlingerSwing</b>
+</pre>
+<p>
+Start up a few copies of this application (on one machine or several).
+The information to control the application can be entered manually
+through the user interface or from a <a href="#ConfigFile"> configuration file listed in <b>slgrconf.ini</b></a>.
+<p>
+Copy this configuration file to each of the systems running the
+application.  Load the file with the "Load All Settings from the Configuration File"
+button on the Configuration screen.  The sample configuration file will send the file 
+/tmp/test.txt on the multicast address 224.25.25.9 and port 4321.  This information
+is advertised to receivers as slingerChannel99 for the slingerApplication.  Set one 
+of the applications to be the sender and the others to be receivers. 
+<p>
+The channel and application names must be the same on both
+the sender and the receivers.  Receivers must enter the directory where
+files being transferred are to be written.  Receivers must specify a
+"Wait time" for listening for the advertisement from the sender for
+this application.  300 seconds is a typical value for "Wait Time".
+<p>
+Once the sender and receivers are configured, click the 
+"Receive File(s)" button on the receivers, then the "Send File(s)" button on
+the sender.  After the initial handshake and delay, the file specified
+at the sender is transferred to all receivers.
+<p>
+<hr>
+<a name="ConfigFile"> <h2>Sample Configuration File. </h2> </a>
+
+The following is a configuration file that can be used to initialize the
+SlingerSwing application.  A "#" in the beginning of a line marks the line to be 
+treated as a comment line.
+
+<pre>
+# slingerProperties.cfg
+slinger.address = 224.25.25.9
+slinger.application = slingerApplication
+slinger.channel = slingerChannel99
+slinger.delay = 30
+slinger.linger = 30
+slinger.port = 4321
+slinger.receive = /home/temp
+slinger.send = /tmp/test.txt
+slinger.speed = 25000
+slinger.transport = TRAM
+slinger.ttl = 1
+slinger.uport = 4322
+slinger.verbose = false
+slinger.wait = 300
+
+</pre>
+<p>
+<hr>
+<a name="docs"> <H2> JRMS Documents </h2> </a>
+
+<A HREF="javadoc/index.html"><FONT SIZE=+2><I>Javadoc</I></FONT><BR></A><BR>
+
+<FONT SIZE=+2><I>Technical Reports</I></FONT><BR>
+<UL>
+<A HREF="http://www.sun.com/research/techrep/1998/abstract-66.html">TRAM: A Tree-based Reliable Multicast Protocol</A><BR>
+<A HREF="http://www.sun.com/research/techrep/1998/abstract-68.html">The Java(tm) Reliable Multicast(tm) Service: A Reliable Multicast Library</A><BR>
+<A HREF="http://www.sun.com/research/techrep/1999/abstract-77.html">Experiences in Programming a Traffic Shaper</A><BR>
+<A HREF="http://www.sun.com/research/techrep/1999/abstract-80.html">Some Observations on Fairness of Bandwidth Sharing</A><BR>
+<A HREF="http://www.sun.com/research/techrep/2000/abstract-85.html">Pruning Algorithms for Multicast Flow Control</A><BR>
+<A HREF="http://www.sun.com/research/techrep/2000/abstract-91.html">A Reliability Window for Flexible and Scalable Multicast Services</A><BR><BR>
+</UL>
+
+<FONT SIZE=+2><I>Internet Drafts</I></FONT><BR>
+<UL>
+<A HREF="http://experimentalstuff.com/jrms/draft-kadansky-tram.txt">TRAM: Tree-based Reliable Multicast</A><BR>
+
+Other IETF work in progress can be found at the home page for <A HREF="http://www.ietf.cnri.reston.va.us/html.charters/rmt-charter.html">the Reliable Multicast Transport working group</A><BR><BR>
+</UL>
+<p>
+<hr>
+<a name="LRMP"> <H2> Light-weight Reliable Multicast Protocol </h2> </a>
+<p>
+With the assistance of Tie Liao of Inria, this version of JRMS
+includes support for the Light-weight Reliable Multicast Protocol
+(LRMP).  This protocol supports multiple senders on a single multicast
+address.  For more information about LRMP, see the <a href="http://webcanal.inria.fr">
+LRMP web site</a>.  To use LRMP in JRMS, see the javadoc for classes in 
+the package <b>com.sun.multicast.reliable.transport.lrmp </b>.
+<p>
+  This release includes version 1.4.2 of LRMP.
+<p>
+
+<pre>
+/*
+ * COPYRIGHT 1995 BY: MASSACHUSETTS INSTITUTE OF TECHNOLOGY (MIT), INRIA
+ * This W3C software is being provided by the copyright holders under the
+ * following license. By obtaining, using and/or copying this software, you
+ * agree that you have read, understood, and will comply with the following
+ * terms and conditions:
+ * 
+ * Permission to use, copy, modify, and distribute this software and its
+ * documentation for any purpose and without fee or royalty is hereby granted,
+ * provided that the full text of this NOTICE appears on ALL copies of the
+ * software and documentation or portions thereof, including modifications,
+ * that you make.
+ * 
+ * THIS SOFTWARE IS PROVIDED "AS IS," AND COPYRIGHT HOLDERS MAKE NO
+ * REPRESENTATIONS OR WARRANTIES, EXPRESS OR IMPLIED. BY WAY OF EXAMPLE, BUT
+ * NOT LIMITATION, COPYRIGHT HOLDERS MAKE NO REPRESENTATIONS OR WARRANTIES OF
+ * MERCHANTABILITY OR FITNESS FOR ANY PARTICULAR PURPOSE OR THAT THE USE OF THE
+ * SOFTWARE OR DOCUMENTATION WILL NOT INFRINGE ANY THIRD PARTY PATENTS,
+ * COPYRIGHTS, TRADEMARKS OR OTHER RIGHTS. COPYRIGHT HOLDERS WILL BEAR NO
+ * LIABILITY FOR ANY USE OF THIS SOFTWARE OR DOCUMENTATION.
+ * 
+ * The name and trademarks of copyright holders may NOT be used in advertising
+ * or publicity pertaining to the software without specific, written prior
+ * permission. Title to copyright in this software and any associated
+ * documentation will at all times remain with copyright holders.
+ */
+</pre>
+</body>
+
+</HTML>
+
+
+
+
+
+<hr>
+<a name="AuthSpecCreation"> <H2> Authentication Spec Creation Procedure</h2> </a>
+<pre>
+
+   Execute the following command to create an AuthenticationSpec: 
+ 
+   Command Syntax:
+     <b> java com.sun.multicast.reliable.authentication.AuthenticationSpec < Algorithm > < SenderHostname > 
+         < KeyStore provider > < keyStore filename > < keyStore password >
+         < senderspec filename > < receiverspec filename > </b>
+ 
+   Example:
+    The following will yield 2 AuthenticationSpec files.  One spec (s1.spec) is to be
+    used by the sender while the other (r1.spec) is to be used by all of
+    the receivers.  The algorithm used in this case is DSA and the sender 
+    node is identified as "poplar".  The keyStore file for the private key used
+    by the sender(s) is 'authStore'.  It uses the standard Sun Java KeyStore Provider
+    (JKS), and the password 'authPassword'.  
+ 
+   <b> java com.sun.multicast.reliable.authentication.AuthenticationSpec DSA poplar JKS authStore authPassword s1.spec r1.spec </b>
+ 

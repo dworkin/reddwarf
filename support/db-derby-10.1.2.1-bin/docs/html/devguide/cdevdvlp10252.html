@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html lang="en-us" xml:lang="en-us">
+<head>
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type" />
+<meta name="copyright" content="(C) Copyright 2005" />
+<meta name="DC.rights.owner" content="(C) Copyright 2005" />
+<meta content="public" name="security" />
+<meta content="index,follow" name="Robots" />
+<meta http-equiv="PICS-Label" content='(PICS-1.1 "http://www.icra.org/ratingsv02.html" l gen true r (cz 1 lz 1 nz 1 oz 1 vz 1) "http://www.rsac.org/ratingsv01.html" l gen true r (n 0 s 0 v 0 l 0) "http://www.classify.org/safesurf/" l gen true r (SS~~000 1))' />
+<meta content="concept" name="DC.Type" />
+<meta name="DC.Title" content="Getting a nested connection" />
+<meta content="Getting a nested connection, using database connection URL attribute, Nested connections, getting" name="DC.subject" />
+<meta content="Getting a nested connection, using database connection URL attribute, Nested connections, getting" name="keywords" />
+<meta scheme="URI" name="DC.Relation" content="cdevdvlp25174.html" />
+<meta scheme="URI" name="DC.Relation" content="cdevdvlp40170.html" />
+<meta scheme="URI" name="DC.Relation" content="rdevdvlp38881.html" />
+<meta scheme="URI" name="DC.Relation" content="tdevdvlp38381.html" />
+<meta content="XHTML" name="DC.Format" />
+<meta content="cdevdvlp10252" name="DC.Identifier" />
+<meta content="en-us" name="DC.Language" />
+<link href="commonltr.css" type="text/css" rel="stylesheet" />
+<title>Getting a nested connection</title>
+</head>
+<body id="cdevdvlp10252"><a name="cdevdvlp10252"><!-- --></a>
+
+
+<h1 class="topictitle1">Getting a nested connection</h1>
+
+
+<div>
+<p>When you are executing a method within SQL, that method might need
+to reuse the current connection to the database in order to execute more SQL statements.
+Such a connection is called a<em> nested connection</em>. The
+way for a method to get a nested connection is to issue a connection request
+using the connection URL.</p>
+
+<pre>jdbc:default:connection</pre>
+
+<p>URL attributes are not supported as part of this connection URL. Any URL
+attributes specified in a Properties object, user name, or password that are
+passed to a <em>java.sql.DriverManager.getConnection()</em> call
+will be ignored.</p>
+
+</div>
+<div>
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a href="cdevdvlp25174.html" title="">Derby embedded basics</a></div>
+</div>
+<div class="relconcepts"><strong>Related concepts</strong><br />
+<div><a href="cdevdvlp40170.html" title="">Embedded Derby JDBC driver</a></div>
+</div>
+<div class="reltasks"><strong>Related tasks</strong><br />
+<div><a href="tdevdvlp38381.html" title="">Starting Derby as an embedded database</a></div>
+</div>
+<div class="relref"><strong>Related reference</strong><br />
+<div><a href="rdevdvlp38881.html" title="">Embedded Derby JDBC database connection URL</a></div>
+</div>
+</div>
+</body>
+</html>

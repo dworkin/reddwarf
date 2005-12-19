@@ -1,6 +1,7 @@
 package com.sun.gi.objectstore;
 
 import java.io.*;
+import java.sql.Timestamp;
 
 /**
  * <p>Title: Transaction.java</p>
@@ -92,5 +93,10 @@ public interface Transaction {
      */
     public long getCurrentAppID();
 
+
+    // DJE
+    public void start(long appID, Timestamp tstamp, long tiebreaker,
+	    ClassLoader cl);
+    public void tstampInterrupt();
    
 }

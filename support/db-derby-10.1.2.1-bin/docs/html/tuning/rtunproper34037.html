@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html lang="en-us" xml:lang="en-us">
+<head>
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type" />
+<meta name="copyright" content="(C) Copyright 2005" />
+<meta name="DC.rights.owner" content="(C) Copyright 2005" />
+<meta content="public" name="security" />
+<meta content="index,follow" name="Robots" />
+<meta http-equiv="PICS-Label" content='(PICS-1.1 "http://www.icra.org/ratingsv02.html" l gen true r (cz 1 lz 1 nz 1 oz 1 vz 1) "http://www.rsac.org/ratingsv01.html" l gen true r (n 0 s 0 v 0 l 0) "http://www.classify.org/safesurf/" l gen true r (SS~~000 1))' />
+<meta content="reference" name="DC.Type" />
+<meta name="DC.Title" content="derby.storage.tempDirectory" />
+<meta content="derby.storage.tempDirectory, tmp directory, setting location for" name="DC.subject" />
+<meta content="derby.storage.tempDirectory, tmp directory, setting location for" name="keywords" />
+<meta scheme="URI" name="DC.Relation" content="ctunproper22250.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunsearchauthdn.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunsearchauthpw.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper26978.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper37341.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper13766.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper25581.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper27467.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper24846.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper81405.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper25025.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper24390.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper39325.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper13217.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper43414.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper43517.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper10607.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper23835.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper40346.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper98166.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper46141.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper27529.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunstorminrecsize.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper81359.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper28026.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper40688.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper33027.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper18151.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper35028.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper26985.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproperdurability.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper32066.html" />
+<meta scheme="URI" name="DC.Relation" content="rtunproper27355.html" />
+<meta content="XHTML" name="DC.Format" />
+<meta content="rtunproper34037" name="DC.Identifier" />
+<meta content="en-us" name="DC.Language" />
+<link href="commonltr.css" type="text/css" rel="stylesheet" />
+<title>derby.storage.tempDirectory</title>
+</head>
+<body id="rtunproper34037"><a name="rtunproper34037"><!-- --></a>
+
+
+<h1 class="topictitle1">derby.storage.tempDirectory</h1>
+
+<div>
+<div class="section"><h4 class="sectiontitle">Function</h4>
+<p>Defines the location on disk for temporary file space needed by <span>Derby</span> for
+performing large sorts and deferred deletes and updates. (Temporary files
+are automatically deleted after use, and are removed when the database restarts
+after a crash.) The temporary directory named by this property will be created
+if it does not exist, but will not be deleted when the system shuts down.
+The path name specified by this property must have file separators that are
+appropriate to the current operating system.</p>
+
+<div class="p">This property allows databases located on read-only media to write temporary
+files to a writable location. If this property is not set, databases located
+on read-only media might get an error like the following:  
+<pre>ERROR XSDF1: Exception during creation 
+	of file  c:\databases\db\tmp\T887256591756.tmp
+for container
+ERROR XJ001: Java exception:
+'a:\databases\db\tmp\T887256591756.tmp: java.io.IOException'.</pre>
+</div>
+
+<div class="p">This property moves the temporary directories for all databases being used
+by the <span>Derby</span> system. <span>Derby</span> makes temporary directories for each
+database under the directory referenced by this property. For example, if
+the property is set as follows:  
+<pre><strong>derby.storage.tempDirectory=C:/Temp/dbtemp</strong></pre>
+</div>
+
+<p>the temporary directories for the databases in <em>C:\databases\db1</em> and <em>C:\databases\db2</em> will be in <em>C:\Temp\dbtemp\db1</em> and <em>C:\Temp\dbtemp\db2</em>, respectively.</p>
+
+<p>The temporary files of two databases running concurrently with the same
+name (e.g.,<em> C:\databases\db1</em> and <em>E:\databases\db1</em>) will conflict with each other if the <em>derby.storage.tempDirectory</em> property is set. This will cause incorrect results, so users are advised
+to give databases unique names.</p>
+
+</div>
+
+<div class="section"><h4 class="sectiontitle">Default</h4>
+<p id="rtunproper34037__rtunproper14048"><a name="rtunproper34037__rtunproper14048"><!-- --></a>A subdirectory named <em>tmp</em> under
+the database directory.</p>
+
+<p>For example, if the database <em>db1</em> is stored in <em>C:\databases\db1</em>, the temporary files are created in <em>C:\databases\db1\tmp</em>.</p>
+
+</div>
+
+<div class="example"><h4 class="sectiontitle">Example</h4>
+<pre><strong><span>-- system-wide property</span>
+derby.storage.tempDirectory=c:/Temp/dbtemp
+<span>-- database-wide property</span>
+CALL SYSCS_UTIL.SYSCS_SET_DATABASE_PROPERTY(
+    'derby.storage.tempDirectory',
+    'c:/Temp/dbtemp')</strong></pre>
+
+</div>
+
+<div class="section"><h4 class="sectiontitle">Dynamic or static</h4>
+<p>This property is static; you must restart <span>Derby</span> for a change to take
+effect.</p>
+
+</div>
+</div>
+<div>
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a href="ctunproper22250.html" title="">Derby properties</a></div>
+</div>
+<div class="relref"><strong>Related reference</strong><br />
+<div><a href="rtunsearchauthdn.html" title="">derby.authentication.ldap.searchAuthDN</a></div>
+<div><a href="rtunsearchauthpw.html" title="">derby.authentication.ldap.searchAuthPW</a></div>
+<div><a href="rtunproper26978.html" title="">derby.authentication.ldap.searchBase</a></div>
+<div><a href="rtunproper37341.html" title="">derby.authentication.ldap.searchFilter</a></div>
+<div><a href="rtunproper13766.html" title="">derby.authentication.provider</a></div>
+<div><a href="rtunproper25581.html" title="">derby.authentication.server</a></div>
+<div><a href="rtunproper27467.html" title="">derby.connection.requireAuthentication</a></div>
+<div><a href="rtunproper24846.html" title="">derby.database.defaultConnectionMode</a></div>
+<div><a href="rtunproper81405.html" title="">derby.database.forceDatabaseLock</a></div>
+<div><a href="rtunproper25025.html" title="">derby.database.fullAccessUsers</a></div>
+<div><a href="rtunproper24390.html" title="">derby.database.propertiesOnly</a></div>
+<div><a href="rtunproper39325.html" title="">derby.database.readOnlyAccessUsers</a></div>
+<div><a href="rtunproper13217.html" title="">derby.infolog.append</a></div>
+<div><a href="rtunproper43414.html" title="">derby.language.logQueryPlan</a></div>
+<div><a href="rtunproper43517.html" title="">derby.language.logStatementText</a></div>
+<div><a href="rtunproper10607.html" title="">derby.locks.deadlockTimeout</a></div>
+<div><a href="rtunproper23835.html" title="">derby.locks.deadlockTrace</a></div>
+<div><a href="rtunproper40346.html" title="">derby.locks.escalationThreshold</a></div>
+<div><a href="rtunproper98166.html" title="">derby.locks.monitor</a></div>
+<div><a href="rtunproper46141.html" title="">derby.locks.waitTimeout</a></div>
+<div><a href="rtunproper27529.html" title="">derby.storage.initialPages</a></div>
+<div><a href="rtunstorminrecsize.html" title="">derby.storage.minimumRecordSize</a></div>
+<div><a href="rtunproper81359.html" title="">derby.storage.pageCacheSize</a></div>
+<div><a href="rtunproper28026.html" title="">derby.storage.pageReservedSpace</a></div>
+<div><a href="rtunproper40688.html" title="">derby.storage.pageSize</a></div>
+<div><a href="rtunproper33027.html" title="">derby.stream.error.field</a></div>
+<div><a href="rtunproper18151.html" title="">derby.stream.error.file</a></div>
+<div><a href="rtunproper35028.html" title="">derby.stream.error.method</a></div>
+<div><a href="rtunproper26985.html" title="">derby.stream.error.logSeverityLevel</a></div>
+<div><a href="rtunproperdurability.html" title="">derby.system.durability</a></div>
+<div><a href="rtunproper32066.html" title="">derby.system.home</a></div>
+<div><a href="rtunproper27355.html" title="">derby.user.UserName</a></div>
+</div>
+</div>
+</body>
+</html>

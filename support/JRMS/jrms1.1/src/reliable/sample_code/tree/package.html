@@ -1,0 +1,59 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN">
+<!--NewPage-->
+<HTML>
+<HEAD>
+<TITLE>
+Java(tm) Reliable Multicast(tm) Service version 1.1
+</TITLE>
+<LINK REL ="stylesheet" TYPE="text/css" HREF="stylesheet.css" TITLE="Style">
+</HEAD>
+<BODY BGCOLOR="white">
+TRAM tree-building simulator.
+<BR>
+<P ALIGN="JUSTIFY">The TreeTest package is a simple GUI application that simulates a a set of network nodes building a TRAM repair tree.  TreeTest can be invoked with a configuration file as an argument, or the user can manually add nodes.  Once the nodes are in place, TRAM may be started.  Multicast messages are displayed on the screen as expanding circles.  It is recommended that this display be turned off when simulating large numbers of nodes, since it takes up extra processing time.
+<P ALIGN="JUSTIFY"></P>
+
+<FONT FACE="Courier New"><P>java com.sun.multicast.reliable.applications.tree.TreeTest [config-file]</P><BR>
+
+
+<B><FONT FACE="Arial"><P><B>Configuration Files</B></P>
+</B></FONT></DIR>
+</DIR>
+
+<P>The TreeTest configuration files provide an alternative to manually placing nodes on the screen and manually adjusting the controlling parameters.  Configuration files are specified as "filename.tcf".  Each line of the file consists of a node type (S for sender, H for repair head, R for reluctant repair head, and M for member), followed by its coordinates on the screen.  Nodes can be co-located on the same local area network by using the 'L' parameter on the lines before and after the co-located node specifications.  If a configuration file is specified, TreeTest will also look for it companion parameter (.tpr) file, which specifies values for various TRAM parameters.  TreeTest uses the Java Properties class to parse .tpr files. Therefore, the file format is a sequence of lines of ASCII text of the form propertyName=value.</P>
+<P></P>
+ Here are some sample files:<BR><BR>
+
+Sample configuration with a sender, four repair heads, and one member: </P><DIR><DIR>
+S 350 150<BR>
+H 350 90<BR>
+H 350 210<BR>
+H 290 150<BR>
+H 410 150<BR>
+M 330 90
+&nbsp;</P></DIR></DIR>
+Sample configuration with a sender, and five repair heads on a local area network:</P><DIR><DIR>
+S 350 150<BR>
+L<BR>
+H 310 80<BR>
+H 290 100<BR>
+H 330 100<BR>
+H 310 120<BR>
+H 370 120<BR>
+L
+&nbsp;</P></DIR></DIR>
+Sample parameter file:</P><DIR><DIR>
+
+tree.ttl=127<BR>
+tree.beaconRate=4000<BR>
+tree.beaconTTLIncrements=20<BR>
+tree.haTTLIncrements=10<BR>
+tree.haTTLLimit=127<BR>
+tree.haInterval=4000<BR>
+tree.maxMembers=10<BR>
+tree.msRate=10000<BR>
+tree.treeFormationPreference=HA<BR>
+<P>&nbsp;</P></DIR></DIR>
+
+</BODY>
+</HTML>

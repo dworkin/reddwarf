@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html lang="en-us" xml:lang="en-us">
+<head>
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type" />
+<meta name="copyright" content="(C) Copyright 2005" />
+<meta name="DC.rights.owner" content="(C) Copyright 2005" />
+<meta content="public" name="security" />
+<meta content="index,follow" name="Robots" />
+<meta http-equiv="PICS-Label" content='(PICS-1.1 "http://www.icra.org/ratingsv02.html" l gen true r (cz 1 lz 1 nz 1 oz 1 vz 1) "http://www.rsac.org/ratingsv01.html" l gen true r (n 0 s 0 v 0 l 0) "http://www.classify.org/safesurf/" l gen true r (SS~~000 1))' />
+<meta content="concept" name="DC.Type" />
+<meta name="DC.Title" content="Changing the boot password" />
+<meta scheme="URI" name="DC.Relation" content="cdevcsecure97760.html" />
+<meta scheme="URI" name="DC.Relation" content="cdevcsecure88690.html" />
+<meta scheme="URI" name="DC.Relation" content="cdevcsecure866716.html" />
+<meta scheme="URI" name="DC.Relation" content="cdevcsecure60146.html" />
+<meta content="XHTML" name="DC.Format" />
+<meta content="cdevcsecure55054" name="DC.Identifier" />
+<meta content="en-us" name="DC.Language" />
+<link href="commonltr.css" type="text/css" rel="stylesheet" />
+<title>Changing the boot password</title>
+</head>
+<body id="cdevcsecure55054"><a name="cdevcsecure55054"><!-- --></a>
+
+
+<h1 class="topictitle1">Changing the boot password</h1>
+
+
+<div>
+<p>You can change the boot password for the current database.</p>
+
+<pre><strong>CALL SYSCS_UTIL.SYSCS_SET_DATABASE_PROPERTY(
+    'bootPassword', '<em>oldbpw</em> , <em>newbpw</em>');</strong></pre>
+
+<p>where <em>oldbpw</em> is the current boot password and <em>newbpw</em> is the new boot password. This call commits immediately;
+it is not transactional.</p>
+
+<div class="note"><span class="notetitle">Note: </span> <samp class="codeph"><em>PropertyInfo.getDatabaseProperty("bootPassword")</em></samp>, or <samp class="codeph">VALUES SYSCS_UTIL.SYSCS_GET_DATABASE_PROPERTY('bootPassword')</samp>, will not return the boot password.</div>
+
+</div>
+<div>
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a href="cdevcsecure97760.html" title="">Working with encryption</a></div>
+</div>
+<div class="relconcepts"><strong>Related concepts</strong><br />
+<div><a href="cdevcsecure88690.html" title="">Encrypting databases on creation</a></div>
+<div><a href="cdevcsecure866716.html" title="">Creating the boot password</a></div>
+<div><a href="cdevcsecure60146.html" title="">Booting an encrypted database</a></div>
+</div>
+</div>
+</body>
+</html>

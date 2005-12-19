@@ -1,0 +1,15 @@
+The changes in the Derby 10.1.2.0 release since the official 10.1 release include.
+
+    - Globalization of  the 10.1 error messages.
+    - Eclipse 3.1 support
+    - Ability to run on  on MAC  with no special configuration    
+    - Support for direct execution of derbynet.jar using the -jar option
+of the VM.
+    - Fixes to allow databases to be loaded from jars in the classpath
+    - Fixes to improve J2ME  support.
+    - Fixes to improve security manager support.
+    - Fixes to eliminate many other product issues.
+
+For a complete list of changes in the release see the release notes:
+http://issues.apache.org/jira/secure/ReleaseNote.jspa?version=12310270&styleName=Text&projectId=10594&Create=Create
+

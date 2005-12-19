@@ -247,10 +247,11 @@ public class DerbyObjectStore
 
   public Transaction newTransaction(long appID, ClassLoader loader) {
     // parameter is for future when we have speerated apps
-    DerbyObjectStoreTransaction trans = null;
+    // DJE DerbyObjectStoreTransaction trans = null;
+    Transaction trans = null;
     synchronized (transactionPool) {
       if (transactionPool.size() > 0) {
-        trans = (DerbyObjectStoreTransaction) transactionPool.remove(0);
+        trans = (Transaction) transactionPool.remove(0);
       }  else if (transactionCount < maxPoolSize){
           trans = new DerbyObjectStoreTransaction(this);
           transactionCount++;
@@ -263,7 +264,7 @@ public class DerbyObjectStore
             ex.printStackTrace();
           }
         }
-        trans = (DerbyObjectStoreTransaction) transactionPool.remove(0);
+        trans = (Transaction) transactionPool.remove(0);
       }
     }
     trans.start(appID, new Timestamp(System.currentTimeMillis())
@@ -275,7 +276,7 @@ public class DerbyObjectStore
     return trans;
   }
 
-  public void returnTransaction(DerbyObjectStoreTransaction trans) {
+  public void returnTransaction(Transaction trans) {
     synchronized (transactionPool) {
       transactionPool.add(trans);
       transactionPool.notify();
@@ -333,8 +334,8 @@ public class DerbyObjectStore
   }
 
   public void tstampInterrupt(long objectID) {
-    DerbyObjectStoreTransaction holder =
-        (DerbyObjectStoreTransaction) objectHolder.get(new Long(objectID));
+    Transaction holder =
+        (Transaction) objectHolder.get(new Long(objectID));
     holder.tstampInterrupt();
   }
 
@@ -367,7 +368,7 @@ public class DerbyObjectStore
   }
 
   public void setObjectHolder(long objectID,
-                              DerbyObjectStoreTransaction trans) {
+                              Transaction trans) {
     objectHolder.put(new Long(objectID), trans);
   }
 

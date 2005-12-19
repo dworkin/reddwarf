@@ -1,0 +1,475 @@
+<html>
+<head><META http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<base target="contentwin"><title>Developer's Guide</title>
+</head>
+<body>
+<UL>
+<LI><a href="rdevcopyright.html">Copyright</a></LI>
+<LI><a href="cdevdgpref29520.html">About this guide</a>
+<UL>
+<LI><a href="cdevdgpref11181.html">Purpose of this guide</a></LI>
+<LI><a href="cdevdgpref24290.html">Audience</a></LI>
+<LI><a href="cdevdgpref23947.html">How this guide Is Organized</a></LI>
+</UL>
+</LI>
+<LI><a href="cdevupgrades.html">Upgrades</a>
+<UL>
+<LI><a href="tdevpreupgrade.html">Preparing to upgrade</a></LI>
+<LI><a href="tdevupgradedb.html">Upgrading a database</a></LI>
+<LI><a href="tdevupgradesoft.html">Soft upgrade</a></LI>
+</UL>
+</LI>
+<LI><a href="cdevdvlp19524.html">JDBC applications and Derby basics</a>
+<UL>
+<LI><a href="cdevdvlp14839.html">Application development overview</a></LI>
+<LI><a href="cdevdvlp39409.html">Derby embedded basics</a>
+<UL>
+<LI><a href="cdevdvlp40653.html">Derby JDBC driver</a></LI>
+<LI><a href="cdevdvlp17453.html">Derby JDBC database connection URL</a></LI>
+<LI><a href="cdevdvlp27610.html">Derby system</a>
+<UL>
+<LI><a href="cdevdvlp96597.html">One Derby instance for each Java Virtual Machine</a></LI>
+<LI><a href="cdevdvlp27715.html">Booting databases</a></LI>
+<LI><a href="tdevdvlp20349.html">Shutting down the system</a></LI>
+<LI><a href="cdevdvlp13018.html">Defining the system directory</a></LI>
+<LI><a href="cdevdvlp25889.html">The error log</a></LI>
+<LI><a href="cdevdvlp39943.html">derby.properties</a></LI>
+<LI><a href="cdevdvlp20458.html">Double-booting system behavior</a></LI>
+<LI><a href="cdevdvlp19297.html">Recommended practices</a></LI>
+</UL>
+</LI>
+<LI><a href="cdevdvlp21955.html">A Derby database</a>
+<UL>
+<LI><a href="cdevdvlp40724.html">The database directory</a></LI>
+<LI><a href="cdevdvlp42173.html">Creating, dropping, and backing up databases</a></LI>
+<LI><a href="cdevdvlp845973.html">Single database shutdown</a></LI>
+<LI><a href="cdevdvlp18166.html">Storage and recovery</a></LI>
+<LI><a href="cdevdvlp84026.html">Log on separate device</a></LI>
+<LI><a href="cdevdvlp25820.html">Database Pages</a></LI>
+<LI><a href="cdevdvlp846110.html">Database-wide properties</a></LI>
+<LI><a href="cdevdvlp30653.html">Database limitations</a></LI>
+</UL>
+</LI>
+<LI><a href="cdevdvlp34964.html">Connecting to databases</a>
+<UL>
+<LI><a href="cdevdvlp19619.html">Standard connections</a>
+<UL>
+<LI><a href="cdevdvlp846369.html">Connecting to databases within the system</a></LI>
+<LI><a href="cdevdvlp846402.html">Connecting to databases outside the system directory</a></LI>
+</UL>
+</LI>
+<LI><a href="cdevdvlp40350.html">Conventions for specifying the database path</a></LI>
+<LI><a href="cdevdvlp19700.html">Special database access</a>
+<UL>
+<LI><a href="cdevdvlp91854.html">Accessing databases from the classpath</a></LI>
+<LI><a href="cdevdvlp24155.html">Accessing databases from a jar or zip file</a></LI>
+</UL>
+</LI>
+<LI><a href="rdevdvlp22102.html">Database connection examples</a></LI>
+</UL>
+</LI>
+<LI><a href="cdevdvlp51654.html">Working with the database connection URL attributes</a>
+<UL>
+<LI><a href="rdevdvlp847152.html">Using the databaseName attribute</a></LI>
+<LI><a href="tdevdvlp40464.html">Shutting down Derby or an individual database</a></LI>
+<LI><a href="tdevdvlp39090.html">Creating and accessing a database</a></LI>
+<LI><a href="tdevdvlp12233.html">Providing a user name and password</a></LI>
+<LI><a href="tdevdvlp14496.html">Encrypting a database when you create it</a></LI>
+<LI><a href="tdevdvlp40140.html">Booting an encrypted database</a></LI>
+<LI><a href="tdevdvlp36289.html">Specifying attributes in a properties object</a></LI>
+</UL>
+</LI>
+</UL>
+</LI>
+</UL>
+</LI>
+<LI><a href="cdevstart19524.html">After installing</a>
+<UL>
+<LI><a href="cdevstart16043.html">The installation directory</a>
+<UL>
+<LI><a href="cdevstart813142.html">Batch files and shell scripts</a></LI>
+</UL>
+</LI>
+<LI><a href="cdevstart18978.html">Derby and JVMs</a></LI>
+<LI><a href="cdevstart98282.html">Derby libraries and classpath</a></LI>
+<LI><a href="cdevstart41260.html">UNIX-specific issues</a>
+<UL>
+<LI><a href="cdevstart39409.html">Configuring file descriptors</a></LI>
+<LI><a href="cdevstart813545.html">Scripts</a></LI>
+</UL>
+</LI>
+</UL>
+</LI>
+<LI><a href="cdevdvlp25174.html">Derby embedded basics</a>
+<UL>
+<LI><a href="cdevdvlp40170.html">Embedded Derby JDBC driver</a></LI>
+<LI><a href="rdevdvlp38881.html">Embedded Derby JDBC database connection URL</a></LI>
+<LI><a href="cdevdvlp10252.html">Getting a nested connection</a></LI>
+<LI><a href="tdevdvlp38381.html">Starting Derby as an embedded database</a></LI>
+</UL>
+</LI>
+<LI><a href="cdevdeploy32171.html">Deploying Derby applications</a>
+<UL>
+<LI><a href="cdevdeploy38918.html">Deployment issues</a>
+<UL>
+<LI><a href="cdevdeploy855368.html">Embedded deployment application overview</a></LI>
+<LI><a href="cdevdeploy855655.html">Deploying Derby in an embedded environment</a>
+<UL>
+<LI><a href="cdevdeploy18639.html">Embedded systems and properties</a></LI>
+</UL>
+</LI>
+</UL>
+</LI>
+<LI><a href="cdevdeploy15325.html">Creating Derby databases for read-only use</a>
+<UL>
+<LI><a href="tdevdeploy26887.html">Creating and preparing the database for read-only use</a></LI>
+<LI><a href="tdevdeploy19136.html">Deploying the database on the read-only media</a></LI>
+<LI><a href="tdevdeploy33704.html">Transferring read-only databases to archive (jar or zip) files</a></LI>
+<LI><a href="cdevdeploy11201.html">Accessing a read-only database in a zip/jar file</a></LI>
+<LI><a href="tdevdeploy39856.html">Accessing databases within a jar file using the classpath</a>
+<UL>
+<LI><a href="cdevdeploy18716.html">Connecting to databases with ambiguous paths to databases in the file system</a></LI>
+<LI><a href="cdevdeploy856333.html">Connecting to databases when the path is ambiguous because of databases in the classpath</a></LI>
+</UL>
+</LI>
+<LI><a href="cdevdeploy82529.html">Databases on read-only media and DatabaseMetaData</a></LI>
+</UL>
+</LI>
+<LI><a href="cdevdeploy30736.html">Loading classes from a database</a>
+<UL>
+<LI><a href="cdevdeploy856753.html">Class loading overview</a>
+<UL>
+<LI><a href="cdevdeploy92419.html">Signed jar files</a></LI>
+</UL>
+</LI>
+<LI><a href="cdevdeploy15818.html">Create jar files for your application</a></LI>
+<LI><a href="cdevdeploy23812.html">Add the jar file or files to the database</a>
+<UL>
+<LI><a href="rdevdeploy856948.html">Jar file examples</a>
+<UL>
+<LI><a href="rdevdeploy856845.html">Installing jar files</a></LI>
+<LI><a href="rdevdeploy856880.html">Removing jar files</a></LI>
+<LI><a href="rdevdeploy856912.html">Replacing jar files</a></LI>
+</UL>
+</LI>
+</UL>
+</LI>
+<LI><a href="cdevdeploy21645.html">Enable database class loading with a property</a></LI>
+<LI><a href="cdevdeploy12748.html">Code your applications</a></LI>
+<LI><a href="cdevdeploy17604.html">Dynamic changes to jar files or to the database jar classpath</a>
+<UL>
+<LI><a href="cdevdeploy857611.html">Requirements for dynamic changes</a></LI>
+<LI><a href="cdevdeploy857648.html">Notes</a></LI>
+</UL>
+</LI>
+</UL>
+</LI>
+</UL>
+</LI>
+<LI><a href="cdevspecial.html">Derby server-side programming</a>
+<UL>
+<LI><a href="cdevspecial42117.html">Programming database-side JDBC procedures</a>
+<UL>
+<LI><a href="cdevspecial29620.html">Database-side JDBC procedures and nested connections</a>
+<UL>
+<LI><a href="cdevspecial28907.html">Requirements for database-side JDBC procedures using nested connections</a></LI>
+</UL>
+</LI>
+<LI><a href="cdevspecial16181.html">Database-side JDBC procedures using non-nested connections</a>
+<UL>
+<LI><a href="cdevspecial847513.html">Invoking a procedure using the CALL command</a></LI>
+</UL>
+</LI>
+<LI><a href="cdevspecial41728.html">Database-side JDBC procedures and SQLExceptions</a></LI>
+<LI><a href="cdevspecial45786.html">User-defined SQLExceptions</a></LI>
+</UL>
+</LI>
+<LI><a href="cdevspecial27163.html">Programming trigger actions</a>
+<UL>
+<LI><a href="cdevspecial53165.html">Trigger action overview</a></LI>
+<LI><a href="cdevspecial76763.html">Performing referential actions</a></LI>
+<LI><a href="cdevspecial67260.html">Accessing before and after rows</a></LI>
+<LI><a href="cdevspecial13670.html">Examples</a></LI>
+<LI><a href="cdevspecial49460.html">Triggers and exceptions</a>
+<UL>
+<LI><a href="cdevspecial93497.html">Aborting statements and transactions</a></LI>
+</UL>
+</LI>
+</UL>
+</LI>
+</UL>
+</LI>
+<LI><a href="cdevconcepts19524.html">Controlling Derby application behavior</a>
+<UL>
+<LI><a href="cdevconcepts38375.html">The JDBC Connection and Transaction Model</a>
+<UL>
+<LI><a href="cdevconcepts36881.html">Connections</a>
+<UL>
+<LI><a href="cdevconcepts838179.html">Statements</a></LI>
+<LI><a href="cdevconcepts838315.html">ResultSets and Cursors</a></LI>
+<LI><a href="cdevconcepts26633.html">Nested connections</a></LI>
+</UL>
+</LI>
+<LI><a href="cdevconcepts19173.html">Transactions</a>
+<UL>
+<LI><a href="cdevconcepts838850.html">Transactions when auto-commit is disabled</a></LI>
+<LI><a href="cdevconcepts29416.html">Using auto-commit</a></LI>
+<LI><a href="tdevconcepts839040.html">Turning Off Auto-Commit</a></LI>
+<LI><a href="cdevconcepts839085.html">Explicitly closing Statements, ResultSets, and Connections</a></LI>
+<LI><a href="cdevconcepts14433.html">Statement versus transaction runtime rollback</a></LI>
+</UL>
+</LI>
+</UL>
+</LI>
+<LI><a href="cdevconcepts41275.html">SQL and JDBC ResultSet/Cursor mechanisms</a>
+<UL>
+<LI><a href="rdevconcepts88082.html">Simple non-updatable ResultSets</a></LI>
+<LI><a href="cdevconcepts28351.html">Updatable cursors</a>
+<UL>
+<LI><a href="cdevconcepts30811.html">Requirements for updatable cursors</a></LI>
+<LI><a href="tdevconcepts41704.html">Naming or accessing the name of a cursor</a></LI>
+<LI><a href="rdevconcepts38274.html">Extended updatable cursor example</a></LI>
+</UL>
+</LI>
+<LI><a href="cdevconcepts23987.html">ResultSets and auto-commit</a></LI>
+<LI><a href="cdevconcepts22641.html">Scrolling insensitive ResultSets</a></LI>
+<LI><a href="rdevconceptsholdablecursors.html">Holdable cursors</a>
+<UL>
+<LI><a href="cdevconcepts840995.html">Holdable cursors and autocommit</a></LI>
+<LI><a href="rdevconcepts1119.html">Non-holdable cursor example</a></LI>
+</UL>
+</LI>
+</UL>
+</LI>
+<LI><a href="cdevconcepts30291.html">Locking, concurrency, and isolation</a>
+<UL>
+<LI><a href="cdevconcepts15366.html">Isolation levels and concurrency</a></LI>
+<LI><a href="cdevconcepts22300.html">Configuring isolation levels</a></LI>
+<LI><a href="cdevconcepts23810.html">Lock granularity</a></LI>
+<LI><a href="cdevconcepts36402.html">Types and scope of locks in Derby systems</a>
+<UL>
+<LI><a href="cdevconcepts842279.html">Exclusive locks</a></LI>
+<LI><a href="cdevconcepts842304.html">Shared locks</a></LI>
+<LI><a href="cdevconcepts842385.html">Update locks</a></LI>
+<LI><a href="rdevconcepts2462.html">Lock compatibility</a></LI>
+<LI><a href="rdevconcepts8424.html">Scope of locks</a></LI>
+<LI><a href="cdevconcepts842613.html">Notes on locking</a></LI>
+</UL>
+</LI>
+<LI><a href="cdevconcepts28436.html">Deadlocks</a>
+<UL>
+<LI><a href="cdevconcepts53677.html">Avoiding Deadlocks</a></LI>
+<LI><a href="cdevconcepts95005.html">Deadlock detection</a></LI>
+<LI><a href="cdevconcepts89097.html">Lock wait timeouts</a></LI>
+<LI><a href="cdevconcepts16400.html">Configuring deadlock detection and lock wait timeouts</a></LI>
+<LI><a href="cdevconcepts50894.html">Debugging Deadlocks</a></LI>
+<LI><a href="cdevconcepts32861.html">Programming applications to handle deadlocks</a></LI>
+</UL>
+</LI>
+</UL>
+</LI>
+<LI><a href="cdevconcepts34828.html">Working with multiple connections to a single database</a>
+<UL>
+<LI><a href="rdevconcepts713.html">Deployment options and threading and connection modes</a></LI>
+<LI><a href="cdevconcepts10914.html">Multi-user database access</a></LI>
+<LI><a href="cdevconcepts24019.html">Multiple connections from a single application</a></LI>
+</UL>
+</LI>
+<LI><a href="cdevconcepts23499.html">Working with multiple threads sharing a single connection</a>
+<UL>
+<LI><a href="cdevconcepts89498.html">Pitfalls of sharing a connection among threads</a></LI>
+<LI><a href="cdevconcepts65864.html">Multi-thread programming tips</a></LI>
+<LI><a href="rdevconcepts600.html">Example of threads sharing a statement</a></LI>
+</UL>
+</LI>
+<LI><a href="cdevdvlp22619.html">Working with database threads in an embedded environment</a></LI>
+<LI><a href="cdevconcepts24927.html">Working with Derby SQLExceptions in an Application</a>
+<UL>
+<LI><a href="cdevconcepts844813.html">Information provided in SQLExceptions</a>
+<UL>
+<LI><a href="rdevprocsqle.html">Example of processing SQLExceptions</a></LI>
+</UL>
+</LI>
+</UL>
+</LI>
+</UL>
+</LI>
+<LI><a href="cdevresman19524.html">Using Derby as a J2EE resource manager</a>
+<UL>
+<LI><a href="rdevresman79556.html">Classes that pertain to resource managers</a></LI>
+<LI><a href="cdevresman89722.html">Getting a DataSource</a></LI>
+<LI><a href="cdevresman92946.html">Shutting down or creating a database</a></LI>
+</UL>
+</LI>
+<LI><a href="cdevcsecuree.html">Derby and Security</a>
+<UL>
+<LI><a href="cdevcsecure12392.html">Configuring security for your environment</a>
+<UL>
+<LI><a href="tdevcsecure82556.html">Configuring security in a client/server environment</a></LI>
+<LI><a href="tdevcsecure81850.html">Configuring security in an embedded environment</a></LI>
+</UL>
+</LI>
+<LI><a href="cdevcsecure42374.html">Working with user authentication</a>
+<UL>
+<LI><a href="cdevcsecure36127.html">Enabling user authentication</a></LI>
+<LI><a href="cdevcsecure37817.html">Defining users</a></LI>
+<LI><a href="cdevcsecure38522.html">External directory service</a>
+<UL>
+<LI><a href="cdevcsecure41285.html">LDAP directory service</a>
+<UL>
+<LI><a href="rdevcsecure608.html">Libraries for LDAP user authentication</a></LI>
+<LI><a href="cdevcsecure863446.html">Setting up Derby to use your LDAP directory service</a></LI>
+<LI><a href="cdevcsecure876908.html">Guest access to search for DNs</a></LI>
+<LI><a href="cdevcsecure863546.html">LDAP performance issues</a></LI>
+<LI><a href="cdevcsecure863611.html">Considerations when using Windows NT with LDAP</a></LI>
+<LI><a href="cdevcsecure863676.html">LDAP restrictions</a></LI>
+</UL>
+</LI>
+<LI><a href="cdevcsecure864242.html">JNDI-specific properties for external directory services</a></LI>
+<LI><a href="cdevcsecure21561.html">User-defined class</a>
+<UL>
+<LI><a href="rdevexudclass.html">Example of setting a user-defined class</a></LI>
+</UL>
+</LI>
+</UL>
+</LI>
+<LI><a href="cdevcsecure21547.html">Built-in Derby users</a>
+<UL>
+<LI><a href="cdevcsecure864642.html">Database-level properties</a></LI>
+<LI><a href="cdevcsecure864692.html">System-level properties</a></LI>
+</UL>
+</LI>
+<LI><a href="rdevcsecure557.html">List of user-authentication properties</a></LI>
+<LI><a href="cdevcsecure79358.html">Programming applications for Derby user authentication</a>
+<UL>
+<LI><a href="rdevcsecure766.html">Programming the application to provide the user and password</a></LI>
+<LI><a href="rdevcsecure305.html">Login failure exceptions with user authentication</a></LI>
+</UL>
+</LI>
+</UL>
+</LI>
+<LI><a href="cdevcsecure37241.html">Users and authorization identifiers</a>
+<UL>
+<LI><a href="cdevcsecure24458.html">Authorization identifiers, user authentication, and user authorization</a></LI>
+<LI><a href="cdevcsecure865580.html">User names and schemas</a></LI>
+<LI><a href="rdevcsecure622.html">Exceptions when using authorization identifiers</a></LI>
+</UL>
+</LI>
+<LI><a href="cdevcsecure36595.html">User authorization</a>
+<UL>
+<LI><a href="cdevcsecure866060.html">Setting user authorization</a>
+<UL>
+<LI><a href="cdevcsecure865818.html">Setting the default access mode</a></LI>
+<LI><a href="cdevcsecure865880.html">Setting the access mode for particular users</a></LI>
+<LI><a href="rdevcsecure935.html">Notes on user authorization</a></LI>
+<LI><a href="rdevcsecure379.html">User authorization exceptions</a></LI>
+</UL>
+</LI>
+<LI><a href="rdevcsecure190.html">Read-only and full access permissions</a></LI>
+<LI><a href="rdevcsecure131.html">Examples of user authorization</a></LI>
+</UL>
+</LI>
+<LI><a href="cdevcsecure24366.html">Encrypting databases on disk</a>
+<UL>
+<LI><a href="cdevcsecure96815.html">Requirements for Derby encryption</a></LI>
+<LI><a href="cdevcsecure97760.html">Working with encryption</a>
+<UL>
+<LI><a href="cdevcsecure88690.html">Encrypting databases on creation</a></LI>
+<LI><a href="cdevcsecure866716.html">Creating the boot password</a>
+<UL>
+<LI><a href="cdevcsecure31493.html">Specifying an alternate encryption provider</a></LI>
+<LI><a href="cdevcsecure67151.html">Specifying an alternate encryption algorithm</a></LI>
+</UL>
+</LI>
+<LI><a href="cdevcsecure60146.html">Booting an encrypted database</a></LI>
+<LI><a href="cdevcsecure55054.html">Changing the boot password</a></LI>
+</UL>
+</LI>
+</UL>
+</LI>
+<LI><a href="cdevcsecure90988.html">Signed jar files</a></LI>
+<LI><a href="cdevcsecure10983.html">Notes on the Derby security features</a></LI>
+<LI><a href="cdevcsecure51876.html">User authentication and authorization examples</a>
+<UL>
+<LI><a href="rdevcsecure125.html">User authentication example in a client/server environment</a></LI>
+<LI><a href="rdevcsecure13713.html">User authentication example in a single-user, embedded environment</a>
+<UL>
+<LI><a href="rdevcsecure26537.html">User authentication and authorization extended examples</a></LI>
+</UL>
+</LI>
+</UL>
+</LI>
+<LI><a href="cdevcbabejdfj.html">Running Derby under a security manager</a>
+<UL>
+<LI><a href="cdevbabejgjd.html">Granting permissions to Derby</a></LI>
+<LI><a href="cdevcsecure871387.html">Examples of Java 2 security policy files for embedded Derby</a>
+<UL>
+<LI><a href="rdevcsecure871406.html">Java 2 security policy file example 1</a></LI>
+<LI><a href="rdevcsecure871422.html">Java 2 security policy file example 2</a></LI>
+<LI><a href="rdevcsecure871439.html">Java 2 security policy file example 3</a></LI>
+</UL>
+</LI>
+</UL>
+</LI>
+</UL>
+</LI>
+<LI><a href="cdevadvjdbc35053.html">Developing Tools and Using Derby with an IDE</a>
+<UL>
+<LI><a href="cdevadvjdbc41138.html">Offering Connection Choices to the User</a>
+<UL>
+<LI><a href="rdevadvjdbc034.html">The DriverPropertyInfo Array</a>
+<UL>
+<LI><a href="rdevadvjdbc965.html">DriverPropertyInfo array example</a></LI>
+</UL>
+</LI>
+</UL>
+</LI>
+<LI><a href="cdevadvjdbc32436.html">Using Derby with IDEs</a>
+<UL>
+<LI><a href="cdevadvjdbc18939.html">IDEs and multiple JVMs</a></LI>
+</UL>
+</LI>
+</UL>
+</LI>
+<LI><a href="cdevtricks32436.html">SQL tips</a>
+<UL>
+<LI><a href="cdevtricks19707.html">Retrieving the database connection URL</a></LI>
+<LI><a href="cdevtricks39584.html">Supplying a parameter only once</a></LI>
+<LI><a href="cdevtricks21248.html">Defining an identity column</a></LI>
+<LI><a href="cdevtricks23426.html">Using third-party tools</a></LI>
+<LI><a href="cdevtricks13019.html">Tricks of the VALUES clause</a>
+<UL>
+<LI><a href="cdevtricks807337.html">Multiple rows</a></LI>
+<LI><a href="cdevtricks807365.html">Mapping column values to return values</a></LI>
+<LI><a href="cdevtricks807400.html">Creating empty queries</a></LI>
+</UL>
+</LI>
+</UL>
+</LI>
+<LI><a href="cdevin10613.html">Localizing Derby</a>
+<UL>
+<LI><a href="cdevin71274.html">SQL parser support for Unicode</a></LI>
+<LI><a href="cdevin55108.html">Other components</a></LI>
+<LI><a href="cdevin38113.html">Messages libraries</a></LI>
+</UL>
+</LI>
+<LI><a href="cdevstandards806118.html">Derby and standards</a>
+<UL>
+<LI><a href="cdevstandards805644.html">Dynamic SQL</a></LI>
+<LI><a href="cdevstandards805664.html">Cursors</a></LI>
+<LI><a href="cdevstandards805690.html">Information schema</a></LI>
+<LI><a href="cdevstandards805716.html">Transactions</a></LI>
+<LI><a href="cdevstandards805742.html">Stored routines and PSM</a></LI>
+<LI><a href="cdevstandards805768.html">Calling functions and procedures</a></LI>
+<LI><a href="cdevstandards805841.html">Unique constraints and nulls</a></LI>
+<LI><a href="cdevstandards805893.html">NOT NULL characteristic</a></LI>
+<LI><a href="cdevstandards805949.html">DECIMAL max precision</a></LI>
+<LI><a href="cdevstandards805975.html">CLOB, and BLOB</a></LI>
+<LI><a href="cdevstandards806001.html">Expressions on LONGs</a></LI>
+<LI><a href="cdevstandards806027.html">ALTER TABLE</a></LI>
+</UL>
+</LI>
+<LI><a href="rdevtrademderby.html">Trademarks</a></LI>
+</UL>
+</body>
+</html>

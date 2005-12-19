@@ -1,0 +1,1448 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<html><head><META http-equiv="Content-Type" content="text/html; charset=utf-8"><title>XSL FO Document</title><META content="text/css" http-equiv="Content-Style-Type"><style type="text/css">
+        a { color: black; border: none; text-decoration: none; }
+        img { border: none; }
+      </style></head><body topmargin="6" leftmargin="6" marginheight="6" marginwidth="6" bgcolor="white"><br><div valign="top">
+<div style="font-family: Helvetica; text-align: right;">
+<div style="line-height: 140%; font-weight: bold; font-size: 30pt;"></div>
+<div style="margin-bottom: 1in; line-height: 140%; font-weight: bold; font-size: 24pt;"></div>
+<div style="line-height: 1.5; font-weight: bold; font-size: 11pt;">[vertical list of authors]</div>
+<div style="line-height: normal; font-weight: bold; font-size: 11pt; margin-top: 3pc;"> &copy; &nbsp;&nbsp; Copyright
+              &nbsp;&nbsp;,. </div>
+</div>
+<div style="padding: 6pt; border-width: thin; border-color: black; border-style: dashed; font-family: Helvetica; margin-top: 2pc;">
+<div style="text-align: center; margin-bottom: 12pc; margin-top: 12pc; line-height: 100%; font-size: 12pt;">
+<span style="font-weight: bold; color: purple;">[cover art/text goes here]</span>
+</div>
+</div>
+</div><br><br><div valign="top">
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em; text-align: center; color: purple;"></div>
+</div><br><br><div valign="top">
+<div style="line-height: 8pt; font-size: 8pt;">Copyright</div>
+</div><div valign="top">
+<a name="page1-1"></a><div style="font-family: Helvetica; font-size: 10pt; line-height: 12pt;">
+<div style="font-family: Helvetica; text-align: left;">
+<div>
+ &nbsp;&nbsp;&nbsp; 
+</div>
+<div style="line-height: 140%; font-weight: bold; font-size: 20pt;">
+              Contents </div>
+</div>
+</div>
+</div><div valign="top">
+<div style="font-family: Helvetica; font-weight: bold; font-size: 10pt; text-align: center;">
+<span>&bull;</span>
+</div>
+</div><br><br><div valign="top">
+<div style="line-height: 8pt; font-size: 8pt;">Copyright</div>
+</div><div valign="top">
+<div style="font-family: Helvetica; font-size: 10pt; text-align: left;">Apache Software FoundationGetting Started with DerbyApache Derby<div>
+<a name="N10033"></a><span></span>
+<a name="N1003C"></a><div style="margin-top: 0pc; margin-bottom: 1.4pc; font-size: 16pt; font-weight: bold; padding-top: 1.4pc;">
+<div style="border-right-width: 0pt; border-left-width: 0pt; line-height: 100%; border-top-width: 3pt; border-top-color: black;">
+<a name="rgscopyright"></a><span></span>Copyright</div>
+</div>
+<div style="margin-left: 72pt; font-size: 10pt;">
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em; margin-left: 72pt;">Second Edition (July 2005)</div>
+<div style="line-height: 12pt; margin-top: 0.6em; font-size: 10pt;">
+<a name="N1004A"></a><span></span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">Copyright 1997, 2005 The Apache Software Foundation or its licensors,
+as applicable.</div>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0em; margin-bottom: 0.6em;">Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.   You may
+obtain a copy of the License at<pre><div style="margin-top: 1.2em; margin-bottom: 0.8em; background-color: #f0f0f0; font-family: Courier; line-height: 106%; font-size: 9pt;">http://www.apache.org/licenses/LICENSE-2.0</div></pre>
+</div>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">Unless
+required by applicable law or agreed to in writing, software   distributed
+under the License is distributed on an "AS IS" BASIS,   WITHOUT WARRANTIES
+OR CONDITIONS OF ANY KIND, either express or implied.   See the License for
+the specific language governing permissions and   limitations under the License.</div>
+</div>
+</div>
+</div>
+<div>
+<a name="N10064"></a><span></span>
+<a name="N1006D"></a><div style="margin-top: 0pc; margin-bottom: 1.4pc; font-size: 16pt; font-weight: bold; padding-top: 1.4pc;">
+<div style="border-right-width: 0pt; border-left-width: 0pt; line-height: 100%; border-top-width: 3pt; border-top-color: black;">
+<a name="cgsintro"></a><span></span>Introducing Derby</div>
+</div>
+<div style="margin-left: 72pt; font-size: 10pt;">
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">Welcome to <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span>! <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> is a relational database
+management system (RDBMS) that is based on <span style="border-right-width: 0pt; border-left-width: 0pt;">Java<span style="font-size: 75%;">(TM)</span>
+</span> and SQL. This section
+describes <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span>.</div>
+</div>
+<div>
+<a name="N100CE"></a><span></span>
+<a name="N100D7"></a><div style="padding-top: 1pc; margin-bottom: 5pt; font-size: 14pt; font-weight: bold;">
+<div style="border-right-width: 0pt; border-left-width: 0pt; border-top-width: 1pt; border-top-color: black;">
+<a name="cgsintdo"></a><span></span>Deployment options</div>
+</div>
+<div style="margin-left: 72pt; font-size: 10pt;">
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0em; margin-bottom: 0.6em;">You can deploy <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> in
+a number of different ways:   <div><table width="100%"><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>Embedded in a single-user Java application. <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> can
+be almost invisible to the end user because it requires no administration
+and runs in the same Java virtual machine (JVM) as the application.</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>Embedded in a multiuser application such as a web server, an application
+server, or a shared development environment.</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>Embedded in a server framework. You can use the Network Server
+with the Network Client driver or a server of your own choice.</div>
+</td></tr></table></div>
+</div>
+</div>
+</div>
+<div>
+<a name="N10132"></a><span></span>
+<a name="N1013B"></a><div style="padding-top: 1pc; margin-bottom: 5pt; font-size: 14pt; font-weight: bold;">
+<div style="border-right-width: 0pt; border-left-width: 0pt; border-top-width: 1pt; border-top-color: black;">
+<a name="cgsinstr"></a><span></span>System requirements</div>
+</div>
+<div style="margin-left: 72pt; font-size: 10pt;">
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">
+<span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> is a database engine
+written completely in Java; it will run in any certified Java Virtual Machine
+(JVM).</div>
+</div>
+</div>
+<div>
+<a name="N1017C"></a><span></span>
+<a name="N10185"></a><div style="padding-top: 1pc; margin-bottom: 5pt; font-size: 14pt; font-weight: bold;">
+<div style="border-right-width: 0pt; border-left-width: 0pt; border-top-width: 1pt; border-top-color: black;">
+<a name="rgsdocs17307"></a><span></span>The Derby library</div>
+</div>
+<div style="margin-left: 72pt; font-size: 10pt;">
+<div style="line-height: 12pt; margin-top: 0.6em; font-size: 10pt;">
+<a name="N1018E"></a><span></span>
+<div>
+<div>
+<div style="font-size: 10pt; font-weight: bold; text-indent: 0em; margin-right: 24pt;">
+<span style="border-right-width: 0pt; border-left-width: 0pt;">
+<span style="font-style: italic;">Derby Developer's Guide</span>
+</span>
+</div>
+<div style="margin-left: 72pt + 16pt;">
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">Describes the functionality and features of <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> common
+to all deployments, such as <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span>'s
+JDBC and SQL specifics, deploying <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> applications,
+security, and other advanced features.</div>
+</div>
+</div>
+<div>
+<div style="font-size: 10pt; font-weight: bold; text-indent: 0em; margin-right: 24pt;">
+<span style="border-right-width: 0pt; border-left-width: 0pt;">
+<span style="font-style: italic;">Derby Reference Manual</span>
+</span>
+</div>
+<div style="margin-left: 72pt + 16pt;">
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">Documents <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span>'s
+implementation of the SQL language. Also provides reference information for <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span>'s JDBC and JTA implementations,
+keywords, system tables, properties, and <span style="font-style: italic;">SQLExceptions</span>. </div>
+</div>
+</div>
+<div>
+<div style="font-size: 10pt; font-weight: bold; text-indent: 0em; margin-right: 24pt;">
+<span style="border-right-width: 0pt; border-left-width: 0pt;">
+<span style="font-style: italic;">Tuning Derby</span>
+</span>
+</div>
+<div style="margin-left: 72pt + 16pt;">
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">Explains how to configure and tune <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> through
+properties and provides reference information on properties. It also offers
+performance tips, an in-depth discussion of performance, and information about
+the <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> optimizer.</div>
+</div>
+</div>
+<div>
+<div style="font-size: 10pt; font-weight: bold; text-indent: 0em; margin-right: 24pt;">
+<span style="border-right-width: 0pt; border-left-width: 0pt;">
+<span style="font-style: italic;">Derby Tools and Utilities Guide</span>
+</span>
+</div>
+<div style="margin-left: 72pt + 16pt;">
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">A guide for working with the <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> tools
+such as <span style="font-family: Courier;">ij</span>, and more advanced utilities such as import/export
+and the database class loader.</div>
+</div>
+</div>
+<div>
+<div style="font-size: 10pt; font-weight: bold; text-indent: 0em; margin-right: 24pt;">
+<span style="border-right-width: 0pt; border-left-width: 0pt;">
+<span style="font-style: italic;">Derby Server and Administration Guide</span>
+</span>
+</div>
+<div style="margin-left: 72pt + 16pt;">
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">Part One of this guide discusses configuration of servers, how to program
+client applications, and database administration.</div>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">In addition, some
+systems might require administrative tasks such as backing up databases. These
+tasks are independent of any server framework but are unique to multi-user
+or large systems. </div>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">Part Two of this guide discusses administrative issues
+such as backups and debugging deadlocks.</div>
+</div>
+</div>
+<div>
+<div style="font-size: 10pt; font-weight: bold; text-indent: 0em; margin-right: 24pt;">
+<span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> API javadoc </div>
+<div style="margin-left: 72pt + 16pt;">
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">Automatically generated for all public <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> classes.
+(No javadoc is provided for the JDBC API, which is part of the Java&trade; 2 Platform,
+Standard Edition) For more information about the classes in the API, see the <span style="font-style: italic;">
+<span style="border-right-width: 0pt; border-left-width: 0pt;">
+<span style="font-style: italic;">Derby Reference Manual</span>
+</span>
+</span>.</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div>
+<a name="N102B7"></a><span></span>
+<a name="N102C0"></a><div style="margin-top: 0pc; margin-bottom: 1.4pc; font-size: 16pt; font-weight: bold; padding-top: 1.4pc;">
+<div style="border-right-width: 0pt; border-left-width: 0pt; line-height: 100%; border-top-width: 3pt; border-top-color: black;">
+<a name="cgsinsta"></a><span></span>Installing and working with Derby</div>
+</div>
+<div style="margin-left: 72pt; font-size: 10pt;">
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">If you are new to <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> and
+JDBC programming, the following topics will help you begin using the product.
+If you are an experienced JDBC programmer, see <span style="color: blue;">
+<a href="#cgsquck19524">Quick start guide for experienced JDBC users</a>
+</span>.</div>
+</div>
+<div>
+<a name="N1031C"></a><span></span>
+<a name="N10325"></a><div style="padding-top: 1pc; margin-bottom: 5pt; font-size: 14pt; font-weight: bold;">
+<div style="border-right-width: 0pt; border-left-width: 0pt; border-top-width: 1pt; border-top-color: black;">
+<a name="cgsinstallingderby"></a><span></span>Installing Derby</div>
+</div>
+<div style="margin-left: 72pt; font-size: 10pt;">
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">In order to install <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> you
+must first download the <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> zip
+or tar archive from the <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> web
+site at <span style="color: blue;">
+<a href="http://db.apache.org/derby/derby_downloads.html">
+<span style="border-right-width: 0pt; border-left-width: 0pt;">http://db.apache.org/derby/derby_downloads.html</span>
+</a>
+</span>. This downloads page
+includes provides several distributions of <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span>,
+including snapshot packages as well as stable-version binary distributions.
+You will also find information on accessing the active source distributions
+for <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span>. The distributions
+come in <span style="font-style: italic;">bin</span>, <span style="font-style: italic;">lib</span> and <span style="font-style: italic;">src</span> packages. This guide assumes
+that you have downloaded the <span style="font-style: italic;">bin</span> distribution package.</div>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0em; margin-bottom: 0.6em;">Extract the downloaded package. The extracted installation contains several
+subdirectories:<div><table width="100%"><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>The <span style="font-family: Courier;">demo</span> subdirectory contains demonstration programs.</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>The <span style="font-family: Courier;">frameworks</span> subdirectory contains scripts for executing
+utilities and setting up the environment.</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>The <span style="font-family: Courier;">javadoc</span> subdirectory contains the <span style="font-family: Courier;">api</span> documentation
+that was generated from source code comments.</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>The <span style="font-family: Courier;">doc</span> subdirectory contains the <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> documentation.</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>The <span style="font-family: Courier;">lib</span> subdirectory contains the <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> jar
+files.</div>
+</td></tr></table></div>
+</div>
+</div>
+</div>
+<div>
+<a name="N10402"></a><span></span>
+<a name="N1040B"></a><div style="padding-top: 1pc; margin-bottom: 5pt; font-size: 14pt; font-weight: bold;">
+<div style="border-right-width: 0pt; border-left-width: 0pt; border-top-width: 1pt; border-top-color: black;">
+<a name="tgssetupjavaenvir"></a><span></span> Setting up your Java environment</div>
+</div>
+<div style="margin-left: 72pt; font-size: 10pt;">
+<div style="line-height: 12pt; margin-top: 0.6em; font-size: 10pt;">
+<a name="N1042A"></a><span></span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">You need to set your PATH environment variable so the JVM and
+Java applications run correctly. This is extremely important for the success
+of your installation because the PATH variable enables your operating system
+to find the appropriate programs from any directory. If you have more than
+one JVM installed, the JVM you want to use must appear before any of the others
+in the PATH variable.</div>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">To check the PATH environment variable:</div>
+</div>
+<div><table width="100%"><tr><td valign="top" style="text-align: right;" width="24">
+<div>1. 
+          </div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>
+<span style="border-right-width: 0pt; border-left-width: 0pt;">In a command window, type the following: </span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">
+<pre><div style="margin-top: 1.2em; margin-bottom: 0.8em; background-color: #f0f0f0; font-family: Courier; line-height: 106%; font-size: 9pt;">java -version</div></pre>
+</div>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">If the path is set correctly, you will see a printout telling
+you the version of your JVM.</div>
+</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>2. 
+          </div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>
+<span style="border-right-width: 0pt; border-left-width: 0pt;">If the command does not return the correct version of your JVM,
+set the PATH variable by adding the <span style="font-family: Courier;">bin</span> subdirectory of the
+JVM directory to the beginning of the path.</span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">For
+example, if the directory is <span style="font-family: Courier;">C:\JDK1.4</span>, add <span style="font-family: Courier;">C:\JDK1.4\bin</span> to
+the beginning of the path.</div>
+</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>3. 
+          </div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>
+<span style="border-right-width: 0pt; border-left-width: 0pt;">Repeat step 1 to make sure the PATH environment variable is set
+correctly.</span>
+</div>
+</td></tr></table></div>
+</div>
+</div>
+<div>
+<a name="N104B8"></a><span></span>
+<a name="N104C1"></a><div style="padding-top: 1pc; margin-bottom: 5pt; font-size: 14pt; font-weight: bold;">
+<div style="border-right-width: 0pt; border-left-width: 0pt; border-top-width: 1pt; border-top-color: black;">
+<a name="cgsusingtoolsutils"></a><span></span>Using the tools and startup utilities</div>
+</div>
+<div style="margin-left: 72pt; font-size: 10pt;">
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">
+<span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> tools include dblook,
+ij, and sysinfo. <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> utilities
+include the import, export and database class utilities. The /frameworks/embedded/bin
+directory contains scripts for running some of the <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> tools
+and utilities in embedded mode. You can find similar scripts for running tools
+and utilities for the Network Server in the /frameworks/NetworkServer/bin
+directory. In discussion of these tools and utilities in embedded mode, the /frameworks/embedded/bin
+directory is referred to as the /bin directory unless stated otherwise.</div>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">The scripts have descriptive names such as <span style="font-family: Courier;">sysinfo.bat</span> or <span style="font-family: Courier;">ij.ksh</span>.
+Like the classpath scripts, these scripts end with different extensions depending
+on your environment. Windows scripts have a .bat extension, while Unix scripts
+have a .ksh extension. You might need to modify these scripts in order for
+the tools and utilities to run properly on Windows and Unix platforms.</div>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">The following information applies <span style="font-style: italic;">only</span> to UNIX platforms.</div>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">In order to use the script files to run the tools and utilities, do the
+following: </div>
+<div><table width="100%"><tr><td valign="top" style="text-align: right;" width="24">
+<div>1. 
+          </div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>Turn on the execute bit for the script files. For example:<pre><div style="margin-top: 1.2em; margin-bottom: 0.8em; background-color: #f0f0f0; font-family: Courier; line-height: 106%; font-size: 9pt;">chmod +x <span style="font-style: italic;">fileName</span>
+</div></pre>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">where <span style="font-style: italic;">fileName</span> is
+any script file with a .ksh extension. This tells the system to execute the
+commands in the script every time you use it. </div>
+</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>2. 
+          </div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>Add the /bin directory to your PATH variable. This allows you to use shortened
+commands to start the <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> tools.</div>
+</td></tr></table></div>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">For more information on scripts, see <span style="color: blue;">
+<a href="#rgslib27507">Scripts provided by Derby</a>
+</span>.</div>
+</div>
+<div>
+<a name="N10592"></a><span></span>
+<a name="N1059B"></a><div style="padding-top: 1pc; margin-bottom: 2pt; font-size: 12pt; font-weight: bold;">
+<a name="cgsusingsysinfo"></a><span></span>Using sysinfo</div>
+<div style="margin-left: 72pt; font-size: 10pt;">
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">
+<span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span>'s sysinfo
+tool displays information about your Java environment and your version of <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span>. The sysinfo script sets
+the appropriate environment variables, including the classpath, and executes
+the sysinfo program. Once you have the /bin directory in your PATH, run sysinfo
+by entering the following in a command window: </div>
+<pre><div style="margin-top: 1.2em; margin-bottom: 0.8em; background-color: #f0f0f0; font-family: Courier; line-height: 106%; font-size: 9pt;">sysinfo</div></pre>
+</div>
+</div>
+<div>
+<a name="N105DB"></a><span></span>
+<a name="N105E4"></a><div style="padding-top: 1pc; margin-bottom: 2pt; font-size: 12pt; font-weight: bold;">
+<a name="tgsrunningij"></a><span></span>Running ij</div>
+<div style="margin-left: 72pt; font-size: 10pt;">
+<div style="line-height: 12pt; margin-top: 0.6em; font-size: 10pt;">
+<a name="N105ED"></a><span></span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">You can use the <span style="font-weight: bold;">ij</span> tool to connect to a <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> database.
+You must include the /bin directory in your PATH environment variable to run
+ij.</div>
+</div>
+<div><table width="100%"><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>
+<span style="border-right-width: 0pt; border-left-width: 0pt;">You can run ij by typing the following command: </span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">
+<pre><div style="margin-top: 1.2em; margin-bottom: 0.8em; background-color: #f0f0f0; font-family: Courier; line-height: 106%; font-size: 9pt;">ij</div></pre>
+</div>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">The ij script executes the ij program and sets up environment
+variables like CLASSPATH.</div>
+</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>
+<span style="border-right-width: 0pt; border-left-width: 0pt;">To create a database with ij, type the following command:</span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">
+<pre><div style="margin-top: 1.2em; margin-bottom: 0.8em; background-color: #f0f0f0; font-family: Courier; line-height: 106%; font-size: 9pt;">ij&gt; connect 'jdbc:derby:testdb;create=true';</div></pre>
+</div>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">This command creates a database called testdb in the current directory, populates the system tables, and connects to the database. You can then execute any SQL statements from
+the ij command line.</div>
+</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>
+<span style="border-right-width: 0pt; border-left-width: 0pt;">When you are ready to leave ij, type: </span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">
+<pre><div style="margin-top: 1.2em; margin-bottom: 0.8em; background-color: #f0f0f0; font-family: Courier; line-height: 106%; font-size: 9pt;">ij&gt; exit;</div></pre>
+</div>
+</div>
+</td></tr></table></div>
+<div style="line-height: 12pt; margin-top: 0.6em; font-size: 10pt;">
+<a name="N10649"></a><span></span>See the <span style="font-style: italic;">
+<span style="border-right-width: 0pt; border-left-width: 0pt;">
+<span style="font-style: italic;">Derby Tools and Utilities Guide</span>
+</span>
+</span> for
+more information on running ij.</div>
+</div>
+</div>
+</div>
+<div>
+<a name="N1067D"></a><span></span>
+<a name="N10686"></a><div style="padding-top: 1pc; margin-bottom: 5pt; font-size: 14pt; font-weight: bold;">
+<div style="border-right-width: 0pt; border-left-width: 0pt; border-top-width: 1pt; border-top-color: black;">
+<a name="cgsmanuallysetting"></a><span></span>Manually setting environment variables and paths </div>
+</div>
+<div style="margin-left: 72pt; font-size: 10pt;">
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">If you cannot run the scripts for the <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> tools
+and utilities, you must complete certain steps manually. The following topics
+show how to set your environment and run the tools manually. </div>
+</div>
+<div>
+<a name="N106F4"></a><span></span>
+<a name="N106FD"></a><div style="padding-top: 1pc; margin-bottom: 2pt; font-size: 12pt; font-weight: bold;">
+<a name="tgs36360"></a><span></span> Set the DERBY_INSTALL environment variable</div>
+<div style="margin-left: 72pt; font-size: 10pt;">
+<div style="line-height: 12pt; margin-top: 0.6em; font-size: 10pt;">
+<a name="N10706"></a><span></span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">During installation, a base directory was created where the software was installed. This document assumes that directory is named <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby_10</span>.
+This document refers to that directory as the <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> base
+directory.</div>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">If you plan to use the scripts in the <span style="font-family: Courier;">/frameworks/embedded/bin</span> directory
+and if your operating system supports it, create an environment variable called <span style="border-right-width: 0pt; border-left-width: 0pt;">DERBY_INSTALL</span> and set its value to
+the path of the <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> base
+directory. This will allow you to use shortened commands to run the <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> tools
+and utilities.</div>
+</div>
+<div style="line-height: 12pt; margin-top: 0.6em; font-size: 10pt;">
+<a name="N10738"></a><span></span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0em; margin-bottom: 0.6em;">For example, if you installed the product in c:\<span style="border-right-width: 0pt; border-left-width: 0pt;">Derby_10</span>,
+set <span style="border-right-width: 0pt; border-left-width: 0pt;">DERBY_INSTALL</span> to c:\<span style="border-right-width: 0pt; border-left-width: 0pt;">Derby_10</span>:
+ <pre><div style="margin-top: 1.2em; margin-bottom: 0.8em; background-color: #f0f0f0; font-family: Courier; line-height: 106%; font-size: 9pt;">set <span style="border-right-width: 0pt; border-left-width: 0pt;">DERBY_INSTALL</span>=c:\<span style="border-right-width: 0pt; border-left-width: 0pt;">Derby_10</span>
+</div></pre>
+</div>
+</div>
+</div>
+</div>
+<div>
+<a name="N10785"></a><span></span>
+<a name="N1078E"></a><div style="padding-top: 1pc; margin-bottom: 2pt; font-size: 12pt; font-weight: bold;">
+<a name="tgs26250"></a><span></span> Set the classpath</div>
+<div style="margin-left: 72pt; font-size: 10pt;">
+<div style="line-height: 12pt; margin-top: 0.6em; font-size: 10pt;">
+<a name="N107AD"></a><span></span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">The JVM needs to know the path of every class file needed by your
+application. The classpath is a list of the class libraries needed by the
+JVM and other Java applications to run your program. You can set the CLASSPATH
+environment variable in the operating system either temporarily, permanently,
+or at run time when you start your Java application and the JVM. If you set
+the environment variable temporarily, you must set it each time that you open
+a new command window.</div>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">In most development environments, it is best to
+set the operating system's CLASSPATH environment variable temporarily. <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> provides some scripts
+to help you set your classpath this way; they are found in the /frameworks/embedded/bin
+directory or the /frameworks/NetworkServer/bin directory. To set the class
+path temporarily, run a script every time you open a new command window. </div>
+</div>
+<div><table width="100%"><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>
+<span style="border-right-width: 0pt; border-left-width: 0pt;">Set your CLASSPATH so that it includes the derby.jar and derbytools.jar
+files.</span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">For example:<pre><div style="margin-top: 1.2em; margin-bottom: 0.8em; background-color: #f0f0f0; font-family: Courier; line-height: 106%; font-size: 9pt;">set CLASSPATH=%<span style="border-right-width: 0pt; border-left-width: 0pt;">DERBY_INSTALL</span>%\lib\derby.jar;
+%<span style="border-right-width: 0pt; border-left-width: 0pt;">DERBY_INSTALL</span>%\lib\derbytools.jar;%CLASSPATH%</div></pre>
+</div>
+</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>
+<span style="border-right-width: 0pt; border-left-width: 0pt;">To manually run the sysinfo utility, enter the following in a command
+window or shell: </span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">
+<pre><div style="margin-top: 1.2em; margin-bottom: 0.8em; background-color: #f0f0f0; font-family: Courier; line-height: 106%; font-size: 9pt;">java org.apache.derby.tools.sysinfo</div></pre>
+</div>
+</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>
+<span style="border-right-width: 0pt; border-left-width: 0pt;">To manually run the ij utility and connect to the database:</span>
+<div><table width="100%"><tr><td valign="top" style="text-align: right;" width="24">
+<div>a.</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>
+<span style="border-right-width: 0pt; border-left-width: 0pt;">Enter the following in a command window or shell: </span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">
+<pre><div style="margin-top: 1.2em; margin-bottom: 0.8em; background-color: #f0f0f0; font-family: Courier; line-height: 106%; font-size: 9pt;">java org.apache.derby.tools.ij
+ij&gt; connect 'jdbc:derby:&lt;<span style="font-style: italic;">dbname</span>&gt;;create=true';</div></pre>where &lt;<span style="font-style: italic;">dbname</span>&gt;
+is the name of the database you are connecting to.</div>
+</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>b.</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>
+<span style="border-right-width: 0pt; border-left-width: 0pt;">To exit the ij utility, enter:</span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">
+<pre><div style="margin-top: 1.2em; margin-bottom: 0.8em; background-color: #f0f0f0; font-family: Courier; line-height: 106%; font-size: 9pt;">ij&gt; exit;</div></pre>
+</div>
+</div>
+</td></tr></table></div>
+</div>
+</td></tr></table></div>
+<div style="line-height: 12pt; margin-top: 0.6em; font-size: 10pt;">
+<a name="N10838"></a><span></span>For more information on running the ij and sysinfo utilities, see
+the <span style="font-style: italic;">
+<span style="border-right-width: 0pt; border-left-width: 0pt;">
+<span style="font-style: italic;">Derby Tools and Utilities Guide</span>
+</span>
+</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div>
+<a name="N1086B"></a><span></span>
+<a name="N10874"></a><div style="margin-top: 0pc; margin-bottom: 1.4pc; font-size: 16pt; font-weight: bold; padding-top: 1.4pc;">
+<div style="border-right-width: 0pt; border-left-width: 0pt; line-height: 100%; border-top-width: 3pt; border-top-color: black;">
+<a name="cgsquck19524"></a><span></span>Quick start guide for experienced JDBC users</div>
+</div>
+<div style="margin-left: 72pt; font-size: 10pt;">
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">This chapter is for experienced JDBC programmers who already know how to
+set the classpath, how to run a Java program, and how to use a JDBC driver.</div>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">For more detailed information on the topics covered in this section,
+see the <span style="font-style: italic;">
+<span style="border-right-width: 0pt; border-left-width: 0pt;">
+<span style="font-style: italic;">Derby Developer's Guide</span>
+</span>
+</span> and
+the <span style="font-style: italic;">
+<span style="border-right-width: 0pt; border-left-width: 0pt;">
+<span style="font-style: italic;">Derby Tools and Utilities Guide</span>
+</span>
+</span>.</div>
+</div>
+<div>
+<a name="N108E3"></a><span></span>
+<a name="N108EC"></a><div style="padding-top: 1pc; margin-bottom: 5pt; font-size: 14pt; font-weight: bold;">
+<div style="border-right-width: 0pt; border-left-width: 0pt; border-top-width: 1pt; border-top-color: black;">
+<a name="cgsquck70629"></a><span></span>Environments in which Derby can run</div>
+</div>
+<div style="margin-left: 72pt; font-size: 10pt;">
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em; margin-left: 72pt;">Before you configure your system to run <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span>,
+it is useful to understand something about the different environments in which <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> can run, because these
+environments affect the classpath, driver name, and database connection URL.</div>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">See the <span style="font-style: italic;">
+<span style="border-right-width: 0pt; border-left-width: 0pt;">
+<span style="font-style: italic;">Derby Developer's Guide</span>
+</span>
+</span> for
+more information on <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> environments.</div>
+</div>
+<div>
+<a name="N10979"></a><span></span>
+<a name="N10982"></a><div style="padding-top: 1pc; margin-bottom: 2pt; font-size: 12pt; font-weight: bold;">
+<a name="cgsquck35643"></a><span></span>Embedded environment</div>
+<div style="margin-left: 72pt; font-size: 10pt;">
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">An environment in which only a single application can access a database
+at one time, and no network access occurs. When an application starts an instance
+of <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> within its JVM,
+the application runs in an embedded environment. Loading the
+embedded driver starts <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span>.</div>
+</div>
+</div>
+<div>
+<a name="N109D8"></a><span></span>
+<a name="N109E1"></a><div style="padding-top: 1pc; margin-bottom: 2pt; font-size: 12pt; font-weight: bold;">
+<a name="cgsquck13780"></a><span></span>Client/server environment</div>
+<div style="margin-left: 72pt; font-size: 10pt;">
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">An environment in which multiple applications connect to <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> over
+the network. These applications run in a client/server environment. <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> runs
+embedded in a server framework that allows multiple network connections. (The
+framework itself starts an instance of <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> and
+runs in an embedded environment. However, the client applications do not run
+in the embedded environment. )</div>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">You can also embed <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> in
+any Java server framework. </div>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">See the <span style="font-style: italic;">
+<span style="border-right-width: 0pt; border-left-width: 0pt;">
+<span style="font-style: italic;">Derby Server and Administration Guide</span>
+</span>
+</span> for
+more information on how to run <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> on
+a server.</div>
+</div>
+</div>
+</div>
+<div>
+<a name="N10A61"></a><span></span>
+<a name="N10A6A"></a><div style="padding-top: 1pc; margin-bottom: 5pt; font-size: 14pt; font-weight: bold;">
+<div style="border-right-width: 0pt; border-left-width: 0pt; border-top-width: 1pt; border-top-color: black;">
+<a name="rgsquck67441"></a><span></span>Libraries and classpath</div>
+</div>
+<div style="margin-left: 72pt; font-size: 10pt;">
+<div style="line-height: 12pt; margin-top: 0.6em; font-size: 10pt;">
+<a name="N10A73"></a><span></span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">See <span style="color: blue;">
+<a href="#cgslib19524">Derby libraries and scripts: complete reference</a>
+</span> in the appendix
+for a complete description of the <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> libraries.</div>
+</div>
+</div>
+</div>
+<div>
+<a name="N10AC5"></a><span></span>
+<a name="N10ACE"></a><div style="padding-top: 1pc; margin-bottom: 5pt; font-size: 14pt; font-weight: bold;">
+<div style="border-right-width: 0pt; border-left-width: 0pt; border-top-width: 1pt; border-top-color: black;">
+<a name="rgsquck35368"></a><span></span>Available drivers</div>
+</div>
+<div style="margin-left: 72pt; font-size: 10pt;">
+<div style="line-height: 12pt; margin-top: 0.6em; font-size: 10pt;">
+<a name="N10AD7"></a><span></span>The following JDBC drivers are available depending on the environment
+you choose for <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span>:<div><table width="100%"><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>org.apache.derby.jdbc.EmbeddedDriver   <div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;"> A driver for embedded environments,
+when <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> runs in the same
+JVM as the application.</div>
+</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>org.apache.derby.jdbc.ClientDriver   <div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">A driver for the Network Server
+environment. The Network Server sets up a client/server environment.</div>
+</div>
+</td></tr></table></div>
+</div>
+</div>
+</div>
+<div>
+<a name="N10B3B"></a><span></span>
+<a name="N10B44"></a><div style="padding-top: 1pc; margin-bottom: 5pt; font-size: 14pt; font-weight: bold;">
+<div style="border-right-width: 0pt; border-left-width: 0pt; border-top-width: 1pt; border-top-color: black;">
+<a name="rgsquck30197"></a><span></span>Database connection URL</div>
+</div>
+<div style="margin-left: 72pt; font-size: 10pt;">
+<div style="line-height: 12pt; margin-top: 0.6em; font-size: 10pt;">
+<a name="N10B68"></a><span></span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0em; margin-bottom: 0.6em;">For the <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span>-provided
+embedded driver, the format for the database connection URL for connecting
+to a database is this:   <pre><div style="margin-top: 1.2em; margin-bottom: 0.8em; background-color: #f0f0f0; font-family: Courier; line-height: 106%; font-size: 9pt;">jdbc:derby:<span style="font-style: italic;">databaseName</span>;<span style="font-style: italic;">URLAttributes</span>
+</div></pre>where:<div><table width="100%"><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>
+<span style="font-style: italic;">databaseName</span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">The name of the database that you want to connect
+to</div>
+</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>
+<span style="font-style: italic;">URLAttributes</span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">One or more of the supported attributes of the
+database connection URL, such as ;<span style="font-style: italic;">locale=ll_CC</span> or ;<span style="font-style: italic;">create=true</span>. </div>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">For
+more information, see the <span style="font-style: italic;">
+<span style="border-right-width: 0pt; border-left-width: 0pt;">
+<span style="font-style: italic;">Derby Developer's Guide</span>
+</span>
+</span>.</div>
+</div>
+</td></tr></table></div>
+</div>
+</div>
+<div style="line-height: 12pt; margin-top: 0.6em; font-size: 10pt;">
+<a name="N10BC8"></a><span></span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0em; margin-bottom: 0.6em;">For the <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span>-provided
+network client driver, the format for the database connection URL for connecting
+to a database is this:   <pre><div style="margin-top: 1.2em; margin-bottom: 0.8em; background-color: #f0f0f0; font-family: Courier; line-height: 106%; font-size: 9pt;">jdbc:derby://&lt;server&gt;[:&lt;port&gt;]/
+<span style="font-style: italic;">databaseName</span>[;<span style="font-style: italic;">URLAttributes</span>=&lt;value&gt; [;...]]</div></pre>where
+the &lt;server&gt; and &lt;port&gt; specify the host name (or IP address) and port
+number where the server is listening for requests. The <span style="font-style: italic;">URLAttributes</span> can
+be either <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> embedded
+or network client attributes. See the <span style="border-right-width: 0pt; border-left-width: 0pt;">
+<span style="font-style: italic;">Derby Server and Administration Guide</span>
+</span> for
+more information on accessing the Network Server by using the network client.</div>
+</div>
+</div>
+</div>
+</div>
+<div>
+<a name="N10C3B"></a><span></span>
+<a name="N10C44"></a><div style="margin-top: 0pc; margin-bottom: 1.4pc; font-size: 16pt; font-weight: bold; padding-top: 1.4pc;">
+<div style="border-right-width: 0pt; border-left-width: 0pt; line-height: 100%; border-top-width: 3pt; border-top-color: black;">
+<a name="rgsdocs37966"></a><span></span>Documentation conventions</div>
+</div>
+<div style="margin-left: 72pt; font-size: 10pt;">
+<div style="line-height: 12pt; margin-top: 0.6em; font-size: 10pt;">
+<a name="N10C4D"></a><span></span> Terminology, syntax, and typographical conventions of the <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> documentation.</div>
+</div>
+<div>
+<a name="N10C8B"></a><span></span>
+<a name="N10C94"></a><div style="padding-top: 1pc; margin-bottom: 5pt; font-size: 14pt; font-weight: bold;">
+<div style="border-right-width: 0pt; border-left-width: 0pt; border-top-width: 1pt; border-top-color: black;">
+<a name="rgsdocs99397"></a><span></span>Terminology</div>
+</div>
+<div style="margin-left: 72pt; font-size: 10pt;">
+<div style="line-height: 12pt; margin-top: 0.6em; font-size: 10pt;">
+<a name="N10C9D"></a><span></span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">The <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> documentation
+uses the specialized term <span style="font-family: Courier;">environment</span> to describe the method
+your application uses to interact with <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span>.
+An environment is sometimes referred to as a <span style="font-style: italic;">framework</span>. The two types
+of environments are the <span style="font-style: italic;">embedded environment</span> and the <span style="font-style: italic;">client/server
+environment.</span>
+</div>
+</div>
+</div>
+</div>
+<div>
+<a name="N10CF7"></a><span></span>
+<a name="N10D00"></a><div style="padding-top: 1pc; margin-bottom: 5pt; font-size: 14pt; font-weight: bold;">
+<div style="border-right-width: 0pt; border-left-width: 0pt; border-top-width: 1pt; border-top-color: black;">
+<a name="rgsdocs10012"></a><span></span>SQL syntax</div>
+</div>
+<div style="margin-left: 72pt; font-size: 10pt;">
+<div style="line-height: 12pt; margin-top: 0.6em; font-size: 10pt;">
+<a name="N10D09"></a><span></span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0em; margin-bottom: 0.6em;"> SQL syntax is presented in modified BNF notation. The meta-symbols
+of BNF are:   <div>
+<table style="margin-top: 12pt; margin-bottom: 10pt; background-color: white; border-style: solid; border-width: 1pt; border-color: black;" valign="top">
+
+
+<thead>
+<tr>
+<td style="border-style: solid; border-width: 1pt; border-color: black; font-weight: bold; text-align: center; padding: 2pt; background-color: silver; margin-left: 2pt;" valign="top">
+<div>Symbol</div>
+</td>
+<td style="border-style: solid; border-width: 1pt; border-color: black; font-weight: bold; text-align: center; padding: 2pt; background-color: silver; margin-left: 2pt;" valign="top">
+<div>Meaning</div>
+</td>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>
+<span style="font-family: Courier;">|</span>
+</div>
+</td>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>&ldquo;or.&rdquo; Choose one of the items</div>
+</td>
+</tr>
+<tr>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>
+<span style="font-family: Courier;">[ ]</span>
+</div>
+</td>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>Enclose optional items.</div>
+</td>
+</tr>
+<tr>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>
+<span style="font-family: Courier;">*</span>
+</div>
+</td>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>Flags items that you can repeat 0 or more times. Has a
+special meaning in some SQL statements.</div>
+</td>
+</tr>
+<tr>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>
+<span style="font-family: Courier;">{ }</span>
+</div>
+</td>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>Groups items so that they can be marked with one of the
+other symbols, i.e. [ ], |, or *.</div>
+</td>
+</tr>
+<tr>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>
+<span style="font-family: Courier;">( )  . , </span>
+</div>
+</td>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>Other punctuation that is part of the syntax.</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div style="line-height: 12pt; margin-top: 0.6em; font-size: 10pt;">
+<a name="N10DAA"></a><span></span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0em; margin-bottom: 0.6em;">An example of how SQL syntax is presented:   <pre><div style="margin-top: 1.2em; margin-bottom: 0.8em; background-color: #f0f0f0; font-family: Courier; line-height: 106%; font-size: 9pt;">
+<span style="font-weight: bold;">CREATE [ UNIQUE ] INDEX <span style="font-weight: bold;">
+<span style="font-style: italic;">IndexName</span>
+</span>
+  ON <span style="font-weight: bold;">
+<span style="font-style: italic;">TableName</span>
+</span> ( <span style="font-weight: bold;">
+<span style="font-style: italic;">SimpleColumnName</span>
+</span> [ , <span style="font-weight: bold;">
+<span style="font-style: italic;">SimpleColumnName</span>
+</span> ] * ) </span>
+</div></pre>
+</div>
+</div>
+<div style="line-height: 12pt; margin-top: 0.6em; font-size: 10pt;">
+<a name="N10DE5"></a><span></span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0em; margin-bottom: 0.6em;">Command-line syntax for running Java programs and utilities (as
+well as examples) always begins with the word <span style="font-style: italic;">java</span>: <pre><div style="margin-top: 1.2em; margin-bottom: 0.8em; background-color: #f0f0f0; font-family: Courier; line-height: 106%; font-size: 9pt;">java org.apache.derby.tools.ij</div></pre>
+</div>
+</div>
+<div style="line-height: 12pt; margin-top: 0.6em; font-size: 10pt;">
+<a name="N10DFA"></a><span></span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">In addition, this documentation uses the IBM Software Development
+Kit style for setting JVM arguments and properties. If you use another Java
+Virtual Machine, the way you set JVM arguments and properties might be different.</div>
+</div>
+</div>
+</div>
+<div>
+<a name="N10E31"></a><span></span>
+<a name="N10E3A"></a><div style="padding-top: 1pc; margin-bottom: 5pt; font-size: 14pt; font-weight: bold;">
+<div style="border-right-width: 0pt; border-left-width: 0pt; border-top-width: 1pt; border-top-color: black;">
+<a name="rgsdocs18277"></a><span></span>Typographical conventions</div>
+</div>
+<div style="margin-left: 72pt; font-size: 10pt;">
+<div style="line-height: 12pt; margin-top: 0.6em; font-size: 10pt;">
+<a name="N10E43"></a><span></span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0em; margin-bottom: 0.6em;">This documentation uses some typographical conventions to highlight
+elements of the SQL language, operating system commands, and the Java programming
+language. <div>
+<table style="margin-top: 12pt; margin-bottom: 10pt; background-color: white; border-style: solid; border-width: 1pt; border-color: black;" valign="top">
+
+
+
+<thead>
+<tr>
+<td style="border-style: solid; border-width: 1pt; border-color: black; font-weight: bold; text-align: center; padding: 2pt; background-color: silver; margin-left: 2pt;" valign="top">
+<div>Usage</div>
+</td>
+<td style="border-style: solid; border-width: 1pt; border-color: black; font-weight: bold; text-align: center; padding: 2pt; background-color: silver; margin-left: 2pt;" valign="top">
+<div>Typeface</div>
+</td>
+<td style="border-style: solid; border-width: 1pt; border-color: black; font-weight: bold; text-align: center; padding: 2pt; background-color: silver; margin-left: 2pt;" valign="top">
+<div>Examples</div>
+</td>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>New terms</div>
+</td>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>Italic</div>
+</td>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>defined by <span style="font-style: italic;">keys</span>
+</div>
+</td>
+</tr>
+<tr>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>File and directory names</div>
+</td>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>Italic</div>
+</td>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>
+<span style="font-style: italic;">C:\<span style="border-right-width: 0pt; border-left-width: 0pt;">derby</span>
+</span>
+</div>
+</td>
+</tr>
+<tr>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>Dictionary objects</div>
+</td>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>Italic</div>
+</td>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>The<span style="font-style: italic;"> Employees</span> table</div>
+</td>
+</tr>
+<tr>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>In syntax, items that you do not type exactly as they appear,
+but replace with the appropriate name </div>
+</td>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>Italic</div>
+</td>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>
+<span style="font-family: Courier;">CREATE TABLE <span style="font-style: italic;">tableName</span>
+</span>
+</div>
+</td>
+</tr>
+<tr>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>SQL examples</div>
+</td>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>Bold and/or fixed-width</div>
+</td>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>
+<span style="font-family: Courier;">
+<span style="font-weight: bold;">SELECT city_name FROM Cities</span>
+</span>
+</div>
+</td>
+</tr>
+<tr>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>Java application examples</div>
+</td>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>Bold and/or fixed-width</div>
+</td>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>
+<span style="font-family: Courier;">Connection conn = DriverManager.getConnection ("jdbc:derby:Sample")</span>
+</div>
+</td>
+</tr>
+<tr>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>Things you type in a command prompt</div>
+</td>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>Bold and/or fixed-width</div>
+</td>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>
+<span style="font-weight: bold;">
+<span style="font-family: Courier;">java org.apache.derby.tools.ij</span>
+</span>
+</div>
+</td>
+</tr>
+<tr>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>Comments within examples</div>
+</td>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>Bold and/or fixed-width</div>
+</td>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>
+<span style="font-family: Courier;">--This line ignored</span>
+</div>
+</td>
+</tr>
+<tr>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>SQL keywords (commands)</div>
+</td>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>All caps</div>
+</td>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>You can use a CREATE TABLE statement</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div>
+<a name="N10FB5"></a><span></span>
+<a name="N10FBE"></a><div style="margin-top: 0pc; margin-bottom: 1.4pc; font-size: 16pt; font-weight: bold; padding-top: 1.4pc;">
+<div style="border-right-width: 0pt; border-left-width: 0pt; line-height: 100%; border-top-width: 3pt; border-top-color: black;">
+<a name="cgslib19524"></a><span></span>Derby libraries and scripts: complete reference </div>
+</div>
+<div style="margin-left: 72pt; font-size: 10pt;">
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">This appendix describes <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> libraries
+and scripts.</div>
+</div>
+<div>
+<a name="N1101B"></a><span></span>
+<a name="N11024"></a><div style="padding-top: 1pc; margin-bottom: 5pt; font-size: 14pt; font-weight: bold;">
+<div style="border-right-width: 0pt; border-left-width: 0pt; border-top-width: 1pt; border-top-color: black;">
+<a name="rgslib46043"></a><span></span>Libraries provided by Derby</div>
+</div>
+<div style="margin-left: 72pt; font-size: 10pt;">
+<div>
+<table style="margin-top: 12pt; margin-bottom: 10pt; background-color: white; border-style: solid; border-width: 1pt; border-color: black;" valign="top">
+
+
+<thead>
+<tr>
+<td style="border-style: solid; border-width: 1pt; border-color: black; font-weight: bold; text-align: center; padding: 2pt; background-color: silver; margin-left: 2pt;" valign="top">
+<div>Library name</div>
+</td>
+<td style="border-style: solid; border-width: 1pt; border-color: black; font-weight: bold; text-align: center; padding: 2pt; background-color: silver; margin-left: 2pt;" valign="top">
+<div>Use</div>
+</td>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top" colspan="NaN">
+<div>
+<span style="font-weight: bold;">Engine libraries</span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">You always need
+this library for embedded environments. For client/server environments, you
+only need this library on the server.</div>
+</div>
+</td>
+</tr>
+<tr>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>derby.jar</div>
+</td>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>For embedded databases </div>
+</td>
+</tr>
+<tr>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top" colspan="NaN">
+<div>
+<span style="font-weight: bold;">Tools libraries</span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">For embedded environments,
+you need a library in the classpath to use a tool. For a client/server environment,
+you need a library on the client only.</div>
+</div>
+</td>
+</tr>
+<tr>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>derbytools.jar</div>
+</td>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>Required for running all the <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> tools
+(such as ij, dblook, and import/export). </div>
+</td>
+</tr>
+<tr>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top" colspan="NaN">
+<div>
+<span style="font-weight: bold;">The Network Server libraries</span>
+</div>
+</td>
+</tr>
+<tr>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>derbynet.jar</div>
+</td>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>Required to start the <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> Network
+Server.</div>
+</td>
+</tr>
+<tr>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top" colspan="NaN">
+<div>
+<span style="font-weight: bold;">The network client libraries</span>
+</div>
+</td>
+</tr>
+<tr>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>derbyclient.jar</div>
+</td>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>Required to use the <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> network
+client driver.</div>
+</td>
+</tr>
+<tr>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top" colspan="NaN">
+<div>
+<span style="font-weight: bold;">The locale libraries</span>
+</div>
+</td>
+</tr>
+<tr>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>
+<div><table width="100%"><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>derbyLocale_es.jar</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>derbyLocale_de_DE.jar</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>derbyLocale_fr.jar</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>derbyLocale_it.jar</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>derbyLocale_ja_JP.jar</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>derbyLocale_ko_KR.jar</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>derbyLocale_pt_BR.jar</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>derbyLocale_zh_CN.jar</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>derbyLocale_zh_TW.jar</div>
+</td></tr></table></div>
+</div>
+</td>
+<td style="border-style: solid; border-width: 1pt; border-color: black; padding: 2pt; background-color: #faf4fa; margin-left: 2pt;" valign="top">
+<div>Required to provide translated messages for the indicated
+locales.</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+<div>
+<a name="N11199"></a><span></span>
+<a name="N111A2"></a><div style="padding-top: 1pc; margin-bottom: 5pt; font-size: 14pt; font-weight: bold;">
+<div style="border-right-width: 0pt; border-left-width: 0pt; border-top-width: 1pt; border-top-color: black;">
+<a name="rgslib56653"></a><span></span> Libraries not provided by Derby</div>
+</div>
+<div style="margin-left: 72pt; font-size: 10pt;">
+<div style="line-height: 12pt; margin-top: 0.6em; font-size: 10pt;">
+<a name="N111AB"></a><span></span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0em; margin-bottom: 0.6em;">In a Java Development Kit Version 1.3 environment,
+some special <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> features
+require that you install additional libraries and place them in your class
+path (Environments using Java Development Kit, Version 1.4 includes all of
+these libraries): <div><table width="100%"><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>LDAP (see the <span style="font-style: italic;">
+<span style="border-right-width: 0pt; border-left-width: 0pt;">
+<span style="font-style: italic;">Derby Developer's Guide</span>
+</span>
+</span>)</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>JTA (see the <span style="font-style: italic;">
+<span style="border-right-width: 0pt; border-left-width: 0pt;">
+<span style="font-style: italic;">Derby Reference Manual</span>
+</span>
+</span>)</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>JDBC 2.0 Extensions (see the <span style="font-style: italic;">
+<span style="border-right-width: 0pt; border-left-width: 0pt;">
+<span style="font-style: italic;">Derby Reference Manual</span>
+</span>
+</span>)</div>
+</td></tr></table></div>
+</div>
+</div>
+</div>
+</div>
+<div>
+<a name="N11225"></a><span></span>
+<a name="N1122E"></a><div style="padding-top: 1pc; margin-bottom: 5pt; font-size: 14pt; font-weight: bold;">
+<div style="border-right-width: 0pt; border-left-width: 0pt; border-top-width: 1pt; border-top-color: black;">
+<a name="rgslib27507"></a><span></span>Scripts provided by Derby</div>
+</div>
+<div style="margin-left: 72pt; font-size: 10pt;">
+<div style="line-height: 12pt; margin-top: 0.6em; font-size: 10pt;">
+<a name="N11237"></a><span></span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0em; margin-bottom: 0.6em;">
+<span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> provides
+scripts in the <span style="font-style: italic;">/bin</span> directory. Each script comes in two flavors, one
+ending in .<span style="font-style: italic;">bat</span> and one ending in .<span style="font-style: italic;">ksh</span>. Here is a complete listing:
+  <div><table width="100%"><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>
+<span style="font-style: italic;">frameworks/embedded/bin/dblook</span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">Runs dblook.</div>
+</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>
+<span style="font-style: italic;">frameworks/embedded/bin/ij</span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">Starts ij.</div>
+</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>
+<span style="font-style: italic;">frameworks/embedded/bin/setEmbeddedCP</span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">Puts all the <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> libraries
+for an embedded environment in the classpath.</div>
+</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>
+<span style="font-style: italic;">frameworks/embedded/bin/sysinfo</span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">Runs sysinfo.</div>
+</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>
+<span style="font-style: italic;">frameworks/NetworkServer/bin/dblook</span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">Runs dblook in a Network
+Server client context.</div>
+</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>
+<span style="font-style: italic;">frameworks/NetworkServer/bin/ij</span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">Runs ij in a Network Server
+client context.</div>
+</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>
+<span style="font-style: italic;">frameworks/NetworkServer/bin/NetworkServerControl</span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">Runs NetworkServerControl.</div>
+</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>
+<span style="font-style: italic;">frameworks/NetworkServer/bin/setNetworkClientCP</span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">Puts the libraries
+needed to connect to <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> Network
+Server into the classpath.</div>
+</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>
+<span style="font-style: italic;">frameworks/NetworkServer/bin/setNetworkServerCP</span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">Puts the libraries
+needed for <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> Network
+Server into the classpath.</div>
+</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>
+<span style="font-style: italic;">frameworks/NetworkServer/bin/startNetworkServer</span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">Starts the Network
+Server on the local machine.</div>
+</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>
+<span style="font-style: italic;">frameworks/NetworkServer/bin/stopNetworkServer</span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">Stops the Network
+Server on the local machine.</div>
+</div>
+</td></tr><tr><td valign="top" style="text-align: right;" width="24">
+<div>
+<span>&bull;</span>
+</div>
+</td><td width="8">&nbsp;</td><td valign="top">
+<div>
+<span style="font-style: italic;">frameworks/NetworkServer/bin/sysinfo</span>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">Gets the system information
+from a running <span style="border-right-width: 0pt; border-left-width: 0pt;">Derby</span> Network
+Server.</div>
+</div>
+</td></tr></table></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div>
+<a name="N11349"></a><span></span>
+<a name="N11352"></a><div style="margin-top: 0pc; margin-bottom: 1.4pc; font-size: 16pt; font-weight: bold; padding-top: 1.4pc;">
+<div style="border-right-width: 0pt; border-left-width: 0pt; line-height: 100%; border-top-width: 3pt; border-top-color: black;">
+<a name="rgstrademderby"></a><span></span>Trademarks</div>
+</div>
+<div style="margin-left: 72pt; font-size: 10pt;">
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">The following terms are trademarks or registered trademarks of other companies
+and have been used in at least one of the documents in the <span style="border-right-width: 0pt; border-left-width: 0pt;">Apache Derby</span> documentation
+library:</div>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">Cloudscape, DB2, DB2 Universal Database, DRDA, and IBM are trademarks of
+International Business Machines Corporation in the United States, other countries,
+or both.</div>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">Microsoft, Windows, Windows NT, and the Windows logo are trademarks of
+Microsoft Corporation in the United States, other countries, or both. </div>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">Java and all Java-based trademarks are trademarks of Sun Microsystems,
+Inc. in the United States, other countries, or both.</div>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">UNIX is a registered trademark of The Open Group in the United States and
+other countries.</div>
+<div style="font-size: 10pt; text-indent: 0em; margin-top: 0.6em; margin-bottom: 0.6em;">Other company, product, or service names may be trademarks or service marks
+of others.</div>
+</div>
+</div>
+</div>
+</div><div valign="top">
+<div style="font-family: Helvetica; font-weight: bold; font-size: 10pt; text-align: center;">
+<span>&bull;</span>
+</div>
+</div><br></body></html>

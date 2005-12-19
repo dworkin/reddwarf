@@ -1,0 +1,39 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN">
+<!--NewPage-->
+<HTML>
+<HEAD>
+<TITLE>
+Java(tm) Reliable Multicast(tm) Service version 1.1
+</TITLE>
+<LINK REL ="stylesheet" TYPE="text/css" HREF="stylesheet.css" TITLE="Style">
+</HEAD>
+<BODY BGCOLOR="white">
+Provides a set of interfaces for accessing and implementing reliable multicast transports.
+<BR>
+<P>The transport system is responsible for providing a reliable multicast transport. It may be 
+used directly by the application or indirectly through the channel management system.  The
+transport system is composed of two parts, a set of protocol-independent transport APIs and 
+one or more transport protocols.
+
+<P>Many different reliable multicast transport protocols have been developed and many more are on 
+the way. Therefore, this package defines a Multicast Transport Application Programmer Interface (MTAPI) 
+that channel managers, senders, and receivers may use to configure transport protocols and send 
+and receive data using them.
+
+<P>This package includes implementations of two existing reliable multicast transport protocols,
+TRAM and LRMP.  It also includes
+a set of APIs that allows new protocols to be plugged in and used by existing  
+applications with little or no change to the applications.  New protocols must implement the
+TransportProfile interface, and at least one of the two socket interfaces, RMPacketSocket and/or 
+RMStreamSocket.
+
+<P>The Tree-Based Reliable Multicast Transport Protocol (TRAM) is a reliable multicast protocol 
+designed to support bulk data 
+transfer with a single sender and multiple receivers. TRAM uses dynamic trees to implement local 
+error recovery to scale to a very large number of receivers without imposing a serious burden on 
+the sender. It also includes congestion control and other techniques necessary to operate efficiently 
+and fairly with other protocols across the wide variety of link and client characteristics that make 
+up the Internet.
+
+</BODY>
+</HTML>

@@ -1,0 +1,291 @@
+<html>
+<head><META http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<base target="contentwin"><title>Tuning Derby</title>
+</head>
+<body>
+<UL>
+<LI><a href="rtuncopyright.html">Copyright</a></LI>
+<LI><a href="ctunpropref1002477.html">About this guide</a>
+<UL>
+<LI><a href="ctunpropref11181.html">Purpose of this guide</a></LI>
+<LI><a href="ctunpropref22460.html">Audience</a></LI>
+<LI><a href="ctunpropref23947.html">How this guide is organized</a></LI>
+</UL>
+</LI>
+<LI><a href="ctunsetprop34818.html">Working with Derby properties</a>
+<UL>
+<LI><a href="ctunsetprop11108.html">Properties overview</a>
+<UL>
+<LI><a href="ctunsetprop824451.html">Scope of properties</a></LI>
+<LI><a href="ctunsetprop824500.html">Persistence of properties</a></LI>
+<LI><a href="ctunsetprop23308.html">Precedence of properties</a>
+<UL>
+<LI><a href="ctunsetprop824533.html">Protection of database-wide properties</a></LI>
+</UL>
+</LI>
+<LI><a href="ctunsetprop824615.html">Dynamic versus static properties</a></LI>
+</UL>
+</LI>
+<LI><a href="ctunsetprop24222.html">Ways of setting Derby properties</a>
+<UL>
+<LI><a href="ctunsetprop16827.html">System-wide properties</a>
+<UL>
+<LI><a href="ctunsetprop11561.html">Changing the system-wide properties programmatically</a></LI>
+<LI><a href="ctunsetprop13074.html">Changing the system-wide properties by using the derby.properties file</a></LI>
+<LI><a href="ctunsetprop824983.html">Verifying system properties</a></LI>
+</UL>
+</LI>
+<LI><a href="ctunsetprop12821.html">Database-wide properties</a></LI>
+<LI><a href="ctunsetprop24843.html">In a client/server environment</a></LI>
+<LI><a href="ctunsetprop44147.html">Dynamic or static changes to properties</a></LI>
+</UL>
+</LI>
+<LI><a href="ctunsetprop32443.html">Properties case study</a></LI>
+</UL>
+</LI>
+<LI><a href="ctunperf22457.html">Performance tips and tricks</a>
+<UL>
+<LI><a href="ctunperf25864.html">The tips</a>
+<UL>
+<LI><a href="ctunperf18705.html">Use prepared statements with substitution parameters</a></LI>
+<LI><a href="ctunperf10679.html">Create indexes, and make sure they are being used</a></LI>
+<LI><a href="ctunperf54492.html">Increase the size of the data page cache</a></LI>
+<LI><a href="ctunperf10065.html">Tune the size of database pages</a>
+<UL>
+<LI><a href="ctunperf816059.html">Performance trade-offs of large pages</a></LI>
+</UL>
+</LI>
+<LI><a href="ctunperf23868.html">Avoid expensive queries</a></LI>
+<LI><a href="ctunperf98197.html">Use the appropriate getXXX and setXXX methods for the type</a></LI>
+<LI><a href="ctunperf16556.html">Tune database booting/class loading</a></LI>
+<LI><a href="ctunperf16800.html">Avoid inserts in autocommit mode if possible</a></LI>
+</UL>
+</LI>
+<LI><a href="ctunperf31086.html">More tips</a>
+<UL>
+<LI><a href="ctunperf17936.html">Shut down the system properly</a></LI>
+<LI><a href="ctunperf816635.html">Put Derby first in your classpath</a></LI>
+</UL>
+</LI>
+</UL>
+</LI>
+<LI><a href="ctundepth39739.html">Tuning databases and applications</a>
+<UL>
+<LI><a href="ctundepth21935.html">Application and database design issues</a>
+<UL>
+<LI><a href="ctundepth10525.html">Avoiding table scans of large tables</a>
+<UL>
+<LI><a href="ctundepth23033.html">Always create indexes</a></LI>
+<LI><a href="ctundepth36205.html">Prevent the user from issuing expensive queries</a></LI>
+</UL>
+</LI>
+<LI><a href="ctundepth29804.html">Avoiding compiling SQL statements</a>
+<UL>
+<LI><a href="ctundepth32379.html">Using the statement cache</a></LI>
+</UL>
+</LI>
+<LI><a href="ctundepth14326.html">Shielding users from Derby class-loading events</a></LI>
+</UL>
+</LI>
+<LI><a href="ttundepth33391.html">Analyzing statement execution</a></LI>
+<LI><a href="ctundepth13055.html">Working with RunTimeStatistics</a>
+<UL>
+<LI><a href="ctundepth26674.html">Overview</a></LI>
+<LI><a href="ttundepth34375.html">How you use the RUNTIMESTATISTICS attribute</a></LI>
+<LI><a href="ctundepth37648.html">Analyzing the information</a>
+<UL>
+<LI><a href="ctundepth853095.html">Statistics timing</a></LI>
+<LI><a href="ctundepth853133.html">Statement execution plan</a></LI>
+<LI><a href="ctundepth853228.html">Optimizer estimates</a></LI>
+</UL>
+</LI>
+</UL>
+</LI>
+</UL>
+</LI>
+<LI><a href="ctunoptimz39739.html">DML statements and performance</a>
+<UL>
+<LI><a href="ctunoptimz23977.html">Performance and optimization</a>
+<UL>
+<LI><a href="ctunoptimz30217.html">Index use and access paths</a>
+<UL>
+<LI><a href="ctunoptimz33368.html">What is an index?</a></LI>
+<LI><a href="ctunoptimz39106.html">What's optimizable?</a></LI>
+<LI><a href="ctunoptimz30768.html">Covering indexes</a></LI>
+<LI><a href="ctunoptimz41314.html">Useful indexes can use qualifiers</a></LI>
+<LI><a href="ctunoptimz22900.html">When a table scan Is better</a></LI>
+<LI><a href="ctunoptimz856914.html">Indexes have a cost for inserts, updates, and deletes</a></LI>
+</UL>
+</LI>
+<LI><a href="ctunoptimz12168.html">Joins and performance</a>
+<UL>
+<LI><a href="ctunoptimz857385.html">Join order overview</a></LI>
+<LI><a href="ctunoptimz23173.html">Join strategies</a></LI>
+</UL>
+</LI>
+<LI><a href="ctunoptimz42425.html">Derby's cost-based optimization</a>
+<UL>
+<LI><a href="ctunoptimz32184.html">About the optimizer's choice of access path</a></LI>
+<LI><a href="ctunoptimz20327.html">About the optimizer's choice of join order</a></LI>
+<LI><a href="ctunoptimz11941.html">About the optimizer's choice of join strategy</a></LI>
+<LI><a href="ctunoptimz27036.html">About the optimizer's choice of sort avoidance</a></LI>
+<LI><a href="ctunoptimz19357.html">About the system's selection of lock granularity</a></LI>
+<LI><a href="ctunoptimz29384.html">About the optimizer's selection of bulk fetch</a></LI>
+</UL>
+</LI>
+</UL>
+</LI>
+<LI><a href="ctunoptimz27975.html">Locking and performance</a>
+<UL>
+<LI><a href="ctunoptimz42065.html">Transaction-based lock escalation</a></LI>
+<LI><a href="ctunoptimz11775.html">LOCK TABLE statement</a></LI>
+</UL>
+</LI>
+<LI><a href="ctunoptimz860097.html">Non-cost-based optimizations</a>
+<UL>
+<LI><a href="ctunoptimz22460.html">Non-cost-based sort avoidance (tuple filtering)</a>
+<UL>
+<LI><a href="ctunoptimz859947.html">DISTINCT</a></LI>
+<LI><a href="ctunoptimz859974.html">GROUP BY</a></LI>
+</UL>
+</LI>
+<LI><a href="ctunoptimz22111.html">The MIN() and MAX() optimizations</a></LI>
+</UL>
+</LI>
+</UL>
+</LI>
+<LI><a href="ctunstats18908.html">Selectivity and cardinality statistics</a>
+<UL>
+<LI><a href="ctunstats57793.html">Determinations of rows scanned from disk for a table scan</a>
+<UL>
+<LI><a href="ctunstats848901.html">How the optimizer determines the number of rows in a table</a></LI>
+</UL>
+</LI>
+<LI><a href="ctunstats60669.html">Estimations of rows scanned from disk for an index scan</a>
+<UL>
+<LI><a href="ctunstats848961.html">Queries with a known search condition</a></LI>
+<LI><a href="ctunstats849000.html">Queries with an unknown search condition</a></LI>
+</UL>
+</LI>
+<LI><a href="ctunstats849203.html">Statistics-based versus hard-wired selectivity</a>
+<UL>
+<LI><a href="ctunstats72938.html">Selectivity from cardinality statistics</a></LI>
+<LI><a href="ctunstats52657.html">Selectivity from hard-wired assumptions</a></LI>
+</UL>
+</LI>
+<LI><a href="ctunstats849251.html">What are cardinality statistics?</a></LI>
+<LI><a href="ctunstats46438.html">Working with cardinality statistics</a>
+<UL>
+<LI><a href="ctunstats57373.html">When cardinality statistics are automatically updated</a></LI>
+<LI><a href="ctunstats849505.html">When cardinality statistics go stale</a></LI>
+</UL>
+</LI>
+</UL>
+</LI>
+<LI><a href="rtunproper32213.html">Derby properties</a>
+<UL>
+<LI><a href="ctunproper51399.html">Scope of Derby properties</a></LI>
+<LI><a href="ctunproper22250.html">Derby properties</a>
+<UL>
+<LI><a href="rtunsearchauthdn.html">derby.authentication.ldap.searchAuthDN</a></LI>
+<LI><a href="rtunsearchauthpw.html">derby.authentication.ldap.searchAuthPW</a></LI>
+<LI><a href="rtunproper26978.html">derby.authentication.ldap.searchBase</a></LI>
+<LI><a href="rtunproper37341.html">derby.authentication.ldap.searchFilter</a></LI>
+<LI><a href="rtunproper13766.html">derby.authentication.provider</a></LI>
+<LI><a href="rtunproper25581.html">derby.authentication.server</a></LI>
+<LI><a href="rtunproper27467.html">derby.connection.requireAuthentication</a></LI>
+<LI><a href="rtunproper24846.html">derby.database.defaultConnectionMode</a></LI>
+<LI><a href="rtunproper81405.html">derby.database.forceDatabaseLock</a></LI>
+<LI><a href="rtunproper25025.html">derby.database.fullAccessUsers</a></LI>
+<LI><a href="rtunproper24390.html">derby.database.propertiesOnly</a></LI>
+<LI><a href="rtunproper39325.html">derby.database.readOnlyAccessUsers</a></LI>
+<LI><a href="rtunproper13217.html">derby.infolog.append</a></LI>
+<LI><a href="rtunproper43414.html">derby.language.logQueryPlan</a></LI>
+<LI><a href="rtunproper43517.html">derby.language.logStatementText</a></LI>
+<LI><a href="rtunproper10607.html">derby.locks.deadlockTimeout</a></LI>
+<LI><a href="rtunproper23835.html">derby.locks.deadlockTrace</a></LI>
+<LI><a href="rtunproper40346.html">derby.locks.escalationThreshold</a></LI>
+<LI><a href="rtunproper98166.html">derby.locks.monitor</a></LI>
+<LI><a href="rtunproper46141.html">derby.locks.waitTimeout</a></LI>
+<LI><a href="rtunproper27529.html">derby.storage.initialPages</a></LI>
+<LI><a href="rtunstorminrecsize.html">derby.storage.minimumRecordSize</a></LI>
+<LI><a href="rtunproper81359.html">derby.storage.pageCacheSize</a></LI>
+<LI><a href="rtunproper28026.html">derby.storage.pageReservedSpace</a></LI>
+<LI><a href="rtunproper40688.html">derby.storage.pageSize</a></LI>
+<LI><a href="rtunproper34037.html">derby.storage.tempDirectory</a></LI>
+<LI><a href="rtunproper33027.html">derby.stream.error.field</a></LI>
+<LI><a href="rtunproper18151.html">derby.stream.error.file</a></LI>
+<LI><a href="rtunproper35028.html">derby.stream.error.method</a></LI>
+<LI><a href="rtunproper26985.html">derby.stream.error.logSeverityLevel</a></LI>
+<LI><a href="rtunproperdurability.html">derby.system.durability</a></LI>
+<LI><a href="rtunproper32066.html">derby.system.home</a></LI>
+<LI><a href="rtunproper27355.html">derby.user.UserName</a>
+<UL>
+<LI><a href="rtunpropercachedn.html">Caching user DNs</a></LI>
+</UL>
+</LI>
+</UL>
+</LI>
+</UL>
+</LI>
+<LI><a href="ctuntransform13966.html">Internal language transformations</a>
+<UL>
+<LI><a href="ctuntransform35783.html">Predicate transformations</a>
+<UL>
+<LI><a href="rtuntransform139.html">BETWEEN transformations</a></LI>
+<LI><a href="rtuntransform208.html">LIKE transformations</a>
+<UL>
+<LI><a href="rtuntransform345.html">Character string beginning with constant</a></LI>
+<LI><a href="rtuntransform443.html">Character string without wildcards</a></LI>
+<LI><a href="rtuntransform472.html">Unknown parameter</a></LI>
+</UL>
+</LI>
+<LI><a href="rtuntransform582.html">Static IN predicate transformations</a>
+<UL>
+<LI><a href="rtuntransform866214.html">NOT IN predicate transformations</a></LI>
+</UL>
+</LI>
+<LI><a href="rtuntransform590.html">OR transformations</a></LI>
+</UL>
+</LI>
+<LI><a href="ctuntransform37032.html">Transitive closure</a>
+<UL>
+<LI><a href="rtuntransform866547.html">Transitive closure on join clauses</a></LI>
+<LI><a href="rtuntransform866587.html">Transitive Closure on Search Clauses</a></LI>
+</UL>
+</LI>
+<LI><a href="ctuntransform11313.html">View transformations</a>
+<UL>
+<LI><a href="ctuntransform22576.html">View flattening</a></LI>
+<LI><a href="ctuntransform36623.html">Predicates pushed into views or derived tables</a></LI>
+</UL>
+</LI>
+<LI><a href="ctuntransform13699.html">Subquery processing and transformations</a>
+<UL>
+<LI><a href="ctuntransform25857.html">Materialization</a></LI>
+<LI><a href="ctuntransform36368.html">Flattening a subquery into a normal join</a></LI>
+<LI><a href="ctuntransform25868.html">Flattening a subquery into an EXISTS join</a></LI>
+<LI><a href="ctuntransform47182.html">Flattening VALUES subqueries</a></LI>
+<LI><a href="ctuntransform867165.html">DISTINCT elimination in IN, ANY, and EXISTS subqueries</a></LI>
+<LI><a href="ctuntransform867201.html">IN/ANY subquery transformation</a></LI>
+</UL>
+</LI>
+<LI><a href="ctuntransform55045.html">Outer join transformations</a></LI>
+<LI><a href="ctuntransform16033.html">Sort avoidance</a>
+<UL>
+<LI><a href="ctuntransform16279.html">DISTINCT elimination based on a uniqueness condition</a></LI>
+<LI><a href="ctuntransform21780.html">Combining ORDER BY and DISTINCT</a></LI>
+<LI><a href="ctuntransform14044.html">Combining ORDER BY and UNION</a></LI>
+</UL>
+</LI>
+<LI><a href="ctuntransform41535.html">Aggregate processing</a>
+<UL>
+<LI><a href="rtuntransform867602.html">COUNT(nonNullableColumn)</a></LI>
+</UL>
+</LI>
+</UL>
+</LI>
+<LI><a href="rtuntrademderby.html">Trademarks</a></LI>
+</UL>
+</body>
+</html>

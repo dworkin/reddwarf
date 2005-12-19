@@ -1,0 +1,341 @@
+# 
+# Copyright (c) 2001, Sun Microsystems Laboratories 
+# All rights reserved. 
+# 
+# Redistribution and use in source and binary forms, 
+# with or without modification, are permitted provided 
+# that the following conditions are met: 
+# 
+#     Redistributions of source code must retain the 
+#     above copyright notice, this list of conditions 
+#     and the following disclaimer. 
+#             
+#     Redistributions in binary form must reproduce 
+#     the above copyright notice, this list of conditions 
+#     and the following disclaimer in the documentation 
+#     and/or other materials provided with the distribution. 
+#             
+#     Neither the name of Sun Microsystems, Inc. nor 
+#     the names of its contributors may be used to endorse 
+#     or promote products derived from this software without 
+#     specific prior written permission. 
+# 
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND 
+# CONTRIBUTORS ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, 
+# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF 
+# MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+# DISCLAIMED. IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE 
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, 
+# OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, 
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, 
+# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND 
+# ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, 
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY 
+# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF 
+# THE POSSIBILITY OF SUCH DAMAGE. 
+#
+
+The scripts in this directory (<workspace>/perf) start the Stock Sender/Viewer 
+and data Sender/Receiver programs.
+
+They can be run directly from this directory or from the bcn web site.
+If run from the web site, the necessary classes and scripts are automatically
+copied to the user's local machine in /tmp/jrms.$USER and the scripts
+are run from there to avoid overloading bcn.east.
+
+To run directly from here without copying files, you must set the
+environment variable jrms_target_tree as described below.
+
+Then run StockViewer.sh.
+
+Stop here unless you want details.
+
+============================================================================
+
+To run the senders (StockSender.sh and DataSender.sh) you must set
+the environment variable "jrms_target_tree" to the directory just
+above your workspace directory. For example, if your workspace is 
+
+    /home/jrms/version1.0/src
+
+then
+
+    setenv jrms_target_tree /home/jrms/version1.0.
+
+You must also set the multicast addresses you want to use for sending.
+
+"stocksender_multicast_address" is for the StockSender.  For example,
+
+    setenv stocksender_multicast_address 224.148.74.41.
+
+"data_sender_multicast_address" is for the DataSender.  For example,
+
+    setenv data_sender_multicast_address 224.148.74.49.
+
+Log files are placed in under this directory in StockLog and DataXferLog.
+
+CurrentStockLog and CurrentDataXferLog are links to the current log files
+in the StockLog and DataXferLog directories.  These links are 
+set to the current directory by the sender scripts.
+
+To run receivers directly in this directory and have both the sender 
+and receiver log files placed in the same directory, you must set 
+the variable "jrms_target_tree" as decribed above.
+
+If you don't set jrms_target_tree, it is automatically set to /tmp/jrms and 
+the scripts and necessary class files are copied from 
+
+    /net/bcn.east/files2/projects/jrms/version1.0
+
+to your local machine in 
+
+    /tmp/jrms.$USER.
+
+The directory structure there is similar to where you are now:
+
+    /tmp/jrms.$USER/
+	Kit/classes.jar
+	src/perf/
+	   CurrentDataXferLog
+	   CurrentStockLog
+	   DataReceiver.sh
+	   DataXferLog
+	   Environment.sh
+	   StockLog
+	   StockViewer.sh
+
+Then the scripts are run from /tmp/jrms.$USER/src/perf and receiver log 
+files are placed under there.  The actual receiver directory names 
+containing the log files match the directory names for the Senders'
+log files so that you can match up senders and receivers even though 
+the logs are on different machines.
+
+You won't need arguments to any of the scripts unless you want
+to override defaults such as port numbers, log levels, multicast address,
+etc.
+
+To start the Stock Sender:
+    StockSender.sh [<StockServer arguments, see ArgParser.java>]
+
+    In addition to setting the variable jrms_target_tree, you'll need to set
+    stocksender_multicast_address to the multicast address that
+    your want the sender to use.
+
+To start the Data Sender:
+    DataSender.sh [<DataSender arguments, see ArgParser.java>]
+
+    In addition to setting the variable jrms_target_tree, you'll need to set
+    datasender_multicast_address to the multicast address that
+    your want the sender to use.
+
+To start receivers:
+
+    StockViewer.sh [<Stock Viewer arguments, see ArgParser.java>]
+
+    The StockViewer.sh script starts the stock viewer and in addition
+    starts a DataReceiver in the background.  When StockViewer.sh exits
+    it creates a file called /tmp/KillDataReceiver.  This tells the
+    DataReceiver to exit.
+
+    A quick way to kill the StockViewer is to create the file
+    /tmp/KillStockViewer.
+
+    StockViewer.sh checks if DataReceiver.sh is already running.  
+    If not, it starts it.  Then it start the StockViewer, and waits for 
+    exit status.  If the StockSender stops sending, then StockViewer.sh
+    restarts the StockViewer automatically.
+    
+    DataReceiver.sh [<data receiver arguments, see ArgParser.java>]
+    Starts a data receiver.  You can run this manually if you're 
+    just testing data transfers.
+
+    When running from /tmp/jrms.$USER, StockViewer.sh and DataReceiver.sh 
+    send email to the alias StockViewerEmail@proteus.East.Sun.COM and 
+    DataReceiverEmail@proteus.East.Sun.COM respectively.  The email message
+    tells whether the receiver is starting or stopping, the hostname, and the
+    user name.  This information can be used to find the log files for
+    a particular member.  When the StockViewer or DataReceiver exits,
+    the complete log is emailed with a message indicating that the viewer
+    or receiver has exited.
+
+    When the sender is stopped, the email file containing all the receiver's
+    emails is moved to the sender's log directory.
+
+
+Other files in this directory
+-----------------------------
+Environment.sh contains commands to set variables
+    common for all the scripts.  For example, jrms_classes is set in here.
+
+stockview.html is the html file used by the bcn web site.
+    XXX mention other files related to web site.
+
+DataSender.arguments   
+    This file contains the actual arguments used by the Data Sender.
+    The Data Receiver reads this file and uses arguments common to
+    the sender and receiver.
+
+StockSender.arguments
+    This file contains the actual arguments used by the Stock Sender.
+    The Stock Receiver reads this file and uses arguments common to
+    the sender and receiver.
+
+CurrentStockLog/
+    This is a link to the directory where the Stock Sender (and Receiver
+    programs) are currently logging data.  The link points into
+    StockLog/<date>.<time>.  This link is changed to point to a new
+    directory when the StockSender exits.
+
+CurrentDataXferLog/
+    This is a link to the directory where the Data Sender (and Receiver
+    programs) are currently logging data.  The link points into
+    DataXferLog/<date>.<time>.  This link is changed to point to a new
+    directory when the DataSender exits.
+
+./DataXfer   			log files for the Data Sender and Receivers
+    <date>.<time>
+	DataSender.<host>.<time>	
+	<host>.<time>
+    <date>.<time>
+	DataSender.<host>.<time>	
+	<host>.<time>
+    ...
+
+./Stock				log files for the Stock Sender and Receivers
+    <date>.<time>
+	StockSender.<host>.<time>
+	<host>.<time>
+    <date>.<time>
+	StockSender.<host>.<time>
+	<host>.<time>
+    ...
+
+The source files for the applications are in <workspace>/reliable/sample_code/stock
+
+The files are:
+
+	ArgParser.java        Parse command line arguments.
+	DataSender.java       Send a specified amount of known data.
+	DataReceiver.java     Receive data and verify its correctness.
+        DataStats.java	      Display statistics for data transfers.
+	StockServer.java      Send a quote for SUNW on SUNWStockChannel.
+	StockViewer.java      Find SUNWStockChannel and display quote for SUNW.
+	StockDebugFlags.java  debug flags
+
+The command line arguments are documented in ArgParser.java.
+Explicit command line arguments specified when invoking a script override 
+the defaults in the scripts.
+
+Example of deployment for testing Data Transfers and pruning.
+-------------------------------------------------------------
+On a server such as bcn:
+
+	cd /home/jrms/version1.0/src/perf
+        setenv jrms_target_tree /home/jrms/version1.0
+	setenv stocksender_multicast_address 224.148.74.41
+	StockSender.sh & 
+	sleep 3 
+        setenv data_sender_multicast_address 224.148.74.49
+	DataSender.sh &
+
+On each machine to receive the information:
+
+	cd /home/jrms/version1.0/src/perf
+	StockViewer.sh
+
+That's it.  Log files should tell it all.
+
+A better way to get receivers to run the StockViewer is through
+the bcn web site http://bcn.east/projects/jrms/index.html.  
+Click on StockViewer near the bottom.
+
+If changes are made to the Data Sender/Receiver which you want to try,
+just kill and restart DataSender.sh.  You'll get a new log directory,
+and all the receivers should exit and restart logging to the new directory.
+
+If changes are made to the Stock Sender/Viewer which you want to try,
+just kill and restart StockSender.sh.  You'll get a new log directory,
+and all the viewers should exit and restart logging to the new directory.
+
+
+Notes on how it works off the tangled web...
+--------------------------------------------
+stockview.html has a reference in it to 
+
+    /cgi-bin/pgm-exec.cgi?/net/bcn.east/files2/projects/jrms/version1.0/src/perf/StockViewer.sh
+
+On bcn, do ps -ef | grep httpd to find out the location of the file httpd.conf.
+Look for ScriptAlias /cgi-bin/ "/opt/apache/cgi-bin/"
+
+We now have the location of cgi-bin.
+
+pgm-exec.cgi is in /opt/apache/cgi-bin.
+Its job is to produce an html file to stdout:
+
+    echo "Content-type: application/x-csh-swan"
+
+Netscape must be configured with:
+
+    application/x-csh-swan  xpreview %s
+
+xpreview is a script in /usr/dist/pkgs/xmessage/5bin.sun4
+which puts up a dialog box asking if you run to run the program
+and then starts a c shell and gives StockViewer.sh as the file.
+
+Environment variables
+---------------------
+CLASSPATH			java class path
+
+exactvm				path to ExactVM
+
+jdkfcs				path to jdk1.2fcs
+
+jdk				set to either $exactvm or $jdkfcs
+
+jrms_source_tree		directory from which sender runs.  Files from here
+				are copied to $jrms_target_tree.
+				e.g. /home/jrms/version1.0/src/perf
+
+jrms_target_tree		target directory where scripts are run from
+				e.g. /tmp/jrms.<username>
+
+jrms_classes			path to jrms classes
+				e.g. $jrms_target_tree/classes
+
+current_data_receiver_log	link pointing to current data receiver log
+				e.g. $jrms_target_tree/src/perf/CurrentDataXferLog
+
+current_data_sender_log		link pointing to current data sender log
+				e.g. $jrms_source_tree/src/perf/CurrentDataXferLog			
+
+current_stock_receiver_log	link pointing to current stock receiver log
+				e.g. $jrms_target_tree/src/perf/CurrentStockLog
+
+current_stock_sender_log 	link pointing to current stock sender log
+				e.g. $jrms_source_tree/src/perf/CurrentStockLog			
+
+data_receiver_log		path for all data receiver logs
+				e.g. $jrms_target_tree/src/perf/DataXferLog
+
+data_sender_log			path for all data sender logs
+				e.g. $jrms_source_tree/src/perf/DataXferLog
+
+data_sender_arguments		data sender's arguments, used by data receivers 
+
+data_sender_multicast_address   data sender multicast address
+
+stock_receiver_log		path for all stock viewer logs
+				e.g. $jrms_target_tree/src/perf/StockLog
+
+stock_sender_log		path for all stock sender logs
+				e.g. $jrms_source_tree/src/perf/StockLog
+
+stock_sender_arguments		stock sender's arguments, used by stock viewers.
+
+stock_sender_multicast_address	stock sender multicast address
+
+data_receiver_email		path to email file.  Must match
+				DataReceiverEmail@proteus.East.Sun.COM
+
+stock_viewer_email		path to email file.  Must match
+				StockViewerEmail@proteus.East.Sun.COM

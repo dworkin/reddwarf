@@ -1,0 +1,117 @@
+# 
+# Copyright (c) 2001, Sun Microsystems Laboratories 
+# All rights reserved. 
+# 
+# Redistribution and use in source and binary forms, 
+# with or without modification, are permitted provided 
+# that the following conditions are met: 
+# 
+#     Redistributions of source code must retain the 
+#     above copyright notice, this list of conditions 
+#     and the following disclaimer. 
+#             
+#     Redistributions in binary form must reproduce 
+#     the above copyright notice, this list of conditions 
+#     and the following disclaimer in the documentation 
+#     and/or other materials provided with the distribution. 
+#             
+#     Neither the name of Sun Microsystems, Inc. nor 
+#     the names of its contributors may be used to endorse 
+#     or promote products derived from this software without 
+#     specific prior written permission. 
+# 
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND 
+# CONTRIBUTORS ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, 
+# INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF 
+# MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+# DISCLAIMED. IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE 
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, 
+# OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, 
+# PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, 
+# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND 
+# ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, 
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY 
+# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF 
+# THE POSSIBILITY OF SUCH DAMAGE. 
+#
+
+# This file is a template to list the various options that are
+# available to dynamically enable TRAM logging.
+# The basic syntax is
+#    <Option keyword> = <required Value>
+#
+# The following are the two ways by which multiple values on the right
+# hand can be specified. Currently only MEMBER_ADDRESS and LOG_OPTION
+# are the only options that support specification of multiple right
+# hand side values. The two ways of listing multiple right hand side
+# values are described below:
+# 
+#   1. Multiple member addresses are ',' separated as shown below.
+#      White spaces are ignored.
+#
+#          129.148.75.98 , 129.148.75.97,129.148.75.96
+#
+#   2. Choosing multiple logging options are '|' (OR'd) as shown below.
+#      White spaces are ignored.
+#
+#	 LOG_SECURITY |LOG_CONG| LOG_DATAMESG
+#
+# The following is the list of various <Option Keywords> that are currently
+# recognized:
+#
+#        MULTICAST_ADDRESS     : Multicast address of the session.
+#
+#	 SOURCE_ADDRESS	       : Address of the node sending multicast 
+#                                session data 
+#                 
+# 	 SESSION_ID            : Session id of the multicast session	
+#
+# 	 PORT                  : Port number on which the multicast data is 
+#                                being sent.
+#
+# 	 TTL                   : The TTL scope to which the message should be 
+#                                sent. default 1
+#
+#	 LOG_OPTION            : Required logging option. Look below for 
+#                                option definitions. Default option(if not 
+#                                Listed) LOG_NONE.
+#
+#	 MEMBER_ADDRESS        : List of node's addresses that need to adopt 
+#                                the logging option. If no address is listed, 
+#                                All members of the session will adopt this 
+#                                option.
+#
+#
+# The following lists the various LOG_OPTIONs currently supported.
+#
+#                                   LOG_CONGESTION
+#                                   LOG_CONTROL_MESSAGES
+#                                   LOG_DATA_MESSAGES 
+#                                   LOG_SESSION
+#                                   LOG_SECURITY
+#                                   LOG_DATACACHE
+#                                   LOG_DIAGNOSTICS
+#                                   LOG_VERBOSE
+#                                   LOG_INFO
+#                                   LOG_NONE
+#                                   LOG_ALL
+#
+#
+#
+#  The following is a sample configuration. Any option keyword not listed
+#  will result in the use of the DEFAULT values.
+#  DEFAULT Values are
+#    TTL = 1, PORT = 4567
+#  The use of '#' at the begining of a line indicates a comment line.
+MULTICAST_ADDRESS = 224.10.10.20
+PORT = 4567
+TTL = 10
+LOG_OPTION = LOG_CONGESTION | LOG_CONTROL_MESSAGES 
+MEMBER_ADDRESS = 129.148.75.95,129.148.75.107, 129.148.75.125
+#
+#
+#
+
+
+
+

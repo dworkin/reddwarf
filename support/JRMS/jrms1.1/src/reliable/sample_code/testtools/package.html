@@ -1,0 +1,1092 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0//EN">
+<!--NewPage-->
+<HTML>
+<HEAD>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=ISO-8859-1">
+<META HTTP-EQUIV="Content-Style-Type" CONTENT="text/css">
+<META NAME="GENERATOR" CONTENT="Adobe FrameMaker 5.5/HTML Export Filter">
+<LINK REL="STYLESHEET" HREF="JRMSTest.css" CHARSET="ISO-8859-1" TYPE="text/css">
+<TITLE> I.	JRMSTest is located in the ../src/reliable/sample_code/testools directory.</TITLE>
+</HEAD>
+<BODY BGCOLOR="#ffffff">
+<P CLASS="Body">
+<A NAME="pgfId-882168"></A>How to Use the JRMSTest harness.</P>
+<P CLASS="Body">
+<A NAME="pgfId-882169"></A>&nbsp;</P>
+<DIV>
+<H2 CLASS="FM1Level">
+<A NAME="pgfId-882170"></A>I.	JRMSTest is located in the ../src/reliable/sample_code/testools directory.</H2>
+<P CLASS="Body">
+<A NAME="pgfId-882172"></A>&nbsp;</P>
+<P CLASS="Body">
+<A NAME="pgfId-882604"></A>&nbsp;</P>
+<P CLASS="Body">
+<A NAME="pgfId-882605"></A>Open a new shell window and type restart.pl to delete any old JDK processes you have and to start the RMI registry on each machine.  Machines are ready when you see Waiting for invocation from clients... appear for each one.  Next open another shell and type:  JRMSTest.sh  To see usage type: java JRMSTest -help</P>
+<P CLASS="Body">
+<A NAME="pgfId-882176"></A>JRMSTest performs the following tasks:</P>
+<P CLASS="Body">
+<A NAME="pgfId-882304"></A>&nbsp;</P>
+<OL>
+<LI CLASS="FM3Level">
+<A NAME="pgfId-882261"></A>Waits for a serialized channel file to be written to the current directory.</LI>
+<LI CLASS="FM3Level">
+<A NAME="pgfId-882262"></A>Uses the channel file to create the specified number of receivers</LI>
+<LI CLASS="FM3Level">
+<A NAME="pgfId-882263"></A>Uses the channel file to create a sender.</LI>
+<LI CLASS="FM3Level">
+<A NAME="pgfId-882595"></A>Uses the hostnames.txt file if it exists to create multiple receivers, one on each host.</LI>
+<LI CLASS="FM3Level">
+<A NAME="pgfId-882264"></A>Uses the sender to transmit bytes using JRMS.</LI>
+<LI CLASS="FM3Level">
+<A NAME="pgfId-882265"></A>Compares each byte that is sent to a running counter and flags any errors.</LI>
+<LI CLASS="FM3Level">
+<A NAME="pgfId-882596"></A>If socket=packet, starts the Graph engine and uses RMI to send time and bytes received from each receiver to the Graph engine.</LI>
+<LI CLASS="FM3Level">
+<A NAME="pgfId-882266"></A>Writes out a log file for each receiver and places it in the current directory.</LI>
+<LI CLASS="FM3Level">
+<A NAME="pgfId-882267"></A>Writes out a log file for the sender and places it in the current directory.</LI>
+<LI CLASS="FM3Level">
+<A NAME="pgfId-882268"></A>Waits for the sender to finish.</LI>
+<LI CLASS="FM3Level">
+<A NAME="pgfId-882269"></A>Opens each log file and writes to system out if any failures where logged, and where found.</LI>
+<LI CLASS="FM3Level">
+<A NAME="pgfId-882382"></A>A test passes when a byte that has been sent has been verified as being received.</LI>
+<LI CLASS="FM3Level">
+<A NAME="pgfId-882383"></A>A logfile is successful when the process that starts the log has ended.  If a logfile does not contain the word &quot;succeeded&quot;, then either the process was killed before completion or it is still running.</LI>
+</OL>
+<P CLASS="Body">
+<A NAME="pgfId-882270"></A>&nbsp;</P>
+</DIV>
+<DIV>
+<H2 CLASS="FM1Level">
+<A NAME="pgfId-882480"></A>II.	You may set JRMSTest configuration parameters in the local default.properties file.   Below is an example of the file with comments.</H2>
+<P CLASS="CellBody">
+<A NAME="pgfId-882477"></A>&nbsp;</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882524"></A>#default Properties</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882535"></A>#Sun Jan 23 22:07:54 EST 2000</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882536"></A>#chanelname can be any name</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882537"></A>channelname=JRMSTest</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882538"></A>#socket can be either packet or stream</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882539"></A>socket=packet</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882540"></A>#port can be any number</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882541"></A>port=4321</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882542"></A>#rverbose and must be true for graphing to work</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882543"></A>rverbose=true</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882544"></A>sverbose=true</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882545"></A>#check with your net admin for a multicast ip address</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882608"></A># At bcn we can use 224.148.74.001 - 224.148.74.255</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882546"></A>address=224.148.74.15</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882547"></A>#maxrate=64000</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882548"></A>maxrate=3000000</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882549"></A>minrate=1000</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882550"></A>ackwindow=32</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882551"></A>#applname can be any name</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882552"></A>applname=RMTest</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882553"></A>CLASSPATH=/net/bcn.east/files3/home/henryw/jrms/version0.8/classes</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882586"></A>#used in the event that a machine cannot run exact vm.</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882554"></A>java1.2fcs=/net/labeast.east/files3/tools/jdk1.2fcs/bin/java</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882555"></A>testtools=com.sun.multicast.reliable.applications.testtools</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882556"></A>simple=com.sun.multicast.reliable.simple</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882582"></A>#time to live</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882557"></A>ttl=1</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882607"></A>#take your pick</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882558"></A>#intsent=3500000</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882559"></A>#intsent=7000000</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882560"></A>#intsent=35000</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882561"></A>#intsent=14000000</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882562"></A>intsent=560000000</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882577"></A>#number of bytes (or ints) to send before ending test.</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882563"></A>#intsent=1120000000</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882564"></A>#For multiple hosts receivers should equal 1</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882565"></A>receivers=1</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882566"></A>hostfile=/home/henryw/jrms/version0.8/reliable/sample_code/testtools/hostnames.txt</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882567"></A>#you should be logged into the server host before starting JRMSTest</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882568"></A>server=apple</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882569"></A>#server=mtest9</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882570"></A>java.security.policy=client.policy</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882571"></A>graph=true</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882587"></A>#whether or not to skew the graph </P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882572"></A>skew=true</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882573"></A>#javahome below can be used when you don't </P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882574"></A>#want to run with servers default java VM</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882575"></A>#javahome=/home/henryw/jdk1.3/bin</P>
+<P CLASS="CellBody">
+<A NAME="pgfId-882576"></A>&nbsp;</P>
+</DIV>
+<DIV>
+<H2 CLASS="FM1Level">
+<A NAME="pgfId-882438"></A>III.	Tech Note: You may also start JRSMTest.sh with these ten optional command line parameters:</H2>
+<P CLASS="Body">
+<A NAME="pgfId-882290"></A>&nbsp;</P>
+<OL>
+<LI CLASS="FM3Level">
+<A NAME="pgfId-882279"></A>-r number of receivers - It is recommended that you start with a small number and work your way up in order to find out how many receivers your machine will be able to handle. If you leave out -r, one receiver will be created. </LI>
+<OL>
+<LI CLASS="FM4Level">
+<A NAME="pgfId-882191"></A>Example: -r 2</LI>
+</OL>
+<LI CLASS="FM3Level">
+<A NAME="pgfId-882192"></A>-a address - sets the multicast address.  Multicast addresses are Class D and are between 224.0.0.0 and 239.255.255.255.  The default address is 224.148.74.12 </LI>
+<OL>
+<LI CLASS="FM4Level">
+<A NAME="pgfId-882309"></A>Example: -a 224.148.73.11</LI>
+</OL>
+<LI CLASS="FM3Level">
+<A NAME="pgfId-882193"></A>-c channelname - sets the serialized channel filename.  The default filename is JRMSTest </LI>
+<OL>
+<LI CLASS="FM4Level">
+<A NAME="pgfId-882310"></A>Example: -c TestChannel</LI>
+</OL>
+<LI CLASS="FM3Level">
+<A NAME="pgfId-882305"></A>-p port number - defines the port number.  The default is 4321</LI>
+<OL>
+<LI CLASS="FM4Level">
+<A NAME="pgfId-882346"></A>Example: -p 1234</LI>
+</OL>
+<LI CLASS="FM3Level">
+<A NAME="pgfId-882306"></A>-m maxrate - sets the maximum data transfer rate in bytes.  The default is 64000</LI>
+<OL>
+<LI CLASS="FM4Level">
+<A NAME="pgfId-882347"></A>Example: -m 32000</LI>
+</OL>
+<LI CLASS="FM3Level">
+<A NAME="pgfId-882404"></A>-n minrate - sets the minimum data transfer rate in bytes.  The default is 1000</LI>
+<OL>
+<LI CLASS="FM4Level">
+<A NAME="pgfId-882405"></A>Example: -n 2000</LI>
+</OL>
+<LI CLASS="FM3Level">
+<A NAME="pgfId-882307"></A>-t ttl - sets the time to live.</LI>
+<OL>
+<LI CLASS="FM4Level">
+<A NAME="pgfId-882348"></A>-t 2</LI>
+</OL>
+<LI CLASS="FM3Level">
+<A NAME="pgfId-882308"></A> -s applname - sets the application name</LI>
+<OL>
+<LI CLASS="FM4Level">
+<A NAME="pgfId-882349"></A>Example: -s MyApp</LI>
+</OL>
+<LI CLASS="FM3Level">
+<A NAME="pgfId-882311"></A>-v receive, send, or both - sets verbose logging in the log files.  The default is to not use verbose logging.</LI>
+<OL>
+<LI CLASS="FM4Level">
+<A NAME="pgfId-882316"></A>-v receive - uses verbose logging for receiver.log files only.</LI>
+<LI CLASS="FM4Level">
+<A NAME="pgfId-882317"></A>-v send - uses verbose logging for the server.log file only.</LI>
+<LI CLASS="FM4Level">
+<A NAME="pgfId-882318"></A>-v both - uses verbose logging for all log files.</LI>
+</OL>
+<LI CLASS="FM3Level">
+<A NAME="pgfId-882319"></A>-i # of ints to send - sets the amount of data you would like to multicast.</LI>
+<OL>
+<LI CLASS="FM4Level">
+<A NAME="pgfId-882320"></A>Example: -i 100000 - the server will send 100000 integers, 4 bytes each.</LI>
+</OL>
+</OL>
+</DIV>
+<DIV>
+<H2 CLASS="FM1Level">
+<A NAME="pgfId-882389"></A>IV.	How to create multiple receivers on different Hosts.</H2>
+<OL>
+<LI CLASS="FM3Level">
+<A NAME="pgfId-882393"></A>Create a hostnames.txt file in the directory that you run JRMSTest.sh from.</LI>
+<LI CLASS="FM3Level">
+<A NAME="pgfId-882394"></A>Put your list of hosts in the hostnames.txt file</LI>
+<LI CLASS="FM3Level">
+<A NAME="pgfId-882395"></A>You may comment out a host with the pound (#) sign.</LI>
+<LI CLASS="FM3Level">
+<A NAME="pgfId-882396"></A>Example:</LI>
+<P CLASS="FM3LevelContinued">
+<A NAME="pgfId-882397"></A>proteus</P>
+<P CLASS="FM3LevelContinued">
+<A NAME="pgfId-882398"></A>bridge</P>
+<P CLASS="FM3LevelContinued">
+<A NAME="pgfId-882399"></A>#masala</P>
+<P CLASS="FM3LevelContinued">
+<A NAME="pgfId-882400"></A>apple</P>
+<P CLASS="FM3LevelContinued">
+<A NAME="pgfId-882401"></A>bcn</P>
+<P CLASS="FM3LevelContinued">
+<A NAME="pgfId-882402"></A>&nbsp;</P>
+<P CLASS="FM3LevelContinued">
+<A NAME="pgfId-882403"></A>In the example above, the host masala will not be used to create a receiver.</P>
+<P CLASS="FM3LevelContinued">
+<A NAME="pgfId-882609"></A>&nbsp;</P>
+</OL>
+</DIV>
+<DIV>
+<H2 CLASS="FM1Level">
+<A NAME="pgfId-882610"></A>V.	Troubleshooting</H2>
+<OL>
+<LI CLASS="FM3Level">
+<A NAME="pgfId-882614"></A>After starting restart.pl.  There should be one JDK process running on each hostmachine in the hostnames.txt file</LI>
+<LI CLASS="FM3Level">
+<A NAME="pgfId-882616"></A>Graphing only works with socket=packet in default.properties</LI>
+<LI CLASS="FM3Level">
+<A NAME="pgfId-882615"></A>After using JRMSTest.sh and if the graph is not working, check the command line that is printed to the screen for each receiver and for the server.  Put the command line into a shell script and run it that way.  You should see error messages appear that will help you figure out why a process is not starting correctly.</LI>
+<LI CLASS="FM3Level">
+<A NAME="pgfId-882620"></A>default.properties rverbose and sverbose should be set to true for graphing to work.</LI>
+<LI CLASS="FM3Level">
+<A NAME="pgfId-882621"></A>default.properties CLASSPATH should be on a network drive where all host machines have access to it.  Also check CLASSPATH - it's case sensitive</LI>
+<LI CLASS="FM3Level">
+<A NAME="pgfId-882622"></A>default.properties server should be set to the server machine.  This should be the same machine where restart.pl and JRMSTest.sh are run.</LI>
+<LI CLASS="FM3Level">
+<A NAME="pgfId-882626"></A>Check to see that the graph engine default.properties graph is set to true</LI>
+<LI CLASS="FM3Level">
+<A NAME="pgfId-882635"></A>Graph will only display 6 receivers.</LI>
+</OL>
+</DIV>
+<BR>
+<P STYLE="margin-bottom: 0in">This implementation is based on sample
+source code found in <U>core JAVA Volume II-Advanced Features</U> by
+Cay S. Horstmann and Gary Cornell Chapter 5 Remote Objects</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">I started by creating an interface with
+the following method prototypes.</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">package
+com.sun.multicast.reliable.applications.testtools;</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">import java.rmi.*;</P>
+<P STYLE="margin-bottom: 0in">import java.util.*;</P>
+<P STYLE="margin-bottom: 0in">import java.lang.*;</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">public interface CallProduct extends
+Remote {</P>
+<P STYLE="margin-bottom: 0in">    void callMCTestQA(String
+commandline) throws RemoteException;</P>
+<P STYLE="margin-bottom: 0in">    void startPerfMon() throws
+RemoteException;</P>
+<P STYLE="margin-bottom: 0in">    void drawGraph(GraphData gd) throws
+RemoteException;</P>
+<P STYLE="margin-bottom: 0in">    void printGraph() throws
+RemoteException;</P>
+<P STYLE="margin-bottom: 0in">    boolean selectVM(String host)
+throws RemoteException;</P>
+<P STYLE="margin-bottom: 0in">    void setReset(boolean set) throws
+RemoteException;</P>
+<P STYLE="margin-bottom: 0in">    boolean getReset() throws
+RemoteException;</P>
+<P STYLE="margin-bottom: 0in">    void testResetHash() throws
+RemoteException;</P>
+<P STYLE="margin-bottom: 0in">    void setHost(String hostname)
+throws RemoteException;</P>
+<P STYLE="margin-bottom: 0in">}</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">Note that each method must throw
+RemoteException.</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">Next I wrote the body or implementation
+for these methods. We will go into the exact implementation of these
+methods at another time.  Right now it's only important to see that
+there was one interface written above, and then the body of these
+methods appearing below in a complementing &quot;Impl&quot; class
+file:</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">package
+com.sun.multicast.reliable.applications.testtools;</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">import java.rmi.*;</P>
+<P STYLE="margin-bottom: 0in">import java.rmi.server.*;</P>
+<P STYLE="margin-bottom: 0in">import java.util.*;</P>
+<P STYLE="margin-bottom: 0in">import java.net.*;</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">public class CallGDImpl</P>
+<P STYLE="margin-bottom: 0in">    extends UnicastRemoteObject 
+</P>
+<P STYLE="margin-bottom: 0in">	implements CallProduct {</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">    private GraphData gd;</P>
+<P STYLE="margin-bottom: 0in">    private int Counter = 0;</P>
+<P STYLE="margin-bottom: 0in">    private GraphManager gm;</P>
+<P STYLE="margin-bottom: 0in">    private SelectVM svm;</P>
+<P STYLE="margin-bottom: 0in">    private HostNameManager hnm;</P>
+<P STYLE="margin-bottom: 0in">    private ResetGDManager rgdm;</P>
+<P STYLE="margin-bottom: 0in">   
+</P>
+<P STYLE="margin-bottom: 0in">    public CallGDImpl() 
+</P>
+<P STYLE="margin-bottom: 0in">	throws RemoteException {</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">    public boolean selectVM(String
+host) 
+</P>
+<P STYLE="margin-bottom: 0in">	throws RemoteException {</P>
+<P STYLE="margin-bottom: 0in">	svm = new SelectVM(host);</P>
+<P STYLE="margin-bottom: 0in">	return svm.getExactVM();</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in">	</P>
+<P STYLE="margin-bottom: 0in">    public void startPerfMon() 
+</P>
+<P STYLE="margin-bottom: 0in">	throws RemoteException {</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">	rgdm =
+ResetGDManager.getResetGDManager();</P>
+<P STYLE="margin-bottom: 0in">	gm = GraphManager.getGraphManager();</P>
+<P STYLE="margin-bottom: 0in">	gm.resetGData();</P>
+<P STYLE="margin-bottom: 0in">	gm.resetRateGData();</P>
+<P STYLE="margin-bottom: 0in">	gm.resetHostnames();</P>
+<P STYLE="margin-bottom: 0in">	gm.resetRateHostnames();</P>
+<P STYLE="margin-bottom: 0in">	gm.showGraph();</P>
+<P STYLE="margin-bottom: 0in">	gm.showRateGraph();</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">    public void drawGraph(GraphData gd)</P>
+<P STYLE="margin-bottom: 0in">	throws RemoteException {</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">	gm.drawGraph(gd);</P>
+<P STYLE="margin-bottom: 0in">	gm.drawRateGraph(gd);</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">    public void setReset(boolean set)</P>
+<P STYLE="margin-bottom: 0in">	throws RemoteException {</P>
+<P STYLE="margin-bottom: 0in">	rgdm.setReset(set);</P>
+<P STYLE="margin-bottom: 0in">    }	</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">    public boolean getReset() 
+</P>
+<P STYLE="margin-bottom: 0in">	throws RemoteException {</P>
+<P STYLE="margin-bottom: 0in">	return rgdm.getReset();</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">    public void testResetHash() 
+</P>
+<P STYLE="margin-bottom: 0in">	throws RemoteException {</P>
+<P STYLE="margin-bottom: 0in">	rgdm.testResetHash();</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in"> 
+</P>
+<P STYLE="margin-bottom: 0in">    public void setHost(String
+hostname) 
+</P>
+<P STYLE="margin-bottom: 0in">	throws RemoteException {</P>
+<P STYLE="margin-bottom: 0in">	rgdm.setHost(hostname);</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">    public void printGraph()</P>
+<P STYLE="margin-bottom: 0in">	throws RemoteException {</P>
+<P STYLE="margin-bottom: 0in">	gm = GraphManager.getGraphManager();</P>
+<P STYLE="margin-bottom: 0in">	gm.printGData();</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">    public void callMCTestQA(String
+commandline)</P>
+<P STYLE="margin-bottom: 0in">        throws RemoteException {</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">        try {</P>
+<P STYLE="margin-bottom: 0in">            Runtime runtime =
+Runtime.getRuntime();</P>
+<P STYLE="margin-bottom: 0in">           
+System.out.println(&quot;runtime.exec(&quot; + commandline + &quot;)&quot;);</P>
+<P STYLE="margin-bottom: 0in">            runtime.exec(commandline);</P>
+<P STYLE="margin-bottom: 0in">        } catch(java.io.IOException e)
+{</P>
+<P STYLE="margin-bottom: 0in">            System.out.println(&quot;Error:
+&quot; + e);</P>
+<P STYLE="margin-bottom: 0in">        }</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in">}</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">Next I created a way for these methods
+to be distributed across the network.  RMI uses naming and rebinding
+to accomplish this.  This allows us to put these methods into the RMI
+registry across the network.  Where does the rmi registry come from? 
+It is supplied by JAVA.</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">package
+com.sun.multicast.reliable.applications.testtools;</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">import java.rmi.*;</P>
+<P STYLE="margin-bottom: 0in">import java.rmi.server.*;</P>
+<P STYLE="margin-bottom: 0in">import java.util.*;</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">public class CallGDServer {</P>
+<P STYLE="margin-bottom: 0in">    public static void main(String
+args[]) { 
+</P>
+<P STYLE="margin-bottom: 0in">	try {</P>
+<P STYLE="margin-bottom: 0in">	    System.out.println(&quot;Constructing
+callback &quot; +</P>
+<P STYLE="margin-bottom: 0in">		&quot;server implementations...&quot;);</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">	    CallGDImpl cgi1 = 
+</P>
+<P STYLE="margin-bottom: 0in">		new CallGDImpl();</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">	    System.out.println(</P>
+<P STYLE="margin-bottom: 0in">		&quot;Binding call server
+implementations to registry...&quot;);</P>
+<P STYLE="margin-bottom: 0in">	</P>
+<P STYLE="margin-bottom: 0in">	    Naming.rebind(&quot;CallMCTest&quot;,
+cgi1);</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">	    System.out.println(</P>
+<P STYLE="margin-bottom: 0in">		&quot;Waiting for invocation from
+clients...&quot;);</P>
+<P STYLE="margin-bottom: 0in">	} catch (Exception e) {</P>
+<P STYLE="margin-bottom: 0in">	    System.out.println(&quot;Error: &quot;
++ e);</P>
+<P STYLE="margin-bottom: 0in">	}</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in">}</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">That's all the written code that is
+necessary to make these methods available for the application.  Now
+we have to compile, then compile again using rmic in order to create
+CallGDImpl_Stub.class.</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">I put that in the
+Makefile:CLASSPATH=$(CLASSPATH) rmic -v1.2 -d $(CLASSPATH)
+com.sun.multicast.reliable.applications.testtools.CallGDImpl</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">Finally you must start the RMI registry
+on each machine that you want these methods available.</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">rmiregistry&amp;</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">And last you make java run the
+CallGDServer.class  on each machine.   Remember the
+CallGDServer.class was created to use naming.rebind to put these
+methods into the registry.</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">java
+com.sun.multicast.reliable.applications.testtools.CallGDServer&amp;</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">Now that everything is up and running I
+only need to demonstrate how, these rmi object methods are called
+from the application.</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">First you create a variable of type
+CallProduct.  Remember that CallProduct is an interface.</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">private CallProduct cp1;</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">Next you lookup the name that was bound
+to the registry:</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">url = &quot;rmi://&quot; + hostname +
+&quot;/&quot;;</P>
+<P STYLE="margin-bottom: 0in">cp1 = (CallProduct)Naming.lookup(url +</P>
+<P STYLE="margin-bottom: 0in">                    &quot;CallMCTest&quot;);</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">Notice that you must cast whatever
+object the Naming.lookup finds to the CallProduct interface.</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">Last you simply call the object method
+of your choice.</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">cp1.startPerfMon();</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">Finally, the compiler will tell you to
+put these rmi calls inside a try catch that includes...</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">} catch(java.rmi.RemoteException e) {</P>
+<P STYLE="margin-bottom: 0in">            System.out.println(&quot;Error:
+&quot; + e);</P>
+<P STYLE="margin-bottom: 0in">        }
+catch(java.rmi.NotBoundException e) {</P>
+<P STYLE="margin-bottom: 0in">            System.out.println(&quot;Error:
+&quot; + e);</P>
+<P STYLE="margin-bottom: 0in">        }
+catch(java.net.MalformedURLException e) {</P>
+<P STYLE="margin-bottom: 0in">            System.out.println(&quot;Error:
+&quot; + e);</P>
+<P STYLE="margin-bottom: 0in">        }</P>
+<P STYLE="margin-bottom: 0in">}</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">JAVA2 forces RMI to use a security
+policy file.  This file is defined in the java.security.policy key of
+any Properties file.  I have named the security policy file</P>
+<P STYLE="margin-bottom: 0in">client.policy</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">You can restrict many things with the
+policy file for JAVA2.  Info on this can be found in Chapter 9 of
+<U>core JAVA 2 Volume II-Advanced Features</U></P>
+<P STYLE="margin-bottom: 0in; text-decoration: none"><BR>
+</P>
+<P STYLE="margin-bottom: 0in; text-decoration: none">I decided to
+take the simplest route for now, and not restrict anything.  This is
+what my 
+</P>
+<P STYLE="margin-bottom: 0in; text-decoration: none">policy file
+looks like:</P>
+<P STYLE="margin-bottom: 0in; text-decoration: none"><BR>
+</P>
+<P STYLE="margin-bottom: 0in; text-decoration: none">grant</P>
+<P STYLE="margin-bottom: 0in; text-decoration: none">{ permission
+java.security.AllPermission;</P>
+<P STYLE="margin-bottom: 0in; text-decoration: none">};</P>
+<P STYLE="margin-bottom: 0in; text-decoration: none"><BR>
+</P>
+<P STYLE="margin-bottom: 0in"><SPAN STYLE="text-decoration: none">To
+include this in any running code, I use the (-D) option for java.  -D
+will set a system property.  Here is an example in the code:</SPAN></P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in; text-decoration: none">java -D
+java.security.policy=client.policy ...</P>
+<P STYLE="margin-bottom: 0in"> 
+</P>
+<P STYLE="margin-bottom: 0in"><FONT SIZE=4 STYLE="font-size: 16pt"><U><B>The
+Graph Nitty Gritty</B></U></FONT></P>
+<P STYLE="margin-bottom: 0in; text-decoration: none"><BR>
+</P>
+<P STYLE="margin-bottom: 0in; text-decoration: none"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">OK let's get into the nitty gritty.</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">The Graphs are instantiated from the
+CallGDImpl.java file in the following method.</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">    public void startPerfMon() 
+</P>
+<P STYLE="margin-bottom: 0in">	throws RemoteException {</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">	rgdm =
+ResetGDManager.getResetGDManager();</P>
+<P STYLE="margin-bottom: 0in">	gm = GraphManager.getGraphManager();</P>
+<P STYLE="margin-bottom: 0in">	gm.resetGData();</P>
+<P STYLE="margin-bottom: 0in">	gm.resetRateGData();</P>
+<P STYLE="margin-bottom: 0in">	gm.resetHostnames();</P>
+<P STYLE="margin-bottom: 0in">	gm.resetRateHostnames();</P>
+<P STYLE="margin-bottom: 0in">	gm.showGraph();</P>
+<P STYLE="margin-bottom: 0in">	gm.showRateGraph();</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">The first two important classes used
+here are the two singletons - Graph Manager.java and
+ResetGDManager.java, so lets take a look at those.</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">They are basically wrappers around the
+two files that actually are in charge of displaying the Performance
+and Rate Graphs, PerfMon.java and RatePerfMon.java  I wanted to use
+inheritance on PerfMon.java and RatePerfMon.java since they have so
+much in common, but have not gotten around to that yet.  The wrapper
+was needed because PerfMon.java already extends Frame and I needed it
+to also extend Observable, so the graph would redraw after another
+window came in front of it.</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">First lets look at GraphManager.java</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">package
+com.sun.multicast.reliable.applications.testtools;</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">import java.util.*;</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">public class GraphManager extends
+Observable {</P>
+<P STYLE="margin-bottom: 0in">    private static GraphManager
+graphmanager;</P>
+<P STYLE="margin-bottom: 0in">    private Observable notifier = new
+PerfObservable();</P>
+<P STYLE="margin-bottom: 0in">    private PerfMon Graph;</P>
+<P STYLE="margin-bottom: 0in">    private RatePerfMon RateGraph;</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">    private GraphManager() {</P>
+<P STYLE="margin-bottom: 0in">	    Graph = new PerfMon(notifier,0,0);</P>
+<P STYLE="margin-bottom: 0in">	    RateGraph = new
+RatePerfMon(notifier,0,500);</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">    public static GraphManager
+getGraphManager() {</P>
+<P STYLE="margin-bottom: 0in">	if (graphmanager == null) {</P>
+<P STYLE="margin-bottom: 0in">	    graphmanager = new GraphManager();</P>
+<P STYLE="margin-bottom: 0in">	}</P>
+<P STYLE="margin-bottom: 0in">	return graphmanager;</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in">    
+</P>
+<P STYLE="margin-bottom: 0in">    public void drawGraph(GraphData gd)
+{</P>
+<P STYLE="margin-bottom: 0in">	Graph.setData(gd);</P>
+<P STYLE="margin-bottom: 0in">	Graph.customPaint();</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">    public void drawRateGraph(GraphData
+gd) {</P>
+<P STYLE="margin-bottom: 0in">	RateGraph.setData(gd);</P>
+<P STYLE="margin-bottom: 0in">	RateGraph.customPaint();</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">    public void printGData() {</P>
+<P STYLE="margin-bottom: 0in">	Graph.printGData();</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">    public void showGraph() {</P>
+<P STYLE="margin-bottom: 0in">	Graph.show();</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">    public void showRateGraph() {</P>
+<P STYLE="margin-bottom: 0in">	RateGraph.show();</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">    public void resetGData() {</P>
+<P STYLE="margin-bottom: 0in">	Graph.resetGData();</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in">    
+</P>
+<P STYLE="margin-bottom: 0in">    public void resetRateGData() {</P>
+<P STYLE="margin-bottom: 0in">	RateGraph.resetGData();</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">    public void resetHostnames() {</P>
+<P STYLE="margin-bottom: 0in">	Graph.resetHostnames();</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">    public void resetRateHostnames() {</P>
+<P STYLE="margin-bottom: 0in">	RateGraph.resetHostnames();</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in">}</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">Then just for a reference lets look at
+PerfMon.java as well:</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">package
+com.sun.multicast.reliable.applications.testtools;</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">import java.awt.*;</P>
+<P STYLE="margin-bottom: 0in">import java.util.*;</P>
+<P STYLE="margin-bottom: 0in">import java.awt.event.*;</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">class PerfMonCanvas extends Canvas
+implements Observer {</P>
+<P STYLE="margin-bottom: 0in">    private Observable notifier;</P>
+<P STYLE="margin-bottom: 0in">    private int i=0;</P>
+<P STYLE="margin-bottom: 0in">    private Vector GData = new
+Vector();</P>
+<P STYLE="margin-bottom: 0in">    private Enumeration e;</P>
+<P STYLE="margin-bottom: 0in">    private Enumeration htkeys;</P>
+<P STYLE="margin-bottom: 0in">    private GraphData gd;</P>
+<P STYLE="margin-bottom: 0in">    private HostNameManager hnm;</P>
+<P STYLE="margin-bottom: 0in">    private Hashtable ht;</P>
+<P STYLE="margin-bottom: 0in">    private Color colors[] =
+{Color.blue, Color.red, Color.green,</P>
+<P STYLE="margin-bottom: 0in">	Color.magenta, Color.orange,
+Color.black};</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">    PerfMonCanvas(Observable notifier)
+{</P>
+<P STYLE="margin-bottom: 0in">	notifier.addObserver(this);</P>
+<P STYLE="margin-bottom: 0in">	this.notifier = notifier;</P>
+<P STYLE="margin-bottom: 0in">	hnm =
+HostNameManager.getHostNameManager();</P>
+<P STYLE="margin-bottom: 0in">	ht = hnm.getHashHosts();</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">    public void paint(Graphics g) {</P>
+<P STYLE="margin-bottom: 0in">	htkeys = ht.keys();</P>
+<P STYLE="margin-bottom: 0in">	GraphData paintgd;</P>
+<P STYLE="margin-bottom: 0in">	e = GData.elements();</P>
+<P STYLE="margin-bottom: 0in">	Dimension d = getSize();</P>
+<P STYLE="margin-bottom: 0in">	int cx = d.width;</P>
+<P STYLE="margin-bottom: 0in">	int cy = d.height;</P>
+<P STYLE="margin-bottom: 0in">	String hostname = &quot;&quot;;</P>
+<P STYLE="margin-bottom: 0in">	int value = 0;</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">	while (htkeys.hasMoreElements()) {</P>
+<P STYLE="margin-bottom: 0in">	    hostname =
+(String)htkeys.nextElement();</P>
+<P STYLE="margin-bottom: 0in">	    value =
+((Integer)ht.get(hostname)).intValue();</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">	    if (!hostname.equals(&quot;reset&quot;))
+{</P>
+<P STYLE="margin-bottom: 0in">		g.setColor(colors[value]);</P>
+<P STYLE="margin-bottom: 0in">		g.fillOval(10,10 + (15*value),6,6);</P>
+<P STYLE="margin-bottom: 0in">		g.drawString(hostname,25,17 +
+(15*value));</P>
+<P STYLE="margin-bottom: 0in">	    }</P>
+<P STYLE="margin-bottom: 0in">	}</P>
+<P STYLE="margin-bottom: 0in">	g.setColor(Color.black);</P>
+<P STYLE="margin-bottom: 0in"> 	g.drawRect(3,3,125,10 + (5 +
+(15*(ht.size()-1))));</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">	while(e.hasMoreElements()) {</P>
+<P STYLE="margin-bottom: 0in">	    paintgd =
+(GraphData)e.nextElement();</P>
+<P STYLE="margin-bottom: 0in">	    drawlines(g, paintgd, cy);</P>
+<P STYLE="margin-bottom: 0in">	}</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">    public void printGData() {</P>
+<P STYLE="margin-bottom: 0in">	e = GData.elements();</P>
+<P STYLE="margin-bottom: 0in">	Dimension d = getSize();</P>
+<P STYLE="margin-bottom: 0in">	int counter = 0;</P>
+<P STYLE="margin-bottom: 0in">	GraphData printgd;</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">	while(e.hasMoreElements()) {</P>
+<P STYLE="margin-bottom: 0in">	    printgd =
+(GraphData)e.nextElement();</P>
+<P STYLE="margin-bottom: 0in">	    System.out.println(counter++);</P>
+<P STYLE="margin-bottom: 0in">	    System.out.println(&quot;Bytes: &quot;
++ printgd.getBytes());</P>
+<P STYLE="margin-bottom: 0in">	    System.out.println(&quot;Time: &quot;
++ printgd.getTime());</P>
+<P STYLE="margin-bottom: 0in">	    System.out.println(&quot;Host: &quot;
++ printgd.getHost());</P>
+<P STYLE="margin-bottom: 0in">	}</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">    public synchronized void
+customPaint() {</P>
+<P STYLE="margin-bottom: 0in">	    Dimension d = getSize();</P>
+<P STYLE="margin-bottom: 0in">	    int cx = d.width;</P>
+<P STYLE="margin-bottom: 0in">	    int cy = d.height;</P>
+<P STYLE="margin-bottom: 0in">	    Integer line;</P>
+<P STYLE="margin-bottom: 0in">	    Graphics g = this.getGraphics();</P>
+<P STYLE="margin-bottom: 0in">	    
+</P>
+<P STYLE="margin-bottom: 0in">	    if (g != null) {	</P>
+<P STYLE="margin-bottom: 0in">		drawlines(g, gd, cy);</P>
+<P STYLE="margin-bottom: 0in">	    }</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">    public void setGData(GraphData gd)
+{</P>
+<P STYLE="margin-bottom: 0in">	this.gd = gd;</P>
+<P STYLE="margin-bottom: 0in">	GData.addElement(gd);</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">    public void resetGData() {</P>
+<P STYLE="margin-bottom: 0in">	GData.removeAllElements();</P>
+<P STYLE="margin-bottom: 0in">	repaint();</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">    public void resetHostnames() {</P>
+<P STYLE="margin-bottom: 0in">	hnm =
+HostNameManager.getHostNameManager();</P>
+<P STYLE="margin-bottom: 0in">	ht = hnm.getHashHosts();</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">    private void drawlines(Graphics g,
+GraphData gd, int cy) {</P>
+<P STYLE="margin-bottom: 0in">        try {</P>
+<P STYLE="margin-bottom: 0in">	    Integer line;</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">            if (gd != null) {</P>
+<P STYLE="margin-bottom: 0in">                line =
+(Integer)ht.get(gd.getHost());</P>
+<P STYLE="margin-bottom: 0in">                switch(line.intValue())
+{</P>
+<P STYLE="margin-bottom: 0in">                    case 0:</P>
+<P STYLE="margin-bottom: 0in">                       
+g.setColor(Color.blue);</P>
+<P STYLE="margin-bottom: 0in">                       
+g.drawLine((gd.getTime()/150)+5,</P>
+<P STYLE="margin-bottom: 0in">                           
+(int)((float)cy-gd.getBytes()/10000),</P>
+<P STYLE="margin-bottom: 0in">                           
+(gd.getTime()/150)+7,</P>
+<P STYLE="margin-bottom: 0in">                           
+(int)((float)cy-gd.getBytes()/10000));</P>
+<P STYLE="margin-bottom: 0in">                        break;</P>
+<P STYLE="margin-bottom: 0in">                    case 1:</P>
+<P STYLE="margin-bottom: 0in">                       
+g.setColor(Color.red); 
+</P>
+<P STYLE="margin-bottom: 0in">                       
+g.drawLine((gd.getTime()/150) + 25,</P>
+<P STYLE="margin-bottom: 0in">                           
+(int)((float)cy-gd.getBytes()/10000),</P>
+<P STYLE="margin-bottom: 0in">                           
+(gd.getTime()/150)+27,</P>
+<P STYLE="margin-bottom: 0in">                           
+(int)((float)cy-gd.getBytes()/10000));</P>
+<P STYLE="margin-bottom: 0in">                        break;</P>
+<P STYLE="margin-bottom: 0in">                    case 2:</P>
+<P STYLE="margin-bottom: 0in">                       
+g.setColor(Color.green);</P>
+<P STYLE="margin-bottom: 0in">                       
+g.drawLine((gd.getTime()/150) + 45,</P>
+<P STYLE="margin-bottom: 0in">                           
+(int)((float)cy-gd.getBytes()/10000),</P>
+<P STYLE="margin-bottom: 0in">                           
+(gd.getTime()/150) + 47, 
+</P>
+<P STYLE="margin-bottom: 0in">                           
+(int)((float)cy-gd.getBytes()/10000));</P>
+<P STYLE="margin-bottom: 0in">                        break;</P>
+<P STYLE="margin-bottom: 0in">                    case 3:</P>
+<P STYLE="margin-bottom: 0in">                       
+g.setColor(Color.magenta); 
+</P>
+<P STYLE="margin-bottom: 0in">                       
+g.drawLine((gd.getTime()/150) + 65,</P>
+<P STYLE="margin-bottom: 0in">                           
+(int)((float)cy-gd.getBytes()/10000),</P>
+<P STYLE="margin-bottom: 0in">                           
+(gd.getTime()/150) + 67,</P>
+<P STYLE="margin-bottom: 0in">                           
+(int)((float)cy-gd.getBytes()/10000));</P>
+<P STYLE="margin-bottom: 0in">                        break;</P>
+<P STYLE="margin-bottom: 0in">                    case 4:</P>
+<P STYLE="margin-bottom: 0in">                       
+g.setColor(Color.orange); 
+</P>
+<P STYLE="margin-bottom: 0in">                       
+g.drawLine((gd.getTime()/150) + 85,</P>
+<P STYLE="margin-bottom: 0in">                           
+(int)((float)cy-gd.getBytes()/10000),</P>
+<P STYLE="margin-bottom: 0in">                           
+(gd.getTime()/150) + 87,</P>
+<P STYLE="margin-bottom: 0in">                           
+(int)((float)cy-gd.getBytes()/10000));</P>
+<P STYLE="margin-bottom: 0in">                        break;</P>
+<P STYLE="margin-bottom: 0in">                    case 5:</P>
+<P STYLE="margin-bottom: 0in">                       
+g.setColor(Color.black); 
+</P>
+<P STYLE="margin-bottom: 0in">                       
+g.drawLine((gd.getTime()/150) + 105,</P>
+<P STYLE="margin-bottom: 0in">                           
+(int)((float)cy-gd.getBytes()/10000),</P>
+<P STYLE="margin-bottom: 0in">                           
+(gd.getTime()/150) + 107,</P>
+<P STYLE="margin-bottom: 0in">                           
+(int)((float)cy-gd.getBytes()/10000));</P>
+<P STYLE="margin-bottom: 0in">                        break;</P>
+<P STYLE="margin-bottom: 0in">		    case 99:  //This is reserved for
+resetting the Vector</P>
+<P STYLE="margin-bottom: 0in">			GData.removeAllElements();</P>
+<P STYLE="margin-bottom: 0in">			repaint();</P>
+<P STYLE="margin-bottom: 0in">                    default:</P>
+<P STYLE="margin-bottom: 0in">                        break;</P>
+<P STYLE="margin-bottom: 0in">                }</P>
+<P STYLE="margin-bottom: 0in">            }</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">        } catch (NoSuchElementException
+e) {</P>
+<P STYLE="margin-bottom: 0in">        }</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">    public void update(Observable o,
+Object arg) {</P>
+<P STYLE="margin-bottom: 0in">	paint(this.getGraphics());</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in">}</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">public class PerfMon extends Frame {</P>
+<P STYLE="margin-bottom: 0in">    private Vector GData = new
+Vector();</P>
+<P STYLE="margin-bottom: 0in">    private PerfMonCanvas pmc;</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">    public PerfMon(Observable notifier,
+int x, int y) {</P>
+<P STYLE="margin-bottom: 0in">	super(&quot;Bytes/Time Performance
+Monitor&quot;);</P>
+<P STYLE="margin-bottom: 0in">	addWindowListener(new DWAdapter());</P>
+<P STYLE="margin-bottom: 0in">	setBackground(Color.white);</P>
+<P STYLE="margin-bottom: 0in">	setLayout( new BorderLayout());</P>
+<P STYLE="margin-bottom: 0in">	setResizable(true);</P>
+<P STYLE="margin-bottom: 0in">	pmc = new PerfMonCanvas(notifier);</P>
+<P STYLE="margin-bottom: 0in">//	ScrollPane sp = new ScrollPane();</P>
+<P STYLE="margin-bottom: 0in">//	sp.add(&quot;Center&quot;, pmc);</P>
+<P STYLE="margin-bottom: 0in">//	add(sp);</P>
+<P STYLE="margin-bottom: 0in">	add(&quot;Center&quot;, pmc);</P>
+<P STYLE="margin-bottom: 0in">//	setSize(640, 480);</P>
+<P STYLE="margin-bottom: 0in">	setBounds(x, y, 640, 480);</P>
+<P STYLE="margin-bottom: 0in">//	setSize(1280, 960);</P>
+<P STYLE="margin-bottom: 0in">//	setSize(2560,1920);</P>
+<P STYLE="margin-bottom: 0in">	setVisible(true);</P>
+<P STYLE="margin-bottom: 0in">	show();</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">    public void setData(GraphData gd) {</P>
+<P STYLE="margin-bottom: 0in">	pmc.setGData(gd);</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">    public void customPaint() {</P>
+<P STYLE="margin-bottom: 0in">	pmc.customPaint();</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in"> 
+</P>
+<P STYLE="margin-bottom: 0in">    public void printGData() {</P>
+<P STYLE="margin-bottom: 0in">	pmc.printGData();</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">    public void resetGData() {</P>
+<P STYLE="margin-bottom: 0in">	pmc.resetGData();</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">    public void resetHostnames() {</P>
+<P STYLE="margin-bottom: 0in">	pmc.resetHostnames();</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in">	</P>
+<P STYLE="margin-bottom: 0in">    class DWAdapter extends
+WindowAdapter {</P>
+<P STYLE="margin-bottom: 0in">	public void windowClosing(WindowEvent
+event) {</P>
+<P STYLE="margin-bottom: 0in">	    //System.exit(0);</P>
+<P STYLE="margin-bottom: 0in">	    closeWindow();</P>
+<P STYLE="margin-bottom: 0in">	}</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in">    public void closeWindow() {</P>
+<P STYLE="margin-bottom: 0in">	this.dispose();</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in">    
+</P>
+<P STYLE="margin-bottom: 0in">    public static void main(String[]
+args) {</P>
+<P STYLE="margin-bottom: 0in">	Observable notifier = new
+PerfObservable();</P>
+<P STYLE="margin-bottom: 0in">	PerfMon f = new PerfMon(notifier,0,0);</P>
+<P STYLE="margin-bottom: 0in"> 
+</P>
+<P STYLE="margin-bottom: 0in">    }</P>
+<P STYLE="margin-bottom: 0in">}</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+<P STYLE="margin-bottom: 0in"><BR>
+</P>
+</BODY>
+</HTML>
+<BR>
+</BODY>
+</HTML>

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html lang="en-us" xml:lang="en-us">
+<head>
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type" />
+<meta name="copyright" content="(C) Copyright 2005" />
+<meta name="DC.rights.owner" content="(C) Copyright 2005" />
+<meta content="public" name="security" />
+<meta content="index,follow" name="Robots" />
+<meta http-equiv="PICS-Label" content='(PICS-1.1 "http://www.icra.org/ratingsv02.html" l gen true r (cz 1 lz 1 nz 1 oz 1 vz 1) "http://www.rsac.org/ratingsv01.html" l gen true r (n 0 s 0 v 0 l 0) "http://www.classify.org/safesurf/" l gen true r (SS~~000 1))' />
+<meta content="task" name="DC.Type" />
+<meta name="DC.Title" content="Upgrading a database" />
+<meta name="abstract" content="To upgrade a database, you must explicitly request an upgrade the first time you connect to it with the new version of Derby." />
+<meta name="description" content="To upgrade a database, you must explicitly request an upgrade the first time you connect to it with the new version of Derby." />
+<meta content="Upgrading Derby" name="DC.subject" />
+<meta content="Upgrading Derby" name="keywords" />
+<meta scheme="URI" name="DC.Relation" content="cdevupgrades.html" />
+<meta scheme="URI" name="DC.Relation" content="tdevpreupgrade.html" />
+<meta scheme="URI" name="DC.Relation" content="tdevupgradesoft.html" />
+<meta content="XHTML" name="DC.Format" />
+<meta content="tdevupgradedb" name="DC.Identifier" />
+<meta content="en-us" name="DC.Language" />
+<link href="commonltr.css" type="text/css" rel="stylesheet" />
+<title>Upgrading a database</title>
+</head>
+<body id="tdevupgradedb"><a name="tdevupgradedb"><!-- --></a>
+
+
+<h1 class="topictitle1">Upgrading a database</h1>
+
+
+
+<div><p>To upgrade a database, you must explicitly request an upgrade the
+first time you connect to it with the new version of <span>Derby</span>.</p>
+
+<div class="p">Do not attempt to upgrade a database without first backing it up.</div>
+
+<div class="section"> <p>To request an upgrade when connecting to the database:</p>
+</div>
+
+
+<div class="p"><span>Use the <samp class="codeph">upgrade=true</samp> database connection URL attribute,
+as shown in the following example:</span> <pre>jdbc:derby:sample;upgrade=true</pre>
+
+ Once the upgrade is complete, you cannot connect to the database
+with an older version of <span>Derby</span>.
+</div>
+
+
+<div class="section">You can find out the version of <span>Derby</span> using
+sysinfo:<pre>java org.apache.derby.tools.sysinfo</pre>
+Note that
+this is the version of <span>Derby</span>,
+not the version of the database. Sysinfo uses information found in the <span>Derby</span> jar files, so verify
+that only one version of <span>Derby</span>'s
+jar files are in your class path when you run this tool.</div>
+
+</div>
+
+<div>
+<div class="familylinks">
+<div class="parentlink"><strong>Parent topic:</strong> <a href="cdevupgrades.html" title="To connect to a database created with a previous version of Derby, you must first upgrade that database.">Upgrades</a></div>
+</div>
+<div class="reltasks"><strong>Related tasks</strong><br />
+<div><a href="tdevpreupgrade.html" title="">Preparing to upgrade</a></div>
+<div><a href="tdevupgradesoft.html" title="Soft upgrade allows you run a newer version of Derby against an existing database without having to fully upgrade the database. This means that you can continue to run an older version of Derby against the database.">Soft upgrade</a></div>
+</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,2521 @@
+
+
+
+INTERNET DRAFT                                                  Tie Liao
+Expires: 13 April 1999                                             INRIA
+                                                         13 October 1998
+
+
+
+         Light-weight Reliable Multicast Protocol Specification
+                      draft-liao-lrmp-00.txt
+
+
+Status of this memo
+
+   This document is an Internet-Draft.  Internet-Drafts are working
+   documents of the Internet Engineering Task Force (IETF), its areas,
+   and its working groups.  Note that other groups may also distribute
+   working documents as Internet-Drafts.
+
+   Internet-Drafts are draft documents valid for a maximum of six months
+   and may be updated, replaced, or obsoleted by other documents at any
+   time.  It is not appropriate to use Internet-Drafts as reference
+   material or to cite them other than as "work in progress".
+
+   To view the entire list of current Internet-Drafts, please check
+   the "1id-abstracts.txt" listing contained in the Internet-Drafts
+   Shadow Directories on ftp.is.co.za (Africa), ftp.nordu.net
+   (Northern Europe), ftp.nis.garr.it (Southern Europe), munnari.oz.au
+   (Pacific Rim), ftp.ietf.org (US East Coast), or ftp.isi.edu
+   (US West Coast).
+
+
+Abstract
+   This document describes LRMP, the Light-weight Reliable Multicast
+   Protocol. LRMP provides a minimum set of functions for end-to-end
+   reliable network transport suitable for bulk data transfer to
+   multiple receivers. LRMP is designed to work in heterogeneous
+   network environments and support multiple data senders. A totally
+   distributed control scheme is used for error recovery so that no
+   prior configuration and no router support are required. LRMP also
+   includes a selective feedback mechanism allowing to monitor the
+   quality of service at receivers. In LRMP, flow and congestion
+   control is performed based on NACK packets and congestion indication
+   from receivers. Forward error correction is supported as an
+   independent optional module.
+
+
+
+
+
+
+
+
+
+Liao                                                            [Page 1]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+Table of Contents
+
+   1.     Introduction ............................................    3
+   1.1    Application Scope .......................................    3
+   1.2    Overview ................................................    4
+   1.3    Implementation ..........................................    6
+   2.     Definitions .............................................    7
+   3.     Packet Types and Common Header Fields ...................    8
+   4.     Data Transmission .......................................   11
+   4.1    Reliable Data Transmission ..............................   11
+   4.2    Unreliable Data Transmission ............................   12
+   5.     Packet Loss Recovery ....................................   12
+   5.1    Organization of Subgroups ...............................   13
+   5.2    Enabling/disabling a Subgroup ...........................   14
+   5.3    Error Report ............................................   15
+   5.4    Duplicate NACK Detection ................................   17
+   5.5    Retransmission ..........................................   18
+   5.6    Reception Failure .......................................   20
+   5.7    Mean Round Trip Time Estimation .........................   21
+   6.     Sender and Receiver Reports .............................   23
+   6.1    Sender Report ...........................................   23
+   6.2    Selective Receiver Report ...............................   23
+   7.     Flow and Congestion Control .............................   25
+   7.1    Transmission Rate .......................................   26
+   7.2    Congestion Control ......................................   26
+   7.2.1  Adaptation to the Loss  .................................   26
+   7.2.2  Adaptation to the Congestion Indication from Receivers ..   27
+   7.2.3  Getting to the Equilibrium: Rate Increase ...............   28
+   7.3    The Case of Heterogeneous Receivers .....................   28
+   8.     Packet Formats ..........................................   29
+   8.1    Unreliable Data .........................................   29
+   8.2    Reliable Data ...........................................   29
+   8.3    Retransmission Data .....................................   30
+   8.4    FEC Redundant Data ......................................   31
+   8.5    Error Report ............................................   31
+   8.6    NACK Reply ..............................................   32
+   8.7    Sender Report ...........................................   33
+   8.8    Receiver Report Selection ...............................   34
+   8.9    Receiver Report .........................................   35
+   9.     Options for Forward Error Correction ....................   36
+   9.1    Parameters ..............................................   37
+   9.2    Packet Format ...........................................   37
+   10.    Security Considerations .................................   38
+   A.     Requirements of RFC 2357 ................................   40
+   B.     References ..............................................   43
+   C.     Acknowledgments .........................................   45
+   D.     Author's Address ........................................   45
+
+
+
+
+Liao                                                            [Page 2]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+1. Introduction
+
+   This document describes the Light-weight Reliable Multicast Protocol
+   (LRMP) version 1 which is intended to provide reliable multicast
+   transport service to applications. The reliable service means source
+   ordered and reliable data delivery on an end-to-end basis.
+
+1.1 Application Scope
+
+   Applications that require group communication are continuously
+   emerging. In group communication, data sent by one host should arrive
+   at multiple receivers. These applications can benefit from IP
+   Multicast [1] that allows one-to-many data delivery at network layer,
+   making optimization possible by replication of data at routers. LRMP
+   (version 1) is intended to be used for a subset of these applications
+   that have the following characteristics:
+
+     o large-scale communication group. The users participating in
+       group communication are generally dispersed in a wide area
+       network environment, thus their network links are heterogeneous,
+       i.e., the end-to-end transmission delay and bandwidth differ a
+       lot.
+
+     o large-size communication group. The number of users participating
+       in group communication may be potentially very large.
+
+     o loose time constraint. This means that the transmission delay is
+       not critical for applications. In another extreme, real time
+       audio and video conference applications need low transmission
+       delay in order for that audio and video data could be played in a
+       synchronized fashion.
+
+     o reasonable performance. These applications do not need to reach
+       very high data throughput, instead they need to keep data
+       transmission at a reasonable rate.
+
+     o loosely coupled group. Applications may join or leave the group
+       at any time and at any location.
+
+     o requiring that data is reliably delivered to receivers.
+
+   Typical applications include bulk data transfer (e.g., file
+   transfer), multicast chat and some kinds of collaborative work. These
+   characteristics allow to adopt conservative approaches when doing
+   error recovery and flow control in order to keep the total traffic
+   of a multicast session at a reasonable level with regard to data
+   traffic.
+
+
+
+
+Liao                                                            [Page 3]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+1.2 Overview
+
+   IP Multicast [1] provides point-to-multipoint datagram delivery
+   service to communicating hosts, i.e., transmission of datagrams from
+   a sender to a group of simultaneous receivers. IP Multicast itself is
+   not reliable, datagrams are not guaranteed to arrive at receivers and
+   in the order they are sent. In unicast case, reliable data delivery
+   is generally achieved by TCP [2] at the transport layer in the
+   Internet environment. In multicast case, reliable multicast transport
+   protocols are needed for applications requiring reliable data
+   transfer.
+
+   The Light-weight Reliable Multicast Protocol (LRMP) is intended to
+   offer end-to-end reliable network transport services suitable for
+   bulk data transfer to multiple receivers. While some TCP design
+   principles can be applied to reliable multicast, the design
+   philosophy for reliable multicast protocols is rather different.
+   Reliable multicast protocols have to offer good scalability,
+   otherwise they may be potentially dangerous to the Internet if used
+   in a wide scale [5].
+
+   A common approach for scalability is to replace positive
+   acknowledgements (ACK) by negative acknowledgements (NACK) [6]. This
+   can reduce considerably the volume of control traffic under normal
+   network conditions. However for large groups, this is insufficient
+   for several reasons. First, the number of NACK packets could still
+   be very high when packet loss occurs simultaneously at many
+   receivers. Second, the resulted control traffic and retransmitted
+   packets still go to every receiver in the group. In particular,
+   heterogeneous environments make these problems much worse. Other
+   techniques are necessary to further improve the scalability, such as
+   duplicate NACK and repair suppression [6], and local error recovery.
+
+   LRMP is intended to offer good scalability on the current
+   infrastructure of Internet, that is, no routers involved in error
+   recovery [10]. The generated control traffic and retransmissions
+   should be kept at a low level and in a limited scope. In case of
+   reception errors, error recovery is first restricted to its local
+   area, i.e., local group. If hopefully it can be done within the
+   local area, this will be transparent to the sender and receivers in
+   other areas. Local error recovery technique allows to isolate
+   reception errors in a limited region when possible. In this way, it
+   avoids that NACK and retransmitted packets travel across the whole
+   group.
+
+   In LRMP, there are no central control points, namely representatives,
+   every receiver plays a strictly equal role. Using centralized control
+   places constraints on flexibility [9] [10] [11]. Unless the router
+
+
+
+Liao                                                            [Page 4]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+   assisted control scheme can be applied, decentralized control is
+   more appropriate for a general use on the Internet. LRMP does not try
+   to rebuild a tree structure from the multicast tree, instead a
+   totally distributed control scheme is used. Local groups are formed
+   implicitly for local error recovery. Therefore all packets to form
+   local group and assign local group representatives are not necessary.
+   LRMP is a receiver-reliable transport protocol. Each receiver is
+   responsible for ensuring its correct reception of data while it may
+   be cooperative by allowing to send repair packets to its neighbors.
+   The failure at one receiver has generally not much to do with the
+   quality of service (QoS) at other receivers.
+
+   LRMP attempts to optimize the message exchange for error recovery.
+   For duplicate NACK and repair suppression, some basic mechanisms of
+   SRM [6] are adopted, including NACK based loss report, exponential
+   back-off timers for sending NACK and missing (repair) packets. While
+   there are no representatives in local recovery, a receiver can
+   dynamically play this role for a repair process in a local group.
+   This can further reduce the probability of duplicate NACK and repair
+   packets.
+
+   It is very difficult, if not impossible, to ensure both high
+   scalability and full reliability in a large scale. Note that at
+   present hosts on the Internet generally have very heterogeneous
+   network links. While one encounters failure in reception, others may
+   have perfectly received all packets. If the missing packets are
+   repeatedly transmitted for a few receivers by the transport protocol
+   while the session is going on, infinite buffer size is theoretically
+   required. LRMP is not intended to be fully reliable for an arbitrary
+   set of receivers, whereas applications could still employ some
+   specific mechanisms to cope with this problem, for example, using a
+   separate session for some particularly slow receivers. In LRMP,
+   receivers either successfully receive all packets or generate
+   reception error events in case of failure. Besides LRMP does not make
+   effort to recover missing packets that are transmitted before a
+   receiver joins a session.
+
+   In order to get feedback information from receivers, a sender
+   selective receiver report mechanism is included. That allows to
+   trigger the transmission of receiver reports while the required
+   bandwidth is totally under control. This technique is also called
+   sampling. Receiver reports can be considered in some sense as
+   positive ACKs and complement the NACK mechanism to make this
+   protocol fully reliable when the number of receivers is low.
+
+   LRMP uses a rate based flow and congestion control mechanism to
+   control the traffic sent to the network. Congestion control is
+   necessary to ensure that the network bandwidth is fairly shared among
+
+
+
+Liao                                                            [Page 5]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+   a number of competing data flows when network congestion occurs. The
+   flow and congestion control mechanism included in LRMP is intended to
+   be friendly and competitive with other data flows under flow and
+   congestion control such as TCP.
+
+   By the name, LRMP is intended to be light-weight. The protocol
+   overhead and control traffic is relatively low to increase the
+   efficiency in data transfer. LRMP is intended to be embeddable into
+   an application.
+
+   LRMP is designed, at least initially, not for use with real time
+   continuous media applications. The performance provided by LRMP,
+   e.g., the transmission delay and throughput, may not satisfy the
+   requirements of these applications. While LRMP is not aimed at
+   providing high performance, the data throughput and transmission
+   delay should be reasonable compared with the quality of service
+   provided by the underlying network.
+
+   This document does not provide any mechanisms either to do membership
+   control in group communications or to collect information about each
+   session member. Applications are free to join and leave the session
+   at any time and at any location.
+
+   In addition this document does not include any mechanism for
+   authentication and protection of information conveyed by the
+   specified protocol. But it does provide a description on security
+   constraints that should be taken into account by applications, see
+   section 10 for more details.
+
+1.3 Implementation
+
+   This specification is based on the lower layer network services that
+   provide identification of a transport end-point by a transport
+   address, transfer of data from or to the given transport address with
+   indication of received datagram length. A transport address is
+   composed of a network address and a port number. Typical example of
+   the target underlying network service is UDP/IP multicast.
+
+   All traffic including data and control is carried on the group
+   address and port unless otherwise noted. LRMP operates on a single
+   group address/port pair.
+
+   LRMP could be implemented as an independent module following the
+   layered design principles or as an integrated part of an application
+   following the principles of application level framing [7].
+
+   All integer fields are carried in network byte order, that is, most
+   significant byte (octet) first. This byte order is commonly known as
+
+
+
+Liao                                                            [Page 6]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+   big-endian. The transmission order is described in detail in [3].
+
+   Unless otherwise noted, numeric constants are in decimal (base 10).
+   All header data is aligned to its natural length, i.e., 16-bit fields
+   are aligned on even offsets, 32-bit fields are aligned at offsets
+   divisible by four, etc. Octets designated as padding have the value
+   zero.
+
+   Wallclock time (absolute time) is represented using the timestamp
+   format of the Network Time Protocol (NTP), which is in seconds
+   relative to 0h UTC on 1 January 1900 [4]. The full resolution NTP
+   timestamp is a 64-bit unsigned fixed-point number with the integer
+   part in the first 32 bits and the fractional part in the last 32
+   bits. In some fields where a more compact representation is
+   appropriate, only the middle 32 bits are used; that is, the low 16
+   bits of the integer part and the high 16 bits of the fractional part.
+   The high 16 bits of the integer part must be determined
+   independently.
+
+2. Definitions
+
+   Application: either a higher layer protocol entity or end user
+        program. It is the source and/or consumer of the data
+        transported by LRMP.
+
+   FEC: forward error correction, a mechanism that adds redundant
+        packets in the transmitted data stream so that partial missing
+        packets could be recovered without retransmission.
+
+   Subgroup: the set of protocol entities in a local region which is
+        reachable using a scope (TTL) value from a particular protocol
+        entity.
+
+   Local recovery: a scheme for requesting and sending missing packets
+        in a subgroup, i.e., whose scope value is less than the session
+        scope value.
+
+   LRMP entity: or protocol entity, an implementation of LRMP that is
+        able to send, receive and reply to LRMP data and control packets.
+
+   LRMP receiver: or simply receiver, an LRMP entity that makes efforts
+        to receive data packets sent by other LRMP entities.
+
+   LRMP sender: or simply sender, an LRMP entity that sends both data
+        and control packets.
+
+   LRMP session: or simply session, the association among a set of LRMP
+        entities. For each LRMP entity, the session is defined by a
+
+
+
+Liao                                                            [Page 7]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+        particular pair of destination transport addresses (one network
+        address plus a port). The destination transport address pair may
+        be common for all LRMP entities, as in the case of IP multicast,
+        or may be different for each, as in the case of individual
+        unicast network addresses plus a common port.
+
+   NACK: negative acknowledgement used to report missing packets.
+
+   Entity Identifier: a 32 bit integer that identifies the source of
+        LRMP packets. It is carried in LRMP packet header so as not to
+        be dependent upon the network address. All packets from a source
+        form part of the same sequence number space, so a receiver
+        groups packets by the entity identifier. An LRMP entity should
+        use the same identifier during the lifetime of an LRMP session.
+
+   TTL: time-to-live, a parameter used in sending IP multicast packets
+        to limit the scope of propagation.
+
+3. Packet Types and Common Header Fields
+
+   This section defines a minimal set of packet types for data transport
+   and control. Packets other than reliable data are sent in a best
+   effort way, that is, there is no mechanism to recover them. The
+   sender should retransmit these packets in need.
+
+   All packets from a single protocol entity should use the same entity
+   identifier. Otherwise they are considered coming from a different
+   entity.
+
+3.1 Common Fixed Header
+
+   All LRMP packets must contain the following fixed header, followed by
+   packet specific options:
+
+       0                   1                   2                   3
+       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |V=1|P|   PT    |    Scope      |            Length             |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |                           Entity ID                           |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+   The fields have the following meaning:
+
+   Version (V): 2 bits
+        This field identifies the version of LRMP defined by the current
+        specification which is one (1).
+
+
+
+
+Liao                                                            [Page 8]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+   Padding (P): 1 bit
+        If this bit is set, the packet contains one or more additional
+        padding octets at the end which are not part of the application
+        data. The last octet of the packet contains a count of how many
+        octets should be ignored.
+
+   Packet Type (PT): 5 bits
+        This field identifies the type of the packet.
+
+   Scope: 8 bits
+        This field indicates the time-to-live (TTL) value used to
+        transmit the packet.
+
+   Length: 16 bits
+        This field indicates the total length of the packet in number
+        of octets, including the header and data.
+
+   Entity ID: 32 bits
+        This field contains the entity identifier that uniquely
+        identifies the sender of the packet.
+
+   Additional packet specific options, if present, should immediately
+   follow this fixed header and should be of an integer number of 32 bit
+   words.
+
+3.2 Packet Types
+
+   The following packet type (PT) values are defined in this document
+   (for backward compatibility, the type values are not continuous):
+
+   Value        Type                   Abbreviation
+     0      Reliable Data                 DATA
+     4      Retransmission Data           R_DATA
+     8      Unreliable Data               U_DATA
+    12      FEC Redundant Data            F_DATA
+    17      NACK                          NACK
+    18      NACK Reply                    R_NACK
+    19      Sender Report                 SR
+    20      Receiver Report Selection     RS
+    21      Receiver Report               RR
+
+   The values not included in the above list are reserved for future use.
+
+3.3 Entity Identifier
+
+   Every protocol entity is assigned with an entity identifier which is
+   a randomly chosen 32 bit integer. The entity identifier must be
+   globally unique within a particular session. Though the probability
+
+
+
+Liao                                                            [Page 9]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+   of identifier collision is rather low in theory, to further minimize
+   collision errors, a protocol entity must detect whether or not there
+   is a collision between the received identifiers and its own each time
+   it receives a packet. In the case of collision, it's the receiver
+   which must change its identifier if another entity is a sender. If
+   the concerned protocol entities are receivers, they must all change
+   their identifiers to another randomly chosen identifier. It is
+   expected that the collision is resolved at the initialization phase
+   for senders, i.e., a sender sends several control packets before data
+   transmission to detect possible collisions.
+
+   At receivers, if a protocol entity sees that two senders use the same
+   identifier from different network locations, it should reject the one
+   which was heard later.
+
+   A protocol entity should use only one entity identifier during the
+   lifetime of a session. If it changes the identifier during a session,
+   it is considered as a completely new entity.
+
+   In data transmission, the entity identifier is used to identify the
+   data stream from a sender, i.e., the packets with the same entity
+   identifier form a data stream ordered by continuous sequence numbers.
+   So as to retransmissions by a third party, the original entity
+   identifier is included.
+
+3.4 Scope
+
+   The scope field of an LRMP packet should be set to the same TTL value
+   with that the packet is sent to the underlying network layer. In
+   LRMP, packets may be transmitted using different TTL values due to
+   local error recovery. The scope field is used by a receiver to
+   approximatively estimate the distance to the packet sender.
+
+3.5 Maximum Packet Length
+
+   Inadequate data fragmentation may introduce inefficiency in the
+   network and should be generally avoided [12]. Optimal solution
+   requires the cooperation of applications. Therefore proper data
+   fragmentation/reassembly are left to higher layer protocols to
+   perform.
+
+   LRMP places a upper bound on the maximum length of packets that can
+   be transmitted, in other words, the maximum transmission unit (MTU).
+   The MTU should be set to the minimum MTU of the network path. Modern
+   internet routers support larger and larger MTU than a decade before.
+   Consequently the maximum transmission unit in LRMP is set to 1400
+   octets, including packet header. Any packets larger than this length
+   are considered not valid and should be dropped by receivers. This
+
+
+
+Liao                                                           [Page 10]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+   gives also the advantage to optimize the buffer management at
+   receivers.
+
+3.6 Multiplexing
+
+   The length field is included in the packet header for multiplexing
+   several data or control packets into one outgoing packet sent to
+   the underlying network. It is not allowed to multiplex packets
+   with different scope value in one compound packet for obvious
+   reasons. LRMP entities need the indication of received data length
+   from the underlying network protocol to correctly parse multiplexed
+   packets, which is supported by most of UDP/IP implementations.
+
+4. Data Transmission
+
+   This section describes the data transmission mechanism that must be
+   implemented by a protocol entity.
+
+   LRMP provides a per packet selective reliability, i.e., application
+   data can be sent either reliably or in a best effort way. This allows
+   an application to use the same transport protocol to send reliable
+   and unreliable data. Application must indicate the reliability
+   (a boolean value) when sending data to LRMP.
+
+4.1 Reliable Data Transmission
+
+   In a normal operation scenario, a data source multicasts a number of
+   DATA packets to a session. Each DATA packet is ordered by a sequence
+   number. A receiver receives these data packets and delivers them to
+   the application if they are in order. If packet loss is detected,
+   the receiver sends a NACK packet to request the retransmission. Any
+   protocol entity that holds the requested lost packets will try to
+   send repair packets (see the next section).
+
+   In general, data packets, the first time transmitted, are sent to
+   the whole group, that is, the scope field should be set to the
+   time-to-live value of the session accordingly. This scope field
+   informs receivers the maximum TTL value which should be used to
+   report loss and do repair.
+
+   Each reliable data packet contains a sequence number and the sender's
+   entity identifier. The sequence number is increased by one for each
+   reliable data packet sent, except retransmission. At receivers,
+   a data packet is identified by the entity identifier and the sequence
+   number. All packets from a single source constitute a data stream.
+
+   The sequence numbers are rounded to 32-bit unsigned integer, thus
+   when overflow occurs, they must take a modulo to 2^32. A sender
+
+
+
+Liao                                                           [Page 11]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+   should generally choose a non-zero random number as the initial
+   sequence number. A receiver learns the initial reception sequence
+   number at the time it joins the session. Therefore LRMP implementors
+   should be aware of that the initial outgoing sequence number and the
+   initial incoming sequence number may be different for a particular
+   data sender and receiver.
+
+   At receivers, the sequence numbers are used to correctly order
+   packets that may be received out of order and to eliminate
+   duplicates. A protocol entity should implement the reordering of
+   received packets before delivering them to the application. An
+   entity should also provide applications with capabilities to
+   configure this option out, so that packets are delivered in
+   reception order.
+
+   Reliable data transmission is subject to flow and congestion control
+   which is described in section 7. Data sender can send FEC encoded
+   redundant data with the original data stream, see section 9 for
+   more details.
+
+4.2 Unreliable Data Transmission
+
+   Unreliable packets are not subject to flow control at the sender side
+   and not subject to sequence control at the receiver side. They can be
+   considered as out-of-band packets which are delivered in priority but
+   without guarantee of arrival at receivers. Due to this particularity,
+   unreliable packets are expected to be sent occasionally by an
+   application.
+
+   When an unreliable packet is received by a receiver, it should be
+   delivered immediately to the application. In addition a receiver does
+   not need to cache such packets in the buffer.
+
+5. Packet Loss Recovery
+
+   To avoid to generate unnecessary traffic in the whole group, the
+   repair of lost packets is first carried out in local regions. To do
+   this, a session is divided by a particular receiver into a number of
+   subgroups. For a protocol entity, a subgroup represents a subregion
+   limited by a distance radius. Packets sent to a subgroup can not
+   reach other entities outside the subgroup. By limiting error recovery
+   in a subgroup, reception errors could be isolated. Local recovery can
+   be performed by alternating the IP scope value in transmission of
+   packets.
+
+
+
+
+
+
+
+Liao                                                           [Page 12]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+5.1 Organization of Subgroups
+
+   Yet another way to define the distance between two hosts is to use
+   the number of hops, in other words, the number of intermediate
+   routers that data packets should transit from the source to the
+   destination. The propagation of an IP datagram is controlled by a
+   scope value, also known as the time-to-live parameter. This scope
+   value can be thus used to control the radius of distance that a
+   multicast packet can reach. In practice, a multicast session is
+   always created with a scope value to indicate at which scope the
+   session is addressed.
+
+   There is a trade-off between the number of subgroup hierarchies and
+   the efficiency of error recovery. More the number of hierarchies,
+   finer the local error recovery but larger the error recovery time.
+   It could be possible to configure the subgroup hierarchies at
+   runtime by an application, a protocol entity uses by default the
+   following rule for organization of subgroups. Given the time-to-live
+   value (the nominal TTL) for a session, the session must be organized
+   into the following hierarchical subgroups:
+
+     o the whole group at TTL
+     o subgroup at 63 if TTL > 63
+     o subgroup at 47 if TTL > 47
+     o subgroup at 15 if TTL > 15
+
+   The top level, i.e., the whole group, must be present in every
+   session. A descendant subgroup is created only if the nominal TTL is
+   greater than the subgroup TTL value. Therefore there could be at
+   maximum four levels of subgroups. For example, a session with TTL
+   value 63 has three levels. A session with TTL value less than and
+   equal to 15 has only one level subgroup. A subgroup contains another
+   subgroup if its ttl value is greater than the latter.
+
+   Every LRMP packet carries a scope field equal to the ttl value with
+   that the packet is sent to the underlying network. So when a receiver
+   receives a packet (data or control), it knows that the packet sender
+   is surely within a distance less than the scope value carried in the
+   packet. The scope field allows a protocol entity to determine whether
+   or not the packet sender belongs to one of its subgroups. It remains
+   constant during transmission, it should not be confused with the
+   scope field in IP datagrams.
+
+   It is possible that the multicast route between two hosts is
+   asymmetric, i.e., the number of hops from host A to host B may be
+   different from that from host B to host A. As the gap of the subgroup
+   ttl value is enough large, in a given subgroup, if host A can reach
+   host B, it is most probable that host B can also reach host A.
+
+
+
+Liao                                                           [Page 13]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+   Error recovery should be performed within subgroups in increasing
+   distance (ttl) order, i.e., first in the lowest level subgroup, then in
+   the second level subgroup and finally in the whole group. In each
+   subgroup, every receiver plays a strictly equal role, there is no
+   subgroup leader. So no join or leave messages are necessary to
+
+   explicitly form subgroups while they may still be implemented by
+   applications in case of strong membership control.
+
+   Each protocol entity is responsible for recovery of its own lost
+   packets. However it should keep track of the control messages
+   received from other protocol entities to eventually cancel the
+   duplicates of control and repair packets.
+
+5.2 Enabling/disabling a Subgroup
+
+   To avoid unnecessary error report to a subgroup, first of all, a
+   protocol entity should use the heuristic algorithm described here to
+   determine whether or not an error could be recovered in a given
+   subgroup. Basically if there are no other protocol entities within
+   a subgroup, certainly no need to do error recovery in that subgroup.
+   If there are other protocol entities in a subgroup, errors may or may
+   not be recoverable in that subgroup. A receiver enables a subgroup if
+   it considers that there are some chances to recover errors in that
+   subgroup, or disables otherwise. The enable/disable mechanism allows
+   to improve the error recovery time for missing packets.
+
+   Enable conditions
+
+   Given a subgroup, enable it if one of the following conditions is
+   true:
+
+     o at start-up.
+
+     o a repair packet with the subgroup ttl is heard.
+
+     o the disabled time is greater than the maximum disabled time,
+       e.g., 3 minutes.
+
+   The last condition is to prevent the deadlock, that is, all subgroup
+   members are in the disabled state. In this case, no receivers will
+   send error report packets within that subgroup. So a timeout
+   mechanism is necessary to retrigger the error recovery in that
+   subgroup.
+
+   Disable condition
+
+   Given a subgroup, disable it if the number of successive subgroup
+
+
+
+Liao                                                           [Page 14]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+   scoped error report packets without subgroup scoped reply is greater
+   than or equal to a prefixed number, 5.
+
+   The whole group must never be disabled since the sender is surely
+   there and will reply to error report packets. If a subgroup is
+   disabled for any reason, a receiver should jump to the next higher
+   level subgroup to do error recovery.
+
+5.3 Error Report
+
+   The protocol makes no effort to recover packets that were sent before
+   a receiver joins the session. The sequence number of the first DATA
+   packet or extracted from a SR (sender report) packet is considered
+   as the starting sequence number for a particular sender.
+
+   A receiver detects packet loss either by checking if there is a gap
+   between the sequence numbers of successive received packets or the
+   sequence number given by a SR (sender report) packet does not
+   correspond to the expected sequence number for that sender.
+
+5.3.1 Algorithm
+
+   When packet loss is detected, error report is carried out from the
+   lowest level subgroup to the whole group until the loss is recovered
+   or the number of maximum tries is reached. An exponential back-off
+   timer is used for duplicate NACK suppression. The subgroup to start
+   error recovery is the lowest level subgroup which is in the enabled
+   state. Given the starting subgroup Gi, a receiver must use the
+   following algorithm to report packet loss by sending a NACK packet,
+
+     1. Set the number of tries (N) to 0.
+
+     2. Schedules a random timer whose value is uniformly distributed
+        in the range [t1, 2*t1], where t1 = MRTT*2^N and MRTT is the
+        estimated mean round trip time to other protocol entities
+        reachable in the subgroup Gi.
+
+     3. During the timer period, if a NACK packet which contains the
+        local NACK is received (see section 5.3.3), goto step 5.
+
+     4. When the timer expires, if all lost packets have been received,
+        the repair process terminates, otherwise send a NACK packet to
+        the subgroup Gi.
+
+     5. Then check
+
+        o if the subgroup level is not the highest level, the subgroup
+          level is increased by one, i <= i + 1, goto step 1;
+
+
+
+Liao                                                           [Page 15]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+        o if the subgroup level is the highest level, the number of
+          tries (N) is increased by one, N <= N + 1. If the number of
+          tries is greater than or equal to 8, the repair process is
+          abandoned. Otherwise goto step 2.
+
+   The loss report should be sequential, that is, the lost packets with
+
+   lower sequence number should be reported first. Unless the current
+   repair process is terminated normally or abnormally, next loss report
+   should not be started. In the worst case, an error report could be
+   carried out once in each subgroup, and eight times in the whole
+   group.
+
+5.3.2 Timer Adjustment
+
+   As the protocol uses a rate based flow control mechanism (see section
+   7), the repair packet sender will send data generally in regular time
+   interval. When a NACK packet is received, it is possible that the
+   first repair packet will be sent only after a transmission interval.
+   To avoid to send excessive NACK packets, a transmission interval
+   should be added to the timer value if a NACK packet was already sent
+   or heard from the network.
+
+   For estimation of the transmission interval used by a particular
+   sender, see section 6.1.
+
+5.3.3 Duplicate NACK Suppression
+
+   A NACK packet is said containing another NACK packet if they are for
+   the same sender and the reported lost sequence numbers are a superset
+   of the latter. The former is called a super NACK of the latter. For
+   example, given the following two NACKs (see section 8.5) for the same
+   sender,
+
+        NACK A: lowest seqno = 34567
+                bitmask = 0x000000ff
+
+        NACK B: lowest seqno = 34570
+                bitmask = 0x0000000f
+
+   NACK A contains NACK B.
+
+   If a super NACK packet is heard from the network, a receiver does not
+   need to send its NACK since its lost packets are reported by that
+   NACK. Therefore the receiver must not send its NACK packet when the
+   current timer expires, but should schedule the next NACK timer to
+   keep the repair process active. When the next timer expires, the
+   receiver must still suppress its NACK in the following cases, since
+
+
+
+Liao                                                           [Page 16]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+   the NACK sender will probably send it again if the lost packets have
+   not been repaired:
+
+     o Another super NACK was heard in this timer period.
+
+     o The receiver did not send a NACK at previous timeouts in the
+       current repair process.
+
+     o Its entity identifier is higher than that of the super NACK
+       packet heard in the last timer period.
+
+   This procedure is intended to further reduce the probability of
+   duplicate NACK packets at the following timeouts. Therefore when
+   multiple receivers encounter the same lost packets, the receiver with
+   the shortest timer value and with the lowest entity identifier will
+   act as a representative in that loss repair process.
+
+   To prevent the NACK sender leaving the group or behaving abnormally, 
+   a receiver should not stop the repair process when a super NACK
+   packet is heard and should apply the above delay procedure for at
+   most next two timer periods.
+
+5.3.4 Other Delay Conditions
+
+   When the NACK timer expires, a receiver should delay the transmission
+   of NACK packet and schedules another timer in the following cases,
+
+     o The first lost packet has been received, it is possible that
+       succeeding repair packets are queued for transmission at the
+       responder side and will arrive soon, except that a R_NACK was
+       received that excludes this possibility.
+
+     o A R_NACK was received during the timer period but the repair
+       packets are not yet received.
+
+5.4 Duplicate NACK Detection
+
+   A newly received NACK packet is considered as duplicate if a super
+   NACK packet (containing this one) was received just before.
+   Duplicates may occur under one of the following conditions:
+
+     o two (or more) protocol entities have a timeout time in an
+       interval which is less than the packet propagation time from
+       one to another.
+
+     o variable packet propagation time.
+
+
+
+
+
+Liao                                                           [Page 17]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+     o due to packet loss, a receiver did not see the NACK packet sent
+       by another entity.
+
+   To distinguish duplicate NACK packets and not to deteriorate the
+   error recovery time, a straightforward way is the following: given
+   the time t1 when the last NACK packet was received and the time t2
+   when the same reporter will issue the next NACK if the loss is not
+   repaired, all NACK packets received between t1 and t2 could be
+   treated as duplicates. This way, at least a successive NACK sent by
+   the same reporter will not be confused with duplicates. The time
+   interval (t2 - t1) between sending two NACK packets by a same
+   reporter is greater than twice the mean round trip time plus a
+   transmission interval. Therefore a protocol entity should treat a
+   newly received NACK packet as duplicate if there is a super NACK
+   packet which was received within an interval equal to twice the mean
+   round trip time plus a transmission interval.
+
+5.5 Retransmission
+
+   LRMP entities keep recently sent and received data packets in their
+   buffer space. The total size of the buffer, depending on the used
+   transmission rate, should be enough large to allow loss repair.
+   It is recommended that the buffer size should correspond to 10
+   seconds - 1 minutes of data packets at the full specified
+   transmission rate (e.g., between 80 KB and 480 KB at 64 kb/s).
+
+   A NACK packet allows to report a number of adjacent lost packets and
+   contains a scope field that should be used by the NACK responder to
+   restrict the retransmissions to the same scope.
+
+   Upon receipt of a NACK packet, a protocol entity is said eligible for
+   sending repairs if it holds a part of the requested lost packets. An
+   eligible entity must check first if the NACK is a duplicate for the
+   purpose to eliminate possible duplicate retransmissions. If a NACK is
+   duplicate, it should be ignored.
+
+5.5.1 Algorithm
+
+   If a NACK is not duplicate, an eligible protocol entity schedules a
+   random timer whose value is uniformly distributed in the range
+   [MRTT, 2*MRTT], where MRTT is the estimated mean round trip time to
+   other protocol entities reachable in the corresponding subgroup. When
+   the timer expires, if the lost packet(s) or a R_NACK (NACK reply)
+   packet have not been heard from other protocol entities, the protocol
+   entity sends first a R_NACK and then the lost packet(s).
+
+   To further improve the performance and reduce the number of duplicate
+   repair packets, the original sender applies a different algorithm.
+
+
+
+Liao                                                           [Page 18]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+   When the sender receives a NACK packet, it checks if this is a
+   duplicate. If it is not, the sender should send immediately the
+   repair packets since one and only one protocol entity will respond
+   immediately.
+
+   In addition, if the scope field of a NACK packet is the session TTL,
+   all receivers must not reply to the NACK packet and expect that the
+   original sender will send the repair(s) with no delay. This will
+   eliminate duplicate repair packets at the session scope level.
+
+   This scheme will get still better performance if there is one fixed
+   protocol entity responsible for error control in each subgroup. This
+   means if a unique entity can apply the retransmission algorithm of
+   the original sender in a subgroup, for example, the router or a
+   designated receiver, the error recovery time and duplicate repairs
+   will be get even better.
+
+5.5.2 Sending NACK reply
+
+   Before sending the repair data (R_DATA) packets, the protocol entity
+   should first send a NACK reply packet. This packet is used to
+   identify the repair packet sender and also used to measure the round
+   trip time between the NACK sender and the repair packet sender.
+
+   NACK reply packets allow in addition fast partial repair. It is
+   possible that a receiver holds only a part of the reported lost
+   packets. In this case, it is desirable that this receiver will send
+   this part while the remaining lost packets can be repaired by other
+   entities or in a higher level subgroup. In the NACK reply packet, the
+   LRSN field should be set to the sequence number of the first repair
+   packet and the BFRP field to the bitmask of the following repair
+   packets, see section 8.6.
+
+   Upon reception of a NACK reply packet, the error reporter can
+   determine which packets can not be repaired in the corresponding
+   subgroup and can report them to a higher level subgroup. For example,
+   suppose that the first lost sequence number and the first repair
+   sequence number is the same, the bitmask of the remaining lost
+   packets can be determined by,
+
+       loss_bitmask &= ~repair_bitmask;
+
+5.5.3 Sending Repairs
+
+   If a receiver is able to send repair packets to its neighbors, it
+   must keep the original data packets intact. Otherwise it should
+   not respond to NACK packets. LRMP implementors should be aware that
+   accepting packets retransmitted by a third-party represents an
+
+
+
+Liao                                                           [Page 19]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+   additional vulnerability to malicious attacks.
+
+   Repair packets should be scoped within the same subgroup as the
+   received NACK packet. They should be transmitted with higher priority
+   than the transmission of new data. In addition, retransmissions are
+   subject to the same flow and congestion control as in data
+   transmission, see section 7.
+
+5.5.4 Duplicate Repair Suppression
+
+   In order to avoid duplicate repair packets, all receivers eligible to
+   respond to the NACK packet should use NACK reply packets to detect
+   possible multiple responses. Since an entity should send first a NACK
+   reply before sending the repair packets, upon receipt of such a
+   packet, other entities can determine whether there will be duplicate
+   repairs if they participate in sending repairs. Thus when a NACK
+   reply is received, if a receiver has not yet send a NACK reply, it
+   should cancel its reply process. Otherwise if its entity identifier
+   is higher than that of the NACK reply sender, it must cancel its
+   response, even if they have started to send the repair packets.
+
+   In absence of NACK reply packets, for example, due to loss, if
+   repair packets are heard from the network, a receiver should still
+   cancel its own retransmissions if its identifier is higher than that
+   of the repair sender.
+
+   In any case, if a NACK reply packet or repair packets are heard from
+   the original sender, all other entities must cancel their reply and
+   retransmissions. It is considered that the original sender has the
+   highest priority in sending repair packets.
+
+5.6 Reception Failure
+
+   Reception failure is an event generated when a receiver can not
+   synchronize with the data stream sent by a sender. Reception
+   failures occur in case of network partition or congestion (a
+   receiver behind a slow link), specifically under the following
+   conditions:
+
+     o when the number of timeouts for a loss event (NACK timer)
+       reaches a threshold, repair packets have still not been received.
+       This threshold depends on the number of error recovery subgroups
+       and has a maximum value of 10.
+
+     o there is a too large difference between the currently received
+       sequence number and the expected sequence number so that the
+       cache space is insufficient to hold all packets between this
+       difference, which is required for error recovery.
+
+
+
+Liao                                                           [Page 20]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+     o there is a too large difference between the sequence number
+       announced by a sender report packet and the expected sequence
+       number.
+
+   When a reception failure is encountered, a receiver should not try
+   anymore to repair the current missing sequence number, instead it
+   should try to synchronize with the current sequence number of the
+   data stream. Otherwise the sender may not respond to its request
+   for retransmission.
+
+   In addition, a receiver should notify the application a reception
+   failure event. Some applications may need this notification to drop
+   incomplete data objects. It is desirable that higher layer protocols
+   might include mechanism for retransmission of missing data objects
+   according to the degree of importance.
+
+5.7 Mean Round Trip Time Estimation
+
+   The sender does not necessarily need to know the round trip time to
+   the receivers for error recovery except for other purposes since it
+   always immediately sends repair packets. Otherwise the round trip
+   time plays an extremely important role in sending error reports and
+   repairs.
+
+   When sending error reports in a subgroup, a receiver generally
+   does not know who will send repair packets. Thus it uses the mean
+   round trip time to schedule error reports, so does the repair packet
+   sender. All receivers should carefully estimate the mean round trip
+   time values to make the error recovery algorithm work more
+   efficiently. LRMP offers some mechanism for this purpose.
+
+   At start-up, the initial mean round trip time for each subgroup
+   should be set to a relatively conservative value using the following
+   expression:
+
+       MRTT = 200*(scope/63)^2 milliseconds
+
+   where the upper bound is set to 800 milliseconds and the lower bound
+   is set to 12 milliseconds. Consequently the groups at world, region
+   and local site scope have approximatively the following initial mean
+   round trip time values,
+
+     o MRTT at scope <= 15: 12 milliseconds.
+     o MRTT at scope 63: 200 milliseconds.
+     o MRTT at scope >= 127: 800 milliseconds.
+
+   The mean round trip time will get closer to its true value in the
+   repair processes. NACK and NACK reply packets allow to measure the
+
+
+
+Liao                                                           [Page 21]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+   round trip time between the NACK sender and its responder. Each NACK
+   packet carries a timestamp value (t1) which indicates the local time
+   the NACK packet is sent. When a protocol entity sends the NACK reply
+   packet, it puts this timestamp (t1) and the delay since the NACK
+   packet was received into the reply packet. Upon reception of the NACK
+   reply, the receiver can get a rough estimation of the round trip time
+   as follows:
+
+   NACK sender    t1 (NACK)              t2 (NACK_REPLY)
+            ------|-----------------------|---------
+                   \                     /
+                    \                   /
+            ---------|-----------------|------------
+   NACK responder    |<---- delay ---->|
+
+       RTT = t2 - t1 - delay
+
+   The mean round trip time in the corresponding subgroup is estimated
+   using the following expression:
+
+       MRTT = ALPHA*MRTT + (1 - ALPHA)*RTT
+
+   where ALPHA is a smoothing factor set to 0.875. To avoid
+   multiplication, the above formula can expressed as,
+
+       MRTT = MRTT + ((RTT - MRTT) >> 3)
+
+   There are two interesting side effects resulted from this scheme.
+   When the network is not congested, the measured round trip time RTT is
+   generally lower than the initial value that is relatively high. After
+   a receiver sent a NACK packet and has received the repair packet, it
+   will hold a mean round trip time lower than those never send a NACK
+   packet. The next time packet loss occurs in that domain, it is most
+   probably this receiver that will first timeout and send the NACK
+   packet. This receiver will then get the mean round trip time even
+   lower. In this way error report will tend to be done by a small
+   number of receivers. This is a desirable behavior since there will be
+   less concurrency in error report and the mean round trip time will
+   get more realistic.
+
+   When the network is congested, it is possible that the measured round
+   trip time is larger than or around the initial value. In that case,
+   error report will be carried out eventually by all receivers. It is
+   more difficult to make the mean round trip time realistic.
+
+
+
+
+
+
+
+Liao                                                           [Page 22]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+6. Sender and Receiver Reports
+
+6.1 Sender Report
+
+   Sender report packets are intended to provide receivers with the
+   current state in data transmission such as the highest sequence
+   number reached, the number of packets and that of octets sent since
+   the beginning of the session. By analyzing a sender report, a
+   receiver can figure out how many packets or octets it has missed and
+   whether it is synchronized with the data transmission.
+
+   A data sender should send some sender report packets in the following
+   cases:
+
+     o before the first time it will send data or it will begin to send
+       data after a long silent time. This is to inform receivers the
+       starting sequence number that will be used in the data
+       transmission that follows. Thus a receiver can determine whether
+       or not it has missed some starting packets.
+
+     o periodically send a sender report during the data transmission
+       to provide some statistics information to receivers. In this
+       case, the sender sends either a report every two seconds or for
+       every quarter of the send window data sent.
+
+     o at the end of bulk data transfer. A sender report informs what
+       is the end sequence number so that receivers can determine
+       whether or not it has missed a portion of ending packets.
+
+   When the data sender enters in idle state, i.e., it has no more data
+   to send, the interval at which sender reports are sent should be
+   doubled every time until the idle time reaches five minutes.
+
+   The actual transmission rate at which the sender sends data can be
+   computed from two successive sender reports. That is, the difference
+   between the octet counts divided by the time interval. The later can
+   be derived from the timestamp field.
+
+   Similarly the transmission interval can also be calculated from two
+   successive sender reports. That is, the difference between the packet
+   counts divided by the time interval.
+
+6.2 Selective Receiver Report
+
+   Receiver reports are useful for both sender and receivers. They have
+   multiple purposes. First they are used for estimation of the session
+   population. It could be interesting to know how many participants are
+   actually in a session. Based on this estimation, the sender could
+
+
+
+Liao                                                           [Page 23]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+   decide, for example, to go on or stop the session.
+
+   Receiver reports are also used to get quality of service feedback
+   from receivers, such as the loss rate, the number of packets and
+   octets received. The feedback can be used to do flow and congestion
+   control and adjust other transmission parameters, for example, the
+   redundancy in the data stream. In addition they allow to know where
+   there is a serious reception problem.
+
+   By default receivers should not send receiver reports. A data sender
+   sends a RS (receiver report selection) packet to tell receivers how
+   to send receiver reports. The following ways are prescribed here for
+   sending receiver reports:
+
+     o a receiver sends once a report with a specified probability.
+       This probability could be adapted by the sender to the number of
+       receivers in a session.
+
+     o a receiver sends a report periodically, but the total traffic
+       (generated by receiver reports) is limited to a small percentage
+       of the total bandwidth, i.e., 5%, like in RTP [23].
+
+   A receiver report selection packet contains a list of receivers
+   which selects the receivers which should send receiver report(s).
+   The list can be either a list of entity identifiers or a wild card
+   address (0xffffffff). If it is a wild card address, that means that
+   all receivers are selected. Otherwise only those whose identifier
+   is among the list are selected. The selected receivers should use
+   the probability and report interval parameters contained in the RS
+   packet to control whether and how to send receiver report(s).
+
+   If the probability field is set to zero, the selected receivers
+   should send receiver reports periodically at the specified interval.
+   However if the total traffic generated by control packets is above
+   the bandwidth limit (5%), a receiver should calculate the report
+   interval with respect to the bandwidth limit.
+
+   If the probability field is greater than zero, the selected receivers
+   should should use a random event generator (by means of a random
+   value generator) to trigger whether or not they should send a report.
+   If an event is generated with the given probability, the receiver
+   should send only once a report.
+
+   If both the probability and interval fields are set to zero, this
+   packet must be interpreted as an unselect packet, that is, the
+   selected receivers should stop sending receiver reports triggered
+   by the previous receiver report selection packet.
+
+
+
+
+Liao                                                           [Page 24]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+   In all cases, the report interval should be randomized to avoid
+   receiver report implosion. The randomized interval should be
+   uniformly distributed in the range [I/4, I], where I is the interval
+   given by the RS packet.
+
+   The receiver report selection is sender specific, that is, a sender
+   can select receivers to send reports just for itself, not for other
+   senders. The settings carried in an RS packet remain valid until
+   another RS packet modifies them. If it is absolutely necessary to
+   modify current settings, the sender should send the new RS packet
+   more than once to prevent possible loss.
+
+   To have an approximative estimate of the session population, the
+   probability field could be set to a non zero value and the list of
+   receivers set to a wild card address. After the time corresponding
+   to the interval field of the packet has elapsed, both the sender
+   and receivers can estimate the number of receivers using the
+   following expression,
+
+       population = number of responders/probability.
+
+   Note that due to possible packet loss, the real population is 
+   generally greater than this estimate.
+
+   The round trip time RTT between a sender and a receiver can also be
+   measured using a pair of sender report and receiver report, similar
+   to the mechanism described in section 5.7.
+
+7. Flow and Congestion Control
+
+   Flow and congestion control constitutes a vital component of this
+   protocol. First applications need flow control to adjust the
+   transmission rate so that the data flow does not go above the
+   processing capacity of the application. Otherwise packets may be lost
+   at end hosts due to lack of processing power. Second the network can
+   generally offer limited throughput. Even if there is a single data
+   flow, it should still be adapted to the available network bandwidth,
+   generally limited by the most bottleneck network path, to avoid
+   congestion and achieve better performance. Third when there are
+   several data flows in the network, it is extremely important that one
+   flow does not shutdown the others. Instead the network bandwidth
+   should be fairly shared among them. Besides a data flow should be
+   competitive to ensure the responsiveness for applications. The
+   rate-based control mechanism described here is intended to be
+   friendly with other data flows under flow and congestion control
+   such as TCP.
+
+
+
+
+
+Liao                                                           [Page 25]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+7.1 Transmission Rate
+
+   Data transmission and retransmission must be kept within a range
+   specified by an application, in form of [Rmin, Rmax], where Rmin
+   and Rmax are the lower and upper bounds of the data rate. If an
+   application does not specify the rate range, the default range
+   should be applied, for example, in [8 kbits/s, 64 kbits/s]. While the
+   specification of rate range requires some experience in network
+   communications, it is not a difficult task in most cases.
+
+   At startup, the data rate R should be increased gradually up to the
+   maximum rate, similar to the slow start in TCP [14]. The initial
+   rate should be set to (Rmin + Rmax)/2. Then for every eighth of send
+   window data sent, increase the rate by 0.125R if no contrary
+   indications. Under normal network conditions, the data rate will
+   reach the maximum rate at most after an amount of data corresponding
+   to one and half send window have been sent.
+
+   As a closed-loop approach is adopted, if the network is partitioned
+   near the sender, no feedback will be returned from the network. In
+   this case, it is desirable that the sender keeps the transmission
+   at the minimum rate.
+
+7.2 Congestion Control
+
+   Flow and congestion control is performed at the sender side according
+   to the feedback information gathered from the network. A network
+   congestion problem can be reflected by the following parameters:
+
+     o the information carried in NACK packets, such as the lowest lost
+       sequence number and the bitmask. Congestion will cause more
+       packets being lost, thus the number of retransmissions will
+       increase.
+
+     o indication from receivers. Due to local error recovery,
+       additional traffic can be generated in local region that will not
+       be seen by the sender. This may result in local congestion
+       problem which needs to be reported to the sender.
+
+   A sender generally maintains transmitted data in its buffer space,
+   called send window, for possible retransmissions. Congestion control
+   should function adaptively with regard to the above parameters and
+   the send window size.
+
+   To reduce unnecessary oscillations of the transmission rate, two
+   adjustment operations should not be performed in too small time
+   interval. It is recommended that adjustments are regularly carried
+   out for every eighth of send window data sent.
+
+
+
+Liao                                                           [Page 26]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+
+7.2.1 Adaptation to the Loss
+
+   NACK packets can be used together with send window to limit the
+   number of outstanding packets in the network, similar to ACK packets
+   used in unicast. However the number of NACK packets heard from the
+   network may not timely indicate a congestion problem due to NACK
+   suppression and the fact that one NACK packet can report more than
+   one lost packets. Congestion control that only makes use of this
+   information will not respond quickly to congestion problem. But the
+   lowest sequence number requested for retransmission by a NACK packet
+   can be a good indication of congestion problem.
+
+   If the lowest sequence number requested for retransmission is going
+   out of the range maintained within the send window, that means that
+   the sender is going ahead too fast and the error recovery will be
+   soon impossible. If the sender does not slow down the data
+   transmission, some receivers will not be able to synchronize with the
+   data flow.
+
+   To respond to this problem, a sender should calculate the difference
+   between the current sequence number in transmission and the lowest
+   sequence number requested for retransmission by a NACK packet. The
+
+   rate should be adjusted as follows, given the current rate R:
+
+     o If the difference is greater than half send window size, the
+       transmission rate should be reduced to R/4.
+
+     o If the difference is greater than one third of send window
+       size, the transmission rate is reduced to R/2.
+
+     o If the difference is greater than a quarter of send window
+       size, the transmission rate is reduced to 3R/4.
+
+   If the rate is not decreased according to the above criteria,
+   it should not be increased at the next adjustment in presence
+   of loss.
+
+7.2.2 Adaptation to Congestion Indication from Receivers
+
+   As described above, additional flow and congestion control is needed
+   for the following reasons. First a receiver may not be able to
+   synchronize with the data flow due to the fact that the application
+   can not timely process received data. That may cause receive buffer
+   overflow. Second the traffic introduced by local error recovery may
+   cause local congestion problem. Congestion indication from receiver
+   is intended to report possible local congestion problem that is
+
+
+
+Liao                                                           [Page 27]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+   useful for congestion avoidance. It was first proposed by [15].
+
+   The congestion flag in receiver report is used for this purpose.
+   It should be set if the difference between the last sequence number
+   delivered to the application and the highest sequence number heard
+   from the sender is greater than half the receive window (buffer)
+   size. This means that the number of outstanding packets is going to
+   be too high so that the receiver will not be able to repair loss due
+   to lack of buffer space. It is thus desirable for the sender to
+   reduce the transmission rate in this case.
+
+   Upon reception of a congestion indication, a sender should reduce
+   the transmission rate to R/2 [22].
+
+7.2.3 Getting to the Equilibrium: Rate Increase
+
+   If no decrease condition is true and no loss is reported, as
+   described above, and one eighth of send window time has elapsed since
+   the last decrease or increase, the rate should be increased by a
+   factor of 0.125 (1/8) up to the maximum rate. With this control
+   policy, one decrease to the half rate requires roughly six increases
+   to reach the original rate.
+
+7.3 The Case of Heterogeneous Receivers
+
+   For large groups and in heterogeneous environments, it is often the
+   case that a few receivers have very slow network connections than
+   the others. In many cases, it is desirable that the slowest receivers
+   do not block the data transmission for the majority of receivers. In
+   particular, interactive applications require that new data is timely
+   presented to the end users. Strictly applying the mechanism described
+   above may lead the data rate always to the minimum in presence of
+   very slow receivers.
+
+   To avoid this to take place, several precautions should be taken:
+
+     o the application should be advised to use an adequate minimum
+       rate. But the minimum rate should be enough low to ensure the
+       fairness of adaptive congestion control.
+
+     o a sender can ignore the congestion signals from the slowest
+       receivers. To do this, the sender needs to keep trace of the
+       hosts that caused most often the rate decreases. In the case
+       where the output queue is full most of time, the sender could
+       make a heuristic decision to ignore further congestion signals
+       from these hosts.
+
+
+
+
+
+Liao                                                           [Page 28]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+     o a receiver should leave the session if it encounters a high
+       loss rate and the data rate is not reduced by the sender
+       accordingly. For normal receivers, this is necessary to reject
+       too aggressive data flows and possible traffic attacks. For very
+       slow receivers, this is particularly necessary not to make their
+       congested network links even worse and also not to block the
+       session for the majority of receivers. The receiver may try to
+       rejoin the session at later time. If the problem persists after
+       several rejoin attempts, the receiver may definitely abandon this
+       session.
+
+   In particularly heterogeneous environments, layered multicast could
+   be useful [24]. That is, an application can use multiple groups,
+   each of them addresses a set of receivers with a particular level
+   of QoS.
+
+8. Packet Formats
+
+   This section defines the packet formats that a protocol entity should
+   implement to send data and control packets. A protocol entity should
+   ignore those packets if their types are not recognized.
+
+8.1 Unreliable Data
+
+   Unreliable data packets have no additional options. They are
+   transmitted in a best effort way and are not subject to sequence
+   control. If they are lost, no efforts should be made for recovery.
+   Therefore every unreliable data packet has a fixed header of 8 bytes.
+
+8.2 Reliable Data
+
+   Reliable data packets must contain the following options in addition
+   to the common fixed header. In total, reliable data packets have a
+   header of 16 bytes.
+
+       0                   1                   2                   3
+       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |                          timestamp                            |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |                       sequence number                         |
+      +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
+      |                       application data                        |
+      |                             ....                              |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+   The fields have the following meaning:
+
+
+
+
+Liao                                                           [Page 29]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+   timestamp: 32 bits
+        This field indicates the time at which this packet is sent.
+        It is encoded as the middle 32 bits of NTP time, i.e., in units
+        of fraction of 1/65536 second.
+
+   sequence number: 32 bits
+        This field indicates the sequence number of this packet.
+
+   Application data with variable length should follow after the data
+   packet header. The length of application data and packet header
+   must fit into the maximum transmission unit.
+
+   By doing a difference between the timestamp fields of two successive
+   data packets, receivers can get a rough estimate of the transmission
+   interval. This interval is only meaningful if the data flow is
+   continuous.
+
+8.3 Retransmission Data
+
+   Retransmission data packets are sent in response to NACK packets.
+   They must contain the following options in addition to the common
+   fixed header:
+
+       0                   1                   2                   3
+       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |                      original entity ID                       |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |                       sequence number                         |
+      +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
+      |                       application data                        |
+      |                             ....                              |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+   The fields have the following meaning:
+
+   original entity ID: 32 bits
+        This field contains the entity identifier of the original sender
+        of the data packet.
+
+   sequence number: 32 bits
+        This field gives the sequence number of the packet which should
+        be the same as received from the original sender.
+
+   It is prescribed that retransmission data packets have the same
+   header length as reliable data packets for two reasons. First, to
+   minimize necessary operations for retransmissions. The NACK
+   responder just needs to modify  the first few fields in the original
+
+
+
+Liao                                                           [Page 30]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+   data packet. Second, to avoid the total packet length exceeding the
+   maximum transmission unit by appending additional fields in the
+   header.
+
+8.4 FEC Redundant Data
+
+   A protocol entity may implement the forward error correction
+   mechanism which is optional. FEC data packet format is specified in
+   a way such that the data stream can still be correctly received even
+   if FEC is not supported by a particular implementation. See section
+   9 for details.
+
+8.5 Error report
+
+   Error report (NACK) packets are used to report a set of adjacent lost
+   packets and request the retransmission. NACK packets must contain the
+   following options in addition to the common fixed header:
+
+       0                   1                   2                   3
+       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |                           timestamp                           |
+      +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
+      |                            srcID 1                            |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |                             LLSN                              |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |                             BFLP                              |
+      +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
+      |                        (next srcID ...)                       |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+   The fields have the following meaning:
+
+   timestamp: 32 bits
+        This field indicates the time at which this packet is sent.
+        It is encoded as the middle 32 bits of NTP time, i.e., in units
+        of fraction of 1/65536 second.
+
+   srcID 1: 32 bits
+        This field indicates the entity identifier of the first data
+        source to which packet loss is reported.
+
+   LLSN (Lowest Lost Sequence Number): 32 bits
+        This field indicates the sequence number of the first lost
+        packet.
+
+
+
+
+
+Liao                                                           [Page 31]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+   BFLP (Bitmask of the Following Lost Packets): 32 bits
+        This field indicates the bitmask of the following lost packets.
+        In the bitmask, the bit k (1 <= k <= 32) is set to 1 if the
+        corresponding sequence number (LLSN + k) is lost. The value
+        0x0101 means that packets with sequence number LLSN, LLSN + 1,
+        LLSN + 9 are lost.
+
+   next srcID: 32 bits
+        This field indicates the entity identifier of the next data
+        source to which packet loss is reported, followed by LLSN and
+        BFLP fields.
+
+   The timestamp is included for the purpose to measure the round trip
+   time between the error reporter and the NACK packet responder.
+
+8.6 NACK Reply
+
+   NACK reply packets are sent in response to NACK packets and before
+   sending repairs. They must contain the following options in addition
+   to the common fixed header:
+
+       0                   1                   2                   3
+       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |                         NACK Reporter                         |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |                         NACK timestamp                        |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |                   delay since received NACK (DSRN)            |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |                        NACK destinator                        |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |                             LRSN                              |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |                             BFRP                              |
+      +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
+      |                    (next NACK Reporter ...)                   |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+   The fields have the following meaning:
+
+   NACK Reporter: 32 bits
+        the entity identifier of the entity which reported the packet
+        loss.
+
+   NACK timestamp: 32 bits
+        This field is a copy of the timestamp field carried in the NACK
+        packet.
+
+
+
+Liao                                                           [Page 32]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+   delay since received NACK (DSRN): 32 bits
+        This field indicates the time passed from the reception of the
+        NACK packet to the reply.  It is encoded in the fractions of
+        1/65536 seconds. The NACK reporter can use the NACK timestamp
+        and the delay to estimate the round trip time to the responder.
+
+   NACK destinator: 32 bits
+        the entity identifier of the original data sender to which the
+        packet loss is reported.
+
+   LRSN (Lowest Repair Sequence Number): 32 bits
+        This field indicates the lowest sequence number of the repair
+        packets that will be sent by the responder.
+
+   BFRP (Bitmask of the Following Repair Packets): 32 bits
+        This field indicates the bitmask of the following repair
+        packets. In the bitmask, the bit k (1 <= k <= 32) is set to 1 if
+        the corresponding sequence number (LRSN + k) will be sent as
+        repair. The value 0x0101 means that packets with sequence
+        number LRSN, LRSN + 1, LRSN + 9 will be sent.
+
+8.7 Sender Report
+
+   Sender reports must contain the following options in addition to
+   the common fixed header:
+
+       0                   1                   2                   3
+       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |                           timestamp                           |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |                      next sequence number                     |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |                         packet count                          |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |                          octet count                          |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+   The fields have the following meaning:
+
+   timestamp: 32 bits
+        This field indicates the time at which this packet is sent. It
+        is encoded as the middle 32 bits of NTP time, i.e., in units
+        of fraction of 1/65536 second.
+
+
+
+
+
+
+
+Liao                                                           [Page 33]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+   Next Sequence Number: 32 bits
+        This field indicates the sequence number to be used in the next
+        data packet. If the sender has not yet sent data packets (i.e.,
+        the packet count is 0), this field informs receivers the initial
+        sequence number. Upon receipt of this packet, receivers could
+        either set the initial sequence number for this sender or check
+        that if they have received all packets till this number minus
+        one.
+
+   Packet Count: 32 bits
+        This field indicates the total number of packets sent by the
+        sender since the creation of the session.
+
+   Octet Count: 32 bits
+        This field indicates the total number of octets sent by the
+        sender since the creation of the session.
+
+8.8 Receiver Report Selection
+
+   Receiver report selection packets must contain the following options
+   in addition to the common fixed header:
+
+       0                   1                   2                   3
+       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |                           timestamp                           |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |          probability          |           interval            |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |                       list of receivers                       |
+      |                       (variable length)                       |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+   The fields have the following meaning:
+
+   Timestamp: 32 bits
+        This field indicates the time at which this packet is sent. It
+        is encoded as the middle 32 bits of NTP time. Its purpose is to
+        measure the round trip time between the sender and a receiver.
+
+   Probability: 16 bit
+        This field indicates the probability that a receiver should use
+        to trigger the transmission of a receiver report. It is encoded
+        in fractions of 1/65536.
+
+   Interval: 16 bit
+        This field indicates the time interval to use to randomize
+        the report time. It is in number of seconds.
+
+
+
+Liao                                                           [Page 34]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+   List of receivers: variable length
+        This field contains either a wild card address (0xffffffff)
+        or a list of entity identifiers of the receivers that are
+        selected to send receiver reports.
+
+8.9 Receiver Report
+
+   Receiver reports are sent only upon selection by the sender. While
+   the report selection is sender specific, a receiver report packet
+   may contain several receiver reports, each of them destinated to a
+   specific sender.
+
+   Receiver reports must contain the following options in addition to
+   the common fixed header:
+
+       0                   1                   2                   3
+       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |                            srcID 1                            |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |                         RS timestamp                          |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |                      delay since RS (DSRS)                    |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |                    expected sequence number                   |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |C|  loss rate  |      cumulative number of packets lost        |
+      +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
+      |                        (next srcID ...)                       |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+   The fields have the following meaning:
+
+   srcID 1: 32 bits
+        the entity identifier of the data source to which the report is
+        addressed.
+
+   RS timestamp: 32 bits
+        This field is a copy of the timestamp field carried in the
+        receiver report selection packet.
+
+   delay since RS (DSRS): 32 bits
+        This field indicates the delay between the reception of the
+        receiver report selection packet and the reply. It is encoded
+        in the fractions of 1/65536 seconds. The sender can use the
+        timestamp and the delay to estimate the round trip time to
+        the reporter.
+
+
+
+
+Liao                                                           [Page 35]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+   expected sequence number: 32 bits
+        This field indicates the expected sequence number from the
+        sender. It implies that all packets less than this number have
+        been correctly received. Thus it can be considered as a
+        positive acknowledgement to all packets till this number minus
+        one.
+
+   C (Congestion): 8 bits
+        This field is the congestion flag. If set, it indicates that
+        the network path is congested between the sender and the
+        receiver.
+
+   loss rate: 8 bits
+        This field indicates the fraction of packets lost since last
+        report or since the receiver joined the session if no report
+        was sent before. It is expressed in fractions of 1/128.
+
+   cumulative number of packets lost: 24 bits
+        This field indicates the total number of packets lost since
+        the receiver joined the session.
+
+9. Options for Forward Error Correction
+
+   This section describes how to integrate forward error correction
+   (FEC) into the protocol. Proper use of FEC technique can
+   substantially improve the scalability due to the fact that it
+   reduces the number of feedback packets from receivers [16] [17]
+   [18] [19]. FEC is particularly useful in very large groups and over
+   asymmetric network links where no or little bandwidth is available
+   on feedback channels.
+
+   Since the use of FEC is optional, the FEC integration scheme
+   described here allows that implementations without FEC support can
+   correctly receive data stream by ignoring FEC redundant packets.
+
+   There are many ways to send FEC encoded packets. For example, FEC
+   encoded packets can be sent either automatically or upon reception
+   of NACK packets as repairs. This document is not intended to define
+   what transmission schemes should be used by the sender, rather it
+   only specifies the necessary elements that allows to implement a
+   generic receiver. Thus no restrictions are put on how FEC packets
+   should be transmitted as long as they allow correct recovery at
+   receivers. Implementations are free to choose an adequate
+   transmission scheme.
+
+
+
+
+
+
+
+Liao                                                           [Page 36]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+9.1 Parameters
+
+   FEC is based on the principle of adding some redundant packets to
+   the transmitted data stream so that the original data packets can be
+   recovered without retransmission up to certain loss. This can avoid
+   generating NACK packets [18] [19].
+
+   FEC can be implemented using erasure codes [16]. More specifically,
+   the data and redundant packets are grouped into blocks. A block
+   contains k data packets and (n-k) redundant packets, where n is the
+   size of a block. The (n-k) redundant packets are calculated from
+   k data packets. At reception if k out of n packets are received,
+   the original data packets can be reconstructed.
+
+   To increase the efficiency of recovery in case of burst loss, a
+   spacing parameter is introduced. That is, let the base sequence
+   number be b and the spacing between sequence numbers be s. The
+   sequence numbers of original data packets in a block are composed of:
+
+        b, b + s, b + 2s, b + 3s, ..., b + (k-1)s
+
+   Larger spacing parameter and large block size (n) requires more
+   buffer space at receivers. In addition, for large block size,
+   receivers that newly joined the session may need longer time to be
+   able to start decoding FEC packets.
+
+   FEC packets that belong to a same block are referenced by the same
+   base sequence number, b. In addition, they should contain the block
+   size (n), the number of redundant packets (n-k) and the spacing
+   parameter. 
+
+9.2 FEC Packet Format
+
+   FEC encoded redundant packets have the same header length as DATA
+   packets and must contain the following options in addition to the
+   common fixed header:
+
+       0                   1                   2                   3
+       0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |                              BSN                              |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+      |       BS      |       NR      |    spacing    |      RC       |
+      +=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+=+
+      |                           FEC data                            |
+      |                             ....                              |
+      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+
+
+
+Liao                                                           [Page 37]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+   The fields have the following meaning:
+
+   BSN (Base Sequence Number): 32 bits
+        This field indicates the starting sequence number of the
+        original data packets from which the redundant packets are
+        calculated.
+
+   BS (Block Size): 8 bits
+        This field is the size of the current block minus one.
+
+   NR (Number of Redundant Packets): 8 bits
+        This field is the number of redundant packets in the current
+        block minus one.
+
+   spacing: 8 bits
+        This field is the spacing between the sequence numbers of
+        DATA packets minus one.
+
+   RC (Redundant packet Count): 8 bits
+        This field indicates the relative redundant packet number,
+        starting from 0, in this block, i.e., 0 <= RC < NR.
+
+   FEC data: variable length
+        This field contains the redundant data calculated from the
+        original data packets.
+
+10. Security Considerations
+
+   LRMP suffers from the same security liabilities as unicast protocols,
+   for example, an imposter can fake source or destination network
+   addresses, or change the header or data payload. This section
+   describes the security constraints present in this protocol in
+   addition to unicast protocols. Multicast is in general more
+   vulnerable to malicious attacks. Implementations should take these
+   constraints into account in order to ensure the normal working of
+   the protocol. It is also desirable that an implementation offers
+   possibilities to log detailed trace in the case where a possible
+   attack is detected.
+
+10.1 Traffic Attacks
+
+   A malicious or misbehaving site may send as much data as possible to
+   a session. This can result in that the session will be flooded by
+   excessive data traffic so that the intended data traffic can not be
+   transmitted as expected. At the worst, it can lead to a denial of
+   service attack. If a protocol entity is detected doing so, the
+   packets received from that entity should be dropped before further
+   processing. The host doing this attack should also be indicated to
+
+
+
+Liao                                                           [Page 38]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+   the network administrator so that possible prevention could be made.
+
+10.2 Error Recovery
+
+   A malicious or misbehaving site may continuously request unnecessary
+   retransmissions by sending excessive NACK packets. Since the
+   retransmission will take some useful bandwidth, this can slow down
+   the transmission of new data. To avoid this problem, a protocol
+   entity can place an upper bound to the number of NACKs that can be
+   generated by a receiver, for example, in form of ratio of NACKs/DATA
+   packets, as well as an upper bound to the number of retransmissions
+   of a same data packet. A protocol entity should reject NACK packets
+   received from a receiver if the number of NACKs received from this
+   receiver is abnormally much higher than any other receivers.
+
+   It is possible that a protocol entity modifies the data packets
+   received from the original sender and sends them as repairs. In
+   absence of low level authentication, it is recommended that
+   applications use some mechanism to authenticate the information
+   carried by the protocol.
+
+10.3 Entity Identifier
+
+   A malicious or misbehaving site may use an entity identifier already
+   used by another entity to send data or erroneous control packets. In
+   this case, it is important that a protocol entity correctly
+   implements the mechanism described in section 3.3 to deny packets
+   from a forged entity.
+
+   A malicious or misbehaving site may also use a low entity identifier
+   in repair process, either for error report or sending repairs. This
+   entity may send or respond to NACK packets, then stop the repair
+   process. If a protocol entity implements incorrectly the repair
+   procedure, loss repair may depend on the entity with low entity
+   identifier and thus can be blocked.
+
+   A malicious or misbehaving site may change very frequently its entity
+   identifier. If an implementation keeps the list of all entities heard
+   in the session, that will make the size of the list continuously
+   growing and consequently will increase the memory usage. To avoid
+   this type of problems, an implementation can take two precautions.
+   First it can limit the size of the list. If the number of entities
+   exceeds the maximum size, old entries are removed. Second it can
+   reuse an old entry that is from the same network address as the new
+   entity and has not been heard since a long time.
+
+
+
+
+
+
+Liao                                                           [Page 39]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+10.4 Round Trip Time
+
+   A malicious or misbehaving site may try to make the estimation of
+   round trip time inadequate by putting bad delay either in NACK reply
+   or receiver report. To prevent this type of attacks, a protocol
+   entity should place a lower bound and a upper bound to measured round
+   trip time and limit the portion contributed by a single entity to the
+   mean round trip time.
+
+10.5 Congestion Control
+
+   A malicious or misbehaving site may try to make the transmission rate
+   too low by sending false NACK packets or congestion indication in the
+   receiver reports. It is desirable to advise the users to put a
+   reasonable lower bound for the transmission rate. In addition,
+   implementations can ignore those NACK packets or congestion
+   indications if they come too often from the same site.
+
+10.6 Confidentiality
+
+   There is no data encryption prescribed by this protocol. Implementors
+   should be aware that as the information is transmitted in clear, all
+   receivers can receive and eventually interpret the information. If an
+   application wants that only the intended receivers decode the
+   information, it should use an encryption algorithm to protect the
+   information.
+
+10.7 Level of Redundancy
+
+   Transmission of redundant packets adds additional traffic to the data
+   transmission. When packet loss occurs, redundant packets could be
+   useful for recovering loss without feedback from receivers. However
+   transmission of large amounts of redundant data could increase
+   network congestion, leading to a contradictory effect of the use of
+   forward error correction. In the worst case, it can lead to a denial
+   of service attack. A protocol entity implementing FEC in data
+   transmission should use the feedback from receivers such as the
+   number of NACKs, round trip time variation to adjust the level of
+   redundancy in the data stream.
+
+A. Requirements of RFC 2357
+
+   This section describes how well this specification satisfies the
+   criteria of RFC 2357 [5] and future work. LRMP has been implemented
+   as a reusable library and a number of tests have been carried out
+   [26]. More performance evaluation results will be presented later.
+
+
+
+
+
+Liao                                                           [Page 40]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+A.1 Scalability
+
+   The basic error recovery scheme of LRMP is derived from SRM and
+   thus has similar behavior as SRM which is well analyzed in [6] for
+   different network topologies. The parameters that influence the
+   scalability are mainly the number of duplicate NACKs and that of
+   duplicate repairs in case of loss. From [6], these numbers remain
+   enough stable with the group size. From our experiments [26], these
+   numbers increase slightly with the group size due to various
+   practical reasons, e.g., variable round trip time and transmission
+   rate. But they remain enough reasonable.
+
+   LRMP adds some overhead by adopting local error recovery. If
+   an error could be recovered in a local group, LRMP will behave
+   better than the original scheme of SRM. Otherwise several messages
+   could be generated in the local groups. Since NACK packets are of
+   small size (24 bytes), the additional traffic is not significant.
+   In general, data packets can be considered much costly than NACK
+   packets in terms of network resource usage. Besides the NACKs
+   sent to the local groups without local repair are not useless, they
+   have also a positive effect, called election phase. That is, they
+   can be thought to elect the protocol entity which will report the
+   packet loss to a higher level group. This can reduce the probability
+   of duplicate NACKs in subgroups with larger TTL values.
+
+   The scalability of the error recovery scheme is improved in case of
+   burst loss due to the fact that a NACK packet can report up to 33
+   lost packets. Compared to one NACK per lost packet, the probability
+   of duplicate NACK packets is considerably reduced.
+
+   When there are multiple senders in a session, the packet loss
+   for one sender is handled independently of the others. It is
+   prescribed that several control packets for different senders can
+   be multiplexed into one outgoing packet if they are sent within the
+   same scope. In addition of the network bandwidth, the cost of
+   multiple senders is the cache space for out-of-order packets. More
+   senders require more cache space. Therefore LRMP can generally
+   support a limited number of senders which depends on available system
+   resources.
+
+   A sender does not need to maintain the state about every receiver.
+   It generally needs only to maintain several recently heard receivers
+   for the purpose to detect the slowest receivers or possible attacks.
+   Similarly receivers only need to maintain the sender state. Thus
+   LRMP should be enough scalable to large groups in terms of system
+   resource usage.
+
+
+
+
+
+Liao                                                           [Page 41]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+A.2 Congestion Control
+
+   The congestion control scheme works in function of the send window
+   size and loss rate (which is reflected by NACKs). For reasonable
+   send window size, e.g., 32 or 64, the congestion control scheme
+   reacts rather quickly in case of congestion problems. Overall data
+   rate can very quickly drop to the minimum as data retransmission is
+   also subject to the same congestion control as transmission of new
+   data.
+
+   Further simulation and test are needed to see what fairness can
+   be achieved with competing TCP-like data flows [25]. It should be
+   noted that it is especially hard to behave the same way as TCP while
+   a different algorithm is used. However it could be easier make the
+   congestion control less aggressive than TCP.
+
+   For large groups and heterogeneous environments, congestion control
+   may often lead the data rate to the minimum due to a few slow
+   receivers. A number of heuristic methods are proposed in section 7.3
+   to tackle this problem. In particular, a receiver should leave the
+   session if it deduces that there is serious mismatch between the
+   session data rate and the available bandwidth.
+
+   It is worth noting that though LRMP was designed for heterogeneous
+   environments, a significant part of users use it in well controlled
+   environments such as private networks where receivers are rather
+   homogeneous.
+
+A.3 Congestion Avoidance
+
+   It is hard to do congestion avoidance when packet loss is not
+   present. As indicated in [27], in lack of any congestion indication
+   from the network, the only available information about the possible
+   congested network path is the packet loss and propagation delay.
+   The possibility to do rate adaptation according to the round trip
+   time variance was explored. To make the rate adaptation pertinent,
+   a sender must know the round trip times to all receivers. Yet these
+   RTTs need to be enough fresh to be usable for congestion control.
+   The need to frequently measure the RTTs to all receivers adds a
+   lot of complexity and makes the scalability worse. 
+
+   Using the mean RTT to all receivers for rate adaptation leads too
+   often to unnecessary adjustments and is not suitable for
+   heterogeneous environments due to the diversity of round trip times
+   to different receivers.
+
+   Thus LRMP uses only the packet loss information for congestion
+   control. LRMP can respond to congestion problem at very early stage
+
+
+
+Liao                                                           [Page 42]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+   once packet loss is detected.
+
+   Again we need to look further into the consequences of this scheme
+   to see the behavior at both sides (LRMP and TCP) and what is the
+   bandwidth share.
+
+A.4 Security Concerns
+
+   A number of security constraints are presented in section 10. They
+   should be carefully taken into account by any implementation.
+   The current specification does not handle the issues related to the
+   authentication and encryption of information. It is recommended
+   that an application should make use of adequate techniques to ensure
+   the authentication, integrity, and confidentiality of the information
+   transported by LRMP.
+
+B. References
+
+   [1] S. Deering, "Host extensions for IP multicasting", RFC 1112,
+       August 1989.
+
+   [2] J. Postel, "Transmission Control Protocol", STD 7, RFC 793,
+       USC/Information Sciences Institute, Sept. 1981.
+
+   [3] J. Postel, "Internet Protocol", STD 5, RFC 791,
+       USC/Information Sciences Institute, Sept. 1981.
+
+   [4] D. Mills, "Network Time Protocol Version 3", RFC 1305, UDEL,
+       March 1992.
+
+   [5] A. Mankin, A. Romanow, S. Bradner, V. Paxson., "IETF Criteria
+       for Evaluating Reliable Multicast Transport and Application
+       Protocols", RFC 2357, June 1998.
+
+   [6] S. Floyd, V. Jacobson, S. McCanne, C. Liu, L. Zhang,
+       "A Reliable Multicast Framework for Light-weight Sessions and
+       Application Level Framing", ACM Transactions on Networking,
+       Nov. 1996.
+
+   [7] D. D. Clark and D. L. Tennenhouse, "Architectural
+       considerations for a new generation of protocols," in SIGCOMM
+       Symposium on Communications Architectures and Protocols,
+       (Philadelphia, Pennsylvania), pp. 200-208, IEEE,  Sept. 1990.
+       Computer Communications Review, Vol. 20(4), Sept. 1990.
+
+   [8] J. C. Lin and S. Paul, "RMTP: A Reliable Multicast Transport
+       Protocol", Proceedings of IEEE INFOCOM '96, March 1996,
+       pp.1414 - 1424.
+
+
+
+Liao                                                           [Page 43]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+   [9] B. Whetten et al., "The RMTP-II Protocol", Internet Draft,
+       draft-whtten-rmtp-ii-00.txt, April 1998.
+
+  [10] T. Speakman, D. Farinacci, S. Lin, and A. Tweedly, "Pragmatic
+       Group Multicast (PGM) Transport Protocol Specification",
+       Internet Draft, draft-speakman-pgm-spec-01.txt, Jan. 1998.
+
+  [11] M. Hofmann, "Enabling Group Communication in Global Networks",
+       Proc. of Global Networking '97, Volume II, pp321-330, Calgary,
+       Alberta, Canada, June 1997.
+
+  [12] C. A. Kent and J. C. Mogul, "Fragmentation Considered Harmful",
+       Proc. of SIGCOMM '87, August 1987.
+
+  [13] P. Karn and C. Partridge, "Improving Round-Trip Time Estimates
+       in Reliable Transport Protocol", ACM Transactions on Computer
+       Systems (TOCS), Vol. 9, No. 4, pp. 364-373, November 1991.
+
+  [14] V. Jacobson, "Congestion Avoidance and Control", Computer
+       Communications Review, vol.18, pp314-329, August 1988.
+
+  [15] K.K. Ramakrishnan and R. Jain, "A Binary Feedback Scheme for
+       Congestion Avoidance in Computer Networks", ACM Transactions on
+       Computer Systems (TOCS), Vol. 8, No. 2, pp 158-181, May, 1990. 
+
+  [16] R. E. Blahut, "Theory and Practice of Error Control Codes",
+       Addison Wesley, 1984.
+
+  [17] C. Perkins and O. Hodson, "Options for Repair of Streaming
+       Media", RFC 2354, UCL, Jube 1998.
+
+  [18] L. Rizzo, "Effective erasure codes for reliable computer
+       communication protocols", ACM Computer Communication Review,
+       Vol.27, no.2, April 1997.
+
+  [19] J. Nonnenmacher, E. W. Biersack and D. Towsley, "Parity-Based
+       Loss Recovery for Reliable Multicast Transmission", Proc. of
+       SIGCOMM '97, Sept. 1997.
+
+  [20] D. Meyer, "Administratively Scoped IP Multicast", RFC 2365,
+       University of Oregon, July 1998.
+
+  [21] S. Floyd and K. Fall, "Promoting the Use of End-to-End
+       Congestion Control in the Internet", submitted to IEEE/ACM
+       Transactions on Networking, Feb. 1998.
+
+
+
+
+
+
+Liao                                                           [Page 44]
+
+INTERNET-DRAFT             LRMP                          13 October 1998
+
+
+  [22] Dah Ming Chiu, "Flow and Congestion Control in Reliable
+       Multicast", Presentation at IRTF RM group meeting, UCL, July
+       1998, available from http://www.east.isi.edu/RMRG/.
+
+  [23] H. Schulzrinne, S. Casner, R. Frederick and V. Jacobson, "RTP:
+       A Transport Protocol for Real-Time Applications", RFC 1889, 
+       January 1996.
+
+  [24] L. Vicisano, L. Rizzo and J. Crowcroft, "TCP-like congestion
+       control for layered multicast data transfer", IEEE Infocom '98,
+       March 1998.
+
+  [25] M. Handley, "Reference simulations for multicast congestion
+       control", Presentation at IRTF RM group meeting, UCL, July
+       1998, available from http://www.east.isi.edu/RMRG/.
+
+  [26] T. Liao, "Light-weight Reliable Multicast Protocol", Technical
+       report, available at
+       http://webcanal.inria.fr/lrmp/lrmp_paper.html, October 1998.
+
+  [27] Jamal Golestani, "Fundamental Observations on Multicast
+       Congestion Control in the Internet", Presentation at IRTF RM
+       group meeting, UCL, July 1998, available at
+       http://www.bell-labs.com/user/golestani/jamal1.ps.
+
+C. Acknowledgments
+
+   Thanks to the IRTF RM group for useful ideas and specially to the
+   following people for constructive suggestions and support:
+   Jon Crowcroft (UCL), Jean-Francois Abramatic (INRIA/W3C),
+   Yves Peynaud (INRIA).
+
+D. Author's Address
+
+   Tie Liao
+   INRIA
+   Domaine Voluceau - BP 105
+   78153 Le Chesnay Cedex
+   France
+
+   Email: Tie.Liao@inria.fr
+
+
+
+
+
+
+
+
+
+
+Liao                                                           [Page 45]
+
