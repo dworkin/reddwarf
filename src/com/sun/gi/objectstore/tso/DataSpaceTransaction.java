@@ -62,7 +62,7 @@ public interface DataSpaceTransaction {
 	 * @param objectID
 	 * @param dh
 	 */
-	void write(long objectID, DataHeader dh);
+	void write(long objectID, Serializable obj);
 
 	/**
 	 * 

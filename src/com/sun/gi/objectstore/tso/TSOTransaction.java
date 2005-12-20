@@ -36,7 +36,7 @@ import com.sun.gi.utils.StatisticalUUID;
  * @version 1.0
  */
 public class TSOTransaction implements Transaction {
-	class DataHeader implements Serializable{
+	public class DataHeader implements Serializable{
 		/**
 		 * 
 		 */
