@@ -47,12 +47,12 @@ public interface DataSpace {
 	/* (non-Javadoc)
 	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#lock(long)
 	 */
-	public void lock(long objectID);
+	public void lock(long appID, long objectID);
 
 	/* (non-Javadoc)
 	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#release(long)
 	 */
-	public void release(long objectID);
+	public void release(long appID, long objectID);
 
 	/* (non-Javadoc)
 	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#atomicUpdate(long, boolean, java.util.Map, java.util.Set, java.util.Map)
@@ -65,6 +65,7 @@ public interface DataSpace {
 	 * @param name
 	 * @return
 	 */
-	public Long lookup(String name);
+	public Long lookup(long appID, String name);
+	
 
 }

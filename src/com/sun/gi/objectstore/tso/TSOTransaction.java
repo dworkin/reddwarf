@@ -14,6 +14,7 @@ import java.io.Serializable;
 import com.sun.gi.objectstore.DeadlockException;
 import com.sun.gi.objectstore.NonExistantObjectIDException;
 import com.sun.gi.objectstore.Transaction;
+import com.sun.gi.objectstore.tso.impl.TSODataHeader;
 import com.sun.gi.utils.SGSUUID;
 import com.sun.gi.utils.StatisticalUUID;
 
@@ -36,34 +37,7 @@ import com.sun.gi.utils.StatisticalUUID;
  * @version 1.0
  */
 public class TSOTransaction implements Transaction {
-	public class DataHeader implements Serializable{
-		/**
-		 * 
-		 */
-		private static final long serialVersionUID = 5666201439015976463L;
-		long time;
-		long tiebreaker;
-		SGSUUID uuid;
-		Serializable dataObject;
-		boolean free;
-		
-		public DataHeader(long time, long tiebreaker,SGSUUID uuid, Serializable obj){
-			this.time =time;
-			this.tiebreaker = tiebreaker;
-			this.uuid = uuid;
-			this.dataObject = obj;
-			free = true;
-		}
-		
-		public boolean before(DataHeader other){
-			if (time<other.time){
-				return true;
-			} else if ((time==other.time)&&(tiebreaker<other.tiebreaker)){
-				
-			}
-			return false;			
-		}
-	}
+	
 	
 	
 	TSOObjectStore objectStore;
@@ -110,7 +84,7 @@ public class TSOTransaction implements Transaction {
 	 *      java.lang.String)
 	 */
 	public long create(Serializable object, String name) {
-		long tsID = dsTrans.create(new DataHeader(time,tiebreaker,uuid,object));
+		long tsID = dsTrans.create(new TSODataHeader(time,tiebreaker,uuid,object));
 		if (name!=null){
 			dsTrans.registerName(name,tsID);
 		}
@@ -133,8 +107,8 @@ public class TSOTransaction implements Transaction {
 	 * @see com.sun.gi.objectstore.Transaction#peek(long)
 	 */
 	public Serializable peek(long objectID) {		
-		DataHeader dh = (DataHeader) dsTrans.read(objectID);
-		return dh.dataObject;
+		TSODataHeader dh = (TSODataHeader) dsTrans.read(objectID);
+		return dh.dataObject; 
 	}
 	
 	public Serializable lock(long objectID) 
@@ -149,7 +123,7 @@ public class TSOTransaction implements Transaction {
 	 */
 	public Serializable lock(long objectID, boolean blocking) throws DeadlockException, NonExistantObjectIDException {
 		dsTrans.lock(objectID);
-		DataHeader dh = (DataHeader) dsTrans.read(objectID);
+		TSODataHeader dh = (TSODataHeader) dsTrans.read(objectID);
 		if (dh==null){
 			throw new NonExistantObjectIDException();
 		}
@@ -166,7 +140,7 @@ public class TSOTransaction implements Transaction {
 			waitForFreedSignal(); // will return when free or throw
 									// DeadlockException
 			dsTrans.lock(objectID); // get header again
-			dh = (DataHeader) dsTrans.read(objectID);	
+			dh = (TSODataHeader) dsTrans.read(objectID);	
 		}
 		// its ours
 		dh.time = time;
@@ -196,7 +170,7 @@ public class TSOTransaction implements Transaction {
 	/**
 	 * @param dh
 	 */
-	private void doTimeStampInterrupt(DataHeader dh) {
+	private void doTimeStampInterrupt(TSODataHeader dh) {
 		objectStore.doTimeStampInterrupt(dh.uuid);		
 	}
 

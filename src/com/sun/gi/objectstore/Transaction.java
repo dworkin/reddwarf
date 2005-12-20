@@ -68,6 +68,8 @@ public interface Transaction {
      */
     public Serializable lock(long objectID,boolean block) throws DeadlockException, NonExistantObjectIDException;
     
+    public Serializable lock(long objectID) throws DeadlockException, NonExistantObjectIDException;
+
     
     /**
      * This method returns the object ID for an object that has previously been created with a name.

@@ -18,6 +18,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -61,6 +62,8 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	private Map<Long, Serializable> localObjectCache = new HashMap<Long,Serializable>();
 	
 	private Map<Long, byte[]> updateMap = new HashMap<Long,byte[]>();
+	
+	private Set<Long> locksHeld = new HashSet<Long>();
 	
 	private boolean clear = false;
 	
@@ -173,8 +176,8 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	 * @see com.sun.gi.objectstore.tso.DataSpaceTransaction#lock(long)
 	 */
 	public void lock(long objectID) {
-		dataSpace.lock(objectID);
-
+		dataSpace.lock(appID,objectID);
+		locksHeld.add(objectID);
 	}
 
 	/*
@@ -183,8 +186,8 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	 * @see com.sun.gi.objectstore.tso.DataSpaceTransaction#release(long)
 	 */
 	public void release(long objectID) {
-		dataSpace.release(objectID);
-
+		dataSpace.release(appID,objectID);
+		locksHeld.remove(objectID);
 	}
 
 	/*
@@ -222,10 +225,19 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	 */
 	public void clear() {
 		clear  = true;
+		resetTransaction();
+	}
+	
+	private void resetTransaction(){
 		newNames.clear();
 		deleteSet.clear();
 		updateMap.clear();
 		localObjectCache.clear();
+		for(Long id : locksHeld){
+			dataSpace.release(appID,id);
+		}
+		locksHeld.clear();
+		
 	}
 
 	/*
@@ -235,7 +247,10 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	 */
 	public void commit() {
 		dataSpace.atomicUpdate(appID,clear,newNames,deleteSet,updateMap);
-		backupSpace.atomicUpdate(appID,clear,newNames,deleteSet,updateMap);
+		if (backupSpace!=null){
+			backupSpace.atomicUpdate(appID,clear,newNames,deleteSet,updateMap);
+		}
+		resetTransaction();
 		active=false;
 	}
 
@@ -245,10 +260,7 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	 * @see com.sun.gi.objectstore.tso.DataSpaceTransaction#abort()
 	 */
 	public void abort() {
-		newNames.clear();
-		deleteSet.clear();
-		updateMap.clear();
-		localObjectCache.clear();
+		resetTransaction();
 		active=false;
 	}
 
@@ -260,7 +272,7 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	public long lookupName(String name) {		
 		Long l = newNames.get(name);
 		if (l==null){ // not in transaction, check data space
-			l = dataSpace.lookup(name);
+			l = dataSpace.lookup(appID,name);
 		}
 		if (l == null){
 			return DataSpace.INVALID_ID;
