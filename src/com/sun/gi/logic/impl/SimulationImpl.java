@@ -26,6 +26,7 @@ import com.sun.gi.logic.SimChannelListener;
 import com.sun.gi.logic.SimKernel;
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.Simulation;
+import com.sun.gi.logic.SimTask.ACCESS_TYPE;
 import com.sun.gi.objectstore.ObjectStore;
 import com.sun.gi.objectstore.Transaction;
 

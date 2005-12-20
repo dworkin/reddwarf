@@ -14,7 +14,6 @@ import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.Simulation;
-import com.sun.gi.logic.Simulation.ACCESS_TYPE;
 import com.sun.gi.objectstore.DeadlockException;
 import com.sun.gi.objectstore.ObjectStore;
 import com.sun.gi.objectstore.Transaction;
@@ -62,7 +61,7 @@ class OutputRecord {
 
 public class SimTaskImpl implements SimTask {
 	private Transaction trans;
-	private Simulation.ACCESS_TYPE accessType;
+	private ACCESS_TYPE accessType;
 
 	private GLOReference startObject;
 
@@ -290,6 +289,14 @@ public class SimTaskImpl implements SimTask {
 	public void queueTask(GLOReference target, Method method, Object[] parameters) {		
 		queueTask(ACCESS_TYPE.GET,target,method,parameters);
 		
+	}
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.logic.SimTask#access_check(com.sun.gi.logic.Simulation.ACCESS_TYPE)
+	 */
+	public void access_check(ACCESS_TYPE accessType, Object glo) {
+		// TODO Auto-generated method stub
+		// should check the passed GLO for the acess type and throw error is not matching
 	}
 
 	

@@ -1,11 +1,10 @@
 package com.sun.gi.logic;
 
-import com.sun.gi.comm.routing.*;
 import com.sun.gi.framework.timer.TimerManager;
-import com.sun.gi.logic.Simulation.ACCESS_TYPE;
-import com.sun.gi.logic.impl.GLOReferenceImpl;
+import com.sun.gi.logic.SimTask.ACCESS_TYPE;
 import com.sun.gi.logic.impl.SimThreadImpl;
-import com.sun.gi.objectstore.*;
+import com.sun.gi.objectstore.ObjectStore;
+import com.sun.gi.objectstore.Transaction;
 
 /**
  * <p>

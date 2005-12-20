@@ -2,17 +2,14 @@
 
 package com.sun.gi.logic;
 
-import java.io.*;
+import java.io.Serializable;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
-import java.util.List;
 
-import com.sun.gi.comm.routing.*;
-import com.sun.gi.gloutils.pdtimer.PDTimer;
-import com.sun.gi.logic.Simulation.ACCESS_TYPE;
-import com.sun.gi.logic.impl.GLOReferenceImpl;
-import com.sun.gi.logic.test.comm.CommTestBoot;
-import com.sun.gi.objectstore.*;
+import com.sun.gi.comm.routing.ChannelID;
+import com.sun.gi.comm.routing.UserID;
+import com.sun.gi.objectstore.ObjectStore;
+import com.sun.gi.objectstore.Transaction;
 
 /**
  *
@@ -26,6 +23,7 @@ import com.sun.gi.objectstore.*;
  */
 
 public interface SimTask {
+	public enum ACCESS_TYPE {GET,PEEK,ATTEMPT};
   /**
    * Called to transfer the calling thread of control to the execution
    * of the task.
@@ -182,6 +180,11 @@ public interface SimTask {
 	 */
 	public void queueTask(GLOReference target, Method method,
 			Object[] parameters);
+
+	/**
+	 * @param get
+	 */
+	public void access_check(ACCESS_TYPE accessType, Object glo); 
 
 
 	

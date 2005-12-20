@@ -14,6 +14,15 @@ import java.sql.Timestamp;
  */
 
 public interface Transaction {
+	
+	/**
+	 * This initializes the transaction for use and should be called before the
+	 * first use and before re-use after an abort.  It allows the transaction to acquire
+	 * underlying pooled resources that are returned on an abort
+	 *
+	 */
+	public void start();
+	
 	/**
 	 * This method is called to create a new entry in the ObjectStore.
 	 * @param object The object who's state should be stored
@@ -22,22 +31,14 @@ public interface Transaction {
 	 */
     public long create(Serializable object, String name);
     
-    /**
-     * This method creates a new entry in the ObjectStore and forces its ID to
-     * the long passed in objectID.  Its really a special purpose routine only used
-     * for a couple of things internal to the Darkstar stack.
-     * @param objectID The object ID to assign to this data record
-     * @param object The object who's state will be stored in this data record
-     * @param name The obejct's name (or null)
-     * @return true if successful, false if it fails.
-     */
-    public boolean create(long objectID, Serializable object, String name);
     
     /**
      * This method removes an entry from the Object Store
      * @param objectID The ID of the data record to remove
+     * @throws NonExistantObjectIDException 
+     * @throws DeadlockException 
      */
-    public void destroy(long objectID);
+    public void destroy(long objectID) throws DeadlockException, NonExistantObjectIDException;
     
     /** 
      * <p>This method fetches a local copy of an object stored in the object store. It 
@@ -55,15 +56,18 @@ public interface Transaction {
     /** 
      * <p>This method takes a write-lock on the object referenced by objectID and returns
      * a copy of the object to work with.</p>
-     * <p>If the obejct has been perviously "getted" then this call will return a refernce 
-     * to the same object.  If the object has been "peeked' but not "getted", or if this
+     * <p>If the object has been perviously locked then this call will return a refernce 
+     * to the same object.  If the object has been "peeked' but not locked, or if this
      * is the first get operation on the obejct udne this transaction, a new copy will be returned,</p>
      * <p>When the transaction commits, all changes to the state of "getted" objects is
      * captured and written back to the ObjectStore.</p<>   
      * @param objectID  The ID of the object to return.
+     * @param block If false, this will return NULL if it cannot immediately lock the object
      * @return A reference to a copy of the object referenced by objectID
+     * @throws NonExistantObjectIDException 
      */
-    public Serializable lock(long objectID) throws DeadlockException;
+    public Serializable lock(long objectID,boolean block) throws DeadlockException, NonExistantObjectIDException;
+    
     
     /**
      * This method returns the object ID for an object that has previously been created with a name.
@@ -92,11 +96,9 @@ public interface Transaction {
      * @return The AppID
      */
     public long getCurrentAppID();
-
-
-    // DJE
-    public void start(long appID, Timestamp tstamp, long tiebreaker,
-	    ClassLoader cl);
-    public void tstampInterrupt();
+    
+    public void clear();
+    
+    
    
 }

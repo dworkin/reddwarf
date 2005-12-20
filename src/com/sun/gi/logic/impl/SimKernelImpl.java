@@ -1,24 +1,18 @@
 package com.sun.gi.logic.impl;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 
-import com.sun.gi.comm.routing.ChannelID;
-import com.sun.gi.comm.routing.Router;
-import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.framework.timer.TimerManager;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimKernel;
-import com.sun.gi.logic.SimThread;
 import com.sun.gi.logic.SimTask;
+import com.sun.gi.logic.SimThread;
 import com.sun.gi.logic.Simulation;
-import com.sun.gi.logic.Simulation.ACCESS_TYPE;
+import com.sun.gi.logic.SimTask.ACCESS_TYPE;
 import com.sun.gi.objectstore.ObjectStore;
 import com.sun.gi.objectstore.Transaction;
-import com.sun.multicast.util.UnimplementedOperationException;
 
 /**
  * <p>

@@ -5,6 +5,7 @@ import java.nio.ByteBuffer;
 
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
+import com.sun.gi.logic.SimTask.ACCESS_TYPE;
 
 /**
  * <p>Title: Simulation</p>
@@ -19,7 +20,7 @@ import com.sun.gi.comm.routing.UserID;
 
 
 public interface Simulation {
-	public enum ACCESS_TYPE {GET,PEEK,ATTEMPT};
+	
   /**
    * This call adds an object as a listener for users joining or leaving this
    * particular game app.  When an event ocurrs, a SmTask is queued for each

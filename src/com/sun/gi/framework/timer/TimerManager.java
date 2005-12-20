@@ -9,11 +9,8 @@
  */
 package com.sun.gi.framework.timer;
 
-import java.lang.reflect.Method;
-
-import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.Simulation;
-import com.sun.gi.logic.Simulation.ACCESS_TYPE;
+import com.sun.gi.logic.SimTask.ACCESS_TYPE;
 
 /**
  *

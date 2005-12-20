@@ -9,19 +9,15 @@
  */
 package com.sun.gi.framework.timer.impl;
 
-import java.io.Serializable;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.List;
 import java.util.PriorityQueue;
 
 import com.sun.gi.framework.timer.TimerManager;
-import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.SimTimerListener;
 import com.sun.gi.logic.Simulation;
-import com.sun.gi.logic.Simulation.ACCESS_TYPE;
+import com.sun.gi.logic.SimTask.ACCESS_TYPE;
 import com.sun.gi.logic.impl.GLOReferenceImpl;
 
 /**

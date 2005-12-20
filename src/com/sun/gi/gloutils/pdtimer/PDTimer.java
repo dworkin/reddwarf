@@ -9,13 +9,10 @@
  */
 package com.sun.gi.gloutils.pdtimer;
 
-import java.util.SortedMap;
-import java.util.TreeMap;
-
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.SimTimerListener;
-import com.sun.gi.logic.Simulation.ACCESS_TYPE;
+import com.sun.gi.logic.SimTask.ACCESS_TYPE;
 
 /**
  *
@@ -31,8 +28,12 @@ import com.sun.gi.logic.Simulation.ACCESS_TYPE;
  * @version 1.0
  */
 public class PDTimer implements SimTimerListener {
+	/**
+	 * Hardwired Serial version UID
+	 */
+	private static final long serialVersionUID = 1L;
 	GLOReference timerListRef=null;
-	public void start(SimTask task,long heartbeat){
+	public void start(SimTask task,long heartbeat) throws InstantiationException{
 		if (timerListRef == null){ // first time
 			PDTimerEventList list = new PDTimerEventList();
 			timerListRef = task.createSO(list,null);
@@ -63,7 +64,7 @@ public class PDTimer implements SimTimerListener {
 		PDTimerEventList list = (PDTimerEventList)timerListRef.get(task);
 		list.addEvent(task,evntRef);
 		return evntRef;
-	}
+	} 
 	
 	public void removeTimerEvent(SimTask task,GLOReference eventRef){
 		PDTimerEventList list = (PDTimerEventList)timerListRef.get(task);
