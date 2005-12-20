@@ -13,8 +13,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
-import com.sun.gi.objectstore.tso.DataSpace;
-import com.sun.gi.objectstore.tso.DataSpaceTransaction;
+
+
 
 /**
  *
@@ -25,86 +25,94 @@ import com.sun.gi.objectstore.tso.DataSpaceTransaction;
  * @author Jeff Kesselman
  * @version 1.0
  */
-public class InMemoryDataSpace implements DataSpace {
+public class InMemoryDataSpace implements DataSpace  {
 	Map<Long,Map<Long,byte[]>> dataSpace = new HashMap<Long,Map<Long,byte[]>>();
-	BackupDataSpace backup;
+
 	private Object idMutex= new Object();
 	private int id = 1;
 	
-	public InMemoryDataSpace(BackupDataSpace backupSpace){
-		backup = backupSpace;
+	public InMemoryDataSpace(){
+		
 	}
 
 	/* (non-Javadoc)
 	 * @see com.sun.gi.objectstore.tso.DataSpace#clearAll()
 	 */
+	/* (non-Javadoc)
+	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#clearAll()
+	 */
+	/* (non-Javadoc)
+	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#clearAll()
+	 */
 	public void clearAll() {
-		dataSpace.clear();
-		backup.clear();
+	
 	}
 
-	/* (non-Javadoc)
-	 * @see com.sun.gi.objectstore.tso.DataSpace#getTransaction(long, java.lang.ClassLoader)
-	 */
-	public DataSpaceTransaction getTransaction(long appID, ClassLoader loader) {		
-		return new InMemoryDataSpaceTransaction(this,appID,loader,backup);
-	}
-
-	/* (non-Javadoc)
-	 * @see com.sun.gi.objectstore.tso.DataSpace#returnTransaction(com.sun.gi.objectstore.tso.DataSpaceTransaction)
-	 */
-	public void returnTransaction(DataSpaceTransaction dsTrans) {
-		// nothing to do yet
-		
-	}
-
+	
 		// internal routines to the system, used by transactions
-	/**
-	 * @return
+	/* (non-Javadoc)
+	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#getNextID()
 	 */
-	long getNextID() {
+	/* (non-Javadoc)
+	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#getNextID()
+	 */
+	public long getNextID() {
 		// TODO Auto-generated method stub
 		synchronized(idMutex){
 			return id ++;
 		}
 	}
 
-	/**
-	 * @param appID
-	 * @param objectID
-	 * @return
+	/* (non-Javadoc)
+	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#getObjBytes(long, long)
 	 */
-	byte[] getObjBytes(long appID, long objectID) {
+	/* (non-Javadoc)
+	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#getObjBytes(long, long)
+	 */
+	public byte[] getObjBytes(long appID, long objectID) {
 		// TODO Auto-generated method stub
 		return null;
 	}
 
-	/**
-	 * @param objectID
+	/* (non-Javadoc)
+	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#lock(long)
 	 */
-	void lock(long objectID) {
+	/* (non-Javadoc)
+	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#lock(long)
+	 */
+	public void lock(long objectID) {
 		// TODO Auto-generated method stub
 		
 	}
 
-	/**
-	 * @param objectID
+	/* (non-Javadoc)
+	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#release(long)
 	 */
-	void release(long objectID) {
+	/* (non-Javadoc)
+	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#release(long)
+	 */
+	public void release(long objectID) {
 		// TODO Auto-generated method stub
 		
 	}
 
-	/**
-	 * @param appID 
-	 * @param clear
-	 * @param newNames
-	 * @param deleteSet
-	 * @param updateMap
+	/* (non-Javadoc)
+	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#atomicUpdate(long, boolean, java.util.Map, java.util.Set, java.util.Map)
+	 */
+	/* (non-Javadoc)
+	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#atomicUpdate(long, boolean, java.util.Map, java.util.Set, java.util.Map)
 	 */
 	public void atomicUpdate(long appID, boolean clear, Map<String, Long> newNames, Set<Long> deleteSet, Map<Long, byte[]> updateMap) {
 		// TODO Auto-generated method stub
 		
+	}
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#lookup(java.lang.String)
+	 */
+	public Long lookup(String name) {
+		// TODO Auto-generated method stub
+		return null;
 	}
 
 }

@@ -16,6 +16,8 @@ import java.util.Map;
 
 import com.sun.gi.objectstore.ObjectStore;
 import com.sun.gi.objectstore.Transaction;
+import com.sun.gi.objectstore.tso.dataspace.DataSpace;
+import com.sun.gi.objectstore.tso.impl.DataSpaceTransactionImpl;
 import com.sun.gi.utils.SGSUUID;
 
 /**
@@ -29,11 +31,13 @@ import com.sun.gi.utils.SGSUUID;
  */
 public class TSOObjectStore implements ObjectStore {
 	DataSpace dataSpace;
+	DataSpace backupSpace;
 	SecureRandom random;
 	Map<SGSUUID,TSOTransaction> localTransactionIDMap = new HashMap<SGSUUID,TSOTransaction>();
 	
-	public TSOObjectStore(DataSpace space) throws InstantiationException{
+	public TSOObjectStore(DataSpace space, DataSpace backupSpace) throws InstantiationException{
 		dataSpace = space;
+		this.backupSpace = backupSpace;
 		try {
 			random = SecureRandom.getInstance("SHA1PRNG");
 		} catch (NoSuchAlgorithmException e) {			
@@ -63,14 +67,13 @@ public class TSOObjectStore implements ObjectStore {
 	 * @return
 	 */
 	DataSpaceTransaction getDataSpaceTransaction(long appID, ClassLoader loader) {		
-		return dataSpace.getTransaction(appID,loader);
+		return new DataSpaceTransactionImpl(appID,loader,dataSpace,backupSpace);
 	}
 	/**
 	 * @param dsTrans
 	 */
 	void returnDataSpaceTransaction(DataSpaceTransaction dsTrans) {
-		dataSpace.returnTransaction(dsTrans);
-		
+		((DataSpaceTransactionImpl)dsTrans).close();		
 	}
 	/**
 	 * @param uuid
