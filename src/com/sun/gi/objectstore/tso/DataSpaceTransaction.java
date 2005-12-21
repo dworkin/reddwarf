@@ -11,7 +11,7 @@ package com.sun.gi.objectstore.tso;
 
 import java.io.Serializable;
 
-import com.sun.gi.objectstore.tso.TSOTransaction.DataHeader;
+import com.sun.gi.objectstore.NonExistantObjectIDException;
 
 /**
  *
@@ -38,8 +38,9 @@ public interface DataSpaceTransaction {
 	/**
 	 * @param objectID
 	 * @return
+	 * @throws NonExistantObjectIDException 
 	 */
-	Serializable read(long objectID);
+	Serializable read(long objectID) throws NonExistantObjectIDException;
 
 	/**
 	 * @param name

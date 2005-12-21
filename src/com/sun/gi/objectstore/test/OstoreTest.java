@@ -99,6 +99,7 @@ public class OstoreTest {
       }
     }
     System.out.println("Testing lock of a non existant object.");
+    obj=null;
     try {
 		obj = (DataObject) t2.lock(5);
 	} catch (DeadlockException e2) {		

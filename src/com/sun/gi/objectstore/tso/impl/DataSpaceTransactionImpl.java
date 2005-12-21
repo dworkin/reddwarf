@@ -26,9 +26,11 @@ import java.io.ObjectInputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 
+import com.sun.gi.objectstore.NonExistantObjectIDException;
 import com.sun.gi.objectstore.tso.DataSpaceTransaction;
 import com.sun.gi.objectstore.tso.dataspace.DataSpace;
 import com.sun.gi.objectstore.tso.dataspace.InMemoryDataSpace;
+import com.sun.gi.utils.classes.CLObjectInputStream;
 
 /**
  * 
@@ -76,7 +78,7 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	 * @param dataSpace
 	 * @param backup
 	 */
-	public DataSpaceTransactionImpl(long appID, ClassLoader loader2,
+	public DataSpaceTransactionImpl(long appID, ClassLoader loader,
 			DataSpace dataSpace, DataSpace backup) {
 		this.dataSpace = dataSpace;
 		this.appID = appID;
@@ -111,13 +113,16 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	 * 
 	 * @see com.sun.gi.objectstore.tso.DataSpaceTransaction#read(long)
 	 */
-	public Serializable read(long objectID) {
+	public Serializable read(long objectID) throws NonExistantObjectIDException {
 		Long id = new Long(objectID);
 		Serializable obj = localObjectCache.get(id);
 		if ((obj == null)&&(!clear)) { // if clear, pretend nothing in the data space
 			byte[] objbytes = dataSpace.getObjBytes(appID, objectID);
-			if (objbytes == null) { 
+			if ((objbytes == null)&&(backupSpace!=null)) { 
 				objbytes = backupSpace.getObjBytes(appID, objectID);
+			}
+			if (objbytes==null){
+				throw new NonExistantObjectIDException();
 			}
 			obj = deserialize(objbytes);
 			localObjectCache.put(new Long(objectID), obj);
@@ -132,11 +137,8 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	 */
 	private Serializable deserialize(byte[] objbytes) {
 		ByteArrayInputStream bais = new ByteArrayInputStream(objbytes);
-		try {
-			Class oisClass = loader.loadClass("ObjectInputStream");
-			Constructor oisConst = oisClass.getConstructor(InputStream.class);
-			ObjectInputStream ois = (ObjectInputStream) oisConst
-					.newInstance(bais);
+		try {			
+			ObjectInputStream ois = new CLObjectInputStream(bais,loader);
 			Serializable obj = (Serializable) ois.readObject();
 			ois.close();
 			return obj;
@@ -145,16 +147,8 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 		} catch (ClassNotFoundException e) {
 			e.printStackTrace();
 		} catch (SecurityException e) {
-			e.printStackTrace();
-		} catch (NoSuchMethodException e) {
-			e.printStackTrace();
+			e.printStackTrace();		
 		} catch (IllegalArgumentException e) {
-			e.printStackTrace();
-		} catch (InstantiationException e) {
-			e.printStackTrace();
-		} catch (IllegalAccessException e) {
-			e.printStackTrace();
-		} catch (InvocationTargetException e) {
 			e.printStackTrace();
 		}
 		return null;

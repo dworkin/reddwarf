@@ -50,8 +50,9 @@ public interface Transaction {
      * and all state changes lost at the end of the transaction.</p>   
      * @param objectID  The ID of the object to return.
      * @return A reference to a local copy of the object referenced by objectID
+     * @throws NonExistantObjectIDException 
      */
-    public Serializable peek(long objectID);
+    public Serializable peek(long objectID) throws NonExistantObjectIDException;
     
     /** 
      * <p>This method takes a write-lock on the object referenced by objectID and returns

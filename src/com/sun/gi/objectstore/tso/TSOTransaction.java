@@ -106,7 +106,7 @@ public class TSOTransaction implements Transaction {
 	 * 
 	 * @see com.sun.gi.objectstore.Transaction#peek(long)
 	 */
-	public Serializable peek(long objectID) {		
+	public Serializable peek(long objectID) throws NonExistantObjectIDException {		
 		TSODataHeader dh = (TSODataHeader) dsTrans.read(objectID);
 		return dh.dataObject; 
 	}

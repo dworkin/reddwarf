@@ -49,6 +49,9 @@ public class TSOObjectStore implements ObjectStore {
 	 * @see com.sun.gi.objectstore.ObjectStore#newTransaction(long, java.lang.ClassLoader)
 	 */
 	public Transaction newTransaction(long appID, ClassLoader loader) {		
+		if (loader==null){
+			loader = this.getClass().getClassLoader();
+		}
 		TSOTransaction trans = new TSOTransaction(this,appID,loader,System.currentTimeMillis(),
 				random.nextLong());
 		localTransactionIDMap.put(trans.uuid,trans);
