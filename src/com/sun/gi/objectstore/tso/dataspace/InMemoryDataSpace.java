@@ -9,10 +9,12 @@
  */
 package com.sun.gi.objectstore.tso.dataspace;
 
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+
+import com.sun.gi.objectstore.NonExistantObjectIDException;
 
 /**
  * 
@@ -33,13 +35,16 @@ import java.util.Set;
  * @version 1.0
  */
 public class InMemoryDataSpace implements DataSpace {
-	Map<Long, Map<Long, byte[]>> dataSpace = new HashMap<Long, Map<Long, byte[]>>();
-	Map<Long,Map<String,Long>> nameSpace = new HashMap<Long,Map<String,Long>>();
-	Map<Long, Set<Long>> lockSets = new HashMap<Long, Set<Long>>();
+	Map<Long, Map<Long, byte[]>> dataSpace = new LinkedHashMap<Long, Map<Long, byte[]>>();
+
+	Map<Long, Map<String, Long>> nameSpace = new LinkedHashMap<Long, Map<String, Long>>();
+
+	Map<Long, Set<Long>> lockSets = new LinkedHashMap<Long, Set<Long>>();
 
 	private Object idMutex = new Object();
 
-	private int id = 1;	
+	private int id = 1;
+
 	public InMemoryDataSpace() {
 
 	}
@@ -94,7 +99,7 @@ public class InMemoryDataSpace implements DataSpace {
 	 */
 	public byte[] getObjBytes(long appID, long objectID) {
 		Map<Long, byte[]> appMap;
-		synchronized(dataSpace){
+		synchronized (dataSpace) {
 			appMap = dataSpace.get(new Long(appID));
 		}
 		if (appMap != null) {
@@ -115,9 +120,23 @@ public class InMemoryDataSpace implements DataSpace {
 	 * 
 	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#lock(long)
 	 */
-	public void lock(long appID, long objectID) {
+	public void lock(long appID, long objectID)
+			throws NonExistantObjectIDException {
 		Set<Long> lockSet;
+		Map<Long, byte[]> appDataSpace;
 		Long id = new Long(appID);
+
+		synchronized (dataSpace) {
+			appDataSpace = dataSpace.get(appID);
+		}
+		if (appDataSpace == null) {
+			throw new NonExistantObjectIDException();
+		}
+		synchronized (appDataSpace) {
+			if (!appDataSpace.containsKey(objectID)) {
+				throw new NonExistantObjectIDException();
+			}
+		}
 		synchronized (lockSets) {
 			lockSet = lockSets.get(id);
 			if (lockSet == null) {
@@ -126,10 +145,10 @@ public class InMemoryDataSpace implements DataSpace {
 			}
 		}
 		synchronized (lockSet) {
-			while(lockSet.contains(objectID)){
+			while (lockSet.contains(objectID)) {
 				try {
 					lockSet.wait();
-				} catch (InterruptedException e) {					
+				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
 			}
@@ -175,32 +194,32 @@ public class InMemoryDataSpace implements DataSpace {
 	 */
 	public void atomicUpdate(long appID, boolean clear,
 			Map<String, Long> newNames, Set<Long> deleteSet,
-			Map<Long, byte[]> updateMap) {
-		Map<Long,byte[]> newObjMap = new HashMap<Long,byte[]>();
-		Map<String,Long> newNameMap = new HashMap<String,Long>();
-		Map<Long,byte[]> existingObjMap=null;
-		Map<String,Long> existingNameMap=null;
+			Map<Long, byte[]> updateMap) {	
+		
 		Long lappID = new Long(appID);
-		synchronized (dataSpace) {
-			synchronized(nameSpace){				
-				if (!clear){ // copy existing data			
-					existingObjMap = dataSpace.get(lappID);
-					existingNameMap = nameSpace.get(lappID);
-				}					
-				if (existingObjMap!=null){
-					newObjMap.putAll(existingObjMap);
+		Map<Long, byte[]> objMap = null;
+		Map<String, Long> nameMap = null;
+		synchronized (dataSpace) {	
+			synchronized (nameSpace) {
+				objMap = dataSpace.get(appID);
+				nameMap = nameSpace.get(appID);
+				if(objMap == null) {				
+					objMap = new LinkedHashMap<Long, byte[]>();
+					dataSpace.put(lappID, objMap);
 				}
-				if (existingNameMap!=null){
-					newNameMap.putAll(existingNameMap);
+				if (nameMap == null) {
+					nameMap = new LinkedHashMap<String, Long>();
+					nameSpace.put(lappID, nameMap);
 				}
-				newObjMap.putAll(updateMap);
-				newNameMap.putAll(newNames);
-				for(Long id : deleteSet)
-				{
-					newObjMap.remove(id);
-				}
-				dataSpace.put(lappID,newObjMap);
-				nameSpace.put(lappID,newNameMap);
+			}
+		}
+		synchronized(objMap){
+			synchronized(nameMap) {
+				objMap.putAll(updateMap);
+				nameMap.putAll(newNames);
+				for (Long id : deleteSet) {
+					objMap.remove(id);
+				}								
 			}
 		}
 	}
@@ -210,12 +229,12 @@ public class InMemoryDataSpace implements DataSpace {
 	 * 
 	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#lookup(java.lang.String)
 	 */
-	public Long lookup(long appID, String name) {	
-		Map<String,Long> nameMap;
-		synchronized(nameSpace){
+	public Long lookup(long appID, String name) {
+		Map<String, Long> nameMap;
+		synchronized (nameSpace) {
 			nameMap = nameSpace.get(new Long(appID));
 		}
-		synchronized(nameMap){
+		synchronized (nameMap) {
 			return nameMap.get(name);
 		}
 	}

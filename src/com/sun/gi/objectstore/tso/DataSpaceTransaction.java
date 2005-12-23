@@ -51,8 +51,9 @@ public interface DataSpaceTransaction {
 	/**
 	 * @param objectID
 	 * @return
+	 * @throws NonExistantObjectIDException 
 	 */
-	void lock(long objectID);
+	void lock(long objectID) throws NonExistantObjectIDException;
 
 	/**
 	 * @param objectID
@@ -85,6 +86,11 @@ public interface DataSpaceTransaction {
 	 * @return
 	 */
 	long lookupName(String name);
+
+	/**
+	 * @param appID
+	 */
+	void clear(long appID);
 
 	
 	

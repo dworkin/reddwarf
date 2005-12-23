@@ -12,6 +12,8 @@ package com.sun.gi.objectstore.tso.dataspace;
 import java.util.Map;
 import java.util.Set;
 
+import com.sun.gi.objectstore.NonExistantObjectIDException;
+
 /**
  *
  * <p>Title: DataSpace.java</p>
@@ -47,7 +49,7 @@ public interface DataSpace {
 	/* (non-Javadoc)
 	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#lock(long)
 	 */
-	public void lock(long appID, long objectID);
+	public void lock(long appID, long objectID) throws NonExistantObjectIDException;
 
 	/* (non-Javadoc)
 	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#release(long)

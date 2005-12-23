@@ -39,7 +39,7 @@ class DataObject
 }
 
 public class OstoreTest {
-  private static boolean TESTISOLATION = false;
+  private static boolean TESTISOLATION = true;
   public OstoreTest() {
   }
 
@@ -85,35 +85,27 @@ public class OstoreTest {
       System.out.println("Getting object from OUTSIDE transaction...");
       try {
 		obj = (DataObject) t2.lock(objid);
-	} catch (DeadlockException e) {		
+		System.out.println("ERROR: returned object.  Object: " + obj.toString());
+		System.exit(1);
+      } catch (DeadlockException e) {		
 		e.printStackTrace();
-	} catch (NonExistantObjectIDException e) {		
-		e.printStackTrace();
-	}
-      if (obj == null) {
-        System.out.println(
-            "Success: failed to lock object from outsiden context.");
-      }
-      else {
-        System.out.println("ERROR: returned object.  Object: " + obj.toString());
+      } catch (NonExistantObjectIDException e) {		
+		 System.out.println("Success: failed to lock object from outsiden context."  );
       }
     }
+    
     System.out.println("Testing lock of a non existant object.");
     obj=null;
     try {
 		obj = (DataObject) t2.lock(5);
+		 System.out.println("ERROR: returned object.  Object: " + obj.toString());
+		 System.exit(2);
 	} catch (DeadlockException e2) {		
 		e2.printStackTrace();
-	} catch (NonExistantObjectIDException e2) {		
-		e2.printStackTrace();
+	} catch (NonExistantObjectIDException e2) {	
+		System.out.println("Success: failed to lock non-existant object."	);	
 	}
-    if (obj == null) {
-      System.out.println(
-          "Success: failed to lock non-existant object.");
-    }
-    else {
-      System.out.println("ERROR: returned object.  Object: " + obj.toString());
-    }
+    
     System.out.println("COmitting object");
     t1.commit();
     System.out.println("Attempting to retrieve object from other transaction.");
@@ -161,7 +153,7 @@ public class OstoreTest {
     secondTrans.start();
     System.out.println("First Trans = "+ firstTrans);
     System.out.println("Second Trans = "+ secondTrans);
-    System.out.println("Timestamp Interrupt test");
+    System.out.println("TSO Interrupt test 1: earlier inetrrupts later wait");
     Thread lockThread = new Thread() {
       public void run() {
         try {
@@ -169,7 +161,7 @@ public class OstoreTest {
           secondTrans.lock(objid);
           System.out.println("acquired first lock.");
           Thread.sleep(3000);
-          System.out.println("Acquiring second lock in later..  should abort me.");
+          System.out.println("Acquiring second lock in later..  ");
           secondTrans.lock(objid2);
           System.out.println("ERROR: Later timstamp got both locks!");
         }
@@ -185,10 +177,12 @@ public class OstoreTest {
     lockThread.start();
     try {
       Thread.sleep(1000);
-      System.out.println("Acquiring lock in earlier transaction.");;
+      System.out.println("Acquiring second lock in earlier transaction.");
+      firstTrans.lock(objid2);
+      System.out.println("Earlier transaction acquired second.");
+      Thread.sleep(5000);
+      System.out.println("Acquiring first lock in earlier transaction.");
       firstTrans.lock(objid);
-      System.out.println("Earlier transaction acquired lock.");
-      Thread.sleep(1000);
     } catch (DeadlockException dle) {
       System.out.println("ERROR: Earlier transaction Aborted.");
     } catch (Exception e) {
@@ -196,6 +190,7 @@ public class OstoreTest {
     }
     firstTrans.commit();
     System.out.println("Earlier trasnaction completed.");
+    /*
     System.out.println("*** Timestamp Timeout Test ***");
     System.out.println("Non blocked test..... waiting for timeout");
     t1 = ostore.newTransaction(1,null);
@@ -211,14 +206,14 @@ public class OstoreTest {
 	} catch (NonExistantObjectIDException e) {		
 		e.printStackTrace();
 	}
-    /** temporarily remove timeout test
+
     try {
       Thread.sleep(ostore.getTimestampTimeout()+500); // sleep half a sec longer then timeout
     } catch (Exception e) {
       e.printStackTrace();
     }
     System.out.println("Attempting to lock objet that shoudl have timed out...");
-    */
+   
     try {
 		t2.lock(objid);
 	} catch (DeadlockException e) {		
@@ -238,6 +233,7 @@ public class OstoreTest {
 		e.printStackTrace();
 	}
     System.out.println("Success: Woke up from block after timeout.");
+    */
     System.out.println("End of tests");
   }
 }

@@ -7,7 +7,7 @@
  * @author Jeff Kesselman
  * @version 1.0
  */
-package com.sun.gi.objectstore.tso.impl;
+package com.sun.gi.objectstore.tso.dataspace;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -28,8 +28,6 @@ import java.lang.reflect.InvocationTargetException;
 
 import com.sun.gi.objectstore.NonExistantObjectIDException;
 import com.sun.gi.objectstore.tso.DataSpaceTransaction;
-import com.sun.gi.objectstore.tso.dataspace.DataSpace;
-import com.sun.gi.objectstore.tso.dataspace.InMemoryDataSpace;
 import com.sun.gi.utils.classes.CLObjectInputStream;
 
 /**
@@ -70,8 +68,7 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	private boolean clear = false;
 	
 	private DataSpace backupSpace;
-	private boolean active = true;
-
+	
 	/**
 	 * @param appID
 	 * @param loader2
@@ -169,7 +166,7 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	 * 
 	 * @see com.sun.gi.objectstore.tso.DataSpaceTransaction#lock(long)
 	 */
-	public void lock(long objectID) {
+	public void lock(long objectID) throws NonExistantObjectIDException {
 		dataSpace.lock(appID,objectID);
 		locksHeld.add(objectID);
 	}
@@ -227,6 +224,7 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 		deleteSet.clear();
 		updateMap.clear();
 		localObjectCache.clear();
+		//release left over locks
 		for(Long id : locksHeld){
 			dataSpace.release(appID,id);
 		}
@@ -245,7 +243,6 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 			backupSpace.atomicUpdate(appID,clear,newNames,deleteSet,updateMap);
 		}
 		resetTransaction();
-		active=false;
 	}
 
 	/*
@@ -255,7 +252,7 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	 */
 	public void abort() {
 		resetTransaction();
-		active=false;
+		
 	}
 
 	/*
@@ -278,9 +275,14 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	 * 
 	 */
 	public void close() {
-		if (active){
-			abort();
-		}
+		abort();		
+	}
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.objectstore.tso.DataSpaceTransaction#clear(long)
+	 */
+	public void clear(long appID) {
+		// TODO Auto-generated method stub
 		
 	}
 

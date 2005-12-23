@@ -10,11 +10,22 @@
 package com.sun.gi.objectstore.tso;
 
 import java.io.Serializable;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.Map.Entry;
 
 import com.sun.gi.objectstore.DeadlockException;
 import com.sun.gi.objectstore.NonExistantObjectIDException;
 import com.sun.gi.objectstore.Transaction;
-import com.sun.gi.objectstore.tso.impl.TSODataHeader;
+import com.sun.gi.objectstore.tso.dataspace.DataSpace;
+import com.sun.gi.objectstore.tso.dataspace.DataSpaceTransactionImpl;
+import com.sun.gi.objectstore.tso.dataspace.InMemoryDataSpace;
 import com.sun.gi.utils.SGSUUID;
 import com.sun.gi.utils.StatisticalUUID;
 
@@ -37,44 +48,60 @@ import com.sun.gi.utils.StatisticalUUID;
  * @version 1.0
  */
 public class TSOTransaction implements Transaction {
-	
-	
-	
-	TSOObjectStore objectStore;
-	long appID;
-	ClassLoader loader;
-	long time;
-	long tiebreaker;
-	SGSUUID uuid;
-	DataSpaceTransaction dsTrans;
-	boolean active = false;
-	private boolean timeStampInterrupted;
-	/**
-	 * @param store
-	 * @param dataSpace
-	 * @param appID
-	 * @param loader
-	 * @param l
-	 * @param m
-	 */
-	public TSOTransaction(TSOObjectStore store, long appID, ClassLoader loader, long time, 
-			long tiebreaker) {
-		this.objectStore = store;
+
+	private TSOObjectStore ostore;
+
+	private long appID;
+
+	private SGSUUID transactionID;
+
+	private long time;
+
+	private long tiebreaker;
+
+	private ClassLoader loader;
+
+	private DataSpaceTransaction mainTrans, keyTrans;
+
+	private DataSpace mainDataSpace, backupDataSpace;
+
+	private Map<Long, Serializable> lockedObjectsMap = new HashMap<Long, Serializable>();
+
+	private List<Long> newObjectIDs = new ArrayList<Long>();
+
+	private boolean timestampInterrupted;
+
+	// static init
+
+	TSOTransaction(TSOObjectStore ostore, long appID, ClassLoader loader,
+			long time, long tiebreaker, DataSpace mainDataSpace,
+			DataSpace backupDataSpace) {
+
+		this.ostore = ostore;
 		this.appID = appID;
 		this.loader = loader;
+		transactionID = new StatisticalUUID();
 		this.time = time;
 		this.tiebreaker = tiebreaker;
-		uuid = new StatisticalUUID();
+		this.mainDataSpace = mainDataSpace;
+		this.backupDataSpace = backupDataSpace;
 	}
-	
+
+	public SGSUUID getUUID() {
+		return transactionID;
+	}
+
 	/*
 	 * (non-Javadoc)
 	 * 
 	 * @see com.sun.gi.objectstore.Transaction#start()
 	 */
 	public void start() {
-		dsTrans = objectStore.getDataSpaceTransaction(appID,loader);
-		active = true;
+		mainTrans = new DataSpaceTransactionImpl(appID, loader, mainDataSpace,
+				backupDataSpace);
+		keyTrans = new DataSpaceTransactionImpl(appID, loader, mainDataSpace,
+				backupDataSpace);
+		timestampInterrupted = false;
 	}
 
 	/*
@@ -84,11 +111,15 @@ public class TSOTransaction implements Transaction {
 	 *      java.lang.String)
 	 */
 	public long create(Serializable object, String name) {
-		long tsID = dsTrans.create(new TSODataHeader(time,tiebreaker,uuid,object));
-		if (name!=null){
-			dsTrans.registerName(name,tsID);
+		long id = mainTrans.create(object);
+		long headerID = mainTrans.create(new TSODataHeader(time, tiebreaker,
+				transactionID, id));
+		if (name != null) {
+			mainTrans.registerName(name, headerID);
 		}
-		return tsID;
+		lockedObjectsMap.put(headerID, object);
+		newObjectIDs.add(headerID);
+		return headerID;
 	}
 
 	/*
@@ -96,9 +127,11 @@ public class TSOTransaction implements Transaction {
 	 * 
 	 * @see com.sun.gi.objectstore.Transaction#destroy(long)
 	 */
-	public void destroy(long objectID) throws DeadlockException, NonExistantObjectIDException {
-		lock(objectID);		
-		dsTrans.destroy(objectID);		
+	public void destroy(long objectID) throws DeadlockException,
+			NonExistantObjectIDException {
+		TSODataHeader hdr = (TSODataHeader) mainTrans.read(objectID);
+		mainTrans.destroy(hdr.objectID); // destroy object
+		mainTrans.destroy(objectID); // destroy header
 	}
 
 	/*
@@ -106,14 +139,74 @@ public class TSOTransaction implements Transaction {
 	 * 
 	 * @see com.sun.gi.objectstore.Transaction#peek(long)
 	 */
-	public Serializable peek(long objectID) throws NonExistantObjectIDException {		
-		TSODataHeader dh = (TSODataHeader) dsTrans.read(objectID);
-		return dh.dataObject; 
+	public Serializable peek(long objectID) throws NonExistantObjectIDException {
+		TSODataHeader hdr = (TSODataHeader) mainTrans.read(objectID);
+		return mainTrans.read(hdr.objectID);
 	}
-	
-	public Serializable lock(long objectID) 
-		throws DeadlockException, NonExistantObjectIDException {
-		return lock(objectID,true);
+
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see com.sun.gi.objectstore.Transaction#lock(long, boolean)
+	 */
+	public Serializable lock(long objectID, boolean block)
+			throws DeadlockException, NonExistantObjectIDException {
+		Serializable obj = lockedObjectsMap.get(objectID);
+		if (obj != null) { // already locked
+			return obj;
+		}
+		keyTrans.lock(objectID);
+		TSODataHeader hdr = (TSODataHeader) keyTrans.read(objectID);
+		while (!hdr.free) {
+			if (timestampInterrupted) {
+				keyTrans.abort();
+				abort();
+				throw new TimestampInterruptException();
+			} else if (!block) {
+				keyTrans.abort();
+				return null;
+			}
+			if ((time < hdr.time)
+					|| ((time == hdr.time) && (tiebreaker < hdr.tiebreaker))) {
+				ostore.requestTimestampInterrupt(hdr.uuid);
+			}
+			// System.out.println("Waiting for wakeup "+transactionID);
+			if (!hdr.availabilityListeners.contains(transactionID)) {
+				hdr.availabilityListeners.add(transactionID);
+				keyTrans.write(objectID, hdr);
+				keyTrans.commit();
+			} else {
+				keyTrans.abort();
+			}
+			waitForWakeup();
+			// System.out.println("wokeup "+transactionID);
+			keyTrans.lock(objectID);
+			hdr = (TSODataHeader) keyTrans.read(objectID);
+		}
+		hdr.free = false;
+		hdr.time = time;
+		hdr.tiebreaker = tiebreaker;
+		hdr.availabilityListeners.remove(transactionID);
+		hdr.uuid = transactionID;
+		keyTrans.write(objectID, hdr);
+		keyTrans.commit();
+		obj = mainTrans.read(hdr.objectID);
+		lockedObjectsMap.put(objectID, obj);
+		return obj;
+	}
+
+	/**
+	 * 
+	 */
+	private void waitForWakeup() {
+		synchronized (this) {
+			try {
+				this.wait();
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+		}
+
 	}
 
 	/*
@@ -121,78 +214,50 @@ public class TSOTransaction implements Transaction {
 	 * 
 	 * @see com.sun.gi.objectstore.Transaction#lock(long)
 	 */
-	public Serializable lock(long objectID, boolean blocking) throws DeadlockException, NonExistantObjectIDException {
-		dsTrans.lock(objectID);
-		TSODataHeader dh = (TSODataHeader) dsTrans.read(objectID);
-		if (dh==null){
-			throw new NonExistantObjectIDException();
-		}
-		while(!dh.free){// data object locked by someone else
-			if ((time<dh.time)||
-				((time == dh.time)&&(tiebreaker<dh.tiebreaker))){
-				// we're older so interrupt the holder
-				doTimeStampInterrupt(dh);
-			} 
-			dsTrans.release(objectID); // get out of the way
-			if (!blocking){
-				return null;
-			}
-			waitForFreedSignal(); // will return when free or throw
-									// DeadlockException
-			dsTrans.lock(objectID); // get header again
-			dh = (TSODataHeader) dsTrans.read(objectID);	
-		}
-		// its ours
-		dh.time = time;
-		dh.tiebreaker = tiebreaker;
-		dh.uuid = uuid;
-		dsTrans.write(objectID,dh);
-		dsTrans.release(objectID);
-		return dh.dataObject;
+	public Serializable lock(long objectID) throws DeadlockException,
+			NonExistantObjectIDException {
+		return lock(objectID, true);
 	}
 
-	/**
-	 * 
-	 */
-	private void waitForFreedSignal() throws DeadlockException{
-		if (timeStampInterrupted){
-			throw new TimestampInterruptException();
-		}
-		synchronized(uuid){
-			try {
-				uuid.wait();
-			} catch (InterruptedException e) {				
-				e.printStackTrace();
-			}
-		}		
-	}
-
-	/**
-	 * @param dh
-	 */
-	private void doTimeStampInterrupt(TSODataHeader dh) {
-		objectStore.doTimeStampInterrupt(dh.uuid);		
-	}
-
-	
 	/*
 	 * (non-Javadoc)
 	 * 
 	 * @see com.sun.gi.objectstore.Transaction#lookup(java.lang.String)
 	 */
-	public long lookup(String name){		
-		return dsTrans.lookupName(name);
+	public long lookup(String name) {
+		return mainTrans.lookupName(name);
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.Transaction#abort()
-	 */
-	public void abort() {		
-		active=false;
-		dsTrans.abort();
-		objectStore.returnDataSpaceTransaction(dsTrans);
+	private void freeLockedObjects() {
+		List<SGSUUID> listeners = new ArrayList<SGSUUID>();
+		for (Long l : lockedObjectsMap.keySet()) {
+			TSODataHeader hdr;
+			if (!newObjectIDs.contains(l)) {
+				try {
+					keyTrans.lock(l);
+					hdr = (TSODataHeader) keyTrans.read(l);
+					hdr.free = true;
+					keyTrans.write(l, hdr);
+					listeners.addAll(hdr.availabilityListeners);
+				} catch (NonExistantObjectIDException e) {
+					e.printStackTrace();
+				}
+			}
+		}	
+		keyTrans.commit();
+		newObjectIDs.clear();
+		ostore.notifyAvailabilityListeners(listeners);
+
+	} /*
+		 * (non-Javadoc)
+		 * 
+		 * @see com.sun.gi.objectstore.Transaction#abort()
+		 */
+
+	public void abort() {
+		mainTrans.abort();
+		freeLockedObjects();
+		lockedObjectsMap.clear();
 	}
 
 	/*
@@ -200,11 +265,10 @@ public class TSOTransaction implements Transaction {
 	 * 
 	 * @see com.sun.gi.objectstore.Transaction#commit()
 	 */
-	public void commit() {		
-		active = false;
-		dsTrans.commit();
-		objectStore.returnDataSpaceTransaction(dsTrans);
-		
+	public void commit() {
+		mainTrans.commit();
+		freeLockedObjects();
+		lockedObjectsMap.clear();
 	}
 
 	/*
@@ -213,7 +277,6 @@ public class TSOTransaction implements Transaction {
 	 * @see com.sun.gi.objectstore.Transaction#getCurrentAppID()
 	 */
 	public long getCurrentAppID() {
-		// TODO Auto-generated method stub
 		return appID;
 	}
 
@@ -223,21 +286,18 @@ public class TSOTransaction implements Transaction {
 	 * @see com.sun.gi.objectstore.Transaction#clear()
 	 */
 	public void clear() {
-		dsTrans.clear();
-		
+		ostore.clear(appID);
 	}
 
 	/**
 	 * 
 	 */
 	public void timeStampInterrupt() {
-		timeStampInterrupted = true;
-		synchronized(uuid){
-			uuid.notifyAll();
+		timestampInterrupted = true;
+		synchronized (this) {
+			this.notifyAll();
 		}
-		
-	}
 
-	
+	}
 
 }

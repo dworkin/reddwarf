@@ -7,9 +7,13 @@
  * @author Jeff Kesselman
  * @version 1.0
  */
-package com.sun.gi.objectstore.tso.impl;
+package com.sun.gi.objectstore.tso;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 import com.sun.gi.utils.SGSUUID;
 
@@ -30,15 +34,17 @@ public class TSODataHeader  implements Serializable{
 		public long time;
 		public long tiebreaker;
 		public SGSUUID uuid;
-		public Serializable dataObject;
 		public boolean free;
+		public Set<SGSUUID> availabilityListeners;
+		public long objectID;
 		
-		public TSODataHeader(long time, long tiebreaker,SGSUUID uuid, Serializable obj){
+		public TSODataHeader(long time, long tiebreaker,SGSUUID uuid, long objID){
 			this.time =time;
 			this.tiebreaker = tiebreaker;
 			this.uuid = uuid;
-			this.dataObject = obj;
+			this.objectID = objID;
 			free = true;
+			availabilityListeners = new HashSet<SGSUUID>();
 		}
 		
 		public boolean before(TSODataHeader other){

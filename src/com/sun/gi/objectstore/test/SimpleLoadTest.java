@@ -1,9 +1,13 @@
 package com.sun.gi.objectstore.test;
 
-import com.sun.gi.objectstore.ObjectStore;
-import com.sun.gi.objectstore.impl.TTObjectStore;
-import com.sun.gi.objectstore.Transaction;
 import java.io.Serializable;
+
+import com.sun.gi.objectstore.DeadlockException;
+import com.sun.gi.objectstore.NonExistantObjectIDException;
+import com.sun.gi.objectstore.ObjectStore;
+import com.sun.gi.objectstore.Transaction;
+import com.sun.gi.objectstore.tso.TSOObjectStore;
+import com.sun.gi.objectstore.tso.dataspace.InMemoryDataSpace;
 
 /**
  * <p>Title: </p>
@@ -46,11 +50,19 @@ public class SimpleLoadTest {
 
   public static void test(int OBJCOUNT) {
     objids = new long[OBJCOUNT];
-    ObjectStore ostore = new TTObjectStore(10,20);
+    ObjectStore ostore=null;
+	try {
+		ostore = new TSOObjectStore(new InMemoryDataSpace(),null);
+	} catch (InstantiationException e) {
+		
+		e.printStackTrace();
+		System.exit(1);
+	}
     System.out.println("Clearing object store");
-    ostore.clear();
+    ostore.clearAll();
     System.out.println("Assigning transactions.");
     Transaction t1 = ostore.newTransaction(1,null);
+    t1.start();
     SLTDataObject dobj = new SLTDataObject(55,3.1415,"data_object");
     int a;
     long start = System.currentTimeMillis();
@@ -72,6 +84,7 @@ public class SimpleLoadTest {
                        (System.currentTimeMillis()-start)+" milliseconds.");
     t1 = ostore.newTransaction(1,null);
     System.out.println("Initializing another transaction");
+    t1.start();
     for (int i = 0; i < OBJCOUNT; i++) {
       objids[i] = t1.create(dobj,null);
     }
@@ -80,10 +93,16 @@ public class SimpleLoadTest {
     System.out.println("Commit time for "+OBJCOUNT+" inserts: "+
                        (System.currentTimeMillis()-start)+" milliseconds.");
     t1 = ostore.newTransaction(1,null);
+    t1.start();
    start = System.currentTimeMillis();
    Serializable obj;
    for (int i = 0; i < OBJCOUNT; i++) {
-     obj = t1.peek(objids[i]);
+     try {
+		obj = t1.peek(objids[i]);
+	} catch (NonExistantObjectIDException e) {
+		
+		e.printStackTrace();
+	}
    }
    result = (System.currentTimeMillis()-start)-looptime;
    System.out.println("Milliseconds per peek: "+((float)result)/OBJCOUNT);
@@ -92,9 +111,18 @@ public class SimpleLoadTest {
    System.out.println("Commit time for "+OBJCOUNT+" peeks: "+
                       (System.currentTimeMillis()-start)+" milliseconds.");
    t1 = ostore.newTransaction(1,null);
+   t1.start();
    start = System.currentTimeMillis();
    for (int i = 0; i < OBJCOUNT; i++) {
-     obj = t1.lock(objids[i]);
+     try {
+		obj = t1.lock(objids[i]);
+	} catch (DeadlockException e) {
+		
+		e.printStackTrace();
+	} catch (NonExistantObjectIDException e) {
+		
+		e.printStackTrace();
+	}
    }
    result = (System.currentTimeMillis() - start) - looptime;
    System.out.println("Milliseconds per lock: "+((float)result)/OBJCOUNT);
@@ -103,16 +131,34 @@ public class SimpleLoadTest {
    System.out.println("Commit time for "+OBJCOUNT+" locks: "+
                       (System.currentTimeMillis()-start)+" milliseconds.");
    t1 = ostore.newTransaction(1,null);
-   obj = t1.lock(objids[0]);
+   t1.start();
+   try {
+	obj = t1.lock(objids[0]);
+} catch (DeadlockException e) {
+	
+	e.printStackTrace();
+} catch (NonExistantObjectIDException e) {
+	
+	e.printStackTrace();
+}
    start = System.currentTimeMillis();
    t1.commit();
    System.out.println("Commit time for "+OBJCOUNT+" writes: "+
                       (System.currentTimeMillis()-start)+" milliseconds.");
 
    t1 = ostore.newTransaction(1,null);
+   t1.start();
    start = System.currentTimeMillis();
    for (int i = 0; i < OBJCOUNT; i++) {
-     t1.destroy(objids[i]);
+     try {
+		t1.destroy(objids[i]);
+	} catch (DeadlockException e) {
+		
+		e.printStackTrace();
+	} catch (NonExistantObjectIDException e) {
+		
+		e.printStackTrace();
+	}
    }
    result = (System.currentTimeMillis() - start) - looptime;
    System.out.println("Milliseconds per destroy: "+((float)result)/OBJCOUNT);
