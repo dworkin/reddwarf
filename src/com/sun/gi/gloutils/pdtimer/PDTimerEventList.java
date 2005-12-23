@@ -85,11 +85,9 @@ public class PDTimerEventList implements Serializable {
 						cleanupMethod, new Object[] { cleanupList });
 			} catch (InstantiationException e) {
 				e.printStackTrace();
-			} catch (SecurityException e) {
-				
+			} catch (SecurityException e) {				
 				e.printStackTrace();
-			} catch (NoSuchMethodException e) {
-				
+			} catch (NoSuchMethodException e) {				
 				e.printStackTrace();
 			}
 		}		

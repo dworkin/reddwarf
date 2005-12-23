@@ -33,11 +33,21 @@ public class PDTimer implements SimTimerListener {
 	 */
 	private static final long serialVersionUID = 1L;
 	GLOReference timerListRef=null;
+	
+	public PDTimer(SimTask task){	
+		System.out.println("initting PDTimer");
+		PDTimerEventList list=null;
+		try {
+			list = new PDTimerEventList();
+		} catch (InstantiationException e) {
+			
+			e.printStackTrace();
+		}			
+		timerListRef = task.createSO(list,null);
+	}
+	
 	public void start(SimTask task,long heartbeat) throws InstantiationException{
-		if (timerListRef == null){ // first time
-			PDTimerEventList list = new PDTimerEventList();
-			timerListRef = task.createSO(list,null);
-		}
+		
 		try {
 			task.registerTimerEvent(ACCESS_TYPE.PEEK,heartbeat*1000,true,task.makeReference(this));
 		} catch (InstantiationException e) {			

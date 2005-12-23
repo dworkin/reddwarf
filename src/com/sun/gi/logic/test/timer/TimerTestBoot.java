@@ -44,7 +44,7 @@ public class TimerTestBoot implements SimBoot, SimTimerListener {
 			*/
 			PDTimer timer;
 			if (pdTimer==null){ // not instantiated yet
-				timer = new PDTimer();
+				timer = new PDTimer(task);
 				pdTimer = task.createSO(timer,null);
 			} else {
 				timer=(PDTimer)pdTimer.get(task);
