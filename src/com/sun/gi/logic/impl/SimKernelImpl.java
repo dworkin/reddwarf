@@ -80,7 +80,7 @@ public SimKernelImpl(ObjectStore ostore) {
 							synchronized(threadPool){
 								if (threadPool.size()>0){
 									if (sim.hasTasks()){
-										SimTask task = sim.nextTask();
+										SimTask task = sim.nextTask();										
 										SimThread thread = threadPool.remove(0);
 										thread.execute(task);
 									}

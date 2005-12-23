@@ -5,6 +5,8 @@ import java.io.ObjectInputStream;
 import java.io.IOException;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask;
+import com.sun.gi.objectstore.DeadlockException;
+import com.sun.gi.objectstore.NonExistantObjectIDException;
 
 /**
  * <p>
@@ -51,13 +53,29 @@ public class GLOReferenceImpl implements GLOReference, Serializable, Comparable 
 	 * @see com.sun.gi.logic.GLOReference#delete(com.sun.gi.logic.SimTask)
 	 */
 	public void delete(SimTask task) {
-		task.getTransaction().destroy(objID);
+		try {
+			task.getTransaction().destroy(objID);
+		} catch (DeadlockException e) {
+			
+			e.printStackTrace();
+		} catch (NonExistantObjectIDException e) {
+			
+			e.printStackTrace();
+		}
 		
 	}
 
 	public Serializable get(SimTask task) {
 		if ((objectCache == null) || (peeked == true)) {
-			objectCache = task.getTransaction().lock(objID);
+			try {
+				objectCache = task.getTransaction().lock(objID);
+			} catch (DeadlockException e) {
+				
+				e.printStackTrace();
+			} catch (NonExistantObjectIDException e) {
+				
+				e.printStackTrace();
+			}
 			task.registerGLOID(objID, objectCache);
 			peeked = false;
 		}
@@ -66,7 +84,12 @@ public class GLOReferenceImpl implements GLOReference, Serializable, Comparable 
 
 	public Serializable peek(SimTask task) {
 		if (objectCache == null) {
-			objectCache = task.getTransaction().peek(objID);
+			try {
+				objectCache = task.getTransaction().peek(objID);
+			} catch (NonExistantObjectIDException e) {
+				
+				e.printStackTrace();
+			}
 			task.registerGLOID(objID, objectCache);
 			peeked = true;
 		}

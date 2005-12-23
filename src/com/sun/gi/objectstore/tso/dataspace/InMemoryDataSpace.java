@@ -234,6 +234,9 @@ public class InMemoryDataSpace implements DataSpace {
 		synchronized (nameSpace) {
 			nameMap = nameSpace.get(new Long(appID));
 		}
+		if (nameMap==null){
+			return DataSpace.INVALID_ID;
+		}
 		synchronized (nameMap) {
 			return nameMap.get(name);
 		}

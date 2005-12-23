@@ -4,6 +4,8 @@
 
 package com.sun.gi.objectstore;
 
+import com.sun.gi.objectstore.tso.dataspace.DataSpace;
+
 /**
  * <p>Title: ObjectStore.java</p>
  * <p>Description: This interface defines a Darkstar ObjectStore</p>
@@ -18,7 +20,7 @@ public interface ObjectStore {
 	 * This constant is used as an error return by Transaction.lookupObject
 	 * @see Transaction
 	 */
-  public static final long INVALID_ID = Long.MIN_VALUE;
+  public static final long INVALID_ID = DataSpace.INVALID_ID;
   
   /**
    * <p>All interractions with data stored in the ObejctStore must ocurr under a transactional context.

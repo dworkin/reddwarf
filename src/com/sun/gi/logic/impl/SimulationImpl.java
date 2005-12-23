@@ -98,6 +98,7 @@ public class SimulationImpl implements Simulation {
 		// check for boot object. it it doesnt exist, then create it
 		Transaction trans = kernel.getOstore().newTransaction(appID,
 				bootclass.getClassLoader());
+		trans.start();
 		boolean firstTime = false;
 		long bootObjectID = trans.lookup("BOOT");
 		if (bootObjectID == ObjectStore.INVALID_ID) { // doesnt exist

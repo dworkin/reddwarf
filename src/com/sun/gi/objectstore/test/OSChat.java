@@ -1,5 +1,7 @@
 package com.sun.gi.objectstore.test;
 
+import com.sun.gi.objectstore.DeadlockException;
+import com.sun.gi.objectstore.NonExistantObjectIDException;
 import com.sun.gi.objectstore.ObjectStore;
 import javax.swing.JFrame;
 import java.awt.Container;
@@ -10,8 +12,9 @@ import java.awt.event.ActionEvent;
 import javax.swing.JTextArea;
 import javax.swing.JScrollPane;
 import com.sun.gi.objectstore.Transaction;
-import java.io.Serializable;
-import com.sun.gi.objectstore.impl.TTObjectStore;
+import com.sun.gi.objectstore.tso.TSOObjectStore;
+import com.sun.gi.objectstore.tso.dataspace.InMemoryDataSpace;
+
 import java.io.*;
 
 /**
@@ -77,7 +80,13 @@ public class OSChat extends JFrame {
             ex.printStackTrace();
           }
           trans = os.newTransaction(1,null);
-          TextHolder holder = (TextHolder)trans.peek(id);
+          TextHolder holder=null;
+		try {
+			holder = (TextHolder)trans.peek(id);
+		} catch (NonExistantObjectIDException e) {
+			
+			e.printStackTrace();
+		}
           if (lastUpdateCount < holder.updatecount){
             outputArea.setText(holder.text);
             lastUpdateCount = holder.updatecount;
@@ -96,7 +105,16 @@ public class OSChat extends JFrame {
     long after = System.currentTimeMillis();
     System.out.println("locking text objeect  ("+(after-time)+")");
     time = after;
-    TextHolder holder = (TextHolder)trans.lock(id);
+    TextHolder holder=null;
+	try {
+		holder = (TextHolder)trans.lock(id);
+	} catch (DeadlockException e) {
+		
+		e.printStackTrace();
+	} catch (NonExistantObjectIDException e) {
+		
+		e.printStackTrace();
+	}
     after = System.currentTimeMillis();
     System.out.println("text obeject locked ("+(after-time)+")");
     time = after;
@@ -110,7 +128,7 @@ public class OSChat extends JFrame {
 
   public static void main(String[] args){
     try {
-      TTObjectStore ostore = new TTObjectStore(10,20);
+      ObjectStore ostore = new TSOObjectStore(new InMemoryDataSpace(),null);
 
       new OSChat(ostore);
     }
