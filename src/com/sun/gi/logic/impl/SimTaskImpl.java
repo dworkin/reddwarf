@@ -322,13 +322,13 @@ public class SimTaskImpl implements SimTask {
 		 * @throws IOException
 		 * @throws SecurityException
 		 */
-		protected NoGLOObjectOutputStream(OutputStream os) throws IOException, SecurityException {
+		protected NoGLOObjectOutputStream(ByteArrayOutputStream os) throws IOException, SecurityException {
 			super(os);	
 			enableReplaceObject(true);
 		}		
 		
 		protected Object replaceObject(Object obj) throws IOException {
-			if (gloIDMap.containsKey(this)){
+			if (gloIDMap.containsKey(obj)){
 				throw new IOException("Attempt to serialize GLO!");
 			}
 			return obj;			
