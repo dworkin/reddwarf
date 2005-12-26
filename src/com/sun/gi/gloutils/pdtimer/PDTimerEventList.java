@@ -59,6 +59,7 @@ public class PDTimerEventList implements Serializable {
 	//Tick is desgined to be called with ACCESS.PEEK
 	public void tick(SimTask task, long time) {
 		task.access_check(ACCESS_TYPE.PEEK,this);
+		System.out.println("Ticking timer list");
 		List<GLOReference> cleanupList = new ArrayList<GLOReference>();
 		for (Entry<Long, GLOReference> entry : timerEvents.entrySet()) {
 			if (entry.getKey() <= time) {
@@ -125,6 +126,7 @@ public class PDTimerEventList implements Serializable {
 	//  * (DESIGNED To BE CALLED WITH ACCESS.GET)
 	public void cleanup(SimTask task, List<GLOReference> cleanupList) {
 		task.access_check(ACCESS_TYPE.GET,this);
+		System.out.println("DOing cleanup");
 		if (--bigCleanupCountdown==0){ // do a big cleanup
 			bigCleanup(task);
 		} else { // do a normal destributed cleanup
@@ -132,7 +134,7 @@ public class PDTimerEventList implements Serializable {
 				PDTimerEvent evnt = (PDTimerEvent) ref.get(task);
 				if (evnt.isRepeating()) {					
 					removeEvent(ref);
-					evnt.reset(); // resets it for next ring
+					evnt.reset(task); // resets it for next ring
 					addEvent(task, ref);
 				} else if (evnt.isMoribund()) {
 					removeEvent(ref);
@@ -149,11 +151,11 @@ public class PDTimerEventList implements Serializable {
 		for(Entry<Long,GLOReference> entry : timerEvents.entrySet()){
 			if(entry.getKey().longValue()<=time){
 				GLOReference ref = entry.getValue();
-				PDTimerEvent evnt = (PDTimerEvent)ref.peek(task);
+				PDTimerEvent evnt = (PDTimerEvent)ref.get(task);
 				if (evnt.requiresCleanup()){ //needs to be cleaned					
 					if (evnt.isRepeating()) {					
 						removeEvent(ref);
-						evnt.reset(); // resets it for next ring
+						evnt.reset(task); // resets it for next ring
 						addEvent(task, ref);
 					} else if (evnt.isMoribund()) {
 						removeEvent(ref);

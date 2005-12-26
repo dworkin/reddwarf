@@ -14,6 +14,7 @@ import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimBoot;
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.SimTimerListener;
+import com.sun.gi.logic.SimTask.ACCESS_TYPE;
 
 /**
  *
@@ -35,8 +36,7 @@ public class TimerTestBoot implements SimBoot, SimTimerListener {
 	 */
 	public void boot(SimTask task, boolean firstBoot) {
 		System.out.println("TimerTestBoot running");
-		try {
-			GLOReference thisobj = task.makeReference(this);
+		try {			
 			/*
 			oneSecEvent = task.registerTimerEvent(1000l,true,thisobj);
 			fiveSecEvent = task.registerTimerEvent(5000l,false,thisobj);
@@ -46,10 +46,14 @@ public class TimerTestBoot implements SimBoot, SimTimerListener {
 			if (pdTimer==null){ // not instantiated yet
 				timer = new PDTimer(task);
 				pdTimer = task.createSO(timer,null);
+				TimerCount tc = new TimerCount();
+				GLOReference tcRef = task.createSO(tc,null);
+				timer.addTimerEvent(task,ACCESS_TYPE.GET,1,true,tcRef,"increment",new Object[]{});
 			} else {
 				timer=(PDTimer)pdTimer.get(task);
 			}
 			timer.start(task,1);
+			
 		} catch (InstantiationException e) {			
 			e.printStackTrace();
 		}		

@@ -110,7 +110,9 @@ public class PDTimerEvent implements Serializable {
 	/**
 	 * 
 	 */
-	public void reset() {
+	public void reset(SimTask task) {
+		task.access_check(ACCESS_TYPE.GET,this);
+		System.out.println("Restting event");
 		isActive=true;
 		
 	}

@@ -5,6 +5,7 @@ import java.io.ObjectInputStream;
 import java.io.IOException;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask;
+import com.sun.gi.logic.SimTask.ACCESS_TYPE;
 import com.sun.gi.objectstore.DeadlockException;
 import com.sun.gi.objectstore.NonExistantObjectIDException;
 
@@ -76,7 +77,7 @@ public class GLOReferenceImpl implements GLOReference, Serializable, Comparable 
 				
 				e.printStackTrace();
 			}
-			task.registerGLOID(objID, objectCache);
+			task.registerGLOID(objID, objectCache, ACCESS_TYPE.GET);
 			peeked = false;
 		}
 		return objectCache;
@@ -90,7 +91,7 @@ public class GLOReferenceImpl implements GLOReference, Serializable, Comparable 
 				
 				e.printStackTrace();
 			}
-			task.registerGLOID(objID, objectCache);
+			task.registerGLOID(objID, objectCache, ACCESS_TYPE.PEEK);
 			peeked = true;
 		}
 		return objectCache;
@@ -111,8 +112,23 @@ public class GLOReferenceImpl implements GLOReference, Serializable, Comparable 
 	 * @see com.sun.gi.logic.GLOReference#attempt(com.sun.gi.logic.SimTask)
 	 */
 	public Serializable attempt(SimTask task) {
-		throw new UnsupportedOperationException("Not yet implemented");
-		// return null;
+		if ((objectCache == null) || (peeked == true)) {
+			try {
+				objectCache = task.getTransaction().lock(objID,false);
+			} catch (DeadlockException e) {
+				
+				e.printStackTrace();
+			} catch (NonExistantObjectIDException e) {
+				
+				e.printStackTrace();
+			}
+			if (objectCache==null){
+				return null;
+			}
+			task.registerGLOID(objID, objectCache, ACCESS_TYPE.ATTEMPT);// was gotten with ATTEMPT
+			peeked = false;
+		}
+		return objectCache;
 	}
 
 	/* (non-Javadoc)

@@ -67,7 +67,7 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	
 	private boolean clear = false;
 	
-	private DataSpace backupSpace;
+	
 	
 	/**
 	 * @param appID
@@ -76,11 +76,11 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	 * @param backup
 	 */
 	public DataSpaceTransactionImpl(long appID, ClassLoader loader,
-			DataSpace dataSpace, DataSpace backup) {
+			DataSpace dataSpace) {
 		this.dataSpace = dataSpace;
 		this.appID = appID;
 		this.loader = loader;
-		this.backupSpace = backup;
+	
 	}
 
 	/*
@@ -114,10 +114,7 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 		Long id = new Long(objectID);
 		Serializable obj = localObjectCache.get(id);
 		if ((obj == null)&&(!clear)) { // if clear, pretend nothing in the data space
-			byte[] objbytes = dataSpace.getObjBytes(appID, objectID);
-			if ((objbytes == null)&&(backupSpace!=null)) { 
-				objbytes = backupSpace.getObjBytes(appID, objectID);
-			}
+			byte[] objbytes = dataSpace.getObjBytes(appID, objectID);			
 			if (objbytes==null){
 				throw new NonExistantObjectIDException();
 			}
@@ -239,9 +236,6 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	 */
 	public void commit() {
 		dataSpace.atomicUpdate(appID,clear,newNames,deleteSet,updateMap);
-		if (backupSpace!=null){
-			backupSpace.atomicUpdate(appID,clear,newNames,deleteSet,updateMap);
-		}
 		resetTransaction();
 	}
 

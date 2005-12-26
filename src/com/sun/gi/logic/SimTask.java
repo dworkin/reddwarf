@@ -160,7 +160,7 @@ public interface SimTask {
 	 */
 	public GLOReference makeReference(Serializable glo) throws InstantiationException;
 
-	public void registerGLOID(long objID,Serializable glo);
+	public void registerGLOID(long objID,Serializable glo,ACCESS_TYPE access);
 
 	/**
 	 * 

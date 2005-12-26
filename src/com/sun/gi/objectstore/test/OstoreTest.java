@@ -123,6 +123,25 @@ public class OstoreTest {
     else {
       System.out.println("ERROR: failed to find object");
     }
+    System.out.println("Testing update");
+    obj.d = 9999.0;
+    obj.i = 9999;
+    obj.s = "ninenineninenine";
+    t2.commit();
+    try {
+		obj = (DataObject) t1.lock(objid);
+	} catch (DeadlockException e1) {		
+		e1.printStackTrace();
+	} catch (NonExistantObjectIDException e1) {		
+		e1.printStackTrace();
+	}
+    if ((obj.d==9999.0)&&(obj.i==9999)&&(obj.s.equals("ninenineninenine"))){
+    	System.out.println("Data sucessfully stored and retrieved.");
+    } else {
+    	System.err.println("ERROR: Data update not properly retrieved!");
+    }
+    t1.commit();
+    t2.commit();
     System.out.println("Looking up ID by name.");
     long lid = t2.lookup("Test_Data");
     if (lid == objid) {

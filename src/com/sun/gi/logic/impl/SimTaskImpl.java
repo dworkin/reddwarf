@@ -1,6 +1,13 @@
 package com.sun.gi.logic.impl;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.OutputStream;
 import java.io.Serializable;
+import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
@@ -11,6 +18,7 @@ import java.util.Map;
 
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
+import com.sun.gi.logic.AccessTypeViolationException;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.Simulation;
@@ -74,8 +82,10 @@ public class SimTaskImpl implements SimTask {
 	private ClassLoader loader;
 
 	private List<OutputRecord> outputList = new ArrayList<OutputRecord>();
+	private List<SimTask> taskLaunchList = new ArrayList<SimTask>();
 	
 	private Map<Serializable,Long> gloIDMap = new HashMap<Serializable,Long>();
+	private Map<Serializable,ACCESS_TYPE> gloAccessMap = new HashMap<Serializable,ACCESS_TYPE>();
 
 	public SimTaskImpl(Simulation sim, ClassLoader loader, ACCESS_TYPE access, long startObjectID,
 			Method startMethod, Object[] startArgs) {
@@ -85,18 +95,17 @@ public class SimTaskImpl implements SimTask {
 		this.loader = loader;
 		this.accessType = access;
 		this.simulation = sim;
-		Object newargs[] = new Object[startArgs.length + 1];
-		newargs[0] = this;
-		System.arraycopy(startArgs, 0, newargs, 1, startArgs.length);
+		Object newargs[] = new Object[startArgs.length + 1];		
+		newargs[0] = this;		
+		System.arraycopy(startArgs,0,newargs,1,startArgs.length);
 		this.startArgs = newargs;
-
 	}
+
+	
 
 	public void execute(ObjectStore ostore) {
 		this.trans = ostore.newTransaction(simulation.getAppID(), loader);	
-		this.trans.start(); //tell trans its waking up to begin anew
-		outputList.clear();
-		gloIDMap.clear();
+		this.trans.start(); //tell trans its waking up to begin anew		
 		Serializable runobj = null;
 		switch (accessType){
 			case GET:
@@ -108,7 +117,7 @@ public class SimTaskImpl implements SimTask {
 			case ATTEMPT:
 				runobj = startObject.attempt(this);
 				if (runobj == null){ // attempt failed
-					trans.abort();
+					trans.abort();				
 					return;
 				}
 				break;
@@ -117,6 +126,9 @@ public class SimTaskImpl implements SimTask {
 			startMethod.invoke(runobj, startArgs);
 			doOutput();
 			trans.commit();
+			for(SimTask task : taskLaunchList){
+				simulation.queueTask(task);				
+			}
 		} catch (InvocationTargetException ex) {
 			ex.printStackTrace();
 			trans.abort();
@@ -131,12 +143,17 @@ public class SimTaskImpl implements SimTask {
 		} catch (IllegalAccessException ex) {
 			ex.printStackTrace();
 			trans.abort();
-		} catch (DeadlockException de) {
+		} catch (DeadlockException de) {	
 			outputList.clear();
+			taskLaunchList.clear();
+			gloIDMap.clear();
+			gloAccessMap.clear();
 			simulation.queueTask(this); // requeue for later execution
 		}
-		outputList.clear();
+		
 	}
+	
+
 
 	/**
 	 * doOutput
@@ -193,6 +210,7 @@ public class SimTaskImpl implements SimTask {
 		return makeReference(trans.lookup(soName));
 	}
 
+
 	/**
 	 * sendData
 	 * 
@@ -235,10 +253,9 @@ public class SimTaskImpl implements SimTask {
 	 *            WurmPlayer
 	 * @return SOReference
 	 */
-	public GLOReference createSO(Serializable simObject, String name) {
-		
+	public GLOReference createSO(Serializable simObject, String name) {		
 		GLOReferenceImpl ref = (GLOReferenceImpl) makeReference(trans.create(simObject, name));
-		registerGLOID(ref.objID,simObject);
+		registerGLOID(ref.objID,simObject,ACCESS_TYPE.GET);
 		return ref;
 	}
 
@@ -264,8 +281,9 @@ public class SimTaskImpl implements SimTask {
 	/* (non-Javadoc)
 	 * @see com.sun.gi.logic.SimTask#registerGLOID(long, java.io.Serializable)
 	 */
-	public void registerGLOID(long objID, Serializable glo) {
-		gloIDMap.put(glo,new Long(objID));		
+	public void registerGLOID(long objID, Serializable glo,ACCESS_TYPE access) {
+		gloIDMap.put(glo,new Long(objID));	
+		gloAccessMap.put(glo,access);
 	}
 
 	/* (non-Javadoc)
@@ -280,10 +298,66 @@ public class SimTaskImpl implements SimTask {
 	 * @see com.sun.gi.logic.SimTask#queueTask(com.sun.gi.logic.Simulation.ACCESS_TYPE, com.sun.gi.logic.GLOReference, java.lang.String, java.lang.Object[])
 	 */
 	public void queueTask(ACCESS_TYPE accessType, GLOReference target, Method method, Object[] parameters) {		
-		simulation.queueTask(simulation.newTask(accessType,target,method,parameters));
+		try {
+			taskLaunchList.add(simulation.newTask(accessType,target,method,
+					scrubAndCopy(parameters)));
+		} catch (SecurityException e) {
+			
+			e.printStackTrace();
+		} catch (IOException e) {
+			
+			e.printStackTrace();
+		} catch (ClassNotFoundException e) {
+			
+			e.printStackTrace();
+		}
 		
 	}
 	
+
+	//used by scrub and copy
+	class NoGLOObjectOutputStream extends ObjectOutputStream{
+
+		/**
+		 * @throws IOException
+		 * @throws SecurityException
+		 */
+		protected NoGLOObjectOutputStream(OutputStream os) throws IOException, SecurityException {
+			super(os);	
+			enableReplaceObject(true);
+		}		
+		
+		protected Object replaceObject(Object obj) throws IOException {
+			if (gloIDMap.containsKey(this)){
+				throw new IOException("Attempt to serialize GLO!");
+			}
+			return obj;			
+		}
+		
+	}
+
+
+
+	/**
+	 * @param parameters
+	 * @return
+	 * @throws IOException 
+	 * @throws SecurityException 
+	 * @throws ClassNotFoundException 
+	 */
+	private Object[] scrubAndCopy(Object[] parameters) throws SecurityException, IOException, ClassNotFoundException {
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		NoGLOObjectOutputStream oos = new NoGLOObjectOutputStream(baos);
+		oos.writeObject(parameters);
+		oos.close();
+		ByteArrayInputStream bais = new ByteArrayInputStream(baos.toByteArray());
+		ObjectInputStream ois = new ObjectInputStream(bais);
+		parameters = (Object[])ois.readObject();
+		return parameters;
+	}
+
+
+
 	/* (non-Javadoc)
 	 * @see com.sun.gi.logic.SimTask#queueTask(com.sun.gi.logic.Simulation.ACCESS_TYPE, com.sun.gi.logic.GLOReference, java.lang.String, java.lang.Object[])
 	 */
@@ -296,8 +370,11 @@ public class SimTaskImpl implements SimTask {
 	 * @see com.sun.gi.logic.SimTask#access_check(com.sun.gi.logic.Simulation.ACCESS_TYPE)
 	 */
 	public void access_check(ACCESS_TYPE accessType, Object glo) {
-		// TODO Auto-generated method stub
-		// should check the passed GLO for the acess type and throw error is not matching
+		ACCESS_TYPE gloAcc = gloAccessMap.get(glo);
+		if (gloAcc != accessType){
+			throw new AccessTypeViolationException("Expected "+accessType+
+					" check returned "+gloAcc);
+		}
 	}
 
 	

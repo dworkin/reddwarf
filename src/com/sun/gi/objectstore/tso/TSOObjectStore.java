@@ -54,7 +54,7 @@ public class TSOObjectStore implements ObjectStore {
 			loader = this.getClass().getClassLoader();
 		}
 		TSOTransaction trans = new TSOTransaction(this,appID,loader,System.currentTimeMillis(),
-				random.nextLong(),dataSpace,backupSpace);
+				random.nextLong(),dataSpace);
 		localTransactionIDMap.put(trans.getUUID(),trans);
 		return trans;
 	}
@@ -71,7 +71,7 @@ public class TSOObjectStore implements ObjectStore {
 	 * @return
 	 */
 	DataSpaceTransaction getDataSpaceTransaction(long appID, ClassLoader loader) {		
-		return new DataSpaceTransactionImpl(appID,loader,dataSpace,backupSpace);
+		return new DataSpaceTransactionImpl(appID,loader,dataSpace);
 	}
 	/**
 	 * @param dsTrans
@@ -112,7 +112,8 @@ public class TSOObjectStore implements ObjectStore {
 		for(SGSUUID uuid : listeners){
 			TSOTransaction trans = localTransactionIDMap.get(uuid);
 			if (trans!=null) {
-				synchronized(trans){
+				//System.out.println("Notfying "+uuid);
+;				synchronized(trans){
 					trans.notifyAll();
 				}
 			}
