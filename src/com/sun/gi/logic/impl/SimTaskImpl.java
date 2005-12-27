@@ -329,7 +329,7 @@ public class SimTaskImpl implements SimTask {
 		
 		protected Object replaceObject(Object obj) throws IOException {
 			if (gloIDMap.containsKey(obj)){
-				throw new IOException("Attempt to serialize GLO!");
+				throw new IOException("Attempt to serialize GLO! ("+obj+")");
 			}
 			return obj;			
 		}
