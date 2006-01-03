@@ -70,15 +70,8 @@ public class SGS {
 		if (verboseString != null){
 			verbose = verboseString.equalsIgnoreCase("true");
 		}
-		try {
-			ostore = new TSOObjectStore(new InMemoryDataSpace(),null);
-			if (System.getProperty("sgs.ostore.startclean").equalsIgnoreCase("true")){
-				if (verbose){
-					System.out.println("Clearing Object Store");
-				}
-				ostore.clearAll();
-			}
-			kernel = new SimKernelImpl(ostore);
+		try {			
+			kernel = new SimKernelImpl();
 			String installProperty = System
 					.getProperty("sgs.framework.installurl");
 			if (installProperty != null) {
@@ -148,7 +141,14 @@ public class SGS {
 	
 		Simulation sim=null;
 		try {
-			sim = new SimulationImpl(kernel,router, game);
+			ostore = new TSOObjectStore(new InMemoryDataSpace(gameID));
+			if (System.getProperty("sgs.ostore.startclean").equalsIgnoreCase("true")){
+				if (verbose){
+					System.out.println("Clearing Object Store");
+				}
+				ostore.clear();
+			}
+			sim = new SimulationImpl(kernel,ostore,router, game);
 		} catch (InstantiationException e) {
 			
 			e.printStackTrace();

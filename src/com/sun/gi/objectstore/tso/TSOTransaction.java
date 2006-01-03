@@ -51,7 +51,6 @@ public class TSOTransaction implements Transaction {
 
 	private TSOObjectStore ostore;
 
-	private long appID;
 
 	private SGSUUID transactionID;
 
@@ -73,11 +72,10 @@ public class TSOTransaction implements Transaction {
 
 	// static init
 
-	TSOTransaction(TSOObjectStore ostore, long appID, ClassLoader loader,
+	TSOTransaction(TSOObjectStore ostore,  ClassLoader loader,
 			long time, long tiebreaker, DataSpace mainDataSpace) {
 
-		this.ostore = ostore;
-		this.appID = appID;
+		this.ostore = ostore;	
 		this.loader = loader;
 		transactionID = new StatisticalUUID();
 		this.time = time;
@@ -96,8 +94,8 @@ public class TSOTransaction implements Transaction {
 	 * @see com.sun.gi.objectstore.Transaction#start()
 	 */
 	public void start() {
-		mainTrans = new DataSpaceTransactionImpl(appID, loader, mainDataSpace);
-		keyTrans = new DataSpaceTransactionImpl(appID, loader, mainDataSpace);
+		mainTrans = new DataSpaceTransactionImpl(loader, mainDataSpace);
+		keyTrans = new DataSpaceTransactionImpl(loader, mainDataSpace);
 		timestampInterrupted = false;
 	}
 
@@ -290,7 +288,7 @@ public class TSOTransaction implements Transaction {
 	 * @see com.sun.gi.objectstore.Transaction#getCurrentAppID()
 	 */
 	public long getCurrentAppID() {
-		return appID;
+		return ostore.getAppID();
 	}
 
 	/*
@@ -299,7 +297,7 @@ public class TSOTransaction implements Transaction {
 	 * @see com.sun.gi.objectstore.Transaction#clear()
 	 */
 	public void clear() {
-		ostore.clear(appID);
+		ostore.clear();
 	}
 
 	/**

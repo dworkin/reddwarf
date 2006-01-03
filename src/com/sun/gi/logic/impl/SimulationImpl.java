@@ -54,6 +54,7 @@ public class SimulationImpl implements Simulation {
 	Router router;
 
 	long appID;
+	ObjectStore ostore;
 
 	ClassLoader loader;
 
@@ -67,10 +68,11 @@ public class SimulationImpl implements Simulation {
 
 	private List<SimTask> taskQueue = new LinkedList<SimTask>();
 
-	public SimulationImpl(SimKernel kernel, Router router, DeploymentRec game)
+	public SimulationImpl(SimKernel kernel, ObjectStore ostore, Router router, DeploymentRec game)
 			throws InstantiationException {
 		this.kernel = kernel;
 		this.appName = game.getName();
+		this.ostore = ostore;
 		this.router = router;
 		try {
 			loader = new URLClassLoader(new URL[] { new URL(game
@@ -96,8 +98,7 @@ public class SimulationImpl implements Simulation {
 		}
 		this.appID = game.getID();
 		// check for boot object. it it doesnt exist, then create it
-		Transaction trans = kernel.getOstore().newTransaction(appID,
-				bootclass.getClassLoader());
+		Transaction trans = ostore.newTransaction(bootclass.getClassLoader());
 		trans.start();
 		boolean firstTime = false;
 		long bootObjectID = trans.lookup("BOOT");
@@ -543,6 +544,13 @@ public class SimulationImpl implements Simulation {
 	 */
 	public SimTask newTask(GLOReference ref, Method methodToCall, Object[] params) {		
 		return newTask(ACCESS_TYPE.GET,ref,methodToCall,params);
+	}
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.logic.Simulation#getObjectStore()
+	 */
+	public ObjectStore getObjectStore() {
+		return ostore;
 	}
 
 }

@@ -30,12 +30,12 @@ public class SimThreadImpl extends Thread implements SimThread {
 	private SimKernel kernel;
 
 	private boolean reused = true;
-	private ObjectStore ostore;
+	//private ObjectStore ostore;
 
-	public SimThreadImpl(SimKernel kernel,ObjectStore ostore) {
+	public SimThreadImpl(SimKernel kernel) {
 		super();
 		this.kernel = kernel;
-		this.ostore = ostore;
+		//this.ostore = ostore;
 	
 		this.start();
 	}	
@@ -52,7 +52,7 @@ public class SimThreadImpl extends Thread implements SimThread {
 					}
 				}
 			}	
-			task.execute(ostore);
+			task.execute();
 			synchronized (this) {
 				task = null;
 				notifyAll();

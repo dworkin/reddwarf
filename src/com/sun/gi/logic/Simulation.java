@@ -6,6 +6,7 @@ import java.nio.ByteBuffer;
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.logic.SimTask.ACCESS_TYPE;
+import com.sun.gi.objectstore.ObjectStore;
 
 /**
  * <p>Title: Simulation</p>
@@ -153,6 +154,11 @@ public interface Simulation {
 
 	public long registerTimerEvent(ACCESS_TYPE access, GLOReference ref, long delay,
 			boolean repeat);
+
+	/**
+	 * @return
+	 */
+	public ObjectStore getObjectStore();
   
 
 }

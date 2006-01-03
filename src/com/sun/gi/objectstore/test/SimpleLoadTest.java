@@ -52,16 +52,16 @@ public class SimpleLoadTest {
     objids = new long[OBJCOUNT];
     ObjectStore ostore=null;
 	try {
-		ostore = new TSOObjectStore(new InMemoryDataSpace(),null);
+		ostore = new TSOObjectStore(new InMemoryDataSpace(1));
 	} catch (InstantiationException e) {
 		
 		e.printStackTrace();
 		System.exit(1);
 	}
     System.out.println("Clearing object store");
-    ostore.clearAll();
+    ostore.clear();
     System.out.println("Assigning transactions.");
-    Transaction t1 = ostore.newTransaction(1,null);
+    Transaction t1 = ostore.newTransaction(null);
     t1.start();
     SLTDataObject dobj = new SLTDataObject(55,3.1415,"data_object");
     int a;
@@ -82,7 +82,7 @@ public class SimpleLoadTest {
     t1.abort();
     System.out.println("Abort time for "+OBJCOUNT+" inserts: "+
                        (System.currentTimeMillis()-start)+" milliseconds.");
-    t1 = ostore.newTransaction(1,null);
+    t1 = ostore.newTransaction(null);
     System.out.println("Initializing another transaction");
     t1.start();
     for (int i = 0; i < OBJCOUNT; i++) {
@@ -92,7 +92,7 @@ public class SimpleLoadTest {
     t1.commit();
     System.out.println("Commit time for "+OBJCOUNT+" inserts: "+
                        (System.currentTimeMillis()-start)+" milliseconds.");
-    t1 = ostore.newTransaction(1,null);
+    t1 = ostore.newTransaction(null);
     t1.start();
    start = System.currentTimeMillis();
    Serializable obj;
@@ -110,7 +110,7 @@ public class SimpleLoadTest {
    t1.commit();
    System.out.println("Commit time for "+OBJCOUNT+" peeks: "+
                       (System.currentTimeMillis()-start)+" milliseconds.");
-   t1 = ostore.newTransaction(1,null);
+   t1 = ostore.newTransaction(null);
    t1.start();
    start = System.currentTimeMillis();
    for (int i = 0; i < OBJCOUNT; i++) {
@@ -130,7 +130,7 @@ public class SimpleLoadTest {
    t1.commit();
    System.out.println("Commit time for "+OBJCOUNT+" locks: "+
                       (System.currentTimeMillis()-start)+" milliseconds.");
-   t1 = ostore.newTransaction(1,null);
+   t1 = ostore.newTransaction(null);
    t1.start();
    try {
 	obj = t1.lock(objids[0]);
@@ -146,7 +146,7 @@ public class SimpleLoadTest {
    System.out.println("Commit time for "+OBJCOUNT+" writes: "+
                       (System.currentTimeMillis()-start)+" milliseconds.");
 
-   t1 = ostore.newTransaction(1,null);
+   t1 = ostore.newTransaction(null);
    t1.start();
    start = System.currentTimeMillis();
    for (int i = 0; i < OBJCOUNT; i++) {

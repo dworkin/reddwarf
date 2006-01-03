@@ -103,8 +103,8 @@ public class SimTaskImpl implements SimTask {
 
 	
 
-	public void execute(ObjectStore ostore) {
-		this.trans = ostore.newTransaction(simulation.getAppID(), loader);	
+	public void execute() {
+		this.trans = simulation.getObjectStore().newTransaction(loader);	
 		this.trans.start(); //tell trans its waking up to begin anew		
 		Serializable runobj = null;
 		switch (accessType){

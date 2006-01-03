@@ -27,13 +27,6 @@ public interface DataSpace {
 
 	static final long INVALID_ID = Long.MIN_VALUE;
 
-	/* (non-Javadoc)
-	 * @see com.sun.gi.objectstore.tso.DataSpace#clearAll()
-	 */
-	/* (non-Javadoc)
-	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#clearAll()
-	 */
-	public void clearAll();
 
 	// internal routines to the system, used by transactions
 	/* (non-Javadoc)
@@ -44,22 +37,22 @@ public interface DataSpace {
 	/* (non-Javadoc)
 	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#getObjBytes(long, long)
 	 */
-	public byte[] getObjBytes(long appID, long objectID);
+	public byte[] getObjBytes(long objectID);
 
 	/* (non-Javadoc)
 	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#lock(long)
 	 */
-	public void lock(long appID, long objectID) throws NonExistantObjectIDException;
+	public void lock(long objectID) throws NonExistantObjectIDException;
 
 	/* (non-Javadoc)
 	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#release(long)
 	 */
-	public void release(long appID, long objectID);
+	public void release(long objectID);
 
 	/* (non-Javadoc)
 	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#atomicUpdate(long, boolean, java.util.Map, java.util.Set, java.util.Map)
 	 */
-	public void atomicUpdate(long appID, boolean clear,
+	public void atomicUpdate(boolean clear,
 			Map<String, Long> newNames, Set<Long> deleteSet,
 			Map<Long, byte[]> updateMap);
 
@@ -67,7 +60,17 @@ public interface DataSpace {
 	 * @param name
 	 * @return
 	 */
-	public Long lookup(long appID, String name);
+	public Long lookup(String name);
+
+	/**
+	 * @return
+	 */
+	public long getAppID();
+
+	/**
+	 * 
+	 */
+	public void clear();
 	
 
 }

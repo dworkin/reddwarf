@@ -27,22 +27,9 @@ import com.sun.gi.objectstore.Transaction;
  */
 
 public interface SimKernel {
-	/**
-	 * Creates a transactional context used to access GLOs
-	 * 
-	 * @param appID
-	 *            long The ID of the game creating the transaction
-	 * @param loader
-	 *            ClassLoader The ClassLoader to use to load the classes of
-	 *            deserialized objects.
-	 * @return Transaction An object that implemenst the Transaction interface.
-	 */
-	public Transaction newTransaction(long appID, ClassLoader loader);
+	
 
-	/**
-	 * @return
-	 */
-	public ObjectStore getOstore();
+	
 	
 	public void addSimulation(Simulation sim);
 	

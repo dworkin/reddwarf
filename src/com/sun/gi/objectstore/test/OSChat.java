@@ -61,7 +61,7 @@ public class OSChat extends JFrame {
   private void startRunning() {
     (new Thread() {
       public void run(){
-        Transaction trans = os.newTransaction(1,null);
+        Transaction trans = os.newTransaction(null);
         long id = trans.lookup("OSChatData");
         if (id == os.INVALID_ID) {
           TextHolder data = new TextHolder();
@@ -79,7 +79,7 @@ public class OSChat extends JFrame {
           catch (InterruptedException ex) {
             ex.printStackTrace();
           }
-          trans = os.newTransaction(1,null);
+          trans = os.newTransaction(null);
           TextHolder holder=null;
 		try {
 			holder = (TextHolder)trans.peek(id);
@@ -98,7 +98,7 @@ public class OSChat extends JFrame {
   }
 
   public void doInput(String str){
-    Transaction trans = os.newTransaction(1,null);
+    Transaction trans = os.newTransaction(null);
     System.out.println("lookign up text object");
     long time = System.currentTimeMillis();
     long id =  trans.lookup("OSChatData");
@@ -128,7 +128,7 @@ public class OSChat extends JFrame {
 
   public static void main(String[] args){
     try {
-      ObjectStore ostore = new TSOObjectStore(new InMemoryDataSpace(),null);
+      ObjectStore ostore = new TSOObjectStore(new InMemoryDataSpace(1));
 
       new OSChat(ostore);
     }

@@ -33,22 +33,22 @@ import com.sun.gi.objectstore.Transaction;
  */
 
 public class SimKernelImpl implements SimKernel {
-	private ObjectStore ostore;
+
 	private TimerManager timerManager;
 
 	private List<Simulation> simList = new ArrayList<Simulation>();
 
 	private List<SimThreadImpl> threadPool = new LinkedList<SimThreadImpl>();
 
-public SimKernelImpl(ObjectStore ostore) {
-		this.ostore = ostore;
+public SimKernelImpl() {
+	
 		int startingPoolSize = 3;
 		String poolSzStr = System.getProperty("sgs.kernel.thread_pool_sz");
 		if (poolSzStr!=null ){
 			startingPoolSize  = Integer.parseInt(poolSzStr);
 		}
 		for(int i=0;i<startingPoolSize;i++){
-			new SimThreadImpl(this,ostore);
+			new SimThreadImpl(this);
 		}
 		// round robin assign threads to tasks from our sim list
 		// this could be a palce where we add prioritization later
@@ -118,13 +118,9 @@ public SimKernelImpl(ObjectStore ostore) {
 		}
 	}
 
-	public Transaction newTransaction(long appID, ClassLoader loader) {
-		return ostore.newTransaction(appID, loader);
-	}
+	
 
-	public ObjectStore getOstore() {
-		return ostore;
-	}
+	
 
 	/* (non-Javadoc)
 	 * @see com.sun.gi.logic.SimKernel#returnToThreadPool(com.sun.gi.logic.impl.SimThreadImpl)

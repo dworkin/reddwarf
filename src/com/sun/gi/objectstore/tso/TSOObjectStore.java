@@ -31,14 +31,14 @@ import com.sun.gi.utils.SGSUUID;
  * @version 1.0
  */
 public class TSOObjectStore implements ObjectStore {
+
 	DataSpace dataSpace;
-	DataSpace backupSpace;
 	SecureRandom random;
 	Map<SGSUUID,TSOTransaction> localTransactionIDMap = new HashMap<SGSUUID,TSOTransaction>();
 	
-	public TSOObjectStore(DataSpace space, DataSpace backupSpace) throws InstantiationException{
+	public TSOObjectStore(DataSpace space) throws InstantiationException{
 		dataSpace = space;
-		this.backupSpace = backupSpace;
+	
 		try {
 			random = SecureRandom.getInstance("SHA1PRNG");
 		} catch (NoSuchAlgorithmException e) {			
@@ -49,29 +49,23 @@ public class TSOObjectStore implements ObjectStore {
 	/* (non-Javadoc)
 	 * @see com.sun.gi.objectstore.ObjectStore#newTransaction(long, java.lang.ClassLoader)
 	 */
-	public Transaction newTransaction(long appID, ClassLoader loader) {		
+	public Transaction newTransaction(ClassLoader loader) {		
 		if (loader==null){
 			loader = this.getClass().getClassLoader();
 		}
-		TSOTransaction trans = new TSOTransaction(this,appID,loader,System.currentTimeMillis(),
+		TSOTransaction trans = new TSOTransaction(this,loader,System.currentTimeMillis(),
 				random.nextLong(),dataSpace);
 		localTransactionIDMap.put(trans.getUUID(),trans);
 		return trans;
 	}
-	/* (non-Javadoc)
-	 * @see com.sun.gi.objectstore.ObjectStore#clearAll()
-	 */
-	public void clearAll() {
-		dataSpace.clearAll();
-		
-	}
+	
 	/**
 	 * @param appID
 	 * @param loader
 	 * @return
 	 */
-	DataSpaceTransaction getDataSpaceTransaction(long appID, ClassLoader loader) {		
-		return new DataSpaceTransactionImpl(appID,loader,dataSpace);
+	DataSpaceTransaction getDataSpaceTransaction(ClassLoader loader) {		
+		return new DataSpaceTransactionImpl(loader,dataSpace);
 	}
 	/**
 	 * @param dsTrans
@@ -101,8 +95,8 @@ public class TSOObjectStore implements ObjectStore {
 	/**
 	 * @param appID
 	 */
-	public void clear(long appID) {
-		// TODO Auto-generated method stub
+	public void clear() {
+		dataSpace.clear();
 		
 	}
 	/**
@@ -119,6 +113,12 @@ public class TSOObjectStore implements ObjectStore {
 			}
 		}
 		
+	}
+	/**
+	 * @return
+	 */
+	public long getAppID() {		
+		return dataSpace.getAppID();
 	}
 
 	

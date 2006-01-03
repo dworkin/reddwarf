@@ -87,10 +87,7 @@ public interface DataSpaceTransaction {
 	 */
 	long lookupName(String name);
 
-	/**
-	 * @param appID
-	 */
-	void clear(long appID);
+	
 
 	
 	

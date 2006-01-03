@@ -37,15 +37,14 @@ public interface ObjectStore {
    * @return A Transaction that is ready for use.
    * @see Transaction
    */
-  public Transaction newTransaction(long appID, ClassLoader loader);
+  public Transaction newTransaction(ClassLoader loader);
 
-  /**
-   * <p>A utility routine for wiping the object store.  This resets it to a fresh just-installed state.</p>
-   * <p><b>NOte that currently it wipes the entire ObjectStore. It is likley that we will
-   * have to add an entry to just wipe a single app's objects.</b></p>
-   */
+/**
+ * 
+ */
+public void clear();
+
   
-  public void clearAll();
    
 
  

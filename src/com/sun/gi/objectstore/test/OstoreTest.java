@@ -46,17 +46,17 @@ public class OstoreTest {
   public static void main(String[] args) {
     ObjectStore ostore=null;
 	try {
-		ostore = new TSOObjectStore(new InMemoryDataSpace(),null);
+		ostore = new TSOObjectStore(new InMemoryDataSpace(1));
 	} catch (InstantiationException e3) {		
 		e3.printStackTrace();
 		System.exit(1);
 	}
     System.out.println("Clearing object store");
-    ostore.clearAll();
+    ostore.clear();
     System.out.println("Assigning transactions.");
-    Transaction t1 = ostore.newTransaction(1,null);
+    Transaction t1 = ostore.newTransaction(null);
     t1.start();
-    Transaction t2 = ostore.newTransaction(1,null);
+    Transaction t2 = ostore.newTransaction(null);
     t2.start();
     System.out.println("Creating test object 1.");
     DataObject obj = new DataObject(55, 3.14, "This is a test!");
@@ -161,14 +161,14 @@ public class OstoreTest {
     }
     t2.commit();
     System.out.println("*****  TSO tests ***");
-    final Transaction firstTrans = ostore.newTransaction(1,null);
+    final Transaction firstTrans = ostore.newTransaction(null);
 	firstTrans.start();
     try {
       Thread.sleep(1000);
     } catch (Exception e){
       e.printStackTrace();
     }
-    final Transaction secondTrans = ostore.newTransaction(1,null);
+    final Transaction secondTrans = ostore.newTransaction(null);
     secondTrans.start();
     System.out.println("First Trans = "+ firstTrans);
     System.out.println("Second Trans = "+ secondTrans);

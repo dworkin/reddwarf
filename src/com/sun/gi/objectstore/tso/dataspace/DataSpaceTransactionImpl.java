@@ -51,7 +51,6 @@ import com.sun.gi.utils.classes.CLObjectInputStream;
 public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	private DataSpace dataSpace;
 
-	private long appID;
 
 	private ClassLoader loader;	
 
@@ -75,10 +74,9 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	 * @param dataSpace
 	 * @param backup
 	 */
-	public DataSpaceTransactionImpl(long appID, ClassLoader loader,
+	public DataSpaceTransactionImpl(ClassLoader loader,
 			DataSpace dataSpace) {
 		this.dataSpace = dataSpace;
-		this.appID = appID;
 		this.loader = loader;
 	
 	}
@@ -114,7 +112,7 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 		Long id = new Long(objectID);
 		Serializable obj = localObjectCache.get(id);
 		if ((obj == null)&&(!clear)) { // if clear, pretend nothing in the data space
-			byte[] objbytes = dataSpace.getObjBytes(appID, objectID);			
+			byte[] objbytes = dataSpace.getObjBytes(objectID);			
 			if (objbytes==null){
 				throw new NonExistantObjectIDException();
 			}
@@ -164,7 +162,7 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	 * @see com.sun.gi.objectstore.tso.DataSpaceTransaction#lock(long)
 	 */
 	public void lock(long objectID) throws NonExistantObjectIDException {
-		dataSpace.lock(appID,objectID);
+		dataSpace.lock(objectID);
 		locksHeld.add(objectID);
 	}
 
@@ -174,7 +172,7 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	 * @see com.sun.gi.objectstore.tso.DataSpaceTransaction#release(long)
 	 */
 	public void release(long objectID) {
-		dataSpace.release(appID,objectID);
+		dataSpace.release(objectID);
 		locksHeld.remove(objectID);
 	}
 
@@ -223,7 +221,7 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 		localObjectCache.clear();
 		//release left over locks
 		for(Long id : locksHeld){
-			dataSpace.release(appID,id);
+			dataSpace.release(id);
 		}
 		locksHeld.clear();
 		
@@ -235,7 +233,7 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	 * @see com.sun.gi.objectstore.tso.DataSpaceTransaction#commit()
 	 */
 	public void commit() {
-		dataSpace.atomicUpdate(appID,clear,newNames,deleteSet,updateMap);
+		dataSpace.atomicUpdate(clear,newNames,deleteSet,updateMap);
 		resetTransaction();
 	}
 
@@ -257,7 +255,7 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	public long lookupName(String name) {		
 		Long l = newNames.get(name);
 		if (l==null){ // not in transaction, check data space
-			l = dataSpace.lookup(appID,name);
+			l = dataSpace.lookup(name);
 		}
 		if (l == null){
 			return DataSpace.INVALID_ID;
@@ -275,9 +273,6 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	/* (non-Javadoc)
 	 * @see com.sun.gi.objectstore.tso.DataSpaceTransaction#clear(long)
 	 */
-	public void clear(long appID) {
-		// TODO Auto-generated method stub
-		
-	}
+
 
 }
