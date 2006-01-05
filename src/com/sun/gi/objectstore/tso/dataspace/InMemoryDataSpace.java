@@ -150,8 +150,8 @@ public class InMemoryDataSpace implements DataSpace {
 	 */
 	public void atomicUpdate(boolean clear,
 			Map<String, Long> newNames, Set<Long> deleteSet,
-			Map<Long, byte[]> updateMap) {		
-		
+			Map<Long, byte[]> updateMap, Set insertSet) {		
+		// insert set is ignored in this case as its uneeded detail
 		synchronized(dataSpace){
 			synchronized(nameSpace) {
 				dataSpace.putAll(updateMap);

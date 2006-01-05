@@ -8,6 +8,7 @@ import com.sun.gi.objectstore.ObjectStore;
 import com.sun.gi.objectstore.Transaction;
 import com.sun.gi.objectstore.tso.TSOObjectStore;
 import com.sun.gi.objectstore.tso.dataspace.InMemoryDataSpace;
+import com.sun.gi.objectstore.tso.dataspace.PersistantInMemoryDataSpace;
 
 /**
  * <p>Title: </p>
@@ -52,7 +53,7 @@ public class SimpleLoadTest {
     objids = new long[OBJCOUNT];
     ObjectStore ostore=null;
 	try {
-		ostore = new TSOObjectStore(new InMemoryDataSpace(1));
+		ostore = new TSOObjectStore(new PersistantInMemoryDataSpace(1));
 	} catch (InstantiationException e) {
 		
 		e.printStackTrace();

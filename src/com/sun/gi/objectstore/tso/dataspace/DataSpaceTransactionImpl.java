@@ -63,6 +63,7 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	private Map<Long, byte[]> updateMap = new HashMap<Long,byte[]>();
 	
 	private Set<Long> locksHeld = new HashSet<Long>();
+	private Set<Long> insertSet = new HashSet<Long>();
 	
 	private boolean clear = false;
 	
@@ -90,6 +91,7 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 		Long objID = new Long(dataSpace.getNextID());
 		localObjectCache.put(objID,object);
 		updateMap.put(objID,serialize(object));
+		insertSet.add(objID);
 		return objID;
 	}
 
@@ -217,6 +219,7 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	private void resetTransaction(){
 		newNames.clear();
 		deleteSet.clear();
+		insertSet.clear();
 		updateMap.clear();
 		localObjectCache.clear();
 		//release left over locks
@@ -233,7 +236,7 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	 * @see com.sun.gi.objectstore.tso.DataSpaceTransaction#commit()
 	 */
 	public void commit() {
-		dataSpace.atomicUpdate(clear,newNames,deleteSet,updateMap);
+		dataSpace.atomicUpdate(clear,newNames,deleteSet,updateMap,insertSet);
 		resetTransaction();
 	}
 
