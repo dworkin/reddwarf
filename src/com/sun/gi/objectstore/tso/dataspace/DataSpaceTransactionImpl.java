@@ -236,7 +236,12 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	 * @see com.sun.gi.objectstore.tso.DataSpaceTransaction#commit()
 	 */
 	public void commit() {
-		dataSpace.atomicUpdate(clear,newNames,deleteSet,updateMap,insertSet);
+		try {
+			dataSpace.atomicUpdate(clear,newNames,deleteSet,updateMap,insertSet);
+		} catch (DataSpaceClosedException e) {
+			
+			e.printStackTrace();
+		}
 		resetTransaction();
 	}
 

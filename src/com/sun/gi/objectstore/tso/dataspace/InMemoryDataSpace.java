@@ -193,4 +193,14 @@ public class InMemoryDataSpace implements DataSpace {
 		
 	}
 
+
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#close()
+	 */
+	public void close() {
+		// TODO Auto-generated method stub
+		
+	}
+
 }

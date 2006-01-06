@@ -120,6 +120,13 @@ public class TSOObjectStore implements ObjectStore {
 	public long getAppID() {		
 		return dataSpace.getAppID();
 	}
+	/* (non-Javadoc)
+	 * @see com.sun.gi.objectstore.ObjectStore#close()
+	 */
+	public void close() {
+		dataSpace.close();
+		
+	}
 
 	
 }

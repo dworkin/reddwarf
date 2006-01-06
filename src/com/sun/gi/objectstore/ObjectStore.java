@@ -44,6 +44,11 @@ public interface ObjectStore {
  */
 public void clear();
 
+/**
+ * 
+ */
+public void close();
+
   
    
 

@@ -255,6 +255,8 @@ public class OstoreTest {
 	}
     System.out.println("Success: Woke up from block after timeout.");
     */
+    System.out.println("Closing ostore");
+    ostore.close();
     System.out.println("End of tests");
   }
 }

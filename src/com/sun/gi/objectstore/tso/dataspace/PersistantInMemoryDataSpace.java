@@ -22,6 +22,7 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
 import java.util.Map.Entry;
 import java.util.concurrent.BlockingQueue;
@@ -49,15 +50,22 @@ import com.sun.gi.objectstore.NonExistantObjectIDException;
  * @version 1.0
  */
 public class PersistantInMemoryDataSpace implements DataSpace {
-	
+
 	class DiskUpdateRecord {
 		String[] newNames;
+
 		Long[] newNameIDs;
+
 		Long[] deleteIDs;
+
 		byte[][] updateData;
+
 		Long[] updateIDs;
+
 		long nextID;
+
 		private Set<Long> insertSet;
+
 		/**
 		 * @param updateIDs2
 		 * @param updateData2
@@ -66,25 +74,23 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 		 * @param deleteIDs2
 		 * @param id
 		 */
-		public DiskUpdateRecord(Long[] updateIDs, byte[][] updateData, Long[] nameIDs, 
-				String[] names, Long[] deleteIDs, long id, Set<Long>insertSet) {
+		public DiskUpdateRecord(Long[] updateIDs, byte[][] updateData,
+				Long[] nameIDs, String[] names, Long[] deleteIDs, long id,
+				Set<Long> insertSet) {
 			this.newNames = names;
 			this.newNameIDs = nameIDs;
 			this.deleteIDs = deleteIDs;
 			this.updateIDs = updateIDs;
 			this.updateData = updateData;
 			this.insertSet = insertSet;
+			this.nextID = id;
 		}
-		
 
-		
-				
 	}
 
 	private long appID;
 
-	private Map<Long, SoftReference<byte[]>> dataSpace = 
-		new LinkedHashMap<Long, SoftReference<byte[]>>();
+	private Map<Long, SoftReference<byte[]>> dataSpace = new LinkedHashMap<Long, SoftReference<byte[]>>();
 
 	private Map<String, Long> nameSpace = new LinkedHashMap<String, Long>();
 
@@ -101,32 +107,53 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	private static final String OBJBASETBL = "OBJECTS";
 
 	private static final String NAMEBASETBL = "NAMEDIRECTORY";
-	
+
 	private static final String INFOTBL = "APPINFO";
-	
-	private static final String INFOTBLNAME = SCHEMA+"."+INFOTBL;
 
-	private static String NAMETBL;
+	private static final String INFOTBLNAME = SCHEMA + "." + INFOTBL;
 
-	private static String NAMETBLNAME;
+	private String NAMETBL;
 
-	private static String OBJTBL;
+	private String NAMETBLNAME;
 
-	private static String OBJTBLNAME;
+	private String OBJTBL;
+
+	private String OBJTBLNAME;
+
 	private Connection conn;
+
 	private Connection updateConn;
+	
+
 	private PreparedStatement getObjStmnt;
+
 	private PreparedStatement getNameStmnt;
+
 	private PreparedStatement updateObjStmnt;
+
 	private PreparedStatement insertObjStmnt;
+
 	private PreparedStatement updateNameStmnt;
+
 	private PreparedStatement insertNameStmnt;
+
 	private PreparedStatement updateInfoStmnt;
+
 	private PreparedStatement insertInfoStmnt;
+
 	private PreparedStatement deleteObjStmnt;
 
-	private BlockingQueue<DiskUpdateRecord> diskUpdateQueue = 
-		new LinkedBlockingQueue<DiskUpdateRecord>();
+	private boolean closed = false;
+
+	private boolean done = false;
+
+	private Queue<DiskUpdateRecord> diskUpdateQueue = new LinkedList<DiskUpdateRecord>();
+
+	private Object closeWaitMutex = new Object();
+
+	private static final boolean TRACEDISK=false;
+	
+	private int commitRegisterCounter=1;
 
 	public PersistantInMemoryDataSpace(long appID) {
 		this.appID = appID;
@@ -146,25 +173,45 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 			// objectIDManager = new SharedDataObjectIDManager(
 			// new JRMSSharedDataManager(),this);
 			checkTables();
-			
+
 			// start update thread
-			new Thread(new Runnable(){
+			new Thread(new Runnable() {
 				public void run() {
-					while(true){
-						try {
-							DiskUpdateRecord rec = diskUpdateQueue.take();
-							doDiskUpdate(rec);
-						} catch (InterruptedException e) {							
-							e.printStackTrace();
+					int commitCount=1;
+					while (true) {
+						DiskUpdateRecord rec = null;
+						synchronized (diskUpdateQueue) {
+							if (diskUpdateQueue.isEmpty()) {
+								if (closed) {
+									break;
+								} else {
+									try {
+										diskUpdateQueue.wait();
+									} catch (InterruptedException e) {
+										e.printStackTrace();
+									}
+								}
+							} else {
+								rec = diskUpdateQueue.remove();
+							}
 						}
-					}					
-				}}).start();
+						if (rec != null) {
+							if (TRACEDISK){
+								System.out.println("      Doing Commit #"+commitCount++);
+							}
+							doDiskUpdate(rec);
+						}
+					}
+					synchronized (closeWaitMutex) {
+						done=true;
+						closeWaitMutex.notifyAll();
+					}
+				}
+			}).start();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
-
-	
 
 	/**
 	 * @param newNames
@@ -172,62 +219,81 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	 * @param deleteList
 	 */
 	protected void doDiskUpdate(DiskUpdateRecord rec) {
-		for(int i=0;i<rec.newNames.length;i++){
-			try {
-				insertNameStmnt.setString(1,rec.newNames[i]);
-				insertNameStmnt.setLong(2,rec.newNameIDs[i]);
-				insertNameStmnt.execute();
-			} catch (SQLException e1) {				
-				e1.printStackTrace();
-			}			
+		if (TRACEDISK){
+			System.out.println("      Starting commit");
 		}
-		for(int i=0;i<rec.updateData.length;i++){
+		if (TRACEDISK && (rec.newNames.length>0)){
+			System.out.println("      Starting inserts");
+		}
+		for (int i = 0; i < rec.newNames.length; i++) {
 			try {
-				if (rec.insertSet.contains(rec.updateIDs[i])){ // new
-					insertObjStmnt.setLong(1,rec.updateIDs[i]);
-					insertObjStmnt.setBytes(2,rec.updateData[i]);
+				insertNameStmnt.setString(1, rec.newNames[i]);
+				insertNameStmnt.setLong(2, rec.newNameIDs[i]);
+				insertNameStmnt.execute();
+			} catch (SQLException e1) {
+				e1.printStackTrace();
+			}
+		}
+		if (TRACEDISK && (rec.updateData.length>0)){
+			System.out.println("      Starting updates");
+		}
+		for (int i = 0; i < rec.updateData.length; i++) {
+			try {
+				if (rec.insertSet.contains(rec.updateIDs[i])) { // new
+					insertObjStmnt.setLong(1, rec.updateIDs[i]);
+					insertObjStmnt.setBytes(2, rec.updateData[i]);
 					insertObjStmnt.execute();
 				} else { // update
-					updateObjStmnt.setBytes(1,rec.updateData[i]);
-					updateObjStmnt.setLong(2,rec.updateIDs[i]);
+					updateObjStmnt.setBytes(1, rec.updateData[i]);
+					updateObjStmnt.setLong(2, rec.updateIDs[i]);
 					updateObjStmnt.execute();
 				}
-			} catch (SQLException e1) {				
+			} catch (SQLException e1) {
 				e1.printStackTrace();
-			}			
+			}
 		}
-		for(Long delid : rec.deleteIDs){
+		if (TRACEDISK && (rec.deleteIDs.length>0)){
+			System.out.println("      Starting deletes");
+		}
+		for (Long delid : rec.deleteIDs) {
 			try {
-				deleteObjStmnt.setLong(1,delid);
+				deleteObjStmnt.setLong(1, delid);
 				deleteObjStmnt.execute();
-			} catch (SQLException e1) {				
+			} catch (SQLException e1) {
 				e1.printStackTrace();
 			}
 		}
 		try {
-			updateInfoStmnt.setLong(1,rec.nextID);
-			updateInfoStmnt.setLong(2,appID);			
+			if (TRACEDISK){
+				System.out.println("      Setting next ID = "+rec.nextID);
+			}
+			updateInfoStmnt.setLong(1, rec.nextID);
+			updateInfoStmnt.setLong(2, appID);
 			updateInfoStmnt.execute();
-		} catch (SQLException e1) {			
+		} catch (SQLException e1) {
 			e1.printStackTrace();
 		}
 		try {
+			if (TRACEDISK){
+				System.out.println("      COmitting trans");
+			}			
 			updateConn.commit();
+			if (TRACEDISK){
+				System.out.println("      Trans comitted");
+			}
 		} catch (SQLException e1) {
-			
+
 			e1.printStackTrace();
-		}		
+		}
 	}
-
-
 
 	/**
 	 * @throws SQLException
 	 * 
 	 */
 	private void checkTables() throws SQLException {
-		conn = getDataConnection();
-		updateConn = getDataConnection();
+		conn = getDataConnection();		
+		updateConn = getDataConnection();	
 		DatabaseMetaData md = conn.getMetaData();
 		ResultSet rs = md.getTables(null, SCHEMA, OBJTBL, null);
 		if (rs.next()) {
@@ -240,17 +306,20 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 			PreparedStatement stmnt = conn.prepareStatement(s);
 			stmnt.execute();
 		}
+		rs.close();
 		rs = md.getTables(null, SCHEMA, NAMETBL, null);
 		if (rs.next()) {
 			System.out.println("Found Name table");
 		} else {
 			System.out.println("Creating Name table");
 			PreparedStatement stmnt = conn.prepareStatement("CREATE TABLE "
-					+ NAMETBLNAME + "(" + "NAME VARCHAR(255) NOT NULL, OBJID BIGINT NOT NULL,"
+					+ NAMETBLNAME + "("
+					+ "NAME VARCHAR(255) NOT NULL, OBJID BIGINT NOT NULL,"
 					+ "PRIMARY KEY (NAME))");
 			stmnt.execute();
 		}
-		rs = md.getTables(null, SCHEMA,INFOTBL, null);
+		rs.close();
+		rs = md.getTables(null, SCHEMA, INFOTBL, null);
 		if (rs.next()) {
 			System.out.println("Found info table");
 		} else {
@@ -260,39 +329,38 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 					+ "NEXTOBJID BIGINT," + "PRIMARY KEY(APPID))");
 			stmnt.execute();
 		}
-		PreparedStatement stmnt = conn.prepareStatement(
-                "SELECT * FROM " + INFOTBLNAME + " T  " +
-                "WHERE T.APPID = "+appID);
+		PreparedStatement stmnt = conn.prepareStatement("SELECT * FROM "
+				+ INFOTBLNAME + " I  " + "WHERE I.APPID = " + appID);
 		rs = stmnt.executeQuery();
-		if (!rs.next()){ // entry does not exist
-			System.out.println("Creating new entry in info table for appID "+appID);
-			stmnt = conn.prepareStatement("INSERT INTO " +
-                    INFOTBLNAME + " VALUES("+appID+","+id+")");
+		if (!rs.next()) { // entry does not exist
+			System.out.println("Creating new entry in info table for appID "
+					+ appID);
+			stmnt = conn.prepareStatement("INSERT INTO " + INFOTBLNAME
+					+ " VALUES(" + appID + "," + id + ")");
 			stmnt.execute();
 		} else {
 			id = rs.getLong("NEXTOBJID");
-			System.out.println("Found entry in info table for appID "+appID);
-			System.out.println("Next objID = "+id);
-		}		
+			System.out.println("Found entry in info table for appID " + appID);
+			System.out.println("Next objID = " + id);
+		}
+		rs.close();
 		conn.commit();
-		getObjStmnt = conn.prepareStatement(
-                "SELECT * FROM " + OBJTBLNAME + " T  " +
-                "WHERE T.OBJID = ?");
-		getNameStmnt = conn.prepareStatement(
-				"SELECT * FROM " + NAMETBLNAME + " T  " +
-        		"WHERE T.NAME = ?");
-		insertObjStmnt = updateConn.prepareStatement("INSERT INTO " +
-                    OBJTBLNAME + " VALUES(?,?)");
-		insertNameStmnt = updateConn.prepareStatement("INSERT INTO " +
-                NAMETBLNAME + " VALUES(?,?)");
-		updateObjStmnt = updateConn.prepareStatement("UPDATE "+ OBJTBLNAME +
-				" SET OBJBYTES=? WHERE OBJID=?");
-		updateNameStmnt = updateConn.prepareStatement("UPDATE "+NAMETBLNAME+
-				" SET NAME=? WHERE OBJID=?");
-		deleteObjStmnt = updateConn.prepareStatement("DELETE FROM " + 
-				OBJTBLNAME + " WHERE OBJID = ?");
-		updateInfoStmnt = updateConn.prepareStatement("UPDATE "+INFOTBLNAME+
-				" SET NEXTOBJID=? WHERE APPID=?");
+		getObjStmnt = conn.prepareStatement("SELECT * FROM " + OBJTBLNAME
+				+ " O  " + "WHERE O.OBJID = ?");
+		getNameStmnt = conn.prepareStatement("SELECT * FROM " + NAMETBLNAME
+				+ " N  " + "WHERE N.NAME = ?");
+		insertObjStmnt = updateConn.prepareStatement("INSERT INTO "
+				+ OBJTBLNAME + " VALUES(?,?)");
+		insertNameStmnt = updateConn.prepareStatement("INSERT INTO "
+				+ NAMETBLNAME + " VALUES(?,?)");
+		updateObjStmnt = updateConn.prepareStatement("UPDATE " + OBJTBLNAME
+				+ " SET OBJBYTES=? WHERE OBJID=?");
+		updateNameStmnt = updateConn.prepareStatement("UPDATE " + NAMETBLNAME
+				+ " SET NAME=? WHERE OBJID=?");
+		deleteObjStmnt = updateConn.prepareStatement("DELETE FROM "
+				+ OBJTBLNAME + " WHERE OBJID = ?");
+		updateInfoStmnt = updateConn.prepareStatement("UPDATE " + INFOTBLNAME
+				+ " SET NEXTOBJID=? WHERE APPID=?");
 	}
 
 	/**
@@ -347,35 +415,38 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	 *      long)
 	 */
 	public byte[] getObjBytes(long objectID) {
-		byte[] objbytes=null;
-		synchronized(dataSpace){
+		byte[] objbytes = null;
+		synchronized (dataSpace) {
 			SoftReference<byte[]> ref = dataSpace.get(new Long(objectID));
-			if (ref != null){
+			if (ref != null) {
 				objbytes = ref.get();
-				if (objbytes==null){ // ref dead
+				if (objbytes == null) { // ref dead
 					dataSpace.remove(ref);
 				}
 			}
-			if (objbytes == null){
+			if (objbytes == null) {
 				objbytes = loadCache(objectID);
 			}
 		}
 		return objbytes;
-		
+
 	}
-	
-	private byte[] loadCache(long objectID){
-		byte[] objbytes=null;
-		synchronized (dataSpace) {			
+
+	private byte[] loadCache(long objectID) {
+		byte[] objbytes = null;
+		synchronized (dataSpace) {
 			try {
-				getObjStmnt.setLong(1,objectID);
+				getObjStmnt.setLong(1, objectID);
 				ResultSet rs = getObjStmnt.executeQuery();
-				if (rs.next()){
+				conn.commit();
+				if (rs.next()) {
 					objbytes = rs.getBytes("OBJBYTES");
-					dataSpace.put(new Long(objectID),new SoftReference<byte[]>(objbytes));
+					dataSpace.put(new Long(objectID),
+							new SoftReference<byte[]>(objbytes));
 				}
-			} catch (SQLException e) {					
-				e.printStackTrace();								
+				rs.close(); // cleanup and free locks
+			} catch (SQLException e) {
+				e.printStackTrace();
 			}
 		}
 		return objbytes;
@@ -394,7 +465,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	public void lock(long objectID) throws NonExistantObjectIDException {
 		synchronized (dataSpace) {
 			if (!dataSpace.containsKey(objectID)) {
-				if (loadCache(objectID)==null){
+				if (loadCache(objectID) == null) {
 					throw new NonExistantObjectIDException();
 				}
 			}
@@ -442,12 +513,16 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	 *      boolean, java.util.Map, java.util.Set, java.util.Map)
 	 */
 	public void atomicUpdate(boolean clear, Map<String, Long> newNames,
-			Set<Long> deleteSet, Map<Long, byte[]> updateMap, Set insertIDs) {
-
+			Set<Long> deleteSet, Map<Long, byte[]> updateMap, Set insertIDs)
+			throws DataSpaceClosedException {
+		if (closed) {
+			throw new DataSpaceClosedException();
+		}
 		synchronized (dataSpace) {
 			synchronized (nameSpace) {
-				for(Entry<Long,byte[]> e : updateMap.entrySet()){
-					dataSpace.put(e.getKey(),new SoftReference<byte[]>(e.getValue()));
+				for (Entry<Long, byte[]> e : updateMap.entrySet()) {
+					dataSpace.put(e.getKey(), new SoftReference<byte[]>(e
+							.getValue()));
 				}
 				nameSpace.putAll(newNames);
 				for (Long id : deleteSet) {
@@ -457,34 +532,45 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 		}
 		// asynchronously update the persistant storage
 		// IMPORTANT: This update record will pin the objects in memory and thus
-		// in the cache until it is complete  This is VERY important so that things
+		// in the cache until it is complete This is VERY important so that
+		// things
 		// don't get cleaned out of the cache until they have been persisted.
-		// It is acceptable to lose transactions, if the entire system dies, but that
-		// is the only time.  Even in this case those lost must be atomic (all or nothing.)
-		
+		// It is acceptable to lose transactions, if the entire system dies, but
+		// that
+		// is the only time. Even in this case those lost must be atomic (all or
+		// nothing.)
+
 		Long[] nameIDs = new Long[newNames.values().size()];
 		String[] names = new String[newNames.keySet().size()];
-		int  i=0;
-		for(Entry<String,Long> e : newNames.entrySet()){
+		int i = 0;
+		for (Entry<String, Long> e : newNames.entrySet()) {
 			nameIDs[i] = e.getValue();
 			names[i++] = e.getKey();
 		}
 		Long[] deleteIDs = new Long[deleteSet.size()];
-		i=0;
-		for(Long l : deleteSet){
+		i = 0;
+		for (Long l : deleteSet) {
 			deleteIDs[i++] = l;
 		}
 		Long[] updateIDs = new Long[updateMap.entrySet().size()];
 		byte[][] updateData = new byte[updateMap.entrySet().size()][];
-		i=0;
-		for(Entry<Long,byte[]> e : updateMap.entrySet()){
+		i = 0;
+		for (Entry<Long, byte[]> e : updateMap.entrySet()) {
 			updateIDs[i] = e.getKey();
-			updateData[i++]= e.getValue();
+			updateData[i++] = e.getValue();
 		}
 		Set<Long> insertSet = new HashSet<Long>(insertIDs);
-			diskUpdateQueue.add(new DiskUpdateRecord(updateIDs,updateData,
-					nameIDs,names,deleteIDs,id,insertSet));
-	
+		synchronized (diskUpdateQueue) {
+			if(!closed){ //closed while we were processing
+				if (TRACEDISK){
+					System.out.println("Queuing commit #"+commitRegisterCounter++);
+				}
+				diskUpdateQueue.add(new DiskUpdateRecord(updateIDs, updateData,
+					nameIDs, names, deleteIDs, id, insertSet));
+				diskUpdateQueue.notifyAll();
+			}
+		}
+
 	}
 
 	/*
@@ -496,10 +582,10 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 		Long retval = null;
 		synchronized (nameSpace) {
 			retval = nameSpace.get(name);
-			if (retval == null){
+			if (retval == null) {
 				retval = loadNameCache(name);
 			}
-		}		
+		}
 		return retval;
 	}
 
@@ -509,16 +595,18 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	 */
 	private Long loadNameCache(String name) {
 		long retval = DataSpace.INVALID_ID;
-		synchronized (nameSpace) {			
+		synchronized (nameSpace) {
 			try {
-				getNameStmnt.setString(1,name);
-				ResultSet rs = getObjStmnt.executeQuery();
-				if (rs.next()){
+				getNameStmnt.setString(1, name);
+				ResultSet rs = getNameStmnt.executeQuery();
+				conn.commit();
+				if (rs.next()) {
 					retval = rs.getLong("OBJID");
-					nameSpace.put(name,new Long(retval));
+					nameSpace.put(name, new Long(retval));
 				}
-			} catch (SQLException e) {					
-				e.printStackTrace();								
+				rs.close();
+			} catch (SQLException e) {
+				e.printStackTrace();
 			}
 		}
 		return retval;
@@ -539,9 +627,29 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#clear()
 	 */
 	public void clear() {
-		// TODO Auto-generated method stub
-		
 
+	}
+
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#close()
+	 */
+	public void close() {
+		
+		synchronized(diskUpdateQueue){
+			closed = true;
+			diskUpdateQueue.notifyAll();
+		}
+		synchronized (closeWaitMutex) {
+			while (!done) {
+				try {
+					closeWaitMutex.wait();
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
+		}
 	}
 
 }

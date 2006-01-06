@@ -54,7 +54,7 @@ public interface DataSpace {
 	 */
 	public void atomicUpdate(boolean clear,
 			Map<String, Long> newNames, Set<Long> deleteSet,
-			Map<Long, byte[]> updateMap, Set insertSet);
+			Map<Long, byte[]> updateMap, Set insertSet) throws DataSpaceClosedException;
 
 	/**
 	 * @param name
@@ -72,5 +72,6 @@ public interface DataSpace {
 	 */
 	public void clear();
 	
+	public void close();
 
 }
