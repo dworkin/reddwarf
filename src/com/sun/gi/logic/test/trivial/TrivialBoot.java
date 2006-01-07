@@ -20,13 +20,17 @@ public class TrivialBoot implements SimBoot {
 	 * 
 	 */
 	private static final long serialVersionUID = 1L;
-	private static final boolean TEST_GLO_PARAM=true;
+	private static final boolean TEST_GLO_PARAM=false;
+	private int count=1;
 
 	public TrivialBoot() {
 	}
 
 	public void boot(SimTask task,boolean firstBoot) {
-		System.out.println("Ran TrivialBoot.boot");
+		if (firstBoot){
+			System.out.println("First boot of trivial test");
+		}
+		System.out.println("Ran TrivialBoot.boot "+(count++)+ " times");
 		if (TEST_GLO_PARAM){
 			System.out.println("Testing queue of a GLO as a task parmaq (should throw exception");
 			Method m;

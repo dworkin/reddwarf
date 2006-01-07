@@ -43,6 +43,7 @@ import com.sun.gi.logic.impl.SimulationImpl;
 import com.sun.gi.objectstore.ObjectStore;
 import com.sun.gi.objectstore.tso.TSOObjectStore;
 import com.sun.gi.objectstore.tso.dataspace.InMemoryDataSpace;
+import com.sun.gi.objectstore.tso.dataspace.PersistantInMemoryDataSpace;
 import com.sun.gi.utils.SGSUUID;
 import com.sun.gi.utils.StatisticalUUID;
 
@@ -141,7 +142,7 @@ public class SGS {
 	
 		Simulation sim=null;
 		try {
-			ostore = new TSOObjectStore(new InMemoryDataSpace(gameID));
+			ostore = new TSOObjectStore(new PersistantInMemoryDataSpace(gameID));
 			if (System.getProperty("sgs.ostore.startclean").equalsIgnoreCase("true")){
 				if (verbose){
 					System.out.println("Clearing Object Store");

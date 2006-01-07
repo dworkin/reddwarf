@@ -43,7 +43,7 @@ public class TimerTestBoot implements SimBoot, SimTimerListener {
 			tenSecEvent = task.registerTimerEvent(10000l,true,thisobj);
 			*/
 			PDTimer timer;
-			if (pdTimer==null){ // not instantiated yet
+			if (firstBoot){ // not instantiated yet
 				timer = new PDTimer(task);
 				pdTimer = task.createSO(timer,null);
 				TimerCount tc = new TimerCount();
