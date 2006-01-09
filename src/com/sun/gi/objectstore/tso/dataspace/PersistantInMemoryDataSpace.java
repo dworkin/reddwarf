@@ -142,6 +142,11 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	private PreparedStatement insertInfoStmnt;
 
 	private PreparedStatement deleteObjStmnt;
+	
+	private PreparedStatement clearObjTableStmnt;
+	private PreparedStatement lockObjTableStmnt;
+	private PreparedStatement clearNameTableStmnt;
+	private PreparedStatement lockNameTableStmnt;
 
 	private boolean closed = false;
 
@@ -361,6 +366,10 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 				+ OBJTBLNAME + " WHERE OBJID = ?");
 		updateInfoStmnt = updateConn.prepareStatement("UPDATE " + INFOTBLNAME
 				+ " SET NEXTOBJID=? WHERE APPID=?");
+		lockObjTableStmnt = conn.prepareStatement("LOCK TABLE "+OBJTBLNAME+" IN EXCLUSIVE MODE");
+		clearObjTableStmnt = conn.prepareStatement("DELETE FROM "+OBJTBLNAME);
+		lockNameTableStmnt = conn.prepareStatement("LOCK TABLE "+NAMETBLNAME+" IN EXCLUSIVE MODE");
+		clearNameTableStmnt = conn.prepareStatement("DELETE FROM "+NAMETBLNAME);
 	}
 
 	/**
@@ -627,6 +636,16 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#clear()
 	 */
 	public void clear() {
+		try {
+			lockObjTableStmnt.execute();
+			lockNameTableStmnt.execute();
+			clearObjTableStmnt.execute();
+			clearNameTableStmnt.execute();
+			conn.commit();
+		} catch (SQLException e) {
+			
+			e.printStackTrace();
+		}
 
 	}
 
