@@ -143,7 +143,8 @@ public class SGS {
 		Simulation sim=null;
 		try {
 			ostore = new TSOObjectStore(new PersistantInMemoryDataSpace(gameID));
-			if (System.getProperty("sgs.ostore.startclean").equalsIgnoreCase("true")){
+			String cleanProperty = System.getProperty("sgs.ostore.startclean");
+			if ((cleanProperty!=null)&&(cleanProperty.equalsIgnoreCase("true"))){
 				if (verbose){
 					System.out.println("Clearing Object Store");
 				}

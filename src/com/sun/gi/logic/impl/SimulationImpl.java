@@ -74,45 +74,7 @@ public class SimulationImpl implements Simulation {
 		this.appName = game.getName();
 		this.ostore = ostore;
 		this.router = router;
-		try {
-			loader = new URLClassLoader(new URL[] { new URL(game
-					.getClasspathURL()) });
-		} catch (MalformedURLException e) {
-			e.printStackTrace();
-			throw new InstantiationException(e.getMessage());
-		}
-		Class bootclass = null;
-		try {
-			bootclass = loader.loadClass(game.getBootClass());
-		} catch (ClassNotFoundException e) {
-			e.printStackTrace();
-			throw new InstantiationException(e.getMessage());
-		}
-		Method startMethod = null;
-		try {
-			startMethod = bootclass.getMethod("boot", new Class[] {
-					SimTask.class, boolean.class });
-		} catch (NoSuchMethodException ex) {
-			throw new InstantiationException(
-					"Boot class in sim has no method: void boot(SimTask)");
-		}
 		this.appID = game.getID();
-		// check for boot object. it it doesnt exist, then create it
-		Transaction trans = ostore.newTransaction(bootclass.getClassLoader());
-		trans.start();
-		boolean firstTime = false;
-		long bootObjectID = trans.lookup("BOOT");
-		if (bootObjectID == ObjectStore.INVALID_ID) { // doesnt exist
-			try {
-				bootObjectID = trans.create((Serializable) bootclass
-						.newInstance(), "BOOT");
-				firstTime = true;
-			} catch (IllegalAccessException ex1) {
-				ex1.printStackTrace();
-				throw new InstantiationException(ex1.getMessage());
-			}
-		}
-		trans.commit();
 		router.addRouterListener(new RouterListener() {
 			public void serverMessage(UserID from, ByteBuffer data,
 					boolean reliable) {
@@ -141,8 +103,49 @@ public class SimulationImpl implements Simulation {
 			}
 
 		});
-		loader = bootclass.getClassLoader();
-		queueTask(newTask(bootObjectID, startMethod, new Object[] { firstTime }));
+		String bootClassName = game.getBootClass();
+		if (bootClassName != null){ // has server side
+			try {
+				loader = new URLClassLoader(new URL[] { new URL(game
+					.getClasspathURL()) });
+			} catch (MalformedURLException e) {
+				e.printStackTrace();
+				throw new InstantiationException(e.getMessage());
+			}
+			Class bootclass = null;
+			try {
+				bootclass = loader.loadClass(bootClassName);
+			} catch (ClassNotFoundException e) {
+				e.printStackTrace();
+				throw new InstantiationException(e.getMessage());
+			}
+			Method startMethod = null;
+			try {
+				startMethod = bootclass.getMethod("boot", new Class[] {
+					SimTask.class, boolean.class });
+			} catch (NoSuchMethodException ex) {
+				throw new InstantiationException(
+					"Boot class in sim has no method: void boot(SimTask)");
+			}
+			
+			// check for boot object. it it doesnt exist, then create it
+			Transaction trans = ostore.newTransaction(bootclass.getClassLoader());
+			trans.start();
+			boolean firstTime = false;
+			long bootObjectID = trans.lookup("BOOT");
+			if (bootObjectID == ObjectStore.INVALID_ID) { // doesnt exist
+				try {
+					bootObjectID = trans.create((Serializable) bootclass
+						.newInstance(), "BOOT");
+					firstTime = true;
+				} catch (IllegalAccessException ex1) {
+					ex1.printStackTrace();
+					throw new InstantiationException(ex1.getMessage());
+				}
+			}
+			trans.commit();
+			queueTask(newTask(bootObjectID, startMethod, new Object[] { firstTime }));
+		}				
 		kernel.addSimulation(this);
 	}
 

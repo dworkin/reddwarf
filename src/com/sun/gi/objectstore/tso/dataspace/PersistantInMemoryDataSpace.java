@@ -637,11 +637,22 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	 */
 	public void clear() {
 		try {
-			lockObjTableStmnt.execute();
-			lockNameTableStmnt.execute();
-			clearObjTableStmnt.execute();
-			clearNameTableStmnt.execute();
-			conn.commit();
+			synchronized(diskUpdateQueue){
+				synchronized(dataSpace){
+					synchronized(nameSpace){
+						dataSpace.clear();
+						nameSpace.clear();
+						diskUpdateQueue.clear();
+						lockObjTableStmnt.execute();
+						lockNameTableStmnt.execute();
+						clearObjTableStmnt.execute();
+						clearNameTableStmnt.execute();
+						conn.commit();
+						
+					}
+				}
+			}
+			
 		} catch (SQLException e) {
 			
 			e.printStackTrace();
