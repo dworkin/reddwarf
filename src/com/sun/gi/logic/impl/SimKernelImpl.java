@@ -128,6 +128,7 @@ public SimKernelImpl() {
 	public void returnToThreadPool(SimThreadImpl impl) {
 		synchronized(threadPool){
 			threadPool.add(impl);
+			threadPool.notify();		// Sten added 1/13/06 -- prevents deadlocks if the pool is waiting.
 		}
 		
 	}
