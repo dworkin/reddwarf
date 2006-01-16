@@ -22,6 +22,7 @@ import com.sun.gi.logic.AccessTypeViolationException;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.Simulation;
+import com.sun.gi.logic.SimTask.ACCESS_TYPE;
 import com.sun.gi.objectstore.DeadlockException;
 import com.sun.gi.objectstore.ObjectStore;
 import com.sun.gi.objectstore.Transaction;
@@ -105,7 +106,7 @@ public class SimTaskImpl implements SimTask {
 
 	public void execute() {
 		this.trans = simulation.getObjectStore().newTransaction(loader);	
-		this.trans.start(); //tell trans its waking up to begin anew		
+		this.trans.start(); //tell trans its waking up to begin anew	
 		Serializable runobj = null;
 		switch (accessType){
 			case GET:
@@ -377,6 +378,56 @@ public class SimTaskImpl implements SimTask {
 		}
 	}
 
+	/**
+	 *  (Copied from SimTask)
+	 * 
+	 * Requests that a socket be opened at the given host on the given port.
+	 * The returned ID can be used for future communication with the socket that will
+	 * be opened.  The socket ID will not be valid, and therefore should not be used 
+	 * until the connection is complete.  Connection is complete once the 
+	 * SimRawSocketListener.socketOpened() call back is called.
+	 * 
+	 * @param access			the access type (GET, PEEK, or ATTEMPT)
+	 * @param ref				a reference to the GLO initiating the connection.
+	 * @param host				a String representation of the remote host.
+	 * @param port				the remote port.
+	 * @param reliable			if true, the connection will use a reliable protocol.
+	 * 
+	 * @return an identifier that can be used for future communication with the socket.
+	 */
+	public long openSocket(ACCESS_TYPE access, GLOReference ref, String host, 
+			int port, boolean reliable) {
+		
+		return simulation.openSocket(access, ref, host, port, reliable);
+	}
+
+	/**
+	 *  (Copied from SimTask)
+	 * 
+	 * Sends data on the socket mapped to the given socketID.  This method 
+	 * will not return until the entire buffer has been drained.
+	 * 
+	 * @param socketID			the socket identifier.
+	 * @param data				the data to send.  The buffer should be in a ready
+	 * 							state, i.e. flipped if necessary. 
+	 * 
+	 * @return the number of bytes sent.
+	 */
+	public long sendRawSocketData(long socketID, ByteBuffer data) {
+		return simulation.sendRawSocketData(socketID, data);
+	}
 	
+	/**
+	 * (Copied from SimTask)
+	 * 
+	 * Requests that the socket matching the given socketID be closed.
+	 * The socket should not be assumed to be closed, however, until the 
+	 * call back SimRawSocketListener.socketClosed() is called.
+	 * 
+	 * @param socketID		the identifier of the socket.
+	 */
+	public void closeSocket(long socketID) {
+		simulation.closeSocket(socketID);
+	}
 
 }

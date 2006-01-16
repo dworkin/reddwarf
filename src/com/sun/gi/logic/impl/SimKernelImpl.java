@@ -1,9 +1,11 @@
 package com.sun.gi.logic.impl;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
+import com.sun.gi.framework.rawsocket.RawSocketManager;
 import com.sun.gi.framework.timer.TimerManager;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimKernel;
@@ -35,6 +37,7 @@ import com.sun.gi.objectstore.Transaction;
 public class SimKernelImpl implements SimKernel {
 
 	private TimerManager timerManager;
+	private RawSocketManager socketManager;
 
 	private List<Simulation> simList = new ArrayList<Simulation>();
 
@@ -80,7 +83,7 @@ public SimKernelImpl() {
 							synchronized(threadPool){
 								if (threadPool.size()>0){
 									if (sim.hasTasks()){
-										SimTask task = sim.nextTask();										
+										SimTask task = sim.nextTask();		
 										SimThread thread = threadPool.remove(0);
 										thread.execute(task);
 									}
@@ -144,6 +147,64 @@ public SimKernelImpl() {
 	public long registerTimerEvent(ACCESS_TYPE access, Simulation sim, GLOReference ref, long delay,
 			boolean repeat){
 		return timerManager.registerEvent(sim,access, ((GLOReferenceImpl)ref).objID,delay,repeat);
+	}
+	
+//	 Hooks into the RawSocketManager, added 1/16/2006
+	
+	/**
+	 * Sets the Raw Socket Manager.
+	 * 
+	 */
+	public void setRawSocketManager(RawSocketManager socketManager) {
+		this.socketManager = socketManager;
+	}
+	
+	
+	/**
+	 * Requests that a socket be opened at the given host on the given port.
+	 * The returned ID can be used for future communication with the socket that will
+	 * be opened.  The socket ID will not be valid, and therefore should not be used 
+	 * until the connection is complete.  Connection is complete once the 
+	 * SimRawSocketListener.socketOpened() call back is called.
+	 * 
+	 * @param sim				the simulation requesting the connection.
+	 * @param access			the access type (GET, PEEK, or ATTEMPT)
+	 * @param ref				a reference to the GLO initiating the connection.
+	 * @param host				a String representation of the remote host.
+	 * @param port				the remote port.
+	 * @param reliable			if true, the connection will use a reliable protocol.
+	 * 
+	 * @return an identifier that can be used for future communication with the socket.
+	 */
+	public long openSocket(Simulation sim, ACCESS_TYPE access, GLOReference ref, 
+			String host, int port, boolean reliable) {
+		
+		return socketManager.openSocket(sim, access, ((GLOReferenceImpl)ref).objID, host, port, reliable);
+	}	
+	
+	/**
+	 * Sends data on the socket mapped to the given socketID.  This method 
+	 * will not return until the entire buffer has been drained.
+	 * 
+	 * @param socketID			the socket identifier.
+	 * @param data				the data to send.  The buffer should be in a ready
+	 * 							state, i.e. flipped if necessary. 
+	 * 
+	 * @return the number of bytes sent.
+	 */
+	public long sendRawSocketData(long socketID, ByteBuffer data) {
+		return socketManager.sendData(socketID, data);
+	}
+	
+	/**
+	 * Requests that the socket matching the given socketID be closed.
+	 * The socket should not be assumed to be closed, however, until the 
+	 * call back SimRawSocketListener.socketClosed() is called.
+	 * 
+	 * @param socketID		the identifier of the socket.
+	 */
+	public void closeSocket(long socketID) {
+		socketManager.closeSocket(socketID);
 	}
 
 }

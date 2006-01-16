@@ -4,3 +4,4 @@
 1			    file:trivial_boot_test.xml
 2				file:commtest_deployment.xml
 3				file:timertest_deployment.xml
+4				file:rawsockettest_deployment.xml

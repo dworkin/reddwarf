@@ -159,6 +159,47 @@ public interface Simulation {
 	 * @return
 	 */
 	public ObjectStore getObjectStore();
+	
+	// Hooks into the RawSocketManager, added 1/16/2006
+	
+	/**
+	 * Requests that a socket be opened at the given host on the given port.
+	 * The returned ID can be used for future communication with the socket that will
+	 * be opened.  The socket ID will not be valid, and therefore should not be used 
+	 * until the connection is complete.  Connection is complete once the 
+	 * SimRawSocketListener.socketOpened() call back is called.
+	 * 
+	 * @param access			the access type (GET, PEEK, or ATTEMPT)
+	 * @param ref				a reference to the GLO initiating the connection.
+	 * @param host				a String representation of the remote host.
+	 * @param port				the remote port.
+	 * @param reliable			if true, the connection will use a reliable protocol.
+	 * 
+	 * @return an identifier that can be used for future communication with the socket.
+	 */
+	public long openSocket(ACCESS_TYPE access, GLOReference ref, String host, 
+			int port, boolean reliable);
+
+	/**
+	 * Sends data on the socket mapped to the given socketID.  This method 
+	 * will not return until the entire buffer has been drained.
+	 * 
+	 * @param socketID			the socket identifier.
+	 * @param data				the data to send.  The buffer should be in a ready
+	 * 							state, i.e. flipped if necessary. 
+	 * 
+	 * @return the number of bytes sent.
+	 */
+	public long sendRawSocketData(long socketID, ByteBuffer data);
+	
+	/**
+	 * Requests that the socket matching the given socketID be closed.
+	 * The socket should not be assumed to be closed, however, until the 
+	 * call back SimRawSocketListener.socketClosed() is called.
+	 * 
+	 * @param socketID		the identifier of the socket.
+	 */
+	public void closeSocket(long socketID);		
   
 
 }

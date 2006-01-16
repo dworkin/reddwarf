@@ -30,6 +30,7 @@ import com.sun.gi.framework.install.ValidatorRec;
 import com.sun.gi.framework.install.impl.InstallationURL;
 import com.sun.gi.framework.interconnect.TransportManager;
 import com.sun.gi.framework.interconnect.impl.LRMPTransportManager;
+import com.sun.gi.framework.rawsocket.impl.RawSocketManagerImpl;
 import com.sun.gi.framework.status.ReportManager;
 import com.sun.gi.framework.status.ReportUpdater;
 import com.sun.gi.framework.status.StatusReport;
@@ -93,6 +94,9 @@ public class SGS {
 			}
 			timerManager = new TimerManagerImpl(heartbeat); 
 			kernel.setTimerManager(timerManager);
+			
+			kernel.setRawSocketManager(new RawSocketManagerImpl());
+			
 			// start game services
 			StatusReport installationReport = reportManager
 					.makeNewReport("_SGS_discover_" + sliceID);
