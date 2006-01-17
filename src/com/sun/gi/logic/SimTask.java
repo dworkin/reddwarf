@@ -217,7 +217,7 @@ public interface SimTask {
 	 * 
 	 * @return the number of bytes sent.
 	 */
-	public long sendRawSocketData(long socketID, ByteBuffer data);
+	public void sendRawSocketData(long socketID, ByteBuffer data);
 	
 	/**
 	 * Requests that the socket matching the given socketID be closed.

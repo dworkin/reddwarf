@@ -68,8 +68,50 @@ class OutputRecord {
 	}
 }
 
-class RawSocketRecord {
+class OpenSocketRecord {
+	long socketID;
+	ACCESS_TYPE access;
+	long objID;
+	String host; 
+	int port; 
+	boolean reliable;
+	/**
+	 * @param sid
+	 * @param access2
+	 * @param l
+	 * @param host2
+	 * @param port2
+	 * @param reliable2
+	 */
+	public OpenSocketRecord(long sid, ACCESS_TYPE access, long objID, String host, int port, boolean reliable) {
+		this.socketID = sid;
+		this.access = access;
+		this.objID = objID;
+		this.host = host;
+		this.port = port;
+		this.reliable = reliable;
+	}
+}
+
+class SocketSendRecord{
+	long socketID;
+	ByteBuffer data;
+
+	/**
+	 * @param socketID
+	 * @param data
+	 */
+	public SocketSendRecord(long socketID, ByteBuffer buff) {
+		this.socketID = socketID;
+		data = ByteBuffer.allocate(buff.capacity());
+		buff.flip(); // flip for read
+		data.put(buff);
+	}
 	
+	
+}
+
+class CloseSocketRecord{
 	
 }
 
@@ -116,7 +158,10 @@ public class SimTaskImpl implements SimTask {
 	
 	private Map<Serializable,Long> gloIDMap = new HashMap<Serializable,Long>();
 	private Map<Serializable,ACCESS_TYPE> gloAccessMap = new HashMap<Serializable,ACCESS_TYPE>();
-	private List<TimerRecord> timerRecordQueue =  new ArrayList<TimerRecord>();;
+	private List<TimerRecord> timerRecordQueue =  new ArrayList<TimerRecord>();
+	private List<OpenSocketRecord> socketOpenQueue = new ArrayList<OpenSocketRecord>();
+	private List<SocketSendRecord> socketSendQueue = new ArrayList<SocketSendRecord>();
+	private List<Long> socketCloseQueue = new ArrayList<Long>();
 
 	public SimTaskImpl(Simulation sim, ClassLoader loader, ACCESS_TYPE access, long startObjectID,
 			Method startMethod, Object[] startArgs) {
@@ -161,6 +206,9 @@ public class SimTaskImpl implements SimTask {
 				simulation.queueTask(task);				
 			}
 			processTimerEvents();
+			processOpenSocketRecords();
+			processRawSocketSends();
+			processSocketCloseRecords();
 		} catch (InvocationTargetException ex) {
 			ex.printStackTrace();
 			trans.abort();
@@ -179,6 +227,9 @@ public class SimTaskImpl implements SimTask {
 			outputList.clear();
 			timerRecordQueue.clear();
 			taskLaunchList.clear();
+			socketCloseQueue.clear();
+			socketOpenQueue.clear();
+			socketSendQueue.clear();
 			gloIDMap.clear();
 			gloAccessMap.clear();
 			simulation.queueTask(this); // requeue for later execution
@@ -441,15 +492,25 @@ public class SimTaskImpl implements SimTask {
 	 */
 	public long openSocket(ACCESS_TYPE access, GLOReference ref, String host, 
 			int port, boolean reliable) {
-		
-		return simulation.openSocket(access, ref, host, port, reliable);
+		long sid = simulation.getNextSocketID();		
+		socketOpenQueue.add(
+				new OpenSocketRecord(sid,access,((GLOReferenceImpl)ref).objID,
+				host,port,reliable));
+		return sid;
+	}
+	
+	private void processOpenSocketRecords(){
+		for (OpenSocketRecord rec:socketOpenQueue){
+			simulation.openSocket(rec.socketID,rec.access,rec.objID,
+					rec.host,rec.port,rec.reliable);
+		}
+		socketOpenQueue.clear();
 	}
 
 	/**
 	 *  (Copied from SimTask)
 	 * 
-	 * Sends data on the socket mapped to the given socketID.  This method 
-	 * will not return until the entire buffer has been drained.
+	 * Sends data on the socket mapped to the given socketID.  
 	 * 
 	 * @param socketID			the socket identifier.
 	 * @param data				the data to send.  The buffer should be in a ready
@@ -457,8 +518,15 @@ public class SimTaskImpl implements SimTask {
 	 * 
 	 * @return the number of bytes sent.
 	 */
-	public long sendRawSocketData(long socketID, ByteBuffer data) {
-		return simulation.sendRawSocketData(socketID, data);
+	public void sendRawSocketData(long socketID, ByteBuffer data) {
+		socketSendQueue .add(new SocketSendRecord(socketID, data));
+	}
+	
+	private void processRawSocketSends(){
+		for(SocketSendRecord rec: socketSendQueue){
+			simulation.sendRawSocketData(rec.socketID,rec.data);
+		}
+		socketSendQueue.clear();
 	}
 	
 	/**
@@ -471,7 +539,13 @@ public class SimTaskImpl implements SimTask {
 	 * @param socketID		the identifier of the socket.
 	 */
 	public void closeSocket(long socketID) {
-		simulation.closeSocket(socketID);
+		socketCloseQueue.add(new Long(socketID));
+	}
+	
+	private void processSocketCloseRecords(){
+		for(Long l : socketCloseQueue){
+			simulation.closeSocket(l);
+		}
 	}
 
 }

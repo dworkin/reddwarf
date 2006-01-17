@@ -13,8 +13,6 @@ import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.SimThread;
 import com.sun.gi.logic.Simulation;
 import com.sun.gi.logic.SimTask.ACCESS_TYPE;
-import com.sun.gi.objectstore.ObjectStore;
-import com.sun.gi.objectstore.Transaction;
 
 /**
  * <p>
@@ -176,10 +174,10 @@ public SimKernelImpl() {
 	 * 
 	 * @return an identifier that can be used for future communication with the socket.
 	 */
-	public long openSocket(Simulation sim, ACCESS_TYPE access, GLOReference ref, 
+	public long openSocket(long sid, Simulation sim, ACCESS_TYPE access, long objID, 
 			String host, int port, boolean reliable) {
 		
-		return socketManager.openSocket(sim, access, ((GLOReferenceImpl)ref).objID, host, port, reliable);
+		return socketManager.openSocket(sid,sim, access, objID, host, port, reliable);
 	}	
 	
 	/**
@@ -213,6 +211,13 @@ public SimKernelImpl() {
 	public long getNextTimerID() {
 		// TODO Auto-generated method stub
 		return timerManager.getNextTimerID();
+	}
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.logic.SimKernel#getNextSocketID()
+	 */
+	public long getNextSocketID() {		
+		return socketManager.getNextSocketID();
 	}
 
 }

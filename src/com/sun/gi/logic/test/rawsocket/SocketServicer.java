@@ -53,7 +53,7 @@ public class SocketServicer implements Serializable, SimRawSocketListener {
 		}
 		buffer.flip();
 		
-		long written = task.sendRawSocketData(socketID, buffer);
+		task.sendRawSocketData(socketID, buffer);
 		
 		//System.out.println("Wrote " + written + " bytes");
 	}

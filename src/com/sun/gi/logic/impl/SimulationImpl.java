@@ -575,10 +575,10 @@ public class SimulationImpl implements Simulation {
 	 * 
 	 * @return an identifier that can be used for future communication with the socket.
 	 */
-	public long openSocket(ACCESS_TYPE access, GLOReference ref, String host, 
+	public long openSocket(long socketID, ACCESS_TYPE access, long objID, String host, 
 			int port, boolean reliable) {
 		
-		return kernel.openSocket(this, access, ref, host, port, reliable);
+		return kernel.openSocket(socketID,this, access, objID, host, port, reliable);
 	}
 
 	/**
@@ -615,6 +615,13 @@ public class SimulationImpl implements Simulation {
 	 */
 	public long getNextTimerID() {		
 		return kernel.getNextTimerID();
+	}
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.logic.Simulation#getNextSocketID()
+	 */
+	public long getNextSocketID() {	
+		return kernel.getNextSocketID();
 	}
 
 }

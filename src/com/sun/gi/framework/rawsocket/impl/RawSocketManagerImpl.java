@@ -65,14 +65,13 @@ public class RawSocketManagerImpl implements RawSocketManager {
 	 * 
 	 * NOTE: Right now, only reliable transport is supported.
 	 */
-	public long openSocket(Simulation sim, ACCESS_TYPE access,
+	public long openSocket(long id, Simulation sim, ACCESS_TYPE access,
 			long startObjectID, String host, int port, boolean reliable) {
 		
-		long id = 0;
 		try {
 			SocketChannel channel = SocketChannel.open();
 			channel.configureBlocking(false);
-			id = storeChannel(sim, access, startObjectID, channel);
+			storeChannel(id,sim, access, startObjectID, channel);
 			channel.connect(new InetSocketAddress(host, port));
 
 			synchronized(pendingConnections) {
@@ -156,13 +155,12 @@ public class RawSocketManagerImpl implements RawSocketManager {
 	 * @param channel
 	 * @return
 	 */
-	private long storeChannel(Simulation sim, ACCESS_TYPE access, long gloID, SocketChannel channel) {
-		long key = currentSocketID.incrementAndGet();
+	private void storeChannel(long key, Simulation sim, ACCESS_TYPE access, long gloID, SocketChannel channel) {		
 		
 		SocketInfo info = new SocketInfo(sim, access, gloID, channel);
 		socketMap.put(key, info);
 		
-		return key;
+		
 	}
 	
 	/**
@@ -370,6 +368,14 @@ public class RawSocketManagerImpl implements RawSocketManager {
 			this.gloID = gloID;
 			this.channel = channel;
 		}
+	}
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.framework.rawsocket.RawSocketManager#getNextSocketID()
+	 */
+	public long getNextSocketID() {
+		// TODO Auto-generated method stub
+		return currentSocketID.getAndIncrement();
 	}
 
 }

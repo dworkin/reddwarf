@@ -81,14 +81,14 @@ public interface SimKernel {
 	 * 
 	 * @param sim				the simulation requesting the connection.
 	 * @param access			the access type (GET, PEEK, or ATTEMPT)
-	 * @param ref				a reference to the GLO initiating the connection.
+	 * @param objID				a reference to the GLO initiating the connection.
 	 * @param host				a String representation of the remote host.
 	 * @param port				the remote port.
 	 * @param reliable			if true, the connection will use a reliable protocol.
 	 * 
 	 * @return an identifier that can be used for future communication with the socket.
 	 */
-	public long openSocket(Simulation sim, ACCESS_TYPE access, GLOReference ref, String host, 
+	public long openSocket(long socketID, Simulation sim, ACCESS_TYPE access, long objID, String host, 
 			int port, boolean reliable);
 
 	
@@ -117,5 +117,10 @@ public interface SimKernel {
 	 * @return
 	 */
 	public long getNextTimerID();
+
+	/**
+	 * @return
+	 */
+	public long getNextSocketID();
 	
 }

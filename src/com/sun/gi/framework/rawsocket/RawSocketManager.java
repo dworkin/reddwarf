@@ -41,7 +41,7 @@ public interface RawSocketManager {
 	 * 
 	 * @return a socketID that can be used in future communication to reference the socket. 
 	 */
-	public long openSocket(Simulation sim, ACCESS_TYPE access, long startObjectID, 
+	public long openSocket(long socketID, Simulation sim, ACCESS_TYPE access, long startObjectID, 
 							String host, int port, boolean reliable);
 	
 	/**
@@ -68,5 +68,10 @@ public interface RawSocketManager {
 	 * @param socketID			the ID of the socket to close.
 	 */
 	public void closeSocket(long socketID);
+
+	/**
+	 * @return
+	 */
+	public long getNextSocketID();
 
 }

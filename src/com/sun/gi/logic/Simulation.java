@@ -170,14 +170,14 @@ public interface Simulation {
 	 * SimRawSocketListener.socketOpened() call back is called.
 	 * 
 	 * @param access			the access type (GET, PEEK, or ATTEMPT)
-	 * @param ref				a reference to the GLO initiating the connection.
+	 * @param objID				a reference to the GLO initiating the connection.
 	 * @param host				a String representation of the remote host.
 	 * @param port				the remote port.
 	 * @param reliable			if true, the connection will use a reliable protocol.
 	 * 
 	 * @return an identifier that can be used for future communication with the socket.
 	 */
-	public long openSocket(ACCESS_TYPE access, GLOReference ref, String host, 
+	public long openSocket(long socketID, ACCESS_TYPE access, long objID, String host, 
 			int port, boolean reliable);
 
 	/**
@@ -204,7 +204,12 @@ public interface Simulation {
 	/**
 	 * @return
 	 */
-	public long getNextTimerID();		
+	public long getNextTimerID();
+
+	/**
+	 * @return
+	 */
+	public long getNextSocketID();		
   
 
 }
