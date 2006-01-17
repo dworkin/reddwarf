@@ -538,8 +538,8 @@ public class SimulationImpl implements Simulation {
 	/* (non-Javadoc)
 	 * @see com.sun.gi.logic.Simulation#registerTimerEvent(com.sun.gi.logic.GLOReference, long, boolean)
 	 */
-	public long registerTimerEvent(ACCESS_TYPE access, GLOReference ref, long delay, boolean repeat) {
-		return kernel.registerTimerEvent(access, this,ref,delay,repeat);
+	public long registerTimerEvent(long tid, ACCESS_TYPE access, long objID, long delay, boolean repeat) {
+		return kernel.registerTimerEvent(tid, access, this,objID,delay,repeat);
 	}
 
 	/* (non-Javadoc)
@@ -608,6 +608,13 @@ public class SimulationImpl implements Simulation {
 	 */
 	public void closeSocket(long socketID) {
 		kernel.closeSocket(socketID);
+	}
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.logic.Simulation#getNextTimerID()
+	 */
+	public long getNextTimerID() {		
+		return kernel.getNextTimerID();
 	}
 
 }

@@ -52,14 +52,15 @@ public interface SimKernel {
 	
 	/**
 	 * 
+	 * @param tid
 	 * @param access 
 	 * @param sim
-	 * @param ref
+	 * @param objID
 	 * @param delay
 	 * @param repeat
 	 * @return
 	 */
-	public long registerTimerEvent(ACCESS_TYPE access, Simulation sim, GLOReference ref, long delay,
+	public long registerTimerEvent(long tid, ACCESS_TYPE access, Simulation sim, long objID, long delay,
 			boolean repeat);
 	
 	
@@ -111,5 +112,10 @@ public interface SimKernel {
 	 * @param socketID		the identifier of the socket.
 	 */
 	public void closeSocket(long socketID);
+
+	/**
+	 * @return
+	 */
+	public long getNextTimerID();
 	
 }

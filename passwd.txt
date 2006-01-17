@@ -1,2 +1,7 @@
 foo 	bar	user
 Guest  	*   guest
+guest1  guest1
+guest2  guest2
+guest3  guest3
+guest4  guest4
+guest5  guest5

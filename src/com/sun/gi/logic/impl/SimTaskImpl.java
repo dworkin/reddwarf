@@ -68,6 +68,35 @@ class OutputRecord {
 	}
 }
 
+class RawSocketRecord {
+	
+	
+}
+
+class TimerRecord {
+	long tid;
+	ACCESS_TYPE access;
+	long delay;
+	boolean repeat;
+	long objID;
+
+	/**
+	 * @param tid
+	 * @param access
+	 * @param delay
+	 * @param repeat
+	 * @param l
+	 */
+	public TimerRecord(long tid, ACCESS_TYPE access, long delay, boolean repeat, long objID) {
+		this.tid = tid;
+		this.access = access;
+		this.delay = delay;
+		this.repeat = repeat;
+		this.objID = objID;
+	}
+	
+}
+
 public class SimTaskImpl implements SimTask {
 	private Transaction trans;
 	private ACCESS_TYPE accessType;
@@ -87,6 +116,7 @@ public class SimTaskImpl implements SimTask {
 	
 	private Map<Serializable,Long> gloIDMap = new HashMap<Serializable,Long>();
 	private Map<Serializable,ACCESS_TYPE> gloAccessMap = new HashMap<Serializable,ACCESS_TYPE>();
+	private List<TimerRecord> timerRecordQueue =  new ArrayList<TimerRecord>();;
 
 	public SimTaskImpl(Simulation sim, ClassLoader loader, ACCESS_TYPE access, long startObjectID,
 			Method startMethod, Object[] startArgs) {
@@ -125,11 +155,12 @@ public class SimTaskImpl implements SimTask {
 		}
 		try {
 			startMethod.invoke(runobj, startArgs);
-			doOutput();
-			trans.commit();
+			doOutput();			
+			trans.commit();			
 			for(SimTask task : taskLaunchList){
 				simulation.queueTask(task);				
 			}
+			processTimerEvents();
 		} catch (InvocationTargetException ex) {
 			ex.printStackTrace();
 			trans.abort();
@@ -146,6 +177,7 @@ public class SimTaskImpl implements SimTask {
 			trans.abort();
 		} catch (DeadlockException de) {	
 			outputList.clear();
+			timerRecordQueue.clear();
 			taskLaunchList.clear();
 			gloIDMap.clear();
 			gloAccessMap.clear();
@@ -276,7 +308,19 @@ public class SimTaskImpl implements SimTask {
 	 *      com.sun.gi.logic.GLOReference)
 	 */
 	public long registerTimerEvent(ACCESS_TYPE access, long delay, boolean repeat, GLOReference ref) {
-		return simulation.registerTimerEvent(access, ref, delay, repeat);
+		long tid = simulation.getNextTimerID();
+		TimerRecord rec = new TimerRecord(tid, access,delay,repeat,((GLOReferenceImpl)ref).objID);
+		timerRecordQueue .add(rec);
+		return tid; 
+	}
+	
+	private void processTimerEvents(){
+		for(TimerRecord rec:timerRecordQueue){
+			simulation.registerTimerEvent(rec.tid,rec.access,rec.objID,rec.delay,
+					rec.repeat);
+		}
+		timerRecordQueue.clear();
+		
 	}
 
 	/* (non-Javadoc)

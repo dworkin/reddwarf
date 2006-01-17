@@ -52,8 +52,7 @@ public class RawSocketTestBoot implements SimBoot {
 			servicerList = new ArrayList<GLOReference>();
 			
 			for (int i = 0; i < numServicers; i++) {
-				GLOReference ssRef = task.createSO(new SocketServicer(), null);
-			
+				GLOReference ssRef = task.createSO(new SocketServicer(), null);			
 				servicerList.add(ssRef);
 			}
 		}

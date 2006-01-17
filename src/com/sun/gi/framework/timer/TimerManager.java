@@ -45,6 +45,7 @@ public interface TimerManager {
 	 * of that tick.  (eg, a 500 ms request at the default tick rate of 1sec (1000ms) will mean
 	 * an actual event frequency of approximately 1/sec.)
 	 * 
+	 * @param tid The timer event ID of this event
 	 * @param sim The simulation who is requesting this timer event
 	 * @param access 
 	 * @param startObjectID ID of a GLO that implements TimerManagerListener to receive the event
@@ -52,12 +53,17 @@ public interface TimerManager {
 	 * @param repeat If false, this is a one shot, else it repeats
 	 * @returns an ID for the event
 	 */
-	public long registerEvent(Simulation sim, ACCESS_TYPE access, long startObjectID, long delay, boolean repeat);
+	public long registerEvent(long tid, Simulation sim, ACCESS_TYPE access, long startObjectID, long delay, boolean repeat);
 	
 	/**
 	 * Removes a task from the lost of timed events.
 	 * @param eventID The ID returned from the call used to register the event.
 	 */
 	public void removeEvent(long eventID);
+
+	/**
+	 * @return
+	 */
+	public long getNextTimerID();
 	
 }

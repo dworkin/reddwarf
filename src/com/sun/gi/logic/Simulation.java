@@ -152,8 +152,8 @@ public interface Simulation {
 	 */
 	public ChannelID openChannel(String string);
 
-	public long registerTimerEvent(ACCESS_TYPE access, GLOReference ref, long delay,
-			boolean repeat);
+	public long registerTimerEvent(long tid, ACCESS_TYPE access, long objID,
+			long delay, boolean repeat); 
 
 	/**
 	 * @return
@@ -199,7 +199,12 @@ public interface Simulation {
 	 * 
 	 * @param socketID		the identifier of the socket.
 	 */
-	public void closeSocket(long socketID);		
+	public void closeSocket(long socketID);
+
+	/**
+	 * @return
+	 */
+	public long getNextTimerID();		
   
 
 }

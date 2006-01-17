@@ -55,9 +55,9 @@ public class TimerManagerImpl implements TimerManager {
 
 		long objID;
 
-		public TimerRec(long delay, boolean repeating, Simulation sim,
+		public TimerRec(long tid, long delay, boolean repeating, Simulation sim,
 				ACCESS_TYPE access, long objID) {
-			evtID = nextID++;
+			evtID = tid;
 			triggerTime = System.currentTimeMillis() + delay;
 			if (repeating) {
 				this.repeatTime = delay;
@@ -145,9 +145,9 @@ public class TimerManagerImpl implements TimerManager {
 	 * @see com.sun.gi.framework.timer.TimerManager#registerEvent(long, long,
 	 *      java.lang.reflect.Method, java.lang.Object[], long, boolean)
 	 */
-	public long registerEvent(Simulation sim, ACCESS_TYPE access, long startObjectID, long delay,
+	public long registerEvent(long id, Simulation sim, ACCESS_TYPE access, long startObjectID, long delay,
 			boolean repeat) {
-		TimerRec rec = new TimerRec(delay, repeat, sim, access, startObjectID);
+		TimerRec rec = new TimerRec(id,delay, repeat, sim, access, startObjectID);
 		synchronized (queue) {
 			queue.add(rec);
 		}
@@ -169,6 +169,13 @@ public class TimerManagerImpl implements TimerManager {
 			}
 		}
 
+	}
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.framework.timer.TimerManager#getNextTimerID()
+	 */
+	public synchronized long getNextTimerID() {		
+		return nextID++;
 	}
 
 }

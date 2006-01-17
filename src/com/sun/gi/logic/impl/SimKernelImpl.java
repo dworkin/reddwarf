@@ -144,9 +144,9 @@ public SimKernelImpl() {
 		
 	}
 	
-	public long registerTimerEvent(ACCESS_TYPE access, Simulation sim, GLOReference ref, long delay,
+	public long registerTimerEvent(long tid, ACCESS_TYPE access, Simulation sim, long objID, long delay,
 			boolean repeat){
-		return timerManager.registerEvent(sim,access, ((GLOReferenceImpl)ref).objID,delay,repeat);
+		return timerManager.registerEvent(tid,sim,access, objID,delay,repeat);
 	}
 	
 //	 Hooks into the RawSocketManager, added 1/16/2006
@@ -205,6 +205,14 @@ public SimKernelImpl() {
 	 */
 	public void closeSocket(long socketID) {
 		socketManager.closeSocket(socketID);
+	}
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.logic.SimKernel#getNextTimerID()
+	 */
+	public long getNextTimerID() {
+		// TODO Auto-generated method stub
+		return timerManager.getNextTimerID();
 	}
 
 }
