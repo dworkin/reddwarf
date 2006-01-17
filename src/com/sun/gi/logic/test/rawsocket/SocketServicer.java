@@ -23,6 +23,8 @@ public class SocketServicer implements Serializable, SimRawSocketListener {
 
 	private static final long serialVersionUID = 8969950991047103803L;
 	
+	private int curBufferSize = 1;
+	
 	/**
 	 * Called when the socket mapped to the specified socketID has been successfully
 	 * opened and ready for communication.
@@ -30,17 +32,20 @@ public class SocketServicer implements Serializable, SimRawSocketListener {
 	 * @param socketID		the ID of the socket.
 	 */
 	public void socketOpened(SimTask task, long socketID) {
-		System.out.println("SocketServicer: Socket ID " + socketID + " is open for business!");
-	
+		//System.out.println("SocketServicer: Socket ID " + socketID + " is open for business!");
+		//System.out.flush();
 		writeBytes(task, socketID);
 		
 	}
 	
 	private void writeBytes(SimTask task, long socketID) {
-		int curBufferSize = 9;
-		if (curBufferSize == 0 || curBufferSize >= 10) {
+		if (curBufferSize == 0 || curBufferSize >= 20) {
 			task.closeSocket(socketID);
+			curBufferSize = 1;
 			return;
+		}
+		else {
+			curBufferSize++;
 		}
 		ByteBuffer buffer = ByteBuffer.allocate(curBufferSize);
 		for (int i = 0; i < curBufferSize; i++) {

@@ -43,11 +43,12 @@ public class RawSocketTestBoot implements SimBoot {
 	 * 
 	 */
 	public void boot(SimTask task, boolean firstBoot) {
+		System.out.println("RawSocketTestBoot boot");
 		if (firstBoot) {
-			int numServicers = 1;		// works with two, with more then that
+			int numServicers = 9;		// works with two, with more then that
 										// NonExistantObjectIDException
 
-			System.out.println("firstBoot");
+			System.out.println("RawSocketTestBoot: firstBoot");
 			//new Throwable().printStackTrace();
 			servicerList = new ArrayList<GLOReference>();
 			
@@ -60,7 +61,7 @@ public class RawSocketTestBoot implements SimBoot {
 		int startPort = 5000;
 		for (GLOReference ref : servicerList) {
 			System.out.println("RawSocketTestBoot: Socket ID = " + 
-					task.openSocket(ACCESS_TYPE.PEEK, ref, "localhost", startPort++, true));
+					task.openSocket(ACCESS_TYPE.GET, ref, "localhost", startPort++, true));
 
 		}
 

@@ -9,8 +9,8 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
+import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -41,13 +41,11 @@ import com.sun.gi.logic.impl.GLOReferenceImpl;
  */
 public class RawSocketManagerImpl implements RawSocketManager {
 
-	private final static int BLOCK_TIME = 100;			// This should probably be configurable.
-	
-	private int bufferSize = 100;
+	private int bufferSize = 512;
 	private AtomicLong currentSocketID;
 	private ConcurrentHashMap<Long, SocketInfo> socketMap;
-	private LinkedList<Long> pendingConnections;		// list of socket IDs to be opened.
-	private LinkedList<Long> pendingClosures;			// list of sockets IDs to be closed.
+	private ArrayList<Long> pendingConnections;			// list of socket IDs to be opened.
+	private ArrayList<Long> pendingClosures;			// list of sockets IDs to be closed.
 	private Selector selector;
 	
 	private boolean shouldUpdate = true;
@@ -55,8 +53,8 @@ public class RawSocketManagerImpl implements RawSocketManager {
 	public RawSocketManagerImpl() {
 		currentSocketID = new AtomicLong(0L);
 		socketMap = new ConcurrentHashMap<Long, SocketInfo>();
-		pendingConnections = new LinkedList<Long>();
-		pendingClosures = new LinkedList<Long>();
+		pendingConnections = new ArrayList<Long>();
+		pendingClosures = new ArrayList<Long>();
 		start();
 	}
 	
@@ -75,24 +73,17 @@ public class RawSocketManagerImpl implements RawSocketManager {
 			SocketChannel channel = SocketChannel.open();
 			channel.configureBlocking(false);
 			id = storeChannel(sim, access, startObjectID, channel);
-			
 			channel.connect(new InetSocketAddress(host, port));
-			synchronized(selector) {			// order is important
-				synchronized(selector.keys()) {
-					SelectionKey key = channel.register(selector, SelectionKey.OP_READ);
-					key.attach(id);
-				}
-			}
-			
+
 			synchronized(pendingConnections) {
 				pendingConnections.add(id);
 			}
-			
 		}
 		catch (IOException ioe) {
 			generateExceptionEvent(id, ioe);
 			return 0;
 		}
+		selector.wakeup();
 		return id;
 	}
 
@@ -105,7 +96,7 @@ public class RawSocketManagerImpl implements RawSocketManager {
 	 * 
 	 */
 	public long sendData(long socketID, ByteBuffer data) {
-		System.out.println("Request to send: " + data.capacity() + " bytes");
+		//System.out.println("Request to send: " + data.capacity() + " bytes");
 		
 		SocketChannel channel = getSocketChannel(socketID);
 		if (channel == null) {
@@ -114,10 +105,10 @@ public class RawSocketManagerImpl implements RawSocketManager {
 		int totalWritten = 0;
 		try {
 			if (!channel.isConnected()) {
-				throw new ClosedChannelException();
+				generateExceptionEvent(socketID, new ClosedChannelException());
+				return 0;
 			}
 			
-			//System.out.println("Data has remaining " + data.hasRemaining());
 			while (data.hasRemaining()) {
 				totalWritten += channel.write(data);
 			}
@@ -136,6 +127,7 @@ public class RawSocketManagerImpl implements RawSocketManager {
 				pendingClosures.add(socketID);
 			}
 		}
+		selector.wakeup();
 	}
 	
 	/**
@@ -179,7 +171,12 @@ public class RawSocketManagerImpl implements RawSocketManager {
 	 */
 	private void start() {
 		socketMap.clear();
-		pendingConnections.clear();
+		synchronized (pendingConnections) {
+			pendingConnections.clear();
+		}
+		synchronized (pendingClosures) {
+			pendingClosures.clear();
+		}
 		shouldUpdate = true;
 		try {
 			selector = Selector.open();
@@ -217,34 +214,32 @@ public class RawSocketManagerImpl implements RawSocketManager {
 							// this will be the offending socket.
 							// The socket will be closed. 
 		try {
-			selector.select(BLOCK_TIME);			
+			selector.select();		// block until some selectable I/O happens or wakeup() is called.
 			
-			synchronized (selector) {			// order is important
-				synchronized (selector.keys()) {
-					synchronized (selector.selectedKeys()) {
-				
-						Iterator keys = selector.selectedKeys().iterator();
-						while (keys.hasNext()) {
-							SelectionKey key = (SelectionKey) keys.next();
-							keys.remove();
-							socketID = (Long) key.attachment();
-							if (key.isReadable()) {
-								SocketChannel curChannel = (SocketChannel) key.channel();
-								if (curChannel.isConnected()) {
-									ByteBuffer in = ByteBuffer.allocate(bufferSize);
-									int numBytes = curChannel.read(in);
-									in.flip();
-									
-									//System.out.println("Received: " + numBytes + " on socketID " +
-									//		key.attachment() + " payload: " + new String(in.array()));
-									
-									SocketInfo info = socketMap.get(socketID);
-									generateEvent(socketID, "dataReceived", 
-											new Class[] {SimTask.class, long.class, ByteBuffer.class},
-											new Object[] {socketID, in});
-								}
-							}
-						}
+			Iterator keys = selector.selectedKeys().iterator();
+			while (keys.hasNext()) {
+				SelectionKey key = (SelectionKey) keys.next();
+				keys.remove();
+				socketID = (Long) key.attachment();
+				SocketChannel curChannel = (SocketChannel) key.channel();
+				if (key.isConnectable()) {
+					if (curChannel.finishConnect()) {
+						//System.out.println("socketID " + socketID + " has finished connecting.");
+						key.interestOps(SelectionKey.OP_READ);
+						generateEvent(socketID, "socketOpened", new Class[] {SimTask.class, long.class},
+										new Object[] {socketID});
+
+					}
+				}
+				else if (key.isReadable()) {
+					if (curChannel.isConnected()) {
+						ByteBuffer in = ByteBuffer.allocate(bufferSize);
+						int numBytes = curChannel.read(in);
+						in.flip();
+						
+						generateEvent(socketID, "dataReceived", 
+								new Class[] {SimTask.class, long.class, ByteBuffer.class},
+								new Object[] {socketID, in});
 					}
 				}
 			}
@@ -264,20 +259,21 @@ public class RawSocketManagerImpl implements RawSocketManager {
 	}
 	
 	private void checkPendingConnections() {
-		synchronized(pendingConnections) {
+		synchronized (pendingConnections) {
 			for (int i = pendingConnections.size() - 1; i >= 0; i--) { 
 				long curSocketID = pendingConnections.get(i);
+				pendingConnections.remove(curSocketID);
 				SocketChannel curChannel = socketMap.get(curSocketID).channel;
+				SelectionKey key = null;
 				try {
-					if (curChannel.finishConnect()) {
-						pendingConnections.remove(curSocketID);
-						generateEvent(curSocketID, "socketOpened", 
-									new Class[] {SimTask.class, long.class},
-									new Object[] {curSocketID});
-					}
+					key = curChannel.register(selector, SelectionKey.OP_CONNECT);
+					key.attach(curSocketID);
+						
 				}
 				catch (IOException ioe) {		// connection failed for some reason
-					pendingConnections.remove(curSocketID);
+					if (key != null) {
+						key.cancel();
+					}
 					generateExceptionEvent(curSocketID, ioe);
 				}
 			}
