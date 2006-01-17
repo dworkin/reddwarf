@@ -51,7 +51,6 @@ public class SocketServicer implements Serializable, SimRawSocketListener {
 		for (int i = 0; i < curBufferSize; i++) {
 			buffer.put((byte) socketID);		// easily identifies which socket is writing
 		}
-		buffer.flip();
 		
 		task.sendRawSocketData(socketID, buffer);
 		

@@ -46,8 +46,7 @@ public interface RawSocketManager {
 	
 	/**
 	 * Attempts to send the given data over the socket associated with
-	 * the given socketID.  The buffer should be ready for writing 
-	 * (i.e. flipped if necessary).
+	 * the given socketID.  
 	 * 
 	 * @param socketID			used to lookup the associated socket.
 	 * @param data				the data to send.

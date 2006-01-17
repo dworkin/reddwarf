@@ -68,6 +68,7 @@ public class RawSocketManagerImpl implements RawSocketManager {
 	public long openSocket(long id, Simulation sim, ACCESS_TYPE access,
 			long startObjectID, String host, int port, boolean reliable) {
 		
+		System.out.println("openSocket id " + id);
 		try {
 			SocketChannel channel = SocketChannel.open();
 			channel.configureBlocking(false);
@@ -97,6 +98,7 @@ public class RawSocketManagerImpl implements RawSocketManager {
 	public long sendData(long socketID, ByteBuffer data) {
 		//System.out.println("Request to send: " + data.capacity() + " bytes");
 		
+		data.flip();
 		SocketChannel channel = getSocketChannel(socketID);
 		if (channel == null) {
 			return 0;
