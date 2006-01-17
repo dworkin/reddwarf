@@ -230,17 +230,19 @@ public class RawSocketManagerImpl implements RawSocketManager {
 							socketID = (Long) key.attachment();
 							if (key.isReadable()) {
 								SocketChannel curChannel = (SocketChannel) key.channel();
-								ByteBuffer in = ByteBuffer.allocate(bufferSize);
-								int numBytes = curChannel.read(in);
-								in.flip();
-								
-								//System.out.println("Received: " + numBytes + " on socketID " +
-								//		key.attachment() + " payload: " + new String(in.array()));
-								
-								SocketInfo info = socketMap.get(socketID);
-								generateEvent(socketID, "dataReceived", 
-										new Class[] {SimTask.class, long.class, ByteBuffer.class},
-										new Object[] {socketID, in});
+								if (curChannel.isConnected()) {
+									ByteBuffer in = ByteBuffer.allocate(bufferSize);
+									int numBytes = curChannel.read(in);
+									in.flip();
+									
+									//System.out.println("Received: " + numBytes + " on socketID " +
+									//		key.attachment() + " payload: " + new String(in.array()));
+									
+									SocketInfo info = socketMap.get(socketID);
+									generateEvent(socketID, "dataReceived", 
+											new Class[] {SimTask.class, long.class, ByteBuffer.class},
+											new Object[] {socketID, in});
+								}
 							}
 						}
 					}
