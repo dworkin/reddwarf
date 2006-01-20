@@ -5,7 +5,10 @@ import java.io.Serializable;
 import java.nio.ByteBuffer;
 
 import com.sun.gi.framework.rawsocket.SimRawSocketListener;
+import com.sun.gi.gloutils.pdtimer.PDTimer;
+import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask;
+import com.sun.gi.logic.SimTimerListener;
 import com.sun.gi.logic.SimTask.ACCESS_TYPE;
 
 /**
@@ -19,7 +22,7 @@ import com.sun.gi.logic.SimTask.ACCESS_TYPE;
  * @author	Sten Anderson
  * @version 1.0
  */
-public class SocketServicer implements Serializable, SimRawSocketListener {
+public class SocketServicer implements Serializable, SimRawSocketListener/*, SimTimerListener*/ {
 
 	private static final long serialVersionUID = 8969950991047103803L;
 	
@@ -34,12 +37,26 @@ public class SocketServicer implements Serializable, SimRawSocketListener {
 	public void socketOpened(SimTask task, long socketID) {
 		//System.out.println("SocketServicer: Socket ID " + socketID + " is open for business!");
 		//System.out.flush();
+		
+		/*try {
+			GLOReference thisRef = task.makeReference(this);
+			task.registerTimerEvent(ACCESS_TYPE.GET, 5000, true, thisRef);
+		}
+		catch (InstantiationException ie) {
+			ie.printStackTrace();
+		}*/
+
 		writeBytes(task, socketID);
 		
 	}
 	
-	private void writeBytes(SimTask task, long socketID) {
+	/*public void timerEvent(SimTask task, long eventID) {
+		writeBytes(task, 0);
+	}*/
+	
+	public void writeBytes(SimTask task, long socketID) {
 		if (curBufferSize == 0 || curBufferSize >= 20) {
+			System.out.println("Done sending data");
 			task.closeSocket(socketID);
 			curBufferSize = 1;
 			return;
@@ -54,7 +71,7 @@ public class SocketServicer implements Serializable, SimRawSocketListener {
 		
 		task.sendRawSocketData(socketID, buffer);
 		
-		//System.out.println("Wrote " + written + " bytes");
+		System.out.println("Wrote bytes");
 	}
 	
 	/**
@@ -63,11 +80,13 @@ public class SocketServicer implements Serializable, SimRawSocketListener {
 	 * @param socketID		the ID of the socket.
 	 * @param data			the incoming data.
 	 */
-	public void dataReceived(SimTask task, long socketID, ByteBuffer data) {
-		System.out.println("RawSocketTestBoot Received: " + data.capacity() + 
+	public void dataReceived(final SimTask task, final long socketID, ByteBuffer data) {
+		System.out.println("RawSocketTestBoot Received on ID " + socketID + 
 				" data:" + new String(data.array()).trim());
 		
 		writeBytes(task, socketID);
+
+
 	}
 	
 	/**

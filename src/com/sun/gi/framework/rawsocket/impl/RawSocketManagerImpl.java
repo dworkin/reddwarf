@@ -5,10 +5,14 @@ import java.lang.reflect.Method;
 import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.nio.channels.ByteChannel;
+import java.nio.channels.Channel;
 import java.nio.channels.ClosedChannelException;
+import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
+import java.nio.channels.spi.AbstractSelectableChannel;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
@@ -26,9 +30,12 @@ import com.sun.gi.logic.impl.GLOReferenceImpl;
  * 
  * <p>Description: A concrete implementation of <code>RawSocketManager</code>.
  * It listens for incoming data and processes socket connections and closures on 
- * a separate thread.  
+ * a separate thread.  All of the public methods are thread safe.</p> 
  * 
- * NOTE: Data is sent on the caller's thread for ease of implementation and to keep the
+ * <p>For reliable transport (TCP), the buffer size is set to 1KB.  For unreliable transport (UDP),
+ * the buffer size is set at the maximum size for a datagram packet: 64KB minus header info.</p>
+ * 
+ * <p>NOTE: Data is sent on the caller's thread for ease of implementation and to keep the
  * thread count low.  This will work fine for small messages, but if typical use will 
  * have larger payloads, then the data should be sent on a different thread.</p>
  * 
@@ -41,7 +48,9 @@ import com.sun.gi.logic.impl.GLOReferenceImpl;
  */
 public class RawSocketManagerImpl implements RawSocketManager {
 
-	private int bufferSize = 512;
+	private final static int RELIABLE_BUFFER_SIZE = 1024;		// 1K
+	private final static int UNRELIABLE_BUFFER_SIZE = 65507;	// max size, 64k - header info
+	
 	private AtomicLong currentSocketID;
 	private ConcurrentHashMap<Long, SocketInfo> socketMap;
 	private ArrayList<Long> pendingConnections;			// list of socket IDs to be opened.
@@ -50,6 +59,9 @@ public class RawSocketManagerImpl implements RawSocketManager {
 	
 	private boolean shouldUpdate = true;
 	
+	/**
+	 * Constructs a new <code>RawSocketManager</code> and starts it running.
+	 */
 	public RawSocketManagerImpl() {
 		currentSocketID = new AtomicLong(0L);
 		socketMap = new ConcurrentHashMap<Long, SocketInfo>();
@@ -62,18 +74,25 @@ public class RawSocketManagerImpl implements RawSocketManager {
 	
 	/**
 	 * Queues a socket to be opened at the given host on the given port.
-	 * 
-	 * NOTE: Right now, only reliable transport is supported.
 	 */
 	public long openSocket(long id, Simulation sim, ACCESS_TYPE access,
 			long startObjectID, String host, int port, boolean reliable) {
 		
-		System.out.println("openSocket id " + id);
 		try {
-			SocketChannel channel = SocketChannel.open();
+			AbstractSelectableChannel channel = reliable ? SocketChannel.open() :
+															DatagramChannel.open();
 			channel.configureBlocking(false);
-			storeChannel(id,sim, access, startObjectID, channel);
-			channel.connect(new InetSocketAddress(host, port));
+			storeChannel(id,sim, access, startObjectID, (ByteChannel) channel);
+			
+			InetSocketAddress address = new InetSocketAddress(host, port);
+			
+			// Even though these classes share the same method, they are separately defined.
+			if (channel instanceof SocketChannel) {
+				((SocketChannel) channel).connect(address);
+			}
+			else {
+				((DatagramChannel) channel).connect(address);
+			}
 
 			synchronized(pendingConnections) {
 				pendingConnections.add(id);
@@ -99,13 +118,13 @@ public class RawSocketManagerImpl implements RawSocketManager {
 		//System.out.println("Request to send: " + data.capacity() + " bytes");
 		
 		data.flip();
-		SocketChannel channel = getSocketChannel(socketID);
+		ByteChannel channel = getChannel(socketID);
 		if (channel == null) {
 			return 0;
 		}
 		int totalWritten = 0;
 		try {
-			if (!channel.isConnected()) {
+			if (!channel.isOpen() || (isReliableChannel(channel) && !((SocketChannel) channel).isConnected())) {
 				generateExceptionEvent(socketID, new ClosedChannelException());
 				return 0;
 			}
@@ -132,16 +151,17 @@ public class RawSocketManagerImpl implements RawSocketManager {
 	}
 	
 	/**
-	 * Returns the SocketChannel associated with the given socketID.
+	 * Returns the ByteChannel associated with the given socketID.
 	 * 
 	 * @param socketID		the socket ID
 	 * 
 	 * @return the Channel mapped to socketID
 	 */
-	private SocketChannel getSocketChannel(long socketID) {
+	private ByteChannel getChannel(long socketID) {
 		SocketInfo info = socketMap.get(socketID);
 		if (info == null) {		// attempt to reference a channel that is no longer valid.
-			System.out.println("No channel in map");
+			System.out.println("No channel in map, ID: " + socketID);
+			new Throwable().printStackTrace();
 			return null;
 		}
 		return info.channel;
@@ -155,14 +175,10 @@ public class RawSocketManagerImpl implements RawSocketManager {
 	 * @param access
 	 * @param gloID
 	 * @param channel
-	 * @return
 	 */
-	private void storeChannel(long key, Simulation sim, ACCESS_TYPE access, long gloID, SocketChannel channel) {		
-		
+	private void storeChannel(long key, Simulation sim, ACCESS_TYPE access, long gloID, ByteChannel channel) {		
 		SocketInfo info = new SocketInfo(sim, access, gloID, channel);
 		socketMap.put(key, info);
-		
-		
 	}
 	
 	/**
@@ -203,14 +219,14 @@ public class RawSocketManagerImpl implements RawSocketManager {
 	 * It does the following:</p>
 	 * 
 	 * <ul>
-	 * <li>Attends to any I/O that's ready to be processed.</li>
-	 * <li>Checks for, and attempts to complete, any pending connections.</li>
+	 * <li>Attends to any I/O that's ready to be processed (reads or connects).</li>
+	 * <li>Checks for, and attempts to complete, any pending connection requests.</li>
 	 * <li>Checks for, and closes, any pending socket closure requests.</li>
 	 * </ul>
 	 *
 	 */
 	private void update() {
-		long socketID = 0;	// If there's an exception thrown
+		long socketID = -1;	// If there's an exception thrown
 							// this will be the offending socket.
 							// The socket will be closed. 
 		try {
@@ -221,10 +237,10 @@ public class RawSocketManagerImpl implements RawSocketManager {
 				SelectionKey key = (SelectionKey) keys.next();
 				keys.remove();
 				socketID = (Long) key.attachment();
-				SocketChannel curChannel = (SocketChannel) key.channel();
+				boolean reliable = isReliableChannel(key.channel());
+				ByteChannel curChannel = (ByteChannel) key.channel();
 				if (key.isConnectable()) {
-					if (curChannel.finishConnect()) {
-						//System.out.println("socketID " + socketID + " has finished connecting.");
+					if (reliable && ((SocketChannel) curChannel).finishConnect()) {
 						key.interestOps(SelectionKey.OP_READ);
 						generateEvent(socketID, "socketOpened", new Class[] {SimTask.class, long.class},
 										new Object[] {socketID});
@@ -232,14 +248,22 @@ public class RawSocketManagerImpl implements RawSocketManager {
 					}
 				}
 				else if (key.isReadable()) {
-					if (curChannel.isConnected()) {
-						ByteBuffer in = ByteBuffer.allocate(bufferSize);
-						int numBytes = curChannel.read(in);
-						in.flip();
-						
-						generateEvent(socketID, "dataReceived", 
-								new Class[] {SimTask.class, long.class, ByteBuffer.class},
-								new Object[] {socketID, in});
+					System.out.println("readable socketID " + socketID);
+					if (curChannel.isOpen()) {
+						if (!reliable || (reliable && ((SocketChannel) curChannel).isConnected())) {
+							ByteBuffer in = ByteBuffer.allocate(reliable ? RELIABLE_BUFFER_SIZE : UNRELIABLE_BUFFER_SIZE);
+							int numBytes = curChannel.read(in);
+							in.flip();
+							
+							generateEvent(socketID, "dataReceived", 
+									new Class[] {SimTask.class, long.class, ByteBuffer.class},
+									new Object[] {socketID, in});
+						}
+					}
+					else {
+						//System.out.println("channel " + socketID + " not connected");
+						generateExceptionEvent(socketID, new ClosedChannelException());
+						doSocketClose(socketID);
 					}
 				}
 			}
@@ -248,7 +272,7 @@ public class RawSocketManagerImpl implements RawSocketManager {
 			checkPendingClosures();
 		}
 		catch (IOException ioe) {
-			if (socketID > 0) {
+			if (socketID >= 0) {
 				generateExceptionEvent(socketID, ioe);
 				doSocketClose(socketID);
 			}
@@ -258,15 +282,26 @@ public class RawSocketManagerImpl implements RawSocketManager {
 		}
 	}
 	
+	/**
+	 * Iterates through the list of pending connection requests and registers the channels
+	 * for either connection (reliable) or directly for read (unreliable).
+	 *
+	 */
 	private void checkPendingConnections() {
 		synchronized (pendingConnections) {
 			for (int i = pendingConnections.size() - 1; i >= 0; i--) { 
 				long curSocketID = pendingConnections.get(i);
 				pendingConnections.remove(curSocketID);
-				SocketChannel curChannel = socketMap.get(curSocketID).channel;
+				ByteChannel bc = getChannel(curSocketID);
+				if (bc == null) {
+					continue;
+				}
+				AbstractSelectableChannel curChannel = (AbstractSelectableChannel) bc;
+				boolean isReliable = isReliableChannel(curChannel);
 				SelectionKey key = null;
 				try {
-					key = curChannel.register(selector, SelectionKey.OP_CONNECT);
+					int interestedOp = isReliable ? SelectionKey.OP_CONNECT : SelectionKey.OP_READ;
+					key = curChannel.register(selector, interestedOp);
 					key.attach(curSocketID);
 						
 				}
@@ -276,10 +311,21 @@ public class RawSocketManagerImpl implements RawSocketManager {
 					}
 					generateExceptionEvent(curSocketID, ioe);
 				}
+				// If this is an unreliable connection, call the socketOpened callback
+				// immediately.
+				if (!isReliable) {
+					generateEvent(curSocketID, "socketOpened", new Class[] {SimTask.class, long.class},
+							new Object[] {curSocketID});
+
+				}
 			}
 		}
 	}
 	
+	/**
+	 * Iterates through the list of pending closure requests and closes the connections
+	 * accordingly.
+	 */
 	private void checkPendingClosures() {
 		synchronized(pendingClosures) {
 			for (int i = pendingClosures.size() - 1; i >= 0; i--) { 
@@ -298,12 +344,16 @@ public class RawSocketManagerImpl implements RawSocketManager {
 	 * @param socketID
 	 */
 	private void doSocketClose(long socketID) {
-		SocketChannel curChannel = socketMap.get(socketID).channel;
+		SocketInfo info = socketMap.get(socketID);
+		if (info == null) {
+			return;
+		}
+		ByteChannel curChannel = info.channel;
 		if (curChannel == null) { 	// already closed.
 			return;
 		}
 		try {
-			if (curChannel.isConnected()) {
+			if (curChannel.isOpen()) {
 				curChannel.close();
 				
 				generateEvent(socketID, "socketClosed", 
@@ -344,6 +394,10 @@ public class RawSocketManagerImpl implements RawSocketManager {
 
 	}
 	
+	/**
+	 * Stops the manager from updating.
+	 *
+	 */
 	private void stop() {
 		shouldUpdate = false;
 		if (selector == null) {
@@ -357,26 +411,27 @@ public class RawSocketManagerImpl implements RawSocketManager {
 		}
 	}
 	
+	private	boolean isReliableChannel(Channel channel) {
+		return channel instanceof SocketChannel; 
+	}
+	
 	private class SocketInfo {
 		
 		Simulation simulation;
 		ACCESS_TYPE access;
 		long gloID;
-		SocketChannel channel;
+		ByteChannel channel;
 
-		SocketInfo(Simulation sim, ACCESS_TYPE access, long gloID, SocketChannel channel) {
+		SocketInfo(Simulation sim, ACCESS_TYPE access, long gloID, ByteChannel channel) {
 			this.simulation = sim;
 			this.access = access;
 			this.gloID = gloID;
 			this.channel = channel;
 		}
+		
 	}
 
-	/* (non-Javadoc)
-	 * @see com.sun.gi.framework.rawsocket.RawSocketManager#getNextSocketID()
-	 */
 	public long getNextSocketID() {
-		// TODO Auto-generated method stub
 		return currentSocketID.getAndIncrement();
 	}
 

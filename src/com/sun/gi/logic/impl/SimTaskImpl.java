@@ -513,10 +513,8 @@ public class SimTaskImpl implements SimTask {
 	 * Sends data on the socket mapped to the given socketID.  
 	 * 
 	 * @param socketID			the socket identifier.
-	 * @param data				the data to send.  The buffer should be in a ready
-	 * 							state, i.e. flipped if necessary. 
+	 * @param data				the data to send.  
 	 * 
-	 * @return the number of bytes sent.
 	 */
 	public void sendRawSocketData(long socketID, ByteBuffer data) {
 		socketSendQueue .add(new SocketSendRecord(socketID, data));

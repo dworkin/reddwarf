@@ -32,6 +32,7 @@ public interface RawSocketManager {
 	 * opened at a near future time.  Once the connection process completes
 	 * a socketOpened event is generated.</p>
 	 * 
+	 * @param socketID		the ID of the socket.
 	 * @param sim			the simulation.
 	 * @param access		the type of access.
 	 * @param startObjectID	the ID of the GLO.
@@ -46,7 +47,8 @@ public interface RawSocketManager {
 	
 	/**
 	 * Attempts to send the given data over the socket associated with
-	 * the given socketID.  
+	 * the given socketID.  The method will not return until the entire buffer
+	 * has been drained.
 	 * 
 	 * @param socketID			used to lookup the associated socket.
 	 * @param data				the data to send.
@@ -69,7 +71,9 @@ public interface RawSocketManager {
 	public void closeSocket(long socketID);
 
 	/**
-	 * @return
+	 * Returns the next available socket ID.
+	 * 
+	 * @return		the next socket ID.
 	 */
 	public long getNextSocketID();
 

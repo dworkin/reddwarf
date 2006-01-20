@@ -7,6 +7,7 @@ import java.nio.CharBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.sun.gi.framework.rawsocket.SimRawSocketListener;
@@ -45,8 +46,7 @@ public class RawSocketTestBoot implements SimBoot {
 	public void boot(SimTask task, boolean firstBoot) {
 		System.out.println("RawSocketTestBoot boot");
 		if (firstBoot) {
-			int numServicers = 9;		// works with two, with more then that
-										// NonExistantObjectIDException
+			int numServicers = 100;		
 
 			System.out.println("RawSocketTestBoot: firstBoot");
 			//new Throwable().printStackTrace();
@@ -58,14 +58,26 @@ public class RawSocketTestBoot implements SimBoot {
 			}
 		}
 		
-		int startPort = 5000;
-		for (GLOReference ref : servicerList) {
+		//String host = "localhost";
+		String host = "192.168.0.5";
+
+		/*System.out.println("RawSocketTestBoot: Socket ID = " + 
+				task.openSocket(ACCESS_TYPE.GET, servicerList.get(0), host, 6000, false));
+		
+		System.out.println("RawSocketTestBoot: Socket ID = " + 
+				task.openSocket(ACCESS_TYPE.GET, servicerList.get(1), host, 6000, false));
+*/
+		for (int i = 2; i < servicerList.size(); i++) {
+			GLOReference ref = servicerList.get(i);
 			System.out.println("RawSocketTestBoot: Socket ID = " + 
-					task.openSocket(ACCESS_TYPE.GET, ref, "localhost", startPort++, true));
+					task.openSocket(ACCESS_TYPE.GET, ref, host, getPort(), true));
 
 		}
-
 		
+	}
+	
+	private int getPort() {
+		return new Random().nextInt(10) + 5000;
 	}
 	
 

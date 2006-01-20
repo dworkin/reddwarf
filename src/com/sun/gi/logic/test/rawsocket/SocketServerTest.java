@@ -1,8 +1,11 @@
 package com.sun.gi.logic.test.rawsocket;
 
 import java.io.IOException;
+import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.nio.ByteBuffer;
+import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
@@ -25,6 +28,7 @@ public class SocketServerTest {
 	Selector selector;
 	
 	public SocketServerTest() {
+		
 		channels = new ArrayList<ServerSocketChannel>();
 		restart();
 		while (true) {
@@ -38,6 +42,32 @@ public class SocketServerTest {
 			}
 		}
 		
+	}
+	
+	private void acceptUDP() {
+		try {
+			DatagramChannel channel = DatagramChannel.open();
+			DatagramSocket socket = channel.socket();
+			InetSocketAddress address = new InetSocketAddress(6000);
+			socket.bind(address);
+			ByteBuffer buffer = ByteBuffer.allocate(65507);
+			while (true) {
+				System.out.println("Waiting for Datagram");
+				SocketAddress clientAddress = channel.receive(buffer);
+				System.out.println("Received Datagram");
+				buffer.flip();
+				for (int i = buffer.position(); i < buffer.limit(); i++) {
+					System.out.print(buffer.get());
+				}
+				System.out.println();
+				buffer.flip();
+				channel.send(buffer, clientAddress);
+				buffer.clear();
+			}
+		}
+		catch (IOException ioe) {
+			ioe.printStackTrace();
+		}
 	}
 	
 	private void restart() {
@@ -56,6 +86,12 @@ public class SocketServerTest {
 	}
 	
 	private void acceptConnections() throws IOException {
+		Thread t = new Thread() {
+			public void run() {
+				acceptUDP();
+			}
+		};
+		t.start();
 		while (true) {
 			selector.select();
 			
