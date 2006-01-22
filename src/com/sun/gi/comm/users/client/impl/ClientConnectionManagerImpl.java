@@ -362,4 +362,12 @@ public class ClientConnectionManagerImpl implements ClientConnectionManager,
 		return true;
 	}
 
+	/**
+	 * @param id
+	 */
+	public void closeChannel(byte[] channelID) {
+		umanager.leaveChannel(channelID);
+		
+	}
+
 }

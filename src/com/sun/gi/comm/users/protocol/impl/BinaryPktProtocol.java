@@ -436,7 +436,8 @@ public class BinaryPktProtocol
         synchronized (hdr) {
             hdr.clear();
             hdr.put((byte)OPCODE.REQ_LEAVE_CHAN.ordinal());
-            hdr.put((byte)chanID.length);            
+            hdr.put((byte)chanID.length);     
+            hdr.put(chanID);
             sendBuffers(hdr);
         }
     }

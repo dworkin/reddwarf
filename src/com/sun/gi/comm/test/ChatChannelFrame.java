@@ -17,6 +17,8 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.ListCellRenderer;
+import javax.swing.event.InternalFrameEvent;
+import javax.swing.event.InternalFrameListener;
 
 import com.sun.gi.comm.users.client.ClientChannel;
 import com.sun.gi.comm.users.client.ClientChannelListener;
@@ -65,6 +67,43 @@ public class ChatChannelFrame extends JInternalFrame implements ClientChannelLis
 				inputField.setText("");
 			}});
 		setSize(400,400);
+		this.setClosable(true);
+		this.setDefaultCloseOperation(JInternalFrame.DISPOSE_ON_CLOSE);
+		this.addInternalFrameListener(new InternalFrameListener(){
+
+			public void internalFrameOpened(InternalFrameEvent arg0) {
+				// TODO Auto-generated method stub
+				
+			}
+
+			public void internalFrameClosing(InternalFrameEvent arg0) {
+				// TODO Auto-generated method stub
+				
+			}
+
+			public void internalFrameClosed(InternalFrameEvent arg0) {
+				chan.close();
+			}
+
+			public void internalFrameIconified(InternalFrameEvent arg0) {
+				// TODO Auto-generated method stub
+				
+			}
+
+			public void internalFrameDeiconified(InternalFrameEvent arg0) {
+				// TODO Auto-generated method stub
+				
+			}
+
+			public void internalFrameActivated(InternalFrameEvent arg0) {
+				// TODO Auto-generated method stub
+				
+			}
+
+			public void internalFrameDeactivated(InternalFrameEvent arg0) {
+				// TODO Auto-generated method stub
+				
+			}});
 		setResizable(true);
 		setVisible(true);
 		

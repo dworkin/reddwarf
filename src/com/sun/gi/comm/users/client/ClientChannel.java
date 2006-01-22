@@ -53,4 +53,6 @@ public interface ClientChannel {
 	 */
 	public void sendBroadcastData(ByteBuffer data, boolean reliable);
 	
+	public void close();
+	
 }

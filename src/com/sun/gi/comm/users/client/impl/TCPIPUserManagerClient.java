@@ -317,6 +317,20 @@ public class TCPIPUserManagerClient
 	}
 
 
+	/* (non-Javadoc)
+	 * @see com.sun.gi.comm.users.client.UserManagerClient#leaveChannel(byte[])
+	 */
+	public void leaveChannel(byte[] channelID) {
+		try {
+			protocol.sendLeaveChannelReq(channelID);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+	}
+
+
 	
     
     

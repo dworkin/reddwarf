@@ -120,6 +120,12 @@ public interface UserManagerClient {
    */
   public void reconnectLogin(byte[] userID, byte[] reconnectionKey);
 
+/**
+ * @param channelID
+ * @param myID
+ */
+public void leaveChannel(byte[] channelID);
+
   
  
 

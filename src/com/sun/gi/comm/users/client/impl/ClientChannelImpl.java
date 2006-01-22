@@ -84,4 +84,12 @@ public class ClientChannelImpl implements ClientChannel {
 		
 	}
 
+	/* (non-Javadoc)
+	 * @see com.sun.gi.comm.users.client.ClientChannel#close()
+	 */
+	public void close() {
+		mgr.closeChannel(ID);
+		
+	}
+
 }
