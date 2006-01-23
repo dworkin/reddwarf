@@ -1,4 +1,4 @@
-package com.sun.gi.logic.test.trivial;
+package com.sun.gi.apps.trivial;
 
 import java.lang.reflect.Method;
 

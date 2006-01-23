@@ -1,4 +1,4 @@
-package com.sun.gi.logic.test.rawsocket;
+package com.sun.gi.apps.rawsocket;
 
 import java.io.IOException;
 import java.net.DatagramSocket;

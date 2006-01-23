@@ -7,7 +7,7 @@
  * @author Jeff Kesselman
  * @version 1.0
  */
-package com.sun.gi.logic.test.timer;
+package com.sun.gi.apps.timertest;
 
 import com.sun.gi.gloutils.pdtimer.PDTimer;
 import com.sun.gi.logic.GLOReference;

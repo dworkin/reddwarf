@@ -7,7 +7,7 @@
  * @author Jeff Kesselman
  * @version 1.0
  */
-package com.sun.gi.logic.test.timer;
+package com.sun.gi.apps.timertest;
 
 import java.io.Serializable;
 

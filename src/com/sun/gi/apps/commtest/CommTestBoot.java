@@ -1,4 +1,4 @@
-package com.sun.gi.logic.test.comm;
+package com.sun.gi.apps.commtest;
 
 import java.nio.ByteBuffer;
 import com.sun.gi.logic.SimBoot;
