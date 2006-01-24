@@ -248,7 +248,6 @@ public class RawSocketManagerImpl implements RawSocketManager {
 					}
 				}
 				else if (key.isReadable()) {
-					System.out.println("readable socketID " + socketID);
 					if (curChannel.isOpen()) {
 						if (!reliable || (reliable && ((SocketChannel) curChannel).isConnected())) {
 							ByteBuffer in = ByteBuffer.allocate(reliable ? RELIABLE_BUFFER_SIZE : UNRELIABLE_BUFFER_SIZE);

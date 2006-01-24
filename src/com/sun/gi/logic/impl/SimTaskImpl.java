@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
-import java.io.Serializable;
 import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -19,6 +18,7 @@ import java.util.Map;
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.logic.AccessTypeViolationException;
+import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.Simulation;
@@ -156,8 +156,8 @@ public class SimTaskImpl implements SimTask {
 	private List<OutputRecord> outputList = new ArrayList<OutputRecord>();
 	private List<SimTask> taskLaunchList = new ArrayList<SimTask>();
 	
-	private Map<Serializable,Long> gloIDMap = new HashMap<Serializable,Long>();
-	private Map<Serializable,ACCESS_TYPE> gloAccessMap = new HashMap<Serializable,ACCESS_TYPE>();
+	private Map<GLO, Long> gloIDMap = new HashMap<GLO, Long>();
+	private Map<GLO, ACCESS_TYPE> gloAccessMap = new HashMap<GLO, ACCESS_TYPE>();
 	private List<TimerRecord> timerRecordQueue =  new ArrayList<TimerRecord>();
 	private List<OpenSocketRecord> socketOpenQueue = new ArrayList<OpenSocketRecord>();
 	private List<SocketSendRecord> socketSendQueue = new ArrayList<SocketSendRecord>();
@@ -182,7 +182,7 @@ public class SimTaskImpl implements SimTask {
 	public void execute() {
 		this.trans = simulation.getObjectStore().newTransaction(loader);	
 		this.trans.start(); //tell trans its waking up to begin anew	
-		Serializable runobj = null;
+		GLO runobj = null;
 		switch (accessType){
 			case GET:
 				runobj = startObject.get(this);
@@ -254,9 +254,9 @@ public class SimTaskImpl implements SimTask {
 	}
 	
 	/* (non-Javadoc)
-	 * @see com.sun.gi.logic.SimTask#makeReference(java.io.Serializable)
+	 * @see com.sun.gi.logic.SimTask#makeReference(com.sun.gi.logic.GLO)
 	 */
-	public GLOReference makeReference(Serializable glo) throws InstantiationException {		
+	public GLOReference makeReference(GLO glo) throws InstantiationException {		
 		Long idl = gloIDMap.get(glo);
 		if (idl == null){
 			throw new InstantiationException("Have no ID for supposed GLO ");
@@ -337,7 +337,7 @@ public class SimTaskImpl implements SimTask {
 	 *            WurmPlayer
 	 * @return SOReference
 	 */
-	public GLOReference createSO(Serializable simObject, String name) {		
+	public GLOReference createSO(GLO simObject, String name) {		
 		GLOReferenceImpl ref = (GLOReferenceImpl) makeReference(trans.create(simObject, name));
 		registerGLOID(ref.objID,simObject,ACCESS_TYPE.GET);
 		return ref;
@@ -375,9 +375,9 @@ public class SimTaskImpl implements SimTask {
 	}
 
 	/* (non-Javadoc)
-	 * @see com.sun.gi.logic.SimTask#registerGLOID(long, java.io.Serializable)
+	 * @see com.sun.gi.logic.SimTask#registerGLOID(long, com.sun.gi.logic.GLO)
 	 */
-	public void registerGLOID(long objID, Serializable glo,ACCESS_TYPE access) {
+	public void registerGLOID(long objID, GLO glo,ACCESS_TYPE access) {
 		gloIDMap.put(glo,new Long(objID));	
 		gloAccessMap.put(glo,access);
 	}

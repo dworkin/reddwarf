@@ -1,6 +1,5 @@
 package com.sun.gi.logic.impl;
 
-import java.io.Serializable;
 import java.lang.reflect.Method;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -21,6 +20,7 @@ import com.sun.gi.comm.routing.RouterListener;
 import com.sun.gi.comm.routing.SGSChannel;
 import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.framework.install.DeploymentRec;
+import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimChannelListener;
 import com.sun.gi.logic.SimKernel;
@@ -135,7 +135,7 @@ public class SimulationImpl implements Simulation {
 			long bootObjectID = trans.lookup("BOOT");
 			if (bootObjectID == ObjectStore.INVALID_ID) { // doesnt exist
 				try {
-					bootObjectID = trans.create((Serializable) bootclass
+					bootObjectID = trans.create((GLO) bootclass
 						.newInstance(), "BOOT");
 					firstTime = true;
 				} catch (IllegalAccessException ex1) {

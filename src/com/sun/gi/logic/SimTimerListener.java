@@ -9,9 +9,6 @@
  */
 package com.sun.gi.logic;
 
-import java.io.Serializable;
-
-
 /**
  *
  * <p>Title: TimerManagerListener.java</p>
@@ -21,6 +18,6 @@ import java.io.Serializable;
  * @author Jeff Kesselman
  * @version 1.0
  */
-public interface SimTimerListener extends Serializable {
+public interface SimTimerListener extends GLO {
 	public void timerEvent(SimTask task, long eventID);
 }

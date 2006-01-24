@@ -9,9 +9,9 @@
  */
 package com.sun.gi.gloutils.pdtimer;
 
-import java.io.Serializable;
 import java.lang.reflect.Method;
 
+import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.SimTask.ACCESS_TYPE;
@@ -25,7 +25,7 @@ import com.sun.gi.logic.SimTask.ACCESS_TYPE;
  * @author Jeff Kesselman
  * @version 1.0
  */
-public class PDTimerEvent implements Serializable {
+public class PDTimerEvent implements GLO {
 
 	/**
 	 * hardwired serial version UID

@@ -1,6 +1,5 @@
 package com.sun.gi.logic;
 
-import java.io.Serializable;
 import java.nio.ByteBuffer;
 
 import com.sun.gi.comm.routing.ChannelID;
@@ -16,7 +15,7 @@ import com.sun.gi.comm.routing.UserID;
  * @author Jeff Kesselman
  * @version 1.0
  */
-public interface SimUserDataListener extends Serializable{
+public interface SimUserDataListener extends GLO {
   /**
    * This method is the start method of a task that gets queued whenever
    * data arrives for a user ID that this GLo has been bound to as a reciever.

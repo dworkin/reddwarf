@@ -9,8 +9,7 @@
  */
 package com.sun.gi.apps.timertest;
 
-import java.io.Serializable;
-
+import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.SimTask;
 
 /**
@@ -22,7 +21,7 @@ import com.sun.gi.logic.SimTask;
  * @author Jeff Kesselman
  * @version 1.0
  */
-public class TimerCount implements Serializable {
+public class TimerCount implements GLO {
 	/**
 	 * 
 	 */

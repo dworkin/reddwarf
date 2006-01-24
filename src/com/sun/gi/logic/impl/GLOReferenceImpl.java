@@ -1,8 +1,9 @@
 package com.sun.gi.logic.impl;
 
-import java.io.Serializable;
 import java.io.ObjectInputStream;
 import java.io.IOException;
+
+import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.SimTask.ACCESS_TYPE;
@@ -27,12 +28,12 @@ import com.sun.gi.objectstore.NonExistantObjectIDException;
  * @version 1.0
  */
 
-public class GLOReferenceImpl implements GLOReference, Serializable, Comparable {
+public class GLOReferenceImpl implements GLOReference, GLO, Comparable {
 	long objID;
 
 	transient boolean peeked;
 
-	transient Serializable objectCache;
+	transient GLO objectCache;
 
 	public GLOReferenceImpl(long id) {
 		objID = id;
@@ -66,10 +67,10 @@ public class GLOReferenceImpl implements GLOReference, Serializable, Comparable 
 		
 	}
 
-	public Serializable get(SimTask task) {
+	public GLO get(SimTask task) {
 		if ((objectCache == null) || (peeked == true)) {
 			try {
-				objectCache = task.getTransaction().lock(objID);
+				objectCache = (GLO) task.getTransaction().lock(objID);
 			} catch (DeadlockException e) {
 				
 				e.printStackTrace();
@@ -83,10 +84,10 @@ public class GLOReferenceImpl implements GLOReference, Serializable, Comparable 
 		return objectCache;
 	}
 
-	public Serializable peek(SimTask task) {
+	public GLO peek(SimTask task) {
 		if (objectCache == null) {
 			try {
-				objectCache = task.getTransaction().peek(objID);
+				objectCache = (GLO) task.getTransaction().peek(objID);
 			} catch (NonExistantObjectIDException e) {
 				
 				e.printStackTrace();
@@ -111,10 +112,10 @@ public class GLOReferenceImpl implements GLOReference, Serializable, Comparable 
 	 * 
 	 * @see com.sun.gi.logic.GLOReference#attempt(com.sun.gi.logic.SimTask)
 	 */
-	public Serializable attempt(SimTask task) {
+	public GLO attempt(SimTask task) {
 		if ((objectCache == null) || (peeked == true)) {
 			try {
-				objectCache = task.getTransaction().lock(objID,false);
+				objectCache = (GLO) task.getTransaction().lock(objID,false);
 			} catch (DeadlockException e) {
 				
 				e.printStackTrace();

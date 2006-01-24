@@ -1,7 +1,5 @@
 package com.sun.gi.logic;
 
-import java.io.Serializable;
-
 /**
  * <p>Title: SimBoot</p>
  * <p>Description: This interface must be implemented by the boot object of a
@@ -12,7 +10,7 @@ import java.io.Serializable;
  * @version 1.0
  */
 
-public interface SimBoot extends Serializable{
+public interface SimBoot extends GLO {
   /**
    * This method is called once on the GLO when the system boots an application.
    *

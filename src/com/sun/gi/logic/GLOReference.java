@@ -1,7 +1,5 @@
 package com.sun.gi.logic;
 
-import java.io.Serializable;
-
 /**
  * <p>Title: SOReference</p>
  * <p>Description: A reference to a Game Logic Object (GLO)
@@ -25,19 +23,21 @@ public interface GLOReference {
    * an in memory instantiation of it.  Multiple get() calls on SOReferences
    * that reference the same GLO will only cause one lock and will all return the
    * same instance.
+   * 
    * @param task SimTask The SimTask context
-   * @return Serializable The in memory instance of the GLO
+   * @return The in memory instance of the GLO
    */
-  public Serializable get(SimTask task);
+  public GLO get(SimTask task);
   /**
    * This method is like a get() except that the object is not write locked.
    * It returns a task-local copy that will not get stored back to the
    * objectstore.  Multiple calls to peek() on SOReferences that reference the
    * same GLO will return the same task-local copy
+   * 
    * @param task SimTask  The SimTask context
-   * @return Serializable The task local instance.
+   * @return The task local instance.
    */
-  public Serializable peek(SimTask task);
+  public GLO peek(SimTask task);
   
   
   /**
@@ -45,10 +45,11 @@ public interface GLOReference {
    * Instead, if the object is already locked, it simply returns null
    * objectstore.  Multiple calls to peek() on SOReferences that reference the
    * same GLO will return the same task-local copy
+   * 
    * @param task SimTask  The SimTask context
-   * @return Serializable The in memory instance of the GLO or null.
+   * @return The in memory instance of the GLO or null.
   */
- public Serializable attempt(SimTask task);
+ public GLO attempt(SimTask task);
 
   /**
    * This method makes a copy of an SOReference that references the same

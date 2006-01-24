@@ -46,7 +46,7 @@ public class RawSocketTestBoot implements SimBoot {
 	public void boot(SimTask task, boolean firstBoot) {
 		System.out.println("RawSocketTestBoot boot");
 		if (firstBoot) {
-			int numServicers = 100;		
+			int numServicers = 5;		
 
 			System.out.println("RawSocketTestBoot: firstBoot");
 			//new Throwable().printStackTrace();
@@ -58,8 +58,8 @@ public class RawSocketTestBoot implements SimBoot {
 			}
 		}
 		
-		//String host = "localhost";
-		String host = "192.168.0.5";
+		String host = "localhost";
+		//String host = "192.168.0.5";
 
 		/*System.out.println("RawSocketTestBoot: Socket ID = " + 
 				task.openSocket(ACCESS_TYPE.GET, servicerList.get(0), host, 6000, false));
@@ -67,7 +67,7 @@ public class RawSocketTestBoot implements SimBoot {
 		System.out.println("RawSocketTestBoot: Socket ID = " + 
 				task.openSocket(ACCESS_TYPE.GET, servicerList.get(1), host, 6000, false));
 */
-		for (int i = 2; i < servicerList.size(); i++) {
+		for (int i = 0; i < servicerList.size(); i++) {
 			GLOReference ref = servicerList.get(i);
 			System.out.println("RawSocketTestBoot: Socket ID = " + 
 					task.openSocket(ACCESS_TYPE.GET, ref, host, getPort(), true));

@@ -19,7 +19,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ObjectInputStream;
 import java.io.*;
 import java.util.*;
-import java.io.Serializable;
 import java.util.Collection;
 
 public class JRMSSharedDataManager

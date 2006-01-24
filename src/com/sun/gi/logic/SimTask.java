@@ -2,7 +2,6 @@
 
 package com.sun.gi.logic;
 
-import java.io.Serializable;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 
@@ -105,12 +104,12 @@ public interface SimTask {
    * This method is called to create a GLO is the objectstore
    * (the name is historical and shoudl probably be changed.)
    *
-   * @param simObject Serializable the GLO to insert into the objects store
+   * @param simObject the GLO to insert into the objects store
    * @param name String an optional symbolic reference to assign to the
    * object, or null.
    * @return SOReference A SOReference that references the newly created GLO
    */
-  public GLOReference createSO(Serializable simObject, String name);
+  public GLOReference createSO(GLO simObject, String name);
   
 
   // data access functions
@@ -158,9 +157,9 @@ public interface SimTask {
 	 * @return
 	 * @throws InstantiationException 
 	 */
-	public GLOReference makeReference(Serializable glo) throws InstantiationException;
+	public GLOReference makeReference(GLO glo) throws InstantiationException;
 
-	public void registerGLOID(long objID,Serializable glo,ACCESS_TYPE access);
+	public void registerGLOID(long objID, GLO glo, ACCESS_TYPE access);
 
 	/**
 	 * 

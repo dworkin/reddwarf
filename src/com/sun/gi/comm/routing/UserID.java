@@ -1,6 +1,5 @@
 package com.sun.gi.comm.routing;
 
-import java.io.Serializable;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.io.InputStream;

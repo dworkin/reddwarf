@@ -1,7 +1,5 @@
 package com.sun.gi.logic;
 
-import java.io.Serializable;
-
 import javax.security.auth.Subject;
 
 import com.sun.gi.comm.routing.UserID;
@@ -16,7 +14,7 @@ import com.sun.gi.comm.routing.UserID;
  * @author Jeff Kesselman
  * @version 1.0
  */
-public interface SimUserListener extends Serializable{
+public interface SimUserListener extends GLO {
   /**
    * This method is the start method of a task queued when a user
    * joins the game.

@@ -9,7 +9,6 @@
  */
 package com.sun.gi.gloutils.pdtimer;
 
-import java.io.Serializable;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -18,6 +17,7 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.Map.Entry;
 
+import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.SimTask.ACCESS_TYPE;
@@ -40,7 +40,7 @@ import com.sun.gi.logic.SimTask.ACCESS_TYPE;
  * @author Jeff Kesselman
  * @version 1.0
  */
-public class PDTimerEventList implements Serializable {
+public class PDTimerEventList implements GLO {
 	private SortedMap<Long, GLOReference> timerEvents = new TreeMap<Long, GLOReference>();
 	private static final int BIGCLEANUP_PERIOD = 100;
 	private int bigCleanupCountdown = BIGCLEANUP_PERIOD;

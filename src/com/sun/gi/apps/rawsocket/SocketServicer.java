@@ -1,11 +1,11 @@
 package com.sun.gi.apps.rawsocket;
 
 import java.io.IOException;
-import java.io.Serializable;
 import java.nio.ByteBuffer;
 
 import com.sun.gi.framework.rawsocket.SimRawSocketListener;
 import com.sun.gi.gloutils.pdtimer.PDTimer;
+import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.SimTimerListener;
@@ -22,7 +22,7 @@ import com.sun.gi.logic.SimTask.ACCESS_TYPE;
  * @author	Sten Anderson
  * @version 1.0
  */
-public class SocketServicer implements Serializable, SimRawSocketListener/*, SimTimerListener*/ {
+public class SocketServicer implements GLO, SimRawSocketListener/*, SimTimerListener*/ {
 
 	private static final long serialVersionUID = 8969950991047103803L;
 	
