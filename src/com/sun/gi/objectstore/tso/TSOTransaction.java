@@ -97,6 +97,7 @@ public class TSOTransaction implements Transaction {
 		mainTrans = new DataSpaceTransactionImpl(loader, mainDataSpace);
 		keyTrans = new DataSpaceTransactionImpl(loader, mainDataSpace);
 		timestampInterrupted = false;
+		ostore.registerActiveTransaction(this);
 	}
 
 	/*
@@ -261,6 +262,7 @@ public class TSOTransaction implements Transaction {
 		newObjectHeaders.clear();
 		lockedObjectsMap.clear();
 		ostore.notifyAvailabilityListeners(listeners);
+		ostore.deregisterActiveTransaction(this);
 
 	} /*
 		 * (non-Javadoc)

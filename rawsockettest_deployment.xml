@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <GAMEAPP gamename="RawSocketTest"> 
-	<GLEAPP bootclass="com.sun.gi.logic.test.rawsocket.RawSocketTestBoot" classpathURL="file:RawSocketTest.jar" />    	
+	<GLEAPP bootclass="com.sun.gi.apps.rawsocket.RawSocketTestBoot" classpathURL="file:RawSocketTest.jar" />    	
 </GAMEAPP>

@@ -21,7 +21,7 @@ public interface UserManagerPolicy {
    * @param umanagerName The FQCN of the UserManager we have chosen for our connection.  A user manager 
    * encapsulates a connection and transport strategy. 
    * @return DiscoveredUserManager
-   * @see UserManager
+   * 
    */
   public DiscoveredUserManager choose(DiscoveredGame game,
                                       String umanagerName);

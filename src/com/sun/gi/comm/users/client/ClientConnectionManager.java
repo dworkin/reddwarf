@@ -14,7 +14,7 @@ import javax.security.auth.callback.Callback;
  * <p>Company: Sun Microsystems</p>
  * @author Jeffrey P. Kesselman
  * @version 1.0
- * @see ClientConnectionManagerImpl  
+ * 
  */
 
 
@@ -35,7 +35,7 @@ public interface ClientConnectionManager
    * to.  
    * 
    * <b> NOTE :It is assumed that the game name and discovery information was set in the constructor.</b>
-   * @see com.sun.gi.comm.users.client.impl.ClientConnectionManagerImpl 
+   * 
    * 
    * @return A String array containing the FQCNs of all the allowed UserManagers for this game.
    */
@@ -81,7 +81,7 @@ public interface ClientConnectionManager
    * 
    * @param userManagerClassName The FQCN of the UserManager to connect to.
    * @param connectAttempts The number of times to try to connect before returning false
-   * @param the numerb of ms to sleep between connect attempts.
+   * @param msBetweenAttempts the number of ms to sleep between connect attempts.
    * @return TRUE if conenction can be attempted, FALSE if not. (For instance
    * if the named userManagerClassName is not supported by the game.) 
    *  

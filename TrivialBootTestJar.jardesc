@@ -9,6 +9,6 @@
 </sealing>
 </manifest>
 <selectedElements exportClassFiles="true" exportJavaFiles="false" exportOutputFolder="false">
-<javaElement handleIdentifier="=SGSatLabs/src&lt;com.sun.gi.logic.test.trivial"/>
+<javaElement handleIdentifier="=SGSatLabs/src&lt;com.sun.gi.apps.trivial"/>
 </selectedElements>
 </jardesc>

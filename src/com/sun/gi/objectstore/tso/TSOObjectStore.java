@@ -54,8 +54,7 @@ public class TSOObjectStore implements ObjectStore {
 			loader = this.getClass().getClassLoader();
 		}
 		TSOTransaction trans = new TSOTransaction(this,loader,System.currentTimeMillis(),
-				random.nextLong(),dataSpace);
-		localTransactionIDMap.put(trans.getUUID(),trans);
+				random.nextLong(),dataSpace);	
 		return trans;
 	}
 	
@@ -127,6 +126,20 @@ public class TSOObjectStore implements ObjectStore {
 		dataSpace.close();
 		
 	}
+	/**
+	 * @param transaction
+	 * @param transactionID
+	 */
+	public void registerActiveTransaction(TSOTransaction trans) {
+		localTransactionIDMap.put(trans.getUUID(),trans);		
+	}
 
 	
+	/**
+	 * @param transaction
+	 */
+	public void deregisterActiveTransaction(TSOTransaction trans) {
+		localTransactionIDMap.remove(trans.getUUID());
+		
+	}
 }

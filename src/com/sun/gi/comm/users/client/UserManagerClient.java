@@ -122,7 +122,6 @@ public interface UserManagerClient {
 
 /**
  * @param channelID
- * @param myID
  */
 public void leaveChannel(byte[] channelID);
 

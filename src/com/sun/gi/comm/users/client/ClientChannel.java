@@ -53,6 +53,12 @@ public interface ClientChannel {
 	 */
 	public void sendBroadcastData(ByteBuffer data, boolean reliable);
 	
+	/**
+	 * 
+	 * This method closes the channel for thsi user.  Everyone else sees
+	 * this as a "userLeftChannel" event.
+	 */
+	
 	public void close();
 	
 }

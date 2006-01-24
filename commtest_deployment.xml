@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <GAMEAPP gamename="ChatTest">    
-	<GLEAPP bootclass="com.sun.gi.logic.test.comm.CommTestBoot" classpathURL="file:CommTest.jar" />    	
+	<GLEAPP bootclass="com.sun.gi.apps.commtest.CommTestBoot" classpathURL="file:CommTest.jar" />    	
 	<USERMANAGER serverclass="com.sun.gi.comm.users.server.impl.TCPIPUserManager"
 				 reconnect_key_ttl="30">        
 		<PARAMETER tag="host" value="127.0.0.1" />        
