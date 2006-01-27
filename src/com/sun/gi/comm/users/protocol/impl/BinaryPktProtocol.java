@@ -44,7 +44,10 @@ public class BinaryPktProtocol
 							JOINED_CHAN, // Server to client notification of user joining a channel
 							REQ_LEAVE_CHAN, // client to server req to leave a channel
 							LEFT_CHAN, // server to client notification of user leaving a channel
-							SERVER_ID // used to send the bit pattern to identify a packet from the GLE
+							SERVER_ID, // used to send the bit pattern to identify a packet from the GLE
+							
+							// Sten added 1/25/2006 for locking channel support
+							CHAN_LOCKED, // server to client notification of join/leave failing due to locked channel
 	}
 	
     private ByteBuffer hdr;
@@ -392,7 +395,29 @@ public class BinaryPktProtocol
     }
     
     
-    
+    /**
+     * Called when the server notifies the client that a request to join/leave
+     * a channel failed due to the channel being locked.
+     * 
+     * @param channelName			the name of the channel.
+     * @param user					the user
+     * 
+     * @throws IOException	
+     */
+    public void deliverChannelLocked(String channelName, byte[] user) throws IOException {
+        synchronized (hdr) {
+            hdr.clear();
+            hdr.put((byte)OPCODE.CHAN_LOCKED.ordinal());
+            
+            byte[] namebytes = channelName.getBytes();
+            hdr.putInt(namebytes.length);
+            hdr.put(namebytes);            
+            
+            hdr.put( (byte) user.length);
+            hdr.put(user);
+            sendBuffers(hdr);
+        }	
+    }
     
     
     /**
@@ -695,7 +720,7 @@ public class BinaryPktProtocol
             	buff.get(namearray);
                 server.rcvReqJoinChan(new String(namearray));
                 break;
-            case REQ_LEAVE_CHAN:               
+            case REQ_LEAVE_CHAN:    
                 chanIDlen = buff.get();
                 chanID = new byte[chanIDlen];
                 buff.get(chanID);                
@@ -714,6 +739,15 @@ public class BinaryPktProtocol
             	user = new byte[usrlen];
             	buff.get(user);
             	client.recvServerID(user);
+            	break;
+            case CHAN_LOCKED:
+            	namelen = buff.getInt();
+                namebytes = new byte[namelen];
+                buff.get(namebytes);            	
+                usrlen = buff.get();
+                user = new byte[usrlen];
+                buff.get(user);
+                client.rcvChannelLocked(new String(namebytes), user);
             	break;
             default:
                 System.out.println("WARNING:Invalid op recieved: " + op +

@@ -24,6 +24,7 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 	private ByteBuffer[] buffs = new ByteBuffer[2];
 	private Map<UserID,SGSUser> localUsers = new HashMap<UserID,SGSUser>();
 	private RouterImpl router;
+	private boolean locked;
 	
 	private enum OPCODE {
 		UserJoinedChan, UserLeftChan, 
@@ -37,6 +38,7 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 		localIDbytes = localID.toByteArray();
 		buffs[0]=hdr;		
 		router = r;
+		locked = false;
 	}
 
 	public void unicastData(UserID from, UserID to, ByteBuffer message, boolean reliable) {
@@ -288,5 +290,24 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 		return transportChannel.getName();
 	}	
 
+	/**
+	 * Returns this channel's lock status.  Users cannot join/leave locked channels
+	 * except by way of the GLE.
+	 * 
+	 * @return		true if this channel is locked.
+	 */
+	public boolean isLocked() {
+		return locked;
+	}
 	
+	
+	/**
+	 * Sets this channel's lock status.  Users cannot join/leave locked channels
+	 * except by way of the GLE.
+	 * 
+	 * @param lock		if true, will lock the channel.
+	 */
+	public void setLocked(boolean lock) {
+		this.locked = lock;
+	}
 }

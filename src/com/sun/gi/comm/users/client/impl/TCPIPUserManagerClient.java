@@ -331,7 +331,16 @@ public class TCPIPUserManagerClient
 	}
 
 
-	
+	/**
+	 * Called when the message was received from the server that an attempted
+	 * join/leave failed due to the target channel being locked.
+	 * 
+	 * @param channelName		the channel name
+	 * @param user				the user ID that attempted the join/leave
+	 */
+	public void rcvChannelLocked(String channelName, byte[] user) {
+		listener.channelLocked(channelName, user);
+	}
     
     
 }

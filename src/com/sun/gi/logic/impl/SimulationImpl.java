@@ -19,6 +19,7 @@ import com.sun.gi.comm.routing.Router;
 import com.sun.gi.comm.routing.RouterListener;
 import com.sun.gi.comm.routing.SGSChannel;
 import com.sun.gi.comm.routing.UserID;
+import com.sun.gi.comm.users.server.SGSUser;
 import com.sun.gi.framework.install.DeploymentRec;
 import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
@@ -623,5 +624,38 @@ public class SimulationImpl implements Simulation {
 	public long getNextSocketID() {	
 		return kernel.getNextSocketID();
 	}
+	
+	/**
+	 * Joins the specified user to the Channel referenced by the
+	 * given ChannelID.
+	 * 
+	 * @param user				the user
+	 * @param id				the ChannelID
+	 */
+	public void join(UserID user, ChannelID id) {
+		router.join(user, id);
+	}
+	
+	/**
+	 * Removes the specified user from the Channel referenced by the
+	 * given ChannelID.
+	 * 
+	 * @param user				the user
+	 * @param id				the ChannelID
+	 */
+	public void leave(UserID user, ChannelID id) {
+		router.leave(user, id);
+	}
 
+	/**
+	 * Locks the given channel based on shouldLock.  Users cannot join/leave locked channels
+	 * except by way of the Router.
+	 * 
+	 * @param cid				the channel ID
+	 * @param shouldLock		if true, will lock the channel, otherwise unlock it.
+	 */
+	public void lock(ChannelID cid, boolean shouldLock) {
+		router.lock(cid, shouldLock);
+	}
+	
 }

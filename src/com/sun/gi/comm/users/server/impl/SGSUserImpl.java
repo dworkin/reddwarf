@@ -263,16 +263,36 @@ public class SGSUserImpl implements SGSUser, TransportProtocolServer {
 	public void rcvReqLeaveChan(byte[] chanID) {
 		try {
 			SGSChannel chan = channelMap.get(new ChannelID(chanID));
-			chan.leave(this);
+			if (!chan.isLocked()) {
+				chan.leave(this);
+			}
+			else {
+				//System.out.println("Channel is locked, can't leave");
+				transport.deliverChannelLocked(chan.getName(), userID.toByteArray());
+			}
 		} catch (InstantiationException e) {			
 			e.printStackTrace();
+		}
+		catch (IOException ioe) {
+			ioe.printStackTrace();
 		}
 		
 	}
 
 	public void rcvReqJoinChan(String channame) {
-		SGSChannel chan = router.openChannel(channame);		
-		chan.join(this);
+		SGSChannel chan = router.openChannel(channame);
+		if (!chan.isLocked()) {
+			chan.join(this);
+		}
+		else {
+			//System.out.println("Channel is locked, can't join");
+			try {
+				transport.deliverChannelLocked(channame, userID.toByteArray());
+			}
+			catch (IOException ioe) {
+				ioe.printStackTrace();
+			}
+		}
 	}
 
 	/**

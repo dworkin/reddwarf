@@ -40,6 +40,13 @@ public interface TransportProtocolClient {
 	 */
 	void recvServerID(byte[] user);
 
- 
+	/**
+	 * Called when the message was received from the server that an attempted
+	 * join/leave failed due to the target channel being locked.
+	 * 
+	 * @param channelName		the name of the channel.
+	 * @param user				the user ID that attempted the join/leave
+	 */
+	void rcvChannelLocked(String channelName, byte[] user);
 
 }

@@ -8,6 +8,7 @@ import com.sun.gi.logic.SimUserDataListener;
 import com.sun.gi.logic.SimUserListener;
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
+import com.sun.gi.comm.users.server.impl.SGSUserImpl;
 import com.sun.gi.logic.GLOReference;
 import java.util.List;
 import java.util.ArrayList;
@@ -24,6 +25,8 @@ public class CommTestBoot implements SimBoot, SimUserListener,
 	UserID myUserID = null;
 
 	List<UserID> users = new ArrayList<UserID>();
+	ChannelID echoID;
+	ChannelID noJoinID;
 
 	GLOReference thisobj;
 
@@ -39,7 +42,12 @@ public class CommTestBoot implements SimBoot, SimUserListener,
 		task.addUserListener(thisobj);
 		ChannelID cid = task.openChannel("echo");
 		task.addChannelListener(cid,thisobj);
-
+		
+		noJoinID = task.openChannel("noJoin");
+		task.lock(noJoinID, true);
+		task.addChannelListener(noJoinID, thisobj);
+		
+		echoID = cid;
 	}
 
 	/**
@@ -67,6 +75,7 @@ public class CommTestBoot implements SimBoot, SimUserListener,
 		System.out.println(")");
 		users.add(uid);
 		task.addUserDataListener(uid, thisobj);
+		
 	}
 
 	/*
@@ -79,6 +88,11 @@ public class CommTestBoot implements SimBoot, SimUserListener,
 	public void userDataReceived(SimTask task, UserID from, ByteBuffer data) {
 		System.out.println("Data from user " + from + ": "
 				+ new String(data.array(),data.arrayOffset(),data.limit()));
+		
+		// Sten - new router feature test
+		//task.leave(from, echoID);
+		//task.join(from, noJoinID);
+		//task.lock(noJoinID, false);
 	}
 
 	/*
@@ -89,7 +103,12 @@ public class CommTestBoot implements SimBoot, SimUserListener,
 	 */
 	public void userJoinedChannel(SimTask task, ChannelID cid, UserID uid) {
 		System.out.println("User " + cid + " joined channel " + uid);
-
+		
+		// test lock from leaving.
+		/*if (cid.equals(noJoinID)) {
+			System.out.println("Locking noJoin");
+			task.lock(noJoinID, true);
+		}*/
 	}
 
 	/*

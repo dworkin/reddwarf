@@ -123,6 +123,8 @@ public class ChatChannelFrame extends JInternalFrame implements ClientChannelLis
 		outputArea.append(StringUtils.bytesToHex(from,from.length-4)+": "+ new String(textb)+"\n");	
 	}
 	public void channelClosed() {
-		getDesktopPane().remove(this);
+		if (getDesktopPane() != null) {
+			getDesktopPane().remove(this);
+		}
 	}
 }

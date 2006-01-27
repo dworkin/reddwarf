@@ -489,7 +489,56 @@ public class RouterImpl implements Router {
 	}
 
 	
-
+	/**
+	 * Joins the specified user to the Channel referenced by the
+	 * given ChannelID.
+	 * 
+	 * @param user				the user
+	 * @param id 				the ChannelID
+	 */
+	public void join(UserID user, ChannelID id) {
+		SGSChannel channel = getChannel(id);
+		if (id == null) {  // channel not opened or otherwise mapped
+			return;
+		}
+		SGSUser sgsUser = userMap.get(user);
+		if (sgsUser != null) {
+			channel.join(sgsUser);
+		}
+	}
+	
+	/**
+	 * Removes the specified user from the Channel referenced by the
+	 * given ChannelID.
+	 * 
+	 * @param user				the user
+	 * @param id 				the ChannelID
+	 */
+	public void leave(UserID user, ChannelID id) {
+		SGSChannel channel = getChannel(id);
+		if (id == null) {  // channel not opened or otherwise mapped
+			return;
+		}
+		SGSUser sgsUser = userMap.get(user);
+		if (sgsUser != null) {
+			channel.leave(sgsUser);
+		}
+	}
+	
+	/**
+	 * Locks the given channel based on shouldLock.  Users cannot join/leave locked channels
+	 * except by way of the Router.
+	 * 
+	 * @param cid				the channel ID
+	 * @param shouldLock		if true, will lock the channel, otherwise unlock it.
+	 */
+	public void lock(ChannelID cid, boolean shouldLock) {
+		SGSChannel channel = getChannel(cid);
+		if (channel == null) {		// no channel in map
+			return;
+		}
+		channel.setLocked(shouldLock);
+	}
 	
 
 }

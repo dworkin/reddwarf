@@ -63,5 +63,21 @@ public interface SGSChannel {
 			boolean sendToListeners);
 	
 	
+	/**
+	 * Returns this channel's lock status.  Users cannot join/leave locked channels
+	 * except by way of the GLE.
+	 * 
+	 * @return		true if this channel is locked.
+	 */
+	public boolean isLocked();
+	
+	
+	/**
+	 * Sets this channel's lock status.  Users cannot join/leave locked channels
+	 * except by way of the GLE.
+	 * 
+	 * @param lock		if true, will lock the channel.
+	 */
+	public void setLocked(boolean lock);
 
 }

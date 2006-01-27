@@ -369,5 +369,16 @@ public class ClientConnectionManagerImpl implements ClientConnectionManager,
 		umanager.leaveChannel(channelID);
 		
 	}
+	
+	/**
+	 * This method is called whenever an attempted join/leave fails due to 
+	 * the target channel being locked.
+	 * 
+	 * @param channelName		the name of the channel.
+	 * @param userID			the ID of the user attemping to join/leave
+	 */
+	public void channelLocked(String channelName, byte[] userID) {
+		listener.channelLocked(channelName, userID);
+	}
 
 }

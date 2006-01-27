@@ -173,5 +173,17 @@ public interface TransportProtocol {
 	public void deliverUserDisconnected(byte[] bs) throws IOException;
 
 	public boolean isLoginPkt(ByteBuffer inputBuffer);
+	
+	/**
+     * Called when the server notifies the client that a request to join/leave
+     * a channel failed due to the channel being locked.
+     * 
+     * @param channelName			the name of the channel.
+     * @param user					the user
+     * 
+     * @throws IOException	
+     */
+    public void deliverChannelLocked(String channelName, byte[] user) throws IOException;
+ 	
 
 }
