@@ -6,26 +6,14 @@ import java.io.Serializable;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 
-public class ReleaseLogEntry implements LogEntry, Serializable {
+public class ReleaseLogEntry extends LogEntry implements Serializable {
     private static final long serialVersionUID = 1L;
-    private final long startTime;
-    private final long endTime;
     protected final long id;
 
     public ReleaseLogEntry(long startTime, long id) {
-	this.startTime = startTime;
-	this.endTime = System.currentTimeMillis();
+	super(startTime);
 	this.id = id;
     }
-
-    public long getStartTime() {
-	return startTime;
-    }
-
-    public long getEndTime() {
-	return endTime;
-    }
-
 
     public void replay(DataSpace dataSpace) {
 	dataSpace.release(id);

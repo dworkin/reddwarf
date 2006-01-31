@@ -6,24 +6,12 @@ import java.io.Serializable;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 
-public class CloseLogEntry implements LogEntry, Serializable {
+public class CloseLogEntry extends LogEntry implements Serializable {
     private static final long serialVersionUID = 1L;
-    private final long startTime;
-    private final long endTime;
 
     public CloseLogEntry(long startTime) {
-	this.startTime = startTime;
-	this.endTime = System.currentTimeMillis();
+	super(startTime);
     }
-
-    public long getStartTime() {
-	return startTime;
-    }
-
-    public long getEndTime() {
-	return endTime;
-    }
-
 
     public void replay(DataSpace dataSpace) {
 	dataSpace.close();
