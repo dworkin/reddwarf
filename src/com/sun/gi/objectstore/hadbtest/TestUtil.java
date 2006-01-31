@@ -9,8 +9,11 @@ import com.sun.gi.objectstore.NonExistantObjectIDException;
 import com.sun.gi.objectstore.ObjectStore;
 import com.sun.gi.objectstore.Transaction;
 import com.sun.gi.objectstore.tso.TSOObjectStore;
+import com.sun.gi.objectstore.tso.dataspace.DataSpace;
 import com.sun.gi.objectstore.tso.dataspace.InMemoryDataSpace;
 import com.sun.gi.objectstore.tso.dataspace.PersistantInMemoryDataSpace;
+import com.sun.gi.objectstore.tso.dataspace.HadbDataSpace;
+import com.sun.gi.objectstore.tso.dataspace.MonitoredDataSpace;
 import java.io.Serializable;
 
 /**
@@ -25,14 +28,22 @@ public class TestUtil {
      * @param clear If true, drop the current contents of the
      * database.  If false, just boot/connect but don't blow it away.
      *
+     * @param type the type of the DataSpace to use
+     *
      * @return an {@link ObjectStore ObjectStore}.
      */
 
-    public static ObjectStore connect(boolean clear) {
+    public static ObjectStore connect(boolean clear,
+	    String type, String traceFile)
+    {
 	ObjectStore ostore;
 
 	try {
-	    ostore = new TSOObjectStore(new PersistantInMemoryDataSpace(1));
+	    if (traceFile != null) {
+		ostore = new TSOObjectStore(openDataSpace(type));
+	    } else {
+		ostore = new TSOObjectStore(openDataSpace(type, traceFile));
+	    }
 	} catch (Exception e) {
 	    System.out.println("unexpected exception: " + e);
 	    return null;
@@ -44,6 +55,46 @@ public class TestUtil {
 	}
 
 	return ostore;
+    }
+
+    public static ObjectStore connect(boolean clear) {
+	return connect(clear, "persistant-inmem", null);
+    }
+
+    public static DataSpace openDataSpace(String type) {
+	DataSpace dspace;
+
+	if (type == null) {
+	    throw new NullPointerException("type is null");
+	}
+
+	try {
+	    if (type.equals("hadb")) {
+		dspace = new HadbDataSpace(1);
+	    } else if (type.equals("inmem")) {
+		dspace = new InMemoryDataSpace(1);
+	    } else if (type.equals("persistant-inmem")) {
+		dspace = new PersistantInMemoryDataSpace(1);
+	    } else {
+		throw new IllegalArgumentException("unknown type: " + type);
+	    }
+	} catch (Exception e) {
+	    System.out.println("unexpected exception: " + e);
+	    return null;
+	}
+
+	return dspace;
+    }
+
+    public static DataSpace openDataSpace(String type, String traceFile) {
+	DataSpace wrappedDspace = openDataSpace(type);
+
+	try {
+	    return new MonitoredDataSpace(wrappedDspace, traceFile);
+	} catch (Exception e) {
+	    System.out.println("unexpected exception: " + e);
+	    return null;
+	}
     }
 
     /**

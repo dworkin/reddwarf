@@ -10,7 +10,7 @@ import com.sun.gi.objectstore.ObjectStore;
  * @author Daniel Ellard
  */
 
-public class Test3 {
+public class Test4 {
     static public void main(String[] args) {
 
 	/*
@@ -24,7 +24,7 @@ public class Test3 {
 	 * Connect to the database, test the connection.
 	 */
 
-	ObjectStore os = TestUtil.connect(true);
+	ObjectStore os = TestUtil.connect(false);
 
 	if (TestUtil.sanityCheck(os, "Hello, World", true)) {
 	    System.out.println("appears to work");
@@ -33,6 +33,16 @@ public class Test3 {
 	    System.out.println("yuck");
 	    return;
 	}
+
+	if (TestUtil.sanityCheck(os, "Hello, World", true)) {
+	    System.out.println("appears to work");
+	}
+	else {
+	    System.out.println("yuck");
+	    return;
+	}
+
+	os.clear();
 
 	/*
 	 * Create a bunch of objects, and then chop them up into clusters.
@@ -52,33 +62,41 @@ public class Test3 {
 	    return ;
 	}
 
-	params.numThreads = 1;
-	for (long snooze = 600; snooze > 0; snooze -= 50) {
-	    Thread[] threads = new Thread[params.numThreads];
+	System.out.println("waiting for the new objects to settle");
+	try {
+	    Thread.sleep(10000);
+	} catch (Exception e) {
+	}
 
-	    for (int i = 0; i < params.numThreads; i++) {
-		ClientTest3 t = new ClientTest3(i, os, clusters, snooze);
-		threads[i] = new Thread(t);
-		threads[i].start();
-	    }
+	System.out.println("continuing...");
 
-	    for (int i = 0; i < params.numThreads; i++) {
-		try {
-		    threads[i].join();
-		} catch (Exception e) {
-		    System.out.println("unexpected: " + e);
-		}
+	for (long snooze = 20; snooze >= 10; snooze -= 1) {
+	    ClientTest4 t = new ClientTest4(10, os, clusters, snooze, 10000);
+
+	    t.run();
+
+	    /*
+	    Thread thread = new Thread(t);
+	    thread.start();
+
+	    try {
+		thread.join();
+	    } catch (Exception e) {
+		System.out.println("unexpected: " + e);
 	    }
+	    */
 
 	    // Let everything settle down...
 	    try {
+		System.out.println("starting snooze: " + snooze);
 		Thread.sleep(5000);
 	    } catch (Exception e) {
 		System.out.println("unexpected: " + e);
 	    }
+
 	}
 
-	// os.close();
+	os.close();
     }
 }
 

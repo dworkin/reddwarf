@@ -18,59 +18,56 @@ import java.util.Random;
  * @author Daniel Ellard
  */
 
-class ClientTest3 implements Runnable {
+class ClientTest4 implements Runnable {
     private ObjectStore os;
     private final long clientId;
     private long lastWake;
-    private long mySleep = 50;
-    private long iters = 5000;
     private long[][] oidClusters;
     private int numPeeks = 4;
     private int numLocks = 2;
     private int numPromotedPeeks = 1;
     private Random r = new Random();
     private boolean verbose = false;
+    private long iters;
     private long sleepTime;
+    Transaction trans;
 
-    public ClientTest3(long clientId, ObjectStore os, long[][] oidClusters,
-	    long sleepTime) {
+    public ClientTest4(long clientId, ObjectStore os, long[][] oidClusters,
+	    long sleepTime, long iters) {
 	this.os = os;
 	this.clientId = clientId;
 	this.oidClusters = oidClusters;
 	this.sleepTime = sleepTime;
+	this.iters = iters;
+	this.trans = os.newTransaction(null);
     }
 
     public void run() {
 	System.out.println("starting up " + clientId + ": whoopee");
 	lastWake = System.currentTimeMillis();
 
-	long start = System.currentTimeMillis();
-	for (int i = 0; i < iters; i++) {
-
-	    if (i % 100 == 0) {
-		System.out.println("snoozing at count " + i);
+	int incr = 1000;
+	for (int count = 0; count < iters; count += incr) {
+	    long start = System.currentTimeMillis();
+	    for (int i = 0; i < incr; i++) {
 		try {
+		    doRandomTransaction(verbose);
 		    Thread.sleep(sleepTime);
 		} catch (Exception e) {
+		    // DJE:
+		    System.out.println("unexpected exception: " + e);
+		    e.printStackTrace(System.out);
 		}
-
-		System.out.println("snoozing at count " + i);
 	    }
-
-	    if (i % 50 == 0) {
-		System.out.println("at count " + i);
-	    }
-
-	    if ((i > 0) && ((i % 1000) == 0)) {
-		long now = System.currentTimeMillis();
-		long elapsed = start - now;
-		start = now;
-		System.out.println("elapsed for 1000: " + elapsed);
-	    }
+	    long now = System.currentTimeMillis();
+	    long elapsed = now - start;
+	    double rate = elapsed / (double) incr;
+	    System.out.println("elapsed for " + sleepTime + " ms " +
+		    incr + ": " + elapsed + "  " + rate + "/ms");
+	    System.out.println("\tat count " + count);
 	    try {
-		doRandomTransaction(verbose);
+		Thread.sleep(10000);
 	    } catch (Exception e) {
-		// DJE:
 		System.out.println("unexpected exception: " + e);
 		e.printStackTrace(System.out);
 	    }
