@@ -70,7 +70,7 @@ public class MonitoredDataSpace implements DataSpace {
 
 	this.dataSpace = dataSpace;
 
-	FileOutputStream fos = new FileOutputStream(pathName);
+	FileOutputStream fos = new FileOutputStream(traceFileName);
 	ObjectOutputStream oos = new ObjectOutputStream(fos);
 
 	this.entryLog = oos;
