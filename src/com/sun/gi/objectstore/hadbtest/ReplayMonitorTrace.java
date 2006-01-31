@@ -14,6 +14,7 @@ import com.sun.gi.objectstore.tso.dataspace.InMemoryDataSpace;
 import com.sun.gi.objectstore.tso.dataspace.PersistantInMemoryDataSpace;
 import com.sun.gi.objectstore.tso.dataspace.HadbDataSpace;
 import com.sun.gi.objectstore.tso.dataspace.MonitoredDataSpace;
+import com.sun.gi.objectstore.tso.dataspace.monitor.LogEntry;
 import java.io.Serializable;
 import java.io.FileInputStream;
 import java.io.ObjectInputStream;
@@ -42,16 +43,18 @@ public class ReplayMonitorTrace {
 
 	// ObjectStore ostore = connect(true, dspaceType, null);
 
-	for (;;) {
-	    Object o;
+	while (fis.available() > 0) {
+	    System.out.println("avail: " + fis.available());
+	    LogEntry o;
 	    try {
-		o = ois.readObject();
+		o = (LogEntry) ois.readObject();
 	    } catch (Exception e) {
 		System.out.println(e);
 		break;
 	    }
 
-	    System.out.println(o.getClass().getName());
+	    System.out.println(o.getClass().getName() + ": " +
+		    o.getStartTime());
 	}
     }
 }

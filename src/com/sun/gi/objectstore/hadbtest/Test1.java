@@ -13,7 +13,7 @@ import com.sun.gi.objectstore.ObjectStore;
 public class Test1 {
 
     static public void main(String[] args) {
-	ObjectStore os = TestUtil.connect(true);
+	ObjectStore os = TestUtil.connect(true, "persistant-inmem", "Plog1");
 
 	System.out.println("connected");
 	if (os == null) {

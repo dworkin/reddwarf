@@ -39,7 +39,7 @@ public class TestUtil {
 	ObjectStore ostore;
 
 	try {
-	    if (traceFile != null) {
+	    if (traceFile == null) {
 		ostore = new TSOObjectStore(openDataSpace(type));
 	    } else {
 		ostore = new TSOObjectStore(openDataSpace(type, traceFile));
@@ -58,7 +58,7 @@ public class TestUtil {
     }
 
     public static ObjectStore connect(boolean clear) {
-	return connect(clear, "persistant-inmem", null);
+	return connect(clear, "persistant-inmem", "SCRATCH1");
     }
 
     public static DataSpace openDataSpace(String type) {

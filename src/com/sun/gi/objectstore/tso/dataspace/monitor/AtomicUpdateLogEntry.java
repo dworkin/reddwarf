@@ -8,8 +8,13 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.io.IOException;
+import java.io.ObjectInputStream;
 
-public class AtomicUpdateLogEntry extends LogEntry implements Serializable {
+public class AtomicUpdateLogEntry implements LogEntry, Serializable {
+    private static final long serialVersionUID = 1L;
+    private final long startTime;
+    private final long endTime;
     protected final boolean clear;
     protected final Map<String, Long> newNames;
     protected final Set<Long> deleteSet;
@@ -20,7 +25,8 @@ public class AtomicUpdateLogEntry extends LogEntry implements Serializable {
 	    Map<String, Long> newNames, Set<Long> deleteSet,
 	    Map<Long, byte[]> updateMap, Set<Long> insertSet)
     {
-	super(startTime);
+	this.startTime = startTime;
+	this.endTime = System.currentTimeMillis();
 
 	this.clear = clear;
 	this.newNames = new HashMap<String, Long>(newNames);
@@ -31,6 +37,15 @@ public class AtomicUpdateLogEntry extends LogEntry implements Serializable {
 	    this.updateMap.put(oid, new Integer(updateMap.get(oid).length));
 	}
     }
+
+    public long getStartTime() {
+	return startTime;
+    }
+
+    public long getEndTime() {
+	return endTime;
+    }
+
 
     public void replay(DataSpace dataSpace) {
 	Map<Long, byte[]> dummys = new HashMap<Long, byte[]>();
@@ -46,5 +61,11 @@ public class AtomicUpdateLogEntry extends LogEntry implements Serializable {
 	    // XXX: unexpected
 	}
 
+    }
+
+    private void readObject(ObjectInputStream in)   
+	    throws IOException, ClassNotFoundException
+    {
+	in.defaultReadObject();
     }
 }
