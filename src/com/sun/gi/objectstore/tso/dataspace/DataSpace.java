@@ -110,7 +110,7 @@ public interface DataSpace {
      */
     void atomicUpdate(boolean clear,
 		    Map<String, Long> newNames, Set<Long> deleteSet,
-		    Map<Long, byte[]> updateMap, Set insertSet)
+		    Map<Long, byte[]> updateMap, Set<Long> insertSet)
 	    throws DataSpaceClosedException;
 
     /**
