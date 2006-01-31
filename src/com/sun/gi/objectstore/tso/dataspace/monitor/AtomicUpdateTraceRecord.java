@@ -11,7 +11,7 @@ import java.util.Set;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 
-public class AtomicUpdateLogEntry extends LogEntry implements Serializable {
+public class AtomicUpdateTraceRecord extends TraceRecord implements Serializable {
     private static final long serialVersionUID = 1L;
     protected final boolean clear;
     protected final Map<String, Long> newNames;
@@ -19,7 +19,7 @@ public class AtomicUpdateLogEntry extends LogEntry implements Serializable {
     protected final Map<Long, Integer> updateMap;
     protected final Set<Long> insertSet;
 
-    public AtomicUpdateLogEntry(long startTime, boolean clear,
+    public AtomicUpdateTraceRecord(long startTime, boolean clear,
 	    Map<String, Long> newNames, Set<Long> deleteSet,
 	    Map<Long, byte[]> updateMap, Set<Long> insertSet)
     {

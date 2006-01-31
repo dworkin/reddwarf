@@ -6,19 +6,17 @@ import java.io.Serializable;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 
-public class LookupLogEntry extends LogEntry implements Serializable {
+public class GetAppIdTraceRecord extends TraceRecord implements Serializable {
     private static final long serialVersionUID = 1L;
     protected final long id;
-    protected final String name;
 
-    public LookupLogEntry(long startTime, String name, long id) {
+    public GetAppIdTraceRecord(long startTime, long id) {
 	super(startTime);
 	this.id = id;
-	this.name = name;
     }
 
     public void replay(DataSpace dataSpace) {
-	long id = dataSpace.lookup(name);
+	long id = dataSpace.getAppID();
 	if (id != this.id) {
 	    // XXX: ??
 	}

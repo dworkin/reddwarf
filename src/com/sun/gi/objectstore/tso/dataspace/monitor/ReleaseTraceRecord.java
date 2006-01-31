@@ -6,11 +6,11 @@ import java.io.Serializable;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 
-public class ReleaseLogEntry extends LogEntry implements Serializable {
+public class ReleaseTraceRecord extends TraceRecord implements Serializable {
     private static final long serialVersionUID = 1L;
     protected final long id;
 
-    public ReleaseLogEntry(long startTime, long id) {
+    public ReleaseTraceRecord(long startTime, long id) {
 	super(startTime);
 	this.id = id;
     }

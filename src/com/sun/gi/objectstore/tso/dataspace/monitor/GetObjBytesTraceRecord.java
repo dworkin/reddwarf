@@ -6,19 +6,21 @@ import java.io.Serializable;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 
-public class GetAppIdLogEntry extends LogEntry implements Serializable {
+public class GetObjBytesTraceRecord extends TraceRecord implements Serializable {
     private static final long serialVersionUID = 1L;
     protected final long id;
+    protected final int length;
 
-    public GetAppIdLogEntry(long startTime, long id) {
+    public GetObjBytesTraceRecord(long startTime, long id, int length) {
 	super(startTime);
 	this.id = id;
+	this.length = length;
     }
 
     public void replay(DataSpace dataSpace) {
-	long id = dataSpace.getAppID();
-	if (id != this.id) {
-	    // XXX: ??
+	byte[] res = dataSpace.getObjBytes(id);
+	if (res.length != length) {
+	    // XXX ??
 	}
     }
     private void readObject(ObjectInputStream in)   

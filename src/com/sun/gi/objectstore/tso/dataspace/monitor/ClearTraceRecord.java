@@ -6,21 +6,19 @@ import java.io.Serializable;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 
-public class GetNextIdLogEntry extends LogEntry implements Serializable {
+public class ClearTraceRecord extends TraceRecord implements Serializable {
     private static final long serialVersionUID = 1L;
-    protected final long id;
 
-    public GetNextIdLogEntry(long startTime, long id) {
+    private ClearTraceRecord() { }
+
+    public ClearTraceRecord(long startTime) {
 	super(startTime);
-	this.id = id;
     }
 
     public void replay(DataSpace dataSpace) {
-	long id = dataSpace.getNextID();
-	if (id != this.id) {
-	    // XXX ??
-	}
+	dataSpace.clear();
     }
+
     private void readObject(ObjectInputStream in)   
 	    throws IOException, ClassNotFoundException
     {
