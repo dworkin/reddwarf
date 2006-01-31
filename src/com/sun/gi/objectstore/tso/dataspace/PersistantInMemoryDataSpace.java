@@ -522,7 +522,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	 *      boolean, java.util.Map, java.util.Set, java.util.Map)
 	 */
 	public void atomicUpdate(boolean clear, Map<String, Long> newNames,
-			Set<Long> deleteSet, Map<Long, byte[]> updateMap, Set insertIDs)
+			Set<Long> deleteSet, Map<Long, byte[]> updateMap, Set<Long> insertIDs)
 			throws DataSpaceClosedException {
 		if (closed) {
 			throw new DataSpaceClosedException();
