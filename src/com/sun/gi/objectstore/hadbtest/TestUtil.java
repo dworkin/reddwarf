@@ -61,6 +61,8 @@ public class TestUtil {
 	return connect(clear, "persistant-inmem", "SCRATCH1");
     }
 
+    /**
+     */
     public static DataSpace openDataSpace(String type) {
 	DataSpace dspace;
 
@@ -98,11 +100,11 @@ public class TestUtil {
     }
 
     /**
-     * First-order sanity check of the transaction mechanism. <p>
+     * First-order sanity check of the transaction mechanism.  <p>
      *
-     * Creates an persistant object (a String) in the database.
-     * References the object by its OID, and then sees whether
-     * what was retrieved is what was written. <p>
+     * Creates an persistant object (a String) in the database. 
+     * References the object by its OID, and then sees whether what
+     * was retrieved is what was written.  <p>
      *
      * @param os the ObjectStore to use.
      *
@@ -112,7 +114,6 @@ public class TestUtil {
      *
      * @return true if successful, false othewise.
      */
-
     public static boolean sanityCheck(ObjectStore os, String text,
     	    boolean verbose) {
 

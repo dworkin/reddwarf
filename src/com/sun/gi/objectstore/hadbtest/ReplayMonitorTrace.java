@@ -10,31 +10,31 @@ import com.sun.gi.objectstore.ObjectStore;
 import com.sun.gi.objectstore.Transaction;
 import com.sun.gi.objectstore.tso.TSOObjectStore;
 import com.sun.gi.objectstore.tso.dataspace.DataSpace;
-import com.sun.gi.objectstore.tso.dataspace.InMemoryDataSpace;
-import com.sun.gi.objectstore.tso.dataspace.PersistantInMemoryDataSpace;
 import com.sun.gi.objectstore.tso.dataspace.HadbDataSpace;
+import com.sun.gi.objectstore.tso.dataspace.InMemoryDataSpace;
 import com.sun.gi.objectstore.tso.dataspace.MonitoredDataSpace;
-import com.sun.gi.objectstore.tso.dataspace.monitor.LogEntry;
-import java.io.Serializable;
+import com.sun.gi.objectstore.tso.dataspace.PersistantInMemoryDataSpace;
+import com.sun.gi.objectstore.tso.dataspace.monitor.TraceRecord;
+import java.io.EOFException;
 import java.io.FileInputStream;
-import java.io.ObjectInputStream;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.Serializable;
 
 /**
- * @author Daniel Ellard
+ * Simple class to read back a sequence of {@link TraceRecord}s
+ * and repeat the operations.
  */
-
 public class ReplayMonitorTrace {
 
     public static void main(String[] args) throws IOException {
 	String traceFile = args[0];
 	String dspaceType = args[1];
 
-	FileInputStream fis;
 	ObjectInputStream ois;
 
 	try {
-	    fis = new FileInputStream(traceFile);
+	    FileInputStream fis = new FileInputStream(traceFile);
 	    ois = new ObjectInputStream(fis);
 	} catch (IOException e) {
 	    System.out.println(e);
@@ -43,18 +43,18 @@ public class ReplayMonitorTrace {
 
 	// ObjectStore ostore = connect(true, dspaceType, null);
 
-	while (fis.available() > 0) {
-	    System.out.println("avail: " + fis.available());
-	    LogEntry o;
+	for (;;) {
+	    TraceRecord o;
 	    try {
-		o = (LogEntry) ois.readObject();
+		o = (TraceRecord) ois.readObject();
+	    } catch (EOFException e) {
+		break;
 	    } catch (Exception e) {
 		System.out.println(e);
 		break;
 	    }
 
-	    System.out.println(o.getClass().getName() + ": " +
-		    o.getStartTime());
+	    System.out.println(o);
 	}
     }
 }
