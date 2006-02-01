@@ -658,4 +658,14 @@ public class SimulationImpl implements Simulation {
 		router.lock(cid, shouldLock);
 	}
 	
+	/**
+	 * Closes the local view of the channel mapped to ChannelID.
+	 * Any remaining users will be notified as the channel is closing.
+	 * 
+	 * @param id		the ID of the channel to close.
+	 */
+	public void closeChannel(ChannelID id) {
+		router.closeChannel(id);
+	}
+	
 }

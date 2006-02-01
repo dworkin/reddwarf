@@ -253,6 +253,14 @@ public interface SimTask {
 	 * @param cid				the channel ID
 	 * @param shouldLock		if true, will lock the channel, otherwise unlock it.
 	 */
-	public void lock(ChannelID cid, boolean shouldLock);	
+	public void lock(ChannelID cid, boolean shouldLock);
+	
+	/**
+	 * Closes the local view of the channel mapped to ChannelID.
+	 * Any remaining users will be notified as the channel is closing.
+	 * 
+	 * @param id		the ID of the channel to close.
+	 */
+	public void closeChannel(ChannelID id);	
 	
 }

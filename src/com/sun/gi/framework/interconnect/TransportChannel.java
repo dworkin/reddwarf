@@ -15,6 +15,14 @@ import java.nio.*;
 public interface TransportChannel {
   public void sendData(ByteBuffer data) throws IOException;
   public void addListener(TransportChannelListener l);
+  
+  /**
+   * Removes the given listener if it exists.
+   * 
+   * @param l		the listener to remove
+   */
+  public void removeListener(TransportChannelListener l);
+  
   public void closeChannel();
 
   /**

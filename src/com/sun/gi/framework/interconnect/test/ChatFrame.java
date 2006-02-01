@@ -21,6 +21,7 @@ import javax.swing.JTextArea;
 public class ChatFrame extends JFrame implements TransportChannelListener{
   final TransportChannel channel;
    JTextArea textOut;
+   
   public ChatFrame(TransportChannel chan) {
     channel = chan;
     channel.addListener(this);

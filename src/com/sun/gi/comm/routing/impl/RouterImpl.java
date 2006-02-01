@@ -388,9 +388,18 @@ public class RouterImpl implements Router {
 		return sgschan;
 	}
 
-	protected void closeChannel(ChannelImpl channel) {
-		channelNameMap.remove(channel.getName());
-		channelMap.remove(channel.channelID());
+	/**
+	 * Removes the given Channel from the various maps.
+	 * 
+	 * @param channel		the channel to remove.
+	 */
+	protected void removeChannel(ChannelImpl channel) {
+		synchronized (channelNameMap) {
+			channelNameMap.remove(channel.getName());
+		}
+		synchronized (channelMap) {
+			channelMap.remove(channel.channelID());
+		}
 	}
 
 	public boolean validateReconnectKey(UserID uid, byte[] key) {
@@ -540,5 +549,18 @@ public class RouterImpl implements Router {
 		channel.setLocked(shouldLock);
 	}
 	
-
+	/**
+	 * Closes the local view of the channel mapped to ChannelID.
+	 * Any remaining users will be notified as the channel is closing.
+	 * 
+	 * @param id		the ID of the channel to close.
+	 */
+	public void closeChannel(ChannelID id) {
+		SGSChannel channel = getChannel(id);
+		if (channel == null) {		// no channel in map
+			return;
+		}
+		channel.close();
+	}
+	
 }

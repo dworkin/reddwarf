@@ -33,9 +33,33 @@ public class LRMPTransportChannel implements TransportChannel {
   public void sendData(ByteBuffer data) throws IOException{
     transportManager.sendData(uuID,data);
   }
+  
+  
   public void addListener(TransportChannelListener l) {
-    listeners.add(l);
+	  synchronized(listeners) {
+		  if (!listeners.contains(l)) {
+			  listeners.add(l);
+		  }
+	  }
   }
+  
+  /**
+   * Removes the given listener if it exists.  After the last listener
+   * is removed, the channel will be closed at the TransportManager level.
+   * 
+   * @param l		the listener to remove
+   */
+  public void removeListener(TransportChannelListener l) {
+	  synchronized(listeners) {
+		  if (listeners.contains(l)) {
+			  listeners.remove(l);
+		  }
+		  if (listeners.isEmpty()) {
+			  transportManager.closeChannel(uuID);
+		  }
+	  }
+  }
+  
   public void closeChannel() {
     /**@todo Implement this com.sun.gi.framework.interconnect.TransportChannel method*/
     throw new java.lang.UnsupportedOperationException("Method closeChannel() not yet implemented.");

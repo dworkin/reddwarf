@@ -579,4 +579,14 @@ public class SimTaskImpl implements SimTask {
 	public void lock(ChannelID cid, boolean shouldLock) {
 		simulation.lock(cid, shouldLock);
 	}
+	
+	/**
+	 * Closes the local view of the channel mapped to ChannelID.
+	 * Any remaining users will be notified as the channel is closing.
+	 * 
+	 * @param id		the ID of the channel to close.
+	 */
+	public void closeChannel(ChannelID id) {
+		simulation.closeChannel(id);
+	}
 }

@@ -112,8 +112,7 @@ private boolean TRACE=false;
       case OP_CHANNEL_REMOVE:
         uuID = new StatisticalUUID();
         uuID.read(buff);
-        idMap.remove(uuID);
-        LRMPTransportChannel chan = (LRMPTransportChannel) chanMap.remove(uuID);
+        LRMPTransportChannel chan = closeChannel(uuID);
         if (chan != null) {
           chan.doCloseChannel();
         }
@@ -132,6 +131,24 @@ private boolean TRACE=false;
         break;
     }
 
+  }
+  
+  /**
+   * Closes off the channel with the given ID by removing references to it.
+   * 
+   * @param uuID		the channels uuID
+   * 
+   * @return the channel.
+   */
+  LRMPTransportChannel closeChannel(SGSUUID uuID) {
+	  synchronized (idMap) {
+		  idMap.remove(uuID);
+	  }
+	  LRMPTransportChannel channel = null;
+	  synchronized (chanMap) {
+		  channel = (LRMPTransportChannel) chanMap.remove(uuID);
+	  }
+	  return channel;
   }
 
   // Transport Manager Methods

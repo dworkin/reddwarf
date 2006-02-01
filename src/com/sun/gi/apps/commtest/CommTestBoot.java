@@ -104,6 +104,9 @@ public class CommTestBoot implements SimBoot, SimUserListener,
 	public void userJoinedChannel(SimTask task, ChannelID cid, UserID uid) {
 		System.out.println("User " + cid + " joined channel " + uid);
 		
+		// test for forcabley closing a channel
+		//task.closeChannel(cid);
+		
 		// test lock from leaving.
 		/*if (cid.equals(noJoinID)) {
 			System.out.println("Locking noJoin");

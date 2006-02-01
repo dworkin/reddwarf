@@ -34,6 +34,7 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 	// only instanceable by RouterImpl
 	ChannelImpl(RouterImpl r, TransportChannel chan) throws IOException {
 		transportChannel = chan;
+		transportChannel.addListener(this);
 		localID = new ChannelID();
 		localIDbytes = localID.toByteArray();
 		buffs[0]=hdr;		
@@ -282,7 +283,7 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 				e.printStackTrace();
 			}
 		}	
-		router.closeChannel(this);
+		router.removeChannel(this);
 	}
 
 	// only for use by RouterImpl
@@ -310,4 +311,15 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 	public void setLocked(boolean lock) {
 		this.locked = lock;
 	}
+	
+	/**
+	 * Signals to the underlying transport channel that this object is
+	 * finished using it.  Clients should call this when they are finished
+	 * using the channel.  Users will be notified that the channel is closing.
+	 */
+	public void close() {
+		transportChannel.removeListener(this);
+		channelClosed();
+	}
+	
 }

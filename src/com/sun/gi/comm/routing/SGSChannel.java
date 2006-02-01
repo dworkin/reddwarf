@@ -80,4 +80,12 @@ public interface SGSChannel {
 	 */
 	public void setLocked(boolean lock);
 
+
+	/**
+	 * Signals to the underlying transport channel that this object is
+	 * finished using it.  Clients should call this when they are finished
+	 * using the channel. 
+	 */
+	public void close();
 }
+
