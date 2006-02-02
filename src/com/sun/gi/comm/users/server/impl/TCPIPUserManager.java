@@ -86,9 +86,6 @@ public class TCPIPUserManager
 
 	final SGSUserImpl user = new SGSUserImpl(router,
 		new TransportProtocolTransmitter() {
-	    public void sendBuffers(ByteBuffer[] buffs) {
-		sendBuffers(buffs, true);
-	    }
 
 	    public void sendBuffers(ByteBuffer[] buffs, boolean reliable) {
 		try {

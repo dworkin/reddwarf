@@ -122,7 +122,7 @@ public class BinaryPktProtocol
             hdr.put( (byte) to.length);
             hdr.put(to);
             sendArray[1] = data;
-            sendBuffers(sendArray);
+            sendBuffers(sendArray, reliable);
         }
     }
     
@@ -149,7 +149,7 @@ public class BinaryPktProtocol
             hdr.put( (byte) to.length);
             hdr.put(to);
             sendArray[1] = data;
-            sendBuffers(sendArray);
+            sendBuffers(sendArray, reliable);
         }
     }
     
@@ -176,7 +176,7 @@ public class BinaryPktProtocol
                 hdr.put(to[i]);
             }
             sendArray[1] = data;
-            sendBuffers(sendArray);
+            sendBuffers(sendArray, reliable);
         }
     }
     
@@ -205,7 +205,7 @@ public class BinaryPktProtocol
                 hdr.put(to[i]);
             }
             sendArray[1] = data;
-            sendBuffers(sendArray);
+            sendBuffers(sendArray, reliable);
         }
     }
     
@@ -225,7 +225,7 @@ public class BinaryPktProtocol
             hdr.put((byte)chanID.length);
             hdr.put(chanID);
             sendArray[1] = data;
-            sendBuffers(sendArray);
+            sendBuffers(sendArray, reliable);
         }
     }
     
@@ -247,7 +247,7 @@ public class BinaryPktProtocol
             hdr.put( (byte) from.length);
             hdr.put(from);
             sendArray[1] = data;
-            sendBuffers(sendArray);
+            sendBuffers(sendArray, reliable);
         }
     }
     
@@ -260,7 +260,7 @@ public class BinaryPktProtocol
             hdr.put((byte)OPCODE.SEND_SERVER_MSG.ordinal());
             hdr.put( (byte) (reliable ? 1 : 0));               
             sendArray[1] = data;
-            sendBuffers(sendArray);
+            sendBuffers(sendArray, reliable);
         }
     }
     
@@ -514,15 +514,23 @@ public class BinaryPktProtocol
         }
     }
     
-    private void sendBuffers(ByteBuffer buff){
-    	xmitter.sendBuffers(new ByteBuffer[] {buff});
+    private void sendBuffers(ByteBuffer buff) {
+    	sendBuffers(buff, true);
     }
     
-    private void sendBuffers(ByteBuffer[] buffs){
-    	xmitter.sendBuffers(buffs);
+    private void sendBuffers(ByteBuffer buff, boolean reliable) {
+    	sendBuffers(new ByteBuffer[] { buff }, reliable);
     }
     
-    //NIOTCPConnectionListener
+    private void sendBuffers(ByteBuffer[] buffs) {
+    	sendBuffers(buffs, true);
+    }
+    
+    private void sendBuffers(ByteBuffer[] buffs, boolean reliable) {
+    	xmitter.sendBuffers(buffs, reliable);
+    }
+    
+    // NIOTCPConnectionListener
     
     
     public boolean isLoginPkt(ByteBuffer buff){
@@ -535,8 +543,7 @@ public class BinaryPktProtocol
     /**
      * packetReceived
      *
-     * @param conn NIOTCPConnection
-     * @param inputBuffer ByteBuffer
+     * @param buff ByteBuffer
      */
     public void packetReceived(ByteBuffer buff) {
         OPCODE op = OPCODE.values()[buff.get()];

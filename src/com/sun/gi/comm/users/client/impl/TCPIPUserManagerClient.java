@@ -74,9 +74,6 @@ public class TCPIPUserManagerClient
 
     public void connected(final NIOConnection connection) {
 	protocol.setTransmitter(new TransportProtocolTransmitter() {
-	    public void sendBuffers(ByteBuffer[] buffs) {
-		sendBuffers(buffs, true);
-	    }
 
 	    public void sendBuffers(ByteBuffer[] buffs, boolean reliable) {
 		try {
