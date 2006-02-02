@@ -1,6 +1,7 @@
 package com.sun.gi.comm.users.client.impl;
 
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -19,366 +20,297 @@ import com.sun.gi.comm.users.client.UserManagerClientListener;
 import com.sun.gi.comm.users.client.UserManagerPolicy;
 import com.sun.gi.utils.types.BYTEARRAY;
 
-public class ClientConnectionManagerImpl implements ClientConnectionManager,
-		UserManagerClientListener {
-	
-	private byte[] server_id;
-	
-	private Discoverer discoverer;
+public class ClientConnectionManagerImpl
+	implements ClientConnectionManager, UserManagerClientListener {
 
-	private UserManagerPolicy policy;
+    private byte[] server_id;
 
-	private UserManagerClient umanager;
+    private Discoverer discoverer;
 
-	private Class umanagerClass;
+    private UserManagerPolicy policy;
 
-	private String gameName;
+    private UserManagerClient umanager;
 
-	private byte[] reconnectionKey = null;
+    private Class umanagerClass;
 
-	private ClientConnectionManagerListener listener;
+    private String gameName;
 
-	private byte[] myID;
+    private byte[] reconnectionKey = null;
 
-	private boolean reconnecting = false;
+    private ClientConnectionManagerListener listener;
 
-	private boolean connected = false;
+    private byte[] myID;
 
-	private Map<BYTEARRAY, ClientChannelImpl> channelMap = new HashMap<BYTEARRAY, ClientChannelImpl>();
+    private boolean reconnecting = false;
 
-	private long keyTimeout = 0;
+    private boolean connected = false;
 
-	// used to do multiple conn attempts
-	private long connAttempts;
+    private Map<BYTEARRAY, ClientChannelImpl> channelMap =
+	new HashMap<BYTEARRAY, ClientChannelImpl>();
 
-	private long connAttemptCounter;
+    private long keyTimeout = 0;
 
-	private long connWaitMS;
+    // used to do multiple conn attempts
+    private long connAttempts;
 
-	private boolean exiting;
+    private long connAttemptCounter;
 
-	public ClientConnectionManagerImpl(String gameName, Discoverer disco) {
-		this(gameName, disco, new DefaultUserManagerPolicy());
+    private long connWaitMS;
+
+    private boolean exiting;
+
+    public ClientConnectionManagerImpl(String gameName, Discoverer disco) {
+	this(gameName, disco, new DefaultUserManagerPolicy());
+    }
+
+    public ClientConnectionManagerImpl(String gameName, Discoverer disco,
+	    UserManagerPolicy policy) {
+	discoverer = disco;
+	this.policy = policy;
+	this.gameName = gameName;
+    }
+
+    public void setListener(ClientConnectionManagerListener l) {
+	listener = l;
+    }
+
+    public String[] getUserManagerClassNames() {
+	DiscoveredGame game = discoverGame(gameName);
+	if (game == null) {
+	    return null;
 	}
 
-	public ClientConnectionManagerImpl(String gameName, Discoverer disco,
-			UserManagerPolicy policy) {
-		discoverer = disco;
-		this.policy = policy;
-		this.gameName = gameName;
+	DiscoveredUserManager[] umgrs = game.getUserManagers();
+	if (umgrs == null) {
+	    return null;
 	}
 
-	public void setListener(ClientConnectionManagerListener l) {
-		listener = l;
+	Set<String> names = new HashSet<String>();
+	for (DiscoveredUserManager umgr : umgrs) {
+	    names.add(umgr.getClientClass());
 	}
 
-	public String[] getUserManagerClassNames() {
-		DiscoveredGame game = discoverGame(gameName);
-		if (game == null) {
-			return null;
-		}
-		DiscoveredUserManager[] umgrs = game.getUserManagers();
-		if (umgrs == null) {
-			return null;
-		}
-		Set<String> names = new HashSet<String>();
-		for (int j = 0; j < umgrs.length; j++) {
-			names.add(umgrs[j].getClientClass());
-		}
-		String[] outnames = new String[names.size()];
-		return (String[]) names.toArray(outnames);
+	String[] outnames = new String[names.size()];
+	return names.toArray(outnames);
+    }
 
+    /**
+     * discoverGame
+     *
+     * @param gameName
+     * @return DiscoveredGame
+     */
+    private DiscoveredGame discoverGame(String gameName) {
+	DiscoveredGame[] games = discoverer.games();
+	for (DiscoveredGame game : games) {
+	    if (game.getName().equals(gameName)) {
+		return game;
+	    }
+	}
+	System.err.println("Discovery Error: No games discovered!");
+	return null;
+    }
+
+    public boolean connect(String userManagerClassName)
+	throws ClientAlreadyConnectedException {
+	    int attempts = 10;
+	    String attstr =
+		System.getProperty("sgs.clientconnmgr.connattempts");
+	    if (attstr != null) {
+		attempts = Integer.parseInt(attstr);
+	    }
+	    long sleepTime = 100;
+	    String sleepstr = System.getProperty("sgs.clientconnmgr.connwait");
+	    if (sleepstr != null) {
+		sleepTime = Long.parseLong(sleepstr);
+	    }
+	    return connect(userManagerClassName, attempts, sleepTime);
 	}
 
-	/**
-	 * discoverGame
-	 * 
-	 * @param gameID
-	 *            int
-	 * @return DiscoveredGame
-	 */
-	private DiscoveredGame discoverGame(String gameName) {
-		DiscoveredGame[] games = discoverer.games();
-		for (int i = 0; i < games.length; i++) {
-			if (games[i].getName().equals(gameName)) {
-				return games[i];
-			}
-		}
-		System.out.println("Discovery Error: No games discovered!");
-		return null;
+    public boolean connect(String userManagerClassName, int attempts,
+	    long sleepTime) throws ClientAlreadyConnectedException {
+	if (connected) {
+	    throw new ClientAlreadyConnectedException();
 	}
-
-	public boolean connect(String userManagerClassName)
-			throws ClientAlreadyConnectedException {
-		int attempts = 10;
-		String attstr = System.getProperty("sgs.clientconnmgr.connattempts");
-		if (attstr != null) {
-			attempts = Integer.parseInt(attstr);
-		}
-		long sleepTime = 100;
-		String sleepstr = System.getProperty("sgs.clientconnmgr.connwait");
-		if (sleepstr != null) {
-			sleepTime = Long.parseLong(sleepstr);
-		}
-		return connect(userManagerClassName, attempts, sleepTime);
+	try {
+	    umanagerClass = Class.forName(userManagerClassName);
+	    umanager = (UserManagerClient) umanagerClass.newInstance();
+	} catch (Exception ex) {
+	    ex.printStackTrace();
+	    return false;
 	}
+	connAttempts = attempts;
+	connWaitMS = sleepTime;
+	connAttemptCounter = 0;
+	reconnecting = false;
+	return connect(umanager);
+    }
 
-	public boolean connect(String userManagerClassName, int attempts,
-			long sleepTime) throws ClientAlreadyConnectedException {
-		if (connected) {
-			throw new ClientAlreadyConnectedException("bad attempt to connect "
-					+ "when already connected.");
-		}
+    private boolean connect(UserManagerClient umanager) {
+	connAttemptCounter++;
+	exiting = false;
+	DiscoveredGame game = discoverGame(gameName);
+	DiscoveredUserManager choice =
+	    policy.choose(game, umanager.getClass().getName());
+
+	return umanager.connect(choice.getParameters(), this);
+    }
+
+    public void disconnect() {
+	exiting = true;
+	umanager.logout();
+    }
+
+    public void sendValidationResponse(Callback[] cbs) {
+	umanager.validationDataResponse(cbs);
+    }
+
+    public void openChannel(String channelName) {
+	umanager.joinChannel(channelName);
+    }
+
+    public void sendToServer(ByteBuffer buff, boolean reliable) {
+	umanager.sendToServer(buff, reliable);
+    }
+
+    // UserClientManagerListener methods
+
+    public void dataReceived(byte[] chanID, byte[] from, ByteBuffer data,
+	    boolean reliable) {
+	ClientChannelImpl chan = channelMap.get(new BYTEARRAY(chanID));
+	chan.dataReceived(from, data, reliable);
+    }
+
+    public void disconnected() {
+	if (connected == false) { // not yet connected
+	    if (connAttemptCounter < connAttempts) { // try again
 		try {
-			umanagerClass = Class.forName(userManagerClassName);
-			umanager = (UserManagerClient) umanagerClass.newInstance();
-		} catch (Exception ex) {
-			ex.printStackTrace();
-			return false;
+		    Thread.sleep(connWaitMS);
+		} catch (InterruptedException e) {
+		    e.printStackTrace();
 		}
-		connAttempts = attempts;
-		connWaitMS = sleepTime;
-		connAttemptCounter = 0;
-		reconnecting = false;
-		return connect(umanager);
+		connect(umanager);
+	    } else {
+		listener.disconnected();
+	    }
+	} else { // lost connection
+	    if ((!exiting) && (keyTimeout > System.currentTimeMillis())) {
+		// valid reconn key
+		listener.failOverInProgress();
+		reconnecting = true;
+		connect(umanager);
+	    } else { // we cant fail over
+		listener.disconnected();
+	    }
 	}
+    }
 
-	private boolean connect(UserManagerClient umanager) {
-		connAttemptCounter++;
-		exiting = false;
-		DiscoveredGame game = discoverGame(gameName);
-		DiscoveredUserManager choice = policy.choose(game, umanager.getClass()
-				.getName());
-
-		return umanager.connect(choice, this);
-
+    public void connected() {
+	connected = true;
+	if (!reconnecting || (keyTimeout < System.currentTimeMillis())) {
+	    umanager.login();
+	} else {
+	    umanager.reconnectLogin(myID, reconnectionKey);
 	}
+    }
 
-	public void disconnect() {
-		exiting = true;
-		umanager.logout();
-	}
+    public void validationDataRequest(Callback[] cbs) {
+	listener.validationRequest(cbs);
+    }
 
-	public void sendValidationResponse(Callback[] cbs) {
-		umanager.validationDataResponse(cbs);
-	}
+    public void loginAccepted(byte[] userID) {
+	myID = new byte[userID.length];
+	System.arraycopy(userID, 0, myID, 0, myID.length);
+	listener.connected(myID);
+    }
 
-	public void openChannel(String channelName) {
-		umanager.joinChannel(channelName);
-	}
+    public void loginRejected(String message) {
+	listener.connectionRefused(message);
+    }
 
-	public void sendToServer(ByteBuffer buff, boolean reliable) {
-		umanager.sendToServer(buff, reliable);
+    public void userAdded(byte[] userID) {
+	listener.userJoined(userID);
+    }
 
-	}
+    public void userDropped(byte[] userID) {
+	listener.userLeft(userID);
+    }
 
-	// callbacks from UserClientManagerListener
-	/**
-	 * dataReceived
-	 * 
-	 * @param from
-	 *            ByteBuffer
-	 * @param data
-	 *            ByteBuffer
-	 */
-	public void dataReceived(byte[] chanID, byte[] from, ByteBuffer data,
-			boolean reliable) {
-		ClientChannelImpl chan = channelMap.get(new BYTEARRAY(chanID));
-		chan.dataReceived(from, data, reliable);
-	}
+    public void newConnectionKeyIssued(byte[] key, long ttl) {
+	reconnectionKey = new byte[key.length];
+	System.arraycopy(key, 0, reconnectionKey, 0, key.length);
+	keyTimeout = System.currentTimeMillis() + (ttl * 1000);
+    }
 
-	/**
-	 * disconnected
-	 */
-	public void disconnected() {
-		if (connected == false) { // not yet connected
-			if (connAttemptCounter < connAttempts) { // try again
-				try {
-					Thread.sleep(connWaitMS);
-				} catch (InterruptedException e) {
-					e.printStackTrace();
-				}
-				connect(umanager);
-			} else {
-				listener.disconnected();
-			}
-		} else { // lost connection
-			if ((!exiting) && (keyTimeout > System.currentTimeMillis())) { 
-				// valid reconn key
-				listener.failOverInProgress();
-				reconnecting = true;
-				connect(umanager);
-			} else { // we cant fail over
-				listener.disconnected();
-			}
-		}
-	}
+    public void joinedChannel(String name, byte[] channelID) {
+	ClientChannelImpl chan = new ClientChannelImpl(this, name, channelID);
+	channelMap.put(new BYTEARRAY(channelID), chan);
+	listener.joinedChannel(chan);
+    }
 
-	/**
-	 * connected
-	 * 
-	 * 
-	 */
-	public void connected() {
-		connected = true;
-		if (!reconnecting || (keyTimeout < System.currentTimeMillis())) {
-			umanager.login();
-		} else {
-			umanager.reconnectLogin(myID, reconnectionKey);
-		}
-	}
+    public void leftChannel(byte[] channelID) {
+	ClientChannelImpl chan = channelMap.remove(new BYTEARRAY(channelID));
+	chan.channelClosed();
+    }
 
-	/**
-	 * validationDataRequest
-	 * 
-	 * 
-	 */
-	public void validationDataRequest(Callback[] cbs) {
-		listener.validationRequest(cbs);
+    public void userJoinedChannel(byte[] channelID, byte[] userID) {
+	ClientChannelImpl chan = channelMap.get(new BYTEARRAY(channelID));
+	chan.userJoined(userID);
+    }
 
-	}
+    public void userLeftChannel(byte[] channelID, byte[] userID) {
+	ClientChannelImpl chan = channelMap.get(new BYTEARRAY(channelID));
+	chan.userLeft(userID);
+    }
 
-	/**
-	 * loginAccepted
-	 * 
-	 * @param userID
-	 *            ByteBuffer
-	 */
-	public void loginAccepted(byte[] userID) {
-		myID = new byte[userID.length];
-		System.arraycopy(userID, 0, myID, 0, myID.length);
-		listener.connected(myID);
-	}
+    public void recvdData(byte[] chanID, byte[] from, ByteBuffer data,
+	    boolean reliable) {
+	ClientChannelImpl chan = channelMap.get(new BYTEARRAY(chanID));
+	chan.dataReceived(from, data, reliable);
+    }
 
-	/**
-	 * loginRejected
-	 * 
-	 * 
-	 */
-	public void loginRejected(String message) {
-		listener.connectionRefused(message);
-	}
+    /*
+     * The below are all package private and intended just for use by
+     * ClientChannelImpl
+     */
 
-	/**
-	 * userAdded
-	 * 
-	 * @param userID
-	 *            ByteBuffer
-	 */
-	public void userAdded(byte[] userID) {
-		listener.userJoined(userID);
-	}
+    void sendUnicastData(byte[] chanID, byte[] to, ByteBuffer data,
+	    boolean reliable) {
+	umanager.sendUnicastMsg(chanID, to, data, reliable);
+    }
 
-	/**
-	 * userDropped
-	 * 
-	 * @param userID
-	 *            ByteBuffer
-	 */
-	public void userDropped(byte[] userID) {
-		listener.userLeft(userID);
-	}
+    void sendMulticastData(byte[] chanID, byte[][] to, ByteBuffer data,
+	    boolean reliable) {
+	umanager.sendMulticastMsg(chanID, to, data, reliable);
+    }
 
-	/**
-	 * newConnectionKeyIssued
-	 * 
-	 * @param key
-	 *            long
-	 */
-	public void newConnectionKeyIssued(byte[] key, long ttl) {
-		reconnectionKey = new byte[key.length];
-		System.arraycopy(key, 0, reconnectionKey, 0, key.length);
-		keyTimeout = System.currentTimeMillis() + (ttl * 1000);
-	}
+    void sendBroadcastData(byte[] chanID, ByteBuffer data, boolean reliable) {
+	umanager.sendBroadcastMsg(chanID, data, reliable);
+    }
 
-	public void joinedChannel(String name, byte[] channelID) {
-		ClientChannelImpl chan = new ClientChannelImpl(this, name, channelID);
-		channelMap.put(new BYTEARRAY(channelID), chan);
-		listener.joinedChannel(chan);
-	}
+    /* (non-Javadoc)
+     * @see com.sun.gi.comm.users.client.UserManagerClientListener#recvServerID(byte[])
+     */
+    public void recvServerID(byte[] user) {
+	server_id = user;
+    }
 
-	public void leftChannel(byte[] channelID) {
-		ClientChannelImpl chan = channelMap.remove(new BYTEARRAY(channelID));
-		chan.channelClosed();
+    public boolean isServerID(byte[] userid){
+	return Arrays.equals(userid, server_id);
+    }
 
-	}
+    public void closeChannel(byte[] channelID) {
+	umanager.leaveChannel(channelID);
+    }
 
-	public void userJoinedChannel(byte[] channelID, byte[] userID) {
-		ClientChannelImpl chan = channelMap.get(new BYTEARRAY(channelID));
-		chan.userJoined(userID);
-	}
-
-	public void userLeftChannel(byte[] channelID, byte[] userID) {
-		ClientChannelImpl chan = channelMap.get(new BYTEARRAY(channelID));
-		chan.userLeft(userID);
-
-	}
-
-	public void recvdData(byte[] chanID, byte[] from, ByteBuffer data,
-			boolean reliable) {
-		ClientChannelImpl chan = channelMap.get(new BYTEARRAY(chanID));
-		chan.dataReceived(from, data, reliable);
-	}
-
-	/*
-	 * The below are all package private and intended just for use by
-	 * ClientChannelImpl
-	 */
-
-	void sendUnicastData(byte[] chanID, byte[] to, ByteBuffer data,
-			boolean reliable) {
-		umanager.sendUnicastMsg(chanID, to, data, reliable);
-
-	}
-
-	void sendMulticastData(byte[] chanID, byte[][] to, ByteBuffer data,
-			boolean reliable) {
-		umanager.sendMulticastMsg(chanID, to, data, reliable);
-
-	}
-
-	void sendBroadcastData(byte[] chanID, ByteBuffer data, boolean reliable) {
-		umanager.sendBroadcastMsg(chanID, data, reliable);
-
-	}
-
-	/* (non-Javadoc)
-	 * @see com.sun.gi.comm.users.client.UserManagerClientListener#recvServerID(byte[])
-	 */
-	public void recvServerID(byte[] user) {
-		server_id = user;
-		
-	}
-	
-	public boolean isServerID(byte[] userid){
-		if (userid.length!=server_id.length){
-			return false;
-		}
-		for(int i=0;i<server_id.length;i++){
-			if (server_id[i]!=userid[i]){
-				return false;
-			}
-		}
-		return true;
-	}
-
-	/**
-	 * @param id
-	 */
-	public void closeChannel(byte[] channelID) {
-		umanager.leaveChannel(channelID);
-		
-	}
-	
-	/**
-	 * This method is called whenever an attempted join/leave fails due to 
-	 * the target channel being locked.
-	 * 
-	 * @param channelName		the name of the channel.
-	 * @param userID			the ID of the user attemping to join/leave
-	 */
-	public void channelLocked(String channelName, byte[] userID) {
-		listener.channelLocked(channelName, userID);
-	}
-
+    /**
+     * This method is called whenever an attempted join/leave fails due to
+     * the target channel being locked.
+     *
+     * @param channelName	the name of the channel.
+     * @param userID		the ID of the user attemping to join/leave
+     */
+    public void channelLocked(String channelName, byte[] userID) {
+	listener.channelLocked(channelName, userID);
+    }
 }

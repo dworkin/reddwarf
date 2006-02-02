@@ -1,6 +1,7 @@
 package com.sun.gi.comm.users.server.impl;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
@@ -47,14 +48,13 @@ public class TCPIPUserManager
     }
 
     private void init() throws InstantiationException {
-
-	log.info("Starting TCPIP User Manager on host " +
-	    host + " port " + port);
+	InetSocketAddress addr = new InetSocketAddress(host, port);
+	log.info("Starting TCPIP User Manager on " + addr);
 
 	try {
 	    socketMgr = new NIOSocketManager();
 	    socketMgr.addListener(this);
-	    socketMgr.acceptConnectionsOn(host, port);
+	    socketMgr.acceptConnectionsOn(addr);
 	} catch (Exception ex) {
 	    ex.printStackTrace();
 	    throw new InstantiationException(
@@ -117,21 +117,21 @@ public class TCPIPUserManager
 	});
     }
 
-    /*
-     * This callback method is not implemented because a UserManager never
-     * initiates a connection.
+    /**
+     * Not implemented, because a UserManager never initiates a connection.
      *
-     * @see  com.sun.gi.utils.nio.NIOSocketManagerListener#connected
+     * @throws UnsupportedOperationException
+     * @see    com.sun.gi.utils.nio.NIOSocketManagerListener#connected
      */
     public void connected(NIOConnection connection) {
 	throw new UnsupportedOperationException();
     }
 
-    /*
-     * This callback method is not implemented because a UserManager never
-     * initiates a connection
+    /**
+     * Not implemented, because a UserManager never initiates a connection.
      *
-     * @see  com.sun.gi.utils.nio.NIOSocketManagerListener#connectionFailed
+     * @throws UnsupportedOperationException
+     * @see    com.sun.gi.utils.nio.NIOSocketManagerListener#connectionFailed
      */
     public void connectionFailed(NIOConnection connection) {
 	throw new UnsupportedOperationException();

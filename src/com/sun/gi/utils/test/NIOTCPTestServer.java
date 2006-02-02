@@ -1,13 +1,15 @@
 package com.sun.gi.utils.test;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.ArrayList;
+
 import com.sun.gi.utils.nio.NIOSocketManager;
 import com.sun.gi.utils.nio.NIOSocketManagerListener;
 import com.sun.gi.utils.nio.NIOConnection;
 import com.sun.gi.utils.nio.NIOConnectionListener;
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.util.List;
-import java.util.ArrayList;
 
 public class NIOTCPTestServer
 	implements NIOSocketManagerListener, NIOConnectionListener {
@@ -22,7 +24,8 @@ public class NIOTCPTestServer
 	try {
 	    socketMgr = new NIOSocketManager();
 	    socketMgr.addListener(this);
-	    socketMgr.acceptConnectionsOn("localhost", 1138);
+	    socketMgr.acceptConnectionsOn(
+		new InetSocketAddress("localhost", 1138));
 	}
 	catch (IOException ex) {
 	    ex.printStackTrace();
@@ -42,32 +45,16 @@ public class NIOTCPTestServer
 	connections.add(connection);
     }
 
-    /**
-     * connected
-     *
-     * @param conn NIOConnection
-     */
     public void connected(NIOConnection conn) {
 	System.err.println("Weird, got connected callback");
     }
 
-    /**
-     * connectionFailed
-     *
-     * @param conn NIOConnection
-     */
     public void connectionFailed(NIOConnection conn) {
 	System.err.println("Weird, got connection failed callback");
     }
 
     // NIOChannelListener methods
 
-    /**
-     * packetReceived
-     *
-     * @param conn NIOConnection
-     * @param inputBuffer ByteBuffer
-     */
     public void packetReceived(NIOConnection conn, ByteBuffer inputBuffer) {
 	byte[] inbytes = new byte[inputBuffer.remaining()];
 	inputBuffer.get(inbytes);
@@ -85,11 +72,6 @@ public class NIOTCPTestServer
 	}
     }
 
-    /**
-     * disconnected
-     *
-     * @param nIOConnection NIOConnection
-     */
     public void disconnected(NIOConnection conn) {
 	System.err.println("Socket disconnected!");
 	connections.remove(conn);

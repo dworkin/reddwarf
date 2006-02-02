@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project basedir="." default="build" name="SGSatLabs">
+
+    <target name="help">
+	<echo message="Please run: $ ant -v -projecthelp"/>
+    </target>
+
+    <property name="debug"      value="true"/>
+    <property name="optimize"   value="true"/>
+    <property name="deprecated" value="true"/>
+
+    <path id="project.classpath">
+        <pathelement location="bin"/>
+        <pathelement location="support/JRMS/jrms1.1/classes.jar"/>
+        <pathelement location="support/db-derby-10.1.2.1-bin/lib/derby.jar"/>
+    </path>
+
+    <target name="init">
+        <mkdir dir="bin"/>
+        <mkdir dir="doc"/>
+    </target>
+
+    <target name="clean">
+        <delete dir="bin"/>
+        <delete dir="doc"/>
+    </target>
+
+    <target name="docs" depends="javadocs,doxygen"/>
+
+    <target name="doxygen">
+	<exec executable="doxygen">
+	    <arg value="java.doxygen"/>
+	</exec>
+    </target>
+
+    <target name="javadocs">
+        <javadoc destdir="doc" sourcepath="src" classpathref="project.classpath" access="private">
+	  <package name="com.sun.gi.*"/>
+	  <tag name="todo" description="To do:"/>
+	</javadoc>
+    </target>
+
+    <target name="build" depends="init">
+        <echo message="${ant.project.name}: ${ant.file}"/>
+        <javac destdir="bin" source="5" target="5"
+	  debug="${debug}" optimize="${optimize}"
+	  deprecation="${deprecated}">
+	    <compilerarg value="-Xlint:unchecked"/>
+            <src path="src"/>
+            <classpath refid="project.classpath"/>
+        </javac>
+    </target>
+
+    <target name="SGS at Labs Clean">
+        <java classname="com.sun.gi.SGS" failonerror="true" fork="yes">
+            <arg value="-C"/>
+            <arg value="-V"/>
+	    <arg value="-Djava.util.logging.config.file=logging.properties"/>
+            <classpath refid="project.classpath"/>
+        </java>
+    </target>
+
+    <target name="ChatTestClient">
+        <java classname="com.sun.gi.apps.commtest.client.ChatTestClient" failonerror="true" fork="yes">
+	    <arg value="-Djava.util.logging.config.file=logging.properties"/>
+            <classpath refid="project.classpath"/>
+        </java>
+    </target>
+
+    <target name="SGS 2 at Labs">
+        <java classname="com.sun.gi.SGS" failonerror="true" fork="yes">
+	    <arg value="-Djava.util.logging.config.file=logging.properties"/>
+            <arg value="file:Install2.txt"/>
+            <classpath refid="project.classpath"/>
+        </java>
+    </target>
+
+    <target name="ChatTestClient (1)">
+        <java classname="com.sun.gi.apps.commtest.client.ChatTestClient" failonerror="true" fork="yes">
+	    <arg value="-Djava.util.logging.config.file=logging.properties"/>
+            <classpath refid="project.classpath"/>
+        </java>
+    </target>
+
+</project>

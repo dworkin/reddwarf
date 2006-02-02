@@ -33,9 +33,7 @@ public interface TimerManager {
 	 * object of the app and always run local to the slice they are registered on.  
 	 * We have provided a destributed and persistant timer GLO library runs of this local timer
 	 * in app space to allow for destributed processing of persistant events.
-	 * 
-	 * @see com.sun.gi.gloutils.Timer
-	 * 
+	 * <p>
 	 * The system will make a best-effort to queue the task as close to the requested 
 	 * time as possible.  Note that actual execution is then up to the code that handles
 	 * executing queued tasks.
@@ -45,13 +43,16 @@ public interface TimerManager {
 	 * of that tick.  (eg, a 500 ms request at the default tick rate of 1sec (1000ms) will mean
 	 * an actual event frequency of approximately 1/sec.)
 	 * 
-	 * @param tid The timer event ID of this event
-	 * @param sim The simulation who is requesting this timer event
+	 * @see com.sun.gi.gloutils.pdtimer.PDTimer
+	 * 
+	 * @param tid     the timer event ID of this event
+	 * @param sim     the simulation who is requesting this timer event
 	 * @param access 
 	 * @param startObjectID ID of a GLO that implements TimerManagerListener to receive the event
-	 * @param delay The time in ns to delay before queuint the event.
-	 * @param repeat If false, this is a one shot, else it repeats
-	 * @returns an ID for the event
+	 * @param delay   the time in ns to delay before queuint the event.
+	 * @param repeat  if false, this is a one shot, else it repeats
+	 *
+	 * @return an ID for the event
 	 */
 	public long registerEvent(long tid, Simulation sim, ACCESS_TYPE access, long startObjectID, long delay, boolean repeat);
 	

@@ -3,10 +3,12 @@ package com.sun.gi.utils.test;
 import com.sun.gi.utils.nio.NIOSocketManager;
 import com.sun.gi.utils.nio.NIOConnectionListener;
 import com.sun.gi.utils.nio.NIOConnection;
-import java.nio.ByteBuffer;
+
 import java.io.InputStreamReader;
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
 
 public class NIOTCPTestClient implements NIOConnectionListener {
 
@@ -24,7 +26,8 @@ public class NIOTCPTestClient implements NIOConnectionListener {
 	    ex1.printStackTrace();
 	    System.exit(1);
 	}
-	conn = socketManager.makeConnectionTo("localhost",1138);
+	conn = socketManager.makeConnectionTo(
+	    new InetSocketAddress("localhost", 1138));
 	conn.addListener(this);
 	BufferedReader rdr =
 	    new BufferedReader(new InputStreamReader(System.in));

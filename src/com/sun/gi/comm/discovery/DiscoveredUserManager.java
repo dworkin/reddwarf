@@ -1,5 +1,7 @@
 package com.sun.gi.comm.discovery;
 
+import java.util.Map;
+
 /**
  * <p>Title: </p>
  * <p>Description: </p>
@@ -8,8 +10,11 @@ package com.sun.gi.comm.discovery;
  * @author not attributable
  * @version 1.0
  */
-
 public interface DiscoveredUserManager {
-  public String getClientClass();
-  public String getParameter(String tag);
+
+    public String getClientClass();
+
+    public String getParameter(String tag);
+
+    public Map<String, String> getParameters();
 }

@@ -1,13 +1,25 @@
 package com.sun.gi.utils.nio;
 
-import java.io.*;
-import java.net.*;
-import java.nio.channels.*;
-import java.util.*;
+import java.io.IOException;
+import java.net.SocketAddress;
+import java.net.Socket;
+import java.net.DatagramSocket;
+import java.nio.channels.Selector;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.DatagramChannel;
+import java.nio.channels.SocketChannel;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.ClosedChannelException;
+import java.util.Iterator;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.List;
+import java.util.ArrayList;
 import java.util.logging.Logger;
-import java.nio.channels.spi.SelectorProvider;
 
 import java.lang.reflect.Method;
+import java.nio.channels.spi.SelectorProvider;
 import sun.nio.ch.DefaultSelectorProvider;
 
 // @todo Non-blocking writes
@@ -61,15 +73,14 @@ public class NIOSocketManager implements Runnable {
 	new Thread(this).start();
     }
 
-    public void acceptConnectionsOn(String host, int port)
+    public void acceptConnectionsOn(SocketAddress addr)
 	    throws IOException {
 	log.entering("NIOSocketManager", "acceptConnectionsOn");
 
 	ServerSocketChannel channel =
 	    selectorProvider.openServerSocketChannel();
 	channel.configureBlocking(false);
-	InetSocketAddress local_addr = new InetSocketAddress(host, port);
-	channel.socket().bind(local_addr);
+	channel.socket().bind(addr);
 
 	synchronized (acceptorQueue) {
 	    acceptorQueue.add(channel);
@@ -79,15 +90,13 @@ public class NIOSocketManager implements Runnable {
 	log.exiting("NIOSocketManager", "acceptConnectionsOn");
     }
 
-    public NIOConnection makeConnectionTo(String host, int port) {
+    public NIOConnection makeConnectionTo(SocketAddress addr) {
 	log.entering("NIOSocketManager", "makeConnectionTo");
-
-	InetSocketAddress remote_addr = new InetSocketAddress(host, port);
 
 	try {
 	    SocketChannel sc = selectorProvider.openSocketChannel();
 	    sc.configureBlocking(false);
-	    sc.connect(remote_addr);
+	    sc.connect(addr);
 
 	    DatagramChannel dchan = selectorProvider.openDatagramChannel();
 	    dchan.configureBlocking(false);

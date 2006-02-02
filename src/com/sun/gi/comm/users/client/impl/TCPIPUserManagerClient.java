@@ -1,7 +1,10 @@
 package com.sun.gi.comm.users.client.impl;
 
 import java.io.IOException;
+import java.net.SocketAddress;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.util.Map;
 import java.util.logging.Logger;
 
 import javax.security.auth.callback.Callback;
@@ -34,7 +37,6 @@ import com.sun.gi.utils.nio.NIOConnection;
  *
  * @version 1.0
  */
-
 public class TCPIPUserManagerClient
     implements UserManagerClient,
 	       NIOSocketManagerListener,
@@ -60,6 +62,21 @@ public class TCPIPUserManagerClient
 	} catch (IOException ex) {
 	    throw new InstantiationException(ex.getMessage());
 	}
+    }
+
+    public boolean connect(SocketAddress addr,
+			   UserManagerClientListener listener) {
+	log.entering("TCPUserManagerClient", "connect",
+	    new Object[] { addr, listener });
+
+	this.listener = listener;
+
+	log.info("Attempting to connect to a TCPIP User Manager on " + addr);
+
+	boolean retval = (mgr.makeConnectionTo(addr) != null);
+	log.exiting("TCPUserManagerClient", "connect", retval);
+
+	return retval;
     }
 
     // NIOSocketManagerListener methods
@@ -176,20 +193,20 @@ public class TCPIPUserManagerClient
 
     public boolean connect(DiscoveredUserManager choice,
 	    UserManagerClientListener listener) {
-	log.entering("TCPUserManagerClient", "connect",
-	    new Object[] { choice, listener });
 
-	this.listener = listener;
 	String host = choice.getParameter("host");
 	int port = Integer.parseInt(choice.getParameter("port"));
 
-	log.info("Attempting to connect to a TCPIP User Manager" +
-		" on host " + host + " port " + port);
+	return connect(new InetSocketAddress(host, port), listener);
+    }
 
-	boolean retval = (mgr.makeConnectionTo(host, port) != null);
-	log.exiting("TCPUserManagerClient", "connect", retval);
+    public boolean connect(Map<String, String> params,
+	    UserManagerClientListener listener) {
 
-	return retval;
+	String host = params.get("host");
+	int port = Integer.parseInt(params.get("port"));
+
+	return connect(new InetSocketAddress(host, port), listener);
     }
 
     public void login() {
