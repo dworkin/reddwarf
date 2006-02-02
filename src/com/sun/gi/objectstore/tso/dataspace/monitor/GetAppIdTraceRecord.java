@@ -15,12 +15,18 @@ public class GetAppIdTraceRecord extends TraceRecord implements Serializable {
 	this.id = id;
     }
 
-    public void replay(DataSpace dataSpace) {
+    public void replay(DataSpace dataSpace, ReplayState replayState) {
 	long id = dataSpace.getAppID();
+
+	// Maybe it's not an error if the replay dataspace does not
+	// know its AppId? -DJE
+
 	if (id != this.id) {
-	    // XXX: ??
+	    System.out.println("Contradiction: old appId = " + this.id +
+		    " new = " + id);
 	}
     }
+
     private void readObject(ObjectInputStream in)   
 	    throws IOException, ClassNotFoundException
     {

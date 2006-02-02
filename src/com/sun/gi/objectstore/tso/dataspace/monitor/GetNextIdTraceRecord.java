@@ -15,10 +15,14 @@ public class GetNextIdTraceRecord extends TraceRecord implements Serializable {
 	this.id = id;
     }
 
-    public void replay(DataSpace dataSpace) {
-	long id = dataSpace.getNextID();
-	if (id != this.id) {
-	    // XXX ??
+    public void replay(DataSpace dataSpace, ReplayState replayState) {
+	// OK.
+	long newId = dataSpace.getNextID();
+
+	if (!replayState.setOidMap(this.id, newId)) {
+	    System.out.println("Contradiction: old = " + this.id +
+		    " new = " + newId +
+		    " prev = " + replayState.getMappedOid(this.id));
 	}
     }
     private void readObject(ObjectInputStream in)   

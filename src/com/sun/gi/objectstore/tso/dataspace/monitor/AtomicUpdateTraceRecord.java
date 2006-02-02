@@ -35,20 +35,44 @@ public class AtomicUpdateTraceRecord extends TraceRecord implements Serializable
 	}
     }
 
-    public void replay(DataSpace dataSpace) {
-	Map<Long, byte[]> dummys = new HashMap<Long, byte[]>();
+    public void replay(DataSpace dataSpace, ReplayState replayState) {
 
+	HashSet<Long> mappedDeleteSet = new HashSet<Long>();
+	for (long oid : deleteSet) {
+	    long mappedOid = replayState.getMappedOid(oid);
+	    if (mappedOid == DataSpace.INVALID_ID) {
+		System.out.println("Unknown deleted OID in atomicUpdate replay");
+	    } else {
+		mappedDeleteSet.add(mappedOid);
+	    }
+	}
+
+	Map<Long, byte[]> mappedUpdateMap = new HashMap<Long, byte[]>();
 	for (Long oid : updateMap.keySet()) {
-	    dummys.put(oid, new byte[updateMap.get(oid)]);
+	    long mappedOid = replayState.getMappedOid(oid);
+	    if (mappedOid == DataSpace.INVALID_ID) {
+		System.out.println("Unknown updated OID in atomicUpdate replay");
+	    } else {
+		mappedUpdateMap.put(mappedOid, new byte[updateMap.get(oid)]);
+	    }
+	}
+
+	HashSet<Long> mappedInsertSet = new HashSet<Long>();
+	for (long oid : insertSet) {
+	    long mappedOid = replayState.getMappedOid(oid);
+	    if (mappedOid == DataSpace.INVALID_ID) {
+		System.out.println("Unknown inserted OID in atomicUpdate replay");
+	    } else {
+		mappedInsertSet.add(mappedOid);
+	    }
 	}
 
 	try {
-	    dataSpace.atomicUpdate(clear, newNames, deleteSet,
-		    dummys, insertSet);
+	    dataSpace.atomicUpdate(clear, newNames, mappedDeleteSet,
+		    mappedUpdateMap, mappedInsertSet);
 	} catch (DataSpaceClosedException e) {
 	    // XXX: unexpected
 	}
-
     }
 
     private void readObject(ObjectInputStream in)   

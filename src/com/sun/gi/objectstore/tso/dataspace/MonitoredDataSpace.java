@@ -255,9 +255,19 @@ public class MonitoredDataSpace implements DataSpace {
      */
     private synchronized void log(TraceRecord entry) {
 	if (loggingEnabled() && (entryLog != null)) {
+
+	    /*
+	     * Note:  it is not expected that the objects will not
+	     * reference each other, so the stream is reset after
+	     * each.  If it is not reset periodically, the
+	     * ObjectOutputStream will keep a reference to everything
+	     * it has ever written, and quickly sponge up all of
+	     * memory.
+	     */
+
 	    try {
 		entryLog.writeObject(entry);
-		entryLog.flush();
+		entryLog.reset();
 	    } catch (IOException e) {
 
 		// XXX: should do something intelligent.  Doesn't.

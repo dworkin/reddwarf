@@ -16,11 +16,14 @@ public class LockTraceRecord extends TraceRecord implements Serializable {
 	this.id = id;
     }
 
-    public void replay(DataSpace dataSpace) {
+    public void replay(DataSpace dataSpace, ReplayState replayState) {
+	// OK.
+	long mappedId = replayState.getMappedOid(this.id);
+
 	try {
-	    dataSpace.lock(id);
+	    dataSpace.lock(mappedId);
 	} catch (NonExistantObjectIDException e) {
-	    // unexpected;
+	    System.out.println("Contradiction: oid " +  this.id + " not found");
 	}
     }
     private void readObject(ObjectInputStream in)   

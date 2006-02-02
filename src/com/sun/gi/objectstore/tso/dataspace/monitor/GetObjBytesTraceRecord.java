@@ -17,12 +17,20 @@ public class GetObjBytesTraceRecord extends TraceRecord implements Serializable 
 	this.length = length;
     }
 
-    public void replay(DataSpace dataSpace) {
-	byte[] res = dataSpace.getObjBytes(id);
-	if (res.length != length) {
-	    // XXX ??
+    public void replay(DataSpace dataSpace, ReplayState replayState) {
+	// OK
+	long mappedId = replayState.getMappedOid(this.id);
+	// check return.
+
+	byte[] res = dataSpace.getObjBytes(mappedId);
+
+	if (res.length != this.length) {
+	    System.out.println("Contradiction: oid " + mappedId +
+		    " length = " + this.length +
+		    " new length = " + res.length);
 	}
     }
+
     private void readObject(ObjectInputStream in)   
 	    throws IOException, ClassNotFoundException
     {

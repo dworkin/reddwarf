@@ -7,6 +7,7 @@ import java.io.ObjectStreamException;
 import java.io.InvalidObjectException;
 
 public abstract class TraceRecord implements Serializable {
+    private static final long serialVersionUID = 1L;
     private long startTime;
     private long endTime;
 
@@ -78,8 +79,12 @@ public abstract class TraceRecord implements Serializable {
      *
      * @param dataSpace the DataSpace on which to execute the
      * operation
+     *
+     * @param replayState the state of the replay, including the mapping
+     * between each object identifiers in the original trace and its
+     * values during replay 
      */
-    public abstract void replay(DataSpace dataSpace);
+    public abstract void replay(DataSpace dataSpace, ReplayState replayState);
 
     /** 
      * Causes deserialization to fail if there is no data for this

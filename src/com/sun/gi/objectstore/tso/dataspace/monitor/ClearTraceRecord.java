@@ -15,7 +15,8 @@ public class ClearTraceRecord extends TraceRecord implements Serializable {
 	super(startTime);
     }
 
-    public void replay(DataSpace dataSpace) {
+    public void replay(DataSpace dataSpace, ReplayState replayState) {
+	// OK.
 	dataSpace.clear();
     }
 

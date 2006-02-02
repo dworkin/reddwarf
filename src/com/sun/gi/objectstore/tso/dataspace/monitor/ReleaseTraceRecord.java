@@ -15,8 +15,12 @@ public class ReleaseTraceRecord extends TraceRecord implements Serializable {
 	this.id = id;
     }
 
-    public void replay(DataSpace dataSpace) {
-	dataSpace.release(id);
+    public void replay(DataSpace dataSpace, ReplayState replayState) {
+	// OK.
+	long mappedId = replayState.getMappedOid(this.id);
+	// check?
+
+	dataSpace.release(mappedId);
     }
     private void readObject(ObjectInputStream in)   
 	    throws IOException, ClassNotFoundException

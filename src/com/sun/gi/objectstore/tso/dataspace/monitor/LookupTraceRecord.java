@@ -17,12 +17,18 @@ public class LookupTraceRecord extends TraceRecord implements Serializable {
 	this.name = name;
     }
 
-    public void replay(DataSpace dataSpace) {
-	long id = dataSpace.lookup(name);
-	if (id != this.id) {
-	    // XXX: ??
+    public void replay(DataSpace dataSpace, ReplayState replayState) {
+	// OK.
+	long gotId = dataSpace.lookup(name);
+	long expectedId = replayState.getMappedOid(this.id);
+	// check return (but *can* fail, because lookup can fail)
+
+	if (gotId != expectedId) {
+	    System.out.println("Contradiction: name = (" + name + ")" +
+		    " expected oid = " + expectedId + " got = " + gotId);
 	}
     }
+
     private void readObject(ObjectInputStream in)   
 	    throws IOException, ClassNotFoundException
     {

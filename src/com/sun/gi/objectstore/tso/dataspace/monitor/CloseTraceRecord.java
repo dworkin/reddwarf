@@ -13,7 +13,8 @@ public class CloseTraceRecord extends TraceRecord implements Serializable {
 	super(startTime);
     }
 
-    public void replay(DataSpace dataSpace) {
+    public void replay(DataSpace dataSpace, ReplayState replayState) {
+	// OK.
 	dataSpace.close();
     }
     private void readObject(ObjectInputStream in)   

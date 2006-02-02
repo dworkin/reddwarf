@@ -337,6 +337,7 @@ public class HadbDataSpace implements DataSpace {
 	    stmnt = conn.prepareStatement(s);
 	    stmnt.execute();
 	} catch (Exception e) {
+	    // XXX
 	}
 
 	System.out.println("Creating Objects table");
@@ -348,6 +349,7 @@ public class HadbDataSpace implements DataSpace {
 	    stmnt = conn.prepareStatement(s);
 	    stmnt.execute();
 	} catch (Exception e) {
+	    // XXX
 	}
     }
 
@@ -397,6 +399,12 @@ public class HadbDataSpace implements DataSpace {
 	 * Id is allocated and returned.  Otherwise, a new block is accessed
 	 * from the database.
 	 */
+
+     /*
+	Statement getNextId = conn.executableStatement(
+		"SELECT OID FROM IDSUSEDTABLE");
+      */
+
 
 	synchronized (idMutex) {
 	    if (currentIdBlockOffset == idBlockSize) {
