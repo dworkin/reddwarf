@@ -7,9 +7,9 @@ import java.net.DatagramSocket;
 import java.nio.channels.Selector;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.DatagramChannel;
+import java.nio.channels.SelectableChannel;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.ClosedChannelException;
 import java.util.Iterator;
 import java.util.Set;
@@ -18,57 +18,37 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.logging.Logger;
 
-import java.lang.reflect.Method;
-import java.nio.channels.spi.SelectorProvider;
-import sun.nio.ch.DefaultSelectorProvider;
-
-// @todo Non-blocking writes
+import static java.nio.channels.SelectionKey.*;
 
 public class NIOSocketManager implements Runnable {
 
     private static Logger log = Logger.getLogger("com.sun.gi.utils.nio");
 
     private Selector selector;
+
+    private int initialInputBuffSz;
+
     private Set<NIOSocketManagerListener> listeners =
 	new TreeSet<NIOSocketManagerListener>();
-    private int initialInputBuffSz;
+
     private List<NIOConnection> initiatorQueue =
 	new ArrayList<NIOConnection>();
+
     private List<NIOConnection> receiverQueue =
 	new ArrayList<NIOConnection>();
+
     private List<ServerSocketChannel> acceptorQueue =
 	new ArrayList<ServerSocketChannel>();
-    private static SelectorProvider selectorProvider;
 
-    static {
-	//DefaultSelectorProvider foo;
-	try {
-	    if (System.getProperty("sgs.nio.forceprovider") != null) {
-		Class selectorProviderClass =
-		    Class.forName("sun.nio.ch.DefaultSelectorProvider");
-		if (selectorProviderClass == null) {
-		    log.warning("Cannot find default provider; cannot force.");
-		    System.exit(8001); // XXX Don't exit
-		}
-		Method factory =
-		    selectorProviderClass.getMethod("create", new Class[] {});
-		selectorProvider = (SelectorProvider) factory.invoke(null);
-	    } else {
-		selectorProvider = SelectorProvider.provider();
-	    }
-	} catch (Exception e) {
-	    e.printStackTrace();
-	    System.exit(8001);         // XXX Don't exit
-	}
-	log.info("selectorProvider = " + selectorProvider);
-    }
+    private List<SelectableChannel> writeQueue =
+	new ArrayList<SelectableChannel>();
 
     public NIOSocketManager() throws IOException {
 	this(64 * 1024);
     }
 
     public NIOSocketManager(int inputBufferSize) throws IOException {
-	selector = selectorProvider.openSelector();
+	selector = Selector.open();
 	initialInputBuffSz = inputBufferSize;
 	new Thread(this).start();
     }
@@ -77,8 +57,7 @@ public class NIOSocketManager implements Runnable {
 	    throws IOException {
 	log.entering("NIOSocketManager", "acceptConnectionsOn");
 
-	ServerSocketChannel channel =
-	    selectorProvider.openServerSocketChannel();
+	ServerSocketChannel channel = ServerSocketChannel.open();
 	channel.configureBlocking(false);
 	channel.socket().bind(addr);
 
@@ -94,15 +73,15 @@ public class NIOSocketManager implements Runnable {
 	log.entering("NIOSocketManager", "makeConnectionTo");
 
 	try {
-	    SocketChannel sc = selectorProvider.openSocketChannel();
+	    SocketChannel sc = SocketChannel.open();
 	    sc.configureBlocking(false);
 	    sc.connect(addr);
 
-	    DatagramChannel dchan = selectorProvider.openDatagramChannel();
-	    dchan.configureBlocking(false);
+	    DatagramChannel dc = DatagramChannel.open();
+	    dc.configureBlocking(false);
 
 	    NIOConnection conn =
-		new NIOConnection(sc, dchan, initialInputBuffSz);
+		new NIOConnection(this, sc, dc, initialInputBuffSz);
 
 	    synchronized (initiatorQueue) {
 		initiatorQueue.add(conn);
@@ -129,7 +108,7 @@ public class NIOSocketManager implements Runnable {
 	    synchronized (initiatorQueue) {
 		for (NIOConnection conn : initiatorQueue) {
 		    try {
-			conn.open(selector, SelectionKey.OP_CONNECT);
+			conn.registerConnect(selector);
 		    }
 		    catch (IOException ex) {
 			ex.printStackTrace();
@@ -141,7 +120,7 @@ public class NIOSocketManager implements Runnable {
 	    synchronized (receiverQueue) {
 		for (NIOConnection conn : receiverQueue) {
 		    try {
-			conn.open(selector, SelectionKey.OP_READ);
+			conn.open(selector);
 		    }
 		    catch (IOException ex) {
 			ex.printStackTrace();
@@ -153,13 +132,21 @@ public class NIOSocketManager implements Runnable {
 	    synchronized (acceptorQueue) {
 		for (ServerSocketChannel chan : acceptorQueue) {
 		    try {
-			chan.register(selector, SelectionKey.OP_ACCEPT);
+			chan.register(selector, OP_ACCEPT);
 		    }
 		    catch (ClosedChannelException ex2) {
 			ex2.printStackTrace();
 		    }
 		}
 		acceptorQueue.clear();
+	    }
+
+	    synchronized (writeQueue) {
+		for (SelectableChannel chan : writeQueue) {
+		    SelectionKey key = chan.keyFor(selector);
+		    key.interestOps(key.interestOps() | OP_WRITE);
+		}
+		writeQueue.clear();
 	    }
 
 	    if (! selector.isOpen())
@@ -201,50 +188,54 @@ public class NIOSocketManager implements Runnable {
 	    // Remove current entry
 	    i.remove();
 
-	    // for accepting connections
 	    if (key.isValid() && key.isAcceptable()) {
-		processAccept(selector, key);
+		handleAccept(key);
 	    }
 
-	    //for reading from connections.
-	    if (key.isValid() && key.isReadable()) {
-		processInput(key);
-	    }
-
-	    // to finish the connecting process
 	    if (key.isValid() && key.isConnectable()) {
-		processConnect(key);
+		handleConnect(key);
+	    }
+
+	    if (key.isValid() && key.isReadable()) {
+		handleRead(key);
+	    }
+
+	    if (key.isValid() && key.isWritable()) {
+		handleWrite(key);
 	    }
 	}
 
 	log.exiting("NIOSocketManager", "processSocketEvents");
     }
 
-    /**
-     * processInput
-     *
-     * @param key SelectionKey
-     */
-    private void processInput(SelectionKey key) {
-	log.entering("NIOSocketManager", "processInput");
-	NIOConnection conn = (NIOConnection) key.attachment();
+    private void handleRead(SelectionKey key) {
+	log.entering("NIOSocketManager", "handleRead");
+	ReadWriteSelectorHandler h =
+	    (ReadWriteSelectorHandler) key.attachment();
 	try {
-	    conn.dataArrived((ReadableByteChannel) key.channel());
+	    h.handleRead(key);
 	} catch (IOException ex) {
-	    conn.disconnect();
+	    h.handleClose();
 	} finally {
-	    log.exiting("NIOSocketManager", "processInput");
+	    log.exiting("NIOSocketManager", "handleRead");
 	}
     }
 
-    /**
-     * processAccept
-     *
-     * @param selector Selector
-     * @param key SelectionKey
-     */
-    private void processAccept(Selector selector, SelectionKey key) {
-	log.entering("NIOSocketManager", "processAccept");
+    private void handleWrite(SelectionKey key) {
+	log.entering("NIOSocketManager", "handleWrite");
+	ReadWriteSelectorHandler h =
+	    (ReadWriteSelectorHandler) key.attachment();
+	try {
+	    h.handleWrite(key);
+	} catch (IOException ex) {
+	    h.handleClose();
+	} finally {
+	    log.exiting("NIOSocketManager", "handleWrite");
+	}
+    }
+
+    private void handleAccept(SelectionKey key) {
+	log.entering("NIOSocketManager", "handleAccept");
 	// Get channel
 	ServerSocketChannel serverChannel =
 	    (ServerSocketChannel) key.channel();
@@ -262,17 +253,17 @@ public class NIOSocketManager implements Runnable {
 
 	    // Now create a UDP channel for this endpoint
 
-	    DatagramChannel dchan = selectorProvider.openDatagramChannel();
-	    conn = new NIOConnection(sc, dchan, initialInputBuffSz);
+	    DatagramChannel dc = DatagramChannel.open();
+	    conn = new NIOConnection(this, sc, dc, initialInputBuffSz);
 
-	    dchan.socket().setReuseAddress(true);
-	    dchan.configureBlocking(false);
-	    dchan.socket().bind(sc.socket().getLocalSocketAddress());
-	    dchan.connect(sc.socket().getRemoteSocketAddress());
+	    dc.socket().setReuseAddress(true);
+	    dc.configureBlocking(false);
+	    dc.socket().bind(sc.socket().getLocalSocketAddress());
+	    dc.connect(sc.socket().getRemoteSocketAddress());
 
 	    log.finest("udp local " +
-		dchan.socket().getLocalSocketAddress() +
-		" remote " + dchan.socket().getRemoteSocketAddress());
+		dc.socket().getLocalSocketAddress() +
+		" remote " + dc.socket().getRemoteSocketAddress());
 
 	    synchronized (receiverQueue) {
 		receiverQueue.add(conn);
@@ -287,17 +278,17 @@ public class NIOSocketManager implements Runnable {
 		conn.disconnect();
 	    }
 	} finally {
-	    log.exiting("NIOSocketManager", "processAccept");
+	    log.exiting("NIOSocketManager", "handleAccept");
 	}
     }
 
-    /**
-     * processConnect
-     *
-     * @param key SelectionKey
-     */
-    private void processConnect(SelectionKey key) {
-	log.entering("NIOSocketManager", "processConnect");
+    public void enableWrite(SelectableChannel chan) {
+	writeQueue.add(chan);
+	selector.wakeup();
+    }
+
+    private void handleConnect(SelectionKey key) {
+	log.entering("NIOSocketManager", "handleConnect");
 
 	NIOConnection conn = (NIOConnection) key.attachment();
 	try {
@@ -312,7 +303,7 @@ public class NIOSocketManager implements Runnable {
 		l.connectionFailed(conn);
 	    }
 	} finally {
-	    log.exiting("NIOSocketManager", "processConnect");
+	    log.exiting("NIOSocketManager", "handleConnect");
 	}
     }
 

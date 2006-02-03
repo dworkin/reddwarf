@@ -45,7 +45,7 @@
         <javac destdir="bin" source="5" target="5"
 	  debug="${debug}" optimize="${optimize}"
 	  deprecation="${deprecated}">
-	    <compilerarg value="-Xlint:unchecked"/>
+	    <!-- <compilerarg value="-Xlint:unchecked"/> -->
             <src path="src"/>
             <classpath refid="project.classpath"/>
         </javac>

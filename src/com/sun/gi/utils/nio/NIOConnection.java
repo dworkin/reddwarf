@@ -1,8 +1,10 @@
 package com.sun.gi.utils.nio;
 
 import java.io.*;
+import java.net.*;
 import java.nio.*;
 import java.nio.channels.*;
+import static java.nio.channels.SelectionKey.*;
 import java.util.*;
 import java.util.logging.Logger;
 
@@ -16,12 +18,13 @@ import java.util.logging.Logger;
  * @version 1.0
  * @todo Set SO_RCVBUF and SO_SNDBUF on the channels
  */
-public class NIOConnection {
+public class NIOConnection implements SelectorHandler {
 
     private static Logger log = Logger.getLogger("com.sun.gi.utils.nio");
 
-    protected final SocketChannel   reliableChannel;
-    protected final DatagramChannel unreliableChannel;
+    protected final NIOSocketManager socketManager;
+    protected final PacketHandler    tcpHandler;
+    protected final PacketHandler    udpHandler;
 
     // made available for filling by the manager
     protected ByteBuffer inputBuffer;
@@ -29,104 +32,202 @@ public class NIOConnection {
     protected ByteBuffer sizeHeader ;
     protected int currentPacketSize = -1;
     protected ByteBuffer outputHeader = ByteBuffer.allocate(4);
-    protected Set<NIOConnectionListener> listeners =
+
+    Set<NIOConnectionListener> listeners =
 	new TreeSet<NIOConnectionListener>();
 
-    // package private factory
+    public NIOConnection(NIOSocketManager mgr,
+			 SocketChannel    sockChannel,
+			 DatagramChannel  dgramChannel,
+			 int bufSize) {
 
-    public NIOConnection(SocketChannel reliableChan,
-			 DatagramChannel unreliableChan,
-			 int initialMaxPacketSize) {
-	reliableChannel = reliableChan;
-	unreliableChannel = unreliableChan;
-	inputBuffer = ByteBuffer.allocate(initialMaxPacketSize);
-	sizeHeader = ByteBuffer.allocate(4);
+	socketManager = mgr;
+
+	tcpHandler = new PacketHandler(this, sockChannel, bufSize);
+	udpHandler = new PacketHandler(this, dgramChannel, bufSize);
     }
 
-    public void open(Selector selector, int ops) throws IOException {
-	log.entering("NIOConnection", "open");
-	reliableChannel.register(selector, ops, this);
-	if ((ops & SelectionKey.OP_READ) != 0) {
-	    unreliableChannel.register(selector, SelectionKey.OP_READ, this);
-	}
-	log.exiting("NIOConnection", "open");
+    public void open(Selector sel) throws IOException {
+	tcpHandler.open(sel);
+	udpHandler.open(sel);
+    }
+
+    public void registerConnect(Selector sel) throws IOException {
+	tcpHandler.channel.register(sel, OP_CONNECT, this);
     }
 
     public void processConnect(SelectionKey key) throws IOException {
-	if (reliableChannel.finishConnect()) {
-	    key.interestOps(SelectionKey.OP_READ);
+	SocketChannel sc = (SocketChannel) key.channel();
+	if (sc.finishConnect()) {
+	    tcpHandler.open(key.selector());
+	    Socket sock = sc.socket();
 
 	    // Point the UDP channel to the right endpoint
-	    unreliableChannel.socket().bind(
-		reliableChannel.socket().getLocalSocketAddress());
-	    unreliableChannel.connect(
-		reliableChannel.socket().getRemoteSocketAddress());
-	    unreliableChannel.register(key.selector(),
-		SelectionKey.OP_READ, this);
-
-	    log.finest("udp local " +
-		unreliableChannel.socket().getLocalSocketAddress() +
-		" remote " +
-		unreliableChannel.socket().getRemoteSocketAddress());
+	    DatagramChannel dc = (DatagramChannel) udpHandler.channel;
+	    DatagramSocket ds = dc.socket();
+	    ds.bind(sock.getLocalSocketAddress());
+	    dc.connect(sock.getRemoteSocketAddress());
+	    udpHandler.open(key.selector());
+	}
+    }
+    
+    void packetReceived(ByteBuffer pkt) {
+	for (NIOConnectionListener l : listeners) {
+	    l.packetReceived(this, pkt);
 	}
     }
 
-    /**
-     * dataArrived
-     */
-    public void dataArrived(ReadableByteChannel chan) throws IOException {
-	log.entering("NIOConnection", "dataArrived");
-	int bytesRead=-1;
-	if (!chan.isOpen()){
-	    IOException e = new IOException("not open");
-	    log.throwing("NIOConnection", "dataArrived", e);
-	    throw e;
+    class PacketHandler
+	    implements ReadWriteSelectorHandler {
+
+	final NIOConnection parent;
+	final SelectableChannel channel;
+	final ByteBuffer sendBuffer;
+	final ByteBuffer recvBuffer;
+
+	protected int nextRecvPacketLen = 0;
+	protected SelectionKey key = null;
+
+	public PacketHandler(NIOConnection conn,
+		SelectableChannel chan, int bufSize) {
+	    parent = conn;
+	    channel = chan;
+	    sendBuffer = ByteBuffer.allocateDirect(bufSize);
+	    recvBuffer = ByteBuffer.allocateDirect(bufSize);
 	}
-	log.finest("chan is a " + chan.getClass());
-	do {
-	    if (currentPacketSize == -1) {// getting size
-		bytesRead = chan.read(sizeHeader);
-		if (!sizeHeader.hasRemaining()){ // have header
-		    sizeHeader.flip();
-		    currentPacketSize = sizeHeader.getInt();
-		    if (inputBuffer.capacity() < currentPacketSize){
-			inputBuffer = ByteBuffer.allocate(currentPacketSize);
-		    } else {
-			inputBuffer.limit(currentPacketSize);
+
+	public void open(Selector sel) {
+	    try {
+		key = channel.register(sel, OP_READ, this);
+	    } catch (IOException e) {
+		e.printStackTrace();
+	    }
+	}
+
+	protected boolean processRecvBuffer() throws IOException {
+	    recvBuffer.flip();
+	    boolean buffer_empty = false;
+
+	    for (;;) {
+		if (nextRecvPacketLen == 0) {
+		    // We're waiting for a frame header (an int)
+
+		    if (recvBuffer.remaining() == 0) {
+			// No partial packets remain in the buffer
+			buffer_empty = true;
+			break;
 		    }
+
+		    if (recvBuffer.remaining() < 4) {
+			log.fine("Waiting for a packet header -- "
+				+ "only have " + recvBuffer.remaining());
+			break;
+		    }
+
+		    // Got frame header
+		    int packet_len = recvBuffer.getInt();
+		    if (packet_len <= 0) {
+			log.warning("Bad packet length: " + packet_len);
+			break;
+		    }
+
+		    // Now we know the new packet's length
+		    nextRecvPacketLen = packet_len;
 		}
-	    } else {
-		bytesRead = chan.read(inputBuffer);
-		if (!inputBuffer.hasRemaining()) { // have packet
-		    // change from "writeten" state to "read" state
-		    inputBuffer.flip();
-		    for (NIOConnectionListener l : listeners) {
-			l.packetReceived(this, inputBuffer.asReadOnlyBuffer());
-		    }
-		    inputBuffer.clear();
-		    sizeHeader.clear();
-		    currentPacketSize = -1;
+
+		if (recvBuffer.remaining() < nextRecvPacketLen) {
+		    // We don't have all of the packet
+		    break;
+		}
+
+		// Got a whole packet; dispatch it
+		ByteBuffer packet = recvBuffer.slice();
+		packet.limit(nextRecvPacketLen);
+		recvBuffer.position(recvBuffer.position() + nextRecvPacketLen);
+		nextRecvPacketLen = 0;
+		parent.packetReceived(packet);
+
+		// Loop around and see if we can dispatch some more
+	    }
+
+	    recvBuffer.compact();
+	    return buffer_empty;
+	}
+
+	public void handleRead(SelectionKey key) throws IOException {
+	    if (! channel.isOpen()) {
+		throw new IOException("not open");
+	    }
+
+	    log.finest("channel is a " + channel.getClass());
+
+	    int rc = ((ReadableByteChannel) channel).read(recvBuffer);
+
+	    if (rc <= 0) {
+		throw new IOException("Error reading");
+	    }
+
+	    processRecvBuffer();
+	}
+
+	public void handleWrite(SelectionKey key) throws IOException {
+	    int wc = 0;
+	    boolean bufferEmpty;
+
+	    synchronized (sendBuffer) {
+		sendBuffer.flip();
+		wc = ((WritableByteChannel) channel).write(sendBuffer);
+		bufferEmpty = (! sendBuffer.hasRemaining());
+		sendBuffer.compact();
+	    }
+
+	    if (bufferEmpty) {
+		key.interestOps(key.interestOps()
+				& (~ SelectionKey.OP_WRITE));
+	    }
+	}
+
+	public void handleClose() {
+	    parent.handleClose();
+	}
+
+	public void close() {
+	    try {
+		log.fine("Closing " + channel);
+		channel.close();
+	    } catch (IOException e) {
+		e.printStackTrace();
+	    }
+	}
+
+	public void send(ByteBuffer[] packetParts) {
+	    int sz = 0;
+	    for (ByteBuffer buf : packetParts) {
+		buf.flip();
+		sz += buf.remaining();
+	    }
+	    synchronized(sendBuffer){
+		sendBuffer.putInt(sz);
+		for (ByteBuffer buf : packetParts) {
+		    sendBuffer.put(buf);
 		}
 	    }
-	} while (bytesRead>0);
-	if (bytesRead == -1) { // closed
-	    disconnect();
+	    parent.socketManager.enableWrite(channel);
 	}
-	log.exiting("NIOConnection", "dataArrived");
+
     }
 
-    /**
-     * disconnect
-     */
-    public void disconnect() {
-	try {
-	    close();
-	} catch (IOException ex) {
-	    ex.printStackTrace();
-	}
+    public void handleClose() {
+	tcpHandler.close();
+	udpHandler.close();
+
 	for (NIOConnectionListener l : listeners) {
 	    l.disconnected(this);
 	}
+    }
+
+    public void disconnect() {
+	handleClose();
     }
 
     /**
@@ -187,36 +288,7 @@ public class NIOConnection {
 	    throws IOException {
 	log.entering("NIOChannel", "send[]");
 
-	GatheringByteChannel chan =
-	    reliable ? reliableChannel : unreliableChannel;
-
-	int sz = 0;
-	for (ByteBuffer buf : packetParts) {
-	    buf.flip();
-	    sz += buf.remaining();
-	}
-	synchronized(outputHeader){
-	    outputHeader.clear();
-	    outputHeader.putInt(sz);
-	    outputHeader.flip();
-	    chan.write(outputHeader);
-	}
-	chan.write(packetParts);
-	log.exiting("NIOChannel", "send[]");
-    }
-
-    public void close() throws IOException {
-	IOException ex = null;
-	try {
-	    reliableChannel.close();
-	} catch (IOException e) {
-	    ex = e;
-	}
-
-	unreliableChannel.close();
-
-	if (ex != null) {
-	    throw ex;
-	}
+	PacketHandler h = reliable ? tcpHandler : udpHandler;
+	h.send(packetParts);
     }
 }
