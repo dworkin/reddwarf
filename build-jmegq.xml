@@ -55,30 +55,30 @@
         <java classname="com.sun.gi.SGS" failonerror="true" fork="yes">
             <arg value="-C"/>
             <arg value="-V"/>
-	    <arg value="-Djava.util.logging.config.file=logging.properties"/>
             <classpath refid="project.classpath"/>
+	    <sysproperty key="java.util.logging.config.file" value="logging.properties"/>
         </java>
     </target>
 
     <target name="ChatTestClient">
         <java classname="com.sun.gi.apps.commtest.client.ChatTestClient" failonerror="true" fork="yes">
-	    <arg value="-Djava.util.logging.config.file=logging.properties"/>
             <classpath refid="project.classpath"/>
+	    <sysproperty key="java.util.logging.config.file" value="logging.properties"/>
         </java>
     </target>
 
     <target name="SGS 2 at Labs">
         <java classname="com.sun.gi.SGS" failonerror="true" fork="yes">
-	    <arg value="-Djava.util.logging.config.file=logging.properties"/>
             <arg value="file:Install2.txt"/>
             <classpath refid="project.classpath"/>
+	    <sysproperty key="java.util.logging.config.file" value="logging.properties"/>
         </java>
     </target>
 
     <target name="ChatTestClient (1)">
         <java classname="com.sun.gi.apps.commtest.client.ChatTestClient" failonerror="true" fork="yes">
-	    <arg value="-Djava.util.logging.config.file=logging.properties"/>
             <classpath refid="project.classpath"/>
+	    <sysproperty key="java.util.logging.config.file" value="logging.properties"/>
         </java>
     </target>
 
