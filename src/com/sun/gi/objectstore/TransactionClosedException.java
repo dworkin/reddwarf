@@ -10,7 +10,7 @@ package com.sun.gi.objectstore;
  * @version 1.0
  */
 
-@SuppressWarnings("serial")
+//@SuppressWarnings("serial")
 public class TransactionClosedException extends RuntimeException {
   public TransactionClosedException() {
   }

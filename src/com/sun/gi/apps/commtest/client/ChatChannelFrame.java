@@ -25,7 +25,7 @@ import com.sun.gi.comm.users.client.ClientChannelListener;
 import com.sun.gi.utils.types.StringUtils;
 import com.sun.gi.utils.types.BYTEARRAY;
 
-@SuppressWarnings("serial")
+//@SuppressWarnings("serial")
 public class ChatChannelFrame extends JInternalFrame implements ClientChannelListener{
 	final ClientChannel chan;
 	JList userList;

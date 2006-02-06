@@ -26,7 +26,7 @@ import javax.swing.JPanel;
 import javax.swing.JPasswordField;
 import javax.swing.JTextField;
 
-@SuppressWarnings("serial")
+//@SuppressWarnings("serial")
 public class ValidatorDialog extends JDialog{
 	Callback[] callbacks;
 	List<Component> dataFields = new ArrayList<Component>();

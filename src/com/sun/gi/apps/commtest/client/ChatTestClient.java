@@ -41,7 +41,7 @@ import com.sun.gi.comm.users.client.impl.ClientConnectionManagerImpl;
 import com.sun.gi.utils.types.BYTEARRAY;
 import com.sun.gi.utils.types.StringUtils;
 
-@SuppressWarnings("serial")
+//@SuppressWarnings("serial")
 public class ChatTestClient extends JFrame implements
 		ClientConnectionManagerListener {
 	JButton loginButton;

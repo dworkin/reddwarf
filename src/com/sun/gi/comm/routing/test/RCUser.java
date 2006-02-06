@@ -28,7 +28,7 @@ import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.comm.users.server.SGSUser;
 import com.sun.gi.utils.types.BYTEARRAY;
 
-@SuppressWarnings("serial")
+//@SuppressWarnings("serial")
 public class RCUser extends JInternalFrame implements SGSUser {
 	private JDesktopPane desktop;
 	private Map<BYTEARRAY,RCChannelFrame> channelMap = new HashMap<BYTEARRAY,RCChannelFrame>();

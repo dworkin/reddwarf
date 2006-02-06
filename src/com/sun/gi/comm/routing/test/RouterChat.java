@@ -17,7 +17,7 @@ import com.sun.gi.comm.routing.Router;
 import com.sun.gi.comm.routing.impl.RouterImpl;
 import com.sun.gi.framework.interconnect.impl.LRMPTransportManager;
 
-@SuppressWarnings("serial")
+//@SuppressWarnings("serial")
 public class RouterChat extends JFrame{
 
 	private Router router;
