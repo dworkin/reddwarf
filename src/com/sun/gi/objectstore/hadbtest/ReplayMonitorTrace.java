@@ -15,6 +15,7 @@ import com.sun.gi.objectstore.tso.dataspace.InMemoryDataSpace;
 import com.sun.gi.objectstore.tso.dataspace.MonitoredDataSpace;
 import com.sun.gi.objectstore.tso.dataspace.PersistantInMemoryDataSpace;
 import com.sun.gi.objectstore.tso.dataspace.monitor.TraceRecord;
+import com.sun.gi.objectstore.tso.dataspace.monitor.ReplayState;
 import java.io.EOFException;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -30,6 +31,7 @@ public class ReplayMonitorTrace {
     public static void main(String[] args) throws IOException {
 	String traceFile = args[0];
 	String dspaceType = args[1];
+	DataSpace dataSpace = null;
 
 	ObjectInputStream ois;
 
@@ -41,21 +43,50 @@ public class ReplayMonitorTrace {
 	    return;
 	}
 
-	// ObjectStore ostore = connect(true, dspaceType, null);
+	ReplayState replayState = new ReplayState();
+
+	dataSpace = TestUtil.openDataSpace(1, dspaceType);
+	dataSpace.clear();
+
+	long traceElapsed;
+	long prevEndTime = -1;
 
 	for (;;) {
 	    TraceRecord o;
 	    try {
 		o = (TraceRecord) ois.readObject();
 	    } catch (EOFException e) {
+		System.out.println("DONE");
 		break;
 	    } catch (Exception e) {
 		System.out.println(e);
 		break;
 	    }
 
-	    System.out.println(o);
+	    System.out.println(o.getUnqualifiedClassName() + ": " +
+	    		(o.getEndTime() - o.getStartTime()));
+
+	    if (dataSpace != null) {
+		if (prevEndTime < 0) {
+		    prevEndTime = o.getStartTime();
+		}
+
+		traceElapsed = o.getStartTime() - prevEndTime;
+		if (traceElapsed > 1) {
+		    System.out.println("snoozing for " + traceElapsed);
+		    try {
+			Thread.sleep(traceElapsed);
+		    } catch (InterruptedException e) {
+			System.out.println("interrupted");
+			return ;
+		    }
+		} 
+		o.replay(dataSpace, replayState);
+		prevEndTime = o.getEndTime();
+	    }
 	}
+
+	dataSpace.close();
     }
 }
 

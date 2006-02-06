@@ -71,7 +71,7 @@ public class Test4 {
 	System.out.println("continuing...");
 
 	for (long snooze = 20; snooze >= 10; snooze -= 1) {
-	    ClientTest4 t = new ClientTest4(10, os, clusters, snooze, 10000);
+	    ClientTest4 t = new ClientTest4(10, os, clusters, snooze, 100);
 
 	    t.run();
 

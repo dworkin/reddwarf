@@ -33,16 +33,17 @@ public class TestUtil {
      * @return an {@link ObjectStore ObjectStore}.
      */
 
-    public static ObjectStore connect(boolean clear,
+    public static ObjectStore connect(long appId, boolean clear,
 	    String type, String traceFile)
     {
 	ObjectStore ostore;
 
 	try {
 	    if (traceFile == null) {
-		ostore = new TSOObjectStore(openDataSpace(type));
+		ostore = new TSOObjectStore(openDataSpace(appId, type));
 	    } else {
-		ostore = new TSOObjectStore(openDataSpace(type, traceFile));
+		ostore = new TSOObjectStore(openDataSpace(appId,
+			type, traceFile));
 	    }
 	} catch (Exception e) {
 	    System.out.println("unexpected exception: " + e);
@@ -58,12 +59,13 @@ public class TestUtil {
     }
 
     public static ObjectStore connect(boolean clear) {
-	return connect(clear, "persistant-inmem", "SCRATCH1");
+	// return connect(1, clear, "persistant-inmem", "SCRATCH1");
+	return connect(1, clear, "persistant-inmem", null);
     }
 
     /**
      */
-    public static DataSpace openDataSpace(String type) {
+    public static DataSpace openDataSpace(long appId, String type) {
 	DataSpace dspace;
 
 	if (type == null) {
@@ -72,11 +74,11 @@ public class TestUtil {
 
 	try {
 	    if (type.equals("hadb")) {
-		dspace = new HadbDataSpace(1);
+		dspace = new HadbDataSpace(appId);
 	    } else if (type.equals("inmem")) {
-		dspace = new InMemoryDataSpace(1);
+		dspace = new InMemoryDataSpace(appId);
 	    } else if (type.equals("persistant-inmem")) {
-		dspace = new PersistantInMemoryDataSpace(1);
+		dspace = new PersistantInMemoryDataSpace(appId);
 	    } else {
 		throw new IllegalArgumentException("unknown type: " + type);
 	    }
@@ -88,8 +90,10 @@ public class TestUtil {
 	return dspace;
     }
 
-    public static DataSpace openDataSpace(String type, String traceFile) {
-	DataSpace wrappedDspace = openDataSpace(type);
+    public static DataSpace openDataSpace(long appId,
+	    String type, String traceFile)
+    {
+	DataSpace wrappedDspace = openDataSpace(appId, type);
 
 	try {
 	    return new MonitoredDataSpace(wrappedDspace, traceFile);
@@ -126,7 +130,7 @@ public class TestUtil {
 	    Transaction trans1 = os.newTransaction(null);
 	    trans1.start();
 
-	    oid = trans1.create(ws, "foo");
+	    oid = trans1.create(ws, null);
 	    if (verbose) {
 		System.out.println("\tOID = " + oid);
 	    }
