@@ -429,6 +429,11 @@ public class HadbTest {
 		    newIdBlockBase = rs.getLong("NEXTOBJID"); // "2"
 		    rs.close();
 
+		    try {
+			Thread.sleep(2);
+		    } catch (Exception e) {
+		    }
+
 		    updateInfoStmnt.setLong(1, newIdBlockBase + idBlockSize);
 		    updateInfoStmnt.setLong(2, appID);
 		    try {
@@ -439,7 +444,7 @@ public class HadbTest {
 			    success = false;
 			    idConn.rollback();
 			}
-			System.out.println("YY " + e + " " + e.getErrorCode());
+			// System.out.println("YY " + e + " " + e.getErrorCode());
 		    }
 
 		    if (success) {
@@ -450,7 +455,7 @@ public class HadbTest {
 			    e.printStackTrace();
 			}
 
-			System.out.println("newIdBlockBase = " + newIdBlockBase);
+			// System.out.println("newIdBlockBase = " + newIdBlockBase);
 		    }
 		}
 	    } catch (SQLException e) {

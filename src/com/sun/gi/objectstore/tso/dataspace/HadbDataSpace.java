@@ -9,6 +9,7 @@ import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
+import java.sql.Statement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -37,8 +38,6 @@ public class HadbDataSpace implements DataSpace {
     private Object idMutex = new Object();
     private String dataConnURL;
 
-    private long id = 1;
-
     /*
      * HADB appears to convert all table and column names to
      * lower-case internally, and some of the methods for
@@ -63,7 +62,9 @@ public class HadbDataSpace implements DataSpace {
 
     private Connection conn;
     private Connection updateConn;
+    private Connection idConn;
     
+    private PreparedStatement getIdStmnt;
     private PreparedStatement getObjStmnt;
     private PreparedStatement getNameStmnt;
     private PreparedStatement updateObjStmnt;
@@ -88,7 +89,30 @@ public class HadbDataSpace implements DataSpace {
     
     private int commitRegisterCounter=1;
 
-    public HadbDataSpace(long appID) throws Exception {
+    /**
+     * Creates a DataSpace with the given appId, connected to the
+     * "default" HADB instance.
+     *
+     * @param appId the application ID
+     */
+    public HadbDataSpace(long appId)
+	    throws Exception
+    {
+	this(appId, false);
+    }
+
+    /**
+     * Creates a DataSpace with the given appId, connected to the
+     * "default" HADB instance.
+     *
+     * @param appId the application ID
+     *
+     * @param dropTables if <code>true</code>, then drop all tables
+     * before begining.
+     */
+    public HadbDataSpace(long appID, boolean dropTables)
+	    throws Exception
+    {
 	this.appID = appID;
 
 	// If we can't load the driver, bail out immediately.
@@ -109,21 +133,54 @@ public class HadbDataSpace implements DataSpace {
 	    // XXX: MUST take these from a config file.
 
 	    String hadbHosts = "129.148.75.63:15025,129.148.75.60:15005";
-	    String dbaseName = "darkstar";
 	    String userName = "system";
 	    String userPasswd = "darkstar";
 
-	    dataConnURL = "jdbc:sun:hadb:" + dbaseName + ":" +
-		    hadbHosts + ";create=true";
+	    dataConnURL = "jdbc:sun:hadb:" + hadbHosts + ";create=true";
 
-	    // XXX: Do we really need two connections?
+	    // XXX:  Do we really need two distinct connections for
+	    // data and update?
 
-	    conn = getDataConnection(userName, userPasswd);
-	    updateConn = getDataConnection(userName, userPasswd);	
+	    conn = getConnection(userName, userPasswd,
+		    Connection.TRANSACTION_READ_COMMITTED);
+	    updateConn = getConnection(userName, userPasswd,
+		    Connection.TRANSACTION_READ_COMMITTED);
+	    idConn = getConnection(userName, userPasswd,
+		    Connection.TRANSACTION_REPEATABLE_READ);
+
+	    if (dropTables) {
+		dropTables();
+	    }
+
 	    checkTables();
+	    createPreparedStmnts();
 
 	} catch (Exception e) {
 	    e.printStackTrace();
+	}
+    }
+
+    private void dropTables() {
+	dropTable(OBJTBLNAME);
+	dropTable(NAMETBLNAME);
+	dropTable(INFOTBLNAME);
+    }
+
+    private boolean dropTable(String tableName) {
+	String s;
+	Statement stmnt;
+
+	s = "DROP TABLE " + tableName;
+	try {
+	    stmnt = conn.createStatement();
+	    stmnt.execute(s);
+	    conn.commit();
+	    System.out.println("Dropped " + tableName);
+	    return true;
+	} catch (SQLException e) {
+	    // XXX ?
+	    System.out.println("FAILED to drop " + tableName);
+	    return false;
 	}
     }
 
@@ -219,10 +276,18 @@ public class HadbDataSpace implements DataSpace {
 	try {
 	    System.out.println("Creating Schema");
 	    String s = "CREATE SCHEMA " + SCHEMA;
-	    PreparedStatement stmnt = conn.prepareStatement(s);
-	    stmnt.execute();
-	} catch (Exception e) {
-	    System.out.println("SCHEMA issue: " + e);
+	    Statement stmnt = conn.createStatement();
+	    stmnt.execute(s);
+	} catch (SQLException e) {
+
+	    /*
+	     * 11751 is "this schema already exists"
+	     */
+
+	    if (e.getErrorCode() != 11751) {
+		System.out.println("SCHEMA issue: " + e);
+		throw e;
+	    }
 	}
 
 	HashSet<String> foundTables = new HashSet<String>();
@@ -231,10 +296,8 @@ public class HadbDataSpace implements DataSpace {
 	    String s = "select tablename from sysroot.alltables" +
 		    " where schemaname like '" + SCHEMA + "%'";
 
-	    System.out.println("(" + s + ")");
-
-	    PreparedStatement stmnt = conn.prepareStatement(s);
-	    rs = stmnt.executeQuery();
+	    Statement stmnt = conn.createStatement();
+	    rs = stmnt.executeQuery(s);
 	    while (rs.next()) {
 		foundTables.add(rs.getString(1).trim());
 	    }
@@ -248,57 +311,62 @@ public class HadbDataSpace implements DataSpace {
 	    System.out.println("Found Objects table");
 	} else {
 	    System.out.println("Creating Objects table");
-	    PreparedStatement stmnt = conn.prepareStatement(
-		    "CREATE TABLE " + OBJTBLNAME + " (" +
+	    String s = "CREATE TABLE " + OBJTBLNAME + " (" +
 			"OBJID DOUBLE INT NOT NULL," +
 			"OBJBYTES BLOB," +
 			"PRIMARY KEY (OBJID)" +
-			")");
-	    stmnt.execute();
+			")";
+	    Statement stmnt = conn.createStatement();
+	    stmnt.execute(s);
+	    conn.commit();
 	}
 
 	if (foundTables.contains(NAMETBL.toLowerCase())) {
 	    System.out.println("Found Name table");
 	} else {
 	    System.out.println("Creating Name table");
-	    PreparedStatement stmnt = conn.prepareStatement(
-		    "CREATE TABLE " + NAMETBLNAME + "(" +
+	    String s = "CREATE TABLE " + NAMETBLNAME + "(" +
 			"NAME VARCHAR(255) NOT NULL, " +
 			"OBJID DOUBLE INT NOT NULL," +
 			"PRIMARY KEY (NAME)" +
-			")");
-		stmnt.execute();
+			")";
+	    Statement stmnt = conn.createStatement();
+	    stmnt.execute(s);
+	    conn.commit();
 	}
 
 	if (foundTables.contains(INFOTBL.toLowerCase())) {
 	    System.out.println("Found info table");
 	} else {
 	    System.out.println("Creating info table");
-	    PreparedStatement stmnt = conn.prepareStatement(
-		    "CREATE TABLE " + INFOTBLNAME + "(" +
+	    String s = "CREATE TABLE " + INFOTBLNAME + "(" +
 			"APPID DOUBLE INT NOT NULL," +
-			"NEXTOBJID DOUBLE INT," +
+			"NEXTIDBLOCKBASE DOUBLE INT, " +
+			"IDBLOCKSIZE INT, " +
 			"PRIMARY KEY(APPID)" +
-			")");
-	    stmnt.execute();
+			")";
+	    Statement stmnt = conn.createStatement();
+	    stmnt.execute(s);
+	    conn.commit();
 	}
 
-	PreparedStatement stmnt = conn.prepareStatement("SELECT * FROM " +
+	getIdStmnt = idConn.prepareStatement("SELECT * FROM " +
 		INFOTBLNAME + " I  " + "WHERE I.APPID = " + appID);
-	rs = stmnt.executeQuery();
+	rs = getIdStmnt.executeQuery();
 	if (!rs.next()) { // entry does not exist
 	    System.out.println("Creating new entry in info table for appID "
 		    + appID);
-	    stmnt = conn.prepareStatement("INSERT INTO " + INFOTBLNAME +
-		    " VALUES(" + appID + "," + id + ")");
+	    PreparedStatement stmnt =
+		    conn.prepareStatement("INSERT INTO " + INFOTBLNAME +
+			" VALUES(" + appID + "," + defaultIdStart +
+			    "," + defaultIdBlockSize + ")");
 	    stmnt.execute();
-	} else {
-	    id = rs.getLong("NEXTOBJID");
-	    System.out.println("Found entry in info table for appID " + appID);
-	    System.out.println("Next objID = " + id);
 	}
 	rs.close();
-	conn.commit();
+	idConn.commit();
+    }
+
+    private void createPreparedStmnts() throws SQLException {
 
 	getObjStmnt = conn.prepareStatement("SELECT * FROM " + OBJTBLNAME
 			+ " O  " + "WHERE O.OBJID = ?");
@@ -315,15 +383,20 @@ public class HadbDataSpace implements DataSpace {
 	deleteObjStmnt = updateConn.prepareStatement("DELETE FROM "
 			+ OBJTBLNAME + " WHERE OBJID = ?");
 	updateInfoStmnt = updateConn.prepareStatement("UPDATE " + INFOTBLNAME
-			+ " SET NEXTOBJID=? WHERE APPID=?");
+			+ " SET NEXTIDBLOCKBASE=? WHERE APPID=?");
 
 	// XXX: HADB does not implement table locking.
 	// So, we NEED another way to do this.
 
-	// lockObjTableStmnt = conn.prepareStatement("LOCK TABLE "+OBJTBLNAME+" IN EXCLUSIVE MODE");
-	clearObjTableStmnt = conn.prepareStatement("DELETE FROM "+OBJTBLNAME);
-	// lockNameTableStmnt = conn.prepareStatement("LOCK TABLE "+NAMETBLNAME+" IN EXCLUSIVE MODE");
-	clearNameTableStmnt = conn.prepareStatement("DELETE FROM "+NAMETBLNAME);
+	// lockObjTableStmnt = conn.prepareStatement(
+	//	"LOCK TABLE "+OBJTBLNAME+" IN EXCLUSIVE MODE");
+	// lockNameTableStmnt = conn.prepareStatement(
+	//	"LOCK TABLE "+NAMETBLNAME+" IN EXCLUSIVE MODE");
+
+	clearObjTableStmnt = conn.prepareStatement(
+		"DELETE FROM " + OBJTBLNAME);
+	clearNameTableStmnt = conn.prepareStatement(
+		"DELETE FROM " + NAMETBLNAME);
     }
 
     private void clearTables() {
@@ -356,14 +429,16 @@ public class HadbDataSpace implements DataSpace {
     /**
      * @return
      */
-    private Connection getDataConnection(String userName, String userPasswd) {
+    private Connection getConnection(String userName, String userPasswd,
+	    int isolation)
+    {
 	Connection conn;
 	try {
 	    conn = DriverManager.getConnection(dataConnURL,
 		    userName, userPasswd);
 
 	    conn.setAutoCommit(false);
-	    conn.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
+	    conn.setTransactionIsolation(isolation);
 	    return conn;
 	} catch (Exception e) {
 	    System.out.println(e);
@@ -372,49 +447,107 @@ public class HadbDataSpace implements DataSpace {
 	return null;
     }
 
-    // internal routines to the system, used by transactions
 
-    // purposefully very small, for debugging.  Should be at least
-    // 1000 for real use.
+    /*
+     * Internal parameters for object ID generation:
+     *
+     * defaultIdStart is where the object ID numbers start.  It is
+     * only used to initialize the database and should never be used
+     * directly.  (only IDs taken from the database are guaranteed
+     * valid)
+     *
+     * defaultIdBlockSize is the number of object IDs grabbed at one
+     * time.  This is currently very small, for debugging.  Should be
+     * at least 1000 for real use.
+     */
 
-    private long idBlockSize = 10;
+    private final long defaultIdStart		= 10;
+    private final long defaultIdBlockSize	= 10;
 
-    // dummy: should be initialized from the database.
-    private long currentIdBlockBase = idBlockSize;
+    /*
+     * Internal variables for object ID generation:
+     *
+     * currentIdBlockBase is the start of the current block of OIDs
+     * that this instance of an HADB can use to generate OIDs.  It
+     * begins with an illegal value to force a fetch from the
+     * database.
+     *
+     * currentIdBlockOffset is the offset of the next OID to generate
+     * within the current block.
+     */
 
-    private long currentIdBlockOffset = 0;
+    private long currentIdBlockBase	= DataSpace.INVALID_ID;
+    private long currentIdBlockOffset	= 0;
 
     /**
      * {@inheritDoc}
      */
-    public long getNextID() {
+    public synchronized long getNextID() {
 
 	/*
-	 * INCOMPLETE.
-	 *
-	 * In order to minimize the overhead of creating new object IDs,
-	 * we allocate them in blocks rather than individually.  If there
-	 * are still remaining object Ids available in the current block
-	 * owned by this reference to the DataSpace, then the next such
-	 * Id is allocated and returned.  Otherwise, a new block is accessed
-	 * from the database.
+	 * In order to minimize the overhead of creating new object
+	 * IDs, we allocate them in blocks rather than individually. 
+	 * If there are still remaining object Ids available in the
+	 * current block owned by this reference to the DataSpace,
+	 * then the next such Id is allocated and returned. 
+	 * Otherwise, a new block is accessed from the database.
 	 */
 
-     /*
-	Statement getNextId = conn.executableStatement(
-		"SELECT OID FROM IDSUSEDTABLE");
-      */
+	if ((currentIdBlockBase == DataSpace.INVALID_ID) ||
+		(currentIdBlockOffset >= defaultIdBlockSize)) {
+	    long newIdBlockBase = 0;
+	    int newIdBlockSize = 0;
+	    boolean success = false;
 
+	    try {
+		while (!success) {
 
-	synchronized (idMutex) {
-	    if (currentIdBlockOffset == idBlockSize) {
-		// XXX: FAKE!
-		// SHOULD fetch next block offset base from database
-		currentIdBlockBase += idBlockSize;
-		currentIdBlockOffset = 0;
+		    /*
+		     * Get the current value of the NEXTIDBLOCKBASE
+		     * from the database.  It is a serious problem if
+		     * this fails -- it might not be possible to
+		     * recover from this condition.
+		     */
+
+		    ResultSet rs = getIdStmnt.executeQuery();
+		    if (!rs.next()) {
+			System.out.println("appID table entry absent for " +
+				appID);
+			// XXX: FATAL unexpected error.
+		    }
+		    newIdBlockBase = rs.getLong("NEXTIDBLOCKBASE"); // "2"
+		    newIdBlockSize = rs.getInt("IDBLOCKSIZE"); // "3"
+		    rs.close();
+
+		    updateInfoStmnt.setLong(1, newIdBlockBase + newIdBlockSize);
+		    updateInfoStmnt.setLong(2, appID);
+		    try {
+			updateInfoStmnt.execute();
+			idConn.commit();
+			success = true;
+		    } catch (SQLException e) {
+			if (e.getErrorCode() == 2097) {
+			    success = false;
+			    idConn.rollback();
+			    try {
+				Thread.sleep(2);
+			    } catch (Exception e2) {
+			    }
+			}
+			// System.out.println("YY " + e + " " + e.getErrorCode());
+		    }
+		}
+	    } catch (SQLException e) {
+		// XXX
+		System.out.println("TT " + e + " " + e.getErrorCode());
+		// e.printStackTrace();
 	    }
-	    return currentIdBlockBase + currentIdBlockOffset++;
+
+	    currentIdBlockBase = newIdBlockBase;
+	    currentIdBlockOffset = 0;
 	}
+
+	return (currentIdBlockBase + currentIdBlockOffset++);
     }
 
     /**
@@ -440,35 +573,16 @@ public class HadbDataSpace implements DataSpace {
      * {@inheritDoc}
      */
     public void lock(long objectID) throws NonExistantObjectIDException {
-	/*
-	synchronized (dataSpace) {
-	    if (!dataSpace.containsKey(objectID)) {
-		if (loadCache(objectID) == null) {
-			throw new NonExistantObjectIDException();
-		}
-	    }
-	}
-	synchronized (lockSet) {
-	    while (lockSet.contains(objectID)) {
-		try {
-		    lockSet.wait();
-		} catch (InterruptedException e) {
-		    e.printStackTrace();
-		}
-	    }
-	    lockSet.add(new Long(objectID));
-	}
-	*/
+
+	// XXX: Do something.
     }
 
     /**
      * {@inheritDoc}
      */
     public void release(long objectID) {
-	synchronized (lockSet) {
-	    lockSet.remove(new Long(objectID));
-	    lockSet.notifyAll();
-	}
+
+	// XXX: Do something.
     }
 
     /**
@@ -538,52 +652,31 @@ public class HadbDataSpace implements DataSpace {
 
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#lookup(java.lang.String)
+    /**
+     * {inheritDoc}
      */
     public Long lookup(String name) {
-	    Long retval = null;
-	    synchronized (nameSpace) {
-		    retval = nameSpace.get(name);
-		    if (retval == null) {
-			    retval = loadNameCache(name);
-		    }
-	    }
-	    return retval;
-    }
+	long oid = DataSpace.INVALID_ID;
 
-    /**
-     * @param name
-     * @return
-     */
-    private Long loadNameCache(String name) {
-	    long retval = DataSpace.INVALID_ID;
-	    synchronized (nameSpace) {
-		    try {
-			    getNameStmnt.setString(1, name);
-			    ResultSet rs = getNameStmnt.executeQuery();
-			    conn.commit();
-			    if (rs.next()) {
-				    retval = rs.getLong("OBJID");
-				    nameSpace.put(name, new Long(retval));
-			    }
-			    rs.close();
-		    } catch (SQLException e) {
-			    e.printStackTrace();
-		    }
+	try {
+	    getNameStmnt.setString(1, name);
+	    ResultSet rs = getNameStmnt.executeQuery();
+	    conn.commit();
+	    if (rs.next()) {
+		oid = rs.getLong("OBJID");
 	    }
-	    return retval;
+	    rs.close();
+	} catch (SQLException e) {
+	    e.printStackTrace();
+	}
+	return oid;
     }
 
     /*
-     * (non-Javadoc)
-     * 
-     * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#getAppID()
+     * {@inheritDoc}
      */
     public long getAppID() {
-	    return appID;
+	return appID;
     }
 
     /*
