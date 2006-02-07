@@ -47,146 +47,119 @@ import com.sun.gi.framework.install.DeploymentRec;
  * @version 1.0
  */
 public class FlatFileUserValidator implements UserValidator {
-	private Subject subject = null;
+    private Subject subject = null;
 
-	private Map<String, String> params;
+    private Map<String, String> params;
 
-	private boolean authenticated = false;
+    private boolean authenticated = false;
 
-	private boolean reset = false;
+    private boolean reset = false;
 
-	public FlatFileUserValidator(Map<String, String> parameters) {
-		params = parameters;
+    public FlatFileUserValidator(Map<String, String> parameters) {
+	params = parameters;
+    }
+
+    public Callback[] nextDataRequest() {
+	synchronized (this) {
+	    if (reset) {
+		reset = false;
+		return new Callback[] { new NameCallback("User Name", "Guest"),
+		    new PasswordCallback("Password", false) };
+	    } else {
+		return null;
+	    }
 	}
+    }
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.comm.users.validation.UserValidator#nextDataRequest()
-	 */
-	public Callback[] nextDataRequest() {
-		synchronized (this) {
-			if (reset) {
-				reset = false;
-				return new Callback[] { new NameCallback("User Name", "Guest"),
-						new PasswordCallback("Password", false) };
-			} else {
-				return null;
+    public void dataResponse(Callback[] buff) {
+	String name = "";
+	String password = "";
+	for (Callback cb : buff) {
+	    if (cb instanceof NameCallback) {
+		name = ((NameCallback) cb).getName();
+	    } else if (cb instanceof PasswordCallback) {
+		password = new String(((PasswordCallback) cb).getPassword());
+	    }
+	}
+	try {
+	    URL passfileURL = new URL(params.get("password_file_url"));
+	    URLConnection conn = passfileURL.openConnection();
+	    conn.connect();
+	    InputStream content = conn.getInputStream();
+	    InputStreamReader isrdr = new InputStreamReader(content);
+	    BufferedReader rdr = new BufferedReader(isrdr);
+	    String in = rdr.readLine();
+	    while (in != null) {
+		StringTokenizer tok = new StringTokenizer(in);
+		String usrname = tok.nextToken();
+		if (usrname.charAt(0) != '#') { // skip comments
+		    String usrpass = tok.nextToken();
+		    if (usrname.equals(name)
+			&& (usrpass.equals("*")
+			    || usrpass.equals(password))) {
+			// found matching entry
+			authenticated = true;
+			subject.getPrincipals().add(
+				new StringPrincipal(usrname));
+			while (tok.hasMoreTokens()) {
+			    String credential = tok.nextToken();
+			    subject.getPublicCredentials().add(credential);
 			}
+		    }
 		}
+		in = rdr.readLine();
+	    }
+	} catch (MalformedURLException e) {
+	    e.printStackTrace();
+	} catch (IOException e) {
+	    e.printStackTrace();
+	}
+    }
 
+    public boolean authenticated() {
+	return authenticated;
+    }
+
+    public Subject getSubject() {
+	return subject;
+    }
+
+    public void reset(Subject subject) {
+	synchronized (this) {
+	    authenticated = false;
+	    reset = true;
+	    this.subject = subject;
+	}
+    }
+
+    class StringPrincipal implements Principal {
+	String name;
+
+	public StringPrincipal(String str) {
+	    name = str;
 	}
 
-	/*
-	 * (non-Javadoc)
+	/**
+	 * Returns the name of this principal
+	 *
+	 * @return the principal name
 	 * 
-	 * @see com.sun.gi.comm.users.validation.UserValidator#dataResponse(javax.security.auth.callback.Callback[])
+	 * @see java.security.Principal#getName()
 	 */
-	public void dataResponse(Callback[] buff) {
-		String name = "";
-		String password = "";
-		for (Callback cb : buff) {
-			if (cb instanceof NameCallback) {
-				name = ((NameCallback) cb).getName();
-			} else if (cb instanceof PasswordCallback) {
-				password = new String(((PasswordCallback) cb).getPassword());
-			}
-		}
-		try {
-			URL passfileURL = new URL(params.get("password_file_url"));
-			URLConnection conn = passfileURL.openConnection();
-			conn.connect();
-			InputStream content = conn.getInputStream();
-			InputStreamReader isrdr = new InputStreamReader(content);
-			BufferedReader rdr = new BufferedReader(isrdr);
-			String inline = rdr.readLine();
-			while (inline != null) {
-				StringTokenizer tok = new StringTokenizer(inline);
-				String usrname = tok.nextToken();
-				if (name.charAt(0) != '#') { // skip comments
-					String usrpass = tok.nextToken();
-					if (usrname.equals(name)
-							&& (usrpass.equals("*") || usrpass.equals(password))) { // found
-																					// matchign
-																					// entry
-						authenticated = true;
-						subject.getPrincipals().add(
-								new StringPrincipal(usrname));
-						while (tok.hasMoreTokens()) {
-							String credential = tok.nextToken();
-							subject.getPublicCredentials().add(credential);
-						}
-					}
-				}
-				inline = rdr.readLine();
-			}
-
-		} catch (MalformedURLException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-
+	public String getName() {
+	    return name;
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.comm.users.validation.UserValidator#authenticated()
-	 */
-	public boolean authenticated() {
-		return authenticated;
+	public boolean equals(Object obj) {
+	    return name.equals(obj);
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.comm.users.validation.UserValidator#getSubject()
-	 */
-	public Subject getSubject() {
-		return subject;
+	public int hashCode() {
+	    return name.hashCode();
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.comm.users.validation.UserValidator#reset()
-	 */
-	public void reset(Subject subject) {
-		synchronized (this) {
-			authenticated = false;
-			reset = true;
-			this.subject = subject;
-		}
+	public String toString() {
+	    return "StringPrincipal:" + name;
 	}
-
-	class StringPrincipal implements Principal {
-		String name;
-
-		public StringPrincipal(String str) {
-			name = str;
-		}
-
-		/***********************************************************************
-		 * Returns the name of this principal @return the principal name
-		 * 
-		 * @see java.security.Principal#getName()
-		 */
-		public String getName() {
-			return name;
-		}
-
-		public boolean equals(Object obj) {
-			return name.equals(obj);
-		}
-
-		public int hashCode() {
-			return name.hashCode();
-		}
-
-		public String toString() {
-			return "StringPrincipal:" + name;
-		}
-	}
-
+    }
 }
