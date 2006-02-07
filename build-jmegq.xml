@@ -18,11 +18,16 @@
     <target name="init">
         <mkdir dir="bin"/>
         <mkdir dir="doc"/>
+        <mkdir dir="dox"/>
     </target>
 
     <target name="clean">
         <delete dir="bin"/>
+    </target>
+
+    <target name="realclean" depends="clean">
         <delete dir="doc"/>
+        <delete dir="dox"/>
     </target>
 
     <target name="docs" depends="javadocs,doxygen"/>
@@ -77,6 +82,14 @@
 
     <target name="ChatTestClient (1)">
         <java classname="com.sun.gi.apps.commtest.client.ChatTestClient" failonerror="true" fork="yes">
+            <classpath refid="project.classpath"/>
+	    <sysproperty key="java.util.logging.config.file" value="logging.properties"/>
+        </java>
+    </target>
+
+    <target name="BattleBoard">
+        <java classname="com.sun.gi.apps.battleboard.client.BattleBoardClient"
+		failonerror="true" fork="true">
             <classpath refid="project.classpath"/>
 	    <sysproperty key="java.util.logging.config.file" value="logging.properties"/>
         </java>

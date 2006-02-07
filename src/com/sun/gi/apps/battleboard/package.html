@@ -1,0 +1,129 @@
+
+<body>
+
+<h2>
+Basic Rules
+</h2>
+
+This game resembles "BattleShip" in general style.  <p>
+
+<ul>
+
+<li> There are an arbitrary number of players, each denoted by a
+    unique name (a short string).  When the necessary number of
+    players have joined the game, then play begins immediately.  No
+    players may join the game after play has begun.  <p>
+
+    Communication and collaboration between the players is permitted
+    (and encouraged).  <p>
+
+<li> Each player controls a region of space that is represented by a
+    grid of a fixed width and height, called a "board".  <p>
+
+<li> The contents of the board are initialized at the start of the
+    game.  Each grid position must either be VACANT or contain a CITY. 
+    Each player is given a predetermined number of cities, which they
+    may place arbitrarily on their board, or they may be placed
+    randomly.  <p>
+
+    <em> At present the cities are always positioned in a fixed
+    arrangement.  This makes debugging easier but makes game-play
+    meaningless.  <p> </em>
+
+<li> At the start of the game, each player knows the contents of their
+    board, but does not know the contents of the boards of the other
+    players (other than knowing the size of the board of each player,
+    and the initial number of cities).  <p>
+
+<li> The players are assigned a fixed order in which to take turns. 
+    All players are aware of this order, and know when it is their
+    turn.  <p>
+ 
+    During a players turn, they may perform exactly one of the
+    following actions, after which their turn ends and the turn of the
+    next player begins:  <p>
+
+    <ul>
+
+    <li> PASS <p>
+    
+	Take no action during this turn.  <p>
+
+    <li> BOMB <em>player</em> <em>xpos</em> <em>ypos</em> <p>
+
+	Drop a bomb on the board belonging to the given
+	<em>player</em>, and the given location
+	(<em>xpos</em>,<em>ypos</em>).  A player may drop a bomb on
+	their own board, if they wish, although this is not generally
+	considered a sound strategy.  <p>
+
+	The player who has been bombed must immediately tell all of
+	the other players the result of the bombing.  There are three
+	possible results:  <p>
+
+	<ul>
+
+	<li> HIT - the position of the bomb is the same as a city. 
+	    <p>
+
+	    A hit destroys the city.  <p>
+
+	<li> NEAR_MISS - the position is not the same as a city, but
+	    is in one of the positions adjacent (including diagonals)
+	    to at least one city.  <p>
+
+	<li> MISS - the position is neither a HIT or a NEAR_MISS.  <p>
+
+	</ul> <p>
+
+    <li> TIMEOUT [optional] <p>
+
+	If the player takes no action within a given period of time,
+	then their turn is ended as if by a PASS.  <p>
+
+    </ul> <p>
+
+<li> A player may withdraw from the game at any time (without waiting
+    for their turn).  A withdrawn player is removed from the order of
+    turns and all players are immediately informed of their withdrawl. 
+    <p>
+
+<li> After each turn, any player that has no remaining cities is said
+    to have <em>lost</em> and is removed from the game.  The losing
+    player is removed from the order of turns and all other players
+    are informed of this event.  <p>
+
+<li> The game continues until only one player remains.  This player is
+    said to have won.  <p>
+
+</ul> <p>
+
+<h2>
+Messages
+</h2>
+
+<h3>
+Client-Initiated
+</h3>
+
+<ul>
+
+<li> <kbd>join</kbd> <em>name</em> <p>
+
+    A player joins the game by sending this message to the server. 
+    The server responds with one of the following: <p>
+
+    <ul>
+
+    <li> <kbd>ok</kbd> <p>
+
+	The player is permitted to join.  In response, the client must
+	send over the location of its cities.  (need format) <p>
+
+    <li> <kbd>already-joined</kbd>
+
+	The player has already joined the current game. <p>
+
+    </ul> <p>
+
+</body>
