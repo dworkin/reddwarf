@@ -50,6 +50,7 @@ public class HadbDataSpace implements DataSpace {
 
     private static final String SCHEMA = "simserver";
     private static final String OBJBASETBL = "objects";
+    private static final String OBJLOCKBASETBL = "objlocks";
     private static final String NAMEBASETBL = "namedirectory";
     private static final String INFOTBL = "appinfo";
 
@@ -59,6 +60,8 @@ public class HadbDataSpace implements DataSpace {
     private String OBJTBL;
     private String NAMETBLNAME;
     private String OBJTBLNAME;
+    private String OBJLOCKTBL;
+    private String OBJLOCKTBLNAME;
 
     private Connection conn;
     private Connection updateConn;
@@ -73,6 +76,8 @@ public class HadbDataSpace implements DataSpace {
     private PreparedStatement insertNameStmnt;
     private PreparedStatement updateInfoStmnt;
     private PreparedStatement insertInfoStmnt;
+    private PreparedStatement updateObjLockStmnt;
+    private PreparedStatement insertObjLockStmnt;
     private PreparedStatement deleteObjStmnt;
     private PreparedStatement clearObjTableStmnt;
     private PreparedStatement lockObjTableStmnt;
@@ -126,6 +131,9 @@ public class HadbDataSpace implements DataSpace {
 	OBJTBL = OBJBASETBL + "_" + appID;
 	OBJTBLNAME = SCHEMA + "." + OBJTBL;
 
+	OBJLOCKTBL = OBJLOCKBASETBL + "_" + appID;
+	OBJLOCKTBLNAME = SCHEMA + "." + OBJLOCKTBL;
+
 	NAMETBL = NAMEBASETBL + "_" + appID;
 	NAMETBLNAME = SCHEMA + "." + NAMETBL;
 
@@ -162,6 +170,7 @@ public class HadbDataSpace implements DataSpace {
 
     private void dropTables() {
 	dropTable(OBJTBLNAME);
+	dropTable(OBJLOCKTBLNAME);
 	dropTable(NAMETBLNAME);
 	dropTable(INFOTBLNAME);
     }
@@ -174,7 +183,7 @@ public class HadbDataSpace implements DataSpace {
 	try {
 	    stmnt = conn.createStatement();
 	    stmnt.execute(s);
-	    conn.commit();
+	    stmnt.getConnection().commit();
 	    System.out.println("Dropped " + tableName);
 	    return true;
 	} catch (SQLException e) {
@@ -318,7 +327,21 @@ public class HadbDataSpace implements DataSpace {
 			")";
 	    Statement stmnt = conn.createStatement();
 	    stmnt.execute(s);
-	    conn.commit();
+	    stmnt.getConnection().commit();
+	}
+
+	if (foundTables.contains(OBJLOCKTBL.toLowerCase())) {
+	    System.out.println("Found object lock table");
+	} else {
+	    System.out.println("Creating object Lock table");
+	    String s = "CREATE TABLE " + OBJLOCKTBLNAME + " (" +
+			"OBJID DOUBLE INT NOT NULL," +
+			"OBJLOCK INT NOT NULL," +
+			"PRIMARY KEY (OBJID)" +
+			")";
+	    Statement stmnt = idConn.createStatement();
+	    stmnt.execute(s);
+	    stmnt.getConnection().commit();
 	}
 
 	if (foundTables.contains(NAMETBL.toLowerCase())) {
@@ -332,7 +355,7 @@ public class HadbDataSpace implements DataSpace {
 			")";
 	    Statement stmnt = conn.createStatement();
 	    stmnt.execute(s);
-	    conn.commit();
+	    stmnt.getConnection().commit();
 	}
 
 	if (foundTables.contains(INFOTBL.toLowerCase())) {
@@ -347,7 +370,7 @@ public class HadbDataSpace implements DataSpace {
 			")";
 	    Statement stmnt = conn.createStatement();
 	    stmnt.execute(s);
-	    conn.commit();
+	    stmnt.getConnection().commit();
 	}
 
 	getIdStmnt = idConn.prepareStatement("SELECT * FROM " +
@@ -356,34 +379,41 @@ public class HadbDataSpace implements DataSpace {
 	if (!rs.next()) { // entry does not exist
 	    System.out.println("Creating new entry in info table for appID "
 		    + appID);
-	    PreparedStatement stmnt =
-		    conn.prepareStatement("INSERT INTO " + INFOTBLNAME +
-			" VALUES(" + appID + "," + defaultIdStart +
-			    "," + defaultIdBlockSize + ")");
-	    stmnt.execute();
+	    Statement stmnt = getIdStmnt.getConnection().createStatement();
+	    String s = "INSERT INTO " + INFOTBLNAME + " VALUES(" +
+		    appID + "," + defaultIdStart + "," +
+		    defaultIdBlockSize + ")";
+	    stmnt.execute(s);
 	}
 	rs.close();
-	idConn.commit();
+	getIdStmnt.getConnection().commit();
     }
 
     private void createPreparedStmnts() throws SQLException {
 
-	getObjStmnt = conn.prepareStatement("SELECT * FROM " + OBJTBLNAME
-			+ " O  " + "WHERE O.OBJID = ?");
-	getNameStmnt = conn.prepareStatement("SELECT * FROM " + NAMETBLNAME
-			+ " N  " + "WHERE N.NAME = ?");
-	insertObjStmnt = updateConn.prepareStatement("INSERT INTO "
-			+ OBJTBLNAME + " VALUES(?,?)");
-	insertNameStmnt = updateConn.prepareStatement("INSERT INTO "
-			+ NAMETBLNAME + " VALUES(?,?)");
-	updateObjStmnt = updateConn.prepareStatement("UPDATE " + OBJTBLNAME
-			+ " SET OBJBYTES=? WHERE OBJID=?");
-	updateNameStmnt = updateConn.prepareStatement("UPDATE " + NAMETBLNAME
-			+ " SET NAME=? WHERE OBJID=?");
-	deleteObjStmnt = updateConn.prepareStatement("DELETE FROM "
-			+ OBJTBLNAME + " WHERE OBJID = ?");
-	updateInfoStmnt = updateConn.prepareStatement("UPDATE " + INFOTBLNAME
-			+ " SET NEXTIDBLOCKBASE=? WHERE APPID=?");
+	getObjStmnt = conn.prepareStatement("SELECT * FROM " +
+		OBJTBLNAME + " O  " + "WHERE O.OBJID = ?");
+	getNameStmnt = conn.prepareStatement("SELECT * FROM " +
+		NAMETBLNAME + " N  " + "WHERE N.NAME = ?");
+	insertObjStmnt = updateConn.prepareStatement("INSERT INTO " +
+		OBJTBLNAME + " VALUES(?,?)");
+	insertNameStmnt = updateConn.prepareStatement("INSERT INTO " +
+		NAMETBLNAME + " VALUES(?,?)");
+	updateObjStmnt = updateConn.prepareStatement("UPDATE " +
+		OBJTBLNAME + " SET OBJBYTES=? WHERE OBJID=?");
+	updateNameStmnt = updateConn.prepareStatement("UPDATE " +
+		NAMETBLNAME + " SET NAME=? WHERE OBJID=?");
+	deleteObjStmnt = updateConn.prepareStatement("DELETE FROM " +
+		OBJTBLNAME + " WHERE OBJID = ?");
+
+	updateInfoStmnt = idConn.prepareStatement("UPDATE " +
+		INFOTBLNAME + " SET NEXTIDBLOCKBASE=? WHERE APPID=?");
+
+	updateObjLockStmnt = idConn.prepareStatement("UPDATE " +
+		OBJLOCKTBLNAME +
+		    " SET OBJLOCK=? WHERE OBJID=? AND OBJLOCK=?");
+	insertObjLockStmnt = idConn.prepareStatement("INSERT INTO " +
+			OBJLOCKTBLNAME + " VALUES(?,?)");
 
 	// XXX: HADB does not implement table locking.
 	// So, we NEED another way to do this.
@@ -409,6 +439,7 @@ public class HadbDataSpace implements DataSpace {
 	    s = "DROP TABLE " + OBJTBLNAME;
 	    stmnt = conn.prepareStatement(s);
 	    stmnt.execute();
+	    stmnt.getConnection().commit();
 	} catch (Exception e) {
 	    // XXX
 	}
@@ -416,11 +447,13 @@ public class HadbDataSpace implements DataSpace {
 	System.out.println("Creating Objects table");
 
 	try { 
-	    s = "CREATE TABLE " + OBJTBLNAME + " ("
-		    + "OBJID DOUBLE INT NOT NULL," + "OBJBYTES BLOB,"
-		    + "PRIMARY KEY (OBJID))";
+	    s = "CREATE TABLE " + OBJTBLNAME + " (" +
+		    "OBJID DOUBLE INT NOT NULL, " +
+		    "OBJBYTES BLOB, " +
+		    "PRIMARY KEY (OBJID))";
 	    stmnt = conn.prepareStatement(s);
 	    stmnt.execute();
+	    stmnt.getConnection().commit();
 	} catch (Exception e) {
 	    // XXX
 	}
@@ -500,6 +533,12 @@ public class HadbDataSpace implements DataSpace {
 	    boolean success = false;
 
 	    try {
+		idConn.commit();
+	    } catch (Exception e) {
+		System.out.println("UNEXPECTED EXCEPTION: " + e);
+	    }
+
+	    try {
 		while (!success) {
 
 		    /*
@@ -517,37 +556,76 @@ public class HadbDataSpace implements DataSpace {
 		    }
 		    newIdBlockBase = rs.getLong("NEXTIDBLOCKBASE"); // "2"
 		    newIdBlockSize = rs.getInt("IDBLOCKSIZE"); // "3"
-		    rs.close();
+
+		    System.out.println("NEXTIDBLOCKBASE/IDBLOCKSIZE " +
+			    newIdBlockBase + "/" + newIdBlockSize);
 
 		    updateInfoStmnt.setLong(1, newIdBlockBase + newIdBlockSize);
 		    updateInfoStmnt.setLong(2, appID);
 		    try {
-			updateInfoStmnt.execute();
-			idConn.commit();
+			updateInfoStmnt.executeUpdate();
+			updateInfoStmnt.getConnection().commit();
+			System.out.println("SUCCESS");
 			success = true;
 		    } catch (SQLException e) {
 			if (e.getErrorCode() == 2097) {
 			    success = false;
-			    idConn.rollback();
+			    updateInfoStmnt.getConnection().rollback();
 			    try {
 				Thread.sleep(2);
 			    } catch (Exception e2) {
 			    }
 			}
-			// System.out.println("YY " + e + " " + e.getErrorCode());
+			System.out.println("YY " + e + " " + e.getErrorCode());
+			e.printStackTrace();
+		    } finally {
+			System.out.println("\t\tClosing...");
+			rs.close();
 		    }
 		}
 	    } catch (SQLException e) {
 		// XXX
 		System.out.println("TT " + e + " " + e.getErrorCode());
-		// e.printStackTrace();
+		e.printStackTrace();
 	    }
 
 	    currentIdBlockBase = newIdBlockBase;
 	    currentIdBlockOffset = 0;
 	}
 
-	return (currentIdBlockBase + currentIdBlockOffset++);
+	long newOID = currentIdBlockBase + currentIdBlockOffset++;
+	System.out.println("NEW OID " + newOID);
+
+	/*
+	 * For the sake of convenience, create the object lock
+	 * immediately, instead of waiting for the atomic update to
+	 * occur.
+	 */
+
+	try {
+	    System.out.println("inserting oid " + newOID);
+	    insertObjLockStmnt.setLong(1, newOID);
+	    insertObjLockStmnt.setInt(2, 0);
+	} catch (SQLException e) {
+	    // XXX: ??
+	}
+
+	try {
+	    insertObjLockStmnt.executeUpdate();
+	    insertObjLockStmnt.getConnection().commit();
+	} catch (SQLException e) {
+	    try {
+		updateObjLockStmnt.getConnection().rollback();
+	    } catch (SQLException e2) {
+		System.out.println("FAILED TO ROLLBACK");
+		System.out.println(e2);
+	    }
+	    System.out.println("FAILURE for OID: " + newOID);
+	    System.out.println(e);
+	    e.printStackTrace();
+	}
+
+	return newOID;
     }
 
     /**
@@ -558,7 +636,7 @@ public class HadbDataSpace implements DataSpace {
 	try {
 	    getObjStmnt.setLong(1, objectID);
 	    ResultSet rs = getObjStmnt.executeQuery();
-	    conn.commit();
+	    getObjStmnt.getConnection().commit();
 	    if (rs.next()) {
 		objbytes = rs.getBytes("OBJBYTES");
 	    }
@@ -574,15 +652,114 @@ public class HadbDataSpace implements DataSpace {
      */
     public void lock(long objectID) throws NonExistantObjectIDException {
 
-	// XXX: Do something.
+	/*
+	 * This is ugly.  I'd love to hear about a better
+	 * approach.
+	 *
+	 * Locks are stored in a table in the database, with one row
+	 * per object.  To get a lock on an object, an attempt is made
+	 * to update the row for that object with a new value for the
+	 * locked column of that row.  If the update succeeds, then
+	 * this update acquires the lock.  If the update fails, then
+	 * the process is repeated until it succeeds or the caller
+	 * gives up in some manner (not part of the interface).
+	 *
+	 * At present the lock table is a different table than the
+	 * object storage, but it could be squeezed into that table as
+	 * well.  This may be an item to tune later.
+	 */
+
+	 int rc = -1;
+
+	 for (;;) {
+
+	    /*
+	     * Is it necessary to reset the values of the parameters
+	     * each time, or do they survive execution?  If the latter,
+	     * then the "set"s can be hoisted out of the loop. -DJE
+	     */
+
+	    try {
+		updateObjLockStmnt.setInt(1, 1);
+		updateObjLockStmnt.setLong(2, objectID);
+		updateObjLockStmnt.setInt(3, 0);
+	    } catch (SQLException e) {
+		System.out.println("FAILED to set parameters");
+	    }
+
+	    rc = 0;
+	    try {
+		rc = updateObjLockStmnt.executeUpdate();
+		updateObjLockStmnt.getConnection().commit();
+	    } catch (SQLException e) {
+		try {
+		    updateObjLockStmnt.getConnection().rollback();
+		} catch (SQLException e2) {
+		    System.out.println("FAILED TO ROLLBACK");
+		    System.out.println(e2);
+		}
+		System.out.println("Blocked on " + objectID);
+		System.out.println(e);
+		e.printStackTrace();
+	    }
+
+	    if (rc == 1) {
+		System.out.println("Got the lock on " + objectID + " rc = " + rc);
+		return;
+	    } else {
+		System.out.println("Missed the lock on " + objectID + " rc = " + rc);
+
+		/* XXX: should sleep here... */
+	    }
+	}
     }
 
     /**
      * {@inheritDoc}
      */
     public void release(long objectID) {
+	
+	/*
+	 * Similar to lock, except it doesn't poll.  If the update
+	 * fails, it assumes that's because the lock is already
+	 * unlocked, and rolls back.
+	 *
+	 * There might be a race condition here:  can't tell without
+	 * looking at the actual packets, which is bad.  -DJE
+	 */
 
-	// XXX: Do something.
+	int rc = -1;
+	try {
+	    updateObjLockStmnt.setInt(1, 0);
+	    updateObjLockStmnt.setLong(2, objectID);
+	    updateObjLockStmnt.setLong(3, 1);
+	} catch (SQLException e) {
+	    System.out.println("FAILED to set parameters");
+	}
+
+	try {
+	    rc = updateObjLockStmnt.executeUpdate();
+	    updateObjLockStmnt.getConnection().commit();
+	} catch (SQLException e) {
+	    try {
+		updateObjLockStmnt.getConnection().rollback();
+	    } catch (SQLException e2) {
+		System.out.println("FAILED TO ROLLBACK");
+		System.out.println(e2);
+	    }
+	    System.out.println("Tried to unlock (" + objectID +
+		    "): already unlocked.");
+	    System.out.println(e);
+	    e.printStackTrace();
+	}
+
+	if (rc == 1) {
+	    System.out.println("Released the lock on " + objectID + " rc = " + rc);
+	    return;
+	} else {
+	    System.out.println("Didn't need to unlock " + objectID + " rc = " + rc);
+	    // XXX: not an error.  This is a diagnostic only.
+	}
     }
 
     /**
@@ -661,7 +838,7 @@ public class HadbDataSpace implements DataSpace {
 	try {
 	    getNameStmnt.setString(1, name);
 	    ResultSet rs = getNameStmnt.executeQuery();
-	    conn.commit();
+	    getNameStmnt.getConnection().commit();
 	    if (rs.next()) {
 		oid = rs.getLong("OBJID");
 	    }
