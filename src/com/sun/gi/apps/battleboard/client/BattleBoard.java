@@ -1,26 +1,17 @@
-package com.sun.gi.apps.battleboard;
+package com.sun.gi.apps.battleboard.client;
 
-import java.io.Serializable;
-
-public class BattleBoard implements Serializable {
-
-    private static long serialVersionUID = 1;
+public class BattleBoard {
 
     /*
      * Default size, for now.  Use of defaults will be deprecated
      * later.
      */
 
-    static int DEFAULT_BOARD_HEIGHT	= 8;
-    static int DEFAULT_BOARD_WIDTH	= 8;
+    protected final int boardHeight;
+    protected final int boardWidth;
+    protected final int board[][];
 
-    final String name;
-    final int    boardHeight;
-    final int    boardWidth;
-    final int    startingCityCount;
-    final int    board[][];
-
-    int cityCount;
+    protected int cityCount;
 
     /*
      * Could use an enum, but that complicates the wire protocol.  So
@@ -35,31 +26,20 @@ public class BattleBoard implements Serializable {
     public static final int POS_NEAR	= 4;
     public static final int POS_MISS	= 5;
 
-    static final int MISS	= 100;
-    static final int NEAR_MISS	= 101;
-    static final int HIT	= 102;
+    static final int MISS       = 100;
+    static final int NEAR_MISS  = 101;
+    static final int HIT        = 102;
 
-    public BattleBoard(String name) {
-	this(name, DEFAULT_BOARD_HEIGHT, DEFAULT_BOARD_WIDTH);
-    }
-
-    public BattleBoard(String name, int width, int height) {
-	this(name, width, height, (width < height) ? width : height);
-    }
-
-    public BattleBoard(String name, int width, int height,
-	    int startingCities) {
+    public BattleBoard(int width, int height) {
 
 	if ((width <= 0) || (height <= 0)) {
 	    throw new IllegalArgumentException("invalid board size");
 	}
 
-	this.name = name;
 	boardWidth = width;
 	boardHeight = height;
-	startingCityCount = startingCities;
 
-	cityCount = startingCityCount;
+	cityCount = (width < height) ? width : height;
 
 	board = new int[boardWidth][boardHeight];
 
@@ -125,7 +105,7 @@ public class BattleBoard implements Serializable {
 	return board[x][y];
     }
 
-    int nukeBoardPosition(int x, int y) {
+    public int nukeBoardPosition(int x, int y) {
 	if ((x < 0) || (x >= boardWidth)) {
 	    throw new IllegalArgumentException("illegal x: " + x);
 	}
@@ -148,11 +128,7 @@ public class BattleBoard implements Serializable {
 	return rc;
     }
 
-    boolean lost() {
-	return (cityCount == 0);
-    }
-
-    int updateBoardPosition(int x, int y, int state) {
+    public int updateBoardPosition(int x, int y, int state) {
 	if ((x < 0) || (x >= boardWidth)) {
 	    throw new IllegalArgumentException("illegal x: " + x);
 	}
@@ -169,11 +145,15 @@ public class BattleBoard implements Serializable {
 	return rc;
     }
 
-    private boolean isHit(int x, int y) {
+    public boolean lost() {
+	return (cityCount == 0);
+    }
+
+    public boolean isHit(int x, int y) {
 	return (getBoardPosition(x, y) == POS_CITY);
     }
 
-    private boolean isNearMiss(int x, int y) {
+    public boolean isNearMiss(int x, int y) {
 
 	// Double-check for off-by-one errors!
 

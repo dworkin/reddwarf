@@ -1,7 +1,5 @@
 package com.sun.gi.apps.battleboard.client;
 
-import com.sun.gi.apps.battleboard.BattleBoard;
-
 import java.io.File;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -26,8 +24,7 @@ import com.sun.gi.utils.types.StringUtils;
 
 public class BattleBoardClient implements ClientConnectionManagerListener {
 
-    private static Logger log =
-	Logger.getLogger("com.sun.gi.apps.battleboard.client");
+    static Logger log = Logger.getLogger("com.sun.gi.apps.battleboard.client");
 
     protected BattleBoard board;
 
@@ -36,6 +33,18 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
 
     protected BufferedReader reader;
     protected Callback[] validationCallbacks = null;
+
+    protected String playerName = "player";
+
+    protected byte[] serverID = null;
+
+    enum State {
+	CONNECTING,
+	JOINING_GAME,
+	PLAY_AWAIT_TURN_ORDER,
+    }
+
+    State state = State.CONNECTING;
 
     public BattleBoardClient() {
 	reader = new BufferedReader(new InputStreamReader(System.in));
@@ -81,37 +90,23 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
     }
 */
 
-    protected void doPrompt(String prompt) {
+    protected void showPrompt(String prompt) {
 	System.out.print(prompt + ": ");
 	System.out.flush();
     }
  
     public void visitNameCallback(NameCallback cb) {
 	log.finer("visitNameCallback");
-	try {
-	    doPrompt(cb.getPrompt());
-	    String line = reader.readLine();
-	    if ((line == null || line.isEmpty())) {
-		return;
-	    }
-	    cb.setName(line);
-	} catch (IOException e) {
-	    e.printStackTrace();
-	}
+	showPrompt(cb.getPrompt());
+	String line = getLine();
+	playerName = line;
+	cb.setName(line);
     }
 
     public void visitPasswordCallback(PasswordCallback cb) {
 	log.finer("visitPasswordCallback");
-	try {
-	    doPrompt(cb.getPrompt());
-	    String line = reader.readLine();
-	    if ((line == null || line.isEmpty())) {
-		return;
-	    }
-	    cb.setPassword(line.toCharArray());
-	} catch (IOException e) {
-	    e.printStackTrace();
-	}
+	showPrompt(cb.getPrompt());
+	cb.setPassword(getLine().toCharArray());
     }
 
     // ClientConnectionManagerListener methods
@@ -134,8 +129,35 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
 	mgr.sendValidationResponse(callbacks);
     }
 
+    protected void sendJoinReq(ClientChannel chan) {
+	ByteBuffer data = ByteBuffer.allocate(64);
+	data.put("join ".getBytes());
+	data.put(playerName.getBytes());
+	// XXX how do we find out the serverID?
+	//chan.sendUnicastData(serverID, buf, true);
+    }
+
+    protected String getLine() {
+	try {
+	    String line = reader.readLine();
+	    return (line == null) ? "" : line;
+	} catch (IOException e) {
+	    e.printStackTrace();
+	    return "";
+	}
+    }
+
     public void connected(byte[] myID) {
 	log.info("connected");
+
+	switch (state) {
+	case CONNECTING:
+	    break;
+
+	default:
+	    log.warning("connected(): unexpected state " + state);
+	    break;
+	}
     }
 
     public void connectionRefused(String message) {
@@ -154,35 +176,9 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
 	log.info("userLeft");
     }
 
-    public void joinedChannel(final ClientChannel channel) {
-	log.info("joinedChannel " + channel.getName());
-
-	channel.setListener(new ClientChannelListener() {
-
-	    public void playerJoined(byte[] playerID) {
-		log.info("playerJoined on " + channel.getName());
-	    }
-
-	    public void playerLeft(byte[] playerID) {
-		log.info("playerJoined on " + channel.getName());
-	    }
-
-	    public void dataArrived(byte[] uid, ByteBuffer data,
-		    boolean reliable) {
-		log.info("dataArrived on " + channel.getName());
-
-		byte[] bytes = new byte[data.remaining()];
-		data.get(bytes);
-	    }
-
-	    public void channelClosed() {
-		log.info("channel " + channel.getName() + " closed");
-	    }
-	});
-    }
-
     public void failOverInProgress() {
-	log.info("failOverInProgress");
+	log.info("failOverInProgress - client choosing to exit");
+	System.exit(1);
     }
 
     public void reconnected() {
@@ -191,6 +187,82 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
 
     public void channelLocked(String chan, byte[] userID) {
 	log.warning("Channel `" + chan + "' is locked");
+    }
+
+    public void joinedChannel(final ClientChannel channel) {
+	log.info("joinedChannel " + channel.getName());
+
+	if (channel.getName().equals("matchmaker")) {
+
+	    showPrompt("Enter your handle [" + playerName + "]");
+	    String line = getLine();
+	    if (! line.isEmpty()) {
+		playerName = line;
+	    }
+
+	    channel.setListener(new ClientChannelListener(){
+		public void playerJoined(byte[] playerID) {
+		    log.info("playerJoined on " + channel.getName());
+		}
+
+		public void playerLeft(byte[] playerID) {
+		    log.info("playerJoined on " + channel.getName());
+		}
+
+		public void dataArrived(byte[] uid, ByteBuffer data,
+			boolean reliable) {
+		    log.info("dataArrived on " + channel.getName());
+
+		    byte[] bytes = new byte[data.remaining()];
+		    data.get(bytes);
+
+		    log.info("got matchmaker data `" + bytes + "'");
+		}
+
+		public void channelClosed() {
+		    log.info("channel " + channel.getName() + " closed");
+		}
+	    });
+
+	    state = State.JOINING_GAME;
+	    sendJoinReq(channel);
+	    return;
+	}
+
+	// Ok, must be a new game channel we've joined
+	if (state == State.JOINING_GAME) {
+	    channel.setListener(new BattleBoardPlayer(channel));
+	    state = State.PLAY_AWAIT_TURN_ORDER;
+	}
+    }
+
+    class BattleBoardPlayer implements ClientChannelListener {
+
+	final ClientChannel channel;
+
+	public BattleBoardPlayer(ClientChannel chan) {
+	    channel = chan;
+	}
+
+	public void playerJoined(byte[] playerID) {
+	    log.info("playerJoined on " + channel.getName());
+	}
+
+	public void playerLeft(byte[] playerID) {
+	    log.info("playerJoined on " + channel.getName());
+	}
+
+	public void dataArrived(byte[] uid, ByteBuffer data,
+		boolean reliable) {
+	    log.info("dataArrived on " + channel.getName());
+
+	    byte[] bytes = new byte[data.remaining()];
+	    data.get(bytes);
+	}
+
+	public void channelClosed() {
+	    log.info("channel " + channel.getName() + " closed");
+	}
     }
 
     // main()
