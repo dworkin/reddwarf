@@ -4,27 +4,20 @@
 
 package com.sun.gi.objectstore.tso.dataspace;
 
-import java.lang.ref.SoftReference;
+import com.sun.gi.objectstore.NonExistantObjectIDException;
+import java.sql.Blob;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
-import java.sql.Statement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
+import java.sql.Statement;
 import java.util.HashSet;
-import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
-import java.util.Queue;
-import java.util.Set;
 import java.util.Map.Entry;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-
-import com.sun.gi.objectstore.NonExistantObjectIDException;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * A {@link DataSpace} based on HADB/JDBC.
@@ -32,9 +25,6 @@ import com.sun.gi.objectstore.NonExistantObjectIDException;
 public class HadbDataSpace implements DataSpace {
 
     private long appID;
-    private Map<Long, SoftReference<byte[]>> dataSpace = new LinkedHashMap<Long, SoftReference<byte[]>>();
-    private Map<String, Long> nameSpace = new LinkedHashMap<String, Long>();
-    private Set<Long> lockSet = new HashSet<Long>();
     private Object idMutex = new Object();
     private String dataConnURL;
 
@@ -190,81 +180,6 @@ public class HadbDataSpace implements DataSpace {
     }
 
     /**
-     * @param newNames
-     * @param updateList
-     * @param deleteList
-     */
-     /*
-    protected void doDiskUpdate(DiskUpdateRecord rec) {
-	if (TRACEDISK){
-	    System.out.println("      Starting commit");
-	}
-	if (TRACEDISK && (rec.newNames.length>0)){
-	    System.out.println("      Starting inserts");
-	}
-	for (int i = 0; i < rec.newNames.length; i++) {
-	    try {
-		insertNameStmnt.setString(1, rec.newNames[i]);
-		insertNameStmnt.setLong(2, rec.newNameIDs[i]);
-		insertNameStmnt.execute();
-	    } catch (SQLException e1) {
-		e1.printStackTrace();
-	    }
-	}
-	if (TRACEDISK && (rec.updateData.length>0)){
-	    System.out.println("      Starting updates");
-	}
-	for (int i = 0; i < rec.updateData.length; i++) {
-	    try {
-		if (rec.insertSet.contains(rec.updateIDs[i])) { // new
-		    insertObjStmnt.setLong(1, rec.updateIDs[i]);
-		    insertObjStmnt.setBytes(2, rec.updateData[i]);
-		    insertObjStmnt.execute();
-		} else { // update
-		    updateObjStmnt.setBytes(1, rec.updateData[i]);
-		    updateObjStmnt.setLong(2, rec.updateIDs[i]);
-		    updateObjStmnt.execute();
-		}
-	    } catch (SQLException e1) {
-		e1.printStackTrace();
-	    }
-	}
-	if (TRACEDISK && (rec.deleteIDs.length>0)){
-	    System.out.println("      Starting deletes");
-	}
-	for (Long delid : rec.deleteIDs) {
-	    try {
-		deleteObjStmnt.setLong(1, delid);
-		deleteObjStmnt.execute();
-	    } catch (SQLException e1) {
-		e1.printStackTrace();
-	    }
-	}
-	try {
-	    if (TRACEDISK){
-		System.out.println("      Setting next ID = "+rec.nextID);
-	    }
-	    updateInfoStmnt.setLong(1, rec.nextID);
-	    updateInfoStmnt.setLong(2, appID);
-	    updateInfoStmnt.execute();
-	} catch (SQLException e1) {
-	    e1.printStackTrace();
-	}
-	try {
-	    if (TRACEDISK){
-		System.out.println("      COmitting trans");
-	    }			
-	    updateConn.commit();
-	    if (TRACEDISK){
-		System.out.println("      Trans comitted");
-	    }
-	} catch (SQLException e1) {
-	    e1.printStackTrace();
-	}
-    }
-    */
-
-    /**
      * @throws SQLException
      */
     private void checkTables() throws SQLException {
@@ -285,6 +200,7 @@ public class HadbDataSpace implements DataSpace {
 	    String s = "CREATE SCHEMA " + SCHEMA;
 	    Statement stmnt = conn.createStatement();
 	    stmnt.execute(s);
+	    stmnt.getConnection().commit();
 	} catch (SQLException e) {
 
 	    /*
@@ -309,6 +225,7 @@ public class HadbDataSpace implements DataSpace {
 		foundTables.add(rs.getString(1).trim());
 	    }
 	    rs.close();
+	    stmnt.getConnection().commit();
 	} catch (Exception e) {
 	    // XXX: failure?
 	    System.out.println("failure finding schema" + e);
@@ -556,15 +473,17 @@ public class HadbDataSpace implements DataSpace {
 		    newIdBlockBase = rs.getLong("NEXTIDBLOCKBASE"); // "2"
 		    newIdBlockSize = rs.getInt("IDBLOCKSIZE"); // "3"
 
+		    /*
 		    System.out.println("NEXTIDBLOCKBASE/IDBLOCKSIZE " +
 			    newIdBlockBase + "/" + newIdBlockSize);
+		    */
 
 		    updateInfoStmnt.setLong(1, newIdBlockBase + newIdBlockSize);
 		    updateInfoStmnt.setLong(2, appID);
 		    try {
 			updateInfoStmnt.executeUpdate();
 			updateInfoStmnt.getConnection().commit();
-			System.out.println("SUCCESS");
+			// System.out.println("SUCCESS");
 			success = true;
 		    } catch (SQLException e) {
 			if (e.getErrorCode() == 2097) {
@@ -574,11 +493,12 @@ public class HadbDataSpace implements DataSpace {
 				Thread.sleep(2);
 			    } catch (Exception e2) {
 			    }
+			} else {
+			    System.out.println("YY " + e + " " + e.getErrorCode());
+			    e.printStackTrace();
 			}
-			System.out.println("YY " + e + " " + e.getErrorCode());
-			e.printStackTrace();
 		    } finally {
-			System.out.println("\t\tClosing...");
+			// System.out.println("\t\tClosing...");
 			rs.close();
 		    }
 
@@ -611,7 +531,7 @@ public class HadbDataSpace implements DataSpace {
 	}
 
 	long newOID = currentIdBlockBase + currentIdBlockOffset++;
-	System.out.println("NEW OID " + newOID);
+	// System.out.println("NEW OID " + newOID);
 
 	/*
 	 * For the sake of convenience, create the object lock
@@ -622,7 +542,7 @@ public class HadbDataSpace implements DataSpace {
 	 */
 
 	try {
-	    System.out.println("inserting oid " + newOID);
+	    // System.out.println("inserting oid " + newOID);
 	    insertObjLockStmnt.setLong(1, newOID);
 	    insertObjLockStmnt.setInt(2, 0);
 	} catch (SQLException e) {
@@ -657,10 +577,13 @@ public class HadbDataSpace implements DataSpace {
 	    ResultSet rs = getObjStmnt.executeQuery();
 	    getObjStmnt.getConnection().commit();
 	    if (rs.next()) {
-		objbytes = rs.getBytes("OBJBYTES");
+		// objbytes = rs.getBytes("OBJBYTES");
+		Blob b = rs.getBlob("OBJBYTES");
+		objbytes = b.getBytes(1L, (int) b.length());
 	    }
 	    rs.close(); // cleanup and free locks
 	} catch (SQLException e) {
+	    System.out.println(e);
 	    e.printStackTrace();
 	}
 	return objbytes;
@@ -672,8 +595,7 @@ public class HadbDataSpace implements DataSpace {
     public void lock(long objectID) throws NonExistantObjectIDException {
 
 	/*
-	 * This is ugly.  I'd love to hear about a better
-	 * approach.
+	 * This is ugly.  I'd love to hear about a better approach.
 	 *
 	 * Locks are stored in a table in the database, with one row
 	 * per object.  To get a lock on an object, an attempt is made
@@ -728,8 +650,10 @@ public class HadbDataSpace implements DataSpace {
 	    }
 
 	    if (rc == 1) {
+		/*
 		System.out.println("Got the lock on " +
 			objectID + " rc = " + rc);
+		*/
 		return;
 	    } else {
 		System.out.println("Missed the lock on " +
@@ -740,6 +664,7 @@ public class HadbDataSpace implements DataSpace {
 		 * a short pause.  The pause backs off to a maximum of
 		 * 5ms.
 		 */
+
 		if (backoffSleep > 0) {
 		    try {
 			Thread.sleep(backoffSleep);
@@ -798,7 +723,7 @@ public class HadbDataSpace implements DataSpace {
 	}
 
 	if (rc == 1) {
-	    System.out.println("Released the lock on " + objectID + " rc = " + rc);
+	    // System.out.println("Released the lock on " + objectID + " rc = " + rc);
 	    return;
 	} else {
 	    System.out.println("Didn't need to unlock " + objectID + " rc = " + rc);
@@ -809,7 +734,7 @@ public class HadbDataSpace implements DataSpace {
     /**
      * {@inheritDoc}
      */
-    public void atomicUpdate(boolean clear, Map<String, Long> newNames,
+    public synchronized void atomicUpdate(boolean clear, Map<String, Long> newNames,
 	    Set<Long> deleteSet, Map<Long, byte[]> updateMap,
 	    Set<Long> insertIDs)
 	throws DataSpaceClosedException
@@ -818,61 +743,94 @@ public class HadbDataSpace implements DataSpace {
 	    throw new DataSpaceClosedException();
 	}
 
-	synchronized (dataSpace) {
-	    synchronized (nameSpace) {
-		for (Entry<Long, byte[]> e : updateMap.entrySet()) {
-		    dataSpace.put(e.getKey(), new SoftReference<byte[]>(e
-						.getValue()));
-			}
-			nameSpace.putAll(newNames);
-			for (Long id : deleteSet) {
-				dataSpace.remove(id);
-			}
-		}
+	// Commit any outstanding transactions.  There SHOULDN'T be
+	// any, but if there's a bug elsewhere, keep it out of this
+	// transaction.
+
+	try {
+	    deleteObjStmnt.getConnection().commit();
+	    updateObjStmnt.getConnection().commit();
+	    insertObjStmnt.getConnection().commit();
+	    insertNameStmnt.getConnection().commit();
+	} catch (SQLException e) {
+	    // XXX: rollback and die
+	    // Is there anything we can do here, other than weep?
+	    e.printStackTrace();
 	}
 
-	// asynchronously update the persistant storage
-	//
-	// IMPORTANT:  This update record will pin the objects in
-	// memory and thus in the cache until it is complete.  This is
-	// VERY important so that things don't get cleaned out of the
-	// cache until they have been persisted.  It is acceptable to
-	// lose transactions, if the entire system dies, but that is
-	// the only time.  Even in this case those lost must be atomic
-	// (all or nothing.)
-
-	Long[] nameIDs = new Long[newNames.values().size()];
-	String[] names = new String[newNames.keySet().size()];
-	int i = 0;
 	for (Entry<String, Long> e : newNames.entrySet()) {
-	    nameIDs[i] = e.getValue();
-	    names[i++] = e.getKey();
+	    long oid = e.getValue();
+	    String name = e.getKey();
+
+	    /*
+	     * If something is in the deleteSet, then there's no need
+	     * to insert it because we're going to remove it as part
+	     * of this atomic op.
+	     */
+
+	    if (deleteSet.contains(oid)) {
+		continue;
+	    }
+
+	    try {
+		insertNameStmnt.setString(1, name);
+		insertNameStmnt.setLong(2, oid);
+		insertNameStmnt.execute();
+	    } catch (SQLException e1) {
+		// XXX: rollback and die
+		e1.printStackTrace();
+	    }
 	}
-	Long[] deleteIDs = new Long[deleteSet.size()];
-	i = 0;
-	for (Long l : deleteSet) {
-		deleteIDs[i++] = l;
-	}
-	Long[] updateIDs = new Long[updateMap.entrySet().size()];
-	byte[][] updateData = new byte[updateMap.entrySet().size()][];
-	i = 0;
+
 	for (Entry<Long, byte[]> e : updateMap.entrySet()) {
-		updateIDs[i] = e.getKey();
-		updateData[i++] = e.getValue();
-	}
-	Set<Long> insertSet = new HashSet<Long>(insertIDs);
-	/* DJE
-	synchronized (diskUpdateQueue) {
-		if(!closed){ //closed while we were processing
-			if (TRACEDISK){
-				System.out.println("Queuing commit #"+commitRegisterCounter++);
-			}
-			diskUpdateQueue.add(new DiskUpdateRecord(updateIDs, updateData,
-				nameIDs, names, deleteIDs, id, insertSet));
-			diskUpdateQueue.notifyAll();
+	    long oid = e.getKey();
+	    byte[] data = e.getValue();
+
+	    if (deleteSet.contains(oid)) {
+		continue;
+	    }
+
+	    try {
+		if (insertIDs.contains(oid)) {
+		    insertObjStmnt.setLong(1, oid);
+		    insertObjStmnt.setBytes(2, data);
+		    insertObjStmnt.execute();
+		} else {
+		    updateObjStmnt.setBytes(1, data);
+		    updateObjStmnt.setLong(2, oid);
+		    updateObjStmnt.execute();
 		}
+	    } catch (SQLException e1) {
+		// XXX: rollback and die
+		e1.printStackTrace();
+	    }
 	}
-	*/
+
+	for (long oid : deleteSet) {
+	    if (insertIDs.contains(oid)) {
+		continue;
+	    }
+
+	    try {
+		deleteObjStmnt.setLong(1, oid);
+		deleteObjStmnt.execute();
+	    } catch (SQLException e1) {
+		// XXX: rollback and die
+		e1.printStackTrace();
+	    }
+	}
+
+	// There's got to be a better way.
+	try {
+	    deleteObjStmnt.getConnection().commit();
+	    updateObjStmnt.getConnection().commit();
+	    insertObjStmnt.getConnection().commit();
+	    insertNameStmnt.getConnection().commit();
+	} catch (SQLException e) {
+	    // XXX: rollback and die
+	    // Is there anything we can do here, other than weep?
+	    e.printStackTrace();
+	}
 
     }
 
@@ -903,50 +861,35 @@ public class HadbDataSpace implements DataSpace {
 	return appID;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#clear()
+    /**
+     * {@inheritDoc}
      */
     public void clear() {
-	    try {
-/* 		    synchronized(diskUpdateQueue){ */
-			    synchronized(dataSpace){
-				    synchronized(nameSpace){
-					    dataSpace.clear();
-					    System.out.println("cleared dataSpace");
-					    nameSpace.clear();
-					    System.out.println("cleared nameSpace");
-/* 					    diskUpdateQueue.clear(); */
-					    System.out.println("cleared diskUpdateQueue");
-					    // lockObjTableStmnt.execute();
-					    // lockNameTableStmnt.execute();
-					    // clearObjTableStmnt.execute();
-					    // conn.commit();
 
-					    clearTables();
-					    // conn.commit();
+	// XXX: INCOMPLETE.
+	// XXX: why does deleting the contents of tables take so long?
 
-					    System.out.println("cleared objTable");
-					    clearNameTableStmnt.execute();
-					    // conn.commit();
-					    System.out.println("cleared nameTable");
-					    
-				    }
-			    }
-/* 		    } */
+	try {
+	    // lockObjTableStmnt.execute();
+	    // lockNameTableStmnt.execute();
+	    // clearObjTableStmnt.execute();
+	    // conn.commit();
 
-	    } catch (SQLException e) {
-		    
-		    e.printStackTrace();
-	    }
+	    // clearTables();
+	    // conn.commit();
 
+	    System.out.println("clearing nameTable");
+	    clearNameTableStmnt.getConnection().commit();
+	    clearNameTableStmnt.execute();
+	    clearNameTableStmnt.getConnection().commit();
+	    System.out.println("cleared nameTable");
+	} catch (SQLException e) {
+	    e.printStackTrace();
+	}
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#close()
+    /**
+     * {@inheritDoc}
      */
     public void close() {
 	closed = true;

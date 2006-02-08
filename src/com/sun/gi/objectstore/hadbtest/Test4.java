@@ -24,7 +24,9 @@ public class Test4 {
 	 * Connect to the database, test the connection.
 	 */
 
-	ObjectStore os = TestUtil.connect(false);
+	// ObjectStore os = TestUtil.connect(false);
+	// ObjectStore os = TestUtil.connect(1, true, "hadb", "Hlog1");
+	ObjectStore os = TestUtil.connect(1, true, "hadb", null);
 
 	if (TestUtil.sanityCheck(os, "Hello, World", true)) {
 	    System.out.println("appears to work");
@@ -70,8 +72,8 @@ public class Test4 {
 
 	System.out.println("continuing...");
 
-	for (long snooze = 20; snooze >= 10; snooze -= 1) {
-	    ClientTest4 t = new ClientTest4(10, os, clusters, snooze, 100);
+	for (long snooze = 0; snooze >= 0; snooze -= 1) {
+	    ClientTest4 t = new ClientTest4(10, os, clusters, snooze, 1000);
 
 	    t.run();
 

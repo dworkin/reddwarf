@@ -46,13 +46,15 @@ class ClientTest4 implements Runnable {
 	System.out.println("starting up " + clientId + ": whoopee");
 	lastWake = System.currentTimeMillis();
 
-	int incr = 1000;
+	int incr = 100;
 	for (int count = 0; count < iters; count += incr) {
 	    long start = System.currentTimeMillis();
 	    for (int i = 0; i < incr; i++) {
 		try {
 		    doRandomTransaction(verbose);
-		    Thread.sleep(sleepTime);
+		    if (sleepTime > 0) {
+			Thread.sleep(sleepTime);
+		    }
 		} catch (Exception e) {
 		    // DJE:
 		    System.out.println("unexpected exception: " + e);
