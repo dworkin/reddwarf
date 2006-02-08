@@ -25,6 +25,17 @@ import com.sun.gi.comm.users.client.ClientChannelListener;
 import com.sun.gi.utils.types.StringUtils;
 import com.sun.gi.utils.types.BYTEARRAY;
 
+
+/**
+ * <p>The ChatChannelFrame presents a GUI so that a user can interact with a channel.  The users connected
+ * to the channel are displayed in a list on the right side.  Messages can be sent on the channel via an
+ * input area on the left side.</p>
+ * 
+ * <p>This class communicates with its channel by implementing ClientChannelListener, and signing up as
+ * a listener on the channel.  As data arrives, and players leave or join, the appropriate call backs are 
+ * called.</p>
+ */
+
 //@SuppressWarnings("serial")
 public class ChatChannelFrame extends JInternalFrame implements ClientChannelListener{
 	final ClientChannel chan;
@@ -108,20 +119,37 @@ public class ChatChannelFrame extends JInternalFrame implements ClientChannelLis
 		setVisible(true);
 		
 	}
+	
+	
+	/**
+	 * Called when a player/user joins the channel.
+	 */
 	public void playerJoined(byte[] playerID) {
 		DefaultListModel mdl = (DefaultListModel)userList.getModel();
 		mdl.addElement(new BYTEARRAY(playerID));
 		
 	}
+	
+	/**
+	 * Called when a player/user leaves the channel.
+	 */
 	public void playerLeft(byte[] playerID) {
 		DefaultListModel mdl = (DefaultListModel)userList.getModel();
 		mdl.removeElement(new BYTEARRAY(playerID));		
 	}
+	
+	/**
+	 * Called when data arrives on the channel.
+	 */
 	public void dataArrived(byte[] from, ByteBuffer data, boolean reliable){	
 		byte[] textb =new byte[data.remaining()];
 		data.get(textb);
 		outputArea.append(StringUtils.bytesToHex(from,from.length-4)+": "+ new String(textb)+"\n");	
 	}
+	
+	/**
+	 * Called when the channel is closed.
+	 */
 	public void channelClosed() {
 		if (getDesktopPane() != null) {
 			getDesktopPane().remove(this);

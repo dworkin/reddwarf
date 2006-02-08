@@ -42,6 +42,33 @@ import com.sun.gi.utils.types.BYTEARRAY;
 import com.sun.gi.utils.types.StringUtils;
 
 //@SuppressWarnings("serial")
+
+/**
+ * <p>The ChatTestClient implements a simple chat program using a Swing UI, mainly for server channel testing purposes.  
+ * It allows the user to open arbitrary channels by name, or to use the Direct Client to Client (DCC)
+ * channel.</p>
+ * 
+ * <p>Before connecting to any channels, the user must login to the server via a UserManager.  When the Login button 
+ * is pressed, a list of available UserManagers is displayed. (Right now the TCPIPUserManager is the only implemented
+ * option).  After selecting a UserManager, the user is prompted for credentials (currently "Guest" with a blank 
+ * password will do a default login).</p>
+ * 
+ * <p>Once logged in, the user can open a new channel, or join an existing channel by clicking the "Open Channel" button
+ * and typing in the channel name.  Once connected to a channel, a separate window opens revealing the users connected to
+ * that channel as well as an area to type messages.  Each channel opened will appear in a new window.</p>
+ * 
+ * <p>A user can send a message directly to the server via the "Send to Server" button.  Messages are sent to the server
+ * via the ClientConnectionManager.</p>
+ * 
+ * <p>A user can send a Direct Client to Client message via the "Send Multi-DCC" button.  This will send a multicast
+ * message on the well-known DCC channel.</p>
+ * 
+ * <p>This class implements ClientConnectionManagerListener so that it can receive and respond to connection events from the server.</p>
+ * 
+ * <p>The ChatTestClient is designed to work with the server application, CommTestBoot.  This application must be installed and 
+ * running on the server for the ChatTestClient to successfully login.  Multiple instances of this program can be run so that 
+ * multiple users will be shown in the client.</p>
+ */
 public class ChatTestClient extends JFrame implements
 		ClientConnectionManagerListener {
 	JButton loginButton;

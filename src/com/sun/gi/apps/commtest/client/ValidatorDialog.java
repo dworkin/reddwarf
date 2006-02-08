@@ -26,6 +26,14 @@ import javax.swing.JPanel;
 import javax.swing.JPasswordField;
 import javax.swing.JTextField;
 
+/**
+ * This class provides a Swing GUI for server validation fulfillment.  When connecting to a server application
+ *  via a UserManager, the UserManager will attempt to validate the user based on the applications validation
+ *  settings as specified in its deployment descriptor.  In the case of the CommTest application, a password 
+ *  is required.
+ *
+ */
+
 //@SuppressWarnings("serial")
 public class ValidatorDialog extends JDialog{
 	Callback[] callbacks;
