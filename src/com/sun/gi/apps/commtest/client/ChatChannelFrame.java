@@ -43,6 +43,12 @@ public class ChatChannelFrame extends JInternalFrame implements ClientChannelLis
 	JTextField inputField;
 	JTextArea outputArea;
 	ByteBuffer outbuff;
+	
+	/**
+	 * Constructs a new ChatChannelFrame as a wrapper around the given channel.
+	 * 
+	 * @param channel		the channel that this class will manage.
+	 */
 	public ChatChannelFrame(ClientChannel channel){
 		super("Channel: "+channel.getName());
 		outbuff = ByteBuffer.allocate(2048);
@@ -122,7 +128,8 @@ public class ChatChannelFrame extends JInternalFrame implements ClientChannelLis
 	
 	
 	/**
-	 * Called when a player/user joins the channel.
+	 * A call back from ClientChannelListener.  Called when a player/user joins the channel.
+	 * This implementation responds by adding the user to the list.
 	 */
 	public void playerJoined(byte[] playerID) {
 		DefaultListModel mdl = (DefaultListModel)userList.getModel();
@@ -131,7 +138,8 @@ public class ChatChannelFrame extends JInternalFrame implements ClientChannelLis
 	}
 	
 	/**
-	 * Called when a player/user leaves the channel.
+	 * A call back from ClientChannelListener.  Called when a player/user leaves the channel.
+	 * This implementation responds by removing the user from the user list.  
 	 */
 	public void playerLeft(byte[] playerID) {
 		DefaultListModel mdl = (DefaultListModel)userList.getModel();
@@ -139,7 +147,10 @@ public class ChatChannelFrame extends JInternalFrame implements ClientChannelLis
 	}
 	
 	/**
-	 * Called when data arrives on the channel.
+	 * A call back from ClientChannelListener.  Called when data arrives on the channel.  
+	 * This implementation simply dumps the data to the output area as a String in the form of:
+	 * 
+	 * <User who sent the message>: <Message>
 	 */
 	public void dataArrived(byte[] from, ByteBuffer data, boolean reliable){	
 		byte[] textb =new byte[data.remaining()];
@@ -148,7 +159,8 @@ public class ChatChannelFrame extends JInternalFrame implements ClientChannelLis
 	}
 	
 	/**
-	 * Called when the channel is closed.
+	 * Called when the channel is closed.  The frame has no need to exist if the channel is closed,
+	 * so it removes itself from the parent.
 	 */
 	public void channelClosed() {
 		if (getDesktopPane() != null) {

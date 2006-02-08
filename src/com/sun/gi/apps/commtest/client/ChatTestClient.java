@@ -65,12 +65,12 @@ import com.sun.gi.utils.types.StringUtils;
  * 
  * <p>This class implements ClientConnectionManagerListener so that it can receive and respond to connection events from the server.</p>
  * 
- * <p>The ChatTestClient is designed to work with the server application, CommTestBoot.  This application must be installed and 
+ * <p>The ChatTestClient is designed to work with the server application, ChatTest.  This application must be installed and 
  * running on the server for the ChatTestClient to successfully login.  Multiple instances of this program can be run so that 
  * multiple users will be shown in the client.</p>
  */
-public class ChatTestClient extends JFrame implements
-		ClientConnectionManagerListener {
+public class ChatTestClient extends JFrame implements ClientConnectionManagerListener {
+	
 	JButton loginButton;
 
 	JButton openChannelButton;
@@ -79,11 +79,11 @@ public class ChatTestClient extends JFrame implements
 
 	JDesktopPane desktop;
 
-	JList userList;
+	JList userList;						// a list of users currently connected to the ChatTest app on the server.
 
-	ClientConnectionManager mgr;
+	ClientConnectionManager mgr;		// used for communication with the server.
 
-	ClientChannel dccChannel;
+	ClientChannel dccChannel;			// the well-known channel for Direct Client to Client communication.
 
 	private JButton dccButton;
 
@@ -110,8 +110,9 @@ public class ChatTestClient extends JFrame implements
 		eastPanel.setLayout(new BorderLayout());
 		eastPanel.add(new JLabel("Users"), BorderLayout.NORTH);
 		userList = new JList(new DefaultListModel());
-		userList
-				.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
+		userList.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
+		
+		
 		userList.addMouseListener(new MouseAdapter() {
 			public void mouseClicked(MouseEvent evt) {
 				if (evt.getClickCount() > 1) {
@@ -126,6 +127,7 @@ public class ChatTestClient extends JFrame implements
 
 			}
 		});
+		
 		userList.setCellRenderer(new ListCellRenderer(){
 			JLabel text = new JLabel();
 			public Component getListCellRendererComponent(JList arg0, Object arg1, int arg2, boolean arg3, boolean arg4) {
@@ -137,6 +139,12 @@ public class ChatTestClient extends JFrame implements
 		c.add(eastPanel, BorderLayout.EAST);
 		buttonPanel.setLayout(new GridLayout(1, 0));
 		loginButton = new JButton("Login");
+		
+		// The login button will attempt to login to the ChatTest application on the server.
+		// It must do this via an UserManager.  The ClientConnectionManager is used to 
+		// return an array of valid UserManager class names.  Once selected, the ClientConnectionManager
+		// will attempt to connect via this UserManager.
+		
 		loginButton.addActionListener(new ActionListener() {
 
 			public void actionPerformed(ActionEvent e) {
@@ -161,6 +169,10 @@ public class ChatTestClient extends JFrame implements
 
 			}
 		});
+		
+		// Opens a channel by name on the server.  If the channel doesn't exist, 
+		// it will be opened.  In either case, it will attempt to join the user 
+		// to the specified channel.
 		openChannelButton = new JButton("Open Channel");
 		openChannelButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
@@ -170,6 +182,8 @@ public class ChatTestClient extends JFrame implements
 			}
 		});
 		openChannelButton.setEnabled(false);
+		
+		// Sends a message directly to the server.
 		serverSendButton = new JButton("Send to Server");
 		serverSendButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
@@ -183,6 +197,8 @@ public class ChatTestClient extends JFrame implements
 			}
 		});
 		serverSendButton.setEnabled(false);
+		
+		// sends a mulicast message to the selected users on the DCC channel.
 		dccButton = new JButton("Send Multi-DCC ");
 		dccButton.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
@@ -207,7 +223,12 @@ public class ChatTestClient extends JFrame implements
 		pack();
 		setSize(800, 600);
 		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-		// start connection process.
+		
+		// start connection process.  The ClientConnectionManager is the central
+		// point of server communication for the client.  The ClientConnectionManager
+		// needs to know the application name to attempt to connect to on the server
+		// and how to find it.  In this case the app name is "ChatTest" and FakeDiscovery.xml
+		// lists the valid UserManagers.
 		try {
 			mgr = new ClientConnectionManagerImpl("ChatTest",
 					new URLDiscoverer(new File("FakeDiscovery.xml").toURI()
@@ -218,6 +239,8 @@ public class ChatTestClient extends JFrame implements
 			e.printStackTrace();
 			System.exit(2);
 		}
+		
+		// When the window closes, disconnect from the manager.
 		this.addWindowStateListener(new WindowStateListener() {
 			public void windowStateChanged(WindowEvent arg0) {
 				if (arg0.getNewState() == WindowEvent.WINDOW_CLOSED) {
@@ -229,7 +252,9 @@ public class ChatTestClient extends JFrame implements
 	}
 
 	/**
-	 * @param message
+	 * Sends a message to the server via the ClientConnectionManager.
+	 * 
+	 * @param message		the message to send.
 	 */
 	protected void doServerMessage(String message) {
 		ByteBuffer out = ByteBuffer.allocate(message.length());
@@ -239,8 +264,10 @@ public class ChatTestClient extends JFrame implements
 	}
 
 	/**
-	 * @param targetList
-	 * @param message
+	 * Sends a multicast message on the DCC channel.
+	 * 
+	 * @param targetList		the list of users to send to
+	 * @param message			the message to send
 	 */
 	protected void doMultiDCCMessage(byte[][] targetList, String message) {
 		ByteBuffer out = ByteBuffer.allocate(message.length());
@@ -250,7 +277,10 @@ public class ChatTestClient extends JFrame implements
 	}
 
 	/**
+	 * Sends a message to a single user on the DCC channel.
 	 * 
+	 * @param target		the user to send to.
+	 * @param message		the message to send.
 	 */
 	protected void doDCCMessage(byte[] target, String message) {
 		ByteBuffer out = ByteBuffer.allocate(message.length());
@@ -259,12 +289,30 @@ public class ChatTestClient extends JFrame implements
 
 	}
 
+	/**
+	 * ClientConnectionManagerListener callback.
+	 * 
+	 * Called by the ClientConnectionManager to request validation credentials.
+	 * The ValidatorDialog takes over from here to populate the CallBacks with 
+	 * user data.  
+	 * 
+	 * In the case of ChatTest, both a username and password are required. 
+	 * 
+	 * @param callbacks			the array of javax.security.auth.callbacks.CallBacks to validate against.
+	 */
 	public void validationRequest(Callback[] callbacks) {
 		statusMessage.setText("Status: Validating...");
 		new ValidatorDialog(this, callbacks);
 		mgr.sendValidationResponse(callbacks);
 	}
 
+	/**
+	 * ClientConnectionManagerListener callback.
+	 * 
+	 * Called by the ClientConnectionManager when the login is successful.
+	 * 
+	 * @param myID			the user's id.  Used for future communication with the server.
+	 */
 	public void connected(byte[] myID) {
 		statusMessage.setText("Status: Connected");
 		setTitle("Chat Test Client: " + StringUtils.bytesToHex(myID));
@@ -276,12 +324,25 @@ public class ChatTestClient extends JFrame implements
 		mgr.openChannel(DCC_CHAN_NAME);
 	}
 
+	/**
+	 * ClientConnectionManagerListener callback.
+	 * 
+	 * Called by the ClientConnectionManager if the login attempt failed.
+	 * 
+	 * @param message		the reason for failure.
+	 */
 	public void connectionRefused(String message) {
 		statusMessage.setText("Status: Connection refused. (" + message + ")");
 		loginButton.setText("Login");
 		loginButton.setEnabled(true);
 	}
 
+	/**
+	 * ClientConnectionManagerListener callback.
+	 * 
+	 * Called by ClientConnectionManager when the user is disconnected.
+	 * 
+	 */
 	public void disconnected() {
 		statusMessage.setText("Status: logged out");
 		loginButton.setText("Login");
@@ -291,6 +352,14 @@ public class ChatTestClient extends JFrame implements
 		serverSendButton.setEnabled(false);
 	}
 
+	/**
+	 * ClientConnectionManagerListener callback.
+	 * 
+	 * Called by the ClientConnectionManager when a new user joins the application.
+	 * The new user is added to the user list on the right side.
+	 * 
+	 * @parma userID		the new user
+	 */
 	public void userJoined(byte[] userID) {
 		DefaultListModel mdl = (DefaultListModel) userList.getModel();
 		mdl.addElement(new BYTEARRAY(userID));
@@ -298,25 +367,39 @@ public class ChatTestClient extends JFrame implements
 
 	}
 
+	/**
+	 * ClientConnectionManagerListener callback.
+	 * 
+	 * Called by the ClientConnectionManager when a user leaves the application.
+	 * The user is removed from the user list on the right side.
+	 * 
+	 * @param userID		the user that left.
+	 */
 	public void userLeft(byte[] userID) {
 		DefaultListModel mdl = (DefaultListModel) userList.getModel();
 		mdl.removeElement(new BYTEARRAY(userID));
 		userList.repaint();
 	}
 
+	
+	/**
+	 * ClientConnectionManagerListener callback.
+	 * 
+	 * Called by the ClientConnectionManager as confirmation that the user
+	 * joined the given channel.  If the channel is the DCC channel, a 
+	 * ClientChannelListener will be attached to receive data from it.
+	 * 
+	 * @param channel		the channel to which the user was joined.
+	 */
 	public void joinedChannel(ClientChannel channel) {
 		if (channel.getName().equals(DCC_CHAN_NAME)) {
 			dccChannel = channel;
 			dccChannel.setListener(new ClientChannelListener() {
 
 				public void playerJoined(byte[] playerID) {
-					// TODO Auto-generated method stub
-
 				}
 
 				public void playerLeft(byte[] playerID) {
-					// TODO Auto-generated method stub
-
 				}
 
 				public void dataArrived(byte[] from, ByteBuffer data,
@@ -332,8 +415,6 @@ public class ChatTestClient extends JFrame implements
 				}
 
 				public void channelClosed() {
-					// TODO Auto-generated method stub
-
 				}
 			});
 		} else {
@@ -344,6 +425,9 @@ public class ChatTestClient extends JFrame implements
 	}
 
 	/**
+	 * Starting point for the client app.
+	 * 
+	 * 
 	 * @param args
 	 */
 	public static void main(String[] args) {
