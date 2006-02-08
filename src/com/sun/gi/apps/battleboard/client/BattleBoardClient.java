@@ -196,7 +196,7 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
 
 	    showPrompt("Enter your handle [" + playerName + "]");
 	    String line = getLine();
-	    if (! line.isEmpty()) {
+	    if (line.length() > 0) {
 		playerName = line;
 	    }
 
