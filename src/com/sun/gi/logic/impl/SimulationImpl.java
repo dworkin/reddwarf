@@ -159,6 +159,8 @@ public class SimulationImpl implements Simulation {
 			ByteBuffer buff) {
 		List<Long> listeners = channelListeners.get(cid);
 		if (listeners != null) {
+			ByteBuffer outBuff = buff.duplicate();
+			outBuff.flip();
 			Method m;
 			try {
 				m = SimChannelListener.class.getMethod("dataArrived",
@@ -166,7 +168,7 @@ public class SimulationImpl implements Simulation {
 						ByteBuffer.class);
 				for (Long uid : listeners) {
 					queueTask(newTask(uid.longValue(), m, new Object[] { cid,
-							from, buff }));
+							from, outBuff.duplicate() }));
 				}
 			} catch (SecurityException e) {
 				e.printStackTrace();

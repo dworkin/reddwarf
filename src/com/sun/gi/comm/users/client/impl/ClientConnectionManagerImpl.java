@@ -200,7 +200,8 @@ public class ClientConnectionManagerImpl
 		reconnecting = true;
 		connect(umanager);
 	    } else { // we cant fail over
-		listener.disconnected();
+	    	connected = false;
+	    	listener.disconnected();
 	    }
 	}
     }
