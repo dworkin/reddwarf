@@ -84,11 +84,7 @@ public class HadbDataSpace implements DataSpace {
     private PreparedStatement clearNameTableStmnt;
     private PreparedStatement lockNameTableStmnt;
 
-    private boolean closed = false;
-
-    private boolean done = false;
-
-    private Object closeWaitMutex = new Object();
+    private volatile boolean closed = false;
 
     private static final boolean TRACEDISK=false;
     
@@ -275,12 +271,14 @@ public class HadbDataSpace implements DataSpace {
 	DatabaseMetaData md = conn.getMetaData();
 	ResultSet rs;
 
-	// XXX:  It is not possible, in HADB, to bring a schema into
-	// existance simply by defining tables within it.  Therefore
-	// we create it separately -- but this might fail, because the
-	// schema might already exist.  There doesn't seem to be a
-	// good way to distinguish this from a "real" failure, but
-	// there ought to be something better than this!  -DJE
+	/*
+	 * It is not possible, in HADB, to bring a schema into
+	 * existance simply by defining tables within it.  Therefore
+	 * we create it separately -- but this might fail, because the
+	 * schema might already exist.  There doesn't seem to be a
+	 * good way to distinguish this from a "real" failure, but
+	 * there ought to be something better than this!  -DJE
+	 */
 
 	try {
 	    System.out.println("Creating Schema");
@@ -539,6 +537,7 @@ public class HadbDataSpace implements DataSpace {
 	    }
 
 	    try {
+		long backoffSleep = 0;
 		while (!success) {
 
 		    /*
@@ -582,6 +581,24 @@ public class HadbDataSpace implements DataSpace {
 			System.out.println("\t\tClosing...");
 			rs.close();
 		    }
+
+		    /*
+		     * If we didn't succeed, then try again, perhaps
+		     * after a short pause.  The pause backs off to a 
+		     * maximum of 5ms.
+		     */
+		    if (!success) {
+			if (backoffSleep > 0) {
+			    try {
+				Thread.sleep(backoffSleep);
+			    } catch (InterruptedException e) {
+			    }
+			}
+			backoffSleep++;
+			if (backoffSleep > 5) {
+			    backoffSleep = 5;
+			}
+		    }
 		}
 	    } catch (SQLException e) {
 		// XXX
@@ -599,7 +616,9 @@ public class HadbDataSpace implements DataSpace {
 	/*
 	 * For the sake of convenience, create the object lock
 	 * immediately, instead of waiting for the atomic update to
-	 * occur.
+	 * occur.  This streamlines the update (and allows us to lock
+	 * objects that exist in the world but don't exist in the
+	 * objtable).
 	 */
 
 	try {
@@ -670,6 +689,7 @@ public class HadbDataSpace implements DataSpace {
 	 */
 
 	 int rc = -1;
+	 long backoffSleep = 0;
 
 	 for (;;) {
 
@@ -690,7 +710,11 @@ public class HadbDataSpace implements DataSpace {
 	    rc = 0;
 	    try {
 		rc = updateObjLockStmnt.executeUpdate();
-		updateObjLockStmnt.getConnection().commit();
+		if (rc == 1) {
+		    updateObjLockStmnt.getConnection().commit();
+		} else {
+		    updateObjLockStmnt.getConnection().rollback();
+		}
 	    } catch (SQLException e) {
 		try {
 		    updateObjLockStmnt.getConnection().rollback();
@@ -704,12 +728,28 @@ public class HadbDataSpace implements DataSpace {
 	    }
 
 	    if (rc == 1) {
-		System.out.println("Got the lock on " + objectID + " rc = " + rc);
+		System.out.println("Got the lock on " +
+			objectID + " rc = " + rc);
 		return;
 	    } else {
-		System.out.println("Missed the lock on " + objectID + " rc = " + rc);
+		System.out.println("Missed the lock on " +
+			objectID + " rc = " + rc);
 
-		/* XXX: should sleep here... */
+		/*
+		 * If we didn't succeed, then try again, perhaps after
+		 * a short pause.  The pause backs off to a maximum of
+		 * 5ms.
+		 */
+		if (backoffSleep > 0) {
+		    try {
+			Thread.sleep(backoffSleep);
+		    } catch (InterruptedException e) {
+		    }
+		}
+		backoffSleep++;
+		if (backoffSleep > 5) {
+		    backoffSleep = 5;
+		}
 	    }
 	}
     }
@@ -739,7 +779,11 @@ public class HadbDataSpace implements DataSpace {
 
 	try {
 	    rc = updateObjLockStmnt.executeUpdate();
-	    updateObjLockStmnt.getConnection().commit();
+	    if (rc == 1) {
+		updateObjLockStmnt.getConnection().commit();
+	    } else {
+		updateObjLockStmnt.getConnection().rollback();
+	    }
 	} catch (SQLException e) {
 	    try {
 		updateObjLockStmnt.getConnection().rollback();
@@ -766,16 +810,18 @@ public class HadbDataSpace implements DataSpace {
      * {@inheritDoc}
      */
     public void atomicUpdate(boolean clear, Map<String, Long> newNames,
-	    Set<Long> deleteSet, Map<Long, byte[]> updateMap, Set<Long> insertIDs)
-	    throws DataSpaceClosedException
+	    Set<Long> deleteSet, Map<Long, byte[]> updateMap,
+	    Set<Long> insertIDs)
+	throws DataSpaceClosedException
     {
 	if (closed) {
-		throw new DataSpaceClosedException();
+	    throw new DataSpaceClosedException();
 	}
+
 	synchronized (dataSpace) {
-		synchronized (nameSpace) {
-			for (Entry<Long, byte[]> e : updateMap.entrySet()) {
-				dataSpace.put(e.getKey(), new SoftReference<byte[]>(e
+	    synchronized (nameSpace) {
+		for (Entry<Long, byte[]> e : updateMap.entrySet()) {
+		    dataSpace.put(e.getKey(), new SoftReference<byte[]>(e
 						.getValue()));
 			}
 			nameSpace.putAll(newNames);
@@ -784,22 +830,23 @@ public class HadbDataSpace implements DataSpace {
 			}
 		}
 	}
+
 	// asynchronously update the persistant storage
-	// IMPORTANT: This update record will pin the objects in memory and thus
-	// in the cache until it is complete This is VERY important so that
-	// things
-	// don't get cleaned out of the cache until they have been persisted.
-	// It is acceptable to lose transactions, if the entire system dies, but
-	// that
-	// is the only time. Even in this case those lost must be atomic (all or
-	// nothing.)
+	//
+	// IMPORTANT:  This update record will pin the objects in
+	// memory and thus in the cache until it is complete.  This is
+	// VERY important so that things don't get cleaned out of the
+	// cache until they have been persisted.  It is acceptable to
+	// lose transactions, if the entire system dies, but that is
+	// the only time.  Even in this case those lost must be atomic
+	// (all or nothing.)
 
 	Long[] nameIDs = new Long[newNames.values().size()];
 	String[] names = new String[newNames.keySet().size()];
 	int i = 0;
 	for (Entry<String, Long> e : newNames.entrySet()) {
-		nameIDs[i] = e.getValue();
-		names[i++] = e.getKey();
+	    nameIDs[i] = e.getValue();
+	    names[i++] = e.getKey();
 	}
 	Long[] deleteIDs = new Long[deleteSet.size()];
 	i = 0;
@@ -902,22 +949,7 @@ public class HadbDataSpace implements DataSpace {
      * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#close()
      */
     public void close() {
-	    
-	/*
-	    synchronized(diskUpdateQueue){
-		    closed = true;
-		    diskUpdateQueue.notifyAll();
-	    }
-	*/
-	    synchronized (closeWaitMutex) {
-		    while (!done) {
-			    try {
-				    closeWaitMutex.wait();
-			    } catch (InterruptedException e) {
-				    e.printStackTrace();
-			    }
-		    }
-	    }
+	closed = true;
     }
 
 }
