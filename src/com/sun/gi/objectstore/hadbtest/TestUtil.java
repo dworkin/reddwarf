@@ -9,8 +9,11 @@ import com.sun.gi.objectstore.NonExistantObjectIDException;
 import com.sun.gi.objectstore.ObjectStore;
 import com.sun.gi.objectstore.Transaction;
 import com.sun.gi.objectstore.tso.TSOObjectStore;
+import com.sun.gi.objectstore.tso.dataspace.DataSpace;
 import com.sun.gi.objectstore.tso.dataspace.InMemoryDataSpace;
 import com.sun.gi.objectstore.tso.dataspace.PersistantInMemoryDataSpace;
+import com.sun.gi.objectstore.tso.dataspace.HadbDataSpace;
+import com.sun.gi.objectstore.tso.dataspace.MonitoredDataSpace;
 import java.io.Serializable;
 
 /**
@@ -25,14 +28,23 @@ public class TestUtil {
      * @param clear If true, drop the current contents of the
      * database.  If false, just boot/connect but don't blow it away.
      *
+     * @param type the type of the DataSpace to use
+     *
      * @return an {@link ObjectStore ObjectStore}.
      */
 
-    public static ObjectStore connect(boolean clear) {
+    public static ObjectStore connect(long appId, boolean clear,
+	    String type, String traceFile)
+    {
 	ObjectStore ostore;
 
 	try {
-	    ostore = new TSOObjectStore(new PersistantInMemoryDataSpace(1));
+	    if (traceFile == null) {
+		ostore = new TSOObjectStore(openDataSpace(appId, type));
+	    } else {
+		ostore = new TSOObjectStore(openDataSpace(appId,
+			type, traceFile));
+	    }
 	} catch (Exception e) {
 	    System.out.println("unexpected exception: " + e);
 	    return null;
@@ -46,12 +58,57 @@ public class TestUtil {
 	return ostore;
     }
 
+    public static ObjectStore connect(boolean clear) {
+	// return connect(1, clear, "persistant-inmem", "SCRATCH1");
+	return connect(1, clear, "persistant-inmem", null);
+    }
+
     /**
-     * First-order sanity check of the transaction mechanism. <p>
+     */
+    public static DataSpace openDataSpace(long appId, String type) {
+	DataSpace dspace;
+
+	if (type == null) {
+	    throw new NullPointerException("type is null");
+	}
+
+	try {
+	    if (type.equals("hadb")) {
+		dspace = new HadbDataSpace(appId);
+	    } else if (type.equals("inmem")) {
+		dspace = new InMemoryDataSpace(appId);
+	    } else if (type.equals("persistant-inmem")) {
+		dspace = new PersistantInMemoryDataSpace(appId);
+	    } else {
+		throw new IllegalArgumentException("unknown type: " + type);
+	    }
+	} catch (Exception e) {
+	    System.out.println("unexpected exception: " + e);
+	    return null;
+	}
+
+	return dspace;
+    }
+
+    public static DataSpace openDataSpace(long appId,
+	    String type, String traceFile)
+    {
+	DataSpace wrappedDspace = openDataSpace(appId, type);
+
+	try {
+	    return new MonitoredDataSpace(wrappedDspace, traceFile);
+	} catch (Exception e) {
+	    System.out.println("unexpected exception: " + e);
+	    return null;
+	}
+    }
+
+    /**
+     * First-order sanity check of the transaction mechanism.  <p>
      *
-     * Creates an persistant object (a String) in the database.
-     * References the object by its OID, and then sees whether
-     * what was retrieved is what was written. <p>
+     * Creates an persistant object (a String) in the database. 
+     * References the object by its OID, and then sees whether what
+     * was retrieved is what was written.  <p>
      *
      * @param os the ObjectStore to use.
      *
@@ -61,7 +118,6 @@ public class TestUtil {
      *
      * @return true if successful, false othewise.
      */
-
     public static boolean sanityCheck(ObjectStore os, String text,
     	    boolean verbose) {
 
@@ -74,7 +130,7 @@ public class TestUtil {
 	    Transaction trans1 = os.newTransaction(null);
 	    trans1.start();
 
-	    oid = trans1.create(ws, "foo");
+	    oid = trans1.create(ws, null);
 	    if (verbose) {
 		System.out.println("\tOID = " + oid);
 	    }

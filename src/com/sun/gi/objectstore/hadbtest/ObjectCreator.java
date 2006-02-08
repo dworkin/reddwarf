@@ -96,7 +96,7 @@ public class ObjectCreator {
 	 * committing them.
 	 *
 	 * Even this may fail, if the individual objects are large
-	 * enough.  There is some magic number (around 5BM?) that
+	 * enough.  There is some magic number (around 5MB?) that
 	 * Derby transactions must not exceed.
 	 */
 

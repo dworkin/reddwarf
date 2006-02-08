@@ -30,20 +30,42 @@ class ClientTest3 implements Runnable {
     private int numPromotedPeeks = 1;
     private Random r = new Random();
     private boolean verbose = false;
+    private long sleepTime;
 
-    public ClientTest3(long clientId, ObjectStore os, long[][] oidClusters) {
+    public ClientTest3(long clientId, ObjectStore os, long[][] oidClusters,
+	    long sleepTime) {
 	this.os = os;
 	this.clientId = clientId;
 	this.oidClusters = oidClusters;
+	this.sleepTime = sleepTime;
     }
 
     public void run() {
 	System.out.println("starting up " + clientId + ": whoopee");
 	lastWake = System.currentTimeMillis();
 
+	long start = System.currentTimeMillis();
 	for (int i = 0; i < iters; i++) {
+
+	    if (i % 100 == 0) {
+		System.out.println("snoozing at count " + i);
+		try {
+		    Thread.sleep(sleepTime);
+		} catch (Exception e) {
+		}
+
+		System.out.println("snoozing at count " + i);
+	    }
+
 	    if (i % 50 == 0) {
 		System.out.println("at count " + i);
+	    }
+
+	    if ((i > 0) && ((i % 1000) == 0)) {
+		long now = System.currentTimeMillis();
+		long elapsed = start - now;
+		start = now;
+		System.out.println("elapsed for 1000: " + elapsed);
 	    }
 	    try {
 		doRandomTransaction(verbose);

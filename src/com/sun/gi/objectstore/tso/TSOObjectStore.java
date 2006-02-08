@@ -36,7 +36,7 @@ public class TSOObjectStore implements ObjectStore {
 	SecureRandom random;
 	Map<SGSUUID,TSOTransaction> localTransactionIDMap = new HashMap<SGSUUID,TSOTransaction>();
 	
-	public TSOObjectStore(DataSpace space) throws InstantiationException{
+	public TSOObjectStore(DataSpace space) throws InstantiationException {
 		dataSpace = space;
 	
 		try {

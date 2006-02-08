@@ -52,10 +52,30 @@ public class Test3 {
 	    return ;
 	}
 
-	for (int i = 0; i < params.numThreads; i++) {
-	    ClientTest3 t = new ClientTest3(i, os, clusters);
-	    Thread thread = new Thread(t);
-	    thread.start();
+	params.numThreads = 1;
+	for (long snooze = 600; snooze > 0; snooze -= 50) {
+	    Thread[] threads = new Thread[params.numThreads];
+
+	    for (int i = 0; i < params.numThreads; i++) {
+		ClientTest3 t = new ClientTest3(i, os, clusters, snooze);
+		threads[i] = new Thread(t);
+		threads[i].start();
+	    }
+
+	    for (int i = 0; i < params.numThreads; i++) {
+		try {
+		    threads[i].join();
+		} catch (Exception e) {
+		    System.out.println("unexpected: " + e);
+		}
+	    }
+
+	    // Let everything settle down...
+	    try {
+		Thread.sleep(5000);
+	    } catch (Exception e) {
+		System.out.println("unexpected: " + e);
+	    }
 	}
 
 	// os.close();
