@@ -1,6 +1,7 @@
 package com.sun.gi.utils.nio;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.Socket;
 import java.net.DatagramSocket;
@@ -257,9 +258,17 @@ public class NIOSocketManager implements Runnable {
 	    conn = new NIOConnection(this, sc, dc, initialInputBuffSz);
 
 	    dc.socket().setReuseAddress(true);
-	    dc.configureBlocking(false);
+            dc.configureBlocking(false);
 	    dc.socket().bind(sc.socket().getLocalSocketAddress());
-	    dc.connect(sc.socket().getRemoteSocketAddress());
+            
+            // @@: Workaround for Windows JDK 1.5; it's unhappy with this
+            // call because it's trying to use the (null) hostname instead
+            // of the host address.  So we explicitly pull out the host
+            // address and create a new InetSocketAddress with it.
+	    //dc.connect(sc.socket().getRemoteSocketAddress());
+            dc.connect(new InetSocketAddress(
+                    sc.socket().getInetAddress().getHostAddress(),
+                    sc.socket().getPort()));
 
 	    log.finest("udp local " +
 		dc.socket().getLocalSocketAddress() +
