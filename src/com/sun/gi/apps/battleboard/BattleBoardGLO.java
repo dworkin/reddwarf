@@ -4,7 +4,7 @@ import com.sun.gi.logic.GLO;
 
 public class BattleBoardGLO implements GLO {
 
-    private static long serialVersionUID = 1;
+    private static final long serialVersionUID = 1L;
 
     /*
      * Default size, for now.  Use of defaults will be deprecated

@@ -19,8 +19,7 @@ public class CommTestBoot
 	implements SimBoot, SimUserListener,
 		   SimUserDataListener, SimChannelListener {
 
-    private static long serialVersionUID = -560245896319031239L;
-    // turn off version checking
+    private static final long serialVersionUID = 1L;
 
     UserID myUserID = null;
 

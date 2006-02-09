@@ -8,5 +8,5 @@ public class SGSERRORCODES {
 			System.err.println(reason);
 			System.exit(0);
 		}
-	};
+	}
 }

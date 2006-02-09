@@ -7,6 +7,7 @@ import java.net.SocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectionKey;
+import static java.nio.channels.SelectionKey.*;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
@@ -44,7 +45,7 @@ public class SocketServerTest {
 		
 	}
 	
-	private void acceptUDP() {
+	void acceptUDP() {
 		try {
 			DatagramChannel channel = DatagramChannel.open();
 			DatagramSocket socket = channel.socket();
@@ -79,8 +80,7 @@ public class SocketServerTest {
 				s.close();
 			}
 			setupChannels(10);
-		}
-		catch (IOException ioe) {
+		} catch (IOException ioe) {
 			ioe.printStackTrace();
 		}
 	}
@@ -95,19 +95,17 @@ public class SocketServerTest {
 		while (true) {
 			selector.select();
 			
-			Set readyKeys = selector.selectedKeys();
-			Iterator iterator = readyKeys.iterator();
-			while (iterator.hasNext()) {
-				SelectionKey curKey = (SelectionKey) iterator.next();
-				iterator.remove();
+			Iterator<SelectionKey> it = selector.selectedKeys().iterator();
+			while (it.hasNext()) {
+				SelectionKey curKey = it.next();
+				it.remove();
 				
 				if (curKey.isAcceptable()) {
 					ServerSocketChannel curChannel = (ServerSocketChannel) curKey.channel();
 					SocketChannel client = curChannel.accept();
 					System.out.println("Accepting connection from " + client);
 					client.configureBlocking(false);
-					SelectionKey clientKey = client.register(selector, SelectionKey.OP_READ | SelectionKey.OP_WRITE);
-					
+					client.register(selector, OP_READ | OP_WRITE);
 				}
 				else if (curKey.isReadable()) {
 					SocketChannel curChannel = (SocketChannel) curKey.channel();
@@ -148,7 +146,7 @@ public class SocketServerTest {
 			ServerSocketChannel curChannel = ServerSocketChannel.open();
 			curChannel.configureBlocking(false);
 			curChannel.socket().bind(new InetSocketAddress(i));
-			curChannel.register(selector, SelectionKey.OP_ACCEPT);
+			curChannel.register(selector, OP_ACCEPT);
 			
 			channels.add(curChannel);
 			System.out.println("Listening on port " + i);
@@ -158,5 +156,4 @@ public class SocketServerTest {
 	public static void main(String[] args) {
 		new SocketServerTest();
 	}
-
 }

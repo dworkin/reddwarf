@@ -16,7 +16,6 @@ import org.xml.sax.SAXException;
 import com.sun.gi.comm.discovery.DiscoveredGame;
 import com.sun.gi.comm.discovery.Discoverer;
 
-;
 
 public class URLDiscoverer implements Discoverer {
 	URL url;

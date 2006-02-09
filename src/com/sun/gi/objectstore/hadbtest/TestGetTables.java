@@ -1,3 +1,4 @@
+package com.sun.gi.objectstore.hadbtest;
 
 import java.sql.*;
 

@@ -61,9 +61,8 @@ public class SocketServicer implements GLO, SimRawSocketListener/*, SimTimerList
 			curBufferSize = 1;
 			return;
 		}
-		else {
-			curBufferSize++;
-		}
+        
+        curBufferSize++;
 		ByteBuffer buffer = ByteBuffer.allocate(curBufferSize);
 		for (int i = 0; i < curBufferSize; i++) {
 			buffer.put((byte) socketID);		// easily identifies which socket is writing

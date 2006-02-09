@@ -25,58 +25,58 @@ import com.sun.gi.utils.nio.NIOConnection;
 /**
  * Title: TCPIPUserManagerClient
  * <p>
- * Description: This class implements a simple TCP/IP based UserManager.
- * It is intended to serve both as a basic UserManager and as an example
- * for the creation of other UserManagers
+ * Description: This class implements a simple TCP/IP based UserManager. It is
+ * intended to serve both as a basic UserManager and as an example for the
+ * creation of other UserManagers
  * <p>
  * Copyright (c) 2005-2006 Sun Microsystems, Inc.
  * <p>
- *
+ * 
  * @author Jeffrey P. Kesselman
  * @author James Megquier
- *
+ * 
  * @version 1.0
  */
-public class TCPIPUserManagerClient
-    implements UserManagerClient,
-	       NIOSocketManagerListener,
-	       TransportProtocolClient {
+public class TCPIPUserManagerClient implements UserManagerClient,
+        NIOSocketManagerListener, TransportProtocolClient {
 
     private static Logger log = Logger.getLogger("com.sun.gi.comm.users");
 
     NIOSocketManager mgr;
+
     UserManagerClientListener listener;
+
     TransportProtocol protocol;
 
     /**
      * Default constructor
-     *
+     * 
      * @throws InstantiationException
      */
     public TCPIPUserManagerClient() throws InstantiationException {
-	try {
-	    mgr = new NIOSocketManager();
-	    mgr.addListener(this);
-	    protocol = new BinaryPktProtocol();
-	    protocol.setClient(this);
-	} catch (IOException ex) {
-	    throw new InstantiationException(ex.getMessage());
-	}
+        try {
+            mgr = new NIOSocketManager();
+            mgr.addListener(this);
+            protocol = new BinaryPktProtocol();
+            protocol.setClient(this);
+        } catch (IOException ex) {
+            throw new InstantiationException(ex.getMessage());
+        }
     }
 
     public boolean connect(SocketAddress addr,
-			   UserManagerClientListener listener) {
-	log.entering("TCPUserManagerClient", "connect",
-	    new Object[] { addr, listener });
+            UserManagerClientListener clientListener) {
+        log.entering("TCPUserManagerClient", "connect", new Object[] { addr,
+                clientListener });
 
-	this.listener = listener;
+        this.listener = clientListener;
 
-	log.info("Attempting to connect to a TCPIP User Manager on " + addr);
+        log.info("Attempting to connect to a TCPIP User Manager on " + addr);
 
-	boolean retval = (mgr.makeConnectionTo(addr) != null);
-	log.exiting("TCPUserManagerClient", "connect", retval);
+        boolean retval = (mgr.makeConnectionTo(addr) != null);
+        log.exiting("TCPUserManagerClient", "connect", retval);
 
-	return retval;
+        return retval;
     }
 
     // NIOSocketManagerListener methods
@@ -86,238 +86,241 @@ public class TCPIPUserManagerClient
      * connections
      */
     public void newConnection(NIOConnection connection) {
-	throw new UnsupportedOperationException();
+        throw new UnsupportedOperationException();
     }
 
     public void connected(final NIOConnection connection) {
-	protocol.setTransmitter(new TransportProtocolTransmitter() {
+        protocol.setTransmitter(new TransportProtocolTransmitter() {
 
-	    public void sendBuffers(ByteBuffer[] buffs, boolean reliable) {
-		try {
-		    connection.send(buffs, reliable);
-		} catch (IOException e) {
-		    // TODO Auto-generated catch block
-		    e.printStackTrace();
-		}
-	    }
+            public void sendBuffers(ByteBuffer[] buffs, boolean reliable) {
+                try {
+                    connection.send(buffs, reliable);
+                } catch (IOException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+            }
 
-	    public void closeConnection() {
-		connection.disconnect();
-	    }
-	});
+            public void closeConnection() {
+                connection.disconnect();
+            }
+        });
 
-	connection.addListener(new NIOConnectionListener() {
-	    public void packetReceived(NIOConnection conn,
-		    ByteBuffer inputBuffer) {
-		protocol.packetReceived(inputBuffer);
-	    }
+        connection.addListener(new NIOConnectionListener() {
+            public void packetReceived(NIOConnection conn,
+                    ByteBuffer inputBuffer) {
+                protocol.packetReceived(inputBuffer);
+            }
 
-	    public void disconnected(NIOConnection conn) {
-		connectionDropped();
-	    }
-	});
+            public void disconnected(NIOConnection conn) {
+                connectionDropped();
+            }
+        });
 
-	listener.connected();
+        listener.connected();
     }
 
-    private void connectionDropped() {
-	listener.disconnected();
+    void connectionDropped() {
+        listener.disconnected();
     }
 
     public void connectionFailed(NIOConnection connection) {
-	listener.disconnected();
+        listener.disconnected();
     }
 
     // TransportProtocolClient methods
 
-    public void rcvUnicastMsg(boolean reliable, byte[] chanID,
-	    byte[] from, byte[] to, ByteBuffer databuff) {
-	listener.recvdData(chanID,from,databuff,reliable);
+    public void rcvUnicastMsg(boolean reliable, byte[] chanID, byte[] from,
+            byte[] to, ByteBuffer databuff) {
+        listener.recvdData(chanID, from, databuff, reliable);
     }
 
-    public void rcvMulticastMsg(boolean reliable, byte[] chanID,
-	    byte[] from, byte[][] tolist, ByteBuffer databuff) {
-	listener.recvdData(chanID,from,databuff,reliable);
+    public void rcvMulticastMsg(boolean reliable, byte[] chanID, byte[] from,
+            byte[][] tolist, ByteBuffer databuff) {
+        listener.recvdData(chanID, from, databuff, reliable);
     }
 
-    public void rcvBroadcastMsg(boolean reliable, byte[] chanID,
-	    byte[] from, ByteBuffer databuff) {
-	listener.recvdData(chanID,from,databuff,reliable);
+    public void rcvBroadcastMsg(boolean reliable, byte[] chanID, byte[] from,
+            ByteBuffer databuff) {
+        listener.recvdData(chanID, from, databuff, reliable);
     }
 
     public void rcvValidationReq(Callback[] cbs) {
-	listener.validationDataRequest(cbs);
+        listener.validationDataRequest(cbs);
     }
 
     public void rcvUserAccepted(byte[] user) {
-	listener.loginAccepted(user);
+        listener.loginAccepted(user);
     }
 
     public void rcvUserRejected(String message) {
-	listener.loginRejected(message);
+        listener.loginRejected(message);
     }
 
     public void rcvUserJoined(byte[] user) {
-	listener.userAdded(user);
+        listener.userAdded(user);
     }
 
     public void rcvUserLeft(byte[] user) {
-	listener.userDropped(user);
+        listener.userDropped(user);
     }
 
     public void rcvUserJoinedChan(byte[] chanID, byte[] user) {
-	listener.userJoinedChannel(chanID,user);
+        listener.userJoinedChannel(chanID, user);
     }
 
     public void rcvUserLeftChan(byte[] chanID, byte[] user) {
-	listener.userLeftChannel(chanID,user);
+        listener.userLeftChannel(chanID, user);
     }
 
     public void rcvReconnectKey(byte[] user, byte[] key, long ttl) {
-	listener.newConnectionKeyIssued(key, ttl);
+        listener.newConnectionKeyIssued(key, ttl);
     }
 
     public void rcvJoinedChan(String name, byte[] chanID) {
-	listener.joinedChannel(name,chanID);
+        listener.joinedChannel(name, chanID);
     }
 
     public void rcvLeftChan(byte[] chanID) {
-	listener.leftChannel(chanID);
+        listener.leftChannel(chanID);
     }
 
     public void rcvUserDisconnected(byte[] chanID) {
-	listener.disconnected();
+        listener.disconnected();
     }
 
     // UserManagerClient methods
 
     public boolean connect(DiscoveredUserManager choice,
-	    UserManagerClientListener listener) {
+            UserManagerClientListener clientListener) {
 
-	String host = choice.getParameter("host");
-	int port = Integer.parseInt(choice.getParameter("port"));
+        String host = choice.getParameter("host");
+        int port = Integer.parseInt(choice.getParameter("port"));
 
-	return connect(new InetSocketAddress(host, port), listener);
+        return connect(new InetSocketAddress(host, port), clientListener);
     }
 
     public boolean connect(Map<String, String> params,
-	    UserManagerClientListener listener) {
+            UserManagerClientListener clientListener) {
 
-	String host = params.get("host");
-	int port = Integer.parseInt(params.get("port"));
+        String host = params.get("host");
+        int port = Integer.parseInt(params.get("port"));
 
-	return connect(new InetSocketAddress(host, port), listener);
+        return connect(new InetSocketAddress(host, port), clientListener);
     }
 
     public void login() {
-	try {
-	    protocol.sendLoginRequest();
-	} catch (IOException e) {
-	    // TODO Auto-generated catch block
-	    e.printStackTrace();
-	}
+        try {
+            protocol.sendLoginRequest();
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
     }
 
     public void validationDataResponse(Callback[] cbs) {
-	try {
-	    protocol.sendValidationResponse(cbs);
-	} catch (UnsupportedCallbackException e) {
-	    // TODO Auto-generated catch block
-	    e.printStackTrace();
-	} catch (IOException e) {
-	    // TODO Auto-generated catch block
-	    e.printStackTrace();
-	}
+        try {
+            protocol.sendValidationResponse(cbs);
+        } catch (UnsupportedCallbackException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
     }
 
     public void logout() {
-	try {
-	    protocol.sendLogoutRequest();
-	} catch (IOException e) {
-	    // TODO Auto-generated catch block
-	    e.printStackTrace();
-	}
+        try {
+            protocol.sendLogoutRequest();
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
     }
 
     public void joinChannel(String channelName) {
-	try {
-	    protocol.sendJoinChannelReq(channelName);
-	} catch (IOException e) {
-	    // TODO Auto-generated catch block
-	    e.printStackTrace();
-	}
+        try {
+            protocol.sendJoinChannelReq(channelName);
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
 
     }
 
     public void sendToServer(ByteBuffer buff, boolean reliable) {
-	try {
-	    protocol.sendServerMsg(reliable,buff);
-	} catch (IOException e) {
-	    // TODO Auto-generated catch block
-	    e.printStackTrace();
-	}
+        try {
+            protocol.sendServerMsg(reliable, buff);
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
     }
 
     public void reconnectLogin(byte[] userID, byte[] reconnectionKey) {
-	try {
-	    protocol.sendReconnectRequest(userID,reconnectionKey);
-	} catch (IOException e) {
-	    // TODO Auto-generated catch block
-	    e.printStackTrace();
-	}
+        try {
+            protocol.sendReconnectRequest(userID, reconnectionKey);
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
     }
 
-    public void sendUnicastMsg(byte[] chanID, byte[] to,
-	    ByteBuffer data, boolean reliable) {
-	try {
-	    protocol.sendUnicastMsg(chanID,to,reliable,data);
-	} catch (IOException e) {
-	    // TODO Auto-generated catch block
-	    e.printStackTrace();
-	}
+    public void sendUnicastMsg(byte[] chanID, byte[] to, ByteBuffer data,
+            boolean reliable) {
+        try {
+            protocol.sendUnicastMsg(chanID, to, reliable, data);
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
     }
 
-
-    public void sendMulticastMsg(byte[] chanID, byte[][] to,
-	    ByteBuffer data, boolean reliable) {
-	try {
-	    protocol.sendMulticastMsg(chanID,to,reliable,data);
-	} catch (IOException e) {
-	    // TODO Auto-generated catch block
-	    e.printStackTrace();
-	}
+    public void sendMulticastMsg(byte[] chanID, byte[][] to, ByteBuffer data,
+            boolean reliable) {
+        try {
+            protocol.sendMulticastMsg(chanID, to, reliable, data);
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
     }
 
     public void sendBroadcastMsg(byte[] chanID, ByteBuffer data,
-	    boolean reliable) {
-	try {
-	    protocol.sendBroadcastMsg(chanID,reliable,data);
-	} catch (IOException e) {
-	    // TODO Auto-generated catch block
-	    e.printStackTrace();
-	}
+            boolean reliable) {
+        try {
+            protocol.sendBroadcastMsg(chanID, reliable, data);
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
     }
 
-    /* (non-Javadoc)
+    /*
+     * (non-Javadoc)
+     * 
      * @see com.sun.gi.comm.users.protocol.TransportProtocolClient#recvServerID(byte[])
      */
     public void recvServerID(byte[] user) {
-	listener.recvServerID(user);
+        listener.recvServerID(user);
     }
 
-    /* (non-Javadoc)
+    /*
+     * (non-Javadoc)
+     * 
      * @see com.sun.gi.comm.users.client.UserManagerClient#leaveChannel(byte[])
      */
     public void leaveChannel(byte[] channelID) {
-	try {
-	    protocol.sendLeaveChannelReq(channelID);
-	} catch (IOException e) {
-	    // TODO Auto-generated catch block
-	    e.printStackTrace();
-	}
+        try {
+            protocol.sendLeaveChannelReq(channelID);
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
     }
 
     public void rcvChannelLocked(String channelName, byte[] user) {
-	listener.channelLocked(channelName, user);
+        listener.channelLocked(channelName, user);
     }
 }

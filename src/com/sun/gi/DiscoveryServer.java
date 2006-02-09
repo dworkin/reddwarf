@@ -85,10 +85,8 @@ public class DiscoveryServer {
         gameMap = new HashMap<Integer, GameRecord>();
         transportManager = new LRMPTransportManager();
         try {
-            reportManager = new ReportManagerImpl(transportManager, 0); // does
-                                                                        // not
-                                                                        // initate
-                                                                        // reports
+            // does not initate reports
+            reportManager = new ReportManagerImpl(transportManager, 0);
             while (true) {
                 String[] reportNames = reportManager.listReports();
                 startDiscoveryFile("discovery.xml");
@@ -132,9 +130,8 @@ public class DiscoveryServer {
         buff.put("<DISCOVERY>\n".getBytes());
 
         for (GameRecord grec : gameMap.values()) {
-            buff
-                    .put(("\t<GAME id=\"" + grec.id +
-                            "\" name=\"" + grec.name + "\" >\n").getBytes());
+            buff.put(("\t<GAME id=\"" + grec.id +
+                    "\" name=\"" + grec.name + "\" >\n").getBytes());
             for (UserManagerRecord urec : grec.userManagerRecords) {
                 buff.put(("\t\t<USERMANAGER clientclass=\""
                         + urec.clientClassName + "\" >\n").getBytes());
@@ -234,12 +231,6 @@ public class DiscoveryServer {
         }
     }
 
-    /**
-     * startDiscoveryReport
-     * 
-     * @param string
-     *            String
-     */
     private void startDiscoveryFile(String string) {
         gameMap.clear();
         discoveryFileName = string;

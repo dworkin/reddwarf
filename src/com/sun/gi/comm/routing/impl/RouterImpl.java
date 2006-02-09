@@ -37,20 +37,20 @@ public class RouterImpl implements Router {
 
 	private Map<String, SGSChannel> channelNameMap = new HashMap<String, SGSChannel>();
 
-	private Map<UserID, BYTEARRAY> currentKeys = new HashMap<UserID, BYTEARRAY>();
+	Map<UserID, BYTEARRAY> currentKeys = new HashMap<UserID, BYTEARRAY>();
 
 	private Map<UserID, BYTEARRAY> previousKeys = new HashMap<UserID, BYTEARRAY>();
 
 	private ByteBuffer hdr = ByteBuffer.allocate(256);
 
-	private List<RouterListener> listeners = new ArrayList();
+	private List<RouterListener> listeners = new ArrayList<RouterListener>();
 	private static final boolean TRACEKEYS=true;
 
 	protected int keySecondsToLive;
 
 	private enum OPCODE {
 		UserJoined, UserLeft, UserJoinedChannel, UserLeftChannel, ReconnectKey
-	};
+	}
 	
 
 
@@ -198,7 +198,7 @@ public class RouterImpl implements Router {
 
 	}
 
-	private void reportUserLeft(byte[] uidbytes) {
+	void reportUserLeft(byte[] uidbytes) {
 		for (SGSUser user : userMap.values()) {
 			try {
 				user.userLeftSystem(uidbytes);
@@ -211,7 +211,7 @@ public class RouterImpl implements Router {
 
 	}
 
-	private void reportUserJoined(byte[] uidbytes) {
+	void reportUserJoined(byte[] uidbytes) {
 		UserID sentID = null;
 		try {
 			sentID = new UserID(uidbytes);

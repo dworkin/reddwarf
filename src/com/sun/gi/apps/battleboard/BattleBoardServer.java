@@ -30,7 +30,8 @@ public class BattleBoardServer
 	implements SimBoot, SimUserListener,
 		   SimUserDataListener, SimChannelListener {
 
-    private static long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
+
     private static Logger log = Logger.getLogger("com.sun.gi.apps.battleboard");
 
     protected UserID serverUserID = null;
