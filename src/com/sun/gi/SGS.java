@@ -120,12 +120,12 @@ public class SGS {
 	 * @param game
 	 *            InstallRec
 	 */
-	private Router startupGame(TransportManager transportManager,
+	private Router startupGame(TransportManager transportMgr,
 			DeploymentRec game, StatusReport installationReport) {
 		Router router = null;
 		int gameID = game.getID();
 		try {
-			router = new RouterImpl(transportManager);
+			router = new RouterImpl(transportMgr);
 		} catch (Exception e) {
 			e.printStackTrace();
 			return null;
@@ -144,7 +144,7 @@ public class SGS {
 
 		// create simulation container for game
 	
-		Simulation sim=null;
+		Simulation sim = null;
 		try {
 			ostore = new TSOObjectStore(new PersistantInMemoryDataSpace(gameID));
 			String cleanProperty = System.getProperty("sgs.ostore.startclean");
