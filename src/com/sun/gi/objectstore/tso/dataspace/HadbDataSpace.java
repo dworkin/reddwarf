@@ -18,6 +18,9 @@ import java.util.List;
 import java.util.Map.Entry;
 import java.util.Map;
 import java.util.Set;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.Properties;
 
 /**
  * A {@link DataSpace} based on HADB/JDBC.
@@ -53,7 +56,7 @@ public class HadbDataSpace implements DataSpace {
     private String OBJLOCKTBL;
     private String OBJLOCKTBLNAME;
 
-    private Connection conn;
+    private Connection readConn;
     private Connection updateConn;
     private Connection idConn;
     
@@ -70,15 +73,18 @@ public class HadbDataSpace implements DataSpace {
     private PreparedStatement insertObjLockStmnt;
     private PreparedStatement deleteObjStmnt;
     private PreparedStatement clearObjTableStmnt;
-    private PreparedStatement lockObjTableStmnt;
     private PreparedStatement clearNameTableStmnt;
-    private PreparedStatement lockNameTableStmnt;
 
     private volatile boolean closed = false;
 
     private static final boolean TRACEDISK=false;
     
     private int commitRegisterCounter=1;
+
+    private String hadbHosts = null;
+    private String hadbUserName = "system";
+    private String hadbPassword = "darkstar";
+    private String hadbDBname = null;
 
     /**
      * Creates a DataSpace with the given appId, connected to the
@@ -114,6 +120,10 @@ public class HadbDataSpace implements DataSpace {
 	    throw e;
 	}
 
+	if (!loadParams()) {
+	    throw new IllegalArgumentException("illegal parameters");
+	}
+
 	OBJTBL = OBJBASETBL + "_" + appID;
 	OBJTBLNAME = SCHEMA + "." + OBJTBL;
 
@@ -125,21 +135,20 @@ public class HadbDataSpace implements DataSpace {
 
 	try {
 	    // XXX: MUST take these from a config file.
+	    // hadbHosts = "129.148.75.63:15025,129.148.75.60:15005";
+	    // String userName = "system";
+	    // String userPasswd = "darkstar";
 
-	    String hadbHosts = "129.148.75.63:15025,129.148.75.60:15005";
-	    String userName = "system";
-	    String userPasswd = "darkstar";
-
-	    dataConnURL = "jdbc:sun:hadb:" + hadbHosts + ";create=true";
+	    String dataConnURL = "jdbc:sun:hadb:" + hadbHosts + ";create=true";
 
 	    // XXX:  Do we really need two distinct connections for
 	    // data and update?
 
-	    conn = getConnection(userName, userPasswd,
+	    readConn = getConnection(dataConnURL, hadbUserName, hadbPassword,
+	 	    Connection.TRANSACTION_READ_COMMITTED);
+	    updateConn = getConnection(dataConnURL, hadbUserName, hadbPassword,
 		    Connection.TRANSACTION_READ_COMMITTED);
-	    updateConn = getConnection(userName, userPasswd,
-		    Connection.TRANSACTION_READ_COMMITTED);
-	    idConn = getConnection(userName, userPasswd,
+	    idConn = getConnection(dataConnURL, hadbUserName, hadbPassword,
 		    Connection.TRANSACTION_REPEATABLE_READ);
 
 	    if (dropTables) {
@@ -154,20 +163,106 @@ public class HadbDataSpace implements DataSpace {
 	}
     }
 
+    private boolean loadParams() {
+	FileInputStream fis = null;
+	Properties hadbParams = new Properties();
+	String hadbParamFile = System.getProperty("dataspace.hadbParamFile");
+
+	if (hadbParamFile != null) {
+	    try {
+		fis = new FileInputStream(hadbParamFile);
+	    } catch (IOException e) {
+		System.out.println("failed to open params file (" +
+			hadbParamFile + "): " + e);
+		return false;
+	    }
+
+	    if (fis != null) {
+		try {
+		    hadbParams.load(fis);
+		} catch (IOException e) {
+		    System.out.println("failed to read params file (" +
+			    hadbParamFile + "): " + e);
+		    hadbParams.clear();
+		    return false;
+		} catch (IllegalArgumentException e) {
+		    System.out.println("params file (" +
+			    hadbParamFile + ") contains errors: " + e);
+		    hadbParams.clear();
+		    return false;
+		}
+
+		try {
+		    fis.close();
+		} catch (IOException e) {
+		    // XXX: Is this really a problem?
+		}
+	    } 
+	}
+
+	hadbHosts = hadbParams.getProperty("dataspace.hadb.hosts");
+	if (hadbHosts == null) {
+	    hadbHosts = System.getProperty("dataspace.hadb.hosts");
+	}
+	if (hadbHosts == null) {
+	    hadbHosts = "129.148.75.63:15025,129.148.75.60:15005";
+	}
+
+	hadbUserName = hadbParams.getProperty("dataspace.hadb.username");
+	if (hadbUserName == null) {
+	    hadbUserName = System.getProperty("dataspace.hadb.username");
+	}
+	if (hadbUserName == null) {
+	    hadbUserName = "system";
+	}
+
+	hadbPassword = hadbParams.getProperty("dataspace.hadb.password");
+	if (hadbPassword == null) {
+	    hadbPassword = System.getProperty("dataspace.hadb.password");
+	}
+	if (hadbPassword == null) {
+	    hadbPassword = "darkstar";
+	}
+
+	// DO NOT USE: leave hadbDBname null.
+	// Setting the database name to anything other than the default
+	// doesn't work properly. -DJE
+
+	hadbDBname = hadbParams.getProperty("dataspace.hadb.dbname");
+	if (hadbDBname == null) {
+	    hadbDBname = System.getProperty("dataspace.hadb.dbname");
+	}
+	if (hadbDBname == null) {
+	    hadbDBname = null;
+	}
+
+	return true;
+    }
+
     private void dropTables() {
+	System.out.println("Dropping all tables!");
 	dropTable(OBJTBLNAME);
 	dropTable(OBJLOCKTBLNAME);
 	dropTable(NAMETBLNAME);
-	dropTable(INFOTBLNAME);
+	// dropTable(INFOTBLNAME);
     }
 
     private boolean dropTable(String tableName) {
 	String s;
 	Statement stmnt;
 
+	try {
+	    updateConn.commit();
+	    readConn.commit();
+	    idConn.commit();
+	} catch (Exception e) {
+	    System.out.println("FAILED to prepare/commit " + tableName);
+	    System.out.println("\t" + e);
+	}
+
 	s = "DROP TABLE " + tableName;
 	try {
-	    stmnt = conn.createStatement();
+	    stmnt = updateConn.createStatement();
 	    stmnt.execute(s);
 	    stmnt.getConnection().commit();
 	    System.out.println("Dropped " + tableName);
@@ -175,6 +270,7 @@ public class HadbDataSpace implements DataSpace {
 	} catch (SQLException e) {
 	    // XXX ?
 	    System.out.println("FAILED to drop " + tableName);
+	    System.out.println("\t" + e);
 	    return false;
 	}
     }
@@ -183,8 +279,8 @@ public class HadbDataSpace implements DataSpace {
      * @throws SQLException
      */
     private void checkTables() throws SQLException {
-	DatabaseMetaData md = conn.getMetaData();
 	ResultSet rs;
+	Statement stmnt = null;
 
 	/*
 	 * It is not possible, in HADB, to bring a schema into
@@ -198,7 +294,7 @@ public class HadbDataSpace implements DataSpace {
 	try {
 	    System.out.println("Creating Schema");
 	    String s = "CREATE SCHEMA " + SCHEMA;
-	    Statement stmnt = conn.createStatement();
+	    stmnt = updateConn.createStatement();
 	    stmnt.execute(s);
 	    stmnt.getConnection().commit();
 	} catch (SQLException e) {
@@ -212,6 +308,9 @@ public class HadbDataSpace implements DataSpace {
 		throw e;
 	    }
 	}
+	if (stmnt != null) {
+	    stmnt.getConnection().commit();
+	}
 
 	HashSet<String> foundTables = new HashSet<String>();
 
@@ -219,7 +318,7 @@ public class HadbDataSpace implements DataSpace {
 	    String s = "select tablename from sysroot.alltables" +
 		    " where schemaname like '" + SCHEMA + "%'";
 
-	    Statement stmnt = conn.createStatement();
+	    stmnt = readConn.createStatement();
 	    rs = stmnt.executeQuery(s);
 	    while (rs.next()) {
 		foundTables.add(rs.getString(1).trim());
@@ -234,82 +333,35 @@ public class HadbDataSpace implements DataSpace {
 	if (foundTables.contains(OBJTBL.toLowerCase())) {
 	    System.out.println("Found Objects table");
 	} else {
-	    System.out.println("Creating Objects table");
-	    String s = "CREATE TABLE " + OBJTBLNAME + " (" +
-			"OBJID DOUBLE INT NOT NULL," +
-			"OBJBYTES BLOB," +
-			"PRIMARY KEY (OBJID)" +
-			")";
-	    Statement stmnt = conn.createStatement();
-	    stmnt.execute(s);
-	    stmnt.getConnection().commit();
+	    createObjTable();
 	}
 
 	if (foundTables.contains(OBJLOCKTBL.toLowerCase())) {
 	    System.out.println("Found object lock table");
 	} else {
-	    System.out.println("Creating object Lock table");
-	    String s = "CREATE TABLE " + OBJLOCKTBLNAME + " (" +
-			"OBJID DOUBLE INT NOT NULL," +
-			"OBJLOCK INT NOT NULL," +
-			"PRIMARY KEY (OBJID)" +
-			")";
-	    Statement stmnt = idConn.createStatement();
-	    stmnt.execute(s);
-	    stmnt.getConnection().commit();
+	    createObjLockTable();
 	}
 
 	if (foundTables.contains(NAMETBL.toLowerCase())) {
 	    System.out.println("Found Name table");
 	} else {
-	    System.out.println("Creating Name table");
-	    String s = "CREATE TABLE " + NAMETBLNAME + "(" +
-			"NAME VARCHAR(255) NOT NULL, " +
-			"OBJID DOUBLE INT NOT NULL," +
-			"PRIMARY KEY (NAME)" +
-			")";
-	    Statement stmnt = conn.createStatement();
-	    stmnt.execute(s);
-	    stmnt.getConnection().commit();
+	    createNameTable();
 	}
 
 	if (foundTables.contains(INFOTBL.toLowerCase())) {
 	    System.out.println("Found info table");
 	} else {
-	    System.out.println("Creating info table");
-	    String s = "CREATE TABLE " + INFOTBLNAME + "(" +
-			"APPID DOUBLE INT NOT NULL," +
-			"NEXTIDBLOCKBASE DOUBLE INT, " +
-			"IDBLOCKSIZE INT, " +
-			"PRIMARY KEY(APPID)" +
-			")";
-	    Statement stmnt = conn.createStatement();
-	    stmnt.execute(s);
-	    stmnt.getConnection().commit();
+	    createInfoTable();
 	}
-
-	getIdStmnt = idConn.prepareStatement("SELECT * FROM " +
-		INFOTBLNAME + " I  " + "WHERE I.APPID = " + appID);
-	rs = getIdStmnt.executeQuery();
-	if (!rs.next()) { // entry does not exist
-	    System.out.println("Creating new entry in info table for appID "
-		    + appID);
-	    Statement stmnt = getIdStmnt.getConnection().createStatement();
-	    String s = "INSERT INTO " + INFOTBLNAME + " VALUES(" +
-		    appID + "," + defaultIdStart + "," +
-		    defaultIdBlockSize + ")";
-	    stmnt.execute(s);
-	}
-	rs.close();
-	getIdStmnt.getConnection().commit();
     }
 
     private void createPreparedStmnts() throws SQLException {
 
-	getObjStmnt = conn.prepareStatement("SELECT * FROM " +
+	getObjStmnt = readConn.prepareStatement("SELECT * FROM " +
 		OBJTBLNAME + " O  " + "WHERE O.OBJID = ?");
-	getNameStmnt = conn.prepareStatement("SELECT * FROM " +
+	getNameStmnt = readConn.prepareStatement("SELECT * FROM " +
 		NAMETBLNAME + " N  " + "WHERE N.NAME = ?");
+
 	insertObjStmnt = updateConn.prepareStatement("INSERT INTO " +
 		OBJTBLNAME + " VALUES(?,?)");
 	insertNameStmnt = updateConn.prepareStatement("INSERT INTO " +
@@ -321,64 +373,144 @@ public class HadbDataSpace implements DataSpace {
 	deleteObjStmnt = updateConn.prepareStatement("DELETE FROM " +
 		OBJTBLNAME + " WHERE OBJID = ?");
 
-	updateInfoStmnt = idConn.prepareStatement("UPDATE " +
-		INFOTBLNAME + " SET NEXTIDBLOCKBASE=? WHERE APPID=?");
-
-	updateObjLockStmnt = idConn.prepareStatement("UPDATE " +
+	updateObjLockStmnt = updateConn.prepareStatement("UPDATE " +
 		OBJLOCKTBLNAME +
 		    " SET OBJLOCK=? WHERE OBJID=? AND OBJLOCK=?");
-	insertObjLockStmnt = idConn.prepareStatement("INSERT INTO " +
+	insertObjLockStmnt = updateConn.prepareStatement("INSERT INTO " +
 			OBJLOCKTBLNAME + " VALUES(?,?)");
 
 	// XXX: HADB does not implement table locking.
 	// So, we NEED another way to do this.
 
-	// lockObjTableStmnt = conn.prepareStatement(
-	//	"LOCK TABLE "+OBJTBLNAME+" IN EXCLUSIVE MODE");
-	// lockNameTableStmnt = conn.prepareStatement(
-	//	"LOCK TABLE "+NAMETBLNAME+" IN EXCLUSIVE MODE");
-
-	clearObjTableStmnt = conn.prepareStatement(
+	clearObjTableStmnt = updateConn.prepareStatement(
 		"DELETE FROM " + OBJTBLNAME);
-	clearNameTableStmnt = conn.prepareStatement(
+	clearNameTableStmnt = updateConn.prepareStatement(
 		"DELETE FROM " + NAMETBLNAME);
+
+	updateInfoStmnt = idConn.prepareStatement("UPDATE " +
+		INFOTBLNAME + " SET NEXTIDBLOCKBASE=? WHERE APPID=?");
+
+	getIdStmnt = idConn.prepareStatement("SELECT * FROM " +
+		INFOTBLNAME + " I  " + "WHERE I.APPID = " + appID);
     }
 
     private void clearTables() {
 	String s;
-	PreparedStatement stmnt;
+	Statement stmnt;
 
 	System.out.println("Dropping Objects table");
 
 	try {
 	    s = "DROP TABLE " + OBJTBLNAME;
-	    stmnt = conn.prepareStatement(s);
-	    stmnt.execute();
+	    stmnt = updateConn.createStatement();
+	    stmnt.execute(s);
 	    stmnt.getConnection().commit();
+
 	} catch (Exception e) {
 	    // XXX
 	}
 
+	createObjTable();
+    }
+
+
+    private boolean createObjTable() {
 	System.out.println("Creating Objects table");
-
+	Statement stmnt;
+	String s = "CREATE TABLE " + OBJTBLNAME + " (" +
+		"OBJID DOUBLE INT NOT NULL, " +
+		"OBJBYTES BLOB, " +
+		"PRIMARY KEY (OBJID))";
 	try { 
-	    s = "CREATE TABLE " + OBJTBLNAME + " (" +
-		    "OBJID DOUBLE INT NOT NULL, " +
-		    "OBJBYTES BLOB, " +
-		    "PRIMARY KEY (OBJID))";
-	    stmnt = conn.prepareStatement(s);
-	    stmnt.execute();
+	    stmnt = updateConn.createStatement();
+	    stmnt.execute(s);
 	    stmnt.getConnection().commit();
 	} catch (Exception e) {
 	    // XXX
 	}
+
+	return true;
+    }
+
+    private boolean createInfoTable() {
+	System.out.println("Creating info table");
+	Statement stmnt;
+	ResultSet rs;
+
+	String s = "CREATE TABLE " + INFOTBLNAME + "(" +
+		"APPID DOUBLE INT NOT NULL," +
+		"NEXTIDBLOCKBASE DOUBLE INT, " +
+		"IDBLOCKSIZE INT, " +
+		"PRIMARY KEY(APPID)" + ")";
+	try {
+	    stmnt = idConn.createStatement();
+	    stmnt.execute(s);
+	    stmnt.getConnection().commit();
+	} catch (SQLException e) {
+	    // XXX
+	}
+
+	s = "SELECT * FROM " + INFOTBLNAME + " I  " +
+		"WHERE I.APPID = " + appID;
+	try {
+	    stmnt = idConn.createStatement();
+	    rs = stmnt.executeQuery(s);
+	    stmnt.getConnection().commit();
+	    if (!rs.next()) { // entry does not exist
+		System.out.println("Creating new entry in info table for appID "
+		    + appID);
+		stmnt = idConn.createStatement();
+		s = "INSERT INTO " + INFOTBLNAME + " VALUES(" +
+			appID + "," + defaultIdStart + "," +
+			defaultIdBlockSize + ")";
+		stmnt.executeUpdate(s);
+		stmnt.getConnection().commit();
+	    }
+	    rs.close();
+	} catch (SQLException e) {
+	    // XXX: ??
+	}
+
+	return true;
+    }
+
+    private boolean createObjLockTable() {
+	System.out.println("Creating object Lock table");
+	String s = "CREATE TABLE " + OBJLOCKTBLNAME + " (" +
+		"OBJID DOUBLE INT NOT NULL," +
+		"OBJLOCK INT NOT NULL," +
+		"PRIMARY KEY (OBJID)" + ")";
+	try {
+	    Statement stmnt = updateConn.createStatement();
+	    stmnt.execute(s);
+	    stmnt.getConnection().commit();
+	} catch (SQLException e) {
+	    // XXX
+	}
+	return true;
+    }
+
+    private boolean createNameTable() {
+	System.out.println("Creating Name table");
+	String s = "CREATE TABLE " + NAMETBLNAME + "(" +
+		"NAME VARCHAR(255) NOT NULL, " +
+		"OBJID DOUBLE INT NOT NULL," +
+		"PRIMARY KEY (NAME)" + ")";
+	try {
+	    Statement stmnt = updateConn.createStatement();
+	    stmnt.execute(s);
+	    stmnt.getConnection().commit();
+	} catch (SQLException e) {
+	    // XXX
+	}
+	return true;
     }
 
     /**
      * @return
      */
-    private Connection getConnection(String userName, String userPasswd,
-	    int isolation)
+    private Connection getConnection(String dataConnURL,
+	    String userName, String userPasswd, int isolation)
     {
 	Connection conn;
 	try {
@@ -448,7 +580,7 @@ public class HadbDataSpace implements DataSpace {
 	    boolean success = false;
 
 	    try {
-		idConn.commit();
+/* 		idConn.commit(); */
 	    } catch (Exception e) {
 		System.out.println("UNEXPECTED EXCEPTION: " + e);
 	    }
@@ -734,7 +866,8 @@ public class HadbDataSpace implements DataSpace {
     /**
      * {@inheritDoc}
      */
-    public synchronized void atomicUpdate(boolean clear, Map<String, Long> newNames,
+    public synchronized void atomicUpdate(boolean clear,
+	    Map<String, Long> newNames,
 	    Set<Long> deleteSet, Map<Long, byte[]> updateMap,
 	    Set<Long> insertIDs)
 	throws DataSpaceClosedException
@@ -747,16 +880,18 @@ public class HadbDataSpace implements DataSpace {
 	// any, but if there's a bug elsewhere, keep it out of this
 	// transaction.
 
+	/*
 	try {
-	    deleteObjStmnt.getConnection().commit();
-	    updateObjStmnt.getConnection().commit();
-	    insertObjStmnt.getConnection().commit();
-	    insertNameStmnt.getConnection().commit();
+	    // deleteObjStmnt.getConnection().commit();
+	    // updateObjStmnt.getConnection().commit();
+	    // insertObjStmnt.getConnection().commit();
+	    // insertNameStmnt.getConnection().commit();
 	} catch (SQLException e) {
 	    // XXX: rollback and die
 	    // Is there anything we can do here, other than weep?
 	    e.printStackTrace();
 	}
+	*/
 
 	for (Entry<String, Long> e : newNames.entrySet()) {
 	    long oid = e.getValue();
@@ -822,10 +957,11 @@ public class HadbDataSpace implements DataSpace {
 
 	// There's got to be a better way.
 	try {
-	    deleteObjStmnt.getConnection().commit();
-	    updateObjStmnt.getConnection().commit();
-	    insertObjStmnt.getConnection().commit();
-	    insertNameStmnt.getConnection().commit();
+	    updateConn.commit();
+	    // deleteObjStmnt.getConnection().commit();
+	    // updateObjStmnt.getConnection().commit();
+	    // insertObjStmnt.getConnection().commit();
+	    // insertNameStmnt.getConnection().commit();
 	} catch (SQLException e) {
 	    // XXX: rollback and die
 	    // Is there anything we can do here, other than weep?
@@ -866,23 +1002,9 @@ public class HadbDataSpace implements DataSpace {
      */
     public void clear() {
 
-	// XXX: INCOMPLETE.
-	// XXX: why does deleting the contents of tables take so long?
-
 	try {
-	    // lockObjTableStmnt.execute();
-	    // lockNameTableStmnt.execute();
-	    // clearObjTableStmnt.execute();
-	    // conn.commit();
-
-	    // clearTables();
-	    // conn.commit();
-
-	    System.out.println("clearing nameTable");
-	    clearNameTableStmnt.getConnection().commit();
-	    clearNameTableStmnt.execute();
-	    clearNameTableStmnt.getConnection().commit();
-	    System.out.println("cleared nameTable");
+	    dropTables();
+	    checkTables();
 	} catch (SQLException e) {
 	    e.printStackTrace();
 	}
