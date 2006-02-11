@@ -114,7 +114,8 @@ public class HadbDataSpace implements DataSpace {
 	// If we can't load the driver, bail out immediately.
 	try {
 	    Class.forName("com.sun.hadb.jdbc.Driver");
-	} catch (Exception e) { // XXX fix this
+	} catch (Exception e) {
+	    System.out.println("Failed to load the HADB JDBC driver.");
 	    System.out.println(e);
 	    throw e;
 	}
@@ -143,23 +144,29 @@ public class HadbDataSpace implements DataSpace {
 
 	    String dataConnURL = "jdbc:sun:hadb:" + hadbHosts + ";create=true";
 
-	    // XXX:  Do we really need two distinct connections for
-	    // data and update?
+	    // XXX:  Do we really need all these connections?
+
+	    updateConn = getConnection(dataConnURL, hadbUserName, hadbPassword,
+		    Connection.TRANSACTION_READ_COMMITTED);
+	    idConn = getConnection(dataConnURL, hadbUserName, hadbPassword,
+		    Connection.TRANSACTION_READ_COMMITTED);
 
 	    readConn = getConnection(dataConnURL, hadbUserName, hadbPassword,
 	 	    Connection.TRANSACTION_READ_COMMITTED);
-	    updateConn = getConnection(dataConnURL, hadbUserName, hadbPassword,
-		    Connection.TRANSACTION_READ_COMMITTED);
-	    // XXX:
-	    idConn = getConnection(dataConnURL, hadbUserName, hadbPassword,
-		    //Connection.TRANSACTION_REPEATABLE_READ);
-		    Connection.TRANSACTION_READ_COMMITTED);
+	    readConn.setReadOnly(true);
+
 	    schemaConn = getConnection(dataConnURL, hadbUserName, hadbPassword,
 		    Connection.TRANSACTION_REPEATABLE_READ);
 	    schemaConn.setAutoCommit(true);
 
 	    if (dropTables) {
-		dropTables();
+		if (!dropTables()) {
+
+		    // This isn't necessarily an error.  The cases
+		    // need to be subdivided more carefully.
+
+		    System.out.println("Failed to drop all tables.");
+		}
 	    }
 
 	    checkTables();
@@ -246,12 +253,20 @@ public class HadbDataSpace implements DataSpace {
 	return true;
     }
 
-    private void dropTables() {
+    private boolean dropTables() {
+	String[] tableNames = {
+		OBJTBLNAME, OBJLOCKTBLNAME, NAMETBLNAME, INFOTBLNAME
+	};
+
 	System.out.println("Dropping all tables!");
-	dropTable(OBJTBLNAME);
-	dropTable(OBJLOCKTBLNAME);
-	dropTable(NAMETBLNAME);
-	dropTable(INFOTBLNAME);
+
+	boolean allSucceeded = true;
+	for (String name : tableNames) {
+	    if (!dropTable(name)) {
+		allSucceeded = false;
+	    }
+	}
+	return allSucceeded;
     }
 
     private boolean dropTable(String tableName) {
@@ -260,7 +275,6 @@ public class HadbDataSpace implements DataSpace {
 
 	try {
 	    updateConn.commit();
-	    readConn.commit();
 	    idConn.commit();
 	} catch (Exception e) {
 	    System.out.println("FAILED to prepare/commit " + tableName);
@@ -274,19 +288,14 @@ public class HadbDataSpace implements DataSpace {
 	    stmnt = schemaConn.createStatement();
 	    stmnt.execute(s);
 	} catch (SQLException e) {
+	    System.out.println("FAILED to drop " + tableName);
+	    System.out.println("\t" + e);
+/* 	    e.printStackTrace(); */
 	    return false;
 	}
 
-/* 	try { */
-	    System.out.println("Dropped " + tableName);
-	    return true;
-/* 	} catch (SQLException e) { */
-	    // XXX ?
-/* 	    System.out.println("FAILED to drop " + tableName); */
-/* 	    System.out.println("\t" + e); */
-/* 	    e.printStackTrace(); */
-/* 	    return false; */
-/* 	} */
+	System.out.println("Dropped " + tableName);
+	return true;
     }
 
     /**
@@ -295,34 +304,55 @@ public class HadbDataSpace implements DataSpace {
     private void checkTables() throws SQLException {
 	ResultSet rs;
 	Statement stmnt = null;
+	boolean schemaExists = false;
 
 	/*
 	 * It is not possible, in HADB, to bring a schema into
 	 * existance simply by defining tables within it.  Therefore
 	 * we create it separately -- but this might fail, because the
-	 * schema might already exist.  There doesn't seem to be a
-	 * good way to distinguish this from a "real" failure, but
-	 * there ought to be something better than this!  -DJE
+	 * schema might already exist.  So we need to check whether it
+	 * exists first, and then try to create it if it doesn't, etc.
+	 *
+	 * There's probably a cleaner way.  -DJE
 	 */
 
 	try {
-	    System.out.println("Creating Schema");
-	    String s = "CREATE SCHEMA " + SCHEMA;
+	    String s = "select schemaname from sysroot.allschemas" +
+		    " where schemaname like '" + SCHEMA + "'";
 	    stmnt = schemaConn.createStatement();
-/* 	    stmnt.execute(s); */
-	} catch (SQLException e) {
-
-	    /*
-	     * 11751 is "this schema already exists"
-	     */
-
-	    if (e.getErrorCode() != 11751) {
-		System.out.println("SCHEMA issue: " + e);
-		throw e;
+	    rs = stmnt.executeQuery(s);
+	    if (!rs.next()) {
+		System.out.println("SCHEMA does not exist: " + SCHEMA);
+		schemaExists = false;
+	    } else {
+		System.out.println("SCHEMA already exists: " + SCHEMA);
+		schemaExists = true;
 	    }
+	    rs.close();
+	} catch (SQLException e) {
+	    System.out.println("SCHEMA error: " + e);
+	    schemaExists = false;
 	}
-	if (stmnt != null) {
-	    stmnt.getConnection().commit();
+
+	if (!schemaExists) {
+	    try {
+		System.out.println("Creating Schema");
+		String s = "CREATE SCHEMA " + SCHEMA;
+		stmnt = schemaConn.createStatement();
+		stmnt.execute(s);
+	    } catch (SQLException e) {
+
+		/*
+		 * 11751 is "this schema already exists"
+		 */
+
+		if (e.getErrorCode() != 11751) {
+		    System.out.println("SCHEMA issue: " + e);
+		    throw e;
+		} else {
+		    System.out.println("SCHEMA already exists: " + e);
+		}
+	    }
 	}
 
 	HashSet<String> foundTables = new HashSet<String>();
@@ -337,9 +367,9 @@ public class HadbDataSpace implements DataSpace {
 		foundTables.add(rs.getString(1).trim());
 	    }
 	    rs.close();
-	} catch (Exception e) {
-	    // XXX: failure?
+	} catch (SQLException e) {
 	    System.out.println("failure finding schema" + e);
+	    throw e;
 	}
 
 	if (foundTables.contains(OBJTBL.toLowerCase())) {
@@ -418,7 +448,8 @@ public class HadbDataSpace implements DataSpace {
 	    stmnt = schemaConn.createStatement();
 	    stmnt.execute(s);
 	} catch (Exception e) {
-	    // XXX
+	    System.out.println("FAILED to create: " + e);
+	    return false;
 	}
 
 	return true;
@@ -439,6 +470,8 @@ public class HadbDataSpace implements DataSpace {
 	    stmnt.execute(s);
 	} catch (SQLException e) {
 	    // XXX
+	    System.out.println("FAILED to create: " + e);
+	    return false;
 	}
 
 	s = "SELECT * FROM " + INFOTBLNAME + " I  " +
@@ -465,6 +498,8 @@ public class HadbDataSpace implements DataSpace {
 	    }
 	    rs.close();
 	} catch (SQLException e) {
+	    System.out.println("FAILED to create: " + e);
+	    return false;
 	    // XXX: ??
 	}
 
@@ -482,6 +517,8 @@ public class HadbDataSpace implements DataSpace {
 	    stmnt.execute(s);
 	} catch (SQLException e) {
 	    // XXX
+	    System.out.println("FAILED to create: " + e);
+	    return false;
 	}
 	return true;
     }
@@ -497,6 +534,8 @@ public class HadbDataSpace implements DataSpace {
 	    stmnt.execute(s);
 	} catch (SQLException e) {
 	    // XXX
+	    System.out.println("FAILED to create: " + e);
+	    return false;
 	}
 	return true;
     }
@@ -1019,6 +1058,32 @@ public class HadbDataSpace implements DataSpace {
      * {@inheritDoc}
      */
     public synchronized void close() {
+	try {
+	    schemaConn.close();
+	} catch (SQLException e) {
+	    System.out.println("can't close schemaConn");
+	}
+
+	try {
+	    idConn.close();
+	} catch (SQLException e) {
+	    System.out.println("can't close idConn");
+	}
+
+	try {
+	    updateConn.close();
+	} catch (SQLException e) {
+	    System.out.println("can't close updateConn");
+	}
+
+	try {
+	    readConn.close();
+	} catch (SQLException e) {
+	    System.out.println("can't close readConn");
+	}
+
+	System.out.println("CLOSED");
+
 	closed = true;
     }
 
