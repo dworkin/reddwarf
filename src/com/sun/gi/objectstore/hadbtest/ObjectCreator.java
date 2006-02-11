@@ -111,13 +111,27 @@ public class ObjectCreator {
 	    }
 
 	    commitTransaction(trans);
-	}
 
-	if (selfId) {
-	    for (int i = 0; i < count; i++) {
-		selfIdentify(appId, newOIDs[i]);
+	    if (selfId) {
+		trans.start();
+		FillerObject fo;
+
+		for (int i = 0; i + base < count && i < chunkSize; i++) {
+		    try {
+			fo = (FillerObject) trans.lock(newOIDs[i + base]);
+			fo.setOID(newOIDs[i + base]);
+		    }
+		    catch (Exception e) {
+			trans.abort();
+			// &&& fix this.
+			System.out.println("FAILED TO INITIALIZE");
+			System.exit(1);
+		    }
+		}
+		commitTransaction(trans);
 	    }
 	}
+
 
 	return newOIDs;
     }

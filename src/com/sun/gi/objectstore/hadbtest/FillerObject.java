@@ -83,6 +83,10 @@ public class FillerObject implements Serializable {
 	this.oid = oid;
     }
 
+    public long getOID() {
+	return oid;
+    }
+
     public long getId() {
 	return id;
     }

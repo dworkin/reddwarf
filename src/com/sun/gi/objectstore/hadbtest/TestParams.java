@@ -29,7 +29,7 @@ public class TestParams {
      * The number of objects to stuff into the database.
      */
 
-    public int numObjs = 5 * 1024;
+    public int numObjs = 1 * 1024;
 
     /**
      * The number of objects in a typical cluster.  A cluster is set

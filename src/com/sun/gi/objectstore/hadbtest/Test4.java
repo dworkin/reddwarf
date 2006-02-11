@@ -51,7 +51,13 @@ public class Test4 {
 	 */
 
 	ObjectCreator creator = new ObjectCreator(os, 0, null, params.objSize);
-	long[] oids = creator.createNewBunch(params.numObjs, 1, false);
+	long[] oids = creator.createNewBunch(params.numObjs, 1, true);
+
+	System.out.println("waiting for the new objects to settle");
+	try {
+	    Thread.sleep(4000);
+	} catch (Exception e) {
+	}
 
 	long[][] clusters;
 	try {
@@ -64,9 +70,9 @@ public class Test4 {
 	    return ;
 	}
 
-	System.out.println("waiting for the new objects to settle");
+	System.out.println("waiting for the clusters to settle");
 	try {
-	    Thread.sleep(10000);
+	    Thread.sleep(1000);
 	} catch (Exception e) {
 	}
 

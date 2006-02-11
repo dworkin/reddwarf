@@ -107,28 +107,44 @@ class ClientTest4 implements Runnable {
 
 	for (int i = 0; i < peekOids.length; i++) {
 	    if (verbose) { System.out.print(peekOids[i] + " "); }
-	    trans.peek(peekOids[i]); 
+	    FillerObject fo = (FillerObject) trans.peek(peekOids[i]); 
+	    if (fo.getOID() != peekOids[i]) {
+		System.out.println("CHECK FAILED: " + fo.getOID() + " != " +
+			peekOids[i]);
+	    }
 	}
 	if (verbose) { System.out.println(); }
 
 	if (verbose) { System.out.println("peekPromoted: "); }
 	for (int i = 0; i < promotedPeekOids.length; i++) {
 	    if (verbose) { System.out.print(promotedPeekOids[i] + " "); }
-	    trans.peek(promotedPeekOids[i]); 
+	    FillerObject fo = (FillerObject) trans.peek(promotedPeekOids[i]); 
+	    if (fo.getOID() != promotedPeekOids[i]) {
+		System.out.println("CHECK FAILED: " + fo.getOID() + " != " +
+			promotedPeekOids[i]);
+	    }
 	}
 	if (verbose) { System.out.println(); }
 
 	if (verbose) { System.out.println("locks: "); }
 	for (int i = 0; i < lockOids.length; i++) {
 	    if (verbose) { System.out.print(lockOids[i] + " "); }
-	    trans.lock(lockOids[i]); 
+	    FillerObject fo = (FillerObject) trans.lock(lockOids[i]); 
+	    if (fo.getOID() != lockOids[i]) {
+		System.out.println("CHECK FAILED: " + fo.getOID() + " != " +
+			lockOids[i]);
+	    }
 	}
 	if (verbose) { System.out.println(); }
 
 	if (verbose) { System.out.println("promotedToLock: "); }
 	for (int i = 0; i < promotedPeekOids.length; i++) {
 	    if (verbose) { System.out.print(promotedPeekOids[i] + " "); }
-	    trans.lock(promotedPeekOids[i]); 
+	    FillerObject fo = (FillerObject) trans.lock(promotedPeekOids[i]); 
+	    if (fo.getOID() != promotedPeekOids[i]) {
+		System.out.println("CHECK FAILED: " + fo.getOID() + " != " +
+			promotedPeekOids[i]);
+	    }
 	}
 	if (verbose) { System.out.println(); }
 
