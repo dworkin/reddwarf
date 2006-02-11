@@ -25,8 +25,8 @@ public class Test4 {
 	 */
 
 	// ObjectStore os = TestUtil.connect(false);
+	ObjectStore os = TestUtil.connect(1, false, "hadb", null);
 	// ObjectStore os = TestUtil.connect(1, true, "hadb", "Hlog1");
-	ObjectStore os = TestUtil.connect(1, true, "hadb", null);
 
 	if (TestUtil.sanityCheck(os, "Hello, World", true)) {
 	    System.out.println("appears to work");

@@ -13,24 +13,24 @@ public class TestH {
 	String identifier = args[0];
 	// HadbTest t1 = null;
 	DataSpace t1 = null;
+	long id1 = 0;
 
 	try {
 	    // t1 = new HadbTest(1);
-	    t1 = new HadbDataSpace(1, true);
+	    t1 = new HadbDataSpace(1, false);
 	} catch (Exception e) {
 	    System.out.println("surrender");
 	    System.exit(1);
 	}
 
-	for (int i = 0; i < 100; i++) {
-	    long id1 = t1.getNextID();
+	for (int i = 0; i < 1000; i++) {
+	    id1 = t1.getNextID();
 	    System.out.println("id1: " + id1 + " " + identifier);
 	}
 
-	long testId = t1.getNextID();
 	try {
-	    t1.lock(testId);
-	    t1.release(testId);
+	    t1.lock(id1);
+	    t1.release(id1);
 	} catch (Exception e) {
 	    System.out.println(e);
 	}

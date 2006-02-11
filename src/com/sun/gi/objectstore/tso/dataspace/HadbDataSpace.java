@@ -150,8 +150,10 @@ public class HadbDataSpace implements DataSpace {
 	 	    Connection.TRANSACTION_READ_COMMITTED);
 	    updateConn = getConnection(dataConnURL, hadbUserName, hadbPassword,
 		    Connection.TRANSACTION_READ_COMMITTED);
+	    // XXX:
 	    idConn = getConnection(dataConnURL, hadbUserName, hadbPassword,
-		    Connection.TRANSACTION_REPEATABLE_READ);
+		    //Connection.TRANSACTION_REPEATABLE_READ);
+		    Connection.TRANSACTION_READ_COMMITTED);
 	    schemaConn = getConnection(dataConnURL, hadbUserName, hadbPassword,
 		    Connection.TRANSACTION_REPEATABLE_READ);
 	    schemaConn.setAutoCommit(true);
@@ -398,7 +400,8 @@ public class HadbDataSpace implements DataSpace {
 		"DELETE FROM " + NAMETBLNAME);
 
 	updateInfoStmnt = idConn.prepareStatement("UPDATE " +
-		INFOTBLNAME + " SET NEXTIDBLOCKBASE=? WHERE APPID=?");
+		INFOTBLNAME + " SET NEXTIDBLOCKBASE=? " +
+		"WHERE APPID=? AND NEXTIDBLOCKBASE=?");
 
 	getIdStmnt = idConn.prepareStatement("SELECT * FROM " +
 		INFOTBLNAME + " I  " + "WHERE I.APPID = " + appID);
@@ -601,15 +604,25 @@ public class HadbDataSpace implements DataSpace {
 			    newIdBlockBase + "/" + newIdBlockSize);
 		    */
 
+		    int rc;
+
 		    updateInfoStmnt.setLong(1, newIdBlockBase + newIdBlockSize);
 		    updateInfoStmnt.setLong(2, appID);
+		    updateInfoStmnt.setLong(3, newIdBlockBase);
 		    try {
-			updateInfoStmnt.executeUpdate();
-			updateInfoStmnt.getConnection().commit();
-			// System.out.println("SUCCESS");
-			success = true;
+			rc = updateInfoStmnt.executeUpdate();
+			if (rc == 1) {
+			    updateInfoStmnt.getConnection().commit();
+			    success = true;
+/* 			    System.out.println("SUCCESS rc = " + rc); */
+			} else {
+			    updateInfoStmnt.getConnection().rollback();
+			    success = false;
+/* 			    System.out.println("CONTENTION rc = " + rc); */
+			}
 		    } catch (SQLException e) {
 			if (e.getErrorCode() == 2097) {
+/* 			    System.out.println("CONTENTION THROW "); */
 			    success = false;
 			    updateInfoStmnt.getConnection().rollback();
 			    try {
