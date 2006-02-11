@@ -42,23 +42,26 @@ public class HadbDataSpace implements DataSpace {
      */
 
     private static final String SCHEMA = "simserver";
+
     private static final String OBJBASETBL = "objects";
     private static final String OBJLOCKBASETBL = "objlocks";
     private static final String NAMEBASETBL = "namedirectory";
-    private static final String INFOTBL = "appinfo";
-
-    private static final String INFOTBLNAME = SCHEMA + "." + INFOTBL;
+    private static final String INFOBASETBL = "appinfo";
 
     private String NAMETBL;
     private String OBJTBL;
+    private String INFOTBL;
+    private String OBJLOCKTBL;
+
     private String NAMETBLNAME;
     private String OBJTBLNAME;
-    private String OBJLOCKTBL;
     private String OBJLOCKTBLNAME;
+    private String INFOTBLNAME;
 
     private Connection readConn;
     private Connection updateConn;
     private Connection idConn;
+    private Connection schemaConn;
     
     private PreparedStatement getIdStmnt;
     private PreparedStatement getObjStmnt;
@@ -76,10 +79,6 @@ public class HadbDataSpace implements DataSpace {
     private PreparedStatement clearNameTableStmnt;
 
     private volatile boolean closed = false;
-
-    private static final boolean TRACEDISK=false;
-    
-    private int commitRegisterCounter=1;
 
     private String hadbHosts = null;
     private String hadbUserName = "system";
@@ -133,6 +132,9 @@ public class HadbDataSpace implements DataSpace {
 	NAMETBL = NAMEBASETBL + "_" + appID;
 	NAMETBLNAME = SCHEMA + "." + NAMETBL;
 
+	INFOTBL = INFOBASETBL + "_" + appID;
+	INFOTBLNAME = SCHEMA + "." + INFOTBL;
+
 	try {
 	    // XXX: MUST take these from a config file.
 	    // hadbHosts = "129.148.75.63:15025,129.148.75.60:15005";
@@ -150,6 +152,9 @@ public class HadbDataSpace implements DataSpace {
 		    Connection.TRANSACTION_READ_COMMITTED);
 	    idConn = getConnection(dataConnURL, hadbUserName, hadbPassword,
 		    Connection.TRANSACTION_REPEATABLE_READ);
+	    schemaConn = getConnection(dataConnURL, hadbUserName, hadbPassword,
+		    Connection.TRANSACTION_REPEATABLE_READ);
+	    schemaConn.setAutoCommit(true);
 
 	    if (dropTables) {
 		dropTables();
@@ -244,7 +249,7 @@ public class HadbDataSpace implements DataSpace {
 	dropTable(OBJTBLNAME);
 	dropTable(OBJLOCKTBLNAME);
 	dropTable(NAMETBLNAME);
-	// dropTable(INFOTBLNAME);
+	dropTable(INFOTBLNAME);
     }
 
     private boolean dropTable(String tableName) {
@@ -258,21 +263,28 @@ public class HadbDataSpace implements DataSpace {
 	} catch (Exception e) {
 	    System.out.println("FAILED to prepare/commit " + tableName);
 	    System.out.println("\t" + e);
+	    e.printStackTrace();
 	}
 
+	stmnt = null;
 	s = "DROP TABLE " + tableName;
 	try {
-	    stmnt = updateConn.createStatement();
+	    stmnt = schemaConn.createStatement();
 	    stmnt.execute(s);
-	    stmnt.getConnection().commit();
-	    System.out.println("Dropped " + tableName);
-	    return true;
 	} catch (SQLException e) {
-	    // XXX ?
-	    System.out.println("FAILED to drop " + tableName);
-	    System.out.println("\t" + e);
 	    return false;
 	}
+
+/* 	try { */
+	    System.out.println("Dropped " + tableName);
+	    return true;
+/* 	} catch (SQLException e) { */
+	    // XXX ?
+/* 	    System.out.println("FAILED to drop " + tableName); */
+/* 	    System.out.println("\t" + e); */
+/* 	    e.printStackTrace(); */
+/* 	    return false; */
+/* 	} */
     }
 
     /**
@@ -294,9 +306,8 @@ public class HadbDataSpace implements DataSpace {
 	try {
 	    System.out.println("Creating Schema");
 	    String s = "CREATE SCHEMA " + SCHEMA;
-	    stmnt = updateConn.createStatement();
-	    stmnt.execute(s);
-	    stmnt.getConnection().commit();
+	    stmnt = schemaConn.createStatement();
+/* 	    stmnt.execute(s); */
 	} catch (SQLException e) {
 
 	    /*
@@ -318,13 +329,12 @@ public class HadbDataSpace implements DataSpace {
 	    String s = "select tablename from sysroot.alltables" +
 		    " where schemaname like '" + SCHEMA + "%'";
 
-	    stmnt = readConn.createStatement();
+	    stmnt = schemaConn.createStatement();
 	    rs = stmnt.executeQuery(s);
 	    while (rs.next()) {
 		foundTables.add(rs.getString(1).trim());
 	    }
 	    rs.close();
-	    stmnt.getConnection().commit();
 	} catch (Exception e) {
 	    // XXX: failure?
 	    System.out.println("failure finding schema" + e);
@@ -394,26 +404,6 @@ public class HadbDataSpace implements DataSpace {
 		INFOTBLNAME + " I  " + "WHERE I.APPID = " + appID);
     }
 
-    private void clearTables() {
-	String s;
-	Statement stmnt;
-
-	System.out.println("Dropping Objects table");
-
-	try {
-	    s = "DROP TABLE " + OBJTBLNAME;
-	    stmnt = updateConn.createStatement();
-	    stmnt.execute(s);
-	    stmnt.getConnection().commit();
-
-	} catch (Exception e) {
-	    // XXX
-	}
-
-	createObjTable();
-    }
-
-
     private boolean createObjTable() {
 	System.out.println("Creating Objects table");
 	Statement stmnt;
@@ -422,9 +412,8 @@ public class HadbDataSpace implements DataSpace {
 		"OBJBYTES BLOB, " +
 		"PRIMARY KEY (OBJID))";
 	try { 
-	    stmnt = updateConn.createStatement();
+	    stmnt = schemaConn.createStatement();
 	    stmnt.execute(s);
-	    stmnt.getConnection().commit();
 	} catch (Exception e) {
 	    // XXX
 	}
@@ -443,9 +432,8 @@ public class HadbDataSpace implements DataSpace {
 		"IDBLOCKSIZE INT, " +
 		"PRIMARY KEY(APPID)" + ")";
 	try {
-	    stmnt = idConn.createStatement();
+	    stmnt = schemaConn.createStatement();
 	    stmnt.execute(s);
-	    stmnt.getConnection().commit();
 	} catch (SQLException e) {
 	    // XXX
 	}
@@ -453,18 +441,24 @@ public class HadbDataSpace implements DataSpace {
 	s = "SELECT * FROM " + INFOTBLNAME + " I  " +
 		"WHERE I.APPID = " + appID;
 	try {
-	    stmnt = idConn.createStatement();
+	    stmnt = schemaConn.createStatement();
 	    rs = stmnt.executeQuery(s);
-	    stmnt.getConnection().commit();
 	    if (!rs.next()) { // entry does not exist
 		System.out.println("Creating new entry in info table for appID "
 		    + appID);
-		stmnt = idConn.createStatement();
+		stmnt = schemaConn.createStatement();
 		s = "INSERT INTO " + INFOTBLNAME + " VALUES(" +
 			appID + "," + defaultIdStart + "," +
 			defaultIdBlockSize + ")";
 		stmnt.executeUpdate(s);
-		stmnt.getConnection().commit();
+
+		/*
+		 * If the table is being re-created, make sure that
+		 * the cached state for the table is invalidated as
+		 * well.
+		 */
+
+		currentIdBlockBase	= DataSpace.INVALID_ID;
 	    }
 	    rs.close();
 	} catch (SQLException e) {
@@ -481,9 +475,8 @@ public class HadbDataSpace implements DataSpace {
 		"OBJLOCK INT NOT NULL," +
 		"PRIMARY KEY (OBJID)" + ")";
 	try {
-	    Statement stmnt = updateConn.createStatement();
+	    Statement stmnt = schemaConn.createStatement();
 	    stmnt.execute(s);
-	    stmnt.getConnection().commit();
 	} catch (SQLException e) {
 	    // XXX
 	}
@@ -497,9 +490,8 @@ public class HadbDataSpace implements DataSpace {
 		"OBJID DOUBLE INT NOT NULL," +
 		"PRIMARY KEY (NAME)" + ")";
 	try {
-	    Statement stmnt = updateConn.createStatement();
+	    Statement stmnt = schemaConn.createStatement();
 	    stmnt.execute(s);
-	    stmnt.getConnection().commit();
 	} catch (SQLException e) {
 	    // XXX
 	}
@@ -512,11 +504,9 @@ public class HadbDataSpace implements DataSpace {
     private Connection getConnection(String dataConnURL,
 	    String userName, String userPasswd, int isolation)
     {
-	Connection conn;
 	try {
-	    conn = DriverManager.getConnection(dataConnURL,
+	    Connection conn = DriverManager.getConnection(dataConnURL,
 		    userName, userPasswd);
-
 	    conn.setAutoCommit(false);
 	    conn.setTransactionIsolation(isolation);
 	    return conn;
@@ -526,7 +516,6 @@ public class HadbDataSpace implements DataSpace {
 	}
 	return null;
     }
-
 
     /*
      * Internal parameters for object ID generation:
@@ -572,6 +561,8 @@ public class HadbDataSpace implements DataSpace {
 	 * then the next such Id is allocated and returned. 
 	 * Otherwise, a new block is accessed from the database.
 	 */
+
+	// System.out.println("currentIdBlockBase = " +  currentIdBlockBase);
 
 	if ((currentIdBlockBase == DataSpace.INVALID_ID) ||
 		(currentIdBlockOffset >= defaultIdBlockSize)) {
@@ -684,6 +675,7 @@ public class HadbDataSpace implements DataSpace {
 	try {
 	    insertObjLockStmnt.executeUpdate();
 	    insertObjLockStmnt.getConnection().commit();
+	    // System.out.println("SUCCESS for OID: " + newOID);
 	} catch (SQLException e) {
 	    try {
 		updateObjLockStmnt.getConnection().rollback();
@@ -702,7 +694,7 @@ public class HadbDataSpace implements DataSpace {
     /**
      * {@inheritDoc}
      */
-    public byte[] getObjBytes(long objectID) {
+    public synchronized byte[] getObjBytes(long objectID) {
 	byte[] objbytes = null;
 	try {
 	    getObjStmnt.setLong(1, objectID);
@@ -724,7 +716,7 @@ public class HadbDataSpace implements DataSpace {
     /**
      * {@inheritDoc}
      */
-    public void lock(long objectID) throws NonExistantObjectIDException {
+    public synchronized void lock(long objectID) throws NonExistantObjectIDException {
 
 	/*
 	 * This is ugly.  I'd love to hear about a better approach.
@@ -814,7 +806,7 @@ public class HadbDataSpace implements DataSpace {
     /**
      * {@inheritDoc}
      */
-    public void release(long objectID) {
+    public synchronized void release(long objectID) {
 	
 	/*
 	 * Similar to lock, except it doesn't poll.  If the update
@@ -973,7 +965,7 @@ public class HadbDataSpace implements DataSpace {
     /**
      * {inheritDoc}
      */
-    public Long lookup(String name) {
+    public synchronized Long lookup(String name) {
 	long oid = DataSpace.INVALID_ID;
 
 	try {
@@ -993,14 +985,14 @@ public class HadbDataSpace implements DataSpace {
     /*
      * {@inheritDoc}
      */
-    public long getAppID() {
+    public synchronized long getAppID() {
 	return appID;
     }
 
     /**
      * {@inheritDoc}
      */
-    public void clear() {
+    public synchronized void clear() {
 
 	try {
 	    dropTables();
@@ -1013,7 +1005,7 @@ public class HadbDataSpace implements DataSpace {
     /**
      * {@inheritDoc}
      */
-    public void close() {
+    public synchronized void close() {
 	closed = true;
     }
 
