@@ -285,14 +285,14 @@ public class SimTaskImpl implements SimTask {
 	}
 
 	/**
-	 * findSO
+	 * findGLO
 	 * 
-	 * @param soName
+	 * @param gloName
 	 *            String
 	 * @return SOReference
 	 */
-	public GLOReference findSO(String soName) {
-		return makeReference(trans.lookup(soName));
+	public GLOReference findGLO(String gloName) {
+		return makeReference(trans.lookup(gloName));
 	}
 
 
@@ -332,16 +332,28 @@ public class SimTaskImpl implements SimTask {
 	}
 
 	/**
-	 * createSO
+	 * createGLO
 	 * 
-	 * @param wurmPlayer
-	 *            WurmPlayer
-	 * @return SOReference
+	 * @param simObject			the object to store
+	 * @param name				an optional name to map the object to.
+	 * 
+	 * @return A GLOReference
 	 */
-	public GLOReference createSO(GLO simObject, String name) {		
+	public GLOReference createGLO(GLO simObject, String name) {		
 		GLOReferenceImpl ref = (GLOReferenceImpl) makeReference(trans.create(simObject, name));
 		registerGLOID(ref.objID,simObject,ACCESS_TYPE.GET);
 		return ref;
+	}
+	
+	/**
+	 * This method is called to create a GLO in the objectstore.
+	 *
+	 * @param simObject the GLO to insert into the objects store
+	 * 
+	 * @return A GLOReference that references the newly created GLO
+	 */
+	public GLOReference createGLO(GLO simObject) {
+		return createGLO(simObject, null);
 	}
 
 	/*

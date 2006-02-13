@@ -31,7 +31,7 @@ public class CommTestBoot
 
     public void boot(SimTask task, boolean firstBoot) {
 	System.err.println("Booting comm test, appid = " + task.getAppID());
-	thisobj = task.findSO("BOOT");
+	thisobj = task.findGLO("BOOT");
 	task.addUserListener(thisobj);
 	ChannelID cid = task.openChannel("echo");
 	task.addChannelListener(cid,thisobj);

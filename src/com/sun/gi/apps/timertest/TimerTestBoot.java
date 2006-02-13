@@ -45,9 +45,9 @@ public class TimerTestBoot implements SimBoot, SimTimerListener {
 			PDTimer timer;
 			if (firstBoot){ // not instantiated yet
 				timer = new PDTimer(task);
-				pdTimer = task.createSO(timer,null);
+				pdTimer = task.createGLO(timer,null);
 				TimerCount tc = new TimerCount();
-				GLOReference tcRef = task.createSO(tc,null);
+				GLOReference tcRef = task.createGLO(tc,null);
 				timer.addTimerEvent(task,ACCESS_TYPE.GET,1,true,tcRef,"increment",new Object[]{});
 			} else {
 				timer=(PDTimer)pdTimer.get(task);

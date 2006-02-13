@@ -61,7 +61,7 @@ public class BattleBoardServer
 	log.info("Booting BattleBoard Server as appID " + task.getAppID());
 
 	// Register with the SGS boot manager
-	bootRef = task.findSO("BOOT");
+	bootRef = task.findGLO("BOOT");
 	task.addUserListener(bootRef);
 
 	gameList = new HashMap<String, GLOReference>();

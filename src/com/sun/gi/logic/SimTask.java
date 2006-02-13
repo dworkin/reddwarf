@@ -102,15 +102,25 @@ public interface SimTask {
   
 
   /**
-   * This method is called to create a GLO is the objectstore
-   * (the name is historical and shoudl probably be changed.)
+   * This method is called to create a GLO in the objectstore.
+   * 
    *
    * @param simObject the GLO to insert into the objects store
    * @param name String an optional symbolic reference to assign to the
    * object, or null.
-   * @return SOReference A SOReference that references the newly created GLO
+   * 
+   * @return A GLOReference that references the newly created GLO
    */
-  public GLOReference createSO(GLO simObject, String name);
+  public GLOReference createGLO(GLO simObject, String name);
+  
+  /**
+   * This method is called to create a GLO in the objectstore.
+   *
+   * @param simObject the GLO to insert into the objects store
+   * 
+   * @return A GLOReference that references the newly created GLO
+   */
+  public GLOReference createGLO(GLO simObject);
   
 
   // data access functions
@@ -123,10 +133,11 @@ public interface SimTask {
    * As is everything else is the obejctstore, symbolic names are specific
    * to a game context.  (The Game's App ID is an implicit part of the key.)
    *
-   * @param soName String The symbolic name to look up.
-   * @return SOReference A reference to the GLo if found, null if not found.
+   * @param gloName String The symbolic name to look up.
+   * 
+   * @return GLOReference A reference to the GLO if found, null if not found.
    */
-  public GLOReference findSO(String soName);
+  public GLOReference findGLO(String gloName);
 
 /**
  * This method opens a comm channel and returns an ID for it

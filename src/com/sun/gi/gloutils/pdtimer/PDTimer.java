@@ -43,7 +43,7 @@ public class PDTimer implements SimTimerListener {
 			
 			e.printStackTrace();
 		}			
-		timerListRef = task.createSO(list,null);
+		timerListRef = task.createGLO(list,null);
 	}
 	
 	public void start(SimTask task,long heartbeat) throws InstantiationException{
@@ -70,7 +70,7 @@ public class PDTimer implements SimTimerListener {
 	public GLOReference addTimerEvent(SimTask task, ACCESS_TYPE access, long delay,boolean repeat,
 			GLOReference target, String methodName, Object[] parameters){
 		PDTimerEvent evnt = new PDTimerEvent(access,delay,repeat,target,methodName,parameters);
-		GLOReference evntRef = task.createSO(evnt,null);
+		GLOReference evntRef = task.createGLO(evnt,null);
 		PDTimerEventList list = (PDTimerEventList)timerListRef.get(task);
 		list.addEvent(task,evntRef);
 		return evntRef;
