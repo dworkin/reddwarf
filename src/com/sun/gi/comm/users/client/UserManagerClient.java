@@ -52,6 +52,15 @@ public interface UserManagerClient {
   public boolean connect(Map<String, String> params,
 			 UserManagerClientListener listener);
 
+  /**
+   * This method is called to initiate connection to the
+   * UserManager in the Darkstar backend.
+   *
+   * @param choice
+   * @param listener the receiver of communication events
+   *
+   * @return true if connection started, false if it fails
+   */
   public boolean connect(DiscoveredUserManager choice,
 			 UserManagerClientListener listener);
 

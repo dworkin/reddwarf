@@ -80,11 +80,7 @@ public class BYTEARRAY implements Comparable {
 		return ("BYTEARRAY(" + toHex() + ")");
 	}
 
-	/**
-	 * @return
-	 */
 	public String toHex() {
 		return StringUtils.bytesToHex(data);
 	}
-
 }

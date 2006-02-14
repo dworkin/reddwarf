@@ -108,7 +108,7 @@ public class BinaryPktProtocol implements TransportProtocol {
      * We use two buffers so we can efficiently
      * create the header separately from the payload.
      *
-     * sendArray[0] is the header<br />
+     * sendArray[0] is the header<br>
      * sendArray[1] is the payload
      */
     protected ByteBuffer[] sendArray = new ByteBuffer[2];

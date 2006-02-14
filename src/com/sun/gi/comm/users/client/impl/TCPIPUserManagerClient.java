@@ -192,21 +192,21 @@ public class TCPIPUserManagerClient implements UserManagerClient,
     // UserManagerClient methods
 
     public boolean connect(DiscoveredUserManager choice,
-            UserManagerClientListener clientListener) {
+            UserManagerClientListener listener) {
 
         String host = choice.getParameter("host");
         int port = Integer.parseInt(choice.getParameter("port"));
 
-        return connect(new InetSocketAddress(host, port), clientListener);
+        return connect(new InetSocketAddress(host, port), listener);
     }
 
     public boolean connect(Map<String, String> params,
-            UserManagerClientListener clientListener) {
+            UserManagerClientListener listener) {
 
         String host = params.get("host");
         int port = Integer.parseInt(params.get("port"));
 
-        return connect(new InetSocketAddress(host, port), clientListener);
+        return connect(new InetSocketAddress(host, port), listener);
     }
 
     public void login() {

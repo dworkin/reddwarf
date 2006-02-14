@@ -39,6 +39,9 @@
 	    <arg value="java-client-api.doxygen"/>
 	</exec>
 	<exec executable="doxygen" failonerror="true">
+	    <arg value="java-server-api.doxygen"/>
+	</exec>
+	<exec executable="doxygen" failonerror="true">
 	    <arg value="java.doxygen"/>
 	</exec>
     </target>

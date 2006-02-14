@@ -36,9 +36,10 @@ public interface Router {
 
 	/**
 	 * This call is made in order to allocate a new unqiue UserID.
+	 *
+	 * @param user 
 	 * @param subject 
 	 * 
-	 * @return UserID The new ID
 	 * @throws IOException 
 	 */
 	public void registerUser(SGSUser user, Subject subject) throws InstantiationException, IOException;
@@ -46,8 +47,7 @@ public interface Router {
 	/**
 	 * This call is used to free a UserID that is no longer needed.
 	 * 
-	 * @param id
-	 *            UserID The ID to dispose.
+	 * @param user The ID to dispose.
 	 */
 	public void deregisterUser(SGSUser user);
 

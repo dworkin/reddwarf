@@ -1,12 +1,3 @@
-/**
- *
- * <p>Title: PDTimerEventList.java</p>
- * <p>Description: </p>
- * <p>Copyright: Copyright (c) 2004 Sun Microsystems, Inc.</p>
- * <p>Company: Sun Microsystems, Inc</p>
- * @author Jeff Kesselman
- * @version 1.0
- */
 package com.sun.gi.gloutils.pdtimer;
 
 import java.lang.reflect.Method;
@@ -97,13 +88,14 @@ public class PDTimerEventList implements GLO {
 
 	/**
 	 * (DESIGNED To BE CALLED WITH ACCESS.GET)
+	 *
+	 * @param task
 	 * @param evntRef
 	 */
 	public void addEvent(SimTask task, GLOReference evntRef) {
 		task.access_check(ACCESS_TYPE.GET,this);
 		PDTimerEvent evnt = (PDTimerEvent) evntRef.peek(task);
-		timerEvents.put(
-				new Long(evnt.delayTime() + System.currentTimeMillis()),
+		timerEvents.put(new Long(evnt.delayTime() + System.currentTimeMillis()),
 				evntRef);
 
 	}

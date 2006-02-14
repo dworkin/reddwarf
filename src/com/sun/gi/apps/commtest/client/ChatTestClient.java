@@ -358,7 +358,7 @@ public class ChatTestClient extends JFrame implements ClientConnectionManagerLis
 	 * Called by the ClientConnectionManager when a new user joins the application.
 	 * The new user is added to the user list on the right side.
 	 * 
-	 * @parma userID		the new user
+	 * @param userID		the new user
 	 */
 	public void userJoined(byte[] userID) {
 		DefaultListModel mdl = (DefaultListModel) userList.getModel();

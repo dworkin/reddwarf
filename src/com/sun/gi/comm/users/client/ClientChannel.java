@@ -46,7 +46,7 @@ public interface ClientChannel {
      * @param data     the data to transmit
      * @param reliable true if the data requires reliable delivery
      */
-    public void sendMulticastData(byte[][]to, ByteBuffer data,
+    public void sendMulticastData(byte[][] to, ByteBuffer data,
 	boolean reliable);
 
     /**

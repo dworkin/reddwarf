@@ -17,6 +17,7 @@ public interface SGSChannel {
 	 *            UserID The UserID who sent the message (a return address.)
 	 * @param message
 	 *            byte[] A byte array containing the data to be sent.
+	 * @param reliable
 	 */
 	public void unicastData(UserID from, UserID to, ByteBuffer message,
 			boolean reliable);
@@ -30,6 +31,7 @@ public interface SGSChannel {
 	 *            UserID The UserID who sent the message (a return address.)
 	 * @param message
 	 *            byte[] A byte array containing the data to be sent.
+	 * @param reliable
 	 */
 	public void multicastData(UserID userID, UserID[] tolist,
 			ByteBuffer message, boolean reliable);
@@ -42,6 +44,7 @@ public interface SGSChannel {
 	 *            UserID The UserID who sent the message (a return address.)
 	 * @param databuff
 	 *            byte[] A byte array containing the data to be sent.
+	 * @param reliable
 	 */
 	public void broadcastData(UserID userID, ByteBuffer databuff, boolean reliable);
 
@@ -58,6 +61,7 @@ public interface SGSChannel {
 	 * @param targets
 	 * @param buff
 	 * @param reliable
+	 * @param sendToListeners
 	 */
 	public void multicastData(UserID server_id, UserID[] targets, ByteBuffer buff, boolean reliable,
 			boolean sendToListeners);
@@ -67,7 +71,7 @@ public interface SGSChannel {
 	 * Returns this channel's lock status.  Users cannot join/leave locked channels
 	 * except by way of the GLE.
 	 * 
-	 * @return		true if this channel is locked.
+	 * @return true if this channel is locked.
 	 */
 	public boolean isLocked();
 	
@@ -76,7 +80,7 @@ public interface SGSChannel {
 	 * Sets this channel's lock status.  Users cannot join/leave locked channels
 	 * except by way of the GLE.
 	 * 
-	 * @param lock		if true, will lock the channel.
+	 * @param lock if true, will lock the channel.
 	 */
 	public void setLocked(boolean lock);
 

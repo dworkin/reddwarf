@@ -58,7 +58,7 @@ public interface SimKernel {
 	 * @param objID
 	 * @param delay
 	 * @param repeat
-	 * @return
+	 * @return an identifier that refers to the timer event
 	 */
 	public long registerTimerEvent(long tid, ACCESS_TYPE access, Simulation sim, long objID, long delay,
 			boolean repeat);
@@ -114,12 +114,12 @@ public interface SimKernel {
 	public void closeSocket(long socketID);
 
 	/**
-	 * @return
+	 * @return the next timer id.
 	 */
 	public long getNextTimerID();
 
 	/**
-	 * @return
+	 * @return the next socket id.
 	 */
 	public long getNextSocketID();
 	

@@ -150,7 +150,7 @@ public class ChatChannelFrame extends JInternalFrame implements ClientChannelLis
 	 * A call back from ClientChannelListener.  Called when data arrives on the channel.  
 	 * This implementation simply dumps the data to the output area as a String in the form of:
 	 * 
-	 * <User who sent the message>: <Message>
+	 * <pre>&lt;User who sent the message&lt;: &lt;Message&lt;</pre>
 	 */
 	public void dataArrived(byte[] from, ByteBuffer data, boolean reliable){	
 		byte[] textb =new byte[data.remaining()];

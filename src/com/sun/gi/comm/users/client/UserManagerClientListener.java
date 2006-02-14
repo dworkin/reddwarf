@@ -87,6 +87,7 @@ public interface UserManagerClientListener {
     /**
      * Informs the event listener of the successful opening of a channel.
      *
+     * @param name
      * @param channelID The ID of the newly joined channel
      */
     public void joinedChannel(String name, byte[] channelID);

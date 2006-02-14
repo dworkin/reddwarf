@@ -1,12 +1,3 @@
-/**
- *
- * <p>Title: PDTimerEvent.java</p>
- * <p>Description: </p>
- * <p>Copyright: Copyright (c) 2004 Sun Microsystems, Inc.</p>
- * <p>Company: Sun Microsystems, Inc</p>
- * @author Jeff Kesselman
- * @version 1.0
- */
 package com.sun.gi.gloutils.pdtimer;
 
 import java.lang.reflect.Method;
@@ -86,30 +77,18 @@ public class PDTimerEvent implements GLO {
 		
 	}
 
-	/**
-	 * @return
-	 */
 	public long delayTime() {		
 		return delay;
 	}
 
-	/**
-	 * @return
-	 */
 	public boolean requiresCleanup() {		
 		return !isActive;
 	}
 
-	/**
-	 * @return
-	 */
 	public boolean isRepeating() {		
 		return repeat;
 	}
 
-	/**
-	 * 
-	 */
 	public void reset(SimTask task) {
 		task.access_check(ACCESS_TYPE.GET,this);
 		System.out.println("Restting event");
@@ -117,20 +96,11 @@ public class PDTimerEvent implements GLO {
 		
 	}
 
-	/**
-	 * @return
-	 */
 	public boolean isMoribund() {
 		return (!isActive)&&(!repeat);
 	}
 
-	/**
-	 * @return
-	 */
 	public boolean isActive() {	
 		return isActive;
 	}
-
-	
-
 }

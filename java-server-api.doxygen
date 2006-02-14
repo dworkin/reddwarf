@@ -17,7 +17,7 @@
 # The PROJECT_NAME tag is a single word (or a sequence of words surrounded 
 # by quotes) that should identify the project.
 
-PROJECT_NAME           = "SGS Client API"
+PROJECT_NAME           = "SGS Server API"
 
 # The PROJECT_NUMBER tag can be used to enter a project or revision number. 
 # This could be handy for archiving the generated documentation or 
@@ -30,7 +30,7 @@ PROJECT_NUMBER         = Snapshot
 # If a relative path is entered, it will be relative to the location 
 # where doxygen was started. If left blank the current directory will be used.
 
-OUTPUT_DIRECTORY       = doc/doxygen/client-api
+OUTPUT_DIRECTORY       = doc/doxygen/server-api
 
 # If the CREATE_SUBDIRS tag is set to YES, then doxygen will create 
 # 4096 sub-directories (in 2 levels) under the output directory of each output 
@@ -450,27 +450,44 @@ WARN_LOGFILE           =
 # directories like "/usr/src/myproject". Separate the files or directories 
 # with spaces.
 
-INPUT =  src/com/sun/gi/comm/users/client/ClientAlreadyConnectedException.java \
-	 src/com/sun/gi/comm/users/client/ClientChannel.java \
+INPUT =  src/com/sun/gi/logic/GLO.java \
+	 src/com/sun/gi/logic/GLOReference.java \
+	 src/com/sun/gi/logic/SimBoot.java \
+	 src/com/sun/gi/logic/SimUserListener.java \
+	 src/com/sun/gi/logic/SimUserDataListener.java \
+	 src/com/sun/gi/logic/SimTimerListener.java \
+	 src/com/sun/gi/logic/SimTask.java \
+	 src/com/sun/gi/objectstore/Transaction.java \
+	 src/com/sun/gi/comm/routing/UserID.java \
+	 src/com/sun/gi/comm/routing/ChannelID.java \
+	 src/com/sun/gi/utils/StatisticalUUID.java \
+	 src/com/sun/gi/utils/SGSUUID.java \
+	 src/com/sun/gi/gloutils/pdtimer \
 	 src/com/sun/gi/comm/users/client/ClientChannelListener.java \
 	 src/com/sun/gi/comm/users/client/ClientConnectionManager.java \
 	 src/com/sun/gi/comm/users/client/ClientConnectionManagerListener.java \
 	 src/com/sun/gi/comm/users/client/impl/ClientConnectionManagerImpl.java \
-	 src/com/sun/gi/comm/users/client/UserManagerClient.java \
 	 src/com/sun/gi/comm/users/client/UserManagerClientListener.java \
 	 src/com/sun/gi/comm/users/client/UserManagerPolicy.java \
 	 src/com/sun/gi/comm/users/client/impl/DefaultUserManagerPolicy.java \
 	 src/com/sun/gi/comm/discovery/DiscoveredUserManager.java \
 	 src/com/sun/gi/comm/discovery/DiscoveredGame.java \
 	 src/com/sun/gi/comm/discovery/Discoverer.java \
-	 src/com/sun/gi/comm/users/client/impl/TCPIPUserManagerClient.java \
+	 src/com/sun/gi/comm/users/server/UserManager.java \
+	 src/com/sun/gi/comm/users/server/SGSUser.java \
+	 src/com/sun/gi/comm/routing/Router.java \
+	 src/com/sun/gi/comm/routing/RouterListener.java \
+	 src/com/sun/gi/comm/routing/SGSChannel.java \
+	 src/com/sun/gi/comm/users/server/impl/TCPIPUserManager.java \
+	 src/com/sun/gi/comm/users/validation/UserValidatorFactory.java \
+	 src/com/sun/gi/comm/users/validation/UserValidator.java \
 	 src/com/sun/gi/comm/users/protocol/TransportProtocol.java \
 	 src/com/sun/gi/comm/users/protocol/TransportProtocolClient.java \
 	 src/com/sun/gi/comm/users/protocol/TransportProtocolServer.java \
 	 src/com/sun/gi/comm/users/protocol/TransportProtocolTransmitter.java \
 	 src/com/sun/gi/comm/users/protocol/impl/BinaryPktProtocol.java \
 	 src/com/sun/gi/comm/users/protocol/impl/ValidationDataProtocol.java \
-	 src/com/sun/gi/apps/commtest/client \
+	 src/com/sun/gi/apps/commtest \
 	 src/com/sun/gi/utils/nio
 
 # If the value of the INPUT tag contains directories, you can use the 

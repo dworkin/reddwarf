@@ -29,8 +29,7 @@ public interface UserManager {
      * Provides the name of a class that a client should
      * instantiate in order to connect to this Darkstar
      * Server UserManager.  That class implements the
-     * {@link com.sun.gi.comm.users.client.UserManagerClient}
-     * interface.
+     * UserManagerClient interface.
      *
      * @return the fully-qualified name of the Darkstar UserManagerClient
      *         class correspoding to this server-side UserManager.

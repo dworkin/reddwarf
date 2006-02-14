@@ -119,8 +119,8 @@ public class ClientConnectionManagerImpl implements ClientConnectionManager,
         return connect(userManagerClassName, attempts, sleepTime);
     }
 
-    public boolean connect(String userManagerClassName, int attempts,
-            long sleepTime) throws ClientAlreadyConnectedException {
+    public boolean connect(String userManagerClassName, int connectAttempts,
+            long msBetweenAttempts) throws ClientAlreadyConnectedException {
         if (connected) {
             throw new ClientAlreadyConnectedException();
         }
@@ -131,8 +131,8 @@ public class ClientConnectionManagerImpl implements ClientConnectionManager,
             ex.printStackTrace();
             return false;
         }
-        connAttempts = attempts;
-        connWaitMS = sleepTime;
+        connAttempts = connectAttempts;
+        connWaitMS = msBetweenAttempts;
         connAttemptCounter = 0;
         reconnecting = false;
         return connect(umanager);
