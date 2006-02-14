@@ -18,7 +18,8 @@
     <target name="init">
         <mkdir dir="bin"/>
         <mkdir dir="doc"/>
-        <mkdir dir="dox"/>
+        <mkdir dir="doc/javadoc"/>
+        <mkdir dir="doc/doxygen"/>
     </target>
 
     <target name="clean">
@@ -27,27 +28,40 @@
 
     <target name="realclean" depends="clean">
         <delete dir="doc"/>
-        <delete dir="dox"/>
-        <delete dir="dox-client"/>
     </target>
+
+    <!-- Documentation targets -->
 
     <target name="docs" depends="javadocs,doxygen"/>
 
-    <target name="doxygen">
-	<exec executable="doxygen">
-	    <arg value="java-client.doxygen"/>
+    <target name="doxygen" depends="init">
+	<exec executable="doxygen" failonerror="true">
+	    <arg value="java-client-api.doxygen"/>
 	</exec>
-	<exec executable="doxygen">
+	<exec executable="doxygen" failonerror="true">
 	    <arg value="java.doxygen"/>
 	</exec>
     </target>
 
-    <target name="javadocs">
-        <javadoc destdir="doc" sourcepath="src" classpathref="project.classpath" access="private">
+    <target name="javadocs" depends="javadocs-internal,javadocs-api"/>
+
+    <target name="javadocs-internal" depends="init">
+        <javadoc destdir="doc/javadoc/internal" sourcepath="src"
+	    classpathref="project.classpath" access="private">
 	  <package name="com.sun.gi.*"/>
 	  <tag name="todo" description="To do:"/>
 	</javadoc>
     </target>
+
+    <target name="javadocs-api" depends="init">
+        <javadoc destdir="doc/javadoc/api" sourcepath="src"
+	    classpathref="project.classpath" access="public">
+	  <package name="com.sun.gi.*"/>
+	  <tag name="todo" description="To do:"/>
+	</javadoc>
+    </target>
+
+    <!-- Compilation targets -->
 
     <target name="build" depends="init">
         <echo message="${ant.project.name}: ${ant.file}"/>
@@ -60,17 +74,12 @@
         </javac>
     </target>
 
+    <!-- Runnable targets -->
+
     <target name="SGS at Labs Clean">
         <java classname="com.sun.gi.SGS" failonerror="true" fork="yes">
             <arg value="-C"/>
             <arg value="-V"/>
-            <classpath refid="project.classpath"/>
-	    <sysproperty key="java.util.logging.config.file" value="logging.properties"/>
-        </java>
-    </target>
-
-    <target name="ChatTestClient">
-        <java classname="com.sun.gi.apps.commtest.client.ChatTestClient" failonerror="true" fork="yes">
             <classpath refid="project.classpath"/>
 	    <sysproperty key="java.util.logging.config.file" value="logging.properties"/>
         </java>
@@ -84,7 +93,14 @@
         </java>
     </target>
 
-    <target name="ChatTestClient (1)">
+    <target name="ChatTestClient">
+        <java classname="com.sun.gi.apps.commtest.client.ChatTestClient" failonerror="true" fork="yes">
+            <classpath refid="project.classpath"/>
+	    <sysproperty key="java.util.logging.config.file" value="logging.properties"/>
+        </java>
+    </target>
+
+    <target name="ChatTestClient2">
         <java classname="com.sun.gi.apps.commtest.client.ChatTestClient" failonerror="true" fork="yes">
             <classpath refid="project.classpath"/>
 	    <sysproperty key="java.util.logging.config.file" value="logging.properties"/>
