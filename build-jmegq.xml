@@ -28,11 +28,15 @@
     <target name="realclean" depends="clean">
         <delete dir="doc"/>
         <delete dir="dox"/>
+        <delete dir="dox-client"/>
     </target>
 
     <target name="docs" depends="javadocs,doxygen"/>
 
     <target name="doxygen">
+	<exec executable="doxygen">
+	    <arg value="java-client.doxygen"/>
+	</exec>
 	<exec executable="doxygen">
 	    <arg value="java.doxygen"/>
 	</exec>
