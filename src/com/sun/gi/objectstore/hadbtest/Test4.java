@@ -19,6 +19,7 @@ public class Test4 {
 	 */
 
 	TestParams params = new TestParams();
+	System.out.println(params.toString());
 
 	/*
 	 * Connect to the database, test the connection.
@@ -50,8 +51,9 @@ public class Test4 {
 	 * Create a bunch of objects, and then chop them up into clusters.
 	 */
 
-	ObjectCreator creator = new ObjectCreator(os, 0, null, params.objSize);
-	long[] oids = creator.createNewBunch(params.numObjs, 1, true);
+	ObjectCreator creator = new ObjectCreator(os, 0, null);
+	long[] oids = creator.createNewBunch(params.numObjs, params.objSize,
+		1, true);
 
 	System.out.println("waiting for the new objects to settle");
 	try {

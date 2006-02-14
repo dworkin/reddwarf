@@ -37,9 +37,9 @@ public class SimpleInitDB {
 
     public static long[] createObjects(ObjectStore os, long appId, int start,
 	    String name, int count, int size) {
-	ObjectCreator oc = new ObjectCreator(os, start, name, size);
+	ObjectCreator oc = new ObjectCreator(os, start, name);
 
-	return oc.createNewBunch(count, appId, true);
+	return oc.createNewBunch(count, size, appId, true);
     }
 
 }

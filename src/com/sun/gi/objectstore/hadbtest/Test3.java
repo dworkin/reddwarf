@@ -38,8 +38,9 @@ public class Test3 {
 	 * Create a bunch of objects, and then chop them up into clusters.
 	 */
 
-	ObjectCreator creator = new ObjectCreator(os, 0, null, params.objSize);
-	long[] oids = creator.createNewBunch(params.numObjs, 1, false);
+	ObjectCreator creator = new ObjectCreator(os, 0, null);
+	long[] oids = creator.createNewBunch(params.numObjs, params.objSize,
+		1, false);
 
 	long[][] clusters;
 	try {

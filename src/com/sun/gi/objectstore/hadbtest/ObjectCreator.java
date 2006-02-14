@@ -15,8 +15,7 @@ import com.sun.gi.objectstore.Transaction;
 
 public class ObjectCreator {
     private final IdGenerator id;
-    private int baggageSize;
-    private long val = 0;
+    private long localVal = -1000000000000L;
     private ClassLoader classLoader;
     private final ObjectStore os;
     private String populatorName = "default";
@@ -34,18 +33,13 @@ public class ObjectCreator {
      *
      * @param populatorName a string representing the "name" of this
      * populator.  May be null.
-     *
-     * @param baggageSize the number of bytes occupied by the
-     * per-object baggage of each {@link FillerObject FillerObject}.
      */
 
-    public ObjectCreator(ObjectStore os, int start, String populatorName,
-	    int baggageSize) {
+    public ObjectCreator(ObjectStore os, int start, String populatorName) {
 	this.classLoader = this.getClass().getClassLoader();
 	this.id = new IdGenerator(start);
 	this.os = os;
 	this.populatorName = populatorName;
-	this.baggageSize = baggageSize;
     }
 
     /*
@@ -81,7 +75,9 @@ public class ObjectCreator {
      * @return an array of the OIDs for the new object.
      */
 
-    public long[] createNewBunch(int count, long appId, boolean selfId) {
+    public long[] createNewBunch(int count, int objSize,
+	    long appId, boolean selfId)
+    {
 
 	if (count <= 0) {
 	    return null;	// &&& Sloppy.
@@ -96,8 +92,9 @@ public class ObjectCreator {
 	 * committing them.
 	 *
 	 * Even this may fail, if the individual objects are large
-	 * enough.  There is some magic number (around 5MB?) that
-	 * Derby transactions must not exceed.
+	 * enough.  For example, there is some magic number (around
+	 * 5MB?) that Derby transactions must not exceed.  Other
+	 * systems may have similar limitations.
 	 */
 
 	int chunkSize = 100;
@@ -107,7 +104,7 @@ public class ObjectCreator {
 
 	    trans.start();
 	    for (int i = 0; i + base < count && i < chunkSize; i++) {
-		newOIDs[i + base] = addFillerObj(trans, appId);
+		newOIDs[i + base] = addFillerObj(trans, appId, objSize, base + i);
 	    }
 
 	    commitTransaction(trans);
@@ -131,30 +128,35 @@ public class ObjectCreator {
 		commitTransaction(trans);
 	    }
 	}
-
-
 	return newOIDs;
     }
 
     /**
      * Create and add a single new object.  <p>
      *
-     * The object is added within a single transaction.  <p>
+     * The object is added within a single transaction.
      *
-     * @param appId the Id of the owning app.
+     * @param appId the Id of the owning app
      *
      * @param selfId whether or not the objects should be backpatched
-     * so that the oid field contains a copy of the OID value.
+     * so that the oid field contains a copy of the OID value
+     *
+     * @param objSize the size of the payload of the object to create
      *
      * @return the OID of the new object.
      */
 
-    public long createNew(long appId, boolean selfId) {
+    public long createNew(long appId, boolean selfId, int objSize) {
+
+	long myVal;
+	synchronized (this) {
+	    myVal = localVal++;
+	}
 
 	Transaction trans = beginTransaction(appId);
 
 	trans.start();
-	long newOID = addFillerObj(trans, appId);
+	long newOID = addFillerObj(trans, appId, objSize, myVal);
 
 	commitTransaction(trans);
 
@@ -186,14 +188,13 @@ public class ObjectCreator {
 	    FillerObject fo = (FillerObject) trans.lock(oid);
 	    fo.setOID(oid);
 	    commitTransaction(trans);
+	    return true;
 	}
 	catch (Exception e) {
 	    trans.abort();
 	    // &&& fix this.
 	    return false;
 	}
-
-	return true;
     }
 
     /**
@@ -207,17 +208,11 @@ public class ObjectCreator {
      * @return the OID of the new object.
      */
 
-    protected long addFillerObj(Transaction trans, long appId) {
-	long myVal;
+    protected long addFillerObj(Transaction trans, long appId, int objSize, long val) {
 
-	synchronized(this) {
-	    myVal = val++;
-	}
+	FillerObject obj = new FillerObject(id, val, objSize, populatorName, null);
 
-	FillerObject obj = new FillerObject(id, myVal, baggageSize,
-		populatorName, null);
-
-	String name = "appId " + appId + " val " + myVal;
+	String name = idString(appId, val);
 	long oid = trans.create(obj, name);
 
 	/*
@@ -227,18 +222,8 @@ public class ObjectCreator {
 	return oid;
     }
 
-    /**
-     * Set the size of the per-object "baggage".
-     *
-     * @param newBaggageSize the new size of the per-object baggage.
-     *
-     * @return the previous size of the per-object baggage.
-     */
-
-    public int setBaggageSize(int newBaggageSize) {
-	int oldBaggageSize = baggageSize;
-	baggageSize = newBaggageSize;
-	return (oldBaggageSize);
+    public static String idString(long appID, long val) {
+	return "appID " + appID + " val " + val;
     }
 }
 

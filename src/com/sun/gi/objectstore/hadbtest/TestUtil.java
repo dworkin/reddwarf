@@ -217,6 +217,22 @@ public class TestUtil {
 
 	return true;
     }
+
+    public static void snooze(long millis, String reason) {
+	if (reason != null) {
+	    System.out.println(reason);
+	}
+
+	if (millis < 1) {
+	    return;
+	} else {
+	    try {
+		Thread.sleep(millis);
+	    } catch (Exception e) {
+		System.out.println("unexpected: " + e);
+	    }
+	}
+    }
 }
 
 /*

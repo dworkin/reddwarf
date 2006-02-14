@@ -5,6 +5,10 @@
 package com.sun.gi.objectstore.hadbtest;
 
 import com.sun.gi.objectstore.ObjectStore;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.Properties;
+import java.util.Enumeration;
 
 /**
  * Parameters for the larger tests.  <p>
@@ -53,7 +57,32 @@ public class TestParams {
      * The number of concurrent threads to start.
      */
 
-    public int numThreads = 2;
+    public int numThreads = 1;
+
+    public int numIters	= 1000;
+
+    public int transactionNumPeeks		= 4;
+    public int transactionNumLocks		= 2;
+    public int transactionNumPromotedPeeks	= 1;
+
+    /**
+     * Whether or not to perform a trace.
+     */
+    public boolean doTrace = false;
+
+    /**
+     * Where to store the trace (if applicable).
+     */
+    public String traceFileName = null;
+
+    /**
+     * one of "persistant-inmem" (memory, backed by Derby),
+     * "inmem" (memory-only), or "hadb" (for HADB).
+     */
+
+    public String dataSpaceType = "persistant-inmem";
+
+    Properties params = new Properties();
 
     public TestParams() { }
 
@@ -64,5 +93,121 @@ public class TestParams {
 	this.clusterSize = clusterSize;
 	this.skipSize = skipSize;
 	this.numThreads = numThreads;
+    }
+
+    public TestParams(String paramFileName) {
+	this();
+
+	loadFromParamFile(paramFileName);
+    }
+
+    public void loadFromParamFile(String paramFileName) {
+
+	if (paramFileName == null) {
+	    throw new NullPointerException("paramFileName is null");
+	}
+
+	FileInputStream fis = null;
+	Properties params = new Properties();
+
+	if (paramFileName != null) {
+	    try {
+		fis = new FileInputStream(paramFileName);
+	    } catch (IOException e) {
+		System.out.println("failed to open params file (" +
+			paramFileName + "): " + e);
+		throw new IllegalArgumentException("bad params file");
+	    }
+
+	    if (fis != null) {
+		try {
+		    params.load(fis);
+		} catch (IOException e) {
+		    System.out.println("failed to read params file (" +
+			    paramFileName + "): " + e);
+		    params.clear();
+		    throw new IllegalArgumentException("bad params file");
+		} catch (IllegalArgumentException e) {
+		    System.out.println("params file (" +
+			    paramFileName + ") contains errors: " + e);
+		    params.clear();
+		    throw new IllegalArgumentException("bad params file");
+		}
+
+		try {
+		    fis.close();
+		} catch (IOException e) {
+		    // XXX: Is this really a problem?
+		}
+	    } 
+	}
+
+	dataSpaceType = (String) params.getProperty("hadbtest.dataSpaceType",
+		"persistant-inmem");
+
+	doTrace = (boolean) new Boolean(
+	    	params.getProperty("hadbtest.doTrace", "false"));
+	traceFileName = (String) params.getProperty("hadbtest.traceFileName",
+		null);
+
+	objSize = (int) new Integer(
+		params.getProperty("hadbtest.objSize", "10240"));
+	numObjs = (int) new Integer(
+	    	params.getProperty("hadbtest.numObjs", "4096"));
+	clusterSize = (int) new Integer(
+	    	params.getProperty("hadbtest.clusterSize", "20"));
+	skipSize = (int) new Integer(
+	    	params.getProperty("hadbtest.skipSize", "4"));
+	numThreads = (int) new Integer(
+	    	params.getProperty("hadbtest.numThreads", "1"));
+	numIters = (int) new Integer(
+	    	params.getProperty("hadbtest.numIters", "1000"));
+
+	transactionNumPeeks = (int) new Integer(
+	    	params.getProperty("hadbtest.transaction.numPeeks", "4"));
+	transactionNumLocks = (int) new Integer(
+	    	params.getProperty("hadbtest.transaction.numLocks", "2"));
+	transactionNumPromotedPeeks = (int) new Integer(
+	    	params.getProperty("hadbtest.transaction.numPromotedPeeks", "1"));
+
+    }
+
+    public String toString() {
+
+	/* A StringBuffer would be faster..." */
+	String s = "";
+	s += "hadbtest.dataSpaceType: " + dataSpaceType + "\n";
+
+	s += "hadbtest.doTrace: " + doTrace + "\n";
+
+	if (doTrace) {
+	    s += "hadtest.traceFileName: " + traceFileName + "\n";
+	}
+
+	s += "hadbtest.objSize: " + objSize + "\n";
+	s += "hadbtest.numObjs: " + numObjs + "\n";
+	s += "hadbtest.clusterSize: " + clusterSize + "\n";
+	s += "hadbtest.skipSize: " + skipSize + "\n";
+	s += "hadbtest.numThreads: " + numThreads + "\n";
+	s += "hadbtest.numIters: " + numIters + "\n";
+	s += "hadbtest.numThreads: " + numThreads + "\n";
+	s += "hadbtest.transaction.numPeeks: " + transactionNumPeeks + "\n";
+	s += "hadbtest.transaction.numLocks: " + transactionNumLocks + "\n";
+	s += "hadbtest.transaction.numPromotedPeeks: " +
+		transactionNumPromotedPeeks + "\n";
+
+	return s;
+    }
+
+    public String properties() {
+
+	Enumeration e = params.propertyNames();
+
+	while (e.hasMoreElements()) {
+	    String name = (String) e.nextElement();
+	    System.out.println(name);
+	}
+
+	return "Write Me...";
     }
 }
