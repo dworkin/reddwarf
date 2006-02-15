@@ -27,6 +27,7 @@ import com.sun.gi.logic.SimTask.ACCESS_TYPE;
 import com.sun.gi.objectstore.DeadlockException;
 import com.sun.gi.objectstore.ObjectStore;
 import com.sun.gi.objectstore.Transaction;
+import com.sun.gi.objectstore.tso.dataspace.DataSpace;
 
 class OutputRecord {
     UserID[] targets;
@@ -232,9 +233,6 @@ public class SimTaskImpl implements SimTask {
 	return new GLOReferenceImpl(id);
     }
 
-    /* (non-Javadoc)
-     * @see com.sun.gi.logic.SimTask#makeReference(com.sun.gi.logic.GLO)
-     */
     public GLOReference makeReference(GLO glo) throws InstantiationException {		
 	Long idl = gloIDMap.get(glo);
 	if (idl == null){
@@ -251,50 +249,21 @@ public class SimTaskImpl implements SimTask {
 	return trans.getCurrentAppID();
     }
 
-    /**
-     * addUserListener
-     * 
-     * @param ref
-     *            SOReference
-     * @return long
-     */
     public void addUserListener(GLOReference ref) {
 	simulation.addUserListener(ref);
     }
 
-    /**
-     * findGLO
-     * 
-     * @param gloName
-     *            String
-     * @return SOReference
-     */
     public GLOReference findGLO(String gloName) {
-	return makeReference(trans.lookup(gloName));
+	long oid = trans.lookup(gloName);
+	return (oid == DataSpace.INVALID_ID) ? null : makeReference(oid);
     }
 
 
-    /**
-     * sendData
-     * 
-     * @param cid
-     *            ChannelID
-     * @param from
-     *            UserID
-     * @param bs
-     *            byte[]
-     */
     public void sendData(ChannelID cid, UserID[] to, ByteBuffer bs,
 	    boolean reliable) {
 	outputList.add(new OutputRecord(cid, to, bs, reliable));
     }
 
-    /**
-     * addUserDataListener
-     * 
-     * @param ref
-     *            SOReference
-     */
     public void addUserDataListener(UserID user, GLOReference ref) {
 	simulation.addUserDataListener(user, ref);
     }
