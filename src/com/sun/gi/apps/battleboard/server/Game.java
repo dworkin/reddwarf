@@ -1,4 +1,4 @@
-package com.sun.gi.apps.battleboard;
+package com.sun.gi.apps.battleboard.server;
 
 import java.util.logging.Logger;
 
@@ -25,7 +25,7 @@ public class Game implements SimChannelListener {
     private static final long serialVersionUID = 1L;
 
     private static final Logger log =
-	Logger.getLogger("com.sun.gi.apps.battleboard");
+	Logger.getLogger("com.sun.gi.apps.battleboard.server");
 
     protected Game() {
     }

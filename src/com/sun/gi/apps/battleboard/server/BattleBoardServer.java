@@ -2,7 +2,7 @@
  * $Id$
  */
 
-package com.sun.gi.apps.battleboard;
+package com.sun.gi.apps.battleboard.server;
 
 import java.nio.ByteBuffer;
 import com.sun.gi.logic.SimBoot;
@@ -30,7 +30,8 @@ public class BattleBoardServer
 
     private static final long serialVersionUID = 1L;
 
-    private static Logger log = Logger.getLogger("com.sun.gi.apps.battleboard");
+    private static Logger log =
+	Logger.getLogger("com.sun.gi.apps.battleboard.server");
 
     protected GLOReference thisRef;
     protected GLOReference matchmakerRef;

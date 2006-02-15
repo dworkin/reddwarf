@@ -1,4 +1,4 @@
-package com.sun.gi.apps.battleboard;
+package com.sun.gi.apps.battleboard.server;
 
 import com.sun.gi.logic.GLO;
 

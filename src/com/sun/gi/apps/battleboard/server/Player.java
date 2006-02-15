@@ -1,4 +1,4 @@
-package com.sun.gi.apps.battleboard;
+package com.sun.gi.apps.battleboard.server;
 
 import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.SimChannelListener;
@@ -30,7 +30,7 @@ public class Player implements SimUserDataListener {
     private static final long serialVersionUID = 1L;
 
     private static final Logger log =
-	Logger.getLogger("com.sun.gi.apps.battleboard");
+	Logger.getLogger("com.sun.gi.apps.battleboard.server");
 
     protected String       myUserName;
     protected UserID       myUserID;
