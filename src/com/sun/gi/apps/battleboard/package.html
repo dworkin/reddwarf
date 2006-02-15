@@ -22,9 +22,8 @@ This game resembles "BattleShip" in general style.  <p>
 
 <li> The contents of the board are initialized at the start of the
     game.  Each grid position must either be VACANT or contain a CITY. 
-    Each player is given a predetermined number of cities, which they
-    may place arbitrarily on their board, or they may be placed
-    randomly.  <p>
+    The location of each city is chosen randomly; the player does
+    <em>not</em> choose their locations.  <p>
 
     <em> At present the cities are always positioned in a fixed
     arrangement.  This makes debugging easier but makes game-play
@@ -88,6 +87,8 @@ This game resembles "BattleShip" in general style.  <p>
     turns and all players are immediately informed of their withdrawl. 
     <p>
 
+    The withdrawl is effective at the end of the current turn.  <p>
+
 <li> After each turn, any player that has no remaining cities is said
     to have <em>lost</em> and is removed from the game.  The losing
     player is removed from the order of turns and all other players
@@ -102,9 +103,16 @@ This game resembles "BattleShip" in general style.  <p>
 Messages
 </h2>
 
+Note that the coordinates are zero-based.  <p>
+
+Note that player names may not contain whitespace of any kind.  <p>
+
 <h3>
 Client-Initiated
 </h3>
+
+(There should probably be a way for the client to get a copy of the
+history of the game, in case he or she missed a message.)
 
 <ul>
 
@@ -115,15 +123,96 @@ Client-Initiated
 
     <ul>
 
-    <li> <kbd>ok</kbd> <p>
+    <li> <kbd>ok</kbd> <em>boardWidth</em> <em>boardHeight</em>
+	<em>numCities</em> <em>cityLocations...</em> <p>
 
-	The player is permitted to join.  In response, the client must
-	send over the location of its cities.  (need format) <p>
+	The player is permitted to join.  The numbers
+	<em>boardWidth</em>, <em>boardHeight</em>, and
+	<em>numCities</em> represent the width of the board, the
+	height of the board, and number of cities that the player has. 
+	The <em>cityLocations</em> is a list of numbers representing
+	the x and y coordinates of each city. <p>
+	
+	For example, the response: <p>
+
+	<blockquote>
+	<kbd>ok 10 8 2 0 1 5 3</kbd>
+	</blockquote> <p>
+
+	indicates that the board has a width of 10 and a height of 8,
+	and that the player has two cities.  The city is at position
+	(0,1) and the second is at position (5,3).  <p>
 
     <li> <kbd>already-joined</kbd>
 
-	The player has already joined the current game. <p>
+	A player with the given name has already joined the current
+	game.  <p>
 
     </ul> <p>
+
+<li> <kbd>withdraw</kbd> <p>
+
+    The player withdraws from the game. <p>
+
+</ul> <p>
+
+<h3>
+Server-Initiated
+</h3>
+
+<ul>
+
+<li> <kbd>turn-order</kbd> <em>player-list</em> <p>
+
+    After the last player has joined the game, the server chooses an
+    order for turns and sends it to all of the players.  <p>
+    
+    This information is not necessary for game-play but may be used by
+    the clients to organize their display.  <p>
+
+<li> <kbd>your-move</kbd> <p>
+
+    A player recieves this message when the system is waiting for him
+    or her to make their move.  They must respond with a message of
+    one of the following forms:  <p>
+
+    <blockquote>
+    <kbd>move</kbd> <em>bombed-player</em> <em>x</em> <em>y</em>
+    </blockquote> <p>
+
+    or 
+
+    <blockquote>
+    <kbd>pass</kbd>
+    </blockquote> <p>
+
+<li> <kbd>move-started</kbd> <em>player</em> <p>
+
+    Indicates that it us the indicated players turn. <p>
+
+    (do we need to send one of these to the player?  Is this redundant
+    wrt <kbd>your-move</kbd>?) <p>
+
+<li> <kbd>move-ended</kbd> <em>player</em> <kbd>pass</kbd> <p>
+
+    The player has ended his or her move by passing to the next player. <p>
+
+    If a player withdraws during their own move, this message is used
+    to denote the end of their move.  A "withdraw" message (see below)
+    is also sent.  <p>
+
+<li> <kbd>move-ended</kbd> <em>player</em> <em>bombed-player</em>
+    <em>x</em> <em>y</em> <em>result</em> <p>
+
+    Indicates that the given <em>player</em> has dropped a bomb on
+    position (x,y) of the board of <em>bombed-player</em>, with the
+    given <em>result</em>.  The result is one of the following: 
+    <kbd>MISS</kbd>, <kbd>NEAR_MISS</kbd>, or <kbd>HIT</kbd>, as
+    described earlier, or <kbd>LOSS</kbd> if the bomb was a hit and it
+    resulted in the last city belonging to that player.  <p>
+
+<li> <kbd>withdraw</kbd> <em>player</em> <p>
+
+    The given player has withdrawn from the game. <p>
 
 </body>
