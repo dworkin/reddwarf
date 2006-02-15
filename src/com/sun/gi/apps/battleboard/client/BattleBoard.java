@@ -52,18 +52,15 @@ public class BattleBoard {
     static final int HIT        = 102;
 
     /**
-     * Creates a BattleBoard with the given width and height and
-     * initializes it with cities.  <p>
-     *
-     * For the sake of simplicity, this constructor always places the
-     * cities in the same pattern.  This makes the game very boring to
-     * play, but makes the example somewhat simpler.
+     * Creates a BattleBoard with the given width and height and with
+     * "unknown" contents.  <p>
      *
      * @param width the width of the board
      *
      * @param height the height of the board
      *
-     * @param numCities the number of cities to place on the board
+     * @param numCities the number of cities that will be place on the
+     * board
      *
      * @throws IllegalArgumentException if the board is an invalid
      * size (either width or height less than 1), if the number of
@@ -94,6 +91,16 @@ public class BattleBoard {
 		board[x][y] = POS_VACANT;
 	    }
 	}
+    }
+
+    /**
+     * Places cities on an empty battle board. <p>
+     *
+     * For the sake of simplicity, this method always places the
+     * cities in the same places.  This makes the game very boring to
+     * play, but makes the example somewhat simpler.
+     */
+    public void populate() {
 
 	/*
 	 * Note that the city locations are chosen in a completely

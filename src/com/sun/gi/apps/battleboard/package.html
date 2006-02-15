@@ -188,7 +188,7 @@ Server-Initiated
 
 <li> <kbd>move-started</kbd> <em>player</em> <p>
 
-    Indicates that it us the indicated players turn. <p>
+    Indicates that it is the indicated players turn. <p>
 
     (do we need to send one of these to the player?  Is this redundant
     wrt <kbd>your-move</kbd>?) <p>
@@ -201,7 +201,8 @@ Server-Initiated
     to denote the end of their move.  A "withdraw" message (see below)
     is also sent.  <p>
 
-<li> <kbd>move-ended</kbd> <em>player</em> <em>bombed-player</em>
+<li> <kbd>move-ended</kbd> <em>player</em> <kbd>bomb</kbd>
+    <em>bombed-player</em>
     <em>x</em> <em>y</em> <em>result</em> <p>
 
     Indicates that the given <em>player</em> has dropped a bomb on
