@@ -19,7 +19,7 @@ public class BattleBoard {
      * The POS_* constants are used to denote the contents of the
      * board (either known, or inferred).
      */
-
+    
     /** Indicates an empty (unoccupied, unbombed) board position. */
     public static final int POS_VACANT	= 0;
 
@@ -94,6 +94,17 @@ public class BattleBoard {
     }
 
     /**
+     * Create a new, empty BattleBoard with the same width, height, and
+     * initial city count as this BattleBoard.
+     * 
+     * @return a new, empty BattleBoard with the same starting parameters
+     * as this one.
+     */
+    public BattleBoard clone() {
+        return new BattleBoard(boardWidth, boardHeight, cityCount);
+    }
+    
+    /**
      * Places cities on an empty battle board. <p>
      *
      * For the sake of simplicity, this method always places the
@@ -107,7 +118,7 @@ public class BattleBoard {
 	 * non-random manner...
 	 */
 
-	int count = numCities;
+	int count = cityCount;
 	for (int y = 0; (y < boardHeight) && (count > 0); y++) {
 	    for (int x = 0; (x < boardWidth) && (count > 0); x++) {
 		board[x][y] = POS_CITY;

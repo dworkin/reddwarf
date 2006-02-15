@@ -7,19 +7,15 @@ import com.sun.gi.comm.users.client.ClientChannelListener;
 import com.sun.gi.comm.users.client.ClientConnectionManager;
 import com.sun.gi.comm.users.client.ClientConnectionManagerListener;
 import com.sun.gi.comm.users.client.impl.ClientConnectionManagerImpl;
-import com.sun.gi.utils.types.BYTEARRAY;
-import com.sun.gi.utils.types.StringUtils;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
-import java.util.HashMap
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map
+import java.util.Map;
 import java.util.logging.Logger;
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.NameCallback;
@@ -40,7 +36,7 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
     protected BufferedReader reader;
     protected Callback[] validationCallbacks = null;
 
-    protected String playerName = "player";
+    protected String myPlayerName = "player";
 
     protected byte[] serverID = null;
 
@@ -107,7 +103,7 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
 	log.finer("visitNameCallback");
 	showPrompt(cb.getPrompt());
 	String line = getLine();
-	playerName = line;
+        myPlayerName = line;
 	cb.setName(line);
     }
 
@@ -140,7 +136,7 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
     protected void sendJoinReq(ClientChannel chan) {
 	ByteBuffer data = ByteBuffer.allocate(64);
 	data.put("join ".getBytes());
-	data.put(playerName.getBytes());
+	data.put(myPlayerName.getBytes());
 	// XXX how do we find out the serverID?
 	//chan.sendUnicastData(serverID, buf, true);
     }
@@ -202,10 +198,10 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
 
 	if (channel.getName().equals("matchmaker")) {
 
-	    showPrompt("Enter your handle [" + playerName + "]");
+	    showPrompt("Enter your handle [" + myPlayerName + "]");
 	    String line = getLine();
 	    if (line.length() > 0) {
-		playerName = line;
+                myPlayerName = line;
 	    }
 
 	    channel.setListener(new ClientChannelListener(){
@@ -239,7 +235,7 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
 
 	// Ok, must be a new game channel we've joined
 	if (state == State.JOINING_GAME) {
-	    channel.setListener(new BattleBoardPlayer(channel));
+	    channel.setListener(new BattleBoardPlayer(channel, myPlayerName, board));
 	    state = State.PLAY_AWAIT_TURN_ORDER;
 	}
     }
@@ -247,7 +243,7 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
     class BattleBoardPlayer implements ClientChannelListener {
 
 	final ClientChannel channel;
-	final List<String> playerNames = new LinkedList<String>();;
+	final List<String> playerNames = new LinkedList<String>();
 	final Map<String, BattleBoard> playerBoards =
 		new HashMap<String, BattleBoard>();
 
@@ -255,14 +251,13 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
 	// the game can begin.  MUST change the constructor to make
 	// this explicit.
 
-	final int boardWidth;
-	final int boardHeight;
-	final int numCities;
 	final String myName;
 	final BattleBoard myBoard;
 
-	public BattleBoardPlayer(ClientChannel chan) {
+	public BattleBoardPlayer(ClientChannel chan, String name, BattleBoard board) {
 	    channel = chan;
+            myName = name;
+            myBoard = board;
 	}
 
 	public void playerJoined(byte[] playerID) {
@@ -323,8 +318,7 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
 		    if (myName.equals(playerName)) {
 			playerBoards.put(myName, myBoard);
 		    } else {
-			playerBoards.put(playerName,
-				new BattleBoard(boardWidth, boardHeight, numCities));
+			playerBoards.put(playerName, myBoard.clone());
 		    }
 		}
 
@@ -351,6 +345,7 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
 		String currPlayer = tokens[1];
 
 		// XXX: Do something.
+                log.info("move-started for " + currPlayer);
 
 		return;
 	    }
@@ -362,6 +357,8 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
 
 		String currPlayer = tokens[1];
 		String action = tokens[2];
+                
+                log.info("move-ended for " + currPlayer);
 
 		if ("pass".equals(action)) {
 		    if (tokens.length != 3) {
@@ -369,6 +366,9 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
 		    }
 
 		    // XXX: they're done.  Update display.
+                    
+                    log.info(currPlayer + " passed");
+                    
 		    return;
 		} else if ("bomb".equals(action)) {
 		    if (tokens.length != 7) {
@@ -376,15 +376,17 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
 		    }
 
 		    String bombedPlayer = tokens[3];
-		    int x = (int) new Integer(tokens[4]);
-		    int y = (int) new Integer(tokens[5]);
+		    int x = Integer.parseInt(tokens[4]);
+		    int y = Integer.parseInt(tokens[5]);
 		    String result = tokens[6];
 
+                    log.info(bombedPlayer + " bombed ("
+                            + x + ", " + y + ") with result " + result);
 		} else {
 		    // XXX: bad server.
 		}
 
-		return ;
+		return;
 	    }
 
 	    if ("withdraw".equals(tokens[0])) {
@@ -393,13 +395,15 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
 		}
 
 		String withdrawnPlayer = tokens[1];
-		if (!playerList.remove(withdrawnPlayer)) {
+		if (!playerNames.remove(withdrawnPlayer)) {
 		    // XXX: bad server.
 		} else {
 		    // XXX: update the display list.
+                    
+                    log.info(withdrawnPlayer + " has withdrawn");
 		}
 
-		return ;
+		return;
 	    }
 	}
 
