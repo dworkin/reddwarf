@@ -30,9 +30,15 @@ public class Matchmaker implements SimUserDataListener {
     protected static final String MATCHMAKER_GLO_NAME = "matchmaker";
 
     protected final ChannelID channel;
-    protected ChannelID nextGameChannelID;
 
-    protected final int PLAYERS_PER_GAME = 2;
+    protected int PLAYERS_PER_GAME = 2;
+
+    static final int DEFAULT_BOARD_WIDTH  = 8;
+    static final int DEFAULT_BOARD_HEIGHT = 8;
+    static final int DEFAULT_CITY_COUNT   = 8;
+
+    protected Set<GLOReference> waitingPlayers =
+	new HashSet<GLOReference>();
 
     public static GLOReference instance(SimTask task) {
 
@@ -63,21 +69,6 @@ public class Matchmaker implements SimUserDataListener {
 	// Create the matchmaker channel so we can talk to unjoined clients
 	channel = task.openChannel("matchmaker");
 	task.lock(channel, true);
-
-	makeNewGameChannel(task);
-    }
-
-    protected void makeNewGameChannel(SimTask task) {
-	// Create a new channel for this game
-
-	// XXX store and increment a next-channel-number in the GLO,
-	// instead of using the current time(?) -jm
-	String gameName = "BB-" + System.currentTimeMillis();
-
-	log.finer("Matchmaker: Next game channel is `" + gameName + "'");
-
-	nextGameChannelID = task.openChannel(gameName);
-	task.lock(nextGameChannelID, true);
     }
 
     protected void addPlayer(SimTask task, Player player) {
@@ -87,13 +78,6 @@ public class Matchmaker implements SimUserDataListener {
     protected void sendAlreadyJoined(SimTask task, UserID uid) {
 	ByteBuffer buf = ByteBuffer.allocate(64);
 	buf.put("already-joined".getBytes());
-	task.sendData(channel, new UserID[] { uid }, buf, true);
-    }
-
-    protected void sendJoinOK(SimTask task, UserID uid) {
-	ByteBuffer buf = ByteBuffer.allocate(64);
-	buf.put("ok ".getBytes());
-	// ... TODO ...
 	task.sendData(channel, new UserID[] { uid }, buf, true);
     }
 
@@ -109,7 +93,7 @@ public class Matchmaker implements SimUserDataListener {
 
     // Handle the "join" command in matchmaker mode
     public void userDataReceived(SimTask task, UserID uid, ByteBuffer data) {
-	log.info("Matchmaker: Direct data from user " + uid);
+	log.info("Matchmaker: data from user " + uid);
 
 	byte[] bytes = new byte[data.remaining()];
 	data.get(bytes);
@@ -123,29 +107,40 @@ public class Matchmaker implements SimUserDataListener {
 	final String playerName = cmd.substring(5);
 	log.info("Matchmaker: join from `" + playerName + "'");
 
-/*
-	if (userIDToPlayer.containsKey(uid)) {
-	    log.warning("Matchmaker already has name `" +
-		userIDToPlayer.get(uid) + "' for uid " + uid);
+	GLOReference playerRef = Player.getRef(task, uid);
+	Player player = (Player) playerRef.get(task);
+	player.setNickname(playerName);
+
+	if (waitingPlayers.contains(playerRef)) {
+	    log.warning("Matchmaker already has `" + player.getNickname());
 	    sendAlreadyJoined(task, uid);
+	    return;
 	}
 
-	Player p = userIDToPlayer.get(uid);
+	waitingPlayers.add(playerRef);
 
-	if (p == null)
-*/
+	// XXX the right thing to do here is probably to queue
+	// a task to check whether we have a game togther, since
+	// we hold the lock on this player but they might not be
+	// involved in the next game we can spawn with current waiters.
+	// Instead we'll just keep the lock for now.
 
-	Player p = Player.get(task, uid);
-	p.setNickname(playerName);
+	checkForEnoughPlayers(task);
+    }
 
-	sendJoinOK(task, uid);
+    protected void checkForEnoughPlayers(SimTask task) {
 
-	// if there are now enough players
-	//   - create a new object to handle the new game
-	//   - have it listen to the game channel
-	//     task.addChannelListener(nextGameChannelID, theGameGLORef);
-	//     and it can:
-	//     - compute and broadcast the turn order
-	//     - etc...
+	if (waitingPlayers.size() < PLAYERS_PER_GAME) {
+	    return;
+	}
+
+	if (waitingPlayers.size() > PLAYERS_PER_GAME) {
+	    log.warning("Too many waiting players!  How'd that happen? "
+		+ "expected " + PLAYERS_PER_GAME + ", got "
+		+ waitingPlayers.size());
+	}
+
+	Game.create(task, waitingPlayers);
+	waitingPlayers.clear();
     }
 }

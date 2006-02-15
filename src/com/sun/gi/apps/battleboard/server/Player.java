@@ -54,8 +54,12 @@ public class Player implements SimUserDataListener {
 	return player;
     }
 
+    public static GLOReference getRef(SimTask task, UserID uid) {
+	return task.findGLO(gloKeyForUID(uid));
+    }
+
     public static Player get(SimTask task, UserID uid) {
-	GLOReference ref = task.findGLO(gloKeyForUID(uid));
+	GLOReference ref = getRef(task, uid);
 	return (Player) ref.get(task);
     }
 

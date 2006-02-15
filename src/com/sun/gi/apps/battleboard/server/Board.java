@@ -11,9 +11,6 @@ public class Board implements GLO {
      * later.
      */
 
-    static int DEFAULT_BOARD_HEIGHT	= 8;
-    static int DEFAULT_BOARD_WIDTH	= 8;
-
     final String name;
     final int    boardHeight;
     final int    boardWidth;
@@ -38,14 +35,6 @@ public class Board implements GLO {
     static final int MISS	= 100;
     static final int NEAR_MISS	= 101;
     static final int HIT	= 102;
-
-    public Board(String name) {
-	this(name, DEFAULT_BOARD_HEIGHT, DEFAULT_BOARD_WIDTH);
-    }
-
-    public Board(String name, int width, int height) {
-	this(name, width, height, (width < height) ? width : height);
-    }
 
     public Board(String name, int width, int height,
 	    int startingCities) {
