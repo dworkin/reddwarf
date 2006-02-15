@@ -475,7 +475,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 		synchronized (dataSpace) {
 			if (!dataSpace.containsKey(objectID)) {
 				if (loadCache(objectID) == null) {
-					throw new NonExistantObjectIDException();
+					throw new NonExistantObjectIDException("Can't find objectID " + objectID);
 				}
 			}
 		}

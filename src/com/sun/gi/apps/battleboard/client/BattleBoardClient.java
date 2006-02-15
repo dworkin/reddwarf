@@ -116,11 +116,10 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
     }
 
     protected void sendJoinReq(ClientChannel chan) {
-	ByteBuffer data = ByteBuffer.allocate(64);
-	data.put("join ".getBytes());
-	data.put(myPlayerName.getBytes());
-	// XXX how do we find out the serverID?
-	//chan.sendUnicastData(serverID, buf, true);
+	ByteBuffer buf = ByteBuffer.allocate(64);
+	buf.put("join ".getBytes());
+	buf.put(myPlayerName.getBytes());
+	mgr.sendToServer(buf, true);
     }
 
     protected String getLine() {

@@ -38,17 +38,25 @@ public class Matchmaker implements SimUserDataListener {
 
 	GLOReference ref = task.findGLO(MATCHMAKER_GLO_NAME);
 
+	log.fine("Matchmaker instance ref is `" + ref + "'");
+
 	if (ref != null) {
 	    return ref;
 	}
 
+	log.fine("Created new Matchmaker instance");
+
 	Matchmaker mm = new Matchmaker(task);
-	return task.createGLO(mm, MATCHMAKER_GLO_NAME);
+	ref = task.createGLO(mm, MATCHMAKER_GLO_NAME);
+	task.addChannelListener(mm.channel, ref);
+	return ref;
     }
 
-    public static void addUser(SimTask task, UserID uid) {
-	Matchmaker mm = (Matchmaker) Matchmaker.instance(task).peek(task);
-	mm.registerUser(task, uid);
+    public static void addPlayer(SimTask task, GLOReference mmRef,
+	    Player player) {
+
+	Matchmaker mm = (Matchmaker) mmRef.peek(task);
+	mm.addPlayer(task, player);
     }
 
     protected Matchmaker(SimTask task) {
@@ -72,9 +80,8 @@ public class Matchmaker implements SimUserDataListener {
 	task.lock(nextGameChannelID, true);
     }
 
-    protected void registerUser(SimTask task, UserID uid) {
-	// Requires only PEEK access
-	task.join(uid, channel);
+    protected void addPlayer(SimTask task, Player player) {
+	task.join(player.getUID(), channel);
     }
 
     protected void sendAlreadyJoined(SimTask task, UserID uid) {
@@ -128,8 +135,8 @@ public class Matchmaker implements SimUserDataListener {
 	if (p == null)
 */
 
-	Player p = Player.instance(task, uid);
-	p.setName(playerName);
+	Player p = Player.get(task, uid);
+	p.setNickname(playerName);
 
 	sendJoinOK(task, uid);
 
