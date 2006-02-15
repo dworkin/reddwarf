@@ -453,6 +453,7 @@ WARN_LOGFILE           =
 INPUT =  src/com/sun/gi/logic/GLO.java \
 	 src/com/sun/gi/logic/GLOReference.java \
 	 src/com/sun/gi/logic/SimBoot.java \
+	 src/com/sun/gi/logic/SimChannelListener.java \
 	 src/com/sun/gi/logic/SimUserListener.java \
 	 src/com/sun/gi/logic/SimUserDataListener.java \
 	 src/com/sun/gi/logic/SimTimerListener.java \

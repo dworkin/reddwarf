@@ -2,7 +2,7 @@ package com.sun.gi.apps.battleboard;
 
 import com.sun.gi.logic.GLO;
 
-public class BattleBoardGLO implements GLO {
+public class Board implements GLO {
 
     private static final long serialVersionUID = 1L;
 
@@ -39,15 +39,15 @@ public class BattleBoardGLO implements GLO {
     static final int NEAR_MISS	= 101;
     static final int HIT	= 102;
 
-    public BattleBoardGLO(String name) {
+    public Board(String name) {
 	this(name, DEFAULT_BOARD_HEIGHT, DEFAULT_BOARD_WIDTH);
     }
 
-    public BattleBoardGLO(String name, int width, int height) {
+    public Board(String name, int width, int height) {
 	this(name, width, height, (width < height) ? width : height);
     }
 
-    public BattleBoardGLO(String name, int width, int height,
+    public Board(String name, int width, int height,
 	    int startingCities) {
 
 	if ((width <= 0) || (height <= 0)) {

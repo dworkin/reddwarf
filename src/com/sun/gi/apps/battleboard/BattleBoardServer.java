@@ -27,149 +27,82 @@ import java.util.logging.Logger;
 import javax.security.auth.Subject;
 
 public class BattleBoardServer
-	implements SimBoot, SimUserListener,
-		   SimUserDataListener, SimChannelListener {
+	implements SimBoot, SimUserListener, SimUserDataListener {
 
     private static final long serialVersionUID = 1L;
 
     private static Logger log = Logger.getLogger("com.sun.gi.apps.battleboard");
 
-    protected UserID serverUserID = null;
-    protected Map<String, GLOReference> gameList;
-    protected Map<UserID, Player> userIDToPlayer;
-    protected Queue<Player> waitingToPlay;
+    protected GLOReference thisRef;
+    protected GLOReference matchmakerRef;
 
-    protected ChannelID matchmakerChannelID;
-    protected ChannelID nextGameChannelID;
-    protected final int MAX_PER_GAME = 2;
-
-    protected GLOReference bootRef;
-
-    class Player {
-	boolean waiting;
-
-	public Player(UserID id, String name) {
-	    waiting = true;
-	}
-
-	public boolean isWaiting() {
-	    return waiting;
-	}
-    }
+    // SimBoot methods
 
     public void boot(SimTask task, boolean firstBoot) {
 	log.info("Booting BattleBoard Server as appID " + task.getAppID());
 
-	// Register with the SGS boot manager
-	bootRef = task.findGLO("BOOT");
-	task.addUserListener(bootRef);
+	// Get a reference to this object as a GLO
+	if (firstBoot) {
+	    thisRef = task.findGLO("BOOT");
+	    matchmakerRef = Matchmaker.instance(task);
+	}
 
-	gameList = new HashMap<String, GLOReference>();
-	userIDToPlayer = new HashMap<UserID, Player>();
-	waitingToPlay = new LinkedList<Player>();
-
-	// Create the matchmaker channel so we can talk to unjoined clients
-	matchmakerChannelID = task.openChannel("matchmaker");
-	task.lock(matchmakerChannelID, true);
-
-	// Make a channel for the next game we're getting together
-	makeNewGameChannel(task);
+	// Register for direct user events (join/leave, sendToServer)
+	task.addUserListener(thisRef);
     }
 
-    protected void makeNewGameChannel(SimTask task) {
-	// Create a new channel for this game
-	// XXX store and increment a next-channel-number in the GLO
-	String gameName = "BB-" + System.currentTimeMillis();
-	log.info("Matchmaker: Next game channel is `" + gameName + "'");
-	nextGameChannelID = task.openChannel(gameName);
-	task.lock(nextGameChannelID, true);
-    }
+    // SimUserListener methods
 
     public void userJoined(SimTask task, UserID uid, Subject subject) {
-	log.info("User " + uid + " joined server");
+	log.info("User " + uid + " joined server, subject = " + subject);
 
-	// We're interested in channel actions for this user
-	task.addUserDataListener(uid, bootRef);
-
-	// Put this user on the matchmaker channel initially
-	task.join(uid, matchmakerChannelID);
+	Player.instance(task, uid);
     }
 
     public void userLeft(SimTask task, UserID uid) {
 	log.info("User " + uid + " left server");
+
+	// XXX: For now, delete the Player GLO -- but
+	//      in the future we may want it to persist.
+
+	// FIXME: There's no way to destroy a GLO association in SimTask
+
+	long objId = task.getTransaction().lookup(uid.toString());
+	try {
+	    task.getTransaction().destroy(objId);
+	} catch (Exception e) {
+	    e.printStackTrace();
+	}
     }
 
-    /// Perform matchmaking
-    public void userDataReceived(SimTask task, UserID uid, ByteBuffer data) {
-	log.warning("unexpected direct data from user " + uid);
-    }
-
-    protected void sendAlreadyJoined(SimTask task, UserID uid) {
-	ByteBuffer buf = ByteBuffer.allocate(64);
-	buf.put("already-joined".getBytes());
-	task.sendData(matchmakerChannelID, new UserID[] { uid }, buf, true);
-    }
-
-    protected void sendJoinOK(SimTask task, UserID uid) {
-	ByteBuffer buf = ByteBuffer.allocate(64);
-	buf.put("ok ".getBytes());
-	// ... TODO ...
-	task.sendData(matchmakerChannelID, new UserID[] { uid }, buf, true);
-    }
+    // SimUserDataListener methods
 
     public void userJoinedChannel(SimTask task, ChannelID cid, UserID uid) {
-	log.info("User " + uid + " joined channel " + cid);
+	log.info("Matchmaker: User " + uid + " joined channel " + cid);
     }
 
     public void userLeftChannel(SimTask task, ChannelID cid, UserID uid) {
-	log.info("User " + uid + " left channel " + cid);
+	log.info("Matchmaker: User " + uid + " left channel " + cid);
     }
 
-    // Handle the "join" command in matchmaker mode
-    public void dataArrived(SimTask task, ChannelID cid,
-	    UserID uid, ByteBuffer data) {
+    /**
+     * Dispatch direct-to-server messages to the appropriate handler object.
+     */
+    public void userDataReceived(SimTask task, UserID uid, ByteBuffer data) {
+	log.warning("data from user " + uid);
 
-	log.info("Data from user " + uid + " on channel " + cid);
+	// Dispatch to the user's game, if any
+	Player player =
+	    (Player) task.findGLO(uid.toString()).peek(task);
 
-	if (! cid.equals(matchmakerChannelID)) {
-	    log.warning("Server got message on unexpected channel. " +
-		"was `" + cid + "', expecting matchmaker `" +
-		matchmakerChannelID + "'");
-	    return;
+	GLOReference gameRef = player.game();
+	if (gameRef != null) {
+	    Game game = (Game) gameRef.get(task);
+	    game.userDataReceived(task, uid, data);
+	} else {
+	    // If no game, dispatch to the matchmaker
+	    Matchmaker mm = (Matchmaker) matchmakerRef.get(task);
+	    mm.userDataReceived(task, uid, data);
 	}
-
-	byte[] bytes = new byte[data.remaining()];
-	data.get(bytes);
-	String cmd = new String(bytes);
-
-	if (! cmd.startsWith ("join ")) {
-	    log.warning("Matchmaker got non-join command: `" + cmd + "'");
-	    return;
-	}
-
-	final String playerName = cmd.substring(5);
-	log.info("Matchmaker: join from `" + playerName + "'");
-
-	if (userIDToPlayer.containsKey(uid)) {
-	    log.warning("Matchmaker already has name `" +
-		userIDToPlayer.get(uid) + "' for uid " + uid);
-	    sendAlreadyJoined(task, uid);
-	}
-
-	Player p = userIDToPlayer.get(uid);
-
-	if (p == null) {
-	    p = new Player(uid, playerName);
-	}
-
-	sendJoinOK(task, uid);
-
-	// if there are now enough players
-	//   - create a new object to handle the new game
-	//   - have it listen to the game channel
-	//     task.addChannelListener(nextGameChannelID, theGameGLORef);
-	//     and it can:
-	//     - compute and broadcast the turn order
-	//     - etc...
     }
 }
