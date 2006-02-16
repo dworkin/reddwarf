@@ -13,6 +13,9 @@
         <pathelement location="bin"/>
         <pathelement location="support/JRMS/jrms1.1/classes.jar"/>
         <pathelement location="support/db-derby-10.1.2.1-bin/lib/derby.jar"/>
+        <pathelement location="support/HTTPServletLibs/javax.servlet.jar" />
+        <pathelement location="support/HTTPServletLibs/commons-logging.jar" />
+        <pathelement location="support/HTTPServletLibs/org.mortbay.jetty.jar" />
     </path>
 
     <target name="init">
