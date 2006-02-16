@@ -63,18 +63,8 @@ public class BattleBoardServer
     public void userLeft(SimTask task, UserID uid) {
 	log.info("User " + uid + " left server");
 
-	// XXX: Here, we might want to delete the Player object.
-	// Or in the future we may want it to persist.
-
-	// FIXME: There's no way to destroy a GLO association in SimTask
-	/*
-	// workaround:
-	long objId = task.getTransaction().lookup(uid.toString());
-	try {
-	    task.getTransaction().destroy(objId);
-	} catch (Exception e) {
-	    e.printStackTrace();
-	}
-	*/
+	// XXX in the future we may want the player object to persist.
+	GLOReference playerRef = Player.getRef(task, uid);
+	playerRef.delete(task);
     }
 }

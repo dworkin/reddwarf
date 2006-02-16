@@ -118,6 +118,7 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
     protected void sendJoinReq(ClientChannel chan) {
 	String cmd = "join " + myPlayerName;
 	ByteBuffer buf = ByteBuffer.wrap(cmd.getBytes());
+	buf.position(buf.limit());
 	mgr.sendToServer(buf, true);
     }
 
