@@ -4,7 +4,7 @@
  * Created on January 5, 2006, 9:48 AM
  */
 
-package com.sun.gi.comm.users.server.jme;
+package com.sun.gi.comm.users.server.impl.jme;
 
 import com.sun.gi.comm.users.server.impl.JMEHttpUserManager;
 import com.sun.gi.utils.http.ServletListener;
