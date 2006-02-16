@@ -6,10 +6,12 @@ package com.sun.gi.apps.battleboard.client;
 
 public class BattleBoard {
 
-    protected final int boardHeight;
-    protected final int boardWidth;
-    protected final int board[][];
-    protected int cityCount;
+    private final String playerName;
+    private final int boardHeight;
+    private final int boardWidth;
+    private final int board[][];
+    private final int startCities;
+    private int survivingCities;
 
     /*
      * Java purists would urge the use of a Java 1.5 enum here, but to
@@ -67,7 +69,7 @@ public class BattleBoard {
      * cities is less than one, or if the number of cities is more
      * than will fit onto the board
      */
-    public BattleBoard(int width, int height, int numCities) {
+    public BattleBoard(String player, int width, int height, int numCities) {
 
 	if ((width <= 0) || (height <= 0)) {
 	    throw new IllegalArgumentException("width and height must be > 0");
@@ -81,9 +83,11 @@ public class BattleBoard {
 	    throw new IllegalArgumentException("numCities is too large");
 	}
 
+	playerName = player;
 	boardWidth = width;
 	boardHeight = height;
-	cityCount = numCities;
+	survivingCities = numCities;
+	startCities = numCities;
 	board = new int[boardWidth][boardHeight];
 
 	for (int x = 0; x < boardWidth; x++) {
@@ -93,17 +97,6 @@ public class BattleBoard {
 	}
     }
 
-    /**
-     * Create a new, empty BattleBoard with the same width, height, and
-     * initial city count as this BattleBoard.
-     * 
-     * @return a new, empty BattleBoard with the same starting parameters
-     * as this one.
-     */
-    public BattleBoard clone() {
-        return new BattleBoard(boardWidth, boardHeight, cityCount);
-    }
-    
     /**
      * Places cities on an empty battle board. <p>
      *
@@ -118,13 +111,22 @@ public class BattleBoard {
 	 * non-random manner...
 	 */
 
-	int count = cityCount;
+	int count = startCities;
 	for (int y = 0; (y < boardHeight) && (count > 0); y++) {
 	    for (int x = 0; (x < boardWidth) && (count > 0); x++) {
 		board[x][y] = POS_CITY;
 		count--;
 	    }
 	}
+    }
+
+    /**
+     * Returns the name of the player for this board.
+     *
+     * @return the name of the player for this board
+     */
+    public String getPlayerName() {
+	return playerName;
     }
 
     /**
@@ -146,11 +148,33 @@ public class BattleBoard {
     }
 
     /**
+     * Returns the number of cities on the board at the start of the
+     * game.
+     *
+     * @return the number of cities on the board at the start of the
+     * game
+     */
+    public int getStartCities() {
+	return startCities;
+    }
+
+    /**
+     * Returns the number of cities still surviving on the the board.
+     *
+     * @return the number of cities still surviving on the the board
+     */
+    public int getSurvivingCities() {
+	return survivingCities;
+    }
+
+    /**
      * Displays the board using a simple text format.
      */
     public void display() {
 	for (int j = getHeight() - 1; j >= 0; j--) {
 
+	    System.out.print("-- " + playerName + " -- " + survivingCities +
+		    " surviving cities");
 	    System.out.print(j);
 
 	    for (int i = 0; i < getWidth(); i++) {
@@ -228,7 +252,7 @@ public class BattleBoard {
 
 	if (isHit(x, y)) {
 	    rc = HIT;
-	    cityCount--;
+	    survivingCities--;
 	} else if (isNearMiss(x, y)) {
 	    rc = NEAR_MISS;
 	} else {
@@ -260,7 +284,7 @@ public class BattleBoard {
      * @throws IllegalArgumentException if either of <em>x</em> or
      * <em>y</em> is outside the board
      */
-    public int updateBoardPosition(int x, int y, int state) {
+    public int update(int x, int y, int state) {
 	if ((x < 0) || (x >= boardWidth)) {
 	    throw new IllegalArgumentException("illegal x: " + x);
 	}
@@ -281,7 +305,7 @@ public class BattleBoard {
      * cities, <code>false</code> otherwise
      */
     public boolean lost() {
-	return (cityCount == 0);
+	return (survivingCities == 0);
     }
 
     /**
