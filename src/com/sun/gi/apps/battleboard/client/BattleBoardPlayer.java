@@ -1,3 +1,7 @@
+/*
+ * Copyright 2006 by Sun Microsystems, Inc.  All rights reserved.
+ */
+
 package com.sun.gi.apps.battleboard.client;
 
 import com.sun.gi.comm.discovery.impl.URLDiscoverer;
@@ -36,12 +40,15 @@ public class BattleBoardPlayer implements ClientChannelListener {
     private String myName;
     private BattleBoard myBoard;
     private boolean youLose = false;
+    private ClientConnectionManager mgr;
 
-    public BattleBoardPlayer(ClientChannel chan, String name,
-	    BattleBoard board) {
-	channel = chan;
-	myName = name;
-	myBoard = board;
+    public BattleBoardPlayer(ClientConnectionManager mgr, ClientChannel chan,
+	    String playerName, BattleBoard board)
+    {
+	this.mgr = mgr;
+	this.channel = chan;
+	this.myName = playerName;
+	this.myBoard = board;
     }
 
     public void playerJoined(byte[] playerID) {
@@ -66,8 +73,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
 
 	String[] tokens = text.split("\\s+");
 	if (tokens.length == 0) {
-	    // XXX: something horrible has happened.
-	    // XXX: log it, and move on.
+	    log.warning("empty message");
 	    return;
 	}
 
@@ -120,12 +126,12 @@ public class BattleBoardPlayer implements ClientChannelListener {
     private boolean setTurnOrder(String[] args) {
 
 	if (playerNames != null) {
-	    log.info("ERROR: setTurnOrder has already been done");
+	    log.severe("setTurnOrder has already been done");
 	    return false;
 	}
 
 	if (args.length < 3) {
-	    log.info("ERROR: setTurnOrder: " +
+	    log.severe("setTurnOrder: " +
 		    "incorrect number of args: " + args.length + " != 3");
 	    return false;
 	}
@@ -154,7 +160,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
 
     private boolean yourTurn(String[] args) {
 	if (args.length != 1) {
-	    log.info("ERROR: yourTurn: " +
+	    log.severe("yourTurn: " +
 		    "incorrect number of args: " + args.length + " != 1");
 	}
 
@@ -164,7 +170,12 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	    String[] move = BattleBoardUtils.getKeyboardInputTokens(
 			"player x y, or pass ");
 	    if ((move.length == 1) && "pass".equals(move[0])) {
-		// XXX: send to server "pass"
+		if (mgr != null) {
+		    ByteBuffer buf = ByteBuffer.wrap("pass".getBytes());
+		    mgr.sendToServer(buf, true);
+		} else {
+		    displayMessage("TO SERVER: " + "pass" + "\n");
+		}
 		break;
 	    } else if (move.length == 3) {
 		String bombedPlayer = move[0];
@@ -188,7 +199,12 @@ public class BattleBoardPlayer implements ClientChannelListener {
 		String moveMessage = "move " + bombedPlayer + " " +
 			x + " " + y;
 
-		// XXX: send to server moveMessage
+		if (mgr != null){
+		    ByteBuffer buf = ByteBuffer.wrap(moveMessage.getBytes());
+		    mgr.sendToServer(buf, true);
+		} else {
+		    displayMessage("TO SERVER: " + moveMessage + "\n");
+		}
 		break;
 	    } else {
 		displayMessage(
@@ -204,12 +220,12 @@ public class BattleBoardPlayer implements ClientChannelListener {
     private boolean moveStarted(String[] args) {
 
 	if (playerNames == null) {
-	    log.info("ERROR: setTurnOrder has not yet been done");
+	    log.severe("setTurnOrder has not yet been done");
 	    return false;
 	}
 
 	if (args.length != 1) {
-	    log.info("ERROR: yourTurn: " +
+	    log.severe("moveStarted: " +
 		    "incorrect number of args: " + args.length + " != 1");
 	    return false;
 	}
@@ -217,24 +233,24 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	String currPlayer = args[1];
 	log.info("move-started for " + currPlayer);
 
-	if (playerNames.contains(currPlayer)) {
-	    // XXX: bad server.
+	if (!playerNames.contains(currPlayer)) {
+	    log.severe("moveStarted: nonexistant player (" + currPlayer + ")");
+	    return false;
 	}
 
 	displayMessage(currPlayer + " is making a move...\n");
-	// displayBoards(currPlayer);
 	return true;
     }
 
     private boolean moveEnded(String[] args) {
 
 	if (playerNames == null) {
-	    log.info("ERROR: setTurnOrder has not yet been done");
+	    log.severe("setTurnOrder has not yet been done");
 	    return false;
 	}
 
 	if (args.length < 3) {
-	    log.info("ERROR: moveEnded: " +
+	    log.severe("moveEnded: " +
 		    "incorrect number of args: " + args.length + " < 3");
 	}
 
@@ -245,8 +261,9 @@ public class BattleBoardPlayer implements ClientChannelListener {
 
 	if ("pass".equals(action)) {
 	    if (args.length != 3) {
-		log.info("ERROR: moveEnded: " +
+		log.severe("moveEnded: " +
 			"incorrect number of args: " + args.length + " != 3");
+		return false;
 	    }
 	    log.info(currPlayer + " passed");
 
@@ -254,14 +271,15 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	    return true;
 	} else if ("bomb".equals(action)) {
 	    if (args.length != 7) {
-		log.info("ERROR: moveEnded: " +
+		log.severe("moveEnded: " +
 			"incorrect number of args: " + args.length + " != 7");
+		return false;
 	    }
 
 	    String bombedPlayer = args[3];
 	    BattleBoard board = playerBoards.get(bombedPlayer);
 	    if (board == null) {
-		log.info("ERROR: nonexistant player (" + bombedPlayer + ")");
+		log.severe("nonexistant player (" + bombedPlayer + ")");
 		return false;
 	    }
 
@@ -270,7 +288,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
 
 	    if ((x < 0) || (x >= myBoard.getWidth()) ||
 		    (y < 0) || (y >= myBoard.getHeight())) {
-		log.info("ERROR: impossible board position " +
+		log.warning("impossible board position " +
 			"(" + x + ", " + y + ")");
 		return false;
 	    }
@@ -287,6 +305,8 @@ public class BattleBoardPlayer implements ClientChannelListener {
 		board.update(x, y, BattleBoard.POS_CITY);
 		if (bombedPlayer.equals(myName)) {
 		    displayMessage("You just lost a city!");
+		} else {
+		    displayMessage(bombedPlayer + " just lost a city.");
 		}
 	    } else if ("NEAR".equals(outcome)) {
 		board.update(x, y, BattleBoard.POS_NEAR);
@@ -304,7 +324,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
 
 	    displayBoards(bombedPlayer);
 	} else {
-	    log.info("ERROR: moveEnded: invalid command");
+	    log.severe("moveEnded: invalid command");
 	    return false;
 	}
 	return true;
@@ -312,20 +332,20 @@ public class BattleBoardPlayer implements ClientChannelListener {
 
     private boolean withdraw(String[] args) {
 	if (playerNames == null) {
-	    log.info("ERROR: setTurnOrder has not yet been done");
+	    log.severe("setTurnOrder has not yet been done");
 	    return false;
 	}
 
 	if (args.length != 2) {
-	    log.info("ERROR: withdraw: " +
-		    "incorrect number of args: " + args.length + " != 2");
+	    log.severe("withdraw: incorrect number of args: " +
+		    args.length + " != 2");
 	    return false;
 	}
 
 	String withdrawnPlayer = args[1];
 	if (!playerNames.remove(withdrawnPlayer)) {
-	    log.info("ERROR: withdraw: " +
-		    "nonexistant player (" + withdrawnPlayer + ")");
+	    log.warning("withdraw: nonexistant player (" +
+		    withdrawnPlayer + ")");
 	    return false;
 	} else {
 	    log.info(withdrawnPlayer + " has withdrawn");
