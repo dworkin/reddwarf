@@ -158,10 +158,45 @@ public class BattleBoardPlayer implements ClientChannelListener {
 		    "incorrect number of args: " + args.length + " != 1");
 	}
 
-	displayMessage("Your move: ");
+	displayMessage("Your move!\n");
 
-	// ALL KINDS OF STUFF MISSING HERE
-	// get a line, then go on...
+	for (;;) {
+	    String[] move = BattleBoardUtils.getKeyboardInputTokens(
+			"player x y, or pass ");
+	    if ((move.length == 1) && "pass".equals(move[0])) {
+		// XXX: send to server "pass"
+		break;
+	    } else if (move.length == 3) {
+		String bombedPlayer = move[0];
+		if (!playerNames.contains(bombedPlayer)) {
+		    displayMessage("Error: player (" + bombedPlayer +
+			    ") is not in the game\n");
+		    displayMessage("Please try again.\n");
+		    continue;
+		}
+
+		int x = (int) new Integer(move[1]);
+		int y = (int) new Integer(move[2]);
+
+		if ((x < 0) || (x >= myBoard.getWidth()) ||
+			(y < 0) || (y >= myBoard.getHeight())) {
+		    displayMessage("Illegal (x,y)\n");
+		    displayMessage("Please try again.\n");
+		    continue;
+		}
+
+		String moveMessage = "move " + bombedPlayer + " " +
+			x + " " + y;
+
+		// XXX: send to server moveMessage
+		break;
+	    } else {
+		displayMessage(
+			"Improperly formatted move.  Please try again.\n");
+	    }
+
+	    return true;
+	}
 
 	return true;
     }
