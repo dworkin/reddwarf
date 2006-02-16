@@ -1,3 +1,7 @@
+/*
+ * Copyright 2006 by Sun Microsystems, Inc.  All rights reserved.
+ */
+
 package com.sun.gi.apps.battleboard.client;
 
 import com.sun.gi.comm.discovery.impl.URLDiscoverer;
@@ -16,13 +20,12 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
-import java.util.regex.Matcher;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.NameCallback;
 import javax.security.auth.callback.PasswordCallback;
-
 
 public class BattleBoardClient implements ClientConnectionManagerListener {
 
@@ -36,7 +39,6 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
     protected ClientConnectionManager mgr;
     protected ClientChannel gameChannel;
 
-    protected BufferedReader reader;
     protected Callback[] validationCallbacks = null;
 
     protected String myPlayerName = "player";
@@ -52,7 +54,6 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
     State state = State.CONNECTING;
 
     public BattleBoardClient() {
-	reader = new BufferedReader(new InputStreamReader(System.in));
     }
 
     public void run() {
@@ -124,7 +125,7 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
 
     protected String getLine() {
 	try {
-	    String line = reader.readLine();
+	    String line = BattleBoardUtils.getKeyboardLine();
 	    return (line == null) ? "" : line;
 	} catch (IOException e) {
 	    e.printStackTrace();
@@ -186,7 +187,7 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
 		myPlayerName = wsRegexp.matcher(line).replaceAll("");
 	    }
 
-	    channel.setListener(new ClientChannelListener(){
+	    channel.setListener(new ClientChannelListener() {
 		public void playerJoined(byte[] playerID) {
 		    log.info("playerJoined on " + channel.getName());
 		}
@@ -218,7 +219,7 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
 	// Ok, must be a new game channel we've joined
 	if (state == State.JOINING_GAME) {
 	    channel.setListener(
-		new BattleBoardPlayer(mgr, channel, myPlayerName, board));
+		new BattleBoardPlayer(mgr, channel, myPlayerName));
 	    state = State.PLAY_AWAIT_TURN_ORDER;
 	}
     }

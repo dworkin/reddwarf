@@ -43,12 +43,11 @@ public class BattleBoardPlayer implements ClientChannelListener {
     private ClientConnectionManager mgr;
 
     public BattleBoardPlayer(ClientConnectionManager mgr, ClientChannel chan,
-	    String playerName, BattleBoard board)
+	    String playerName)
     {
 	this.mgr = mgr;
 	this.channel = chan;
 	this.myName = playerName;
-	this.myBoard = board;
     }
 
     public void playerJoined(byte[] playerID) {
@@ -103,7 +102,9 @@ public class BattleBoardPlayer implements ClientChannelListener {
 
 	String cmd = tokens[0];
 
-	if ("turn-order".equals(cmd)) {
+	if ("ok".equals(cmd)) {
+	    setBoard(tokens);
+	} else if ("turn-order".equals(cmd)) {
 	    setTurnOrder(tokens);
 	} else if ("your-move".equals(cmd)) {
 	    yourTurn(tokens);
@@ -121,6 +122,57 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	} else if (playerNames.size() == 1) {
 	    displayMessage("YOU WIN!");
 	}
+    }
+
+    private boolean setBoard(String[] args) {
+
+	// XXX: hacking, needs error checking.
+
+	if (args.length < 4) {
+	    log.severe("setBoard: incorrect number of arguments");
+	    return false;
+	}
+
+	int boardWidth = (int) new Integer(args[1]);
+	int boardHeight = (int) new Integer(args[2]);
+	int numCities = (int) new Integer(args[3]);
+
+	if ((boardWidth < 1) || (boardHeight < 1)) {
+	    log.severe("bad board dimensions (" +
+		    boardWidth + ", " + boardHeight + ")");
+	    return false;
+	}
+
+	if (numCities < 1) {
+	    log.severe("bad numCities (" + numCities + ")");
+	    return false;
+	}
+
+	BattleBoard tempBoard = new BattleBoard(myName,
+		boardWidth, boardHeight, numCities);
+
+	if (((args.length - 4) % 2) != 0) {
+	    log.severe("bad list of city positions");
+	    return false;
+	}
+
+	for (int base = 4; base < args.length; base += 2) {
+	    int x = (int) new Integer(args[base]);
+	    int y = (int) new Integer(args[base+1]);
+
+	    if ((x < 0) || (x >= boardWidth) || (y < 0) || (y >= boardHeight)) {
+		log.severe("improper city position (" + x + ", " + y + ")");
+		return false;
+	    }
+
+	    tempBoard.update(x, y, BattleBoard.POS_CITY);
+	}
+
+	myBoard = tempBoard;
+	displayMessage("Here is your board:\n");
+	myBoard.display();
+
+	return true;
     }
 
     private boolean setTurnOrder(String[] args) {

@@ -12,6 +12,12 @@ import java.nio.ByteBuffer;
 
 public class BattleBoardUtils {
 
+    public static String getKeyboardLine() throws IOException {
+	BufferedReader input = new BufferedReader(
+		new InputStreamReader(System.in));
+	return input.readLine();
+    }
+
     public static String[] getKeyboardInputTokens(String prompt) {
 	String commandline = "";
 
@@ -19,15 +25,12 @@ public class BattleBoardUtils {
 	    prompt = ">> ";
 	}
 
-	BufferedReader input = new BufferedReader(
-		new InputStreamReader(System.in));
-
 	for (;;) {
 	    System.out.print(prompt);
 	    System.out.flush();
 
 	    try {
-		commandline = input.readLine();
+		commandline = getKeyboardLine();
 	    } catch (IOException e) {
 		System.out.println("Unexpected exception: " + e);
 		return new String[0];
