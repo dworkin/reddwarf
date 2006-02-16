@@ -216,7 +216,8 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
 
 	// Ok, must be a new game channel we've joined
 	if (state == State.JOINING_GAME) {
-	    channel.setListener(new BattleBoardPlayer(channel, myPlayerName, board));
+	    channel.setListener(
+		new BattleBoardPlayer(mgr, channel, myPlayerName, board));
 	    state = State.PLAY_AWAIT_TURN_ORDER;
 	}
     }

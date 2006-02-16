@@ -20,7 +20,7 @@ class BattleBoardStandalone {
 
 	myBoard.populate();
 
-	BattleBoardPlayer player = new BattleBoardPlayer(null,
+	BattleBoardPlayer player = new BattleBoardPlayer(null, null,
 		playerName, myBoard);
 
 	BufferedReader input = new BufferedReader(
