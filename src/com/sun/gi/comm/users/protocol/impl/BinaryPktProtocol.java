@@ -365,6 +365,7 @@ public class BinaryPktProtocol implements TransportProtocol {
 	    hdr.put(from);
 	    hdr.put((byte)reconnectionKey.length);
 	    hdr.put(reconnectionKey);
+	    sendBuffers(hdr);
 	}
     }
 
