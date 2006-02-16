@@ -186,6 +186,15 @@ Server-Initiated
     <kbd>pass</kbd>
     </blockquote> <p>
 
+    If the player makes an illegal move (dropping a bomb on a nonexistant
+    player, or a nonexistant board position), this is equivalent to a pass.
+    It is the responsibility of the player to ensure that their move is
+    valid.  The exception to this rule is that if another player withdraws
+    from the game in the time between when the <kbd>your-move</kbd> message
+    is sent by the server and the <kbd>move</kbd> message is received, and
+    the <em>bombed-player</em> is the withdrawn player, then the the player
+    will immediately recieve another <kbd>your-move</kdb> message. <p>
+
 <li> <kbd>move-started</kbd> <em>player</em> <p>
 
     Indicates that it is the indicated players turn. <p>

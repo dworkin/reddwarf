@@ -64,7 +64,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
 
 	log.info("dataArrived: (" + text + ")");
 
-	String[] tokens = text.split("\\s*");
+	String[] tokens = text.split("\\s+");
 	if (tokens.length == 0) {
 	    // XXX: something horrible has happened.
 	    // XXX: log it, and move on.
