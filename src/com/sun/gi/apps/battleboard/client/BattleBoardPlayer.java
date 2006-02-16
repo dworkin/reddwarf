@@ -104,12 +104,18 @@ public class BattleBoardPlayer implements ClientChannelListener {
 
 	if ("ok".equals(cmd)) {
 	    setBoard(tokens);
+	    return;
 	} else if ("turn-order".equals(cmd)) {
 	    setTurnOrder(tokens);
 	} else if ("your-move".equals(cmd)) {
 	    yourTurn(tokens);
 	} else if ("move-started".equals(cmd)) {
-	    moveStarted(tokens);
+	    // XXX How about getting rid of your-move? -jm
+	    if (myName.equals(tokens[1])) {
+		yourTurn(tokens);
+	    } else {
+		moveStarted(tokens);
+	    }
 	} else if ("move-ended".equals(cmd)) {
 	    moveEnded(tokens);
 	} else if ("withdraw".equals(cmd)) {
@@ -276,9 +282,9 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	    return false;
 	}
 
-	if (args.length != 1) {
+	if (args.length != 2) {
 	    log.severe("moveStarted: " +
-		    "incorrect number of args: " + args.length + " != 1");
+		    "incorrect number of args: " + args.length + " != 2");
 	    return false;
 	}
 

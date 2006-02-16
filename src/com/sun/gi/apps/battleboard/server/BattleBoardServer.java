@@ -65,6 +65,8 @@ public class BattleBoardServer
 
 	// XXX in the future we may want the player object to persist.
 	GLOReference playerRef = Player.getRef(task, uid);
-	playerRef.delete(task);
+	if (playerRef != null) {
+	    playerRef.delete(task);
+	}
     }
 }

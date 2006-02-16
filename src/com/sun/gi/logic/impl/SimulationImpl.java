@@ -24,6 +24,7 @@ import com.sun.gi.framework.install.DeploymentRec;
 import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimChannelListener;
+import com.sun.gi.logic.SimChannelDataListener;
 import com.sun.gi.logic.SimKernel;
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.Simulation;
@@ -65,6 +66,8 @@ public class SimulationImpl implements Simulation {
     private Map<UserID, List<Long>> userDataListeners = new HashMap<UserID, List<Long>>();
 
     private Map<ChannelID, List<Long>> channelListeners = new HashMap<ChannelID, List<Long>>();
+
+    private Map<ChannelID, List<Long>> channelDataListeners = new HashMap<ChannelID, List<Long>>();
 
     private List<SimTask> taskQueue = new LinkedList<SimTask>();
 
@@ -158,13 +161,13 @@ public class SimulationImpl implements Simulation {
 
     protected void fireChannelDataPacket(ChannelID cid, UserID from,
 	    ByteBuffer buff) {
-	List<Long> listeners = channelListeners.get(cid);
+	List<Long> listeners = channelDataListeners.get(cid);
 	if (listeners != null) {
 	    ByteBuffer outBuff = buff.duplicate();
 	    outBuff.flip();
 	    Method m;
 	    try {
-		m = SimChannelListener.class.getMethod("dataArrived",
+		m = SimChannelDataListener.class.getMethod("dataArrived",
 			SimTask.class, ChannelID.class, UserID.class,
 			ByteBuffer.class);
 		for (Long uid : listeners) {
@@ -318,12 +321,21 @@ public class SimulationImpl implements Simulation {
     }
 
     public void addChannelListener(ChannelID id, GLOReference ref) {
-	List<Long> channelListenersList = channelListeners.get(id);
-	if (channelListenersList == null) {
-	    channelListenersList = new ArrayList<Long>();
-	    channelListeners.put(id, channelListenersList);
+	List<Long> listeners = channelListeners.get(id);
+	if (listeners == null) {
+	    listeners = new ArrayList<Long>();
+	    channelListeners.put(id, listeners);
 	}
-	channelListenersList.add(new Long(((GLOReferenceImpl) ref).objID));
+	listeners.add(new Long(((GLOReferenceImpl) ref).objID));
+    }
+
+    public void addChannelDataListener(ChannelID id, GLOReference ref) {
+	List<Long> channelDataListenersList = channelDataListeners.get(id);
+	if (channelDataListenersList == null) {
+	    channelDataListenersList = new ArrayList<Long>();
+	    channelDataListeners.put(id, channelDataListenersList);
+	}
+	channelDataListenersList.add(new Long(((GLOReferenceImpl) ref).objID));
     }
 
     protected void fireUserLeftChannel(UserID uid, ChannelID cid) {
@@ -351,6 +363,30 @@ public class SimulationImpl implements Simulation {
 	    }
 	}
 
+	List<Long> chanListenerIDs = channelListeners.get(cid);
+	if (chanListenerIDs != null) {
+	    try {
+		Method leftChannelMethod = loader.loadClass(
+			"com.sun.gi.logic.SimChannelListener").getMethod(
+			    "leftChannel",
+			    new Class[] { SimTask.class, ChannelID.class,
+			    UserID.class });
+		Object[] params = { cid, uid };
+		for (Long gloID : chanListenerIDs) {
+		    queueTask(newTask(gloID, leftChannelMethod, params));
+		}
+	    } catch (SecurityException e) {
+
+		e.printStackTrace();
+	    } catch (NoSuchMethodException e) {
+
+		e.printStackTrace();
+	    } catch (ClassNotFoundException e) {
+
+		e.printStackTrace();
+	    }
+	}
+
     }
 
     /**
@@ -361,14 +397,38 @@ public class SimulationImpl implements Simulation {
 	List<Long> listenerIDs = userDataListeners.get(uid);
 	if (listenerIDs != null) {
 	    try {
-		Method userLeftChannelMethod = loader.loadClass(
+		Method userJoinedChannelMethod = loader.loadClass(
 			"com.sun.gi.logic.SimUserDataListener").getMethod(
 			    "userJoinedChannel",
 			    new Class[] { SimTask.class, ChannelID.class,
 			    UserID.class });
 		Object[] params = { cid, uid };
 		for (Long gloID : listenerIDs) {
-		    queueTask(newTask(gloID, userLeftChannelMethod, params));
+		    queueTask(newTask(gloID, userJoinedChannelMethod, params));
+		}
+	    } catch (SecurityException e) {
+
+		e.printStackTrace();
+	    } catch (NoSuchMethodException e) {
+
+		e.printStackTrace();
+	    } catch (ClassNotFoundException e) {
+
+		e.printStackTrace();
+	    }
+	}
+
+	List<Long> chanListenerIDs = channelListeners.get(cid);
+	if (chanListenerIDs != null) {
+	    try {
+		Method joinedChannelMethod = loader.loadClass(
+			"com.sun.gi.logic.SimChannelListener").getMethod(
+			    "joinedChannel",
+			    new Class[] { SimTask.class, ChannelID.class,
+			    UserID.class });
+		Object[] params = { cid, uid };
+		for (Long gloID : chanListenerIDs) {
+		    queueTask(newTask(gloID, joinedChannelMethod, params));
 		}
 	    } catch (SecurityException e) {
 

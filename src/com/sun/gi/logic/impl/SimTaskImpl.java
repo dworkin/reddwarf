@@ -272,6 +272,10 @@ public class SimTaskImpl implements SimTask {
 	simulation.addChannelListener(cid, ref);
     }
 
+    public void addChannelDataListener(ChannelID cid, GLOReference ref) {
+	simulation.addChannelDataListener(cid, ref);
+    }
+
     /**
      * createGLO
      * 

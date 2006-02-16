@@ -2,7 +2,7 @@ package com.sun.gi.apps.commtest;
 
 import java.nio.ByteBuffer;
 import com.sun.gi.logic.SimBoot;
-import com.sun.gi.logic.SimChannelListener;
+import com.sun.gi.logic.SimChannelDataListener;
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.SimUserDataListener;
 import com.sun.gi.logic.SimUserListener;
@@ -17,7 +17,7 @@ import javax.security.auth.Subject;
 
 public class CommTestBoot
 	implements SimBoot, SimUserListener,
-		   SimUserDataListener, SimChannelListener {
+		   SimUserDataListener, SimChannelDataListener {
 
     private static final long serialVersionUID = 1L;
 
@@ -34,11 +34,11 @@ public class CommTestBoot
 	thisobj = task.findGLO("BOOT");
 	task.addUserListener(thisobj);
 	ChannelID cid = task.openChannel("echo");
-	task.addChannelListener(cid,thisobj);
+	task.addChannelDataListener(cid,thisobj);
 
 	noJoinID = task.openChannel("noJoin");
 	task.lock(noJoinID, true);
-	task.addChannelListener(noJoinID, thisobj);
+	task.addChannelDataListener(noJoinID, thisobj);
 
 	echoID = cid;
     }
@@ -108,7 +108,7 @@ public class CommTestBoot
     }
 
     /* (non-Javadoc)
-     * @see com.sun.gi.logic.SimChannelListener#dataArrived
+     * @see com.sun.gi.logic.SimChannelDataListener#dataArrived
      */
     public void dataArrived(SimTask task, ChannelID cid,
 	    UserID from, ByteBuffer buff) {

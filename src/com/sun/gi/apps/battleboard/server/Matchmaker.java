@@ -20,7 +20,7 @@ import java.util.LinkedList;
 import java.util.Set;
 import java.util.HashSet;
 
-public class Matchmaker implements SimUserDataListener {
+public class Matchmaker implements SimChannelListener {
 
     private static final long serialVersionUID = 1L;
 
@@ -83,12 +83,15 @@ public class Matchmaker implements SimUserDataListener {
 
     // SimUserDataListener methods
 
-    public void userJoinedChannel(SimTask task, ChannelID cid, UserID uid) {
+    public void joinedChannel(SimTask task, ChannelID cid, UserID uid) {
 	log.info("Matchmaker: User " + uid + " joined channel " + cid);
     }
 
-    public void userLeftChannel(SimTask task, ChannelID cid, UserID uid) {
+    public void leftChannel(SimTask task, ChannelID cid, UserID uid) {
 	log.info("Matchmaker: User " + uid + " left channel " + cid);
+
+	GLOReference playerRef = Player.getRef(task, uid);
+	waitingPlayers.remove(playerRef);
     }
 
     // Handle the "join" command in matchmaker mode

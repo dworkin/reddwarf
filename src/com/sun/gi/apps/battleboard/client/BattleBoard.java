@@ -4,13 +4,15 @@
 
 package com.sun.gi.apps.battleboard.client;
 
-public class BattleBoard {
+import java.io.Serializable;
 
-    private final String playerName;
-    private final int boardHeight;
-    private final int boardWidth;
-    private final int board[][];
-    private final int startCities;
+public class BattleBoard implements Serializable {
+
+    private String playerName;
+    private int boardHeight;
+    private int boardWidth;
+    private int board[][];
+    private int startCities;
     private int survivingCities;
 
     /*
@@ -52,6 +54,9 @@ public class BattleBoard {
 
     /** Indicates that the bomb hit a city. */
     static final int HIT        = 102;
+
+    /** Default constructor, required for serialization */
+    protected BattleBoard() { }
 
     /**
      * Creates a BattleBoard with the given width and height and with
@@ -171,10 +176,12 @@ public class BattleBoard {
      * Displays the board using a simple text format.
      */
     public void display() {
+
+	System.out.println("-- " + playerName + " -- " + survivingCities +
+		" surviving cities");
+
 	for (int j = getHeight() - 1; j >= 0; j--) {
 
-	    System.out.print("-- " + playerName + " -- " + survivingCities +
-		    " surviving cities");
 	    System.out.print(j);
 
 	    for (int i = 0; i < getWidth(); i++) {
