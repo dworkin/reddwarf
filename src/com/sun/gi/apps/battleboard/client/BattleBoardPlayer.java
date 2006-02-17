@@ -39,7 +39,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
     private Map<String, BattleBoard> playerBoards = null;
     private String myName;
     private BattleBoard myBoard;
-    private boolean youLose = false;
+    private boolean lost = false;
     private ClientConnectionManager mgr;
 
     public BattleBoardPlayer(ClientConnectionManager mgr, ClientChannel chan,
@@ -119,11 +119,13 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	    withdraw(tokens);
 	}
 
-	if (youLose) {
-	    displayMessage("You have lost all of your cities.\n");
-	    displayMessage("Goodbye!");
+	if (lost) {
+	    displayMessage("You lose!");
+	    displayMessage("Better luck next time.");
+	    mgr.disconnect();
 	} else if (playerNames.size() == 1) {
 	    displayMessage("YOU WIN!");
+	    mgr.disconnect();
 	}
     }
 
@@ -367,7 +369,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
 		if ("LOSS".equals(outcome)) {
 		    if (bombedPlayer.equals(myName)) {
 			displayMessage("You just lost your last city!");
-			youLose = true;
+			loslost = true;
 		    } else {
 			displayMessage(bombedPlayer + " lost their last city.");
 		    }
@@ -420,7 +422,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
     }
 
     public boolean lost() {
-	return youLose;
+	return lost;
     }
 
     private void displayMessage(String message) {
