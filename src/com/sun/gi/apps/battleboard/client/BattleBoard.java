@@ -243,7 +243,7 @@ public class BattleBoard implements Serializable {
      * @throws IllegalArgumentException if either of <em>x</em> or
      * <em>y</em> is outside the board
      */
-    public positionValue  bombBoardPosition(int x, int y) {
+    public positionValue bombBoardPosition(int x, int y) {
 	positionValue  rc;
 
 	if ((x < 0) || (x >= boardWidth)) {
@@ -255,7 +255,7 @@ public class BattleBoard implements Serializable {
 
 	if (isHit(x, y)) {
 	    rc = positionValue.HIT;
-	    survivingCities--;
+	    hit();
 	} else if (isNearMiss(x, y)) {
 	    rc = positionValue.NEAR;
 	} else {
@@ -297,6 +297,10 @@ public class BattleBoard implements Serializable {
 	positionValue rc = getBoardPosition(x, y);
 	board[x][y] = state;
 	return rc;
+    }
+
+    public void hit() {
+	survivingCities--;
     }
 
     /**

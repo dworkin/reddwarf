@@ -361,7 +361,8 @@ public class BattleBoardPlayer implements ClientChannelListener {
 		    "at " + x + "," + y + " with outcome " + outcome + "\n");
 
 	    if ("HIT".equals(outcome)) {
-		board.update(x, y, BattleBoard.positionValue.CITY);
+		board.update(x, y, BattleBoard.positionValue.HIT);
+		board.hit();
 		if (bombedPlayer.equals(myName)) {
 		    displayMessage("You just lost a city!");
 		} else {
@@ -372,7 +373,8 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	    } else if ("MISS".equals(outcome)) {
 		board.update(x, y, BattleBoard.positionValue.MISS);
 	    } else if ("LOSS".equals(outcome)) {
-		board.update(x, y, BattleBoard.positionValue.CITY);
+		board.update(x, y, BattleBoard.positionValue.HIT);
+		board.hit();
 		if (bombedPlayer.equals(myName)) {
 		    youLose = true;
 		} else {
