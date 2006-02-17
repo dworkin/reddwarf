@@ -122,9 +122,13 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	if (lost) {
 	    displayMessage("You lose!");
 	    displayMessage("Better luck next time.");
-	    mgr.disconnect();
+	    // mgr.disconnect();
 	} else if (playerNames.size() == 1) {
-	    displayMessage("YOU WIN!");
+	    if (myName.equals(playerNames.get(1))) {
+		displayMessage("YOU WIN!  w00t!");
+	    } else {
+		displayMessage(playerNames.get(1) + " has won.");
+	    }
 	    mgr.disconnect();
 	}
     }
