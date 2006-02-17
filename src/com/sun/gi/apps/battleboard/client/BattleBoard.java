@@ -262,7 +262,7 @@ public class BattleBoard implements Serializable {
 	    rc = positionValue.MISS;
 	}
 
-	board[x][y] = rc;
+	update(x, y, rc);
 	return rc;
     }
 

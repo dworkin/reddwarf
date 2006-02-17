@@ -168,7 +168,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
 		return false;
 	    }
 
-	    tempBoard.update(x, y, BattleBoard.POS_CITY);
+	    tempBoard.update(x, y, BattleBoard.positionValue.CITY);
 	}
 
 	myBoard = tempBoard;
@@ -361,18 +361,18 @@ public class BattleBoardPlayer implements ClientChannelListener {
 		    "at " + x + "," + y + " with outcome " + outcome + "\n");
 
 	    if ("HIT".equals(outcome)) {
-		board.update(x, y, BattleBoard.POS_CITY);
+		board.update(x, y, BattleBoard.positionValue.CITY);
 		if (bombedPlayer.equals(myName)) {
 		    displayMessage("You just lost a city!");
 		} else {
 		    displayMessage(bombedPlayer + " just lost a city.");
 		}
 	    } else if ("NEAR".equals(outcome)) {
-		board.update(x, y, BattleBoard.POS_NEAR);
+		board.update(x, y, BattleBoard.positionValue.NEAR);
 	    } else if ("MISS".equals(outcome)) {
-		board.update(x, y, BattleBoard.POS_MISS);
+		board.update(x, y, BattleBoard.positionValue.MISS);
 	    } else if ("LOSS".equals(outcome)) {
-		board.update(x, y, BattleBoard.POS_CITY);
+		board.update(x, y, BattleBoard.positionValue.CITY);
 		if (bombedPlayer.equals(myName)) {
 		    youLose = true;
 		} else {
