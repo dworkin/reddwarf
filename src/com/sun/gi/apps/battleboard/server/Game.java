@@ -205,7 +205,7 @@ public class Game implements SimChannelListener {
 	String outcome = "";
 	switch (result) {
 	case HIT:
-	    outcome = board.lost() ? "LOST" : "HIT";
+	    outcome = board.lost() ? "LOSS" : "HIT";
 	    break;
 
 	case NEAR:
