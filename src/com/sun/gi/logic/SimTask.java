@@ -95,8 +95,8 @@ public interface SimTask {
      */
     public void addUserDataListener(UserID id, GLOReference ref);
 
+    public void addChannelMembershipListener(ChannelID id, GLOReference ref);
     public void addChannelListener(ChannelID id, GLOReference ref);
-    public void addChannelDataListener(ChannelID id, GLOReference ref);
 
     /**
      * The game code can call this to send data to users by their IDs.

@@ -7,7 +7,7 @@ import com.sun.gi.comm.routing.UserID;
 
 /**
  *
- * <p>Title: SimChannelDataListener.java</p>
+ * <p>Title: SimChannelListener.java</p>
  * <p>Description: This interface is used by GLOs that want to evesdrop on data
  * flow.  It should be used judiciously as the data flow between clients can
  * easily over-whelm the server.</p>
@@ -16,7 +16,7 @@ import com.sun.gi.comm.routing.UserID;
  * @author Jeff Kesselman
  * @version 1.0
  */
-public interface SimChannelDataListener extends GLO {
+public interface SimChannelListener extends GLO {
     public void dataArrived(SimTask task, ChannelID id,
 	UserID from, ByteBuffer buff);
 }

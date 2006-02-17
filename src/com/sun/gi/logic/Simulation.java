@@ -49,7 +49,7 @@ public interface Simulation {
   public void addUserDataListener(UserID cid, GLOReference ref);
   
   /** Listen to join/leave events on a particular channel */
-  public void addChannelListener(ChannelID cid, GLOReference ref);
+  public void addChannelMembershipListener(ChannelID cid, GLOReference ref);
 
   /**
    * This calls add a GLO as a listener to the data being sent  on a channel.
@@ -60,7 +60,7 @@ public interface Simulation {
    * @param ref  A GLORerence to the GLO to get the callback.
    * @see addUserDataListener
    */
-  public void addChannelDataListener(ChannelID cid, GLOReference ref);
+  public void addChannelListener(ChannelID cid, GLOReference ref);
 
   /**
    * This call creates a SimTask object that can then be queued for executon.
