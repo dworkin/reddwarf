@@ -117,13 +117,12 @@ public class Game implements SimChannelListener {
 
 	for (int i = 0; i < board.getWidth(); ++i) {
 	    for (int j = 0; j < board.getHeight(); ++j) {
-		if (board.getBoardPosition(i, j) != Board.POS_CITY) {
-		    continue;
+		if (board.getBoardPosition(i, j) == Board.POS_CITY) {
+		    buf.put(" ".getBytes());
+		    buf.put(Integer.toString(i).getBytes());
+		    buf.put(" ".getBytes());
+		    buf.put(Integer.toString(j).getBytes());
 		}
-		buf.put(" ".getBytes());
-		buf.put(Integer.toString(i).getBytes());
-		buf.put(" ".getBytes());
-		buf.put(Integer.toString(j).getBytes());
 	    }
 	}
 
@@ -170,6 +169,74 @@ public class Game implements SimChannelListener {
 	sendMoveStarted(task, p);
     }
 
+    protected void handlePass(SimTask task, Player player) {
+	ByteBuffer buf = ByteBuffer.allocate(1024);
+	buf.put("move-ended ".getBytes());
+	buf.put(player.getNickname().getBytes());
+	buf.put(" pass".getBytes());
+	broadcast(task, buf.asReadOnlyBuffer());
+
+	startNextMove(task);
+    }
+
+    protected void handleMove(SimTask task, Player player, String[] tokens) {
+
+	String bombedPlayerNick = tokens[1];
+
+	GLOReference boardRef = playerBoards.get(bombedPlayerNick);
+	if (boardRef == null) {
+	    log.warning(player.getNickname() +
+		    " tried to bomb non-existant player " +
+		    bombedPlayerNick);
+	    handlePass(task, player);
+	    return;
+
+	}
+	Board board = (Board) boardRef.get(task);
+
+	int x = Integer.parseInt(tokens[2]);
+	int y = Integer.parseInt(tokens[3]);
+
+	// XXX check that x and y are in bounds
+
+	int result = board.bombBoardPosition(x, y);
+
+	String outcome = "";
+	switch (result) {
+	case Board.HIT:
+	    outcome = board.lost() ? "LOST" : "HIT";
+	    break;
+
+	case Board.NEAR_MISS:
+	    outcome = "NEAR_MISS";
+	    break;
+
+	case Board.MISS:
+	    outcome = "MISS";
+	    break;
+	}
+
+	// XXX if board.lost(), remove them from the active players list
+	// (or something)
+
+	ByteBuffer buf = ByteBuffer.allocate(1024);
+	buf.put("move-ended ".getBytes());
+	buf.put(player.getNickname().getBytes());
+	buf.put(" bomb ".getBytes());
+	buf.put(bombedPlayerNick.getBytes());
+	buf.put(" ".getBytes());
+	buf.put(Integer.toString(x).getBytes());
+	buf.put(" ".getBytes());
+	buf.put(Integer.toString(y).getBytes());
+	buf.put(" ".getBytes());
+	buf.put(outcome.getBytes());
+	buf.put(" ".getBytes());
+
+	broadcast(task, buf.asReadOnlyBuffer());
+
+	startNextMove(task);
+    }
+
     protected void handleResponse(SimTask task, GLOReference playerRef,
 	    String[] tokens) {
 
@@ -179,27 +246,15 @@ public class Game implements SimChannelListener {
 	}
 
 	Player player = (Player) playerRef.peek(task);
-	ByteBuffer buf = ByteBuffer.allocate(1024);
-
 	String cmd = tokens[0];
 
 	if ("pass".equals(cmd)) {
-
-	    buf.put("move-ended ".getBytes());
-	    buf.put(player.getNickname().getBytes());
-	    buf.put(" pass".getBytes());
-	    broadcast(task, buf.asReadOnlyBuffer());
-
-	    startNextMove(task);
-
-	} else if ("turn-order".equals(cmd)) {
-
-	    buf.put("move-ended ".getBytes());
-	    buf.put(player.getNickname().getBytes());
-	    buf.put(" pass".getBytes());
-	    broadcast(task, buf.asReadOnlyBuffer());
-
-	    startNextMove(task);
+	    handlePass(task, player);
+	} else if ("move".equals(cmd)) {
+	    handleMove(task, player, tokens);
+	} else {
+	    log.warning("Unknown command `" + cmd + "'");
+	    handlePass(task, player);
 	}
     }
 

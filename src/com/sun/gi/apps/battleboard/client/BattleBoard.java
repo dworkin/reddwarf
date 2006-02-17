@@ -47,13 +47,13 @@ public class BattleBoard implements Serializable {
      */
 
     /** Indicates the bomb missed any city. */
-    static final int MISS       = 100;
+    public static final int MISS       = 100;
 
     /** Indicates that the bomb landed adjacent to a city. */
-    static final int NEAR_MISS  = 101;
+    public static final int NEAR_MISS  = 101;
 
     /** Indicates that the bomb hit a city. */
-    static final int HIT        = 102;
+    public static final int HIT        = 102;
 
     /** Default constructor, required for serialization */
     protected BattleBoard() { }

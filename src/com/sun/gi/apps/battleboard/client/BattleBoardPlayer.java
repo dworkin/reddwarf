@@ -107,12 +107,9 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	    return;
 	} else if ("turn-order".equals(cmd)) {
 	    setTurnOrder(tokens);
-//	} else if ("your-move".equals(cmd)) {
-//	    yourTurn(tokens);
-// XXX How about getting rid of your-move? -jm
 	} else if ("move-started".equals(cmd)) {
 	    if (myName.equals(tokens[1])) {
-		yourTurn(tokens);
+		yourTurn();
 	    } else {
 		moveStarted(tokens);
 	    }
@@ -216,11 +213,13 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	return true;
     }
 
-    private boolean yourTurn(String[] args) {
+    private boolean yourTurn() {
+	/*
 	if (args.length != 1) {
 	    log.severe("yourTurn: " +
 		    "incorrect number of args: " + args.length + " != 1");
 	}
+	*/
 
 	displayMessage("Your move!\n");
 
