@@ -17,7 +17,7 @@
 # The PROJECT_NAME tag is a single word (or a sequence of words surrounded 
 # by quotes) that should identify the project.
 
-PROJECT_NAME           = "SGS Server API"
+PROJECT_NAME           = "SGS Examples"
 
 # The PROJECT_NUMBER tag can be used to enter a project or revision number. 
 # This could be handy for archiving the generated documentation or 
@@ -30,7 +30,7 @@ PROJECT_NUMBER         = Snapshot
 # If a relative path is entered, it will be relative to the location 
 # where doxygen was started. If left blank the current directory will be used.
 
-OUTPUT_DIRECTORY       = doc/doxygen/server-api
+OUTPUT_DIRECTORY       = doc/doxygen/examples
 
 # If the CREATE_SUBDIRS tag is set to YES, then doxygen will create 
 # 4096 sub-directories (in 2 levels) under the output directory of each output 
@@ -450,17 +450,9 @@ WARN_LOGFILE           =
 # directories like "/usr/src/myproject". Separate the files or directories 
 # with spaces.
 
-INPUT =  src/com/sun/gi/logic/GLO.java \
-	 src/com/sun/gi/logic/GLOReference.java \
-	 src/com/sun/gi/logic/SimBoot.java \
-	 src/com/sun/gi/logic/SimChannelListener.java \
-	 src/com/sun/gi/logic/SimUserListener.java \
-	 src/com/sun/gi/logic/SimUserDataListener.java \
-	 src/com/sun/gi/logic/SimRawSocketListener.java \
-	 src/com/sun/gi/logic/SimTimerListener.java \
-	 src/com/sun/gi/logic/SimTask.java \
-	 src/com/sun/gi/comm/routing/UserID.java \
-	 src/com/sun/gi/comm/routing/ChannelID.java
+INPUT =  src/com/sun/gi/apps/commtest \
+	 src/com/sun/gi/apps/commtest/client \
+	 src/com/sun/gi/gloutils/pdtimer
 
 # If the value of the INPUT tag contains directories, you can use the 
 # FILE_PATTERNS tag to specify one or more wildcard pattern (like *.cpp 

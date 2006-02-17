@@ -455,15 +455,7 @@ INPUT =  src/com/sun/gi/comm/users/client/ClientAlreadyConnectedException.java \
 	 src/com/sun/gi/comm/users/client/ClientChannelListener.java \
 	 src/com/sun/gi/comm/users/client/ClientConnectionManager.java \
 	 src/com/sun/gi/comm/users/client/ClientConnectionManagerListener.java \
-	 src/com/sun/gi/comm/users/client/impl/ClientConnectionManagerImpl.java \
-	 src/com/sun/gi/comm/users/client/UserManagerClient.java \
-	 src/com/sun/gi/comm/users/client/UserManagerClientListener.java \
-	 src/com/sun/gi/comm/users/client/UserManagerPolicy.java \
-	 src/com/sun/gi/comm/users/client/impl/DefaultUserManagerPolicy.java \
-	 src/com/sun/gi/comm/discovery/DiscoveredUserManager.java \
-	 src/com/sun/gi/comm/discovery/DiscoveredGame.java \
-	 src/com/sun/gi/comm/discovery/Discoverer.java \
-	 src/com/sun/gi/apps/commtest/client
+	 src/com/sun/gi/comm/users/client/impl/ClientConnectionManagerImpl.java
 
 # If the value of the INPUT tag contains directories, you can use the 
 # FILE_PATTERNS tag to specify one or more wildcard pattern (like *.cpp 
