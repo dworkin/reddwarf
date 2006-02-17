@@ -29,6 +29,7 @@ public class Game implements SimChannelListener {
     protected ChannelID  channel;
     protected GLOReference               thisRef;
     protected LinkedList<GLOReference>   players;
+    protected LinkedList<GLOReference>   spectators;
     protected Map<String, GLOReference>  playerBoards;
     protected GLOReference               currentPlayerRef;
 
@@ -65,12 +66,14 @@ public class Game implements SimChannelListener {
 	players = new LinkedList(newPlayers);
 	Collections.shuffle(players);
 
+	spectators = new LinkedList();
+
 	playerBoards = new HashMap<String, GLOReference>();
 	for (GLOReference playerRef : players) {
 	    Player p = (Player) playerRef.get(task);
 	    playerBoards.put(p.getNickname(),
 		createBoard(task, p.getNickname()));
-	    p.setGameRef(thisRef);
+	    p.gameStarted(thisRef);
 	}
 
 	channel = task.openChannel(gameName);
@@ -95,9 +98,35 @@ public class Game implements SimChannelListener {
 	startNextMove(task);
     }
 
+    public void endGame(SimTask task) {
+	log.info("Ending Game");
+	// Tell all the players this game is over
+	for (GLOReference ref : players) {
+	    Player p = (Player) ref.get(task);
+	    p.gameEnded(thisRef);
+	}
+
+	// Close this game's channel
+	task.closeChannel(channel);
+	channel = null;
+
+	// Destroy all the players' boards
+	for (GLOReference ref : playerBoards.values()) {
+	    ref.delete(task);
+	}
+
+	// null the lists and maps so they can be GC'd
+	players.clear();
+	spectators.clear();
+	playerBoards.clear();
+
+	// Queue a reaper task to destroy this Game GLO
+	// XXX do this...
+    }
+
     protected void sendJoinOK(SimTask task) {
-	for (GLOReference playerRef : players) {
-	    Player p = (Player) playerRef.peek(task);
+	for (GLOReference ref : players) {
+	    Player p = (Player) ref.peek(task);
 	    task.join(p.getUID(), channel);
 	    sendJoinOK(task, p);
 	}
@@ -143,14 +172,22 @@ public class Game implements SimChannelListener {
     }
 
     protected void broadcast(SimTask task, ByteBuffer buf) {
-	UserID[] uids = new UserID[players.size()];
+	UserID[] uids = new UserID[players.size() + spectators.size()];
+
 	int i = 0;
-	for (GLOReference playerRef : players) {
-	    Player p = (Player) playerRef.peek(task);
+	for (GLOReference ref : players) {
+	    Player p = (Player) ref.peek(task);
 	    uids[i++] = p.getUID();
 	}
+
+	for (GLOReference ref : spectators) {
+	    Player p = (Player) ref.peek(task);
+	    uids[i++] = p.getUID();
+	}
+
 	log.info("Game: Broadcasting " + buf.position() +
 	    " bytes on " + channel);
+
 	task.sendData(channel, uids, buf, true);
     }
 
@@ -232,9 +269,7 @@ public class Game implements SimChannelListener {
 
 	broadcast(task, buf.asReadOnlyBuffer());
 
-	// If the bombed player has lost, remove them from the game
-	// TODO may want to let them keep watching, or do something...
-
+	// If the bombed player has lost, make them a spectator
 	if (board.lost()) {
 	    playerBoards.remove(bombedPlayerNick);
 	    Iterator<GLOReference> i = players.iterator();
@@ -242,17 +277,26 @@ public class Game implements SimChannelListener {
 		GLOReference ref = i.next();
 		Player p = (Player) ref.peek(task);
 		if (bombedPlayerNick.equals(p.getNickname())) {
+		    spectators.add(ref);
 		    i.remove();
 		}
 	    }
 	}
 
-	// XXX Check whether the player has won
-	/*
-	    // Try to upgrade to a GET lock
-	    Player lockedPlayer = (Player) ref.get(task);
-	    lockedPlayer.setGameRef(null);
-	*/
+	// Check whether the player has won
+	if (players.size() == 1) { // XXX: what if it's zero?
+	    // queue a new task to handle end of game
+	    try {
+		task.queueTask(thisRef,
+		    Game.class.getMethod("endGame", SimTask.class),
+		    new Object[] { });
+	    } catch (Exception e) {
+		e.printStackTrace();
+	    }
+
+	    // They won, so don't start the next move
+	    return;
+	}
 
 	startNextMove(task);
     }

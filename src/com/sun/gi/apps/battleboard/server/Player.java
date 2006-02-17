@@ -92,12 +92,21 @@ public class Player implements SimUserDataListener {
 	myUserID = uid;
     }
 
-    public GLOReference getGameRef() {
-	return myGameRef;
+    /*
+    // XXX: support multiple games
+    public Set<GLOReference> getGames() {
+	return myGameRefs;
+    }
+    */
+
+    public void gameStarted(GLOReference gameRef) {
+	//myGameRefs.add(gameRef);
+	myGameRef = gameRef;
     }
 
-    public void setGameRef(GLOReference gameRef) {
-	myGameRef = gameRef;
+    public void gameEnded(GLOReference gameRef) {
+	myGameRef = null;
+	// If there are no more games, join the matchmaker channel
     }
 
     public String getNickname() {
@@ -128,6 +137,7 @@ public class Player implements SimUserDataListener {
 	}
 
 	if (myGameRef != null) {
+	    // XXX: this currently supports only one game per player
 	    Game game = (Game) myGameRef.get(task);
 	    game.userDataReceived(task, myUserID, data);
 	} else {

@@ -29,11 +29,7 @@ public class Matchmaker implements SimChannelListener {
 
     protected final ChannelID channel;
 
-    protected int PLAYERS_PER_GAME = 2;
-
-    static final int DEFAULT_BOARD_WIDTH  = 8;
-    static final int DEFAULT_BOARD_HEIGHT = 8;
-    static final int DEFAULT_CITY_COUNT   = 8;
+    protected int PLAYERS_PER_GAME = 3;
 
     protected Set<GLOReference> waitingPlayers =
 	new HashSet<GLOReference>();
