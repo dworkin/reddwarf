@@ -1,7 +1,7 @@
 package com.sun.gi.apps.battleboard.server;
 
 import com.sun.gi.logic.GLO;
-import com.sun.gi.logic.SimChannelListener;
+import com.sun.gi.logic.SimChannelMembershipListener;
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
@@ -18,7 +18,7 @@ import java.util.HashMap;
 import java.util.logging.Logger;
 import static com.sun.gi.apps.battleboard.client.BattleBoard.positionValue.*;
 
-public class Game implements SimChannelListener {
+public class Game implements SimChannelMembershipListener {
 
     private static final long serialVersionUID = 1L;
 
@@ -78,7 +78,7 @@ public class Game implements SimChannelListener {
 
 	channel = task.openChannel(gameName);
 	task.lock(channel, true);
-	task.addChannelListener(channel, thisRef);
+	task.addChannelMembershipListener(channel, thisRef);
     }
 
     protected GLOReference createBoard(SimTask task, String playerName) {
@@ -345,7 +345,7 @@ public class Game implements SimChannelListener {
 	handleResponse(task, playerRef, tokens);
     }
 
-    // SimChannelListener methods
+    // SimChannelMembershipListener methods
 
     public void joinedChannel(SimTask task, ChannelID cid, UserID uid) {
 	log.info("Game: User " + uid + " joined channel " + cid);

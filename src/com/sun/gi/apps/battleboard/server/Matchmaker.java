@@ -3,7 +3,7 @@ package com.sun.gi.apps.battleboard.server;
 import java.util.logging.Logger;
 
 import com.sun.gi.logic.GLO;
-import com.sun.gi.logic.SimChannelListener;
+import com.sun.gi.logic.SimChannelMembershipListener;
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
@@ -18,7 +18,7 @@ import java.util.LinkedList;
 import java.util.Set;
 import java.util.HashSet;
 
-public class Matchmaker implements SimChannelListener {
+public class Matchmaker implements SimChannelMembershipListener {
 
     private static final long serialVersionUID = 1L;
 
@@ -46,7 +46,7 @@ public class Matchmaker implements SimChannelListener {
 
 	Matchmaker mm = new Matchmaker(task);
 	ref = task.createGLO(mm, MATCHMAKER_GLO_NAME);
-	task.addChannelListener(mm.channel, ref);
+	task.addChannelMembershipListener(mm.channel, ref);
 	return ref;
     }
 
@@ -125,7 +125,7 @@ public class Matchmaker implements SimChannelListener {
 	waitingPlayers.clear();
     }
 
-    // SimChannelListener methods
+    // SimChannelMembershipListener methods
 
     public void joinedChannel(SimTask task, ChannelID cid, UserID uid) {
 	log.info("Matchmaker: User " + uid + " joined channel " + cid);

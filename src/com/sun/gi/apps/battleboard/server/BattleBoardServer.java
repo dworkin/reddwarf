@@ -6,7 +6,6 @@ package com.sun.gi.apps.battleboard.server;
 
 import java.nio.ByteBuffer;
 import com.sun.gi.logic.SimBoot;
-import com.sun.gi.logic.SimChannelListener;
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.SimUserDataListener;
 import com.sun.gi.logic.SimUserListener;
