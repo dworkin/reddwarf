@@ -156,7 +156,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 
 	private Object closeWaitMutex = new Object();
 
-	private static final boolean TRACEDISK=true;
+	private static final boolean TRACEDISK=false;
 	
 	private int commitRegisterCounter=1;
 

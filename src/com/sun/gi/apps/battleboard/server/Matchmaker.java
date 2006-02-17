@@ -54,22 +54,15 @@ public class Matchmaker implements SimChannelListener {
 	return ref;
     }
 
-    public static void addPlayer(SimTask task, GLOReference mmRef,
-	    Player player) {
-
-	Matchmaker mm = (Matchmaker) mmRef.peek(task);
-	mm.addPlayer(task, player);
-    }
-
     protected Matchmaker(SimTask task) {
 	// Create the matchmaker channel so we can talk to unjoined clients
 	channel = task.openChannel("matchmaker");
 	task.lock(channel, true);
     }
 
-    protected void addPlayer(SimTask task, Player player) {
+    public void addUserID(SimTask task, UserID uid) {
 	log.info("Adding to matchmaker");
-	task.join(player.getUID(), channel);
+	task.join(uid, channel);
 	log.info("Added to matchmaker");
     }
 

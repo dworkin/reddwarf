@@ -57,7 +57,15 @@ public class BattleBoardServer
 	log.info("User " + uid + " joined server, subject = " + subject);
 
 	Player player = Player.instanceFor(task, uid, subject);
-	Matchmaker.addPlayer(task, matchmakerRef, player);
+
+	try {
+	    task.queueTask(matchmakerRef,
+		Matchmaker.class.getMethod(
+		    "addUserID", SimTask.class, UserID.class),
+		new Object[] { uid });
+	} catch (Exception e) {
+	    e.printStackTrace();
+	}
     }
 
     public void userLeft(SimTask task, UserID uid) {
