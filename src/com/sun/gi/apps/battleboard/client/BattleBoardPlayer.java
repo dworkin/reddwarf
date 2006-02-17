@@ -360,27 +360,28 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	    displayMessage(currPlayer + " bombed " + bombedPlayer +
 		    "at " + x + "," + y + " with outcome " + outcome + "\n");
 
-	    if ("HIT".equals(outcome)) {
+	    if ("HIT".equals(outcome) || "LOSS".equals(outcome)) {
 		board.update(x, y, BattleBoard.positionValue.HIT);
 		board.hit();
-		if (bombedPlayer.equals(myName)) {
-		    displayMessage("You just lost a city!");
+
+		if ("LOSS".equals(outcome)) {
+		    if (bombedPlayer.equals(myName)) {
+			displayMessage("You just lost your last city!");
+			youLose = true;
+		    } else {
+			displayMessage(bombedPlayer + " lost their last city.");
+		    }
 		} else {
-		    displayMessage(bombedPlayer + " just lost a city.");
+		    if (bombedPlayer.equals(myName)) {
+			displayMessage("You just lost a city!");
+		    } else {
+			displayMessage(bombedPlayer + " lost a city.");
+		    }
 		}
 	    } else if ("NEAR_MISS".equals(outcome)) {
 		board.update(x, y, BattleBoard.positionValue.NEAR);
 	    } else if ("MISS".equals(outcome)) {
 		board.update(x, y, BattleBoard.positionValue.MISS);
-	    } else if ("LOSS".equals(outcome)) {
-		board.update(x, y, BattleBoard.positionValue.HIT);
-		board.hit();
-		if (bombedPlayer.equals(myName)) {
-		    youLose = true;
-		} else {
-		    playerNames.remove(bombedPlayer);
-		    displayMessage(bombedPlayer + " has lost.\n");
-		}
 	    }
 
 	    displayBoards(bombedPlayer);
