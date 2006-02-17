@@ -364,7 +364,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	    log.info(bombedPlayer + " bombed ("
 		    + x + ", " + y + ") with outcome " + outcome);
 	    displayMessage(currPlayer + " bombed " + bombedPlayer +
-		    "at " + x + "," + y + " with outcome " + outcome + "\n");
+		    " at " + x + "," + y + " with outcome " + outcome + "\n");
 
 	    if ("HIT".equals(outcome) || "LOSS".equals(outcome)) {
 		board.update(x, y, BattleBoard.positionValue.HIT);
