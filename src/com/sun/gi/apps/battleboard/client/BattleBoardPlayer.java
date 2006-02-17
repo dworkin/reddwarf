@@ -107,10 +107,10 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	    return;
 	} else if ("turn-order".equals(cmd)) {
 	    setTurnOrder(tokens);
-	} else if ("your-move".equals(cmd)) {
-	    yourTurn(tokens);
+//	} else if ("your-move".equals(cmd)) {
+//	    yourTurn(tokens);
+// XXX How about getting rid of your-move? -jm
 	} else if ("move-started".equals(cmd)) {
-	    // XXX How about getting rid of your-move? -jm
 	    if (myName.equals(tokens[1])) {
 		yourTurn(tokens);
 	    } else {
@@ -230,6 +230,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	    if ((move.length == 1) && "pass".equals(move[0])) {
 		if (mgr != null) {
 		    ByteBuffer buf = ByteBuffer.wrap("pass".getBytes());
+		    buf.position(buf.limit());
 		    mgr.sendToServer(buf, true);
 		} else {
 		    displayMessage("TO SERVER: " + "pass" + "\n");
@@ -259,6 +260,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
 
 		if (mgr != null){
 		    ByteBuffer buf = ByteBuffer.wrap(moveMessage.getBytes());
+		    buf.position(buf.limit());
 		    mgr.sendToServer(buf, true);
 		} else {
 		    displayMessage("TO SERVER: " + moveMessage + "\n");

@@ -3,8 +3,6 @@ package com.sun.gi.apps.battleboard.server;
 import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.SimChannelListener;
 import com.sun.gi.logic.SimTask;
-import com.sun.gi.logic.SimUserDataListener;
-import com.sun.gi.logic.SimUserListener;
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.comm.users.server.impl.SGSUserImpl;
@@ -61,6 +59,8 @@ public class Game implements SimChannelListener {
 
 	log.finer("Next game channel is `" + gameName + "'");
 
+	thisRef = task.createGLO(this, gameName);
+
 	players = new LinkedList(newPlayers);
 	Collections.shuffle(players);
 
@@ -74,8 +74,6 @@ public class Game implements SimChannelListener {
 
 	channel = task.openChannel(gameName);
 	task.lock(channel, true);
-
-	thisRef = task.createGLO(this, gameName);
 	task.addChannelListener(channel, thisRef);
     }
 
@@ -156,14 +154,6 @@ public class Game implements SimChannelListener {
 	task.sendData(channel, uids, buf, true);
     }
 
-    public void joinedChannel(SimTask task, ChannelID cid, UserID uid) {
-	log.info("Game: User " + uid + " joined channel " + cid);
-    }
-
-    public void leftChannel(SimTask task, ChannelID cid, UserID uid) {
-	log.info("Game: User " + uid + " left channel " + cid);
-    }
-
     protected void sendMoveStarted(SimTask task, Player player) {
 	ByteBuffer buf = ByteBuffer.allocate(1024);
 	buf.put("move-started ".getBytes());
@@ -234,6 +224,16 @@ public class Game implements SimChannelListener {
 	// XXX check for null
 
 	handleResponse(task, playerRef, tokens);
+    }
+
+    // SimChannelListener methods
+
+    public void joinedChannel(SimTask task, ChannelID cid, UserID uid) {
+	log.info("Game: User " + uid + " joined channel " + cid);
+    }
+
+    public void leftChannel(SimTask task, ChannelID cid, UserID uid) {
+	log.info("Game: User " + uid + " left channel " + cid);
     }
 
 }

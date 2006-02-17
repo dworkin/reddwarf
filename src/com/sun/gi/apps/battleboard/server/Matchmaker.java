@@ -5,8 +5,6 @@ import java.util.logging.Logger;
 import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.SimChannelListener;
 import com.sun.gi.logic.SimTask;
-import com.sun.gi.logic.SimUserDataListener;
-import com.sun.gi.logic.SimUserListener;
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.comm.users.server.impl.SGSUserImpl;
@@ -81,19 +79,6 @@ public class Matchmaker implements SimChannelListener {
 	task.sendData(channel, new UserID[] { uid }, buf, true);
     }
 
-    // SimUserDataListener methods
-
-    public void joinedChannel(SimTask task, ChannelID cid, UserID uid) {
-	log.info("Matchmaker: User " + uid + " joined channel " + cid);
-    }
-
-    public void leftChannel(SimTask task, ChannelID cid, UserID uid) {
-	log.info("Matchmaker: User " + uid + " left channel " + cid);
-
-	GLOReference playerRef = Player.getRef(task, uid);
-	waitingPlayers.remove(playerRef);
-    }
-
     // Handle the "join" command in matchmaker mode
     public void userDataReceived(SimTask task, UserID uid, ByteBuffer data) {
 	log.info("Matchmaker: data from user " + uid);
@@ -110,15 +95,19 @@ public class Matchmaker implements SimChannelListener {
 	final String playerName = cmd.substring(5);
 	log.info("Matchmaker: join from `" + playerName + "'");
 
+	for (GLOReference ref : waitingPlayers) {
+	    Player p = (Player) ref.peek(task);
+	    if (playerName.equals(p.getNickname())) {
+		log.warning("Matchmaker already has `" + playerName);
+		sendAlreadyJoined(task, uid);
+		return;
+	    }
+
+	}
+
 	GLOReference playerRef = Player.getRef(task, uid);
 	Player player = (Player) playerRef.get(task);
 	player.setNickname(playerName);
-
-	if (waitingPlayers.contains(playerRef)) {
-	    log.warning("Matchmaker already has `" + player.getNickname());
-	    sendAlreadyJoined(task, uid);
-	    return;
-	}
 
 	waitingPlayers.add(playerRef);
 
@@ -145,5 +134,18 @@ public class Matchmaker implements SimChannelListener {
 
 	Game.create(task, waitingPlayers);
 	waitingPlayers.clear();
+    }
+
+    // SimChannelListener methods
+
+    public void joinedChannel(SimTask task, ChannelID cid, UserID uid) {
+	log.info("Matchmaker: User " + uid + " joined channel " + cid);
+    }
+
+    public void leftChannel(SimTask task, ChannelID cid, UserID uid) {
+	log.info("Matchmaker: User " + uid + " left channel " + cid);
+
+	GLOReference playerRef = Player.getRef(task, uid);
+	waitingPlayers.remove(playerRef);
     }
 }

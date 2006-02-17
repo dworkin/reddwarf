@@ -1,10 +1,8 @@
 package com.sun.gi.apps.battleboard.server;
 
 import com.sun.gi.logic.GLO;
-import com.sun.gi.logic.SimChannelListener;
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.SimUserDataListener;
-import com.sun.gi.logic.SimUserListener;
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.comm.users.server.impl.SGSUserImpl;
