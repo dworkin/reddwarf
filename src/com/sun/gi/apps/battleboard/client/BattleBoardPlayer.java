@@ -124,11 +124,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	    withdraw(tokens);
 	}
 
-	if (lost) {
-	    displayMessage("You lose!");
-	    displayMessage("Better luck next time.");
-	    // mgr.disconnect();
-	} else if ((playerNames != null) && (playerNames.size() == 1)) {
+	if ((playerNames != null) && (playerNames.size() == 1)) {
 	    if (myName.equals(playerNames.get(0))) {
 		displayMessage("YOU WIN!  w00t!");
 	    } else {
@@ -412,17 +408,19 @@ public class BattleBoardPlayer implements ClientChannelListener {
 		board.hit();
 
 		if ("LOSS".equals(outcome)) {
+		    playerNames.remove(bombedPlayer);
 		    if (bombedPlayer.equals(myName)) {
-			displayMessage("You just lost your last city!");
+			displayMessage("You lose!\n");
+			displayMessage("Better luck next time.\n");
 			lost = true;
 		    } else {
-			displayMessage(bombedPlayer + " lost their last city.");
+			displayMessage(bombedPlayer + " lost their last city.\n");
 		    }
 		} else {
 		    if (bombedPlayer.equals(myName)) {
-			displayMessage("You just lost a city!");
+			displayMessage("You just lost a city!\n");
 		    } else {
-			displayMessage(bombedPlayer + " lost a city.");
+			displayMessage(bombedPlayer + " lost a city.\n");
 		    }
 		}
 	    } else if ("NEAR_MISS".equals(outcome)) {
@@ -476,11 +474,11 @@ public class BattleBoardPlayer implements ClientChannelListener {
     }
 
     /**
-     * Returns <code>true</code> if this player has lost the
-     * game, <code>false</code> otherwise.
+     * Returns <code>true</code> if this player has lost the game,
+     * <code>false</code> otherwise.
      *
-     * @returns <code>true</code> if this player has lost the
-     * game, <code>false</code> otherwise
+     * @returns <code>true</code> if this player has lost the game,
+     * <code>false</code> otherwise
      */
     public boolean lost() {
 	return lost;
