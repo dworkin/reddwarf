@@ -462,6 +462,7 @@ INPUT =  src/com/sun/gi/comm/users/protocol/TransportProtocol.java \
 	 src/com/sun/gi/comm/users/client/UserManagerPolicy.java \
 	 src/com/sun/gi/comm/users/client/impl/DefaultUserManagerPolicy.java \
 	 src/com/sun/gi/comm/users/server/impl/TCPIPUserManager.java \
+	 src/com/sun/gi/comm/users/server/impl/SGSUserImpl.java \
 	 src/com/sun/gi/comm/users/server/UserManager.java \
 	 src/com/sun/gi/comm/users/server/SGSUser.java \
 	 src/com/sun/gi/comm/discovery/DiscoveredUserManager.java \
