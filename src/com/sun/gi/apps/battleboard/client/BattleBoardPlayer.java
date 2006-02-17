@@ -50,10 +50,16 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	this.myName = playerName;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public void playerJoined(byte[] playerID) {
 	log.info("playerJoined on " + channel.getName());
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public void playerLeft(byte[] playerID) {
 	log.info("playerJoined on " + channel.getName());
     }
@@ -86,25 +92,24 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	playGame(tokens);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public void channelClosed() {
 	log.info("channel " + channel.getName() + " closed");
     }
 
-    public void playGame(String[] tokens) {
-
-	// Lots of potential error checks here: make sure
-	// that the list hasn't already been populated, and
-	// that the list contains at least two players, and
-	// that no player appears more than once in the list.
-	//
-	// Could also check that the size of the game the
-	// player got is the size they asked for.
-
+    /**
+     * Performs the game-play for the given array of tokens.
+     *
+     * @param tokens an array of Strings containing the tokens
+     * of the message from the server
+     */
+    void playGame(String[] tokens) {
 	String cmd = tokens[0];
 
 	if ("ok".equals(cmd)) {
 	    setBoard(tokens);
-	    return;
 	} else if ("turn-order".equals(cmd)) {
 	    setTurnOrder(tokens);
 	} else if ("move-started".equals(cmd)) {
@@ -124,7 +129,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	    displayMessage("Better luck next time.");
 	    // mgr.disconnect();
 	} else if (playerNames.size() == 1) {
-	    if (myName.equals(playerNames.get(1))) {
+	    if (myName.equals(playerNames.get(0))) {
 		displayMessage("YOU WIN!  w00t!");
 	    } else {
 		displayMessage(playerNames.get(1) + " has won.");
@@ -133,10 +138,17 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	}
     }
 
+    /**
+     * Implements the operations for the "ok" message, which tells the
+     * user what board the server has chosen for them.
+     *
+     * @param tokens an array of Strings containing the tokens of the
+     * message from the server
+     *
+     * @return <code>true</code> if the message was valid and executed
+     * correctly, <code>false</code> otherwise
+     */
     private boolean setBoard(String[] args) {
-
-	// XXX: hacking, needs error checking.
-
 	if (args.length < 4) {
 	    log.severe("setBoard: incorrect number of arguments");
 	    return false;
@@ -184,6 +196,17 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	return true;
     }
 
+    /**
+     * Implements the operations for the "turn-order" message, which
+     * tells the player what the order of turns will be among the
+     * players.
+     *
+     * @param tokens an array of Strings containing the tokens of the
+     * message from the server
+     *
+     * @return <code>true</code> if the message was valid and executed
+     * correctly, <code>false</code> otherwise
+     */
     private boolean setTurnOrder(String[] args) {
 
 	if (playerNames != null) {
@@ -219,14 +242,14 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	return true;
     }
 
+    /**
+     * Implements the operations for the "move-started" message, for
+     * the player whose move it is.
+     *
+     * @return <code>true</code> if the move was executed correctly,
+     * <code>false</code> otherwise
+     */
     private boolean yourTurn() {
-	/*
-	if (args.length != 1) {
-	    log.severe("yourTurn: " +
-		    "incorrect number of args: " + args.length + " != 1");
-	}
-	*/
-
 	displayMessage("Your move!\n");
 
 	for (;;) {
@@ -282,6 +305,13 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	return true;
     }
 
+    /**
+     * Implements the operations for the "move-started" message, for
+     * any player whose move it is not.
+     *
+     * @return <code>true</code> if the move was executed correctly,
+     * <code>false</code> otherwise
+     */
     private boolean moveStarted(String[] args) {
 
 	if (playerNames == null) {
@@ -307,6 +337,12 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	return true;
     }
 
+    /**
+     * Implements the operations for the "move-ended" message.
+     *
+     * @return <code>true</code> if the move was executed correctly,
+     * <code>false</code> otherwise
+     */
     private boolean moveEnded(String[] args) {
 
 	if (playerNames == null) {
