@@ -42,8 +42,6 @@ public class Matchmaker implements SimChannelListener {
 
 	GLOReference ref = task.findGLO(MATCHMAKER_GLO_NAME);
 
-	log.fine("Matchmaker instance ref is `" + ref + "'");
-
 	if (ref != null) {
 	    return ref;
 	}
@@ -70,7 +68,9 @@ public class Matchmaker implements SimChannelListener {
     }
 
     protected void addPlayer(SimTask task, Player player) {
+	log.info("Adding to matchmaker");
 	task.join(player.getUID(), channel);
+	log.info("Added to matchmaker");
     }
 
     protected void sendAlreadyJoined(SimTask task, UserID uid) {

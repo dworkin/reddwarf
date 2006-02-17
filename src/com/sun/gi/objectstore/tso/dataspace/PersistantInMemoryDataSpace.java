@@ -156,7 +156,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 
 	private Object closeWaitMutex = new Object();
 
-	private static final boolean TRACEDISK=false;
+	private static final boolean TRACEDISK=true;
 	
 	private int commitRegisterCounter=1;
 
@@ -231,6 +231,9 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 			System.out.println("      Starting inserts");
 		}
 		for (int i = 0; i < rec.newNames.length; i++) {
+			if (TRACEDISK){
+				System.out.println("          Inserting " + rec.newNameIDs[i]);
+			}
 			try {
 				insertNameStmnt.setString(1, rec.newNames[i]);
 				insertNameStmnt.setLong(2, rec.newNameIDs[i]);
@@ -243,6 +246,9 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 			System.out.println("      Starting updates");
 		}
 		for (int i = 0; i < rec.updateData.length; i++) {
+			if (TRACEDISK){
+				System.out.println("          Updating " + rec.updateIDs[i]);
+			}
 			try {
 				if (rec.insertSet.contains(rec.updateIDs[i])) { // new
 					insertObjStmnt.setLong(1, rec.updateIDs[i]);
@@ -261,6 +267,9 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 			System.out.println("      Starting deletes");
 		}
 		for (Long delid : rec.deleteIDs) {
+			if (TRACEDISK){
+				System.out.println("          Deleting " + delid);
+			}
 			try {
 				deleteObjStmnt.setLong(1, delid);
 				deleteObjStmnt.execute();

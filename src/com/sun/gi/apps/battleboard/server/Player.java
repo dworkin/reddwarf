@@ -43,14 +43,18 @@ public class Player implements SimUserDataListener {
 	Player player = new Player (userName, uid);
 
 	// check that the player doesn't already exist
+	/*
 	GLOReference playerRef = getRef(task, uid);
 	if (playerRef != null) {
 	    playerRef.delete(task);
 	}
+	*/
 
-	playerRef = task.createGLO(player, gloKeyForUID(uid));
+	log.info("Creating GLORef");
+	GLOReference playerRef = task.createGLO(player, gloKeyForUID(uid));
 
 	// We're interested in direct server data sent by the user.
+	log.info("Adding userDataListener");
 	task.addUserDataListener(uid, playerRef);
 
 	return player;
