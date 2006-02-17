@@ -368,7 +368,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
 		} else {
 		    displayMessage(bombedPlayer + " just lost a city.");
 		}
-	    } else if ("NEAR".equals(outcome)) {
+	    } else if ("NEAR_MISS".equals(outcome)) {
 		board.update(x, y, BattleBoard.positionValue.NEAR);
 	    } else if ("MISS".equals(outcome)) {
 		board.update(x, y, BattleBoard.positionValue.MISS);
