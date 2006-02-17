@@ -16,6 +16,7 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.logging.Logger;
+import static com.sun.gi.apps.battleboard.client.BattleBoard.positionValue.*;
 
 public class Game implements SimChannelListener {
 
@@ -117,7 +118,7 @@ public class Game implements SimChannelListener {
 
 	for (int i = 0; i < board.getWidth(); ++i) {
 	    for (int j = 0; j < board.getHeight(); ++j) {
-		if (board.getBoardPosition(i, j) == Board.POS_CITY) {
+		if (board.getBoardPosition(i, j) == CITY) {
 		    buf.put(" ".getBytes());
 		    buf.put(Integer.toString(i).getBytes());
 		    buf.put(" ".getBytes());
@@ -199,19 +200,19 @@ public class Game implements SimChannelListener {
 
 	// XXX check that x and y are in bounds
 
-	int result = board.bombBoardPosition(x, y);
+	Board.positionValue result = board.bombBoardPosition(x, y);
 
 	String outcome = "";
 	switch (result) {
-	case Board.HIT:
+	case HIT:
 	    outcome = board.lost() ? "LOST" : "HIT";
 	    break;
 
-	case Board.NEAR_MISS:
+	case NEAR:
 	    outcome = "NEAR_MISS";
 	    break;
 
-	case Board.MISS:
+	case MISS:
 	    outcome = "MISS";
 	    break;
 	}

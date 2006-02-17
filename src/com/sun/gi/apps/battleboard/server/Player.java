@@ -42,9 +42,13 @@ public class Player implements SimUserDataListener {
 	String userName = subject.getPrincipals().iterator().next().getName();
 	Player player = new Player (userName, uid);
 
-	// XXX check that the player doesn't already exist
-	GLOReference playerRef =
-	    task.createGLO(player, gloKeyForUID(uid));
+	// check that the player doesn't already exist
+	GLOReference playerRef = getRef(task, uid);
+	if (playerRef != null) {
+	    playerRef.delete(task);
+	}
+
+	playerRef = task.createGLO(player, gloKeyForUID(uid));
 
 	// We're interested in direct server data sent by the user.
 	task.addUserDataListener(uid, playerRef);
