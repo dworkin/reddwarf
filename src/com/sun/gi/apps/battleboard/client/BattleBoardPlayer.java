@@ -369,7 +369,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
 		if ("LOSS".equals(outcome)) {
 		    if (bombedPlayer.equals(myName)) {
 			displayMessage("You just lost your last city!");
-			loslost = true;
+			lost = true;
 		    } else {
 			displayMessage(bombedPlayer + " lost their last city.");
 		    }
