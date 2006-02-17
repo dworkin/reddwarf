@@ -456,9 +456,9 @@ INPUT =  src/com/sun/gi/logic/GLO.java \
 	 src/com/sun/gi/logic/SimChannelListener.java \
 	 src/com/sun/gi/logic/SimUserListener.java \
 	 src/com/sun/gi/logic/SimUserDataListener.java \
-	 src/com/sun/gi/logic/SimRawSocketListener.java \
 	 src/com/sun/gi/logic/SimTimerListener.java \
 	 src/com/sun/gi/logic/SimTask.java \
+	 src/com/sun/gi/framework/rawsocket/SimRawSocketListener.java \
 	 src/com/sun/gi/comm/routing/UserID.java \
 	 src/com/sun/gi/comm/routing/ChannelID.java
 

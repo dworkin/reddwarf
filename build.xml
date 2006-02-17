@@ -37,7 +37,15 @@
 
     <target name="docs" depends="javadocs,doxygen"/>
 
-    <target name="doxygen" depends="init">
+    <target name="doxygen" depends="doxygen-internal,doxygen-external" />
+
+    <target name="doxygen-internal" depends="init">
+	<exec executable="doxygen" failonerror="true">
+	    <arg value="java.doxygen"/>
+	</exec>
+    </target>
+
+    <target name="doxygen-external" depends="init">
 	<exec executable="doxygen" failonerror="true">
 	    <arg value="java-client-api.doxygen"/>
 	</exec>
@@ -45,10 +53,10 @@
 	    <arg value="java-server-api.doxygen"/>
 	</exec>
 	<exec executable="doxygen" failonerror="true">
-	    <arg value="java-protocol-api.doxygen"/>
+	    <arg value="java-stackext-api.doxygen"/>
 	</exec>
 	<exec executable="doxygen" failonerror="true">
-	    <arg value="java.doxygen"/>
+	    <arg value="java-examples.doxygen"/>
 	</exec>
     </target>
 
