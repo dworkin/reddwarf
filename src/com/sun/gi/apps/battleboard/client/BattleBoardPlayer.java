@@ -20,13 +20,13 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.NameCallback;
 import javax.security.auth.callback.PasswordCallback;
 
 // XXX import static?  what's that?
-import static java.util.logging.Level.*;
 
 public class BattleBoardPlayer implements ClientChannelListener {
 
@@ -76,7 +76,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	    return;
 	}
 
-	if (log.isLoggable(FINER)) {
+	if (log.isLoggable(Level.FINER)) {
 	    int pos = 0;
 	    for (String t : tokens) {
 		log.finer("\tpos = " + pos++ + " token = " + t);

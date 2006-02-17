@@ -5,8 +5,23 @@
 package com.sun.gi.apps.battleboard.client;
 
 import java.io.Serializable;
+import java.util.LinkedList;
+import java.util.List;
 
 public class BattleBoard implements Serializable {
+
+    public class BattleBoardLocation {
+	private final int x;
+	private final int y;
+
+	public BattleBoardLocation(int x, int y) {
+	    this.x = x;
+	    this.y = y;
+	}
+
+	public int getX() { return x; }
+	public int getY() { return y; }
+    }
 
     private String playerName;
     private int boardHeight;
@@ -104,8 +119,14 @@ public class BattleBoard implements Serializable {
      * For the sake of simplicity, this method always places the
      * cities in the same places.  This makes the game very boring to
      * play, but makes the example somewhat simpler.
+     *
+     * @return a list of BattleBoardLocations containing the location
+     * of each city
      */
-    public void populate() {
+    public List<BattleBoardLocation>  populate() {
+
+	List<BattleBoardLocation> cityLocations =
+		new LinkedList<BattleBoardLocation>();
 
 	/*
 	 * Note that the city locations are chosen in a completely
@@ -117,8 +138,12 @@ public class BattleBoard implements Serializable {
 	    for (int x = 0; (x < boardWidth) && (count > 0); x++) {
 		board[x][y] = positionValue.CITY;
 		count--;
+
+		cityLocations.add(new BattleBoardLocation(x, y));
 	    }
 	}
+
+	return cityLocations;
     }
 
     /**
