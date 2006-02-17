@@ -128,7 +128,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	    displayMessage("You lose!");
 	    displayMessage("Better luck next time.");
 	    // mgr.disconnect();
-	} else if (playerNames.size() == 1) {
+	} else if ((playerNames != null) && (playerNames.size() == 1)) {
 	    if (myName.equals(playerNames.get(0))) {
 		displayMessage("YOU WIN!  w00t!");
 	    } else {
@@ -309,6 +309,9 @@ public class BattleBoardPlayer implements ClientChannelListener {
      * Implements the operations for the "move-started" message, for
      * any player whose move it is not.
      *
+     * @param tokens an array of Strings containing the tokens of the
+     * message from the server
+     *
      * @return <code>true</code> if the move was executed correctly,
      * <code>false</code> otherwise
      */
@@ -339,6 +342,9 @@ public class BattleBoardPlayer implements ClientChannelListener {
 
     /**
      * Implements the operations for the "move-ended" message.
+     *
+     * @param tokens an array of Strings containing the tokens of the
+     * message from the server
      *
      * @return <code>true</code> if the move was executed correctly,
      * <code>false</code> otherwise
@@ -434,6 +440,15 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	return true;
     }
 
+    /**
+     * Implements the operations for the "withdraw" message.
+     *
+     * @param tokens an array of Strings containing the tokens of the
+     * message from the server
+     *
+     * @return <code>true</code> if the move was executed correctly,
+     * <code>false</code> otherwise
+     */
     private boolean withdraw(String[] args) {
 	if (playerNames == null) {
 	    log.severe("setTurnOrder has not yet been done");
@@ -461,6 +476,13 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	return true;
     }
 
+    /**
+     * Returns <code>true</code> if this player has lost the
+     * game, <code>false</code> otherwise.
+     *
+     * @returns <code>true</code> if this player has lost the
+     * game, <code>false</code> otherwise
+     */
     public boolean lost() {
 	return lost;
     }
