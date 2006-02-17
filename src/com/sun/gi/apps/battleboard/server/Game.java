@@ -34,7 +34,7 @@ public class Game implements SimChannelListener {
 
     protected static int DEFAULT_BOARD_WIDTH  = 8;
     protected static int DEFAULT_BOARD_HEIGHT = 8;
-    protected static int DEFAULT_BOARD_CITIES = 8;
+    protected static int DEFAULT_BOARD_CITIES = 2;
 
     public static GLOReference create(SimTask task,
 	    Collection<GLOReference> players) {
@@ -217,9 +217,6 @@ public class Game implements SimChannelListener {
 	    break;
 	}
 
-	// XXX if board.lost(), remove them from the active players list
-	// (or something)
-
 	ByteBuffer buf = ByteBuffer.allocate(1024);
 	buf.put("move-ended ".getBytes());
 	buf.put(player.getNickname().getBytes());
@@ -234,6 +231,28 @@ public class Game implements SimChannelListener {
 	buf.put(" ".getBytes());
 
 	broadcast(task, buf.asReadOnlyBuffer());
+
+	// If the bombed player has lost, remove them from the game
+	// TODO may want to let them keep watching, or do something...
+
+	if (board.lost()) {
+	    playerBoards.remove(bombedPlayerNick);
+	    Iterator<GLOReference> i = players.iterator();
+	    while (i.hasNext()) {
+		GLOReference ref = i.next();
+		Player p = (Player) ref.peek(task);
+		if (bombedPlayerNick.equals(p.getNickname())) {
+		    i.remove();
+		}
+	    }
+	}
+
+	// XXX Check whether the player has won
+	/*
+	    // Try to upgrade to a GET lock
+	    Player lockedPlayer = (Player) ref.get(task);
+	    lockedPlayer.setGameRef(null);
+	*/
 
 	startNextMove(task);
     }
