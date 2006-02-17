@@ -10,7 +10,7 @@
     <GAME id="5" name="BattleBoard">
         <USERMANAGER clientclass=
           "com.sun.gi.comm.users.client.impl.TCPIPUserManagerClient">
-            <PARAMETER tag="host" value="127.0.0.1" />
+            <PARAMETER tag="host" value="129.148.173.231" />
             <PARAMETER tag="port" value="1180" />
         </USERMANAGER>
     </GAME>

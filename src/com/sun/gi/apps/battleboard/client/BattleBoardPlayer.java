@@ -401,7 +401,6 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	    }
 
 	    String outcome = args[6];
-	    boolean lost = false;
 
 	    log.info(bombedPlayer + " bombed ("
 		    + x + ", " + y + ") with outcome " + outcome);
