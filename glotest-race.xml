@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GAMEAPP gamename="GLOTestRace"> 
+    <GLEAPP bootclass="com.sun.gi.apps.glotest.ChannelListenerRace" classpathURL="file:glotest-channelrace.jar" />
+    <USERMANAGER serverclass="com.sun.gi.comm.users.server.impl.TCPIPUserManager" reconnect_key_ttl="30">
+	<PARAMETER tag="host" value="127.0.0.1" />
+	<PARAMETER tag="port" value="1301" />
+	<VALIDATOR moduleclass="com.sun.gi.comm.users.validation.impl.FlatFileUserValidator">
+	    <PARAMETER tag="password_file_url" value="file:passwd.txt" />
+	</VALIDATOR>		
+    </USERMANAGER>
+</GAMEAPP>
