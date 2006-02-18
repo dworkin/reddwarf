@@ -100,6 +100,26 @@ class TimerRecord {
     }
 }
 
+class UIDListenerRec {
+	UserID uid;
+	long objID;
+	
+	public UIDListenerRec(UserID uid, GLOReference glo){
+		this.uid = uid; // XXX does this need to be cloned?
+		this.objID = ((GLOReferenceImpl)glo).objID;
+	}
+}
+
+class CIDListenerRec {
+	ChannelID cid;
+	long objID;
+	
+	public CIDListenerRec(ChannelID cid, GLOReference glo) {
+		this.cid = cid; // XXX does this need to be cloned?
+		this.objID = ((GLOReferenceImpl)glo).objID;
+	}
+}
+
 /**
  * <p>
  * Title:
@@ -144,6 +164,13 @@ public class SimTaskImpl implements SimTask {
     private List<SocketSendRecord> socketSendQueue =
 	new ArrayList<SocketSendRecord>();
     private List<Long> socketCloseQueue = new ArrayList<Long>();
+	private List<Long> userListenerQueue = new ArrayList<Long>();
+	private List<UIDListenerRec> userDataListenerQueue = 
+		new ArrayList<UIDListenerRec>();
+	private List<CIDListenerRec> channelListenerQueue=
+		new ArrayList<CIDListenerRec>();
+	private List<CIDListenerRec> channelMembershipListenerQueue=
+		new ArrayList<CIDListenerRec>();
 
     public SimTaskImpl(Simulation sim, ClassLoader loader,
 	    ACCESS_TYPE access, long startObjectID,
@@ -191,6 +218,10 @@ public class SimTaskImpl implements SimTask {
 	    processOpenSocketRecords();
 	    processRawSocketSends();
 	    processSocketCloseRecords();
+	    processUserListenerRecords();
+	    processUserDataListenerRecords();
+	    processChannelListenerRecords();
+	    processChannelMembershipListenerRecords();	  
 	} catch (InvocationTargetException ex) {
 	    ex.printStackTrace();
 	    trans.abort();
@@ -250,30 +281,33 @@ public class SimTaskImpl implements SimTask {
     }
 
     public void addUserListener(GLOReference ref) {
-	simulation.addUserListener(ref);
+		userListenerQueue.add(((GLOReferenceImpl)ref).objID);
     }
 
     public GLOReference findGLO(String gloName) {
-	long oid = trans.lookup(gloName);
-	return (oid == DataSpace.INVALID_ID) ? null : makeReference(oid);
+    	long oid = trans.lookup(gloName);
+    	return (oid == DataSpace.INVALID_ID) ? null : makeReference(oid);
     }
 
 
     public void sendData(ChannelID cid, UserID[] to, ByteBuffer bs,
 	    boolean reliable) {
-	outputList.add(new OutputRecord(cid, to, bs, reliable));
+    	outputList.add(new OutputRecord(cid, to, bs, reliable));
     }
 
     public void addUserDataListener(UserID user, GLOReference ref) {
-	simulation.addUserDataListener(user, ref);
-    }
-
-    public void addChannelMembershipListener(ChannelID cid, GLOReference ref) {
-	simulation.addChannelMembershipListener(cid, ref);
+    	userDataListenerQueue.add(new UIDListenerRec(user,ref));
+    	//simulation.addUserDataListener(user, ref);
     }
 
     public void addChannelListener(ChannelID cid, GLOReference ref) {
-	simulation.addChannelListener(cid, ref);
+    	channelListenerQueue.add(new CIDListenerRec(cid,ref));
+    	//simulation.addChannelListener(cid, ref);
+    }
+
+    public void addChannelMembershipListener(ChannelID cid, GLOReference ref) {
+    	channelMembershipListenerQueue.add(new CIDListenerRec(cid,ref));
+    	//simulation.addChannelMembershipListener(cid, ref);
     }
 
     /**
@@ -433,6 +467,33 @@ public class SimTaskImpl implements SimTask {
 	for(Long l : socketCloseQueue){
 	    simulation.closeSocket(l);
 	}
+    }
+    
+    private void processUserListenerRecords(){
+    	for(Long l : userListenerQueue){
+    		simulation.addUserListener(
+    				new GLOReferenceImpl(l));
+    	}
+    }
+    private void processUserDataListenerRecords(){
+    	for(UIDListenerRec rec : userDataListenerQueue){
+    		simulation.addUserDataListener(rec.uid,
+    				new GLOReferenceImpl(rec.objID));
+    	}
+    }
+    
+    private void processChannelListenerRecords(){
+    	for(CIDListenerRec rec : channelListenerQueue){
+    		simulation.addChannelListener(rec.cid,
+    				new GLOReferenceImpl(rec.objID));
+    	}
+    }
+    
+    private void processChannelMembershipListenerRecords(){
+    	for(CIDListenerRec rec : channelMembershipListenerQueue){
+    		simulation.addChannelMembershipListener(rec.cid,
+    				new GLOReferenceImpl(rec.objID));
+    	}
     }
 
     /**
