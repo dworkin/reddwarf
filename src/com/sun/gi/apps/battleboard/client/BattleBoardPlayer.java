@@ -26,28 +26,53 @@ import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.NameCallback;
 import javax.security.auth.callback.PasswordCallback;
 
-// XXX import static?  what's that?
-
 public class BattleBoardPlayer implements ClientChannelListener {
 
     private static final Logger log =
 	Logger.getLogger("com.sun.gi.apps.battleboard.client");
 
     private final ClientChannel channel;
-
+    private final ClientConnectionManager connectionManager;
     private List<String> playerNames = null;
     private Map<String, BattleBoard> playerBoards = null;
     private String myName;
     private BattleBoard myBoard;
     private boolean lost = false;
-    private ClientConnectionManager mgr;
+    private boolean standAloneMode;
 
-    public BattleBoardPlayer(ClientConnectionManager mgr, ClientChannel chan,
-	    String playerName)
+    /**
+     * The game play is in one of several states:  waiting for a board
+     * to be provided by the server (NEED_BOARD), waiting for a player
+     * list to be provided by the server (NEED_TURN_ORDER), then
+     * iterating through turns (BEGIN_MOVE, END_MOVE), until some
+     * player has won (GAME_OVER).
+     */
+    private enum GameState {
+	NEED_BOARD,
+	NEED_TURN_ORDER,
+	BEGIN_MOVE,
+	END_MOVE,
+	GAME_OVER
+    }
+
+    private GameState gameState = GameState.NEED_BOARD;
+
+    public BattleBoardPlayer(ClientConnectionManager connectionManager,
+	    ClientChannel chan, String playerName)
     {
-	this.mgr = mgr;
+	this.connectionManager = connectionManager;
 	this.channel = chan;
 	this.myName = playerName;
+	standAloneMode = false;
+    }
+
+    /**
+     * Used only for standalone tests.
+     */
+    BattleBoardPlayer(String playerName) {
+	this(null, null, playerName);
+
+	standAloneMode = true;
     }
 
     /**
@@ -108,29 +133,43 @@ public class BattleBoardPlayer implements ClientChannelListener {
     void playGame(String[] tokens) {
 	String cmd = tokens[0];
 
-	if ("ok".equals(cmd)) {
-	    setBoard(tokens);
-	} else if ("turn-order".equals(cmd)) {
-	    setTurnOrder(tokens);
-	} else if ("move-started".equals(cmd)) {
+	if ((gameState == GameState.NEED_BOARD) && "ok".equals(cmd)) {
+	    gameState = setBoard(tokens);
+	} else if ((gameState == GameState.NEED_TURN_ORDER) &&
+		"turn-order".equals(cmd)) {
+	    gameState = setTurnOrder(tokens);
+	} else if ((gameState == GameState.BEGIN_MOVE) &&
+		"move-started".equals(cmd)) {
 	    if (myName.equals(tokens[1])) {
-		yourTurn();
+		gameState = yourTurn();
 	    } else {
-		moveStarted(tokens);
+		gameState = moveStarted(tokens);
 	    }
-	} else if ("move-ended".equals(cmd)) {
-	    moveEnded(tokens);
+	    gameState = GameState.END_MOVE;
+	} else if ((gameState == GameState.END_MOVE) &&
+		"move-ended".equals(cmd)) {
+	    gameState = moveEnded(tokens);
 	} else if ("withdraw".equals(cmd)) {
 	    withdraw(tokens);
+	} else {
+	    log.severe("Illegal game state: cmd " + cmd +
+		    " gameState " + gameState);
 	}
 
-	if ((playerNames != null) && (playerNames.size() == 1)) {
+	/*
+	 * If there's only one player left, that last remaining player
+	 * is the winner.
+	 */
+	if (playerNames.size() == 1) {
 	    if (myName.equals(playerNames.get(0))) {
-		displayMessage("YOU WIN!  w00t!");
+		displayMessage("YOU WIN!");
 	    } else {
-		displayMessage(playerNames.get(1) + " has won.");
+		displayMessage(playerNames.get(0) + " WINS!");
 	    }
-	    mgr.disconnect();
+	    gameState = GameState.GAME_OVER;
+	    if (!standAloneMode) {
+		connectionManager.disconnect();
+	    }
 	}
     }
 
@@ -144,10 +183,10 @@ public class BattleBoardPlayer implements ClientChannelListener {
      * @return <code>true</code> if the message was valid and executed
      * correctly, <code>false</code> otherwise
      */
-    private boolean setBoard(String[] args) {
+    private GameState setBoard(String[] args) {
 	if (args.length < 4) {
 	    log.severe("setBoard: incorrect number of arguments");
-	    return false;
+	    return GameState.NEED_BOARD;
 	}
 
 	int boardWidth = (int) new Integer(args[1]);
@@ -157,12 +196,12 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	if ((boardWidth < 1) || (boardHeight < 1)) {
 	    log.severe("bad board dimensions (" +
 		    boardWidth + ", " + boardHeight + ")");
-	    return false;
+	    return GameState.NEED_BOARD;
 	}
 
 	if (numCities < 1) {
 	    log.severe("bad numCities (" + numCities + ")");
-	    return false;
+	    return GameState.NEED_BOARD;
 	}
 
 	BattleBoard tempBoard = new BattleBoard(myName,
@@ -170,7 +209,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
 
 	if (((args.length - 4) % 2) != 0) {
 	    log.severe("bad list of city positions");
-	    return false;
+	    return GameState.NEED_BOARD;
 	}
 
 	for (int base = 4; base < args.length; base += 2) {
@@ -179,7 +218,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
 
 	    if ((x < 0) || (x >= boardWidth) || (y < 0) || (y >= boardHeight)) {
 		log.severe("improper city position (" + x + ", " + y + ")");
-		return false;
+		return GameState.NEED_BOARD;
 	    }
 
 	    tempBoard.update(x, y, BattleBoard.positionValue.CITY);
@@ -189,7 +228,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	displayMessage("Here is your board:\n");
 	myBoard.display();
 
-	return true;
+	return GameState.NEED_TURN_ORDER;
     }
 
     /**
@@ -200,20 +239,21 @@ public class BattleBoardPlayer implements ClientChannelListener {
      * @param tokens an array of Strings containing the tokens of the
      * message from the server
      *
-     * @return <code>true</code> if the message was valid and executed
-     * correctly, <code>false</code> otherwise
+     * @return <code>BEGIN_MOVE</code> if the message was valid and
+     * executed correctly and moves may begin,,
+     * <code>NEED_TURN_ORDER</code> otherwise
      */
-    private boolean setTurnOrder(String[] args) {
+    private GameState setTurnOrder(String[] args) {
 
 	if (playerNames != null) {
 	    log.severe("setTurnOrder has already been done");
-	    return false;
+	    return GameState.NEED_TURN_ORDER;
 	}
 
 	if (args.length < 3) {
 	    log.severe("setTurnOrder: " +
 		    "incorrect number of args: " + args.length + " != 3");
-	    return false;
+	    return GameState.NEED_TURN_ORDER;
 	}
 
 	playerNames = new LinkedList<String>();
@@ -235,29 +275,29 @@ public class BattleBoardPlayer implements ClientChannelListener {
 
 	displayMessage("Initial Boards:\n");
 	displayBoards(null);
-	return true;
+	return GameState.BEGIN_MOVE;
     }
 
     /**
      * Implements the operations for the "move-started" message, for
      * the player whose move it is.
      *
-     * @return <code>true</code> if the move was executed correctly,
-     * <code>false</code> otherwise
+     * @return <code>END_MOVE</code> if the move was executed
+     * correctly, <code>BEGIN_MOVE</code> otherwise
      */
-    private boolean yourTurn() {
+    private GameState yourTurn() {
 	displayMessage("Your move!\n");
 
 	for (;;) {
 	    String[] move = BattleBoardUtils.getKeyboardInputTokens(
 			"player x y, or pass ");
 	    if ((move.length == 1) && "pass".equals(move[0])) {
-		if (mgr != null) {
+		if (standAloneMode) {
+		    displayMessage("TO SERVER: " + "pass" + "\n");
+		} else {
 		    ByteBuffer buf = ByteBuffer.wrap("pass".getBytes());
 		    buf.position(buf.limit());
-		    mgr.sendToServer(buf, true);
-		} else {
-		    displayMessage("TO SERVER: " + "pass" + "\n");
+		    connectionManager.sendToServer(buf, true);
 		}
 		break;
 	    } else if (move.length == 3) {
@@ -282,12 +322,12 @@ public class BattleBoardPlayer implements ClientChannelListener {
 		String moveMessage = "move " + bombedPlayer + " " +
 			x + " " + y;
 
-		if (mgr != null){
+		if (standAloneMode) {
+		    displayMessage("TO SERVER: " + moveMessage + "\n");
+		} else {
 		    ByteBuffer buf = ByteBuffer.wrap(moveMessage.getBytes());
 		    buf.position(buf.limit());
-		    mgr.sendToServer(buf, true);
-		} else {
-		    displayMessage("TO SERVER: " + moveMessage + "\n");
+		    connectionManager.sendToServer(buf, true);
 		}
 		break;
 	    } else {
@@ -295,10 +335,10 @@ public class BattleBoardPlayer implements ClientChannelListener {
 			"Improperly formatted move.  Please try again.\n");
 	    }
 
-	    return true;
+	    return GameState.END_MOVE;
 	}
 
-	return true;
+	return GameState.END_MOVE;
     }
 
     /**
@@ -308,20 +348,15 @@ public class BattleBoardPlayer implements ClientChannelListener {
      * @param tokens an array of Strings containing the tokens of the
      * message from the server
      *
-     * @return <code>true</code> if the move was executed correctly,
-     * <code>false</code> otherwise
+     * @return <code>END_MOVE</code> if the move was executed
+     * correctly, <code>BEGIN_MOVE</code> otherwise
      */
-    private boolean moveStarted(String[] args) {
-
-	if (playerNames == null) {
-	    log.severe("setTurnOrder has not yet been done");
-	    return false;
-	}
+    private GameState moveStarted(String[] args) {
 
 	if (args.length != 2) {
 	    log.severe("moveStarted: " +
 		    "incorrect number of args: " + args.length + " != 2");
-	    return false;
+	    return GameState.BEGIN_MOVE;
 	}
 
 	String currPlayer = args[1];
@@ -329,11 +364,11 @@ public class BattleBoardPlayer implements ClientChannelListener {
 
 	if (!playerNames.contains(currPlayer)) {
 	    log.severe("moveStarted: nonexistant player (" + currPlayer + ")");
-	    return false;
+	    return GameState.BEGIN_MOVE;
 	}
 
 	displayMessage(currPlayer + " is making a move...\n");
-	return true;
+	return GameState.END_MOVE;
     }
 
     /**
@@ -342,19 +377,15 @@ public class BattleBoardPlayer implements ClientChannelListener {
      * @param tokens an array of Strings containing the tokens of the
      * message from the server
      *
-     * @return <code>true</code> if the move was executed correctly,
-     * <code>false</code> otherwise
+     * @return <code>BEGIN_MOVE</code> if the move was executed
+     * correctly, <code>END_MOVE</code> otherwise
      */
-    private boolean moveEnded(String[] args) {
-
-	if (playerNames == null) {
-	    log.severe("setTurnOrder has not yet been done");
-	    return false;
-	}
+    private GameState moveEnded(String[] args) {
 
 	if (args.length < 3) {
 	    log.severe("moveEnded: " +
 		    "incorrect number of args: " + args.length + " < 3");
+	    return GameState.END_MOVE;
 	}
 
 	String currPlayer = args[1];
@@ -366,24 +397,24 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	    if (args.length != 3) {
 		log.severe("moveEnded: " +
 			"incorrect number of args: " + args.length + " != 3");
-		return false;
+		return GameState.END_MOVE;
 	    }
 	    log.info(currPlayer + " passed");
 
 	    displayMessage(currPlayer + " passed.\n");
-	    return true;
+	    return GameState.BEGIN_MOVE;
 	} else if ("bomb".equals(action)) {
 	    if (args.length != 7) {
 		log.severe("moveEnded: " +
 			"incorrect number of args: " + args.length + " != 7");
-		return false;
+		return GameState.END_MOVE;
 	    }
 
 	    String bombedPlayer = args[3];
 	    BattleBoard board = playerBoards.get(bombedPlayer);
 	    if (board == null) {
 		log.severe("nonexistant player (" + bombedPlayer + ")");
-		return false;
+		return GameState.END_MOVE;
 	    }
 
 	    int x = Integer.parseInt(args[4]);
@@ -393,7 +424,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
 		    (y < 0) || (y >= myBoard.getHeight())) {
 		log.warning("impossible board position " +
 			"(" + x + ", " + y + ")");
-		return false;
+		return GameState.END_MOVE;
 	    }
 
 	    String outcome = args[6];
@@ -414,7 +445,8 @@ public class BattleBoardPlayer implements ClientChannelListener {
 			displayMessage("Better luck next time.\n");
 			lost = true;
 		    } else {
-			displayMessage(bombedPlayer + " lost their last city.\n");
+			displayMessage(bombedPlayer +
+				" lost their last city.\n");
 		    }
 		} else {
 		    if (bombedPlayer.equals(myName)) {
@@ -428,13 +460,13 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	    } else if ("MISS".equals(outcome)) {
 		board.update(x, y, BattleBoard.positionValue.MISS);
 	    }
-
 	    displayBoards(bombedPlayer);
 	} else {
 	    log.severe("moveEnded: invalid command");
-	    return false;
+	    return GameState.END_MOVE;
 	}
-	return true;
+
+	return GameState.BEGIN_MOVE;
     }
 
     /**
