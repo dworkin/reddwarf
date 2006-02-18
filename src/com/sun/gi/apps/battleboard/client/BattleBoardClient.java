@@ -29,8 +29,6 @@ import javax.security.auth.callback.PasswordCallback;
 
 public class BattleBoardClient implements ClientConnectionManagerListener {
 
-    // DJE: why is this static?
-
     private static final Logger log =
 	Logger.getLogger("com.sun.gi.apps.battleboard.client");
 
@@ -62,13 +60,8 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
 		      new URLDiscoverer(
 			  new File("FakeDiscovery.xml").toURI().toURL()));
 	    mgr.setListener(this);
-
 	    String[] classNames = mgr.getUserManagerClassNames();
-
 	    mgr.connect(classNames[0]);
-
-	    // DJE: is this where the game play goes?
-
 	} catch (Exception e) {
 	    e.printStackTrace();
 	    return;
