@@ -27,13 +27,13 @@ public class TestParams {
      * The size of the typical objects in the database.
      */
 
-    public int objSize = 5 * 1024;
+    public int objSize;
 
     /**
      * The number of objects to stuff into the database.
      */
 
-    public int numObjs = 1 * 1024;
+    public int numObjs;
 
     /**
      * The number of objects in a typical cluster.  A cluster is set
@@ -42,7 +42,7 @@ public class TestParams {
      * particular player.
      */
 
-    public int clusterSize = 20;
+    public int clusterSize;
 
     /**
      * The number of oids to skip between adjacent oids in the same
@@ -51,19 +51,21 @@ public class TestParams {
      * anticipated to be the worst case on many systems.
      */
 
-    public int skipSize = 0;
+    public int skipSize;
 
     /**
      * The number of concurrent threads to start.
      */
 
-    public int numThreads = 1;
+    public int numThreads;
 
-    public int numIters	= 1000;
+    public int numIters;
 
-    public int transactionNumPeeks		= 4;
-    public int transactionNumLocks		= 2;
-    public int transactionNumPromotedPeeks	= 1;
+    public int transactionNumPeeks;
+
+    public int transactionNumLocks;
+
+    public int transactionNumPromotedPeeks;
 
     /**
      * Whether or not to perform a trace.
@@ -84,10 +86,15 @@ public class TestParams {
 
     Properties params = new Properties();
 
-    public TestParams() { }
+    public TestParams() {
+	initialize();
+    }
 
     public TestParams(int objSize, int numObjs, int clusterSize, int skipSize,
 	    int numThreads) {
+
+	initialize();
+
 	this.objSize = objSize;
 	this.numObjs = numObjs;
 	this.clusterSize = clusterSize;
@@ -98,10 +105,11 @@ public class TestParams {
     public TestParams(String paramFileName) {
 	this();
 
-	loadFromParamFile(paramFileName);
+	setParamFile(paramFileName);
+	initialize();
     }
 
-    public void loadFromParamFile(String paramFileName) {
+    private void setParamFile(String paramFileName) {
 
 	if (paramFileName == null) {
 	    throw new NullPointerException("paramFileName is null");
@@ -141,34 +149,64 @@ public class TestParams {
 		}
 	    } 
 	}
+    }
+
+    private void initialize() {
 
 	dataSpaceType = (String) params.getProperty("hadbtest.dataSpaceType",
-		"persistant-inmem");
+		System.getProperty("hadbtest.dataSpaceType",
+			"persistant-inmem"));
+
+	System.out.println("XXX: dataSpaceType=" + dataSpaceType);
 
 	doTrace = (boolean) new Boolean(
-	    	params.getProperty("hadbtest.doTrace", "false"));
+	    	params.getProperty("hadbtest.doTrace",
+			System.getProperty("hadbtest.doTrace",
+				"false")));
+
 	traceFileName = (String) params.getProperty("hadbtest.traceFileName",
-		null);
+		(String) System.getProperty("hadbtest.traceFileName",
+			null));
 
 	objSize = (int) new Integer(
-		params.getProperty("hadbtest.objSize", "10240"));
+		params.getProperty("hadbtest.objSize",
+			System.getProperty("hadbtest.objSize",
+				"10240")));
+
 	numObjs = (int) new Integer(
-	    	params.getProperty("hadbtest.numObjs", "4096"));
+	    	params.getProperty("hadbtest.numObjs",
+			System.getProperty("hadbtest.numObjs",
+				"1000")));
+
 	clusterSize = (int) new Integer(
-	    	params.getProperty("hadbtest.clusterSize", "20"));
+	    	params.getProperty("hadbtest.clusterSize",
+			System.getProperty("hadbtest.clusterSize",
+				"20")));
 	skipSize = (int) new Integer(
-	    	params.getProperty("hadbtest.skipSize", "4"));
+	    	params.getProperty("hadbtest.skipSize",
+			System.getProperty("hadbtest.skipSize",
+				"4")));
 	numThreads = (int) new Integer(
-	    	params.getProperty("hadbtest.numThreads", "1"));
+	    	params.getProperty("hadbtest.numThreads",
+			System.getProperty("hadbtest.numThreads",
+				"1")));
 	numIters = (int) new Integer(
-	    	params.getProperty("hadbtest.numIters", "1000"));
+	    	params.getProperty("hadbtest.numIters",
+			System.getProperty("hadbtest.numIters",
+				"1000")));
 
 	transactionNumPeeks = (int) new Integer(
-	    	params.getProperty("hadbtest.transaction.numPeeks", "4"));
+	    	params.getProperty("hadbtest.transaction.numPeeks",
+			System.getProperty("hadbtest.transaction.numPeeks",
+				"4")));
 	transactionNumLocks = (int) new Integer(
-	    	params.getProperty("hadbtest.transaction.numLocks", "2"));
+	    	params.getProperty("hadbtest.transaction.numLocks",
+			System.getProperty("hadbtest.transaction.numLocks",
+				"2")));
 	transactionNumPromotedPeeks = (int) new Integer(
-	    	params.getProperty("hadbtest.transaction.numPromotedPeeks", "1"));
+	    	params.getProperty("hadbtest.transaction.numPromotedPeeks",
+			System.getProperty("hadbtest.transaction.numPromotedPeeks",
+				"1")));
 
     }
 

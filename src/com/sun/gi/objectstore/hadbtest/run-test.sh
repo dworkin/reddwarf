@@ -13,4 +13,9 @@ echo $package.$*
 
 set heapProf = "-agentlib:hprof=heap=all,depth=22"
 
-java -classpath $classpath $package.$*
+if ($?testParams) then
+    echo "WITH TESTPARAMS"
+    java $testParams -classpath $classpath $package.$*
+else
+    java -classpath $classpath $package.$*
+endif

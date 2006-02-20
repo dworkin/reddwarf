@@ -65,18 +65,19 @@ public class Test5 {
 
 	os.close();
 
-	lookupTest(appID, oids, params, true, 5);
-	lookupTest(appID, oids, params, false, 5);
+	lookupTest(appID, oids, params, 1, 2);
+	lookupTest(appID, oids, params, 100, 2);
 
-	accessTest(appID, oids, params, true, true, 5);
-	accessTest(appID, oids, params, true, false, 5);
-	accessTest(appID, oids, params, false, true, 5);
-	accessTest(appID, oids, params, false, false, 5);
+	accessTest(appID, oids, params, true, 1, 2);
+	accessTest(appID, oids, params, true, 100, 2);
+	accessTest(appID, oids, params, false, 1, 2);
+	accessTest(appID, oids, params, false, 100, 2);
 
-	transactionTest(appID, oids, params);
+	// transactionTest(appID, oids, params);
     }
 
-    private static void transactionTest(long appID, long[] oids, TestParams params) {
+    private static void transactionTest(long appID, long[] oids,
+	    TestParams params) {
 
 	long[][] clusters;
 	try {
@@ -130,7 +131,7 @@ public class Test5 {
     }
 
     private static void accessTest(long appID, long[] oids, TestParams params,
-	    boolean doLock, boolean oneOpPerTrans, int laps) {
+	    boolean doLock, int opsPerTrans, int laps) {
 	long startTime, endTime;
 	Transaction trans = null;
 
@@ -138,18 +139,13 @@ public class Test5 {
 		params.dataSpaceType, null);
 
 	startTime = System.currentTimeMillis();
+
+	int opsSeenInTrans = 0;
+	trans = os.newTransaction(null);
+	trans.start();
+
 	for (int lap = 0; lap < laps; lap++) {
-	    if (!oneOpPerTrans) {
-		trans = os.newTransaction(null);
-		trans.start();
-	    }
-
 	    for (int i = 0; i < oids.length; i++) {
-
-		if (oneOpPerTrans) {
-		    trans = os.newTransaction(null);
-		    trans.start();
-		}
 
 		try {
 		    FillerObject fo;
@@ -170,27 +166,29 @@ public class Test5 {
 		    System.exit(1);
 		}
 
-		if (oneOpPerTrans) {
+		if (opsSeenInTrans++ == opsPerTrans) {
 		    trans.commit();
+		    opsSeenInTrans = 0;
+		    trans = os.newTransaction(null);
+		    trans.start();
 		}
-	    }
-	    if (!oneOpPerTrans) {
-		trans.commit();
+
 	    }
 	}
 
 	endTime = System.currentTimeMillis();
 
-	long elapsed = endTime - startTime;
-	double ave = oids.length / (double) elapsed;
+	long totalVisited = oids.length * laps;
 
-	if (oneOpPerTrans) {
-	    System.out.println("One op per trans: ave " +
-	    	    (doLock ? "LOCK: " : "PEEK: ") + ave + " ms");
-	} else {
-	    System.out.println("One trans per test: ave " +
-	    	    (doLock ? "LOCK: " : "PEEK: ") + ave + " ms");
-	}
+	long elapsed = endTime - startTime;
+	double ave = elapsed / (double) totalVisited;
+
+	System.out.println("EE: elapsed " + elapsed +
+		" totalOps " + totalVisited);
+
+	System.out.println("ave " +
+	    	    (doLock ? "LOCK: " : "PEEK: ") + ave + " ms" + 
+		    " trans size " + opsPerTrans);
 
 	System.out.println("draining...");
 	os.close();
@@ -198,7 +196,7 @@ public class Test5 {
     }
 
     private static void lookupTest(long appID, long[] oids, TestParams params,
-	    boolean oneOpPerTrans, int laps) {
+	    int opsPerTrans, int laps) {
 	long startTime, endTime;
 	Transaction trans = null;
 
@@ -213,20 +211,15 @@ public class Test5 {
 		params.dataSpaceType, null);
 
 	startTime = System.currentTimeMillis();
-	for (int lap = 0; lap < laps; lap++) {
-	    if (!oneOpPerTrans) {
-		trans = os.newTransaction(null);
-		trans.start();
-	    }
 
+	int opsSeenInTrans = 0;
+	trans = os.newTransaction(null);
+	trans.start();
+
+	for (int lap = 0; lap < laps; lap++) {
 	    for (int i = 0; i < oids.length; i++) {
 
 		String name = ObjectCreator.idString(appID, i);
-
-		if (oneOpPerTrans) {
-		    trans = os.newTransaction(null);
-		    trans.start();
-		}
 
 		try {
 		    long oid = trans.lookup(name); 
@@ -241,26 +234,30 @@ public class Test5 {
 		    System.exit(1);
 		}
 
-		if (oneOpPerTrans) {
+		if (opsSeenInTrans++ == opsPerTrans) {
 		    trans.commit();
+		    opsSeenInTrans = 0;
+		    trans = os.newTransaction(null);
+		    trans.start();
 		}
+
 	    }
+	}
+
+	if (opsSeenInTrans > 0) {
+	    trans.commit();
 	}
 	endTime = System.currentTimeMillis();
 
+	long totalVisited = oids.length * laps;
 	long elapsed = endTime - startTime;
-	double ave = oids.length / (double) elapsed;
+	double ave = elapsed / (double) totalVisited;
 
-	if (!oneOpPerTrans) {
-	    trans.commit();
-	}
+	System.out.println("EE: elapsed " + elapsed +
+		" totalOps " + totalVisited);
 
-	if (oneOpPerTrans) {
-	    System.out.println("One op per trans: ave lookup speed: " + ave + " ms");
-	} else {
-	    System.out.println("One op per test: ave lookup speed: " + ave + " ms");
-	}
-
+	System.out.println("ave lookup speed: " + ave + " ms" +
+		" trans size " + opsPerTrans);
 	os.close();
     }
 }
