@@ -27,8 +27,8 @@ import java.util.Properties;
  */
 public class HadbDataSpace implements DataSpace {
 
+    boolean debug = true;
     private long appID;
-    private Object idMutex = new Object();
     private String dataConnURL;
 
     /*
@@ -115,7 +115,7 @@ public class HadbDataSpace implements DataSpace {
 	try {
 	    Class.forName("com.sun.hadb.jdbc.Driver");
 	} catch (Exception e) {
-	    System.out.println("Failed to load the HADB JDBC driver.");
+	    System.out.println("ERROR: Failed to load the HADB JDBC driver.");
 	    System.out.println(e);
 	    throw e;
 	}
@@ -144,6 +144,8 @@ public class HadbDataSpace implements DataSpace {
 
 	    String dataConnURL = "jdbc:sun:hadb:" + hadbHosts + ";create=true";
 
+	    System.out.println("XXX\t\tdataConnURL: " + dataConnURL);
+
 	    // XXX:  Do we really need all these connections?
 
 	    updateConn = getConnection(dataConnURL, hadbUserName, hadbPassword,
@@ -165,7 +167,7 @@ public class HadbDataSpace implements DataSpace {
 		    // This isn't necessarily an error.  The cases
 		    // need to be subdivided more carefully.
 
-		    System.out.println("Failed to drop all tables.");
+		    System.out.println("ERROR: Failed to drop all tables.");
 		}
 	    }
 
@@ -186,7 +188,7 @@ public class HadbDataSpace implements DataSpace {
 	    try {
 		fis = new FileInputStream(hadbParamFile);
 	    } catch (IOException e) {
-		System.out.println("failed to open params file (" +
+		System.out.println("ERROR: failed to open params file (" +
 			hadbParamFile + "): " + e);
 		return false;
 	    }
@@ -195,12 +197,12 @@ public class HadbDataSpace implements DataSpace {
 		try {
 		    hadbParams.load(fis);
 		} catch (IOException e) {
-		    System.out.println("failed to read params file (" +
+		    System.out.println("ERROR: failed to read params file (" +
 			    hadbParamFile + "): " + e);
 		    hadbParams.clear();
 		    return false;
 		} catch (IllegalArgumentException e) {
-		    System.out.println("params file (" +
+		    System.out.println("ERROR: params file (" +
 			    hadbParamFile + ") contains errors: " + e);
 		    hadbParams.clear();
 		    return false;
@@ -214,40 +216,39 @@ public class HadbDataSpace implements DataSpace {
 	    } 
 	}
 
-	hadbHosts = hadbParams.getProperty("dataspace.hadb.hosts");
-	if (hadbHosts == null) {
-	    hadbHosts = System.getProperty("dataspace.hadb.hosts");
-	}
+	hadbHosts = hadbParams.getProperty("dataspace.hadb.hosts",
+		System.getProperty("dataspace.hadb.hosts",
+			null));
 	if (hadbHosts == null) {
 	    hadbHosts = "129.148.75.63:15025,129.148.75.60:15005";
+	    hadbHosts = "20.20.11.107:15105,20.20.10.101:15005,20.20.11.105:15065,20.20.10.103:15085,20.20.10.102:15045,20.20.10.104:15025";
 	}
 
-	hadbUserName = hadbParams.getProperty("dataspace.hadb.username");
-	if (hadbUserName == null) {
-	    hadbUserName = System.getProperty("dataspace.hadb.username");
-	}
-	if (hadbUserName == null) {
-	    hadbUserName = "system";
-	}
+	hadbUserName = hadbParams.getProperty("dataspace.hadb.username",
+		System.getProperty("dataspace.hadb.username",
+			"system"));
 
-	hadbPassword = hadbParams.getProperty("dataspace.hadb.password");
-	if (hadbPassword == null) {
-	    hadbPassword = System.getProperty("dataspace.hadb.password");
-	}
-	if (hadbPassword == null) {
-	    hadbPassword = "darkstar";
-	}
+	hadbPassword = hadbParams.getProperty("dataspace.hadb.password",
+		System.getProperty("dataspace.hadb.password",
+			"darkstar"));
 
 	// DO NOT USE: leave hadbDBname null.
 	// Setting the database name to anything other than the default
 	// doesn't work properly. -DJE
 
-	hadbDBname = hadbParams.getProperty("dataspace.hadb.dbname");
-	if (hadbDBname == null) {
-	    hadbDBname = System.getProperty("dataspace.hadb.dbname");
-	}
-	if (hadbDBname == null) {
-	    hadbDBname = null;
+	hadbDBname = hadbParams.getProperty("dataspace.hadb.dbname",
+		System.getProperty("dataspace.hadb.dbname",
+			null));
+
+	if (debug) {
+	    System.out.println("PARAM: dataspace.hadb.hosts: " +
+		    hadbHosts);
+	    System.out.println("PARAM: dataspace.hadb.username: " +
+		    hadbUserName);
+	    System.out.println("PARAM: dataspace.hadb.password: " +
+		    hadbPassword);
+	    System.out.println("PARAM: dataspace.hadb.dbname: " +
+		    ((hadbDBname == null) ? "null" : hadbDBname));
 	}
 
 	return true;
@@ -258,7 +259,7 @@ public class HadbDataSpace implements DataSpace {
 		OBJTBLNAME, OBJLOCKTBLNAME, NAMETBLNAME, INFOTBLNAME
 	};
 
-	System.out.println("Dropping all tables!");
+	System.out.println("INFO: Dropping all tables!");
 
 	boolean allSucceeded = true;
 	for (String name : tableNames) {
@@ -277,7 +278,7 @@ public class HadbDataSpace implements DataSpace {
 	    updateConn.commit();
 	    idConn.commit();
 	} catch (Exception e) {
-	    System.out.println("FAILED to prepare/commit " + tableName);
+	    System.out.println("ERROR: FAILED to prepare/commit " + tableName);
 	    System.out.println("\t" + e);
 	    e.printStackTrace();
 	}
@@ -288,13 +289,13 @@ public class HadbDataSpace implements DataSpace {
 	    stmnt = schemaConn.createStatement();
 	    stmnt.execute(s);
 	} catch (SQLException e) {
-	    System.out.println("FAILED to drop " + tableName);
+	    System.out.println("ERROR: FAILED to drop " + tableName);
 	    System.out.println("\t" + e);
 /* 	    e.printStackTrace(); */
 	    return false;
 	}
 
-	System.out.println("Dropped " + tableName);
+	System.out.println("INFO: Dropped " + tableName);
 	return true;
     }
 
@@ -322,21 +323,21 @@ public class HadbDataSpace implements DataSpace {
 	    stmnt = schemaConn.createStatement();
 	    rs = stmnt.executeQuery(s);
 	    if (!rs.next()) {
-		System.out.println("SCHEMA does not exist: " + SCHEMA);
+		System.out.println("INFO: SCHEMA does not exist: " + SCHEMA);
 		schemaExists = false;
 	    } else {
-		System.out.println("SCHEMA already exists: " + SCHEMA);
+		System.out.println("INFO: SCHEMA already exists: " + SCHEMA);
 		schemaExists = true;
 	    }
 	    rs.close();
 	} catch (SQLException e) {
-	    System.out.println("SCHEMA error: " + e);
+	    System.out.println("INFO: SCHEMA error: " + e);
 	    schemaExists = false;
 	}
 
 	if (!schemaExists) {
 	    try {
-		System.out.println("Creating Schema");
+		System.out.println("INFO: Creating Schema");
 		String s = "CREATE SCHEMA " + SCHEMA;
 		stmnt = schemaConn.createStatement();
 		stmnt.execute(s);
@@ -347,10 +348,10 @@ public class HadbDataSpace implements DataSpace {
 		 */
 
 		if (e.getErrorCode() != 11751) {
-		    System.out.println("SCHEMA issue: " + e);
+		    System.out.println("ERROR: SCHEMA issue: " + e);
 		    throw e;
 		} else {
-		    System.out.println("SCHEMA already exists: " + e);
+		    System.out.println("INFO: SCHEMA already exists: " + e);
 		}
 	    }
 	}
@@ -368,30 +369,30 @@ public class HadbDataSpace implements DataSpace {
 	    }
 	    rs.close();
 	} catch (SQLException e) {
-	    System.out.println("failure finding schema" + e);
+	    System.out.println("ERROR: failure finding schema" + e);
 	    throw e;
 	}
 
 	if (foundTables.contains(OBJTBL.toLowerCase())) {
-	    System.out.println("Found Objects table");
+	    System.out.println("INFO: Found Objects table");
 	} else {
 	    createObjTable();
 	}
 
 	if (foundTables.contains(OBJLOCKTBL.toLowerCase())) {
-	    System.out.println("Found object lock table");
+	    System.out.println("INFO: Found object lock table");
 	} else {
 	    createObjLockTable();
 	}
 
 	if (foundTables.contains(NAMETBL.toLowerCase())) {
-	    System.out.println("Found Name table");
+	    System.out.println("INFO: Found Name table");
 	} else {
 	    createNameTable();
 	}
 
 	if (foundTables.contains(INFOTBL.toLowerCase())) {
-	    System.out.println("Found info table");
+	    System.out.println("INFO: Found info table");
 	} else {
 	    createInfoTable();
 	}
@@ -438,7 +439,7 @@ public class HadbDataSpace implements DataSpace {
     }
 
     private boolean createObjTable() {
-	System.out.println("Creating Objects table");
+	System.out.println("INFO: Creating Objects table");
 	Statement stmnt;
 	String s = "CREATE TABLE " + OBJTBLNAME + " (" +
 		"OBJID DOUBLE INT NOT NULL, " +
@@ -448,7 +449,7 @@ public class HadbDataSpace implements DataSpace {
 	    stmnt = schemaConn.createStatement();
 	    stmnt.execute(s);
 	} catch (Exception e) {
-	    System.out.println("FAILED to create: " + e);
+	    System.out.println("ERROR: FAILED to create: " + e);
 	    return false;
 	}
 
@@ -456,7 +457,7 @@ public class HadbDataSpace implements DataSpace {
     }
 
     private boolean createInfoTable() {
-	System.out.println("Creating info table");
+	System.out.println("INFO: Creating info table");
 	Statement stmnt;
 	ResultSet rs;
 
@@ -470,7 +471,7 @@ public class HadbDataSpace implements DataSpace {
 	    stmnt.execute(s);
 	} catch (SQLException e) {
 	    // XXX
-	    System.out.println("FAILED to create: " + e);
+	    System.out.println("ERROR: FAILED to create: " + e);
 	    return false;
 	}
 
@@ -480,7 +481,7 @@ public class HadbDataSpace implements DataSpace {
 	    stmnt = schemaConn.createStatement();
 	    rs = stmnt.executeQuery(s);
 	    if (!rs.next()) { // entry does not exist
-		System.out.println("Creating new entry in info table for appID "
+		System.out.println("INFO: Creating new entry in info table for appID "
 		    + appID);
 		stmnt = schemaConn.createStatement();
 		s = "INSERT INTO " + INFOTBLNAME + " VALUES(" +
@@ -498,7 +499,7 @@ public class HadbDataSpace implements DataSpace {
 	    }
 	    rs.close();
 	} catch (SQLException e) {
-	    System.out.println("FAILED to create: " + e);
+	    System.out.println("ERROR: FAILED to create: " + e);
 	    return false;
 	    // XXX: ??
 	}
@@ -507,7 +508,7 @@ public class HadbDataSpace implements DataSpace {
     }
 
     private boolean createObjLockTable() {
-	System.out.println("Creating object Lock table");
+	System.out.println("INFO: Creating object Lock table");
 	String s = "CREATE TABLE " + OBJLOCKTBLNAME + " (" +
 		"OBJID DOUBLE INT NOT NULL," +
 		"OBJLOCK INT NOT NULL," +
@@ -517,14 +518,14 @@ public class HadbDataSpace implements DataSpace {
 	    stmnt.execute(s);
 	} catch (SQLException e) {
 	    // XXX
-	    System.out.println("FAILED to create: " + e);
+	    System.out.println("ERROR: FAILED to create: " + e);
 	    return false;
 	}
 	return true;
     }
 
     private boolean createNameTable() {
-	System.out.println("Creating Name table");
+	System.out.println("INFO: Creating Name table");
 	String s = "CREATE TABLE " + NAMETBLNAME + "(" +
 		"NAME VARCHAR(255) NOT NULL, " +
 		"OBJID DOUBLE INT NOT NULL," +
@@ -534,7 +535,7 @@ public class HadbDataSpace implements DataSpace {
 	    stmnt.execute(s);
 	} catch (SQLException e) {
 	    // XXX
-	    System.out.println("FAILED to create: " + e);
+	    System.out.println("ERROR: FAILED to create: " + e);
 	    return false;
 	}
 	return true;
@@ -653,11 +654,9 @@ public class HadbDataSpace implements DataSpace {
 			if (rc == 1) {
 			    updateInfoStmnt.getConnection().commit();
 			    success = true;
-/* 			    System.out.println("SUCCESS rc = " + rc); */
 			} else {
 			    updateInfoStmnt.getConnection().rollback();
 			    success = false;
-/* 			    System.out.println("CONTENTION rc = " + rc); */
 			}
 		    } catch (SQLException e) {
 			if (e.getErrorCode() == 2097) {

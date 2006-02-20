@@ -98,7 +98,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 
 	private Object idMutex = new Object();
 
-	private long id = 1;
+	private volatile long id = 1;
 
 	private String dataConnURL;
 

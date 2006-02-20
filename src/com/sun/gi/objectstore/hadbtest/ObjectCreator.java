@@ -210,7 +210,7 @@ public class ObjectCreator {
 
     protected long addFillerObj(Transaction trans, long appId, int objSize, long val) {
 
-	FillerObject obj = new FillerObject(id, val, objSize, populatorName, null);
+	FillerObject obj = new FillerObject(id, objSize);
 
 	String name = idString(appId, val);
 	long oid = trans.create(obj, name);

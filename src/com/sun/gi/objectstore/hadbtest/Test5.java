@@ -49,31 +49,34 @@ public class Test5 {
 	    return;
 	}
 
-	os.clear();
+	for (int objSize = 1024; objSize <= 16 * 1024; objSize *= 2) {
+	    os.clear();
 
-	/*
-	 * Create a bunch of objects, and then chop them up into clusters.
-	 */
+	    /*
+	     * Create a bunch of objects, and then chop them up into clusters.
+	     */
 
-	ObjectCreator creator = new ObjectCreator(os, 0, null);
-	long[] oids = creator.createNewBunch(params.numObjs, params.objSize,
-		1, true);
+	    params.objSize = objSize;
+	    ObjectCreator creator = new ObjectCreator(os, 0, null);
+	    long[] oids = creator.createNewBunch(params.numObjs, params.objSize,
+		    1, true);
 
-	if (params.dataSpaceType.equals("persistant-inmem")) {
-	    TestUtil.snooze(10000, "waiting for the new objects to settle");
+	    if (params.dataSpaceType.equals("persistant-inmem")) {
+		TestUtil.snooze(10000, "waiting for the new objects to settle");
+	    }
+
+	    os.close();
+
+	    lookupTest(appID, oids, params, 1, 2);
+	    lookupTest(appID, oids, params, 100, 2);
+
+	    accessTest(appID, oids, params, true, 1, 2);
+	    accessTest(appID, oids, params, true, 100, 2);
+	    accessTest(appID, oids, params, false, 1, 2);
+	    accessTest(appID, oids, params, false, 100, 2);
+
+	    // transactionTest(appID, oids, params);
 	}
-
-	os.close();
-
-	lookupTest(appID, oids, params, 1, 2);
-	lookupTest(appID, oids, params, 100, 2);
-
-	accessTest(appID, oids, params, true, 1, 2);
-	accessTest(appID, oids, params, true, 100, 2);
-	accessTest(appID, oids, params, false, 1, 2);
-	accessTest(appID, oids, params, false, 100, 2);
-
-	// transactionTest(appID, oids, params);
     }
 
     private static void transactionTest(long appID, long[] oids,
@@ -188,7 +191,7 @@ public class Test5 {
 
 	System.out.println("ave " +
 	    	    (doLock ? "LOCK: " : "PEEK: ") + ave + " ms" + 
-		    " trans size " + opsPerTrans);
+		    " trans size " + opsPerTrans + " objSize " + params.objSize);
 
 	System.out.println("draining...");
 	os.close();
@@ -257,7 +260,7 @@ public class Test5 {
 		" totalOps " + totalVisited);
 
 	System.out.println("ave lookup speed: " + ave + " ms" +
-		" trans size " + opsPerTrans);
+		" trans size " + opsPerTrans + " objSize " + params.objSize);
 	os.close();
     }
 }
