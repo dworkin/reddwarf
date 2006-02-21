@@ -179,6 +179,7 @@ public class HadbDataSpace implements DataSpace {
 	}
     }
 
+
     private boolean loadParams() {
 	FileInputStream fis = null;
 	Properties hadbParams = new Properties();
@@ -220,8 +221,7 @@ public class HadbDataSpace implements DataSpace {
 		System.getProperty("dataspace.hadb.hosts",
 			null));
 	if (hadbHosts == null) {
-	    hadbHosts = "129.148.75.63:15025,129.148.75.60:15005";
-	    hadbHosts = "20.20.11.107:15105,20.20.10.101:15005,20.20.11.105:15065,20.20.10.103:15085,20.20.10.102:15045,20.20.10.104:15025";
+	    hadbHosts = "20.20.10.104:15025,20.20.10.103:15085,20.20.11.107:15105,20.20.10.101:15005,20.20.11.105:15065,20.20.10.102:15045";
 	}
 
 	hadbUserName = hadbParams.getProperty("dataspace.hadb.username",
@@ -254,19 +254,55 @@ public class HadbDataSpace implements DataSpace {
 	return true;
     }
 
-    private boolean dropTables() {
+    private String[] getTableNames() {
 	String[] tableNames = {
 		OBJTBLNAME, OBJLOCKTBLNAME, NAMETBLNAME, INFOTBLNAME
 	};
+	return tableNames;
+    }
+
+    /**
+     * Drops all of the tables.  <p>
+     *
+     * This is private because it is not possible to drop the tables
+     * once the connections are established (and attempting to do so
+     * will lead to an inconsistent state):  the only place where this
+     * method can be successfully used (from what I can determine) is
+     * in the constructor of this object.  As soon as the prepared
+     * statements are set up, it's too late.
+     */
+    private synchronized boolean dropTables() {
 
 	System.out.println("INFO: Dropping all tables!");
 
 	boolean allSucceeded = true;
-	for (String name : tableNames) {
+	for (String name : getTableNames()) {
 	    if (!dropTable(name)) {
 		allSucceeded = false;
 	    }
 	}
+	return allSucceeded;
+    }
+
+    /**
+     * Clears all of the tables <em>except</em> the infotbl.  <p>
+     *
+     * The infotbl contains the generator for the next object ID. 
+     * clearing the infotbl can cause disasters.  (clearing any of the
+     * tables when the system is mid-stride can be disasterous, but
+     * clearing the infotbl is almost guaranteed to be disasterous).
+     */
+    public synchronized boolean clearTables() {
+	System.out.println("INFO: Clearing tables!");
+
+	boolean allSucceeded = true;
+	for (String name : getTableNames()) {
+	    // don't clear the INFOTBL.
+	    if (!name.equals(INFOTBLNAME) && !clearTable(name)) {
+		allSucceeded = false;
+	    }
+	}
+
 	return allSucceeded;
     }
 
@@ -288,6 +324,7 @@ public class HadbDataSpace implements DataSpace {
 	try {
 	    stmnt = schemaConn.createStatement();
 	    stmnt.execute(s);
+	    System.out.println("INFO: Dropped " + tableName);
 	} catch (SQLException e) {
 	    System.out.println("ERROR: FAILED to drop " + tableName);
 	    System.out.println("\t" + e);
@@ -295,14 +332,42 @@ public class HadbDataSpace implements DataSpace {
 	    return false;
 	}
 
-	System.out.println("INFO: Dropped " + tableName);
+	return true;
+    }
+
+    private boolean clearTable(String tableName) {
+	String s;
+	Statement stmnt;
+
+	try {
+	    updateConn.commit();
+	    idConn.commit();
+	} catch (Exception e) {
+	    System.out.println("ERROR: FAILED to prepare/commit " + tableName);
+	    System.out.println("\t" + e);
+	    e.printStackTrace();
+	}
+
+	stmnt = null;
+	s = "DELETE FROM " + tableName;
+	try {
+	    stmnt = schemaConn.createStatement();
+	    stmnt.execute(s);
+	    System.out.println("INFO: Deleted contents of " + tableName);
+	} catch (SQLException e) {
+	    System.out.println("ERROR: FAILED to delete " + tableName);
+	    System.out.println("\t" + e);
+/* 	    e.printStackTrace(); */
+	    return false;
+	}
+
 	return true;
     }
 
     /**
      * @throws SQLException
      */
-    private void checkTables() throws SQLException {
+    private synchronized void checkTables() throws SQLException {
 	ResultSet rs;
 	Statement stmnt = null;
 	boolean schemaExists = false;
@@ -398,7 +463,7 @@ public class HadbDataSpace implements DataSpace {
 	}
     }
 
-    private void createPreparedStmnts() throws SQLException {
+    private synchronized void createPreparedStmnts() throws SQLException {
 
 	getObjStmnt = readConn.prepareStatement("SELECT * FROM " +
 		OBJTBLNAME + " O  " + "WHERE O.OBJID = ?");
@@ -1046,8 +1111,8 @@ public class HadbDataSpace implements DataSpace {
     public synchronized void clear() {
 
 	try {
-	    dropTables();
 	    checkTables();
+	    clearTables();
 	} catch (SQLException e) {
 	    e.printStackTrace();
 	}
@@ -1057,23 +1122,27 @@ public class HadbDataSpace implements DataSpace {
      * {@inheritDoc}
      */
     public synchronized void close() {
-	try {
-	    schemaConn.close();
-	} catch (SQLException e) {
-	    System.out.println("can't close schemaConn");
-	}
 
 	try {
+	    idConn.commit();
 	    idConn.close();
 	} catch (SQLException e) {
 	    System.out.println("can't close idConn");
 	}
 
 	try {
+	    updateConn.commit();
 	    updateConn.close();
 	} catch (SQLException e) {
 	    System.out.println("can't close updateConn");
 	}
+
+	try {
+	    schemaConn.close();
+	} catch (SQLException e) {
+	    System.out.println("can't close schemaConn");
+	}
+
 
 	try {
 	    readConn.close();
