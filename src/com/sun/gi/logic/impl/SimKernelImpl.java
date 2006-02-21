@@ -2,6 +2,7 @@ package com.sun.gi.logic.impl;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -58,8 +59,7 @@ public SimKernelImpl() {
 		
 		new Thread(new Runnable(){
 			public void run() {
-				while(true){
-					
+				while(true){					
 					synchronized(simList){				
 						boolean tasksAvailable = false;
 						while (!tasksAvailable){
@@ -77,21 +77,28 @@ public SimKernelImpl() {
 								}
 							}
 						}	
-						for(Simulation sim : simList){
-							synchronized(threadPool){
-								if (threadPool.size()>0){
-									if (sim.hasTasks()){
-										SimTask task = sim.nextTask();		
-										SimThread thread = threadPool.remove(0);
-										thread.execute(task);
-									}
-								} else {
-									try {
-										threadPool.wait();
-									} catch (InterruptedException e) {										
-										e.printStackTrace();
-									}
-								}
+					}
+					// has sims, now wait to have threads
+					synchronized(threadPool){
+						while (threadPool.size()==0){
+							try {
+								threadPool.wait();
+							} catch (InterruptedException e) {								
+								e.printStackTrace();
+							}
+						}
+					}
+					// have soem of both, match em up
+					synchronized(simList){
+						synchronized(threadPool){
+							Iterator iter = simList.iterator();									
+							while ((threadPool.size()>0)&&(iter.hasNext())){
+								Simulation sim = (Simulation)iter.next();
+								while ((threadPool.size()>0)&&(sim.hasTasks())){					
+									SimTask task = sim.nextTask();		
+									SimThread thread = threadPool.remove(0);
+									thread.execute(task);
+								}								
 							}
 						}
 					}					
