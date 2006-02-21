@@ -78,7 +78,7 @@ public SimKernelImpl() {
 							}
 						}	
 					}
-					// has sims, now wait to have threads
+					// has sim tasks, now wait to have threads
 					synchronized(threadPool){
 						while (threadPool.size()==0){
 							try {
