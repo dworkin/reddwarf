@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project basedir="." default="build" name="SGSatLabs">
+
+    <target name="help">
+		<echo message="Please run: $ ant -v -projecthelp" />
+	</target>
+
+	<property name="debug" value="true" />
+	<property name="optimize" value="true" />
+	<property name="deprecated" value="true" />
+
+	<path id="project.classpath">
+		<pathelement location="bin" />
+		<pathelement location="resources/libs/jrms/classes.jar" />
+		<pathelement location="resources/libs/derby/derby.jar" />
+        <pathelement location="resources/libs/servlet/javax.servlet.jar" />      
+		<pathelement location="resources/libs/servlet/commons-logging.jar" />
+		<pathelement location="resources/libs/servlet/org.mortbay.jetty.jar" />
+	</path>
+
+    <target name="init">
+        <mkdir dir="bin"/>
+        <mkdir dir="doc"/>
+        <mkdir dir="release"/>
+    	<mkdir dir="release/apps"/>
+    	<mkdir dir="release/apps/trivial_boot"/>
+    	<mkdir dir="release/apps/battleboard"/>
+    	<mkdir dir="release/apps/chat_test"/>
+    	<mkdir dir="release/derby"/>
+    	<mkdir dir="release/jrms"/>
+    </target>
+
+	<target name="clean">
+		<delete dir="bin" />
+		<delete dir="release" />
+	</target>
+
+	<target name="realclean" depends="clean">
+		<delete dir="doc" />
+	</target>
+
+
+	<!-- Documentation targets -->
+
+	<target name="docs" depends="javadocs,doxygen" />
+
+	<target name="doxygen" depends="init">
+		<exec executable="doxygen" failonerror="true">
+			<arg value="java-client-api.doxygen" />
+		</exec>
+		<exec executable="doxygen" failonerror="true">
+			<arg value="java-server-api.doxygen" />
+		</exec>
+		<!--
+		<exec executable="doxygen" failonerror="true">
+			<arg value="java-protocol-api.doxygen" />
+		</exec>
+		<exec executable="doxygen" failonerror="true">
+			<arg value="java.doxygen" />
+		</exec>
+		-->
+	</target>
+
+	<target name="javadocs" depends="javadocs-internal,javadocs-api" />
+
+	<target name="javadocs-internal" depends="init">
+		<javadoc destdir="doc/javadoc/internal" sourcepath="src" classpathref="project.classpath" access="private">
+			<package name="com.sun.gi.*" />
+			<tag name="todo" description="To do:" />
+		</javadoc>
+	</target>
+
+	<target name="javadocs-api" depends="init">
+		<javadoc destdir="doc/javadoc/api" sourcepath="src" classpathref="project.classpath" access="public">
+			<package name="com.sun.gi.*" />
+			<tag name="todo" description="To do:" />
+		</javadoc>
+	</target>
+
+	<!-- Compilation targets -->
+
+	<target name="build" depends="init">
+		<echo message="${ant.project.name}: ${ant.file}" />
+		<javac destdir="bin" source="5" target="5" debug="${debug}" optimize="${optimize}" deprecation="${deprecated}">
+			<!-- <compilerarg value="-Xlint:unchecked"/> -->
+			<src path="src" />
+			<classpath refid="project.classpath" />
+			<exclude name="com/sun/gi/apps/**" />
+		</javac>
+	</target>
+
+	<target name="buildchat" depends="serverjar">
+		<echo message="${ant.project.name}: ${ant.file}" />
+		<javac srcdir="src" destdir="bin" source="5" target="5" debug="${debug}" optimize="${optimize}" deprecation="${deprecated}">
+			<!-- <compilerarg value="-Xlint:unchecked"/> -->
+			<classpath refid="project.classpath" />
+			<include name="com/sun/gi/apps/chattest/ChatTestBoot.java" />
+		</javac>
+	</target>
+
+	<target name="buildtrivial" depends="serverjar">
+		<echo message="${ant.project.name}: ${ant.file}" />
+		<javac srcdir="src" destdir="bin" source="5" target="5" debug="${debug}" optimize="${optimize}" deprecation="${deprecated}">
+			<!-- <compilerarg value="-Xlint:unchecked"/> -->
+			<classpath refid="project.classpath" />
+			<include name="com/sun/gi/apps/trivial/TrivialBoot.java" />
+		</javac>
+	</target>
+
+	<target name="buildbattleboard" depends="serverjar">
+		<echo message="${ant.project.name}: ${ant.file}" />
+		<javac srcdir="src" destdir="bin" source="5" target="5" debug="${debug}" optimize="${optimize}" deprecation="${deprecated}">
+			<!-- <compilerarg value="-Xlint:unchecked"/> -->
+			<classpath refid="project.classpath" />
+			<include name="com/sun/gi/apps/battleboard/server/**" />
+		</javac>
+	</target>
+
+	<!-- Runnable targets -->
+
+	<target name="SGS at Labs Clean">
+		<java classname="com.sun.gi.SGS" failonerror="true" fork="yes">
+			<arg value="-C" />
+			<arg value="-V" />
+			<classpath refid="project.classpath" />
+			<sysproperty key="java.util.logging.config.file" value="logging.properties" />
+		</java>
+	</target>
+
+	<target name="SGS 2 at Labs">
+		<java classname="com.sun.gi.SGS" failonerror="true" fork="yes">
+			<arg value="file:Install2.txt" />
+			<classpath refid="project.classpath" />
+			<sysproperty key="java.util.logging.config.file" value="logging.properties" />
+		</java>
+	</target>
+
+	<target name="ChatTestClient">
+		<java classname="com.sun.gi.apps.commtest.client.ChatTestClient" failonerror="true" fork="yes">
+			<classpath refid="project.classpath" />
+			<sysproperty key="java.util.logging.config.file" value="logging.properties" />
+		</java>
+	</target>
+
+	<target name="ChatTestClient2">
+		<java classname="com.sun.gi.apps.commtest.client.ChatTestClient" failonerror="true" fork="yes">
+			<classpath refid="project.classpath" />
+			<sysproperty key="java.util.logging.config.file" value="logging.properties" />
+		</java>
+	</target>
+
+	<target name="BattleBoard">
+		<java classname="com.sun.gi.apps.battleboard.client.BattleBoardClient" failonerror="true" fork="true">
+			<classpath refid="project.classpath" />
+			<sysproperty key="java.util.logging.config.file" value="logging.properties" />
+		</java>
+	</target>
+
+	<!-- Release Targets -->
+	<target name="serverjar" depends="build">
+		<jar destfile="release/ProjectDarkstar.jar" basedir="bin" excludes="com/sun/gi/apps/**,
+					   com/sun/gi/comm/users/client" manifest="resources/ProjectDarkstarManifest.mf" />
+	</target>
+
+	<target name="trivialboot" depends="buildtrivial">
+		<jar destfile="release/apps/trivial_boot/trivial_boot.jar" basedir="bin" includes="com/sun/gi/apps/trivial/**" />
+	</target>
+
+	<target name="chattest" depends="buildchat">
+		<jar destfile="release/apps/chat_test/ChatTest.jar" basedir="bin" includes="com/sun/gi/apps/chattest/ChatTestBoot.class" />
+	</target>
+
+	<target name="battleboard" depends="buildbattleboard">
+		<jar destfile="release/apps/battleboard/BattleBoard.jar" basedir="bin" includes="com/sun/gi/apps/battleboard/server/**" />
+	</target>
+
+
+	<target name="release" depends="serverjar,trivialboot,
+		chattest, battleboard, doxygen">	
+		<copy file="resources/startDarkstar.sh" todir="release" />
+		<copy file="resources/startDiscovery.sh" todir="release" />
+		<chmod file="release/startDarkstar.sh" perm="755" />
+		<chmod file="release/startDiscovery.sh" perm="755" />
+		<copy file="resources/libs/jrms/classes.jar" todir="release/jrms" />
+		<copy file="resources/libs/derby/derby.jar" todir="release/derby" />
+		<copy file="resources/Install.txt" todir="release" />
+		<copy file="resources/passwd.txt" todir="release" />
+		<copy file="resources/battleboard_deployment.xml" todir="release/apps/battleboard" />
+		<copy file="resources/chat_test_deployment.xml" todir="release/apps/chat_test" />
+		<copy file="resources/trivial_boot_deployment.xml" todir="release/apps/trivial_boot" />
+		<copy todir="release/docs" >
+			<fileset dir="doc/doxygen">
+				<exclude name="internal/**" />
+			</fileset>	
+		</copy>	
+		<zip destfile="ProjectDarkstar.zip" basedir="release" />
+	</target>
+
+</project>
