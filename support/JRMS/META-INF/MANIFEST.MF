@@ -1,6 +1,0 @@
-Manifest-Version: 1.0
-Version: 1.1
-URL: www.experimentalstuff.com
-Created-By: 1.3.0 (Sun Microsystems Inc.)
-Title: Java(tm) Reliable Multicast(tm) Service
-
