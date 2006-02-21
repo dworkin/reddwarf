@@ -108,8 +108,10 @@ public class TSOTransaction implements Transaction {
 	 *      java.lang.String)
 	 */
 	public long create(Serializable object, String name) {
-		if (!mainTrans.newName(name)){
-			return ObjectStore.INVALID_ID;
+		if (name!=null){
+			if (!mainTrans.newName(name)){
+				return ObjectStore.INVALID_ID;
+			}
 		}
 		long id = mainTrans.create(object);
 		TSODataHeader hdr = new TSODataHeader(time, tiebreaker,
