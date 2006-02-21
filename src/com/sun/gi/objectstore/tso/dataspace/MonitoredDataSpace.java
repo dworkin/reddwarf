@@ -283,4 +283,12 @@ public class MonitoredDataSpace implements DataSpace {
 	    }
 	}
     }
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#newName(java.lang.String)
+	 */
+	public boolean newName(String name) {
+		// TODO Auto-generated method stub
+		return false;
+	}
 }

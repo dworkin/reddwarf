@@ -156,4 +156,10 @@ public interface DataSpace {
      */
     void close();
 
+	/**
+	 * @param name
+	 * @return
+	 */
+	boolean newName(String name);
+
 }

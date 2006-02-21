@@ -203,4 +203,19 @@ public class InMemoryDataSpace implements DataSpace {
 		
 	}
 
+
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#newName(java.lang.String)
+	 */
+	public boolean newName(String name) {
+		synchronized(nameSpace){
+			if (nameSpace.containsKey(name)){
+				return false;
+			}
+			nameSpace.put(name,null);
+			return true;
+		}		
+	}
+
 }

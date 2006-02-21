@@ -279,6 +279,18 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	}
 
 	/* (non-Javadoc)
+	 * @see com.sun.gi.objectstore.tso.DataSpaceTransaction#newName(java.lang.String)
+	 */
+	public boolean newName(String name) {
+		synchronized(newNames){
+			if (newNames.containsKey(name)){
+				return false;
+			}
+			return dataSpace.newName(name);
+		}		
+	}
+
+	/* (non-Javadoc)
 	 * @see com.sun.gi.objectstore.tso.DataSpaceTransaction#clear(long)
 	 */
 

@@ -86,4 +86,10 @@ public interface DataSpaceTransaction {
 	 * @return
 	 */
 	long lookupName(String name);
+
+	/**
+	 * @param name
+	 * @return
+	 */
+	boolean newName(String name);
 }
