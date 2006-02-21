@@ -76,6 +76,12 @@ public class Game implements SimChannelMembershipListener {
 	    p.gameStarted(thisRef);
 	}
 
+	log.fine("playerBoards size " + playerBoards.size());
+	for (Map.Entry<String, GLOReference> x : playerBoards.entrySet()) {
+	    log.fine("playerBoard[ " + x.getKey() +
+	      "]=`" + x.getValue() + "'");
+	}
+
 	channel = task.openChannel(gameName);
 	task.lock(channel, true);
 	task.addChannelMembershipListener(channel, thisRef);
@@ -88,7 +94,9 @@ public class Game implements SimChannelMembershipListener {
 		DEFAULT_BOARD_HEIGHT,
 		DEFAULT_BOARD_CITIES);
 	board.populate();
-	return task.createGLO(board);
+	GLOReference ref = task.createGLO(board);
+	log.finer("createBoard[" + playerName + "] returning " + ref);
+	return ref;
     }
 
     public void init(SimTask task) {
@@ -135,6 +143,8 @@ public class Game implements SimChannelMembershipListener {
     protected void sendJoinOK(SimTask task, Player player) {
 	ByteBuffer buf = ByteBuffer.allocate(1024);
 	buf.put("ok ".getBytes());
+
+	log.fine("playerBoards size " + playerBoards.size());
 
 	GLOReference boardRef = playerBoards.get(player.getNickname());
 	Board board = (Board) boardRef.peek(task);

@@ -160,7 +160,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	 * If there's only one player left, that last remaining player
 	 * is the winner.
 	 */
-	if (playerNames.size() == 1) {
+	if (playerNames != null && playerNames.size() == 1) {
 	    if (myName.equals(playerNames.get(0))) {
 		displayMessage("YOU WIN!");
 	    } else {
