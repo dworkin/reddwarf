@@ -33,6 +33,7 @@ class ClientTest5 implements Runnable {
      * Simulation controls.  Taken from the params.
      */
 
+    private int objSize;
     private int numPeeks;
     private int numLocks;
     private int numPromotedPeeks;
@@ -65,6 +66,7 @@ class ClientTest5 implements Runnable {
 	this.os = TestUtil.connect(appID, false,
 		params.dataSpaceType, traceFileName);
 
+	this.objSize = params.objSize;;
 	this.numPeeks = params.transactionNumPeeks;
 	this.numLocks = params.transactionNumLocks;
 	this.numPromotedPeeks = params.transactionNumPromotedPeeks;
@@ -75,38 +77,42 @@ class ClientTest5 implements Runnable {
     public void run() {
 	System.out.println("starting up " + clientId + ": whoopee");
 	lastWake = System.currentTimeMillis();
+	int iters = 500;
 
-	int incr = 100;
-	for (int count = 0; count < iters; count += incr) {
-	    long start = System.currentTimeMillis();
-	    for (int i = 0; i < incr; i++) {
-		try {
-		    doRandomTransaction(verbose);
-		    if (sleepTime > 0) {
-			Thread.sleep(sleepTime);
-		    }
-		} catch (Exception e) {
-		    // DJE:
-		    System.out.println("unexpected exception: " + e);
-		    e.printStackTrace(System.out);
-		}
-	    }
-	    long now = System.currentTimeMillis();
-	    long elapsed = now - start;
-	    double rate = elapsed / (double) incr;
-	    System.out.println("elapsed for " + sleepTime + " ms " +
-		    incr + ": " + elapsed + "  " + rate + "/ms");
-	    System.out.println("\tat count " + count);
+	/*
+	System.out.println("PARAMS transaction sleep " + sleepTime + " ms " +
+		" iters " + iters +
+		" objSize " + objSize +
+		" peeks " + numPeeks +
+		" locks " + numLocks +
+		" promoted " + numPromotedPeeks);
+	*/
+
+	long start = System.currentTimeMillis();
+	for (int i = 0; i < iters; i++) {
 	    try {
-		Thread.sleep(5000);
+		doRandomTransaction(verbose);
+		if (sleepTime > 0) {
+		    Thread.sleep(sleepTime);
+		}
 	    } catch (Exception e) {
+		// DJE:
 		System.out.println("unexpected exception: " + e);
 		e.printStackTrace(System.out);
 	    }
 	}
+	long now = System.currentTimeMillis();
+	long elapsed = now - start;
+	double rate = elapsed / (double) iters;
+	System.out.println("transaction sleep " + sleepTime + " ms " +
+		+ rate + " ms" +
+		" iters " + iters +
+		" objSize " + objSize +
+		" peeks " + numPeeks +
+		" locks " + numLocks +
+		" promoted " + numPromotedPeeks);
 
 	os.close();
-
 	return;
     }
 

@@ -38,18 +38,25 @@ public class Test5 {
 	 * Connect to the database, test the connection.
 	 */
 
-	ObjectStore os = TestUtil.connect(appID, false,
+	ObjectStore os = TestUtil.connect(appID, true,
 		params.dataSpaceType, params.traceFileName);
+	os.clear();
 
 	if (TestUtil.sanityCheck(os, "Hello, World", true)) {
 	    System.out.println("appears to work");
 	}
 	else {
 	    System.out.println("yuck");
+	    os.close();
 	    return;
 	}
+	os.close();
+
+	params.numObjs = 1000;
 
 	for (int objSize = 1024; objSize <= 16 * 1024; objSize *= 2) {
+
+	    os = TestUtil.connect(appID, false, params.dataSpaceType, null);
 	    os.clear();
 
 	    /*
@@ -67,22 +74,37 @@ public class Test5 {
 
 	    os.close();
 
-	    lookupTest(appID, oids, params, 1, 2);
-	    lookupTest(appID, oids, params, 100, 2);
+	    /*
+	    lookupTest(appID, oids, params, 1, 5);
+	    lookupTest(appID, oids, params, 100, 5);
 
-	    accessTest(appID, oids, params, true, 1, 2);
-	    accessTest(appID, oids, params, true, 100, 2);
-	    accessTest(appID, oids, params, false, 1, 2);
-	    accessTest(appID, oids, params, false, 100, 2);
+	    accessTest(appID, oids, params, true, 1, 5);
+	    accessTest(appID, oids, params, true, 100, 5);
+	    accessTest(appID, oids, params, false, 1, 5);
+	    accessTest(appID, oids, params, false, 100, 5);
+	    */
 
-	    // transactionTest(appID, oids, params);
+	    long[][] clusters = makeClusters(oids, params);
+
+	    for (int peeks = 1; peeks < 11; peeks += 2) {
+		for (int locks = 1; locks < 11; locks += 2) {
+		    params.transactionNumPeeks = peeks;
+		    params.transactionNumLocks = locks;
+		    params.transactionNumPromotedPeeks = 0;
+
+		    transactionTest(appID, clusters, params);
+		}
+	    }
 	}
+
+	os = TestUtil.connect(appID, false, params.dataSpaceType, null);
+	os.clear();
+	os.close();
     }
 
-    private static void transactionTest(long appID, long[] oids,
-	    TestParams params) {
-
+    private static long[][] makeClusters(long[] oids, TestParams params) {
 	long[][] clusters;
+
 	try {
 	    clusters = FakeAppUtil.createRelatedClusters(oids,
 		    params.numObjs / params.clusterSize, params.clusterSize,
@@ -90,8 +112,15 @@ public class Test5 {
 	}
 	catch (Exception e) {
 	    e.printStackTrace(System.out);
-	    return ;
+	    return null;
 	}
+
+	return clusters;
+    }
+
+    private static void transactionTest(long appID, long[][] clusters,
+	    TestParams params)
+    {
 
 	System.out.println(params.toString());
 
@@ -128,7 +157,7 @@ public class Test5 {
 		    }
 		}
 	    }
-	    TestUtil.snooze(5000, "waiting for activity to drain");
+	    // TestUtil.snooze(5000, "waiting for activity to drain");
 	}
 	System.out.println("done");
     }
@@ -189,7 +218,7 @@ public class Test5 {
 	System.out.println("EE: elapsed " + elapsed +
 		" totalOps " + totalVisited);
 
-	System.out.println("ave " +
+	System.out.println("RESULT ave " +
 	    	    (doLock ? "LOCK: " : "PEEK: ") + ave + " ms" + 
 		    " trans size " + opsPerTrans + " objSize " + params.objSize);
 
@@ -259,7 +288,7 @@ public class Test5 {
 	System.out.println("EE: elapsed " + elapsed +
 		" totalOps " + totalVisited);
 
-	System.out.println("ave lookup speed: " + ave + " ms" +
+	System.out.println("RESULT ave LOOKUP speed: " + ave + " ms" +
 		" trans size " + opsPerTrans + " objSize " + params.objSize);
 	os.close();
     }
