@@ -28,6 +28,7 @@
     	<mkdir dir="release/apps/chat_test"/>
     	<mkdir dir="release/derby"/>
     	<mkdir dir="release/jrms"/>
+    	<mkdir dir="doc/doxygen" />
     </target>
 
 	<target name="clean">
