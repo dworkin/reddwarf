@@ -22,6 +22,7 @@ import java.util.Map.Entry;
 
 import com.sun.gi.objectstore.DeadlockException;
 import com.sun.gi.objectstore.NonExistantObjectIDException;
+import com.sun.gi.objectstore.ObjectStore;
 import com.sun.gi.objectstore.Transaction;
 import com.sun.gi.objectstore.tso.dataspace.DataSpace;
 import com.sun.gi.objectstore.tso.dataspace.DataSpaceTransactionImpl;
@@ -108,7 +109,7 @@ public class TSOTransaction implements Transaction {
 	 */
 	public long create(Serializable object, String name) {
 		if (!mainTrans.newName(name)){
-			return DataSpace.INVALID_ID;
+			return ObjectStore.INVALID_ID;
 		}
 		long id = mainTrans.create(object);
 		TSODataHeader hdr = new TSODataHeader(time, tiebreaker,
