@@ -11,6 +11,7 @@ import com.sun.gi.objectstore.tso.dataspace.monitor.GetNextIdTraceRecord;
 import com.sun.gi.objectstore.tso.dataspace.monitor.GetObjBytesTraceRecord;
 import com.sun.gi.objectstore.tso.dataspace.monitor.LockTraceRecord;
 import com.sun.gi.objectstore.tso.dataspace.monitor.LookupTraceRecord;
+import com.sun.gi.objectstore.tso.dataspace.monitor.NewNameTraceRecord;
 import com.sun.gi.objectstore.tso.dataspace.monitor.ReleaseTraceRecord;
 import com.sun.gi.objectstore.tso.dataspace.monitor.TraceRecord;
 import java.io.FileOutputStream;
@@ -212,6 +213,21 @@ public class MonitoredDataSpace implements DataSpace {
     }
 
     /**
+     * {@inheritDoc}
+     */
+    public boolean newName(String name) {
+	long startTime = loggingEnabled() ? System.currentTimeMillis() : -1;
+
+	boolean rc = dataSpace.newName(name);
+
+	if (loggingEnabled()) {
+	    log(new NewNameTraceRecord(startTime, name));
+	}
+
+	return rc;
+    }
+
+    /**
      * Enables/disables logging.
      *
      * @param val enable logging if <code>true</code>, disable
@@ -284,11 +300,4 @@ public class MonitoredDataSpace implements DataSpace {
 	}
     }
 
-	/* (non-Javadoc)
-	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#newName(java.lang.String)
-	 */
-	public boolean newName(String name) {
-		// TODO Auto-generated method stub
-		return false;
-	}
 }

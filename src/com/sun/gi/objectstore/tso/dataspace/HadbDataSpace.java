@@ -222,6 +222,7 @@ public class HadbDataSpace implements DataSpace {
 			null));
 	if (hadbHosts == null) {
 	    hadbHosts = "20.20.10.104:15025,20.20.10.103:15085,20.20.11.107:15105,20.20.10.101:15005,20.20.11.105:15065,20.20.10.102:15045";
+	    hadbHosts = "129.148.75.63:15025,129.148.75.60:15005";
 	}
 
 	hadbUserName = hadbParams.getProperty("dataspace.hadb.username",
@@ -263,15 +264,8 @@ public class HadbDataSpace implements DataSpace {
 
     /**
      * Drops all of the tables.  <p>
-     *
-     * This is private because it is not possible to drop the tables
-     * once the connections are established (and attempting to do so
-     * will lead to an inconsistent state):  the only place where this
-     * method can be successfully used (from what I can determine) is
-     * in the constructor of this object.  As soon as the prepared
-     * statements are set up, it's too late.
      */
-    private synchronized boolean dropTables() {
+    public synchronized boolean dropTables() {
 
 	System.out.println("INFO: Dropping all tables!");
 
@@ -501,6 +495,10 @@ public class HadbDataSpace implements DataSpace {
 
 	getIdStmnt = idConn.prepareStatement("SELECT * FROM " +
 		INFOTBLNAME + " I  " + "WHERE I.APPID = " + appID);
+
+	idConn.commit();
+	updateConn.commit();
+	readConn.commit();
     }
 
     private boolean createObjTable() {
@@ -1127,27 +1125,27 @@ public class HadbDataSpace implements DataSpace {
 	    idConn.commit();
 	    idConn.close();
 	} catch (SQLException e) {
-	    System.out.println("can't close idConn");
+	    System.out.println("can't close idConn " + e);
 	}
 
 	try {
 	    updateConn.commit();
 	    updateConn.close();
 	} catch (SQLException e) {
-	    System.out.println("can't close updateConn");
+	    System.out.println("can't close updateConn " + e);
 	}
 
 	try {
 	    schemaConn.close();
 	} catch (SQLException e) {
-	    System.out.println("can't close schemaConn");
+	    System.out.println("can't close schemaConn " + e);
 	}
 
 
 	try {
 	    readConn.close();
 	} catch (SQLException e) {
-	    System.out.println("can't close readConn");
+	    System.out.println("can't close readConn " + e);
 	}
 
 	System.out.println("CLOSED");
@@ -1155,12 +1153,12 @@ public class HadbDataSpace implements DataSpace {
 	closed = true;
     }
 
-	/* (non-Javadoc)
-	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#newName(java.lang.String)
-	 */
-	public boolean newName(String name) {
-		// TODO Auto-generated method stub
-		return false;
-	}
+    /*
+     * {@inheritDoc}
+     * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#newName(java.lang.String)
+     */
+    public boolean newName(String name) {
+	return false;
+    }
 
 }

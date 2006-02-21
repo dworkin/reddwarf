@@ -7,6 +7,8 @@ package com.sun.gi.objectstore.tso.dataspace.monitor;
 import com.sun.gi.objectstore.tso.dataspace.DataSpace;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Simple class to encapsulate the state of a trace replay.  <p>
@@ -19,6 +21,7 @@ import java.util.HashMap;
  */
 public class ReplayState {
 
+    private final Set<String> newNames = new HashSet<String>();
     private final Map<Long, Long> oidMap = new HashMap<Long, Long>();
     private final Map<String, Long> nameMap = new HashMap<String, Long>();
 
@@ -71,6 +74,15 @@ public class ReplayState {
 	    return nameMap.get(name);
 	} else {
 	    return DataSpace.INVALID_ID;
+	}
+    }
+
+    public synchronized boolean setNewName(String name) {
+	if (newNames.contains(name)) {
+	    return false;
+	} else {
+	    newNames.add(name);
+	    return true;
 	}
     }
 }
