@@ -219,6 +219,7 @@ public class ObjectCreator {
 	 * &&& should check whether oid is OK.
 	 */
 
+	// System.out.println("\tNew OID: " + oid);
 	return oid;
     }
 

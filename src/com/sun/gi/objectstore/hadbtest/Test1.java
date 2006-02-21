@@ -16,8 +16,8 @@ public class Test1 {
 
     static public void main(String[] args) {
 	try {
-	    DataSpace t1 = new HadbDataSpace(1, true);
-	    t1.close();
+	    // DataSpace t1 = new HadbDataSpace(1, true);
+	    // t1.close();
 	} catch (Exception e) {
 	    System.out.println("Exception: " + e);
 	    System.exit(1);

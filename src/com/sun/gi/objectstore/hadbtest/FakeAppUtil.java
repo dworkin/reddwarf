@@ -172,6 +172,26 @@ public class FakeAppUtil {
 	    results[2][i] = oids[pos++];
 	}
 
+	for (int i = 0; i < locks; i++) {
+	    for (int j = i + 1; j < locks; j++) {
+		if (results[1][i] == results[1][j]) {
+		    System.out.println("DOUBLE LOCKS");
+		}
+	    }
+	    for (int j = 0; j < promotedPeeks; j++) {
+		if (results[1][i] == results[2][j]) {
+		    System.out.println("DOUBLE LOCK/PROMOTED");
+		}
+	    }
+	}
+	for (int i = 0; i < promotedPeeks; i++) {
+	    for (int j = i + 1; j < promotedPeeks; j++) {
+		if (results[2][i] == results[2][j]) {
+		    System.out.println("DOUBLE PROMOTED");
+		}
+	    }
+	}
+
 	return results;
     }
 

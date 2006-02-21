@@ -32,8 +32,7 @@ public class ResetHadb {
 
 	try {
 	    // t1 = new HadbDataSpace(appID, true);
-	    t1 = new HadbDataSpace(appID, false);
-	    t1.dropTables();
+	    t1 = new HadbDataSpace(appID, true);
 	    t1.close();
 	} catch (Exception e) {
 	    System.out.println("FAILED");

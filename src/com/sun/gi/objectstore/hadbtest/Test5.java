@@ -40,7 +40,7 @@ public class Test5 {
 
 	ObjectStore os = TestUtil.connect(appID, true,
 		params.dataSpaceType, params.traceFileName);
-	os.clear();
+	// os.clear();
 
 	if (TestUtil.sanityCheck(os, "Hello, World", true)) {
 	    System.out.println("appears to work");
@@ -52,12 +52,12 @@ public class Test5 {
 	}
 	os.close();
 
-	params.numObjs = 1000;
+	params.numObjs = 10000;
 
 	for (int objSize = 1024; objSize <= 16 * 1024; objSize *= 2) {
 
-	    os = TestUtil.connect(appID, false, params.dataSpaceType, null);
-	    os.clear();
+	    os = TestUtil.connect(appID, true, params.dataSpaceType, null);
+	    // os.clear();
 
 	    /*
 	     * Create a bunch of objects, and then chop them up into clusters.
@@ -74,20 +74,18 @@ public class Test5 {
 
 	    os.close();
 
-	    /*
-	    lookupTest(appID, oids, params, 1, 5);
-	    lookupTest(appID, oids, params, 100, 5);
+	    lookupTest(appID, oids, params, 1, 1);
+	    lookupTest(appID, oids, params, 100, 1);
 
-	    accessTest(appID, oids, params, true, 1, 5);
-	    accessTest(appID, oids, params, true, 100, 5);
-	    accessTest(appID, oids, params, false, 1, 5);
-	    accessTest(appID, oids, params, false, 100, 5);
-	    */
+	    accessTest(appID, oids, params, true, 1, 1);
+	    accessTest(appID, oids, params, true, 100, 1);
+	    accessTest(appID, oids, params, false, 1, 1);
+	    accessTest(appID, oids, params, false, 100, 1);
 
 	    long[][] clusters = makeClusters(oids, params);
 
-	    for (int peeks = 1; peeks < 11; peeks += 2) {
-		for (int locks = 1; locks < 11; locks += 2) {
+	    for (int peeks = 2; peeks < 11; peeks += 2) {
+		for (int locks = 0; locks < 11; locks += 2) {
 		    params.transactionNumPeeks = peeks;
 		    params.transactionNumLocks = locks;
 		    params.transactionNumPromotedPeeks = 0;
@@ -204,8 +202,10 @@ public class Test5 {
 		    trans = os.newTransaction(null);
 		    trans.start();
 		}
-
 	    }
+	}
+	if (opsSeenInTrans > 0) {
+	    trans.commit();
 	}
 
 	endTime = System.currentTimeMillis();

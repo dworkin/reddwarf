@@ -100,6 +100,15 @@ class ClientTest5 implements Runnable {
 		System.out.println("unexpected exception: " + e);
 		e.printStackTrace(System.out);
 	    }
+
+	    if ((i % 20) == 0) {
+		System.out.println("\t\tx " + i + 
+			" iters " + iters +
+			" objSize " + objSize +
+			" peeks " + numPeeks +
+			" locks " + numLocks +
+			" promoted " + numPromotedPeeks);
+	    }
 	}
 	long now = System.currentTimeMillis();
 	long elapsed = now - start;
@@ -141,8 +150,25 @@ class ClientTest5 implements Runnable {
 	Transaction trans = os.newTransaction(null);
 	trans.start();
 
-	if (verbose) { System.out.println("peeks: "); }
+	/*
+	if (verbose) { System.out.print("peeks: "); }
+	for (int i = 0; i < peekOids.length; i++) {
+	    if (verbose) { System.out.print(peekOids[i] + " "); }
+	}
+	System.out.println();
+	if (verbose) { System.out.print("peekPromoted: "); }
+	for (int i = 0; i < promotedPeekOids.length; i++) {
+	    if (verbose) { System.out.print(promotedPeekOids[i] + " "); }
+	}
+	System.out.println();
+	if (verbose) { System.out.print("locks: "); }
+	for (int i = 0; i < lockOids.length; i++) {
+	    if (verbose) { System.out.print(lockOids[i] + " "); }
+	}
+	System.out.println();
+	*/
 
+	if (verbose) { System.out.println("peeks: "); }
 	for (int i = 0; i < peekOids.length; i++) {
 	    if (verbose) { System.out.print(peekOids[i] + " "); }
 	    FillerObject fo = (FillerObject) trans.peek(peekOids[i]); 
