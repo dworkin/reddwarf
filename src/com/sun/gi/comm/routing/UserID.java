@@ -33,6 +33,12 @@ public class UserID extends StatisticalUUID {
 		super(time,rand);
 	}
 	
+	/**
+	 * @param uid
+	 */
+	public UserID(UserID uid) {
+		super(uid);
+	}
 	public static UserID getLogicEngineID(){
 		return new UserID(-1,-1);
 	}

@@ -1,4 +1,4 @@
-package com.sun.gi.apps.commtest.client;
+package com.sun.gi.apps.chattest.client;
 
 import java.awt.BorderLayout;
 import java.awt.Component;

@@ -1,4 +1,4 @@
-package com.sun.gi.apps.commtest;
+package com.sun.gi.apps.chattest;
 
 import java.nio.ByteBuffer;
 import com.sun.gi.logic.SimBoot;
@@ -15,7 +15,7 @@ import java.util.ArrayList;
 
 import javax.security.auth.Subject;
 
-public class CommTestBoot
+public class ChatTestBoot
 	implements SimBoot, SimUserListener,
 		   SimUserDataListener, SimChannelListener {
 
@@ -108,7 +108,7 @@ public class CommTestBoot
     }
 
     /* (non-Javadoc)
-     * @see com.sun.gi.logic.SimChannelListener#dataArrived
+     * @see com.sun.gi.logic.SimChannelDataListener#dataArrived
      */
     public void dataArrived(SimTask task, ChannelID cid,
 	    UserID from, ByteBuffer buff) {

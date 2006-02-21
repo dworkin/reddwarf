@@ -20,4 +20,10 @@ public class ChannelID extends StatisticalUUID {
 	public ChannelID(byte[] bytes) throws InstantiationException{
 		super(bytes);
 	}
+	/**
+	 * @param cid
+	 */
+	public ChannelID(ChannelID cid) {
+		super(cid);
+	}
 }

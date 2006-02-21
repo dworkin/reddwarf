@@ -4,6 +4,8 @@ import java.io.*;
 import java.nio.*;
 import java.security.*;
 
+import com.sun.gi.comm.routing.UserID;
+
 /**
  * <p>Title: </p>
  * <p>Description: </p>
@@ -69,7 +71,14 @@ public class StatisticalUUID
     randomValue = byteBuffer.getLong();
   }
 
-  public int compareTo(Object object) {
+  /**
+ * @param uid
+ */
+public StatisticalUUID(StatisticalUUID uid) {
+	this(uid.timeValue,uid.randomValue);
+}
+
+public int compareTo(Object object) {
 	long otherTime=0;
 	long otherRand=0;
 	if (object instanceof StatisticalUUID){

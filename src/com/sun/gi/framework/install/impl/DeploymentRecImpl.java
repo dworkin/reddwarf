@@ -125,4 +125,12 @@ public class DeploymentRecImpl implements DeploymentRec {
 		return bootClass;
 	}
 
+	/**
+	 * @param classpath
+	 */
+	public void setClasspathURL(String classpath) {
+		classpathURL = classpath;
+		
+	}
+
 }
