@@ -460,7 +460,13 @@ INPUT =  src/com/sun/gi/logic/GLO.java \
 	 src/com/sun/gi/logic/SimTask.java \
 	 src/com/sun/gi/framework/rawsocket/SimRawSocketListener.java \
 	 src/com/sun/gi/comm/routing/UserID.java \
+	 src/com/sun/gi/comm/routing/ChannelID.java \
+	 src/com/sun/gi/utils/StatisticalUUID.java \
+	 src/com/sun/gi/utils/SGSUUID.java \
+	 src/com/sun/gi/gloutils/pdtimer \
+	 src/com/sun/gi/apps/chattest
 	 src/com/sun/gi/comm/routing/ChannelID.java
+
 
 # If the value of the INPUT tag contains directories, you can use the 
 # FILE_PATTERNS tag to specify one or more wildcard pattern (like *.cpp 
