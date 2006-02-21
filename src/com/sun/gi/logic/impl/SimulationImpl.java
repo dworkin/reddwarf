@@ -133,10 +133,13 @@ public class SimulationImpl implements Simulation {
 		if (bootObjectID == ObjectStore.INVALID_ID) {
 		    // boot object doesn't exist; create it
 		    bootObjectID =
-			trans.create((GLO) bootclass.newInstance(), "BOOT");
-		    firstTime = true;
+		    	trans.create((GLO) bootclass.newInstance(), "BOOT");
+		    if (bootObjectID == ObjectStore.INVALID_ID){ //we lost a create race
+		    	bootObjectID = trans.lookup("BOOT");
+		    } else {
+		    	firstTime = true;
+		    }
 		}
-
 		trans.commit();
 		queueTask(newTask(bootObjectID,
 		    startMethod, new Object[] { firstTime }));
@@ -200,7 +203,11 @@ public class SimulationImpl implements Simulation {
      *
      */
     public void addUserListener(GLOReference ref) {
-	userListeners.add(new Long(((GLOReferenceImpl) ref).objID));
+    	addUserListener(((GLOReferenceImpl) ref).objID);
+    }
+    
+    public void addUserListener(long objID){
+    	userListeners.add(objID);
     }
 
     // internal

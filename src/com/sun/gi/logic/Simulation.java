@@ -32,11 +32,12 @@ public interface Simulation {
    * Important: Any GLO that is going to listene for user events must implement
    * the SimUserListener interface.
    *
-   * @param ref SOReference A rference to a GLO so add to the user listeners list.
+   * @param l SOReference A rference to a GLO so add to the user listeners list.
    */
 
-
   public void addUserListener(GLOReference ref);
+
+  public void addUserListener(long l);
   
   /**
    * This is called  by the SimTask to actually register a user data listener.
