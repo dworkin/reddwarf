@@ -67,7 +67,7 @@ public class AtomicUpdateTraceRecord extends TraceRecord implements Serializable
 	    }
 	}
 
-	// TODO sten commented out to fix build
+	// TODO: sten commented out to fix build
 	
 //		try {
 //		    dataSpace.atomicUpdate(clear, newNames, mappedDeleteSet,

@@ -138,7 +138,9 @@ public class MonitoredDataSpace implements DataSpace {
 
     /**
      * {@inheritDoc}
+     * @deprecated
      */
+    // TODO: sten deprecated
     public void atomicUpdate(boolean clear,
 	    Map<String, Long> newNames, Set<Long> deleteSet,
 	    Map<Long, byte[]> updateMap, Set<Long> insertSet)
@@ -146,7 +148,7 @@ public class MonitoredDataSpace implements DataSpace {
     {
 	long startTime = loggingEnabled() ? System.currentTimeMillis() : -1;
 
-	// TODO sten commented out to fix build
+	// TODO: sten commented out to fix build
 	
 	//dataSpace.atomicUpdate(clear, newNames,
 	//	deleteSet, updateMap, insertSet);
@@ -220,7 +222,7 @@ public class MonitoredDataSpace implements DataSpace {
     public boolean newName(String name) {
 	long startTime = loggingEnabled() ? System.currentTimeMillis() : -1;
 
-	boolean rc = true; /*dataSpace.newName(name);*/  // TODO sten commented out to fix build
+	boolean rc = true; /*dataSpace.newName(name);*/  // TODO: sten commented out to fix build
 
 	if (loggingEnabled()) {
 	    log(new NewNameTraceRecord(startTime, name));

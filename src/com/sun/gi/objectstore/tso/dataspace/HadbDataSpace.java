@@ -971,7 +971,9 @@ public class HadbDataSpace implements DataSpace {
 
     /**
      * {@inheritDoc}
+     * @deprecated
      */
+    // TODO: sten deprecated
     public synchronized void atomicUpdate(boolean clear,
 	    Map<String, Long> newNames,
 	    Set<Long> deleteSet, Map<Long, byte[]> updateMap,
