@@ -53,18 +53,13 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 
 
 	private ClassLoader loader;	
-
-	private Map<String, Long> newNames = new HashMap<String, Long>();
-
-	private Set<Long> deleteSet = new HashSet<Long>();
 	
 	private Map<Long, Serializable> localObjectCache = new HashMap<Long,Serializable>();
 	
 	private Map<Long, byte[]> updateMap = new HashMap<Long,byte[]>();
 	
 	private Set<Long> locksHeld = new HashSet<Long>();
-	private Set<Long> insertSet = new HashSet<Long>();
-	
+
 	private boolean clear = false;
 	
 	
@@ -87,12 +82,8 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	 * 
 	 * @see com.sun.gi.objectstore.tso.DataSpaceTransaction#create(java.io.Serializable)
 	 */
-	public long create(Serializable object) {
-		Long objID = new Long(dataSpace.getNextID());
-		localObjectCache.put(objID,object);
-		updateMap.put(objID,serialize(object));
-		insertSet.add(objID);
-		return objID;
+	public long create(Serializable object, String name) {
+		return dataSpace.create(serialize(object),name);	
 	}
 
 	/*
@@ -101,8 +92,7 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	 * @see com.sun.gi.objectstore.tso.DataSpaceTransaction#destroy(long)
 	 */
 	public void destroy(long objectID) {
-		Long id = new Long(objectID);
-		deleteSet.add(id);
+		dataSpace.destroy(objectID);
 	}
 
 	/*
@@ -148,15 +138,7 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 		return null;
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.DataSpaceTransaction#registerName(java.lang.String,
-	 *      long)
-	 */
-	public void registerName(String name, long tsID) {
-		newNames.put(name, new Long(tsID));
-	}
+	
 
 	/*
 	 * (non-Javadoc)
@@ -217,9 +199,6 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	}
 	
 	private void resetTransaction(){
-		newNames.clear();
-		deleteSet.clear();
-		insertSet.clear();
 		updateMap.clear();
 		localObjectCache.clear();
 		//release left over locks
@@ -237,7 +216,7 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	 */
 	public void commit() {
 		try {
-			dataSpace.atomicUpdate(clear,newNames,deleteSet,updateMap,insertSet);
+			dataSpace.atomicUpdate(clear,updateMap);
 		} catch (DataSpaceClosedException e) {
 			
 			e.printStackTrace();
@@ -260,11 +239,8 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	 * 
 	 * @see com.sun.gi.objectstore.tso.DataSpaceTransaction#lookupName(java.lang.String)
 	 */
-	public long lookupName(String name) {		
-		Long l = newNames.get(name);
-		if (l==null){ // not in transaction, check data space
-			l = dataSpace.lookup(name);
-		}
+	public long lookupName(String name) {				
+		Long l = dataSpace.lookup(name);
 		if (l == null){
 			return DataSpace.INVALID_ID;
 		}
@@ -278,21 +254,7 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 		abort();		
 	}
 
-	/* (non-Javadoc)
-	 * @see com.sun.gi.objectstore.tso.DataSpaceTransaction#newName(java.lang.String)
-	 */
-	public boolean newName(String name) {
-		synchronized(newNames){
-			if (newNames.containsKey(name)){
-				return false;
-			}
-			return dataSpace.newName(name);
-		}		
-	}
-
-	/* (non-Javadoc)
-	 * @see com.sun.gi.objectstore.tso.DataSpaceTransaction#clear(long)
-	 */
+	
 
 
 }

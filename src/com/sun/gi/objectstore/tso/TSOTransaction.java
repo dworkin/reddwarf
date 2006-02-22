@@ -67,7 +67,7 @@ public class TSOTransaction implements Transaction {
 
 	private Map<Long, Serializable> lockedObjectsMap = new HashMap<Long, Serializable>();
 
-	private Map<Long, TSODataHeader> newObjectHeaders = new HashMap<Long,TSODataHeader>();
+	//private Map<Long, TSODataHeader> newObjectHeaders = new HashMap<Long,TSODataHeader>();
 
 	private boolean timestampInterrupted;
 
@@ -107,21 +107,18 @@ public class TSOTransaction implements Transaction {
 	 * @see com.sun.gi.objectstore.Transaction#create(java.io.Serializable,
 	 *      java.lang.String)
 	 */
-	public long create(Serializable object, String name) {
-		if (name!=null){
-			if (!mainTrans.newName(name)){
-				return ObjectStore.INVALID_ID;
-			}
-		}
-		long id = mainTrans.create(object);
+	public long create(Serializable object, String name) {				
 		TSODataHeader hdr = new TSODataHeader(time, tiebreaker,
-				transactionID, id);
-		long headerID = mainTrans.create(hdr);
-		if (name != null) {
-			mainTrans.registerName(name, headerID);
-		}
+				transactionID, ObjectStore.INVALID_ID);
+		long headerID = mainTrans.create(hdr,name);
+		if (headerID == DataSpace.INVALID_ID){
+			return ObjectStore.INVALID_ID;
+		}	
+		long id = mainTrans.create(object,null);
+		hdr.objectID = id;	
+		mainTrans.write(headerID,hdr);
 		lockedObjectsMap.put(headerID, object);
-		newObjectHeaders.put(headerID,hdr);
+		//newObjectHeaders.put(headerID,hdr);
 		return headerID;
 	}
 
@@ -244,14 +241,11 @@ public class TSOTransaction implements Transaction {
 		for (Entry<Long, Serializable> entry : lockedObjectsMap.entrySet()) {
 			Long l = entry.getKey();
 			try {
-				TSODataHeader hdr = newObjectHeaders.get(l);
-				if (hdr==null) {
-					keyTrans.lock(l);
-					hdr = (TSODataHeader) keyTrans.read(l);
-					hdr.free = true;
-					keyTrans.write(l, hdr);					
-					listeners.addAll(hdr.availabilityListeners);
-				}
+				keyTrans.lock(l);
+				TSODataHeader hdr = (TSODataHeader) keyTrans.read(l);
+				hdr.free = true;
+				keyTrans.write(l, hdr);					
+				listeners.addAll(hdr.availabilityListeners);
 				if (commit) {
 					mainTrans.write(hdr.objectID, entry.getValue());
 				}
@@ -264,8 +258,7 @@ public class TSOTransaction implements Transaction {
 			mainTrans.commit();
 		} else {
 			mainTrans.abort();
-		}
-		newObjectHeaders.clear();
+		}	
 		lockedObjectsMap.clear();
 		ostore.notifyAvailabilityListeners(listeners);
 		ostore.deregisterActiveTransaction(this);

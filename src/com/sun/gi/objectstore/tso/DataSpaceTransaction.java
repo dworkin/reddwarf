@@ -28,7 +28,7 @@ public interface DataSpaceTransaction {
 	 * @param object
 	 * @return
 	 */
-	long create(Serializable object);
+	long create(Serializable object, String name);
 
 	/**
 	 * @param objectID
@@ -41,12 +41,7 @@ public interface DataSpaceTransaction {
 	 * @throws NonExistantObjectIDException 
 	 */
 	Serializable read(long objectID) throws NonExistantObjectIDException;
-
-	/**
-	 * @param name
-	 * @param tsID
-	 */
-	void registerName(String name, long tsID);
+	
 
 	/**
 	 * @param objectID
@@ -87,9 +82,5 @@ public interface DataSpaceTransaction {
 	 */
 	long lookupName(String name);
 
-	/**
-	 * @param name
-	 * @return
-	 */
-	boolean newName(String name);
+	
 }

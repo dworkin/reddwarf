@@ -52,19 +52,12 @@ import com.sun.gi.objectstore.NonExistantObjectIDException;
 public class PersistantInMemoryDataSpace implements DataSpace {
 
 	class DiskUpdateRecord {
-		String[] newNames;
-
-		Long[] newNameIDs;
-
-		Long[] deleteIDs;
 
 		byte[][] updateData;
 
 		Long[] updateIDs;
 
 		long nextID;
-
-		private Set<Long> insertSet;
 
 		/**
 		 * @param updateIDs2
@@ -74,15 +67,10 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 		 * @param deleteIDs2
 		 * @param id
 		 */
-		public DiskUpdateRecord(Long[] updateIDs, byte[][] updateData,
-				Long[] nameIDs, String[] names, Long[] deleteIDs, long id,
-				Set<Long> insertSet) {
-			this.newNames = names;
-			this.newNameIDs = nameIDs;
-			this.deleteIDs = deleteIDs;
+		public DiskUpdateRecord(Long[] updateIDs, byte[][] updateData, long id) {
+
 			this.updateIDs = updateIDs;
 			this.updateData = updateData;
-			this.insertSet = insertSet;
 			this.nextID = id;
 		}
 
@@ -123,7 +111,8 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	private Connection conn;
 
 	private Connection updateConn;
-	
+
+	private Connection deleteInsertConn;
 
 	private PreparedStatement getObjStmnt;
 
@@ -142,10 +131,13 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	private PreparedStatement insertInfoStmnt;
 
 	private PreparedStatement deleteObjStmnt;
-	
+
 	private PreparedStatement clearObjTableStmnt;
+
 	private PreparedStatement lockObjTableStmnt;
+
 	private PreparedStatement clearNameTableStmnt;
+
 	private PreparedStatement lockNameTableStmnt;
 
 	private boolean closed = false;
@@ -156,9 +148,9 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 
 	private Object closeWaitMutex = new Object();
 
-	private static final boolean TRACEDISK=false;
-	
-	private int commitRegisterCounter=1;
+	private static final boolean TRACEDISK = false;
+
+	private int commitRegisterCounter = 1;
 
 	public PersistantInMemoryDataSpace(long appID) {
 		this.appID = appID;
@@ -182,7 +174,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 			// start update thread
 			new Thread(new Runnable() {
 				public void run() {
-					int commitCount=1;
+					int commitCount = 1;
 					while (true) {
 						DiskUpdateRecord rec = null;
 						synchronized (diskUpdateQueue) {
@@ -201,14 +193,15 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 							}
 						}
 						if (rec != null) {
-							if (TRACEDISK){
-								System.out.println("      Doing Commit #"+commitCount++);
+							if (TRACEDISK) {
+								System.out.println("      Doing Commit #"
+										+ commitCount++);
 							}
 							doDiskUpdate(rec);
 						}
 					}
 					synchronized (closeWaitMutex) {
-						done=true;
+						done = true;
 						closeWaitMutex.notifyAll();
 					}
 				}
@@ -224,62 +217,29 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	 * @param deleteList
 	 */
 	protected void doDiskUpdate(DiskUpdateRecord rec) {
-		if (TRACEDISK){
+		if (TRACEDISK) {
 			System.out.println("      Starting commit");
 		}
-		if (TRACEDISK && (rec.newNames.length>0)){
-			System.out.println("      Starting inserts");
-		}
-		for (int i = 0; i < rec.newNames.length; i++) {
-			if (TRACEDISK){
-				System.out.println("          Inserting " + rec.newNameIDs[i]);
-			}
-			try {
-				insertNameStmnt.setString(1, rec.newNames[i]);
-				insertNameStmnt.setLong(2, rec.newNameIDs[i]);
-				insertNameStmnt.execute();
-			} catch (SQLException e1) {
-				e1.printStackTrace();
-			}
-		}
-		if (TRACEDISK && (rec.updateData.length>0)){
+
+		if (TRACEDISK && (rec.updateData.length > 0)) {
 			System.out.println("      Starting updates");
 		}
 		for (int i = 0; i < rec.updateData.length; i++) {
-			if (TRACEDISK){
+			if (TRACEDISK) {
 				System.out.println("          Updating " + rec.updateIDs[i]);
 			}
-			try {
-				if (rec.insertSet.contains(rec.updateIDs[i])) { // new
-					insertObjStmnt.setLong(1, rec.updateIDs[i]);
-					insertObjStmnt.setBytes(2, rec.updateData[i]);
-					insertObjStmnt.execute();
-				} else { // update
-					updateObjStmnt.setBytes(1, rec.updateData[i]);
-					updateObjStmnt.setLong(2, rec.updateIDs[i]);
-					updateObjStmnt.execute();
-				}
+			try { // update
+				updateObjStmnt.setBytes(1, rec.updateData[i]);
+				updateObjStmnt.setLong(2, rec.updateIDs[i]);
+				updateObjStmnt.execute();
 			} catch (SQLException e1) {
 				e1.printStackTrace();
 			}
 		}
-		if (TRACEDISK && (rec.deleteIDs.length>0)){
-			System.out.println("      Starting deletes");
-		}
-		for (Long delid : rec.deleteIDs) {
-			if (TRACEDISK){
-				System.out.println("          Deleting " + delid);
-			}
-			try {
-				deleteObjStmnt.setLong(1, delid);
-				deleteObjStmnt.execute();
-			} catch (SQLException e1) {
-				e1.printStackTrace();
-			}
-		}
+
 		try {
-			if (TRACEDISK){
-				System.out.println("      Setting next ID = "+rec.nextID);
+			if (TRACEDISK) {
+				System.out.println("      Setting next ID = " + rec.nextID);
 			}
 			updateInfoStmnt.setLong(1, rec.nextID);
 			updateInfoStmnt.setLong(2, appID);
@@ -288,11 +248,11 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 			e1.printStackTrace();
 		}
 		try {
-			if (TRACEDISK){
+			if (TRACEDISK) {
 				System.out.println("      COmitting trans");
-			}			
+			}
 			updateConn.commit();
-			if (TRACEDISK){
+			if (TRACEDISK) {
 				System.out.println("      Trans comitted");
 			}
 		} catch (SQLException e1) {
@@ -306,8 +266,9 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	 * 
 	 */
 	private void checkTables() throws SQLException {
-		conn = getDataConnection();		
-		updateConn = getDataConnection();	
+		conn = getDataConnection();
+		updateConn = getDataConnection();
+		deleteInsertConn = getDataConnection();
 		DatabaseMetaData md = conn.getMetaData();
 		ResultSet rs = md.getTables(null, SCHEMA, OBJTBL, null);
 		if (rs.next()) {
@@ -363,22 +324,25 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 				+ " O  " + "WHERE O.OBJID = ?");
 		getNameStmnt = conn.prepareStatement("SELECT * FROM " + NAMETBLNAME
 				+ " N  " + "WHERE N.NAME = ?");
-		insertObjStmnt = updateConn.prepareStatement("INSERT INTO "
+		insertObjStmnt = deleteInsertConn.prepareStatement("INSERT INTO "
 				+ OBJTBLNAME + " VALUES(?,?)");
-		insertNameStmnt = updateConn.prepareStatement("INSERT INTO "
+		insertNameStmnt = deleteInsertConn.prepareStatement("INSERT INTO "
 				+ NAMETBLNAME + " VALUES(?,?)");
 		updateObjStmnt = updateConn.prepareStatement("UPDATE " + OBJTBLNAME
 				+ " SET OBJBYTES=? WHERE OBJID=?");
 		updateNameStmnt = updateConn.prepareStatement("UPDATE " + NAMETBLNAME
 				+ " SET NAME=? WHERE OBJID=?");
-		deleteObjStmnt = updateConn.prepareStatement("DELETE FROM "
+		deleteObjStmnt = deleteInsertConn.prepareStatement("DELETE FROM "
 				+ OBJTBLNAME + " WHERE OBJID = ?");
 		updateInfoStmnt = updateConn.prepareStatement("UPDATE " + INFOTBLNAME
 				+ " SET NEXTOBJID=? WHERE APPID=?");
-		lockObjTableStmnt = conn.prepareStatement("LOCK TABLE "+OBJTBLNAME+" IN EXCLUSIVE MODE");
-		clearObjTableStmnt = conn.prepareStatement("DELETE FROM "+OBJTBLNAME);
-		lockNameTableStmnt = conn.prepareStatement("LOCK TABLE "+NAMETBLNAME+" IN EXCLUSIVE MODE");
-		clearNameTableStmnt = conn.prepareStatement("DELETE FROM "+NAMETBLNAME);
+		lockObjTableStmnt = conn.prepareStatement("LOCK TABLE " + OBJTBLNAME
+				+ " IN EXCLUSIVE MODE");
+		clearObjTableStmnt = conn.prepareStatement("DELETE FROM " + OBJTBLNAME);
+		lockNameTableStmnt = conn.prepareStatement("LOCK TABLE " + NAMETBLNAME
+				+ " IN EXCLUSIVE MODE");
+		clearNameTableStmnt = conn.prepareStatement("DELETE FROM "
+				+ NAMETBLNAME);
 	}
 
 	/**
@@ -484,7 +448,8 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 		synchronized (dataSpace) {
 			if (!dataSpace.containsKey(objectID)) {
 				if (loadCache(objectID) == null) {
-					throw new NonExistantObjectIDException("Can't find objectID " + objectID);
+					throw new NonExistantObjectIDException(
+							"Can't find objectID " + objectID);
 				}
 			}
 		}
@@ -530,23 +495,18 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#atomicUpdate(long,
 	 *      boolean, java.util.Map, java.util.Set, java.util.Map)
 	 */
-	public void atomicUpdate(boolean clear, Map<String, Long> newNames,
-			Set<Long> deleteSet, Map<Long, byte[]> updateMap, Set<Long> insertIDs)
+	public void atomicUpdate(boolean clear, Map<Long, byte[]> updateMap)
 			throws DataSpaceClosedException {
 		if (closed) {
 			throw new DataSpaceClosedException();
 		}
 		synchronized (dataSpace) {
-			synchronized (nameSpace) {
-				for (Entry<Long, byte[]> e : updateMap.entrySet()) {
-					dataSpace.put(e.getKey(), new SoftReference<byte[]>(e
-							.getValue()));
-				}
-				nameSpace.putAll(newNames);
-				for (Long id : deleteSet) {
-					dataSpace.remove(id);
-				}
+
+			for (Entry<Long, byte[]> e : updateMap.entrySet()) {
+				dataSpace.put(e.getKey(), new SoftReference<byte[]>(e
+						.getValue()));
 			}
+
 		}
 		// asynchronously update the persistant storage
 		// IMPORTANT: This update record will pin the objects in memory and thus
@@ -558,33 +518,21 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 		// is the only time. Even in this case those lost must be atomic (all or
 		// nothing.)
 
-		Long[] nameIDs = new Long[newNames.values().size()];
-		String[] names = new String[newNames.keySet().size()];
-		int i = 0;
-		for (Entry<String, Long> e : newNames.entrySet()) {
-			nameIDs[i] = e.getValue();
-			names[i++] = e.getKey();
-		}
-		Long[] deleteIDs = new Long[deleteSet.size()];
-		i = 0;
-		for (Long l : deleteSet) {
-			deleteIDs[i++] = l;
-		}
 		Long[] updateIDs = new Long[updateMap.entrySet().size()];
 		byte[][] updateData = new byte[updateMap.entrySet().size()][];
-		i = 0;
+		int i = 0;
 		for (Entry<Long, byte[]> e : updateMap.entrySet()) {
 			updateIDs[i] = e.getKey();
 			updateData[i++] = e.getValue();
 		}
-		Set<Long> insertSet = new HashSet<Long>(insertIDs);
 		synchronized (diskUpdateQueue) {
-			if(!closed){ //closed while we were processing
-				if (TRACEDISK){
-					System.out.println("Queuing commit #"+commitRegisterCounter++);
+			if (!closed) { // closed while we were processing
+				if (TRACEDISK) {
+					System.out.println("Queuing commit #"
+							+ commitRegisterCounter++);
 				}
 				diskUpdateQueue.add(new DiskUpdateRecord(updateIDs, updateData,
-					nameIDs, names, deleteIDs, id, insertSet));
+						id));
 				diskUpdateQueue.notifyAll();
 			}
 		}
@@ -612,7 +560,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	 * @return
 	 */
 	private Long loadNameCache(String name) {
-		long retval = DataSpace.INVALID_ID;
+		Long retval = null;
 		synchronized (nameSpace) {
 			try {
 				getNameStmnt.setString(1, name);
@@ -620,7 +568,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 				conn.commit();
 				if (rs.next()) {
 					retval = rs.getLong("OBJID");
-					nameSpace.put(name, new Long(retval));
+					nameSpace.put(name, retval);
 				}
 				rs.close();
 			} catch (SQLException e) {
@@ -646,9 +594,9 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	 */
 	public void clear() {
 		try {
-			synchronized(diskUpdateQueue){
-				synchronized(dataSpace){
-					synchronized(nameSpace){
+			synchronized (diskUpdateQueue) {
+				synchronized (dataSpace) {
+					synchronized (nameSpace) {
 						dataSpace.clear();
 						nameSpace.clear();
 						diskUpdateQueue.clear();
@@ -657,13 +605,13 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 						clearObjTableStmnt.execute();
 						clearNameTableStmnt.execute();
 						conn.commit();
-						
+
 					}
 				}
 			}
-			
+
 		} catch (SQLException e) {
-			
+
 			e.printStackTrace();
 		}
 
@@ -675,8 +623,8 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#close()
 	 */
 	public void close() {
-		
-		synchronized(diskUpdateQueue){
+
+		synchronized (diskUpdateQueue) {
 			closed = true;
 			diskUpdateQueue.notifyAll();
 		}
@@ -691,17 +639,59 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 		}
 	}
 
-	/* (non-Javadoc)
-	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#newName(java.lang.String)
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#create(byte[],
+	 *      java.lang.String)
 	 */
-	public boolean newName(String name) {
-		synchronized(nameSpace){
-			if (nameSpace.containsKey(name)){
-				return false;
+	public long create(byte[] data, String name) {
+		Long id;
+		if (name != null) {
+			synchronized (nameSpace) {
+				id = lookup(name);
+				if (id != null) {
+					return DataSpace.INVALID_ID;
+				}
+
+				id = new Long(getNextID());
+				nameSpace.put(name, id);
 			}
-			nameSpace.put(name,null);
+			try {
+				insertNameStmnt.setString(1, name);
+				insertNameStmnt.setLong(2, id);
+				insertNameStmnt.execute();
+			} catch (SQLException e) {
+				e.printStackTrace();
+				return DataSpace.INVALID_ID;
+			}
+
+		} else {
+			id = new Long(getNextID());
 		}
-		return true;
+		synchronized (dataSpace) {
+			dataSpace.put(id, new SoftReference<byte[]>(data));
+		}
+		try {
+			insertObjStmnt.setLong(1, id);
+			insertObjStmnt.setBytes(2, data);
+			insertObjStmnt.execute();
+			deleteInsertConn.commit();
+		} catch (SQLException e) {
+			e.printStackTrace();
+			return DataSpace.INVALID_ID;
+		}
+		return id;
+	}
+
+	/*
+	 * (non-Javadoc)
+	 * 
+	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#destroy(long)
+	 */
+	public void destroy(long objectID) {
+		
+
 	}
 
 }

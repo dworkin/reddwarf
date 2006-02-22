@@ -148,18 +148,10 @@ public class InMemoryDataSpace implements DataSpace {
 	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#atomicUpdate(long,
 	 *      boolean, java.util.Map, java.util.Set, java.util.Map)
 	 */
-	public void atomicUpdate(boolean clear,
-			Map<String, Long> newNames, Set<Long> deleteSet,
-			Map<Long, byte[]> updateMap, Set<Long> insertSet) {		
+	public void atomicUpdate(boolean clear, Map<Long, byte[]> updateMap) {		
 		// insert set is ignored in this case as its uneeded detail
-		synchronized(dataSpace){
-			synchronized(nameSpace) {
-				dataSpace.putAll(updateMap);
-				nameSpace.putAll(newNames);
-				for (Long id : deleteSet) {
-					dataSpace.remove(id);
-				}								
-			}
+		synchronized(dataSpace){	
+			dataSpace.putAll(updateMap);										
 		}
 	}
 
@@ -193,7 +185,20 @@ public class InMemoryDataSpace implements DataSpace {
 		
 	}
 
-
+	public long create(byte[] data, String name){
+		long id = DataSpace.INVALID_ID;
+		synchronized(nameSpace){
+			if (nameSpace.containsKey(name)){
+				return DataSpace.INVALID_ID;
+			}
+			id = getNextID();
+			nameSpace.put(name,id);			
+		}
+		synchronized(dataSpace){
+			dataSpace.put(id,data);
+		}
+		return id;
+	}
 
 	/* (non-Javadoc)
 	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#close()
@@ -206,16 +211,15 @@ public class InMemoryDataSpace implements DataSpace {
 
 
 	/* (non-Javadoc)
-	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#newName(java.lang.String)
+	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#destroy(long)
 	 */
-	public boolean newName(String name) {
-		synchronized(nameSpace){
-			if (nameSpace.containsKey(name)){
-				return false;
-			}
-			nameSpace.put(name,null);
-			return true;
-		}		
+	public void destroy(long objectID) {
+		// TODO Auto-generated method stub
+		
 	}
+
+
+
+
 
 }

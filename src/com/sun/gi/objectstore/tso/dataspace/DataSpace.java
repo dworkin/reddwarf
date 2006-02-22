@@ -49,12 +49,26 @@ public interface DataSpace {
      *
      * (seems inconsistent to return null here and throw
      * NonExistantObjectIDException in other situations -DJE)
+     * (agreed.  There are also some functions that return Long 
+     * and others that return long.  The ones that return Long
+     * return null for error and the ones that return long return
+     * DataSpace.INVALID ID.  This should probably all get sorted 
+     * out post GDC... JK)  
      */
     byte[] getObjBytes(long objectID);
 
     /**
+     * A very basic locking mechanism.
+     * 
      * Blocks until the object with the given <em>objectID</em> is
      * available, locks the object, and returns.
+     * 
+     * Note that this is not a counting lock, calling lock twice on the 
+     * same ID is a deadlock situation as you will sit and wait for
+     * yourself to free the lock.
+     * 
+     * Also note that there is no notion of a lock owner.  Anyone who knows 
+     * the number can free a lock by calling release on it. 
      *
      * @param objectID the identifier of the object to lock
      *
@@ -67,7 +81,7 @@ public interface DataSpace {
      * Releases the lock on the object with the given
      * <em>objectID</em>.  <p>
      *
-     * Note that any thread may release any lock.  <p>
+     * Note that any thread may release any lock.  (see above.)<p>
      *
      * Also note that it is not an error to release the lock on an
      * object that is not currently locked, or to attempt to release
@@ -84,38 +98,23 @@ public interface DataSpace {
      *
      * The <code>updateMap</code> contains new bindings between object
      * identifiers and the byte arrays that represent their values. 
-     * The <code>insertSet</code> must contain the objectID for each
-     * element in the <code>updateMap</code> that represents a
-     * <em>new</em> object (a binding for a previously unbound object
-     * identifier).  This is important because implementations may
-     * handle insertions of new objects differently than updates of
-     * existing objects.
      *
      * @param clear <b>NOT USED IN CURRENT IMPL</b>
      *
-     * @param newNames new bindings between names and object
-     * identifiers
-     *
-     * @param deleteSet the set of identifiers of objects to delete
-     *
      * @param updateMap new bindings between object identifiers and
      * byte arrays
-     *
-     * @param insertSet new object identifiers
      *
      * @throws DataSpaceClosedException
      *
      * (What is <code>clear</code> supposed to do?  Or is this now
      * unused and should be removed?  -DJE)
      */
-    void atomicUpdate(boolean clear,
-		    Map<String, Long> newNames, Set<Long> deleteSet,
-		    Map<Long, byte[]> updateMap, Set<Long> insertSet)
+    void atomicUpdate(boolean clear, Map<Long, byte[]> updateMap)
 	    throws DataSpaceClosedException;
 
     /**
      * Returns the object identifier of the object with a given name
-     * (assigned via an {@link #atomicUpdate atomicUpdate}).  <p>
+     * (assigned via a {@link #create create}).  <p>
      *
      * If more than one object identifier is bound to the same name,
      * the identifier returned may be chosen arbitrarily from the set
@@ -139,8 +138,23 @@ public interface DataSpace {
     /**
      * Deletes the contents of the DataSpace and releases any locks
      * held on those contents.
+     * 
+     * Clear is an immediate (non-transactional) chnage to the
+     * DataSpace
      */
     void clear();
+    
+    /** creates a new element in the DataSpace
+     * If name is non-null and the name is already in the DataSpace then
+     * create will fail.  
+     * 
+     * Create is an immediate (non-transactional) chnage to the DataSpace.
+     * 
+     * @return objectID or DataSpace.Invalid_ID if it fails
+     */
+    
+    public long create(byte[] data,String name);
+    
 
     /**
      * Closes the DataSpace, preventing further updates.  <p>
@@ -156,10 +170,18 @@ public interface DataSpace {
      */
     void close();
 
-    /**
-     * @param name
-     * @return
-     */
-    boolean newName(String name);
+	/**
+	 * Destroys the object associated with objectID and removes the name
+	 * associated with that ID (if any.)
+	 * 
+	 * destroy is an immediate (non-transactional) change to the DataSpace.
+	 * 
+	 * @param objectID
+	 */
+	void destroy(long objectID);
+    
+    
+
+    
 
 }
