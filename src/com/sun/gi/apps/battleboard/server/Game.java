@@ -41,16 +41,6 @@ public class Game implements SimChannelMembershipListener {
 	    Collection<GLOReference> players) {
 
 	Game game = new Game(task, players);
-
-	// queue a new task to handle game start
-	try {
-	    task.queueTask(game.thisRef,
-		Game.class.getMethod("init", SimTask.class),
-		new Object[] { });
-	} catch (Exception e) {
-	    e.printStackTrace();
-	}
-
 	return game.thisRef;
     }
 
@@ -85,6 +75,10 @@ public class Game implements SimChannelMembershipListener {
 	channel = task.openChannel(gameName);
 	task.lock(channel, true);
 	task.addChannelMembershipListener(channel, thisRef);
+
+	sendJoinOK(task);
+	sendTurnOrder(task);
+	startNextMove(task);
     }
 
     protected GLOReference createBoard(SimTask task, String playerName) {
@@ -97,13 +91,6 @@ public class Game implements SimChannelMembershipListener {
 	GLOReference ref = task.createGLO(board);
 	log.finer("createBoard[" + playerName + "] returning " + ref);
 	return ref;
-    }
-
-    public void init(SimTask task) {
-	log.info("Running Game.init");
-	sendJoinOK(task);
-	sendTurnOrder(task);
-	startNextMove(task);
     }
 
     public void endGame(SimTask task) {
