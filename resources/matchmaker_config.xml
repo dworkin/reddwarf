@@ -1,0 +1,68 @@
+<Folder name="Root" description="Root Folder">
+
+	<Folder name="Newbies" description="Easy skill set">
+	
+		<Lobby 	name="Lords of the Jungle" 
+				description="New players only" 
+				password="secret"
+				maxPlayersInLobby="2"
+				allowHostToBoot="true"
+				allowHostToBootBan="false"
+				maxConnectionTime="2"	 >
+				
+			<GameParameters>
+			
+				<GameParameter name="timeLimit" value="15" />
+				<GameParameter name="gameType" value="Free For All" />
+				
+			</GameParameters>
+			
+		</Lobby>
+				
+		
+	</Folder>
+	
+	<Folder name="Advanced" description="Expert skill set">
+	
+		
+		<Lobby 	name="Baboons Rule!" 
+				description="Experienced players only" 
+				password="secret"
+				maxPlayersInLobby="2"
+				allowHostToBoot="true"
+				allowHostToBootBan="false"
+				canHostChangeSettingsAfterCreate="false"
+				maxConnectionTime="2"	 >
+				
+			<GameParameters>
+			
+				<GameParameter name="timeLimit" type="int" value="15" />
+				<GameParameter name="gameType" type="string" value="Team Play" />
+				
+			</GameParameters>
+			
+		</Lobby>
+		
+		<Folder name="Tournament" description="Experts compete one on one">
+		
+			<Lobby 	name="Tournaments of the Jungle" 
+					description="Tournament players only" 
+					password="secret"
+					maxPlayersInLobby="2"
+					allowHostToBoot="true"
+					allowHostToBootBan="false"
+					maxConnectionTime="2"	 >
+					
+				<GameParameters>
+				
+					<GameParameter name="timeLimit" value="15" />
+					<GameParameter name="gameType" value="Free For All" />
+					
+				</GameParameters>
+				
+			</Lobby>
+			
+		</Folder>				
+		
+	</Folder>	
+</Folder>
