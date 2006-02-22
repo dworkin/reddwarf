@@ -40,7 +40,7 @@ class DataObject
 }
 
 public class OstoreTest {
-  private static boolean TESTISOLATION = true;
+  private static boolean TESTISOLATION = false;
   public OstoreTest() {
   }
 
@@ -99,7 +99,7 @@ public class OstoreTest {
     System.out.println("Testing lock of a non existant object.");
     obj=null;
     try {
-		obj = (DataObject) t2.lock(5);
+		obj = (DataObject) t2.lock(Long.MAX_VALUE);
 		 System.out.println("ERROR: returned object.  Object: " + obj.toString());
 		 System.exit(2);
 	} catch (DeadlockException e2) {		

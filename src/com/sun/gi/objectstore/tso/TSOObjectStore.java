@@ -142,4 +142,11 @@ public class TSOObjectStore implements ObjectStore {
 		localTransactionIDMap.remove(trans.getUUID());
 		
 	}
+	/**
+	 * @param uuid
+	 */
+	public void requestTimeoutInterrupt(SGSUUID uuid) {
+		// TODO Auto-generated method stub
+		
+	}
 }

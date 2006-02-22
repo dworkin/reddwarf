@@ -46,6 +46,7 @@ public class SGSUserImpl implements SGSUser, TransportProtocolServer {
 	transport.setServer(this);
 	try {
 	    userID = new UserID();
+	    transport.deliverServerID(UserID.SERVER_ID.toByteArray());
 	} catch (InstantiationException e) {
 	    e.printStackTrace();
 	}

@@ -165,4 +165,9 @@ public interface TransportProtocol {
     public void deliverUserDisconnected(byte[] bs) throws IOException;
 
     public boolean isLoginPkt(ByteBuffer inputBuffer);
+
+	/**
+	 * @param bs
+	 */
+	public void deliverServerID(byte[] bs);
 }

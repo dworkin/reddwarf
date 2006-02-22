@@ -33,17 +33,22 @@ public class TSODataHeader  implements Serializable{
 		private static final long serialVersionUID = 5666201439015976463L;
 		public long time;
 		public long tiebreaker;
+		public long timeoutTime;
 		public SGSUUID uuid;
 		public boolean free;
+		public boolean createNotCommitted;
 		public Set<SGSUUID> availabilityListeners;
 		public long objectID;
 		
-		public TSODataHeader(long time, long tiebreaker,SGSUUID uuid, long objID){
+		public TSODataHeader(long time, long tiebreaker,long timeoutTime,
+				SGSUUID uuid, long objID){
 			this.time =time;
 			this.tiebreaker = tiebreaker;
 			this.uuid = uuid;
 			this.objectID = objID;
-			free = true;
+			this.timeoutTime = timeoutTime;
+			free = false; // create in locked state
+			createNotCommitted = true;
 			availabilityListeners = new HashSet<SGSUUID>();
 		}
 		
