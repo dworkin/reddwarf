@@ -1160,5 +1160,53 @@ public class HadbDataSpace implements DataSpace {
     public boolean newName(String name) {
 	return false;
     }
+    
+    // TODO: Sten inserted stubs to fix the build -- someone implement
+    
+    /**
+     * Atomically updates the DataSpace.  <p>
+     *
+     * The <code>updateMap</code> contains new bindings between object
+     * identifiers and the byte arrays that represent their values. 
+     *
+     * @param clear <b>NOT USED IN CURRENT IMPL</b>
+     *
+     * @param updateMap new bindings between object identifiers and
+     * byte arrays
+     *
+     * @throws DataSpaceClosedException
+     *
+     * (What is <code>clear</code> supposed to do?  Or is this now
+     * unused and should be removed?  -DJE)
+     */
+    public void atomicUpdate(boolean clear, Map<Long, byte[]> updateMap)
+	    throws DataSpaceClosedException {
+    	
+    }
+    
+    /** creates a new element in the DataSpace
+     * If name is non-null and the name is already in the DataSpace then
+     * create will fail.  
+     * 
+     * Create is an immediate (non-transactional) chnage to the DataSpace.
+     * 
+     * @return objectID or DataSpace.Invalid_ID if it fails
+     */
+    
+    public long create(byte[] data,String name) {
+    	return 0;
+    }
+    
+	/**
+	 * Destroys the object associated with objectID and removes the name
+	 * associated with that ID (if any.)
+	 * 
+	 * destroy is an immediate (non-transactional) change to the DataSpace.
+	 * 
+	 * @param objectID
+	 */
+	public void destroy(long objectID) {
+		
+	}
 
 }
