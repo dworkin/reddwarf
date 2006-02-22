@@ -507,9 +507,11 @@ public class SimulationImpl implements Simulation {
 			ByteBuffer.class });
 	    Object[] params = { from, data.duplicate() };
 	    List listeners = (List) userDataListeners.get(from);
-	    for (Iterator i = listeners.iterator(); i.hasNext();) {
-		long objID = ((Long) i.next()).longValue();
-		queueTask(newTask(objID, userJoinedMethod, params));
+	    if (listeners != null) {
+		    for (Iterator i = listeners.iterator(); i.hasNext();) {
+		    	long objID = ((Long) i.next()).longValue();
+		    	queueTask(newTask(objID, userJoinedMethod, params));
+		    }
 	    }
 	} catch (ClassNotFoundException ex) {
 	    ex.printStackTrace();

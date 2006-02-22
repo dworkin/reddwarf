@@ -26,6 +26,7 @@
     	<mkdir dir="release/apps/trivial_boot"/>
     	<mkdir dir="release/apps/battleboard"/>
     	<mkdir dir="release/apps/chat_test"/>
+    	<mkdir dir="release/apps/matchmaker"/>
     	<mkdir dir="release/derby"/>
     	<mkdir dir="release/jrms"/>
     	<mkdir dir="doc/doxygen" />
@@ -116,6 +117,15 @@
 			<include name="com/sun/gi/apps/battleboard/server/**" />
 		</javac>
 	</target>
+	
+	<target name="buildmatchmaker" depends="serverjar">
+		<echo message="${ant.project.name}: ${ant.file}" />
+		<javac srcdir="src" destdir="bin" source="5" target="5" debug="${debug}" optimize="${optimize}" deprecation="${deprecated}">
+			<!-- <compilerarg value="-Xlint:unchecked"/> -->
+			<classpath refid="project.classpath" />
+			<include name="com/sun/gi/apps/mcs/matchmaker/server/**" />
+		</javac>
+	</target>	
 
 	<!-- Runnable targets -->
 
@@ -156,6 +166,13 @@
 			<sysproperty key="java.util.logging.config.file" value="logging.properties" />
 		</java>
 	</target>
+	
+	<target name="MatchMakerClientTest">
+		<java classname="com.sun.gi.apps.mcs.matchmaker.client.test.MatchMakerClientTest" failonerror="true" fork="true">
+			<classpath refid="project.classpath" />
+			<sysproperty key="java.util.logging.config.file" value="logging.properties" />
+		</java>
+	</target>	
 
 	<!-- Release Targets -->
 	<target name="serverjar" depends="build">
@@ -174,10 +191,14 @@
 	<target name="battleboard" depends="buildbattleboard">
 		<jar destfile="release/apps/battleboard/BattleBoard.jar" basedir="bin" includes="com/sun/gi/apps/battleboard/server/**" />
 	</target>
+	
+	<target name="matchmaker" depends="buildmatchmaker">
+		<jar destfile="release/apps/matchmaker/MatchMakerTest.jar" basedir="bin" includes="com/sun/gi/apps/mcs/matchmaker/server/**" />
+	</target>	
 
 
 	<target name="release" depends="serverjar,trivialboot,
-		chattest, battleboard, doxygen">	
+		chattest, battleboard, matchmaker, doxygen">	
 		<copy file="resources/startDarkstar.sh" todir="release" />
 		<copy file="resources/startDiscovery.sh" todir="release" />
 		<chmod file="release/startDarkstar.sh" perm="755" />
@@ -187,6 +208,8 @@
 		<copy file="resources/Install.txt" todir="release" />
 		<copy file="resources/passwd.txt" todir="release" />
 		<copy file="resources/battleboard_deployment.xml" todir="release/apps/battleboard" />
+		<copy file="resources/matchmakertest_deployment.xml" todir="release/apps/matchmaker" />
+		<copy file="resources/matchmaker_config.xml" todir="release/apps/matchmaker" />
 		<copy file="resources/chat_test_deployment.xml" todir="release/apps/chat_test" />
 		<copy file="resources/trivial_boot_deployment.xml" todir="release/apps/trivial_boot" />
 		<copy todir="release/docs" >
