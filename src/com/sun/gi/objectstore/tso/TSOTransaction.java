@@ -162,6 +162,9 @@ public class TSOTransaction implements Transaction {
 	 */
 	public Serializable peek(long objectID) throws NonExistantObjectIDException {
 		TSODataHeader hdr = (TSODataHeader) mainTrans.read(objectID);
+		if (hdr.createNotCommitted){
+			return null;
+		}
 		return mainTrans.read(hdr.objectID);
 	}
 
