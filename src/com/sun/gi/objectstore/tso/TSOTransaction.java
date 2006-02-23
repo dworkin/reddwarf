@@ -52,7 +52,6 @@ public class TSOTransaction implements Transaction {
 
 	private TSOObjectStore ostore;
 
-
 	private SGSUUID transactionID;
 
 	private long time;
@@ -67,26 +66,29 @@ public class TSOTransaction implements Transaction {
 
 	private Map<Long, Serializable> lockedObjectsMap = new HashMap<Long, Serializable>();
 
-	//private Map<Long, TSODataHeader> newObjectHeaders = new HashMap<Long,TSODataHeader>();
+	private List<Long> createdIDsList = new ArrayList<Long>();
+
+	// private Map<Long, TSODataHeader> newObjectHeaders = new
+	// HashMap<Long,TSODataHeader>();
 
 	private boolean timestampInterrupted;
-	
-	private static  long TIMEOUT;
-	
+
+	private static long TIMEOUT;
+
 	{
-		TIMEOUT = 2000*60; //default timeout is 2 min
+		TIMEOUT = 2000 * 60; // default timeout is 2 min
 		String toStr = System.getProperty("sgs.objectstore.timeout");
-		if (toStr!=null){
+		if (toStr != null) {
 			TIMEOUT = Integer.parseInt(toStr);
 		}
 	}
 
 	// static init
 
-	TSOTransaction(TSOObjectStore ostore,  ClassLoader loader,
-			long time, long tiebreaker, DataSpace mainDataSpace) {
+	TSOTransaction(TSOObjectStore ostore, ClassLoader loader, long time,
+			long tiebreaker, DataSpace mainDataSpace) {
 
-		this.ostore = ostore;	
+		this.ostore = ostore;
 		this.loader = loader;
 		transactionID = new StatisticalUUID();
 		this.time = time;
@@ -118,28 +120,29 @@ public class TSOTransaction implements Transaction {
 	 * @see com.sun.gi.objectstore.Transaction#create(java.io.Serializable,
 	 *      java.lang.String)
 	 */
-	public long create(Serializable object, String name) {				
-		TSODataHeader hdr = new TSODataHeader(time, tiebreaker,
-				System.currentTimeMillis()+TIMEOUT,
-				transactionID, ObjectStore.INVALID_ID);
-		long headerID = createTrans.create(hdr,name);
-		if (headerID == DataSpace.INVALID_ID){ //we were beat there
+	public long create(Serializable object, String name) {
+		TSODataHeader hdr = new TSODataHeader(time, tiebreaker, System
+				.currentTimeMillis()
+				+ TIMEOUT, transactionID, ObjectStore.INVALID_ID);
+		long headerID = createTrans.create(hdr, name);
+		if (headerID == DataSpace.INVALID_ID) { // we were beat there
 			headerID = lookup(name);
 			try {
-				lock(headerID);	
-			} catch (NonExistantObjectIDException e) {				
+				lock(headerID);
+			} catch (NonExistantObjectIDException e) {
 				e.printStackTrace();
-			} //wait til we can acquire a lock
+			} // wait til we can acquire a lock
 			return ObjectStore.INVALID_ID;
 		}
-		long id = mainTrans.create(object,null);
-		hdr.objectID = id;	
-		createTrans.write(headerID,hdr);
+		long id = mainTrans.create(object, null);
+		hdr.objectID = id;
+		createTrans.write(headerID, hdr);
 		createTrans.commit();
 		hdr.free = true;
 		hdr.createNotCommitted = false;
-		mainTrans.write(headerID,hdr); //will free when mainTrans commits
+		mainTrans.write(headerID, hdr); // will free when mainTrans commits
 		lockedObjectsMap.put(headerID, object);
+		createdIDsList.add(headerID);
 		return headerID;
 	}
 
@@ -162,7 +165,7 @@ public class TSOTransaction implements Transaction {
 	 */
 	public Serializable peek(long objectID) throws NonExistantObjectIDException {
 		TSODataHeader hdr = (TSODataHeader) mainTrans.read(objectID);
-		if (hdr.createNotCommitted){
+		if (hdr.createNotCommitted) {
 			return null;
 		}
 		return mainTrans.read(hdr.objectID);
@@ -182,7 +185,7 @@ public class TSOTransaction implements Transaction {
 		keyTrans.lock(objectID);
 		TSODataHeader hdr = (TSODataHeader) keyTrans.read(objectID);
 		while (!hdr.free) {
-			if (System.currentTimeMillis() > hdr.timeoutTime){ // timed out
+			if (System.currentTimeMillis() > hdr.timeoutTime) { // timed out
 				ostore.requestTimeoutInterrupt(hdr.uuid);
 				hdr.free = true;
 			}
@@ -199,7 +202,7 @@ public class TSOTransaction implements Transaction {
 				ostore.requestTimestampInterrupt(hdr.uuid);
 			}
 			// System.out.println("Waiting for wakeup "+transactionID);
-			synchronized(this){
+			synchronized (this) {
 				if (!hdr.availabilityListeners.contains(transactionID)) {
 					hdr.availabilityListeners.add(transactionID);
 					keyTrans.write(objectID, hdr);
@@ -213,7 +216,7 @@ public class TSOTransaction implements Transaction {
 			keyTrans.lock(objectID);
 			hdr = (TSODataHeader) keyTrans.read(objectID);
 		}
-		if (hdr.createNotCommitted){
+		if (hdr.createNotCommitted) {
 			mainTrans.destroy(hdr.objectID);
 			mainTrans.destroy(objectID);
 			return null;
@@ -231,23 +234,23 @@ public class TSOTransaction implements Transaction {
 	}
 
 	/**
-	 * @param l 
+	 * @param l
 	 * 
 	 */
 	private void waitForWakeup(long l) {
-		//System.out.println("GOing into wait "+transactionID);
-		//System.out.flush();
+		// System.out.println("GOing into wait "+transactionID);
+		// System.out.flush();
 		synchronized (this) {
 			try {
-				
-				this.wait(l-System.currentTimeMillis());
-				
+
+				this.wait(l - System.currentTimeMillis());
+
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
 		}
-		//System.out.println("Coming out of wait "+transactionID);
-		//System.out.flush();
+		// System.out.println("Coming out of wait "+transactionID);
+		// System.out.flush();
 
 	}
 
@@ -270,34 +273,41 @@ public class TSOTransaction implements Transaction {
 		return mainTrans.lookupName(name);
 	}
 
-	private void processLockedObjects(boolean commit) {
+private void processLockedObjects(boolean commit) {
 		List<SGSUUID> listeners = new ArrayList<SGSUUID>();
-		for (Entry<Long, Serializable> entry : lockedObjectsMap.entrySet()) {
-			Long l = entry.getKey();
-			try {
-				keyTrans.lock(l);
-				TSODataHeader hdr = (TSODataHeader) keyTrans.read(l);
-				hdr.free = true;
-				keyTrans.write(l, hdr);					
-				listeners.addAll(hdr.availabilityListeners);
-				if (commit) {
-					mainTrans.write(hdr.objectID, entry.getValue());
+		synchronized(keyTrans){
+			for (Entry<Long, Serializable> entry : lockedObjectsMap.entrySet()) {
+				Long l = entry.getKey();
+				try {
+					keyTrans.lock(l);
+					TSODataHeader hdr = (TSODataHeader) keyTrans.read(l);
+					hdr.free = true;
+					keyTrans.write(l, hdr);					
+					listeners.addAll(hdr.availabilityListeners);
+					if (commit) {
+						mainTrans.write(hdr.objectID, entry.getValue());
+					}
+				} catch (NonExistantObjectIDException e) {
+					e.printStackTrace();
 				}
-			} catch (NonExistantObjectIDException e) {
-				e.printStackTrace();
 			}
+			keyTrans.commit();
 		}
-		keyTrans.commit();
 		if (commit) {
 			mainTrans.commit();
 		} else {
+			synchronized(keyTrans){
+				for(Long l : createdIDsList){
+					keyTrans.destroy(l);
+				}
+			}
 			mainTrans.abort();
 		}	
 		lockedObjectsMap.clear();
 		ostore.notifyAvailabilityListeners(listeners);
 		ostore.deregisterActiveTransaction(this);
 
-	} /*
+	}	/*
 		 * (non-Javadoc)
 		 * 
 		 * @see com.sun.gi.objectstore.Transaction#abort()
