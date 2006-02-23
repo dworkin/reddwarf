@@ -125,14 +125,16 @@ public class TSOTransaction implements Transaction {
 				.currentTimeMillis()
 				+ TIMEOUT, transactionID, ObjectStore.INVALID_ID);
 		long headerID = createTrans.create(hdr, name);
-		if (headerID == DataSpace.INVALID_ID) { // we were beat there
+		while (headerID == DataSpace.INVALID_ID) { // we were beat there
 			headerID = lookup(name);
 			try {
-				lock(headerID);
+				lock(headerID);				
+				return ObjectStore.INVALID_ID;
 			} catch (NonExistantObjectIDException e) {
-				e.printStackTrace();
-			} // wait til we can acquire a lock
-			return ObjectStore.INVALID_ID;
+				// means its been removed out from under us, so create is okay
+				// try again
+				 headerID = createTrans.create(hdr, name);
+			} // wait til we can acquire a lock			
 		}
 		long id = mainTrans.create(object, null);
 		hdr.objectID = id;

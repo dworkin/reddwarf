@@ -225,8 +225,11 @@ public class OstoreTest {
 		t1.start();		
 		final Transaction t2 = ostore.newTransaction(null);
 		t2.start();
-		long time = System.currentTimeMillis();
+		
 		DataObject obj = new DataObject(55, 3.14, "This is a test!");
+		
+		// commit test
+		long time = System.currentTimeMillis();
 		final long objid = t1.create(obj, "CreationTests");
 		if (objid == ObjectStore.INVALID_ID){
 			System.out.println("Error: invalid id from initial create");
@@ -261,6 +264,128 @@ public class OstoreTest {
 			e.printStackTrace();
 		} catch (NonExistantObjectIDException e) {
 			System.out.println("Failure: claims obj does not exist.");
+		}
+		
+		// abort test
+		t1.start();
+		t2.start();
+
+		
+		final long objid2 = t1.create(obj, "CreationTests2");
+		if (objid2 == ObjectStore.INVALID_ID){
+			System.out.println("Error: invalid id from initial create");
+			System.exit(1);
+		}
+		time = System.currentTimeMillis();
+		try {
+			(new Thread() {
+				public void run() {
+					try {
+						Thread.sleep(5000);
+					} catch (InterruptedException e) {
+
+						e.printStackTrace();
+					}
+					t1.abort();
+					System.out.println(".... t1 aborted");
+				}
+			}).start();
+			obj = (DataObject) t2.lock(objid2);
+			if (System.currentTimeMillis() < time + 5000) {
+				System.out.println("ERROR: did not block!");
+				System.exit(1);
+			} else {
+				if (obj != null) {
+					System.out.println("Error: blocked but failed to return null!");
+					System.exit(1);
+				}
+				System.out.println("Success: blocked til abort!");
+				t2.abort();
+			}
+		} catch (DeadlockException e) {
+			e.printStackTrace();
+		} catch (NonExistantObjectIDException e) {
+			System.out.println("Success: claims obj does not exist.");
+		}
+		
+		// create v. create and commit test
+		t1.start();
+		t2.start();
+
+		
+		final long objid3 = t1.create(obj, "CreationTests3");
+		if (objid3 == ObjectStore.INVALID_ID){
+			System.out.println("Error: invalid id from initial create");
+			System.exit(1);
+		}
+		time = System.currentTimeMillis();
+		try {
+			(new Thread() {
+				public void run() {
+					try {
+						Thread.sleep(5000);
+					} catch (InterruptedException e) {
+
+						e.printStackTrace();
+					}
+					t1.commit();
+					System.out.println(".... t1 aborted");
+				}
+			}).start();
+			long objid4 = t2.create(obj, "CreationTests3");
+			if (System.currentTimeMillis() < time + 5000) {
+				System.out.println("ERROR: did not block!");
+				System.exit(1);
+			} else {
+				if (objid4 != ObjectStore.INVALID_ID) {
+					System.out.println("Error: blocked but failed returned "+objid4);
+					System.exit(1);
+				}
+				System.out.println("Success: blocked til commit and returned INVALID_ID");
+				t2.abort();
+			}
+		} catch (DeadlockException e) {
+			e.printStackTrace();
+		}
+		
+//		 create v. create and abort test
+		t1.start();
+		t2.start();
+
+		
+		final long objid4 = t1.create(obj, "CreationTests4");
+		if (objid4 == ObjectStore.INVALID_ID){
+			System.out.println("Error: invalid id from initial create");
+			System.exit(1);
+		}
+		time = System.currentTimeMillis();
+		try {
+			(new Thread() {
+				public void run() {
+					try {
+						Thread.sleep(5000);
+					} catch (InterruptedException e) {
+
+						e.printStackTrace();
+					}
+					t1.abort();
+					System.out.println(".... t1 aborted");
+				}
+			}).start();
+			long objid5 = t2.create(obj, "CreationTests4");
+			if (System.currentTimeMillis() < time + 5000) {
+				System.out.println("ERROR: did not block!");
+				System.exit(1);
+			} else {
+				if (objid5 == ObjectStore.INVALID_ID) {
+					System.out.println("Error: blocked but failed returned INVALID_ID");
+					System.exit(1);
+				}
+				System.out.println("Success: blocked til abort and returned"+objid5);
+				t2.abort();
+			}
+		} catch (DeadlockException e) {
+			e.printStackTrace();
 		}
 		
 	}

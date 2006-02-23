@@ -17,6 +17,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -81,6 +82,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	private Map<Long, SoftReference<byte[]>> dataSpace = new LinkedHashMap<Long, SoftReference<byte[]>>();
 
 	private Map<String, Long> nameSpace = new LinkedHashMap<String, Long>();
+	private Map<Long,String> reverseNameSpace = new HashMap<Long,String>();
 
 	private Set<Long> lockSet = new HashSet<Long>();
 
@@ -131,6 +133,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	private PreparedStatement insertInfoStmnt;
 
 	private PreparedStatement deleteObjStmnt;
+	private PreparedStatement deleteNameStmnt;
 
 	private PreparedStatement clearObjTableStmnt;
 
@@ -334,6 +337,8 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 				+ " SET NAME=? WHERE OBJID=?");
 		deleteObjStmnt = deleteInsertConn.prepareStatement("DELETE FROM "
 				+ OBJTBLNAME + " WHERE OBJID = ?");
+		deleteNameStmnt = deleteInsertConn.prepareStatement("DELETE FROM "
+				+ NAMETBLNAME + " WHERE OBJID = ?");
 		updateInfoStmnt = updateConn.prepareStatement("UPDATE " + INFOTBLNAME
 				+ " SET NEXTOBJID=? WHERE APPID=?");
 		lockObjTableStmnt = conn.prepareStatement("LOCK TABLE " + OBJTBLNAME
@@ -599,6 +604,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 					synchronized (nameSpace) {
 						dataSpace.clear();
 						nameSpace.clear();
+						reverseNameSpace.clear();
 						diskUpdateQueue.clear();
 						lockObjTableStmnt.execute();
 						lockNameTableStmnt.execute();
@@ -656,6 +662,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 
 				id = new Long(getNextID());
 				nameSpace.put(name, id);
+				reverseNameSpace.put(id,name);
 			}
 			try {
 				insertNameStmnt.setString(1, name);
@@ -665,7 +672,6 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 				e.printStackTrace();
 				return DataSpace.INVALID_ID;
 			}
-
 		} else {
 			id = new Long(getNextID());
 		}
@@ -690,6 +696,29 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#destroy(long)
 	 */
 	public void destroy(long objectID) {
+		synchronized(nameSpace){
+			String name = reverseNameSpace.get(objectID);
+			if (name!=null){
+				reverseNameSpace.remove(objectID);
+				nameSpace.remove(name);
+			}
+		}
+		synchronized(dataSpace){
+			dataSpace.remove(objectID);
+		}
+		synchronized(deleteInsertConn){
+			try {
+				deleteObjStmnt.setLong(1,objectID);
+				deleteObjStmnt.execute();
+				deleteNameStmnt.setLong(1,objectID);
+				deleteNameStmnt.execute();
+				deleteInsertConn.commit();
+			} catch (SQLException e) {
+				
+				e.printStackTrace();
+			}
+			
+		}
 		
 
 	}
