@@ -17,6 +17,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
@@ -121,6 +122,8 @@ public class BattleBoardGame implements GLO{
 		new HashMap<UserID,String>();
 	Map<String,UserID> reverseScreenNames = 
 		new HashMap<String,UserID>();	
+	Map<UserID,GLOReference> idToGLORef = 
+		new HashMap<UserID,GLOReference>();
 	ChannelID controlChannel;
 	Map<UserID,BattleMap> playerMaps = new HashMap<UserID,BattleMap>();
 	private String gameName;
@@ -143,7 +146,8 @@ public class BattleBoardGame implements GLO{
 					"BATTLEBOARD ERROR: Tried to add too many players");
 			return;
 		}
-		playingList.add(uid);		
+		playingList.add(uid);
+		idToGLORef.put(uid,playerRef);
 	}
 
 	/**
@@ -320,7 +324,19 @@ public class BattleBoardGame implements GLO{
 	 * 
 	 */
 	private void gameOver() {
-		// TODO Auto-generated method stub
+		SimTask task = SimTask.getCurrent();
+		UserID uid = playingList.get(currentPlayer);
+		for(Entry<UserID,GLOReference> entry : idToGLORef.entrySet()){
+			GLOReference ref = entry.getValue();
+			BattleBoardPlayer player = 
+				(BattleBoardPlayer)ref.get(task);
+			if (uid.equals(entry.getKey())){
+				player.wins++;
+			} else {
+				player.losses++;
+			}
+		}
+		
 		
 	}
 
