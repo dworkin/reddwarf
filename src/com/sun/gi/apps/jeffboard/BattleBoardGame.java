@@ -177,16 +177,24 @@ public class BattleBoardGame implements GLO{
 				playerIterator = screenNames.keySet().iterator();
 			}
 			currentPlayer = playerIterator.next();
-			if ((currentPlayer!=lastPlayer)&&(currentPlayer.isAlive()){
+			GLOReference cpref = playerList.get(currentPlayer);
+			BattleBoardPlayer playerGLO = 
+				(BattleBoardPlayer)cpref.peek(task);
+			if ((currentPlayer!=lastPlayer)&&(playerGLO.isAlive())){
 				stillPlaying=true;
 				break;
 			}
 		}
 		if (stillPlaying){
-			task.sendData(currentPlayer,new UserID[]{to},
+			task.sendData(gameChannel,new UserID[]{currentPlayer},
 					ByteBuffer.wrap("your-move".getBytes()),true);
 		} else {
-			
+			task.sendData(gameChannel,new UserID[]{currentPlayer},
+					ByteBuffer.wrap("winner".getBytes()),true);
+			for(UserID uid : screenNames.keySet()){
+				task.sendData(gameChannel,new UserID[]{currentPlayer},
+						ByteBuffer.wrap("game-over".getBytes()),true);
+			}
 		}
 		
 		

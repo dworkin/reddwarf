@@ -14,6 +14,7 @@ import java.util.Set;
 
 import javax.security.auth.Subject;
 
+import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimBoot;
@@ -31,6 +32,9 @@ import com.sun.gi.logic.SimUserListener;
  */
 public class BattleBoardBoot implements SimBoot,SimUserListener{
 	GLOReference currentlyFillingGame = null;
+	ChannelID controlChannel;
+	long gameCounter=0;
+	
 	/* (non-Javadoc)
 	 * @see com.sun.gi.logic.SimBoot#boot(com.sun.gi.logic.GLOReference, boolean)
 	 */
@@ -40,6 +44,7 @@ public class BattleBoardBoot implements SimBoot,SimUserListener{
 		}
 		SimTask task = SimTask.getCurrent();
 		task.addUserListener(thisGLO);
+		controlChannel = task.openChannel("matchmaker");
 	}
 
 	/* (non-Javadoc)
@@ -62,7 +67,7 @@ public class BattleBoardBoot implements SimBoot,SimUserListener{
 		}
 		task.addUserDataListener(uid,playerRef);
 		BattleBoardGame game = getCurrentlyFillingGame(task);
-		game.addPlayer(playerRef);
+		game.addPlayer(playerRef,uid);
 		if (game.isFull()){
 			nextGame();
 		}
@@ -81,7 +86,9 @@ public class BattleBoardBoot implements SimBoot,SimUserListener{
 	 */
 	private BattleBoardGame getCurrentlyFillingGame(SimTask task) {
 		if (currentlyFillingGame==null){
-			currentlyFillingGame = task.createGLO(new BattleBoardGame());
+			currentlyFillingGame = task.createGLO(
+				new BattleBoardGame(controlChannel,
+						"BattleBoard"+gameCounter++));
 		}
 		return null;
 	}

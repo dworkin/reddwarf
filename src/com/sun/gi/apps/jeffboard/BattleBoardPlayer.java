@@ -13,6 +13,7 @@ import java.nio.ByteBuffer;
 
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
+import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.SimUserDataListener;
 
 /**
@@ -24,7 +25,7 @@ import com.sun.gi.logic.SimUserDataListener;
  * @author Jeff Kesselman
  * @version 1.0
  */
-public class BattleBoardPlayer implements SimUserDataListener{
+public class BattleBoardPlayer implements GLO, SimUserDataListener{
 	String playerName;
 	long wins=0;
 	long losses=0;
@@ -65,6 +66,14 @@ public class BattleBoardPlayer implements SimUserDataListener{
 	public void dataArrivedFromChannel(ChannelID id, UserID from, ByteBuffer buff) {
 		// TODO Auto-generated method stub
 		
+	}
+
+	/**
+	 * @return
+	 */
+	public boolean isAlive() {
+		// TODO Auto-generated method stub
+		return false;
 	}
 
 }
