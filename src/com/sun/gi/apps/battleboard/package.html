@@ -170,11 +170,19 @@ Server-Initiated
     This information is not necessary for game-play but may be used by
     the clients to organize their display.  <p>
 
-<li> <kbd>your-move</kbd> <p>
 
-    A player recieves this message when the system is waiting for him
-    or her to make their move.  They must respond with a message of
-    one of the following forms:  <p>
+<li> <kbd>move-started</kbd> <em>player</em> <p>
+
+    Indicates that it is the given player's turn. <p>
+
+    All players receive this message when a move is started.  The
+    player who is named is to then make a move.  All other players
+    wait until the move-ended message for the result.
+
+    <p>
+
+    The named player must respond to the server with a message of one
+    of the following forms:  <p>
 
     <blockquote>
     <kbd>move</kbd> <em>bombed-player</em> <em>x</em> <em>y</em>
@@ -194,13 +202,6 @@ Server-Initiated
     is sent by the server and the <kbd>move</kbd> message is received, and
     the <em>bombed-player</em> is the withdrawn player, then the the player
     will immediately recieve another <kbd>your-move</kdb> message. <p>
-
-<li> <kbd>move-started</kbd> <em>player</em> <p>
-
-    Indicates that it is the indicated players turn. <p>
-
-    (do we need to send one of these to the player?  Is this redundant
-    wrt <kbd>your-move</kbd>?) <p>
 
 <li> <kbd>move-ended</kbd> <em>player</em> <kbd>pass</kbd> <p>
 
