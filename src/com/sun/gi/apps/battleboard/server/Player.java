@@ -1,3 +1,43 @@
+/*
+ * $Id$
+ *
+ * Copyright 2006 Sun Microsystems, Inc. All Rights Reserved.
+ *
+ * Redistribution and use in source and binary forms, with or
+ * without modification, are permitted provided that the following
+ * conditions are met:
+ *
+ * -Redistributions of source code must retain the above copyright
+ * notice, this  list of conditions and the following disclaimer.
+ *
+ * -Redistribution in binary form must reproduct the above copyright
+ * notice, this list of conditions and the following disclaimer in
+ * the documentation and/or other materials provided with the
+ * distribution.
+ *
+ * Neither the name of Sun Microsystems, Inc. or the names of
+ * contributors may be used to endorse or promote products derived
+ * from this software without specific prior written permission.
+ *
+ * This software is provided "AS IS," without a warranty of any
+ * kind. ALL EXPRESS OR IMPLIED CONDITIONS, REPRESENTATIONS AND
+ * WARRANTIES, INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE OR NON-INFRINGEMENT, ARE HEREBY
+ * EXCLUDED. SUN AND ITS LICENSORS SHALL NOT BE LIABLE FOR ANY
+ * DAMAGES OR LIABILITIES  SUFFERED BY LICENSEE AS A RESULT OF  OR
+ * RELATING TO USE, MODIFICATION OR DISTRIBUTION OF THE SOFTWARE OR
+ * ITS DERIVATIVES. IN NO EVENT WILL SUN OR ITS LICENSORS BE LIABLE
+ * FOR ANY LOST REVENUE, PROFIT OR DATA, OR FOR DIRECT, INDIRECT,
+ * SPECIAL, CONSEQUENTIAL, INCIDENTAL OR PUNITIVE DAMAGES, HOWEVER
+ * CAUSED AND REGARDLESS OF THE THEORY OF LIABILITY, ARISING OUT OF
+ * THE USE OF OR INABILITY TO USE SOFTWARE, EVEN IF SUN HAS BEEN
+ * ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+ *
+ * You acknowledge that Software is not designed, licensed or
+ * intended for use in the design, construction, operation or
+ * maintenance of any nuclear facility.
+ */
+
 package com.sun.gi.apps.battleboard.server;
 
 import com.sun.gi.logic.GLO;
@@ -35,31 +75,6 @@ public class Player implements SimUserDataListener {
     protected GLOReference myGameRef;
     protected String       myNick;
 
-    public static Player instanceFor(SimTask task, UserID uid,
-	    Subject subject) {
-
-
-	String userName = subject.getPrincipals().iterator().next().getName();
-	Player player = new Player (userName, uid);
-
-	// check that the player doesn't already exist
-	/*
-	GLOReference playerRef = getRef(task, uid);
-	if (playerRef != null) {
-	    playerRef.delete(task);
-	}
-	*/
-
-	log.info("Creating GLORef");
-	GLOReference playerRef = task.createGLO(player, gloKeyForUID(uid));
-
-	// We're interested in direct server data sent by the user.
-	log.info("Adding userDataListener");
-	task.addUserDataListener(uid, playerRef);
-
-	return player;
-    }
-
     public static GLOReference getRef(SimTask task, UserID uid) {
 	return task.findGLO(gloKeyForUID(uid));
     }
@@ -67,10 +82,6 @@ public class Player implements SimUserDataListener {
     public static Player get(SimTask task, UserID uid) {
 	GLOReference ref = getRef(task, uid);
 	return (Player) ref.get(task);
-    }
-
-    protected static String gloKeyForUID(UserID uid) {
-	return Pattern.compile("\\W+").matcher(uid.toString()).replaceAll("");
     }
 
     protected Player(String userName, UserID uid) {
@@ -117,6 +128,53 @@ public class Player implements SimUserDataListener {
 	myNick = nickname;
     }
 
+
+    protected static String gloKeyForUID(UserID uid) {
+	return Pattern.compile("\\W+").matcher(uid.toString()).replaceAll("");
+    }
+
+
+    // Static versions of the SimUserListener methods
+
+    public static void userJoined(SimTask task, UserID uid, Subject subject) {
+	log.info("User " + uid + " joined server, subject = " + subject);
+
+	// Idea: return as quickly as possible, queueing any extra work
+	// so the parent userJoin handler has less contention.
+
+	String gloKey = gloKeyForUID(uid);
+
+	// check that the player doesn't already exist
+	/*
+	GLOReference playerRef = getRef(task, uid);
+	if (playerRef != null) {
+	    // delete it? update it with this uid?
+	    // kick the new guy off? kick the old guy?
+	}
+	*/
+
+	String userName = subject.getPrincipals().iterator().next().getName();
+	Player player = new Player (userName, uid);
+
+	GLOReference playerRef = task.createGLO(player, gloKey);
+
+	// We're interested in direct server data sent by the user.
+	task.addUserDataListener(uid, playerRef);
+
+	mm.addUserID(task, uid);
+    }
+
+    public static void userLeft(SimTask task, UserID uid) {
+	log.info("User " + uid + " left server");
+
+	// XXX in the future we may want the player object to persist.
+	GLOReference playerRef = Player.getRef(task, uid);
+	if (playerRef != null) {
+	    playerRef.delete(task);
+	}
+
+    }
+
     // SimUserDataListener methods
 
     public void userJoinedChannel(SimTask task, ChannelID cid, UserID uid) {
@@ -138,13 +196,10 @@ public class Player implements SimUserDataListener {
 
 	if (myGameRef != null) {
 	    // XXX: this currently supports only one game per player
-	    Game game = (Game) myGameRef.get(task);
-	    game.userDataReceived(task, myUserID, data);
+	    ((Game) myGameRef.get(task)).userDataReceived(task, myUserID, data);
 	} else {
 	    // If no game, dispatch to the matchmaker
-	    GLOReference ref = Matchmaker.instance(task);
-	    Matchmaker mm = (Matchmaker) ref.get(task);
-	    mm.userDataReceived(task, uid, data);
+	    Matchmaker.get(task).userDataReceived(task, uid, data);
 	}
     }
 

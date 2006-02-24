@@ -1,13 +1,53 @@
+/*
+ * $Id$
+ *
+ * Copyright 2006 Sun Microsystems, Inc. All Rights Reserved.
+ *
+ * Redistribution and use in source and binary forms, with or
+ * without modification, are permitted provided that the following
+ * conditions are met:
+ *
+ * -Redistributions of source code must retain the above copyright
+ * notice, this  list of conditions and the following disclaimer.
+ *
+ * -Redistribution in binary form must reproduct the above copyright
+ * notice, this list of conditions and the following disclaimer in
+ * the documentation and/or other materials provided with the
+ * distribution.
+ *
+ * Neither the name of Sun Microsystems, Inc. or the names of
+ * contributors may be used to endorse or promote products derived
+ * from this software without specific prior written permission.
+ *
+ * This software is provided "AS IS," without a warranty of any
+ * kind. ALL EXPRESS OR IMPLIED CONDITIONS, REPRESENTATIONS AND
+ * WARRANTIES, INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE OR NON-INFRINGEMENT, ARE HEREBY
+ * EXCLUDED. SUN AND ITS LICENSORS SHALL NOT BE LIABLE FOR ANY
+ * DAMAGES OR LIABILITIES  SUFFERED BY LICENSEE AS A RESULT OF  OR
+ * RELATING TO USE, MODIFICATION OR DISTRIBUTION OF THE SOFTWARE OR
+ * ITS DERIVATIVES. IN NO EVENT WILL SUN OR ITS LICENSORS BE LIABLE
+ * FOR ANY LOST REVENUE, PROFIT OR DATA, OR FOR DIRECT, INDIRECT,
+ * SPECIAL, CONSEQUENTIAL, INCIDENTAL OR PUNITIVE DAMAGES, HOWEVER
+ * CAUSED AND REGARDLESS OF THE THEORY OF LIABILITY, ARISING OUT OF
+ * THE USE OF OR INABILITY TO USE SOFTWARE, EVEN IF SUN HAS BEEN
+ * ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+ *
+ * You acknowledge that Software is not designed, licensed or
+ * intended for use in the design, construction, operation or
+ * maintenance of any nuclear facility.
+ */
+
 package com.sun.gi.apps.battleboard.server;
 
-import com.sun.gi.logic.GLO;
-import com.sun.gi.logic.SimChannelMembershipListener;
-import com.sun.gi.logic.SimTask;
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.comm.users.server.impl.SGSUserImpl;
 import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
+import com.sun.gi.logic.SimChannelMembershipListener;
+import com.sun.gi.logic.SimTask;
+
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Collections;
@@ -15,10 +55,17 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.logging.Level;
 import java.util.logging.Logger;
+
 import static com.sun.gi.apps.battleboard.client.BattleBoard.positionValue.*;
 
-public class Game implements SimChannelMembershipListener {
+/**
+ *
+ * @author  James Megquier
+ * @version $Rev$, $Date$
+ */
+public class Game implements ChannelListener {
 
     private static final long serialVersionUID = 1L;
 
@@ -41,6 +88,7 @@ public class Game implements SimChannelMembershipListener {
 	    Collection<GLOReference> players) {
 
 	Game game = new Game(task, players);
+
 	return game.thisRef;
     }
 
@@ -51,34 +99,43 @@ public class Game implements SimChannelMembershipListener {
 
 	log.finer("Next game channel is `" + gameName + "'");
 
-	thisRef = task.createGLO(this, gameName);
-
-	players = new LinkedList(newPlayers);
+	players = new LinkedList<GLOReference>(newPlayers);
 	Collections.shuffle(players);
 
-	spectators = new LinkedList();
+	spectators = new LinkedList<GLOReference>();
 
 	playerBoards = new HashMap<String, GLOReference>();
 	for (GLOReference playerRef : players) {
 	    Player p = (Player) playerRef.get(task);
 	    playerBoards.put(p.getNickname(),
 		createBoard(task, p.getNickname()));
-	    p.gameStarted(thisRef);
 	}
 
-	log.fine("playerBoards size " + playerBoards.size());
-	for (Map.Entry<String, GLOReference> x : playerBoards.entrySet()) {
-	    log.fine("playerBoard[ " + x.getKey() +
-	      "]=`" + x.getValue() + "'");
+	if (log.isLoggable(Level.FINE)) {
+	    log.fine("playerBoards size " + playerBoards.size());
+	    for (Map.Entry<String, GLOReference> x : playerBoards.entrySet()) {
+		log.fine("playerBoard[" + x.getKey() + "]=`" +
+		    x.getValue() + "'");
+	    }
 	}
 
 	channel = task.openChannel(gameName);
 	task.lock(channel, true);
+
+	// XXX only now is it safe to create thisRef, since this
+	// game is fully initialized.
+	thisRef = task.createGLO(this, gameName);
+	newThis = (Game) thisRef.get(task);
+
+	for (GLOReference playerRef : players) {
+	    Player p = (Player) playerRef.get(task);
+	    p.gameStarted(thisRef);
+	}
 	task.addChannelMembershipListener(channel, thisRef);
 
-	sendJoinOK(task);
-	sendTurnOrder(task);
-	startNextMove(task);
+	newThis.sendJoinOK(task);
+	newThis.sendTurnOrder(task);
+	newThis.startNextMove(task);
     }
 
     protected GLOReference createBoard(SimTask task, String playerName) {
@@ -88,7 +145,8 @@ public class Game implements SimChannelMembershipListener {
 		DEFAULT_BOARD_HEIGHT,
 		DEFAULT_BOARD_CITIES);
 	board.populate();
-	GLOReference ref = task.createGLO(board);
+	GLOReference ref = task.createGLO(board,
+	    gameName + "-board-" + playerName);
 	log.finer("createBoard[" + playerName + "] returning " + ref);
 	return ref;
     }

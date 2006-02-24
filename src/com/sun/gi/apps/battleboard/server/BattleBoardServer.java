@@ -1,5 +1,41 @@
 /*
  * $Id$
+ *
+ * Copyright 2006 Sun Microsystems, Inc. All Rights Reserved.
+ *
+ * Redistribution and use in source and binary forms, with or
+ * without modification, are permitted provided that the following
+ * conditions are met:
+ *
+ * -Redistributions of source code must retain the above copyright
+ * notice, this  list of conditions and the following disclaimer.
+ *
+ * -Redistribution in binary form must reproduct the above copyright
+ * notice, this list of conditions and the following disclaimer in
+ * the documentation and/or other materials provided with the
+ * distribution.
+ *
+ * Neither the name of Sun Microsystems, Inc. or the names of
+ * contributors may be used to endorse or promote products derived
+ * from this software without specific prior written permission.
+ *
+ * This software is provided "AS IS," without a warranty of any
+ * kind. ALL EXPRESS OR IMPLIED CONDITIONS, REPRESENTATIONS AND
+ * WARRANTIES, INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE OR NON-INFRINGEMENT, ARE HEREBY
+ * EXCLUDED. SUN AND ITS LICENSORS SHALL NOT BE LIABLE FOR ANY
+ * DAMAGES OR LIABILITIES  SUFFERED BY LICENSEE AS A RESULT OF  OR
+ * RELATING TO USE, MODIFICATION OR DISTRIBUTION OF THE SOFTWARE OR
+ * ITS DERIVATIVES. IN NO EVENT WILL SUN OR ITS LICENSORS BE LIABLE
+ * FOR ANY LOST REVENUE, PROFIT OR DATA, OR FOR DIRECT, INDIRECT,
+ * SPECIAL, CONSEQUENTIAL, INCIDENTAL OR PUNITIVE DAMAGES, HOWEVER
+ * CAUSED AND REGARDLESS OF THE THEORY OF LIABILITY, ARISING OUT OF
+ * THE USE OF OR INABILITY TO USE SOFTWARE, EVEN IF SUN HAS BEEN
+ * ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+ *
+ * You acknowledge that Software is not designed, licensed or
+ * intended for use in the design, construction, operation or
+ * maintenance of any nuclear facility.
  */
 
 package com.sun.gi.apps.battleboard.server;
@@ -24,112 +60,47 @@ import java.util.logging.Logger;
 
 import javax.security.auth.Subject;
 
-public class BattleBoardServer
-	implements SimBoot, SimUserListener,SimUserDataListener {
+public class BattleBoardServer implements SimBoot, SimUserListener {
 
     private static final long serialVersionUID = 1L;
 
     private static Logger log =
 	Logger.getLogger("com.sun.gi.apps.battleboard.server");
 
-    protected GLOReference thisRef;
-    protected GLOReference matchmakerRef;
+    private GLOReference matchmakerRef;
 
     // SimBoot methods
 
-    public void boot(SimTask task, boolean firstBoot) {
+    /**
+     * Called by the SGS stack when this application is booted.
+     * If firstBoot is true, this call represents the first time boot()
+     * is being called on this application across all stacks.  Otherwise,
+     * this app has been booted already (and exists in the DataStore),
+     * and is simply being brought up in a new stack as well.
+
+     */
+    public void boot(GLOReference thisGLO, boolean firstBoot) {
 	log.info("Booting BattleBoard Server as appID " + task.getAppID());
 
 	// Get a reference to this object as a GLO
 	if (firstBoot) {
-	    thisRef = task.findGLO("BOOT");
-	    matchmakerRef = Matchmaker.instance(task);
+	    // Since firstBoot is called exactly once, we don't
+	    // need any fancy checks here; this must succeed.
+	    matchmakerRef = Matchmaker.create();
 	}
 
-	// Register for user join/leave
-	task.addUserListener(thisRef);
+        // Register this object as the handler for login- and
+	// disconnect-events for all users on this app.
+	task.addUserListener(thisGLO);
     }
 
     // SimUserListener methods
 
-    public void userJoined(SimTask task, UserID uid, Subject subject) {
-	log.info("User " + uid + " joined server, subject = " + subject);
-
-	Player player = Player.instanceFor(task, uid, subject);
-
-	try {
-	    task.queueTask(matchmakerRef,
-		Matchmaker.class.getMethod(
-		    "addUserID", SimTask.class, UserID.class),
-		new Object[] { uid });
-	} catch (Exception e) {
-	    e.printStackTrace();
-	}
+    public void userJoined(UserID uid, Subject subject) {
+	Player.userJoined(uid, subject);
     }
 
-    public void userLeft(SimTask task, UserID uid) {
-	log.info("User " + uid + " left server");
-
-	// XXX in the future we may want the player object to persist.
-	GLOReference playerRef = Player.getRef(task, uid);
-	if (playerRef != null) {
-	    playerRef.delete(task);
-	}
+    public void userLeft(UserID uid) {
+	Player.userLeft(uid);
     }
-
-	/* (non-Javadoc)
-	 * @see com.sun.gi.logic.SimBoot#boot(com.sun.gi.logic.GLOReference, boolean)
-	 */
-	public void boot(GLOReference thisGLO, boolean firstBoot) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	/* (non-Javadoc)
-	 * @see com.sun.gi.logic.SimUserListener#userJoined(com.sun.gi.comm.routing.UserID, javax.security.auth.Subject)
-	 */
-	public void userJoined(UserID uid, Subject subject) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	/* (non-Javadoc)
-	 * @see com.sun.gi.logic.SimUserListener#userLeft(com.sun.gi.comm.routing.UserID)
-	 */
-	public void userLeft(UserID uid) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	/* (non-Javadoc)
-	 * @see com.sun.gi.logic.SimUserDataListener#userDataReceived(com.sun.gi.comm.routing.UserID, java.nio.ByteBuffer)
-	 */
-	public void userDataReceived(UserID from, ByteBuffer data) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	/* (non-Javadoc)
-	 * @see com.sun.gi.logic.SimUserDataListener#userJoinedChannel(com.sun.gi.comm.routing.ChannelID, com.sun.gi.comm.routing.UserID)
-	 */
-	public void userJoinedChannel(ChannelID cid, UserID uid) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	/* (non-Javadoc)
-	 * @see com.sun.gi.logic.SimUserDataListener#userLeftChannel(com.sun.gi.comm.routing.ChannelID, com.sun.gi.comm.routing.UserID)
-	 */
-	public void userLeftChannel(ChannelID cid, UserID uid) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	/* (non-Javadoc)
-	 * @see com.sun.gi.logic.SimUserDataListener#dataArrivedFromChannel(com.sun.gi.comm.routing.ChannelID, com.sun.gi.comm.routing.UserID, java.nio.ByteBuffer)
-	 */
-	public void dataArrivedFromChannel(ChannelID id, UserID from, ByteBuffer buff) {
-		// TODO Auto-generated method stub
-		
-	}
 }
