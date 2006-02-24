@@ -59,7 +59,8 @@ public class BattleBoardBoot implements SimBoot,SimUserListener{
 		GLOReference playerRef = task.findGLO(playerObjectName);
 		if (playerRef == null){
 			BattleBoardPlayer playerTemplate = 
-				new BattleBoardPlayer(playerName);
+				new BattleBoardPlayer(playerName,
+						getCurrentlyFillingGameGLORef(task));
 			playerRef = task.createGLO(playerTemplate,playerObjectName);
 			if (playerRef == null){
 				playerRef = task.findGLO(playerObjectName);
@@ -84,13 +85,18 @@ public class BattleBoardBoot implements SimBoot,SimUserListener{
 	/**
 	 * @return
 	 */
-	private BattleBoardGame getCurrentlyFillingGame(SimTask task) {
+	private GLOReference getCurrentlyFillingGameGLORef(SimTask task) {
 		if (currentlyFillingGame==null){
 			currentlyFillingGame = task.createGLO(
 				new BattleBoardGame(controlChannel,
 						"BattleBoard"+gameCounter++));
 		}
-		return null;
+		return currentlyFillingGame;
+	}
+	
+	private BattleBoardGame getCurrentlyFillingGame(SimTask task){
+		return (BattleBoardGame)
+			getCurrentlyFillingGameGLORef(task).get(task);
 	}
 
 	/* (non-Javadoc)
