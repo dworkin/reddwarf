@@ -43,26 +43,28 @@
 	<delete dir="doc" />
     </target>
 
-
     <!-- Documentation targets -->
 
     <target name="docs" depends="javadocs,doxygen" />
 
-    <target name="doxygen" depends="init">
+    <target name="doxygen" depends="doxygen-internal,doxygen-api" />
+
+    <target name="doxygen-api" depends="init">
 	<exec executable="doxygen" failonerror="true">
 	    <arg value="java-client-api.doxygen" />
 	</exec>
 	<exec executable="doxygen" failonerror="true">
 	    <arg value="java-server-api.doxygen" />
 	</exec>
-	<!--
 	<exec executable="doxygen" failonerror="true">
-	    <arg value="java-protocol-api.doxygen" />
+	    <arg value="java-stackext-api.doxygen" />
 	</exec>
+    </target>
+
+    <target name="doxygen-internal" depends="init">
 	<exec executable="doxygen" failonerror="true">
 	    <arg value="java.doxygen" />
 	</exec>
-	-->
     </target>
 
     <target name="javadocs" depends="javadocs-internal,javadocs-api" />
@@ -85,18 +87,19 @@
 
     <!-- Compilation targets -->
 
-    <target name="build" depends="init">
+    <target name="build.server" depends="init">
 	<echo message="${ant.project.name}: ${ant.file}" />
 	<javac srcdir="src" destdir="bin" source="5" target="5"
 		debug="${debug}" optimize="${optimize}"
 		deprecation="${deprecated}">
 	    <!-- <compilerarg value="-Xlint:unchecked"/> -->
 	    <classpath refid="project.classpath" />
-	    <exclude name="com/sun/gi/apps/**" />
+	    <exclude name="com/sun/gi/apps/*/*.java" />
+	    <exclude name="com/sun/gi/apps/**/server/**" />
 	</javac>
     </target>
 
-    <target name="buildchat" depends="serverjar">
+    <target name="build.chat" depends="init">
 	<echo message="${ant.project.name}: ${ant.file}" />
 	<javac srcdir="src" destdir="bin" source="5" target="5"
 		debug="${debug}" optimize="${optimize}"
@@ -107,7 +110,7 @@
 	</javac>
     </target>
 
-    <target name="buildtrivial" depends="serverjar">
+    <target name="build.trivial" depends="init">
 	<echo message="${ant.project.name}: ${ant.file}" />
 	<javac srcdir="src" destdir="bin" source="5" target="5"
 		debug="${debug}" optimize="${optimize}"
@@ -118,7 +121,7 @@
 	</javac>
     </target>
 
-    <target name="buildtimertest" depends="serverjar">
+    <target name="build.timertest" depends="init">
 	<echo message="${ant.project.name}: ${ant.file}" />
 	<javac srcdir="src" destdir="bin" source="5" target="5"
 		debug="${debug}" optimize="${optimize}"
@@ -129,7 +132,7 @@
 	</javac>
     </target>
 
-    <target name="buildbattleboard" depends="serverjar">
+    <target name="build.battleboard" depends="init">
 	<echo message="${ant.project.name}: ${ant.file}" />
 	<javac srcdir="src" destdir="bin" source="5" target="5"
 		debug="${debug}" optimize="${optimize}"
@@ -140,7 +143,7 @@
 	</javac>
     </target>
 
-    <target name="buildjeffboard" depends="serverjar">
+    <target name="build.jeffboard" depends="init">
 	<echo message="${ant.project.name}: ${ant.file}" />
 	<javac srcdir="src" destdir="bin" source="5" target="5"
 		debug="${debug}" optimize="${optimize}"
@@ -151,7 +154,7 @@
 	</javac>
     </target>
 
-    <target name="buildmatchmaker" depends="serverjar">
+    <target name="build.matchmaker" depends="init">
 	<echo message="${ant.project.name}: ${ant.file}" />
 	<javac srcdir="src" destdir="bin" source="5" target="5"
 		debug="${debug}" optimize="${optimize}"
@@ -162,14 +165,15 @@
 	</javac>
     </target>
 
-    <!-- Runnable targets -->
+    <!-- Runnable Servers -->
 
     <target name="SGS-clean">
 	<java classname="com.sun.gi.SGS" failonerror="true" fork="yes">
 	    <arg value="-C" />
 	    <arg value="-V" />
 	    <classpath refid="project.classpath" />
-	    <sysproperty key="java.util.logging.config.file" value="logging.properties" />
+	    <sysproperty key="java.util.logging.config.file"
+			 file="logging.properties" />
 	</java>
     </target>
 
@@ -177,7 +181,8 @@
 	<java classname="com.sun.gi.SGS" failonerror="true" fork="yes">
 	    <arg value="-V" />
 	    <classpath refid="project.classpath" />
-	    <sysproperty key="java.util.logging.config.file" value="logging.properties" />
+	    <sysproperty key="java.util.logging.config.file"
+			 file="logging.properties" />
 	</java>
     </target>
 
@@ -185,15 +190,19 @@
 	<java classname="com.sun.gi.SGS" failonerror="true" fork="yes">
 	    <arg value="file:Install2.txt" />
 	    <classpath refid="project.classpath" />
-	    <sysproperty key="java.util.logging.config.file" value="logging.properties" />
+	    <sysproperty key="java.util.logging.config.file"
+			 file="logging.properties" />
 	</java>
     </target>
+
+    <!-- Runnable Clients -->
 
     <target name="ChatTest">
 	<java classname="com.sun.gi.apps.commtest.client.ChatTestClient"
 		failonerror="true" fork="yes">
 	    <classpath refid="project.classpath" />
-	    <sysproperty key="java.util.logging.config.file" value="logging.properties" />
+	    <sysproperty key="java.util.logging.config.file"
+			 file="logging.properties" />
 	</java>
     </target>
 
@@ -201,7 +210,8 @@
 	<java classname="com.sun.gi.apps.commtest.client.ChatTestClient"
 		failonerror="true" fork="yes">
 	    <classpath refid="project.classpath" />
-	    <sysproperty key="java.util.logging.config.file" value="logging.properties" />
+	    <sysproperty key="java.util.logging.config.file"
+			 file="logging.properties" />
 	</java>
     </target>
 
@@ -209,57 +219,30 @@
 	<java classname="com.sun.gi.apps.battleboard.client.BattleBoardClient"
 		failonerror="true" fork="true">
 	    <classpath refid="project.classpath" />
-	    <sysproperty key="java.util.logging.config.file" value="logging.properties" />
+	    <sysproperty key="java.util.logging.config.file"
+			 file="logging.properties" />
 	</java>
     </target>
 
     <target name="MatchMakerClientTest">
 	<java classname="com.sun.gi.apps.mcs.matchmaker.client.test.MatchMakerClientTest" failonerror="true" fork="true">
 	    <classpath refid="project.classpath" />
-	    <sysproperty key="java.util.logging.config.file" value="logging.properties" />
+	    <sysproperty key="java.util.logging.config.file"
+			 file="logging.properties" />
 	</java>
     </target>
 
     <!-- Release Targets -->
 
-    <target name="serverjar" depends="build">
+    <target name="release" depends="release.server,release.docs,release.apps">
+	<zip destfile="ProjectDarkstar.zip" basedir="release" />
+    </target>
+    
+    <target name="release.server" depends="build.server">
 	<jar destfile="release/ProjectDarkstar.jar"
 	    basedir="bin"
 	    excludes="com/sun/gi/apps/**,com/sun/gi/comm/users/client"
 	    manifest="resources/ProjectDarkstarManifest.mf" />
-    </target>
-
-    <target name="trivialboot" depends="buildtrivial">
-	<jar destfile="release/apps/trivial_boot/trivial_boot.jar"
-	    basedir="bin" includes="com/sun/gi/apps/trivial/**" />
-    </target>
-
-    <target name="chattest" depends="buildchat">
-	<jar destfile="release/apps/chat_test/ChatTest.jar"
-	    basedir="bin" includes="com/sun/gi/apps/chattest/ChatTestBoot.class" />
-    </target>
-
-    <target name="battleboard" depends="buildbattleboard">
-	<jar destfile="release/apps/battleboard/BattleBoard.jar"
-	    basedir="bin" includes="com/sun/gi/apps/battleboard/server/**" />
-    </target>
-
-    <target name="jeffboard" depends="buildjeffboard">
-	<jar destfile="release/apps/jeffboard/JeffBoard.jar"
-	    basedir="bin" includes="com/sun/gi/apps/jeffboard/**" />
-    </target>
-
-    <target name="matchmaker" depends="buildmatchmaker">
-	<jar destfile="release/apps/matchmaker/MatchMakerTest.jar"
-	    basedir="bin" includes="com/sun/gi/apps/mcs/matchmaker/server/**" />
-    </target>
-
-    <target name="timertest" depends="buildtimertest">
-	<jar destfile="release/apps/timer_test/TimerTest.jar"
-	    basedir="bin" includes="com/sun/gi/apps/timertest/**" />
-    </target>
-
-    <target name="release" depends="serverjar,trivialboot,timertest,chattest,jeffboard">
 	<copy file="resources/startDarkstar.sh" todir="release" />
 	<copy file="resources/startDiscovery.sh" todir="release" />
 	<chmod file="release/startDarkstar.sh" perm="755" />
@@ -268,19 +251,62 @@
 	<copy file="resources/libs/derby/derby.jar" todir="release/derby" />
 	<copy file="resources/Install.txt" todir="release" />
 	<copy file="resources/passwd.txt" todir="release" />
-	<copy file="resources/battleboard_deployment.xml" todir="release/apps/battleboard" />
-	<copy file="resources/jeffboard_deployment.xml" todir="release/apps/jeffboard" />
-	<copy file="resources/matchmakertest_deployment.xml" todir="release/apps/matchmaker" />
-	<copy file="resources/matchmaker_config.xml" todir="release/apps/matchmaker" />
-	<copy file="resources/chat_test_deployment.xml" todir="release/apps/chat_test" />
-	<copy file="resources/trivial_boot_deployment.xml" todir="release/apps/trivial_boot" />
-	<copy file="resources/timer_test_deployment.xml" todir="release/apps/timer_test" />
+    </target>
+
+    <target name="release.docs" depends="docs">
 	<copy todir="release/docs" >
 	    <fileset dir="doc/doxygen">
 		<exclude name="internal/**" />
 	    </fileset>
 	</copy>
-	<zip destfile="ProjectDarkstar.zip" basedir="release" />
+    </target>
+
+    <target name="release.apps"
+      depends="release.trivialboot,release.timertest,release.chattest,release.jeffboard">
+    </target>
+
+    <target name="release.trivialboot" depends="build.trivial">
+	<jar destfile="release/apps/trivial_boot/trivial_boot.jar"
+	    basedir="bin" includes="com/sun/gi/apps/trivial/**" />
+	<copy file="resources/trivial_boot_deployment.xml"
+	    todir="release/apps/trivial_boot" />
+    </target>
+
+    <target name="release.chattest" depends="build.chat">
+	<jar destfile="release/apps/chat_test/ChatTest.jar"
+	    basedir="bin" includes="com/sun/gi/apps/chattest/ChatTestBoot.class" />
+	<copy file="resources/chat_test_deployment.xml"
+	    todir="release/apps/chat_test" />
+    </target>
+
+    <target name="release.battleboard" depends="build.battleboard">
+	<jar destfile="release/apps/battleboard/BattleBoard.jar"
+	    basedir="bin" includes="com/sun/gi/apps/battleboard/server/**" />
+	<copy file="resources/battleboard_deployment.xml"
+	    todir="release/apps/battleboard" />
+    </target>
+
+    <target name="release.jeffboard" depends="build.jeffboard">
+	<jar destfile="release/apps/jeffboard/JeffBoard.jar"
+	    basedir="bin" includes="com/sun/gi/apps/jeffboard/**" />
+	<copy file="resources/jeffboard_deployment.xml"
+	    todir="release/apps/jeffboard" />
+    </target>
+
+    <target name="release.matchmaker" depends="build.matchmaker">
+	<jar destfile="release/apps/matchmaker/MatchMakerTest.jar"
+	    basedir="bin" includes="com/sun/gi/apps/mcs/matchmaker/server/**" />
+	<copy file="resources/matchmakertest_deployment.xml"
+	    todir="release/apps/matchmaker" />
+	<copy file="resources/matchmaker_config.xml"
+	    todir="release/apps/matchmaker" />
+    </target>
+
+    <target name="release.timertest" depends="build.timertest">
+	<jar destfile="release/apps/timer_test/TimerTest.jar"
+	    basedir="bin" includes="com/sun/gi/apps/timertest/**" />
+	<copy file="resources/timer_test_deployment.xml"
+	    todir="release/apps/timer_test" />
     </target>
 
 </project>
