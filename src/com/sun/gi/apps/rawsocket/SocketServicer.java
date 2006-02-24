@@ -34,7 +34,7 @@ public class SocketServicer implements GLO, SimRawSocketListener/*, SimTimerList
 	 * 
 	 * @param socketID		the ID of the socket.
 	 */
-	public void socketOpened(SimTask task, long socketID) {
+	public void socketOpened(long socketID) {
 		//System.out.println("SocketServicer: Socket ID " + socketID + " is open for business!");
 		//System.out.flush();
 		
@@ -46,7 +46,7 @@ public class SocketServicer implements GLO, SimRawSocketListener/*, SimTimerList
 			ie.printStackTrace();
 		}*/
 
-		writeBytes(task, socketID);
+		writeBytes(socketID);
 		
 	}
 	
@@ -54,7 +54,8 @@ public class SocketServicer implements GLO, SimRawSocketListener/*, SimTimerList
 		writeBytes(task, 0);
 	}*/
 	
-	public void writeBytes(SimTask task, long socketID) {
+	public void writeBytes(long socketID) {
+		SimTask task = SimTask.getCurrent();
 		if (curBufferSize == 0 || curBufferSize >= 20) {
 			System.out.println("Done sending data");
 			task.closeSocket(socketID);
@@ -79,11 +80,11 @@ public class SocketServicer implements GLO, SimRawSocketListener/*, SimTimerList
 	 * @param socketID		the ID of the socket.
 	 * @param data			the incoming data.
 	 */
-	public void dataReceived(final SimTask task, final long socketID, ByteBuffer data) {
+	public void dataReceived(final long socketID, ByteBuffer data) {
 		System.out.println("RawSocketTestBoot Received on ID " + socketID + 
 				" data:" + new String(data.array()).trim());
 		
-		writeBytes(task, socketID);
+		writeBytes(socketID);
 
 
 	}
@@ -93,11 +94,12 @@ public class SocketServicer implements GLO, SimRawSocketListener/*, SimTimerList
 	 * 
 	 * @param socketID		the ID of the socket.
 	 */
-	public void socketClosed(SimTask task, long socketID) {
+	public void socketClosed(long socketID) {
+		SimTask task = SimTask.getCurrent();
 		System.out.println("RawSocketTestBoot: SocketID " + socketID + " Closed.");
 	}
 	
-	public void socketException(SimTask task, long socketID, IOException exception) {
+	public void socketException(long socketID, IOException exception) {
 		System.out.println("RawSocketTestBoot: Exception on SocketID " + socketID);
 		exception.printStackTrace();
 	}

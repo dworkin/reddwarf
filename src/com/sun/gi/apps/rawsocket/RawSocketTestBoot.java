@@ -43,8 +43,8 @@ public class RawSocketTestBoot implements SimBoot {
 	 * Connect one socket per service object.
 	 * 
 	 */
-	public void boot(SimTask task, boolean firstBoot) {
-		System.out.println("RawSocketTestBoot boot");
+	public void boot(GLOReference bootGLO, boolean firstBoot) {
+		SimTask task = SimTask.getCurrent(); 
 		if (firstBoot) {
 			int numServicers = 5;		
 
