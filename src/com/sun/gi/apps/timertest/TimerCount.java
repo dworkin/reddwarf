@@ -28,7 +28,7 @@ public class TimerCount implements GLO {
 	private static final long serialVersionUID = 8916778872579494400L;
 	long tickCount=0;
 	
-	public void increment(SimTask task){
+	public void increment(){
 		
 		System.out.println("Tick count = "+tickCount++);
 	}

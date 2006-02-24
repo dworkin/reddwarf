@@ -58,11 +58,12 @@ public class PDTimer implements SimTimerListener {
 	/* (non-Javadoc)
 	 * @see com.sun.gi.logic.SimTimerListener#timerEvent(com.sun.gi.logic.SimTask, long)
 	 */
-	public void timerEvent(SimTask task, long eventID) {
+	public void timerEvent(long eventID) {
 		// NOte that when this is called we have just been PEEKed.
 		// Thsi is intentional to prvent needless blocking by the different
 		// slices all servicing timer events
 		System.out.println("pd timer tick");
+		SimTask task = SimTask.getCurrent();
 		PDTimerEventList eventList = (PDTimerEventList)timerListRef.peek(task);
 		eventList.tick(task,System.currentTimeMillis());		
 	}

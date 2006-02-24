@@ -34,7 +34,7 @@ public class TimerTestBoot implements SimBoot, SimTimerListener {
 	/* (non-Javadoc)
 	 * @see com.sun.gi.logic.SimBoot#boot(com.sun.gi.logic.SimTask, boolean)
 	 */
-	public void boot(SimTask task, boolean firstBoot) {
+	public void boot(GLOReference gloRef, boolean firstBoot) {
 		System.out.println("TimerTestBoot running");
 		try {			
 			/*
@@ -42,6 +42,7 @@ public class TimerTestBoot implements SimBoot, SimTimerListener {
 			fiveSecEvent = task.registerTimerEvent(5000l,false,thisobj);
 			tenSecEvent = task.registerTimerEvent(10000l,true,thisobj);
 			*/
+			SimTask task = SimTask.getCurrent();
 			PDTimer timer;
 			if (firstBoot){ // not instantiated yet
 				timer = new PDTimer(task);
@@ -63,7 +64,8 @@ public class TimerTestBoot implements SimBoot, SimTimerListener {
 	/* (non-Javadoc)
 	 * @see com.sun.gi.logic.SimTimerListener#timerEvent(com.sun.gi.logic.SimTask, long)
 	 */
-	public void timerEvent(SimTask task, long eventID) {
+	public void timerEvent(long eventID) {
+		SimTask task = SimTask.getCurrent();
 		if (eventID==oneSecEvent){
 			System.out.println("One second pulse recvd (repeats)");			
 		} else if (eventID == fiveSecEvent){

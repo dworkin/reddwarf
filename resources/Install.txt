@@ -4,3 +4,4 @@
 1			    file:apps/trivial_boot/trivial_boot_deployment.xml
 2				file:apps/chat_test/chat_test_deployment.xml
 3				file:apps/battleboard/battleboard_deployment.xml
+4				file:apps/timer_test/timer_test_deployment.xml

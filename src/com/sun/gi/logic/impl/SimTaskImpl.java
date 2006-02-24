@@ -153,7 +153,7 @@ class CIDListenerRec {
  * @author not attributable
  * @version 1.0
  */
-public class SimTaskImpl implements SimTask {
+public class SimTaskImpl extends SimTask {
 	private Transaction trans;
 
 	private ACCESS_TYPE accessType;
@@ -201,13 +201,14 @@ public class SimTaskImpl implements SimTask {
 		this.loader = loader;
 		this.accessType = access;
 		this.simulation = sim;
-		Object newargs[] = new Object[startArgs.length + 1];
-		newargs[0] = this;
-		System.arraycopy(startArgs, 0, newargs, 1, startArgs.length);
+		Object newargs[] = new Object[startArgs.length];		
+		System.arraycopy(startArgs, 0, newargs, 0, startArgs.length);
 		this.startArgs = newargs;
 	}
-
+	
+	
 	public void execute() {
+		setAsCurrent();
 		this.trans = simulation.getObjectStore().newTransaction(loader);
 		this.trans.start(); // tell trans its waking up to begin anew
 		GLO runobj = null;
@@ -239,8 +240,6 @@ public class SimTaskImpl implements SimTask {
 			processSocketCloseRecords();
 			processUserListenerRecords();
 			processUserDataListenerRecords();
-			processChannelListenerRecords();
-			processChannelMembershipListenerRecords();
 		} catch (InvocationTargetException ex) {
 			ex.printStackTrace();
 			trans.abort();
@@ -318,15 +317,7 @@ public class SimTaskImpl implements SimTask {
 		// simulation.addUserDataListener(user, ref);
 	}
 
-	public void addChannelListener(ChannelID cid, GLOReference ref) {
-		channelListenerQueue.add(new CIDListenerRec(cid, ref));
-		// simulation.addChannelListener(cid, ref);
-	}
-
-	public void addChannelMembershipListener(ChannelID cid, GLOReference ref) {
-		channelMembershipListenerQueue.add(new CIDListenerRec(cid, ref));
-		// simulation.addChannelMembershipListener(cid, ref);
-	}
+	
 
 	/**
 	 * createGLO
@@ -505,19 +496,7 @@ public class SimTaskImpl implements SimTask {
 		}
 	}
 
-	private void processChannelListenerRecords() {
-		for (CIDListenerRec rec : channelListenerQueue) {
-			simulation.addChannelListener(rec.cid, new GLOReferenceImpl(
-					rec.objID));
-		}
-	}
 
-	private void processChannelMembershipListenerRecords() {
-		for (CIDListenerRec rec : channelMembershipListenerQueue) {
-			simulation.addChannelMembershipListener(rec.cid,
-					new GLOReferenceImpl(rec.objID));
-		}
-	}
 
 	/**
 	 * Joins the specified user to the Channel referenced by the given
@@ -567,5 +546,15 @@ public class SimTaskImpl implements SimTask {
 	 */
 	public void closeChannel(ChannelID id) {
 		simulation.closeChannel(id);
+	}
+
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.logic.SimTask#setEvesdroppingEnabled(com.sun.gi.comm.routing.UserID, com.sun.gi.comm.routing.ChannelID, boolean)
+	 */
+	@Override
+	public void setEvesdroppingEnabled(UserID uid, ChannelID cid, boolean setting) {
+		simulation.enableEvesdropping(uid,cid,setting);
+		
 	}
 }

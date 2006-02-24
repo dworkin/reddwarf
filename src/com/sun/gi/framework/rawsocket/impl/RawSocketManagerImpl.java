@@ -242,7 +242,7 @@ public class RawSocketManagerImpl implements RawSocketManager {
 				if (key.isConnectable()) {
 					if (reliable && ((SocketChannel) curChannel).finishConnect()) {
 						key.interestOps(SelectionKey.OP_READ);
-						generateEvent(socketID, "socketOpened", new Class[] {SimTask.class, long.class},
+						generateEvent(socketID, "socketOpened", new Class[] {long.class},
 										new Object[] {socketID});
 
 					}
@@ -255,7 +255,7 @@ public class RawSocketManagerImpl implements RawSocketManager {
 							in.flip();
 							
 							generateEvent(socketID, "dataReceived", 
-									new Class[] {SimTask.class, long.class, ByteBuffer.class},
+									new Class[] {long.class, ByteBuffer.class},
 									new Object[] {socketID, in});
 						}
 					}
@@ -313,7 +313,7 @@ public class RawSocketManagerImpl implements RawSocketManager {
 				// If this is an unreliable connection, call the socketOpened callback
 				// immediately.
 				if (!isReliable) {
-					generateEvent(curSocketID, "socketOpened", new Class[] {SimTask.class, long.class},
+					generateEvent(curSocketID, "socketOpened", new Class[] {long.class},
 							new Object[] {curSocketID});
 
 				}
@@ -356,7 +356,7 @@ public class RawSocketManagerImpl implements RawSocketManager {
 				curChannel.close();
 				
 				generateEvent(socketID, "socketClosed", 
-							new Class[] {SimTask.class, long.class},
+							new Class[] {long.class},
 							new Object[] {socketID});
 				socketMap.remove(socketID);
 			}
@@ -368,7 +368,7 @@ public class RawSocketManagerImpl implements RawSocketManager {
 	
 	private void generateExceptionEvent(long socketID, IOException ioe) {
 		generateEvent(socketID, "socketException", 
-				new Class[] {SimTask.class, long.class, IOException.class},
+				new Class[] {long.class, IOException.class},
 				new Object[] {socketID, ioe});
 		
 	}

@@ -92,7 +92,7 @@ public class TimerManagerImpl implements TimerManager {
 	public TimerManagerImpl(final long heartbeat) throws InstantiationException {
 		try {
 			callbackMethod = SimTimerListener.class.getMethod("timerEvent",
-					new Class[] { SimTask.class, long.class });
+					new Class[] {long.class });
 		} catch (SecurityException e1) {
 			e1.printStackTrace();
 			throw new InstantiationException();

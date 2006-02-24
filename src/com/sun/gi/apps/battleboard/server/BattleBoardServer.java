@@ -25,7 +25,7 @@ import java.util.logging.Logger;
 import javax.security.auth.Subject;
 
 public class BattleBoardServer
-	implements SimBoot, SimUserListener {
+	implements SimBoot, SimUserListener,SimUserDataListener {
 
     private static final long serialVersionUID = 1L;
 
@@ -76,4 +76,60 @@ public class BattleBoardServer
 	    playerRef.delete(task);
 	}
     }
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.logic.SimBoot#boot(com.sun.gi.logic.GLOReference, boolean)
+	 */
+	public void boot(GLOReference thisGLO, boolean firstBoot) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.logic.SimUserListener#userJoined(com.sun.gi.comm.routing.UserID, javax.security.auth.Subject)
+	 */
+	public void userJoined(UserID uid, Subject subject) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.logic.SimUserListener#userLeft(com.sun.gi.comm.routing.UserID)
+	 */
+	public void userLeft(UserID uid) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.logic.SimUserDataListener#userDataReceived(com.sun.gi.comm.routing.UserID, java.nio.ByteBuffer)
+	 */
+	public void userDataReceived(UserID from, ByteBuffer data) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.logic.SimUserDataListener#userJoinedChannel(com.sun.gi.comm.routing.ChannelID, com.sun.gi.comm.routing.UserID)
+	 */
+	public void userJoinedChannel(ChannelID cid, UserID uid) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.logic.SimUserDataListener#userLeftChannel(com.sun.gi.comm.routing.ChannelID, com.sun.gi.comm.routing.UserID)
+	 */
+	public void userLeftChannel(ChannelID cid, UserID uid) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.logic.SimUserDataListener#dataArrivedFromChannel(com.sun.gi.comm.routing.ChannelID, com.sun.gi.comm.routing.UserID, java.nio.ByteBuffer)
+	 */
+	public void dataArrivedFromChannel(ChannelID id, UserID from, ByteBuffer buff) {
+		// TODO Auto-generated method stub
+		
+	}
 }

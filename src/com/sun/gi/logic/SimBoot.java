@@ -14,9 +14,9 @@ public interface SimBoot extends GLO {
   /**
    * This method is called once on the GLO when the system boots an application.
    *
-   * @param task SimTask The task the boot method is being run under.
-   * @param firstBoot boolean Whether this is the first time the boot method
+   * @param thisGLO A GLOReference to the boot object
+   * @param firstBoot Whether this is the first time the boot method
    * has been called in the life of this app in this backednd
    */
-  public void boot(SimTask task, boolean firstBoot);
+  public void boot(GLOReference thisGLO, boolean firstBoot);
 }

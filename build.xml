@@ -27,6 +27,7 @@
     	<mkdir dir="release/apps/battleboard"/>
     	<mkdir dir="release/apps/chat_test"/>
     	<mkdir dir="release/apps/matchmaker"/>
+    	<mkdir dir="release/apps/timer_test"/>
     	<mkdir dir="release/derby"/>
     	<mkdir dir="release/jrms"/>
     	<mkdir dir="doc/doxygen" />
@@ -108,6 +109,15 @@
 			<include name="com/sun/gi/apps/trivial/TrivialBoot.java" />
 		</javac>
 	</target>
+	
+	<target name="buildtimertest" depends="serverjar">
+			<echo message="${ant.project.name}: ${ant.file}" />
+			<javac srcdir="src" destdir="bin" source="5" target="5" debug="${debug}" optimize="${optimize}" deprecation="${deprecated}">
+				<!-- <compilerarg value="-Xlint:unchecked"/> -->
+				<classpath refid="project.classpath" />
+				<include name="com/sun/gi/apps/timertest/**" />
+			</javac>
+		</target>
 
 	<target name="buildbattleboard" depends="serverjar">
 		<echo message="${ant.project.name}: ${ant.file}" />
@@ -195,10 +205,13 @@
 	<target name="matchmaker" depends="buildmatchmaker">
 		<jar destfile="release/apps/matchmaker/MatchMakerTest.jar" basedir="bin" includes="com/sun/gi/apps/mcs/matchmaker/server/**" />
 	</target>	
+	<target name="timertest" depends="buildtimertest">
+			<jar destfile="release/apps/timer_test/TimerTest.jar" basedir="bin" includes="com/sun/gi/apps/timertest/**" />
+	</target>
 
 
-	<target name="release" depends="serverjar,trivialboot,
-		chattest, battleboard, matchmaker, doxygen">	
+	<target name="release" depends="serverjar,trivialboot,timertest,
+		chattest">	
 		<copy file="resources/startDarkstar.sh" todir="release" />
 		<copy file="resources/startDiscovery.sh" todir="release" />
 		<chmod file="release/startDarkstar.sh" perm="755" />
@@ -212,6 +225,7 @@
 		<copy file="resources/matchmaker_config.xml" todir="release/apps/matchmaker" />
 		<copy file="resources/chat_test_deployment.xml" todir="release/apps/chat_test" />
 		<copy file="resources/trivial_boot_deployment.xml" todir="release/apps/trivial_boot" />
+		<copy file="resources/timer_test_deployment.xml" todir="release/apps/timer_test" />
 		<copy todir="release/docs" >
 			<fileset dir="doc/doxygen">
 				<exclude name="internal/**" />

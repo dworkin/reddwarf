@@ -22,13 +22,13 @@ public interface SimUserListener extends GLO {
    * @param uid UserID The ID of the user joining.
    * @param subject A javax.auth Subject that contains details such as authorizations
    */
-  public void userJoined(SimTask task, UserID uid, Subject subject);
+  public void userJoined(UserID uid, Subject subject);
   /**
    *  This method is the start method of a task queued when a user
    *  leavses the game.
    * @param task SimTask  The SimTask context.
    * @param uid UserID The ID of the user leaving the game.
    */
-  public void userLeft(SimTask task,UserID uid);
+  public void userLeft(UserID uid);
   
 }

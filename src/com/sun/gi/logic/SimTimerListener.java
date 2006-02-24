@@ -19,5 +19,5 @@ package com.sun.gi.logic;
  * @version 1.0
  */
 public interface SimTimerListener extends GLO {
-	public void timerEvent(SimTask task, long eventID);
+	public void timerEvent(long eventID);
 }

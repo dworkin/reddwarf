@@ -25,9 +25,12 @@ public interface SimUserDataListener extends GLO {
      * @param from UserID the UserID the data came from
      * @param data byte[] the data sent.
      */
-    public void userDataReceived(SimTask task, UserID from, ByteBuffer data);
+    public void userDataReceived(UserID from, ByteBuffer data);
 
-    public void userJoinedChannel(SimTask task, ChannelID cid, UserID uid);
+    public void userJoinedChannel(ChannelID cid, UserID uid);
 
-    public void userLeftChannel(SimTask task, ChannelID cid, UserID uid);
+    public void userLeftChannel(ChannelID cid, UserID uid);
+    
+    public void dataArrivedFromChannel(ChannelID id,
+    		UserID from, ByteBuffer buff);
 }
