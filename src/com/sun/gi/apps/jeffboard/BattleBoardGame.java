@@ -9,6 +9,7 @@
  */
 package com.sun.gi.apps.jeffboard;
 
+import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -40,77 +41,7 @@ public class BattleBoardGame implements GLO{
 	private static final int BOARD_HEIGHT = 8;
 	static final int MAX_PLAYERS = 3; // 3 players per game
 	
-	class BattleMap {
-		List<int[]> cityList = new ArrayList<int[]>();
-		private boolean withdrawn = false;
-		
-		public BattleMap(){
-			int count = 0;
-			while (count<CITY_COUNT){
-				int x = (int)(Math.random()*BOARD_WIDTH);
-				int y = (int)(Math.random()*BOARD_HEIGHT);
-				boolean found = false;
-				for(int[] city : cityList){
-					if ((city[0]==x)&&(city[1]==y)){ // duplicate
-						found = true;
-						break;
-					}
-				}
-				if (!found){
-					cityList.add(new int[] {x,y});
-					count++;
-				}
-			}
-		}
-
-		/**
-		 * @return
-		 */
-		public List<int[]> getCityList() {
-			return cityList;
-		}
-
-		/**
-		 * @param x
-		 * @param y
-		 */
-		public String bomb(int x, int y) {
-			for(Iterator<int[]> iter = cityList.iterator();iter.hasNext();){
-				int[] pos = iter.next();
-				if ((pos[0]==x)&&(pos[1]==y)){ // hit
-					iter.remove();
-					if (cityList.isEmpty()){
-						return "LOSS";
-					} else {
-						return "HIT";
-					}
-				}
-			}
-			for(Iterator<int[]> iter = cityList.iterator();iter.hasNext();){
-				int[] pos = iter.next();
-				if ((Math.abs(pos[0]-x)<=1)&&
-					(Math.abs(pos[1]-y)<=1)){  // near miss
-						return "NEAR_MISS";
-				}
-			}
-			return "MISS";
-		}
-
-		/**
-		 * @return
-		 */
-		public boolean isAlive() {
-			// TODO Auto-generated method stub
-			return cityList.isEmpty();
-		}
-
-		/**
-		 * 
-		 */
-		public void withdraw() {
-			withdrawn = true;			
-		}
-	}
+	
 	/**
 	 * 
 	 */
@@ -132,9 +63,13 @@ public class BattleBoardGame implements GLO{
 	private int joinerCount=0;
 	private int currentPlayer = 0;
 	
-	public BattleBoardGame(ChannelID controlChannel,String gameName){
+	public BattleBoardGame(SimTask task, ChannelID controlChannel,
+			String gameName){
 		this.controlChannel = controlChannel;
 		this.gameName = gameName;
+		gameChannel = task.openChannel("bb_"+gameName);
+		// lock it for security
+		task.lock(gameChannel,true);
 	}
 	
 	/**
@@ -156,50 +91,55 @@ public class BattleBoardGame implements GLO{
 	public boolean isFull() {
 		return (playingList.size()==MAX_PLAYERS);	
 	}
+
 	
 	public void setScreenName(UserID uid, String screenName){
 		SimTask task = SimTask.getCurrent();
 		if (reverseScreenNames.get(screenName)!=null){
-			task.sendData(controlChannel,new UserID[]{uid},
-					ByteBuffer.wrap("already-joined".getBytes()),true);
+			sendData(task,controlChannel,uid,"already-joined");		
 			return;
-		}
+		}		
 		screenNames.put(uid,screenName);	
 		reverseScreenNames.put(screenName,uid);
-		setupBoard(task,uid);		
-		if (screenNames.size()==MAX_PLAYERS){
-			// all screen names set, lets start playing!
-			joinPlayers(task);
-		}
+		setupBoard(task,uid);	
+		task.join(uid,gameChannel);
+	}
+
+	/**
+	 * @param task 
+	 * @param controlChannel2
+	 * @param uid
+	 * @param string
+	 */
+	private void sendData(SimTask task, ChannelID cid, UserID uid, String string) {
+		ByteBuffer buff = ByteBuffer.allocate(string.length());
+		buff.put(string.getBytes());
+		task.sendData(cid,new UserID[]{uid},buff,true);
+		
 	}
 
 	/**
 	 * 
 	 */
-	private void joinPlayers(SimTask task) {
+	private void sendTurnOrder(SimTask task) {
 		StringBuffer out = new StringBuffer("turn-order");
-		for(String screenName : screenNames.values()){
-			out.append(" "+screenName);
+		for(UserID uid : playingList){
+			out.append(" "+screenNames.get(uid));
 		}		
-		turnOrderString = out.toString();
-		// open a game channel
-		gameChannel = task.openChannel("bb_"+gameName);
-		// lock it for security
-		task.lock(gameChannel,true);
+		String turnOrderString = out.toString();		// open a game channel
+		
 		for(UserID uid : screenNames.keySet()){
-			joinerCount++;
-			task.join(uid,gameChannel);
+			sendData(task,gameChannel,uid,turnOrderString);
 		}
 	}
 	
-	private void joinedChannel(UserID uid, ChannelID cid){
+	public void joinedChannel(UserID uid, ChannelID cid){
 		SimTask task = SimTask.getCurrent();
-		if (cid == gameChannel){
+		if (cid.equals(gameChannel)){
 			if (screenNames.containsKey(uid)){
-				joinerCount--;
-				task.sendData(gameChannel,new UserID[]{uid},
-						ByteBuffer.wrap(turnOrderString.getBytes()),true);
-				if (joinerCount==0){
+				joinerCount++;
+				if (joinerCount==MAX_PLAYERS){ //all here
+					sendTurnOrder(task);
 					currentPlayer = 0;
 					nextMove(task);
 				}
@@ -216,15 +156,11 @@ public class BattleBoardGame implements GLO{
 		if (playingList.size()>1){
 			withdrawnList.clear(); // temporary list to handle edge case
 			UserID thisPlayer = playingList.get(currentPlayer);
-			task.sendData(gameChannel,
-					new UserID[]{thisPlayer},
-					ByteBuffer.wrap("your-move".getBytes()),true);
+			sendData(task,gameChannel,thisPlayer,"your-move");
 			String outstr = "move-started "+screenNames.get(thisPlayer);
 			for(UserID id : screenNames.keySet()){
 				if (id!=thisPlayer){
-					task.sendData(gameChannel,
-							new UserID[]{id},
-							ByteBuffer.wrap(outstr.getBytes()),true);
+					sendData(task,gameChannel,id,outstr);
 				}
 			}
 			currentPlayer++;
@@ -235,16 +171,14 @@ public class BattleBoardGame implements GLO{
 	}
 	
 	public void passMove(UserID uid){
-		if (uid != playingList.get(currentPlayer)){
+		if (!uid.equals(playingList.get(currentPlayer))){
 			System.err.println("BB ERROR: Non current player tried to pass");
 			return;
 		}
 		SimTask task = SimTask.getCurrent();
 		String outstr = "move-ended "+screenNames.get(uid)+" pass";
 		for(UserID id : screenNames.keySet()){			
-				task.sendData(gameChannel,
-						new UserID[]{id},
-						ByteBuffer.wrap(outstr.getBytes()),true);
+				sendData(task,gameChannel,id,outstr);
 			
 		}
 		nextMove(task);
@@ -253,7 +187,7 @@ public class BattleBoardGame implements GLO{
 	public void makeMove(UserID from, String bombedPlayer,int x, int y){
 		SimTask task = SimTask.getCurrent();
 		UserID thisPlayer = playingList.get(currentPlayer);
-		if (thisPlayer!=from){
+		if (!thisPlayer.equals(from)){
 			System.err.println("BB ERROR: Player "+from+
 					" moved out of turn.");
 			System.err.println("BB ERROR: Expected player "+thisPlayer);
@@ -261,9 +195,7 @@ public class BattleBoardGame implements GLO{
 		}
 		UserID target = reverseScreenNames.get(bombedPlayer);
 		if (withdrawnList.contains(target)){
-			task.sendData(gameChannel,
-					new UserID[]{thisPlayer},
-					ByteBuffer.wrap("your-move".getBytes()),true);
+			sendData(task,gameChannel,thisPlayer,"your-move");
 			withdrawnList.clear();
 			return;
 			
@@ -289,9 +221,7 @@ public class BattleBoardGame implements GLO{
 		String outstr = "move-ended "+screenNames.get(thisPlayer)+" bombed "+
 			screenNames.get(target)+" "+result;          ;
 		for(UserID id : screenNames.keySet()){			
-				task.sendData(gameChannel,
-						new UserID[]{id},
-						ByteBuffer.wrap(outstr.getBytes()),true);			
+				sendData(task,gameChannel,id,outstr);	
 		}
 		nextMove(task);
 	}
@@ -344,17 +274,88 @@ public class BattleBoardGame implements GLO{
 	 * @param uid
 	 */
 	private void setupBoard(SimTask task ,UserID uid) {
-		BattleMap map = new BattleMap();
+		BattleMap map = new BattleMap(CITY_COUNT,
+				BOARD_WIDTH,BOARD_HEIGHT);
 		playerMaps.put(uid,map);
-		StringBuffer out = new StringBuffer(
-				"ok"+BOARD_WIDTH+" "+BOARD_HEIGHT+" "+
-				CITY_COUNT);
+		StringBuffer out = new StringBuffer("ok"+BOARD_WIDTH+" "
+				+BOARD_HEIGHT+" "+CITY_COUNT);
 		for(int[] city : map.getCityList()){
 			out.append(" "+city[0]+" "+city[1]);
 		}
-		task.sendData(controlChannel,new UserID[]{uid},
-				ByteBuffer.wrap(out.toString().getBytes()),true);
+		sendData(task,controlChannel,uid,out.toString());
 		
 	}
 
+}
+
+class BattleMap implements Serializable{
+	List<int[]> cityList = new ArrayList<int[]>();
+	private boolean withdrawn = false;
+	
+	public BattleMap(int cityCount, int width, int height){
+		int count = 0;
+		while (count<cityCount){
+			int x = (int)(Math.random()*width);
+			int y = (int)(Math.random()*height);
+			boolean found = false;
+			for(int[] city : cityList){
+				if ((city[0]==x)&&(city[1]==y)){ // duplicate
+					found = true;
+					break;
+				}
+			}
+			if (!found){
+				cityList.add(new int[] {x,y});
+				count++;
+			}
+		}
+	}
+
+	/**
+	 * @return
+	 */
+	public List<int[]> getCityList() {
+		return cityList;
+	}
+
+	/**
+	 * @param x
+	 * @param y
+	 */
+	public String bomb(int x, int y) {
+		for(Iterator<int[]> iter = cityList.iterator();iter.hasNext();){
+			int[] pos = iter.next();
+			if ((pos[0]==x)&&(pos[1]==y)){ // hit
+				iter.remove();
+				if (cityList.isEmpty()){
+					return "LOSS";
+				} else {
+					return "HIT";
+				}
+			}
+		}
+		for(Iterator<int[]> iter = cityList.iterator();iter.hasNext();){
+			int[] pos = iter.next();
+			if ((Math.abs(pos[0]-x)<=1)&&
+				(Math.abs(pos[1]-y)<=1)){  // near miss
+					return "NEAR_MISS";
+			}
+		}
+		return "MISS";
+	}
+
+	/**
+	 * @return
+	 */
+	public boolean isAlive() {
+		// TODO Auto-generated method stub
+		return cityList.isEmpty();
+	}
+
+	/**
+	 * 
+	 */
+	public void withdraw() {
+		withdrawn = true;			
+	}
 }

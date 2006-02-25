@@ -44,8 +44,16 @@ public class BattleBoardPlayer implements GLO, SimUserDataListener{
 	/* (non-Javadoc)
 	 * @see com.sun.gi.logic.SimUserDataListener#userDataReceived(com.sun.gi.comm.routing.UserID, java.nio.ByteBuffer)
 	 */
-	public void userDataReceived(UserID from, ByteBuffer data) {
-		// TODO Auto-generated method stub
+	public void userDataReceived(UserID from, ByteBuffer buff) {
+		byte[] inputBytes = new byte[buff.remaining()];
+		buff.get(inputBytes);
+		String cmd = new String(inputBytes);
+		String[] words = explode(cmd);
+		BattleBoardGame game = 
+			(BattleBoardGame)myGame.get(SimTask.getCurrent());
+		if (words[0].equalsIgnoreCase("join")){
+			game.setScreenName(from,words[1]);
+		} 
 		
 	}
 
@@ -53,8 +61,9 @@ public class BattleBoardPlayer implements GLO, SimUserDataListener{
 	 * @see com.sun.gi.logic.SimUserDataListener#userJoinedChannel(com.sun.gi.comm.routing.ChannelID, com.sun.gi.comm.routing.UserID)
 	 */
 	public void userJoinedChannel(ChannelID cid, UserID uid) {
-		// TODO Auto-generated method stub
-		
+		BattleBoardGame game = 
+			(BattleBoardGame)myGame.get(SimTask.getCurrent());
+		game.joinedChannel(uid,cid);
 	}
 
 	/* (non-Javadoc)
@@ -75,9 +84,7 @@ public class BattleBoardPlayer implements GLO, SimUserDataListener{
 		String[] words = explode(cmd);
 		BattleBoardGame game = 
 			(BattleBoardGame)myGame.get(SimTask.getCurrent());
-		if (words[0].equalsIgnoreCase("join")){
-			game.setScreenName(from,words[1]);
-		} else if (words[0].equalsIgnoreCase("withdraw")){
+		if (words[0].equalsIgnoreCase("withdraw")){
 			game.withdraw(from);
 		} else if (words[0].equalsIgnoreCase("move")){
 			game.makeMove(from, words[1],Integer.parseInt(words[2]),

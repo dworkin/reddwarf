@@ -81,6 +81,7 @@ public class BattleBoardBoot implements SimBoot,SimUserListener{
 		if (game.isFull()){
 			nextGame();
 		}
+		task.join(uid,controlChannel);
 	}
 
 	/**
@@ -97,7 +98,7 @@ public class BattleBoardBoot implements SimBoot,SimUserListener{
 	private GLOReference getCurrentlyFillingGameGLORef(SimTask task) {
 		if (currentlyFillingGame==null){
 			currentlyFillingGame = task.createGLO(
-				new BattleBoardGame(controlChannel,
+				new BattleBoardGame(task,controlChannel,
 						"BattleBoard"+gameCounter++));
 		}
 		return currentlyFillingGame;
