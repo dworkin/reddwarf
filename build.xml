@@ -168,7 +168,7 @@
     <!-- Runnable Servers -->
 
     <target name="SGS-clean">
-	<java classname="com.sun.gi.SGS" failonerror="true" fork="yes">
+	<java dir="release" classname="com.sun.gi.SGS" failonerror="true" fork="yes">
 	    <arg value="-C" />
 	    <arg value="-V" />
 	    <classpath refid="project.classpath" />
@@ -178,7 +178,7 @@
     </target>
 
     <target name="SGS">
-	<java classname="com.sun.gi.SGS" failonerror="true" fork="yes">
+	<java dir="release" classname="com.sun.gi.SGS" failonerror="true" fork="yes">
 	    <arg value="-V" />
 	    <classpath refid="project.classpath" />
 	    <sysproperty key="java.util.logging.config.file"
@@ -187,7 +187,7 @@
     </target>
 
     <target name="SGS2">
-	<java classname="com.sun.gi.SGS" failonerror="true" fork="yes">
+	<java dir="release" classname="com.sun.gi.SGS" failonerror="true" fork="yes">
 	    <arg value="file:Install2.txt" />
 	    <classpath refid="project.classpath" />
 	    <sysproperty key="java.util.logging.config.file"
