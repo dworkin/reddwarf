@@ -59,7 +59,8 @@ public class HadbDataSpace implements DataSpace {
     private String INFOTBLNAME;
 
     private Connection readConn;
-    private Connection updateConn;
+    private Connection updateTransConn;
+    private Connection updateSingleConn;
     private Connection idConn;
     private Connection schemaConn;
     
@@ -73,6 +74,7 @@ public class HadbDataSpace implements DataSpace {
     private PreparedStatement updateInfoStmnt;
     private PreparedStatement insertInfoStmnt;
     private PreparedStatement updateObjLockStmnt;
+    private PreparedStatement updateObjUnlockStmnt;
     private PreparedStatement insertObjLockStmnt;
     private PreparedStatement deleteObjStmnt;
     private PreparedStatement clearObjTableStmnt;
@@ -148,14 +150,21 @@ public class HadbDataSpace implements DataSpace {
 
 	    // XXX:  Do we really need all these connections?
 
-	    updateConn = getConnection(dataConnURL, hadbUserName, hadbPassword,
-		    Connection.TRANSACTION_READ_COMMITTED);
+	    updateTransConn = getConnection(dataConnURL,
+		    hadbUserName, hadbPassword,
+			    Connection.TRANSACTION_READ_COMMITTED);
+	    updateSingleConn = getConnection(dataConnURL,
+		    hadbUserName, hadbPassword,
+			    Connection.TRANSACTION_READ_COMMITTED);
+	    updateSingleConn.setAutoCommit(true);
+
 	    idConn = getConnection(dataConnURL, hadbUserName, hadbPassword,
 		    Connection.TRANSACTION_READ_COMMITTED);
 
 	    readConn = getConnection(dataConnURL, hadbUserName, hadbPassword,
 	 	    Connection.TRANSACTION_READ_COMMITTED);
 	    readConn.setReadOnly(true);
+	    readConn.setAutoCommit(true);
 
 	    schemaConn = getConnection(dataConnURL, hadbUserName, hadbPassword,
 		    Connection.TRANSACTION_REPEATABLE_READ);
@@ -221,8 +230,8 @@ public class HadbDataSpace implements DataSpace {
 		System.getProperty("dataspace.hadb.hosts",
 			null));
 	if (hadbHosts == null) {
+	    // hadbHosts = "129.148.75.63:15025,129.148.75.60:15005";
 	    hadbHosts = "20.20.10.104:15025,20.20.10.103:15085,20.20.11.107:15105,20.20.10.101:15005,20.20.11.105:15065,20.20.10.102:15045";
-	    hadbHosts = "129.148.75.63:15025,129.148.75.60:15005";
 	}
 
 	hadbUserName = hadbParams.getProperty("dataspace.hadb.username",
@@ -265,7 +274,7 @@ public class HadbDataSpace implements DataSpace {
     /**
      * Drops all of the tables.  <p>
      */
-    public synchronized boolean dropTables() {
+    private synchronized boolean dropTables() {
 
 	System.out.println("INFO: Dropping all tables!");
 
@@ -305,7 +314,7 @@ public class HadbDataSpace implements DataSpace {
 	Statement stmnt;
 
 	try {
-	    updateConn.commit();
+	    updateTransConn.commit();
 	    idConn.commit();
 	} catch (Exception e) {
 	    System.out.println("ERROR: FAILED to prepare/commit " + tableName);
@@ -334,7 +343,7 @@ public class HadbDataSpace implements DataSpace {
 	Statement stmnt;
 
 	try {
-	    updateConn.commit();
+	    updateTransConn.commit();
 	    idConn.commit();
 	} catch (Exception e) {
 	    System.out.println("ERROR: FAILED to prepare/commit " + tableName);
@@ -464,29 +473,33 @@ public class HadbDataSpace implements DataSpace {
 	getNameStmnt = readConn.prepareStatement("SELECT * FROM " +
 		NAMETBLNAME + " N  " + "WHERE N.NAME = ?");
 
-	insertObjStmnt = updateConn.prepareStatement("INSERT INTO " +
+	insertObjStmnt = updateTransConn.prepareStatement("INSERT INTO " +
 		OBJTBLNAME + " VALUES(?,?)");
-	insertNameStmnt = updateConn.prepareStatement("INSERT INTO " +
-		NAMETBLNAME + " VALUES(?,?)");
-	updateObjStmnt = updateConn.prepareStatement("UPDATE " +
+	updateObjStmnt = updateTransConn.prepareStatement("UPDATE " +
 		OBJTBLNAME + " SET OBJBYTES=? WHERE OBJID=?");
-	updateNameStmnt = updateConn.prepareStatement("UPDATE " +
+
+	insertNameStmnt = updateTransConn.prepareStatement("INSERT INTO " +
+		NAMETBLNAME + " VALUES(?,?)");
+	updateNameStmnt = updateTransConn.prepareStatement("UPDATE " +
 		NAMETBLNAME + " SET NAME=? WHERE OBJID=?");
-	deleteObjStmnt = updateConn.prepareStatement("DELETE FROM " +
+	deleteObjStmnt = updateTransConn.prepareStatement("DELETE FROM " +
 		OBJTBLNAME + " WHERE OBJID = ?");
 
-	updateObjLockStmnt = updateConn.prepareStatement("UPDATE " +
+	updateObjLockStmnt = updateSingleConn.prepareStatement("UPDATE " +
 		OBJLOCKTBLNAME +
-		    " SET OBJLOCK=? WHERE OBJID=? AND OBJLOCK=?");
-	insertObjLockStmnt = updateConn.prepareStatement("INSERT INTO " +
+		    " SET OBJLOCK=1 WHERE OBJID=? AND OBJLOCK=0");
+	updateObjUnlockStmnt = updateSingleConn.prepareStatement("UPDATE " +
+		OBJLOCKTBLNAME +
+		    " SET OBJLOCK=0 WHERE OBJID=? AND OBJLOCK=1");
+	insertObjLockStmnt = updateSingleConn.prepareStatement("INSERT INTO " +
 			OBJLOCKTBLNAME + " VALUES(?,?)");
 
 	// XXX: HADB does not implement table locking.
 	// So, we NEED another way to do this.
 
-	clearObjTableStmnt = updateConn.prepareStatement(
+	clearObjTableStmnt = updateSingleConn.prepareStatement(
 		"DELETE FROM " + OBJTBLNAME);
-	clearNameTableStmnt = updateConn.prepareStatement(
+	clearNameTableStmnt = updateSingleConn.prepareStatement(
 		"DELETE FROM " + NAMETBLNAME);
 
 	updateInfoStmnt = idConn.prepareStatement("UPDATE " +
@@ -497,8 +510,7 @@ public class HadbDataSpace implements DataSpace {
 		INFOTBLNAME + " I  " + "WHERE I.APPID = " + appID);
 
 	idConn.commit();
-	updateConn.commit();
-	readConn.commit();
+	updateTransConn.commit();
     }
 
     private boolean createObjTable() {
@@ -559,6 +571,7 @@ public class HadbDataSpace implements DataSpace {
 		 */
 
 		currentIdBlockBase	= DataSpace.INVALID_ID;
+		// System.out.println("invalidating currentIdBlockBase: " + currentIdBlockBase);
 	    }
 	    rs.close();
 	} catch (SQLException e) {
@@ -676,8 +689,9 @@ public class HadbDataSpace implements DataSpace {
 	    int newIdBlockSize = 0;
 	    boolean success = false;
 
+	    // System.out.println("going to database for new blockID " + currentIdBlockBase);
 	    try {
-/* 		idConn.commit(); */
+		// DJE: idConn.commit();
 	    } catch (Exception e) {
 		System.out.println("UNEXPECTED EXCEPTION: " + e);
 	    }
@@ -792,7 +806,7 @@ public class HadbDataSpace implements DataSpace {
 	    // System.out.println("SUCCESS for OID: " + newOID);
 	} catch (SQLException e) {
 	    try {
-		updateObjLockStmnt.getConnection().rollback();
+		insertObjLockStmnt.getConnection().rollback();
 	    } catch (SQLException e2) {
 		System.out.println("FAILED TO ROLLBACK");
 		System.out.println(e2);
@@ -813,7 +827,7 @@ public class HadbDataSpace implements DataSpace {
 	try {
 	    getObjStmnt.setLong(1, objectID);
 	    ResultSet rs = getObjStmnt.executeQuery();
-	    getObjStmnt.getConnection().commit();
+	    // getObjStmnt.getConnection().commit();
 	    if (rs.next()) {
 		// objbytes = rs.getBytes("OBJBYTES");
 		Blob b = rs.getBlob("OBJBYTES");
@@ -830,7 +844,9 @@ public class HadbDataSpace implements DataSpace {
     /**
      * {@inheritDoc}
      */
-    public synchronized void lock(long objectID) throws NonExistantObjectIDException {
+    public synchronized void lock(long objectID)
+	    throws NonExistantObjectIDException
+    {
 
 	/*
 	 * This is ugly.  I'd love to hear about a better approach.
@@ -859,21 +875,14 @@ public class HadbDataSpace implements DataSpace {
 	     * then the "set"s can be hoisted out of the loop. -DJE
 	     */
 
-	    try {
-		updateObjLockStmnt.setInt(1, 1);
-		updateObjLockStmnt.setLong(2, objectID);
-		updateObjLockStmnt.setInt(3, 0);
-	    } catch (SQLException e) {
-		System.out.println("FAILED to set parameters");
-	    }
-
 	    rc = 0;
 	    try {
+		updateObjLockStmnt.setLong(1, objectID);
 		rc = updateObjLockStmnt.executeUpdate();
 		if (rc == 1) {
-		    updateObjLockStmnt.getConnection().commit();
+		    // updateObjLockStmnt.getConnection().commit();
 		} else {
-		    updateObjLockStmnt.getConnection().rollback();
+		    // updateObjLockStmnt.getConnection().rollback();
 		}
 	    } catch (SQLException e) {
 		try {
@@ -933,27 +942,27 @@ public class HadbDataSpace implements DataSpace {
 
 	int rc = -1;
 	try {
-	    updateObjLockStmnt.setInt(1, 0);
-	    updateObjLockStmnt.setLong(2, objectID);
-	    updateObjLockStmnt.setLong(3, 1);
+	    updateObjUnlockStmnt.setLong(1, objectID);
 	} catch (SQLException e) {
 	    System.out.println("FAILED to set parameters");
 	}
 
 	try {
-	    rc = updateObjLockStmnt.executeUpdate();
+	    rc = updateObjUnlockStmnt.executeUpdate();
 	    if (rc == 1) {
-		updateObjLockStmnt.getConnection().commit();
+		// updateObjUnlockStmnt.getConnection().commit();
 	    } else {
-		updateObjLockStmnt.getConnection().rollback();
+		// updateObjUnlockStmnt.getConnection().rollback();
 	    }
 	} catch (SQLException e) {
+	    /*
 	    try {
-		updateObjLockStmnt.getConnection().rollback();
+		// updateObjUnlockStmnt.getConnection().rollback();
 	    } catch (SQLException e2) {
 		System.out.println("FAILED TO ROLLBACK");
 		System.out.println(e2);
 	    }
+	    */
 	    System.out.println("Tried to unlock (" + objectID +
 		    "): already unlocked.");
 	    System.out.println(e);
@@ -971,9 +980,7 @@ public class HadbDataSpace implements DataSpace {
 
     /**
      * {@inheritDoc}
-     * @deprecated
      */
-    // TODO: sten deprecated
     public synchronized void atomicUpdate(boolean clear,
 	    Map<String, Long> newNames,
 	    Set<Long> deleteSet, Map<Long, byte[]> updateMap,
@@ -992,7 +999,6 @@ public class HadbDataSpace implements DataSpace {
 	try {
 	    // deleteObjStmnt.getConnection().commit();
 	    // updateObjStmnt.getConnection().commit();
-	    // insertObjStmnt.getConnection().commit();
 	    // insertNameStmnt.getConnection().commit();
 	} catch (SQLException e) {
 	    // XXX: rollback and die
@@ -1065,10 +1071,9 @@ public class HadbDataSpace implements DataSpace {
 
 	// There's got to be a better way.
 	try {
-	    updateConn.commit();
+	    updateTransConn.commit();
 	    // deleteObjStmnt.getConnection().commit();
 	    // updateObjStmnt.getConnection().commit();
-	    // insertObjStmnt.getConnection().commit();
 	    // insertNameStmnt.getConnection().commit();
 	} catch (SQLException e) {
 	    // XXX: rollback and die
@@ -1087,7 +1092,7 @@ public class HadbDataSpace implements DataSpace {
 	try {
 	    getNameStmnt.setString(1, name);
 	    ResultSet rs = getNameStmnt.executeQuery();
-	    getNameStmnt.getConnection().commit();
+	    // getNameStmnt.getConnection().commit();
 	    if (rs.next()) {
 		oid = rs.getLong("OBJID");
 	    }
@@ -1131,10 +1136,16 @@ public class HadbDataSpace implements DataSpace {
 	}
 
 	try {
-	    updateConn.commit();
-	    updateConn.close();
+	    updateTransConn.commit();
+	    updateTransConn.close();
 	} catch (SQLException e) {
-	    System.out.println("can't close updateConn " + e);
+	    System.out.println("can't close updateTransConn " + e);
+	}
+
+	try {
+	    updateSingleConn.close();
+	} catch (SQLException e) {
+	    System.out.println("can't close updateSingleConn " + e);
 	}
 
 	try {
@@ -1142,7 +1153,6 @@ public class HadbDataSpace implements DataSpace {
 	} catch (SQLException e) {
 	    System.out.println("can't close schemaConn " + e);
 	}
-
 
 	try {
 	    readConn.close();
@@ -1162,53 +1172,5 @@ public class HadbDataSpace implements DataSpace {
     public boolean newName(String name) {
 	return false;
     }
-    
-    // TODO: Sten inserted stubs to fix the build -- someone implement
-    
-    /**
-     * Atomically updates the DataSpace.  <p>
-     *
-     * The <code>updateMap</code> contains new bindings between object
-     * identifiers and the byte arrays that represent their values. 
-     *
-     * @param clear <b>NOT USED IN CURRENT IMPL</b>
-     *
-     * @param updateMap new bindings between object identifiers and
-     * byte arrays
-     *
-     * @throws DataSpaceClosedException
-     *
-     * (What is <code>clear</code> supposed to do?  Or is this now
-     * unused and should be removed?  -DJE)
-     */
-    public void atomicUpdate(boolean clear, Map<Long, byte[]> updateMap)
-	    throws DataSpaceClosedException {
-    	
-    }
-    
-    /** creates a new element in the DataSpace
-     * If name is non-null and the name is already in the DataSpace then
-     * create will fail.  
-     * 
-     * Create is an immediate (non-transactional) chnage to the DataSpace.
-     * 
-     * @return objectID or DataSpace.Invalid_ID if it fails
-     */
-    
-    public long create(byte[] data,String name) {
-    	return 0;
-    }
-    
-	/**
-	 * Destroys the object associated with objectID and removes the name
-	 * associated with that ID (if any.)
-	 * 
-	 * destroy is an immediate (non-transactional) change to the DataSpace.
-	 * 
-	 * @param objectID
-	 */
-	public void destroy(long objectID) {
-		
-	}
 
 }
