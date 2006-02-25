@@ -277,12 +277,12 @@ public class BattleBoardGame implements GLO{
 		BattleMap map = new BattleMap(CITY_COUNT,
 				BOARD_WIDTH,BOARD_HEIGHT);
 		playerMaps.put(uid,map);
-		StringBuffer out = new StringBuffer("ok"+BOARD_WIDTH+" "
+		StringBuffer out = new StringBuffer("ok "+BOARD_WIDTH+" "
 				+BOARD_HEIGHT+" "+CITY_COUNT);
 		for(int[] city : map.getCityList()){
 			out.append(" "+city[0]+" "+city[1]);
 		}
-		sendData(task,controlChannel,uid,out.toString());
+		sendData(task,gameChannel,uid,out.toString());
 		
 	}
 
