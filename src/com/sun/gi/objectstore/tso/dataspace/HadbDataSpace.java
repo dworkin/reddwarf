@@ -991,67 +991,95 @@ public class HadbDataSpace implements DataSpace {
 	    throw new DataSpaceClosedException();
 	}
 
-	// Commit any outstanding transactions.  There SHOULDN'T be
-	// any, but if there's a bug elsewhere, keep it out of this
-	// transaction.
-
 	/*
+	 * Debugging:  commit any outstanding transactions.  There
+	 * SHOULDN'T be any, but if there's a bug elsewhere, keep it
+	 * out of this transaction.
+
 	try {
-	    // deleteObjStmnt.getConnection().commit();
-	    // updateObjStmnt.getConnection().commit();
-	    // insertNameStmnt.getConnection().commit();
+	    updateObjStmnt.getConnection().commit();
 	} catch (SQLException e) {
 	    // XXX: rollback and die
 	    // Is there anything we can do here, other than weep?
 	    e.printStackTrace();
 	}
-	*/
+	 */
 
-	for (Entry<String, Long> e : newNames.entrySet()) {
-	    long oid = e.getValue();
-	    String name = e.getKey();
+	if (newNames.entrySet().size() > 0) {
+	    for (Entry<String, Long> e : newNames.entrySet()) {
+		long oid = e.getValue();
+		String name = e.getKey();
 
-	    /*
-	     * If something is in the deleteSet, then there's no need
-	     * to insert it because we're going to remove it as part
-	     * of this atomic op.
-	     */
+		/*
+		 * If something is in the deleteSet, then there's no need
+		 * to insert it because we're going to remove it as part
+		 * of this atomic op.
+		 */
 
-	    if (deleteSet.contains(oid)) {
-		continue;
+		if (deleteSet.contains(oid)) {
+		    continue;
+		}
+
+		try {
+		    insertNameStmnt.setString(1, name);
+		    insertNameStmnt.setLong(2, oid);
+		    insertNameStmnt.addBatch();
+		} catch (SQLException e1) {
+		    // XXX: rollback and die
+		    e1.printStackTrace();
+		}
+
 	    }
 
 	    try {
-		insertNameStmnt.setString(1, name);
-		insertNameStmnt.setLong(2, oid);
-		insertNameStmnt.execute();
+		insertNameStmnt.executeBatch();
 	    } catch (SQLException e1) {
 		// XXX: rollback and die
 		e1.printStackTrace();
 	    }
 	}
 
-	for (Entry<Long, byte[]> e : updateMap.entrySet()) {
-	    long oid = e.getKey();
-	    byte[] data = e.getValue();
+	if (updateMap.entrySet().size() > 0) {
+	    for (Entry<Long, byte[]> e : updateMap.entrySet()) {
+		long oid = e.getKey();
+		byte[] data = e.getValue();
 
-	    if (deleteSet.contains(oid)) {
-		continue;
+		if (deleteSet.contains(oid)) {
+		    continue;
+		}
+
+		try {
+		    if (insertIDs.contains(oid)) {
+			insertObjStmnt.setLong(1, oid);
+			insertObjStmnt.setBytes(2, data);
+			insertObjStmnt.addBatch();
+		    } else {
+			updateObjStmnt.setBytes(1, data);
+			updateObjStmnt.setLong(2, oid);
+			updateObjStmnt.addBatch();
+		    }
+		} catch (SQLException e1) {
+		    // XXX: rollback and die
+		    e1.printStackTrace();
+		}
 	    }
 
-	    try {
-		if (insertIDs.contains(oid)) {
-		    insertObjStmnt.setLong(1, oid);
-		    insertObjStmnt.setBytes(2, data);
-		    insertObjStmnt.execute();
-		} else {
-		    updateObjStmnt.setBytes(1, data);
-		    updateObjStmnt.setLong(2, oid);
-		    updateObjStmnt.execute();
+	    if (insertIDs.size() > 0) {
+		try {
+		    insertObjStmnt.executeBatch();
+		} catch (SQLException e1) {
+		    // XXX: rollback and die
+		    e1.printStackTrace();
 		}
-	    } catch (SQLException e1) {
-		// XXX: rollback and die
-		e1.printStackTrace();
+	    }
+
+	    if ((updateMap.entrySet().size() - insertIDs.size()) > 0) {
+		try {
+		    updateObjStmnt.executeBatch();
+		} catch (SQLException e1) {
+		    // XXX: rollback and die
+		    e1.printStackTrace();
+		}
 	    }
 	}
 
