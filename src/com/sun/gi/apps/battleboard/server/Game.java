@@ -357,7 +357,7 @@ public class Game implements /* ChannelListener */ GLO {
 	    // queue a new task to handle end of game
 	    try {
 		task.queueTask(thisRef,
-		    Game.class.getMethod("endGame", SimTask.class),
+		    Game.class.getMethod("endGame"),
 		    new Object[] { });
 	    } catch (Exception e) {
 		e.printStackTrace();

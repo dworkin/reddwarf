@@ -264,7 +264,7 @@
     </target>
 
     <target name="release.apps"
-      depends="release.trivialboot,release.timertest,release.chattest,release.jeffboard">
+      depends="release.trivialboot,release.timertest,release.chattest,release.jeffboard,release.battleboard">
     </target>
 
     <target name="release.trivialboot" depends="build.trivial">

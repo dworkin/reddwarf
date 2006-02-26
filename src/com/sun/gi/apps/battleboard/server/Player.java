@@ -171,18 +171,45 @@ public class Player implements SimUserDataListener {
 
     public void userJoinedChannel(ChannelID cid, UserID uid) {
 	log.info("Player: User " + uid + " joined channel " + cid);
+
+	if (! uid.equals(myUserID)) {
+	    log.warning("Player: Got UID " + uid + " expected " + myUserID);
+	    return;
+	}
+
+	SimTask task = SimTask.getCurrent();
+	if (myGameRef != null) {
+	    // XXX: this currently supports only one game per player
+	    ((Game) myGameRef.get(task)).joinedChannel(cid, uid);
+	} else {
+	    // If no game, dispatch to the matchmaker
+	    Matchmaker.get().joinedChannel(cid, uid);
+	}
     }
 
     public void userLeftChannel(ChannelID cid, UserID uid) {
 	log.info("Player: User " + uid + " left channel " + cid);
+
+	if (! uid.equals(myUserID)) {
+	    log.warning("Player: Got UID " + uid + " expected " + myUserID);
+	    return;
+	}
+
+	SimTask task = SimTask.getCurrent();
+	if (myGameRef != null) {
+	    // XXX: this currently supports only one game per player
+	    ((Game) myGameRef.get(task)).leftChannel(cid, uid);
+	} else {
+	    // If no game, dispatch to the matchmaker
+	    Matchmaker.get().leftChannel(cid, uid);
+	}
     }
 
     public void userDataReceived(UserID uid, ByteBuffer data) {
 	log.info("Player: User " + uid + " direct data");
 
 	if (! uid.equals(myUserID)) {
-	    log.warning("Player: Wrong UID! Got " + uid +
-		" expected " + myUserID);
+	    log.warning("Player: Got UID " + uid + " expected " + myUserID);
 	    return;
 	}
 
