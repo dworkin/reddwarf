@@ -234,10 +234,12 @@
 
     <!-- Release Targets -->
 
-    <target name="release" depends="release.server,release.docs,release.apps">
+    <target name="release" depends="release.bin,release.docs">
 	<zip destfile="ProjectDarkstar.zip" basedir="release" />
     </target>
     
+    <target name="release.bin" depends="release.server,release.apps" />
+
     <target name="release.server" depends="build.server">
 	<jar destfile="release/ProjectDarkstar.jar"
 	    basedir="bin"
