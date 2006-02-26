@@ -20,5 +20,12 @@
             <PARAMETER tag="host" value="127.0.0.1" />
             <PARAMETER tag="port" value="1160" />
         </USERMANAGER>
-    </GAME>    
+    </GAME>
+    <GAME id="101" name="ChannelListenerRace">
+        <USERMANAGER clientclass=
+          "com.sun.gi.comm.users.client.impl.TCPIPUserManagerClient">
+            <PARAMETER tag="host" value="127.0.0.1" />
+            <PARAMETER tag="port" value="1301" />
+        </USERMANAGER>
+    </GAME>
 </DISCOVERY>

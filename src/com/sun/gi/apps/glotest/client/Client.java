@@ -2,7 +2,7 @@
  * Copyright 2006 by Sun Microsystems, Inc.  All rights reserved.
  */
 
-package com.sun.gi.apps.glotest;
+package com.sun.gi.apps.glotest.client;
 
 import com.sun.gi.comm.discovery.impl.URLDiscoverer;
 import com.sun.gi.comm.users.client.ClientAlreadyConnectedException;
@@ -27,7 +27,7 @@ public class Client implements ClientConnectionManagerListener {
     private ClientConnectionManager  mgr;
     private ClientChannel            channel;
 
-    private String         appName = "GLOTestRace";
+    private String         appName = "ChannelListenerRace";
     private String         appUser = "foo";
     private String         appPass = "bar";
 
