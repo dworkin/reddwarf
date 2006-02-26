@@ -54,7 +54,7 @@ public class Test5 {
 
 	params.numObjs = 10000;
 
-	for (int objSize = 1024; objSize <= 16 * 1024; objSize *= 2) {
+	for (int objSize = 1024; objSize <= 16 * 1024; objSize *= 4) {
 
 	    os = TestUtil.connect(appID, true, params.dataSpaceType, null);
 	    // os.clear();
@@ -84,8 +84,8 @@ public class Test5 {
 
 	    long[][] clusters = makeClusters(oids, params);
 
-	    for (int peeks = 2; peeks < 11; peeks += 2) {
-		for (int locks = 0; locks < 11; locks += 2) {
+	    for (int peeks = 2; peeks <= 10; peeks += 4) {
+		for (int locks = 0; locks <= 10; locks += 10) {
 		    params.transactionNumPeeks = peeks;
 		    params.transactionNumLocks = locks;
 		    params.transactionNumPromotedPeeks = 0;
