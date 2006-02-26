@@ -40,22 +40,12 @@
 
 package com.sun.gi.apps.battleboard.server;
 
-import java.nio.ByteBuffer;
+import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.logic.SimBoot;
 import com.sun.gi.logic.SimTask;
-import com.sun.gi.logic.SimUserDataListener;
 import com.sun.gi.logic.SimUserListener;
-import com.sun.gi.comm.routing.ChannelID;
-import com.sun.gi.comm.routing.UserID;
-import com.sun.gi.comm.users.server.impl.SGSUserImpl;
-import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.Queue;
-import java.util.LinkedList;
-import java.util.Set;
-import java.util.HashSet;
+
 import java.util.logging.Logger;
 
 import javax.security.auth.Subject;
@@ -80,6 +70,8 @@ public class BattleBoardServer implements SimBoot, SimUserListener {
 
      */
     public void boot(GLOReference thisGLO, boolean firstBoot) {
+	SimTask task = SimTask.getCurrent();
+
 	log.info("Booting BattleBoard Server as appID " + task.getAppID());
 
 	// Get a reference to this object as a GLO

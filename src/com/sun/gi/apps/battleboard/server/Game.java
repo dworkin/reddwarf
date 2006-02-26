@@ -42,10 +42,8 @@ package com.sun.gi.apps.battleboard.server;
 
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
-import com.sun.gi.comm.users.server.impl.SGSUserImpl;
 import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
-import com.sun.gi.logic.SimChannelMembershipListener;
 import com.sun.gi.logic.SimTask;
 
 import java.nio.ByteBuffer;
@@ -65,7 +63,7 @@ import static com.sun.gi.apps.battleboard.client.BattleBoard.positionValue.*;
  * @author  James Megquier
  * @version $Rev$, $Date$
  */
-public class Game implements ChannelListener {
+public class Game implements /* ChannelListener */ GLO {
 
     private static final long serialVersionUID = 1L;
 
@@ -84,15 +82,19 @@ public class Game implements ChannelListener {
     protected static int DEFAULT_BOARD_HEIGHT = 8;
     protected static int DEFAULT_BOARD_CITIES = 2;
 
-    public static GLOReference create(SimTask task,
-	    Collection<GLOReference> players) {
+    public static GLOReference create(Collection<GLOReference> players) {
 
-	Game game = new Game(task, players);
+	SimTask task = SimTask.getCurrent();
+	GLOReference ref = task.createGLO(new Game(players));
 
-	return game.thisRef;
+	((Game) ref.get(task)).boot(ref);
+	return ref;
     }
 
-    protected Game(SimTask task, Collection<GLOReference> newPlayers) {
+    protected Game(Collection<GLOReference> newPlayers) {
+
+	SimTask task = SimTask.getCurrent();
+
 	// XXX store and increment a next-channel-number in the GLO,
 	// instead of using the current time(?) -jm
 	gameName = "BB-" + System.currentTimeMillis();
@@ -108,8 +110,17 @@ public class Game implements ChannelListener {
 	for (GLOReference playerRef : players) {
 	    Player p = (Player) playerRef.get(task);
 	    playerBoards.put(p.getNickname(),
-		createBoard(task, p.getNickname()));
+		createBoard(p.getNickname()));
 	}
+
+	channel = task.openChannel(gameName);
+	task.lock(channel, true);
+    }
+
+    protected void boot(GLOReference ref) {
+	SimTask task = SimTask.getCurrent();
+
+	thisRef = ref;
 
 	if (log.isLoggable(Level.FINE)) {
 	    log.fine("playerBoards size " + playerBoards.size());
@@ -119,39 +130,34 @@ public class Game implements ChannelListener {
 	    }
 	}
 
-	channel = task.openChannel(gameName);
-	task.lock(channel, true);
-
-	// XXX only now is it safe to create thisRef, since this
-	// game is fully initialized.
-	thisRef = task.createGLO(this, gameName);
-	newThis = (Game) thisRef.get(task);
-
 	for (GLOReference playerRef : players) {
 	    Player p = (Player) playerRef.get(task);
 	    p.gameStarted(thisRef);
 	}
-	task.addChannelMembershipListener(channel, thisRef);
+	//task.addChannelMembershipListener(channel, thisRef);
 
-	newThis.sendJoinOK(task);
-	newThis.sendTurnOrder(task);
-	newThis.startNextMove(task);
+	sendJoinOK();
+	sendTurnOrder();
+	startNextMove();
     }
 
-    protected GLOReference createBoard(SimTask task, String playerName) {
-	Board board =
-	    new Board(playerName,
-		DEFAULT_BOARD_WIDTH,
-		DEFAULT_BOARD_HEIGHT,
-		DEFAULT_BOARD_CITIES);
+    protected GLOReference createBoard(String playerName) {
+	SimTask task = SimTask.getCurrent();
+
+	Board board = new Board(playerName,
+	    DEFAULT_BOARD_WIDTH, DEFAULT_BOARD_HEIGHT, DEFAULT_BOARD_CITIES);
+
 	board.populate();
+
 	GLOReference ref = task.createGLO(board,
 	    gameName + "-board-" + playerName);
+
 	log.finer("createBoard[" + playerName + "] returning " + ref);
 	return ref;
     }
 
-    public void endGame(SimTask task) {
+    public void endGame() {
+	SimTask task = SimTask.getCurrent();
 	log.info("Ending Game");
 	// Tell all the players this game is over
 	for (GLOReference ref : players) {
@@ -177,15 +183,17 @@ public class Game implements ChannelListener {
 	// XXX do this...
     }
 
-    protected void sendJoinOK(SimTask task) {
+    protected void sendJoinOK() {
+	SimTask task = SimTask.getCurrent();
 	for (GLOReference ref : players) {
 	    Player p = (Player) ref.peek(task);
 	    task.join(p.getUID(), channel);
-	    sendJoinOK(task, p);
+	    sendJoinOK(p);
 	}
     }
     
-    protected void sendJoinOK(SimTask task, Player player) {
+    protected void sendJoinOK(Player player) {
+	SimTask task = SimTask.getCurrent();
 	ByteBuffer buf = ByteBuffer.allocate(1024);
 	buf.put("ok ".getBytes());
 
@@ -215,7 +223,8 @@ public class Game implements ChannelListener {
 	    buf.asReadOnlyBuffer(), true);
     }
 
-    protected void sendTurnOrder(SimTask task) {
+    protected void sendTurnOrder() {
+	SimTask task = SimTask.getCurrent();
 	ByteBuffer buf = ByteBuffer.allocate(1024);
 	buf.put("turn-order".getBytes());
 	for (GLOReference playerRef : players) {
@@ -223,10 +232,11 @@ public class Game implements ChannelListener {
 	    buf.put(" ".getBytes());
 	    buf.put(p.getNickname().getBytes());
 	}
-	broadcast(task, buf.asReadOnlyBuffer());
+	broadcast(buf.asReadOnlyBuffer());
     }
 
-    protected void broadcast(SimTask task, ByteBuffer buf) {
+    protected void broadcast(ByteBuffer buf) {
+	SimTask task = SimTask.getCurrent();
 	UserID[] uids = new UserID[players.size() + spectators.size()];
 
 	int i = 0;
@@ -246,33 +256,37 @@ public class Game implements ChannelListener {
 	task.sendData(channel, uids, buf, true);
     }
 
-    protected void sendMoveStarted(SimTask task, Player player) {
+    protected void sendMoveStarted(Player player) {
+	SimTask task = SimTask.getCurrent();
 	ByteBuffer buf = ByteBuffer.allocate(1024);
 	buf.put("move-started ".getBytes());
 	buf.put(player.getNickname().getBytes());
-	broadcast(task, buf.asReadOnlyBuffer());
+	broadcast(buf.asReadOnlyBuffer());
     }
 
-    protected void startNextMove(SimTask task) {
+    protected void startNextMove() {
+	SimTask task = SimTask.getCurrent();
 	log.info("Running Game.startNextMove");
 
 	currentPlayerRef = players.removeFirst();
 	players.addLast(currentPlayerRef);
 	Player p = (Player) currentPlayerRef.peek(task);
-	sendMoveStarted(task, p);
+	sendMoveStarted(p);
     }
 
-    protected void handlePass(SimTask task, Player player) {
+    protected void handlePass(Player player) {
+	SimTask task = SimTask.getCurrent();
 	ByteBuffer buf = ByteBuffer.allocate(1024);
 	buf.put("move-ended ".getBytes());
 	buf.put(player.getNickname().getBytes());
 	buf.put(" pass".getBytes());
-	broadcast(task, buf.asReadOnlyBuffer());
+	broadcast(buf.asReadOnlyBuffer());
 
-	startNextMove(task);
+	startNextMove();
     }
 
-    protected void handleMove(SimTask task, Player player, String[] tokens) {
+    protected void handleMove(Player player, String[] tokens) {
+	SimTask task = SimTask.getCurrent();
 
 	String bombedPlayerNick = tokens[1];
 
@@ -281,7 +295,7 @@ public class Game implements ChannelListener {
 	    log.warning(player.getNickname() +
 		    " tried to bomb non-existant player " +
 		    bombedPlayerNick);
-	    handlePass(task, player);
+	    handlePass(player);
 	    return;
 
 	}
@@ -322,7 +336,7 @@ public class Game implements ChannelListener {
 	buf.put(outcome.getBytes());
 	buf.put(" ".getBytes());
 
-	broadcast(task, buf.asReadOnlyBuffer());
+	broadcast(buf.asReadOnlyBuffer());
 
 	// If the bombed player has lost, make them a spectator
 	if (board.lost()) {
@@ -353,10 +367,10 @@ public class Game implements ChannelListener {
 	    return;
 	}
 
-	startNextMove(task);
+	startNextMove();
     }
 
-    protected void handleResponse(SimTask task, GLOReference playerRef,
+    protected void handleResponse(GLOReference playerRef,
 	    String[] tokens) {
 
 	if (! playerRef.equals(currentPlayerRef)) {
@@ -364,23 +378,24 @@ public class Game implements ChannelListener {
 	    return;
 	}
 
+	SimTask task = SimTask.getCurrent();
 	Player player = (Player) playerRef.peek(task);
 	String cmd = tokens[0];
 
 	if ("pass".equals(cmd)) {
-	    handlePass(task, player);
+	    handlePass(player);
 	} else if ("move".equals(cmd)) {
-	    handleMove(task, player, tokens);
+	    handleMove(player, tokens);
 	} else {
 	    log.warning("Unknown command `" + cmd + "'");
-	    handlePass(task, player);
+	    handlePass(player);
 	}
     }
 
     /**
      * Handle data that was sent directly to the server.
      */
-    public void userDataReceived(SimTask task, UserID uid, ByteBuffer data) {
+    public void userDataReceived(UserID uid, ByteBuffer data) {
 	log.info("Game: Direct data from user " + uid);
 
 	byte[] bytes = new byte[data.remaining()];
@@ -394,19 +409,19 @@ public class Game implements ChannelListener {
 	    return;
 	}
 
-	GLOReference playerRef = Player.getRef(task, uid);
+	GLOReference playerRef = Player.getRef(uid);
 	// XXX check for null
 
-	handleResponse(task, playerRef, tokens);
+	handleResponse(playerRef, tokens);
     }
 
     // SimChannelMembershipListener methods
 
-    public void joinedChannel(SimTask task, ChannelID cid, UserID uid) {
+    public void joinedChannel(ChannelID cid, UserID uid) {
 	log.info("Game: User " + uid + " joined channel " + cid);
     }
 
-    public void leftChannel(SimTask task, ChannelID cid, UserID uid) {
+    public void leftChannel(ChannelID cid, UserID uid) {
 	log.info("Game: User " + uid + " left channel " + cid);
     }
 

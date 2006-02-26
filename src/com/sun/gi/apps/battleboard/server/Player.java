@@ -45,17 +45,10 @@ import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.SimUserDataListener;
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
-import com.sun.gi.comm.users.server.impl.SGSUserImpl;
 import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
 
 import java.nio.ByteBuffer;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.Queue;
-import java.util.LinkedList;
-import java.util.Set;
-import java.util.HashSet;
 import java.util.regex.Pattern;
 import java.util.regex.Matcher;
 import java.util.logging.Logger;
@@ -75,12 +68,14 @@ public class Player implements SimUserDataListener {
     protected GLOReference myGameRef;
     protected String       myNick;
 
-    public static GLOReference getRef(SimTask task, UserID uid) {
+    public static GLOReference getRef(UserID uid) {
+	SimTask task = SimTask.getCurrent();
 	return task.findGLO(gloKeyForUID(uid));
     }
 
-    public static Player get(SimTask task, UserID uid) {
-	GLOReference ref = getRef(task, uid);
+    public static Player get(UserID uid) {
+	SimTask task = SimTask.getCurrent();
+	GLOReference ref = getRef(uid);
 	return (Player) ref.get(task);
     }
 
@@ -102,13 +97,6 @@ public class Player implements SimUserDataListener {
     public void setUID(UserID uid) {
 	myUserID = uid;
     }
-
-    /*
-    // XXX: support multiple games
-    public Set<GLOReference> getGames() {
-	return myGameRefs;
-    }
-    */
 
     public void gameStarted(GLOReference gameRef) {
 	//myGameRefs.add(gameRef);
@@ -136,8 +124,10 @@ public class Player implements SimUserDataListener {
 
     // Static versions of the SimUserListener methods
 
-    public static void userJoined(SimTask task, UserID uid, Subject subject) {
+    public static void userJoined(UserID uid, Subject subject) {
 	log.info("User " + uid + " joined server, subject = " + subject);
+
+	SimTask task = SimTask.getCurrent();
 
 	// Idea: return as quickly as possible, queueing any extra work
 	// so the parent userJoin handler has less contention.
@@ -146,7 +136,7 @@ public class Player implements SimUserDataListener {
 
 	// check that the player doesn't already exist
 	/*
-	GLOReference playerRef = getRef(task, uid);
+	GLOReference playerRef = getRef(uid);
 	if (playerRef != null) {
 	    // delete it? update it with this uid?
 	    // kick the new guy off? kick the old guy?
@@ -161,14 +151,16 @@ public class Player implements SimUserDataListener {
 	// We're interested in direct server data sent by the user.
 	task.addUserDataListener(uid, playerRef);
 
-	mm.addUserID(task, uid);
+	Matchmaker.get().addUserID(uid);
     }
 
-    public static void userLeft(SimTask task, UserID uid) {
+    public static void userLeft(UserID uid) {
 	log.info("User " + uid + " left server");
 
+	SimTask task = SimTask.getCurrent();
+
 	// XXX in the future we may want the player object to persist.
-	GLOReference playerRef = Player.getRef(task, uid);
+	GLOReference playerRef = Player.getRef(uid);
 	if (playerRef != null) {
 	    playerRef.delete(task);
 	}
@@ -177,30 +169,35 @@ public class Player implements SimUserDataListener {
 
     // SimUserDataListener methods
 
-    public void userJoinedChannel(SimTask task, ChannelID cid, UserID uid) {
+    public void userJoinedChannel(ChannelID cid, UserID uid) {
 	log.info("Player: User " + uid + " joined channel " + cid);
     }
 
-    public void userLeftChannel(SimTask task, ChannelID cid, UserID uid) {
+    public void userLeftChannel(ChannelID cid, UserID uid) {
 	log.info("Player: User " + uid + " left channel " + cid);
     }
 
-    public void userDataReceived(SimTask task, UserID uid, ByteBuffer data) {
+    public void userDataReceived(UserID uid, ByteBuffer data) {
 	log.info("Player: User " + uid + " direct data");
 
 	if (! uid.equals(myUserID)) {
-	    log.warning("Player: Wrong UID data sent to me! Got "
-		+ uid + " expected " + myUserID);
+	    log.warning("Player: Wrong UID! Got " + uid +
+		" expected " + myUserID);
 	    return;
 	}
 
+	SimTask task = SimTask.getCurrent();
 	if (myGameRef != null) {
 	    // XXX: this currently supports only one game per player
-	    ((Game) myGameRef.get(task)).userDataReceived(task, myUserID, data);
+	    ((Game) myGameRef.get(task)).userDataReceived(myUserID, data);
 	} else {
 	    // If no game, dispatch to the matchmaker
-	    Matchmaker.get(task).userDataReceived(task, uid, data);
+	    Matchmaker.get().userDataReceived(uid, data);
 	}
     }
 
+    public void dataArrivedFromChannel(ChannelID cid, UserID uid,
+	    ByteBuffer data) {
+	// no-op
+    }
 }

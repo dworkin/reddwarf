@@ -42,20 +42,15 @@ package com.sun.gi.apps.battleboard.server;
 
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
-import com.sun.gi.comm.users.server.impl.SGSUserImpl;
 import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask;
 import java.nio.ByteBuffer;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.Map;
-import java.util.Queue;
 import java.util.Set;
 import java.util.logging.Logger;
 
-public class Matchmaker implements ChannelListener {
+public class Matchmaker implements /* ChannelListener */ GLO {
 
     private static final long serialVersionUID = 1L;
 
@@ -71,7 +66,8 @@ public class Matchmaker implements ChannelListener {
     protected Set<GLOReference> waitingPlayers =
 	new HashSet<GLOReference>();
 
-    public static Matchmaker get(SimTask task) {
+    public static Matchmaker get() {
+	SimTask task = SimTask.getCurrent();
 	return (Matchmaker) task.findGLO(MATCHMAKER_GLO_NAME).get(task);
     }
 
@@ -88,8 +84,7 @@ public class Matchmaker implements ChannelListener {
 	    return ref;
 	}
 
-	Matchmaker mm = new Matchmaker(task);
-	ref = task.createGLO(mm, MATCHMAKER_GLO_NAME);
+	ref = task.createGLO(new Matchmaker(), MATCHMAKER_GLO_NAME);
 
 	// More paranoia; for the reasons above, this particular
 	// use of createGLO must succeed, so this isn't needed.
@@ -104,30 +99,36 @@ public class Matchmaker implements ChannelListener {
 	    }
 	}
 
-	ChannelListener.add(mm.channel, ref);
+	//((Matchmaker) ref.get(task)).boot(ref);
 	return ref;
     }
 
-    protected Matchmaker(SimTask task) {
+    protected Matchmaker() {
 	// Create the matchmaker channel so we can talk to unjoined clients
+	SimTask task = SimTask.getCurrent();
 	channel = task.openChannel("matchmaker");
 	task.lock(channel, true);
     }
 
-    public void addUserID(SimTask task, UserID uid) {
+    protected void boot(GLOReference thisRef) {
+	//ChannelListener.add(channel, thisRef);
+    }
+
+    public void addUserID(UserID uid) {
 	log.info("Adding to matchmaker");
-	task.join(uid, channel);
+	SimTask.getCurrent().join(uid, channel);
 	log.info("Added to matchmaker");
     }
 
-    protected void sendAlreadyJoined(SimTask task, UserID uid) {
+    protected void sendAlreadyJoined(UserID uid) {
 	ByteBuffer buf = ByteBuffer.allocate(64);
 	buf.put("already-joined".getBytes());
+	SimTask task = SimTask.getCurrent();
 	task.sendData(channel, new UserID[] { uid }, buf, true);
     }
 
     // Handle the "join" command in matchmaker mode
-    public void userDataReceived(SimTask task, UserID uid, ByteBuffer data) {
+    public void userDataReceived(UserID uid, ByteBuffer data) {
 	log.info("Matchmaker: data from user " + uid);
 
 	byte[] bytes = new byte[data.remaining()];
@@ -142,17 +143,18 @@ public class Matchmaker implements ChannelListener {
 	final String playerName = cmd.substring(5);
 	log.info("Matchmaker: join from `" + playerName + "'");
 
+	SimTask task = SimTask.getCurrent();
 	for (GLOReference ref : waitingPlayers) {
 	    Player p = (Player) ref.peek(task);
 	    if (playerName.equals(p.getNickname())) {
 		log.warning("Matchmaker already has `" + playerName);
-		sendAlreadyJoined(task, uid);
+		sendAlreadyJoined(uid);
 		return;
 	    }
 
 	}
 
-	GLOReference playerRef = Player.getRef(task, uid);
+	GLOReference playerRef = Player.getRef(uid);
 	Player player = (Player) playerRef.get(task);
 	player.setNickname(playerName);
 
@@ -164,10 +166,10 @@ public class Matchmaker implements ChannelListener {
 	// involved in the next game we can spawn with current waiters.
 	// Instead we'll just keep the lock for now.
 
-	checkForEnoughPlayers(task);
+	checkForEnoughPlayers();
     }
 
-    protected void checkForEnoughPlayers(SimTask task) {
+    protected void checkForEnoughPlayers() {
 
 	if (waitingPlayers.size() < PLAYERS_PER_GAME) {
 	    return;
@@ -179,20 +181,20 @@ public class Matchmaker implements ChannelListener {
 		+ waitingPlayers.size());
 	}
 
-	Game.create(task, waitingPlayers);
+	Game.create(waitingPlayers);
 	waitingPlayers.clear();
     }
 
     // SimChannelMembershipListener methods
 
-    public void joinedChannel(SimTask task, ChannelID cid, UserID uid) {
+    public void joinedChannel(ChannelID cid, UserID uid) {
 	log.info("Matchmaker: User " + uid + " joined channel " + cid);
     }
 
-    public void leftChannel(SimTask task, ChannelID cid, UserID uid) {
+    public void leftChannel(ChannelID cid, UserID uid) {
 	log.info("Matchmaker: User " + uid + " left channel " + cid);
 
-	GLOReference playerRef = Player.getRef(task, uid);
+	GLOReference playerRef = Player.getRef(uid);
 	waitingPlayers.remove(playerRef);
     }
 }
