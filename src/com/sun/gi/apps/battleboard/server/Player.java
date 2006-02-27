@@ -56,6 +56,11 @@ import java.util.logging.Logger;
 import java.security.Principal;
 import javax.security.auth.Subject;
 
+/**
+ *
+ * @author  James Megquier
+ * @version $Rev$, $Date$
+ */
 public class Player implements SimUserDataListener {
 
     private static final long serialVersionUID = 1L;

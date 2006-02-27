@@ -50,6 +50,11 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.logging.Logger;
 
+/**
+ *
+ * @author  James Megquier
+ * @version $Rev$, $Date$
+ */
 public class Matchmaker implements /* ChannelListener */ GLO {
 
     private static final long serialVersionUID = 1L;
