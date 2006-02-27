@@ -450,8 +450,8 @@ WARN_LOGFILE           =
 # directories like "/usr/src/myproject". Separate the files or directories 
 # with spaces.
 
-INPUT =  src/com/sun/gi/apps/commtest \
-	 src/com/sun/gi/apps/commtest/client \
+INPUT =  src/com/sun/gi/apps/chattest \
+	 src/com/sun/gi/apps/chattest/client \
 	 src/com/sun/gi/gloutils/pdtimer
 
 # If the value of the INPUT tag contains directories, you can use the 
