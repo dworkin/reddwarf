@@ -36,7 +36,7 @@ import com.sun.gi.logic.SimTask;
  * @version 1.0
  */
 public class BattleBoardGame implements GLO{
-	private static final int CITY_COUNT = 5;
+	private static final int CITY_COUNT = 2;
 	private static final int BOARD_WIDTH = 10;
 	private static final int BOARD_HEIGHT = 8;
 	static final int MAX_PLAYERS = 3; // 3 players per game

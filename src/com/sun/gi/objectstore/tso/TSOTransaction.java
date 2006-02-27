@@ -244,8 +244,10 @@ public class TSOTransaction implements Transaction {
 		// System.out.flush();
 		synchronized (this) {
 			try {
-
-				this.wait(l - System.currentTimeMillis());
+				long time = System.currentTimeMillis();
+				if (time<l){
+					this.wait(l - time);
+				}
 
 			} catch (InterruptedException e) {
 				e.printStackTrace();
