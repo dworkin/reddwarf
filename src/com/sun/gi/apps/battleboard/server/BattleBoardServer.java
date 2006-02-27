@@ -55,7 +55,8 @@ import javax.security.auth.Subject;
  * @author  James Megquier
  * @version $Rev$, $Date$
  */
-public class BattleBoardServer implements SimBoot, SimUserListener {
+public class BattleBoardServer
+	implements SimBoot<BattleBoardServer>, SimUserListener {
 
     private static final long serialVersionUID = 1L;
 
@@ -72,7 +73,8 @@ public class BattleBoardServer implements SimBoot, SimUserListener {
      * and is simply being brought up in a new stack as well.
 
      */
-    public void boot(GLOReference thisGLO, boolean firstBoot) {
+    public void boot(GLOReference<? extends BattleBoardServer> thisGLO,
+	    boolean firstBoot) {
 
 	SimTask task = SimTask.getCurrent();
 
@@ -88,7 +90,7 @@ public class BattleBoardServer implements SimBoot, SimUserListener {
 
         // Register this object as the handler for login- and
 	// disconnect-events for all users on this app.
-	task.addUserListener((GLOReference<BattleBoardServer>) thisGLO);
+	task.addUserListener(thisGLO);
     }
 
     // SimUserListener methods

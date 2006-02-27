@@ -10,7 +10,7 @@ package com.sun.gi.logic;
  * @version 1.0
  */
 
-public interface SimBoot extends GLO {
+public interface SimBoot<T extends SimBoot<T>> extends GLO {
   /**
    * This method is called once on the GLO when the system boots an application.
    *
@@ -18,5 +18,5 @@ public interface SimBoot extends GLO {
    * @param firstBoot Whether this is the first time the boot method
    * has been called in the life of this app in this backednd
    */
-  public void boot(GLOReference<? extends SimBoot> thisGLO, boolean firstBoot);
+  public void boot(GLOReference<? extends T> thisGLO, boolean firstBoot);
 }
