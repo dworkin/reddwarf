@@ -1,6 +1,7 @@
 
 package com.sun.gi.objectstore.tso.dataspace.monitor;
 
+import com.sun.gi.objectstore.NonExistantObjectIDException;
 import com.sun.gi.objectstore.tso.dataspace.DataSpace;
 import java.io.Serializable;
 import java.io.IOException;
@@ -20,8 +21,13 @@ public class ReleaseTraceRecord extends TraceRecord implements Serializable {
 	long mappedId = replayState.getMappedOid(this.id);
 	// check?
 
-	dataSpace.release(mappedId);
+	try {
+	    dataSpace.release(mappedId);
+	} catch (NonExistantObjectIDException e) {
+	    // XXX: make note of the error
+	}
     }
+
     private void readObject(ObjectInputStream in)   
 	    throws IOException, ClassNotFoundException
     {

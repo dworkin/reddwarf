@@ -6,13 +6,15 @@ import java.io.Serializable;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 
-public class NewNameTraceRecord extends TraceRecord implements Serializable {
+public class CreateTraceRecord extends TraceRecord implements Serializable {
     private static final long serialVersionUID = 1L;
     protected final String name;
+    protected final int length;
 
-    public NewNameTraceRecord(long startTime, String name) {
+    public CreateTraceRecord(long startTime, byte[] data, String name) {
 	super(startTime);
 	this.name = name;
+	this.length = data.length;
     }
 
     public void replay(DataSpace dataSpace, ReplayState replayState) {

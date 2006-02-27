@@ -5,7 +5,9 @@ package com.sun.gi.objectstore.tso.dataspace;
 import com.sun.gi.objectstore.NonExistantObjectIDException;
 import com.sun.gi.objectstore.tso.dataspace.monitor.AtomicUpdateTraceRecord;
 import com.sun.gi.objectstore.tso.dataspace.monitor.ClearTraceRecord;
+import com.sun.gi.objectstore.tso.dataspace.monitor.CreateTraceRecord;
 import com.sun.gi.objectstore.tso.dataspace.monitor.CloseTraceRecord;
+import com.sun.gi.objectstore.tso.dataspace.monitor.DestroyTraceRecord;
 import com.sun.gi.objectstore.tso.dataspace.monitor.GetAppIdTraceRecord;
 import com.sun.gi.objectstore.tso.dataspace.monitor.GetNextIdTraceRecord;
 import com.sun.gi.objectstore.tso.dataspace.monitor.GetObjBytesTraceRecord;
@@ -81,21 +83,6 @@ public class MonitoredDataSpace implements DataSpace {
     /**
      * {@inheritDoc}
      */
-    public long getNextID() {
-	long startTime = loggingEnabled() ? System.currentTimeMillis() : -1;
-
-	long id = dataSpace.getNextID();
-
-	if (loggingEnabled()) {
-	    log(new GetNextIdTraceRecord(startTime, id));
-	}
-
-	return id;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
     public byte[] getObjBytes(long objectID) {
 	long startTime = loggingEnabled() ? System.currentTimeMillis() : -1;
 
@@ -129,7 +116,11 @@ public class MonitoredDataSpace implements DataSpace {
     public void release(long objectID) {
 	long startTime = loggingEnabled() ? System.currentTimeMillis() : -1;
 
-	dataSpace.release(objectID);
+	try {
+	    dataSpace.release(objectID);
+	} catch (NonExistantObjectIDException e) {
+	    // XXX: note the error.
+	}
 
 	if (loggingEnabled()) {
 	    log(new ReleaseTraceRecord(startTime, objectID));
@@ -138,24 +129,16 @@ public class MonitoredDataSpace implements DataSpace {
 
     /**
      * {@inheritDoc}
-     * @deprecated
      */
-    // TODO: sten deprecated
-    public void atomicUpdate(boolean clear,
-	    Map<String, Long> newNames, Set<Long> deleteSet,
-	    Map<Long, byte[]> updateMap, Set<Long> insertSet)
+    public void atomicUpdate(boolean clear, Map<Long, byte[]> updateMap)
 	throws DataSpaceClosedException
     {
 	long startTime = loggingEnabled() ? System.currentTimeMillis() : -1;
 
-	// TODO: sten commented out to fix build
-	
-	//dataSpace.atomicUpdate(clear, newNames,
-	//	deleteSet, updateMap, insertSet);
+	dataSpace.atomicUpdate(clear, updateMap);
 
 	if (loggingEnabled()) {
-	    log(new AtomicUpdateTraceRecord(startTime, clear, newNames,
-		    deleteSet, updateMap, insertSet));
+	    log(new AtomicUpdateTraceRecord(startTime, clear, updateMap));
 	}
     }
 
@@ -219,16 +202,39 @@ public class MonitoredDataSpace implements DataSpace {
     /**
      * {@inheritDoc}
      */
-    public boolean newName(String name) {
+    public long create(byte[] data, String name) {
 	long startTime = loggingEnabled() ? System.currentTimeMillis() : -1;
+	long oid = DataSpace.INVALID_ID;
 
-	boolean rc = true; /*dataSpace.newName(name);*/  // TODO: sten commented out to fix build
+	oid = dataSpace.create(data, name);
 
 	if (loggingEnabled()) {
-	    log(new NewNameTraceRecord(startTime, name));
+	    log(new CreateTraceRecord(startTime, data, name));
 	}
 
-	return rc;
+	return oid;
+    }
+    
+    /**
+     * {@inheritDoc}
+     */
+    public void destroy(long objectID) throws NonExistantObjectIDException {
+	long startTime = loggingEnabled() ? System.currentTimeMillis() : -1;
+	NonExistantObjectIDException seenException = null;
+
+	try {
+	    dataSpace.destroy(objectID);
+	} catch (NonExistantObjectIDException e) {
+	    seenException = e;
+	}
+
+	if (loggingEnabled()) {
+	    log(new DestroyTraceRecord(startTime, objectID));
+	}
+
+	if (seenException != null) {
+	    throw seenException;
+	}
     }
 
     /**
@@ -303,53 +309,4 @@ public class MonitoredDataSpace implements DataSpace {
 	    }
 	}
     }
-    
-    // TODO: Sten inserted stubs to fix the build -- someone implement
-    
-    /**
-     * Atomically updates the DataSpace.  <p>
-     *
-     * The <code>updateMap</code> contains new bindings between object
-     * identifiers and the byte arrays that represent their values. 
-     *
-     * @param clear <b>NOT USED IN CURRENT IMPL</b>
-     *
-     * @param updateMap new bindings between object identifiers and
-     * byte arrays
-     *
-     * @throws DataSpaceClosedException
-     *
-     * (What is <code>clear</code> supposed to do?  Or is this now
-     * unused and should be removed?  -DJE)
-     */
-    public void atomicUpdate(boolean clear, Map<Long, byte[]> updateMap)
-	    throws DataSpaceClosedException {
-    	
-    }
-    
-    /** creates a new element in the DataSpace
-     * If name is non-null and the name is already in the DataSpace then
-     * create will fail.  
-     * 
-     * Create is an immediate (non-transactional) chnage to the DataSpace.
-     * 
-     * @return objectID or DataSpace.Invalid_ID if it fails
-     */
-    
-    public long create(byte[] data,String name) {
-    	return 0;
-    }
-    
-	/**
-	 * Destroys the object associated with objectID and removes the name
-	 * associated with that ID (if any.)
-	 * 
-	 * destroy is an immediate (non-transactional) change to the DataSpace.
-	 * 
-	 * @param objectID
-	 */
-	public void destroy(long objectID) {
-		
-	}
-
 }
