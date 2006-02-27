@@ -38,6 +38,7 @@
     <target name="clean">
 	<delete dir="bin" />
 	<delete dir="release" />
+	<delete file="ProjectDarkstar.zip" />
     </target>
 
     <target name="realclean" depends="clean">
