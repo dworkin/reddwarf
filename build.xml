@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project basedir="." default="release" name="SGS">
+<project basedir="." default="release.bin" name="SGS">
 
     <target name="help">
 	<echo message="Please run: $ ant -v -projecthelp" />
