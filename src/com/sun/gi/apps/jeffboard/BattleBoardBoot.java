@@ -42,6 +42,9 @@ public class BattleBoardBoot implements SimBoot,SimUserListener{
 	long gameCounter=0;
 	Map<UserID,GLOReference> playerToGameMap = 
 		new HashMap<UserID, GLOReference>();
+	private int guestCount=0;
+	private Map<UserID,GLOReference> guestMap = 
+		new HashMap<UserID,GLOReference>();
 	
 	/* (non-Javadoc)
 	 * @see com.sun.gi.logic.SimBoot#boot(com.sun.gi.logic.GLOReference, boolean)
@@ -63,15 +66,26 @@ public class BattleBoardBoot implements SimBoot,SimUserListener{
 		Set<Principal> principles = subject.getPrincipals();
 		Principal principal = principles.iterator().next();
 		String playerName = principal.getName();
-		String playerObjectName = "player_"+playerName;
-		GLOReference playerRef = task.findGLO(playerObjectName);
-		if (playerRef == null){
+		GLOReference playerRef; 
+		if (playerName.equalsIgnoreCase("Guest")){
+			String guestName = "Guest"+guestCount;
+			guestCount++;	
 			BattleBoardPlayer playerTemplate = 
-				new BattleBoardPlayer(playerName,
+				new BattleBoardGuest(guestName,
 						getCurrentlyFillingGameGLORef(task));
-			playerRef = task.createGLO(playerTemplate,playerObjectName);
+			playerRef = task.createGLO(playerTemplate,null);
+			guestMap.put(uid,playerRef);
+		} else {
+			String playerObjectName = "player_"+playerName;
+			playerRef = task.findGLO(playerObjectName);
 			if (playerRef == null){
-				playerRef = task.findGLO(playerObjectName);
+				BattleBoardPlayer playerTemplate = 
+					new BattleBoardPlayer(playerName,
+						getCurrentlyFillingGameGLORef(task));
+				playerRef = task.createGLO(playerTemplate,playerObjectName);
+				if (playerRef == null){
+					playerRef = task.findGLO(playerObjectName);
+				}
 			}
 		}
 		task.addUserDataListener(uid,playerRef);
@@ -117,6 +131,10 @@ public class BattleBoardBoot implements SimBoot,SimUserListener{
 		BattleBoardGame game = 
 			(BattleBoardGame)gameRef.get(SimTask.getCurrent());
 		game.withdraw(uid);
+		if (guestMap.containsKey(uid)){
+			guestMap.get(uid).delete(SimTask.getCurrent());
+			guestMap.remove(uid);
+		}
 		playerToGameMap.remove(uid);		
 	}
 

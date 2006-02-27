@@ -261,9 +261,9 @@ public class BattleBoardGame implements GLO{
 			BattleBoardPlayer player = 
 				(BattleBoardPlayer)ref.get(task);
 			if (uid.equals(entry.getKey())){
-				player.wins++;
+				player.gameOver(true);
 			} else {
-				player.losses++;
+				player.gameOver(false);
 			}
 		}
 		

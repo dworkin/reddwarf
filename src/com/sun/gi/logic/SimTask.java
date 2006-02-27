@@ -146,7 +146,13 @@ public abstract class SimTask {
      * @return A reference to the GLO if found, null if not found.
      */
     public abstract GLOReference findGLO(String gloName);
-
+    
+    
+    /**
+     * 
+     * @param ref
+     */
+    public abstract void destroyGLO(GLOReference ref);
     /**
      * This method opens a comm channel and returns an ID for it
      *
@@ -302,5 +308,7 @@ public abstract class SimTask {
 	protected void setAsCurrent(){
 		current.set(this);
 	}
+	
+	
 	
 }

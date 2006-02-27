@@ -557,4 +557,14 @@ public class SimTaskImpl extends SimTask {
 		simulation.enableEvesdropping(uid,cid,setting);
 		
 	}
+
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.logic.SimTask#destroyGLO(com.sun.gi.logic.GLOReference)
+	 */
+	@Override
+	public void destroyGLO(GLOReference ref) {
+		ref.delete(this);
+		
+	}
 }

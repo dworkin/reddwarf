@@ -81,6 +81,7 @@ public class BattleBoardPlayer implements GLO, SimUserDataListener{
 		byte[] inputBytes = new byte[buff.remaining()];
 		buff.get(inputBytes);
 		String cmd = new String(inputBytes);
+		System.out.println("CMD: "+playerName+": "+cmd);
 		String[] words = explode(cmd);
 		BattleBoardGame game = 
 			(BattleBoardGame)myGame.get(SimTask.getCurrent());
@@ -111,6 +112,14 @@ public class BattleBoardPlayer implements GLO, SimUserDataListener{
 	public boolean isAlive() {
 		// TODO Auto-generated method stub
 		return false;
+	}
+	
+	public void gameOver(boolean winner){
+		if (winner){
+			wins++;
+		} else {
+			losses++;
+		}
 	}
 
 }
