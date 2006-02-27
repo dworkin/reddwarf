@@ -1112,6 +1112,60 @@ public class HadbDataSpace implements DataSpace {
     }
 
     /**
+     * FIXME: Stub code, needs to be implemented!
+     *
+     * Atomically updates the DataSpace.  <p>
+     *
+     * The <code>updateMap</code> contains new bindings between object
+     * identifiers and the byte arrays that represent their values.
+     *
+     * @param clear <b>NOT USED IN CURRENT IMPL</b>
+     *
+     * @param updateMap new bindings between object identifiers and
+     * byte arrays
+     *
+     * @throws DataSpaceClosedException
+     *
+     * (What is <code>clear</code> supposed to do?  Or is this now
+     * unused and should be removed?  -DJE)
+     */
+
+    public synchronized void atomicUpdate(boolean clear, Map<Long, byte[]> updateMap)
+	    throws DataSpaceClosedException {
+	// FIXME: implement
+    }
+
+    /**
+     * FIXME: Stub code, needs to be implemented!
+     *
+     * Creates a new element in the DataSpace.
+     * If name is non-null and the name is already in the DataSpace then create
+     * will fail.
+     *
+     * Create is an immediate (non-transactional) chnage to the DataSpace.
+     *
+     * @return objectID or DataSpace.Invalid_ID if it fails
+     */
+    public long create(byte[] data,String name) {
+	// FIXME: implement
+	return 0;
+    }
+
+    /**
+     * FIXME: Stub code, needs to be implemented!
+     *
+     * Destroys the object associated with objectID and removes the name
+     * associated with that ID (if any).
+     *
+     * destroy is an immediate (non-transactional) change to the DataSpace.
+     *
+     * @param objectID
+     */
+    public void destroy(long objectID) {
+	// FIXME: implement
+    }
+
+    /**
      * {inheritDoc}
      */
     public synchronized Long lookup(String name) {
