@@ -9,13 +9,14 @@ package com.sun.gi.logic;
  * @author Jeff Kesselman
  * @version 1.0
  */
-
 public interface SimThread {
-  /**
-   * This method is called to start a SimTask executing on this thread.
-   * This method blocks if there is already a task executing on this thread.
-   * It returns when the new task has begun execution.
-   * @param task SimTask task for this SimThread to execute next
-   */
-  public void execute(SimTask task);
+
+    /**
+     * Starts a SimTask executing on this thread.  Blocks if there is
+     * already a task executing on this thread.  It returns when the
+     * new task has begun execution.
+     *
+     * @param task  the task for this SimThread to execute next
+     */
+    public void execute(SimTask task);
 }

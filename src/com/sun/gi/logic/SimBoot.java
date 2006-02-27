@@ -9,14 +9,22 @@ package com.sun.gi.logic;
  * @author Jeff Kesselman
  * @version 1.0
  */
-
 public interface SimBoot<T extends SimBoot<T>> extends GLO {
-  /**
-   * This method is called once on the GLO when the system boots an application.
-   *
-   * @param thisGLO A GLOReference to the boot object
-   * @param firstBoot Whether this is the first time the boot method
-   * has been called in the life of this app in this backednd
-   */
-  public void boot(GLOReference<? extends T> thisGLO, boolean firstBoot);
+
+    /**
+     * This method is called once on the GLO when the system boots an
+     * application.
+     *
+     * @param thisGLO A GLOReference to the boot object.  The type of
+     *                this GLOReference is the type &lt;T&gt; of this boot
+     *                object, which implements SimBoot&lt;T&gt;.
+     *
+     * @param firstBoot true if this is the first time the boot method
+     *                  has been called in the life of this app in
+     *                  this backend.  That is, if firstBoot is true,
+     *                  then the objectstore did not previously
+     *                  contain an instance of this boot object and
+     *                  you may wish to do additional one-time setup.
+     */
+    public void boot(GLOReference<? extends T> thisGLO, boolean firstBoot);
 }

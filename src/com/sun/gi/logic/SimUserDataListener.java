@@ -30,7 +30,7 @@ public interface SimUserDataListener extends GLO {
     public void userJoinedChannel(ChannelID cid, UserID uid);
 
     public void userLeftChannel(ChannelID cid, UserID uid);
-    
+
     public void dataArrivedFromChannel(ChannelID id,
-    		UserID from, ByteBuffer buff);
+	    UserID from, ByteBuffer buff);
 }
