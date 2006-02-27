@@ -13,7 +13,6 @@ import com.sun.gi.objectstore.tso.dataspace.monitor.GetNextIdTraceRecord;
 import com.sun.gi.objectstore.tso.dataspace.monitor.GetObjBytesTraceRecord;
 import com.sun.gi.objectstore.tso.dataspace.monitor.LockTraceRecord;
 import com.sun.gi.objectstore.tso.dataspace.monitor.LookupTraceRecord;
-import com.sun.gi.objectstore.tso.dataspace.monitor.NewNameTraceRecord;
 import com.sun.gi.objectstore.tso.dataspace.monitor.ReleaseTraceRecord;
 import com.sun.gi.objectstore.tso.dataspace.monitor.TraceRecord;
 import java.io.FileOutputStream;
