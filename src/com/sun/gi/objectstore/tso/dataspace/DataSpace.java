@@ -144,17 +144,20 @@ public interface DataSpace {
      */
     void clear();
     
-    /** creates a new element in the DataSpace
-     * If name is non-null and the name is already in the DataSpace then
-     * create will fail.  
+    /**
+     * Creates a new element in the DataSpace.  <p>
+     *
+     * If <code>name</code> is non-<code>null</code> and
+     * <code>name</code> is already in the DataSpace then this method
+     * will fail.  <p>
      * 
-     * Create is an immediate (non-transactional) chnage to the DataSpace.
+     * Create is an immediate (non-transactional) change to the
+     * DataSpace.
      * 
-     * @return objectID or DataSpace.Invalid_ID if it fails
+     * @return a new objectID if successful, or
+     * <code>DataSpace.INVALID_ID</code> if it fails
      */
-    
-    public long create(byte[] data,String name);
-    
+    public long create(byte[] data, String name);
 
     /**
      * Closes the DataSpace, preventing further updates.  <p>
@@ -170,18 +173,13 @@ public interface DataSpace {
      */
     void close();
 
-	/**
-	 * Destroys the object associated with objectID and removes the name
-	 * associated with that ID (if any.)
-	 * 
-	 * destroy is an immediate (non-transactional) change to the DataSpace.
-	 * 
-	 * @param objectID
-	 */
-	void destroy(long objectID);
-    
-    
-
-    
-
+    /**
+     * Destroys the object associated with objectID and removes the name
+     * associated with that ID (if any). <p>
+     * 
+     * destroy is an immediate (non-transactional) change to the DataSpace.
+     * 
+     * @param The objectID of the object to destroy
+     */
+    void destroy(long objectID);
 }
