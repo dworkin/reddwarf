@@ -35,7 +35,7 @@ public interface DataSpace {
      *
      * @return a newly allocated object identifier
      */
-    long getNextID();
+    // long getNextID();
 
     /**
      * Returns a copy of the object as a <code>byte</code> array
@@ -48,27 +48,24 @@ public interface DataSpace {
      * <code>null</code> if no such object exists
      *
      * (seems inconsistent to return null here and throw
-     * NonExistantObjectIDException in other situations -DJE)
-     * (agreed.  There are also some functions that return Long 
-     * and others that return long.  The ones that return Long
-     * return null for error and the ones that return long return
-     * DataSpace.INVALID ID.  This should probably all get sorted 
-     * out post GDC... JK)  
+     * NonExistantObjectIDException in other situations -DJE) (agreed. 
+     * There are also some functions that return Long and others that
+     * return long.  The ones that return Long return null for error
+     * and the ones that return long return DataSpace.INVALID ID. 
+     * This should probably all get sorted out post GDC...  JK)
      */
     byte[] getObjBytes(long objectID);
 
     /**
-     * A very basic locking mechanism.
-     * 
      * Blocks until the object with the given <em>objectID</em> is
      * available, locks the object, and returns.
      * 
-     * Note that this is not a counting lock, calling lock twice on the 
-     * same ID is a deadlock situation as you will sit and wait for
-     * yourself to free the lock.
+     * Note that this is not a counting lock, calling lock twice on
+     * the same ID is a deadlock situation as you will sit and wait
+     * for yourself to free the lock.
      * 
-     * Also note that there is no notion of a lock owner.  Anyone who knows 
-     * the number can free a lock by calling release on it. 
+     * Also note that there is no notion of a lock owner.  Anyone who
+     * knows the number can free a lock by calling release on it. 
      *
      * @param objectID the identifier of the object to lock
      *
@@ -90,8 +87,11 @@ public interface DataSpace {
      * DataSpace.
      *
      * @param objectID the object whose lock to release
+     *
+     * @throws NonExistantObjectIDException if no object with the
+     * given <em>objectID</em> exists
      */
-    void release(long objectID);
+    void release(long objectID) throws NonExistantObjectIDException;
 
     /**
      * Atomically updates the DataSpace.  <p>
@@ -174,12 +174,16 @@ public interface DataSpace {
     void close();
 
     /**
-     * Destroys the object associated with objectID and removes the name
-     * associated with that ID (if any). <p>
+     * Destroys the object associated with objectID and removes the
+     * name associated with that ID (if any).  <p>
      * 
-     * destroy is an immediate (non-transactional) change to the DataSpace.
+     * destroy is an immediate (non-transactional) change to the
+     * DataSpace.
      * 
      * @param The objectID of the object to destroy
+     *
+     * @throws NonExistantObjectIDException if no object with the
+     * given <em>objectID</em> exists
      */
-    void destroy(long objectID);
+    void destroy(long objectID) throws NonExistantObjectIDException;
 }

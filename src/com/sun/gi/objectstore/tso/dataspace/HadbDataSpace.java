@@ -13,6 +13,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map.Entry;
@@ -41,13 +42,14 @@ public class HadbDataSpace implements DataSpace {
      * and get the answer "no") -DJE
      */
 
-    private static final String SCHEMA = "simserver";
+    private static final String SCHEMAROOT = "simserver";
 
     private static final String OBJBASETBL = "objects";
     private static final String OBJLOCKBASETBL = "objlocks";
     private static final String NAMEBASETBL = "namedirectory";
     private static final String INFOBASETBL = "appinfo";
 
+    private final String SCHEMA;
     private String NAMETBL;
     private String OBJTBL;
     private String INFOTBL;
@@ -77,6 +79,7 @@ public class HadbDataSpace implements DataSpace {
     private PreparedStatement updateObjUnlockStmnt;
     private PreparedStatement insertObjLockStmnt;
     private PreparedStatement deleteObjStmnt;
+    private PreparedStatement deleteNameStmnt;
     private PreparedStatement clearObjTableStmnt;
     private PreparedStatement clearNameTableStmnt;
 
@@ -126,17 +129,12 @@ public class HadbDataSpace implements DataSpace {
 	    throw new IllegalArgumentException("illegal parameters");
 	}
 
-	OBJTBL = OBJBASETBL + "_" + appID;
-	OBJTBLNAME = SCHEMA + "." + OBJTBL;
+	SCHEMA = SCHEMAROOT + "_" + appID;
 
-	OBJLOCKTBL = OBJLOCKBASETBL + "_" + appID;
-	OBJLOCKTBLNAME = SCHEMA + "." + OBJLOCKTBL;
-
-	NAMETBL = NAMEBASETBL + "_" + appID;
-	NAMETBLNAME = SCHEMA + "." + NAMETBL;
-
-	INFOTBL = INFOBASETBL + "_" + appID;
-	INFOTBLNAME = SCHEMA + "." + INFOTBL;
+	OBJTBLNAME = SCHEMA + "." + OBJBASETBL;
+	OBJLOCKTBLNAME = SCHEMA + "." + OBJLOCKBASETBL;
+	NAMETBLNAME = SCHEMA + "." + NAMEBASETBL;
+	INFOTBLNAME = SCHEMA + "." + INFOBASETBL;
 
 	try {
 	    // XXX: MUST take these from a config file.
@@ -469,9 +467,12 @@ public class HadbDataSpace implements DataSpace {
     private synchronized void createPreparedStmnts() throws SQLException {
 
 	getObjStmnt = readConn.prepareStatement("SELECT * FROM " +
-		OBJTBLNAME + " O  " + "WHERE O.OBJID = ?");
+		OBJTBLNAME + " WHERE OBJID=?");
 	getNameStmnt = readConn.prepareStatement("SELECT * FROM " +
-		NAMETBLNAME + " N  " + "WHERE N.NAME = ?");
+		NAMETBLNAME + " WHERE NAME=?");
+
+	deleteNameStmnt = updateTransConn.prepareStatement("DELETE FROM " +
+		NAMETBLNAME + " WHERE NAME=?");
 
 	insertObjStmnt = updateTransConn.prepareStatement("INSERT INTO " +
 		OBJTBLNAME + " VALUES(?,?)");
@@ -483,7 +484,7 @@ public class HadbDataSpace implements DataSpace {
 	updateNameStmnt = updateTransConn.prepareStatement("UPDATE " +
 		NAMETBLNAME + " SET NAME=? WHERE OBJID=?");
 	deleteObjStmnt = updateTransConn.prepareStatement("DELETE FROM " +
-		OBJTBLNAME + " WHERE OBJID = ?");
+		OBJTBLNAME + " WHERE OBJID=?");
 
 	updateObjLockStmnt = updateSingleConn.prepareStatement("UPDATE " +
 		OBJLOCKTBLNAME +
@@ -670,7 +671,7 @@ public class HadbDataSpace implements DataSpace {
     /**
      * {@inheritDoc}
      */
-    public synchronized long getNextID() {
+    private synchronized long getNextID() {
 
 	/*
 	 * In order to minimize the overhead of creating new object
@@ -982,6 +983,19 @@ public class HadbDataSpace implements DataSpace {
      * {@inheritDoc}
      */
     public synchronized void atomicUpdate(boolean clear,
+	    Map<Long, byte[]> updateMap)
+	throws DataSpaceClosedException
+    {
+	Map<String, Long> dummyNewNames = new HashMap<String, Long>();
+	Set<Long> dummyIdSet = new HashSet<Long>();
+
+	atomicUpdate(clear, dummyNewNames, dummyIdSet, updateMap, dummyIdSet);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    private synchronized void atomicUpdate(boolean clear,
 	    Map<String, Long> newNames,
 	    Set<Long> deleteSet, Map<Long, byte[]> updateMap,
 	    Set<Long> insertIDs)
@@ -1112,60 +1126,6 @@ public class HadbDataSpace implements DataSpace {
     }
 
     /**
-     * FIXME: Stub code, needs to be implemented!
-     *
-     * Atomically updates the DataSpace.  <p>
-     *
-     * The <code>updateMap</code> contains new bindings between object
-     * identifiers and the byte arrays that represent their values.
-     *
-     * @param clear <b>NOT USED IN CURRENT IMPL</b>
-     *
-     * @param updateMap new bindings between object identifiers and
-     * byte arrays
-     *
-     * @throws DataSpaceClosedException
-     *
-     * (What is <code>clear</code> supposed to do?  Or is this now
-     * unused and should be removed?  -DJE)
-     */
-
-    public synchronized void atomicUpdate(boolean clear, Map<Long, byte[]> updateMap)
-	    throws DataSpaceClosedException {
-	// FIXME: implement
-    }
-
-    /**
-     * FIXME: Stub code, needs to be implemented!
-     *
-     * Creates a new element in the DataSpace.
-     * If name is non-null and the name is already in the DataSpace then create
-     * will fail.
-     *
-     * Create is an immediate (non-transactional) chnage to the DataSpace.
-     *
-     * @return objectID or DataSpace.Invalid_ID if it fails
-     */
-    public long create(byte[] data,String name) {
-	// FIXME: implement
-	return 0;
-    }
-
-    /**
-     * FIXME: Stub code, needs to be implemented!
-     *
-     * Destroys the object associated with objectID and removes the name
-     * associated with that ID (if any).
-     *
-     * destroy is an immediate (non-transactional) change to the DataSpace.
-     *
-     * @param objectID
-     */
-    public void destroy(long objectID) {
-	// FIXME: implement
-    }
-
-    /**
      * {inheritDoc}
      */
     public synchronized Long lookup(String name) {
@@ -1255,4 +1215,64 @@ public class HadbDataSpace implements DataSpace {
 	return false;
     }
 
+    public void destroy(long objectID) throws NonExistantObjectIDException {
+
+	// XXX: write me.
+
+	// XXX: doesn't check for bad objectIDs
+	// XXX: BIG BUG: doesn't delete names of anything!
+
+	try {
+	    deleteObjStmnt.setLong(1, objectID);
+	    deleteObjStmnt.executeUpdate();
+
+	    deleteObjStmnt.getConnection().commit();
+
+	    return;
+	} catch (SQLException e) {
+	    try {
+		deleteObjStmnt.getConnection().rollback();
+	    } catch (SQLException e2) {
+		// XXX: DO SOMETHING.
+	    }
+	}
+    }
+
+    public long create(byte[] data, String name) {
+	// XXX: write me.
+
+	if (data == null) {
+	    throw new NullPointerException("data is null");
+	}
+
+	long oid = getNextID();
+
+	if (name != null) {
+	    try {
+		insertNameStmnt.setString(1, name);
+		insertNameStmnt.setLong(2, oid);
+		insertNameStmnt.executeUpdate();
+	    } catch (SQLException e) {
+		// Was there already an identical name?
+		// Do we need to commit to find out?
+	    }
+	}
+
+	try {
+	    insertObjStmnt.setLong(1, oid);
+	    insertObjStmnt.setBytes(2, data);
+	    insertObjStmnt.executeUpdate();
+
+	    insertObjStmnt.getConnection().commit();
+
+	    return oid;
+	} catch (SQLException e) {
+	    try {
+		insertObjStmnt.getConnection().rollback();
+	    } catch (SQLException e2) {
+		// XXX: DO SOMETHING.
+	    }
+	    return DataSpace.INVALID_ID;
+	}
+    }
 }
