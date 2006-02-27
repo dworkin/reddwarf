@@ -16,50 +16,50 @@ package com.sun.gi.logic;
  * @author Jeff Kesselman
  * @version 1.0
  */
+public interface GLOReference<T extends GLO> {
+    /**
+     * This method locks the referenced GLO for write and returns a reference
+     * to an in memory instantiation of it.  Multiple get() calls on
+     * GLOReferences that reference the same GLO will only cause one lock and
+     * will all return the same instance.
+     * 
+     * @param task SimTask The SimTask context
+     * @return The in memory instance of the GLO
+     */
+    public T get(SimTask task);
+    /**
+     * This method is like a get() except that the object is not write locked.
+     * It returns a task-local copy that will not get stored back to the
+     * objectstore.  Multiple calls to peek() on GLOReferences that reference
+     * the same GLO will return the same task-local copy
+     * 
+     * @param task SimTask  The SimTask context
+     * @return The task local instance.
+     */
+    public T peek(SimTask task);
 
-public interface GLOReference {
-  /**
-   * This method locks the referenced GLO for write and returns a reference to
-   * an in memory instantiation of it.  Multiple get() calls on GLOReferences
-   * that reference the same GLO will only cause one lock and will all return
-   * the same instance.
-   * 
-   * @param task SimTask The SimTask context
-   * @return The in memory instance of the GLO
-   */
-  public GLO get(SimTask task);
-  /**
-   * This method is like a get() except that the object is not write locked.
-   * It returns a task-local copy that will not get stored back to the
-   * objectstore.  Multiple calls to peek() on GLOReferences that reference the
-   * same GLO will return the same task-local copy
-   * 
-   * @param task SimTask  The SimTask context
-   * @return The task local instance.
-   */
-  public GLO peek(SimTask task);
-  
-  
-  /**
-   * This method is like a get() except that it does not block.
-   * Instead, if the object is already locked, it simply returns null
-   * objectstore.  Multiple calls to peek() on GLOReferences that reference the
-   * same GLO will return the same task-local copy
-   * 
-   * @param task SimTask  The SimTask context
-   * @return The in memory instance of the GLO or null.
-  */
- public GLO attempt(SimTask task);
 
-  /**
-   * This method makes a copy of an GLOReference that references the same
-   * GLO.
-   * @return GLOReference the new GLOReference.
-   */
-  public GLOReference shallowCopy();
-/**
- * @param task
- */
-	public void delete(SimTask task);
+    /**
+     * This method is like a get() except that it does not block.
+     * Instead, if the object is already locked, it simply returns null
+     * objectstore.  Multiple calls to peek() on GLOReferences that reference
+     * the same GLO will return the same task-local copy
+     * 
+     * @param task SimTask  The SimTask context
+     * @return The in memory instance of the GLO or null.
+     */
+    public T attempt(SimTask task);
 
+    /**
+     * This method makes a copy of an GLOReference that references the same
+     * GLO.
+     *
+     * @return GLOReference the new GLOReference.
+     */
+    public GLOReference<T> shallowCopy();
+
+    /**
+     * @param task
+     */
+    public void delete(SimTask task);
 }

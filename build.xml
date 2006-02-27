@@ -138,7 +138,7 @@
 	<javac srcdir="src" destdir="bin" source="5" target="5"
 		debug="${debug}" optimize="${optimize}"
 		deprecation="${deprecated}">
-	    <!-- <compilerarg value="-Xlint:unchecked"/> -->
+	    <compilerarg value="-Xlint:unchecked"/>
 	    <classpath refid="project.classpath" />
 	    <include name="com/sun/gi/apps/battleboard/server/**" />
 	</javac>

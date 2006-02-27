@@ -438,7 +438,7 @@ public class SimTaskImpl extends SimTask {
 
 	}
 
-	public void access_check(ACCESS_TYPE accessType, Object glo) {
+	public void access_check(ACCESS_TYPE accessType, GLO glo) {
 		ACCESS_TYPE gloAcc = gloAccessMap.get(glo);
 		if (gloAcc != accessType) {
 			throw new AccessTypeViolationException("Expected " + accessType

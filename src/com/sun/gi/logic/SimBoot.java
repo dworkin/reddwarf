@@ -18,5 +18,5 @@ public interface SimBoot extends GLO {
    * @param firstBoot Whether this is the first time the boot method
    * has been called in the life of this app in this backednd
    */
-  public void boot(GLOReference thisGLO, boolean firstBoot);
+  public void boot(GLOReference<? extends SimBoot> thisGLO, boolean firstBoot);
 }

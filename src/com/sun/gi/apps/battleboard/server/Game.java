@@ -72,26 +72,27 @@ public class Game implements /* ChannelListener */ GLO {
 
     protected String     gameName;
     protected ChannelID  channel;
-    protected GLOReference               thisRef;
-    protected LinkedList<GLOReference>   players;
-    protected LinkedList<GLOReference>   spectators;
-    protected Map<String, GLOReference>  playerBoards;
-    protected GLOReference               currentPlayerRef;
+    protected GLOReference<Game>                thisRef;
+    protected LinkedList<GLOReference<Player>>  players;
+    protected LinkedList<GLOReference<Player>>  spectators;
+    protected Map<String, GLOReference<Board>>  playerBoards;
+    protected GLOReference<Player>              currentPlayerRef;
 
     protected static int DEFAULT_BOARD_WIDTH  = 8;
     protected static int DEFAULT_BOARD_HEIGHT = 8;
     protected static int DEFAULT_BOARD_CITIES = 2;
 
-    public static GLOReference create(Collection<GLOReference> players) {
+    public static GLOReference create(
+	    Collection<GLOReference<Player>> players) {
 
 	SimTask task = SimTask.getCurrent();
-	GLOReference ref = task.createGLO(new Game(players));
+	GLOReference<Game> ref = task.createGLO(new Game(players));
 
-	((Game) ref.get(task)).boot(ref);
+	ref.get(task).boot(ref);
 	return ref;
     }
 
-    protected Game(Collection<GLOReference> newPlayers) {
+    protected Game(Collection<GLOReference<Player>> newPlayers) {
 
 	SimTask task = SimTask.getCurrent();
 
@@ -101,14 +102,14 @@ public class Game implements /* ChannelListener */ GLO {
 
 	log.finer("Next game channel is `" + gameName + "'");
 
-	players = new LinkedList<GLOReference>(newPlayers);
+	players = new LinkedList<GLOReference<Player>>(newPlayers);
 	Collections.shuffle(players);
 
-	spectators = new LinkedList<GLOReference>();
+	spectators = new LinkedList<GLOReference<Player>>();
 
-	playerBoards = new HashMap<String, GLOReference>();
-	for (GLOReference playerRef : players) {
-	    Player p = (Player) playerRef.get(task);
+	playerBoards = new HashMap<String, GLOReference<Board>>();
+	for (GLOReference<Player> playerRef : players) {
+	    Player p = playerRef.get(task);
 	    playerBoards.put(p.getNickname(),
 		createBoard(p.getNickname()));
 	}
@@ -117,21 +118,21 @@ public class Game implements /* ChannelListener */ GLO {
 	task.lock(channel, true);
     }
 
-    protected void boot(GLOReference ref) {
+    protected void boot(GLOReference<Game> ref) {
 	SimTask task = SimTask.getCurrent();
 
 	thisRef = ref;
 
 	if (log.isLoggable(Level.FINE)) {
 	    log.fine("playerBoards size " + playerBoards.size());
-	    for (Map.Entry<String, GLOReference> x : playerBoards.entrySet()) {
+	    for (Map.Entry<String, GLOReference<Board>> x : playerBoards.entrySet()) {
 		log.fine("playerBoard[" + x.getKey() + "]=`" +
 		    x.getValue() + "'");
 	    }
 	}
 
-	for (GLOReference playerRef : players) {
-	    Player p = (Player) playerRef.get(task);
+	for (GLOReference<Player> playerRef : players) {
+	    Player p = playerRef.get(task);
 	    p.gameStarted(thisRef);
 	}
 	//task.addChannelMembershipListener(channel, thisRef);
@@ -141,7 +142,7 @@ public class Game implements /* ChannelListener */ GLO {
 	startNextMove();
     }
 
-    protected GLOReference createBoard(String playerName) {
+    protected GLOReference<Board> createBoard(String playerName) {
 	SimTask task = SimTask.getCurrent();
 
 	Board board = new Board(playerName,
@@ -149,7 +150,7 @@ public class Game implements /* ChannelListener */ GLO {
 
 	board.populate();
 
-	GLOReference ref = task.createGLO(board,
+	GLOReference<Board> ref = task.createGLO(board,
 	    gameName + "-board-" + playerName);
 
 	log.finer("createBoard[" + playerName + "] returning " + ref);
@@ -160,8 +161,8 @@ public class Game implements /* ChannelListener */ GLO {
 	SimTask task = SimTask.getCurrent();
 	log.info("Ending Game");
 	// Tell all the players this game is over
-	for (GLOReference ref : players) {
-	    Player p = (Player) ref.get(task);
+	for (GLOReference<Player> ref : players) {
+	    Player p = ref.get(task);
 	    p.gameEnded(thisRef);
 	}
 
@@ -185,8 +186,8 @@ public class Game implements /* ChannelListener */ GLO {
 
     protected void sendJoinOK() {
 	SimTask task = SimTask.getCurrent();
-	for (GLOReference ref : players) {
-	    Player p = (Player) ref.peek(task);
+	for (GLOReference<Player> ref : players) {
+	    Player p = ref.peek(task);
 	    task.join(p.getUID(), channel);
 	    sendJoinOK(p);
 	}
@@ -227,8 +228,8 @@ public class Game implements /* ChannelListener */ GLO {
 	SimTask task = SimTask.getCurrent();
 	ByteBuffer buf = ByteBuffer.allocate(1024);
 	buf.put("turn-order".getBytes());
-	for (GLOReference playerRef : players) {
-	    Player p = (Player) playerRef.peek(task);
+	for (GLOReference<Player> playerRef : players) {
+	    Player p = playerRef.peek(task);
 	    buf.put(" ".getBytes());
 	    buf.put(p.getNickname().getBytes());
 	}
@@ -240,13 +241,13 @@ public class Game implements /* ChannelListener */ GLO {
 	UserID[] uids = new UserID[players.size() + spectators.size()];
 
 	int i = 0;
-	for (GLOReference ref : players) {
-	    Player p = (Player) ref.peek(task);
+	for (GLOReference<Player> ref : players) {
+	    Player p = ref.peek(task);
 	    uids[i++] = p.getUID();
 	}
 
-	for (GLOReference ref : spectators) {
-	    Player p = (Player) ref.peek(task);
+	for (GLOReference<Player> ref : spectators) {
+	    Player p = ref.peek(task);
 	    uids[i++] = p.getUID();
 	}
 
@@ -270,7 +271,7 @@ public class Game implements /* ChannelListener */ GLO {
 
 	currentPlayerRef = players.removeFirst();
 	players.addLast(currentPlayerRef);
-	Player p = (Player) currentPlayerRef.peek(task);
+	Player p = currentPlayerRef.peek(task);
 	sendMoveStarted(p);
     }
 
@@ -290,7 +291,7 @@ public class Game implements /* ChannelListener */ GLO {
 
 	String bombedPlayerNick = tokens[1];
 
-	GLOReference boardRef = playerBoards.get(bombedPlayerNick);
+	GLOReference<Board> boardRef = playerBoards.get(bombedPlayerNick);
 	if (boardRef == null) {
 	    log.warning(player.getNickname() +
 		    " tried to bomb non-existant player " +
@@ -299,7 +300,7 @@ public class Game implements /* ChannelListener */ GLO {
 	    return;
 
 	}
-	Board board = (Board) boardRef.get(task);
+	Board board = boardRef.get(task);
 
 	int x = Integer.parseInt(tokens[2]);
 	int y = Integer.parseInt(tokens[3]);
@@ -341,10 +342,10 @@ public class Game implements /* ChannelListener */ GLO {
 	// If the bombed player has lost, make them a spectator
 	if (board.lost()) {
 	    playerBoards.remove(bombedPlayerNick);
-	    Iterator<GLOReference> i = players.iterator();
+	    Iterator<GLOReference<Player>> i = players.iterator();
 	    while (i.hasNext()) {
-		GLOReference ref = i.next();
-		Player p = (Player) ref.peek(task);
+		GLOReference<Player> ref = i.next();
+		Player p = ref.peek(task);
 		if (bombedPlayerNick.equals(p.getNickname())) {
 		    spectators.add(ref);
 		    i.remove();
@@ -370,7 +371,7 @@ public class Game implements /* ChannelListener */ GLO {
 	startNextMove();
     }
 
-    protected void handleResponse(GLOReference playerRef,
+    protected void handleResponse(GLOReference<Player> playerRef,
 	    String[] tokens) {
 
 	if (! playerRef.equals(currentPlayerRef)) {
@@ -379,7 +380,7 @@ public class Game implements /* ChannelListener */ GLO {
 	}
 
 	SimTask task = SimTask.getCurrent();
-	Player player = (Player) playerRef.peek(task);
+	Player player = playerRef.peek(task);
 	String cmd = tokens[0];
 
 	if ("pass".equals(cmd)) {
@@ -409,7 +410,7 @@ public class Game implements /* ChannelListener */ GLO {
 	    return;
 	}
 
-	GLOReference playerRef = Player.getRef(uid);
+	GLOReference<Player> playerRef = Player.getRef(uid);
 	// XXX check for null
 
 	handleResponse(playerRef, tokens);

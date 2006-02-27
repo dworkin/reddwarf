@@ -70,6 +70,7 @@ public class BattleBoardServer implements SimBoot, SimUserListener {
 
      */
     public void boot(GLOReference thisGLO, boolean firstBoot) {
+
 	SimTask task = SimTask.getCurrent();
 
 	log.info("Booting BattleBoard Server as appID " + task.getAppID());
@@ -83,7 +84,7 @@ public class BattleBoardServer implements SimBoot, SimUserListener {
 
         // Register this object as the handler for login- and
 	// disconnect-events for all users on this app.
-	task.addUserListener(thisGLO);
+	task.addUserListener((GLOReference<BattleBoardServer>) thisGLO);
     }
 
     // SimUserListener methods

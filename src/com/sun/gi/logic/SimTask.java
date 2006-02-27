@@ -8,6 +8,7 @@ import java.nio.ByteBuffer;
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.comm.users.server.SGSUser;
+import com.sun.gi.framework.rawsocket.SimRawSocketListener;
 import com.sun.gi.objectstore.ObjectStore;
 import com.sun.gi.objectstore.Transaction;
 
@@ -54,7 +55,7 @@ public abstract class SimTask {
      * @return a GLOReference that may be used by another GLO
      */
 
-    public abstract GLOReference makeReference(long id);
+    public abstract GLOReference<? extends GLO> makeReference(long id);
 
     /**
      * Gets the transaction associated with this SimTask.  A SimTask
@@ -82,7 +83,7 @@ public abstract class SimTask {
      *
      * @param ref A reference to the GLO to be registered.
      */
-    public abstract void addUserListener(GLOReference ref);
+    public abstract void addUserListener(GLOReference<? extends SimUserListener> ref);
 
     /**
      * This function registers a GLO as a listener to data packet arrival
@@ -94,7 +95,8 @@ public abstract class SimTask {
      * this listener.
      * @param ref A reference to the GLO to be registered.
      */
-    public abstract void addUserDataListener(UserID id, GLOReference ref);
+    public abstract void addUserDataListener(UserID id,
+	GLOReference<? extends SimUserDataListener> ref);
 
    
     /**
@@ -119,7 +121,8 @@ public abstract class SimTask {
      *
      * @return A GLOReference that references the newly created GLO
      */
-    public abstract GLOReference createGLO(GLO simObject, String name);
+    public abstract <T extends GLO> GLOReference<T> createGLO(T simObject,
+	String name);
 
     /**
      * This method is called to create a GLO in the objectstore.
@@ -128,7 +131,7 @@ public abstract class SimTask {
      *
      * @return A GLOReference that references the newly created GLO
      */
-    public abstract GLOReference createGLO(GLO simObject);
+    public abstract <T extends GLO> GLOReference<T> createGLO(T simObject);
 
 
     // data access functions
@@ -145,7 +148,7 @@ public abstract class SimTask {
      *
      * @return A reference to the GLO if found, null if not found.
      */
-    public abstract GLOReference findGLO(String gloName);
+    public abstract <T extends GLO> GLOReference<T> findGLO(String gloName);
     
     
     /**
@@ -153,6 +156,7 @@ public abstract class SimTask {
      * @param ref
      */
     public abstract void destroyGLO(GLOReference ref);
+
     /**
      * This method opens a comm channel and returns an ID for it
      *
@@ -170,7 +174,7 @@ public abstract class SimTask {
      * @return an id for this timer event registration
      */
 
-    public abstract long registerTimerEvent(long delay, boolean repeat, GLOReference ref);
+    public abstract long registerTimerEvent(long delay, boolean repeat, GLOReference<? extends SimTimerListener> ref);
 
     /**
      * @param access
@@ -180,7 +184,7 @@ public abstract class SimTask {
      *
      * @return an id for this timer event registration
      */
-    public abstract long registerTimerEvent(ACCESS_TYPE access, long l, boolean b, GLOReference reference);
+    public abstract long registerTimerEvent(ACCESS_TYPE access, long l, boolean b, GLOReference<? extends SimTimerListener> reference);
 
     /**
      * @param glo
@@ -189,7 +193,7 @@ public abstract class SimTask {
      *
      * @throws InstantiationException
      */
-    public abstract GLOReference makeReference(GLO glo) throws InstantiationException;
+    public abstract <T extends GLO> GLOReference<T> makeReference(T glo) throws InstantiationException;
 
     public abstract void registerGLOID(long objID, GLO glo, ACCESS_TYPE access);
 
@@ -199,22 +203,23 @@ public abstract class SimTask {
      * @param method
      * @param parameters
      */
-    public abstract void queueTask(ACCESS_TYPE accessType, GLOReference target, Method method,
-	    Object[] parameters);
+    public abstract void queueTask(ACCESS_TYPE accessType,
+	GLOReference<? extends GLO> target, Method method,
+	Object[] parameters);
 
     /**
      * @param target
      * @param method
      * @param parameters
      */
-    public abstract void queueTask(GLOReference target, Method method,
-	    Object[] parameters);
+    public abstract void queueTask(GLOReference<? extends GLO> target,
+	Method method, Object[] parameters);
 
     /**
      * @param accessType
      * @param glo
      */
-    public abstract void access_check(ACCESS_TYPE accessType, Object glo);
+    public abstract void access_check(ACCESS_TYPE accessType, GLO glo);
 
     // Hooks into the RawSocketManager, added 1/16/2006
 
@@ -233,8 +238,9 @@ public abstract class SimTask {
      *
      * @return an identifier that can be used for future communication with the socket.
      */
-    public abstract long openSocket(ACCESS_TYPE access, GLOReference ref, String host,
-	    int port, boolean reliable);
+    public abstract long openSocket(ACCESS_TYPE access,
+	GLOReference<? extends SimRawSocketListener> ref,
+	String host, int port, boolean reliable);
 
     /**
      * Sends data on the socket mapped to the given socketID.  This method

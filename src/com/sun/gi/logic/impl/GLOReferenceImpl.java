@@ -28,127 +28,129 @@ import com.sun.gi.objectstore.NonExistantObjectIDException;
  * @version 1.0
  */
 
-public class GLOReferenceImpl implements GLOReference, GLO, Comparable {
-	long objID;
+public class GLOReferenceImpl<T extends GLO>
+	implements GLOReference<T>, GLO, Comparable {
 
-	transient boolean peeked;
+    long objID;
 
-	transient GLO objectCache;
+    transient boolean peeked;
 
-	public GLOReferenceImpl(long id) {
-		objID = id;
-		objectCache = null;
-	}
+    transient T objectCache;
 
-	private void initTransients() {
-		peeked = false;
-		objectCache = null;
-	}
+    public GLOReferenceImpl(long id) {
+	objID = id;
+	objectCache = null;
+    }
 
-	private void readObject(ObjectInputStream in) throws IOException,
-			ClassNotFoundException {
+    private void initTransients() {
+	peeked = false;
+	objectCache = null;
+    }
+
+    private void readObject(ObjectInputStream in) throws IOException,
+	    ClassNotFoundException {
 		in.defaultReadObject();
 		initTransients();
-	}
-	
-	/* (non-Javadoc)
-	 * @see com.sun.gi.logic.GLOReference#delete(com.sun.gi.logic.SimTask)
-	 */
-	public void delete(SimTask task) {
-		try {
-			task.getTransaction().destroy(objID);
-		} catch (DeadlockException e) {
-			
-			e.printStackTrace();
-		} catch (NonExistantObjectIDException e) {
-			
-			e.printStackTrace();
-		}
-		
+	    }
+
+    /* (non-Javadoc)
+     * @see com.sun.gi.logic.GLOReference#delete(com.sun.gi.logic.SimTask)
+     */
+    public void delete(SimTask task) {
+	try {
+	    task.getTransaction().destroy(objID);
+	} catch (DeadlockException e) {
+
+	    e.printStackTrace();
+	} catch (NonExistantObjectIDException e) {
+
+	    e.printStackTrace();
 	}
 
-	public GLO get(SimTask task) {
-		if ((objectCache == null) || (peeked == true)) {
-			try {
-				objectCache = (GLO) task.getTransaction().lock(objID);
-			} catch (DeadlockException e) {
-				
-				e.printStackTrace();
-			} catch (NonExistantObjectIDException e) {
-				
-				e.printStackTrace();
-			}
-			task.registerGLOID(objID, objectCache, ACCESS_TYPE.GET);
-			peeked = false;
-		}
-		return objectCache;
-	}
+    }
 
-	public GLO peek(SimTask task) {
-		if (objectCache == null) {
-			try {
-				objectCache = (GLO) task.getTransaction().peek(objID);
-			} catch (NonExistantObjectIDException e) {
-				
-				e.printStackTrace();
-			}
-			task.registerGLOID(objID, objectCache, ACCESS_TYPE.PEEK);
-			peeked = true;
-		}
-		return objectCache;
-	}
+    public T get(SimTask task) {
+	if ((objectCache == null) || (peeked == true)) {
+	    try {
+		objectCache = (T) task.getTransaction().lock(objID);
+	    } catch (DeadlockException e) {
 
-	/**
-	 * shallowCopy
-	 * 
-	 * @return SOReference
-	 */
-	public GLOReference shallowCopy() {
-		return new GLOReferenceImpl(objID);
-	}
+		e.printStackTrace();
+	    } catch (NonExistantObjectIDException e) {
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.logic.GLOReference#attempt(com.sun.gi.logic.SimTask)
-	 */
-	public GLO attempt(SimTask task) {
-		if ((objectCache == null) || (peeked == true)) {
-			try {
-				objectCache = (GLO) task.getTransaction().lock(objID,false);
-			} catch (DeadlockException e) {
-				
-				e.printStackTrace();
-			} catch (NonExistantObjectIDException e) {
-				
-				e.printStackTrace();
-			}
-			if (objectCache==null){
-				return null;
-			}
-			task.registerGLOID(objID, objectCache, ACCESS_TYPE.ATTEMPT);// was gotten with ATTEMPT
-			peeked = false;
-		}
-		return objectCache;
+		e.printStackTrace();
+	    }
+	    task.registerGLOID(objID, objectCache, ACCESS_TYPE.GET);
+	    peeked = false;
 	}
+	return objectCache;
+    }
 
-	/* (non-Javadoc)
-	 * @see java.lang.Comparable#compareTo(T)
-	 */
-	public int compareTo(Object arg0) {
-		GLOReferenceImpl other = (GLOReferenceImpl)arg0;
-		if (objID< other.objID ){
-			return -1;
-		} else if (objID > other.objID) {
-			return 1;
-		} else {
-			return 0;
-		}
-	}
-	
-	public boolean equals(Object other){
-		return (compareTo(other)==0);
-	}
+    public T peek(SimTask task) {
+	if (objectCache == null) {
+	    try {
+		objectCache = (T) task.getTransaction().peek(objID);
+	    } catch (NonExistantObjectIDException e) {
 
-	
+		e.printStackTrace();
+	    }
+	    task.registerGLOID(objID, objectCache, ACCESS_TYPE.PEEK);
+	    peeked = true;
+	}
+	return objectCache;
+    }
+
+    /**
+     * shallowCopy
+     * 
+     * @return SOReference
+     */
+    public GLOReference<T> shallowCopy() {
+	return new GLOReferenceImpl(objID);
+    }
+
+    /*
+     * (non-Javadoc)
+     * 
+     * @see com.sun.gi.logic.GLOReference#attempt(com.sun.gi.logic.SimTask)
+     */
+    public T attempt(SimTask task) {
+	if ((objectCache == null) || (peeked == true)) {
+	    try {
+		objectCache = (T) task.getTransaction().lock(objID,false);
+	    } catch (DeadlockException e) {
+
+		e.printStackTrace();
+	    } catch (NonExistantObjectIDException e) {
+
+		e.printStackTrace();
+	    }
+	    if (objectCache==null){
+		return null;
+	    }
+	    task.registerGLOID(objID, objectCache, ACCESS_TYPE.ATTEMPT);// was gotten with ATTEMPT
+	    peeked = false;
+	}
+	return objectCache;
+    }
+
+    /* (non-Javadoc)
+     * @see java.lang.Comparable#compareTo(T)
+     */
+    public int compareTo(Object arg0) {
+	GLOReferenceImpl other = (GLOReferenceImpl)arg0;
+	if (objID< other.objID ){
+	    return -1;
+	} else if (objID > other.objID) {
+	    return 1;
+	} else {
+	    return 0;
+	}
+    }
+
+    public boolean equals(Object other){
+	return (compareTo(other)==0);
+    }
+
+
 }

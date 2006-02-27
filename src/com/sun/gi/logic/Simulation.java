@@ -35,7 +35,7 @@ public interface Simulation {
    * @param l SOReference A rference to a GLO so add to the user listeners list.
    */
 
-  public void addUserListener(GLOReference ref);
+  public void addUserListener(GLOReference<? extends SimUserListener> ref);
 
   public void addUserListener(long l);
   
@@ -47,7 +47,8 @@ public interface Simulation {
    * @param ref SOReference The reference to the GLO to actually handle the
    * events.
    */
-  public void addUserDataListener(UserID cid, GLOReference ref);
+  public void addUserDataListener(UserID cid,
+      GLOReference<? extends SimUserDataListener> ref);
   
   /**
    * This call creates a SimTask object that can then be queued for executon.
@@ -58,7 +59,8 @@ public interface Simulation {
    * @param params Object[] The parameters to pass to that method.
    * @return SimTask The created SimTask.
    */
-  public SimTask newTask(GLOReference ref, Method methodToCall, Object[] params);
+  public SimTask newTask(GLOReference<? extends GLO> ref,
+      Method methodToCall, Object[] params);
   
   /**
    * This call creates a SimTask object that can then be queued for executon.
@@ -73,7 +75,8 @@ public interface Simulation {
    * @param params Object[] The parameters to pass to that method.
    * @return SimTask The created SimTask.
    */
-  public SimTask newTask(ACCESS_TYPE access, GLOReference ref, Method methodToCall, Object[] params);
+  public SimTask newTask(ACCESS_TYPE access, GLOReference<? extends GLO> ref,
+      Method methodToCall, Object[] params);
 
   /**
    * Thsi method returns the string that has been assigend as the name of the

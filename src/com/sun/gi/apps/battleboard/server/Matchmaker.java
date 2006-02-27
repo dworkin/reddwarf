@@ -63,22 +63,22 @@ public class Matchmaker implements /* ChannelListener */ GLO {
 
     protected int PLAYERS_PER_GAME = 3;
 
-    protected Set<GLOReference> waitingPlayers =
-	new HashSet<GLOReference>();
+    protected Set<GLOReference<Player>> waitingPlayers =
+	new HashSet<GLOReference<Player>>();
 
     public static Matchmaker get() {
 	SimTask task = SimTask.getCurrent();
 	return (Matchmaker) task.findGLO(MATCHMAKER_GLO_NAME).get(task);
     }
 
-    public static GLOReference create() {
+    public static GLOReference<Matchmaker> create() {
 	SimTask task = SimTask.getCurrent();
 
 	// Paranoid check for pre-existing matchmaker object.
 	// In BattleBoard, this isn't necessary because only the
 	// boot object creates the matchmaker, and it does so
 	// with a mutex (or "GET-lock" held).
-	GLOReference ref = task.findGLO(MATCHMAKER_GLO_NAME);
+	GLOReference<Matchmaker> ref = task.findGLO(MATCHMAKER_GLO_NAME);
 	if (ref != null) {
 	    log.severe("matchmaker GLO already exists");
 	    return ref;
@@ -89,7 +89,7 @@ public class Matchmaker implements /* ChannelListener */ GLO {
 	// More paranoia; for the reasons above, this particular
 	// use of createGLO must succeed, so this isn't needed.
 	if (ref == null) {
-	    GLOReference ref2 = task.findGLO(MATCHMAKER_GLO_NAME);
+	    GLOReference<Matchmaker> ref2 = task.findGLO(MATCHMAKER_GLO_NAME);
 	    if (ref2 == null) {
 		log.severe("createGLO failed");
 		throw new RuntimeException("createGLO failed");
@@ -110,7 +110,7 @@ public class Matchmaker implements /* ChannelListener */ GLO {
 	task.lock(channel, true);
     }
 
-    protected void boot(GLOReference thisRef) {
+    protected void boot(GLOReference<Matchmaker> thisRef) {
 	//ChannelListener.add(channel, thisRef);
     }
 
@@ -144,8 +144,8 @@ public class Matchmaker implements /* ChannelListener */ GLO {
 	log.info("Matchmaker: join from `" + playerName + "'");
 
 	SimTask task = SimTask.getCurrent();
-	for (GLOReference ref : waitingPlayers) {
-	    Player p = (Player) ref.peek(task);
+	for (GLOReference<Player> ref : waitingPlayers) {
+	    Player p = ref.peek(task);
 	    if (playerName.equals(p.getNickname())) {
 		log.warning("Matchmaker already has `" + playerName);
 		sendAlreadyJoined(uid);
@@ -154,8 +154,8 @@ public class Matchmaker implements /* ChannelListener */ GLO {
 
 	}
 
-	GLOReference playerRef = Player.getRef(uid);
-	Player player = (Player) playerRef.get(task);
+	GLOReference<Player> playerRef = Player.getRef(uid);
+	Player player = playerRef.get(task);
 	player.setNickname(playerName);
 
 	waitingPlayers.add(playerRef);
@@ -194,7 +194,7 @@ public class Matchmaker implements /* ChannelListener */ GLO {
     public void leftChannel(ChannelID cid, UserID uid) {
 	log.info("Matchmaker: User " + uid + " left channel " + cid);
 
-	GLOReference playerRef = Player.getRef(uid);
+	GLOReference<Player> playerRef = Player.getRef(uid);
 	waitingPlayers.remove(playerRef);
     }
 }

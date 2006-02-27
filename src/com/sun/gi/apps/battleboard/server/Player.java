@@ -63,20 +63,20 @@ public class Player implements SimUserDataListener {
     private static final Logger log =
 	Logger.getLogger("com.sun.gi.apps.battleboard.server");
 
-    protected String       myUserName;
-    protected UserID       myUserID;
-    protected GLOReference myGameRef;
-    protected String       myNick;
+    protected String             myUserName;
+    protected UserID             myUserID;
+    protected GLOReference<Game> myGameRef;
+    protected String             myNick;
 
-    public static GLOReference getRef(UserID uid) {
+    public static GLOReference<Player> getRef(UserID uid) {
 	SimTask task = SimTask.getCurrent();
 	return task.findGLO(gloKeyForUID(uid));
     }
 
     public static Player get(UserID uid) {
 	SimTask task = SimTask.getCurrent();
-	GLOReference ref = getRef(uid);
-	return (Player) ref.get(task);
+	GLOReference<Player> ref = getRef(uid);
+	return ref.get(task);
     }
 
     protected Player(String userName, UserID uid) {
@@ -98,12 +98,12 @@ public class Player implements SimUserDataListener {
 	myUserID = uid;
     }
 
-    public void gameStarted(GLOReference gameRef) {
+    public void gameStarted(GLOReference<Game> gameRef) {
 	//myGameRefs.add(gameRef);
 	myGameRef = gameRef;
     }
 
-    public void gameEnded(GLOReference gameRef) {
+    public void gameEnded(GLOReference<Game> gameRef) {
 	myGameRef = null;
 	// If there are no more games, join the matchmaker channel
     }
@@ -146,7 +146,7 @@ public class Player implements SimUserDataListener {
 	String userName = subject.getPrincipals().iterator().next().getName();
 	Player player = new Player (userName, uid);
 
-	GLOReference playerRef = task.createGLO(player, gloKey);
+	GLOReference<Player> playerRef = task.createGLO(player, gloKey);
 
 	// We're interested in direct server data sent by the user.
 	task.addUserDataListener(uid, playerRef);
@@ -180,7 +180,7 @@ public class Player implements SimUserDataListener {
 	SimTask task = SimTask.getCurrent();
 	if (myGameRef != null) {
 	    // XXX: this currently supports only one game per player
-	    ((Game) myGameRef.get(task)).joinedChannel(cid, uid);
+	    myGameRef.get(task).joinedChannel(cid, uid);
 	} else {
 	    // If no game, dispatch to the matchmaker
 	    Matchmaker.get().joinedChannel(cid, uid);
@@ -198,7 +198,7 @@ public class Player implements SimUserDataListener {
 	SimTask task = SimTask.getCurrent();
 	if (myGameRef != null) {
 	    // XXX: this currently supports only one game per player
-	    ((Game) myGameRef.get(task)).leftChannel(cid, uid);
+	    myGameRef.get(task).leftChannel(cid, uid);
 	} else {
 	    // If no game, dispatch to the matchmaker
 	    Matchmaker.get().leftChannel(cid, uid);
@@ -216,7 +216,7 @@ public class Player implements SimUserDataListener {
 	SimTask task = SimTask.getCurrent();
 	if (myGameRef != null) {
 	    // XXX: this currently supports only one game per player
-	    ((Game) myGameRef.get(task)).userDataReceived(myUserID, data);
+	    myGameRef.get(task).userDataReceived(myUserID, data);
 	} else {
 	    // If no game, dispatch to the matchmaker
 	    Matchmaker.get().userDataReceived(uid, data);
