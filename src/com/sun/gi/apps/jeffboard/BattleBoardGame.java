@@ -140,7 +140,7 @@ public class BattleBoardGame implements GLO{
 				joinerCount++;
 				if (joinerCount==MAX_PLAYERS){ //all here
 					sendTurnOrder(task);
-					currentPlayer = 0;
+					currentPlayer = -1;
 					nextMove(task);
 				}
 			} else { // alien, boot em
@@ -153,6 +153,8 @@ public class BattleBoardGame implements GLO{
 	 * 
 	 */
 	private void nextMove(SimTask task) {	
+		currentPlayer++;
+		currentPlayer %= playingList.size();
 		if (playingList.size()>1){
 			withdrawnList.clear(); // temporary list to handle edge case
 			UserID thisPlayer = playingList.get(currentPlayer);
@@ -163,8 +165,7 @@ public class BattleBoardGame implements GLO{
 					sendData(task,gameChannel,id,outstr);
 				}
 			}
-			currentPlayer++;
-			currentPlayer %= playingList.size();
+			
 		} else {
 			gameOver();
 		}				
@@ -218,8 +219,8 @@ public class BattleBoardGame implements GLO{
 		if (!map.isAlive()){
 			removePlayer(target);
 		}
-		String outstr = "move-ended "+screenNames.get(thisPlayer)+" bombed "+
-			screenNames.get(target)+" "+result;          ;
+		String outstr = "move-ended "+screenNames.get(thisPlayer)+" bomb "+
+			screenNames.get(target)+" "+x+" "+y+" "+result;          ;
 		for(UserID id : screenNames.keySet()){			
 				sendData(task,gameChannel,id,outstr);	
 		}
@@ -244,9 +245,6 @@ public class BattleBoardGame implements GLO{
 		// adjust the current player index for moved players
 		if (currentPlayer>=idx){
 			currentPlayer--;
-			if (currentPlayer<0){
-				currentPlayer = playingList.size()-1;
-			}
 		}
 	}
 
@@ -349,7 +347,7 @@ class BattleMap implements Serializable{
 	 */
 	public boolean isAlive() {
 		// TODO Auto-generated method stub
-		return cityList.isEmpty();
+		return !cityList.isEmpty();
 	}
 
 	/**

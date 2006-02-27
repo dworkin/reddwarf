@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
 
 import javax.security.auth.Subject;
 
@@ -26,33 +27,32 @@ import com.sun.gi.utils.StatisticalUUID;
 import com.sun.gi.utils.types.BYTEARRAY;
 
 public class RouterImpl implements Router {
-	
-	private Map<UserID, SGSUser> userMap = new HashMap<UserID, SGSUser>();
+
+	private Map<UserID, SGSUser> userMap = new ConcurrentHashMap<UserID, SGSUser>();
 
 	private TransportManager transportManager;
 
 	private TransportChannel routerControlChannel;
 
-	private Map<ChannelID, SGSChannel> channelMap = new HashMap<ChannelID, SGSChannel>();
+	private Map<ChannelID, SGSChannel> channelMap = new ConcurrentHashMap<ChannelID, SGSChannel>();
 
-	private Map<String, SGSChannel> channelNameMap = new HashMap<String, SGSChannel>();
+	private Map<String, SGSChannel> channelNameMap = new ConcurrentHashMap<String, SGSChannel>();
 
-	Map<UserID, BYTEARRAY> currentKeys = new HashMap<UserID, BYTEARRAY>();
+	Map<UserID, BYTEARRAY> currentKeys = new ConcurrentHashMap<UserID, BYTEARRAY>();
 
-	private Map<UserID, BYTEARRAY> previousKeys = new HashMap<UserID, BYTEARRAY>();
+	private Map<UserID, BYTEARRAY> previousKeys = new ConcurrentHashMap<UserID, BYTEARRAY>();
 
 	private ByteBuffer hdr = ByteBuffer.allocate(256);
 
 	private List<RouterListener> listeners = new ArrayList<RouterListener>();
-	private static final boolean TRACEKEYS=true;
+
+	private static final boolean TRACEKEYS = true;
 
 	protected int keySecondsToLive;
 
 	private enum OPCODE {
 		UserJoined, UserLeft, UserJoinedChannel, UserLeftChannel, ReconnectKey
 	}
-	
-
 
 	public RouterImpl(TransportManager cmgr) throws IOException {
 		transportManager = cmgr;
@@ -92,11 +92,11 @@ public class RouterImpl implements Router {
 						buff.get(idbytes);
 						BYTEARRAY ba = new BYTEARRAY(idbytes);
 						synchronized (currentKeys) {
-							currentKeys.put(uid,ba);
+							currentKeys.put(uid, ba);
 						}
-						if (TRACEKEYS){
-							System.out.println("Received key "+ba.toHex()+
-									" for user "+uid.toString());
+						if (TRACEKEYS) {
+							System.out.println("Received key " + ba.toHex()
+									+ " for user " + uid.toString());
 						}
 					} catch (InstantiationException e) {
 						e.printStackTrace();
@@ -145,8 +145,8 @@ public class RouterImpl implements Router {
 			previousKeys.clear();
 			previousKeys.putAll(currentKeys);
 			currentKeys.clear();
-			for (SGSUser user : userMap.values()) {								
-				issueNewKey(user);				
+			for (SGSUser user : userMap.values()) {
+				issueNewKey(user);
 			}
 		}
 
@@ -156,28 +156,27 @@ public class RouterImpl implements Router {
 	 * @param user
 	 */
 	private void issueNewKey(SGSUser user) {
-		synchronized(currentKeys){
+		synchronized (currentKeys) {
 			SGSUUID key = new StatisticalUUID();
 			BYTEARRAY keybytes = new BYTEARRAY(key.toByteArray());
 			currentKeys.put(user.getUserID(), keybytes);
 			try {
-				user.reconnectKeyReceived(keybytes.data(),
-								keySecondsToLive);
+				user.reconnectKeyReceived(keybytes.data(), keySecondsToLive);
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
 			xmitConnectKey(user.getUserID(), keybytes);
-			if (TRACEKEYS){
-				System.out.println("Generated key "+keybytes.toString()+
-						" for user "+user.toString());
+			if (TRACEKEYS) {
+				System.out.println("Generated key " + keybytes.toString()
+						+ " for user " + user.toString());
 			}
 		}
-		
+
 	}
 
 	/**
 	 * @param uid
-	 * @param keybytes	 
+	 * @param keybytes
 	 */
 	private void xmitConnectKey(UserID uid, BYTEARRAY key) {
 		byte[] uidbytes = uid.toByteArray();
@@ -234,30 +233,18 @@ public class RouterImpl implements Router {
 	}
 
 	/*
-	private void reportUserJoinedChannel(byte[] chanID, byte[] uidbytes) {
-		UserID sentID = null;
-		try {
-			sentID = new UserID(uidbytes);
-		} catch (InstantiationException e1) {
-			e1.printStackTrace();
-			return;
-		}
-		for (SGSUser user : userMap.values()) {
-			try {
-				if (!user.getUserID().equals(sentID)) {
-					user.userJoinedChannel(chanID, uidbytes);
-				}
-			} catch (IOException e) {
-				System.out.println("Exception sending UserJOined to user id="
-						+ user.getUserID());
-				e.printStackTrace();
-			}
-		}
+	 * private void reportUserJoinedChannel(byte[] chanID, byte[] uidbytes) {
+	 * UserID sentID = null; try { sentID = new UserID(uidbytes); } catch
+	 * (InstantiationException e1) { e1.printStackTrace(); return; } for
+	 * (SGSUser user : userMap.values()) { try { if
+	 * (!user.getUserID().equals(sentID)) { user.userJoinedChannel(chanID,
+	 * uidbytes); } } catch (IOException e) { System.out.println("Exception
+	 * sending UserJOined to user id=" + user.getUserID()); e.printStackTrace(); } }
+	 *  }
+	 */
 
-	}*/
-
-	public void registerUser(SGSUser user, Subject subject) throws InstantiationException,
-			IOException {
+	public void registerUser(SGSUser user, Subject subject)
+			throws InstantiationException, IOException {
 		userMap.put(user.getUserID(), user);
 		xmitUserJoined(user.getUserID());
 		issueNewKey(user);
@@ -306,7 +293,7 @@ public class RouterImpl implements Router {
 		}
 
 	}
-	
+
 	private void xmitUserLeftChannel(ChannelID cid, UserID uid) {
 		byte[] uidbytes = uid.toByteArray();
 		byte[] cidbytes = cid.toByteArray();
@@ -362,8 +349,8 @@ public class RouterImpl implements Router {
 		}
 
 	}
-	
-	public SGSChannel getChannel(ChannelID id){
+
+	public SGSChannel getChannel(ChannelID id) {
 		return channelMap.get(id);
 	}
 
@@ -391,7 +378,8 @@ public class RouterImpl implements Router {
 	/**
 	 * Removes the given Channel from the various maps.
 	 * 
-	 * @param channel		the channel to remove.
+	 * @param channel
+	 *            the channel to remove.
 	 */
 	protected void removeChannel(ChannelImpl channel) {
 		synchronized (channelNameMap) {
@@ -405,27 +393,30 @@ public class RouterImpl implements Router {
 	public boolean validateReconnectKey(UserID uid, byte[] key) {
 		synchronized (currentKeys) {
 			BYTEARRAY currentKey = currentKeys.get(uid);
-			if (currentKey == null){
-				if (TRACEKEYS){
-					System.out.println("No key available for ID: "+uid.toString());
+			if (currentKey == null) {
+				if (TRACEKEYS) {
+					System.out.println("No key available for ID: "
+							+ uid.toString());
 				}
 				return false;
 			}
 			if (currentKey.equals(key)) {
-				if (TRACEKEYS){
-					System.out.println("Current Key validated for ID: "+uid.toString());
+				if (TRACEKEYS) {
+					System.out.println("Current Key validated for ID: "
+							+ uid.toString());
 				}
 				return true;
 			}
 			BYTEARRAY pastKey = previousKeys.get(uid);
-			if ((pastKey!=null)&&(pastKey.equals(key))) {
-				if (TRACEKEYS){
-					System.out.println("Past Key validated for ID: "+uid.toString());
+			if ((pastKey != null) && (pastKey.equals(key))) {
+				if (TRACEKEYS) {
+					System.out.println("Past Key validated for ID: "
+							+ uid.toString());
 				}
 				return true;
 			}
-			if (TRACEKEYS){
-				System.out.println("Incorrect Key for ID: "+uid.toString());
+			if (TRACEKEYS) {
+				System.out.println("Incorrect Key for ID: " + uid.toString());
 			}
 			return false;
 		}
@@ -437,38 +428,51 @@ public class RouterImpl implements Router {
 
 	public void serverMessage(boolean reliable, UserID userID,
 			ByteBuffer databuff) {
-		for(RouterListener listener : listeners){
-			listener.serverMessage(userID, databuff, reliable);
+		synchronized (listeners) {
+			for (RouterListener listener : listeners) {
+				listener.serverMessage(userID, databuff, reliable);
+			}
 		}
 	}
-	
-	public void fireUserJoined(UserID uid, Subject subject){
-		for(RouterListener listener : listeners){
-			listener.userJoined(uid,subject);
+
+	public void fireUserJoined(UserID uid, Subject subject) {
+		synchronized (listeners) {
+			for (RouterListener listener : listeners) {
+				listener.userJoined(uid, subject);
+			}
 		}
 	}
-	
-	public void fireUserLeft(UserID uid){
-		for(RouterListener listener : listeners){
-			listener.userLeft(uid);
+
+	public void fireUserLeft(UserID uid) {
+		synchronized (listeners) {
+			for (RouterListener listener : listeners) {
+				listener.userLeft(uid);
+			}
 		}
 	}
-	
-	public void fireUserJoinedChannel(UserID uid, ChannelID cid){
-		for(RouterListener listener : listeners){
-			listener.userJoinedChannel(uid,cid);
+
+	public void fireUserJoinedChannel(UserID uid, ChannelID cid) {
+		synchronized (listeners) {
+			for (RouterListener listener : listeners) {
+				listener.userJoinedChannel(uid, cid);
+			}
 		}
 	}
-	
-	public void fireUserLeftChannel(UserID uid, ChannelID cid){
-		for(RouterListener listener : listeners){
-			listener.userLeftChannel(uid,cid);
+
+	public void fireUserLeftChannel(UserID uid, ChannelID cid) {
+		synchronized (listeners) {
+			for (RouterListener listener : listeners) {
+				listener.userLeftChannel(uid, cid);
+			}
 		}
 	}
-	
-	public void fireChannelDataPacket(ChannelID cid, UserID from, ByteBuffer buff){
-		for(RouterListener listener : listeners){
-			listener.channelDataPacket(cid,from,buff.duplicate());
+
+	public void fireChannelDataPacket(ChannelID cid, UserID from,
+			ByteBuffer buff) {
+		synchronized (listeners) {
+			for (RouterListener listener : listeners) {
+				listener.channelDataPacket(cid, from, buff.duplicate());
+			}
 		}
 	}
 
@@ -477,9 +481,9 @@ public class RouterImpl implements Router {
 	 * @param user
 	 */
 	public void userJoinedChan(ChannelImpl chan, SGSUser user) {
-		xmitUserJoinedChannel(chan.channelID(),user.getUserID());
-		fireUserJoinedChannel(user.getUserID(),chan.channelID());
-		
+		xmitUserJoinedChannel(chan.channelID(), user.getUserID());
+		fireUserJoinedChannel(user.getUserID(), chan.channelID());
+
 	}
 
 	/**
@@ -487,27 +491,28 @@ public class RouterImpl implements Router {
 	 * @param user
 	 */
 	public void userLeftChan(ChannelImpl chan, SGSUser user) {
-		xmitUserLeftChannel(chan.channelID(),user.getUserID());
-		fireUserLeftChannel(user.getUserID(),chan.channelID());
-		
-	}
-	
-	public void channelDataPacket(ChannelImpl chan, UserID from, ByteBuffer data,
-			boolean reliable){
-		fireChannelDataPacket(chan.channelID(),from,data);
+		xmitUserLeftChannel(chan.channelID(), user.getUserID());
+		fireUserLeftChannel(user.getUserID(), chan.channelID());
+
 	}
 
-	
+	public void channelDataPacket(ChannelImpl chan, UserID from,
+			ByteBuffer data, boolean reliable) {
+		fireChannelDataPacket(chan.channelID(), from, data);
+	}
+
 	/**
-	 * Joins the specified user to the Channel referenced by the
-	 * given ChannelID.
+	 * Joins the specified user to the Channel referenced by the given
+	 * ChannelID.
 	 * 
-	 * @param user				the user
-	 * @param id 				the ChannelID
+	 * @param user
+	 *            the user
+	 * @param id
+	 *            the ChannelID
 	 */
 	public void join(UserID user, ChannelID id) {
 		SGSChannel channel = getChannel(id);
-		if (id == null) {  // channel not opened or otherwise mapped
+		if (id == null) { // channel not opened or otherwise mapped
 			return;
 		}
 		SGSUser sgsUser = userMap.get(user);
@@ -515,17 +520,19 @@ public class RouterImpl implements Router {
 			channel.join(sgsUser);
 		}
 	}
-	
+
 	/**
-	 * Removes the specified user from the Channel referenced by the
-	 * given ChannelID.
+	 * Removes the specified user from the Channel referenced by the given
+	 * ChannelID.
 	 * 
-	 * @param user				the user
-	 * @param id 				the ChannelID
+	 * @param user
+	 *            the user
+	 * @param id
+	 *            the ChannelID
 	 */
 	public void leave(UserID user, ChannelID id) {
 		SGSChannel channel = getChannel(id);
-		if (id == null) {  // channel not opened or otherwise mapped
+		if (id == null) { // channel not opened or otherwise mapped
 			return;
 		}
 		SGSUser sgsUser = userMap.get(user);
@@ -533,34 +540,37 @@ public class RouterImpl implements Router {
 			channel.leave(sgsUser);
 		}
 	}
-	
+
 	/**
-	 * Locks the given channel based on shouldLock.  Users cannot join/leave locked channels
-	 * except by way of the Router.
+	 * Locks the given channel based on shouldLock. Users cannot join/leave
+	 * locked channels except by way of the Router.
 	 * 
-	 * @param cid				the channel ID
-	 * @param shouldLock		if true, will lock the channel, otherwise unlock it.
+	 * @param cid
+	 *            the channel ID
+	 * @param shouldLock
+	 *            if true, will lock the channel, otherwise unlock it.
 	 */
 	public void lock(ChannelID cid, boolean shouldLock) {
 		SGSChannel channel = getChannel(cid);
-		if (channel == null) {		// no channel in map
+		if (channel == null) { // no channel in map
 			return;
 		}
 		channel.setLocked(shouldLock);
 	}
-	
+
 	/**
-	 * Closes the local view of the channel mapped to ChannelID.
-	 * Any remaining users will be notified as the channel is closing.
+	 * Closes the local view of the channel mapped to ChannelID. Any remaining
+	 * users will be notified as the channel is closing.
 	 * 
-	 * @param id		the ID of the channel to close.
+	 * @param id
+	 *            the ID of the channel to close.
 	 */
 	public void closeChannel(ChannelID id) {
 		SGSChannel channel = getChannel(id);
-		if (channel == null) {		// no channel in map
+		if (channel == null) { // no channel in map
 			return;
 		}
 		channel.close();
 	}
-	
+
 }

@@ -48,12 +48,24 @@ public class BattleBoardPlayer implements GLO, SimUserDataListener{
 		byte[] inputBytes = new byte[buff.remaining()];
 		buff.get(inputBytes);
 		String cmd = new String(inputBytes);
+		System.out.println("CMD: "+playerName+": "+cmd);
 		String[] words = explode(cmd);
 		BattleBoardGame game = 
 			(BattleBoardGame)myGame.get(SimTask.getCurrent());
 		if (words[0].equalsIgnoreCase("join")){
 			game.setScreenName(from,words[1]);
-		} 
+		} else if (words[0].equalsIgnoreCase("withdraw")){
+			game.withdraw(from);
+		} else if (words[0].equalsIgnoreCase("move")){
+			game.makeMove(from, words[1],Integer.parseInt(words[2]),
+					Integer.parseInt(words[3]));
+		} else if (words[0].equalsIgnoreCase("pass")){
+			game.passMove(from);
+		} else {
+			System.err.println("BB Player Error: Unknown command: "+cmd);
+		}
+		
+		
 		
 	}
 
@@ -78,23 +90,7 @@ public class BattleBoardPlayer implements GLO, SimUserDataListener{
 	 * @see com.sun.gi.logic.SimUserDataListener#dataArrivedFromChannel(com.sun.gi.comm.routing.ChannelID, com.sun.gi.comm.routing.UserID, java.nio.ByteBuffer)
 	 */
 	public void dataArrivedFromChannel(ChannelID cid, UserID from, ByteBuffer buff) {
-		byte[] inputBytes = new byte[buff.remaining()];
-		buff.get(inputBytes);
-		String cmd = new String(inputBytes);
-		System.out.println("CMD: "+playerName+": "+cmd);
-		String[] words = explode(cmd);
-		BattleBoardGame game = 
-			(BattleBoardGame)myGame.get(SimTask.getCurrent());
-		if (words[0].equalsIgnoreCase("withdraw")){
-			game.withdraw(from);
-		} else if (words[0].equalsIgnoreCase("move")){
-			game.makeMove(from, words[1],Integer.parseInt(words[2]),
-					Integer.parseInt(words[3]));
-		} else if (words[0].equalsIgnoreCase("pass")){
-			game.passMove(from);
-		} else {
-			System.err.println("BB Player Error: Unknown command: "+cmd);
-		}
+		
 		
 	}
 
