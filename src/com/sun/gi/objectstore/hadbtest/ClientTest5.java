@@ -78,7 +78,7 @@ class ClientTest5 implements Runnable {
 	System.out.println("starting up " + clientId + ": whoopee");
 	lastWake = System.currentTimeMillis();
 	//int iters = 1000;
-	int iters = 5000;
+	int iters = 1000;
 
 	/*
 	System.out.println("PARAMS transaction sleep " + sleepTime + " ms " +

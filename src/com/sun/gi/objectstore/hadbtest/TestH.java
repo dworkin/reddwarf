@@ -13,6 +13,7 @@ public class TestH {
 	String identifier = args[0];
 	// HadbTest t1 = null;
 	DataSpace t1 = null;
+	byte[] buf = new byte[10];
 	long id1 = 0;
 
 	try {
@@ -24,7 +25,7 @@ public class TestH {
 	}
 
 	for (int i = 0; i < 1000; i++) {
-	    id1 = t1.getNextID();
+	    id1 = t1.create(buf, null);
 	    System.out.println("id1: " + id1 + " " + identifier);
 	}
 

@@ -50,10 +50,6 @@ public class HadbDataSpace implements DataSpace {
     private static final String INFOBASETBL = "appinfo";
 
     private final String SCHEMA;
-    private String NAMETBL;
-    private String OBJTBL;
-    private String INFOTBL;
-    private String OBJLOCKTBL;
 
     private String NAMETBLNAME;
     private String OBJTBLNAME;
@@ -228,8 +224,8 @@ public class HadbDataSpace implements DataSpace {
 		System.getProperty("dataspace.hadb.hosts",
 			null));
 	if (hadbHosts == null) {
-	    // hadbHosts = "129.148.75.63:15025,129.148.75.60:15005";
-	    hadbHosts = "20.20.10.104:15025,20.20.10.103:15085,20.20.11.107:15105,20.20.10.101:15005,20.20.11.105:15065,20.20.10.102:15045";
+	    hadbHosts = "129.148.75.63:15025,129.148.75.60:15005";
+	    // hadbHosts = "20.20.10.104:15025,20.20.10.103:15085,20.20.11.107:15105,20.20.10.101:15005,20.20.11.105:15065,20.20.10.102:15045";
 	}
 
 	hadbUserName = hadbParams.getProperty("dataspace.hadb.username",
@@ -439,25 +435,25 @@ public class HadbDataSpace implements DataSpace {
 	    throw e;
 	}
 
-	if (foundTables.contains(OBJTBL.toLowerCase())) {
+	if (foundTables.contains(OBJBASETBL.toLowerCase())) {
 	    System.out.println("INFO: Found Objects table");
 	} else {
 	    createObjTable();
 	}
 
-	if (foundTables.contains(OBJLOCKTBL.toLowerCase())) {
+	if (foundTables.contains(OBJLOCKBASETBL.toLowerCase())) {
 	    System.out.println("INFO: Found object lock table");
 	} else {
 	    createObjLockTable();
 	}
 
-	if (foundTables.contains(NAMETBL.toLowerCase())) {
+	if (foundTables.contains(NAMEBASETBL.toLowerCase())) {
 	    System.out.println("INFO: Found Name table");
 	} else {
 	    createNameTable();
 	}
 
-	if (foundTables.contains(INFOTBL.toLowerCase())) {
+	if (foundTables.contains(INFOBASETBL.toLowerCase())) {
 	    System.out.println("INFO: Found info table");
 	} else {
 	    createInfoTable();
@@ -472,7 +468,7 @@ public class HadbDataSpace implements DataSpace {
 		NAMETBLNAME + " WHERE NAME=?");
 
 	deleteNameStmnt = updateTransConn.prepareStatement("DELETE FROM " +
-		NAMETBLNAME + " WHERE NAME=?");
+		NAMETBLNAME + " WHERE OBJID=?");
 
 	insertObjStmnt = updateTransConn.prepareStatement("INSERT INTO " +
 		OBJTBLNAME + " VALUES(?,?)");
@@ -615,6 +611,18 @@ public class HadbDataSpace implements DataSpace {
 	    System.out.println("ERROR: FAILED to create: " + e);
 	    return false;
 	}
+
+	s = "CREATE INDEX " + NAMETBLNAME + "_r ON " + NAMETBLNAME + "(OBJID)";
+	try {
+	    Statement stmnt = schemaConn.createStatement();
+	    stmnt.execute(s);
+	} catch (SQLException e) {
+	    // XXX
+	    System.out.println("ERROR: FAILED to create: " + e);
+	    e.printStackTrace();
+	    return false;
+	}
+
 	return true;
     }
 
@@ -1220,15 +1228,30 @@ public class HadbDataSpace implements DataSpace {
 	// XXX: write me.
 
 	// XXX: doesn't check for bad objectIDs
-	// XXX: BIG BUG: doesn't delete names of anything!
 
 	try {
 	    deleteObjStmnt.setLong(1, objectID);
 	    deleteObjStmnt.executeUpdate();
 
-	    deleteObjStmnt.getConnection().commit();
+	} catch (SQLException e) {
+	    try {
+		deleteObjStmnt.getConnection().rollback();
+	    } catch (SQLException e2) {
+		// XXX: DO SOMETHING.
+	    }
+	    
+	    // XXX: need to double-check that this is WHY
+	    // we got into this state.
 
-	    return;
+	    throw new NonExistantObjectIDException("object " + objectID +
+		    " does not exist");
+	}
+
+	try {
+	    deleteNameStmnt.setLong(1, objectID);
+	    deleteNameStmnt.executeUpdate();
+
+	    deleteObjStmnt.getConnection().commit();
 	} catch (SQLException e) {
 	    try {
 		deleteObjStmnt.getConnection().rollback();
@@ -1236,6 +1259,8 @@ public class HadbDataSpace implements DataSpace {
 		// XXX: DO SOMETHING.
 	    }
 	}
+
+	return;
     }
 
     public long create(byte[] data, String name) {
@@ -1253,6 +1278,7 @@ public class HadbDataSpace implements DataSpace {
 		insertNameStmnt.setLong(2, oid);
 		insertNameStmnt.executeUpdate();
 	    } catch (SQLException e) {
+		System.out.println("create: " + e);
 		// Was there already an identical name?
 		// Do we need to commit to find out?
 	    }

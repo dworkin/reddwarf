@@ -23,6 +23,7 @@ public class Test1 {
 	    System.exit(1);
 	}
 
+	System.out.println("Welcome to the Himalayas!");
 	ObjectStore os = TestUtil.connect(1, false, "hadb", null);
 	System.out.println("connected");
 	if (os == null) {

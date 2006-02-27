@@ -155,7 +155,9 @@ public class Test5 {
 		    }
 		}
 	    }
-	    // TestUtil.snooze(5000, "waiting for activity to drain");
+	    if (params.dataSpaceType.equals("persistant-inmem")) {
+		TestUtil.snooze(10000, "waiting for activity to drain");
+	    }
 	}
 	System.out.println("done");
     }

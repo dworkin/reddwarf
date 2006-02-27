@@ -2,7 +2,7 @@
 
 set root = ../../../../../..
 set classes = "$root/bin"
-set derby = "$root/support/db-derby-10.1.2.1-bin/lib/derby.jar"
+set derby = "$root/resources/libs/derby/derby.jar"
 set hadb = "./hadbjdbc4.jar"
 set package = com.sun.gi.objectstore.hadbtest
 

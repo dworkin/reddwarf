@@ -92,7 +92,11 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	 * @see com.sun.gi.objectstore.tso.DataSpaceTransaction#destroy(long)
 	 */
 	public void destroy(long objectID) {
-		dataSpace.destroy(objectID);
+		try {
+			dataSpace.destroy(objectID);
+		} catch (NonExistantObjectIDException e) {
+			// XXX: should do something.
+		}
 	}
 
 	/*
@@ -156,7 +160,12 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	 * @see com.sun.gi.objectstore.tso.DataSpaceTransaction#release(long)
 	 */
 	public void release(long objectID) {
-		dataSpace.release(objectID);
+		try {
+			dataSpace.release(objectID);
+		} catch (NonExistantObjectIDException e) {
+			// XXX: should note the error.
+		}
+
 		locksHeld.remove(objectID);
 	}
 
@@ -203,7 +212,11 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 		localObjectCache.clear();
 		//release left over locks
 		for(Long id : locksHeld){
-			dataSpace.release(id);
+			try {
+				dataSpace.release(id);
+			} catch (NonExistantObjectIDException e) {
+				// XXX: note the excecption.
+			}
 		}
 		locksHeld.clear();
 		
