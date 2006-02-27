@@ -57,8 +57,6 @@ public class BattleBoardServer implements SimBoot, SimUserListener {
     private static Logger log =
 	Logger.getLogger("com.sun.gi.apps.battleboard.server");
 
-    private GLOReference matchmakerRef;
-
     // SimBoot methods
 
     /**
@@ -77,9 +75,10 @@ public class BattleBoardServer implements SimBoot, SimUserListener {
 
 	// Get a reference to this object as a GLO
 	if (firstBoot) {
-	    // Since firstBoot is called exactly once, we don't
-	    // need any fancy checks here; this must succeed.
-	    matchmakerRef = Matchmaker.create();
+	    // Since firstBoot is called exactly once, when the
+	    // database is empty, this is the only time we need
+	    // to create the matchmaker object.
+	    Matchmaker.create();
 	}
 
         // Register this object as the handler for login- and
