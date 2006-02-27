@@ -59,7 +59,8 @@ public class Player implements SimUserDataListener {
      * 
      * @see com.sun.gi.logic.SimUserDataListener#userDataReceived
      */
-	public void userDataReceived(SimTask task, UserID from, ByteBuffer data) {
+	public void userDataReceived(UserID from, ByteBuffer data) {
+		SimTask task = SimTask.getCurrent();
 		System.out.println("UserDataReceived from: " + from.toString());
 		int commandCode = protocol.readUnsignedByte(data);
 		if (commandCode == CommandProtocol.LIST_FOLDER_REQUEST) {
@@ -88,6 +89,11 @@ public class Player implements SimUserDataListener {
 		}
 		
 	}
+	
+    public void dataArrivedFromChannel(ChannelID id,
+    		UserID from, ByteBuffer buff) {
+    	
+    }
 	  
 	/**
      * This callback is called when a user joins a channel.  This implementation also
@@ -96,7 +102,8 @@ public class Player implements SimUserDataListener {
      * 
      * @see com.sun.gi.logic.SimUserDataListener#userJoinedChannel
      */
-	public void userJoinedChannel(SimTask task, ChannelID cid, UserID uid) {
+	public void userJoinedChannel(ChannelID cid, UserID uid) {
+		SimTask task = SimTask.getCurrent();
 		if (uid.equals(userID)) {  // it was this player who joined, add to the either the lobby or game list.
 			GLOMap<SGSUUID, GLOReference> lobbyMap = (GLOMap<SGSUUID, GLOReference>) task.findGLO("LobbyMap").peek(task);
 			GLOReference lobbyRef = lobbyMap.get(cid);
@@ -159,7 +166,8 @@ public class Player implements SimUserDataListener {
      * 
      * @see com.sun.gi.logic.SimUserDataListener#userLeftChannel
      */
-	public void userLeftChannel(SimTask task, ChannelID cid, UserID uid) {
+	public void userLeftChannel(ChannelID cid, UserID uid) {
+		SimTask task = SimTask.getCurrent();
 		if (uid.equals(userID)) {  // it was this player who left, cleanup -- remove from any lists.
 			if (currentGameRoom != null) {		// the player left a game room
 				GameRoom gameRoom = (GameRoom) currentGameRoom.get(task);

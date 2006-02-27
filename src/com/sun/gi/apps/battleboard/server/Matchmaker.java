@@ -1,24 +1,61 @@
+/*
+ * $Id$
+ *
+ * Copyright 2006 Sun Microsystems, Inc. All Rights Reserved.
+ *
+ * Redistribution and use in source and binary forms, with or
+ * without modification, are permitted provided that the following
+ * conditions are met:
+ *
+ * -Redistributions of source code must retain the above copyright
+ * notice, this  list of conditions and the following disclaimer.
+ *
+ * -Redistribution in binary form must reproduct the above copyright
+ * notice, this list of conditions and the following disclaimer in
+ * the documentation and/or other materials provided with the
+ * distribution.
+ *
+ * Neither the name of Sun Microsystems, Inc. or the names of
+ * contributors may be used to endorse or promote products derived
+ * from this software without specific prior written permission.
+ *
+ * This software is provided "AS IS," without a warranty of any
+ * kind. ALL EXPRESS OR IMPLIED CONDITIONS, REPRESENTATIONS AND
+ * WARRANTIES, INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE OR NON-INFRINGEMENT, ARE HEREBY
+ * EXCLUDED. SUN AND ITS LICENSORS SHALL NOT BE LIABLE FOR ANY
+ * DAMAGES OR LIABILITIES  SUFFERED BY LICENSEE AS A RESULT OF  OR
+ * RELATING TO USE, MODIFICATION OR DISTRIBUTION OF THE SOFTWARE OR
+ * ITS DERIVATIVES. IN NO EVENT WILL SUN OR ITS LICENSORS BE LIABLE
+ * FOR ANY LOST REVENUE, PROFIT OR DATA, OR FOR DIRECT, INDIRECT,
+ * SPECIAL, CONSEQUENTIAL, INCIDENTAL OR PUNITIVE DAMAGES, HOWEVER
+ * CAUSED AND REGARDLESS OF THE THEORY OF LIABILITY, ARISING OUT OF
+ * THE USE OF OR INABILITY TO USE SOFTWARE, EVEN IF SUN HAS BEEN
+ * ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+ *
+ * You acknowledge that Software is not designed, licensed or
+ * intended for use in the design, construction, operation or
+ * maintenance of any nuclear facility.
+ */
+
 package com.sun.gi.apps.battleboard.server;
 
-import java.util.logging.Logger;
-
-import com.sun.gi.logic.GLO;
-import com.sun.gi.logic.SimChannelMembershipListener;
-import com.sun.gi.logic.SimTask;
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
-import com.sun.gi.comm.users.server.impl.SGSUserImpl;
 import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
+import com.sun.gi.logic.SimTask;
 import java.nio.ByteBuffer;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.Queue;
-import java.util.LinkedList;
-import java.util.Set;
 import java.util.HashSet;
+import java.util.Set;
+import java.util.logging.Logger;
 
-public class Matchmaker implements SimChannelMembershipListener {
+/**
+ *
+ * @author  James Megquier
+ * @version $Rev$, $Date$
+ */
+public class Matchmaker implements /* ChannelListener */ GLO {
 
     private static final long serialVersionUID = 1L;
 
@@ -31,45 +68,72 @@ public class Matchmaker implements SimChannelMembershipListener {
 
     protected int PLAYERS_PER_GAME = 3;
 
-    protected Set<GLOReference> waitingPlayers =
-	new HashSet<GLOReference>();
+    protected Set<GLOReference<Player>> waitingPlayers =
+	new HashSet<GLOReference<Player>>();
 
-    public static GLOReference instance(SimTask task) {
+    public static Matchmaker get() {
+	SimTask task = SimTask.getCurrent();
+	return (Matchmaker) task.findGLO(MATCHMAKER_GLO_NAME).get(task);
+    }
 
-	GLOReference ref = task.findGLO(MATCHMAKER_GLO_NAME);
+    public static GLOReference<Matchmaker> create() {
+	SimTask task = SimTask.getCurrent();
 
+	// Paranoid check for pre-existing matchmaker object.
+	// In BattleBoard, this isn't necessary because only the
+	// boot object creates the matchmaker, and it does so
+	// with a mutex (or "GET-lock" held).
+	GLOReference<Matchmaker> ref = task.findGLO(MATCHMAKER_GLO_NAME);
 	if (ref != null) {
+	    log.severe("matchmaker GLO already exists");
 	    return ref;
 	}
 
-	log.fine("Created new Matchmaker instance");
+	ref = task.createGLO(new Matchmaker(), MATCHMAKER_GLO_NAME);
 
-	Matchmaker mm = new Matchmaker(task);
-	ref = task.createGLO(mm, MATCHMAKER_GLO_NAME);
-	task.addChannelMembershipListener(mm.channel, ref);
+	// More paranoia; for the reasons above, this particular
+	// use of createGLO must succeed, so this isn't needed.
+	if (ref == null) {
+	    GLOReference<Matchmaker> ref2 = task.findGLO(MATCHMAKER_GLO_NAME);
+	    if (ref2 == null) {
+		log.severe("createGLO failed");
+		throw new RuntimeException("createGLO failed");
+	    } else {
+		log.severe("lost createGLO race");
+		return ref2;
+	    }
+	}
+
+	//((Matchmaker) ref.get(task)).boot(ref);
 	return ref;
     }
 
-    protected Matchmaker(SimTask task) {
+    protected Matchmaker() {
 	// Create the matchmaker channel so we can talk to unjoined clients
+	SimTask task = SimTask.getCurrent();
 	channel = task.openChannel("matchmaker");
 	task.lock(channel, true);
     }
 
-    public void addUserID(SimTask task, UserID uid) {
+    protected void boot(GLOReference<Matchmaker> thisRef) {
+	//ChannelListener.add(channel, thisRef);
+    }
+
+    public void addUserID(UserID uid) {
 	log.info("Adding to matchmaker");
-	task.join(uid, channel);
+	SimTask.getCurrent().join(uid, channel);
 	log.info("Added to matchmaker");
     }
 
-    protected void sendAlreadyJoined(SimTask task, UserID uid) {
+    protected void sendAlreadyJoined(UserID uid) {
 	ByteBuffer buf = ByteBuffer.allocate(64);
 	buf.put("already-joined".getBytes());
+	SimTask task = SimTask.getCurrent();
 	task.sendData(channel, new UserID[] { uid }, buf, true);
     }
 
     // Handle the "join" command in matchmaker mode
-    public void userDataReceived(SimTask task, UserID uid, ByteBuffer data) {
+    public void userDataReceived(UserID uid, ByteBuffer data) {
 	log.info("Matchmaker: data from user " + uid);
 
 	byte[] bytes = new byte[data.remaining()];
@@ -84,18 +148,19 @@ public class Matchmaker implements SimChannelMembershipListener {
 	final String playerName = cmd.substring(5);
 	log.info("Matchmaker: join from `" + playerName + "'");
 
-	for (GLOReference ref : waitingPlayers) {
-	    Player p = (Player) ref.peek(task);
+	SimTask task = SimTask.getCurrent();
+	for (GLOReference<Player> ref : waitingPlayers) {
+	    Player p = ref.peek(task);
 	    if (playerName.equals(p.getNickname())) {
 		log.warning("Matchmaker already has `" + playerName);
-		sendAlreadyJoined(task, uid);
+		sendAlreadyJoined(uid);
 		return;
 	    }
 
 	}
 
-	GLOReference playerRef = Player.getRef(task, uid);
-	Player player = (Player) playerRef.get(task);
+	GLOReference<Player> playerRef = Player.getRef(uid);
+	Player player = playerRef.get(task);
 	player.setNickname(playerName);
 
 	waitingPlayers.add(playerRef);
@@ -106,10 +171,10 @@ public class Matchmaker implements SimChannelMembershipListener {
 	// involved in the next game we can spawn with current waiters.
 	// Instead we'll just keep the lock for now.
 
-	checkForEnoughPlayers(task);
+	checkForEnoughPlayers();
     }
 
-    protected void checkForEnoughPlayers(SimTask task) {
+    protected void checkForEnoughPlayers() {
 
 	if (waitingPlayers.size() < PLAYERS_PER_GAME) {
 	    return;
@@ -121,20 +186,20 @@ public class Matchmaker implements SimChannelMembershipListener {
 		+ waitingPlayers.size());
 	}
 
-	Game.create(task, waitingPlayers);
+	Game.create(waitingPlayers);
 	waitingPlayers.clear();
     }
 
     // SimChannelMembershipListener methods
 
-    public void joinedChannel(SimTask task, ChannelID cid, UserID uid) {
+    public void joinedChannel(ChannelID cid, UserID uid) {
 	log.info("Matchmaker: User " + uid + " joined channel " + cid);
     }
 
-    public void leftChannel(SimTask task, ChannelID cid, UserID uid) {
+    public void leftChannel(ChannelID cid, UserID uid) {
 	log.info("Matchmaker: User " + uid + " left channel " + cid);
 
-	GLOReference playerRef = Player.getRef(task, uid);
+	GLOReference<Player> playerRef = Player.getRef(uid);
 	waitingPlayers.remove(playerRef);
     }
 }

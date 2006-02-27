@@ -35,8 +35,8 @@ public class MatchMakerBoot implements SimBoot, SimUserListener {
      * 
      * @see com.sun.gi.logic.SimBoot#boot
      */
-	public void boot(SimTask task, boolean firstBoot) {
-
+	public void boot(GLOReference bootGLO, boolean firstBoot) {
+		SimTask task = SimTask.getCurrent();
 		if (firstBoot) {
 			System.out.println("MatchMakerBoot: firstBoot");
 			GLOMap<String, UserID> userMap = new GLOMap<String, UserID>();
@@ -51,9 +51,7 @@ public class MatchMakerBoot implements SimBoot, SimUserListener {
 			folderRoot = task.createGLO(createRootFolder(task));
 
 		}
-		GLOReference thisRef = task.findGLO("BOOT");
-		
-		task.addUserListener(thisRef);
+		task.addUserListener(bootGLO);
 		
 	}
 	
@@ -62,7 +60,8 @@ public class MatchMakerBoot implements SimBoot, SimUserListener {
      * 
      * @see com.sun.gi.logic.SimUserListener#userJoined
      */
-    public void userJoined(SimTask task, UserID uid, Subject subject) {
+    public void userJoined(UserID uid, Subject subject) {
+    	SimTask task = SimTask.getCurrent();
     	System.out.println("Match Maker User Joined");
 
     	GLOMap<String, UserID> userMap = (GLOMap<String, UserID>) task.findGLO("UsernameMap").get(task);
@@ -88,7 +87,8 @@ public class MatchMakerBoot implements SimBoot, SimUserListener {
      * 
      * @see com.sun.gi.logic.SimUserListener#userLeft
      */
-	public void userLeft(SimTask task, UserID uid) {
+	public void userLeft(UserID uid) {
+		SimTask task = SimTask.getCurrent();
 		GLOReference pRef = task.findGLO(uid.toString());
 		Player player = (Player) pRef.get(task);
 		GLOMap<String, UserID> userMap = (GLOMap<String, UserID>) task.findGLO("UsernameMap").get(task);

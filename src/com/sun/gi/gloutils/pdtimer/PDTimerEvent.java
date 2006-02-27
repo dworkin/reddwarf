@@ -58,10 +58,9 @@ public class PDTimerEvent implements GLO {
 			return;
 		}
 		Object targetObject = target.peek(task);
-		Class[] classes = new Class[parameters.length+1];
-		classes[0] = SimTask.class;
+		Class[] classes = new Class[parameters.length];
 		for(int i=0;i<parameters.length;i++){
-			classes[i+1]=parameters[i].getClass();
+			classes[i]=parameters[i].getClass();
 		}
 		try {
 			Method method = targetObject.getClass().getMethod(methodName,classes);

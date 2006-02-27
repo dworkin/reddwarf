@@ -145,7 +145,9 @@ public class NIOSocketManager implements Runnable {
 	    synchronized (writeQueue) {
 		for (SelectableChannel chan : writeQueue) {
 		    SelectionKey key = chan.keyFor(selector);
-		    key.interestOps(key.interestOps() | OP_WRITE);
+		    if (key.isValid()) {
+			key.interestOps(key.interestOps() | OP_WRITE);
+		    }
 		}
 		writeQueue.clear();
 	    }

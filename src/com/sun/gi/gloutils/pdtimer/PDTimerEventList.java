@@ -72,7 +72,7 @@ public class PDTimerEventList implements GLO {
 			try {				
 
 				Method cleanupMethod = PDTimerEventList.class.getMethod("cleanup",
-							SimTask.class, List.class);				
+							 List.class);				
 				task.queueTask(ACCESS_TYPE.GET, task.makeReference(this),
 						cleanupMethod, new Object[] { cleanupList });
 			} catch (InstantiationException e) {
@@ -116,7 +116,8 @@ public class PDTimerEventList implements GLO {
 
 	// called from a task
 	//  * (DESIGNED To BE CALLED WITH ACCESS.GET)
-	public void cleanup(SimTask task, List<GLOReference> cleanupList) {
+	public void cleanup(List<GLOReference> cleanupList) {
+		SimTask task = SimTask.getCurrent();
 		task.access_check(ACCESS_TYPE.GET,this);
 		System.out.println("DOing cleanup");
 		if (--bigCleanupCountdown==0){ // do a big cleanup

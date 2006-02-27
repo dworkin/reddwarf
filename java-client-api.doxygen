@@ -463,7 +463,6 @@ INPUT =  src/com/sun/gi/comm/users/client/ClientAlreadyConnectedException.java \
 	 src/com/sun/gi/comm/discovery/DiscoveredUserManager.java \
 	 src/com/sun/gi/comm/discovery/DiscoveredGame.java \
 	 src/com/sun/gi/comm/discovery/Discoverer.java \
-	 src/com/sun/gi/comm/users/client/impl/ClientConnectionManagerImpl.java \
 	 src/com/sun/gi/apps/chattest/client
 
 # If the value of the INPUT tag contains directories, you can use the 

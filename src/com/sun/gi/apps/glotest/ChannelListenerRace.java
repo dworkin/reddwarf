@@ -22,30 +22,25 @@ public class ChannelListenerRace implements SimBoot, SimUserListener {
     private static final Logger log =
 	Logger.getLogger("com.sun.gi.apps.glotest");
 
-    private GLOReference thisRef;
     private ChannelID    channel;
 
     // SimBoot methods
 
-    public void boot(SimTask task, boolean firstBoot) {
+    public void boot(GLOReference thisRef, boolean firstBoot) {
+	SimTask task = SimTask.getCurrent();
 	log.info("Booting ChannelListenerRace as appID " + task.getAppID());
 
-	// Get a reference to this object as a GLO
-	if (firstBoot) {
-	    thisRef = task.findGLO("BOOT");
-	}
-
 	channel = task.openChannel("ChannelListenerRace");
-
-	// Register for user join/leave
 	task.addUserListener(thisRef);
     }
 
     // SimUserListener methods
 
-    public void userJoined(SimTask task, UserID uid, Subject subject) {
+    public void userJoined(UserID uid, Subject subject) {
 
 	log.info("Registering newly-created GLO as listener for " + uid);
+
+	SimTask task = SimTask.getCurrent();
 
 	Player player = new Player(uid);
 	GLOReference ref = task.createGLO(player);
@@ -64,7 +59,7 @@ public class ChannelListenerRace implements SimBoot, SimUserListener {
 	log.info("Returning to Simulator");
     }
 
-    public void userLeft(SimTask task, UserID uid) {
+    public void userLeft(UserID uid) {
 	// no-op
     }
 }

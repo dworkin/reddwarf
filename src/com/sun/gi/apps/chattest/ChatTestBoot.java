@@ -1,23 +1,22 @@
 package com.sun.gi.apps.chattest;
 
 import java.nio.ByteBuffer;
-import com.sun.gi.logic.SimBoot;
-import com.sun.gi.logic.SimChannelListener;
-import com.sun.gi.logic.SimTask;
-import com.sun.gi.logic.SimUserDataListener;
-import com.sun.gi.logic.SimUserListener;
-import com.sun.gi.comm.routing.ChannelID;
-import com.sun.gi.comm.routing.UserID;
-import com.sun.gi.comm.users.server.impl.SGSUserImpl;
-import com.sun.gi.logic.GLOReference;
-import java.util.List;
 import java.util.ArrayList;
+import java.util.List;
 
 import javax.security.auth.Subject;
 
+import com.sun.gi.comm.routing.ChannelID;
+import com.sun.gi.comm.routing.UserID;
+import com.sun.gi.logic.GLOReference;
+import com.sun.gi.logic.SimBoot;
+import com.sun.gi.logic.SimTask;
+import com.sun.gi.logic.SimUserDataListener;
+import com.sun.gi.logic.SimUserListener;
+
 public class ChatTestBoot
-	implements SimBoot, SimUserListener,
-		   SimUserDataListener, SimChannelListener {
+	implements SimBoot, SimUserListener, SimUserDataListener
+		    {
 
     private static final long serialVersionUID = 1L;
 
@@ -29,21 +28,19 @@ public class ChatTestBoot
 
     GLOReference thisobj;
 
-    public void boot(SimTask task, boolean firstBoot) {
+    public void boot(GLOReference thisGLO, boolean firstBoot) {
+    SimTask task = SimTask.getCurrent();	
 	System.err.println("Booting comm test, appid = " + task.getAppID());
 	thisobj = task.findGLO("BOOT");
 	task.addUserListener(thisobj);
-	ChannelID cid = task.openChannel("echo");
-	task.addChannelListener(cid,thisobj);
+	echoID = task.openChannel("echo");
 
 	noJoinID = task.openChannel("noJoin");
 	task.lock(noJoinID, true);
-	task.addChannelListener(noJoinID, thisobj);
 
-	echoID = cid;
     }
 
-    public void userLeft(SimTask task, UserID uid) {
+    public void userLeft(UserID uid) {
 	System.err.println("User left server: " + uid);
 	users.remove(uid);
     }
@@ -53,15 +50,14 @@ public class ChatTestBoot
      * 
      * @see com.sun.gi.logic.SimUserListener#userJoined
      */
-    public void userJoined(SimTask task, UserID uid, Subject subject) {
+    public void userJoined(UserID uid, Subject subject) {
 	System.err.print("User Joined server: " + uid + " ( ");
 	for (Object cred : subject.getPublicCredentials()) {
 	    System.err.print(cred + " ");
 	}
 	System.err.println(")");
 	users.add(uid);
-	task.addUserDataListener(uid, thisobj);
-
+	SimTask.getCurrent().addUserDataListener(uid, thisobj);
     }
 
     /*
@@ -69,7 +65,7 @@ public class ChatTestBoot
      * 
      * @see com.sun.gi.logic.SimUserDataListener#userDataReceived
      */
-    public void userDataReceived(SimTask task, UserID from, ByteBuffer data) {
+    public void userDataReceived(UserID from, ByteBuffer data) {
 	System.err.println("Data from user " + from + ": "
 		+ new String(data.array(),data.arrayOffset(),data.limit()));
 
@@ -84,8 +80,10 @@ public class ChatTestBoot
      * 
      * @see com.sun.gi.logic.SimUserDataListener#userJoinedChannel
      */
-    public void userJoinedChannel(SimTask task, ChannelID cid, UserID uid) {
+    public void userJoinedChannel(ChannelID cid, UserID uid) {
 	System.err.println("User " + cid + " joined channel " + uid);
+	SimTask.getCurrent().setEvesdroppingEnabled(uid,echoID,true);
+	SimTask.getCurrent().setEvesdroppingEnabled(uid,noJoinID,true);
 
 	// test for forcabley closing a channel
 	//task.closeChannel(cid);
@@ -102,7 +100,7 @@ public class ChatTestBoot
      * 
      * @see com.sun.gi.logic.SimUserDataListener#userLeftChannel
      */
-    public void userLeftChannel(SimTask task, ChannelID cid, UserID uid) {
+    public void userLeftChannel(ChannelID cid, UserID uid) {
 	System.err.println("User " + cid + " left channel " + uid);
 
     }
@@ -110,12 +108,21 @@ public class ChatTestBoot
     /* (non-Javadoc)
      * @see com.sun.gi.logic.SimChannelDataListener#dataArrived
      */
-    public void dataArrived(SimTask task, ChannelID cid,
+    public void dataArrived(ChannelID cid,
 	    UserID from, ByteBuffer buff) {
 
-	System.err.println("Echoing: " +
-	    new String(buff.array(),buff.arrayOffset(), buff.limit()));
-
-	task.sendData(cid,new UserID[] {from},buff,true);
+	
     }
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.logic.SimUserDataListener#dataArrivedFromChannel(com.sun.gi.comm.routing.ChannelID, com.sun.gi.comm.routing.UserID, java.nio.ByteBuffer)
+	 */
+	public void dataArrivedFromChannel(ChannelID cid, UserID from, ByteBuffer buff) {
+		SimTask task = SimTask.getCurrent();
+		task.sendData(cid,new UserID[] {from},buff,true);
+		
+	}
+
+	
+	
 }

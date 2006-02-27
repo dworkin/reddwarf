@@ -2,6 +2,7 @@ package com.sun.gi.apps.trivial;
 
 import java.lang.reflect.Method;
 
+import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimBoot;
 import com.sun.gi.logic.SimTask;
 
@@ -25,7 +26,7 @@ public class TrivialBoot implements SimBoot {
     public TrivialBoot() {
     }
 
-    public void boot(SimTask task, boolean firstBoot) {
+    public void boot(GLOReference bootGLO, boolean firstBoot) {
 	if (firstBoot){
 	    System.out.println("First boot of trivial test");
 	}
@@ -37,8 +38,9 @@ public class TrivialBoot implements SimBoot {
 		" (should throw exception)");
 	    Method m;
 	    try {
+	    	SimTask task = SimTask.getCurrent();
 		m = getClass().getMethod("illegalTask",
-			new Class[] { SimTask.class, TrivialBoot.class });
+			new Class[] { GLOReference.class, TrivialBoot.class });
 		task.queueTask(task.makeReference(this),
 		    m, new Object[] { this });
 	    } catch (SecurityException e) {

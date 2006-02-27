@@ -35,7 +35,7 @@ public interface Simulation {
    * @param l SOReference A rference to a GLO so add to the user listeners list.
    */
 
-  public void addUserListener(GLOReference ref);
+  public void addUserListener(GLOReference<? extends SimUserListener> ref);
 
   public void addUserListener(long l);
   
@@ -47,22 +47,9 @@ public interface Simulation {
    * @param ref SOReference The reference to the GLO to actually handle the
    * events.
    */
-  public void addUserDataListener(UserID cid, GLOReference ref);
+  public void addUserDataListener(UserID cid,
+      GLOReference<? extends SimUserDataListener> ref);
   
-  /** Listen to join/leave events on a particular channel */
-  public void addChannelMembershipListener(ChannelID cid, GLOReference ref);
-
-  /**
-   * This calls add a GLO as a listener to the data being sent  on a channel.
-   * Its should be used very judiciously as the clients chatting abck and forth can
-   * easily over-whelm the server.  The usual way to get data to the server is directly from the
-   * sending user using addUserDataListener above.  This is more for "evesdropping" where
-   * necessary.
-   * @param ref  A GLORerence to the GLO to get the callback.
-   * @see addUserDataListener
-   */
-  public void addChannelListener(ChannelID cid, GLOReference ref);
-
   /**
    * This call creates a SimTask object that can then be queued for executon.
    * The AccessType for the target object will be ACCESS_GET
@@ -72,7 +59,8 @@ public interface Simulation {
    * @param params Object[] The parameters to pass to that method.
    * @return SimTask The created SimTask.
    */
-  public SimTask newTask(GLOReference ref, Method methodToCall, Object[] params);
+  public SimTask newTask(GLOReference<? extends GLO> ref,
+      Method methodToCall, Object[] params);
   
   /**
    * This call creates a SimTask object that can then be queued for executon.
@@ -87,7 +75,8 @@ public interface Simulation {
    * @param params Object[] The parameters to pass to that method.
    * @return SimTask The created SimTask.
    */
-  public SimTask newTask(ACCESS_TYPE access, GLOReference ref, Method methodToCall, Object[] params);
+  public SimTask newTask(ACCESS_TYPE access, GLOReference<? extends GLO> ref,
+      Method methodToCall, Object[] params);
 
   /**
    * Thsi method returns the string that has been assigend as the name of the
@@ -250,4 +239,17 @@ public interface Simulation {
 	 * @param id		the ID of the channel to close.
 	 */
 	public void closeChannel(ChannelID id);	
+	
+	/**
+	 * Normally the server only gets packets sent specifically to it
+	 * in the SimUserDataListener.dataArrivedFromChannel callback.
+	 * However if evesdropping is turned on for a channel,user tuple then 
+	 * every packet sent by that user  in that channel will be sent to
+	 * the SimUserDataListener for that user.
+	 * @param uid User to evesdrop on
+	 * @param cid Channel to evesdrop on
+	 * @param setting evesdrop or not
+	 */
+	public void enableEvesdropping(UserID uid, ChannelID cid, 
+			boolean setting);
 }

@@ -1,13 +1,51 @@
+/*
+ * $Id$
+ *
+ * Copyright 2006 Sun Microsystems, Inc. All Rights Reserved.
+ *
+ * Redistribution and use in source and binary forms, with or
+ * without modification, are permitted provided that the following
+ * conditions are met:
+ *
+ * -Redistributions of source code must retain the above copyright
+ * notice, this  list of conditions and the following disclaimer.
+ *
+ * -Redistribution in binary form must reproduct the above copyright
+ * notice, this list of conditions and the following disclaimer in
+ * the documentation and/or other materials provided with the
+ * distribution.
+ *
+ * Neither the name of Sun Microsystems, Inc. or the names of
+ * contributors may be used to endorse or promote products derived
+ * from this software without specific prior written permission.
+ *
+ * This software is provided "AS IS," without a warranty of any
+ * kind. ALL EXPRESS OR IMPLIED CONDITIONS, REPRESENTATIONS AND
+ * WARRANTIES, INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE OR NON-INFRINGEMENT, ARE HEREBY
+ * EXCLUDED. SUN AND ITS LICENSORS SHALL NOT BE LIABLE FOR ANY
+ * DAMAGES OR LIABILITIES  SUFFERED BY LICENSEE AS A RESULT OF  OR
+ * RELATING TO USE, MODIFICATION OR DISTRIBUTION OF THE SOFTWARE OR
+ * ITS DERIVATIVES. IN NO EVENT WILL SUN OR ITS LICENSORS BE LIABLE
+ * FOR ANY LOST REVENUE, PROFIT OR DATA, OR FOR DIRECT, INDIRECT,
+ * SPECIAL, CONSEQUENTIAL, INCIDENTAL OR PUNITIVE DAMAGES, HOWEVER
+ * CAUSED AND REGARDLESS OF THE THEORY OF LIABILITY, ARISING OUT OF
+ * THE USE OF OR INABILITY TO USE SOFTWARE, EVEN IF SUN HAS BEEN
+ * ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
+ *
+ * You acknowledge that Software is not designed, licensed or
+ * intended for use in the design, construction, operation or
+ * maintenance of any nuclear facility.
+ */
+
 package com.sun.gi.apps.battleboard.server;
 
-import com.sun.gi.logic.GLO;
-import com.sun.gi.logic.SimChannelMembershipListener;
-import com.sun.gi.logic.SimTask;
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
-import com.sun.gi.comm.users.server.impl.SGSUserImpl;
 import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
+import com.sun.gi.logic.SimTask;
+
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Collections;
@@ -15,10 +53,17 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.logging.Level;
 import java.util.logging.Logger;
+
 import static com.sun.gi.apps.battleboard.client.BattleBoard.positionValue.*;
 
-public class Game implements SimChannelMembershipListener {
+/**
+ *
+ * @author  James Megquier
+ * @version $Rev$, $Date$
+ */
+public class Game implements /* ChannelListener */ GLO {
 
     private static final long serialVersionUID = 1L;
 
@@ -27,77 +72,97 @@ public class Game implements SimChannelMembershipListener {
 
     protected String     gameName;
     protected ChannelID  channel;
-    protected GLOReference               thisRef;
-    protected LinkedList<GLOReference>   players;
-    protected LinkedList<GLOReference>   spectators;
-    protected Map<String, GLOReference>  playerBoards;
-    protected GLOReference               currentPlayerRef;
+    protected GLOReference<Game>                thisRef;
+    protected LinkedList<GLOReference<Player>>  players;
+    protected LinkedList<GLOReference<Player>>  spectators;
+    protected Map<String, GLOReference<Board>>  playerBoards;
+    protected GLOReference<Player>              currentPlayerRef;
 
     protected static int DEFAULT_BOARD_WIDTH  = 8;
     protected static int DEFAULT_BOARD_HEIGHT = 8;
     protected static int DEFAULT_BOARD_CITIES = 2;
 
-    public static GLOReference create(SimTask task,
-	    Collection<GLOReference> players) {
+    public static GLOReference create(
+	    Collection<GLOReference<Player>> players) {
 
-	Game game = new Game(task, players);
-	return game.thisRef;
+	SimTask task = SimTask.getCurrent();
+	GLOReference<Game> ref = task.createGLO(new Game(players));
+
+	ref.get(task).boot(ref);
+	return ref;
     }
 
-    protected Game(SimTask task, Collection<GLOReference> newPlayers) {
+    protected Game(Collection<GLOReference<Player>> newPlayers) {
+
+	SimTask task = SimTask.getCurrent();
+
 	// XXX store and increment a next-channel-number in the GLO,
 	// instead of using the current time(?) -jm
 	gameName = "BB-" + System.currentTimeMillis();
 
 	log.finer("Next game channel is `" + gameName + "'");
 
-	thisRef = task.createGLO(this, gameName);
-
-	players = new LinkedList(newPlayers);
+	players = new LinkedList<GLOReference<Player>>(newPlayers);
 	Collections.shuffle(players);
 
-	spectators = new LinkedList();
+	spectators = new LinkedList<GLOReference<Player>>();
 
-	playerBoards = new HashMap<String, GLOReference>();
-	for (GLOReference playerRef : players) {
-	    Player p = (Player) playerRef.get(task);
+	playerBoards = new HashMap<String, GLOReference<Board>>();
+	for (GLOReference<Player> playerRef : players) {
+	    Player p = playerRef.get(task);
 	    playerBoards.put(p.getNickname(),
-		createBoard(task, p.getNickname()));
-	    p.gameStarted(thisRef);
-	}
-
-	log.fine("playerBoards size " + playerBoards.size());
-	for (Map.Entry<String, GLOReference> x : playerBoards.entrySet()) {
-	    log.fine("playerBoard[ " + x.getKey() +
-	      "]=`" + x.getValue() + "'");
+		createBoard(p.getNickname()));
 	}
 
 	channel = task.openChannel(gameName);
 	task.lock(channel, true);
-	task.addChannelMembershipListener(channel, thisRef);
-
-	sendJoinOK(task);
-	sendTurnOrder(task);
-	startNextMove(task);
     }
 
-    protected GLOReference createBoard(SimTask task, String playerName) {
-	Board board =
-	    new Board(playerName,
-		DEFAULT_BOARD_WIDTH,
-		DEFAULT_BOARD_HEIGHT,
-		DEFAULT_BOARD_CITIES);
+    protected void boot(GLOReference<Game> ref) {
+	SimTask task = SimTask.getCurrent();
+
+	thisRef = ref;
+
+	if (log.isLoggable(Level.FINE)) {
+	    log.fine("playerBoards size " + playerBoards.size());
+	    for (Map.Entry<String, GLOReference<Board>> x : playerBoards.entrySet()) {
+		log.fine("playerBoard[" + x.getKey() + "]=`" +
+		    x.getValue() + "'");
+	    }
+	}
+
+	for (GLOReference<Player> playerRef : players) {
+	    Player p = playerRef.get(task);
+	    p.gameStarted(thisRef);
+	}
+	//task.addChannelMembershipListener(channel, thisRef);
+
+	sendJoinOK();
+	sendTurnOrder();
+	startNextMove();
+    }
+
+    protected GLOReference<Board> createBoard(String playerName) {
+	SimTask task = SimTask.getCurrent();
+
+	Board board = new Board(playerName,
+	    DEFAULT_BOARD_WIDTH, DEFAULT_BOARD_HEIGHT, DEFAULT_BOARD_CITIES);
+
 	board.populate();
-	GLOReference ref = task.createGLO(board);
+
+	GLOReference<Board> ref = task.createGLO(board,
+	    gameName + "-board-" + playerName);
+
 	log.finer("createBoard[" + playerName + "] returning " + ref);
 	return ref;
     }
 
-    public void endGame(SimTask task) {
+    public void endGame() {
+	SimTask task = SimTask.getCurrent();
 	log.info("Ending Game");
 	// Tell all the players this game is over
-	for (GLOReference ref : players) {
-	    Player p = (Player) ref.get(task);
+	for (GLOReference<Player> ref : players) {
+	    Player p = ref.get(task);
 	    p.gameEnded(thisRef);
 	}
 
@@ -119,15 +184,17 @@ public class Game implements SimChannelMembershipListener {
 	// XXX do this...
     }
 
-    protected void sendJoinOK(SimTask task) {
-	for (GLOReference ref : players) {
-	    Player p = (Player) ref.peek(task);
+    protected void sendJoinOK() {
+	SimTask task = SimTask.getCurrent();
+	for (GLOReference<Player> ref : players) {
+	    Player p = ref.peek(task);
 	    task.join(p.getUID(), channel);
-	    sendJoinOK(task, p);
+	    sendJoinOK(p);
 	}
     }
     
-    protected void sendJoinOK(SimTask task, Player player) {
+    protected void sendJoinOK(Player player) {
+	SimTask task = SimTask.getCurrent();
 	ByteBuffer buf = ByteBuffer.allocate(1024);
 	buf.put("ok ".getBytes());
 
@@ -157,28 +224,30 @@ public class Game implements SimChannelMembershipListener {
 	    buf.asReadOnlyBuffer(), true);
     }
 
-    protected void sendTurnOrder(SimTask task) {
+    protected void sendTurnOrder() {
+	SimTask task = SimTask.getCurrent();
 	ByteBuffer buf = ByteBuffer.allocate(1024);
 	buf.put("turn-order".getBytes());
-	for (GLOReference playerRef : players) {
-	    Player p = (Player) playerRef.peek(task);
+	for (GLOReference<Player> playerRef : players) {
+	    Player p = playerRef.peek(task);
 	    buf.put(" ".getBytes());
 	    buf.put(p.getNickname().getBytes());
 	}
-	broadcast(task, buf.asReadOnlyBuffer());
+	broadcast(buf.asReadOnlyBuffer());
     }
 
-    protected void broadcast(SimTask task, ByteBuffer buf) {
+    protected void broadcast(ByteBuffer buf) {
+	SimTask task = SimTask.getCurrent();
 	UserID[] uids = new UserID[players.size() + spectators.size()];
 
 	int i = 0;
-	for (GLOReference ref : players) {
-	    Player p = (Player) ref.peek(task);
+	for (GLOReference<Player> ref : players) {
+	    Player p = ref.peek(task);
 	    uids[i++] = p.getUID();
 	}
 
-	for (GLOReference ref : spectators) {
-	    Player p = (Player) ref.peek(task);
+	for (GLOReference<Player> ref : spectators) {
+	    Player p = ref.peek(task);
 	    uids[i++] = p.getUID();
 	}
 
@@ -188,46 +257,50 @@ public class Game implements SimChannelMembershipListener {
 	task.sendData(channel, uids, buf, true);
     }
 
-    protected void sendMoveStarted(SimTask task, Player player) {
+    protected void sendMoveStarted(Player player) {
+	SimTask task = SimTask.getCurrent();
 	ByteBuffer buf = ByteBuffer.allocate(1024);
 	buf.put("move-started ".getBytes());
 	buf.put(player.getNickname().getBytes());
-	broadcast(task, buf.asReadOnlyBuffer());
+	broadcast(buf.asReadOnlyBuffer());
     }
 
-    protected void startNextMove(SimTask task) {
+    protected void startNextMove() {
+	SimTask task = SimTask.getCurrent();
 	log.info("Running Game.startNextMove");
 
 	currentPlayerRef = players.removeFirst();
 	players.addLast(currentPlayerRef);
-	Player p = (Player) currentPlayerRef.peek(task);
-	sendMoveStarted(task, p);
+	Player p = currentPlayerRef.peek(task);
+	sendMoveStarted(p);
     }
 
-    protected void handlePass(SimTask task, Player player) {
+    protected void handlePass(Player player) {
+	SimTask task = SimTask.getCurrent();
 	ByteBuffer buf = ByteBuffer.allocate(1024);
 	buf.put("move-ended ".getBytes());
 	buf.put(player.getNickname().getBytes());
 	buf.put(" pass".getBytes());
-	broadcast(task, buf.asReadOnlyBuffer());
+	broadcast(buf.asReadOnlyBuffer());
 
-	startNextMove(task);
+	startNextMove();
     }
 
-    protected void handleMove(SimTask task, Player player, String[] tokens) {
+    protected void handleMove(Player player, String[] tokens) {
+	SimTask task = SimTask.getCurrent();
 
 	String bombedPlayerNick = tokens[1];
 
-	GLOReference boardRef = playerBoards.get(bombedPlayerNick);
+	GLOReference<Board> boardRef = playerBoards.get(bombedPlayerNick);
 	if (boardRef == null) {
 	    log.warning(player.getNickname() +
 		    " tried to bomb non-existant player " +
 		    bombedPlayerNick);
-	    handlePass(task, player);
+	    handlePass(player);
 	    return;
 
 	}
-	Board board = (Board) boardRef.get(task);
+	Board board = boardRef.get(task);
 
 	int x = Integer.parseInt(tokens[2]);
 	int y = Integer.parseInt(tokens[3]);
@@ -264,15 +337,15 @@ public class Game implements SimChannelMembershipListener {
 	buf.put(outcome.getBytes());
 	buf.put(" ".getBytes());
 
-	broadcast(task, buf.asReadOnlyBuffer());
+	broadcast(buf.asReadOnlyBuffer());
 
 	// If the bombed player has lost, make them a spectator
 	if (board.lost()) {
 	    playerBoards.remove(bombedPlayerNick);
-	    Iterator<GLOReference> i = players.iterator();
+	    Iterator<GLOReference<Player>> i = players.iterator();
 	    while (i.hasNext()) {
-		GLOReference ref = i.next();
-		Player p = (Player) ref.peek(task);
+		GLOReference<Player> ref = i.next();
+		Player p = ref.peek(task);
 		if (bombedPlayerNick.equals(p.getNickname())) {
 		    spectators.add(ref);
 		    i.remove();
@@ -285,7 +358,7 @@ public class Game implements SimChannelMembershipListener {
 	    // queue a new task to handle end of game
 	    try {
 		task.queueTask(thisRef,
-		    Game.class.getMethod("endGame", SimTask.class),
+		    Game.class.getMethod("endGame"),
 		    new Object[] { });
 	    } catch (Exception e) {
 		e.printStackTrace();
@@ -295,10 +368,10 @@ public class Game implements SimChannelMembershipListener {
 	    return;
 	}
 
-	startNextMove(task);
+	startNextMove();
     }
 
-    protected void handleResponse(SimTask task, GLOReference playerRef,
+    protected void handleResponse(GLOReference<Player> playerRef,
 	    String[] tokens) {
 
 	if (! playerRef.equals(currentPlayerRef)) {
@@ -306,23 +379,24 @@ public class Game implements SimChannelMembershipListener {
 	    return;
 	}
 
-	Player player = (Player) playerRef.peek(task);
+	SimTask task = SimTask.getCurrent();
+	Player player = playerRef.peek(task);
 	String cmd = tokens[0];
 
 	if ("pass".equals(cmd)) {
-	    handlePass(task, player);
+	    handlePass(player);
 	} else if ("move".equals(cmd)) {
-	    handleMove(task, player, tokens);
+	    handleMove(player, tokens);
 	} else {
 	    log.warning("Unknown command `" + cmd + "'");
-	    handlePass(task, player);
+	    handlePass(player);
 	}
     }
 
     /**
      * Handle data that was sent directly to the server.
      */
-    public void userDataReceived(SimTask task, UserID uid, ByteBuffer data) {
+    public void userDataReceived(UserID uid, ByteBuffer data) {
 	log.info("Game: Direct data from user " + uid);
 
 	byte[] bytes = new byte[data.remaining()];
@@ -336,19 +410,19 @@ public class Game implements SimChannelMembershipListener {
 	    return;
 	}
 
-	GLOReference playerRef = Player.getRef(task, uid);
+	GLOReference<Player> playerRef = Player.getRef(uid);
 	// XXX check for null
 
-	handleResponse(task, playerRef, tokens);
+	handleResponse(playerRef, tokens);
     }
 
     // SimChannelMembershipListener methods
 
-    public void joinedChannel(SimTask task, ChannelID cid, UserID uid) {
+    public void joinedChannel(ChannelID cid, UserID uid) {
 	log.info("Game: User " + uid + " joined channel " + cid);
     }
 
-    public void leftChannel(SimTask task, ChannelID cid, UserID uid) {
+    public void leftChannel(ChannelID cid, UserID uid) {
 	log.info("Game: User " + uid + " left channel " + cid);
     }
 

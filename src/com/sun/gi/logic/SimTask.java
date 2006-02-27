@@ -8,6 +8,7 @@ import java.nio.ByteBuffer;
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.comm.users.server.SGSUser;
+import com.sun.gi.framework.rawsocket.SimRawSocketListener;
 import com.sun.gi.objectstore.ObjectStore;
 import com.sun.gi.objectstore.Transaction;
 
@@ -22,7 +23,8 @@ import com.sun.gi.objectstore.Transaction;
  * @version 1.0
  */
 
-public interface SimTask {
+public abstract class SimTask {
+	private static ThreadLocal<SimTask> current = new ThreadLocal<SimTask>();
 
     public enum ACCESS_TYPE {
 
@@ -41,7 +43,7 @@ public interface SimTask {
      * of the task.
      *
      */
-    public void execute();
+    public abstract void execute();
 
     /**
      * This is a utility call used by other parts of the system.
@@ -53,7 +55,7 @@ public interface SimTask {
      * @return a GLOReference that may be used by another GLO
      */
 
-    public GLOReference makeReference(long id);
+    public abstract GLOReference<? extends GLO> makeReference(long id);
 
     /**
      * Gets the transaction associated with this SimTask.  A SimTask
@@ -62,7 +64,7 @@ public interface SimTask {
      * @return the associated transaction or NULL if the SimTask
      * is not currently executing.
      */
-    public Transaction getTransaction();
+    public abstract Transaction getTransaction();
 
     // client functions
     // All the functions from here down are used by game application code
@@ -73,7 +75,7 @@ public interface SimTask {
      *
      * @return the app ID
      */
-    public long getAppID();
+    public abstract long getAppID();
 
     /**
      * This function registers a GLO as a listener to user join/left events
@@ -81,7 +83,7 @@ public interface SimTask {
      *
      * @param ref A reference to the GLO to be registered.
      */
-    public void addUserListener(GLOReference ref);
+    public abstract void addUserListener(GLOReference<? extends SimUserListener> ref);
 
     /**
      * This function registers a GLO as a listener to data packet arrival
@@ -93,11 +95,10 @@ public interface SimTask {
      * this listener.
      * @param ref A reference to the GLO to be registered.
      */
-    public void addUserDataListener(UserID id, GLOReference ref);
+    public abstract void addUserDataListener(UserID id,
+	GLOReference<? extends SimUserDataListener> ref);
 
-    public void addChannelMembershipListener(ChannelID id, GLOReference ref);
-    public void addChannelListener(ChannelID id, GLOReference ref);
-
+   
     /**
      * The game code can call this to send data to users by their IDs.
      * This actually maps to the send call down in the router layer by calling the
@@ -108,7 +109,7 @@ public interface SimTask {
      * @param data      the data packet to send
      * @param reliable
      */
-    public void sendData(ChannelID cid, UserID[] to, ByteBuffer data,
+    public abstract void sendData(ChannelID cid, UserID[] to, ByteBuffer data,
 			 boolean reliable);
 
     /**
@@ -120,7 +121,8 @@ public interface SimTask {
      *
      * @return A GLOReference that references the newly created GLO
      */
-    public GLOReference createGLO(GLO simObject, String name);
+    public abstract <T extends GLO> GLOReference<T> createGLO(T simObject,
+	String name);
 
     /**
      * This method is called to create a GLO in the objectstore.
@@ -129,7 +131,7 @@ public interface SimTask {
      *
      * @return A GLOReference that references the newly created GLO
      */
-    public GLOReference createGLO(GLO simObject);
+    public abstract <T extends GLO> GLOReference<T> createGLO(T simObject);
 
 
     // data access functions
@@ -146,7 +148,14 @@ public interface SimTask {
      *
      * @return A reference to the GLO if found, null if not found.
      */
-    public GLOReference findGLO(String gloName);
+    public abstract <T extends GLO> GLOReference<T> findGLO(String gloName);
+    
+    
+    /**
+     * 
+     * @param ref
+     */
+    public abstract void destroyGLO(GLOReference ref);
 
     /**
      * This method opens a comm channel and returns an ID for it
@@ -155,7 +164,7 @@ public interface SimTask {
      *
      * @return the new ChannelID for the channel created.
      */
-    public ChannelID openChannel(String string);
+    public abstract ChannelID openChannel(String string);
 
     /**
      * @param delay
@@ -165,7 +174,7 @@ public interface SimTask {
      * @return an id for this timer event registration
      */
 
-    public long registerTimerEvent(long delay, boolean repeat, GLOReference ref);
+    public abstract long registerTimerEvent(long delay, boolean repeat, GLOReference<? extends SimTimerListener> ref);
 
     /**
      * @param access
@@ -175,7 +184,7 @@ public interface SimTask {
      *
      * @return an id for this timer event registration
      */
-    public long registerTimerEvent(ACCESS_TYPE access, long l, boolean b, GLOReference reference);
+    public abstract long registerTimerEvent(ACCESS_TYPE access, long l, boolean b, GLOReference<? extends SimTimerListener> reference);
 
     /**
      * @param glo
@@ -184,9 +193,9 @@ public interface SimTask {
      *
      * @throws InstantiationException
      */
-    public GLOReference makeReference(GLO glo) throws InstantiationException;
+    public abstract <T extends GLO> GLOReference<T> makeReference(T glo) throws InstantiationException;
 
-    public void registerGLOID(long objID, GLO glo, ACCESS_TYPE access);
+    public abstract void registerGLOID(long objID, GLO glo, ACCESS_TYPE access);
 
     /**
      * @param accessType
@@ -194,22 +203,23 @@ public interface SimTask {
      * @param method
      * @param parameters
      */
-    public void queueTask(ACCESS_TYPE accessType, GLOReference target, Method method,
-	    Object[] parameters);
+    public abstract void queueTask(ACCESS_TYPE accessType,
+	GLOReference<? extends GLO> target, Method method,
+	Object[] parameters);
 
     /**
      * @param target
      * @param method
      * @param parameters
      */
-    public void queueTask(GLOReference target, Method method,
-	    Object[] parameters);
+    public abstract void queueTask(GLOReference<? extends GLO> target,
+	Method method, Object[] parameters);
 
     /**
      * @param accessType
      * @param glo
      */
-    public void access_check(ACCESS_TYPE accessType, Object glo);
+    public abstract void access_check(ACCESS_TYPE accessType, GLO glo);
 
     // Hooks into the RawSocketManager, added 1/16/2006
 
@@ -228,8 +238,9 @@ public interface SimTask {
      *
      * @return an identifier that can be used for future communication with the socket.
      */
-    public long openSocket(ACCESS_TYPE access, GLOReference ref, String host,
-	    int port, boolean reliable);
+    public abstract long openSocket(ACCESS_TYPE access,
+	GLOReference<? extends SimRawSocketListener> ref,
+	String host, int port, boolean reliable);
 
     /**
      * Sends data on the socket mapped to the given socketID.  This method
@@ -239,7 +250,7 @@ public interface SimTask {
      * @param data	the data to send.  The buffer should be in a ready
      * 			state, i.e. flipped if necessary.
      */
-    public void sendRawSocketData(long socketID, ByteBuffer data);
+    public abstract void sendRawSocketData(long socketID, ByteBuffer data);
 
     /**
      * Requests that the socket matching the given socketID be closed.
@@ -248,7 +259,7 @@ public interface SimTask {
      *
      * @param socketID		the identifier of the socket.
      */
-    public void closeSocket(long socketID);
+    public abstract void closeSocket(long socketID);
 
     /**
      * Joins the specified user to the Channel referenced by the
@@ -257,7 +268,7 @@ public interface SimTask {
      * @param user			the user
      * @param id			the ChannelID
      */
-    public void join(UserID user, ChannelID id);
+    public abstract void join(UserID user, ChannelID id);
 
     /**
      * Removes the specified user from the Channel referenced by the
@@ -266,7 +277,7 @@ public interface SimTask {
      * @param user			the user
      * @param id			the ChannelID
      */
-    public void leave(UserID user, ChannelID id);
+    public abstract void leave(UserID user, ChannelID id);
 
     /**
      * Locks the given channel based on shouldLock.  Users cannot join/leave locked channels
@@ -275,7 +286,7 @@ public interface SimTask {
      * @param cid			the channel ID
      * @param shouldLock		if true, will lock the channel, otherwise unlock it.
      */
-    public void lock(ChannelID cid, boolean shouldLock);
+    public abstract void lock(ChannelID cid, boolean shouldLock);
 
     /**
      * Closes the local view of the channel mapped to ChannelID.
@@ -283,5 +294,27 @@ public interface SimTask {
      *
      * @param cid		the ID of the channel to close.
      */
-    public void closeChannel(ChannelID cid);
+    public abstract void closeChannel(ChannelID cid);
+    
+    public abstract void setEvesdroppingEnabled(UserID uid, ChannelID cid,
+    		boolean setting);
+
+	/**
+	 * Gets the SimTask for the currently executing event
+	 * @return the SimTask
+	 */
+	public static SimTask getCurrent() throws ExecutionOutsideOfTaskException {
+		SimTask simTask = current.get();
+		if (simTask==null){
+			throw new ExecutionOutsideOfTaskException();
+		}
+		return simTask;
+	}
+	
+	protected void setAsCurrent(){
+		current.set(this);
+	}
+	
+	
+	
 }

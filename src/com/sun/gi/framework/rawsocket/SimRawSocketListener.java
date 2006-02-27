@@ -25,7 +25,7 @@ public interface SimRawSocketListener {
 	 * 
 	 * @param socketID		the ID of the socket.
 	 */
-	public void socketOpened(SimTask task, long socketID);
+	public void socketOpened(long socketID);
 	
 	/**
 	 * Called when there is incoming data on the socket mapped to the given ID.
@@ -35,14 +35,14 @@ public interface SimRawSocketListener {
 	 * @param socketID		the ID of the socket.
 	 * @param data			the incoming data.
 	 */
-	public void dataReceived(SimTask task, long socketID, ByteBuffer data);
+	public void dataReceived(long socketID, ByteBuffer data);
 	
 	/**
 	 * Called when the socket with the given ID is closed.
 	 * 
 	 * @param socketID		the ID of the socket.
 	 */
-	public void socketClosed(SimTask task, long socketID);
+	public void socketClosed(long socketID);
 	
 	/**
 	 * Called when an exception is thrown after an attempt to perform 
@@ -55,6 +55,6 @@ public interface SimRawSocketListener {
 	 * @param socketID			the ID of the socket on which the exception was thrown
 	 * @param exception			the actual exception
 	 */
-	public void socketException(SimTask task, long socketID, IOException exception);
+	public void socketException(long socketID, IOException exception);
 
 }

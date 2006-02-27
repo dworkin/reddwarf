@@ -27,15 +27,20 @@ public class Player implements SimUserDataListener {
 
     // SimUserDataListener methods
 
-    public void userJoinedChannel(SimTask task, ChannelID cid, UserID uid) {
+    public void userJoinedChannel(ChannelID cid, UserID uid) {
 	log.info("Player: User " + uid + " joined channel " + cid);
     }
 
-    public void userLeftChannel(SimTask task, ChannelID cid, UserID uid) {
+    public void userLeftChannel(ChannelID cid, UserID uid) {
 	log.info("Player: User " + uid + " left channel " + cid);
     }
 
-    public void userDataReceived(SimTask task, UserID uid, ByteBuffer data) {
+    public void userDataReceived(UserID uid, ByteBuffer data) {
 	log.info("Player: User " + uid + " got data");
+    }
+
+    public void dataArrivedFromChannel(ChannelID cid, UserID uid,
+	    ByteBuffer data) {
+	log.info("Player: User " + uid + " evesdrop data on channel " + cid);
     }
 }
