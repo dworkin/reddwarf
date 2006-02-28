@@ -87,6 +87,10 @@ public class Lobby extends ChannelRoom {
 		gameRoomList.add(grRef);
 	}
 	
+	public void addGameParameter(String key, Object value) {
+		gameParameters.put(key, value);
+	}
+	
 	public SGSUUID getLobbyID() {
 		return getChannelID();
 	}

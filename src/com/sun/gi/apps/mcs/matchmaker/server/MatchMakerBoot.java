@@ -2,6 +2,7 @@ package com.sun.gi.apps.mcs.matchmaker.server;
 
 import java.io.IOException;
 import java.net.URL;
+import java.util.Iterator;
 
 import javax.security.auth.Subject;
 
@@ -26,9 +27,7 @@ import com.sun.gi.utils.SGSUUID;
  */
 public class MatchMakerBoot implements SimBoot, SimUserListener {
 
-	private GLOReference folderRoot;
-	private GLOMap<SGSUUID, GLOReference> lobbyMap;
-	private GLOMap<SGSUUID, GLOReference> gameRoomMap;
+	private GLOReference<Folder> folderRoot;
 	
 	/*
      * (non-Javadoc)
@@ -39,24 +38,48 @@ public class MatchMakerBoot implements SimBoot, SimUserListener {
 		SimTask task = SimTask.getCurrent();
 		if (firstBoot) {
 			System.out.println("MatchMakerBoot: firstBoot");
-			GLOMap<String, UserID> userMap = new GLOMap<String, UserID>();
-			task.createGLO(userMap, "UsernameMap");
+			if (task.findGLO("UsernameMap") == null) {
+				task.createGLO(new GLOMap<String, UserID>(), "UsernameMap");
+			}
 			
-			lobbyMap = new GLOMap<SGSUUID, GLOReference>();
-			task.createGLO(lobbyMap, "LobbyMap");
+			if (task.findGLO("LobbyMap") == null) {
+				task.createGLO(new GLOMap<SGSUUID, GLOReference<Lobby>>(), "LobbyMap");
+			}
 			
-			gameRoomMap = new GLOMap<SGSUUID, GLOReference>();
-			task.createGLO(gameRoomMap, "GameRoomMap");
+			if (task.findGLO("GameRoomMap") == null) {
+				task.createGLO(new GLOMap<SGSUUID, GLOReference<GameRoom>>(), "GameRoomMap");
+			}
 			
 			folderRoot = task.createGLO(createRootFolder(task));
 
 		}
 		task.addUserListener(bootGLO);
+		initChannels(task);
 		
 	}
 	
+	private void initChannels(SimTask task) {
+		GLOReference<GLOMap<SGSUUID, GLOReference>> lobbyRef = task.findGLO("LobbyMap");
+		openChannels(task, lobbyRef);
+		
+		GLOReference<GLOMap<SGSUUID, GLOReference>> gameRoomRef = task.findGLO("GameRoomMap");
+		openChannels(task, gameRoomRef);
+	}
+	
+	private void openChannels(SimTask task, GLOReference<GLOMap<SGSUUID, GLOReference>> gloMapRef) {
+		GLOMap<SGSUUID, GLOReference> gloMap = gloMapRef.peek(task);
+		Iterator iterator = gloMap.keySet().iterator();
+		while (iterator.hasNext()) {
+			GLOReference ref = gloMap.get(iterator.next());
+			ChannelRoom curRoom = (ChannelRoom) ref.get(task);
+			curRoom.setChannelID(task.openChannel(curRoom.getChannelName()));
+		}
+	}
+	
 	/*
-     * (non-Javadoc)
+     * Called when a new user connects to the server.  A new Player object is
+     * constructed and set as the user's "command proxy".  A new task is queued
+     * to join the user to the Lobby Manager Control channel.
      * 
      * @see com.sun.gi.logic.SimUserListener#userJoined
      */
@@ -66,6 +89,7 @@ public class MatchMakerBoot implements SimBoot, SimUserListener {
 
     	GLOMap<String, UserID> userMap = (GLOMap<String, UserID>) task.findGLO("UsernameMap").get(task);
     	System.out.println("userJoined: map size " + userMap.size());
+    	// TODO sten: don't know how to handle duplicate logins yet.
     	//if (!userMap.containsKey(uid)) {
     		String username = null;
     		for (Object curCredential : subject.getPublicCredentials()) {
@@ -77,8 +101,23 @@ public class MatchMakerBoot implements SimBoot, SimUserListener {
     		System.out.println("Adding username " + username +  " uid " + uid);
     		
     		// map the player reference to its UserID for later lookup by other players.
-    		GLOReference pRef = task.createGLO(p, uid.toString());
+    		GLOReference<Player> pRef = task.findGLO(uid.toString());
+    		if (pRef == null) {
+    			pRef = task.createGLO(p, uid.toString());
+    			if (pRef == null) {
+    				pRef = task.findGLO(uid.toString());
+    			}
+    		}
     		task.addUserDataListener(uid, pRef);
+    		
+    		// join the new user to the lobby manager control channel
+    		// do this asynchronously to avoid a race condition with 
+    		// signing up to listen for channel joins.
+    		try {
+    		    task.queueTask(pRef, Player.class.getMethod("joinUser"), new Object[] {});
+    		} catch (Exception e) {
+    		    e.printStackTrace();
+    		}
     	//}
     }
 
@@ -90,12 +129,15 @@ public class MatchMakerBoot implements SimBoot, SimUserListener {
 	public void userLeft(UserID uid) {
 		SimTask task = SimTask.getCurrent();
 		GLOReference pRef = task.findGLO(uid.toString());
+		
 		Player player = (Player) pRef.get(task);
 		GLOMap<String, UserID> userMap = (GLOMap<String, UserID>) task.findGLO("UsernameMap").get(task);
 		if (userMap.containsKey(player.getUserName())) {
+			System.out.println("removing " + player.getUserName() + " from map");
 			userMap.remove(uid);
 		}
-		pRef.delete(task);
+		// this currently throws an exception
+		//pRef.delete(task);
 	}
 	
 	/**
@@ -103,17 +145,14 @@ public class MatchMakerBoot implements SimBoot, SimUserListener {
 	 * the way.  
 	 * 
 	 * 
-	 *   TODO sten: currently this just genereates test data until the real 
-	 *   scheme is know.
-	 * 
 	 * @param task		the SimTask to generate all the GLOReferences.
 	 * 
 	 */
 	private Folder createRootFolder(SimTask task) {
 		URL url = null;
 		try {
-			url = new URL("file:apps/matchmaker/matchmaker_config.xml");
-			//url = new URL("file:release/apps/matchmaker/matchmaker_config.xml");
+			//url = new URL("file:apps/matchmaker/matchmaker_config.xml");
+			url = new URL("file:release/apps/matchmaker/matchmaker_config.xml");
 		}
 		catch (IOException ioe) {
 			ioe.printStackTrace();

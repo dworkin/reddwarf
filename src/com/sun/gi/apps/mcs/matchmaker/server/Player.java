@@ -8,6 +8,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import static com.sun.gi.apps.mcs.matchmaker.server.CommandProtocol.*;
+
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.logic.GLO;
@@ -34,13 +36,13 @@ public class Player implements SimUserDataListener {
 	
 	private String userName;
 	private UserID userID;
-	private GLOReference folderRoot;
-	private GLOReference currentLobby;
-	private GLOReference currentGameRoom;
+	private GLOReference<Folder> folderRoot;
+	private GLOReference<Lobby> currentLobby;
+	private GLOReference<GameRoom> currentGameRoom;
 	
 	private CommandProtocol protocol;
 	
-	public Player(UserID uid, String userName, GLOReference root) {
+	public Player(UserID uid, String userName, GLOReference<Folder> root) {
 		this.userID = uid;
 		this.userName = userName;
 		this.folderRoot = root;
@@ -48,8 +50,19 @@ public class Player implements SimUserDataListener {
 		protocol = new CommandProtocol();
 	}
 	
-	public GLOReference getCurrentLobby() {
+	public GLOReference<Lobby> getCurrentLobby() {
 		return currentLobby;
+	}
+	
+	/**
+	 * Joins the user associated with this Player to the lobby manager control
+	 * channel.  
+	 * 
+	 * @param task
+	 */
+	public void joinUser() {
+		SimTask task = SimTask.getCurrent();
+		task.join(userID, task.openChannel(LOBBY_MANAGER_CONTROL_CHANNEL));
 	}
 	
 	/**
@@ -63,28 +76,28 @@ public class Player implements SimUserDataListener {
 		SimTask task = SimTask.getCurrent();
 		System.out.println("UserDataReceived from: " + from.toString());
 		int commandCode = protocol.readUnsignedByte(data);
-		if (commandCode == CommandProtocol.LIST_FOLDER_REQUEST) {
+		if (commandCode == LIST_FOLDER_REQUEST) {
 			listFolderRequest(task, data);
 		}
-		else if (commandCode == CommandProtocol.LOOKUP_USER_ID_REQUEST) {
+		else if (commandCode == LOOKUP_USER_ID_REQUEST) {
 			lookupUserIDRequest(task, data);
 		}
-		else if (commandCode == CommandProtocol.LOOKUP_USER_NAME_REQUEST) {
+		else if (commandCode == LOOKUP_USER_NAME_REQUEST) {
 			lookupUserNameRequest(task, data);
 		}
-		else if (commandCode == CommandProtocol.FIND_USER_REQUEST) {
+		else if (commandCode == FIND_USER_REQUEST) {
 			locateUserRequest(task, data);
 		}
-		else if (commandCode == CommandProtocol.JOIN_LOBBY) {
+		else if (commandCode == JOIN_LOBBY) {
 			joinLobby(task, data);
 		}
-		else if (commandCode == CommandProtocol.JOIN_GAME) {
+		else if (commandCode == JOIN_GAME) {
 			joinGame(task, data);
 		}
-		else if (commandCode == CommandProtocol.GAME_PARAMETERS_REQUEST) {
+		else if (commandCode == GAME_PARAMETERS_REQUEST) {
 			gameParametersRequest(task);
 		}
-		else if (commandCode == CommandProtocol.CREATE_GAME) {
+		else if (commandCode == CREATE_GAME) {
 			createGame(task, data);
 		}
 		
@@ -96,39 +109,48 @@ public class Player implements SimUserDataListener {
     }
 	  
 	/**
-     * This callback is called when a user joins a channel.  This implementation also
+     * <p>This callback is called when a user joins a channel.  This implementation also
      * passes the PlayerEnteredLobby command down the channel, which includes
-     * the user's username.
+     * the user's username.</p>
+     * 
+     * <p>If the channel joined is the lobby manager control channel, then the 
+     * SERVER_LISTENING response is sent down the channel to the user.</p>
      * 
      * @see com.sun.gi.logic.SimUserDataListener#userJoinedChannel
      */
 	public void userJoinedChannel(ChannelID cid, UserID uid) {
 		SimTask task = SimTask.getCurrent();
 		if (uid.equals(userID)) {  // it was this player who joined, add to the either the lobby or game list.
-			GLOMap<SGSUUID, GLOReference> lobbyMap = (GLOMap<SGSUUID, GLOReference>) task.findGLO("LobbyMap").peek(task);
-			GLOReference lobbyRef = lobbyMap.get(cid);
+			if (cid.equals(task.openChannel(LOBBY_MANAGER_CONTROL_CHANNEL))) {
+				List list = new LinkedList();
+				list.add(SERVER_LISTENING);
+				sendResponse(task, list);
+				return;
+			}
+			GLOMap<SGSUUID, GLOReference<Lobby>> lobbyMap = (GLOMap<SGSUUID, GLOReference<Lobby>>) task.findGLO("LobbyMap").peek(task);
+			GLOReference<Lobby> lobbyRef = lobbyMap.get(cid);
 			if (lobbyRef != null) {
 				currentLobby = lobbyRef;
-				Lobby lobby = (Lobby) lobbyRef.get(task);
+				Lobby lobby = lobbyRef.get(task);
 				lobby.addUser(uid);
 				
 				// send lobby joined message
 				List list = new LinkedList();
-				list.add(CommandProtocol.PLAYER_ENTERED_LOBBY);
+				list.add(PLAYER_ENTERED_LOBBY);
 				list.add(userID);
 				list.add(userName);
 				sendResponse(task, list, cid);
 			}
 			else {			// must have been a game room
-				GLOMap<SGSUUID, GLOReference> gameRoomMap = (GLOMap<SGSUUID, GLOReference>) task.findGLO("GameRoomMap").peek(task);
-				GLOReference gameRef = gameRoomMap.get(cid);
+				GLOMap<SGSUUID, GLOReference<GameRoom>> gameRoomMap = (GLOMap<SGSUUID, GLOReference<GameRoom>>) task.findGLO("GameRoomMap").peek(task);
+				GLOReference<GameRoom> gameRef = gameRoomMap.get(cid);
 				if (gameRef != null) {
-					GameRoom gameRoom = (GameRoom) gameRef.get(task);
+					GameRoom gameRoom = gameRef.get(task);
 					gameRoom.addUser(uid);
 					
 					// send playerJoinedGame message to lobby
 					List lobbyList = new LinkedList();
-					lobbyList.add(CommandProtocol.PLAYER_JOINED_GAME);
+					lobbyList.add(PLAYER_JOINED_GAME);
 					lobbyList.add(uid);
 					lobbyList.add(gameRoom.getGameID());
 					
@@ -138,7 +160,7 @@ public class Player implements SimUserDataListener {
 					
 					// send playerEnteredGame to game room
 					List grList = new LinkedList();
-					grList.add(CommandProtocol.PLAYER_ENTERED_GAME);
+					grList.add(PLAYER_ENTERED_GAME);
 					grList.add(uid);
 					grList.add(userName);
 					
@@ -185,7 +207,7 @@ public class Player implements SimUserDataListener {
 						
 						// Send notification to the Lobby that the game was killed
 						List list = new LinkedList();
-						list.add(CommandProtocol.GAME_DELETED);
+						list.add(GAME_DELETED);
 						list.add(gameRoom.getGameID());
 						
 						sendResponse(task, list, lobby.getChannelID());
@@ -199,7 +221,7 @@ public class Player implements SimUserDataListener {
 					
 					// send PlayerLeftGame message to lobby
 					List list = new LinkedList();
-					list.add(CommandProtocol.PLAYER_LEFT_GAME);
+					list.add(PLAYER_LEFT_GAME);
 					list.add(uid);
 					list.add(gameRoom.getGameID());
 					
@@ -236,7 +258,7 @@ public class Player implements SimUserDataListener {
 		Folder targetFolder = folderID == null ? root : root.findFolder(task, folderID); 
 		System.out.println("folderID = " + folderID + " targetFolder " + targetFolder.getName());
 		List list = new LinkedList();
-		list.add(CommandProtocol.LIST_FOLDER_RESPONSE);
+		list.add(LIST_FOLDER_RESPONSE);
 		list.add(folderID == null ? root.getFolderID() : folderID);
 		if (targetFolder != null) {
 			list.add(targetFolder.getFolders().size());
@@ -285,7 +307,7 @@ public class Player implements SimUserDataListener {
 		}
 		
 		List list = new LinkedList();
-		list.add(CommandProtocol.LOOKUP_USER_ID_RESPONSE);
+		list.add(LOOKUP_USER_ID_RESPONSE);
 		list.add(username);
 		list.add(id);
 		
@@ -304,7 +326,7 @@ public class Player implements SimUserDataListener {
 		}
 		
 		List list = new LinkedList();
-		list.add(CommandProtocol.LOOKUP_USER_NAME_RESPONSE);
+		list.add(LOOKUP_USER_NAME_RESPONSE);
 		list.add(username);
 		list.add(id);
 		
@@ -319,16 +341,16 @@ public class Player implements SimUserDataListener {
 	 */
 	private void locateUserRequest(SimTask task, ByteBuffer data) {
 		UserID requestedID = protocol.readUserID(data);
-		GLOReference requestedRef = task.findGLO(requestedID.toString());
+		GLOReference<Player> requestedRef = task.findGLO(requestedID.toString());
 		Lobby lobby = null;
 		if (requestedRef != null) {
-			Player requestedPlayer = (Player) requestedRef.peek(task);
+			Player requestedPlayer = requestedRef.peek(task);
 			if (requestedPlayer.getCurrentLobby() != null) {
-				lobby = (Lobby) requestedPlayer.getCurrentLobby().peek(task);
+				lobby = requestedPlayer.getCurrentLobby().peek(task);
 			}
 		}
 		List list = new LinkedList();
-		list.add(CommandProtocol.LOCATE_USER_RESPONSE);
+		list.add(LOCATE_USER_RESPONSE);
 		list.add(requestedID);
 		list.add(lobby != null ? 1 : 0);			// number of lobbies -- only one allowed
 		if (lobby != null) {
@@ -345,22 +367,23 @@ public class Player implements SimUserDataListener {
 	/**
 	 * Attempts to join this user to the Lobby channel specified in the 
 	 * data buffer.  If the lobby is password protected, then a password
-	 * is CommandProtocol.read off the buffer and compared.
+	 * is read off the buffer and compared.
 	 * 
 	 * @param task			the SimTask
 	 * @param data			the buffer containing the command parameters
 	 */
 	private void joinLobby(SimTask task, ByteBuffer data) {
+		System.out.println("joinLobby request");
 		// TODO sten: perhaps this should send a response instead of silently returning
 		if (currentLobby != null) {
 			return;
 		}
 		
 		SGSUUID lobbyID = protocol.readUUID(data);
-		GLOMap<SGSUUID, GLOReference> lobbyMap = (GLOMap<SGSUUID, GLOReference>) task.findGLO("LobbyMap").peek(task);
-		GLOReference lobbyRef = lobbyMap.get(lobbyID);
+		GLOMap<SGSUUID, GLOReference<Lobby>> lobbyMap = (GLOMap<SGSUUID, GLOReference<Lobby>>) task.findGLO("LobbyMap").peek(task);
+		GLOReference<Lobby> lobbyRef = lobbyMap.get(lobbyID);
 		if (lobbyRef != null) {
-			Lobby lobby = (Lobby) lobbyRef.peek(task);
+			Lobby lobby = lobbyRef.peek(task);
 			if (lobby.getNumPlayers() == lobby.getMaxPlayers()) {
 				// TODO sten: perhaps in the future spawn a new lobby. 
 				return;
@@ -378,29 +401,30 @@ public class Player implements SimUserDataListener {
 		}
 		else {
 			//TODO sten: return an error if lobby not found, or if passwords don't match?
+			System.out.println("lobby not found " + lobbyID);
 		}
 	}
 	
 	/**
 	 * Attempts to join this user to the Game Room channel specified in the 
 	 * data buffer.  If the game is password protected, then a password
-	 * is CommandProtocol.read off the buffer and compared.
+	 * is read off the buffer and compared.
 	 * 
 	 * @param task			the SimTask
 	 * @param data			the buffer containing the command parameters
 	 */
 	private void joinGame(SimTask task, ByteBuffer data) {
-		if (currentGameRoom != null) {		// can't connect if alCommandProtocol.ready connected to a game.
+		if (currentGameRoom != null) {		// can't connect if already connected to a game.
 			return;
 		}
 		SGSUUID gameID = protocol.readUUID(data);
 		
-		GLOMap<SGSUUID, GLOReference> gameRoomMap = (GLOMap<SGSUUID, GLOReference>) task.findGLO("GameRoomMap").peek(task);
-		GLOReference gameRef = gameRoomMap.get(gameID);
+		GLOMap<SGSUUID, GLOReference<GameRoom>> gameRoomMap = (GLOMap<SGSUUID, GLOReference<GameRoom>>) task.findGLO("GameRoomMap").peek(task);
+		GLOReference<GameRoom> gameRef = gameRoomMap.get(gameID);
 		if (gameRef == null) {
 			return;
 		}
-		GameRoom gameRoom = (GameRoom) gameRef.peek(task);
+		GameRoom gameRoom = gameRef.peek(task);
 		if (gameRoom.isPasswordProtected()) {
 			String password = protocol.readString(data);
 			if (!password.equals(gameRoom.getPassword())) {
@@ -419,20 +443,27 @@ public class Player implements SimUserDataListener {
 	 */
 	private void gameParametersRequest(SimTask task) {
 		List list = new LinkedList();
-		list.add(CommandProtocol.GAME_PARAMETERS_RESPONSE);
+		list.add(GAME_PARAMETERS_RESPONSE);
 		if (currentLobby != null) {
-			Lobby lobby = (Lobby) currentLobby.peek(task);
+			Lobby lobby = currentLobby.peek(task);
+			list.add(lobby.getChannelName());
 			Map<String, Object> gameParameters = lobby.getGameParamters();
+			System.out.println("gameParameters.size " + gameParameters.size() + " maxPlayers " + lobby.getMaxPlayers());
 			list.add(gameParameters.size());
-			Iterator iterator = gameParameters.keySet().iterator();
+			Iterator<String> iterator = gameParameters.keySet().iterator();
 			while (iterator.hasNext()) {
-				String curKey = (String) iterator.next();
+				String curKey = iterator.next();
+				System.out.println("adding param " + curKey);
 				list.add(curKey);
 				Object value = gameParameters.get(curKey);
+				System.out.println("value: " + value + " class " + value.getClass().getName());
 				list.add(protocol.mapType(value));
 				list.add(value);
 				
 			}
+		}
+		else {
+			System.out.println("current lobby is null");
 		}
 		
 		sendResponse(task, list);
@@ -452,7 +483,7 @@ public class Player implements SimUserDataListener {
 	private void createGame(SimTask task, ByteBuffer data) {
 		String gameName = protocol.readString(data);
 		if (currentLobby == null) {			// bail out early if not connected.
-			sendGameCreateFailedResponse(task, gameName, "Not connected to a lobby");
+			sendGameCreateFailedResponse(task, null, gameName, "Not connected to a lobby");
 			return;
 		}
 		
@@ -469,12 +500,12 @@ public class Player implements SimUserDataListener {
 			gameParams.put(protocol.readString(data), protocol.readParamValue(data));
 		}
 		
-		Lobby lobby = (Lobby) currentLobby.get(task);
+		Lobby lobby = currentLobby.get(task);
 		Map<String, Object> lobbyParameters = lobby.getGameParamters();
 		
 		// bail out if all of the expected parameters are not present.
-		if (gameParams.keySet().equals(lobbyParameters.keySet())) {
-			sendGameCreateFailedResponse(task, gameName, "Parameters mis-match.");
+		if (!gameParams.keySet().equals(lobbyParameters.keySet())) {
+			sendGameCreateFailedResponse(task, lobby.getChannelName(), gameName, "Parameters mis-match.");
 			return;
 		}
 		
@@ -482,15 +513,15 @@ public class Player implements SimUserDataListener {
 		ChannelID cid = task.openChannel(channelName);
 		task.lock(cid, true);	// game access is controled by the server
 		GameRoom gr = new GameRoom(gameName, description, password, channelName, cid, userID);
-		GLOReference grRef = task.createGLO(gr);
+		GLOReference<GameRoom> grRef = task.createGLO(gr);
 		lobby.addGameRoom(grRef);
 		
 		// add to the game room map for easy look-up by gameID
-		GLOMap<SGSUUID, GLOReference> gameRoomMap = (GLOMap<SGSUUID, GLOReference>) task.findGLO("GameRoomMap").get(task);
+		GLOMap<SGSUUID, GLOReference<GameRoom>> gameRoomMap = (GLOMap<SGSUUID, GLOReference<GameRoom>>) task.findGLO("GameRoomMap").get(task);
 		gameRoomMap.put(gr.getGameID(), grRef);
 		
 		List list = new LinkedList();
-		list.add(CommandProtocol.GAME_CREATED);
+		list.add(GAME_CREATED);
 		list.add(cid);
 		list.add(gameName);
 		list.add(description);
@@ -512,17 +543,18 @@ public class Player implements SimUserDataListener {
 		
 	}
 	
-	private void sendGameCreateFailedResponse(SimTask task, String gameName, String message) {
+	private void sendGameCreateFailedResponse(SimTask task, String lobbyChannelName, String gameName, String message) {
 		List list = new LinkedList();
-		list.add(CommandProtocol.CREATE_GAME_FAILED);
+		list.add(CREATE_GAME_FAILED);
 		list.add(gameName);
 		list.add(message);
+		list.add(lobbyChannelName);
 		
 		sendResponse(task, list);
 	}
 	
 	private void sendResponse(SimTask task, List list) {
-		ChannelID cid = task.openChannel(CommandProtocol.LOBBY_MANAGER_CONTROL_CHANNEL);
+		ChannelID cid = task.openChannel(LOBBY_MANAGER_CONTROL_CHANNEL);
 		
 		sendResponse(task, list, cid);
 	}

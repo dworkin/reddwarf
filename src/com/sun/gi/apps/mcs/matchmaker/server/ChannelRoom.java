@@ -57,6 +57,10 @@ public abstract class ChannelRoom implements GLO {
 		return channelName;
 	}
 	
+	public void setChannelID(ChannelID cid) {
+		this.channelID = cid;
+	}
+	
 	public ChannelID getChannelID() {
 		return channelID;
 	}

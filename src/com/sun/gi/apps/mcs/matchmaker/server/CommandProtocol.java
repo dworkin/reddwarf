@@ -31,6 +31,11 @@ public final class CommandProtocol implements Serializable {
 	// The command codes are unsigned bytes, but since Java doesn't have unsigned bytes
 	// ints are used to fit the range.
 	
+	/**
+	 * Sent to the client to notify that the server is ready to accept commands. 
+	 */
+	public final static int SERVER_LISTENING = 0x10;
+	
 	public final static int LIST_FOLDER_REQUEST = 0x70;
 	public final static int LIST_FOLDER_RESPONSE = 0x71;
 	
@@ -46,6 +51,8 @@ public final class CommandProtocol implements Serializable {
 	public final static int JOIN_LOBBY = 0x78;
 	public final static int JOIN_GAME = 0x79;
 	public final static int PLAYER_ENTERED_LOBBY = 0x90;
+	
+	public final static int SEND_TEXT = 0x91;
 	
 	public final static int GAME_PARAMETERS_REQUEST = 0x94;
 	public final static int GAME_PARAMETERS_RESPONSE = 0x95;
@@ -123,6 +130,10 @@ public final class CommandProtocol implements Serializable {
 				byteList.add(curObj);
 				bufferSize += 4;
 			}
+			else if (curObj instanceof UnsignedByte) {
+				byteList.add(((UnsignedByte) curObj).byteValue());
+				bufferSize++;
+			}
 		}
 		
 		// now that we know the buffer size, allocate the buffer
@@ -143,6 +154,13 @@ public final class CommandProtocol implements Serializable {
 			}
 		}
 		return buffer;
+	}
+	
+	public List createCommandList(int commandCode) {
+		List list = new LinkedList();
+		list.add(commandCode);
+		
+		return list;
 	}
 	
 	/**
@@ -188,6 +206,9 @@ public final class CommandProtocol implements Serializable {
 	 */
 	public SGSUUID readUUID(ByteBuffer data) {
 		byte[] uuid = readBytes(data, true);
+		if (uuid.length == 0) {
+			return null;
+		}
 		SGSUUID sgsuuid = null;
 		try {
 			sgsuuid = new StatisticalUUID(uuid);
@@ -278,25 +299,25 @@ public final class CommandProtocol implements Serializable {
 	 * 
 	 * @return of the the CommandCodes.TYPE_X static ints.
 	 */
-	public int mapType(Object value) {
+	public UnsignedByte mapType(Object value) {
 		if (value instanceof Integer) {
-			return TYPE_INTEGER;
+			return new UnsignedByte(TYPE_INTEGER);
 		}
 		else if (value instanceof Boolean) {
-			return TYPE_BOOLEAN;
+			return new UnsignedByte(TYPE_BOOLEAN);
 		}
 		else if (value instanceof String) {
-			return TYPE_STRING;
+			return new UnsignedByte(TYPE_STRING);
 		}
 		else if (value instanceof UnsignedByte) {
-			return TYPE_BYTE;
+			return new UnsignedByte(TYPE_BYTE);
 		}
 		else if (value instanceof SGSUUID) {
-			return TYPE_UUID;
+			return new UnsignedByte(TYPE_UUID);
 		}
 		
 		// unknown, or unsupported type.
-		return 0;
+		return new UnsignedByte(0);
 			
 	}	
 	
@@ -346,6 +367,10 @@ class UnsignedByte extends Number {
 	
 	public int intValue() {
 		return value;
+	}
+	
+	public byte byteValue() {
+		return (byte) value;
 	}
 	
 	public boolean equals(Object obj) {

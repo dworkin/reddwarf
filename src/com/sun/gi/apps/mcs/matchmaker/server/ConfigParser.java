@@ -110,7 +110,7 @@ public class ConfigParser {
 		String channelName = path + channelNamePrefix + lobbyName;
 		ChannelID cid = task.openChannel(channelName);
 		task.lock(cid, true);	// lobby access is controled by the server
-		//System.out.println("Creating Lobby: " + channelName);
+		System.out.println("Creating Lobby: " + channelName);
 		Lobby lobby = new Lobby(lobbyName, element.getAttribute("description"), element.getAttribute("password"), channelName, cid);
 		
 		// set the lobby attributes that may or may not be present
@@ -129,7 +129,8 @@ public class ConfigParser {
 				Node curNode = gameAttributeList.item(i);
 				if (curNode instanceof Element && curNode.getNodeName().equals("GameParameter")) {
 					Element curGameAttribute = (Element) curNode;
-					gameParameterMap.put(curGameAttribute.getAttribute("name"), mapAttributeType(curGameAttribute));
+					System.out.println("curGameAttrib " + curGameAttribute.getAttribute("name"));
+					lobby.addGameParameter(curGameAttribute.getAttribute("name"), mapAttributeType(curGameAttribute));
 				}
 			}
 		}
@@ -141,6 +142,7 @@ public class ConfigParser {
 		GLOReference lobbyRef = task.createGLO(lobby);
 		
 		GLOMap lobbyMap = (GLOMap) task.findGLO("LobbyMap").get(task);
+		System.out.println("storing lobby: " + cid);
 		lobbyMap.put(cid, lobbyRef);
 		
 		return lobbyRef;
