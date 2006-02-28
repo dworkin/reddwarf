@@ -44,7 +44,16 @@ public interface IMatchMakingClient {
 	 */
 	public void lookupUserName(byte[] userID);
 	
+	/**
+	 * Attempts to find the user ID of a currently connected user with the given user name.
+	 * 
+	 * @param username
+	 */
+	public void lookupUserID(String username);
+	
 	public void joinLobby(byte[] lobbyID, String password);
+	
+	public void joinGame(byte[] gameID, String password);
 	
 	/**
 	 * Called as a pass-through to the ClientConnectionManager during login authentication.

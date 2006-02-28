@@ -2,12 +2,15 @@ package com.sun.gi.apps.mcs.matchmaker.client;
 
 import java.net.SocketAddress;
 import java.nio.ByteBuffer;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.UUID;
 
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.NameCallback;
+
+import static com.sun.gi.apps.mcs.matchmaker.server.CommandProtocol.*;
 
 import com.sun.gi.apps.mcs.matchmaker.server.CommandProtocol;
 import com.sun.gi.comm.users.client.ClientChannel;
@@ -37,6 +40,7 @@ public class MatchMakingClient implements IMatchMakingClient, ClientConnectionMa
 	
 	private IMatchMakingClientListener listener;
 	private ClientConnectionManager manager;
+	private HashMap<String, LobbyChannel> lobbyMap;
 	
 	private CommandProtocol protocol;
 	private byte[] myID;
@@ -50,9 +54,10 @@ public class MatchMakingClient implements IMatchMakingClient, ClientConnectionMa
 		this.manager = manager;
 		manager.setListener(this);
 		protocol = new CommandProtocol();
+		lobbyMap = new HashMap<String, LobbyChannel>();
 	}
 	
-	private void sendCommand(List list) {
+	void sendCommand(List list) {
 		manager.sendToServer(protocol.assembleCommand(list), true);
 	}
 	
@@ -72,7 +77,7 @@ public class MatchMakingClient implements IMatchMakingClient, ClientConnectionMa
 
 	public void listFolder(byte[] folderID) {
 		List list = new LinkedList();
-		list.add(CommandProtocol.LIST_FOLDER_REQUEST);
+		list.add(LIST_FOLDER_REQUEST);
 		if (folderID != null) {
 			list.add(createUUID(folderID));
 		}
@@ -82,8 +87,19 @@ public class MatchMakingClient implements IMatchMakingClient, ClientConnectionMa
 	
 	public void joinLobby(byte[] lobbyID, String password) {
 		List list = new LinkedList();
-		list.add(CommandProtocol.JOIN_LOBBY);
+		list.add(JOIN_LOBBY);
 		list.add(createUUID(lobbyID));
+		if (password != null) {
+			list.add(password);
+		}
+		
+		sendCommand(list);
+	}
+	
+	public void joinGame(byte[] gameID, String password) {
+		List list = new LinkedList();
+		list.add(JOIN_GAME);
+		list.add(createUUID(gameID));
 		if (password != null) {
 			list.add(password);
 		}
@@ -98,8 +114,20 @@ public class MatchMakingClient implements IMatchMakingClient, ClientConnectionMa
 	 */
 	public void lookupUserName(byte[] userID) {
 		List list = new LinkedList();
-		list.add(CommandProtocol.LOOKUP_USER_NAME_REQUEST);
+		list.add(LOOKUP_USER_NAME_REQUEST);
 		list.add(createUUID(userID));
+		
+		sendCommand(list);
+	}
+	
+	/**
+	 * Attempts to find the user ID of a currently connected user with the given user name.
+	 * 
+	 * @param username
+	 */
+	public void lookupUserID(String username) {
+		List list = protocol.createCommandList(LOOKUP_USER_ID_REQUEST);
+		list.add(username);
 		
 		sendCommand(list);
 	}
@@ -117,7 +145,6 @@ public class MatchMakingClient implements IMatchMakingClient, ClientConnectionMa
     public void connected(byte[] myID) {
     	System.out.println("connected");
     	this.myID = myID;
-    	manager.openChannel(CommandProtocol.LOBBY_MANAGER_CONTROL_CHANNEL);
     }
 
     public void connectionRefused(String message) {
@@ -174,10 +201,19 @@ public class MatchMakingClient implements IMatchMakingClient, ClientConnectionMa
      */
     public void joinedChannel(ClientChannel channel) {
     	System.out.println("Connected to channel " + channel.getName());
-    	if (channel.getName().equals(CommandProtocol.LOBBY_MANAGER_CONTROL_CHANNEL)) {
+    	if (channel.getName().equals(LOBBY_MANAGER_CONTROL_CHANNEL)) {
     		channel.setListener(this);
     	}
-    	listener.connected(myID);
+    	else if (channel.getName().indexOf(":") == -1){  // lobby
+    		LobbyChannel lobby = new LobbyChannel(channel, this);
+    		lobbyMap.put(channel.getName(), lobby);
+    		channel.setListener(lobby);
+    		listener.joinedLobby(lobby);
+    	}
+    	else { // game
+    		
+    	}
+    	
     }
 
     /**
@@ -228,13 +264,27 @@ public class MatchMakingClient implements IMatchMakingClient, ClientConnectionMa
     		return;
     	}*/
     	int command = protocol.readUnsignedByte(data);
-    	if (command == CommandProtocol.LIST_FOLDER_RESPONSE) {
+    	if (command == SERVER_LISTENING) {
+    		listener.connected(myID);
+    	}
+    	else if (command == LIST_FOLDER_RESPONSE) {
     		listFolderResponse(data);
     	}
-    	else if (command == CommandProtocol.LOOKUP_USER_NAME_RESPONSE) {
+    	else if (command == LOOKUP_USER_NAME_RESPONSE) {
     		lookupUserNameResponse(data);
     	}
+    	else if (command == LOOKUP_USER_ID_RESPONSE) {
+    		lookupUserIDResponse(data);
+    	}
+    	else if (command == GAME_PARAMETERS_RESPONSE) {
+    		gameParametersResponse(data);
+    	}
+    	else if (command == CREATE_GAME_FAILED) {
+    		createGameFailed(data);
+    	}
     }
+    
+    
 
     /**
      * Notifies this listener that the channel has been closed.
@@ -278,6 +328,41 @@ public class MatchMakingClient implements IMatchMakingClient, ClientConnectionMa
     	SGSUUID userID = protocol.readUUID(data);
     	
     	listener.foundUserName(userName, userID.toByteArray());
+    }
+    
+    private void lookupUserIDResponse(ByteBuffer data) {
+    	String userName = protocol.readString(data);
+    	SGSUUID userID = protocol.readUUID(data);
+    	
+    	listener.foundUserID(userName, userID != null ? userID.toByteArray() : null);
+    }  
+    
+    private void gameParametersResponse(ByteBuffer data) {
+    	String lobbyName = protocol.readString(data);
+    	int numParams = data.getInt();
+    	HashMap<String, Object> paramMap = new HashMap<String, Object>();
+    	for (int i = 0; i < numParams; i++) {
+    		String param = protocol.readString(data);
+    		Object value = protocol.readParamValue(data);
+    		paramMap.put(param, value);
+    	}
+    	LobbyChannel lobby = lobbyMap.get(lobbyName);
+    	if (lobby != null) {
+    		lobby.receiveGameParameters(paramMap);
+    	}
+    }
+    
+    private void createGameFailed(ByteBuffer data) {
+    	String game = protocol.readString(data);
+    	String desc = protocol.readString(data);
+    	String lobbyName = protocol.readString(data);
+    	if (lobbyName == null) {
+    		return;
+    	}
+      	LobbyChannel lobby = lobbyMap.get(lobbyName);
+    	if (lobby != null) {
+    		lobby.createGameFailed(game, desc);
+    	}
     }
     
 }

@@ -1,5 +1,7 @@
 package com.sun.gi.apps.mcs.matchmaker.client;
 
+import java.util.HashMap;
+
 import javax.security.auth.callback.Callback;
 
 import com.sun.gi.utils.SGSUUID;
@@ -31,7 +33,11 @@ public interface IMatchMakingClientListener {
 	
 	public void foundUserName(String userName, byte[] userID);
 	
+	public void foundUserID(String userName, byte[] userID);
+	
 	public void joinedLobby(ILobbyChannel channel);
+	
+	public void joinedGame(IGameChannel channel);
 	
 	/**
 	 * Called when the client has successfully connected to the server and received confirmation
