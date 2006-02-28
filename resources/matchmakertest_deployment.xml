@@ -5,8 +5,8 @@
 		<PARAMETER tag="host" value="127.0.0.1" />        
 		<PARAMETER tag="port" value="1160" />  
 		<VALIDATOR moduleclass="com.sun.gi.comm.users.validation.impl.FlatFileUserValidator">
-			<PARAMETER tag="password_file_url" value="file:passwd.txt" />
-<!--			<PARAMETER tag="password_file_url" value="file:release/passwd.txt" /> -->
+<!--			<PARAMETER tag="password_file_url" value="file:passwd.txt" /> -->
+			<PARAMETER tag="password_file_url" value="file:release/passwd.txt" />
 		</VALIDATOR>		
 	</USERMANAGER>
 </GAMEAPP>
