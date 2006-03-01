@@ -10,10 +10,10 @@ import java.lang.reflect.Array;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
+import java.util.LinkedList;
 import java.util.Map;
+import java.util.Queue;
 
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
@@ -61,14 +61,7 @@ public class SimTaskImpl extends SimTask {
     private Map<GLO, Long>         gloIDMap;
     private Map<GLO, ACCESS_TYPE>  gloAccessMap;
 
-    private List<DeferredOutput>       outputQueue;
-    private List<DeferredNewTask>      newTaskQueue;
-    private List<DeferredNewTimer>     timerRecordQueue;
-    private List<DeferredSocketOpen>   socketOpenQueue;
-    private List<DeferredSocketSend>   socketSendQueue;
-    private List<DeferredSocketClose>  socketCloseQueue;
-    private List<DeferredUserListener> userListenerQueue;
-    private List<DeferredUserDataListener>   userDataListenerQueue;
+    private Queue<DeferredSimCommand> deferredCommands;
 
     public SimTaskImpl(Simulation sim, ClassLoader loader, ACCESS_TYPE access,
 	    long startObjectID, Method startMethod, Object[] startArgs) {
@@ -86,14 +79,7 @@ public class SimTaskImpl extends SimTask {
 	gloIDMap = new HashMap<GLO, Long>();
 	gloAccessMap = new HashMap<GLO, ACCESS_TYPE>();
 
-	outputQueue = new ArrayList<DeferredOutput>();
-	newTaskQueue = new ArrayList<DeferredNewTask>();
-	timerRecordQueue = new ArrayList<DeferredNewTimer>();
-	socketOpenQueue = new ArrayList<DeferredSocketOpen>();
-	socketSendQueue = new ArrayList<DeferredSocketSend>();
-	socketCloseQueue = new ArrayList<DeferredSocketClose>();
-	userListenerQueue = new ArrayList<DeferredUserListener>();
-	userDataListenerQueue = new ArrayList<DeferredUserDataListener>();
+	deferredCommands = new LinkedList<DeferredSimCommand>();
     }
 
     public void execute() {
@@ -124,15 +110,8 @@ public class SimTaskImpl extends SimTask {
 
 	try {
 	    startMethod.invoke(runobj, startArgs);
-	    processOutput();
 	    trans.commit();
-	    processNewTasks();
-	    processTimerEvents();
-	    processDeferredSocketOpens();
-	    processRawSocketSends();
-	    processDeferredSocketCloses();
-	    processDeferredUserListeners();
-	    processUserDataListenerRecords();
+	    processDeferredCommands();
 	} catch (InvocationTargetException ex) {
 	    ex.printStackTrace();
 	    trans.abort();
@@ -148,12 +127,7 @@ public class SimTaskImpl extends SimTask {
 	    ex.printStackTrace();
 	    trans.abort();
 	} catch (DeadlockException de) {
-	    outputQueue.clear();
-	    timerRecordQueue.clear();
-	    newTaskQueue.clear();
-	    socketCloseQueue.clear();
-	    socketOpenQueue.clear();
-	    socketSendQueue.clear();
+	    deferredCommands.clear();
 	    gloIDMap.clear();
 	    gloAccessMap.clear();
 	    simulation.queueTask(this); // requeue for later execution
@@ -181,7 +155,7 @@ public class SimTaskImpl extends SimTask {
     }
 
     public void addUserListener(GLOReference ref) {
-	userListenerQueue.add(
+	deferredCommands.add(
 	    new DeferredUserListener(((GLOReferenceImpl) ref).objID));
     }
 
@@ -192,11 +166,11 @@ public class SimTaskImpl extends SimTask {
 
     public void sendData(ChannelID cid, UserID[] to, ByteBuffer bs,
 	    boolean reliable) {
-	outputQueue.add(new DeferredOutput(cid, to, bs, reliable));
+	deferredCommands.add(new DeferredOutput(cid, to, bs, reliable));
     }
 
     public void addUserDataListener(UserID user, GLOReference ref) {
-	userDataListenerQueue.add(new DeferredUserDataListener(user, ref));
+	deferredCommands.add(new DeferredUserDataListener(user, ref));
     }
 
     /**
@@ -245,7 +219,7 @@ public class SimTaskImpl extends SimTask {
 	long tid = simulation.getNextTimerID();
 	DeferredNewTimer rec = new DeferredNewTimer(tid, access, delay,
 	    repeat, ((GLOReferenceImpl) ref).objID);
-	timerRecordQueue.add(rec);
+	deferredCommands.add(rec);
 	return tid;
     }
 
@@ -262,7 +236,7 @@ public class SimTaskImpl extends SimTask {
     public void queueTask(ACCESS_TYPE accessType, GLOReference target,
 	    Method method, Object[] parameters) {
 	try {
-	    newTaskQueue.add(
+	    deferredCommands.add(
 		new DeferredNewTask(
 		    simulation.newTask(accessType, target, method,
 				       scrubAndCopy(parameters))));
@@ -325,17 +299,17 @@ public class SimTaskImpl extends SimTask {
     public long openSocket(ACCESS_TYPE access, GLOReference ref, String host,
 	    int port, boolean reliable) {
 	long sid = simulation.getNextSocketID();
-	socketOpenQueue.add(new DeferredSocketOpen(sid, access,
+	deferredCommands.add(new DeferredSocketOpen(sid, access,
 		    ((GLOReferenceImpl) ref).objID, host, port, reliable));
 	return sid;
     }
 
     public void sendRawSocketData(long socketID, ByteBuffer data) {
-	socketSendQueue.add(new DeferredSocketSend(socketID, data));
+	deferredCommands.add(new DeferredSocketSend(socketID, data));
     }
 
     public void closeSocket(long socketID) {
-	socketCloseQueue.add(new DeferredSocketClose(socketID));
+	deferredCommands.add(new DeferredSocketClose(socketID));
     }
 
     /**
@@ -397,56 +371,11 @@ public class SimTaskImpl extends SimTask {
 	ref.delete(this);
     }
 
-    // Process queued commands
-
-    private void processNewTasks() {
-	for (DeferredSimCommand rec : newTaskQueue) {
-	    rec.execute(simulation);
-	}
-    }
-
-    private void processOutput() {
-	for (DeferredSimCommand rec : outputQueue) {
-	    rec.execute(simulation);
-	}
-    }
-
-    private void processUserDataListenerRecords() {
-	for (DeferredSimCommand rec : userDataListenerQueue) {
-	    rec.execute(simulation);
-	}
-    }
-
-    private void processTimerEvents() {
-	for (DeferredSimCommand rec : timerRecordQueue) {
-	    rec.execute(simulation);
-	}
-	timerRecordQueue.clear();
-    }
-
-    private void processDeferredSocketOpens() {
-	for (DeferredSimCommand rec : socketOpenQueue) {
-	    rec.execute(simulation);
-	}
-	socketOpenQueue.clear();
-    }
-
-    private void processRawSocketSends() {
-	for (DeferredSimCommand rec : socketSendQueue) {
-	    rec.execute(simulation);
-	}
-	socketSendQueue.clear();
-    }
-
-    private void processDeferredSocketCloses() {
-	for (DeferredSimCommand rec : socketCloseQueue) {
-	    rec.execute(simulation);
-	}
-    }
-
-    private void processDeferredUserListeners() {
-	for (DeferredSimCommand rec : userListenerQueue) {
-	    rec.execute(simulation);
+    private void processDeferredCommands() {
+	while (! deferredCommands.isEmpty()) {
+	    DeferredSimCommand cmd = deferredCommands.remove();
+	    //System.err.println("exec deffered " + cmd.getClass());
+	    cmd.execute(simulation);
 	}
     }
 }
