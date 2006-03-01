@@ -28,6 +28,7 @@ import com.sun.gi.objectstore.DeadlockException;
 import com.sun.gi.objectstore.ObjectStore;
 import com.sun.gi.objectstore.Transaction;
 import com.sun.gi.objectstore.tso.dataspace.DataSpace;
+import com.sun.gi.utils.classes.CLObjectInputStream;
 
 class OutputRecord {
     UserID[] targets;
@@ -416,10 +417,10 @@ public class SimTaskImpl extends SimTask {
 	    NoGLOObjectOutputStream oos = new NoGLOObjectOutputStream(baos);
 	    oos.writeObject(parameters);
 	    oos.close();
-
-	    ByteArrayInputStream bais =
-		new ByteArrayInputStream(baos.toByteArray());
-	    ObjectInputStream ois = new ObjectInputStream(bais);
+	  
+	    ByteArrayInputStream bais = 
+	    	new ByteArrayInputStream(baos.toByteArray());
+	    CLObjectInputStream ois = new CLObjectInputStream(bais,loader);
 	    parameters = (Object[]) ois.readObject();
 	    return parameters;
 	}
