@@ -148,6 +148,10 @@ public class GLOReferenceImpl<T extends GLO>
 	}
     }
 
+    public int hashCode() {
+        return (int)objID;
+    }
+
     public boolean equals(Object other){
 	return (compareTo(other)==0);
     }
