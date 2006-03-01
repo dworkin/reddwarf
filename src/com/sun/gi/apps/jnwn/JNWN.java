@@ -107,14 +107,7 @@ public class JNWN implements SimBoot<JNWN>, SimUserListener {
 	}
 	userMap.put(uid, userRef);
 
-	// userRef.get(task).joinedGame();
-	userRef.get(task); // ensure we have the lock on the user
-	try {
-	    task.queueTask(userRef,
-		User.class.getMethod("joinedGame"), new Object[] { });
-	} catch (Exception e) {
-	    e.printStackTrace();
-	}
+	userRef.get(task).joinedGame();
     }
 
     public void userLeft(UserID uid) {

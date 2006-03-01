@@ -38,12 +38,15 @@
 
     <target name="clean">
 	<delete dir="bin" />
-	<delete dir="release" />
-	<delete file="ProjectDarkstar.zip" />
+	<delete>
+	  <fileset dir="release" includes="**/*.jar"/>
+	</delete>
     </target>
 
     <target name="realclean" depends="clean">
 	<delete dir="doc" />
+	<delete dir="release" />
+	<delete file="ProjectDarkstar.zip" />
     </target>
 
     <!-- Documentation targets -->
@@ -289,7 +292,7 @@
     </target>
 
     <target name="release.apps"
-      depends="release.trivialboot,release.timertest,release.chattest,release.jeffboard,release.battleboard,release.glotest">
+      depends="release.trivialboot,release.timertest,release.chattest,release.jeffboard,release.battleboard,release.glotest,release.jnwn">
     </target>
 
     <target name="release.trivialboot" depends="build.trivial">
