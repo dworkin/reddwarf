@@ -66,7 +66,9 @@ public class BattleBoard implements Serializable {
 
     }
 
-    /** Default constructor, required for serialization */
+    /**
+     * Default constructor, not for public use.
+     */
     protected BattleBoard() { }
 
     /**
