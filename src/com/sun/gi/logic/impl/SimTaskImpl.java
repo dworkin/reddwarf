@@ -30,95 +30,6 @@ import com.sun.gi.objectstore.Transaction;
 import com.sun.gi.objectstore.tso.dataspace.DataSpace;
 import com.sun.gi.utils.classes.CLObjectInputStream;
 
-class OutputRecord {
-    UserID[] targets;
-    UserID uid;
-    ByteBuffer data;
-    boolean reliable;
-    ChannelID channel;
-
-    public OutputRecord(ChannelID cid, UserID[] to, ByteBuffer buff,
-	    boolean reliableFlag) {
-	channel = cid;
-	data = ByteBuffer.allocate(buff.capacity());
-	buff.flip(); // flip for read
-	data.put(buff);
-	reliable = reliableFlag;
-	targets = new UserID[to.length];
-	System.arraycopy(to, 0, targets, 0, to.length);
-    }
-}
-
-class OpenSocketRecord {
-    long socketID;
-    ACCESS_TYPE access;
-    long objID;
-    String host;
-    int port;
-    boolean reliable;
-
-    public OpenSocketRecord(long sid, ACCESS_TYPE access, long objID,
-	    String host, int port, boolean reliable) {
-	this.socketID = sid;
-	this.access = access;
-	this.objID = objID;
-	this.host = host;
-	this.port = port;
-	this.reliable = reliable;
-    }
-}
-
-class SocketSendRecord {
-    long socketID;
-
-    ByteBuffer data;
-
-    public SocketSendRecord(long socketID, ByteBuffer buff) {
-	this.socketID = socketID;
-	data = ByteBuffer.allocate(buff.capacity());
-	buff.flip(); // flip for read
-	data.put(buff);
-    }
-}
-
-class TimerRecord {
-    long tid;
-    ACCESS_TYPE access;
-    long delay;
-    boolean repeat;
-    long objID;
-
-    public TimerRecord(long tid, ACCESS_TYPE access, long delay,
-	    boolean repeat, long objID) {
-
-	this.tid = tid;
-	this.access = access;
-	this.delay = delay;
-	this.repeat = repeat;
-	this.objID = objID;
-    }
-}
-
-class UIDListenerRec {
-    UserID uid;
-    long objID;
-
-    public UIDListenerRec(UserID uid, GLOReference glo) {
-	this.uid = uid; // XXX does this need to be cloned?
-	this.objID = ((GLOReferenceImpl) glo).objID;
-    }
-}
-
-class CIDListenerRec {
-    ChannelID cid;
-    long objID;
-
-    public CIDListenerRec(ChannelID cid, GLOReference glo) {
-	this.cid = cid; // XXX does this need to be cloned?
-	this.objID = ((GLOReferenceImpl) glo).objID;
-    }
-}
-
 /**
  * <p>
  * Title:
@@ -147,22 +58,17 @@ public class SimTaskImpl extends SimTask {
     private Simulation    simulation;
     private ClassLoader   loader;
 
-    private List<OutputRecord>     outputList;
-    private List<SimTask>          taskLaunchList;
-
     private Map<GLO, Long>         gloIDMap;
     private Map<GLO, ACCESS_TYPE>  gloAccessMap;
 
-    private List<TimerRecord>      timerRecordQueue;
-    private List<OpenSocketRecord> socketOpenQueue;
-    private List<SocketSendRecord> socketSendQueue;
-
-    private List<Long>             socketCloseQueue;
-    private List<Long>             userListenerQueue;
-
-    private List<UIDListenerRec>   userDataListenerQueue;
-    private List<CIDListenerRec>   channelListenerQueue;
-    private List<CIDListenerRec>   channelMembershipListenerQueue;
+    private List<DeferredOutput>       outputQueue;
+    private List<DeferredNewTask>      newTaskQueue;
+    private List<DeferredNewTimer>     timerRecordQueue;
+    private List<DeferredSocketOpen>   socketOpenQueue;
+    private List<DeferredSocketSend>   socketSendQueue;
+    private List<DeferredSocketClose>  socketCloseQueue;
+    private List<DeferredUserListener> userListenerQueue;
+    private List<DeferredUserDataListener>   userDataListenerQueue;
 
     public SimTaskImpl(Simulation sim, ClassLoader loader, ACCESS_TYPE access,
 	    long startObjectID, Method startMethod, Object[] startArgs) {
@@ -177,22 +83,17 @@ public class SimTaskImpl extends SimTask {
 	System.arraycopy(startArgs, 0, newargs, 0, startArgs.length);
 	this.startArgs = newargs;
 
-	outputList = new ArrayList<OutputRecord>();
-	taskLaunchList = new ArrayList<SimTask>();
-
 	gloIDMap = new HashMap<GLO, Long>();
 	gloAccessMap = new HashMap<GLO, ACCESS_TYPE>();
 
-	timerRecordQueue = new ArrayList<TimerRecord>();
-	socketOpenQueue = new ArrayList<OpenSocketRecord>();
-	socketSendQueue = new ArrayList<SocketSendRecord>();
-
-	socketCloseQueue = new ArrayList<Long>();
-	userListenerQueue = new ArrayList<Long>();
-
-	userDataListenerQueue = new ArrayList<UIDListenerRec>();
-	channelListenerQueue = new ArrayList<CIDListenerRec>();
-	channelMembershipListenerQueue = new ArrayList<CIDListenerRec>();
+	outputQueue = new ArrayList<DeferredOutput>();
+	newTaskQueue = new ArrayList<DeferredNewTask>();
+	timerRecordQueue = new ArrayList<DeferredNewTimer>();
+	socketOpenQueue = new ArrayList<DeferredSocketOpen>();
+	socketSendQueue = new ArrayList<DeferredSocketSend>();
+	socketCloseQueue = new ArrayList<DeferredSocketClose>();
+	userListenerQueue = new ArrayList<DeferredUserListener>();
+	userDataListenerQueue = new ArrayList<DeferredUserDataListener>();
     }
 
     public void execute() {
@@ -223,16 +124,14 @@ public class SimTaskImpl extends SimTask {
 
 	try {
 	    startMethod.invoke(runobj, startArgs);
-	    doOutput();
+	    processOutput();
 	    trans.commit();
-	    for (SimTask task : taskLaunchList) {
-		simulation.queueTask(task);
-	    }
+	    processNewTasks();
 	    processTimerEvents();
-	    processOpenSocketRecords();
+	    processDeferredSocketOpens();
 	    processRawSocketSends();
-	    processSocketCloseRecords();
-	    processUserListenerRecords();
+	    processDeferredSocketCloses();
+	    processDeferredUserListeners();
 	    processUserDataListenerRecords();
 	} catch (InvocationTargetException ex) {
 	    ex.printStackTrace();
@@ -249,25 +148,15 @@ public class SimTaskImpl extends SimTask {
 	    ex.printStackTrace();
 	    trans.abort();
 	} catch (DeadlockException de) {
-	    outputList.clear();
+	    outputQueue.clear();
 	    timerRecordQueue.clear();
-	    taskLaunchList.clear();
+	    newTaskQueue.clear();
 	    socketCloseQueue.clear();
 	    socketOpenQueue.clear();
 	    socketSendQueue.clear();
 	    gloIDMap.clear();
 	    gloAccessMap.clear();
 	    simulation.queueTask(this); // requeue for later execution
-	}
-    }
-
-    /**
-     * doOutput
-     */
-    private void doOutput() {
-	for (OutputRecord rec : outputList) {
-	    simulation.sendMulticastData(rec.channel, rec.targets, rec.data,
-		    rec.reliable);
 	}
     }
 
@@ -292,7 +181,8 @@ public class SimTaskImpl extends SimTask {
     }
 
     public void addUserListener(GLOReference ref) {
-	userListenerQueue.add(((GLOReferenceImpl) ref).objID);
+	userListenerQueue.add(
+	    new DeferredUserListener(((GLOReferenceImpl) ref).objID));
     }
 
     public GLOReference findGLO(String gloName) {
@@ -302,11 +192,11 @@ public class SimTaskImpl extends SimTask {
 
     public void sendData(ChannelID cid, UserID[] to, ByteBuffer bs,
 	    boolean reliable) {
-	outputList.add(new OutputRecord(cid, to, bs, reliable));
+	outputQueue.add(new DeferredOutput(cid, to, bs, reliable));
     }
 
     public void addUserDataListener(UserID user, GLOReference ref) {
-	userDataListenerQueue.add(new UIDListenerRec(user, ref));
+	userDataListenerQueue.add(new DeferredUserDataListener(user, ref));
     }
 
     /**
@@ -353,18 +243,10 @@ public class SimTaskImpl extends SimTask {
 	    boolean repeat, GLOReference ref) {
 
 	long tid = simulation.getNextTimerID();
-	TimerRecord rec = new TimerRecord(tid, access, delay, repeat,
-		((GLOReferenceImpl) ref).objID);
+	DeferredNewTimer rec = new DeferredNewTimer(tid, access, delay,
+	    repeat, ((GLOReferenceImpl) ref).objID);
 	timerRecordQueue.add(rec);
 	return tid;
-    }
-
-    private void processTimerEvents() {
-	for (TimerRecord rec : timerRecordQueue) {
-	    simulation.registerTimerEvent(rec.tid, rec.access, rec.objID,
-		    rec.delay, rec.repeat);
-	}
-	timerRecordQueue.clear();
     }
 
     public void registerGLOID(long objID, GLO glo, ACCESS_TYPE access) {
@@ -380,8 +262,10 @@ public class SimTaskImpl extends SimTask {
     public void queueTask(ACCESS_TYPE accessType, GLOReference target,
 	    Method method, Object[] parameters) {
 	try {
-	    taskLaunchList.add(simulation.newTask(accessType, target, method,
-			scrubAndCopy(parameters)));
+	    newTaskQueue.add(
+		new DeferredNewTask(
+		    simulation.newTask(accessType, target, method,
+				       scrubAndCopy(parameters))));
 	} catch (SecurityException e) {
 	    e.printStackTrace();
 	} catch (IOException e) {
@@ -411,19 +295,19 @@ public class SimTaskImpl extends SimTask {
     }
 
     private Object[] scrubAndCopy(Object[] parameters)
-	throws SecurityException, IOException, ClassNotFoundException {
+	    throws SecurityException, IOException, ClassNotFoundException {
 
-	    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-	    NoGLOObjectOutputStream oos = new NoGLOObjectOutputStream(baos);
-	    oos.writeObject(parameters);
-	    oos.close();
-	  
-	    ByteArrayInputStream bais = 
-	    	new ByteArrayInputStream(baos.toByteArray());
-	    CLObjectInputStream ois = new CLObjectInputStream(bais,loader);
-	    parameters = (Object[]) ois.readObject();
-	    return parameters;
-	}
+	ByteArrayOutputStream baos = new ByteArrayOutputStream();
+	NoGLOObjectOutputStream oos = new NoGLOObjectOutputStream(baos);
+	oos.writeObject(parameters);
+	oos.close();
+
+	ByteArrayInputStream bais =
+	    new ByteArrayInputStream(baos.toByteArray());
+	CLObjectInputStream ois = new CLObjectInputStream(bais, loader);
+	parameters = (Object[]) ois.readObject();
+	return parameters;
+    }
 
     public void queueTask(GLOReference target, Method method,
 	    Object[] parameters) {
@@ -441,51 +325,17 @@ public class SimTaskImpl extends SimTask {
     public long openSocket(ACCESS_TYPE access, GLOReference ref, String host,
 	    int port, boolean reliable) {
 	long sid = simulation.getNextSocketID();
-	socketOpenQueue.add(new OpenSocketRecord(sid, access,
+	socketOpenQueue.add(new DeferredSocketOpen(sid, access,
 		    ((GLOReferenceImpl) ref).objID, host, port, reliable));
 	return sid;
     }
 
-    private void processOpenSocketRecords() {
-	for (OpenSocketRecord rec : socketOpenQueue) {
-	    simulation.openSocket(rec.socketID, rec.access, rec.objID,
-		    rec.host, rec.port, rec.reliable);
-	}
-	socketOpenQueue.clear();
-    }
-
     public void sendRawSocketData(long socketID, ByteBuffer data) {
-	socketSendQueue.add(new SocketSendRecord(socketID, data));
-    }
-
-    private void processRawSocketSends() {
-	for (SocketSendRecord rec : socketSendQueue) {
-	    simulation.sendRawSocketData(rec.socketID, rec.data);
-	}
-	socketSendQueue.clear();
+	socketSendQueue.add(new DeferredSocketSend(socketID, data));
     }
 
     public void closeSocket(long socketID) {
-	socketCloseQueue.add(new Long(socketID));
-    }
-
-    private void processSocketCloseRecords() {
-	for (Long l : socketCloseQueue) {
-	    simulation.closeSocket(l);
-	}
-    }
-
-    private void processUserListenerRecords() {
-	for (Long l : userListenerQueue) {
-	    simulation.addUserListener(new GLOReferenceImpl(l));
-	}
-    }
-
-    private void processUserDataListenerRecords() {
-	for (UIDListenerRec rec : userDataListenerQueue) {
-	    simulation.addUserDataListener(rec.uid, new GLOReferenceImpl(
-			rec.objID));
-	}
+	socketCloseQueue.add(new DeferredSocketClose(socketID));
     }
 
     /**
@@ -540,10 +390,203 @@ public class SimTaskImpl extends SimTask {
 
     public void setEvesdroppingEnabled(UserID uid, ChannelID cid,
 	    boolean setting) {
-	simulation.enableEvesdropping(uid,cid,setting);
+	simulation.enableEvesdropping(uid, cid, setting);
     }
 
     public void destroyGLO(GLOReference ref) {
 	ref.delete(this);
+    }
+
+    // Process queued commands
+
+    private void processNewTasks() {
+	for (DeferredSimCommand rec : newTaskQueue) {
+	    rec.execute(simulation);
+	}
+    }
+
+    private void processOutput() {
+	for (DeferredSimCommand rec : outputQueue) {
+	    rec.execute(simulation);
+	}
+    }
+
+    private void processUserDataListenerRecords() {
+	for (DeferredSimCommand rec : userDataListenerQueue) {
+	    rec.execute(simulation);
+	}
+    }
+
+    private void processTimerEvents() {
+	for (DeferredSimCommand rec : timerRecordQueue) {
+	    rec.execute(simulation);
+	}
+	timerRecordQueue.clear();
+    }
+
+    private void processDeferredSocketOpens() {
+	for (DeferredSimCommand rec : socketOpenQueue) {
+	    rec.execute(simulation);
+	}
+	socketOpenQueue.clear();
+    }
+
+    private void processRawSocketSends() {
+	for (DeferredSimCommand rec : socketSendQueue) {
+	    rec.execute(simulation);
+	}
+	socketSendQueue.clear();
+    }
+
+    private void processDeferredSocketCloses() {
+	for (DeferredSimCommand rec : socketCloseQueue) {
+	    rec.execute(simulation);
+	}
+    }
+
+    private void processDeferredUserListeners() {
+	for (DeferredSimCommand rec : userListenerQueue) {
+	    rec.execute(simulation);
+	}
+    }
+}
+
+
+interface DeferredSimCommand {
+    public void execute(Simulation sim);
+}
+
+class DeferredOutput implements DeferredSimCommand {
+    UserID[] targets;
+    UserID uid;
+    ByteBuffer data;
+    boolean reliable;
+    ChannelID channel;
+
+    public DeferredOutput(ChannelID cid, UserID[] to, ByteBuffer buff,
+	    boolean reliableFlag) {
+	channel = cid;
+	data = ByteBuffer.allocate(buff.capacity());
+	buff.flip(); // flip for read
+	data.put(buff);
+	reliable = reliableFlag;
+	targets = new UserID[to.length];
+	System.arraycopy(to, 0, targets, 0, to.length);
+    }
+
+    public void execute(Simulation sim) {
+	sim.sendMulticastData(channel, targets, data, reliable);
+    }
+
+}
+
+class DeferredSocketOpen implements DeferredSimCommand {
+    private final long         socketID;
+    private final ACCESS_TYPE  access;
+    private final long         objID;
+    private final String       host;
+    private final int          port;
+    private final boolean      reliable;
+
+    public DeferredSocketOpen(long sid, ACCESS_TYPE access, long objID,
+	    String host, int port, boolean reliable) {
+	this.socketID = sid;
+	this.access = access;
+	this.objID = objID;
+	this.host = host;
+	this.port = port;
+	this.reliable = reliable;
+    }
+
+    public void execute(Simulation sim) {
+	sim.openSocket(socketID, access, objID, host, port, reliable);
+    }
+}
+
+class DeferredSocketSend implements DeferredSimCommand {
+    private final long        socketID;
+    private final ByteBuffer  data;
+
+    public DeferredSocketSend(long socketID, ByteBuffer buff) {
+	this.socketID = socketID;
+	data = ByteBuffer.allocate(buff.capacity());
+	buff.flip(); // flip for read
+	data.put(buff);
+    }
+
+    public void execute(Simulation sim) {
+	sim.sendRawSocketData(socketID, data);
+    }
+}
+
+class DeferredNewTask implements DeferredSimCommand {
+    private final SimTask  task;
+
+    public DeferredNewTask(SimTask t) {
+	this.task = t;
+    }
+
+    public void execute(Simulation sim) {
+	sim.queueTask(task);
+    }
+}
+
+class DeferredNewTimer implements DeferredSimCommand {
+    private final long         tid;
+    private final ACCESS_TYPE  access;
+    private final long         delay;
+    private final boolean      repeat;
+    private final long         objID;
+
+    public DeferredNewTimer(long tid, ACCESS_TYPE access,
+	    long delay, boolean repeat, long objID) {
+
+	this.tid = tid;
+	this.access = access;
+	this.delay = delay;
+	this.repeat = repeat;
+	this.objID = objID;
+    }
+
+    public void execute(Simulation sim) {
+	sim.registerTimerEvent(tid, access, objID, delay, repeat);
+    }
+}
+
+class DeferredUserDataListener implements DeferredSimCommand {
+    private final UserID  uid;
+    private final long    objID;
+
+    public DeferredUserDataListener(UserID uid, GLOReference glo) {
+	this.uid = uid; // XXX does this need to be cloned?
+	this.objID = ((GLOReferenceImpl) glo).objID;
+    }
+
+    public void execute(Simulation sim) {
+	sim.addUserDataListener(uid, new GLOReferenceImpl(objID));
+    }
+}
+
+class DeferredSocketClose implements DeferredSimCommand {
+    private final long  socketID;
+
+    public DeferredSocketClose(long socketID) {
+	this.socketID = socketID;
+    }
+
+    public void execute(Simulation sim) {
+	sim.closeSocket(socketID);
+    }
+}
+
+class DeferredUserListener implements DeferredSimCommand {
+    private final long  gloID;
+
+    public DeferredUserListener(long gloID) {
+	this.gloID = gloID;
+    }
+
+    public void execute(Simulation sim) {
+	sim.addUserListener(new GLOReferenceImpl(gloID));
     }
 }
