@@ -12,7 +12,7 @@
     <path id="project.classpath">
 	<pathelement location="bin" />
 	<pathelement location="resources/libs/jrms/classes.jar" />
-	<pathelement location="resources/libs/derby/derby.jar" />
+	<pathelement location="resources/libs/derby/derby-10.1.1.0.jar" />
 	<pathelement location="resources/libs/servlet/javax.servlet.jar" />
 	<pathelement location="resources/libs/servlet/commons-logging.jar" />
 	<pathelement location="resources/libs/servlet/org.mortbay.jetty.jar" />
@@ -275,7 +275,7 @@
 	<chmod file="release/startDarkstar.sh" perm="755" />
 	<chmod file="release/startDiscovery.sh" perm="755" />
 	<copy file="resources/libs/jrms/classes.jar" todir="release/jrms" />
-	<copy file="resources/libs/derby/derby.jar" todir="release/derby" />
+	<copy file="resources/libs/derby/derby-10.1.1.0.jar" todir="release/derby" />
 	<copy file="resources/Install.txt" todir="release" />
 	<copy file="resources/passwd.txt" todir="release" />
     </target>
