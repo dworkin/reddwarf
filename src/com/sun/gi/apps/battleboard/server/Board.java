@@ -58,7 +58,7 @@ public class Board extends BattleBoard implements GLO {
     private static final long serialVersionUID = 1L;
 
     /**
-     * Default constructor, required for serialization.
+     * Default constructor, not for public use.
      */
     protected Board() {
 	super();
