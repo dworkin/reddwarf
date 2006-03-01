@@ -113,9 +113,6 @@ public class User implements SimUserDataListener {
 	characterRef = ref;
     }
 
-
-    // Static versions of the SimUserListener methods
-
     public static GLOReference<User> findOrCreate(UserID userID,
 	    String userName) {
 
@@ -158,13 +155,13 @@ public class User implements SimUserDataListener {
     }
 
     public void joinedGame() {
-	log.fine("User " + name + "[" + uid + "] joined game");
+	log.fine("User " + name + " [" + uid + "] joined game");
 
 	characterRef.get(SimTask.getCurrent()).joinArea();
     }
 
     public void leftGame() {
-	log.fine("User " + name + "[" + uid + "] left game");
+	log.fine("User " + name + " [" + uid + "] left game");
 
 	// @@ we could do cleanup here, but it should all have been
 	// done by the various channel-leave handlers already.
@@ -173,7 +170,7 @@ public class User implements SimUserDataListener {
     // SimUserDataListener methods
 
     public void userJoinedChannel(ChannelID channelID, UserID userID) {
-	log.fine("User: User " + userID + " joined channel " + channelID);
+	log.fine("User " + userID + " joined channel " + channelID);
 
 	// Paranoia
 	if (! uid.equals(userID)) {
@@ -191,7 +188,7 @@ public class User implements SimUserDataListener {
     }
 
     public void userLeftChannel(ChannelID channelID, UserID userID) {
-	log.fine("User: User " + userID + " left channel " + channelID);
+	log.fine("User " + userID + " left channel " + channelID);
 
 	// Paranoia
 	if (! uid.equals(userID)) {

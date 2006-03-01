@@ -83,7 +83,7 @@ public class Character implements GLO {
 	characterID = (int) System.currentTimeMillis(); // FIXME
 	name = uref.peek(task).getName();
 	userRef = uref;
-	areaRef = task.findGLO("Area-1"); // XXX
+	areaRef = task.findGLO("Area:foo"); // XXX
 	position = new float[3];
     }
 

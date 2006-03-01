@@ -96,6 +96,9 @@ public class JNWN implements SimBoot<JNWN>, SimUserListener {
     // SimUserListener methods
 
     public void userJoined(UserID uid, Subject subject) {
+
+	SimTask task = SimTask.getCurrent();
+
 	String userName = subject.getPrincipals().iterator().next().getName();
 	GLOReference<User> userRef = User.findOrCreate(uid, userName);
 	if (userRef == null) {
@@ -103,7 +106,15 @@ public class JNWN implements SimBoot<JNWN>, SimUserListener {
 	    return;
 	}
 	userMap.put(uid, userRef);
-	userRef.get(SimTask.getCurrent()).joinedGame();
+
+	// userRef.get(task).joinedGame();
+	userRef.get(task); // ensure we have the lock on the user
+	try {
+	    task.queueTask(userRef,
+		User.class.getMethod("joinedGame"), new Object[] { });
+	} catch (Exception e) {
+	    e.printStackTrace();
+	}
     }
 
     public void userLeft(UserID uid) {

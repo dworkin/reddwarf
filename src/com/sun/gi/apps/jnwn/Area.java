@@ -68,7 +68,8 @@ public class Area implements GLO {
 
     public static GLOReference create(String name) {
 	SimTask task = SimTask.getCurrent();
-	GLOReference<Area> ref = task.createGLO(new Area(name));
+	String gloname = "Area:" + name;
+	GLOReference<Area> ref = task.createGLO(new Area(name), gloname);
 	ref.get(task).boot(ref);
 	return ref;
     }
@@ -79,7 +80,7 @@ public class Area implements GLO {
 	characters = new LinkedList<GLOReference<Character>>();
 
 	SimTask task = SimTask.getCurrent();
-	String channelName = "Area-" + areaName;
+	String channelName = "Channel:Area:" + areaName;
 	channel = task.openChannel(areaName);
 	task.lock(channel, true);
     }
@@ -89,8 +90,7 @@ public class Area implements GLO {
     }
 
     protected void broadcast(ByteBuffer buf) {
-	log.finer("Area: Broadcasting " + buf.position() +
-	    " bytes on " + channel);
+	log.finer("Broadcasting " + buf.position() + " bytes on " + channel);
 
 	//SimTask.getCurrent().broadcastData(channel, buf, true);
     }
