@@ -209,8 +209,8 @@ public class SimTaskImpl extends SimTask {
 	return createGLO(templateObj, null);
     }
 
-    public ChannelID openChannel(String string) {
-	return simulation.openChannel(string);
+    public void destroyGLO(GLOReference ref) {
+	ref.delete(this);
     }
 
     public long registerTimerEvent(ACCESS_TYPE access, long delay,
@@ -312,6 +312,11 @@ public class SimTaskImpl extends SimTask {
 	deferredCommands.add(new DeferredSocketClose(socketID));
     }
 
+    public ChannelID openChannel(String string) {
+	// @@ It should be ok to open the channel immediately -jm
+	return simulation.openChannel(string);
+    }
+
     /**
      * Joins the specified user to the Channel referenced by the given
      * ChannelID.
@@ -321,8 +326,8 @@ public class SimTaskImpl extends SimTask {
      * @param id
      *            the ChannelID
      */
-    public void join(UserID user, ChannelID id) {
-	simulation.join(user, id);
+    public void join(UserID user, ChannelID cid) {
+	deferredCommands.add(new DeferredChannelJoin(user, cid));
     }
 
     /**
@@ -334,8 +339,8 @@ public class SimTaskImpl extends SimTask {
      * @param id
      *            the ChannelID
      */
-    public void leave(UserID user, ChannelID id) {
-	simulation.leave(user, id);
+    public void leave(UserID user, ChannelID cid) {
+	deferredCommands.add(new DeferredChannelLeave(user, cid));
     }
 
     /**
@@ -348,7 +353,7 @@ public class SimTaskImpl extends SimTask {
      *            if true, lock the channel, otherwise unlock it.
      */
     public void lock(ChannelID cid, boolean shouldLock) {
-	simulation.lock(cid, shouldLock);
+	deferredCommands.add(new DeferredChannelLock(cid, shouldLock));
     }
 
     /**
@@ -358,17 +363,13 @@ public class SimTaskImpl extends SimTask {
      * @param id
      *            the ID of the channel to close.
      */
-    public void closeChannel(ChannelID id) {
-	simulation.closeChannel(id);
+    public void closeChannel(ChannelID cid) {
+	deferredCommands.add(new DeferredChannelClose(cid));
     }
 
     public void setEvesdroppingEnabled(UserID uid, ChannelID cid,
 	    boolean setting) {
-	simulation.enableEvesdropping(uid, cid, setting);
-    }
-
-    public void destroyGLO(GLOReference ref) {
-	ref.delete(this);
+	deferredCommands.add(new DeferredChannelSnoop(uid, cid, setting));
     }
 
     private void processDeferredCommands() {
@@ -517,5 +518,76 @@ class DeferredUserListener implements DeferredSimCommand {
 
     public void execute(Simulation sim) {
 	sim.addUserListener(new GLOReferenceImpl(gloID));
+    }
+}
+
+class DeferredChannelJoin implements DeferredSimCommand {
+    private final UserID     uid;
+    private final ChannelID  cid;
+
+    public DeferredChannelJoin(UserID userID, ChannelID chanID) {
+	this.uid = userID;
+	this.cid = chanID;
+    }
+
+    public void execute(Simulation sim) {
+	sim.join(uid, cid);
+    }
+}
+
+class DeferredChannelLeave implements DeferredSimCommand {
+    private final UserID     uid;
+    private final ChannelID  cid;
+
+    public DeferredChannelLeave(UserID userID, ChannelID chanID) {
+	this.uid = userID;
+	this.cid = chanID;
+    }
+
+    public void execute(Simulation sim) {
+	sim.leave(uid, cid);
+    }
+}
+
+class DeferredChannelLock implements DeferredSimCommand {
+    private final ChannelID  cid;
+    private final boolean    lock;
+
+    public DeferredChannelLock(ChannelID chanID, boolean shouldLock) {
+	this.cid = chanID;
+	this.lock = shouldLock;
+    }
+
+    public void execute(Simulation sim) {
+	sim.lock(cid, lock);
+    }
+}
+
+class DeferredChannelClose implements DeferredSimCommand {
+    private final ChannelID  cid;
+
+    public DeferredChannelClose(ChannelID chanID) {
+	this.cid = chanID;
+    }
+
+    public void execute(Simulation sim) {
+	sim.closeChannel(cid);
+    }
+}
+
+class DeferredChannelSnoop implements DeferredSimCommand {
+    private final UserID     uid;
+    private final ChannelID  cid;
+    private final boolean    enable;
+
+    public DeferredChannelSnoop(UserID userID, ChannelID chanID,
+	    boolean setting) {
+	this.uid = userID;
+	this.cid = chanID;
+	this.enable = setting;
+    }
+
+    public void execute(Simulation sim) {
+	sim.enableEvesdropping(uid, cid, enable);
     }
 }
