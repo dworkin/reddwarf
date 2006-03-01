@@ -31,13 +31,9 @@ import com.sun.gi.objectstore.tso.dataspace.DataSpace;
 
 class OutputRecord {
     UserID[] targets;
-
     UserID uid;
-
     ByteBuffer data;
-
     boolean reliable;
-
     ChannelID channel;
 
     public OutputRecord(ChannelID cid, UserID[] to, ByteBuffer buff,
@@ -54,15 +50,10 @@ class OutputRecord {
 
 class OpenSocketRecord {
     long socketID;
-
     ACCESS_TYPE access;
-
     long objID;
-
     String host;
-
     int port;
-
     boolean reliable;
 
     public OpenSocketRecord(long sid, ACCESS_TYPE access, long objID,
@@ -89,18 +80,11 @@ class SocketSendRecord {
     }
 }
 
-class CloseSocketRecord {
-}
-
 class TimerRecord {
     long tid;
-
     ACCESS_TYPE access;
-
     long delay;
-
     boolean repeat;
-
     long objID;
 
     public TimerRecord(long tid, ACCESS_TYPE access, long delay,
@@ -116,7 +100,6 @@ class TimerRecord {
 
 class UIDListenerRec {
     UserID uid;
-
     long objID;
 
     public UIDListenerRec(UserID uid, GLOReference glo) {
@@ -127,7 +110,6 @@ class UIDListenerRec {
 
 class CIDListenerRec {
     ChannelID cid;
-
     long objID;
 
     public CIDListenerRec(ChannelID cid, GLOReference glo) {
