@@ -308,16 +308,16 @@ public class SimulationImpl implements Simulation {
 	}
 
 	protected void fireUserLeftChannel(UserID uid, ChannelID cid) {
-		List<Long> cmListenerIDs = userDataListeners.get(cid);
-		if (cmListenerIDs != null) {
+		List<Long> listenerIDs = userDataListeners.get(uid);
+		if (listenerIDs != null) {
 			try {
-				Method leftChannelMethod = loader.loadClass(
+				Method userLeftChannelMethod = loader.loadClass(
 						"com.sun.gi.logic.SimUserDataListener").getMethod(
-						"leftChannel",
+						"userLeftChannel",
 						new Class[] { ChannelID.class, UserID.class });
 				Object[] params = { cid, uid };
-				for (Long gloID : cmListenerIDs) {
-					queueTask(newTask(gloID, leftChannelMethod, params));
+				for (Long gloID : listenerIDs) {
+					queueTask(newTask(gloID, userLeftChannelMethod, params));
 				}
 			} catch (SecurityException e) {
 

@@ -136,11 +136,15 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 	}
 	
 	public void leave(SGSUser user) {
-		localUsers.remove(user.getUserID());
+        // if the user isn't on this channel, then ignore them
+		if (localUsers.remove(user.getUserID()) == null) {
+            return;
+        }
+
 		byte[] userbytes = user.getUserID().toByteArray();
 		synchronized(hdr){
 			hdr.clear();
-			hdr.put((byte)OPCODE.UserJoinedChan.ordinal());	
+            hdr.put((byte)OPCODE.UserLeftChan.ordinal());
 			hdr.putInt(userbytes.length);
 			hdr.put(userbytes);			
 			buffs[1] = null;
