@@ -30,6 +30,7 @@
     	<mkdir dir="release/apps/timer_test"/>
     	<mkdir dir="release/apps/jeffboard"/>
     	<mkdir dir="release/apps/glotest"/>
+    	<mkdir dir="release/apps/jnwn"/>
     	<mkdir dir="release/derby"/>
     	<mkdir dir="release/jrms"/>
     	<mkdir dir="doc/doxygen" />
@@ -175,6 +176,17 @@
 	    <!-- <compilerarg value="-Xlint:unchecked"/> -->
 	    <classpath refid="project.classpath" />
 	    <include name="com/sun/gi/apps/glotest/*.java" />
+	</javac>
+    </target>
+
+    <target name="build.jnwn" depends="init">
+	<echo message="${ant.project.name}: ${ant.file}" />
+	<javac srcdir="src" destdir="bin" source="5" target="5"
+		debug="${debug}" optimize="${optimize}"
+		deprecation="${deprecated}">
+	    <compilerarg value="-Xlint:unchecked"/>
+	    <classpath refid="project.classpath" />
+	    <include name="com/sun/gi/apps/jnwn/**" />
 	</javac>
     </target>
 
@@ -329,6 +341,13 @@
 	    basedir="bin" includes="com/sun/gi/apps/timertest/**" />
 	<copy file="resources/timer_test_deployment.xml"
 	    todir="release/apps/timer_test" />
+    </target>
+
+    <target name="release.jnwn" depends="build.jnwn">
+	<jar destfile="release/apps/jnwn/JNWN.jar"
+	    basedir="bin" includes="com/sun/gi/apps/jnwn/**" />
+	<copy file="resources/jnwn/deploy.xml"
+	    todir="release/apps/jnwn" />
     </target>
 
 </project>
