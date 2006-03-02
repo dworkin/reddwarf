@@ -130,7 +130,7 @@
 	    <include name="com/sun/gi/apps/**" />
 	    <exclude name="com/sun/gi/apps/*/*.java" />
 	    <exclude name="com/sun/gi/apps/**/server/**" />
-	    <include name="com/sun/gi/clients/**" />
+	    <include name="com/sun/gi/client/**" />
 	</javac>
     </target>
 
@@ -283,6 +283,15 @@
 
     <target name="MatchMakerClientTest">
 	<java classname="com.sun.gi.apps.mcs.matchmaker.client.test.MatchMakerClientTest" failonerror="true" fork="true">
+	    <classpath refid="project.classpath" />
+	    <sysproperty key="java.util.logging.config.file"
+			 file="logging.properties" />
+	</java>
+    </target>
+
+    <target name="DIRC">
+	<java classname="com.sun.gi.client.dirc.DIRC"
+		failonerror="true" fork="true">
 	    <classpath refid="project.classpath" />
 	    <sysproperty key="java.util.logging.config.file"
 			 file="logging.properties" />
