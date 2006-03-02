@@ -228,7 +228,12 @@ public class DIRC implements ClientConnectionManagerListener, ChatManager {
 		byte[] bytes = new byte[data.remaining()];
 		data.get(bytes);
 
-		chatPanel.messageArrived(StringUtils.bytesToHex(userID),
+		String userName =
+		    clientManager.isServerID(userID)
+			? "SERVER"
+			: StringUtils.bytesToHex(userID);
+
+		chatPanel.messageArrived(userName, 
 					 channel.getName(),
 					 new String(bytes));
 	    }
