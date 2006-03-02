@@ -98,17 +98,6 @@ public interface Simulation {
     public long getAppID();
 
     /**
-     * sendMulticastData
-     * 
-     * @param cid
-     * @param targets
-     * @param buff
-     * @param reliable
-     */
-    public void sendMulticastData(ChannelID cid, UserID[] targets,
-	    ByteBuffer buff, boolean reliable);
-
-    /**
      * sendUnicastData
      * 
      * @param cid
@@ -120,15 +109,25 @@ public interface Simulation {
 	    boolean reliable);
 
     /**
-     * sendBroadcastData
+     * sendMulticastData
      * 
      * @param cid
-     * @param target
+     * @param targets
      * @param buff
      * @param reliable
      */
-    public void sendBroadcastData(ChannelID cid, UserID target,
+    public void sendMulticastData(ChannelID cid, UserID[] targets,
 	    ByteBuffer buff, boolean reliable);
+
+    /**
+     * sendBroadcastData
+     * 
+     * @param cid
+     * @param buff
+     * @param reliable
+     */
+    public void sendBroadcastData(ChannelID cid, ByteBuffer buff,
+	    boolean reliable);
 
     public boolean hasTasks();
 

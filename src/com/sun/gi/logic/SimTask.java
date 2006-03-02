@@ -99,10 +99,20 @@ public abstract class SimTask {
 	    GLOReference<? extends SimUserDataListener> ref);
 
     /**
-     * The game code can call this to send data to users by their IDs.
-     * This actually maps to the send call down in the router layer by
-     * calling the user manager created to handle this particular
-     * game.
+     * Send data to a single user on a particular channel.
+     *
+     * @param cid       the channel ID
+     * @param to        the message recipient
+     * @param data      the data packet to send
+     * @param reliable  true if the data should be sent reliably
+     */
+    public abstract void sendData(ChannelID cid, UserID to, ByteBuffer data,
+	    boolean reliable);
+
+    /**
+     * Send data to a set of users by their IDs, on a particular channel.  This
+     * actually maps to the sendMulticast call down in the router layer by
+     * calling the user manager created to handle this particular game.
      *
      * @param cid       the channel ID
      * @param to        the list of message recipients
@@ -110,6 +120,16 @@ public abstract class SimTask {
      * @param reliable  true if the data should be sent reliably
      */
     public abstract void sendData(ChannelID cid, UserID[] to, ByteBuffer data,
+	    boolean reliable);
+
+    /**
+     * Send data to all users on a particular channel.
+     *
+     * @param cid       the channel ID
+     * @param data      the data packet to send
+     * @param reliable  true if the data should be sent reliably
+     */
+    public abstract void broadcastData(ChannelID cid, ByteBuffer data,
 	    boolean reliable);
 
     /**

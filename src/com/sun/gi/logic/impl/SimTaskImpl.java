@@ -164,9 +164,19 @@ public class SimTaskImpl extends SimTask {
 	return (oid == DataSpace.INVALID_ID) ? null : makeReference(oid);
     }
 
-    public void sendData(ChannelID cid, UserID[] to, ByteBuffer bs,
+    public void sendData(ChannelID cid, UserID to, ByteBuffer data,
 	    boolean reliable) {
-	deferredCommands.add(new DeferredOutput(cid, to, bs, reliable));
+	deferredCommands.add(new DeferredUnicast(cid, to, data, reliable));
+    }
+
+    public void sendData(ChannelID cid, UserID[] to, ByteBuffer data,
+	    boolean reliable) {
+	deferredCommands.add(new DeferredMulticast(cid, to, data, reliable));
+    }
+
+    public void broadcastData(ChannelID cid, ByteBuffer data,
+	    boolean reliable) {
+	deferredCommands.add(new DeferredBroadcast(cid, data, reliable));
     }
 
     public void addUserDataListener(UserID user, GLOReference ref) {
@@ -386,14 +396,36 @@ interface DeferredSimCommand {
     public void execute(Simulation sim);
 }
 
-class DeferredOutput implements DeferredSimCommand {
+class DeferredUnicast implements DeferredSimCommand {
+    UserID target;
+    UserID uid;
+    ByteBuffer data;
+    boolean reliable;
+    ChannelID channel;
+
+    public DeferredUnicast(ChannelID cid, UserID to, ByteBuffer buff,
+	    boolean reliableFlag) {
+	channel = cid;
+	data = ByteBuffer.allocate(buff.capacity());
+	buff.flip(); // flip for read
+	data.put(buff);
+	reliable = reliableFlag;
+	target = to;
+    }
+
+    public void execute(Simulation sim) {
+	sim.sendUnicastData(channel, target, data, reliable);
+    }
+}
+
+class DeferredMulticast implements DeferredSimCommand {
     UserID[] targets;
     UserID uid;
     ByteBuffer data;
     boolean reliable;
     ChannelID channel;
 
-    public DeferredOutput(ChannelID cid, UserID[] to, ByteBuffer buff,
+    public DeferredMulticast(ChannelID cid, UserID[] to, ByteBuffer buff,
 	    boolean reliableFlag) {
 	channel = cid;
 	data = ByteBuffer.allocate(buff.capacity());
@@ -407,7 +439,26 @@ class DeferredOutput implements DeferredSimCommand {
     public void execute(Simulation sim) {
 	sim.sendMulticastData(channel, targets, data, reliable);
     }
+}
 
+class DeferredBroadcast implements DeferredSimCommand {
+    UserID uid;
+    ByteBuffer data;
+    boolean reliable;
+    ChannelID channel;
+
+    public DeferredBroadcast(ChannelID cid, ByteBuffer buff,
+	    boolean reliableFlag) {
+	channel = cid;
+	data = ByteBuffer.allocate(buff.capacity());
+	buff.flip(); // flip for read
+	data.put(buff);
+	reliable = reliableFlag;
+    }
+
+    public void execute(Simulation sim) {
+	sim.sendBroadcastData(channel, data, reliable);
+    }
 }
 
 class DeferredSocketOpen implements DeferredSimCommand {

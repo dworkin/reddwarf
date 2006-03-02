@@ -263,30 +263,22 @@ public class SimulationImpl implements Simulation {
 	return appName;
     }
 
-    /**
-     * sendMulticastData
-     * 
-     * @param cid
-     * @param targets
-     * @param buff
-     * @param reliable
-     */
-    public void sendMulticastData(ChannelID cid, UserID[] targets,
-	    ByteBuffer buff, boolean reliable) {
-	SGSChannel channel = router.getChannel(cid);
-	channel.multicastData(UserID.SERVER_ID, targets, buff, reliable, false);
-    }
-
     public void sendUnicastData(ChannelID cid, UserID target, ByteBuffer buff,
 	    boolean reliable) {
 	SGSChannel channel = router.getChannel(cid);
 	channel.unicastData(UserID.SERVER_ID, target, buff, reliable);
     }
 
-    public void sendBroadcastData(ChannelID cid, UserID target,
+    public void sendMulticastData(ChannelID cid, UserID[] targets,
 	    ByteBuffer buff, boolean reliable) {
 	SGSChannel channel = router.getChannel(cid);
-	channel.unicastData(UserID.SERVER_ID, target, buff, reliable);
+	channel.multicastData(UserID.SERVER_ID, targets, buff, reliable, false);
+    }
+
+    public void sendBroadcastData(ChannelID cid, ByteBuffer buff,
+	    boolean reliable) {
+	SGSChannel channel = router.getChannel(cid);
+	channel.broadcastData(UserID.SERVER_ID, buff, reliable);
     }
 
     public void addUserDataListener(UserID id, GLOReference ref) {
