@@ -92,8 +92,10 @@ public class DIRC implements ClientConnectionManagerListener, ChatManager {
 	buf.position(buf.limit());
 
 	if (currentChannel == null) {
+	    chatPanel.info("-> SERVER: " + text);
 	    clientManager.sendToServer(buf, true);
 	} else {
+	    chatPanel.info("-> [" + currentChannel.getName() + "]: " + text);
 	    currentChannel.sendBroadcastData(buf, true);
 	}
     }
