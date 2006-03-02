@@ -9,6 +9,7 @@
  */
 package com.sun.gi.objectstore.tso.dataspace;
 
+import com.sun.gi.objectstore.NonExistantObjectIDException;
 import java.lang.ref.SoftReference;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -18,18 +19,14 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
-import java.util.Map.Entry;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-
-import com.sun.gi.objectstore.NonExistantObjectIDException;
 
 /**
  * 
@@ -87,6 +84,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	private Set<Long> lockSet = new HashSet<Long>();
 
 	private Object idMutex = new Object();
+	private Object diskUpdateQueueMutex = new Object();
 
 	private volatile long id = 1;
 
@@ -143,17 +141,17 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 
 	private PreparedStatement lockNameTableStmnt;
 
-	private boolean closed = false;
+	private volatile boolean closed = false;
 
-	private boolean done = false;
+	private volatile boolean done = false;
 
-	private Queue<DiskUpdateRecord> diskUpdateQueue = new LinkedList<DiskUpdateRecord>();
+	private volatile LinkedList<DiskUpdateRecord> diskUpdateQueue = new LinkedList<DiskUpdateRecord>();
 
 	private Object closeWaitMutex = new Object();
 
 	private static final boolean TRACEDISK = false;
 
-	private int commitRegisterCounter = 1;
+	private volatile int commitRegisterCounter = 1;
 
 	public PersistantInMemoryDataSpace(long appID) {
 		this.appID = appID;
@@ -179,28 +177,43 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 				public void run() {
 					int commitCount = 1;
 					while (true) {
-						DiskUpdateRecord rec = null;
-						synchronized (diskUpdateQueue) {
+						LinkedList<DiskUpdateRecord> recList = null;
+						synchronized (diskUpdateQueueMutex) {
 							if (diskUpdateQueue.isEmpty()) {
+								recList = null;
 								if (closed) {
 									break;
 								} else {
 									try {
-										diskUpdateQueue.wait();
+										diskUpdateQueueMutex.wait();
 									} catch (InterruptedException e) {
 										e.printStackTrace();
 									}
 								}
 							} else {
-								rec = diskUpdateQueue.remove();
+								if (diskUpdateQueue.size() > 200) {
+									System.out.println(
+										"GRAVE-WARNING: diskUpdateQueue size : " +
+											diskUpdateQueue.size());
+								} else if (diskUpdateQueue.size() > 100) {
+									System.out.println(
+										"WARNING: diskUpdateQueue size : " +
+											diskUpdateQueue.size());
+								}
+
+								recList = diskUpdateQueue;
+								diskUpdateQueue = new LinkedList<DiskUpdateRecord>();
 							}
 						}
-						if (rec != null) {
-							if (TRACEDISK) {
-								System.out.println("      Doing Commit #"
-										+ commitCount++);
+						if (recList != null) {
+							while (recList.size() > 0) {
+								DiskUpdateRecord rec = recList.remove();
+								if (TRACEDISK) {
+									System.out.println("      Doing Commit #"
+											+ commitCount++);
+								}
+								doDiskUpdate(rec);
 							}
-							doDiskUpdate(rec);
 						}
 					}
 					synchronized (closeWaitMutex) {
@@ -404,11 +417,11 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	public byte[] getObjBytes(long objectID) {
 		byte[] objbytes = null;
 		synchronized (dataSpace) {
-			SoftReference<byte[]> ref = dataSpace.get(new Long(objectID));
+			SoftReference<byte[]> ref = dataSpace.get(objectID);
 			if (ref != null) {
 				objbytes = ref.get();
 				if (objbytes == null) { // ref dead
-					dataSpace.remove(ref);
+					dataSpace.remove(objectID);
 				}
 			}
 			if (objbytes == null) {
@@ -428,8 +441,11 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 				conn.commit();
 				if (rs.next()) {
 					objbytes = rs.getBytes("OBJBYTES");
-					dataSpace.put(new Long(objectID),
+					dataSpace.put(objectID,
 							new SoftReference<byte[]>(objbytes));
+				}
+				if (objbytes == null) {
+					System.out.println("GOT A NULL OBJBYTES in loadCache " + objectID);
 				}
 				rs.close(); // cleanup and free locks
 			} catch (SQLException e) {
@@ -508,8 +524,8 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 		synchronized (dataSpace) {
 
 			for (Entry<Long, byte[]> e : updateMap.entrySet()) {
-				dataSpace.put(e.getKey(), new SoftReference<byte[]>(e
-						.getValue()));
+				dataSpace.put(e.getKey(),
+					new SoftReference<byte[]>(e.getValue()));
 			}
 
 		}
@@ -530,7 +546,48 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 			updateIDs[i] = e.getKey();
 			updateData[i++] = e.getValue();
 		}
-		synchronized (diskUpdateQueue) {
+
+		/*
+		 * Try to throttle back:  if the queue is shorter than
+		 * 40, let it go.  If the queue is 40-80, then sleep
+		 * for 20ms, which should be long enough to move
+		 * something off the queue (by rough guess), leaving
+		 * the system in steady state.  As the queue gets
+		 * longer, back off more and more aggressively to
+		 * allow the system to catch up.
+		 *
+		 * Note that because the queue is swallowed whole by
+		 * the draining thread it may appear to instantly go
+		 * to zero length.  This should not have any impact on
+		 * this heuristic, because we care how long the queue
+		 * gets before the switch.
+		 */
+
+		int queueLength;
+		synchronized (diskUpdateQueueMutex) {
+			queueLength = diskUpdateQueue.size();
+		}
+
+		try {
+			if (queueLength > 150) {
+				System.out.println("\t\tXXX XXX XXX XXX falling behind " + queueLength);
+				Thread.sleep(80);
+			} else if (queueLength > 100) {
+				// System.out.println("\t\tXXX XXX XXX falling behind " + queueLength);
+				Thread.sleep(55);
+			} else if (queueLength > 70) {
+				// System.out.println("\t\tXXX XXX falling behind " + queueLength);
+				Thread.sleep(35);
+			} else if (queueLength > 50) {
+				// System.out.println("\t\tXXX falling behind " + queueLength);
+				Thread.sleep(20);
+			} else {
+				// Carry on.
+			}
+		} catch (Exception e) {
+		}
+
+		synchronized (diskUpdateQueueMutex) {
 			if (!closed) { // closed while we were processing
 				if (TRACEDISK) {
 					System.out.println("Queuing commit #"
@@ -538,7 +595,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 				}
 				diskUpdateQueue.add(new DiskUpdateRecord(updateIDs, updateData,
 						id));
-				diskUpdateQueue.notifyAll();
+				diskUpdateQueueMutex.notifyAll();
 			}
 		}
 
@@ -599,7 +656,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	 */
 	public void clear() {
 		try {
-			synchronized (diskUpdateQueue) {
+			synchronized (diskUpdateQueueMutex) {
 				synchronized (dataSpace) {
 					synchronized (nameSpace) {
 						dataSpace.clear();
@@ -630,9 +687,9 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	 */
 	public void close() {
 
-		synchronized (diskUpdateQueue) {
+		synchronized (diskUpdateQueueMutex) {
 			closed = true;
-			diskUpdateQueue.notifyAll();
+			diskUpdateQueueMutex.notifyAll();
 		}
 		synchronized (closeWaitMutex) {
 			while (!done) {
@@ -642,6 +699,36 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 					e.printStackTrace();
 				}
 			}
+
+			try {
+			    conn.close();
+			} catch (SQLException e) {
+			    // XXX:
+			}
+
+			try {
+			    updateConn.close();
+			} catch (SQLException e) {
+			    // XXX:
+			}
+
+			try {
+			    deleteInsertConn.close();
+			} catch (SQLException e) {
+			    // XXX:
+			}
+
+			diskUpdateQueue.clear();
+			diskUpdateQueue = null;
+
+			dataSpace.clear();
+			dataSpace = null;
+
+			nameSpace.clear();
+			nameSpace = null;
+
+			reverseNameSpace.clear();
+			reverseNameSpace = null;
 		}
 	}
 
