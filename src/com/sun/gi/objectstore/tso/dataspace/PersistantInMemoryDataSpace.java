@@ -402,17 +402,8 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 		}
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#getObjBytes(long,
-	 *      long)
-	 */
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#getObjBytes(long,
-	 *      long)
+	/**
+	 * {@inheritDoc}
 	 */
 	public byte[] getObjBytes(long objectID) {
 		byte[] objbytes = null;
@@ -455,15 +446,8 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 		return objbytes;
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#lock(long)
-	 */
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#lock(long)
+	/**
+	 * {@inheritDoc}
 	 */
 	public void lock(long objectID) throws NonExistantObjectIDException {
 		synchronized (dataSpace) {
@@ -486,17 +470,12 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 		}
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#release(long)
+	/**
+	 * {@inheritDoc}
 	 */
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#release(long)
-	 */
-	public void release(long objectID) {
+	public void release(long objectID)
+			throws NonExistantObjectIDException
+	{
 		synchronized (lockSet) {
 			lockSet.remove(new Long(objectID));
 			lockSet.notifyAll();
@@ -504,17 +483,32 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#atomicUpdate(long,
-	 *      boolean, java.util.Map, java.util.Set, java.util.Map)
+	/**
+	 * {@inheritDoc}
 	 */
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#atomicUpdate(long,
-	 *      boolean, java.util.Map, java.util.Set, java.util.Map)
+	public void release(Set<Long> objectIDs)
+			throws NonExistantObjectIDException
+	{
+	    NonExistantObjectIDException re = null;
+
+	    for (long oid : objectIDs) {
+		try {
+		    release(oid);
+		} catch (NonExistantObjectIDException e) {
+		    re = e;
+		}
+	    }
+
+	    // If any of the releases threw an exception, throw it
+	    // here.
+
+	    if (re != null) {
+		throw re;
+	    }
+	}
+
+	/**
+	 * {@inheritDoc}
 	 */
 	public void atomicUpdate(boolean clear, Map<Long, byte[]> updateMap)
 			throws DataSpaceClosedException {
@@ -601,10 +595,8 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#lookup(java.lang.String)
+	/**
+	 * {@inheritDoc}
 	 */
 	public Long lookup(String name) {
 		Long retval = null;
@@ -640,19 +632,15 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 		return retval;
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#getAppID()
+	/**
+	 * {@inheritDoc}
 	 */
 	public long getAppID() {
 		return appID;
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#clear()
+	/**
+	 * {@inheritDoc}
 	 */
 	public void clear() {
 		try {
@@ -680,10 +668,8 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#close()
+	/**
+	 * {@inheritDoc}
 	 */
 	public void close() {
 
@@ -732,11 +718,8 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 		}
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#create(byte[],
-	 *      java.lang.String)
+	/**
+	 * {@inheritDoc}
 	 */
 	public long create(byte[] data, String name) {
 		Long id;
@@ -777,10 +760,8 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 		return id;
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#destroy(long)
+	/**
+	 * {@inheritDoc}
 	 */
 	public void destroy(long objectID) {
 		synchronized(nameSpace){
@@ -806,8 +787,5 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 			}
 			
 		}
-		
-
 	}
-
 }

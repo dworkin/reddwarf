@@ -13,6 +13,7 @@ import com.sun.gi.objectstore.tso.dataspace.monitor.GetNextIdTraceRecord;
 import com.sun.gi.objectstore.tso.dataspace.monitor.GetObjBytesTraceRecord;
 import com.sun.gi.objectstore.tso.dataspace.monitor.LockTraceRecord;
 import com.sun.gi.objectstore.tso.dataspace.monitor.LookupTraceRecord;
+import com.sun.gi.objectstore.tso.dataspace.monitor.ReleaseMultiTraceRecord;
 import com.sun.gi.objectstore.tso.dataspace.monitor.ReleaseTraceRecord;
 import com.sun.gi.objectstore.tso.dataspace.monitor.TraceRecord;
 import java.io.FileOutputStream;
@@ -101,28 +102,70 @@ public class MonitoredDataSpace implements DataSpace {
 	    throws NonExistantObjectIDException
     {
 	long startTime = loggingEnabled() ? System.currentTimeMillis() : -1;
+	NonExistantObjectIDException re = null;
 
-	dataSpace.lock(objectID);
+	try {
+	    dataSpace.lock(objectID);
+	} catch (NonExistantObjectIDException e) {
+	    re = e;
+	}
 
 	if (loggingEnabled()) {
 	    log(new LockTraceRecord(startTime, objectID));
+	}
+
+	if (re != null) {
+	    throw re;
 	}
     }
 
     /**
      * {@inheritDoc}
      */
-    public void release(long objectID) {
+    public void release(long objectID)
+	    throws NonExistantObjectIDException
+    {
 	long startTime = loggingEnabled() ? System.currentTimeMillis() : -1;
+	NonExistantObjectIDException re = null;
 
 	try {
 	    dataSpace.release(objectID);
 	} catch (NonExistantObjectIDException e) {
 	    // XXX: note the error.
+	    re = e;
 	}
 
 	if (loggingEnabled()) {
 	    log(new ReleaseTraceRecord(startTime, objectID));
+	}
+
+	if (re != null) {
+	    throw re;
+	}
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void release(Set<Long> objectIDs)
+	    throws NonExistantObjectIDException
+    {
+	long startTime = loggingEnabled() ? System.currentTimeMillis() : -1;
+	NonExistantObjectIDException re = null;
+
+	try {
+	    dataSpace.release(objectIDs);
+	} catch (NonExistantObjectIDException e) {
+	    // XXX: note the error.
+	    re = e;
+	}
+
+	if (loggingEnabled()) {
+	    log(new ReleaseMultiTraceRecord(startTime, objectIDs));
+	}
+
+	if (re != null) {
+	    throw re;
 	}
     }
 
@@ -133,11 +176,20 @@ public class MonitoredDataSpace implements DataSpace {
 	throws DataSpaceClosedException
     {
 	long startTime = loggingEnabled() ? System.currentTimeMillis() : -1;
+	DataSpaceClosedException re = null;
 
-	dataSpace.atomicUpdate(clear, updateMap);
+	try {
+	    dataSpace.atomicUpdate(clear, updateMap);
+	} catch (DataSpaceClosedException e) {
+	    re = e;
+	}
 
 	if (loggingEnabled()) {
 	    log(new AtomicUpdateTraceRecord(startTime, clear, updateMap));
+	}
+
+	if (re != null) {
+	    throw re;
 	}
     }
 
@@ -217,7 +269,9 @@ public class MonitoredDataSpace implements DataSpace {
     /**
      * {@inheritDoc}
      */
-    public void destroy(long objectID) throws NonExistantObjectIDException {
+    public void destroy(long objectID)
+	    throws NonExistantObjectIDException
+    {
 	long startTime = loggingEnabled() ? System.currentTimeMillis() : -1;
 	NonExistantObjectIDException seenException = null;
 

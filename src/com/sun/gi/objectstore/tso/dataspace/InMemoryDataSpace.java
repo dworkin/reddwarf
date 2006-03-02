@@ -1,5 +1,4 @@
 /**
- *
  * <p>Title: InMemoryDataSpace.java</p>
  * <p>Description: </p>
  * <p>Copyright: Copyright (c) 2004 Sun Microsystems, Inc.</p>
@@ -51,36 +50,17 @@ public class InMemoryDataSpace implements DataSpace {
 		this.appID = appID;
 	}
 
-	
-
 	// internal routines to the system, used by transactions
 	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#getNextID()
 	 */
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#getNextID()
-	 */
-	public long getNextID() {
+	private long getNextID() {
 		synchronized (idMutex) {
 			return id++;
 		}
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#getObjBytes(long,
-	 *      long)
-	 */
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#getObjBytes(long,
-	 *      long)
+	/**
+	 * {@inheritDoc}
 	 */
 	public byte[] getObjBytes(long objectID) {		
 		synchronized (dataSpace) {
@@ -88,15 +68,8 @@ public class InMemoryDataSpace implements DataSpace {
 		}
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#lock(long)
-	 */
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#lock(long)
+	/**
+	 * {@inheritDoc}
 	 */
 	public void lock(long objectID)
 			throws NonExistantObjectIDException {
@@ -118,17 +91,12 @@ public class InMemoryDataSpace implements DataSpace {
 		}
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#release(long)
+	/**
+	 * {@inheritDoc}
 	 */
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#release(long)
-	 */
-	public void release(long objectID) {		
+	public void release(long objectID)
+			throws NonExistantObjectIDException
+	{
 		synchronized (lockSet) {
 			lockSet.remove(new Long(objectID));
 			lockSet.notifyAll();
@@ -136,17 +104,32 @@ public class InMemoryDataSpace implements DataSpace {
 
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#atomicUpdate(long,
-	 *      boolean, java.util.Map, java.util.Set, java.util.Map)
+	/**
+	 * {@inheritDoc}
 	 */
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#atomicUpdate(long,
-	 *      boolean, java.util.Map, java.util.Set, java.util.Map)
+	public void release(Set<Long> objectIDs)
+		throws NonExistantObjectIDException
+	{
+	    NonExistantObjectIDException re = null;
+
+	    for (long oid : objectIDs) {
+		try {
+		    release(oid);
+		} catch (NonExistantObjectIDException e) {
+		    re = e;
+		}
+	    }
+
+	    // If any of the releases threw an exception, throw it
+	    // here.
+
+	    if (re != null) {
+		throw re;
+	    }
+	}
+
+	/**
+	 * {@inheritDoc}
 	 */
 	public void atomicUpdate(boolean clear, Map<Long, byte[]> updateMap) {		
 		// insert set is ignored in this case as its uneeded detail
@@ -155,10 +138,8 @@ public class InMemoryDataSpace implements DataSpace {
 		}
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#lookup(java.lang.String)
+	/**
+	 * {@inheritDoc}
 	 */
 	public Long lookup(String name) {		
 		synchronized (nameSpace) {
@@ -166,25 +147,26 @@ public class InMemoryDataSpace implements DataSpace {
 		}
 	}
 
-
-
-	/* (non-Javadoc)
-	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#getAppID()
+	/**
+	 * {@inheritDoc}
 	 */
 	public long getAppID() {
 		return appID;
 	}
 
-
-
-	/* (non-Javadoc)
-	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#clear()
+	/**
+	 * NOT IMPLEMENTED.
+	 *
+	 * {@inheritDoc}
 	 */
 	public void clear() {
 		// TODO Auto-generated method stub
 		
 	}
 
+	/**
+	 * {@inheritDoc}
+	 */
 	public long create(byte[] data, String name){
 		long id = DataSpace.INVALID_ID;
 		synchronized(nameSpace){
@@ -200,26 +182,21 @@ public class InMemoryDataSpace implements DataSpace {
 		return id;
 	}
 
-	/* (non-Javadoc)
-	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#close()
+	/**
+	 * NOT IMPLEMENTED.
+	 *
+	 * {@inheritDoc}
 	 */
 	public void close() {
 		// TODO Auto-generated method stub
-		
 	}
 
-
-
-	/* (non-Javadoc)
-	 * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#destroy(long)
+	/**
+	 * NOT IMPLEMENTED
+	 *
+	 * {@inheritDoc}
 	 */
 	public void destroy(long objectID) {
 		// TODO Auto-generated method stub
-		
 	}
-
-
-
-
-
 }

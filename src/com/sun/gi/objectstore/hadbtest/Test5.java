@@ -54,7 +54,7 @@ public class Test5 {
 
 	params.numObjs = 10000;
 
-	for (int objSize = 1024; objSize <= 16 * 1024; objSize *= 4) {
+	for (int objSize = 1 * 1024; objSize <= 16 * 1024; objSize *= 4) {
 
 	    os = TestUtil.connect(appID, true, params.dataSpaceType, null);
 	    // os.clear();
@@ -127,11 +127,14 @@ public class Test5 {
 	//System.out.println("transactionTest skipSize " + params.skipSize);
 
 	for (long snooze = 0; snooze >= 0; snooze -= 1) {
+	    if (snooze != 0) {
+		System.out.println("!!! !!! !!! !!! NONZERO SNOOZE: " + snooze);
+	    }
 
 	    if (params.numThreads == 1) {
 		System.out.println("starting one thread");
 		ClientTest5 t = new ClientTest5(appID, 0, params,
-			clusters, snooze, 1000);
+			clusters, snooze, 2000);
 		t.run();
 	    } else {
 		System.out.println("starting " + params.numThreads +
@@ -142,7 +145,7 @@ public class Test5 {
 		
 		for (int i = 0; i < params.numThreads; i++) {
 		    clients[i] = new ClientTest5(appID, i, params,
-			    clusters, snooze, 1000);
+			    clusters, snooze, 2000);
 		    allThreads[i] = new Thread(clients[i]);
 		    allThreads[i].start();
 		}

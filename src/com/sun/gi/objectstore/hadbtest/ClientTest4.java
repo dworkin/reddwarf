@@ -68,7 +68,7 @@ class ClientTest4 implements Runnable {
 		    incr + ": " + elapsed + "  " + rate + "/ms");
 	    System.out.println("\tat count " + count);
 	    try {
-		Thread.sleep(10000);
+		Thread.sleep(5000);
 	    } catch (Exception e) {
 		System.out.println("unexpected exception: " + e);
 		e.printStackTrace(System.out);

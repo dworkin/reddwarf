@@ -26,8 +26,8 @@ public class Test4 {
 	 */
 
 	// ObjectStore os = TestUtil.connect(false);
-	ObjectStore os = TestUtil.connect(1, false, "hadb", null);
-	// ObjectStore os = TestUtil.connect(1, true, "hadb", "Hlog1");
+	ObjectStore os = TestUtil.connect(1, false, "persistant-inmem", null);
+	// ObjectStore os = TestUtil.connect(1, true, "hadb", null);
 
 	if (TestUtil.sanityCheck(os, "Hello, World", true)) {
 	    System.out.println("appears to work");
@@ -81,7 +81,7 @@ public class Test4 {
 	System.out.println("continuing...");
 
 	for (long snooze = 0; snooze >= 0; snooze -= 1) {
-	    ClientTest4 t = new ClientTest4(10, os, clusters, snooze, 1000);
+	    ClientTest4 t = new ClientTest4(10, os, clusters, snooze, 40000);
 
 	    t.run();
 

@@ -160,6 +160,9 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	 * @see com.sun.gi.objectstore.tso.DataSpaceTransaction#release(long)
 	 */
 	public void release(long objectID) {
+
+		System.out.println("DataSpaceTransactionImpl.release");
+
 		try {
 			dataSpace.release(objectID);
 		} catch (NonExistantObjectIDException e) {
@@ -185,16 +188,18 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 	 */
 	private byte[] serialize(Serializable obj) {
 		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		byte[] buf = null;
 		try {
 			ObjectOutputStream oas = new ObjectOutputStream(baos);
 			oas.writeObject(obj);
 			oas.flush();
 			oas.close();
-			return baos.toByteArray();
+			buf = baos.toByteArray();
+			baos.reset();
 		} catch (IOException e) {			
 			e.printStackTrace();
 		}
-		return null;
+		return buf;
 	}
 
 	/*
@@ -211,6 +216,13 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 		updateMap.clear();
 		localObjectCache.clear();
 		//release left over locks
+
+		try {
+		    dataSpace.release(locksHeld);
+		} catch (NonExistantObjectIDException e) {
+		}
+
+		/*
 		for(Long id : locksHeld){
 			try {
 				dataSpace.release(id);
@@ -218,8 +230,9 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 				// XXX: note the excecption.
 			}
 		}
+		*/
+
 		locksHeld.clear();
-		
 	}
 
 	/*

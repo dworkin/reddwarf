@@ -94,6 +94,27 @@ public interface DataSpace {
     void release(long objectID) throws NonExistantObjectIDException;
 
     /**
+     * Releases all of the locks in the given set of object IDs.  <p>
+     *
+     * Note that any thread may release any lock.  (see above.)<p>
+     *
+     * Also note that it is not an error to release the lock on an
+     * object that is not currently locked, or to attempt to release
+     * the lock on an object that does not exist.  In either of these
+     * cases, releasing the lock has no effect on the state of the
+     * DataSpace.  A {@link NonExistantObjectIDException} is thrown if
+     * any of the objects do not exist, but this does not prevent all
+     * of the other objects from being released.
+     *
+     * @param objectIDs a set of IDs for objects whose locks to
+     * release
+     *
+     * @throws NonExistantObjectIDException if one or more of the
+     * object IDs does not exist
+     */
+    void release(Set<Long> objectIDs) throws NonExistantObjectIDException;
+
+    /**
      * Atomically updates the DataSpace.  <p>
      *
      * The <code>updateMap</code> contains new bindings between object

@@ -486,8 +486,7 @@ public class HadbDataSpace implements DataSpace {
 		OBJLOCKTBLNAME +
 		    " SET OBJLOCK=1 WHERE OBJID=? AND OBJLOCK=0");
 	updateObjUnlockStmnt = updateSingleConn.prepareStatement("UPDATE " +
-		OBJLOCKTBLNAME +
-		    " SET OBJLOCK=0 WHERE OBJID=? AND OBJLOCK=1");
+		OBJLOCKTBLNAME + " SET OBJLOCK=0 WHERE OBJID=?");
 	insertObjLockStmnt = updateSingleConn.prepareStatement("INSERT INTO " +
 			OBJLOCKTBLNAME + " VALUES(?,?)");
 
@@ -612,7 +611,8 @@ public class HadbDataSpace implements DataSpace {
 	    return false;
 	}
 
-	s = "CREATE INDEX " + NAMETBLNAME + "_r ON " + NAMETBLNAME + "(OBJID)";
+	s = "CREATE INDEX " + NAMEBASETBL + "_" + appID + "_r ON " +
+		NAMETBLNAME + " (OBJID)";
 	try {
 	    Statement stmnt = schemaConn.createStatement();
 	    stmnt.execute(s);
@@ -914,6 +914,9 @@ public class HadbDataSpace implements DataSpace {
 	    } else {
 		System.out.println("Missed the lock on " +
 			objectID + " rc = " + rc);
+		{
+		    (new Exception("missed")).printStackTrace();
+		}
 
 		/*
 		 * If we didn't succeed, then try again, perhaps after
@@ -938,7 +941,9 @@ public class HadbDataSpace implements DataSpace {
     /**
      * {@inheritDoc}
      */
-    public synchronized void release(long objectID) {
+    public synchronized void release(long objectID)
+	    throws NonExistantObjectIDException
+    {
 	
 	/*
 	 * Similar to lock, except it doesn't poll.  If the update
@@ -986,6 +991,48 @@ public class HadbDataSpace implements DataSpace {
 	    // XXX: not an error.  This is a diagnostic only.
 	}
     }
+
+    /*
+     * {@inheritDoc}
+     */
+    public void release(Set<Long> objectIDs)
+	    throws NonExistantObjectIDException
+    {
+
+	/*
+	 * Similar to lock, except it doesn't poll.  If the update
+	 * fails, it assumes that's because the lock is already
+	 * unlocked, and rolls back.
+	 *
+	 * There might be a race condition here:  can't tell without
+	 * looking at the actual packets, which is bad.  -DJE
+	 */
+
+	int[] updateCounts = new int[0];
+	for (long oid : objectIDs) {
+	    try {
+		updateObjUnlockStmnt.setLong(1, oid);
+		updateObjUnlockStmnt.addBatch();
+	    } catch (SQLException e) {
+		System.out.println("FAILED to set parameters");
+	    }
+	}
+
+	try {
+	    updateCounts = updateObjUnlockStmnt.executeBatch();
+	} catch (SQLException e) {
+	    System.out.println(e);
+	    e.printStackTrace();
+	}
+
+	for (int rc : updateCounts) {
+	    if (rc != 1) {
+		System.out.println("failed to release something");
+		throw new NonExistantObjectIDException("unknown obj released.");
+	    }
+	}
+    }
+
 
     /**
      * {@inheritDoc}
