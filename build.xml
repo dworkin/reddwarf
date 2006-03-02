@@ -104,6 +104,21 @@
 	    <exclude name="com/sun/gi/client/**" />
 	</javac>
     </target>
+	
+
+    <target name="build.j2seAPI" depends="init">
+	<echo message="${ant.project.name}: ${ant.file}" />
+	<javac srcdir="src" sourcepath="" destdir="bin" source="5" target="5"
+		debug="${debug}" optimize="${optimize}"
+		deprecation="${deprecated}">
+	    <!-- <compilerarg value="-Xlint:unchecked"/> -->
+	    <classpath refid="project.classpath" />
+		<include name= "com/sun/gi/comm/users/client/**" />
+		<include name= "com/sun/gi/comm/user/protocol/**" />
+		<include name= "com/sun/gi/validation/**" />
+		<include name = "com/sun/gi/comm/discovery/**" />		
+	</javac>
+    </target>
 
     <target name="build.clients" depends="init">
 	<echo message="${ant.project.name}: ${ant.file}" />
@@ -280,7 +295,7 @@
 	<zip destfile="ProjectDarkstar.zip" basedir="release" />
     </target>
     
-    <target name="release.bin" depends="release.server,release.apps,release.clients" />
+    <target name="release.bin" depends="release.server,release.j2seAPI, release.apps,release.clients" />
 
     <target name="release.server" depends="build.server">
 	<jar destfile="release/ProjectDarkstar.jar"
@@ -296,6 +311,14 @@
 	<copy file="resources/Install.txt" todir="release" />
 	<copy file="resources/passwd.txt" todir="release" />
     </target>
+	
+	   <target name="release.j2seAPI" depends="build.j2seAPI">
+		<jar destfile="release/ProjectDarkstarClientAPI.jar"
+		    basedir="bin" includes="com/sun/gi/comm/users/client/**,
+				com/sun/gi/comm/user/protocol/**,
+				com/sun/gi/validation/**,
+				com/sun/gi/comm/discovery/**" />		
+	    </target>
 
     <target name="release.docs" depends="docs">
 	<copy todir="release/docs" >
