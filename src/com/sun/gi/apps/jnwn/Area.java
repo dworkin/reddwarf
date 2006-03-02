@@ -86,8 +86,8 @@ public class Area implements GLO {
 	characters = new LinkedList<GLOReference<Character>>();
 
 	SimTask task = SimTask.getCurrent();
-	String channelName = "Channel:Area:" + areaName;
-	channel = task.openChannel(areaName);
+	String channelName = "Area:" + areaName;
+	channel = task.openChannel(channelName);
 	task.lock(channel, true);
     }
 

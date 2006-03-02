@@ -40,6 +40,7 @@
 
 package com.sun.gi.apps.jnwn;
 
+import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.logic.SimBoot;
 import com.sun.gi.logic.SimTask;
@@ -63,6 +64,10 @@ public class JNWN implements SimBoot<JNWN>, SimUserListener {
     private static Logger log = Logger.getLogger("com.sun.gi.apps.jnwn");
 
     private HashMap<UserID, GLOReference<User>> userMap;
+
+    public static final String CONTROL_CHANNEL_NAME = "Control";
+
+    private ChannelID controlChannel;
 
     // SimBoot methods
 
@@ -91,6 +96,8 @@ public class JNWN implements SimBoot<JNWN>, SimUserListener {
         // Register this object as the handler for login- and
 	// disconnect-events for all users on this app.
 	task.addUserListener(thisGLO);
+
+	controlChannel = task.openChannel(CONTROL_CHANNEL_NAME);
     }
 
     // SimUserListener methods
@@ -100,13 +107,15 @@ public class JNWN implements SimBoot<JNWN>, SimUserListener {
 	SimTask task = SimTask.getCurrent();
 
 	String userName = subject.getPrincipals().iterator().next().getName();
-	GLOReference<User> userRef = User.findOrCreate(uid, userName);
+	GLOReference<User> userRef =
+	    User.findOrCreate(uid, userName, controlChannel);
 	if (userRef == null) {
 	    log.severe("No GLO mapped for user " + uid);
 	    return;
 	}
 	userMap.put(uid, userRef);
 
+	// Let the user object do any additional setup
 	userRef.get(task).joinedGame();
     }
 

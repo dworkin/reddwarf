@@ -69,6 +69,7 @@ public class User implements SimUserDataListener {
 
     private String  name;
     private UserID  uid;
+    private ChannelID  controlChannel;
     private GLOReference<Character>  characterRef;
 
     protected User(String userName, UserID userID) {
@@ -77,7 +78,9 @@ public class User implements SimUserDataListener {
 	characterRef = null;
     }
 
-    protected void boot(GLOReference<User> thisRef) {
+    protected void boot(GLOReference<User> thisRef, ChannelID controlChan) {
+
+	controlChannel = controlChan;
 
 	if (characterRef == null) {
 	    // This is a new user
@@ -114,16 +117,17 @@ public class User implements SimUserDataListener {
     }
 
     public static GLOReference<User> findOrCreate(UserID userID,
-	    String userName) {
+	    String userName, ChannelID controlChan) {
 
 	SimTask task = SimTask.getCurrent();
-	GLOReference<User> ref = findOrCreateGLO(userID, userName);
+	GLOReference<User> ref =
+	    findOrCreateGLO(userID, userName);
 
 	// Register the new User GLO as the event-handler for this uid.
 	task.addUserDataListener(userID, ref);
 
 	// Do any additional init
-	ref.get(task).boot(ref);
+	ref.get(task).boot(ref, controlChan);
 
 	return ref;
     }
@@ -157,7 +161,8 @@ public class User implements SimUserDataListener {
     public void joinedGame() {
 	log.fine("User " + name + " [" + uid + "] joined game");
 
-	characterRef.get(SimTask.getCurrent()).joinArea();
+	// Put this user on the global control channel
+	SimTask.getCurrent().join(uid, controlChannel);
     }
 
     public void leftGame() {
@@ -172,6 +177,8 @@ public class User implements SimUserDataListener {
     public void userJoinedChannel(ChannelID channelID, UserID userID) {
 	log.fine("User " + userID + " joined channel " + channelID);
 
+	SimTask task = SimTask.getCurrent();
+
 	// Paranoia
 	if (! uid.equals(userID)) {
 	    log.warning("User: Got UID " + userID + " expected " + uid);
@@ -183,8 +190,22 @@ public class User implements SimUserDataListener {
 	    return;
 	}
 
-	// Let my Character handle it
-	characterRef.peek(SimTask.getCurrent()).joinedChannel(channelID);
+	Character ch = characterRef.peek(task);
+
+	if (controlChannel.equals(channelID)) {
+	    String message = "userid " + ch.getCharacterID();
+	    ByteBuffer buf = ByteBuffer.wrap(message.getBytes());
+	    buf.position(buf.limit());
+	    task.sendData(controlChannel, uid, buf, true);
+
+	    // Join the map we're going to be playing
+	    ch.joinArea();
+
+	    return;
+	}
+
+	// Otherwise, let my Character handle it
+	ch.joinedChannel(channelID);
     }
 
     public void userLeftChannel(ChannelID channelID, UserID userID) {
@@ -198,6 +219,11 @@ public class User implements SimUserDataListener {
 
 	if (characterRef == null) {
 	    log.severe("Channel joined, but no character assigned");
+	    return;
+	}
+
+	if (controlChannel.equals(channelID)) {
+	    // ignore it; we're shutting down
 	    return;
 	}
 
