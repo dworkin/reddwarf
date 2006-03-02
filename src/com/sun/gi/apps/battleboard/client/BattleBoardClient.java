@@ -186,7 +186,7 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
 		}
 
 		public void playerLeft(byte[] playerID) {
-		    log.info("playerJoined on " + channel.getName());
+		    log.info("playerLeft on " + channel.getName());
 		}
 
 		public void dataArrived(byte[] uid, ByteBuffer data,
