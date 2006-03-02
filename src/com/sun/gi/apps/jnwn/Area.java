@@ -75,8 +75,9 @@ public class Area implements GLO {
 	return ref;
     }
 
-    public void addCharacter(Character character) {
-	SimTask.getCurrent().join(character.getUID(), channel);
+    public void addCharacter(Character ch) {
+	SimTask task = SimTask.getCurrent();
+	task.join(ch.getUID(), channel);
     }
 
     protected Area(String name) {
@@ -171,7 +172,7 @@ public class Area implements GLO {
 	data.get(bytes);
 	String text = new String(bytes);
 
-	log.finest("dataReceived: (" + text + ")");
+	log.finest("(" + text + ")");
 	String[] tokens = text.split("\\s+");
 	if (tokens.length == 0) {
 	    log.warning("empty message");

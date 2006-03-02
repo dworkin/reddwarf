@@ -187,7 +187,7 @@ public class User implements SimUserDataListener {
 
 	// Paranoia
 	if (! uid.equals(userID)) {
-	    log.warning("User: Got UID " + userID + " expected " + uid);
+	    log.warning("Got UID " + userID + " expected " + uid);
 	    return;
 	}
 
@@ -217,19 +217,19 @@ public class User implements SimUserDataListener {
     public void userLeftChannel(ChannelID channelID, UserID userID) {
 	log.fine("User " + userID + " left channel " + channelID);
 
+	if (controlChannel.equals(channelID)) {
+	    // ignore it; we're shutting down
+	    return;
+	}
+
 	// Paranoia
 	if (! uid.equals(userID)) {
-	    log.warning("User: Got UID " + userID + " expected " + uid);
+	    log.warning("Got UID " + userID + " expected " + uid);
 	    return;
 	}
 
 	if (characterRef == null) {
-	    log.severe("Channel joined, but no character assigned");
-	    return;
-	}
-
-	if (controlChannel.equals(channelID)) {
-	    // ignore it; we're shutting down
+	    log.severe("Channel left, but no character assigned");
 	    return;
 	}
 
@@ -238,16 +238,16 @@ public class User implements SimUserDataListener {
     }
 
     public void userDataReceived(UserID userID, ByteBuffer data) {
-	log.finer("User: User " + userID + " direct data");
+	log.finer("User " + userID + " direct data");
 
 	// Paranoia
 	if (! uid.equals(userID)) {
-	    log.warning("User: Got UID " + userID + " expected " + uid);
+	    log.warning("Got UID " + userID + " expected " + uid);
 	    return;
 	}
 
 	if (characterRef == null) {
-	    log.severe("Channel joined, but no character assigned");
+	    log.severe("Channel data, but no character assigned");
 	    return;
 	}
 
