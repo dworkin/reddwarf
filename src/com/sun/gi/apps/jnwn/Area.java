@@ -104,7 +104,7 @@ public class Area implements GLO {
 	buf.put(moduleName.getBytes());
 	buf.put("load area ".getBytes());
 	buf.put(areaName.getBytes());
-	broadcast(buf.asReadOnlyBuffer());
+	sendToCharacter(character, buf.asReadOnlyBuffer());
     }
 
     protected void handleWalk(Character character, String[] tokens) {
@@ -113,6 +113,10 @@ public class Area implements GLO {
 
     public void addCharacter(Character character) {
 	SimTask.getCurrent().join(character.getUID(), channel);
+    }
+
+    protected void sendToCharacter(Character ch, ByteBuffer buf) {
+	SimTask.getCurrent().sendData(channel, ch.getUID(), buf, true);
     }
 
     /**
