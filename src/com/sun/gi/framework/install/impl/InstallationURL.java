@@ -64,16 +64,18 @@ public class InstallationURL implements InstallationLoader {
 				DeploymentRec drec = deprdr.getDeploymentRec(drecURL);
 				if (drec != null) {
 					drec.setID(appID);
-					String classpath = drec.getClasspathURL().trim();
-					if (classpath.substring(0,5).equalsIgnoreCase("file:")&&
-						(!classpath.substring(5,7).equals("//"))){
-						// realtive file URL, money with it
-						URL ctext = new URL(drecURL.getProtocol()+":"+
+					if (drec.getClasspathURL()!=null){
+						String classpath = drec.getClasspathURL().trim();
+						if (classpath.substring(0,5).equalsIgnoreCase("file:")&&
+								(!classpath.substring(5,7).equals("//"))){
+							// realtive file URL, money with it
+							URL ctext = new URL(drecURL.getProtocol()+":"+
 								drecURL.getPath());
-						URL turl = new URL(ctext,classpath.substring(5));
-						classpath = turl.toExternalForm();
-						System.out.println("Modified cp:"+classpath);
-						((DeploymentRecImpl)drec).setClasspathURL(classpath);
+							URL turl = new URL(ctext,classpath.substring(5));
+							classpath = turl.toExternalForm();
+							System.out.println("Modified cp:"+classpath);
+							((DeploymentRecImpl)drec).setClasspathURL(classpath);
+						}
 					}
 					idToDeploymentRec.put(appID, drec);
 				}

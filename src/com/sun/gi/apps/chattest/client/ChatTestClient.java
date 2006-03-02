@@ -13,6 +13,7 @@ import java.awt.event.WindowEvent;
 import java.awt.event.WindowStateListener;
 import java.io.File;
 import java.net.MalformedURLException;
+import java.net.URL;
 import java.nio.ByteBuffer;
 
 import javax.security.auth.callback.Callback;
@@ -233,6 +234,10 @@ public class ChatTestClient extends JFrame implements ClientConnectionManagerLis
 			mgr = new ClientConnectionManagerImpl("ChatTest",
 					new URLDiscoverer(new File("FakeDiscovery.xml").toURI()
 							.toURL()));
+			//mgr = new ClientConnectionManagerImpl("ChatTest",
+			//		new URLDiscoverer(
+			//				new URL("http://alpha-darkstar.sunlabs.com/discovery.xml")));
+			
 			mgr.setListener(this);
 
 		} catch (MalformedURLException e) {
