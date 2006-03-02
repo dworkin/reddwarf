@@ -71,11 +71,13 @@ public class User implements SimUserDataListener {
     private UserID  uid;
     private ChannelID  controlChannel;
     private GLOReference<Character>  characterRef;
+    private boolean connected;
 
     protected User(String userName, UserID userID) {
 	name = userName;
 	uid  = userID;
 	characterRef = null;
+	connected = true;
     }
 
     protected void boot(GLOReference<User> thisRef, ChannelID controlChan) {
@@ -132,6 +134,10 @@ public class User implements SimUserDataListener {
 	return ref;
     }
 
+    protected boolean isConnected() {
+	return connected;
+    }
+
     protected static GLOReference<User> findOrCreateGLO(UserID userID,
 	    String userName) {
 
@@ -141,7 +147,7 @@ public class User implements SimUserDataListener {
 	    User user = ref.get(task);
 	    if (user != null) {
 		UserID oldUserID = user.getUID();
-		if (oldUserID != null) {
+		if (user.isConnected() && oldUserID != null) {
 		    log.severe("User " + userName +
 			" still logged in as uid " + oldUserID);
 		    // user.kick();
@@ -163,13 +169,13 @@ public class User implements SimUserDataListener {
 
 	// Put this user on the global control channel
 	SimTask.getCurrent().join(uid, controlChannel);
+
+	connected = true;
     }
 
     public void leftGame() {
 	log.fine("User " + name + " [" + uid + "] left game");
-
-	// @@ we could do cleanup here, but it should all have been
-	// done by the various channel-leave handlers already.
+	connected = false;
     }
 
     // SimUserDataListener methods

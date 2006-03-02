@@ -125,6 +125,8 @@ public class JNWN implements SimBoot<JNWN>, SimUserListener {
 	    log.severe("No GLO mapped for user " + uid);
 	    return;
 	}
+	// XXX: Check if the userid is mapped correctly
+
 	userRef.get(SimTask.getCurrent()).leftGame();
     }
 }
