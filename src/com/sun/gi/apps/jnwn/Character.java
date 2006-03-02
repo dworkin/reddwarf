@@ -117,6 +117,33 @@ public class Character implements GLO {
 	facing = radians;
     }
 
+    public float getX() {
+	return position[0];
+    }
+
+    public float getY() {
+	return position[1];
+    }
+
+    public float getZ() {
+	return position[2];
+    }
+
+    public float getDirection() {
+	return facing;
+    }
+
+    public String getModel() {
+	return "my-model";
+    }
+
+    public String getName() {
+	return userRef.peek(SimTask.getCurrent()).getName();
+    }
+
+    public GLOReference<Character> getReference() {
+	return thisRef;
+    }
     public void joinArea() {
 	areaRef.peek(SimTask.getCurrent()).addCharacter(this);
     }

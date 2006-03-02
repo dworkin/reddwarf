@@ -75,6 +75,10 @@ public class Area implements GLO {
 	return ref;
     }
 
+    public void addCharacter(Character character) {
+	SimTask.getCurrent().join(character.getUID(), channel);
+    }
+
     protected Area(String name) {
 
 	moduleName = "FooModule"; // XXX
@@ -91,39 +95,77 @@ public class Area implements GLO {
 	thisRef = ref;
     }
 
-    protected void broadcast(ByteBuffer buf) {
-	log.finer("Broadcasting " + buf.position() + " bytes on " + channel);
-
-	SimTask.getCurrent().broadcastData(channel, buf, true);
-    }
-
-    protected void sendLoad(Character character) {
+    protected String getLoadModuleMessage() {
 	// XXX precompute this message for this area
-	ByteBuffer buf = ByteBuffer.allocate(1024);
-	buf.put("load module ".getBytes());
-	buf.put(moduleName.getBytes());
-	buf.put("load area ".getBytes());
-	buf.put(areaName.getBytes());
-	sendToCharacter(character, buf.asReadOnlyBuffer());
+	StringBuffer sb = new StringBuffer();
+	sb.append("load module ")
+	  .append(moduleName);
+	return sb.toString();
     }
 
-    protected void handleWalk(Character character, String[] tokens) {
+    protected String getLoadAreaMessage() {
+	StringBuffer sb = new StringBuffer();
+	sb.append("load area ")
+	  .append(areaName);
+	return sb.toString();
+    }
+
+    protected String getAddCharacterMessage(Character ch) {
+	StringBuffer sb = new StringBuffer();
+	sb.append("add character ")
+	  .append(ch.getCharacterID())
+	  .append(" ")
+	  .append(ch.getX())
+	  .append(" ")
+	  .append(ch.getY())
+	  .append(" ")
+	  .append(ch.getZ())
+	  .append(" ")
+	  .append(ch.getDirection())
+	  .append(" ")
+	  .append(ch.getModel())
+	  .append(" ")
+	  .append(ch.getName());
+	return sb.toString();
+    }
+
+    protected String getRemoveCharacterMessage(Character ch) {
+	StringBuffer sb = new StringBuffer();
+	sb.append("remove character ")
+	  .append(ch.getCharacterID());
+	return sb.toString();
+    }
+
+    protected void sendCurrentCharactersTo(Character ch) {
+	SimTask task = SimTask.getCurrent();
+	for (GLOReference<Character> ref : characters) {
+	    sendToCharacter(ch, getAddCharacterMessage(ref.peek(task)));
+	}
+    }
+
+    protected void handleWalk(Character ch, String[] tokens) {
 	SimTask task = SimTask.getCurrent();
     }
 
-    public void addCharacter(Character character) {
-	SimTask.getCurrent().join(character.getUID(), channel);
+    protected void broadcast(String message) {
+	log.finest("Broadcasting `" + message + "' on " + channel);
+	ByteBuffer buf = ByteBuffer.wrap(message.getBytes());
+	buf.position(buf.limit());
+	SimTask.getCurrent().broadcastData(channel, buf, true);
     }
 
-    protected void sendToCharacter(Character ch, ByteBuffer buf) {
+    protected void sendToCharacter(Character ch, String message) {
+	log.finest("Sending `" + message + "' to " + ch.getUID());
+	ByteBuffer buf = ByteBuffer.wrap(message.getBytes());
+	buf.position(buf.limit());
 	SimTask.getCurrent().sendData(channel, ch.getUID(), buf, true);
     }
 
     /**
      * Handle data that was sent directly to the server.
      */
-    public void dataReceived(Character character, ByteBuffer data) {
-	log.finer("Direct data from character " + character.getCharacterID());
+    public void dataReceived(Character ch, ByteBuffer data) {
+	log.finer("Direct data from character " + ch.getCharacterID());
 
 	byte[] bytes = new byte[data.remaining()];
 	data.get(bytes);
@@ -142,11 +184,19 @@ public class Area implements GLO {
 
     // SimChannelMembershipListener methods
 
-    public void characterJoined(Character c) {
-	log.fine("Character " + c.getCharacterID() + " joined " + areaName);
+    public void characterJoined(Character ch) {
+	log.fine("Character " + ch.getCharacterID() + " joined " + areaName);
+
+	sendToCharacter(ch, getLoadModuleMessage());
+	sendToCharacter(ch, getLoadAreaMessage());
+	sendCurrentCharactersTo(ch); // @@ must come before characters.add
+	characters.add(ch.getReference());
+	broadcast(getAddCharacterMessage(ch));
     }
 
-    public void characterLeft(Character c) {
-	log.fine("Character " + c.getCharacterID() + " left " + areaName);
+    public void characterLeft(Character ch) {
+	log.fine("Character " + ch.getCharacterID() + " left " + areaName);
+	characters.remove(ch.getReference());
+	broadcast(getRemoveCharacterMessage(ch));
     }
 }
