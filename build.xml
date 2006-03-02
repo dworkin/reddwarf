@@ -100,8 +100,22 @@
 		deprecation="${deprecated}">
 	    <!-- <compilerarg value="-Xlint:unchecked"/> -->
 	    <classpath refid="project.classpath" />
+	    <exclude name="com/sun/gi/apps/**" />
+	    <exclude name="com/sun/gi/client/**" />
+	</javac>
+    </target>
+
+    <target name="build.clients" depends="init">
+	<echo message="${ant.project.name}: ${ant.file}" />
+	<javac srcdir="src" destdir="bin" source="5" target="5"
+		debug="${debug}" optimize="${optimize}"
+		deprecation="${deprecated}">
+	    <!-- <compilerarg value="-Xlint:unchecked"/> -->
+	    <classpath refid="project.classpath" />
+	    <include name="com/sun/gi/apps/**" />
 	    <exclude name="com/sun/gi/apps/*/*.java" />
 	    <exclude name="com/sun/gi/apps/**/server/**" />
+	    <include name="com/sun/gi/clients/**" />
 	</javac>
     </target>
 
@@ -266,7 +280,7 @@
 	<zip destfile="ProjectDarkstar.zip" basedir="release" />
     </target>
     
-    <target name="release.bin" depends="release.server,release.apps" />
+    <target name="release.bin" depends="release.server,release.apps,release.clients" />
 
     <target name="release.server" depends="build.server">
 	<jar destfile="release/ProjectDarkstar.jar"
@@ -290,6 +304,8 @@
 	    </fileset>
 	</copy>
     </target>
+
+    <target name="release.clients" depends="build.clients"/>
 
     <target name="release.apps"
       depends="release.trivialboot,release.timertest,release.chattest,release.jeffboard,release.battleboard,release.glotest,release.jnwn">
