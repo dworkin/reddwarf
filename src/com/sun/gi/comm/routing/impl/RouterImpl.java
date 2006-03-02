@@ -512,7 +512,7 @@ public class RouterImpl implements Router {
 	 */
 	public void join(UserID user, ChannelID id) {
 		SGSChannel channel = getChannel(id);
-		if (id == null) { // channel not opened or otherwise mapped
+		if (channel == null) { // channel not opened or otherwise mapped
 			return;
 		}
 		SGSUser sgsUser = userMap.get(user);
@@ -532,7 +532,7 @@ public class RouterImpl implements Router {
 	 */
 	public void leave(UserID user, ChannelID id) {
 		SGSChannel channel = getChannel(id);
-		if (id == null) { // channel not opened or otherwise mapped
+		if (channel == null) { // channel not opened or otherwise mapped
 			return;
 		}
 		SGSUser sgsUser = userMap.get(user);
