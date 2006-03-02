@@ -18,7 +18,9 @@ import com.sun.gi.utils.SGSUUID;
  * <p>Title: Lobby</p>
  * 
  * <p>Description: Represents a Lobby in the Match Making application.  Lobbies function
- * both as a starting point for creating games and as a chat area.</p>
+ * both as a starting point for creating games and as a chat area. Lobbies are loosely 
+ * mapped to channels.   A lobby channel name is in the form of:
+ * FolderName.SubFolderName.LobbyName.</p>
  * 
  * <p>Copyright: Copyright (c) 2006</p>
  * <p>Company: Sun Microsystems, TMI</p>
@@ -28,6 +30,8 @@ import com.sun.gi.utils.SGSUUID;
  */
 public class Lobby extends ChannelRoom {
 
+	private static final long serialVersionUID = 1L;
+	
 	private int maxPlayers;
 	private boolean canHostBoot;
 	private boolean canHostBan;

@@ -83,7 +83,6 @@ public class LobbyChannel implements ILobbyChannel, ClientChannelListener {
      * @param playerID The ID of the joining player.
      */
     public void playerJoined(byte[] playerID) {
-    	System.out.println("Player joined: " + playerID);
     }
 
     /**
@@ -112,9 +111,9 @@ public class LobbyChannel implements ILobbyChannel, ClientChannelListener {
     	// TODO sten: test isServerID once that works
     	int command = protocol.readUnsignedByte(data);
     	if (command == PLAYER_ENTERED_LOBBY) {
-    		System.out.println("Player entered lobby");
     		SGSUUID userID = protocol.readUUID(data);
     		String name = protocol.readString(data);
+    		System.out.println("LobbyChannel: Player entered lobby " + name);
     		listener.playerEntered(userID.toByteArray(), name);
     	}
     	else if (command == SEND_TEXT) {
@@ -143,6 +142,10 @@ public class LobbyChannel implements ILobbyChannel, ClientChannelListener {
      */
     public void channelClosed() {
     	
+    }
+    
+    public String getName() {
+    	return channel.getName();
     }
 
 }

@@ -24,6 +24,8 @@ import com.sun.gi.utils.StatisticalUUID;
  */
 public class Folder implements GLO {
 	
+	private static final long serialVersionUID = 1L;
+	
 	private List<GLOReference> folderList;
 	private List<GLOReference> lobbyList;
 	

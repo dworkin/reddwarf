@@ -160,7 +160,7 @@ public class MatchMakingClient implements IMatchMakingClient, ClientConnectionMa
     }
 
     public void disconnected() {
-    	System.out.println("Disconnected");
+    	listener.disconnected();
     }
 
     /**
@@ -312,13 +312,14 @@ public class MatchMakingClient implements IMatchMakingClient, ClientConnectionMa
     	LobbyDescriptor[] lobbies = new LobbyDescriptor[numLobbies];
     	for (int i = 0; i < numLobbies; i++) {
     		String curLobbyName = protocol.readString(data);
+    		String curLobbyChannelName = protocol.readString(data);
     		String curLobbyDescription = protocol.readString(data);
     		SGSUUID curLobbyID = protocol.readUUID(data);
     		int numUsers = data.getInt();
     		int maxUsers = data.getInt();
     		boolean isPasswordProtected = protocol.readBoolean(data);
     		
-    		lobbies[i] = new LobbyDescriptor(curLobbyID, curLobbyName, curLobbyDescription, numUsers, maxUsers, isPasswordProtected);
+    		lobbies[i] = new LobbyDescriptor(curLobbyID, curLobbyName, curLobbyChannelName, curLobbyDescription, numUsers, maxUsers, isPasswordProtected);
     	}
     	listener.listedFolder(folderID, subfolders, lobbies);
     }

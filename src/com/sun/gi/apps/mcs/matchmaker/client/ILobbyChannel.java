@@ -4,6 +4,8 @@ import java.util.HashMap;
 
 public interface ILobbyChannel {
 	
+	public String getName();
+	
 	public void setListener(ILobbyChannelListener listener);
 	
 	public void sendText(String text);

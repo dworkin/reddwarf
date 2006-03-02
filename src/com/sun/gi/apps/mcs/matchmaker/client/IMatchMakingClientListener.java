@@ -44,6 +44,8 @@ public interface IMatchMakingClientListener {
 	 * that it is joined to the LobbyManager control channel.
 	 */
 	public void connected(byte[] myID);
+	
+	public void disconnected();
 
 	/**
 	 * Called when a request for login authentication comes from the server.

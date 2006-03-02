@@ -19,14 +19,16 @@ public class LobbyDescriptor {
 
 	private SGSUUID lobbyID;
 	private String name;
+	private String channelName;
 	private String description;
 	private int numUsers;
 	private int maxUsers;
 	private boolean passwordProtected;
 	
-	public LobbyDescriptor(SGSUUID id, String name, String desc, int numUsers, int maxUsers, boolean passwordProtected) {
+	public LobbyDescriptor(SGSUUID id, String name, String channelName, String desc, int numUsers, int maxUsers, boolean passwordProtected) {
 		this.lobbyID = id;
 		this.name = name;
+		this.channelName = channelName;
 		this.description = desc;
 		this.numUsers = numUsers;
 		this.maxUsers = maxUsers;
@@ -39,6 +41,10 @@ public class LobbyDescriptor {
 	
 	public String getName() {
 		return name;
+	}
+	
+	public String getChannelName() {
+		return channelName;
 	}
 	
 	public String getDescription() {

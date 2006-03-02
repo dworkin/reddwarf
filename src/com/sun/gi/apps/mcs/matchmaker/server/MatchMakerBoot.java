@@ -17,7 +17,8 @@ import com.sun.gi.utils.SGSUUID;
 /**
  * <p>Title: MatchMakerBoot</p>
  * 
- * <p>Description: The boot class for the MCS Match Maker application.</p>
+ * <p>Description: The boot class for the MCS Match Maker application.  When users join, they are
+ * wrapped in a Player object and registered in the GLO namespace under their UserID.</p>
  * 
  * <p>Copyright: Copyright (c) 2006</p>
  * <p>Company: Sun Microsystems, TMI</p>
@@ -27,6 +28,8 @@ import com.sun.gi.utils.SGSUUID;
  */
 public class MatchMakerBoot implements SimBoot, SimUserListener {
 
+	private static final long serialVersionUID = 1L;
+	
 	private GLOReference<Folder> folderRoot;
 	
 	/*
@@ -130,6 +133,9 @@ public class MatchMakerBoot implements SimBoot, SimUserListener {
 		SimTask task = SimTask.getCurrent();
 		GLOReference pRef = task.findGLO(uid.toString());
 		
+		if (pRef == null) {
+			return;
+		}
 		Player player = (Player) pRef.get(task);
 		GLOMap<String, UserID> userMap = (GLOMap<String, UserID>) task.findGLO("UsernameMap").get(task);
 		if (userMap.containsKey(player.getUserName())) {

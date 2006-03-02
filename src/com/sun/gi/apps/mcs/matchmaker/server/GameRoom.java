@@ -22,6 +22,8 @@ import com.sun.gi.utils.SGSUUID;
  */
 public class GameRoom extends ChannelRoom {
 	
+	private static final long serialVersionUID = 1L;
+	
 	private UserID host; 
 	
 	public GameRoom(String name, String description, String password, String channelName, ChannelID cid, UserID host) {

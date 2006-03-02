@@ -24,7 +24,10 @@ import com.sun.org.apache.bcel.internal.generic.LLOAD;
  * 
  * <p>Title: Player</p>
  * 
- * <p>Description: This class represents a Player that is currently on-line.</p>
+ * <p>Description: This class represents a Player that is currently on-line.  The Player object acts
+ * as a "command proxy" for the associated user.  Commands arrive via userDataReceived callback on the Lobby 
+ * Manager control channel.  The command is processed and a response sent back to the user on the
+ * same channel.</p>
  * 
  * <p>Copyright: Copyright (c) 2006</p>
  * <p>Company: Sun Microsystems, TMI</p>
@@ -33,6 +36,8 @@ import com.sun.org.apache.bcel.internal.generic.LLOAD;
  * @version 1.0
  */
 public class Player implements SimUserDataListener {
+	
+	private static final long serialVersionUID = 1L;
 	
 	private String userName;
 	private UserID userID;
@@ -109,9 +114,8 @@ public class Player implements SimUserDataListener {
     }
 	  
 	/**
-     * <p>This callback is called when a user joins a channel.  This implementation also
-     * passes the PlayerEnteredLobby command down the channel, which includes
-     * the user's username.</p>
+     * <p>This callback is called when a user joins a channel.  The joined channel could be the
+     * Lobby Manager control channel, a lobby, or a game room. </p>  
      * 
      * <p>If the channel joined is the lobby manager control channel, then the 
      * SERVER_LISTENING response is sent down the channel to the user.</p>
@@ -139,7 +143,8 @@ public class Player implements SimUserDataListener {
 				list.add(PLAYER_ENTERED_LOBBY);
 				list.add(userID);
 				list.add(userName);
-				sendResponse(task, list, cid);
+				System.out.println("send player entered lobby " + userName);
+				sendMulticastResponse(task, lobby.getUsers(), list, cid);
 			}
 			else {			// must have been a game room
 				GLOMap<SGSUUID, GLOReference<GameRoom>> gameRoomMap = (GLOMap<SGSUUID, GLOReference<GameRoom>>) task.findGLO("GameRoomMap").peek(task);
@@ -175,7 +180,8 @@ public class Player implements SimUserDataListener {
 	 
 	/**
      * <p>Called when a user leaves a channel.  There's only work to do if the user leaving is
-     * the player.  If so, they either left a lobby or a game room.</p>
+     * the player.  If so, they either left a lobby or a game room (or the lobby manager control
+     * channel, which means they left the server).</p>
      * 
      * <p>If they left a Lobby, simply remove them from the Lobby's list of users.</p>
      * 
@@ -231,7 +237,7 @@ public class Player implements SimUserDataListener {
 			else if (currentLobby != null) {
 				Lobby lobby = (Lobby) currentLobby.get(task);
 				lobby.removeUser(uid);
-				currentLobby.delete(task);
+//				currentLobby.delete(task);
 				currentLobby = null;
 			}
 		}
@@ -279,6 +285,7 @@ public class Player implements SimUserDataListener {
 				Lobby curLobby = (Lobby) lobbyRef.peek(task);
 				
 				list.add(curLobby.getName());
+				list.add(curLobby.getChannelName());
 				list.add(curLobby.getDescription());
 				list.add(curLobby.getLobbyID());
 				list.add(curLobby.getNumPlayers());
@@ -559,13 +566,22 @@ public class Player implements SimUserDataListener {
 		sendResponse(task, list, cid);
 	}
 	
+	private void sendMulticastResponse(SimTask task, List<UserID> users, List list, ChannelID cid) {
+		sendResponse(task, users.toArray(new UserID[users.size()]), list, cid);
+	}
+	
 	private void sendResponse(SimTask task, List list, ChannelID cid) {
+		sendResponse(task, new UserID[] {userID}, list, cid);
+	}
+	
+	private void sendResponse(SimTask task, UserID[] to, List list, ChannelID cid) {
 		ByteBuffer data = protocol.assembleCommand(list);
 		
 		// TODO sten: refactor sendData for unicast (or not)
-		task.sendData(cid, new UserID[] {userID}, data, true);
+		task.sendData(cid, to, data, true);
 	}
 	
+
 
 }
 

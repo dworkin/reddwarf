@@ -173,6 +173,8 @@ public class MatchMakerClientTest implements IMatchMakingClientListener {
 		//mmClient.lookupUserID("gust");
 	}
 	
+	public void disconnected() {}
+	
 	public void validationRequest(Callback[] callbacks) {
     	System.out.println("validation request");
     	for (Callback cb : callbacks) {
