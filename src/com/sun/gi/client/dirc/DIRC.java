@@ -39,12 +39,15 @@ public class DIRC implements ClientConnectionManagerListener, ChatManager {
 
     private String appName;
     private URL    discoveryURL;
-    private ClientConnectionManager clientManager;
-    private Map<String, ClientChannel> channels;
-    private Callback[] validationCallbacks = null;
     private boolean autologin = true;
 
+    private Map<String, ClientChannel> channels;
+    private ClientChannel currentChannel = null;
     private ChatPanel chatPanel;
+
+    private ClientConnectionManager clientManager;
+    private NameCallback     loginNameCB = null;
+    private PasswordCallback loginPassCB = null;
 
     public DIRC(String app, URL discovery) {
 	appName = app;
@@ -74,41 +77,71 @@ public class DIRC implements ClientConnectionManagerListener, ChatManager {
 	}
     }
 
-    // Input-related methods
-
-    protected void showPrompt(String prompt) {
-	chatPanel.info("[Validator] " + prompt);
-    }
- 
-    // Validation-related methods
-
-    public void visitNameCallback(NameCallback cb) {
-	log.finest("visitNameCallback");
-	String line = "foo";
-	/*
-	if (! autologin) {
-	    showPrompt(cb.getPrompt());
-	    line = getLine();
-	}
-	*/
-	cb.setName(line);
-    }
-
-    public void visitPasswordCallback(PasswordCallback cb) {
-	log.finest("visitPasswordCallback");
-	String line = "bar";
-	/*
-	if (! autologin) {
-	    showPrompt(cb.getPrompt());
-	    line = getLine();
-	}
-	*/
-	cb.setPassword(line.toCharArray());
-    }
-
     // Chat input
+
     public void handleChatInput(String text) {
-	log.info("handleChatInput: `" + text + "'");
+	boolean handled = false;
+	if (text.startsWith("/")) {
+	    handled = handleChatCommand(text);
+	}
+	if (handled) {
+	    return;
+	}
+
+	ByteBuffer buf = ByteBuffer.wrap(text.getBytes());
+	buf.position(buf.limit());
+
+	if (currentChannel == null) {
+	    clientManager.sendToServer(buf, true);
+	} else {
+	    currentChannel.sendBroadcastData(buf, true);
+	}
+    }
+
+    public boolean handleChatCommand(String text) {
+	if (text.startsWith("/user ")) {
+	    if (loginNameCB != null) {
+		loginNameCB.setName(text.substring(6));
+	    }
+	    chatPanel.info("[Validator]: " + loginPassCB.getPrompt());
+	    return true;
+	}
+
+	if (text.startsWith("/pass ")) {
+	    if (loginPassCB != null) { // XXX check that name went first
+		loginPassCB.setPassword(text.substring(6).toCharArray());
+	    }
+	    sendValidationResponse();
+	    return true;
+	}
+
+	if (text.startsWith("/chan")) {
+	    String newChanName = text.substring(6);
+	    if (newChanName.length() == 0) {
+		currentChannel = null;
+		chatPanel.info("Current channel is direct-to-server");
+		return true;
+	    }
+
+	    ClientChannel newChan = channels.get(newChanName);
+	    if (newChan == null) {
+		chatPanel.info("No such channel `" + newChanName + "'");
+		return true;
+	    }
+
+	    if (!(newChan.equals(currentChannel))) {
+		currentChannel = newChan;
+	    }
+	    chatPanel.info("Current channel is `" + newChanName + "'");
+	    return true;
+	}
+
+	if (text.startsWith("/quit")) {
+	    clientManager.disconnect();
+	    return true;
+	}
+
+	return false;
     }
 
     // ClientConnectionManagerListener methods
@@ -119,36 +152,45 @@ public class DIRC implements ClientConnectionManagerListener, ChatManager {
 	for (Callback cb : callbacks) {
 	    try {
 		if (cb instanceof NameCallback) {
-		    visitNameCallback((NameCallback) cb);
+		    loginNameCB = (NameCallback) cb;
 		} else if (cb instanceof PasswordCallback) {
-		    visitPasswordCallback((PasswordCallback) cb);
+		    loginPassCB = (PasswordCallback) cb;
 		}
 	    } catch (Exception e) {
 		e.printStackTrace();
 	    } 
 	}
+	chatPanel.info("[Validator]: " + loginNameCB.getPrompt());
+    }
 
+    protected void sendValidationResponse() {
+	Callback[] callbacks = new Callback[2];
+	callbacks[0] = loginNameCB;
+	callbacks[1] = loginPassCB;
+	loginNameCB = null;
+	loginPassCB = null;
 	clientManager.sendValidationResponse(callbacks);
     }
 
     public void connected(byte[] myID) {
-	chatPanel.info("connected");
+	chatPanel.info("connected as " + StringUtils.bytesToHex(myID));
     }
 
     public void connectionRefused(String message) {
-	chatPanel.info("connectionRefused");
+	chatPanel.info("connection refused: `" + message + "'");
     }
 
     public void disconnected() {
 	chatPanel.info("disconnected");
+	System.exit(0);
     }
 
     public void userJoined(byte[] userID) {
-	chatPanel.info("userJoined");
+	chatPanel.info(StringUtils.bytesToHex(userID) + " connected");
     }
 
     public void userLeft(byte[] userID) {
-	chatPanel.info("userLeft");
+	chatPanel.info(StringUtils.bytesToHex(userID) + " disconnected");
     }
 
     public void failOverInProgress() {
@@ -165,30 +207,37 @@ public class DIRC implements ClientConnectionManagerListener, ChatManager {
     }
 
     public void joinedChannel(final ClientChannel channel) {
-	chatPanel.info("joinedChannel " + channel.getName());
+	chatPanel.info("Joined `" + channel.getName() + "'");
+
+	channels.put(channel.getName(), channel);
 
 	channel.setListener(new ClientChannelListener() {
-	    public void playerJoined(byte[] playerID) {
-		chatPanel.info("playerJoined on " + channel.getName());
+	    public void playerJoined(byte[] userID) {
+		chatPanel.info(StringUtils.bytesToHex(userID) +
+		    " joined `" + channel.getName() + "'");
 	    }
 
-	    public void playerLeft(byte[] playerID) {
-		chatPanel.info("playerLeft on " + channel.getName());
+	    public void playerLeft(byte[] userID) {
+		chatPanel.info(StringUtils.bytesToHex(userID) +
+		    " left `" + channel.getName() + "'");
 	    }
 
-	    public void dataArrived(byte[] uid, ByteBuffer data,
+	    public void dataArrived(byte[] userID, ByteBuffer data,
 		    boolean reliable) {
 
 		byte[] bytes = new byte[data.remaining()];
 		data.get(bytes);
 
-		chatPanel.messageArrived(StringUtils.bytesToHex(uid),
+		chatPanel.messageArrived(StringUtils.bytesToHex(userID),
 					 channel.getName(),
 					 new String(bytes));
 	    }
 
 	    public void channelClosed() {
-		chatPanel.info("channel " + channel.getName() + " closed");
+		chatPanel.info("Channel " + channel.getName() + " closed");
+		if (currentChannel == channels.remove(channel.getName())) {
+		    currentChannel = null;
+		}
 	    }
 	});
     }

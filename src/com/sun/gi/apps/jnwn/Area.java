@@ -61,6 +61,7 @@ public class Area implements GLO {
 
     private static Logger log = Logger.getLogger("com.sun.gi.apps.jnwn");
 
+    private String     moduleName;
     private String     areaName;
     private ChannelID  channel;
     private GLOReference<Area>  thisRef;
@@ -76,6 +77,7 @@ public class Area implements GLO {
 
     protected Area(String name) {
 
+	moduleName = "FooModule"; // XXX
 	areaName = name;
 	characters = new LinkedList<GLOReference<Character>>();
 
@@ -92,16 +94,16 @@ public class Area implements GLO {
     protected void broadcast(ByteBuffer buf) {
 	log.finer("Broadcasting " + buf.position() + " bytes on " + channel);
 
-	//SimTask.getCurrent().broadcastData(channel, buf, true);
+	SimTask.getCurrent().broadcastData(channel, buf, true);
     }
 
     protected void sendLoad(Character character) {
 	// XXX precompute this message for this area
 	ByteBuffer buf = ByteBuffer.allocate(1024);
 	buf.put("load module ".getBytes());
-	// buf.put(moduleName.getBytes());
+	buf.put(moduleName.getBytes());
 	buf.put("load area ".getBytes());
-	// buf.put(areaName.getBytes());
+	buf.put(areaName.getBytes());
 	broadcast(buf.asReadOnlyBuffer());
     }
 
