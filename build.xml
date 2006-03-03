@@ -115,9 +115,10 @@
 	    <!-- <compilerarg value="-Xlint:unchecked"/> -->
 	    <classpath refid="project.classpath" />
 		<include name= "com/sun/gi/comm/users/client/**" />
-		<include name= "com/sun/gi/comm/user/protocol/**" />
+		<include name= "com/sun/gi/comm/users/protocol/**" />
 		<include name= "com/sun/gi/validation/**" />
-		<include name = "com/sun/gi/comm/discovery/**" />		
+		<include name = "com/sun/gi/comm/discovery/**" />
+		<include name = "com/sun/gi/utils/nio/**" />
 	</javac>
     </target>
 
@@ -325,9 +326,10 @@
 	   <target name="release.j2seAPI" depends="build.j2seAPI">
 		<jar destfile="release/ProjectDarkstarClientAPI.jar"
 		    basedir="bin" includes="com/sun/gi/comm/users/client/**,
-				com/sun/gi/comm/user/protocol/**,
+				com/sun/gi/comm/users/protocol/**,
 				com/sun/gi/validation/**,
-				com/sun/gi/comm/discovery/**" />		
+				com/sun/gi/comm/discovery/**,
+				com/sun/gi/utils/nio/**" />		
 	    </target>
 
     <target name="release.docs" depends="docs">
