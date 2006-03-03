@@ -36,9 +36,6 @@ public class ChatPanel extends JPanel implements ActionListener, ChatListener
     // the display area
     private JTextArea outputArea;
 
-    // the channel area
-    private JTextArea channelArea;
-
     // the entry field
     private JTextField inputField;
 
@@ -63,19 +60,11 @@ public class ChatPanel extends JPanel implements ActionListener, ChatListener
         outputArea.setRows(40);
         outputArea.setLineWrap(true);
 
-        // create a channel list
-        channelArea = new JTextArea();
-        channelArea.setColumns(10);
-        channelArea.setRows(42);
-        channelArea.setLineWrap(false);
-        channelArea.setEditable(false);
-
         // create the entry field, and capture return key-presses
         inputField = new JTextField();
         inputField.addActionListener(this);
 
         add(outputArea, BorderLayout.CENTER);
-        add(channelArea, BorderLayout.EAST);
         add(inputField, BorderLayout.SOUTH);
     }
 

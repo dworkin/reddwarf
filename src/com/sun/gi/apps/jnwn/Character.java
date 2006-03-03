@@ -64,9 +64,6 @@ public class Character implements GLO {
     private String  name;
     private GLOReference<User>       userRef;
     private GLOReference<Area>       areaRef;
-    private float[] position;
-    private float facing;
-    private float[] lastPosition;
     private GLOReference<Character>  thisRef;
 
     public static GLOReference<Character> create(GLOReference<User> uref) {
@@ -84,57 +81,14 @@ public class Character implements GLO {
 	name = uref.peek(task).getName();
 	userRef = uref;
 	areaRef = task.findGLO("Area:foo"); // XXX
-	position = new float[3];
     }
 
     protected void boot(GLOReference<Character> ref) {
 	thisRef = ref;
     }
 
-    protected void setPosition(float x, float y, float z) {
-	position[0] = x;
-	position[1] = y;
-	position[2] = z;
-    }
-
-    public void setNewArea(GLOReference<Area> area,
-	    float x, float y, float z, float radians) {
+    public void setAreaRef(GLOReference<Area> area) {
 	areaRef = area;
-	setPosition(x, y, z);
-	setDirection(radians);
-    }
-
-    public void walk(float x, float y, float z) {
-	lastPosition = position.clone();
-	setPosition(x, y, z);
-
-	if (! lastPosition.equals(position)) {
-	    // We moved -- check walkability
-	}
-    }
-
-    public void setDirection(float radians) {
-	facing = radians;
-    }
-
-    public float getX() {
-	return position[0];
-    }
-
-    public float getY() {
-	return position[1];
-    }
-
-    public float getZ() {
-	return position[2];
-    }
-
-    public float getDirection() {
-	return facing;
-    }
-
-    public String getModel() {
-	return "my-model";
     }
 
     public String getName() {

@@ -45,8 +45,9 @@ import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask;
 
+import java.io.Serializable;
 import java.nio.ByteBuffer;
-import java.util.LinkedList;
+import java.util.HashMap;
 import java.util.logging.Logger;
 
 /**
@@ -65,7 +66,7 @@ public class Area implements GLO {
     private String     areaName;
     private ChannelID  channel;
     private GLOReference<Area>  thisRef;
-    private LinkedList<GLOReference<Character>>  characters;
+    private HashMap<GLOReference<Character>, PlayerInfo>  map;
 
     public static GLOReference create(String name) {
 	SimTask task = SimTask.getCurrent();
@@ -84,7 +85,7 @@ public class Area implements GLO {
 
 	moduleName = "FooModule"; // XXX
 	areaName = name;
-	characters = new LinkedList<GLOReference<Character>>();
+	map = new HashMap<GLOReference<Character>, PlayerInfo>();
 
 	SimTask task = SimTask.getCurrent();
 	String channelName = "Area:" + areaName;
@@ -112,19 +113,20 @@ public class Area implements GLO {
     }
 
     protected String getAddCharacterMessage(Character ch) {
+	PlayerInfo info = map.get(ch.getReference());
 	StringBuffer sb = new StringBuffer();
 	sb.append("add character ")
 	  .append(ch.getCharacterID())
 	  .append(" ")
-	  .append(ch.getX())
+	  .append(info.x)
 	  .append(" ")
-	  .append(ch.getY())
+	  .append(info.y)
 	  .append(" ")
-	  .append(ch.getZ())
+	  .append(info.z)
 	  .append(" ")
-	  .append(ch.getDirection())
+	  .append(info.heading)
 	  .append(" ")
-	  .append(ch.getModel())
+	  .append(info.model)
 	  .append(" ")
 	  .append(ch.getName());
 	return sb.toString();
@@ -139,7 +141,7 @@ public class Area implements GLO {
 
     protected void sendCurrentCharactersTo(Character ch) {
 	SimTask task = SimTask.getCurrent();
-	for (GLOReference<Character> ref : characters) {
+	for (GLOReference<Character> ref : map.keySet()) {
 	    sendToCharacter(ch, getAddCharacterMessage(ref.peek(task)));
 	}
     }
@@ -179,8 +181,12 @@ public class Area implements GLO {
 	    return;
 	}
 
-	//GLOReference<Character> characterRef = Character.getRef(uid);
-	//handleResponse(characterRef, tokens);
+	//GLOReference<Character> ref = Character.getRef(uid);
+	//handleResponse(ref, tokens);
+    }
+
+    protected PlayerInfo getNewInfo() {
+	return new PlayerInfo();
     }
 
     // SimChannelMembershipListener methods
@@ -190,14 +196,47 @@ public class Area implements GLO {
 
 	sendToCharacter(ch, getLoadModuleMessage());
 	sendToCharacter(ch, getLoadAreaMessage());
-	sendCurrentCharactersTo(ch); // @@ must come before characters.add
-	characters.add(ch.getReference());
+	sendCurrentCharactersTo(ch); // @@ must come before map.put
+	map.put(ch.getReference(), getNewInfo());
 	broadcast(getAddCharacterMessage(ch));
     }
 
     public void characterLeft(Character ch) {
 	log.fine("Character " + ch.getCharacterID() + " left " + areaName);
-	characters.remove(ch.getReference());
+	map.remove(ch.getReference());
 	broadcast(getRemoveCharacterMessage(ch));
+    }
+
+    //
+
+    static class PlayerInfo implements Serializable {
+
+	private static final long serialVersionUID = 1L;
+
+	public float x;
+	public float y;
+	public float z;
+	public float heading; // in radians
+
+	private float lastX;
+	private float lastY;
+	private float lastZ;
+
+	public String model;
+
+	public PlayerInfo() {
+	    this(0.0f, 0.0f, 0.0f, "nw_troll");
+	}
+
+	public PlayerInfo(float x, float y, float heading, String model) {
+	    this.x = x;
+	    this.y = y;
+	    this.z = z;
+	    this.heading = heading;
+	    this.model = model;
+	    lastX = x;
+	    lastY = y;
+	    lastZ = z;
+	}
     }
 }
