@@ -2,7 +2,7 @@
  * Copyright 2006 by Sun Microsystems, Inc.  All rights reserved.
  */
 
-package com.sun.gi.apps.battleboard.client;
+package com.sun.gi.apps.battleboard;
 
 import java.io.Serializable;
 import java.util.LinkedList;
@@ -19,18 +19,23 @@ public class BattleBoard implements Serializable {
 	    this.y = y;
 	}
 
-	public int getX() { return x; }
-	public int getY() { return y; }
+	public int getX() {
+	    return x;
+	}
+
+	public int getY() {
+	    return y;
+	}
     }
 
     private String playerName;
     private int boardHeight;
     private int boardWidth;
-    private positionValue board[][];
+    private PositionValue board[][];
     private int startCities;
     private int survivingCities;
 
-    public enum positionValue {
+    public enum PositionValue {
 
 	/**
 	 * Indicates an empty (unoccupied, unbombed) board position.
@@ -63,7 +68,6 @@ public class BattleBoard implements Serializable {
 	 * Indicates a board position that contains a bombed city.
 	 */
 	HIT
-
     }
 
     /**
@@ -106,11 +110,11 @@ public class BattleBoard implements Serializable {
 	boardHeight = height;
 	survivingCities = numCities;
 	startCities = numCities;
-	board = new positionValue[boardWidth][boardHeight];
+	board = new PositionValue[boardWidth][boardHeight];
 
 	for (int x = 0; x < boardWidth; x++) {
 	    for (int y = 0; y < boardHeight; y++) {
-		board[x][y] = positionValue.VACANT;
+		board[x][y] = PositionValue.VACANT;
 	    }
 	}
     }
@@ -138,7 +142,7 @@ public class BattleBoard implements Serializable {
 	int count = startCities;
 	for (int y = 0; (y < boardHeight) && (count > 0); y++) {
 	    for (int x = 0; (x < boardWidth) && (count > 0); x++) {
-		board[x][y] = positionValue.CITY;
+		board[x][y] = PositionValue.CITY;
 		count--;
 
 		cityLocations.add(new BattleBoardLocation(x, y));
@@ -243,7 +247,7 @@ public class BattleBoard implements Serializable {
      * @throws IllegalArgumentException if either of <em>x</em> or
      * <em>y</em> is outside the board
      */
-    public positionValue getBoardPosition(int x, int y) {
+    public PositionValue getBoardPosition(int x, int y) {
 	if ((x < 0) || (x >= boardWidth)) {
 	    throw new IllegalArgumentException("illegal x: " + x);
 	}
@@ -255,23 +259,25 @@ public class BattleBoard implements Serializable {
 
     /**
      * Drops a bomb on the given board position (which changes the
-     * current contents of the given board position to HIT, NEAR, or
-     * MISS, and returns the result.
+     * current contents of the given board position to {@link
+     * PositionValue#HIT}, {@link PositionValue#NEAR}, or {@link
+     * PositionValue#MISS}, and returns the result.
      *
      * @param x the <em>x</em> coordinate of the bomb
      *
      * @param y the <em>y</em> coordinate of the bomb
      *
-     * @return HIT if the given position contains a city, NEAR if the
-     * given position is adjacent to a city (and not a city itself),
-     * or MISS if the position is does not contain nor is adjacent to
-     * a city
+     * @return {@link PositionValue#HIT} if the given position
+     * contains a city, {@link PositionValue#NEAR} if the given
+     * position is adjacent to a city (and not a city itself), or
+     * {@link PositionValue#MISS} if the position is does not contain
+     * nor is adjacent to a city
      *
      * @throws IllegalArgumentException if either of <em>x</em> or
      * <em>y</em> is outside the board
      */
-    public positionValue bombBoardPosition(int x, int y) {
-	positionValue  rc;
+    public PositionValue bombBoardPosition(int x, int y) {
+	PositionValue  rc;
 
 	if ((x < 0) || (x >= boardWidth)) {
 	    throw new IllegalArgumentException("illegal x: " + x);
@@ -281,12 +287,12 @@ public class BattleBoard implements Serializable {
 	}
 
 	if (isHit(x, y)) {
-	    rc = positionValue.HIT;
+	    rc = PositionValue.HIT;
 	    hit();
 	} else if (isNearMiss(x, y)) {
-	    rc = positionValue.NEAR;
+	    rc = PositionValue.NEAR;
 	} else {
-	    rc = positionValue.MISS;
+	    rc = PositionValue.MISS;
 	}
 
 	update(x, y, rc);
@@ -294,17 +300,18 @@ public class BattleBoard implements Serializable {
     }
 
     /**
-     * Updates the given board position with the given state.  <p>
+     * Updates the given board position to the given state.  <p>
      *
      * Does not verify that the given state change is actually legal
      * in terms of actual game-play.  For example, it is possible to
-     * use this method to change a NEAR to a HIT or vice
-     * versa.  "Illegal" state changes are permitted in order to allow
-     * this method to be used by a player to keep track of their
-     * <em>guesses</em> about the contents of the boards of the other
-     * players.
+     * use this method to change a {@link PositionValue#NEAR} to a
+     * {@link PositionValue#HIT} or vice versa.  "Illegal" state
+     * changes are permitted in order to allow this method to be used
+     * by a player to keep track of their <em>guesses</em> about the
+     * contents of the boards of the other players.
      *
-     * @param state one of HIT, NEAR, or MISS.
+     * @param state one of {@link PositionValue#HIT}, {@link
+     * PositionValue#NEAR}, or {@link PositionValue#MISS}.
      *
      * @param x the <em>x</em> coordinate of the bomb
      *
@@ -313,7 +320,7 @@ public class BattleBoard implements Serializable {
      * @throws IllegalArgumentException if either of <em>x</em> or
      * <em>y</em> is outside the board
      */
-    public positionValue update(int x, int y, positionValue state) {
+    public PositionValue update(int x, int y, PositionValue state) {
 	if ((x < 0) || (x >= boardWidth)) {
 	    throw new IllegalArgumentException("illegal x: " + x);
 	}
@@ -321,18 +328,21 @@ public class BattleBoard implements Serializable {
 	    throw new IllegalArgumentException("illegal y: " + y);
 	}
 
-	positionValue rc = getBoardPosition(x, y);
+	PositionValue rc = getBoardPosition(x, y);
 	board[x][y] = state;
 	return rc;
     }
-
+ 
+    /**
+     * Updates the count of surviving cities when a city is hit.
+     */
     public void hit() {
 	survivingCities--;
     }
 
     /**
-     * Indicates whether or not the given board has been "lost".  A
-     * board is lost when it contains no cities.
+     * Tests whether or not the given board has been "lost".  A board
+     * is lost when it contains no cities.
      *
      * @return <code>true</code> if the board contains zero un-bombed
      * cities, <code>false</code> otherwise
@@ -342,8 +352,8 @@ public class BattleBoard implements Serializable {
     }
 
     /**
-     * Indicates whether a given position is a hit (currently occupied
-     * by a city).
+     * Tests whether a given position is a hit (currently occupied by
+     * a city).
      *
      * @param x the <em>x</em> coordinate of the bomb
      *
@@ -353,13 +363,12 @@ public class BattleBoard implements Serializable {
      * city, <code>false</code> otherwise
      */
     public boolean isHit(int x, int y) {
-	return (getBoardPosition(x, y) == positionValue.CITY);
+	return (getBoardPosition(x, y) == PositionValue.CITY);
     }
 
     /**
-     * Indicates whether a given position is a near miss (not
-     * currently occupied by a city, but adjacent to a position that
-     * is).
+     * Tests whether a given position is a near miss (not currently
+     * occupied by a city, but adjacent to a position that is).
      *
      * @param x the <em>x</em> coordinate of the bomb
      *

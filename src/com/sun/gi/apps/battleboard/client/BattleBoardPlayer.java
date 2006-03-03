@@ -4,6 +4,7 @@
 
 package com.sun.gi.apps.battleboard.client;
 
+import com.sun.gi.apps.battleboard.BattleBoard;
 import com.sun.gi.comm.discovery.impl.URLDiscoverer;
 import com.sun.gi.comm.users.client.ClientAlreadyConnectedException;
 import com.sun.gi.comm.users.client.ClientChannel;
@@ -177,7 +178,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
      * Implements the operations for the "ok" message, which tells the
      * user what board the server has chosen for them.
      *
-     * @param tokens an array of Strings containing the tokens of the
+     * @param args an array of Strings containing the tokens of the
      * message from the server
      *
      * @return <code>true</code> if the message was valid and executed
@@ -221,7 +222,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
 		return GameState.NEED_BOARD;
 	    }
 
-	    tempBoard.update(x, y, BattleBoard.positionValue.CITY);
+	    tempBoard.update(x, y, BattleBoard.PositionValue.CITY);
 	}
 
 	myBoard = tempBoard;
@@ -236,7 +237,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
      * tells the player what the order of turns will be among the
      * players.
      *
-     * @param tokens an array of Strings containing the tokens of the
+     * @param args an array of Strings containing the tokens of the
      * message from the server
      *
      * @return <code>BEGIN_MOVE</code> if the message was valid and
@@ -345,7 +346,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
      * Implements the operations for the "move-started" message, for
      * any player whose move it is not.
      *
-     * @param tokens an array of Strings containing the tokens of the
+     * @param args an array of Strings containing the tokens of the
      * message from the server
      *
      * @return <code>END_MOVE</code> if the move was executed
@@ -374,7 +375,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
     /**
      * Implements the operations for the "move-ended" message.
      *
-     * @param tokens an array of Strings containing the tokens of the
+     * @param args an array of Strings containing the tokens of the
      * message from the server
      *
      * @return <code>BEGIN_MOVE</code> if the move was executed
@@ -435,7 +436,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
 		    " at " + x + "," + y + " with outcome " + outcome + "\n");
 
 	    if ("HIT".equals(outcome) || "LOSS".equals(outcome)) {
-		board.update(x, y, BattleBoard.positionValue.HIT);
+		board.update(x, y, BattleBoard.PositionValue.HIT);
 		board.hit();
 
 		if ("LOSS".equals(outcome)) {
@@ -456,9 +457,9 @@ public class BattleBoardPlayer implements ClientChannelListener {
 		    }
 		}
 	    } else if ("NEAR_MISS".equals(outcome)) {
-		board.update(x, y, BattleBoard.positionValue.NEAR);
+		board.update(x, y, BattleBoard.PositionValue.NEAR);
 	    } else if ("MISS".equals(outcome)) {
-		board.update(x, y, BattleBoard.positionValue.MISS);
+		board.update(x, y, BattleBoard.PositionValue.MISS);
 	    }
 	    displayBoards(bombedPlayer);
 	} else {
@@ -472,7 +473,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
     /**
      * Implements the operations for the "withdraw" message.
      *
-     * @param tokens an array of Strings containing the tokens of the
+     * @param args an array of Strings containing the tokens of the
      * message from the server
      *
      * @return <code>true</code> if the move was executed correctly,
@@ -509,7 +510,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
      * Returns <code>true</code> if this player has lost the game,
      * <code>false</code> otherwise.
      *
-     * @returns <code>true</code> if this player has lost the game,
+     * @return <code>true</code> if this player has lost the game,
      * <code>false</code> otherwise
      */
     public boolean lost() {

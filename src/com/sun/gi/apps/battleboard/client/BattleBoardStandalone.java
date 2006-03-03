@@ -1,9 +1,10 @@
 
 package com.sun.gi.apps.battleboard.client;
 
+import com.sun.gi.apps.battleboard.BattleBoard;
 import java.io.BufferedReader;
-import java.io.InputStreamReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 
 /**
  * Test driver for BattleBoardPlayer.

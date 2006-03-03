@@ -45,18 +45,17 @@ import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask;
-
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
-import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import static com.sun.gi.apps.battleboard.client.BattleBoard.positionValue.*;
+import static com.sun.gi.apps.battleboard.BattleBoard.PositionValue.*;
 
 /**
  *
@@ -195,48 +194,46 @@ public class Game implements /* ChannelListener */ GLO {
     
     protected void sendJoinOK(Player player) {
 	SimTask task = SimTask.getCurrent();
-	ByteBuffer buf = ByteBuffer.allocate(1024);
-	buf.put("ok ".getBytes());
+
+	StringBuffer buf = new StringBuffer("ok ");
 
 	log.fine("playerBoards size " + playerBoards.size());
 
 	GLOReference boardRef = playerBoards.get(player.getNickname());
 	Board board = (Board) boardRef.peek(task);
 
-	buf.put(Integer.toString(board.getWidth()).getBytes());
-	buf.put(" ".getBytes());
-	buf.put(Integer.toString(board.getHeight()).getBytes());
-	buf.put(" ".getBytes());
-	buf.put(Integer.toString(board.getStartCities()).getBytes());
+	buf.append(board.getWidth() + " ");
+	buf.append(board.getHeight() + " ");
+	buf.append(board.getStartCities());
 
 	for (int i = 0; i < board.getWidth(); ++i) {
 	    for (int j = 0; j < board.getHeight(); ++j) {
 		if (board.getBoardPosition(i, j) == CITY) {
-		    buf.put(" ".getBytes());
-		    buf.put(Integer.toString(i).getBytes());
-		    buf.put(" ".getBytes());
-		    buf.put(Integer.toString(j).getBytes());
+		    buf.append(" " + i + " " + j);
 		}
 	    }
 	}
 
+	ByteBuffer byteBuffer = ByteBuffer.wrap(buf.toString().getBytes());
+	byteBuffer.position(byteBuffer.limit());
+
 	task.sendData(channel, new UserID[] { player.getUID() },
-	    buf.asReadOnlyBuffer(), true);
+		byteBuffer.asReadOnlyBuffer(), true);
     }
 
     protected void sendTurnOrder() {
 	SimTask task = SimTask.getCurrent();
-	ByteBuffer buf = ByteBuffer.allocate(1024);
-	buf.put("turn-order".getBytes());
+	StringBuffer buf = new StringBuffer("turn-order ");
+
 	for (GLOReference<Player> playerRef : players) {
 	    Player p = playerRef.peek(task);
-	    buf.put(" ".getBytes());
-	    buf.put(p.getNickname().getBytes());
+	    buf.append(" " + p.getNickname());
 	}
-	broadcast(buf.asReadOnlyBuffer());
+
+	broadcast(buf);
     }
 
-    protected void broadcast(ByteBuffer buf) {
+    protected void broadcast(StringBuffer buf) {
 	SimTask task = SimTask.getCurrent();
 	UserID[] uids = new UserID[players.size() + spectators.size()];
 
@@ -251,18 +248,20 @@ public class Game implements /* ChannelListener */ GLO {
 	    uids[i++] = p.getUID();
 	}
 
-	log.info("Game: Broadcasting " + buf.position() +
+	ByteBuffer byteBuffer = ByteBuffer.wrap(buf.toString().getBytes());
+	byteBuffer.position(byteBuffer.limit());
+
+	log.info("Game: Broadcasting " + byteBuffer.position() +
 	    " bytes on " + channel);
 
-	task.sendData(channel, uids, buf, true);
+	task.sendData(channel, uids, byteBuffer.asReadOnlyBuffer(), true);
     }
 
     protected void sendMoveStarted(Player player) {
 	SimTask task = SimTask.getCurrent();
-	ByteBuffer buf = ByteBuffer.allocate(1024);
-	buf.put("move-started ".getBytes());
-	buf.put(player.getNickname().getBytes());
-	broadcast(buf.asReadOnlyBuffer());
+	StringBuffer buf = new StringBuffer("move-started " +
+		player.getNickname());
+	broadcast(buf);
     }
 
     protected void startNextMove() {
@@ -277,12 +276,11 @@ public class Game implements /* ChannelListener */ GLO {
 
     protected void handlePass(Player player) {
 	SimTask task = SimTask.getCurrent();
-	ByteBuffer buf = ByteBuffer.allocate(1024);
-	buf.put("move-ended ".getBytes());
-	buf.put(player.getNickname().getBytes());
-	buf.put(" pass".getBytes());
-	broadcast(buf.asReadOnlyBuffer());
+	StringBuffer buf = new StringBuffer("move-ended ");
+	buf.append(player.getNickname());
+	buf.append(" pass");
 
+	broadcast(buf);
 	startNextMove();
     }
 
@@ -307,7 +305,7 @@ public class Game implements /* ChannelListener */ GLO {
 
 	// XXX check that x and y are in bounds
 
-	Board.positionValue result = board.bombBoardPosition(x, y);
+	Board.PositionValue result = board.bombBoardPosition(x, y);
 
 	String outcome = "";
 	switch (result) {
@@ -324,20 +322,16 @@ public class Game implements /* ChannelListener */ GLO {
 	    break;
 	}
 
-	ByteBuffer buf = ByteBuffer.allocate(1024);
-	buf.put("move-ended ".getBytes());
-	buf.put(player.getNickname().getBytes());
-	buf.put(" bomb ".getBytes());
-	buf.put(bombedPlayerNick.getBytes());
-	buf.put(" ".getBytes());
-	buf.put(Integer.toString(x).getBytes());
-	buf.put(" ".getBytes());
-	buf.put(Integer.toString(y).getBytes());
-	buf.put(" ".getBytes());
-	buf.put(outcome.getBytes());
-	buf.put(" ".getBytes());
+	StringBuffer buf = new StringBuffer("move-ended ");
 
-	broadcast(buf.asReadOnlyBuffer());
+	buf.append(player.getNickname());
+	buf.append(" bomb");
+	buf.append(" " + bombedPlayerNick);
+	buf.append(" " + x);
+	buf.append(" " + y);
+	buf.append(" " + outcome);
+
+	broadcast(buf);
 
 	// If the bombed player has lost, make them a spectator
 	if (board.lost()) {

@@ -4,6 +4,7 @@
 
 package com.sun.gi.apps.battleboard.client;
 
+import com.sun.gi.apps.battleboard.BattleBoard;
 import com.sun.gi.comm.discovery.impl.URLDiscoverer;
 import com.sun.gi.comm.users.client.ClientAlreadyConnectedException;
 import com.sun.gi.comm.users.client.ClientChannel;

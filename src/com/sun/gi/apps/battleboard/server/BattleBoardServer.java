@@ -66,12 +66,12 @@ public class BattleBoardServer
     // SimBoot methods
 
     /**
-     * Called by the SGS stack when this application is booted.
-     * If firstBoot is true, this call represents the first time boot()
-     * is being called on this application across all stacks.  Otherwise,
-     * this app has been booted already (and exists in the DataStore),
-     * and is simply being brought up in a new stack as well.
-
+     * Called by the SGS stack when this application is booted.  If
+     * firstBoot is true, this call represents the first time boot()
+     * is being called on this application across all stacks. 
+     * Otherwise, this app has been booted already (and exists in the
+     * DataStore), and is simply being brought up in a new stack as
+     * well.
      */
     public void boot(GLOReference<? extends BattleBoardServer> thisGLO,
 	    boolean firstBoot) {
