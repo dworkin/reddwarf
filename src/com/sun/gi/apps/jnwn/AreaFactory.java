@@ -131,11 +131,26 @@ public class AreaFactory {
 	    e.printStackTrace();
 	}
 
-	return new Area(moduleName,
+	return new Area(minfo.getModuleName(),
 			areaName,
 			minfo.getStartX(),
 			minfo.getStartY(),
 			minfo.getStartZ(),
-			minfo.getStartingFacing());
+			minfo.getStartingFacing(),
+			new FakeCheatDetector());
+    }
+
+    static class FakeCheatDetector implements CheatDetector, Serializable {
+
+	private static final long serialVersionUID = 1L;
+
+	public boolean detectWalkCheat(PlayerInfo info) {
+	    if (info.pos.distance(info.lastPos) > 5.0f) {
+		Pos last_valid_position = info.lastPos.clone();
+		info.pos = last_valid_position;
+		return true;
+	    }
+	    return false;
+	}
     }
 }

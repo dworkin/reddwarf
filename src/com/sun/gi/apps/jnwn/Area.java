@@ -72,6 +72,7 @@ public class Area implements GLO {
     private ChannelID  channel;
     private GLOReference<Area>  thisRef;
     private HashMap<GLOReference<Character>, PlayerInfo>  map;
+    private CheatDetector detector;
 
     public static GLOReference<Area> create() {
 	SimTask task = SimTask.getCurrent();
@@ -100,7 +101,7 @@ public class Area implements GLO {
     }
 
     protected Area() {
-	this("FooModule", "foo", 0f, 0f, 0f, 0f);
+	this("FooModule", "foo", 0f, 0f, 0f, 0f, null);
     }
 
     protected Area(String moduleName,
@@ -108,13 +109,15 @@ public class Area implements GLO {
 		   float  startX,
 		   float  startY,
 		   float  startZ,
-		   float  startFacing) {
+		   float  startFacing,
+		   CheatDetector detector) {
 	this.moduleName  = moduleName;
 	this.areaName    = areaName;
 	this.startX      = startX;
 	this.startY      = startY;
 	this.startZ      = startZ;
 	this.startFacing = startFacing;
+	this.detector    = detector;
 
 	map = new HashMap<GLOReference<Character>, PlayerInfo>();
 
@@ -291,13 +294,7 @@ public class Area implements GLO {
     }
 
     protected boolean detectWalkCheat(PlayerInfo info) {
-	// FIXME - dummy impl for testing
-	if (info.pos.distance(info.lastPos) > 5.0f) {
-	    Pos last_valid_position = info.lastPos.clone();
-	    info.pos = last_valid_position;
-	    return true;
-	}
-	return false;
+	return (detector != null) && detector.detectWalkCheat(info);
     }
 
     protected void handleAttack(Character ch, String[] args) {
@@ -327,78 +324,5 @@ public class Area implements GLO {
 	log.fine("Character " + ch.getCharacterID() + " left " + areaName);
 	map.remove(ch.getReference());
 	broadcast(getRemoveCharacterMessage(ch));
-    }
-
-    //
-
-    static class Pos implements Serializable, Cloneable {
-
-	private static final long serialVersionUID = 1L;
-
-	public long  timestamp;
-	public float x;
-	public float y;
-	public float z;
-	public float heading; // in radians
-	public float velocity;
-
-	public Pos(long timestamp, float x, float y, float z,
-		float heading, float velocity) {
-	    update(timestamp, x, y, z, heading, velocity);
-	}
-
-	public void update(long timestamp, float x, float y, float z,
-		float heading, float velocity) {
-	    this.timestamp = timestamp;
-	    this.x = x;
-	    this.y = y;
-	    this.z = z;
-	    this.heading = heading;
-	    this.velocity = velocity;
-	}
-
-	public Pos clone() {
-	    try {
-		return (Pos) super.clone();
-	    } catch (CloneNotSupportedException e) {
-		return null;
-	    }
-	}
-
-	public float distance(final Pos o) {
-	    final float dX = x - o.x;
-	    final float dY = y - o.y;
-	    final float dZ = z - o.z;
-	    return (float) Math.sqrt((dX * dX) + (dY * dY) + (dZ * dZ));
-	}
-    }
-
-    static class PlayerInfo implements Serializable {
-
-	private static final long serialVersionUID = 1L;
-
-	public Pos    pos;
-	public Pos    lastPos;
-	public String model;
-	public Object melee;
-
-	public PlayerInfo(long timestamp, float x, float y, float z,
-		float heading, float velocity, String model) {
-	    this.model = model;
-	    this.pos = new Pos(timestamp, x, y, z, heading, velocity);
-	    this.lastPos = pos.clone();
-	    this.melee = null;
-	}
-
-	public void doWalk(String[] args) {
-	    long  newTime     = Long.parseLong(args[1]);
-	    float newX        = Float.parseFloat(args[2]);
-	    float newY        = Float.parseFloat(args[3]);
-	    float newZ        = Float.parseFloat(args[4]);
-	    float newFacing   = Float.parseFloat(args[5]);
-	    float newVelocity = Float.parseFloat(args[6]);
-	    lastPos = pos.clone();
-	    pos.update(newTime, newX, newY, newZ, newFacing, newVelocity);
-	}
     }
 }
