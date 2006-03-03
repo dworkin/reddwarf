@@ -105,7 +105,7 @@
 	    <exclude name="com/sun/gi/client/**" />
 	</javac>
     </target>
-	
+
 
     <target name="build.j2seAPI" depends="init">
 	<echo message="${ant.project.name}: ${ant.file}" />
@@ -218,8 +218,10 @@
 	<javac srcdir="src" destdir="bin" source="5" target="5"
 		debug="${debug}" optimize="${optimize}"
 		deprecation="${deprecated}">
-	    <compilerarg value="-Xlint:unchecked"/>
+	    <compilerarg value="-Xlint:all"/>
 	    <classpath refid="project.classpath" />
+	    <classpath location="NWNSupport.jar"/>
+	    <classpath location="/usr/share/java/java3d/j3dutils.jar"/>
 	    <include name="com/sun/gi/apps/jnwn/**" />
 	</javac>
     </target>
@@ -228,11 +230,27 @@
 
     <target name="SGS-clean">
 	<java dir="release" classname="com.sun.gi.SGS" failonerror="true" fork="yes">
-	    <arg value="-C" />
-	    <arg value="-V" />
-	    <classpath refid="project.classpath" />
+	    <arg value="-C"/>
+	    <arg value="-V"/>
+	    <classpath refid="project.classpath"/>
 	    <sysproperty key="java.util.logging.config.file"
-			 file="logging.properties" />
+			 file="logging.properties"/>
+	</java>
+    </target>
+
+    <target name="SGS-jnwn-clean">
+	<java dir="release" classname="com.sun.gi.SGS" failonerror="true" fork="yes">
+	    <arg value="-C"/>
+	    <arg value="-V"/>
+	    <classpath refid="project.classpath"/>
+	    <classpath location="NWNSupport.jar"/>
+	    <classpath location="genesisfx.jar"/>
+	    <classpath location="/usr/share/java/java3d/j3dcore.jar"/>
+	    <classpath location="/usr/share/java/java3d/j3dutils.jar"/>
+	    <classpath location="/usr/share/java/java3d/vecmath.jar"/>
+	    <sysproperty key="jnwn.data.dir" path="/u01/nwn"/>
+	    <sysproperty key="java.util.logging.config.file"
+			 file="logging.properties"/>
 	</java>
     </target>
 
@@ -305,7 +323,7 @@
     <target name="release" depends="release.bin,release.docs,release.examples">
 	<zip destfile="ProjectDarkstar.zip" basedir="release" />
     </target>
-    
+
     <target name="release.bin" depends="release.server,release.j2seAPI, release.apps,release.clients"/>
 
     <target name="release.server" depends="build.server">
@@ -322,15 +340,15 @@
 	<copy file="resources/Install.txt" todir="release" />
 	<copy file="resources/passwd.txt" todir="release" />
     </target>
-	
-	   <target name="release.j2seAPI" depends="build.j2seAPI">
-		<jar destfile="release/ProjectDarkstarClientAPI.jar"
-		    basedir="bin" includes="com/sun/gi/comm/users/client/**,
-				com/sun/gi/comm/users/protocol/**,
-				com/sun/gi/validation/**,
-				com/sun/gi/comm/discovery/**,
-				com/sun/gi/utils/nio/**" />		
-	    </target>
+
+    <target name="release.j2seAPI" depends="build.j2seAPI">
+	<jar destfile="release/ProjectDarkstarClientAPI.jar"
+	    basedir="bin" includes="com/sun/gi/comm/users/client/**,
+		com/sun/gi/comm/users/protocol/**,
+		com/sun/gi/validation/**,
+		com/sun/gi/comm/discovery/**,
+		com/sun/gi/utils/nio/**" />
+    </target>
 
     <target name="release.docs" depends="docs">
 	<copy todir="release/docs" >
@@ -343,7 +361,7 @@
     <target name="release.clients" depends="build.clients"/>
 
     <target name="release.apps"
-      depends="release.trivialboot,release.timertest,release.chattest,release.jeffboard,release.battleboard,release.glotest,release.jnwn">
+	depends="release.trivialboot,release.timertest,release.chattest,release.jeffboard,release.battleboard,release.glotest">
     </target>
 
     <target name="release.trivialboot" depends="build.trivial">
@@ -403,10 +421,10 @@
 	<copy file="resources/jnwn/deploy.xml"
 	    todir="release/apps/jnwn" />
     </target>
-	
-	<target name="release.examples" >
-		<zip destfile="release/Examples.zip" basedir="src"
-		includes="com/sun/gi/apps/chattest/**"/>
-	</target>
+
+    <target name="release.examples" >
+	<zip destfile="release/Examples.zip" basedir="src"
+	    includes="com/sun/gi/apps/chattest/**"/>
+    </target>
 
 </project>

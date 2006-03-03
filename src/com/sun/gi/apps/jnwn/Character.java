@@ -66,6 +66,8 @@ public class Character implements GLO {
     private GLOReference<Area>       areaRef;
     private GLOReference<Character>  thisRef;
 
+    private final String DEFAULT_AREA_NAME = "Area:uncleflakeyshous";
+
     public static GLOReference<Character> create(GLOReference<User> uref) {
 	SimTask task = SimTask.getCurrent();
 	Character c = new Character(uref);
@@ -80,7 +82,7 @@ public class Character implements GLO {
 	characterID = (int) System.currentTimeMillis(); // FIXME
 	name = uref.peek(task).getName();
 	userRef = uref;
-	areaRef = task.findGLO("Area:foo"); // XXX
+	areaRef = task.findGLO(DEFAULT_AREA_NAME);
     }
 
     protected void boot(GLOReference<Character> ref) {

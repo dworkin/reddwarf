@@ -89,7 +89,7 @@ public class JNWN implements SimBoot<JNWN>, SimUserListener {
 	    // Since firstBoot is called exactly once, when the
 	    // database is empty, this is the only time we need
 	    // to create the supported Area(s).
-	    Area.create("foo");
+	    Area.create();
 	    userMap = new HashMap<UserID, GLOReference<User>>();
 	}
 

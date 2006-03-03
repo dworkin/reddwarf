@@ -64,14 +64,28 @@ public class Area implements GLO {
 
     private String     moduleName;
     private String     areaName;
+    private float      startX;
+    private float      startY;
+    private float      startZ;
+    private float      startFacing;
+    private String     startModel = "nw_troll";
     private ChannelID  channel;
     private GLOReference<Area>  thisRef;
     private HashMap<GLOReference<Character>, PlayerInfo>  map;
 
-    public static GLOReference create(String name) {
+    public static GLOReference<Area> create() {
 	SimTask task = SimTask.getCurrent();
-	String gloname = "Area:" + name;
-	GLOReference<Area> ref = task.createGLO(new Area(name), gloname);
+	//GLOReference<Area> ref = task.createGLO(new Area(name), gloname);
+	Area templateArea = null;
+	try {
+	    templateArea = AreaFactory.create();
+	} catch (Exception e) {
+	    log.warning("Creating default area");
+	    templateArea = new Area();
+	    e.printStackTrace();
+	}
+	String gloname = "Area:" + templateArea.getName();
+	GLOReference<Area> ref = task.createGLO(templateArea, gloname);
 	ref.get(task).boot(ref);
 	return ref;
     }
@@ -81,10 +95,23 @@ public class Area implements GLO {
 	task.join(ch.getUID(), channel);
     }
 
-    protected Area(String name) {
+    protected Area() {
+	this("FooModule", "foo", 0f, 0f, 0f, 0f);
+    }
 
-	moduleName = "FooModule"; // XXX
-	areaName = name;
+    protected Area(String moduleName,
+		   String areaName,
+		   float  startX,
+		   float  startY,
+		   float  startZ,
+		   float  startFacing) {
+	this.moduleName  = moduleName;
+	this.areaName    = areaName;
+	this.startX      = startX;
+	this.startY      = startY;
+	this.startZ      = startZ;
+	this.startFacing = startFacing;
+
 	map = new HashMap<GLOReference<Character>, PlayerInfo>();
 
 	SimTask task = SimTask.getCurrent();
@@ -100,15 +127,17 @@ public class Area implements GLO {
     protected String getLoadModuleMessage() {
 	// XXX precompute this message for this area
 	StringBuffer sb = new StringBuffer();
-	sb.append("load module ")
-	  .append(moduleName);
+	sb.append("load module \"")
+	  .append(moduleName)
+	  .append("\"");
 	return sb.toString();
     }
 
     protected String getLoadAreaMessage() {
 	StringBuffer sb = new StringBuffer();
-	sb.append("load area ")
-	  .append(areaName);
+	sb.append("load area \"")
+	  .append(areaName)
+	  .append("\"");
 	return sb.toString();
     }
 
@@ -164,6 +193,10 @@ public class Area implements GLO {
 	SimTask.getCurrent().sendData(channel, ch.getUID(), buf, true);
     }
 
+    public String getName() {
+	return areaName;
+    }
+
     /**
      * Handle data that was sent directly to the server.
      */
@@ -186,7 +219,7 @@ public class Area implements GLO {
     }
 
     protected PlayerInfo getNewInfo() {
-	return new PlayerInfo();
+	return new PlayerInfo(startX, startY, startZ, startFacing, startModel);
     }
 
     // SimChannelMembershipListener methods
@@ -225,10 +258,11 @@ public class Area implements GLO {
 	public String model;
 
 	public PlayerInfo() {
-	    this(0.0f, 0.0f, 0.0f, "nw_troll");
+	    this(0.0f, 0.0f, 0.0f, 0.0f, "nw_troll");
 	}
 
-	public PlayerInfo(float x, float y, float heading, String model) {
+	public PlayerInfo(float x, float y, float z,
+		float heading, String model) {
 	    this.x = x;
 	    this.y = y;
 	    this.z = z;
