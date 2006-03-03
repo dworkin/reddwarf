@@ -50,6 +50,7 @@ import com.sun.gi.utils.StatisticalUUID;
 
 public class SGS {
 	ReportManager reportManager;
+
 	TimerManager timerManager;
 
 	TransportManager transportManager;
@@ -61,6 +62,7 @@ public class SGS {
 	SimKernel kernel;
 
 	ObjectStore ostore;
+
 	private boolean verbose = false;
 
 	private String installFile = "file:Install.txt";
@@ -68,19 +70,20 @@ public class SGS {
 	private static final long REPORTTTL = 1000;
 
 	public SGS() {
-		String verboseString = System.getProperty("sgs.framework.verbose");		
-		if (verboseString != null){
+		String verboseString = System.getProperty("sgs.framework.verbose");
+		if (verboseString != null) {
 			verbose = verboseString.equalsIgnoreCase("true");
 		}
-		try {			
+		try {
 			kernel = new SimKernelImpl();
 			String installProperty = System
 					.getProperty("sgs.framework.installurl");
 			if (installProperty != null) {
 				installFile = installProperty;
 			}
-			if (verbose){
-				System.out.println("Loading configuration from: "+installFile);
+			if (verbose) {
+				System.out
+						.println("Loading configuration from: " + installFile);
 			}
 			InstallationLoader installation = new InstallationURL(new URL(
 					installFile));
@@ -89,14 +92,14 @@ public class SGS {
 			reportManager = new ReportManagerImpl(transportManager, REPORTTTL);
 			long heartbeat = 1000; // 1 sec heartbeat default
 			String hbprop = System.getProperty("sgs.framework.timer.heartbeat");
-			if (hbprop!= null){
+			if (hbprop != null) {
 				heartbeat = Long.parseLong(hbprop);
 			}
-			timerManager = new TimerManagerImpl(heartbeat); 
+			timerManager = new TimerManagerImpl(heartbeat);
 			kernel.setTimerManager(timerManager);
-			
+
 			kernel.setRawSocketManager(new RawSocketManagerImpl());
-			
+
 			// start game services
 			StatusReport installationReport = reportManager
 					.makeNewReport("_SGS_discover_" + sliceID);
@@ -130,7 +133,7 @@ public class SGS {
 			e.printStackTrace();
 			return null;
 		}
-		
+
 		int gameCount = Integer.parseInt(installationReport.getParameter(
 				"game", "count"));
 		String statusBlockName = "game." + gameCount;
@@ -143,22 +146,26 @@ public class SGS {
 		int umgrCount = 0;
 
 		// create simulation container for game
-	
-		Simulation sim = null;
-		try {
-			ostore = new TSOObjectStore(new PersistantInMemoryDataSpace(gameID));
-			String cleanProperty = System.getProperty("sgs.ostore.startclean");
-			if ((cleanProperty!=null)&&(cleanProperty.equalsIgnoreCase("true"))){
-				if (verbose){
-					System.out.println("Clearing Object Store");
+		if (game.getBootClass() != null) {
+			Simulation sim = null;
+			try {
+				ostore = new TSOObjectStore(new PersistantInMemoryDataSpace(
+						gameID));
+				String cleanProperty = System
+						.getProperty("sgs.ostore.startclean");
+				if ((cleanProperty != null)
+						&& (cleanProperty.equalsIgnoreCase("true"))) {
+					if (verbose) {
+						System.out.println("Clearing Object Store");
+					}
+					ostore.clear();
 				}
-				ostore.clear();
+				sim = new SimulationImpl(kernel, ostore, router, game);
+			} catch (InstantiationException e) {
+
+				e.printStackTrace();
+				return null;
 			}
-			sim = new SimulationImpl(kernel,ostore,router, game);
-		} catch (InstantiationException e) {
-			
-			e.printStackTrace();
-			return null;
 		}
 
 		// create user managers
@@ -221,23 +228,23 @@ public class SGS {
 	}
 
 	static public void main(String[] args) {
-		for(int i=0;i<args.length;i++){
-			if (args[i].charAt(0)=='-'){
-				switch(args[i].charAt(1)){
-					case 'v':
-					case 'V':
-						System.setProperty("sgs.framework.verbose","true");
-						break;
-					case 'i':
-					case 'I':
-						System.setProperty("sgs.framework.installurl", args[++i]);
-					break;	
-					case 'c':
-					case 'C':
-						System.setProperty("sgs.ostore.startclean","true");
+		for (int i = 0; i < args.length; i++) {
+			if (args[i].charAt(0) == '-') {
+				switch (args[i].charAt(1)) {
+				case 'v':
+				case 'V':
+					System.setProperty("sgs.framework.verbose", "true");
 					break;
-				}				
-			}			
+				case 'i':
+				case 'I':
+					System.setProperty("sgs.framework.installurl", args[++i]);
+					break;
+				case 'c':
+				case 'C':
+					System.setProperty("sgs.ostore.startclean", "true");
+					break;
+				}
+			}
 		}
 		new SGS();
 
