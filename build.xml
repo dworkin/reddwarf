@@ -404,7 +404,7 @@
 	
 	<target name="release.examples" >
 		<zip destfile="release/Examples.zip" basedir="src"
-		includes="com/sun/gi/apps/**"/>
+		includes="com/sun/gi/apps/chattest/**"/>
 	</target>
 
 </project>
