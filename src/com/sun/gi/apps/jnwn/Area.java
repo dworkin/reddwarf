@@ -90,6 +90,10 @@ public class Area implements GLO {
 	return ref;
     }
 
+    public String getName() {
+	return areaName;
+    }
+
     public void addCharacter(Character ch) {
 	SimTask task = SimTask.getCurrent();
 	task.join(ch.getUID(), channel);
@@ -147,17 +151,47 @@ public class Area implements GLO {
 	sb.append("add character ")
 	  .append(ch.getCharacterID())
 	  .append(" ")
-	  .append(info.x)
+	  .append(info.pos.x)
 	  .append(" ")
-	  .append(info.y)
+	  .append(info.pos.y)
 	  .append(" ")
-	  .append(info.z)
+	  .append(info.pos.z)
 	  .append(" ")
-	  .append(info.heading)
+	  .append(info.pos.heading)
 	  .append(" ")
 	  .append(info.model)
 	  .append(" ")
 	  .append(ch.getName());
+	return sb.toString();
+    }
+
+    protected String getTeleportMessage(Character ch) {
+	PlayerInfo info = map.get(ch.getReference());
+	StringBuffer sb = new StringBuffer();
+	sb.append("move ")
+	  .append(ch.getCharacterID())
+	  .append(" ")
+	  .append(info.pos.x)
+	  .append(" ")
+	  .append(info.pos.y)
+	  .append(" ")
+	  .append(info.pos.z);
+	return sb.toString();
+    }
+
+    protected String getRemoteWalkMessage(Character ch) {
+	PlayerInfo info = map.get(ch.getReference());
+	StringBuffer sb = new StringBuffer();
+	sb.append("walk ")
+	  .append(ch.getCharacterID())
+	  .append(" ")
+	  .append(info.lastPos.heading) // XXX: pos or lastPos?
+	  .append(" ")
+	  .append(info.pos.x)
+	  .append(" ")
+	  .append(info.pos.y)
+	  .append(" ")
+	  .append(info.pos.z);
 	return sb.toString();
     }
 
@@ -175,10 +209,6 @@ public class Area implements GLO {
 	}
     }
 
-    protected void handleWalk(Character ch, String[] tokens) {
-	SimTask task = SimTask.getCurrent();
-    }
-
     protected void broadcast(String message) {
 	log.finest("Broadcasting `" + message + "' on " + channel);
 	ByteBuffer buf = ByteBuffer.wrap(message.getBytes());
@@ -191,10 +221,6 @@ public class Area implements GLO {
 	ByteBuffer buf = ByteBuffer.wrap(message.getBytes());
 	buf.position(buf.limit());
 	SimTask.getCurrent().sendData(channel, ch.getUID(), buf, true);
-    }
-
-    public String getName() {
-	return areaName;
     }
 
     /**
@@ -214,13 +240,76 @@ public class Area implements GLO {
 	    return;
 	}
 
-	//GLOReference<Character> ref = Character.getRef(uid);
-	//handleResponse(ref, tokens);
+	handleClientCommand(ch, tokens);
     }
 
-    protected PlayerInfo getNewInfo() {
-	return new PlayerInfo(startX, startY, startZ, startFacing, startModel);
+    protected PlayerInfo getStartInfo() {
+	return new PlayerInfo(System.currentTimeMillis(),
+	    startX, startY, startZ,
+	    startFacing, 0.0f, startModel);
     }
+
+    protected void handleClientCommand(Character ch, String[] args) {
+	if ("walk".equals(args[0])) {
+	    handleWalk(ch, args);
+	} else if ("attack".equals(args[0])) {
+	    handleAttack(ch, args);
+	} else if ("flee".equals(args[0])) {
+	    handleFlee(ch, args);
+	} else {
+	}
+    }
+
+    protected void handleWalk(Character ch, String[] args) {
+	SimTask task = SimTask.getCurrent();
+
+	if (args.length != 7) {
+	    log.warning("Walk requires 7 args, got " + args.length);
+	    return;
+	}
+
+	PlayerInfo info = map.get(ch.getReference());
+
+	if (info == null) {
+	    log.severe("No player-info for character " + ch.getCharacterID());
+	    return;
+	}
+
+	if (info.melee != null) {
+	    log.fine("Character " + ch.getCharacterID() + " is fighting");
+	    return;
+	}
+
+	info.doWalk(args);
+
+	if (detectWalkCheat(info)) {
+	    log.info("Character " + ch.getCharacterID() + " is a cheater!");
+	    broadcast(getTeleportMessage(ch));
+	} else {
+	    broadcast(getRemoteWalkMessage(ch));
+	}
+    }
+
+    protected boolean detectWalkCheat(PlayerInfo info) {
+	// FIXME - dummy impl for testing
+	if (info.pos.distance(info.lastPos) > 5.0f) {
+	    Pos last_valid_position = info.lastPos.clone();
+	    info.pos = last_valid_position;
+	    return true;
+	}
+	return false;
+    }
+
+    protected void handleAttack(Character ch, String[] args) {
+	SimTask task = SimTask.getCurrent();
+	log.warning("Attack not supported yet");
+    }
+
+    protected void handleFlee(Character ch, String[] args) {
+	SimTask task = SimTask.getCurrent();
+	log.warning("Flee not supported yet");
+    }
+
 
     // SimChannelMembershipListener methods
 
@@ -230,7 +319,7 @@ public class Area implements GLO {
 	sendToCharacter(ch, getLoadModuleMessage());
 	sendToCharacter(ch, getLoadAreaMessage());
 	sendCurrentCharactersTo(ch); // @@ must come before map.put
-	map.put(ch.getReference(), getNewInfo());
+	map.put(ch.getReference(), getStartInfo());
 	broadcast(getAddCharacterMessage(ch));
     }
 
@@ -242,35 +331,74 @@ public class Area implements GLO {
 
     //
 
-    static class PlayerInfo implements Serializable {
+    static class Pos implements Serializable, Cloneable {
 
 	private static final long serialVersionUID = 1L;
 
+	public long  timestamp;
 	public float x;
 	public float y;
 	public float z;
 	public float heading; // in radians
+	public float velocity;
 
-	private float lastX;
-	private float lastY;
-	private float lastZ;
-
-	public String model;
-
-	public PlayerInfo() {
-	    this(0.0f, 0.0f, 0.0f, 0.0f, "nw_troll");
+	public Pos(long timestamp, float x, float y, float z,
+		float heading, float velocity) {
+	    update(timestamp, x, y, z, heading, velocity);
 	}
 
-	public PlayerInfo(float x, float y, float z,
-		float heading, String model) {
+	public void update(long timestamp, float x, float y, float z,
+		float heading, float velocity) {
+	    this.timestamp = timestamp;
 	    this.x = x;
 	    this.y = y;
 	    this.z = z;
 	    this.heading = heading;
+	    this.velocity = velocity;
+	}
+
+	public Pos clone() {
+	    try {
+		return (Pos) super.clone();
+	    } catch (CloneNotSupportedException e) {
+		return null;
+	    }
+	}
+
+	public float distance(final Pos o) {
+	    final float dX = x - o.x;
+	    final float dY = y - o.y;
+	    final float dZ = z - o.z;
+	    return (float) Math.sqrt((dX * dX) + (dY * dY) + (dZ * dZ));
+	}
+    }
+
+    static class PlayerInfo implements Serializable {
+
+	private static final long serialVersionUID = 1L;
+
+	public Pos    pos;
+	public Pos    lastPos;
+	public String model;
+	public Object melee;
+
+	public PlayerInfo(long timestamp, float x, float y, float z,
+		float heading, float velocity, String model) {
 	    this.model = model;
-	    lastX = x;
-	    lastY = y;
-	    lastZ = z;
+	    this.pos = new Pos(timestamp, x, y, z, heading, velocity);
+	    this.lastPos = pos.clone();
+	    this.melee = null;
+	}
+
+	public void doWalk(String[] args) {
+	    long  newTime     = Long.parseLong(args[1]);
+	    float newX        = Float.parseFloat(args[2]);
+	    float newY        = Float.parseFloat(args[3]);
+	    float newZ        = Float.parseFloat(args[4]);
+	    float newFacing   = Float.parseFloat(args[5]);
+	    float newVelocity = Float.parseFloat(args[6]);
+	    lastPos = pos.clone();
+	    pos.update(newTime, newX, newY, newZ, newFacing, newVelocity);
 	}
     }
 }
