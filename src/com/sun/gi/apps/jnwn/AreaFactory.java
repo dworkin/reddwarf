@@ -121,12 +121,14 @@ public class AreaFactory {
 	final String areaName = minfo.getStartingArea();
 	log.finer("Starting area is `" + areaName + "'");
 
+	WalkMeshMap wmm = null;
+
 	try {
 	    AreaLoader areaLoader = new AreaLoader(mgr);
 	    ByteBuffer areaBuf = mgr.getRawResource(areaName, (short) 2012);
 	    AreaSceneBase areaSB =
 		(AreaSceneBase) areaLoader.load(areaName, areaBuf, false);
-	    areaSB.getWalkMeshMap();
+	    wmm = areaSB.getWalkMeshMap();
 	} catch (NullPointerException e) {
 	    e.printStackTrace();
 	}
@@ -137,10 +139,10 @@ public class AreaFactory {
 			minfo.getStartY(),
 			minfo.getStartZ(),
 			minfo.getStartingFacing(),
-			new FakeCheatDetector());
+			new WalkMeshCheatDetector(wmm));
     }
 
-    static class FakeCheatDetector implements CheatDetector, Serializable {
+    static class FakeCheatDetector implements CheatDetector {
 
 	private static final long serialVersionUID = 1L;
 

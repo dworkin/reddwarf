@@ -40,9 +40,16 @@
 
 package com.sun.gi.apps.jnwn;
 
-import com.sun.gi.logic.GLO;
+import com.worldwizards.nwn.j3d.WalkMeshMap;
 
-public interface CheatDetector extends GLO {
+public class WalkMeshCheatDetector implements CheatDetector {
 
-    public boolean detectWalkCheat(PlayerInfo info);
+    private static final long serialVersionUID = 1L;
+
+    public WalkMeshCheatDetector(WalkMeshMap wmm) {
+    }
+
+    public boolean detectWalkCheat(PlayerInfo info) {
+	return false;
+    }
 }
