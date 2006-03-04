@@ -27,7 +27,8 @@ public class NIOSocketManager implements Runnable {
 
     private Selector selector;
 
-    private int initialInputBuffSz;
+    private int tcpBufSize;
+    private int udpBufSize;
 
     private Set<NIOSocketManagerListener> listeners =
 	new TreeSet<NIOSocketManagerListener>();
@@ -45,12 +46,15 @@ public class NIOSocketManager implements Runnable {
 	new ArrayList<SelectableChannel>();
 
     public NIOSocketManager() throws IOException {
-	this(64 * 1024);
+	this(1024 * 1024, 64 * 1024);
     }
 
-    public NIOSocketManager(int inputBufferSize) throws IOException {
+    public NIOSocketManager(int tcpBufferSize, int udpBufferSize)
+	    throws IOException {
+
 	selector = Selector.open();
-	initialInputBuffSz = inputBufferSize;
+	this.tcpBufSize = tcpBufferSize;
+	this.udpBufSize = udpBufferSize;
 	new Thread(this).start();
     }
 
@@ -82,7 +86,7 @@ public class NIOSocketManager implements Runnable {
 	    dc.configureBlocking(false);
 
 	    NIOConnection conn =
-		new NIOConnection(this, sc, dc, initialInputBuffSz);
+		new NIOConnection(this, sc, dc, tcpBufSize, udpBufSize);
 
 	    synchronized (initiatorQueue) {
 		initiatorQueue.add(conn);
@@ -257,7 +261,8 @@ public class NIOSocketManager implements Runnable {
 	    // Now create a UDP channel for this endpoint
 
 	    DatagramChannel dc = DatagramChannel.open();
-	    conn = new NIOConnection(this, sc, dc, initialInputBuffSz);
+	    conn =
+		new NIOConnection(this, sc, dc, tcpBufSize, udpBufSize);
 
 	    dc.socket().setReuseAddress(true);
             dc.configureBlocking(false);

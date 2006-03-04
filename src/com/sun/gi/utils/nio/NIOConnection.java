@@ -39,12 +39,13 @@ public class NIOConnection implements SelectorHandler {
     public NIOConnection(NIOSocketManager mgr,
 			 SocketChannel    sockChannel,
 			 DatagramChannel  dgramChannel,
-			 int bufSize) {
+			 int tcpBufSize,
+			 int udpBufSize) {
 
 	socketManager = mgr;
 
-	tcpHandler = new PacketHandler(this, sockChannel, bufSize);
-	udpHandler = new PacketHandler(this, dgramChannel, bufSize);
+	tcpHandler = new PacketHandler(this, sockChannel, tcpBufSize);
+	udpHandler = new PacketHandler(this, dgramChannel, udpBufSize);
     }
 
     public void open(Selector sel) throws IOException {
