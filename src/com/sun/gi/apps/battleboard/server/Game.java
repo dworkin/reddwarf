@@ -46,7 +46,7 @@ import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask;
 import java.nio.ByteBuffer;
-import java.util.Collection;
+import java.util.Set;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -58,41 +58,27 @@ import java.util.logging.Logger;
 import static com.sun.gi.apps.battleboard.BattleBoard.PositionValue.*;
 
 /**
- *
- * @author  James Megquier
- * @version $Rev$, $Date$
  */
-public class Game implements /* ChannelListener */ GLO {
-
+public class Game implements GLO {
     private static final long serialVersionUID = 1L;
 
     private static final Logger log =
 	Logger.getLogger("com.sun.gi.apps.battleboard.server");
 
-    protected String     gameName;
-    protected ChannelID  channel;
-    protected GLOReference<Game>                thisRef;
-    protected LinkedList<GLOReference<Player>>  players;
-    protected LinkedList<GLOReference<Player>>  spectators;
-    protected Map<String, GLOReference<Board>>  playerBoards;
-    protected GLOReference<Player>              currentPlayerRef;
+    private String gameName;
+    private ChannelID channel;
+    private GLOReference<Game> thisRef;
+    private LinkedList<GLOReference<Player>> players;
+    private LinkedList<GLOReference<Player>> spectators;
+    private Map<String, GLOReference<Board>> playerBoards;
+    private GLOReference<Player> currentPlayerRef;
+    private Map<String, GLOReference<PlayerHistory>> nameToHistory;
 
-    protected static int DEFAULT_BOARD_WIDTH  = 8;
-    protected static int DEFAULT_BOARD_HEIGHT = 8;
-    protected static int DEFAULT_BOARD_CITIES = 2;
+    private static int DEFAULT_BOARD_WIDTH  = 8;
+    private static int DEFAULT_BOARD_HEIGHT = 8;
+    private static int DEFAULT_BOARD_CITIES = 2;
 
-    public static GLOReference create(
-	    Collection<GLOReference<Player>> players) {
-
-	SimTask task = SimTask.getCurrent();
-	GLOReference<Game> ref = task.createGLO(new Game(players));
-
-	ref.get(task).boot(ref);
-	return ref;
-    }
-
-    protected Game(Collection<GLOReference<Player>> newPlayers) {
-
+    protected Game(Set<GLOReference<Player>> newPlayers) {
 	SimTask task = SimTask.getCurrent();
 
 	// XXX store and increment a next-channel-number in the GLO,
@@ -113,8 +99,18 @@ public class Game implements /* ChannelListener */ GLO {
 		createBoard(p.getNickname()));
 	}
 
+	nameToHistory = new HashMap<String, GLOReference<PlayerHistory>>();
 	channel = task.openChannel(gameName);
 	task.lock(channel, true);
+    }
+
+    public static GLOReference create(Set<GLOReference<Player>> players)
+    {
+	SimTask task = SimTask.getCurrent();
+	GLOReference<Game> ref = task.createGLO(new Game(players));
+
+	ref.get(task).boot(ref);
+	return ref;
     }
 
     protected void boot(GLOReference<Game> ref) {
@@ -124,7 +120,8 @@ public class Game implements /* ChannelListener */ GLO {
 
 	if (log.isLoggable(Level.FINE)) {
 	    log.fine("playerBoards size " + playerBoards.size());
-	    for (Map.Entry<String, GLOReference<Board>> x : playerBoards.entrySet()) {
+	    for (Map.Entry<String, GLOReference<Board>> x :
+			playerBoards.entrySet()) {
 		log.fine("playerBoard[" + x.getKey() + "]=`" +
 		    x.getValue() + "'");
 	    }
@@ -296,7 +293,6 @@ public class Game implements /* ChannelListener */ GLO {
 		    bombedPlayerNick);
 	    handlePass(player);
 	    return;
-
 	}
 	Board board = boardRef.get(task);
 
@@ -309,17 +305,9 @@ public class Game implements /* ChannelListener */ GLO {
 
 	String outcome = "";
 	switch (result) {
-	case HIT:
-	    outcome = board.lost() ? "LOSS" : "HIT";
-	    break;
-
-	case NEAR:
-	    outcome = "NEAR_MISS";
-	    break;
-
-	case MISS:
-	    outcome = "MISS";
-	    break;
+	    case HIT: outcome = board.lost() ? "LOSS" : "HIT"; break;
+	    case NEAR: outcome = "NEAR_MISS"; break;
+	    case MISS: outcome = "MISS"; break;
 	}
 
 	StringBuffer buf = new StringBuffer("move-ended ");
@@ -345,10 +333,26 @@ public class Game implements /* ChannelListener */ GLO {
 		    i.remove();
 		}
 	    }
+
+	    GLOReference<PlayerHistory> historyRef = 
+		    nameToHistory.get(bombedPlayerNick);
+	    PlayerHistory history = historyRef.get(task);
+	    history.lose();
+
+	    log.info(bombedPlayerNick + " summary: " + history.toString());
 	}
 
 	// Check whether the player has won
 	if (players.size() == 1) { // XXX: what if it's zero?
+
+	    GLOReference<Player> playerRef = players.get(0);
+	    Player winner = playerRef.peek(task);
+	    GLOReference<PlayerHistory> historyRef = 
+		    nameToHistory.get(winner.getUserName());
+	    PlayerHistory history = historyRef.get(task);
+	    history.win();
+	    log.info(winner.getUserName() + " summary: " + history.toString());
+
 	    // queue a new task to handle end of game
 	    try {
 		task.queueTask(thisRef,
@@ -420,4 +424,9 @@ public class Game implements /* ChannelListener */ GLO {
 	log.info("Game: User " + uid + " left channel " + cid);
     }
 
+    public void addHistory(String userName,
+	    GLOReference<PlayerHistory> historyRef)
+    {
+	nameToHistory.put(userName, historyRef);
+    }
 }

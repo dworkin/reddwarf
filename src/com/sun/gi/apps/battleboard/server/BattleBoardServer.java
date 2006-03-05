@@ -51,13 +51,10 @@ import java.util.logging.Logger;
 import javax.security.auth.Subject;
 
 /**
- *
- * @author  James Megquier
- * @version $Rev$, $Date$
  */
 public class BattleBoardServer
-	implements SimBoot<BattleBoardServer>, SimUserListener {
-
+	implements SimBoot<BattleBoardServer>, SimUserListener
+{
     private static final long serialVersionUID = 1L;
 
     private static Logger log =
@@ -74,7 +71,8 @@ public class BattleBoardServer
      * well.
      */
     public void boot(GLOReference<? extends BattleBoardServer> thisGLO,
-	    boolean firstBoot) {
+	    boolean firstBoot)
+    {
 
 	SimTask task = SimTask.getCurrent();
 

@@ -40,38 +40,39 @@
 
 package com.sun.gi.apps.battleboard.server;
 
-import com.sun.gi.logic.GLO;
-import com.sun.gi.logic.SimTask;
-import com.sun.gi.logic.SimUserDataListener;
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.logic.GLO;
+import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
-
+import com.sun.gi.logic.SimTask;
+import com.sun.gi.logic.SimUserDataListener;
 import java.nio.ByteBuffer;
-import java.util.regex.Pattern;
-import java.util.regex.Matcher;
-import java.util.logging.Logger;
-
 import java.security.Principal;
+import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import javax.security.auth.Subject;
 
 /**
- *
- * @author  James Megquier
- * @version $Rev$, $Date$
  */
 public class Player implements SimUserDataListener {
-
     private static final long serialVersionUID = 1L;
 
     private static final Logger log =
 	Logger.getLogger("com.sun.gi.apps.battleboard.server");
 
-    protected String             myUserName;
-    protected UserID             myUserID;
-    protected GLOReference<Game> myGameRef;
-    protected String             myNick;
+    private String myUserName;
+    private UserID myUserID;
+    private GLOReference<Game> myGameRef;
+    private String myNick;
+
+    protected Player(String userName, UserID uid) {
+	myUserName = userName;
+	myUserID = uid;
+	myGameRef = null;
+	myNick = null;
+    }
 
     public static GLOReference<Player> getRef(UserID uid) {
 	SimTask task = SimTask.getCurrent();
@@ -82,13 +83,6 @@ public class Player implements SimUserDataListener {
 	SimTask task = SimTask.getCurrent();
 	GLOReference<Player> ref = getRef(uid);
 	return ref.get(task);
-    }
-
-    protected Player(String userName, UserID uid) {
-	myUserName = userName;
-	myUserID = uid;
-	myGameRef = null;
-	myNick = null;
     }
 
     public String getUserName() {
@@ -104,8 +98,22 @@ public class Player implements SimUserDataListener {
     }
 
     public void gameStarted(GLOReference<Game> gameRef) {
+	SimTask task = SimTask.getCurrent();
 	//myGameRefs.add(gameRef);
 	myGameRef = gameRef;
+	Game game = gameRef.peek(task);
+
+	String playerHistoryName = myUserName + ".history";
+	GLOReference<PlayerHistory> historyRef =
+		task.createGLO(new PlayerHistory(myUserName),
+			playerHistoryName);
+	if (historyRef == null) {
+	    log.fine("GLO already exists for " + playerHistoryName);
+	    historyRef = task.findGLO(playerHistoryName);
+	} else {
+	    log.fine("created GLO for " + playerHistoryName);
+	}
+	game.addHistory(myUserName, historyRef);
     }
 
     public void gameEnded(GLOReference<Game> gameRef) {
@@ -149,14 +157,14 @@ public class Player implements SimUserDataListener {
 	*/
 
 	String userName = subject.getPrincipals().iterator().next().getName();
-	Player player = new Player (userName, uid);
+	Player player = new Player(userName, uid);
 
 	GLOReference<Player> playerRef = task.createGLO(player, gloKey);
 
 	// We're interested in direct server data sent by the user.
 	task.addUserDataListener(uid, playerRef);
-
 	Matchmaker.get().addUserID(uid);
+
     }
 
     public static void userLeft(UserID uid) {
@@ -229,7 +237,8 @@ public class Player implements SimUserDataListener {
     }
 
     public void dataArrivedFromChannel(ChannelID cid, UserID uid,
-	    ByteBuffer data) {
+	    ByteBuffer data)
+    {
 	// no-op
     }
 }

@@ -17,10 +17,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -33,28 +29,28 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
     private static final Logger log =
 	Logger.getLogger("com.sun.gi.apps.battleboard.client");
 
-    protected BattleBoard board;
+    private BattleBoard board;
+    private ClientConnectionManager mgr;
+    private ClientChannel gameChannel;
 
-    protected ClientConnectionManager mgr;
-    protected ClientChannel gameChannel;
+    private static Pattern wsRegexp = Pattern.compile("\\s");
+    private State state = State.CONNECTING;
 
-    protected Callback[] validationCallbacks = null;
+    private String myPlayerName = "player";
 
-    protected String myPlayerName = "player";
-
-    protected byte[] serverID = null;
+    // private Callback[] validationCallbacks = null;
+    // private byte[] serverID = null;
 
     enum State {
 	CONNECTING,
-	JOINING_GAME,
-	PLAY_AWAIT_TURN_ORDER,
+	JOINING_GAME
     }
 
-    State state = State.CONNECTING;
+    public BattleBoardClient() { }
 
-    public BattleBoardClient() {
-    }
-
+    /**
+     * {@inheritDoc}
+     */
     public void run() {
 	try {
 	    mgr = new ClientConnectionManagerImpl("BattleBoard",
@@ -74,8 +70,6 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
 	System.out.flush();
     }
 
-    protected static Pattern wsRegexp = Pattern.compile("\\s");
- 
     public void visitNameCallback(NameCallback cb) {
 	log.finer("visitNameCallback");
 	showPrompt(cb.getPrompt());
@@ -93,7 +87,7 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
     // ClientConnectionManagerListener methods
 
     public void validationRequest(Callback[] callbacks) {
-	log.info("validationRequest");
+	log.fine("validationRequest");
 
 	for (Callback cb : callbacks) {
 	    try {
@@ -128,49 +122,72 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
     }
 
     public void connected(byte[] myID) {
-	log.info("connected");
+	log.fine("connected");
 
 	switch (state) {
-	case CONNECTING:
-	    break;
-
-	default:
-	    log.warning("connected(): unexpected state " + state);
-	    break;
+	    case CONNECTING:
+		break;
+	    default:
+		log.warning("connected(): unexpected state " + state);
+		break;
 	}
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public void connectionRefused(String message) {
 	log.info("connectionRefused");
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public void disconnected() {
-	log.info("disconnected");
+	log.fine("disconnected");
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public void userJoined(byte[] userID) {
-	log.info("userJoined");
+	log.fine("userJoined");
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public void userLeft(byte[] userID) {
-	log.info("userLeft");
+	log.fine("userLeft");
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public void failOverInProgress() {
 	log.info("failOverInProgress - client choosing to exit");
 	System.exit(1);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public void reconnected() {
 	log.info("reconnected");
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public void channelLocked(String chan, byte[] userID) {
 	log.warning("Channel `" + chan + "' is locked");
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public void joinedChannel(final ClientChannel channel) {
-	log.info("joinedChannel " + channel.getName());
+	log.fine("joinedChannel " + channel.getName());
 
 	if (channel.getName().equals("matchmaker")) {
 
@@ -183,25 +200,25 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
 
 	    channel.setListener(new ClientChannelListener() {
 		public void playerJoined(byte[] playerID) {
-		    log.info("playerJoined on " + channel.getName());
+		    log.fine("playerJoined on " + channel.getName());
 		}
 
 		public void playerLeft(byte[] playerID) {
-		    log.info("playerLeft on " + channel.getName());
+		    log.fine("playerLeft on " + channel.getName());
 		}
 
 		public void dataArrived(byte[] uid, ByteBuffer data,
 			boolean reliable) {
-		    log.info("dataArrived on " + channel.getName());
+		    log.fine("dataArrived on " + channel.getName());
 
 		    byte[] bytes = new byte[data.remaining()];
 		    data.get(bytes);
 
-		    log.info("got matchmaker data `" + bytes + "'");
+		    log.fine("got matchmaker data `" + bytes + "'");
 		}
 
 		public void channelClosed() {
-		    log.info("channel " + channel.getName() + " closed");
+		    log.fine("channel " + channel.getName() + " closed");
 		}
 	    });
 
@@ -214,7 +231,6 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
 	if (state == State.JOINING_GAME) {
 	    channel.setListener(
 		new BattleBoardPlayer(mgr, channel, myPlayerName));
-	    state = State.PLAY_AWAIT_TURN_ORDER;
 	}
     }
 
@@ -223,5 +239,4 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
     public static void main(String[] args) {
 	new BattleBoardClient().run();
     }
-
 }

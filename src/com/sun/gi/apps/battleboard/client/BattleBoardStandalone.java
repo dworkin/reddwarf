@@ -5,6 +5,8 @@ import com.sun.gi.apps.battleboard.BattleBoard;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.List;
+import java.util.LinkedList;
 
 /**
  * Test driver for BattleBoardPlayer.
@@ -21,6 +23,23 @@ class BattleBoardStandalone {
 
 	myBoard.populate();
 
+	BattleBoard b2 = new BattleBoard("playerTwo", boardWidth, boardHeight,
+		numCities);
+	BattleBoard b3 = new BattleBoard("playerThree", boardWidth, boardHeight,
+		numCities);
+
+	List<BattleBoard> boards = new LinkedList<BattleBoard>();
+	boards.add(myBoard);
+	boards.add(b2);
+	boards.add(b3);
+
+	TextDisplay display = new TextDisplay(playerName);
+
+	display.showBoards(boards, playerName);
+	display.showBoards(boards, "playerTwo");
+	display.showBoards(boards, "playerThree");
+
+	/*
 	BattleBoardPlayer player = new BattleBoardPlayer(playerName);
 
 	BufferedReader input = new BufferedReader(
@@ -41,5 +60,6 @@ class BattleBoardStandalone {
 	    String[] tokens = commandline.split("\\s*");
 	    player.playGame(tokens);
 	}
+	*/
     }
 }

@@ -7,6 +7,7 @@ package com.sun.gi.apps.battleboard;
 import java.io.Serializable;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Random;
 
 public class BattleBoard implements Serializable {
 
@@ -27,6 +28,8 @@ public class BattleBoard implements Serializable {
 	    return y;
 	}
     }
+
+    private transient Random random = new Random();
 
     private String playerName;
     private int boardHeight;
@@ -105,6 +108,10 @@ public class BattleBoard implements Serializable {
 	    throw new IllegalArgumentException("numCities is too large");
 	}
 
+	if (player == null) {
+	    throw new NullPointerException("player must not be null");
+	}
+
 	playerName = player;
 	boardWidth = width;
 	boardHeight = height;
@@ -120,35 +127,33 @@ public class BattleBoard implements Serializable {
     }
 
     /**
-     * Places cities on an empty battle board. <p>
-     *
-     * For the sake of simplicity, this method always places the
-     * cities in the same places.  This makes the game very boring to
-     * play, but makes the example somewhat simpler.
+     * Places cities at random on an empty battle board. <p>
      *
      * @return a list of BattleBoardLocations containing the location
      * of each city
      */
-    public List<BattleBoardLocation>  populate() {
-
+    public List<BattleBoardLocation> populate() {
 	List<BattleBoardLocation> cityLocations =
 		new LinkedList<BattleBoardLocation>();
+	int count = startCities;
 
 	/*
-	 * Note that the city locations are chosen in a completely
-	 * non-random manner...
+	 * This method is not efficient if the number of cities is
+	 * more than half the total number of positions -- but usually
+	 * the number of cities is a small fraction of the number of
+	 * possible positions and therefore this is not a worry.
 	 */
 
-	int count = startCities;
-	for (int y = 0; (y < boardHeight) && (count > 0); y++) {
-	    for (int x = 0; (x < boardWidth) && (count > 0); x++) {
-		board[x][y] = PositionValue.CITY;
-		count--;
+	while (count > 0) {
+	    int x = random.nextInt(boardWidth);
+	    int y = random.nextInt(boardHeight);
 
+	    if (board[x][y] != PositionValue.CITY) {
+		board[x][y] = PositionValue.CITY;
 		cityLocations.add(new BattleBoardLocation(x, y));
+		count--;
 	    }
 	}
-
 	return cityLocations;
     }
 
@@ -191,48 +196,12 @@ public class BattleBoard implements Serializable {
     }
 
     /**
-     * Returns the number of cities still surviving on the the board.
+     * Returns the number of cities still surviving on the board.
      *
-     * @return the number of cities still surviving on the the board
+     * @return the number of cities still surviving on the board
      */
     public int getSurvivingCities() {
 	return survivingCities;
-    }
-
-    /**
-     * Displays the board using a simple text format.
-     */
-    public void display() {
-
-	System.out.println("-- " + playerName + " -- " + survivingCities +
-		" surviving cities");
-
-	for (int j = getHeight() - 1; j >= 0; j--) {
-
-	    System.out.print(j);
-
-	    for (int i = 0; i < getWidth(); i++) {
-		String b;
-
-		switch (getBoardPosition(i, j)) {
-		    case VACANT   : b = "   "; break;
-		    case CITY     : b = " C "; break;
-		    case UNKNOWN  : b = " . "; break;
-		    case MISS     : b = " - "; break;
-		    case NEAR     : b = " + "; break;
-		    case HIT      : b = " # "; break;
-		    default       : b = "???"; break;
-		}
-		System.out.print(b);
-	    }
-	    System.out.println();
-	}
-	System.out.print(" ");
-
-	for (int i = 0; i < getWidth(); i++) {
-	    System.out.print(" " + i + " ");
-	}
-	System.out.println();
     }
 
     /**

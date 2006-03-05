@@ -5,17 +5,9 @@
 package com.sun.gi.apps.battleboard.client;
 
 import com.sun.gi.apps.battleboard.BattleBoard;
-import com.sun.gi.comm.discovery.impl.URLDiscoverer;
-import com.sun.gi.comm.users.client.ClientAlreadyConnectedException;
 import com.sun.gi.comm.users.client.ClientChannel;
 import com.sun.gi.comm.users.client.ClientChannelListener;
 import com.sun.gi.comm.users.client.ClientConnectionManager;
-import com.sun.gi.comm.users.client.ClientConnectionManagerListener;
-import com.sun.gi.comm.users.client.impl.ClientConnectionManagerImpl;
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -23,9 +15,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import javax.security.auth.callback.Callback;
-import javax.security.auth.callback.NameCallback;
-import javax.security.auth.callback.PasswordCallback;
 
 public class BattleBoardPlayer implements ClientChannelListener {
 
@@ -34,12 +23,13 @@ public class BattleBoardPlayer implements ClientChannelListener {
 
     private final ClientChannel channel;
     private final ClientConnectionManager connectionManager;
+    private final TextDisplay display;
     private List<String> playerNames = null;
-    private Map<String, BattleBoard> playerBoards = null;
+    private List<BattleBoard> playerBoards = null;
+    private Map<String, BattleBoard> nameToBoard = null;
     private String myName;
     private BattleBoard myBoard;
     private boolean lost = false;
-    private boolean standAloneMode;
 
     /**
      * The game play is in one of several states:  waiting for a board
@@ -64,7 +54,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	this.connectionManager = connectionManager;
 	this.channel = chan;
 	this.myName = playerName;
-	standAloneMode = false;
+	this.display = new TextDisplay(playerName);
     }
 
     /**
@@ -72,35 +62,36 @@ public class BattleBoardPlayer implements ClientChannelListener {
      */
     BattleBoardPlayer(String playerName) {
 	this(null, null, playerName);
-
-	standAloneMode = true;
     }
 
     /**
      * {@inheritDoc}
      */
     public void playerJoined(byte[] playerID) {
-	log.info("playerJoined on " + channel.getName());
+	log.fine("playerJoined on " + channel.getName());
     }
 
     /**
      * {@inheritDoc}
      */
     public void playerLeft(byte[] playerID) {
-	log.info("playerJoined on " + channel.getName());
+	log.fine("playerJoined on " + channel.getName());
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public void dataArrived(byte[] uid, ByteBuffer data, boolean reliable) {
 
 	// XXX: sanity checks?
 
-	log.info("dataArrived on " + channel.getName());
+	log.fine("dataArrived on " + channel.getName());
 
 	byte[] bytes = new byte[data.remaining()];
 	data.get(bytes);
 	String text = new String(bytes);
 
-	log.info("dataArrived: (" + text + ")");
+	log.finer("dataArrived: (" + text + ")");
 
 	String[] tokens = text.split("\\s+");
 	if (tokens.length == 0) {
@@ -122,7 +113,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
      * {@inheritDoc}
      */
     public void channelClosed() {
-	log.info("channel " + channel.getName() + " closed");
+	log.fine("channel " + channel.getName() + " closed");
     }
 
     /**
@@ -150,8 +141,6 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	} else if ((gameState == GameState.END_MOVE) &&
 		"move-ended".equals(cmd)) {
 	    gameState = moveEnded(tokens);
-	} else if ("withdraw".equals(cmd)) {
-	    withdraw(tokens);
 	} else {
 	    log.severe("Illegal game state: cmd " + cmd +
 		    " gameState " + gameState);
@@ -161,16 +150,16 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	 * If there's only one player left, that last remaining player
 	 * is the winner.
 	 */
-	if (playerNames != null && playerNames.size() == 1) {
-	    if (myName.equals(playerNames.get(0))) {
-		displayMessage("YOU WIN!");
+	if (playerBoards != null && playerBoards.size() == 1) {
+	    if (myName.equals(playerBoards.get(0).getPlayerName())) {
+		display.message("YOU WIN!");
 	    } else {
-		displayMessage(playerNames.get(0) + " WINS!");
+		display.message(playerBoards.get(0).getPlayerName() +
+			" WINS!");
 	    }
 	    gameState = GameState.GAME_OVER;
-	    if (!standAloneMode) {
-		//connectionManager.disconnect();
-	    }
+	    connectionManager.disconnect();
+	    System.exit(0);
 	}
     }
 
@@ -224,10 +213,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
 
 	    tempBoard.update(x, y, BattleBoard.PositionValue.CITY);
 	}
-
 	myBoard = tempBoard;
-	displayMessage("Here is your board:\n");
-	myBoard.display();
 
 	return GameState.NEED_TURN_ORDER;
     }
@@ -246,7 +232,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
      */
     private GameState setTurnOrder(String[] args) {
 
-	if (playerNames != null) {
+	if (playerBoards != null) {
 	    log.severe("setTurnOrder has already been done");
 	    return GameState.NEED_TURN_ORDER;
 	}
@@ -258,24 +244,25 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	}
 
 	playerNames = new LinkedList<String>();
-	playerBoards = new HashMap<String, BattleBoard>();
+	playerBoards = new LinkedList<BattleBoard>();
+	nameToBoard = new HashMap<String, BattleBoard>();
 
 	for (int i = 1; i < args.length; i++) {
 	    String playerName = args[i];
 	    playerNames.add(playerName);
 
 	    if (myName.equals(playerName)) {
-		playerBoards.put(myName, myBoard);
+		playerBoards.add(myBoard);
+		nameToBoard.put(myName, myBoard);
 	    } else {
-		playerBoards.put(playerName,
-			new BattleBoard(playerName,
-				myBoard.getWidth(), myBoard.getHeight(),
-				myBoard.getStartCities()));
+		BattleBoard newBoard = new BattleBoard(playerName,
+			myBoard.getWidth(), myBoard.getHeight(),
+			myBoard.getStartCities());
+		playerBoards.add(newBoard);
+		nameToBoard.put(playerName, newBoard);
 	    }
 	}
 
-	displayMessage("Initial Boards:\n");
-	displayBoards(null);
 	return GameState.BEGIN_MOVE;
     }
 
@@ -287,26 +274,24 @@ public class BattleBoardPlayer implements ClientChannelListener {
      * correctly, <code>BEGIN_MOVE</code> otherwise
      */
     private GameState yourTurn() {
-	displayMessage("Your move!\n");
+	display.showBoards(playerBoards, myName);
+	display.message("Your move!\n");
 
 	for (;;) {
 	    String[] move = BattleBoardUtils.getKeyboardInputTokens(
 			"player x y, or pass ");
+
 	    if ((move.length == 1) && "pass".equals(move[0])) {
-		if (standAloneMode) {
-		    displayMessage("TO SERVER: " + "pass" + "\n");
-		} else {
-		    ByteBuffer buf = ByteBuffer.wrap("pass".getBytes());
-		    buf.position(buf.limit());
-		    connectionManager.sendToServer(buf, true);
-		}
+		ByteBuffer buf = ByteBuffer.wrap("pass".getBytes());
+		buf.position(buf.limit());
+		connectionManager.sendToServer(buf, true);
 		break;
 	    } else if (move.length == 3) {
 		String bombedPlayer = move[0];
 		if (!playerNames.contains(bombedPlayer)) {
-		    displayMessage("Error: player (" + bombedPlayer +
+		    display.message("Error: player (" + bombedPlayer +
 			    ") is not in the game\n");
-		    displayMessage("Please try again.\n");
+		    display.message("Please try again.\n");
 		    continue;
 		}
 
@@ -315,24 +300,20 @@ public class BattleBoardPlayer implements ClientChannelListener {
 
 		if ((x < 0) || (x >= myBoard.getWidth()) ||
 			(y < 0) || (y >= myBoard.getHeight())) {
-		    displayMessage("Illegal (x,y)\n");
-		    displayMessage("Please try again.\n");
+		    display.message("Illegal (x,y)\n");
+		    display.message("Please try again.\n");
 		    continue;
 		}
 
 		String moveMessage = "move " + bombedPlayer + " " +
 			x + " " + y;
 
-		if (standAloneMode) {
-		    displayMessage("TO SERVER: " + moveMessage + "\n");
-		} else {
-		    ByteBuffer buf = ByteBuffer.wrap(moveMessage.getBytes());
-		    buf.position(buf.limit());
-		    connectionManager.sendToServer(buf, true);
-		}
+		ByteBuffer buf = ByteBuffer.wrap(moveMessage.getBytes());
+		buf.position(buf.limit());
+		connectionManager.sendToServer(buf, true);
 		break;
 	    } else {
-		displayMessage(
+		display.message(
 			"Improperly formatted move.  Please try again.\n");
 	    }
 
@@ -361,14 +342,15 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	}
 
 	String currPlayer = args[1];
-	log.info("move-started for " + currPlayer);
+	log.fine("move-started for " + currPlayer);
 
 	if (!playerNames.contains(currPlayer)) {
 	    log.severe("moveStarted: nonexistant player (" + currPlayer + ")");
 	    return GameState.BEGIN_MOVE;
 	}
 
-	displayMessage(currPlayer + " is making a move...\n");
+	display.showBoards(playerBoards, currPlayer);
+	display.message(currPlayer + " is making a move...\n");
 	return GameState.END_MOVE;
     }
 
@@ -392,7 +374,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	String currPlayer = args[1];
 	String action = args[2];
 
-	log.info("move-ended for " + currPlayer);
+	log.fine("move-ended for " + currPlayer);
 
 	if ("pass".equals(action)) {
 	    if (args.length != 3) {
@@ -400,9 +382,9 @@ public class BattleBoardPlayer implements ClientChannelListener {
 			"incorrect number of args: " + args.length + " != 3");
 		return GameState.END_MOVE;
 	    }
-	    log.info(currPlayer + " passed");
+	    log.fine(currPlayer + " passed");
 
-	    displayMessage(currPlayer + " passed.\n");
+	    display.message(currPlayer + " passed.\n");
 	    return GameState.BEGIN_MOVE;
 	} else if ("bomb".equals(action)) {
 	    if (args.length != 7) {
@@ -412,7 +394,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	    }
 
 	    String bombedPlayer = args[3];
-	    BattleBoard board = playerBoards.get(bombedPlayer);
+	    BattleBoard board = nameToBoard.get(bombedPlayer);
 	    if (board == null) {
 		log.severe("nonexistant player (" + bombedPlayer + ")");
 		return GameState.END_MOVE;
@@ -430,9 +412,9 @@ public class BattleBoardPlayer implements ClientChannelListener {
 
 	    String outcome = args[6];
 
-	    log.info(bombedPlayer + " bombed ("
+	    log.fine(bombedPlayer + " bombed ("
 		    + x + ", " + y + ") with outcome " + outcome);
-	    displayMessage(currPlayer + " bombed " + bombedPlayer +
+	    display.message(currPlayer + " bombed " + bombedPlayer +
 		    " at " + x + "," + y + " with outcome " + outcome + "\n");
 
 	    if ("HIT".equals(outcome) || "LOSS".equals(outcome)) {
@@ -440,20 +422,21 @@ public class BattleBoardPlayer implements ClientChannelListener {
 		board.hit();
 
 		if ("LOSS".equals(outcome)) {
+		    playerBoards.remove(nameToBoard.get(bombedPlayer));
 		    playerNames.remove(bombedPlayer);
 		    if (bombedPlayer.equals(myName)) {
-			displayMessage("You lose!\n");
-			displayMessage("Better luck next time.\n");
+			display.message("You lose!\n");
+			display.message("Better luck next time.\n");
 			lost = true;
 		    } else {
-			displayMessage(bombedPlayer +
+			display.message(bombedPlayer +
 				" lost their last city.\n");
 		    }
 		} else {
 		    if (bombedPlayer.equals(myName)) {
-			displayMessage("You just lost a city!\n");
+			display.message("You just lost a city!\n");
 		    } else {
-			displayMessage(bombedPlayer + " lost a city.\n");
+			display.message(bombedPlayer + " lost a city.\n");
 		    }
 		}
 	    } else if ("NEAR_MISS".equals(outcome)) {
@@ -461,7 +444,8 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	    } else if ("MISS".equals(outcome)) {
 		board.update(x, y, BattleBoard.PositionValue.MISS);
 	    }
-	    displayBoards(bombedPlayer);
+
+	    display.showBoards(playerBoards, bombedPlayer);
 	} else {
 	    log.severe("moveEnded: invalid command");
 	    return GameState.END_MOVE;
@@ -471,7 +455,9 @@ public class BattleBoardPlayer implements ClientChannelListener {
     }
 
     /**
-     * Implements the operations for the "withdraw" message.
+     * Implements the operations for the "withdraw" message. <p>
+     *
+     * <em>This method is not used in the current game.</em>
      *
      * @param args an array of Strings containing the tokens of the
      * message from the server
@@ -480,7 +466,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
      * <code>false</code> otherwise
      */
     private boolean withdraw(String[] args) {
-	if (playerNames == null) {
+	if (playerBoards == null) {
 	    log.severe("setTurnOrder has not yet been done");
 	    return false;
 	}
@@ -497,10 +483,10 @@ public class BattleBoardPlayer implements ClientChannelListener {
 		    withdrawnPlayer + ")");
 	    return false;
 	} else {
-	    log.info(withdrawnPlayer + " has withdrawn");
+	    log.fine(withdrawnPlayer + " has withdrawn");
 
-	    displayMessage(withdrawnPlayer + " has withdrawn.");
-	    displayBoards(null);
+	    display.showBoards(playerBoards, null);
+	    display.message(withdrawnPlayer + " has withdrawn.");
 	}
 
 	return true;
@@ -515,35 +501,5 @@ public class BattleBoardPlayer implements ClientChannelListener {
      */
     public boolean lost() {
 	return lost;
-    }
-
-    private void displayMessage(String message) {
-	System.out.print(message);
-	System.out.flush();
-    }
-
-    private void displayBoards(String activePlayer) {
-
-	if ((activePlayer != null) && myName.equals(activePlayer)) {
-	    System.out.println("========");
-	    myBoard.display();
-	    System.out.println("========");
-	} else {
-	    myBoard.display();
-	}
-
-	for (String name : playerNames) {
-	    if (name.equals(myName)) {
-		continue;
-	    }
-
-	    if ((activePlayer != null) && name.equals(activePlayer)) {
-		System.out.println("========");
-		playerBoards.get(name).display();
-		System.out.println("========");
-	    } else {
-		playerBoards.get(name).display();
-	    }
-	}
     }
 }

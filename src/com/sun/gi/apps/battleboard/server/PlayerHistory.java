@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright 2006 Sun Microsystems, Inc. All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or
@@ -40,30 +38,45 @@
 
 package com.sun.gi.apps.battleboard.server;
 
-import com.sun.gi.apps.battleboard.BattleBoard;
 import com.sun.gi.logic.GLO;
 
 /**
- * Board represents the state of a single Player's board in
- * a particular Game of BattleBoard.  It supports the same
- * interface and semantics as a client-side board representation,
- * but implements the GLO interface so as to participate in
- * SGS persistence.
  */
-public class Board extends BattleBoard implements GLO {
+public class PlayerHistory implements GLO {
     private static final long serialVersionUID = 1L;
 
-    /**
-     * Default constructor, not for public use.
-     */
-    protected Board() {
-	super();
+    private final String playerName;
+    private long gamesWon;
+    private long gamesLost;
+
+    public PlayerHistory(String name) {
+	this.playerName = name;
+	this.gamesWon = 0;
+	this.gamesLost = 0;
     }
 
-    /**
-     * Construct a blank Board with the given initial parameters.
-     */
-    public Board(String player, int width, int height, int numCities) {
-	super(player, width, height, numCities);
+    public long getWon() {
+	return gamesWon;
+    }
+
+    public long getLost() {
+	return gamesLost;
+    }
+
+    public long getTotalGames() {
+	return gamesWon + gamesLost;
+    }
+
+    public void win() {
+	gamesWon++;
+    }
+
+    public void lose() {
+	gamesLost++;
+    }
+
+    public String toString() {
+	return "playerName: " + playerName +
+		" won: " + gamesWon + " lost: " + gamesLost;
     }
 }

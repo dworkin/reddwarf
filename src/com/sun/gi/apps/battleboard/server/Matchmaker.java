@@ -66,7 +66,7 @@ public class Matchmaker implements /* ChannelListener */ GLO {
 
     protected final ChannelID channel;
 
-    protected int PLAYERS_PER_GAME = 3;
+    protected int PLAYERS_PER_GAME = 2;
 
     protected Set<GLOReference<Player>> waitingPlayers =
 	new HashSet<GLOReference<Player>>();
