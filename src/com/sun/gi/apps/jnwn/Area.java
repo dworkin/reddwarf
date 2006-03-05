@@ -174,6 +174,8 @@ public class Area implements GLO {
 	sb.append("move ")
 	  .append(ch.getCharacterID())
 	  .append(" ")
+	  .append(info.pos.heading)
+	  .append(" ")
 	  .append(info.pos.x)
 	  .append(" ")
 	  .append(info.pos.y)
