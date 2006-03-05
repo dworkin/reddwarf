@@ -254,7 +254,7 @@ public class DIRC implements ClientConnectionManagerListener, ChatManager {
     public static void main(String[] args) {
 	try {
 	    new DIRC(
-		"JNWN",
+		"BattleTrolls",
 		new File("FakeDiscovery.xml").toURI().toURL()
 	    ).run();
 	} catch (Exception e) {

@@ -266,8 +266,11 @@ public class Area implements GLO {
     protected void handleWalk(Character ch, String[] args) {
 	SimTask task = SimTask.getCurrent();
 
-	if (args.length != 7) {
-	    log.warning("Walk requires 7 args, got " + args.length);
+	final int EXPECTED_ARGS = 7;
+
+	if (args.length != EXPECTED_ARGS) {
+	    log.warning("Walk requires " + EXPECTED_ARGS +
+		" args, got " + args.length);
 	    return;
 	}
 

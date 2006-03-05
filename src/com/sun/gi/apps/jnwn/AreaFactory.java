@@ -139,7 +139,8 @@ public class AreaFactory {
 			minfo.getStartY(),
 			minfo.getStartZ(),
 			minfo.getStartingFacing(),
-			new WalkMeshCheatDetector(wmm));
+			new FakeCheatDetector());
+			//new WalkMeshCheatDetector(wmm));
     }
 
     static class FakeCheatDetector implements CheatDetector {
