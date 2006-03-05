@@ -9,10 +9,15 @@
     <property name="optimize" value="true" />
     <property name="deprecated" value="true" />
 
+    <property name="jrms.version" value="1.1" />
+    <property name="jrms.jarfile" value="jrms/jrms-${jrms.version}.jar" />
+    <property name="derby.version" value="10.1.2.1" />
+    <property name="derby.jarfile" value="derby/derby-${derby.version}.jar" />
+
     <path id="project.classpath">
 	<pathelement location="bin" />
-	<pathelement location="resources/libs/jrms/classes.jar" />
-	<pathelement location="resources/libs/derby/derby-10.1.1.0.jar" />
+	<pathelement location="resources/libs/${jrms.jarfile}" />
+	<pathelement location="resources/libs/${derby.jarfile}" />
 	<pathelement location="resources/libs/servlet/javax.servlet.jar" />
 	<pathelement location="resources/libs/servlet/commons-logging.jar" />
 	<pathelement location="resources/libs/servlet/org.mortbay.jetty.jar" />
@@ -327,28 +332,41 @@
     <target name="release.bin" depends="release.server,release.j2seAPI, release.apps,release.clients"/>
 
     <target name="release.server" depends="build.server">
-	<jar destfile="release/ProjectDarkstar.jar"
-	    basedir="bin"
-	    excludes="com/sun/gi/apps/**,com/sun/gi/comm/users/client"
-	    manifest="resources/ProjectDarkstarManifest.mf" />
+	<jar destfile="release/ProjectDarkstar.jar">
+	    <manifest>
+		<attribute name="Class-Path"
+			   value="${jrms.jarfile} ${derby.jarfile}"/>
+		<attribute name="Main-Class"
+			   value="com.sun.gi.SGS"/>
+	    </manifest>
+	    <fileset dir="bin">
+		<exclude name="com/sun/gi/apps/**"/>
+		<exclude name="com/sun/gi/client/**"/>
+		<exclude name="com/sun/gi/comm/users/client/**"/>
+	    </fileset>
+	</jar>
 	<copy file="resources/startDarkstar.sh" todir="release" />
 	<copy file="resources/startDiscovery.sh" todir="release" />
 	<chmod file="release/startDarkstar.sh" perm="755" />
 	<chmod file="release/startDiscovery.sh" perm="755" />
-	<copy file="resources/libs/jrms/classes.jar" todir="release/jrms" />
-	<copy file="resources/libs/derby/derby-10.1.1.0.jar" todir="release/derby" />
+	<copy file="resources/libs/${jrms.jarfile}" todir="release/jrms" />
+	<copy file="resources/libs/${derby.jarfile}" todir="release/derby" />
 	<copy file="resources/Install.txt" todir="release" />
 	<copy file="resources/passwd.txt" todir="release" />
     <copy file="resources/FakeDiscovery.xml" todir="release" />
     </target>
 
     <target name="release.j2seAPI" depends="build.j2seAPI">
-	<jar destfile="release/ProjectDarkstarClientAPI.jar"
-	    basedir="bin" includes="com/sun/gi/comm/users/client/**,
-		com/sun/gi/comm/users/protocol/**,
-		com/sun/gi/validation/**,
-		com/sun/gi/comm/discovery/**,
-		com/sun/gi/utils/nio/**" />
+	<jar destfile="release/ProjectDarkstarClientAPI.jar">
+	    <fileset dir="bin">
+		<include name="com/sun/gi/comm/users/client/**"/>
+		<include name="com/sun/gi/comm/users/protocol/**"/>
+		<include name="com/sun/gi/validation/**"/>
+		<include name="com/sun/gi/comm/discovery/**"/>
+		<include name="com/sun/gi/utils/nio/**"/>
+		<include name="com/sun/gi/utils/types/**"/>
+	    </fileset>
+	</jar>
     </target>
 
     <target name="release.docs" depends="docs">

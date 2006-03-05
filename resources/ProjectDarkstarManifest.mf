@@ -1,3 +1,0 @@
-Manifest-Version: 1.0
-Class-Path: jrms/classes.jar derby/derby-10.1.1.0.jar 
-Main-Class: com.sun.gi.SGS
