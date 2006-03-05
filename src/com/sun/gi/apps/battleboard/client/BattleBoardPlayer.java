@@ -152,10 +152,10 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	 */
 	if (playerBoards != null && playerBoards.size() == 1) {
 	    if (myName.equals(playerBoards.get(0).getPlayerName())) {
-		display.message("YOU WIN!");
+		display.message("YOU WIN!\n");
 	    } else {
 		display.message(playerBoards.get(0).getPlayerName() +
-			" WINS!");
+			" WINS!\n");
 	    }
 	    gameState = GameState.GAME_OVER;
 	    connectionManager.disconnect();
