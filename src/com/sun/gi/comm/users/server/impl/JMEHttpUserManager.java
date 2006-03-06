@@ -38,7 +38,7 @@ public class JMEHttpUserManager implements UserManager, ServletListener, HttpSes
     private String gameName = "Test";
     private final static String USER_OBJECT = "USER_OBJECT";
     private static boolean servletContainerStarted = false;
-    private String listenerServletname = "com.sun.gi.comm.users.server.jme.JMEListenerServlet";
+    private String listenerServletname = "com.sun.gi.comm.users.server.impl.jme.JMEListenerServlet";
     
     private int port = 8080;
     
@@ -103,7 +103,7 @@ public class JMEHttpUserManager implements UserManager, ServletListener, HttpSes
             server.addListener(listener);
             ServletHttpContext context = (ServletHttpContext) server.getContext("/");            
             context.addServlet("JMEServlet","/Servlet/*",
-                           "com.sun.gi.comm.users.server.jme.JMEListenerServlet");
+                           listenerServletname);
             context.setResourceBase("static");
             context.addHandler(new ResourceHandler());
             ServletHandler handler = context.getServletHandler();
