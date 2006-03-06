@@ -1,39 +1,5 @@
 /*
- * Copyright 2006 Sun Microsystems, Inc. All Rights Reserved.
- *
- * Redistribution and use in source and binary forms, with or
- * without modification, are permitted provided that the following
- * conditions are met:
- *
- * -Redistributions of source code must retain the above copyright
- * notice, this  list of conditions and the following disclaimer.
- *
- * -Redistribution in binary form must reproduct the above copyright
- * notice, this list of conditions and the following disclaimer in
- * the documentation and/or other materials provided with the
- * distribution.
- *
- * Neither the name of Sun Microsystems, Inc. or the names of
- * contributors may be used to endorse or promote products derived
- * from this software without specific prior written permission.
- *
- * This software is provided "AS IS," without a warranty of any
- * kind. ALL EXPRESS OR IMPLIED CONDITIONS, REPRESENTATIONS AND
- * WARRANTIES, INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE OR NON-INFRINGEMENT, ARE HEREBY
- * EXCLUDED. SUN AND ITS LICENSORS SHALL NOT BE LIABLE FOR ANY
- * DAMAGES OR LIABILITIES  SUFFERED BY LICENSEE AS A RESULT OF  OR
- * RELATING TO USE, MODIFICATION OR DISTRIBUTION OF THE SOFTWARE OR
- * ITS DERIVATIVES. IN NO EVENT WILL SUN OR ITS LICENSORS BE LIABLE
- * FOR ANY LOST REVENUE, PROFIT OR DATA, OR FOR DIRECT, INDIRECT,
- * SPECIAL, CONSEQUENTIAL, INCIDENTAL OR PUNITIVE DAMAGES, HOWEVER
- * CAUSED AND REGARDLESS OF THE THEORY OF LIABILITY, ARISING OUT OF
- * THE USE OF OR INABILITY TO USE SOFTWARE, EVEN IF SUN HAS BEEN
- * ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
- *
- * You acknowledge that Software is not designed, licensed or
- * intended for use in the design, construction, operation or
- * maintenance of any nuclear facility.
+ * Copyright 2006 Sun Microsystems, Inc.  All Rights Reserved.
  */
 
 package com.sun.gi.gloutils;
@@ -44,42 +10,58 @@ import com.sun.gi.logic.SimTask;
 import java.math.BigInteger;
 
 /**
+ * A GLO that provides a simple sequence number.  <p>
+ *
+ * The sequence starts at a small number (by default, zero) and is
+ * incremented every time <code>SequenceGLO.getNext</code> is invoked.
+ *
+ * The intended usage is:
+ *
+ * <pre>
+ * BigInteger sequenceNumber = SequenceGLO.getNext(task, name);
+ * </pre> <p>
+ *
+ * where <code>task</code> is the current task and <code>name</code>
+ * is the name of the sequence. <p>
+ *
+ * For applications that need to generate several sequence numbers,
+ * it is more efficient to acquire a {@link GLOReference} to the SequenceGLO,
+ * {@link GLOReference.get get} the underlying object and invoke
+ * <code>getNext</code> on it directly: <p>
+ *
+ * <pre>
+ * // Assumes that the GLO already exists.
+ * // Do this once, to get the reference:
+ * GLOReference<SequenceGLO> ref = task.findGLO(name);
+ *
+ * // Do this once per task, to deref the reference:
+ * SequenceGLO sequence = ref.get(task);
+ *
+ * // Within a task, do this as often as required:
+ * BigInteger next = sequence.getNext();
+ * </pre> <p>
  */
 public class SequenceGLO implements GLO {
     private static final long serialVersionUID = 1L;
     private BigInteger value;
 
     /**
-     * Creates a SequenceGLO with the given initialValue.
+     * Creates a SequenceGLO with the given initial value. <p>
+     *
+     * Note that because of the way the values are computed, the
+     * initial value is never one of the values returned by
+     * {@link #getNext}. <p>
+     *
+     * This constructor is not meant to be used directly.  It is
+     * only meant to be used by {@link #getReference}.
+     *
+     * @param initialValue the starting value of the sequence
      */
     private SequenceGLO(BigInteger initialValue) {
 	if (initialValue == null) {
 	    throw new NullPointerException("initialValue is null");
 	}
 	this.value = initialValue;
-    }
-
-    /**
-     * Creates a SequenceGLO with the given initialValue.
-     */
-    private SequenceGLO(long initialValue) {
-	this.value = BigInteger.valueOf(initialValue);
-    }
-
-    /**
-     * Creates a SequenceGLO with an initial value of zero.
-     */
-    private SequenceGLO() {
-	this(BigInteger.ZERO);
-    }
-
-    /**
-     * Returns the current value of the sequence.
-     *
-     * @return the current value of the sequence
-     */
-    public BigInteger getValue() {
-	return value;
     }
 
     /**
@@ -107,7 +89,7 @@ public class SequenceGLO implements GLO {
      * @return a GLOReference for a SequenceGLO for the given task and
      * name
      */
-    public static GLOReference<SequenceGLO> get(SimTask task,
+    public static GLOReference<SequenceGLO> getReference(SimTask task,
 	    String name)
     {
 	BigInteger initialValue = BigInteger.ZERO;
@@ -122,14 +104,18 @@ public class SequenceGLO implements GLO {
     }
 
     /**
+     * Returns the next sequence number for the SequenceGLO with the
+     * given name.
+     *
      * @param task the current {@link SimTask}
      *
      * @param name the name for this new GLO
+     *
+     * @return the next sequence number for the SequenceGLO with the
+     * given name
      */
     public static BigInteger getNext(SimTask task, String name) {
-
-	GLOReference<SequenceGLO> ref = SequenceGLO.get(task, name);
-
+	GLOReference<SequenceGLO> ref = SequenceGLO.getReference(task, name);
 	SequenceGLO seq = ref.get(task);
 	return seq.getNext();
     }
