@@ -60,18 +60,40 @@ public class Player implements SimUserDataListener {
     private static final long serialVersionUID = 1L;
 
     private static final Logger log =
-	Logger.getLogger("com.sun.gi.apps.battleboard.server");
+	    Logger.getLogger("com.sun.gi.apps.battleboard.server");
 
+    /**
+     * The username for the user.
+     */
     private String myUserName;
-    private UserID myUserID;
-    private GLOReference<Game> myGameRef;
-    private String myNick;
 
+    /**
+     * The UserID of this user.
+     */
+    private UserID myUserID;
+
+    /**
+     * The name under which the player is playing (i.e., a screen name
+     * for this user).  This need not be related in any way to the
+     * user name!
+     */
+    private String myPlayerName;
+
+    private GLOReference<Game> myGameRef;
+
+    /**
+     * Creates a Player instance with the given userName and uid.
+     *
+     * @param userName the name of the user (which is not necessarily the same
+     * as the playerName)
+     *
+     * @param uid the UID of this user
+     */
     protected Player(String userName, UserID uid) {
 	myUserName = userName;
 	myUserID = uid;
 	myGameRef = null;
-	myNick = null;
+	myPlayerName = null;
     }
 
     public static GLOReference<Player> getRef(UserID uid) {
@@ -121,12 +143,12 @@ public class Player implements SimUserDataListener {
 	// If there are no more games, join the matchmaker channel
     }
 
-    public String getNickname() {
-	return myNick;
+    public String getPlayerName() {
+	return myPlayerName;
     }
 
-    public void setNickname(String nickname) {
-	myNick = nickname;
+    public void setPlayerName(String playerName) {
+	myPlayerName = playerName;
     }
 
 

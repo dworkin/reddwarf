@@ -93,9 +93,6 @@ public class Game implements GLO {
      */
     protected Game(Set<GLOReference<Player>> newPlayers) {
 
-	// XXX: is it OK to throw runtime exceptions here?
-	// XXX: If not, what to do?
-
 	if (newPlayers == null) {
 	    throw new NullPointerException("newPlayers is null");
 	}
@@ -105,11 +102,10 @@ public class Game implements GLO {
 
 	SimTask task = SimTask.getCurrent();
 
-	// XXX store and increment a next-channel-number in the GLO,
-	// instead of using the current time(?) -jm
-	gameName = "BB-" + System.currentTimeMillis();
-
-	log.finer("Next game channel is `" + gameName + "'");
+	gameName = "GameChannel-" +
+		SequenceGLO.getNext(task, "GameChannelSequence");
+		
+	log.info("New game channel is `" + gameName + "'");
 
 	players = new LinkedList<GLOReference<Player>>(newPlayers);
 	Collections.shuffle(players);
@@ -119,8 +115,8 @@ public class Game implements GLO {
 	playerBoards = new HashMap<String, GLOReference<Board>>();
 	for (GLOReference<Player> playerRef : players) {
 	    Player p = playerRef.get(task);
-	    playerBoards.put(p.getNickname(),
-		createBoard(p.getNickname()));
+	    playerBoards.put(p.getPlayerName(),
+		createBoard(p.getPlayerName()));
 	}
 
 	nameToHistory = new HashMap<String, GLOReference<PlayerHistory>>();
@@ -219,7 +215,7 @@ public class Game implements GLO {
 
 	log.fine("playerBoards size " + playerBoards.size());
 
-	GLOReference boardRef = playerBoards.get(player.getNickname());
+	GLOReference boardRef = playerBoards.get(player.getPlayerName());
 	Board board = (Board) boardRef.peek(task);
 
 	buf.append(board.getWidth() + " ");
@@ -247,7 +243,7 @@ public class Game implements GLO {
 
 	for (GLOReference<Player> playerRef : players) {
 	    Player p = playerRef.peek(task);
-	    buf.append(" " + p.getNickname());
+	    buf.append(" " + p.getPlayerName());
 	}
 
 	broadcast(buf);
@@ -280,7 +276,7 @@ public class Game implements GLO {
     protected void sendMoveStarted(Player player) {
 	SimTask task = SimTask.getCurrent();
 	StringBuffer buf = new StringBuffer("move-started " +
-		player.getNickname());
+		player.getPlayerName());
 	broadcast(buf);
     }
 
@@ -297,7 +293,7 @@ public class Game implements GLO {
     protected void handlePass(Player player) {
 	SimTask task = SimTask.getCurrent();
 	StringBuffer buf = new StringBuffer("move-ended ");
-	buf.append(player.getNickname());
+	buf.append(player.getPlayerName());
 	buf.append(" pass");
 
 	broadcast(buf);
@@ -311,7 +307,7 @@ public class Game implements GLO {
 
 	GLOReference<Board> boardRef = playerBoards.get(bombedPlayerNick);
 	if (boardRef == null) {
-	    log.warning(player.getNickname() +
+	    log.warning(player.getPlayerName() +
 		    " tried to bomb non-existant player " +
 		    bombedPlayerNick);
 	    handlePass(player);
@@ -329,7 +325,7 @@ public class Game implements GLO {
 
 	if ((x < 0) || (x >= board.getWidth()) ||
 		(y < 0) || (y >= board.getHeight())) {
-	    log.warning(player.getNickname() +
+	    log.warning(player.getPlayerName() +
 		    " tried to move outside the board");
 	    handlePass(player);
 	    return;
@@ -351,7 +347,7 @@ public class Game implements GLO {
 	}
 
 	StringBuffer buf = new StringBuffer("move-ended ");
-	buf.append(player.getNickname());
+	buf.append(player.getPlayerName());
 	buf.append(" bomb");
 	buf.append(" " + bombedPlayerNick);
 	buf.append(" " + x);
@@ -367,7 +363,7 @@ public class Game implements GLO {
 	    while (i.hasNext()) {
 		GLOReference<Player> ref = i.next();
 		Player p = ref.peek(task);
-		if (bombedPlayerNick.equals(p.getNickname())) {
+		if (bombedPlayerNick.equals(p.getPlayerName())) {
 		    spectators.add(ref);
 		    i.remove();
 		}

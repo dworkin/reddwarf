@@ -148,7 +148,7 @@ public class Matchmaker implements /* ChannelListener */ GLO {
 	SimTask task = SimTask.getCurrent();
 	for (GLOReference<Player> ref : waitingPlayers) {
 	    Player p = ref.peek(task);
-	    if (playerName.equals(p.getNickname())) {
+	    if (playerName.equals(p.getPlayerName())) {
 		log.warning("Matchmaker already has `" + playerName);
 		sendAlreadyJoined(uid);
 		return;
@@ -158,7 +158,7 @@ public class Matchmaker implements /* ChannelListener */ GLO {
 
 	GLOReference<Player> playerRef = Player.getRef(uid);
 	Player player = playerRef.get(task);
-	player.setNickname(playerName);
+	player.setPlayerName(playerName);
 
 	waitingPlayers.add(playerRef);
 
