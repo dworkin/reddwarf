@@ -25,37 +25,53 @@ public class JMEBatchProcessor  implements TransportProtocolTransmitter {
     
     private TransportProtocol transportProtocol;
     private SGSUserImpl user;
-    
+    private ByteBuffer[] packetsToBeSent;
     /** Creates a new instance of JMEBatchProcessor */
     public JMEBatchProcessor() {
         transportProtocol = new BinaryPktProtocol();
     }
     
     public void setUser(SGSUserImpl user) {
-        this.user = user;
+        this.user = user;      
+        //this should always happen
+        //once the user is created send the server id back to 
+        //the client
+        if (packetsToBeSent != null) {
+            sendBuffers(packetsToBeSent,true);
+            packetsToBeSent = null;
+        }
     }
         
     public void sendBuffers(ByteBuffer[] buffs,boolean reliable) {
-        Queue<byte[]> outgoingMessageQueue = ((JMESGSUserImpl)user).getOutgoingMessageQueue();
-        byte[] tempPacket = new byte[8096];
-        byte[] packetArray;
-        byte[] packetToQueue;
-        int packetsSize = 0;
-        int position = 0;
-        for (ByteBuffer packet : buffs) {
-            packet.flip();
-            int packetSize = packet.remaining();
-            packetArray = new byte[packetSize];
-            packet.get(packetArray);
-            packetsSize += packetSize;
-            System.arraycopy(packetArray,0,tempPacket,position,packetSize);            
-            position += packetSize;
+        //the user creation process sends a message back to the user
+        //this happens before the user is actually completed and therefore
+        //here when we try to send the message we can't get the queue we don't
+        //have the user, therefore we need to store the message until the user 
+        //is created
+        if (user == null) {
+            packetsToBeSent = buffs;
+        } else {        
+            Queue<byte[]> outgoingMessageQueue = ((JMESGSUserImpl)user).getOutgoingMessageQueue();
+            byte[] tempPacket = new byte[8096];
+            byte[] packetArray;
+            byte[] packetToQueue;
+            int packetsSize = 0;
+            int position = 0;
+            for (ByteBuffer packet : buffs) {
+                packet.flip();
+                int packetSize = packet.remaining();
+                packetArray = new byte[packetSize];
+                packet.get(packetArray);
+                packetsSize += packetSize;
+                System.arraycopy(packetArray,0,tempPacket,position,packetSize);            
+                position += packetSize;
+            }
+            packetToQueue = new byte[packetsSize + 2];
+            packetToQueue[0] = short1((short)packetsSize);
+            packetToQueue[1] = short0((short)packetsSize);
+            System.arraycopy(tempPacket,0,packetToQueue,2,packetsSize);            
+            outgoingMessageQueue.add(packetToQueue);
         }
-        packetToQueue = new byte[packetsSize + 2];
-        packetToQueue[0] = short1((short)packetsSize);
-        packetToQueue[1] = short0((short)packetsSize);
-        System.arraycopy(tempPacket,0,packetToQueue,2,packetsSize);            
-        outgoingMessageQueue.add(packetToQueue);
     }
     
     private byte short1(short x) { return (byte)(x >>  8); }
