@@ -18,6 +18,8 @@ import com.sun.gi.utils.jme.ByteBuffer;
 import com.sun.gi.utils.jme.Callback;
 import com.sun.gi.utils.jme.UnsupportedCallbackException;
 import java.io.IOException;
+import java.util.Random;
+import java.util.Vector;
 
 /**
  * Manager for JME Clients. Sends events to the client listener and receives 
@@ -36,6 +38,7 @@ public class JMEClientManager {
     private static JMEClientManager clientManager;
     private long keyTimeout = 0;
     private byte[] myID;
+    private Random random;
     private static final Object PRESENT = new Object();
     
     /** Creates a new instance of JMEClientManager */
@@ -47,7 +50,7 @@ public class JMEClientManager {
         this.gameName = gameName;
         protocol = new JMEBinaryPktProtocol();
         protocol.setClient(this);
-        
+        random = new Random();
     }
     
     /**
@@ -77,12 +80,16 @@ public class JMEClientManager {
         JMEDiscoveredGameImpl game = discoverGame(gameName);
         JMEDiscoveredUserManagerImpl[] userManagers = game.getUserManagers();
         JMEDiscoveredUserManagerImpl userManager = null;
+        Vector httpUserManagers = new Vector();
         for (int i = 0;i < userManagers.length;i++) {
+            //if (userManagers[i].getClientClass().equals(userManagerClassName)) {
+            //    userManager = userManagers[i];
+            //    break;
             if (userManagers[i].getClientClass().equals(userManagerClassName)) {
-                userManager = userManagers[i];
-                break;
+                httpUserManagers.addElement(userManagers[i]);
             }
         }
+        userManager = getRandomUsrMgr(httpUserManagers);
         if (userManager == null) {
             throw new IllegalArgumentException("No matching user manager found");
         }
@@ -95,6 +102,17 @@ public class JMEClientManager {
         }
         protocol.sendLoginRequest();
         return true;
+    }
+
+    private JMEDiscoveredUserManagerImpl getRandomUsrMgr(final Vector httpUserManagers) {
+        int numUsrMgrs = httpUserManagers.size();
+        System.out.println("getting random user manager " + numUsrMgrs);
+        if (numUsrMgrs == 1) {
+            return (JMEDiscoveredUserManagerImpl)httpUserManagers.firstElement();
+        } else if (numUsrMgrs > 1) {
+            return (JMEDiscoveredUserManagerImpl)httpUserManagers.elementAt(random.nextInt(numUsrMgrs -1));
+        }
+        return null;
     }
     
     /**
