@@ -299,7 +299,9 @@ public class NIOSocketManager implements Runnable {
     }
 
     public void enableWrite(SelectableChannel chan) {
-	writeQueue.add(chan);
+	synchronized(writeQueue) {
+	    writeQueue.add(chan);
+	}
 	selector.wakeup();
     }
 
