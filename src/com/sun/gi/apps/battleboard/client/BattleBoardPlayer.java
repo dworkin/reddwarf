@@ -23,7 +23,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
 
     private final ClientChannel channel;
     private final ClientConnectionManager connectionManager;
-    private final TextDisplay display;
+    private Display display;
     private List<String> playerNames = null;
     private List<BattleBoard> playerBoards = null;
     private Map<String, BattleBoard> nameToBoard = null;
@@ -54,7 +54,13 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	this.connectionManager = connectionManager;
 	this.channel = chan;
 	this.myName = playerName;
-	this.display = new TextDisplay(playerName);
+
+	/*
+	 * We don't have all the info we need to create the display at
+	 * this point.
+	 */ 
+
+	this.display = null;
     }
 
     /**
@@ -130,6 +136,13 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	} else if ((gameState == GameState.NEED_TURN_ORDER) &&
 		"turn-order".equals(cmd)) {
 	    gameState = setTurnOrder(tokens);
+
+	    /*
+	     * At this point, we finally have all the info
+	     * necessary to build the display.
+	     */
+
+	    display = new TextDisplay(playerBoards);
 	} else if ((gameState == GameState.BEGIN_MOVE) &&
 		"move-started".equals(cmd)) {
 	    if (myName.equals(tokens[1])) {
@@ -268,58 +281,44 @@ public class BattleBoardPlayer implements ClientChannelListener {
 
     /**
      * Implements the operations for the "move-started" message, for
-     * the player whose move it is.
+     * the player whose move it is. <p>
+     *
+     * Note that the {@link Display.getMove getMove} is responsible
+     * for validating the input, and therefore there is no checking
+     * here.  If the client sends a bad move to the server, the server
+     * will detect the error and substitute a "pass". <p>
      *
      * @return <code>END_MOVE</code> if the move was executed
      * correctly, <code>BEGIN_MOVE</code> otherwise
      */
     private GameState yourTurn() {
-	display.showBoards(playerBoards, myName);
+	display.showBoards(myName);
 	display.message("Your move!\n");
 
-	for (;;) {
-	    String[] move = BattleBoardUtils.getKeyboardInputTokens(
-			"player x y, or pass ");
+	String[] move = display.getMove();
 
-	    if ((move.length == 1) && "pass".equals(move[0])) {
-		ByteBuffer buf = ByteBuffer.wrap("pass".getBytes());
-		buf.position(buf.limit());
-		connectionManager.sendToServer(buf, true);
-		break;
-	    } else if (move.length == 3) {
-		String bombedPlayer = move[0];
-		if (!playerNames.contains(bombedPlayer)) {
-		    display.message("Error: player (" + bombedPlayer +
-			    ") is not in the game\n");
-		    display.message("Please try again.\n");
-		    continue;
-		}
+	if ((move.length == 1) && "pass".equals(move[0])) {
+	    ByteBuffer buf = ByteBuffer.wrap("pass".getBytes());
+	    buf.position(buf.limit());
+	    connectionManager.sendToServer(buf, true);
+	} else if (move.length == 3) {
+	    String bombedPlayer = move[0];
+	    int x = (int) new Integer(move[1]);
+	    int y = (int) new Integer(move[2]);
 
-		int x = (int) new Integer(move[1]);
-		int y = (int) new Integer(move[2]);
+	    String moveMessage = "move " + bombedPlayer + " " +
+		    x + " " + y;
 
-		if ((x < 0) || (x >= myBoard.getWidth()) ||
-			(y < 0) || (y >= myBoard.getHeight())) {
-		    display.message("Illegal (x,y)\n");
-		    display.message("Please try again.\n");
-		    continue;
-		}
-
-		String moveMessage = "move " + bombedPlayer + " " +
-			x + " " + y;
-
-		ByteBuffer buf = ByteBuffer.wrap(moveMessage.getBytes());
-		buf.position(buf.limit());
-		connectionManager.sendToServer(buf, true);
-		break;
-	    } else {
-		display.message(
-			"Improperly formatted move.  Please try again.\n");
-	    }
-
-	    return GameState.END_MOVE;
+	    ByteBuffer buf = ByteBuffer.wrap(moveMessage.getBytes());
+	    buf.position(buf.limit());
+	    connectionManager.sendToServer(buf, true);
+	} else {
+	    display.message(
+		    "Improperly formatted move.  Passing instead....\n");
+	    ByteBuffer buf = ByteBuffer.wrap("pass".getBytes());
+	    buf.position(buf.limit());
+	    connectionManager.sendToServer(buf, true);
 	}
-
 	return GameState.END_MOVE;
     }
 
@@ -349,7 +348,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	    return GameState.BEGIN_MOVE;
 	}
 
-	display.showBoards(playerBoards, currPlayer);
+	display.showBoards(currPlayer);
 	display.message(currPlayer + " is making a move...\n");
 	return GameState.END_MOVE;
     }
@@ -424,6 +423,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
 		if ("LOSS".equals(outcome)) {
 		    playerBoards.remove(nameToBoard.get(bombedPlayer));
 		    playerNames.remove(bombedPlayer);
+		    display.removePlayer(bombedPlayer);
 		    if (bombedPlayer.equals(myName)) {
 			display.message("You lose!\n");
 			display.message("Better luck next time.\n");
@@ -445,7 +445,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
 		board.update(x, y, BattleBoard.PositionValue.MISS);
 	    }
 
-	    display.showBoards(playerBoards, bombedPlayer);
+	    display.showBoards(bombedPlayer);
 	} else {
 	    log.severe("moveEnded: invalid command");
 	    return GameState.END_MOVE;
@@ -485,7 +485,8 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	} else {
 	    log.fine(withdrawnPlayer + " has withdrawn");
 
-	    display.showBoards(playerBoards, null);
+	    display.removePlayer(withdrawnPlayer);
+	    display.showBoards(null);
 	    display.message(withdrawnPlayer + " has withdrawn.");
 	}
 

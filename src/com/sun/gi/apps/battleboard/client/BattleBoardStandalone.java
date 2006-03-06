@@ -33,11 +33,11 @@ class BattleBoardStandalone {
 	boards.add(b2);
 	boards.add(b3);
 
-	TextDisplay display = new TextDisplay(playerName);
-
+	/*
 	display.showBoards(boards, playerName);
 	display.showBoards(boards, "playerTwo");
 	display.showBoards(boards, "playerThree");
+	*/
 
 	/*
 	BattleBoardPlayer player = new BattleBoardPlayer(playerName);

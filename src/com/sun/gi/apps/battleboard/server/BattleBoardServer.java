@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright 2006 Sun Microsystems, Inc. All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or
@@ -41,13 +39,11 @@
 package com.sun.gi.apps.battleboard.server;
 
 import com.sun.gi.comm.routing.UserID;
+import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimBoot;
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.SimUserListener;
-import com.sun.gi.logic.GLOReference;
-
 import java.util.logging.Logger;
-
 import javax.security.auth.Subject;
 
 /**
@@ -63,12 +59,21 @@ public class BattleBoardServer
     // SimBoot methods
 
     /**
-     * Called by the SGS stack when this application is booted.  If
-     * firstBoot is true, this call represents the first time boot()
-     * is being called on this application across all stacks. 
-     * Otherwise, this app has been booted already (and exists in the
-     * DataStore), and is simply being brought up in a new stack as
-     * well.
+     * Boots the BattleBoard application.  <p>
+     *
+     * Invoked by the SGS stack when BattleBoard is booted.  If
+     * <code>firstBoot</code> is true, this call represents the first
+     * time that this method has been called for this application
+     * across all stacks for the current instance of the app server. 
+     * When this is true, additional intialization may be necessary. 
+     * Otherwise, this app has been booted already and is simply being
+     * brought up in a new stack.
+     *
+     * @param thisGLO a GLOReference to this server itself
+     *
+     * @param firstBoot <code>true</code> if this is the first
+     * instance of this app to be created, <code>false</code>
+     * otherwise
      */
     public void boot(GLOReference<? extends BattleBoardServer> thisGLO,
 	    boolean firstBoot)
@@ -93,10 +98,16 @@ public class BattleBoardServer
 
     // SimUserListener methods
 
+    /**
+     * {@inheritDoc}
+     */
     public void userJoined(UserID uid, Subject subject) {
 	Player.userJoined(uid, subject);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public void userLeft(UserID uid) {
 	Player.userLeft(uid);
     }

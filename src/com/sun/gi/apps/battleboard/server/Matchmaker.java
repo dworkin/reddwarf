@@ -51,9 +51,6 @@ import java.util.Set;
 import java.util.logging.Logger;
 
 /**
- *
- * @author  James Megquier
- * @version $Rev$, $Date$
  */
 public class Matchmaker implements /* ChannelListener */ GLO {
 
@@ -126,10 +123,10 @@ public class Matchmaker implements /* ChannelListener */ GLO {
     }
 
     protected void sendAlreadyJoined(UserID uid) {
-	ByteBuffer buf = ByteBuffer.allocate(64);
-	buf.put("already-joined".getBytes());
+	ByteBuffer byteBuffer = ByteBuffer.wrap("already-joined".getBytes());
+	byteBuffer.position(byteBuffer.limit());
 	SimTask task = SimTask.getCurrent();
-	task.sendData(channel, new UserID[] { uid }, buf, true);
+	task.sendData(channel, new UserID[] { uid }, byteBuffer, true);
     }
 
     // Handle the "join" command in matchmaker mode
@@ -138,14 +135,14 @@ public class Matchmaker implements /* ChannelListener */ GLO {
 
 	byte[] bytes = new byte[data.remaining()];
 	data.get(bytes);
-	String cmd = new String(bytes);
+	String command = new String(bytes);
 
-	if (! cmd.startsWith ("join ")) {
-	    log.warning("Matchmaker got non-join command: `" + cmd + "'");
+	if (!command.startsWith ("join ")) {
+	    log.warning("Matchmaker got non-join command: `" + command + "'");
 	    return;
 	}
 
-	final String playerName = cmd.substring(5);
+	final String playerName = command.substring(5);
 	log.info("Matchmaker: join from `" + playerName + "'");
 
 	SimTask task = SimTask.getCurrent();

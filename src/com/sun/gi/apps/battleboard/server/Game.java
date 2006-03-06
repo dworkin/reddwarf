@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright 2006 Sun Microsystems, Inc. All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or
@@ -74,11 +72,37 @@ public class Game implements GLO {
     private GLOReference<Player> currentPlayerRef;
     private Map<String, GLOReference<PlayerHistory>> nameToHistory;
 
+    /*
+     * The default BattleBoard game is between two players and played
+     * on an eight-by-eight board, although the game may be played on
+     * different board sizes and with additional players.
+     *
+     * For the sake of simplicity, this implementation does not
+     * support different numbers of players and/or different board
+     * sizes.
+     */
+
     private static int DEFAULT_BOARD_WIDTH  = 8;
     private static int DEFAULT_BOARD_HEIGHT = 8;
     private static int DEFAULT_BOARD_CITIES = 2;
 
+    /**
+     * Creates a new BattleBoard game object for a set of players. <p>
+     *
+     * @param newPlayers a set of GLOReferences to Player GLOs
+     */
     protected Game(Set<GLOReference<Player>> newPlayers) {
+
+	// XXX: is it OK to throw runtime exceptions here?
+	// XXX: If not, what to do?
+
+	if (newPlayers == null) {
+	    throw new NullPointerException("newPlayers is null");
+	}
+	if (newPlayers.size() == 0) {
+	    throw new IllegalArgumentException("newPlayers is empty");
+	}
+
 	SimTask task = SimTask.getCurrent();
 
 	// XXX store and increment a next-channel-number in the GLO,
@@ -104,8 +128,7 @@ public class Game implements GLO {
 	task.lock(channel, true);
     }
 
-    public static GLOReference create(Set<GLOReference<Player>> players)
-    {
+    public static GLOReference create(Set<GLOReference<Player>> players) {
 	SimTask task = SimTask.getCurrent();
 	GLOReference<Game> ref = task.createGLO(new Game(players));
 
@@ -299,19 +322,35 @@ public class Game implements GLO {
 	int x = Integer.parseInt(tokens[2]);
 	int y = Integer.parseInt(tokens[3]);
 
-	// XXX check that x and y are in bounds
+	/*
+	 * Check that x and y are in bounds.  If not, treat it as a
+	 * pass.
+	 */
+
+	if ((x < 0) || (x >= board.getWidth()) ||
+		(y < 0) || (y >= board.getHeight())) {
+	    log.warning(player.getNickname() +
+		    " tried to move outside the board");
+	    handlePass(player);
+	    return;
+	}
 
 	Board.PositionValue result = board.bombBoardPosition(x, y);
 
 	String outcome = "";
 	switch (result) {
-	    case HIT: outcome = board.lost() ? "LOSS" : "HIT"; break;
-	    case NEAR: outcome = "NEAR_MISS"; break;
-	    case MISS: outcome = "MISS"; break;
+	    case HIT:
+		outcome = board.lost() ? "LOSS" : "HIT";
+		break;
+	    case NEAR:
+		outcome = "NEAR_MISS";
+		break;
+	    case MISS:
+		outcome = "MISS";
+		break;
 	}
 
 	StringBuffer buf = new StringBuffer("move-ended ");
-
 	buf.append(player.getNickname());
 	buf.append(" bomb");
 	buf.append(" " + bombedPlayerNick);
@@ -342,7 +381,16 @@ public class Game implements GLO {
 	    log.info(bombedPlayerNick + " summary: " + history.toString());
 	}
 
-	// Check whether the player has won
+	/*
+	 * Check whether some player has won.  Under ordinary
+	 * circumstances, a player wins by making a move that destroys
+	 * the last city of his or her last opponent, but it is also
+	 * possible for a player to drop a bomb on his or her own
+	 * board, destroying their last city, and thereby forfeiting
+	 * the game to his or her opponent.  Therefore we need to not
+	 * only check whether someone won, but who.
+	 */
+
 	if (players.size() == 1) { // XXX: what if it's zero?
 
 	    GLOReference<Player> playerRef = players.get(0);
@@ -391,6 +439,26 @@ public class Game implements GLO {
 	}
     }
 
+    // Class-specific utilities.
+
+    /**
+     * Adds a new PlayerHistory GLOReference to the set of histories
+     * associated with this game.
+     *
+     * When the game is done, each player is updated with a win or
+     * loss.
+     *
+     * @param playerName the name of the player
+     *
+     * @param historyRef a GLOReference to the PlayerHistory instance
+     * for the player with the given name
+     */
+    public void addHistory(String playerName,
+	    GLOReference<PlayerHistory> historyRef)
+    {
+	nameToHistory.put(playerName, historyRef);
+    }
+
     /**
      * Handle data that was sent directly to the server.
      */
@@ -416,17 +484,18 @@ public class Game implements GLO {
 
     // SimChannelMembershipListener methods
 
+    /**
+     * {@inheritDoc}
+     */
     public void joinedChannel(ChannelID cid, UserID uid) {
 	log.info("Game: User " + uid + " joined channel " + cid);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public void leftChannel(ChannelID cid, UserID uid) {
 	log.info("Game: User " + uid + " left channel " + cid);
     }
 
-    public void addHistory(String userName,
-	    GLOReference<PlayerHistory> historyRef)
-    {
-	nameToHistory.put(userName, historyRef);
-    }
 }

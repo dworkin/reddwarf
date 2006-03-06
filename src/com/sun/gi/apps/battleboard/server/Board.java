@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright 2006 Sun Microsystems, Inc. All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or
@@ -44,11 +42,10 @@ import com.sun.gi.apps.battleboard.BattleBoard;
 import com.sun.gi.logic.GLO;
 
 /**
- * Board represents the state of a single Player's board in
- * a particular Game of BattleBoard.  It supports the same
- * interface and semantics as a client-side board representation,
- * but implements the GLO interface so as to participate in
- * SGS persistence.
+ * A Board represents the state of a single Players board in a
+ * particular Game of BattleBoard.  It supports the same interface and
+ * semantics as a client-side board representation, but implements the
+ * GLO interface so it can be made persistence.
  */
 public class Board extends BattleBoard implements GLO {
     private static final long serialVersionUID = 1L;

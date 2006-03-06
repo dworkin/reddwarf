@@ -49,7 +49,7 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
     public BattleBoardClient() { }
 
     /**
-     * {@inheritDoc}
+     *
      */
     public void run() {
 	try {
