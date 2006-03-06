@@ -36,7 +36,7 @@
  * maintenance of any nuclear facility.
  */
 
-package com.sun.gi.apps.battleboard.server;
+package com.sun.gi.gloutils;
 
 import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
