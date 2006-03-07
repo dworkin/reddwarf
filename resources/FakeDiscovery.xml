@@ -14,7 +14,7 @@
             <PARAMETER tag="port" value="1180" />
         </USERMANAGER>
     </GAME>
-    <GAME id="4" name="MatchMakerTest">
+    <GAME id="4" name="MatchMaker">
         <USERMANAGER clientclass=
           "com.sun.gi.comm.users.client.impl.TCPIPUserManagerClient">
             <PARAMETER tag="host" value="127.0.0.1" />
