@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Collection;
 
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.SGSChannel;
@@ -123,11 +124,16 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 		}		
 		try {
 			user.joinedChan(this);
-			for(SGSUser existingUser : localUsers.values()){
-				user.userJoinedChannel(localIDbytes, existingUser.getUserID().toByteArray());
+			synchronized (localUsers) {
+			    for (SGSUser existingUser : localUsers.values()){
+				user.userJoinedChannel(localIDbytes,
+					existingUser.getUserID().toByteArray());
+			    }
 			}
 			sendJoinToLocalUsers(user.getUserID().toByteArray());
-			localUsers.put(user.getUserID(),user);	
+			synchronized(localUsers) {
+			    localUsers.put(user.getUserID(), user);	
+			}
 			router.userJoinedChan(this,user);
 		} catch (IOException e) {			
 			e.printStackTrace();
@@ -136,31 +142,34 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 	}
 	
 	public void leave(SGSUser user) {
-        // if the user isn't on this channel, then ignore them
-		if (localUsers.remove(user.getUserID()) == null) {
-            return;
-        }
 
-		byte[] userbytes = user.getUserID().toByteArray();
-		synchronized(hdr){
-			hdr.clear();
-            hdr.put((byte)OPCODE.UserLeftChan.ordinal());
-			hdr.putInt(userbytes.length);
-			hdr.put(userbytes);			
-			buffs[1] = null;
-			try {
-				transportChannel.sendData(hdr);
-			} catch (IOException e) {				
-				e.printStackTrace();
-			}
+	    // if the user isn't on this channel, then ignore them
+	    synchronized (localUsers) {
+		if (localUsers.remove(user.getUserID()) == null) {
+		    return;
 		}
-		try {			
-			user.leftChan(this);
-		} catch (IOException e) {		
-			e.printStackTrace();
+	    }
+
+	    byte[] userbytes = user.getUserID().toByteArray();
+	    synchronized(hdr){
+		hdr.clear();
+		hdr.put((byte)OPCODE.UserLeftChan.ordinal());
+		hdr.putInt(userbytes.length);
+		hdr.put(userbytes);			
+		buffs[1] = null;
+		try {
+		    transportChannel.sendData(hdr);
+		} catch (IOException e) {				
+		    e.printStackTrace();
 		}
-		sendLeaveToLocalUsers(userbytes);
-		router.userLeftChan(this,user);
+	    }
+	    try {			
+		user.leftChan(this);
+	    } catch (IOException e) {		
+		e.printStackTrace();
+	    }
+	    sendLeaveToLocalUsers(userbytes);
+	    router.userLeftChan(this,user);
 	}
 
 	public ChannelID channelID() {
@@ -221,39 +230,47 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 
 
 	private void sendLeaveToLocalUsers(byte[] frombytes) {		
+	    synchronized (localUsers) {
 		for(SGSUser user : localUsers.values()){
-			try {
-				user.userLeftChannel(localIDbytes,frombytes);
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
+		    try {
+			user.userLeftChannel(localIDbytes, frombytes);
+		    } catch (IOException e) {
+			e.printStackTrace();
+		    }
 		}
-		
+	    }
 	}
 
 	private void sendJoinToLocalUsers(byte[] frombytes) {
+	    synchronized (localUsers) {
 		for(SGSUser user : localUsers.values()){
-			try {
-				user.userJoinedChannel(localIDbytes,frombytes);
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
+		    try {
+			user.userJoinedChannel(localIDbytes,frombytes);
+		    } catch (IOException e) {
+			e.printStackTrace();
+		    }
 		}
+	    }
 	}
 
-	private void sendToLocalUser(byte[] frombytes, byte[] tobytes, ByteBuffer buff, boolean reliable) {
-		try {
-			SGSUser user = localUsers.get(new UserID(tobytes));
-			if (user != null){ // our user
-				user.msgReceived(localIDbytes,frombytes,reliable,buff.duplicate());
-			}
-		} catch (InstantiationException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
+	private void sendToLocalUser(byte[] frombytes, byte[] tobytes,
+		ByteBuffer buff, boolean reliable)
+	{
+	    try {
+		SGSUser user;
+
+		synchronized (localUsers) {
+		    user = localUsers.get(new UserID(tobytes));
 		}
-		
-		
+		if (user != null) { // our user
+		    user.msgReceived(localIDbytes, frombytes, reliable,
+			    buff.duplicate());
+		}
+	    } catch (InstantiationException e) {
+		    e.printStackTrace();
+	    } catch (IOException e) {
+		    e.printStackTrace();
+	    }
 	}
 
 	private void multicastToLocalUsers(byte[] frombytes, byte[][] tolist, ByteBuffer buff, boolean reliable) {
@@ -263,31 +280,36 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 		
 	}
 
-	private void broadcastToLocalUsers(byte[] frombytes, ByteBuffer buff, boolean reliable) {
-		UserID fromID;
-		try {
-			fromID = new UserID(frombytes);
-			for(SGSUser user : localUsers.values()){
-				if (!user.getUserID().equals(fromID)){// dont echo to sender
-					sendToLocalUser(frombytes,user.getUserID().toByteArray(),buff,reliable);
-				}
+	private void broadcastToLocalUsers(byte[] frombytes,
+		ByteBuffer buff, boolean reliable)
+	{
+	    UserID fromID;
+	    try {
+		fromID = new UserID(frombytes);
+		synchronized (localUsers) {
+		    for (SGSUser user : localUsers.values()){
+			if (!user.getUserID().equals(fromID)){// dont echo to sender
+			    sendToLocalUser(frombytes,
+				    user.getUserID().toByteArray(), buff, reliable);
 			}
-		} catch (InstantiationException e) {
-			
-			e.printStackTrace();
+		    }
 		}
-				
+	    } catch (InstantiationException e) {
+		e.printStackTrace();
+	    }
 	}
 
 	public void channelClosed() {
+	    synchronized (localUsers) {
 		for(SGSUser user : localUsers.values()){
-			try {
-				user.leftChan(this);
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-		}	
-		router.removeChannel(this);
+		    try {
+			user.leftChan(this);
+		    } catch (IOException e) {
+			e.printStackTrace();
+		    }
+		}
+	    }	
+	    router.removeChannel(this);
 	}
 
 	// only for use by RouterImpl
