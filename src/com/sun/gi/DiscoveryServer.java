@@ -13,7 +13,6 @@ import java.util.HashMap;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.ByteBuffer;
-import java.util.Iterator;
 import java.util.Map.Entry;
 
 public class DiscoveryServer {

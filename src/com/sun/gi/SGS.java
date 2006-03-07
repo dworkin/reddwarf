@@ -111,7 +111,6 @@ import com.sun.gi.logic.impl.SimKernelImpl;
 import com.sun.gi.logic.impl.SimulationImpl;
 import com.sun.gi.objectstore.ObjectStore;
 import com.sun.gi.objectstore.tso.TSOObjectStore;
-import com.sun.gi.objectstore.tso.dataspace.InMemoryDataSpace;
 import com.sun.gi.objectstore.tso.dataspace.PersistantInMemoryDataSpace;
 import com.sun.gi.utils.SGSUUID;
 import com.sun.gi.utils.StatisticalUUID;
