@@ -40,7 +40,6 @@
 
 package com.sun.gi.apps.jnwn;
 
-import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask;
@@ -48,89 +47,49 @@ import com.sun.gi.logic.SimTask;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.logging.Logger;
 
 /**
- * A JNWN Area represents a shared, multicharacter subspace in NWN.
+ * A Melee manages combat among two or more Characters.
  *
  * @author  James Megquier
  * @version $Rev$, $Date$
  */
-public class Area implements GLO {
+public class Melee implements GLO {
 
     private static final long serialVersionUID = 1L;
 
     private static Logger log = Logger.getLogger("com.sun.gi.apps.jnwn");
 
-    private String     moduleName;
-    private String     areaName;
-    private float      startX;
-    private float      startY;
-    private float      startZ;
-    private float      startFacing;
-    private String     startModel = "nw_troll";
-    private ChannelID  channel;
-    private GLOReference<Area>  thisRef;
-    private HashMap<GLOReference<Character>, PlayerInfo>  map;
-    private CheatDetector detector;
+    private GLOReference<Area>            area;
+    private Set<GLOReference<Character>>  fighters;
+    private GLOReference<Melee>           thisRef;
 
-    public static GLOReference<Area> create() {
+    public static GLOReference<Melee> create() {
 	SimTask task = SimTask.getCurrent();
-	//GLOReference<Area> ref = task.createGLO(new Area(name), gloname);
-	Area templateArea = null;
-	try {
-	    templateArea = AreaFactory.create();
-	} catch (Exception e) {
-	    log.warning("Creating default area");
-	    templateArea = new Area();
-	    e.printStackTrace();
-	}
-	String gloname = "Area:" + templateArea.getName();
-	GLOReference<Area> ref = task.createGLO(templateArea, gloname);
+	Melee templateMelee = new Melee();
+	GLOReference<Melee> ref = task.createGLO(templateMelee);
 	ref.get(task).boot(ref);
 	return ref;
     }
 
-    public String getName() {
-	return areaName;
-    }
-
     public void addCharacter(Character ch) {
 	SimTask task = SimTask.getCurrent();
-	task.join(ch.getUID(), channel);
+	fighters.add(ch.getReference());
+	// XXX
     }
 
-    protected Area() {
-	this("FooModule", "foo", 0f, 0f, 0f, 0f, null);
+    protected Melee() {
+	fighters = new HashSet<GLOReference<Character>>();
     }
 
-    protected Area(String moduleName,
-		   String areaName,
-		   float  startX,
-		   float  startY,
-		   float  startZ,
-		   float  startFacing,
-		   CheatDetector detector) {
-	this.moduleName  = moduleName;
-	this.areaName    = areaName;
-	this.startX      = startX;
-	this.startY      = startY;
-	this.startZ      = startZ;
-	this.startFacing = startFacing;
-	this.detector    = detector;
-
-	map = new HashMap<GLOReference<Character>, PlayerInfo>();
-
-	SimTask task = SimTask.getCurrent();
-	String channelName = "Area:" + areaName;
-	channel = task.openChannel(channelName);
-	task.lock(channel, true);
-    }
-
-    protected void boot(GLOReference<Area> ref) {
+    protected void boot(GLOReference<Melee> ref) {
 	thisRef = ref;
     }
 
+/*
     protected String getLoadModuleMessage() {
 	// XXX precompute this message for this area
 	StringBuffer sb = new StringBuffer();
@@ -235,10 +194,11 @@ public class Area implements GLO {
 	buf.position(buf.limit());
 	SimTask.getCurrent().sendData(channel, ch.getUID(), buf, true);
     }
-
+*/
     /**
      * Handle data that was sent directly to the server.
      */
+/*
     public void dataReceived(Character ch, ByteBuffer data) {
 	log.finer("Direct data from character " + ch.getCharacterID());
 
@@ -257,9 +217,10 @@ public class Area implements GLO {
     }
 
     protected PlayerInfo getStartInfo() {
+	// XXX negating startFacing; bug? -jm
 	return new PlayerInfo(System.currentTimeMillis(),
 	    startX, startY, startZ,
-	    startFacing, 0.0f, startModel);
+	    -startFacing, 0.0f, startModel);
     }
 
     protected void handleClientCommand(Character ch, String[] args) {
@@ -338,4 +299,5 @@ public class Area implements GLO {
 	map.remove(ch.getReference());
 	broadcast(getRemoveCharacterMessage(ch));
     }
+*/
 }
