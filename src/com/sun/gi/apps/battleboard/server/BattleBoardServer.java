@@ -81,7 +81,6 @@ public class BattleBoardServer
     public void boot(GLOReference<? extends BattleBoardServer> thisGLO,
 	    boolean firstBoot)
     {
-
 	SimTask task = SimTask.getCurrent();
 
 	log.info("Booting BattleBoard Server as appID " + task.getAppID());

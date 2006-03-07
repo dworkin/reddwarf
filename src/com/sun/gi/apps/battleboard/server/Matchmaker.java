@@ -51,6 +51,12 @@ import java.util.Set;
 import java.util.logging.Logger;
 
 /**
+ * Matchmaker is responsible for collecting Players together until there
+ * are enough to start a new Game.  This very basic implementation starts
+ * a new game as soon as a globally-defined group size arrives.  More
+ * sophisticated implementations would allow players to specify constraints
+ * on the games they wish to play, and the Matchmaker would attempt
+ * to satisfy those constraints when placing players onto Games.
  */
 public class Matchmaker implements GLO {
 
@@ -101,25 +107,18 @@ public class Matchmaker implements GLO {
 	    }
 	}
 
-	//((Matchmaker) ref.get(task)).boot(ref);
 	return ref;
     }
 
     protected Matchmaker() {
-	// Create the matchmaker channel so we can talk to unjoined clients
+	// Create the matchmaker channel so we can talk to non-playing clients
 	SimTask task = SimTask.getCurrent();
 	channel = task.openChannel("matchmaker");
 	task.lock(channel, true);
     }
 
-    protected void boot(GLOReference<Matchmaker> thisRef) {
-	//ChannelListener.add(channel, thisRef);
-    }
-
     public void addUserID(UserID uid) {
-	log.info("Adding to matchmaker");
 	SimTask.getCurrent().join(uid, channel);
-	log.info("Added to matchmaker");
     }
 
     protected void sendAlreadyJoined(UserID uid) {
@@ -162,11 +161,11 @@ public class Matchmaker implements GLO {
 
 	waitingPlayers.add(playerRef);
 
-	// XXX the right thing to do here is probably to queue
-	// a task to check whether we have a game togther, since
-	// we hold the lock on this player but they might not be
-	// involved in the next game we can spawn with current waiters.
-	// Instead we'll just keep the lock for now.
+	// A less lock-holding technique would be to queue a new
+	// task to check whether we have a game togther --
+	// we hold the lock on this player, but they might not be
+	// involved in the next game we spawn with current waiters.
+	// For now, just keep this player's lock.
 
 	checkForEnoughPlayers();
     }
@@ -178,7 +177,7 @@ public class Matchmaker implements GLO {
 	}
 
 	if (waitingPlayers.size() > PLAYERS_PER_GAME) {
-	    log.warning("Too many waiting players!  How'd that happen? "
+	    log.warning("Too many waiting players!  "
 		+ "expected " + PLAYERS_PER_GAME + ", got "
 		+ waitingPlayers.size());
 	}
@@ -187,14 +186,14 @@ public class Matchmaker implements GLO {
 	waitingPlayers.clear();
     }
 
-    // SimChannelMembershipListener methods
+    // Channel Join/Leave methods
 
     public void joinedChannel(ChannelID cid, UserID uid) {
-	log.info("Matchmaker: User " + uid + " joined channel " + cid);
+	log.finer("Matchmaker: User " + uid + " joined channel " + cid);
     }
 
     public void leftChannel(ChannelID cid, UserID uid) {
-	log.info("Matchmaker: User " + uid + " left channel " + cid);
+	log.finer("Matchmaker: User " + uid + " left channel " + cid);
 
 	GLOReference<Player> playerRef = Player.getRef(uid);
 	waitingPlayers.remove(playerRef);

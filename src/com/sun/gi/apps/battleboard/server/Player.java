@@ -51,6 +51,10 @@ import java.util.regex.Pattern;
 import javax.security.auth.Subject;
 
 /**
+ * A server-side BattleBoard Player holds basic data (such as username),
+ * and contains login/logout logic.  As the SimUserDataListener for
+ * a single user, it also dispatches messages to the higher-level Game
+ * or Matchmaker that this Player is participating in.
  */
 public class Player implements SimUserDataListener {
 
@@ -65,7 +69,7 @@ public class Player implements SimUserDataListener {
     private String myUserName;
 
     /**
-     * The UserID of this user.
+     * The current UserID of this user, if logged in.
      */
     private UserID myUserID;
 
@@ -118,7 +122,6 @@ public class Player implements SimUserDataListener {
 
     public void gameStarted(GLOReference<Game> gameRef) {
 	SimTask task = SimTask.getCurrent();
-	//myGameRefs.add(gameRef);
 	myGameRef = gameRef;
 	Game game = gameRef.peek(task);
 
@@ -137,7 +140,6 @@ public class Player implements SimUserDataListener {
 
     public void gameEnded(GLOReference<Game> gameRef) {
 	myGameRef = null;
-	// If there are no more games, join the matchmaker channel
     }
 
     public String getPlayerName() {
@@ -148,21 +150,16 @@ public class Player implements SimUserDataListener {
 	myPlayerName = playerName;
     }
 
-
     protected static String gloKeyForUID(UserID uid) {
 	return Pattern.compile("\\W+").matcher(uid.toString()).replaceAll("");
     }
 
-
     // Static versions of the SimUserListener methods
 
     public static void userJoined(UserID uid, Subject subject) {
-	log.info("User " + uid + " joined server, subject = " + subject);
+	log.fine("User " + uid + " joined server, subject = " + subject);
 
 	SimTask task = SimTask.getCurrent();
-
-	// Idea: return as quickly as possible, queueing any extra work
-	// so the parent userJoin handler has less contention.
 
 	String gloKey = gloKeyForUID(uid);
 
@@ -170,6 +167,7 @@ public class Player implements SimUserDataListener {
 	/*
 	GLOReference playerRef = getRef(uid);
 	if (playerRef != null) {
+            // XXX
 	    // delete it? update it with this uid?
 	    // kick the new guy off? kick the old guy?
 	}
@@ -187,11 +185,13 @@ public class Player implements SimUserDataListener {
     }
 
     public static void userLeft(UserID uid) {
-	log.info("User " + uid + " left server");
+	log.fine("User " + uid + " left server");
 
 	SimTask task = SimTask.getCurrent();
 
-	// XXX in the future we may want the player object to persist.
+	// In the future we may want the player object to persist.
+        // The PlayerHistory does persist, but in this implementation
+        // we delete the Player GLO on logout.
 	GLOReference playerRef = Player.getRef(uid);
 	if (playerRef != null) {
 	    playerRef.delete(task);
@@ -202,7 +202,7 @@ public class Player implements SimUserDataListener {
     // SimUserDataListener methods
 
     public void userJoinedChannel(ChannelID cid, UserID uid) {
-	log.info("Player: User " + uid + " joined channel " + cid);
+	log.finer("Player: User " + uid + " joined channel " + cid);
 
 	if (! uid.equals(myUserID)) {
 	    log.warning("Player: Got UID " + uid + " expected " + myUserID);
@@ -211,7 +211,7 @@ public class Player implements SimUserDataListener {
 
 	SimTask task = SimTask.getCurrent();
 	if (myGameRef != null) {
-	    // XXX: this currently supports only one game per player
+	    // We currently support only one game per player
 	    myGameRef.get(task).joinedChannel(cid, uid);
 	} else {
 	    // If no game, dispatch to the matchmaker
@@ -220,7 +220,7 @@ public class Player implements SimUserDataListener {
     }
 
     public void userLeftChannel(ChannelID cid, UserID uid) {
-	log.info("Player: User " + uid + " left channel " + cid);
+	log.finer("Player: User " + uid + " left channel " + cid);
 
 	if (! uid.equals(myUserID)) {
 	    log.warning("Player: Got UID " + uid + " expected " + myUserID);
@@ -229,7 +229,7 @@ public class Player implements SimUserDataListener {
 
 	SimTask task = SimTask.getCurrent();
 	if (myGameRef != null) {
-	    // XXX: this currently supports only one game per player
+            // We currently support only one game per player
 	    myGameRef.get(task).leftChannel(cid, uid);
 	} else {
 	    // If no game, dispatch to the matchmaker
@@ -247,7 +247,7 @@ public class Player implements SimUserDataListener {
 
 	SimTask task = SimTask.getCurrent();
 	if (myGameRef != null) {
-	    // XXX: this currently supports only one game per player
+            // We currently support only one game per player
 	    myGameRef.get(task).userDataReceived(myUserID, data);
 	} else {
 	    // If no game, dispatch to the matchmaker
@@ -258,6 +258,6 @@ public class Player implements SimUserDataListener {
     public void dataArrivedFromChannel(ChannelID cid, UserID uid,
 	    ByteBuffer data)
     {
-	// no-op
+	// no-op, since we don't evesdrop channel data in this app
     }
 }

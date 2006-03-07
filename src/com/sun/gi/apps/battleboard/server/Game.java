@@ -57,6 +57,13 @@ import java.util.logging.Logger;
 import static com.sun.gi.apps.battleboard.BattleBoard.PositionValue.*;
 
 /**
+ * Game encapuslates the server-side management of a BattleBoard game.
+ * Once created with a set of players, a Game will create a new
+ * communication channel and begin the BattleBoard protocol with
+ * the players.  Once the game has started, the Game reacts to player
+ * messages and coordinates the turns.  When the game ends, the Game
+ * records wins and losses, removes all players from this game's channel
+ * and closes the server-side resources.
  */
 public class Game implements GLO {
 
@@ -91,7 +98,7 @@ public class Game implements GLO {
     private int defaultNumCities   = 2;
 
     /**
-     * Creates a new BattleBoard game object for a set of players. <p>
+     * Creates a new BattleBoard game object for a set of players.
      *
      * @param newPlayers a set of GLOReferences to Player GLOs
      */
@@ -109,7 +116,7 @@ public class Game implements GLO {
 	gameName = "GameChannel-" +
 		SequenceGLO.getNext(task, "GameChannelSequence");
 		
-	log.info("New game channel is `" + gameName + "'");
+	log.fine("New game channel is `" + gameName + "'");
 
 	players = new LinkedList<GLOReference<Player>>(newPlayers);
 	Collections.shuffle(players);
@@ -142,10 +149,10 @@ public class Game implements GLO {
 	thisRef = ref;
 
 	if (log.isLoggable(Level.FINE)) {
-	    log.fine("playerBoards size " + playerBoards.size());
+	    log.finest("playerBoards size " + playerBoards.size());
 	    for (Map.Entry<String, GLOReference<Board>> x :
 			playerBoards.entrySet()) {
-		log.fine("playerBoard[" + x.getKey() + "]=`" +
+		log.finest("playerBoard[" + x.getKey() + "]=`" +
 		    x.getValue() + "'");
 	    }
 	}
@@ -154,8 +161,6 @@ public class Game implements GLO {
 	    Player p = playerRef.get(task);
 	    p.gameStarted(thisRef);
 	}
-	// XXX: ?
-	//task.addChannelMembershipListener(channel, thisRef);
 
 	sendJoinOK();
 	sendTurnOrder();
@@ -179,7 +184,7 @@ public class Game implements GLO {
 
     public void endGame() {
 	SimTask task = SimTask.getCurrent();
-	log.info("Ending Game");
+	log.finer("Ending Game");
 	// Tell all the players this game is over
 	for (GLOReference<Player> ref : players) {
 	    Player p = ref.get(task);
@@ -218,7 +223,7 @@ public class Game implements GLO {
 
 	StringBuffer buf = new StringBuffer("ok ");
 
-	log.fine("playerBoards size " + playerBoards.size());
+	log.finer("playerBoards size " + playerBoards.size());
 
 	GLOReference boardRef = playerBoards.get(player.getPlayerName());
 	Board board = (Board) boardRef.peek(task);
@@ -272,7 +277,7 @@ public class Game implements GLO {
 	ByteBuffer byteBuffer = ByteBuffer.wrap(buf.toString().getBytes());
 	byteBuffer.position(byteBuffer.limit());
 
-	log.fine("Game: Broadcasting " + byteBuffer.position() +
+	log.finest("Game: Broadcasting " + byteBuffer.position() +
 	    " bytes on " + channel);
 
 	task.sendData(channel, uids, byteBuffer.asReadOnlyBuffer(), true);
@@ -286,7 +291,7 @@ public class Game implements GLO {
 
     protected void startNextMove() {
 	SimTask task = SimTask.getCurrent();
-	log.fine("Running Game.startNextMove");
+	log.finest("Running Game.startNextMove");
 
 	currentPlayerRef = players.removeFirst();
 	players.addLast(currentPlayerRef);
@@ -322,8 +327,7 @@ public class Game implements GLO {
 	int y = Integer.parseInt(tokens[3]);
 
 	/*
-	 * Check that x and y are in bounds.  If not, treat it as a
-	 * pass.
+	 * Check that x and y are in bounds.  If not, treat it as a pass.
 	 */
 
 	if ((x < 0) || (x >= board.getWidth()) ||
@@ -378,15 +382,22 @@ public class Game implements GLO {
 	 * only check whether someone won, but who.
 	 */
 
-	if (players.size() == 1) { // XXX: what if it's zero?
-
-	    GLOReference<Player> playerRef = players.get(0);
-	    Player winner = playerRef.peek(task);
-	    GLOReference<PlayerHistory> historyRef = 
-		    nameToHistory.get(winner.getUserName());
-	    PlayerHistory history = historyRef.get(task);
-	    history.win();
-	    log.info(winner.getUserName() + " summary: " + history.toString());
+	if (players.size() <= 1) {
+            
+            /*
+             * It shouldn't be possible for the boardset to be empty
+             * at this point, but just in case, check for the expected case.
+             */
+            if (players.size() == 1) {
+                GLOReference<Player> playerRef = players.get(0);
+                Player winner = playerRef.peek(task);
+                GLOReference<PlayerHistory> historyRef = 
+                    nameToHistory.get(winner.getUserName());
+                PlayerHistory history = historyRef.get(task);
+                history.win();
+                log.finer(winner.getUserName() +
+                        " summary: " + history.toString());
+            }
 
 	    // queue a new task to handle end of game
 	    try {
@@ -397,7 +408,7 @@ public class Game implements GLO {
 		e.printStackTrace();
 	    }
 
-	    // They won, so don't start the next move
+	    // Someone won, so don't start the next move
 	    return;
 	}
 
@@ -481,13 +492,13 @@ public class Game implements GLO {
      * Handle data that was sent directly to the server.
      */
     public void userDataReceived(UserID uid, ByteBuffer data) {
-	log.fine("Game: Direct data from user " + uid);
+	log.finest("Game: Direct data from user " + uid);
 
 	byte[] bytes = new byte[data.remaining()];
 	data.get(bytes);
 	String text = new String(bytes);
 
-	log.fine("userDataReceived: (" + text + ")");
+	log.finest("userDataReceived: (" + text + ")");
 	String[] tokens = text.split("\\s+");
 	if (tokens.length == 0) {
 	    log.warning("empty message");
@@ -495,25 +506,30 @@ public class Game implements GLO {
 	}
 
 	GLOReference<Player> playerRef = Player.getRef(uid);
-	// XXX check for null
+	
+	if (playerRef == null) {
+	    log.warning("No Player found for uid " + uid);
+        }
 
 	handleResponse(playerRef, tokens);
     }
 
-    // SimChannelMembershipListener methods
+    // Channel Join/Leave methods
 
     /**
-     * XXX
+     * XXX: We should wait until we get joinedChannel from all
+     * our players before starting the game.
      */
     public void joinedChannel(ChannelID cid, UserID uid) {
-	log.info("Game: User " + uid + " joined channel " + cid);
+	log.finer("Game: User " + uid + " joined channel " + cid);
     }
 
     /**
-     * XXX
+     * XXX: When a player leaves unexpectedly, we should treat
+     * it as a "withdraw" command, when we implement withdraw.
      */
     public void leftChannel(ChannelID cid, UserID uid) {
-	log.info("Game: User " + uid + " left channel " + cid);
+	log.finer("Game: User " + uid + " left channel " + cid);
     }
 
 }

@@ -42,7 +42,7 @@ import com.sun.gi.logic.GLO;
 
 /**
  * A GLO representing the "history" of a BattleBoard player:  their
- * name, and how many games he or she has has won and lost.  <p>
+ * name, and how many games he or she has has won and lost.
  */
 public class PlayerHistory implements GLO {
 
