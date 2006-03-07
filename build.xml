@@ -100,7 +100,6 @@
     <!-- Compilation targets -->
 
     <target name="build.server" depends="init">
-	<echo message="${ant.project.name}: ${ant.file}" />
 	<javac srcdir="src" destdir="bin" source="5" target="5"
 		debug="${debug}" optimize="${optimize}"
 		deprecation="${deprecated}">
@@ -113,27 +112,25 @@
 
 
     <target name="build.j2seAPI" depends="init">
-	<echo message="${ant.project.name}: ${ant.file}" />
 	<javac srcdir="src" sourcepath="" destdir="bin" source="5" target="5"
 		debug="${debug}" optimize="${optimize}"
 		deprecation="${deprecated}">
-	    <!-- <compilerarg value="-Xlint:unchecked"/> -->
+	    <compilerarg value="-Xlint:unchecked"/>
 	    <classpath refid="project.classpath" />
-		<include name = "com/sun/gi/comm/users/client/**" />
-		<include name = "com/sun/gi/comm/users/protocol/**" />
-		<include name = "com/sun/gi/validation/**" />
-		<include name = "com/sun/gi/comm/discovery/**" />
-		<include name = "com/sun/gi/utils/nio/**" />
-		<include name = "com/sun/gi/utils/types/**" />
+	    <include name = "com/sun/gi/comm/users/client/**" />
+	    <include name = "com/sun/gi/comm/users/protocol/**" />
+	    <include name = "com/sun/gi/validation/**" />
+	    <include name = "com/sun/gi/comm/discovery/**" />
+	    <include name = "com/sun/gi/utils/nio/**" />
+	    <include name = "com/sun/gi/utils/types/**" />
 	</javac>
     </target>
 
     <target name="build.clients" depends="build.j2seAPI">
-	<echo message="${ant.project.name}: ${ant.file}" />
 	<javac srcdir="src" destdir="bin" source="5" target="5"
 		debug="${debug}" optimize="${optimize}"
 		deprecation="${deprecated}">
-	    <!-- <compilerarg value="-Xlint:unchecked"/> -->
+	    <!-- <compilerarg value="-Xlint:all"/> -->
 	    <classpath refid="project.classpath" />
 	    <include name="com/sun/gi/apps/**" />
 	    <exclude name="com/sun/gi/apps/*/*.java" />
@@ -143,7 +140,6 @@
     </target>
 
     <target name="build.chat" depends="init">
-	<echo message="${ant.project.name}: ${ant.file}" />
 	<javac srcdir="src" destdir="bin" source="5" target="5"
 		debug="${debug}" optimize="${optimize}"
 		deprecation="${deprecated}">
@@ -154,18 +150,16 @@
     </target>
 
     <target name="build.trivial" depends="init">
-	<echo message="${ant.project.name}: ${ant.file}" />
 	<javac srcdir="src" destdir="bin" source="5" target="5"
 		debug="${debug}" optimize="${optimize}"
 		deprecation="${deprecated}">
-	    <!-- <compilerarg value="-Xlint:unchecked"/> -->
+	    <compilerarg value="-Xlint:all"/>
 	    <classpath refid="project.classpath" />
 	    <include name="com/sun/gi/apps/trivial/TrivialBoot.java" />
 	</javac>
     </target>
 
     <target name="build.timertest" depends="init">
-	<echo message="${ant.project.name}: ${ant.file}" />
 	<javac srcdir="src" destdir="bin" source="5" target="5"
 		debug="${debug}" optimize="${optimize}"
 		deprecation="${deprecated}">
@@ -176,18 +170,16 @@
     </target>
 
     <target name="build.battleboard" depends="init">
-	<echo message="${ant.project.name}: ${ant.file}" />
 	<javac srcdir="src" destdir="bin" source="5" target="5"
 		debug="${debug}" optimize="${optimize}"
 		deprecation="${deprecated}">
-	    <compilerarg value="-Xlint:unchecked"/>
+	    <compilerarg value="-Xlint:all"/>
 	    <classpath refid="project.classpath" />
 	    <include name="com/sun/gi/apps/battleboard/server/**" />
 	</javac>
     </target>
 
     <target name="build.jeffboard" depends="init">
-	<echo message="${ant.project.name}: ${ant.file}" />
 	<javac srcdir="src" destdir="bin" source="5" target="5"
 		debug="${debug}" optimize="${optimize}"
 		deprecation="${deprecated}">
@@ -198,7 +190,6 @@
     </target>
 
     <target name="build.matchmaker" depends="init">
-	<echo message="${ant.project.name}: ${ant.file}" />
 	<javac srcdir="src" destdir="bin" source="5" target="5"
 		debug="${debug}" optimize="${optimize}"
 		deprecation="${deprecated}">
@@ -209,18 +200,16 @@
     </target>
 
     <target name="build.glotest" depends="init">
-	<echo message="${ant.project.name}: ${ant.file}" />
 	<javac srcdir="src" destdir="bin" source="5" target="5"
 		debug="${debug}" optimize="${optimize}"
 		deprecation="${deprecated}">
-	    <!-- <compilerarg value="-Xlint:unchecked"/> -->
+	    <compilerarg value="-Xlint:all"/>
 	    <classpath refid="project.classpath" />
 	    <include name="com/sun/gi/apps/glotest/*.java" />
 	</javac>
     </target>
 
     <target name="build.jnwn" depends="init">
-	<echo message="${ant.project.name}: ${ant.file}" />
 	<javac srcdir="src" destdir="bin" source="5" target="5"
 		debug="${debug}" optimize="${optimize}"
 		deprecation="${deprecated}">

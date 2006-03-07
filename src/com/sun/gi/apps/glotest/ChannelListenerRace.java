@@ -15,18 +15,19 @@ import java.util.logging.Logger;
 
 import javax.security.auth.Subject;
 
-public class ChannelListenerRace implements SimBoot, SimUserListener {
+public class ChannelListenerRace
+	implements SimBoot<ChannelListenerRace>, SimUserListener
+{
 
     private static final long serialVersionUID = 1L;
 
-    private static final Logger log =
-	Logger.getLogger("com.sun.gi.apps.glotest");
+    private static Logger log = Logger.getLogger("com.sun.gi.apps.glotest");
 
     private ChannelID    channel;
 
     // SimBoot methods
 
-    public void boot(GLOReference thisRef, boolean firstBoot) {
+    public void boot(GLOReference<? extends ChannelListenerRace> thisRef, boolean firstBoot) {
 	SimTask task = SimTask.getCurrent();
 	log.info("Booting ChannelListenerRace as appID " + task.getAppID());
 
@@ -38,25 +39,25 @@ public class ChannelListenerRace implements SimBoot, SimUserListener {
 
     public void userJoined(UserID uid, Subject subject) {
 
-	log.info("Registering newly-created GLO as listener for " + uid);
+	log.fine("Registering newly-created GLO as listener for " + uid);
 
 	SimTask task = SimTask.getCurrent();
 
 	Player player = new Player(uid);
-	GLOReference ref = task.createGLO(player);
+	GLOReference<Player> ref = task.createGLO(player);
 	task.addUserDataListener(uid, ref);
 
-	log.info("Joining " + uid + " to a channel");
+	log.fine("Joining " + uid + " to a channel");
 	task.join(uid, channel);
 
 	// Give the player's callback time to try to run...
-	log.info("Sleeping before we allow the commit");
+	log.fine("Sleeping before we allow the commit");
 	try {
 	    Thread.sleep(1000);
 	} catch (Exception e) {
 	    e.printStackTrace();
 	}
-	log.info("Returning to Simulator");
+	log.fine("Returning to Simulator");
     }
 
     public void userLeft(UserID uid) {
