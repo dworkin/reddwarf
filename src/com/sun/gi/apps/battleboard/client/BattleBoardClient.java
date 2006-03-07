@@ -4,21 +4,16 @@
 
 package com.sun.gi.apps.battleboard.client;
 
-import com.sun.gi.apps.battleboard.BattleBoard;
 import com.sun.gi.comm.discovery.impl.URLDiscoverer;
-import com.sun.gi.comm.users.client.ClientAlreadyConnectedException;
 import com.sun.gi.comm.users.client.ClientChannel;
 import com.sun.gi.comm.users.client.ClientChannelListener;
 import com.sun.gi.comm.users.client.ClientConnectionManager;
 import com.sun.gi.comm.users.client.ClientConnectionManagerListener;
 import com.sun.gi.comm.users.client.impl.ClientConnectionManagerImpl;
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
 import java.util.logging.Logger;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.NameCallback;
@@ -26,19 +21,13 @@ import javax.security.auth.callback.PasswordCallback;
 
 public class BattleBoardClient implements ClientConnectionManagerListener {
 
-    private static final Logger log =
+    private static Logger log =
 	Logger.getLogger("com.sun.gi.apps.battleboard.client");
 
-    private BattleBoard board;
     private ClientConnectionManager mgr;
-    private ClientChannel gameChannel;
 
     private static Pattern wsRegexp = Pattern.compile("\\s");
     private State state = State.CONNECTING;
-
-    
-    // private Callback[] validationCallbacks = null;
-    // private byte[] serverID = null;
 
     enum State {
 	CONNECTING,
@@ -67,7 +56,9 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
     private static boolean nonInteractive = "false".equals(
 	    System.getProperty("battleboard.interactive", "true"));
 
-    public BattleBoardClient() { }
+    public BattleBoardClient() {
+        // no-op
+    }
 
     /**
      *
@@ -242,27 +233,42 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
 		}
 	    }
 
+            /*
+             * This Matchmaker channel listener, isn't strictly needed.
+             * The server will manage the process of joining this client
+             * to the correct Game channel when enough players are present.
+             *
+             * A more sophisticated game might match players to games based
+             * on various parameters.
+             * 
+             * This listener will also get called back if the Matchmaker
+             * channel closes for some reason, which a client may wish
+             * to handle.
+             * 
+             * Any non-trivial listener should be implemented as a
+             * full-fledged class rather than as an anonynmous class.
+             */
 	    channel.setListener(new ClientChannelListener() {
 		public void playerJoined(byte[] playerID) {
-		    log.fine("playerJoined on " + channel.getName());
+		    //log.fine("playerJoined on " + channel.getName());
 		}
 
 		public void playerLeft(byte[] playerID) {
-		    log.fine("playerLeft on " + channel.getName());
+		    //log.fine("playerLeft on " + channel.getName());
 		}
 
 		public void dataArrived(byte[] uid, ByteBuffer data,
 			boolean reliable) {
-		    log.fine("dataArrived on " + channel.getName());
+		    //log.fine("dataArrived on " + channel.getName());
 
 		    byte[] bytes = new byte[data.remaining()];
 		    data.get(bytes);
 
-		    log.fine("got matchmaker data `" + bytes + "'");
+		    //log.fine("got matchmaker data `" + bytes + "'");
 		}
 
 		public void channelClosed() {
-		    log.fine("channel " + channel.getName() + " closed");
+		    //log.fine("channel " + channel.getName() + " closed");
 		}
 	    });
 

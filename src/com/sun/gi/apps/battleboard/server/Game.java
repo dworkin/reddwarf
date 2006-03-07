@@ -59,9 +59,10 @@ import static com.sun.gi.apps.battleboard.BattleBoard.PositionValue.*;
 /**
  */
 public class Game implements GLO {
-    private static final long serialVersionUID = 1L;
 
-    private static final Logger log =
+    private static final long serialVersionUID = 1294764363875499351L;
+
+    private static Logger log =
 	Logger.getLogger("com.sun.gi.apps.battleboard.server");
 
     private String gameName;
@@ -278,7 +279,6 @@ public class Game implements GLO {
     }
 
     protected void sendMoveStarted(Player player) {
-	SimTask task = SimTask.getCurrent();
 	StringBuffer buf = new StringBuffer("move-started " +
 		player.getPlayerName());
 	broadcast(buf);
@@ -290,12 +290,11 @@ public class Game implements GLO {
 
 	currentPlayerRef = players.removeFirst();
 	players.addLast(currentPlayerRef);
-	Player p = currentPlayerRef.peek(task);
-	sendMoveStarted(p);
+	Player player = currentPlayerRef.peek(task);
+	sendMoveStarted(player);
     }
 
     protected void handlePass(Player player) {
-	SimTask task = SimTask.getCurrent();
 	StringBuffer buf = new StringBuffer("move-ended ");
 	buf.append(player.getPlayerName());
 	buf.append(" pass");
@@ -348,6 +347,10 @@ public class Game implements GLO {
 	    case MISS:
 		outcome = "MISS";
 		break;
+            default:
+                log.severe("Unhandled result in handleMove: " + result.name());
+                outcome = "MISS";
+                break;
 	}
 
 	StringBuffer buf = new StringBuffer("move-ended ");

@@ -52,11 +52,11 @@ import java.util.logging.Logger;
 
 /**
  */
-public class Matchmaker implements /* ChannelListener */ GLO {
+public class Matchmaker implements GLO {
 
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = -8915460204027934417L;
 
-    private static final Logger log =
+    private static Logger log =
 	Logger.getLogger("com.sun.gi.apps.battleboard.server");
 
     protected static final String MATCHMAKER_GLO_NAME = "matchmaker";

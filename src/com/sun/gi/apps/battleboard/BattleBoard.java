@@ -14,6 +14,8 @@ import java.util.Random;
  */
 public class BattleBoard implements Serializable {
 
+    private static final long serialVersionUID = -1844166888116129301L;
+
     public class BattleBoardLocation {
 	private final int x;
 	private final int y;
@@ -79,7 +81,9 @@ public class BattleBoard implements Serializable {
     /**
      * Default constructor, not for public use.
      */
-    protected BattleBoard() { }
+    protected BattleBoard() {
+        // no-op
+    }
 
     /**
      * Creates a BattleBoard with the given width and height and with

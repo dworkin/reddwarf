@@ -12,9 +12,8 @@ import java.io.InputStreamReader;
 import java.util.LinkedList;
 import java.util.List;
 
-import static com.sun.gi.apps.battleboard.BattleBoard.PositionValue.*;
-
 public class TextDisplay implements Display {
+
     private final List<BattleBoard> boards;
     private final List<String> players;
     private final int boardWidth;
@@ -198,8 +197,8 @@ public class TextDisplay implements Display {
 		if (!players.contains(move[0])) {
 		    message("Player " + move[0] + " is not in the game.");
 		} else {
-		    int x = (int) new Integer(move[1]);
-		    int y = (int) new Integer(move[2]);
+		    int x = Integer.parseInt(move[1]);
+		    int y = Integer.parseInt(move[2]);
 
 		    if ((x < 0) || (x >= boardWidth) &&
 			    (y < 0) && (y >= boardHeight)) {
@@ -223,17 +222,17 @@ public class TextDisplay implements Display {
      * If <code>activePlayer</code> is <code>null</code> then no
      * board is highlighted.
      *
-     * @param boards the list of boards being displayed
+     * @param boardList the list of boards being displayed
      *
      * @param activePlayer the name of the player (if any) whose board
      * is active and therefore highlighted
      */
-    private void printActiveLine(List<BattleBoard> boards,
+    private static void printActiveLine(List<BattleBoard> boardList,
 	    String activePlayer)
     {
 
 	System.out.print("   ");
-	for (BattleBoard currBoard : boards) {
+	for (BattleBoard currBoard : boardList) {
 	    String str = (currBoard.getPlayerName().equals(activePlayer)) ?
 		    "***" : "---";
 

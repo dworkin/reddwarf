@@ -42,24 +42,21 @@ package com.sun.gi.apps.battleboard.server;
 
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
-import com.sun.gi.logic.GLO;
-import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.SimUserDataListener;
 import java.nio.ByteBuffer;
-import java.security.Principal;
 import java.util.logging.Logger;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.security.auth.Subject;
 
 /**
  */
 public class Player implements SimUserDataListener {
-    private static final long serialVersionUID = 1L;
 
-    private static final Logger log =
+    private static final long serialVersionUID = -2335255496881210523L;
+
+    private static Logger log =
 	    Logger.getLogger("com.sun.gi.apps.battleboard.server");
 
     /**

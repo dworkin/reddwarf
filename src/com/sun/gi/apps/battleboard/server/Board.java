@@ -50,7 +50,8 @@ import com.sun.gi.logic.GLO;
  * ObjectStore.
  */
 public class Board extends BattleBoard implements GLO {
-    private static final long serialVersionUID = 1L;
+
+    private static final long serialVersionUID = 5550388209563755528L;
 
     /**
      * Default constructor, not for public use.

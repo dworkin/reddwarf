@@ -5,10 +5,8 @@
 package com.sun.gi.apps.battleboard.client;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
-
 
 /**
  * Utility methods for the BattleBoard example program.
@@ -30,5 +28,4 @@ public class BattleBoardUtils {
 		new InputStreamReader(System.in));
 	return input.readLine();
     }
-
 }

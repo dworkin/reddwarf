@@ -13,12 +13,11 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class BattleBoardPlayer implements ClientChannelListener {
 
-    private static final Logger log =
+    private static Logger log =
 	Logger.getLogger("com.sun.gi.apps.battleboard.client");
 
     private final ClientChannel channel;
@@ -193,9 +192,9 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	    return GameState.NEED_BOARD;
 	}
 
-	int boardWidth = (int) new Integer(args[1]);
-	int boardHeight = (int) new Integer(args[2]);
-	int numCities = (int) new Integer(args[3]);
+	int boardWidth = Integer.parseInt(args[1]);
+	int boardHeight = Integer.parseInt(args[2]);
+	int numCities = Integer.parseInt(args[3]);
 
 	if ((boardWidth < 1) || (boardHeight < 1)) {
 	    log.severe("bad board dimensions (" +
@@ -217,8 +216,8 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	}
 
 	for (int base = 4; base < args.length; base += 2) {
-	    int x = (int) new Integer(args[base]);
-	    int y = (int) new Integer(args[base+1]);
+	    int x = Integer.parseInt(args[base]);
+	    int y = Integer.parseInt(args[base+1]);
 
 	    if ((x < 0) || (x >= boardWidth) || (y < 0) || (y >= boardHeight)) {
 		log.severe("improper city position (" + x + ", " + y + ")");
@@ -304,8 +303,8 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	    connectionManager.sendToServer(buf, true);
 	} else if (move.length == 3) {
 	    String bombedPlayer = move[0];
-	    int x = (int) new Integer(move[1]);
-	    int y = (int) new Integer(move[2]);
+	    int x = Integer.parseInt(move[1]);
+	    int y = Integer.parseInt(move[2]);
 
 	    String moveMessage = "move " + bombedPlayer + " " +
 		    x + " " + y;

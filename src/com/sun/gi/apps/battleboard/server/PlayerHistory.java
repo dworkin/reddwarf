@@ -45,8 +45,9 @@ import com.sun.gi.logic.GLO;
  * name, and how many games he or she has has won and lost.  <p>
  */
 public class PlayerHistory implements GLO {
-    private static final long serialVersionUID = 1L;
 
+    private static final long serialVersionUID = -1121141179656664638L;
+    
     private final String playerName;
     private long gamesWon;
     private long gamesLost;

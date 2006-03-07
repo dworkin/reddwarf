@@ -2,20 +2,18 @@
 package com.sun.gi.apps.battleboard.client;
 
 import com.sun.gi.apps.battleboard.BattleBoard;
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.util.List;
 import java.util.LinkedList;
+import java.util.List;
 
 /**
  * Test driver for BattleBoardPlayer.
  */
 class BattleBoardStandalone {
-    private static String playerName = "HamsterBoy";
-    private final static int boardWidth = 6;
-    private final static int boardHeight = 6;
-    private final static int numCities = 10;
+
+    private static String playerName     = "HamsterBoy";
+    private final static int boardWidth  =  6;
+    private final static int boardHeight =  6;
+    private final static int numCities   = 10;
 
     public static void main(String[] args) {
 	BattleBoard myBoard = new BattleBoard(playerName,

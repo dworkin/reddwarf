@@ -4,9 +4,6 @@
 
 package com.sun.gi.apps.battleboard.client;
 
-import com.sun.gi.apps.battleboard.BattleBoard;
-import java.util.List;
-
 /**
  * An interface defining a very simple display abstraction for the
  * BattleBoard game client.

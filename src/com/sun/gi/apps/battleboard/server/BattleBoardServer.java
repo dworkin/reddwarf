@@ -54,8 +54,8 @@ import javax.security.auth.Subject;
 public class BattleBoardServer
 	implements SimBoot<BattleBoardServer>, SimUserListener
 {
-    private static final long serialVersionUID = 1L;
-
+    private static final long serialVersionUID = -6452053898871581484L;
+    
     private static Logger log =
 	Logger.getLogger("com.sun.gi.apps.battleboard.server");
 
