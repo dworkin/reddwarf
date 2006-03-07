@@ -46,7 +46,7 @@ import com.sun.gi.logic.GLO;
  */
 public class PlayerHistory implements GLO {
 
-    private static final long serialVersionUID = -1121141179656664638L;
+    private static final long serialVersionUID = 1;
     
     private final String playerName;
     private long gamesWon;

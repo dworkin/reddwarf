@@ -58,7 +58,7 @@ import javax.security.auth.Subject;
  */
 public class Player implements SimUserDataListener {
 
-    private static final long serialVersionUID = -2335255496881210523L;
+    private static final long serialVersionUID = 1;
 
     private static Logger log =
 	    Logger.getLogger("com.sun.gi.apps.battleboard.server");

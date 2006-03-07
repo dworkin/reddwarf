@@ -5,8 +5,13 @@
 use FileHandle;
 use IPC::Open2;
 
-$BoardWidth	= 2;
-$BoardHeight	= 2;
+# NOTE:  if the BoardWidth and BoardHeight are not at least as large
+# as the actual board, then there is no guarantee that the game will
+# terminate.  It is not a problem if they are too large; the client
+# (and server) will reject illegal moves.
+
+$BoardWidth	= 4;
+$BoardHeight	= 4;
 
 $Props	= '-Dbattleboard.interactive=false';
 $Class	= 'com.sun.gi.apps.battleboard.client.BattleBoardClient';

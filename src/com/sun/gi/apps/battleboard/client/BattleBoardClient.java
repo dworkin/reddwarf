@@ -139,7 +139,9 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
 
     protected String getLine() {
 	try {
-	    String line = BattleBoardUtils.getKeyboardLine();
+	    BufferedReader input = new BufferedReader(
+		    new InputStreamReader(System.in));
+	    String line =  input.readLine();
 	    return (line == null) ? "" : line;
 	} catch (IOException e) {
 	    e.printStackTrace();

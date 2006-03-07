@@ -38,6 +38,7 @@
 
 package com.sun.gi.apps.battleboard.server;
 
+import com.sun.gi.apps.battleboard.BattleBoard;
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.gloutils.SequenceGLO;
@@ -67,7 +68,7 @@ import static com.sun.gi.apps.battleboard.BattleBoard.PositionValue.*;
  */
 public class Game implements GLO {
 
-    private static final long serialVersionUID = 1294764363875499351L;
+    private static final long serialVersionUID = 1;
 
     private static Logger log =
 	Logger.getLogger("com.sun.gi.apps.battleboard.server");
@@ -82,9 +83,8 @@ public class Game implements GLO {
     private Map<String, GLOReference<PlayerHistory>> nameToHistory;
 
     /*
-     * The default BattleBoard game is between two players and played
-     * on an eight-by-eight board, although the game may be played on
-     * different board sizes and with additional players.
+     * The default BattleBoard game is defined in the {@link
+     * BattleBoard} class.
      *
      * For the sake of simplicity, this implementation does not
      * support different numbers of players and/or different board
@@ -93,9 +93,9 @@ public class Game implements GLO {
      * of cities.
      */
 
-    private int defaultBoardWidth  = 2;
-    private int defaultBoardHeight = 2;
-    private int defaultNumCities   = 2;
+    private int boardWidth  = BattleBoard.DEFAULT_BOARD_WIDTH;
+    private int boardHeight = BattleBoard.DEFAULT_BOARD_WIDTH;
+    private int numCities   = BattleBoard.DEFAULT_NUM_CITIES;
 
     /**
      * Creates a new BattleBoard game object for a set of players.
@@ -170,9 +170,7 @@ public class Game implements GLO {
     protected GLOReference<Board> createBoard(String playerName) {
 	SimTask task = SimTask.getCurrent();
 
-	Board board = new Board(playerName,
-	    defaultBoardWidth, defaultBoardHeight, defaultNumCities);
-
+	Board board = new Board(playerName, boardWidth, boardHeight, numCities);
 	board.populate();
 
 	GLOReference<Board> ref = task.createGLO(board,

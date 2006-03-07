@@ -13,8 +13,11 @@ import java.util.Random;
  * A simple representation of a BattleBoard game board.
  */
 public class BattleBoard implements Serializable {
+    private static final long serialVersionUID = 1;
 
-    private static final long serialVersionUID = -1844166888116129301L;
+    public static final int DEFAULT_BOARD_WIDTH = 4;
+    public static final int DEFAULT_BOARD_HEIGHT = 4;
+    public static final int DEFAULT_NUM_CITIES = 2;
 
     public class BattleBoardLocation {
 	private final int x;

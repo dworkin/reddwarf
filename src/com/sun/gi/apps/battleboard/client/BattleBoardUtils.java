@@ -13,19 +13,4 @@ import java.io.InputStreamReader;
  */
 public class BattleBoardUtils {
 
-    /**
-     * Reads a line of input from System.in (which for the purpose of
-     * this game, we assume is a players keyboard) and returns it as a
-     * String.
-     *
-     * @return the next line of text read from <code>System.in</code>.
-     *
-     * @throws IOException if an exception occurs accessing
-     * <code>System.in</code>.
-     */
-    public static String getKeyboardLine() throws IOException {
-	BufferedReader input = new BufferedReader(
-		new InputStreamReader(System.in));
-	return input.readLine();
-    }
 }
