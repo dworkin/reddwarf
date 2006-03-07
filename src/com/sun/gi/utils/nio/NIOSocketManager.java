@@ -86,8 +86,21 @@ public class NIOSocketManager implements Runnable {
 	    DatagramChannel dc = DatagramChannel.open();
 	    dc.configureBlocking(false);
 
-	    NIOConnection conn =
-		new NIOConnection(this, sc, dc, tcpBufSize, udpBufSize);
+	    NIOConnection conn = null;
+	    try {
+		conn =
+		    new NIOConnection(this, sc, dc, tcpBufSize, udpBufSize);
+	    } catch (OutOfMemoryError e) {
+		e.printStackTrace();
+		log.severe("Can't allocate buffers for connection");
+		try {
+		    sc.close();
+		    dc.close();
+		} catch (IOException ie) {
+		    // ignore
+		}
+		return null;
+	    }
 
 	    synchronized (initiatorQueue) {
 		initiatorQueue.add(conn);
@@ -266,8 +279,20 @@ public class NIOSocketManager implements Runnable {
 	    // Now create a UDP channel for this endpoint
 
 	    DatagramChannel dc = DatagramChannel.open();
-	    conn =
-		new NIOConnection(this, sc, dc, tcpBufSize, udpBufSize);
+	    try {
+		conn =
+		    new NIOConnection(this, sc, dc, tcpBufSize, udpBufSize);
+	    } catch (OutOfMemoryError e) {
+		e.printStackTrace();
+		log.severe("Can't allocate buffers for connection");
+		try {
+		    sc.close();
+		    dc.close();
+		} catch (IOException ie) {
+		    // ignore
+		}
+		return;
+	    }
 
 	    dc.socket().setReuseAddress(true);
             dc.configureBlocking(false);
