@@ -66,15 +66,15 @@ public class TCPIPUserManagerClient implements UserManagerClient,
 
     public boolean connect(SocketAddress addr,
             UserManagerClientListener clientListener) {
-        log.entering("TCPUserManagerClient", "connect", new Object[] { addr,
-                clientListener });
+        //log.entering("TCPUserManagerClient", "connect", new Object[] { addr,
+        //        clientListener });
 
         this.listener = clientListener;
 
         log.info("Attempting to connect to a TCPIP User Manager on " + addr);
 
         boolean retval = (mgr.makeConnectionTo(addr) != null);
-        log.exiting("TCPUserManagerClient", "connect", retval);
+        //log.exiting("TCPUserManagerClient", "connect", retval);
 
         return retval;
     }

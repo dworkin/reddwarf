@@ -60,7 +60,7 @@ public class NIOSocketManager implements Runnable {
 
     public void acceptConnectionsOn(SocketAddress addr)
 	    throws IOException {
-	log.entering("NIOSocketManager", "acceptConnectionsOn");
+	//log.entering("NIOSocketManager", "acceptConnectionsOn");
 
 	ServerSocketChannel channel = ServerSocketChannel.open();
 	channel.configureBlocking(false);
@@ -71,11 +71,11 @@ public class NIOSocketManager implements Runnable {
 	}
 	selector.wakeup();
 
-	log.exiting("NIOSocketManager", "acceptConnectionsOn");
+	//log.exiting("NIOSocketManager", "acceptConnectionsOn");
     }
 
     public NIOConnection makeConnectionTo(SocketAddress addr) {
-	log.entering("NIOSocketManager", "makeConnectionTo");
+	//log.entering("NIOSocketManager", "makeConnectionTo");
 
 	try {
 	    SocketChannel sc = SocketChannel.open();
@@ -98,15 +98,15 @@ public class NIOSocketManager implements Runnable {
 	catch (IOException ex) {
 	    ex.printStackTrace();
 	    return null;
-	} finally {
-	    log.exiting("NIOSocketManager", "makeConnectionTo");
+	//} finally {
+	    //log.exiting("NIOSocketManager", "makeConnectionTo");
 	}
     }
 
     // This runs the actual polled input
 
     public void run() {
-	log.entering("NIOSocketManager", "run");
+	//log.entering("NIOSocketManager", "run");
 
 	while (true) {    // until shutdown() is called
 
@@ -173,7 +173,7 @@ public class NIOSocketManager implements Runnable {
 		e.printStackTrace();
 	    }
 	}
-	log.exiting("NIOSocketManager", "run");
+	//log.exiting("NIOSocketManager", "run");
     }
 
     /**
@@ -182,7 +182,7 @@ public class NIOSocketManager implements Runnable {
      * @param selector Selector
      */
     private void processSocketEvents(Selector selector) {
-	log.entering("NIOSocketManager", "processSocketEvents");
+	//log.entering("NIOSocketManager", "processSocketEvents");
 
 	Iterator<SelectionKey> i = selector.selectedKeys().iterator();
 
@@ -212,37 +212,37 @@ public class NIOSocketManager implements Runnable {
 	    }
 	}
 
-	log.exiting("NIOSocketManager", "processSocketEvents");
+	//log.exiting("NIOSocketManager", "processSocketEvents");
     }
 
     private void handleRead(SelectionKey key) {
-	log.entering("NIOSocketManager", "handleRead");
+	//log.entering("NIOSocketManager", "handleRead");
 	ReadWriteSelectorHandler h =
 	    (ReadWriteSelectorHandler) key.attachment();
 	try {
 	    h.handleRead(key);
 	} catch (IOException ex) {
 	    h.handleClose();
-	} finally {
-	    log.exiting("NIOSocketManager", "handleRead");
+	//} finally {
+	    //log.exiting("NIOSocketManager", "handleRead");
 	}
     }
 
     private void handleWrite(SelectionKey key) {
-	log.entering("NIOSocketManager", "handleWrite");
+	//log.entering("NIOSocketManager", "handleWrite");
 	ReadWriteSelectorHandler h =
 	    (ReadWriteSelectorHandler) key.attachment();
 	try {
 	    h.handleWrite(key);
 	} catch (IOException ex) {
 	    h.handleClose();
-	} finally {
-	    log.exiting("NIOSocketManager", "handleWrite");
+	//} finally {
+	    //log.exiting("NIOSocketManager", "handleWrite");
 	}
     }
 
     private void handleAccept(SelectionKey key) {
-	log.entering("NIOSocketManager", "handleAccept");
+	//log.entering("NIOSocketManager", "handleAccept");
 	// Get channel
 	ServerSocketChannel serverChannel =
 	    (ServerSocketChannel) key.channel();
@@ -294,7 +294,7 @@ public class NIOSocketManager implements Runnable {
 		conn.disconnect();
 	    }
 	} finally {
-	    log.exiting("NIOSocketManager", "handleAccept");
+	    //log.exiting("NIOSocketManager", "handleAccept");
 	}
     }
 
@@ -306,7 +306,7 @@ public class NIOSocketManager implements Runnable {
     }
 
     private void handleConnect(SelectionKey key) {
-	log.entering("NIOSocketManager", "handleConnect");
+	//log.entering("NIOSocketManager", "handleConnect");
 
 	NIOConnection conn = (NIOConnection) key.attachment();
 	try {
@@ -320,8 +320,8 @@ public class NIOSocketManager implements Runnable {
 	    for (NIOSocketManagerListener l : listeners) {
 		l.connectionFailed(conn);
 	    }
-	} finally {
-	    log.exiting("NIOSocketManager", "handleConnect");
+	//} finally {
+	    //log.exiting("NIOSocketManager", "handleConnect");
 	}
     }
 

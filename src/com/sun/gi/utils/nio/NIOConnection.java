@@ -295,7 +295,7 @@ public class NIOConnection implements SelectorHandler {
      */
     public synchronized void send(ByteBuffer[] packetParts, boolean reliable)
 	    throws IOException {
-	log.entering("NIOChannel", "send[]");
+	//log.entering("NIOChannel", "send[]");
 
 	PacketHandler h = reliable ? tcpHandler : udpHandler;
 	h.send(packetParts);
