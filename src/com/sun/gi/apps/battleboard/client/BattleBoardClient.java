@@ -10,8 +10,10 @@ import com.sun.gi.comm.users.client.ClientChannelListener;
 import com.sun.gi.comm.users.client.ClientConnectionManager;
 import com.sun.gi.comm.users.client.ClientConnectionManagerListener;
 import com.sun.gi.comm.users.client.impl.ClientConnectionManagerImpl;
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
@@ -139,8 +141,8 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
 
     protected String getLine() {
 	try {
-	    BufferedReader input = new BufferedReader(
-		    new InputStreamReader(System.in));
+	    BufferedReader input =
+		    new BufferedReader(new InputStreamReader(System.in));
 	    String line =  input.readLine();
 	    return (line == null) ? "" : line;
 	} catch (IOException e) {
