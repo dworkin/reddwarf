@@ -52,7 +52,12 @@ public final class CommandProtocol implements Serializable {
 	public final static int JOIN_GAME = 0x79;
 	public final static int PLAYER_ENTERED_LOBBY = 0x90;
 	
+	public final static int UPDATE_PLAYER_READY_REQUEST = 0xBB;
+	public final static int PLAYER_READY_UPDATE = 0xBC;
+	public final static int START_GAME_REQUEST = 0xBD;
+	
 	public final static int SEND_TEXT = 0x91;
+	public final static int SEND_PRIVATE_TEXT = 0x92;
 	
 	public final static int GAME_PARAMETERS_REQUEST = 0x94;
 	public final static int GAME_PARAMETERS_RESPONSE = 0x95;
@@ -60,6 +65,7 @@ public final class CommandProtocol implements Serializable {
 	public final static int CREATE_GAME = 0x96;
 	public final static int CREATE_GAME_FAILED = 0x97;
 	public final static int GAME_CREATED = 0x98;
+	public final static int GAME_STARTED = 0x9A;
 	
 	public final static int PLAYER_JOINED_GAME = 0x9B;			// sent to lobby
 	public final static int PLAYER_ENTERED_GAME = 0xB0;		// sent to game room

@@ -18,7 +18,6 @@ import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.SimUserDataListener;
 import com.sun.gi.utils.SGSUUID;
 import com.sun.gi.utils.StatisticalUUID;
-import com.sun.org.apache.bcel.internal.generic.LLOAD;
 
 /**
  * 
@@ -60,17 +59,6 @@ public class Player implements SimUserDataListener {
 	}
 	
 	/**
-	 * Joins the user associated with this Player to the lobby manager control
-	 * channel.  
-	 * 
-	 * @param task
-	 */
-	public void joinUser() {
-		SimTask task = SimTask.getCurrent();
-		task.join(userID, task.openChannel(LOBBY_MANAGER_CONTROL_CHANNEL));
-	}
-	
-	/**
      * All command protocols for a connected user come in on this call back.  The 
      * command is parsed/processed and a response is sent out on the LobbyManager
      * control channel.
@@ -105,14 +93,19 @@ public class Player implements SimUserDataListener {
 		else if (commandCode == CREATE_GAME) {
 			createGame(task, data);
 		}
+		else if (commandCode == UPDATE_PLAYER_READY_REQUEST) {
+			updatePlayerReadyRequest(task, data);
+		}
+		else if (commandCode == START_GAME_REQUEST) {
+			startGame(task);
+		}
 		
 	}
 	
-    public void dataArrivedFromChannel(ChannelID id,
-    		UserID from, ByteBuffer buff) {
+    public void dataArrivedFromChannel(ChannelID id, UserID from, ByteBuffer buff) {
     	
     }
-	  
+    
 	/**
      * <p>This callback is called when a user joins a channel.  The joined channel could be the
      * Lobby Manager control channel, a lobby, or a game room. </p>  
@@ -150,6 +143,7 @@ public class Player implements SimUserDataListener {
 				GLOMap<SGSUUID, GLOReference<GameRoom>> gameRoomMap = (GLOMap<SGSUUID, GLOReference<GameRoom>>) task.findGLO("GameRoomMap").peek(task);
 				GLOReference<GameRoom> gameRef = gameRoomMap.get(cid);
 				if (gameRef != null) {
+					currentGameRoom = gameRef;
 					GameRoom gameRoom = gameRef.get(task);
 					gameRoom.addUser(uid);
 					
@@ -161,7 +155,7 @@ public class Player implements SimUserDataListener {
 					
 					// TODO sten: assumes that player keeps lobby ref.  verify.
 					Lobby lobby = (Lobby) currentLobby.peek(task);
-					sendResponse(task, lobbyList, lobby.getChannelID());
+					sendMulticastResponse(task, lobby.getUsers(), lobbyList, lobby.getChannelID());
 					
 					// send playerEnteredGame to game room
 					List grList = new LinkedList();
@@ -169,7 +163,7 @@ public class Player implements SimUserDataListener {
 					grList.add(uid);
 					grList.add(userName);
 					
-					sendResponse(task, grList, gameRoom.getChannelID());
+					sendMulticastResponse(task, gameRoom.getUsers(), grList, gameRoom.getChannelID());
 				}
 
 			}
@@ -219,7 +213,7 @@ public class Player implements SimUserDataListener {
 						sendResponse(task, list, lobby.getChannelID());
 					}
 					
-					currentGameRoom.delete(task);
+					//currentGameRoom.delete(task);
 					currentGameRoom = null;
 					
 					// rejoin lobby
@@ -412,6 +406,82 @@ public class Player implements SimUserDataListener {
 		}
 	}
 	
+	private void startGame(SimTask task) {
+		if (currentGameRoom == null) {
+			return;
+		}
+		GameRoom gameRoom = currentGameRoom.peek(task);
+		UserID host = gameRoom.getHost();
+		// only the host can start the game.
+		if (!host.equals(userID)) {
+			sendStartGameFailed(task, "Only the host can start a game", gameRoom.getChannelID());
+			return;
+		}
+		if (!gameRoom.arePlayersReady()) {
+			sendStartGameFailed(task, "Not all players are ready", gameRoom.getChannelID());
+			return;
+		}
+		System.out.println("Player: create game successful");
+
+		List list = protocol.createCommandList(GAME_STARTED);
+		packGameDescriptor(list, gameRoom);
+		
+		sendResponse(task, list, gameRoom.getChannelID());
+	}
+	
+	private void sendStartGameFailed(SimTask task, String reason, ChannelID cid) {
+		List list = protocol.createCommandList(START_GAME_REQUEST);
+		list.add(reason);
+		
+		sendResponse(task, list, cid);
+	}
+	
+	private void updatePlayerReadyRequest(SimTask task, ByteBuffer data) {
+		if (currentGameRoom == null) {
+			return;
+		}
+		boolean ready = protocol.readBoolean(data);
+		GameRoom gameRoom = currentGameRoom.get(task);
+		if (ready) {
+			int numParams = data.getInt();
+			HashMap<String, Object> gameParams = new HashMap<String, Object>();
+			for (int i = 0; i < numParams; i++) {
+				gameParams.put(protocol.readString(data), protocol.readParamValue(data));
+			}
+			
+			
+			Map<String, Object> masterParameters = gameRoom.getGameParamters();
+			
+			// bail out if all of the expected parameters are not present.
+			if (!gameParams.keySet().equals(masterParameters.keySet())) {
+				sendPlayerReadyUpdate(task, false, gameRoom);
+				return;
+			}
+			
+			// now compare the parameters one by one.  Each one should equal.
+			Iterator<String> iterator = gameParams.keySet().iterator();
+			while (iterator.hasNext()) {
+				String curKey = iterator.next();
+				if (!gameParams.get(curKey).equals(masterParameters.get(curKey))) {
+					sendPlayerReadyUpdate(task, false, gameRoom);
+				}
+			}
+			
+			// all criteria has been met, the play is indeed ready (or not).
+			gameRoom.updateReady(userID, ready);
+		}
+		sendPlayerReadyUpdate(task, ready, gameRoom);
+	}
+	
+	private void sendPlayerReadyUpdate(SimTask task, boolean ready, GameRoom game) {
+		List list = new LinkedList();
+		list.add(PLAYER_READY_UPDATE);
+		list.add(userID);
+		list.add(ready);
+		
+		sendMulticastResponse(task, game.getUsers(), list, game.getChannelID());
+	}
+	
 	/**
 	 * Attempts to join this user to the Game Room channel specified in the 
 	 * data buffer.  If the game is password protected, then a password
@@ -519,35 +589,59 @@ public class Player implements SimUserDataListener {
 		String channelName = lobby.getChannelName() + ":" + gameName;
 		ChannelID cid = task.openChannel(channelName);
 		task.lock(cid, true);	// game access is controled by the server
-		GameRoom gr = new GameRoom(gameName, description, password, channelName, cid, userID);
-		GLOReference<GameRoom> grRef = task.createGLO(gr);
+
+		GLOReference<GameRoom> grRef = task.createGLO(new GameRoom(gameName, description, password, channelName, cid, userID));
 		lobby.addGameRoom(grRef);
 		
+		GameRoom gr = grRef.get(task);
+
 		// add to the game room map for easy look-up by gameID
 		GLOMap<SGSUUID, GLOReference<GameRoom>> gameRoomMap = (GLOMap<SGSUUID, GLOReference<GameRoom>>) task.findGLO("GameRoomMap").get(task);
 		gameRoomMap.put(gr.getGameID(), grRef);
 		
+		Iterator<String> iterator = gameParams.keySet().iterator();
+		while (iterator.hasNext()) {
+			String curKey = iterator.next();
+			Object value = gameParams.get(curKey);
+			gr.addGameParameter(curKey, value);
+		}
+		
 		List list = new LinkedList();
 		list.add(GAME_CREATED);
-		list.add(cid);
-		list.add(gameName);
-		list.add(description);
-		list.add(channelName);
-		list.add(password != null);
-		list.add(numParams);
+		packGameDescriptor(list, gr);
 		
-		Iterator iterator = gameParams.keySet().iterator();
+		sendMulticastResponse(task, lobby.getUsers(), list, lobby.getChannelID());
+		
+		// join the user that created this game as the host after the CREATE_GAME message has been sent.
+		task.join(userID, cid);
+		
+	}
+	
+	/**
+	 * Puts the details of a game room into the given list for transport.
+	 * 
+	 * @param list				the list in which to put the game details
+	 * @param game				the game
+	 */
+	private void packGameDescriptor(List list, GameRoom game) {
+		list.add(game.getChannelID());
+		list.add(game.getName());
+		list.add(game.getDescription());
+		list.add(game.getChannelName());
+		list.add(game.isPasswordProtected());
+		
+		Map<String, Object> gameParams = game.getGameParamters();
+		list.add(gameParams.size());
+		
+		Iterator<String> iterator = gameParams.keySet().iterator();
 		while (iterator.hasNext()) {
-			String curKey= (String) iterator.next();
+			String curKey= iterator.next();
 			list.add(curKey);
 			Object value = gameParams.get(curKey);
 			
 			list.add(protocol.mapType(value));
 			list.add(value);
 		}
-		
-		sendResponse(task, list, lobby.getChannelID());
-		
 	}
 	
 	private void sendGameCreateFailedResponse(SimTask task, String lobbyChannelName, String gameName, String message) {

@@ -15,6 +15,6 @@ public interface ILobbyChannelListener {
 	
 	public void gameCreated(GameDescriptor game);
 	
-	public void playerJoinedGame(GameDescriptor game, byte[] player);
+	public void playerJoinedGame(byte[] gameID, byte[] player);
 
 }

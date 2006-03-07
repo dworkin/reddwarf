@@ -39,12 +39,14 @@ public class Lobby extends ChannelRoom {
 	private int maxConnectionTime;			// in minutes?
 	private HashMap<String, Object> gameParameters;
 	private List<GLOReference> gameRoomList;
+	private List<UserID> playerList;
 	
 	public Lobby(String name, String description, String password, String channelName, ChannelID cid) {
 		super(name, description, password, channelName, cid);
 		
 		gameParameters = new HashMap<String, Object>();
 		gameRoomList = new LinkedList<GLOReference>();
+		this.playerList = new LinkedList<UserID>();
 	}
 	
 	public void setMaxPlayers(int num) {
@@ -106,5 +108,27 @@ public class Lobby extends ChannelRoom {
 	 */
 	public Map<String, Object> getGameParamters() {
 		return Collections.unmodifiableMap(gameParameters);
+	}
+	
+	public void addUser(UserID user) {
+		if (!playerList.contains(user)) {
+			playerList.add(user);
+		}
+	}
+	
+	public void removeUser(UserID user) {
+		playerList.remove(user);
+	}
+	
+	public List<UserID> getUsers() {
+		return playerList;
+	}
+	
+	public void removeAllUsers() {
+		playerList.clear();
+	}
+	
+	public int getNumPlayers() {
+		return playerList.size();
 	}
 }

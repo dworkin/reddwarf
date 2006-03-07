@@ -53,6 +53,8 @@ public interface IMatchMakingClient {
 	
 	public void joinLobby(byte[] lobbyID, String password);
 	
+	public void joinGame(byte[] gameID);
+	
 	public void joinGame(byte[] gameID, String password);
 	
 	/**

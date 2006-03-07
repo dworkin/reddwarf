@@ -13,6 +13,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.StringTokenizer;
 
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.NameCallback;
@@ -41,6 +42,7 @@ import com.sun.gi.comm.discovery.impl.URLDiscoverer;
 import com.sun.gi.comm.users.client.ClientConnectionManager;
 import com.sun.gi.comm.users.client.impl.ClientConnectionManagerImpl;
 import com.sun.gi.utils.SGSUUID;
+import com.sun.gi.utils.StatisticalUUID;
 
 public class MatchMakerClientTestUI extends JFrame implements IMatchMakingClientListener {
 
@@ -52,6 +54,7 @@ public class MatchMakerClientTestUI extends JFrame implements IMatchMakingClient
 	private LobbyPanel lobbyPanel;
 	private GamePanel gamePanel;
 	private HashMap<String, LobbyDescriptor> lobbyMap;
+	private JTextArea incomingText;
 	
 	private JButton connectButton;
 	
@@ -95,15 +98,40 @@ public class MatchMakerClientTestUI extends JFrame implements IMatchMakingClient
 		});
 		
 		JButton joinGame = new JButton("Join Game");
+		joinGame.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				GameDescriptor game = lobbyPanel.getSelectedGame();
+				if (game == null) {
+					return;
+				}
+				mmClient.joinGame(game.getGameID().toByteArray());
+			}
+		});
+		
+		JButton readyButton = new JButton("Ready");
+		readyButton.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				gamePanel.ready();
+			}
+		});
+		
+		JButton startGameButton = new JButton("Start Game");
+		startGameButton.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				gamePanel.startGame();
+			}
+		});
 		
 		JPanel buttonPanel = new JPanel();
 		buttonPanel.add(connectButton);
 		buttonPanel.add(joinLobby);
 		buttonPanel.add(createGame);
 		buttonPanel.add(joinGame);
+		buttonPanel.add(readyButton);
+		buttonPanel.add(startGameButton);
 		
 		JSplitPane rightPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
-		rightPane.setDividerLocation(300);
+		rightPane.setDividerLocation(250);
 		rightPane.setTopComponent(lobbyPanel = new LobbyPanel());
 		rightPane.setBottomComponent(gamePanel = new GamePanel());
 		
@@ -113,11 +141,22 @@ public class MatchMakerClientTestUI extends JFrame implements IMatchMakingClient
 		splitPane.setLeftComponent(treePanel);
 		splitPane.setRightComponent(rightPane);
 		
-		JTextField chatField = new JTextField(35);
+		final JTextField chatField = new JTextField(35);
 		JButton sendTextButton = new JButton("Send Text");
-		JButton sendPrivateTextButton = new JButton("Send Private Text");
+		sendTextButton.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				lobbyPanel.sendText(chatField.getText());
+			}
+		});
 		
-		JTextArea incomingText = new JTextArea(3, 40);
+		JButton sendPrivateTextButton = new JButton("Send Private Text");
+		sendPrivateTextButton.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				lobbyPanel.sendPrivateText(chatField.getText());
+			}
+		});
+		
+		incomingText = new JTextArea(3, 40);
 		
 		JPanel chatPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
 		chatPanel.add(chatField);
@@ -146,6 +185,10 @@ public class MatchMakerClientTestUI extends JFrame implements IMatchMakingClient
 		});
 		
 		setVisible(true);
+	}
+	
+	private void receiveServerMessage(String message) {
+		incomingText.setText(incomingText.getText() + "<Server>: " + message + "\n");
 	}
 	
 	private LobbyDescriptor getSelectedLobby() {
@@ -182,6 +225,16 @@ public class MatchMakerClientTestUI extends JFrame implements IMatchMakingClient
 
 		return new DefaultTreeModel(root);
 	}
+	
+	private SGSUUID createUUID(byte[] bytes) {
+		SGSUUID id = null;
+		try {
+			id = new StatisticalUUID(bytes);
+		}
+		catch (InstantiationException ie) {}
+		
+		return id;
+	}	
 	
 	private void setStatus(String status) {
 		setTitle("Match Maker Client Test: " + status);
@@ -254,8 +307,9 @@ public class MatchMakerClientTestUI extends JFrame implements IMatchMakingClient
 	}
 
 	public void joinedGame(IGameChannel channel) {
-		// TODO Auto-generated method stub
-
+		System.out.println("joinedGame: " + channel.getName());
+		gamePanel.setGame(channel, lobbyPanel.gameMap.get(channel.getName()));
+		
 	}
 
 	public void connected(byte[] myID) {
@@ -333,6 +387,32 @@ public class MatchMakerClientTestUI extends JFrame implements IMatchMakingClient
 
 	}
 	
+	private byte[] stringToByteArray(String str) {
+		StringTokenizer tokenizer = new StringTokenizer(str, " ");
+		byte[] array = new byte[tokenizer.countTokens()];
+		int index = 0;
+		while (tokenizer.hasMoreTokens()) {
+			array[index] = Byte.parseByte(tokenizer.nextToken());
+			index++;
+		}
+		return array;
+	}
+	
+	/**
+	 * Convert a byte array to a String by stringing the contents
+	 * together.  Makes for easy hashing.
+	 * 
+	 * @param array
+	 * @return
+	 */
+	private String byteArrayToString(byte[] array) {
+		StringBuffer buffer = new StringBuffer();
+		for (int i = 0; i < array.length; i++) {
+			buffer.append(array[i] + " ");
+		}
+		return buffer.toString();
+	}
+	
 	private class LobbyPanel extends JPanel implements ILobbyChannelListener {
 		
 		private JLabel lobbyName;
@@ -343,17 +423,21 @@ public class MatchMakerClientTestUI extends JFrame implements IMatchMakingClient
 		private int numUsers = 0;
 		private int maxUsers = 0;
 		private DefaultListModel userListModel;
-		private DefaultListModel gameListModel;
 		private JList userList;
+		private JList gameList;
+		private DefaultListModel gameListModel;
 		private GameParametersTableModel parametersModel;
 		private HashMap<String, Object> gameParameters;
 		
-		private HashMap<byte[], String> userMap; 
+		private HashMap<String, String> userMap; 
+		
+		HashMap<String, GameDescriptor> gameMap;
 		
 		LobbyPanel() {
 			super(new BorderLayout());
 			
-			userMap = new HashMap<byte[], String>();
+			userMap = new HashMap<String, String>();
+			gameMap = new HashMap<String, GameDescriptor>();
 			
 			JPanel topPanel = new JPanel();
 			topPanel.add(new JLabel("Current Lobby:"));
@@ -374,7 +458,7 @@ public class MatchMakerClientTestUI extends JFrame implements IMatchMakingClient
 			gameParametersPanel.add(new JLabel("Game Params"), BorderLayout.NORTH);
 			gameParametersPanel.add(tablePane, BorderLayout.CENTER);
 			
-			JScrollPane gameListPane = new JScrollPane(new JList(gameListModel = new DefaultListModel()));
+			JScrollPane gameListPane = new JScrollPane(gameList = new JList(gameListModel = new DefaultListModel()));
 			gameListPane.setPreferredSize(new Dimension(150, listHeight));
 			
 			JPanel gameListPanel = new JPanel(new BorderLayout());
@@ -398,6 +482,10 @@ public class MatchMakerClientTestUI extends JFrame implements IMatchMakingClient
 			add(bottomPanel, BorderLayout.SOUTH);
 		}
 		
+		public GameDescriptor getSelectedGame() {
+			return (GameDescriptor) gameList.getSelectedValue();
+		}
+		
 		void setLobby(ILobbyChannel channel) {
 			LobbyPanel.this.channel = channel;
 			channel.setListener(LobbyPanel.this);
@@ -415,30 +503,50 @@ public class MatchMakerClientTestUI extends JFrame implements IMatchMakingClient
 			channel.createGame("My Game", "My description", null, gameParameters);
 		}
 		
+		void sendText(String message) {
+			channel.sendText(message);
+		}
+		
+		void sendPrivateText(String message) {
+			byte[] userID = lookupUserID((String) userList.getSelectedValue());
+			System.out.println("private text: " + byteArrayToString(userID));
+			channel.sendPrivateText(userID, message);
+		}
+		
+		private byte[] lookupUserID(String username) {
+			Iterator<String> iterator = userMap.keySet().iterator();
+			while (iterator.hasNext()) {
+				String curID = iterator.next();
+				if (username.equals(userMap.get(curID))) {
+					return stringToByteArray(curID);
+				}
+			}
+			return new byte[0];
+		}
+		
 		private void updateNumUsers() {
 			numUserLabel.setText("Users: " + numUsers + "/" + maxUsers);
 		}
 		
 		public void playerEntered(byte[] player, String name) {
-			System.out.println("Lobby Panel: Player entered " + name);
-			userMap.put(player, name);
+			receiveServerMessage(name + " Entered Lobby " + lobbyName.getText());	
+			userMap.put(byteArrayToString(player), name);
 			numUsers++;
 			updateNumUsers();
 			userListModel.addElement(name);
-			userList.repaint();
 		}
 		
 		public void playerLeft(byte[] player) {
 			numUsers--;
 			updateNumUsers();
-			String name = userMap.remove(player);
-			System.out.println("Lobby Panel: Player Left " + name);			
+			String name = userMap.remove(byteArrayToString(player));
+			receiveServerMessage(name + " Left Lobby " + lobbyName.getText());			
 			userListModel.removeElement(name);
-			userList.repaint();
 		}
 		
 		public void receiveText(byte[] from, String text, boolean wasPrivate) {
-			
+			String userName = userMap.get(byteArrayToString(from));
+			incomingText.setText(incomingText.getText() + "<Lobby> " + userName + "" + (wasPrivate ? " (privately)" : "") + ": " + text + "\n");
 		}
 		
 		public void receivedGameParameters(HashMap<String, Object> parameters) {
@@ -452,15 +560,18 @@ public class MatchMakerClientTestUI extends JFrame implements IMatchMakingClient
 		}
 		
 		public void createGameFailed(String name, String reason) {
-			System.out.println("LobbyPanel createGameFailed: " + name + " reason " + reason);
+			receiveServerMessage("LobbyPanel createGameFailed: " + name + " reason " + reason);
 		}
 		
 		public void gameCreated(GameDescriptor game) {
-			gameListModel.addElement(game.getName());
+			gameListModel.addElement(game);
+			System.out.println("gameCreated " + game.getChannelName());
+			gameMap.put(game.getChannelName(), game);
+			receiveServerMessage("Game Created: " + game.getName());
 		}
 		
-		public void playerJoinedGame(GameDescriptor game, byte[] player) {
-			
+		public void playerJoinedGame(byte[] gameID, byte[] player) {
+			receiveServerMessage("<Lobby> " + userMap.get(byteArrayToString(player)) + " Joined Game ");
 		}
 	}
 	
@@ -506,9 +617,16 @@ public class MatchMakerClientTestUI extends JFrame implements IMatchMakingClient
 		private JLabel numUserLabel;
 		private JCheckBox isPasswordProtected;
 		private IGameChannel channel;
+		private GameDescriptor descriptor;
+		private HashMap<String, String> userMap; 
+		private GameUsersTableModel userTableModel;
+		private GameParametersTableModel parametersModel;
+		private JTable userTable;
 		
 		GamePanel() {
 			super(new BorderLayout());
+			
+			userMap = new HashMap<String, String>();
 			
 			JPanel topPanel = new JPanel();
 			topPanel.add(new JLabel("Current Game:"));
@@ -520,27 +638,144 @@ public class MatchMakerClientTestUI extends JFrame implements IMatchMakingClient
 			centerPanel.add(isPasswordProtected = new JCheckBox("Password Protected"));
 			isPasswordProtected.setEnabled(false);
 			
+			int listHeight = 100;
+			JTable gameParametersTable = new JTable(parametersModel = new GameParametersTableModel());
+			JScrollPane tablePane = new JScrollPane(gameParametersTable);
+			tablePane.setPreferredSize(new Dimension(250, listHeight));
+			
+			JPanel gameParametersPanel = new JPanel(new BorderLayout());
+			gameParametersPanel.add(new JLabel("Game Params"), BorderLayout.NORTH);
+			gameParametersPanel.add(tablePane, BorderLayout.CENTER);
+			
+			JScrollPane userListPane = new JScrollPane(userTable= new JTable(userTableModel = new GameUsersTableModel()));
+			userListPane.setPreferredSize(new Dimension(220, listHeight));
+			
+			JPanel userListPanel = new JPanel(new BorderLayout());
+			userListPanel.add(new JLabel("User List"), BorderLayout.NORTH);
+			userListPanel.add(userListPane, BorderLayout.CENTER);
+			
+			JPanel bottomPanel = new JPanel(new BorderLayout());
+			bottomPanel.add(userListPanel, BorderLayout.WEST);
+			bottomPanel.add(gameParametersPanel, BorderLayout.EAST);
+			
 			add(topPanel, BorderLayout.NORTH);
 			add(centerPanel, BorderLayout.CENTER);
+			add(bottomPanel, BorderLayout.SOUTH);
 		}
 		
-		public void setGame(IGameChannel channel) {
+		public void setGame(IGameChannel channel, GameDescriptor descriptor) {
 			GamePanel.this.channel = channel;
+			GamePanel.this.descriptor = descriptor;
+			channel.setListener(GamePanel.this);
+			gameName.setText(descriptor.getName() + ", " + descriptor.getDescription());
+			updateGameParameters(descriptor.getGameParameters());
+		}
+		
+		public void ready() {
+			channel.ready(descriptor, true);
+		}
+		
+		public void startGame() {
+			channel.startGame();
+		}
+		
+		private void updateGameParameters(HashMap<String, Object> parameters) {
+			Iterator<String> iterator = parameters.keySet().iterator();
+			while (iterator.hasNext()) {
+				String curKey = iterator.next();
+				parametersModel.addParameter(curKey, parameters.get(curKey));
+			}
+			parametersModel.fireTableDataChanged();
 		}
 		
 		public void playerEntered(byte[] player, String name) {
-			
+			receiveServerMessage("<Game Room> " + name + " Entered Game " + gameName.getText());	
+			userMap.put(byteArrayToString(player), name);
+			userTableModel.addUser(name);
 		}
 		
 		public void playerLeft(byte[] player) {
-			
+			String name = userMap.remove(byteArrayToString(player));
+			userTableModel.removeUser(name);
+			receiveServerMessage("<Game Room> " + name + " Left Game " + gameName.getText());	
 		}
 		
 		public void receiveText(byte[] from, String text, boolean wasPrivate) {
+			String userName = userMap.get(byteArrayToString(from));
+			incomingText.setText(incomingText.getText() + "<Game Room> " + userName + "" + (wasPrivate ? " (privately)" : "") + ": " + text + "\n");
+
+		}
+		
+		public void playerReady(byte[] player, boolean ready) {
+			String userName = userMap.get(byteArrayToString(player));
+			receiveServerMessage("<Game Room> " + userName + " is " + (ready ? "" : "not ") + "ready");
+			userTableModel.updateReady(userName, ready);
+		}
+		
+		public void startGameFailed(String reason) {
+			receiveServerMessage("<Game Room> Start Game Failed: " + reason);
 			
 		}
 		
+		public void gameStarted(GameDescriptor game) {
+			receiveServerMessage("<Game Room> Game Started " + game.getName());
+		}
 		
+	}
+	
+	private class GameUsersTableModel extends AbstractTableModel {
+		
+		private List<String> usernames;
+		private List<Boolean> readyState;
+		
+		GameUsersTableModel() {
+			usernames = new LinkedList<String>();
+			readyState = new LinkedList<Boolean>();
+		}
+		
+		public void addUser(String userName) {
+			usernames.add(userName);
+			readyState.add(false);
+			fireTableDataChanged();
+		}
+		
+		public void removeUser(String userName) {
+			int index = usernames.indexOf(userName);
+			if (index == -1) {
+				return;
+			}
+			usernames.remove(userName);
+			readyState.remove(index);
+			fireTableDataChanged();
+		}
+		
+		public int getColumnCount() {
+			return 2;
+		}
+		
+		public int getRowCount() {
+			return usernames.size();
+		}
+		
+		public void updateReady(String userName, boolean ready) {
+			int index = usernames.indexOf(userName);
+			if (index == -1) {
+				return;
+			}
+			readyState.set(index, ready);
+			fireTableDataChanged();
+		}
+		
+		public Object getValueAt(int row, int col) {
+			if (col == 0) {
+				return usernames.get(row);
+			}
+			return readyState.get(row);
+		}
+		
+		public String getColumnName(int col) {
+			return col == 0 ? "User" : "Ready?";
+		}
 	}
 
 }

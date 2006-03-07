@@ -8,6 +8,7 @@ import java.util.List;
 import static com.sun.gi.apps.mcs.matchmaker.server.CommandProtocol.*;
 
 import com.sun.gi.apps.mcs.matchmaker.server.CommandProtocol;
+import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.comm.users.client.ClientChannel;
 import com.sun.gi.comm.users.client.ClientChannelListener;
 import com.sun.gi.utils.SGSUUID;
@@ -34,6 +35,27 @@ public class LobbyChannel implements ILobbyChannel, ClientChannelListener {
 		list.add(text);
 		ByteBuffer buffer = protocol.assembleCommand(list);
 		channel.sendBroadcastData(buffer, true);
+	}
+
+	// TODO sten: implement this
+	public void sendPrivateText(byte[] user, String text) {
+		List list = protocol.createCommandList(SEND_PRIVATE_TEXT);
+		list.add(createUserID(user));
+		list.add(text);
+		ByteBuffer buffer = protocol.assembleCommand(list);
+		
+		System.out.println("LobbyChannel: Sending private text to " + user.length);
+		channel.sendUnicastData(user, buffer, true);
+	}
+	
+	private UserID createUserID(byte[] bytes) {
+		UserID id = null;
+		try {
+			id = new UserID(bytes);
+		}
+		catch (InstantiationException ie) {}
+		
+		return id;
 	}
 	
 	public void requestGameParameters() {
@@ -113,11 +135,14 @@ public class LobbyChannel implements ILobbyChannel, ClientChannelListener {
     	if (command == PLAYER_ENTERED_LOBBY) {
     		SGSUUID userID = protocol.readUUID(data);
     		String name = protocol.readString(data);
-    		System.out.println("LobbyChannel: Player entered lobby " + name);
     		listener.playerEntered(userID.toByteArray(), name);
     	}
     	else if (command == SEND_TEXT) {
     		listener.receiveText(from, protocol.readString(data), false);
+    	}
+    	else if (command == SEND_PRIVATE_TEXT) {
+    		UserID id = protocol.readUserID(data);
+    		listener.receiveText(from, protocol.readString(data), true);
     	}
     	else if (command == GAME_CREATED) {
     		SGSUUID uuid = protocol.readUUID(data);
@@ -134,6 +159,11 @@ public class LobbyChannel implements ILobbyChannel, ClientChannelListener {
         	}
     		GameDescriptor game = new GameDescriptor(uuid, name, description, channelName, isProtected, paramMap);
     		listener.gameCreated(game);
+    	}
+    	else if (command == PLAYER_JOINED_GAME) {
+    		SGSUUID userID = protocol.readUUID(data);
+    		SGSUUID gameID = protocol.readUUID(data);
+    		listener.playerJoinedGame(gameID.toByteArray(), userID.toByteArray());
     	}
     }
 

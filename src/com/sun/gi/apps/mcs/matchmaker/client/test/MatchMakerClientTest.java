@@ -141,8 +141,8 @@ public class MatchMakerClientTest implements IMatchMakingClientListener {
 				}
 			}
 			
-			public void playerJoinedGame(GameDescriptor game, byte[] player) {
-				System.out.println("LobbyChannelListener: playerJoinedGame " + game.getName());
+			public void playerJoinedGame(byte[] gameID, byte[] player) {
+				System.out.println("LobbyChannelListener: playerJoinedGame ");
 			}
 		});
 		channel.requestGameParameters();
@@ -161,6 +161,18 @@ public class MatchMakerClientTest implements IMatchMakingClientListener {
 			
 			public void receiveText(byte[] from, String text, boolean wasPrivate) {
 				System.out.println("IGameChannelListener " + text + " wasPrivate " + wasPrivate);
+			}
+			
+			public void playerReady(byte[] player, boolean ready) {
+				
+			}
+			
+			public void startGameFailed(String reason) {
+				
+			}
+			
+			public void gameStarted(GameDescriptor game) {
+				
 			}
 		});
 	}

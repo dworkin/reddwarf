@@ -28,8 +28,6 @@ public abstract class ChannelRoom implements GLO {
 	private String password;
 	private ChannelID channelID;
 	private String channelName;
-	private List<UserID> playerList;
-	
 
 	public ChannelRoom(String name, String description, String password, String channelName, ChannelID cid) {
 		this.name = name;
@@ -37,7 +35,6 @@ public abstract class ChannelRoom implements GLO {
 		this.password = password;
 		this.channelName = channelName;
 		this.channelID = cid;
-		this.playerList = new LinkedList<UserID>();
 	}
 	
 	
@@ -67,28 +64,6 @@ public abstract class ChannelRoom implements GLO {
 	
 	public boolean isPasswordProtected() {
 		return password != null;
-	}
-	
-	public void addUser(UserID user) {
-		if (!playerList.contains(user)) {
-			playerList.add(user);
-		}
-	}
-	
-	public void removeUser(UserID user) {
-		playerList.remove(user);
-	}
-	
-	public List<UserID> getUsers() {
-		return playerList;
-	}
-	
-	public void removeAllUsers() {
-		playerList.clear();
-	}
-	
-	public int getNumPlayers() {
-		return playerList.size();
 	}
 	
 }

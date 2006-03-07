@@ -41,6 +41,7 @@ public class MatchMakingClient implements IMatchMakingClient, ClientConnectionMa
 	private IMatchMakingClientListener listener;
 	private ClientConnectionManager manager;
 	private HashMap<String, LobbyChannel> lobbyMap;
+	private HashMap<String, GameChannel> gameMap;
 	
 	private CommandProtocol protocol;
 	private byte[] myID;
@@ -55,6 +56,7 @@ public class MatchMakingClient implements IMatchMakingClient, ClientConnectionMa
 		manager.setListener(this);
 		protocol = new CommandProtocol();
 		lobbyMap = new HashMap<String, LobbyChannel>();
+		gameMap = new HashMap<String, GameChannel>();
 	}
 	
 	void sendCommand(List list) {
@@ -94,6 +96,10 @@ public class MatchMakingClient implements IMatchMakingClient, ClientConnectionMa
 		}
 		
 		sendCommand(list);
+	}
+	
+	public void joinGame(byte[] gameID) {
+		joinGame(gameID, null);
 	}
 	
 	public void joinGame(byte[] gameID, String password) {
@@ -211,7 +217,10 @@ public class MatchMakingClient implements IMatchMakingClient, ClientConnectionMa
     		listener.joinedLobby(lobby);
     	}
     	else { // game
-    		
+    		GameChannel game = new GameChannel(channel, this);
+    		gameMap.put(channel.getName(), game);
+    		channel.setListener(game);
+    		listener.joinedGame(game);
     	}
     	
     }

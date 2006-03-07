@@ -6,7 +6,7 @@ import com.sun.gi.utils.SGSUUID;
 
 public class GameDescriptor {
 	
-	private SGSUUID lobbyID;
+	private SGSUUID gameID;
 	private String name;
 	private String description;
 	private boolean passwordProtected;
@@ -14,7 +14,7 @@ public class GameDescriptor {
 	private HashMap<String, Object> gameParameters;
 	
 	public GameDescriptor(SGSUUID id, String name, String desc, String channelName, boolean passwordProtected, HashMap<String, Object> params) {
-		this.lobbyID = id;
+		this.gameID = id;
 		this.name = name;
 		this.description = desc;
 		this.channelName = channelName;
@@ -22,8 +22,8 @@ public class GameDescriptor {
 		this.gameParameters = params;
 	}
 	
-	public SGSUUID getLobbyID() {
-		return lobbyID;
+	public SGSUUID getGameID() {
+		return gameID;
 	}
 	
 	public String getName() {
@@ -44,6 +44,21 @@ public class GameDescriptor {
 	
 	public HashMap<String, Object> getGameParameters() {
 		return gameParameters;
+	}
+	
+	public String toString() {
+		return name;
+	}
+	
+	public boolean equals(Object o) {
+		if (!(o instanceof GameDescriptor)) {
+			return false;
+		}
+		return ((GameDescriptor) o).getChannelName().equals(getChannelName());
+	}
+	
+	public int hashCode() {
+		return getChannelName().hashCode();
 	}
 
 }

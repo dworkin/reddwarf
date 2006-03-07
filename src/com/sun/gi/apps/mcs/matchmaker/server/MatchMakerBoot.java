@@ -2,7 +2,9 @@ package com.sun.gi.apps.mcs.matchmaker.server;
 
 import java.io.IOException;
 import java.net.URL;
+import java.security.Principal;
 import java.util.Iterator;
+import java.util.Set;
 
 import javax.security.auth.Subject;
 
@@ -26,7 +28,7 @@ import com.sun.gi.utils.SGSUUID;
  * @author	Sten Anderson
  * @version 1.0
  */
-public class MatchMakerBoot implements SimBoot, SimUserListener {
+public class MatchMakerBoot implements SimBoot<MatchMakerBoot>, SimUserListener {
 
 	private static final long serialVersionUID = 1L;
 	
@@ -94,10 +96,9 @@ public class MatchMakerBoot implements SimBoot, SimUserListener {
     	System.out.println("userJoined: map size " + userMap.size());
     	// TODO sten: don't know how to handle duplicate logins yet.
     	//if (!userMap.containsKey(uid)) {
-    		String username = null;
-    		for (Object curCredential : subject.getPublicCredentials()) {
-    			username = (String) curCredential;
-    		}
+    		Set<Principal> principles = subject.getPrincipals();
+    		Principal principal = principles.iterator().next();
+    		String username = principal.getName();
     		userMap.put(username, uid);
     		Player p = new Player(uid, username, folderRoot);
     		
@@ -113,14 +114,7 @@ public class MatchMakerBoot implements SimBoot, SimUserListener {
     		}
     		task.addUserDataListener(uid, pRef);
     		
-    		// join the new user to the lobby manager control channel
-    		// do this asynchronously to avoid a race condition with 
-    		// signing up to listen for channel joins.
-    		try {
-    		    task.queueTask(pRef, Player.class.getMethod("joinUser"), new Object[] {});
-    		} catch (Exception e) {
-    		    e.printStackTrace();
-    		}
+    		task.join(uid, task.openChannel(CommandProtocol.LOBBY_MANAGER_CONTROL_CHANNEL));
     	//}
     }
 
