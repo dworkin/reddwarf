@@ -115,20 +115,21 @@ public class NIOConnection implements SelectorHandler {
 
 		    if (recvBuffer.remaining() == 0) {
 			// No partial packets remain in the buffer
+			//log.finest("Dispatched entire buffer");
 			buffer_empty = true;
 			break;
 		    }
 
 		    if (recvBuffer.remaining() < 4) {
-			log.fine("Waiting for a packet header -- "
-				+ "only have " + recvBuffer.remaining());
+			//log.fine("Waiting for a packet header -- "
+			//	+ "only have " + recvBuffer.remaining());
 			break;
 		    }
 
 		    // Got frame header
 		    int packet_len = recvBuffer.getInt();
 		    if (packet_len <= 0) {
-			log.warning("Bad packet length: " + packet_len);
+			//log.warning("Bad packet length: " + packet_len);
 			break;
 		    }
 
@@ -138,15 +139,22 @@ public class NIOConnection implements SelectorHandler {
 
 		if (recvBuffer.remaining() < nextRecvPacketLen) {
 		    // We don't have all of the packet
+		    //log.finer("Partial packet; have " +
+		    //      recvBuffer.remaining() +
+		    //      " bytes, need " + nextRecvPacketLen);
 		    break;
 		}
 
 		// Got a whole packet; dispatch it
-		ByteBuffer packet = recvBuffer.slice();
-		packet.limit(nextRecvPacketLen);
+		// Copy the packet in this implementation
+		ByteBuffer packetView = recvBuffer.slice().asReadOnlyBuffer();
+		packetView.limit(nextRecvPacketLen);
 		recvBuffer.position(recvBuffer.position() + nextRecvPacketLen);
+		ByteBuffer packetCopy = ByteBuffer.allocate(nextRecvPacketLen);
+		packetCopy.put(packetView);
+		packetCopy.rewind();
 		nextRecvPacketLen = 0;
-		parent.packetReceived(packet);
+		parent.packetReceived(packetCopy);
 
 		// Loop around and see if we can dispatch some more
 	    }
