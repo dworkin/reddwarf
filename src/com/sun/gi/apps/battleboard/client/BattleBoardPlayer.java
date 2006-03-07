@@ -84,7 +84,15 @@ public class BattleBoardPlayer implements ClientChannelListener {
      * {@inheritDoc}
      */
     public void playerLeft(byte[] playerID) {
-	log.fine("playerJoined on " + channel.getName());
+	log.fine("playerLeft on " + channel.getName());
+
+	// XXX: Exit if someone left unexpectedly
+	if (gameState != GameState.GAME_OVER) {
+	    gameState = GameState.GAME_OVER;
+	    log.severe("Exiting because another player left");
+	    connectionManager.disconnect();
+	    System.exit(-1);
+	}
     }
 
     /**
