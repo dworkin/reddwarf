@@ -237,6 +237,7 @@
 	<java dir="release" classname="com.sun.gi.SGS" failonerror="true" fork="yes">
 	    <arg value="-C"/>
 	    <arg value="-V"/>
+	    <arg value="-I"/>
 	    <arg value="file:JNWN-server.txt" />
 	    <classpath refid="project.classpath"/>
 	    <classpath location="NWNSupport.jar"/>
@@ -261,6 +262,7 @@
 
     <target name="SGS2">
 	<java dir="release" classname="com.sun.gi.SGS" failonerror="true" fork="yes">
+	    <arg value="-I"/>
 	    <arg value="file:Install2.txt" />
 	    <classpath refid="project.classpath" />
 	    <sysproperty key="java.util.logging.config.file"
