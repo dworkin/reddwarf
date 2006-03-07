@@ -5,8 +5,8 @@
 use FileHandle;
 use IPC::Open2;
 
-$BoardWidth	= 8;
-$BoardHeight	= 8;
+$BoardWidth	= 2;
+$BoardHeight	= 2;
 
 $Props	= '-Dbattleboard.interactive=false';
 $Class	= 'com.sun.gi.apps.battleboard.client.BattleBoardClient';
@@ -24,8 +24,24 @@ $PlayerName = shift @ARGV;
 
 $Command	= "java -cp bin $Props $Class";
 
+$GamesPlayed = 0;
+$GamesWon    = 0;
+$GamesLost   = 0;
+$GamesError  = 0;
+
 for (;;) {
     $rc = play($Command, $UserName, $UserPasswd, $PlayerName, @opponents);
+    $GamesPlayed += 1;
+    if ($rc == 1) {
+	$GamesWon += 1;
+    } elsif ($rc == 0) {
+	$GamesLost += 1;
+    } else {
+	$GamesError += 1;
+	if ($rc < -1) {
+	    die "** Game returned $rc -- exiting\n";
+	}
+    }
 }
 
 sub play {
@@ -87,11 +103,17 @@ sub play {
 		    wait;
 		    return 0;
 		}
-		elsif ($line =~ /Connection refused/) {
+		elsif ($line =~ /is not in the game\.$/) {
 		    close Reader;
 		    close Writer;
 		    wait;
 		    return -1;
+		}
+		elsif ($line =~ /Connection refused/) {
+		    close Reader;
+		    close Writer;
+		    wait;
+		    return -2;
 		}
 	    }
 	}
