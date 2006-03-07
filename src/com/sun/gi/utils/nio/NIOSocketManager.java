@@ -149,6 +149,10 @@ public class NIOSocketManager implements Runnable {
 	    synchronized (writeQueue) {
 		for (SelectableChannel chan : writeQueue) {
 		    SelectionKey key = chan.keyFor(selector);
+		    if (key == null) { // XXX: DJE
+			log.warning("key is null");
+			continue;
+		    }
 		    if (key.isValid()) {
 			key.interestOps(key.interestOps() | OP_WRITE);
 		    }

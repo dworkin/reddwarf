@@ -116,7 +116,7 @@ public class Game implements GLO {
 	gameName = "GameChannel-" +
 		SequenceGLO.getNext(task, "GameChannelSequence");
 		
-	log.fine("New game channel is `" + gameName + "'");
+	log.info("New game channel is `" + gameName + "'");
 
 	players = new LinkedList<GLOReference<Player>>(newPlayers);
 	Collections.shuffle(players);
