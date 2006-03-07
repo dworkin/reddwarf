@@ -47,7 +47,7 @@ public class MatchMakerClientTest implements IMatchMakingClientListener {
 	
 	public void connect() {
 		try {
-		    ClientConnectionManager manager = new ClientConnectionManagerImpl("MatchMakerTest",
+		    ClientConnectionManager manager = new ClientConnectionManagerImpl("MatchMaker",
 			      new URLDiscoverer(
 				  new File("resources/FakeDiscovery.xml").toURI().toURL()));
 		    mmClient = new MatchMakingClient(manager);
@@ -74,22 +74,23 @@ public class MatchMakerClientTest implements IMatchMakingClientListener {
 	 * @param lobbies			an array of lobbies contained by the requested folder
 	 */
 	public void listedFolder(SGSUUID folderID, FolderDescriptor[] subFolders, LobbyDescriptor[] lobbies) {
-		System.out.println("listed folder: folderID: " + folderID);
+		System.out.println("Listed folder: folderID: " + folderID);
 		for (FolderDescriptor f : subFolders) {
-			System.out.println("Folder: " + f.getName() + " " + f.getDescription() + " " + f.getFolderID());
+			System.out.println("\tFolder: " + f.getName() + " " + f.getDescription() + " " + f.getFolderID());
+			mmClient.listFolder(f.getFolderID().toByteArray());
 		}
-		for (LobbyDescriptor l : lobbies) {
+		/*for (LobbyDescriptor l : lobbies) {
 			System.out.println("Lobby: " + l.getName() + " " + l.getDescription() + " " + l.getNumUsers() + " " + l.getMaxUsers() + 
 					l.isPasswordProtected() + " " + l.getLobbyID());
-		}
+		}*/
 		
-		if (subFolders.length > 0 && numTimes == 0) {
-			numTimes++;
+		/*if (subFolders.length > 0 && numTimes == 0) {
+			//numTimes++;
 			mmClient.listFolder(subFolders[0].getFolderID().toByteArray());
-		}
-		if(lobbies.length > 0) {
+		}*/
+		/*if(lobbies.length > 0) {
 			mmClient.joinLobby(lobbies[0].getLobbyID().toByteArray(), "secret");
-		}
+		}*/
 	}
 	
 	public void foundUserName(String userName, byte[] userID) {

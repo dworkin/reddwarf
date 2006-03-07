@@ -3,11 +3,15 @@ package com.sun.gi.apps.mcs.matchmaker.server;
 import java.io.IOException;
 import java.net.URL;
 import java.security.Principal;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Set;
 
 import javax.security.auth.Subject;
 
+import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimBoot;
@@ -72,12 +76,22 @@ public class MatchMakerBoot implements SimBoot<MatchMakerBoot>, SimUserListener 
 	}
 	
 	private void openChannels(SimTask task, GLOReference<GLOMap<SGSUUID, GLOReference>> gloMapRef) {
-		GLOMap<SGSUUID, GLOReference> gloMap = gloMapRef.peek(task);
+		GLOMap<SGSUUID, GLOReference> gloMap = gloMapRef.get(task);
 		Iterator iterator = gloMap.keySet().iterator();
+		List<GLOReference> channelRooms = new LinkedList<GLOReference>();
+		HashMap<SGSUUID, GLOReference> map = new HashMap<SGSUUID, GLOReference>();
 		while (iterator.hasNext()) {
 			GLOReference ref = gloMap.get(iterator.next());
 			ChannelRoom curRoom = (ChannelRoom) ref.get(task);
-			curRoom.setChannelID(task.openChannel(curRoom.getChannelName()));
+			ChannelID cid = task.openChannel(curRoom.getChannelName());
+			curRoom.setChannelID(cid);
+			map.put(cid, ref);
+		}
+		gloMap.clear();
+		Iterator<SGSUUID> mapIterator = map.keySet().iterator();
+		while (mapIterator.hasNext()) {
+			SGSUUID curKey = mapIterator.next();
+			gloMap.put(curKey, map.get(curKey));
 		}
 	}
 	
@@ -151,8 +165,8 @@ public class MatchMakerBoot implements SimBoot<MatchMakerBoot>, SimUserListener 
 	private Folder createRootFolder(SimTask task) {
 		URL url = null;
 		try {
-			//url = new URL("file:apps/matchmaker/matchmaker_config.xml");
-			url = new URL("file:release/apps/matchmaker/matchmaker_config.xml");
+			url = new URL("file:apps/matchmaker/matchmaker_config.xml");
+			//url = new URL("file:release/apps/matchmaker/matchmaker_config.xml");
 		}
 		catch (IOException ioe) {
 			ioe.printStackTrace();

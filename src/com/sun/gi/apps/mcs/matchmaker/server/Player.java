@@ -285,6 +285,7 @@ public class Player implements SimUserDataListener {
 				list.add(curLobby.getNumPlayers());
 				list.add(curLobby.getMaxPlayers());
 				list.add(curLobby.isPasswordProtected());
+				
 			}
 		}
 		else {  // return a zero size
@@ -377,6 +378,7 @@ public class Player implements SimUserDataListener {
 		System.out.println("joinLobby request");
 		// TODO sten: perhaps this should send a response instead of silently returning
 		if (currentLobby != null) {
+			sendErrorResponse(task, "Already connected to a lobby");
 			return;
 		}
 		
@@ -394,6 +396,10 @@ public class Player implements SimUserDataListener {
 				if (lobby.getPassword().equals(password)) {
 					task.join(userID, lobby.getChannelID());
 				}
+				else {
+					sendErrorResponse(task, "password mismatch for lobbyID " + lobbyID);
+					return;
+				}
 			}
 			else {
 				task.join(userID, lobby.getChannelID());
@@ -401,9 +407,19 @@ public class Player implements SimUserDataListener {
 			
 		}
 		else {
-			//TODO sten: return an error if lobby not found, or if passwords don't match?
-			System.out.println("lobby not found " + lobbyID);
+			sendErrorResponse(task, "lobby not found: " + lobbyID);
 		}
+	}
+	
+	/**
+	 * Sends a response of ERROR on the control channel with a message detailing
+	 * the failure.
+	 * 
+	 * @param message			the reason for the error
+	 */
+	private void sendErrorResponse(SimTask task, String message) {
+		List list = protocol.createCommandList(ERROR);
+		sendResponse(task, list);
 	}
 	
 	private void startGame(SimTask task) {

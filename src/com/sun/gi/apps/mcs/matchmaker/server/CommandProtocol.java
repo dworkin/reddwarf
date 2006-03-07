@@ -35,6 +35,7 @@ public final class CommandProtocol implements Serializable {
 	 * Sent to the client to notify that the server is ready to accept commands. 
 	 */
 	public final static int SERVER_LISTENING = 0x10;
+	public final static int ERROR = 0x11;
 	
 	public final static int LIST_FOLDER_REQUEST = 0x70;
 	public final static int LIST_FOLDER_RESPONSE = 0x71;
@@ -343,52 +344,3 @@ public final class CommandProtocol implements Serializable {
 
 }
 
-/**
- *  This class represents an unsigned byte value.  It uses
- *  an int to store the value since a regular Java signed byte
- *  isn't wide enough.  
- *  
- *  This class exists primarily to mark an int to be intrepreted
- *  as an unsigned byte instead of an int. 
- */
-class UnsignedByte extends Number {
-	
-	private int value;
-	
-	UnsignedByte(int num) {
-		this.value = num;
-	}
-	
-	public float floatValue() {
-		return value;
-	}
-	
-	public long longValue() {
-		return value;
-	}
-	
-	public double doubleValue() {
-		return value;
-	}
-	
-	public int intValue() {
-		return value;
-	}
-	
-	public byte byteValue() {
-		return (byte) value;
-	}
-	
-	public boolean equals(Object obj) {
-		return (obj instanceof UnsignedByte && ((UnsignedByte) obj).intValue() == value);
-	}
-	
-	public int hashCode() {
-		return value;
-	}
-	
-	public int compareTo(UnsignedByte b) {
-		return b.intValue() == value ? 0 : b.intValue() > value ? -1 : 1;
-	}
-	
-}

@@ -86,7 +86,8 @@ public class MatchMakerClientTestUI extends JFrame implements IMatchMakingClient
 				if (lobby == null) {
 					return;
 				}
-				mmClient.joinLobby(lobby.getLobbyID().toByteArray(), "secret");
+				System.out.println("attempt to join lobby " + lobby.getLobbyID().toString());
+				mmClient.joinLobby(lobby.getLobbyID().toByteArray(), null);
 			}
 		});
 		
@@ -242,7 +243,7 @@ public class MatchMakerClientTestUI extends JFrame implements IMatchMakingClient
 	
 	public void connect() {
 		try {
-		    manager = new ClientConnectionManagerImpl("MatchMakerTest",
+		    manager = new ClientConnectionManagerImpl("MatchMaker",
 			      new URLDiscoverer(
 				  new File("resources/FakeDiscovery.xml").toURI().toURL()));
 		    mmClient = new MatchMakingClient(manager);
