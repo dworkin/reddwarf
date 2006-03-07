@@ -373,12 +373,12 @@ public class SimulationImpl implements Simulation {
 
     protected void fireUserLeft(UserID uid) {
 	try {
-	    Method userLeftChannelMethod = loader.loadClass(
+	    Method userLeftMethod = loader.loadClass(
 		    "com.sun.gi.logic.SimUserListener").getMethod("userLeft",
 			new Class[] { UserID.class });
 	    Object[] params = { uid };
 	    for (Long gloID : userListeners) {
-		queueTask(newTask(gloID, userLeftChannelMethod, params));
+		queueTask(newTask(gloID, userLeftMethod, params));
 	    }
 	} catch (SecurityException e) {
 
@@ -394,12 +394,12 @@ public class SimulationImpl implements Simulation {
 
     protected void fireUserJoined(UserID uid, Subject subject) {
 	try {
-	    Method userLeftChannelMethod = loader.loadClass(
+	    Method userJoinedMethod = loader.loadClass(
 		    "com.sun.gi.logic.SimUserListener").getMethod("userJoined",
 			new Class[] {  UserID.class, Subject.class });
 	    Object[] params = { uid, subject };
 	    for (Long gloID : userListeners) {
-		queueTask(newTask(gloID, userLeftChannelMethod, params));
+		queueTask(newTask(gloID, userJoinedMethod, params));
 	    }
 	} catch (SecurityException e) {
 
