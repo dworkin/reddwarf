@@ -44,7 +44,7 @@
 
     <target name="clean">
 	<delete dir="bin" />
-	<delete>
+	<delete quiet="true">
 	  <fileset dir="release" includes="**/*.jar"/>
 	</delete>
     </target>
