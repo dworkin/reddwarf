@@ -87,6 +87,12 @@ sub play {
 		    wait;
 		    return 0;
 		}
+		elsif ($line =~ /Connection refused/) {
+		    close Reader;
+		    close Writer;
+		    wait;
+		    return -1;
+		}
 	    }
 	}
     }
