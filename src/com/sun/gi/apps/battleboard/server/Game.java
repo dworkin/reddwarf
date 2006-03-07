@@ -360,25 +360,9 @@ public class Game implements GLO {
 
 	broadcast(buf);
 
-	// If the bombed player has lost, make them a spectator
+	// If the bombed player has lost, do extra processing
 	if (board.lost()) {
-	    playerBoards.remove(bombedPlayerNick);
-	    Iterator<GLOReference<Player>> i = players.iterator();
-	    while (i.hasNext()) {
-		GLOReference<Player> ref = i.next();
-		Player p = ref.peek(task);
-		if (bombedPlayerNick.equals(p.getPlayerName())) {
-		    spectators.add(ref);
-		    i.remove();
-		}
-	    }
-
-	    GLOReference<PlayerHistory> historyRef = 
-		    nameToHistory.get(bombedPlayerNick);
-	    PlayerHistory history = historyRef.get(task);
-	    history.lose();
-
-	    log.fine(bombedPlayerNick + " summary: " + history.toString());
+	    handlePlayerLoss(bombedPlayerNick);
 	}
 
 	/*
@@ -415,6 +399,37 @@ public class Game implements GLO {
 	}
 
 	startNextMove();
+    }
+
+    protected void handlePlayerLoss(String loserNick) {
+	SimTask task = SimTask.getCurrent();
+
+	playerBoards.remove(loserNick);
+
+	Iterator<GLOReference<Player>> i = players.iterator();
+	Player loser = null;
+	while (i.hasNext()) {
+	    GLOReference<Player> ref = i.next();
+	    Player player = ref.peek(task);
+	    if (loserNick.equals(player.getPlayerName())) {
+		loser = player;
+		spectators.add(ref);
+		i.remove();
+	    }
+	}
+
+	if (loser == null) {
+	    log.severe("Can't find losing Player nicknamed `" +
+		    loserNick + "'");
+	    return;
+	}
+
+	GLOReference<PlayerHistory> historyRef = 
+		nameToHistory.get(loser.getUserName());
+	PlayerHistory history = historyRef.get(task);
+	history.lose();
+
+	log.fine(loserNick + " summary: " + history.toString());
     }
 
     protected void handleResponse(GLOReference<Player> playerRef,
