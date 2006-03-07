@@ -299,8 +299,8 @@
 	</java>
     </target>
 
-    <target name="MatchMakerClientTest">
-	<java classname="com.sun.gi.apps.mcs.matchmaker.client.test.MatchMakerClientTest" failonerror="true" fork="true">
+    <target name="MatchMakerClientTestUI">
+	<java classname="com.sun.gi.apps.mcs.matchmaker.client.test.MatchMakerClientTestUI" failonerror="true" fork="true">
 	    <classpath refid="project.classpath" />
 	    <sysproperty key="java.util.logging.config.file"
 			 file="logging.properties" />
@@ -373,7 +373,7 @@
     <target name="release.clients" depends="build.clients"/>
 
     <target name="release.apps"
-	depends="release.trivialboot,release.timertest,release.chattest,release.jeffboard,release.battleboard,release.glotest">
+	depends="release.trivialboot,release.timertest,release.chattest,release.jeffboard,release.battleboard,release.glotest,release.matchmaker">
     </target>
 
     <target name="release.trivialboot" depends="build.trivial">
@@ -412,9 +412,9 @@
     </target>
 
     <target name="release.matchmaker" depends="build.matchmaker">
-	<jar destfile="release/apps/matchmaker/MatchMakerTest.jar"
+	<jar destfile="release/apps/matchmaker/MatchMaker.jar"
 	    basedir="bin" includes="com/sun/gi/apps/mcs/matchmaker/server/**" />
-	<copy file="resources/matchmakertest_deployment.xml"
+	<copy file="resources/matchmaker_deployment.xml"
 	    todir="release/apps/matchmaker" />
 	<copy file="resources/matchmaker_config.xml"
 	    todir="release/apps/matchmaker" />
