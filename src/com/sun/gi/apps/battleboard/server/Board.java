@@ -43,9 +43,11 @@ import com.sun.gi.logic.GLO;
 
 /**
  * A Board represents the state of a single Players board in a
- * particular Game of BattleBoard.  It supports the same interface and
- * semantics as a client-side board representation, but implements the
- * GLO interface so it can be made persistence.
+ * particular Game of BattleBoard.  <p>
+ *
+ * This is a trivial extension of {@link BattleBoard} to implement the
+ * GLO interface so that it can be made persistant and managed by the
+ * ObjectStore.
  */
 public class Board extends BattleBoard implements GLO {
     private static final long serialVersionUID = 1L;

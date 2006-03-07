@@ -131,7 +131,7 @@ public class Matchmaker implements /* ChannelListener */ GLO {
 
     // Handle the "join" command in matchmaker mode
     public void userDataReceived(UserID uid, ByteBuffer data) {
-	log.info("Matchmaker: data from user " + uid);
+	log.fine("Matchmaker: data from user " + uid);
 
 	byte[] bytes = new byte[data.remaining()];
 	data.get(bytes);
@@ -143,7 +143,7 @@ public class Matchmaker implements /* ChannelListener */ GLO {
 	}
 
 	final String playerName = command.substring(5);
-	log.info("Matchmaker: join from `" + playerName + "'");
+	log.fine("Matchmaker: join from `" + playerName + "'");
 
 	SimTask task = SimTask.getCurrent();
 	for (GLOReference<Player> ref : waitingPlayers) {

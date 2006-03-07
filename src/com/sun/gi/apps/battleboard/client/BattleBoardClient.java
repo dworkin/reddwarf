@@ -36,8 +36,7 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
     private static Pattern wsRegexp = Pattern.compile("\\s");
     private State state = State.CONNECTING;
 
-    private String myPlayerName = "player";
-
+    
     // private Callback[] validationCallbacks = null;
     // private byte[] serverID = null;
 
@@ -45,6 +44,28 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
 	CONNECTING,
 	JOINING_GAME
     }
+
+    /*
+     * Allow the user to control some aspects of the system from the
+     * commandline rather than interactively.
+     *
+     * The properties battleboard.userName, battleboard.userPassword,
+     * and battleboard.playerName can be used to specify the user
+     * name, password, and player name, respectively.
+     *
+     * If the "battleboard.interactive" property is "false", then
+     * append a newline to each prompt.  This makes it considerably
+     * easier to attach the client to a line-oriented test harness.
+     */
+
+    private String userName = System.getProperty(
+	    "battleboard.userName", null);
+    private String userPassword = System.getProperty(
+	    "battleboard.userPassword", null);
+    private String playerName = System.getProperty(
+	    "battleboard.playerName", null);
+    private static boolean nonInteractive = "false".equals(
+	    System.getProperty("battleboard.interactive", "true"));
 
     public BattleBoardClient() { }
 
@@ -67,21 +88,32 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
 
     protected void showPrompt(String prompt) {
 	System.out.print(prompt + ": ");
+	if (nonInteractive) {
+	    System.out.println();
+	}
 	System.out.flush();
     }
 
     public void visitNameCallback(NameCallback cb) {
 	log.finer("visitNameCallback");
-	showPrompt(cb.getPrompt());
-	String line = getLine();
-        myPlayerName = wsRegexp.matcher(line).replaceAll("");
-	cb.setName(line);
+	if (userName != null) {
+	    cb.setName(userName);
+	} else {
+	    showPrompt(cb.getPrompt());
+	    String line = getLine();
+	    userName = wsRegexp.matcher(line).replaceAll("");
+	    cb.setName(line);
+	}
     }
 
     public void visitPasswordCallback(PasswordCallback cb) {
 	log.finer("visitPasswordCallback");
-	showPrompt(cb.getPrompt());
-	cb.setPassword(getLine().toCharArray());
+	if (userPassword != null) {
+	    cb.setPassword(userPassword.toCharArray());
+	} else {
+	    showPrompt(cb.getPrompt());
+	    cb.setPassword(getLine().toCharArray());
+	}
     }
 
     // ClientConnectionManagerListener methods
@@ -91,7 +123,10 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
 
 	for (Callback cb : callbacks) {
 	    try {
-		if (cb instanceof NameCallback) {
+		if (cb == null) {
+		    // shouldn't happen.
+		    log.warning("null callback");
+		} else if (cb instanceof NameCallback) {
 		    visitNameCallback((NameCallback) cb);
 		} else if (cb instanceof PasswordCallback) {
 		    visitPasswordCallback((PasswordCallback) cb);
@@ -105,7 +140,7 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
     }
 
     protected void sendJoinReq(ClientChannel chan) {
-	String cmd = "join " + myPlayerName;
+	String cmd = "join " + playerName;
 	ByteBuffer buf = ByteBuffer.wrap(cmd.getBytes());
 	buf.position(buf.limit());
 	mgr.sendToServer(buf, true);
@@ -191,11 +226,20 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
 
 	if (channel.getName().equals("matchmaker")) {
 
-	    showPrompt("Enter your handle [" + myPlayerName + "]");
-	    String line = getLine();
-	    if (line.length() > 0) {
-		// Spaces aren't allowed
-		myPlayerName = wsRegexp.matcher(line).replaceAll("");
+	    if (playerName == null) {
+
+		/*
+		 * If the user hasn't provided a playerName, offer
+		 * that they use their userName as their playerName.
+		 */
+
+		playerName = userName;
+		showPrompt("Enter your handle [" + userName + "]");
+		String line = getLine();
+		if (line.length() > 0) {
+		    // Spaces aren't allowed
+		    playerName = wsRegexp.matcher(line).replaceAll("");
+		}
 	    }
 
 	    channel.setListener(new ClientChannelListener() {
@@ -230,7 +274,7 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
 	// Ok, must be a new game channel we've joined
 	if (state == State.JOINING_GAME) {
 	    channel.setListener(
-		new BattleBoardPlayer(mgr, channel, myPlayerName));
+		new BattleBoardPlayer(mgr, channel, playerName));
 	}
     }
 

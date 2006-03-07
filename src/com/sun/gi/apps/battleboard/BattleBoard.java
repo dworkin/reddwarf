@@ -9,6 +9,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
 
+/**
+ * A simple representation of a BattleBoard game board.
+ */
 public class BattleBoard implements Serializable {
 
     public class BattleBoardLocation {
@@ -138,6 +141,9 @@ public class BattleBoard implements Serializable {
 	int count = startCities;
 
 	/*
+	 * Randomly picks a location and, if there isn't already a
+	 * city there, places a city there and then repeats.
+	 * 
 	 * This method is not efficient if the number of cities is
 	 * more than half the total number of positions -- but usually
 	 * the number of cities is a small fraction of the number of
@@ -345,19 +351,26 @@ public class BattleBoard implements Serializable {
      *
      * @return <code>true</code> if the given position is a near miss,
      * <code>false</code> otherwise
+     *
+     * @throws IllegalArgumentException if either of <em>x</em> or
+     * <em>y</em> is outside the board
      */
     public boolean isNearMiss(int x, int y) {
-
-	// Double-check for off-by-one errors!
-
-	int min_x = (x <= 0) ? x : x - 1;
-	int min_y = (y <= 0) ? y : y - 1;
-	int max_x = (x >= (getWidth() - 1)) ? x : x + 1;
-	int max_y = (y >= (getHeight() - 1)) ? y : y + 1;
+	if ((x < 0) || (x >= boardWidth)) {
+	    throw new IllegalArgumentException("illegal x: " + x);
+	}
+	if ((y < 0) || (y >= boardHeight)) {
+	    throw new IllegalArgumentException("illegal y: " + y);
+	}
 
 	if (isHit(x, y)) {
 	    return false;
 	}
+
+	int min_x = (x == 0) ? x : x - 1;
+	int min_y = (y == 0) ? y : y - 1;
+	int max_x = (x == (getWidth() - 1)) ? x : x + 1;
+	int max_y = (y == (getHeight() - 1)) ? y : y + 1;
 
 	for (int i = min_x; i <= max_x; i++) {
 	    for (int j = min_y; j <= max_y; j++) {

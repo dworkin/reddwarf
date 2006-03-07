@@ -135,6 +135,7 @@ public class TextDisplay implements Display {
 	    System.out.print("  ");
 	}
 	System.out.println();
+	System.out.flush();
     }
 
     /**
@@ -167,6 +168,7 @@ public class TextDisplay implements Display {
 	    System.out.print(" " + i + " ");
 	}
 	System.out.println();
+	System.out.flush();
     }
 
     /**
@@ -177,6 +179,7 @@ public class TextDisplay implements Display {
 	    throw new NullPointerException("message is null");
 	}
 	System.out.print(message);
+	System.out.println();
 	System.out.flush();
     }
 
@@ -193,7 +196,7 @@ public class TextDisplay implements Display {
 		return move;
 	    } else if (move.length == 3) {
 		if (!players.contains(move[0])) {
-		    message("Player " + move[0] + "is not in the game.");
+		    message("Player " + move[0] + " is not in the game.");
 		} else {
 		    int x = (int) new Integer(move[1]);
 		    int y = (int) new Integer(move[2]);
@@ -241,6 +244,7 @@ public class TextDisplay implements Display {
 	    System.out.print("     ");
 	}
 	System.out.println();
+	System.out.flush();
     }
 
     /**
@@ -286,12 +290,14 @@ public class TextDisplay implements Display {
 
 	for (;;) {
 	    System.out.print(prompt);
+	    System.out.println();
 	    System.out.flush();
 
 	    try {
 		commandline = getKeyboardLine();
 	    } catch (IOException e) {
 		System.out.println("Unexpected exception: " + e);
+		System.out.flush();
 		return new String[0];
 	    }
 

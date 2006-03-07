@@ -8,8 +8,8 @@ import com.sun.gi.apps.battleboard.BattleBoard;
 import java.util.List;
 
 /**
- * An interface defining a very simple display for the BattleBoard
- * game.
+ * An interface defining a very simple display abstraction for the
+ * BattleBoard game client.
  */
 public interface Display {
 
@@ -41,15 +41,13 @@ public interface Display {
 
     /**
      * Gets a move from the user and returns the Strings corresponding
-     * to the tokens in that move. <p>
+     * to the tokens in that move.  <p>
      *
      * This method is responsible for validating the input provided by
      * the user; it should not return until it has valid input.
      *
-     * @return an array of Strings representing the operator ("pass" or
-     * the name of the player to bomb) and the operands.
-     *
-     * @see BattleBoardPlayer.yourMove
+     * @return an array of Strings representing the operator ("pass"
+     * or the name of the player to bomb) and the operands.
      */
     String[] getMove();
 }

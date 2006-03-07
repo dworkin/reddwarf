@@ -48,6 +48,16 @@ public class BattleBoardPlayer implements ClientChannelListener {
 
     private GameState gameState = GameState.NEED_BOARD;
 
+    /**
+     * Creates a BattleBoard player instance for the given connectionManager,
+     * ClientChannel, and player name. <p>
+     *
+     * @param connectionManager the ClientConnectionManager for this game
+     *
+     * @param chan the ClientChannel for this game
+     *
+     * @param playerName the name of the player
+     */
     public BattleBoardPlayer(ClientConnectionManager connectionManager,
 	    ClientChannel chan, String playerName)
     {
@@ -57,17 +67,10 @@ public class BattleBoardPlayer implements ClientChannelListener {
 
 	/*
 	 * We don't have all the info we need to create the display at
-	 * this point.
+	 * this point, so we do not initialize the display yet.
 	 */ 
 
 	this.display = null;
-    }
-
-    /**
-     * Used only for standalone tests.
-     */
-    BattleBoardPlayer(String playerName) {
-	this(null, null, playerName);
     }
 
     /**
@@ -88,9 +91,6 @@ public class BattleBoardPlayer implements ClientChannelListener {
      * {@inheritDoc}
      */
     public void dataArrived(byte[] uid, ByteBuffer data, boolean reliable) {
-
-	// XXX: sanity checks?
-
 	log.fine("dataArrived on " + channel.getName());
 
 	byte[] bytes = new byte[data.remaining()];
@@ -103,13 +103,6 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	if (tokens.length == 0) {
 	    log.warning("empty message");
 	    return;
-	}
-
-	if (log.isLoggable(Level.FINER)) {
-	    int pos = 0;
-	    for (String t : tokens) {
-		log.finer("\tpos = " + pos++ + " token = " + t);
-	    }
 	}
 
 	playGame(tokens);
@@ -163,12 +156,12 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	 * If there's only one player left, that last remaining player
 	 * is the winner.
 	 */
+
 	if (playerBoards != null && playerBoards.size() == 1) {
 	    if (myName.equals(playerBoards.get(0).getPlayerName())) {
-		display.message("YOU WIN!\n");
+		display.message("YOU WIN!");
 	    } else {
-		display.message(playerBoards.get(0).getPlayerName() +
-			" WINS!\n");
+		display.message(playerBoards.get(0).getPlayerName() + " WINS!");
 	    }
 	    gameState = GameState.GAME_OVER;
 	    connectionManager.disconnect();
@@ -283,7 +276,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
      * Implements the operations for the "move-started" message, for
      * the player whose move it is. <p>
      *
-     * Note that the {@link Display.getMove getMove} is responsible
+     * Note that the {@link Display#getMove getMove} is responsible
      * for validating the input, and therefore there is no checking
      * here.  If the client sends a bad move to the server, the server
      * will detect the error and substitute a "pass". <p>
@@ -293,7 +286,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
      */
     private GameState yourTurn() {
 	display.showBoards(myName);
-	display.message("Your move!\n");
+	display.message("Your move!");
 
 	String[] move = display.getMove();
 
@@ -313,8 +306,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	    buf.position(buf.limit());
 	    connectionManager.sendToServer(buf, true);
 	} else {
-	    display.message(
-		    "Improperly formatted move.  Passing instead....\n");
+	    display.message("Improper move.  Passing instead....");
 	    ByteBuffer buf = ByteBuffer.wrap("pass".getBytes());
 	    buf.position(buf.limit());
 	    connectionManager.sendToServer(buf, true);
@@ -349,7 +341,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	}
 
 	display.showBoards(currPlayer);
-	display.message(currPlayer + " is making a move...\n");
+	display.message(currPlayer + " is making a move...");
 	return GameState.END_MOVE;
     }
 
@@ -383,7 +375,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	    }
 	    log.fine(currPlayer + " passed");
 
-	    display.message(currPlayer + " passed.\n");
+	    display.message(currPlayer + " passed.");
 	    return GameState.BEGIN_MOVE;
 	} else if ("bomb".equals(action)) {
 	    if (args.length != 7) {
@@ -414,7 +406,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
 	    log.fine(bombedPlayer + " bombed ("
 		    + x + ", " + y + ") with outcome " + outcome);
 	    display.message(currPlayer + " bombed " + bombedPlayer +
-		    " at " + x + "," + y + " with outcome " + outcome + "\n");
+		    " at " + x + "," + y + " with outcome " + outcome);
 
 	    if ("HIT".equals(outcome) || "LOSS".equals(outcome)) {
 		board.update(x, y, BattleBoard.PositionValue.HIT);
@@ -425,18 +417,18 @@ public class BattleBoardPlayer implements ClientChannelListener {
 		    playerNames.remove(bombedPlayer);
 		    display.removePlayer(bombedPlayer);
 		    if (bombedPlayer.equals(myName)) {
-			display.message("You lose!\n");
-			display.message("Better luck next time.\n");
+			display.message("You lose!");
+			display.message("Better luck next time.");
 			lost = true;
 		    } else {
 			display.message(bombedPlayer +
-				" lost their last city.\n");
+				" lost their last city.");
 		    }
 		} else {
 		    if (bombedPlayer.equals(myName)) {
-			display.message("You just lost a city!\n");
+			display.message("You just lost a city!");
 		    } else {
-			display.message(bombedPlayer + " lost a city.\n");
+			display.message(bombedPlayer + " lost a city.");
 		    }
 		}
 	    } else if ("NEAR_MISS".equals(outcome)) {

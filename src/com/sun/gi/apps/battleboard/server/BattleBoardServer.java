@@ -47,6 +47,9 @@ import java.util.logging.Logger;
 import javax.security.auth.Subject;
 
 /**
+ * The BattleBoard server. <p>
+ *
+ * There's not much to this class: 
  */
 public class BattleBoardServer
 	implements SimBoot<BattleBoardServer>, SimUserListener
@@ -83,16 +86,27 @@ public class BattleBoardServer
 
 	log.info("Booting BattleBoard Server as appID " + task.getAppID());
 
-	// Get a reference to this object as a GLO
+	/*
+	 * firstBoot is true if and only if this is the first time the
+	 * boot method has been called for this app on this system (or
+	 * if evidence that the app has already been started has been
+	 * removed -- for example if someone removes all the data
+	 * associated with this app from the ObjectStore).  Therefore
+	 * when firstBoot is true, we do all the initialization.
+	 *
+	 * For this app, initialization is very simple:  all we need
+	 * to do is to create the matchmaker.
+	 */
+
 	if (firstBoot) {
-	    // Since firstBoot is called exactly once, when the
-	    // database is empty, this is the only time we need
-	    // to create the matchmaker object.
 	    Matchmaker.create();
 	}
 
-        // Register this object as the handler for login- and
-	// disconnect-events for all users on this app.
+        /*
+	 * Register this object as the handler for login and
+	 * disconnect events for all users on this app.
+	 */
+
 	task.addUserListener(thisGLO);
     }
 

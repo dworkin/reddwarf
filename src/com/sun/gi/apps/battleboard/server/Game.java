@@ -80,12 +80,14 @@ public class Game implements GLO {
      *
      * For the sake of simplicity, this implementation does not
      * support different numbers of players and/or different board
-     * sizes.
+     * sizes.  These would not be hard to change; just change the call
+     * to createBoard to create a board of the desired size and number
+     * of cities.
      */
 
-    private static int DEFAULT_BOARD_WIDTH  = 8;
-    private static int DEFAULT_BOARD_HEIGHT = 8;
-    private static int DEFAULT_BOARD_CITIES = 2;
+    private int defaultBoardWidth  = 8;
+    private int defaultBoardHeight = 8;
+    private int defaultNumCities   = 2;
 
     /**
      * Creates a new BattleBoard game object for a set of players. <p>
@@ -151,6 +153,7 @@ public class Game implements GLO {
 	    Player p = playerRef.get(task);
 	    p.gameStarted(thisRef);
 	}
+	// XXX: ?
 	//task.addChannelMembershipListener(channel, thisRef);
 
 	sendJoinOK();
@@ -162,7 +165,7 @@ public class Game implements GLO {
 	SimTask task = SimTask.getCurrent();
 
 	Board board = new Board(playerName,
-	    DEFAULT_BOARD_WIDTH, DEFAULT_BOARD_HEIGHT, DEFAULT_BOARD_CITIES);
+	    defaultBoardWidth, defaultBoardHeight, defaultNumCities);
 
 	board.populate();
 
@@ -268,7 +271,7 @@ public class Game implements GLO {
 	ByteBuffer byteBuffer = ByteBuffer.wrap(buf.toString().getBytes());
 	byteBuffer.position(byteBuffer.limit());
 
-	log.info("Game: Broadcasting " + byteBuffer.position() +
+	log.fine("Game: Broadcasting " + byteBuffer.position() +
 	    " bytes on " + channel);
 
 	task.sendData(channel, uids, byteBuffer.asReadOnlyBuffer(), true);
@@ -283,7 +286,7 @@ public class Game implements GLO {
 
     protected void startNextMove() {
 	SimTask task = SimTask.getCurrent();
-	log.info("Running Game.startNextMove");
+	log.fine("Running Game.startNextMove");
 
 	currentPlayerRef = players.removeFirst();
 	players.addLast(currentPlayerRef);
@@ -375,7 +378,7 @@ public class Game implements GLO {
 	    PlayerHistory history = historyRef.get(task);
 	    history.lose();
 
-	    log.info(bombedPlayerNick + " summary: " + history.toString());
+	    log.fine(bombedPlayerNick + " summary: " + history.toString());
 	}
 
 	/*
@@ -460,13 +463,13 @@ public class Game implements GLO {
      * Handle data that was sent directly to the server.
      */
     public void userDataReceived(UserID uid, ByteBuffer data) {
-	log.info("Game: Direct data from user " + uid);
+	log.fine("Game: Direct data from user " + uid);
 
 	byte[] bytes = new byte[data.remaining()];
 	data.get(bytes);
 	String text = new String(bytes);
 
-	log.info("userDataReceived: (" + text + ")");
+	log.fine("userDataReceived: (" + text + ")");
 	String[] tokens = text.split("\\s+");
 	if (tokens.length == 0) {
 	    log.warning("empty message");
@@ -482,14 +485,14 @@ public class Game implements GLO {
     // SimChannelMembershipListener methods
 
     /**
-     * {@inheritDoc}
+     * XXX
      */
     public void joinedChannel(ChannelID cid, UserID uid) {
 	log.info("Game: User " + uid + " joined channel " + cid);
     }
 
     /**
-     * {@inheritDoc}
+     * XXX
      */
     public void leftChannel(ChannelID cid, UserID uid) {
 	log.info("Game: User " + uid + " left channel " + cid);

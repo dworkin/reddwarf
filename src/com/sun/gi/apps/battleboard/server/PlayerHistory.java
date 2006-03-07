@@ -57,11 +57,9 @@ public class PlayerHistory implements GLO {
      *
      * Each player should have exactly one PlayerHistory object
      * created for their name.  This is not enforced here; it is
-     * enforced in {@link Player.gameStarted gameStarted}, which only
+     * enforced in {@link Player#gameStarted gameStarted}, which only
      * creates new PlayerHistory instances for players for which it
      * cannot find a PlayerHistory GLO.
-     *
-     * {@see Player.gameStarted}
      *
      * @param name the player name
      */

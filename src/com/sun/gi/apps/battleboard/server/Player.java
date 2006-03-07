@@ -241,7 +241,7 @@ public class Player implements SimUserDataListener {
     }
 
     public void userDataReceived(UserID uid, ByteBuffer data) {
-	log.info("Player: User " + uid + " direct data");
+	log.fine("Player: User " + uid + " direct data");
 
 	if (! uid.equals(myUserID)) {
 	    log.warning("Player: Got UID " + uid + " expected " + myUserID);
