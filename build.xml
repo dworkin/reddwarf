@@ -119,15 +119,16 @@
 		deprecation="${deprecated}">
 	    <!-- <compilerarg value="-Xlint:unchecked"/> -->
 	    <classpath refid="project.classpath" />
-		<include name= "com/sun/gi/comm/users/client/**" />
-		<include name= "com/sun/gi/comm/users/protocol/**" />
-		<include name= "com/sun/gi/validation/**" />
+		<include name = "com/sun/gi/comm/users/client/**" />
+		<include name = "com/sun/gi/comm/users/protocol/**" />
+		<include name = "com/sun/gi/validation/**" />
 		<include name = "com/sun/gi/comm/discovery/**" />
 		<include name = "com/sun/gi/utils/nio/**" />
+		<include name = "com/sun/gi/utils/types/**" />
 	</javac>
     </target>
 
-    <target name="build.clients" depends="init">
+    <target name="build.clients" depends="build.j2seAPI">
 	<echo message="${ant.project.name}: ${ant.file}" />
 	<javac srcdir="src" destdir="bin" source="5" target="5"
 		debug="${debug}" optimize="${optimize}"
@@ -247,6 +248,7 @@
 	<java dir="release" classname="com.sun.gi.SGS" failonerror="true" fork="yes">
 	    <arg value="-C"/>
 	    <arg value="-V"/>
+	    <arg value="file:JNWN-server.txt" />
 	    <classpath refid="project.classpath"/>
 	    <classpath location="NWNSupport.jar"/>
 	    <classpath location="genesisfx.jar"/>
