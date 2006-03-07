@@ -85,8 +85,8 @@ public class Game implements GLO {
      * of cities.
      */
 
-    private int defaultBoardWidth  = 8;
-    private int defaultBoardHeight = 8;
+    private int defaultBoardWidth  = 2;
+    private int defaultBoardHeight = 2;
     private int defaultNumCities   = 2;
 
     /**

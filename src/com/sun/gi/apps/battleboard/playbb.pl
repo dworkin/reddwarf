@@ -104,6 +104,7 @@ sub play {
 		    return 0;
 		}
 		elsif ($line =~ /is not in the game\.$/) {
+		    kill "TERM", $pid;
 		    close Reader;
 		    close Writer;
 		    wait;
