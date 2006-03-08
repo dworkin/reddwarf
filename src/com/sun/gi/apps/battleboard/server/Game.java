@@ -46,12 +46,12 @@ import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask;
 import java.nio.ByteBuffer;
-import java.util.Set;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -71,7 +71,7 @@ public class Game implements GLO {
     private static final long serialVersionUID = 1;
 
     private static Logger log =
-	Logger.getLogger("com.sun.gi.apps.battleboard.server");
+	    Logger.getLogger("com.sun.gi.apps.battleboard.server");
 
     private String gameName;
     private ChannelID channel;
@@ -135,7 +135,14 @@ public class Game implements GLO {
 	task.lock(channel, true);
     }
 
-    public static GLOReference create(Set<GLOReference<Player>> players) {
+    /**
+     * Creates a new Game object for the given players.
+     *
+     * @param the set of GLOReferences to players
+     *
+     * @return the GLOReference for a new Game
+     */
+    public static GLOReference<Game> create(Set<GLOReference<Player>> players) {
 	SimTask task = SimTask.getCurrent();
 	GLOReference<Game> ref = task.createGLO(new Game(players));
 
@@ -174,7 +181,7 @@ public class Game implements GLO {
 	board.populate();
 
 	GLOReference<Board> ref = task.createGLO(board,
-	    gameName + "-board-" + playerName);
+		gameName + "-board-" + playerName);
 
 	log.finer("createBoard[" + playerName + "] returning " + ref);
 	return ref;
@@ -276,7 +283,7 @@ public class Game implements GLO {
 	byteBuffer.position(byteBuffer.limit());
 
 	log.finest("Game: Broadcasting " + byteBuffer.position() +
-	    " bytes on " + channel);
+		" bytes on " + channel);
 
 	task.sendData(channel, uids, byteBuffer.asReadOnlyBuffer(), true);
     }
@@ -529,5 +536,4 @@ public class Game implements GLO {
     public void leftChannel(ChannelID cid, UserID uid) {
 	log.finer("Game: User " + uid + " left channel " + cid);
     }
-
 }

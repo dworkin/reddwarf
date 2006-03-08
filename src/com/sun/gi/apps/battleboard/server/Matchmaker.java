@@ -51,12 +51,24 @@ import java.util.Set;
 import java.util.logging.Logger;
 
 /**
- * Matchmaker is responsible for collecting Players together until there
- * are enough to start a new Game.  This very basic implementation starts
- * a new game as soon as a globally-defined group size arrives.  More
- * sophisticated implementations would allow players to specify constraints
- * on the games they wish to play, and the Matchmaker would attempt
- * to satisfy those constraints when placing players onto Games.
+ * Matchmaker is responsible for collecting Players together until
+ * there are enough to start a new Game.  <p>
+ *
+ * This very basic implementation starts a new game as soon as
+ * <code>PLAYERS_PER_GAME</code> players have arrived.  More
+ * sophisticated implementations would allow players to specify
+ * constraints on the games (for example, if there are other players
+ * that prefer to play together, or if players are ranked and want to
+ * play against players of roughly equal skill, etc) and the
+ * Matchmaker would attempt to satisfy those constraints when placing
+ * players into Games.  <p>
+ *
+ * Users specify what playerName they wish to use.  In this example,
+ * there is no persistant binding between a user and a playerName; a
+ * user can use as many different playerNames as he or she wishes, and
+ * different users can use the same playerName.  The only restriction
+ * is that all of the playerNames joined into a particular game must
+ * be unique. XXX: DJE: is that correct?
  */
 public class Matchmaker implements GLO {
 
@@ -65,14 +77,14 @@ public class Matchmaker implements GLO {
     private static Logger log =
 	Logger.getLogger("com.sun.gi.apps.battleboard.server");
 
-    protected static final String MATCHMAKER_GLO_NAME = "matchmaker";
+    private static final String MATCHMAKER_GLO_NAME = "matchmaker";
 
-    protected final ChannelID channel;
+    private final ChannelID channel;
 
-    protected int PLAYERS_PER_GAME = 2;
+    private int PLAYERS_PER_GAME = 2;
 
-    protected Set<GLOReference<Player>> waitingPlayers =
-	new HashSet<GLOReference<Player>>();
+    private Set<GLOReference<Player>> waitingPlayers =
+	    new HashSet<GLOReference<Player>>();
 
     public static Matchmaker get() {
 	SimTask task = SimTask.getCurrent();
@@ -82,10 +94,15 @@ public class Matchmaker implements GLO {
     public static GLOReference<Matchmaker> create() {
 	SimTask task = SimTask.getCurrent();
 
-	// Paranoid check for pre-existing matchmaker object.
-	// In BattleBoard, this isn't necessary because only the
-	// boot object creates the matchmaker, and it does so
-	// with a mutex (or "GET-lock" held).
+	/*
+	 * Check for pre-existing matchmaker object.
+	 *
+	 * In BattleBoard, this isn't necessary because only the boot
+	 * object is supposed to call this method in order to create
+	 * the matchmaker, and it does so with a mutex (or "GET-lock"
+	 * held).  But better safe than sorry...
+	 */
+
 	GLOReference<Matchmaker> ref = task.findGLO(MATCHMAKER_GLO_NAME);
 	if (ref != null) {
 	    log.severe("matchmaker GLO already exists");
@@ -94,33 +111,51 @@ public class Matchmaker implements GLO {
 
 	ref = task.createGLO(new Matchmaker(), MATCHMAKER_GLO_NAME);
 
-	// More paranoia; for the reasons above, this particular
-	// use of createGLO must succeed, so this isn't needed.
+	/*
+	 * More extra caution:  for the reasons given above, this
+	 * particular use of createGLO will succeed (unless something
+	 * is terribly wrong), so this is purely defensive against
+	 * errors elsewhere.
+	 */
+
 	if (ref == null) {
-	    GLOReference<Matchmaker> ref2 = task.findGLO(MATCHMAKER_GLO_NAME);
-	    if (ref2 == null) {
-		log.severe("createGLO failed");
-		throw new RuntimeException("createGLO failed");
+	    ref = task.findGLO(MATCHMAKER_GLO_NAME);
+	    if (ref == null) {
+		log.severe("matchmaker createGLO failed");
+		throw new RuntimeException("matchmaker createGLO failed");
 	    } else {
-		log.severe("lost createGLO race");
-		return ref2;
+		log.severe("matchmaker GLO creation race");
 	    }
 	}
 
 	return ref;
     }
 
+    /**
+     * Creates the matchmaker channel so we can talk to non-playing
+     * clients.
+     */
     protected Matchmaker() {
-	// Create the matchmaker channel so we can talk to non-playing clients
 	SimTask task = SimTask.getCurrent();
 	channel = task.openChannel("matchmaker");
 	task.lock(channel, true);
     }
 
+    /**
+     * Adds a new user to the channel.
+     *
+     * @param uid the UserID of the new user
+     */
     public void addUserID(UserID uid) {
 	SimTask.getCurrent().join(uid, channel);
     }
 
+    /**
+     * Informs the user that a player with the same player name that
+     * they have requested is already waiting to join a game.  <p>
+     *
+     * @param uid the UserID of the user
+     */
     protected void sendAlreadyJoined(UserID uid) {
 	ByteBuffer byteBuffer = ByteBuffer.wrap("already-joined".getBytes());
 	byteBuffer.position(byteBuffer.limit());
@@ -128,70 +163,113 @@ public class Matchmaker implements GLO {
 	task.sendData(channel, new UserID[] { uid }, byteBuffer, true);
     }
 
-    // Handle the "join" command in matchmaker mode
+    /**
+     * Dispatches messages from users.  <p>
+     *
+     * For a simple matchmaker like this one, the only expected
+     * message is a request to "join".  Messages that do not begin
+     * with the prefix <code>"join"</code> are rejected out of hand.
+     *
+     * @param uid the UserID of the user from whom the message is
+     *
+     * @param data the contents of the message
+     */
     public void userDataReceived(UserID uid, ByteBuffer data) {
 	log.fine("Matchmaker: data from user " + uid);
 
 	byte[] bytes = new byte[data.remaining()];
 	data.get(bytes);
-	String command = new String(bytes);
+	String text = new String(bytes);
 
-	if (!command.startsWith ("join ")) {
+	String[] tokens = text.split("\\s+");
+	if (tokens.length == 0) {
+	    log.warning("empty message");
+	    return;
+	}
+
+	if (tokens.length != 2) {
+	    log.warning("bad join (" + text + ")");
+	    return;
+	}
+
+	String command = tokens[0];
+	String playerName = tokens[1];
+
+	if (!"join".equals(command)) {
 	    log.warning("Matchmaker got non-join command: `" + command + "'");
 	    return;
 	}
 
-	final String playerName = command.substring(5);
 	log.fine("Matchmaker: join from `" + playerName + "'");
+
+	/* XXX:  DJE:  this is confusing:  can we not have two users
+	 * with the same playerName WAITING, but there could be two
+	 * users using the same playerName but in two different games? 
+	 * I'm not sure I like that.
+	 */
+
+	/*
+	 * Before adding this user under the given playerName, check
+	 * that the playerName is not already in use.  If so, then
+	 * reject the join.
+	 */
 
 	SimTask task = SimTask.getCurrent();
 	for (GLOReference<Player> ref : waitingPlayers) {
-	    Player p = ref.peek(task);
-	    if (playerName.equals(p.getPlayerName())) {
+	    Player player = ref.peek(task);
+	    if (playerName.equals(player.getPlayerName())) {
 		log.warning("Matchmaker already has `" + playerName);
 		sendAlreadyJoined(uid);
 		return;
 	    }
-
 	}
+
+	/*
+	 * Get a reference to the player object for this user, set the
+	 * name of that player to playerName, and add the playerRef to
+	 * the set of waiting players.
+	 */
 
 	GLOReference<Player> playerRef = Player.getRef(uid);
 	Player player = playerRef.get(task);
 	player.setPlayerName(playerName);
-
 	waitingPlayers.add(playerRef);
 
-	// A less lock-holding technique would be to queue a new
-	// task to check whether we have a game togther --
-	// we hold the lock on this player, but they might not be
-	// involved in the next game we spawn with current waiters.
-	// For now, just keep this player's lock.
+	/*
+	 * If there are enough players waiting, create a game.
+	 *
+	 * Another technique would be to queue a new task to check
+	 * whether we have enough players to create a game and/or
+	 * partition the set of players into games.  This has the
+	 * possible advantage of releasing the lock on this player,
+	 * which we otherwise continue to hold.
+	 */
 
-	checkForEnoughPlayers();
-    }
+	/* XXX:  DJE:  I removed the whole "check if it's more than
+	 * PLAYERS_PER_GAME" logic because that never seems to happen
+	 * and I thought it was impossible anyway...  Can it happen
+	 * that waitingPlayers can be updated by another thread at the
+	 * same time?  (if so, then we have more synching to do!)
+	 */
 
-    protected void checkForEnoughPlayers() {
-
-	if (waitingPlayers.size() < PLAYERS_PER_GAME) {
-	    return;
+	if (waitingPlayers.size() == PLAYERS_PER_GAME) {
+	    Game.create(waitingPlayers);
+	    waitingPlayers.clear();
 	}
-
-	if (waitingPlayers.size() > PLAYERS_PER_GAME) {
-	    log.warning("Too many waiting players!  "
-		+ "expected " + PLAYERS_PER_GAME + ", got "
-		+ waitingPlayers.size());
-	}
-
-	Game.create(waitingPlayers);
-	waitingPlayers.clear();
     }
 
     // Channel Join/Leave methods
 
+    /**
+     * {@inheritDoc}
+     */
     public void joinedChannel(ChannelID cid, UserID uid) {
 	log.finer("Matchmaker: User " + uid + " joined channel " + cid);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public void leftChannel(ChannelID cid, UserID uid) {
 	log.finer("Matchmaker: User " + uid + " left channel " + cid);
 
