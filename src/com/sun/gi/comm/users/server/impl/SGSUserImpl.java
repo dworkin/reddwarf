@@ -1,3 +1,71 @@
+/*
+ * Copyright © 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa
+ * Clara, California 95054, U.S.A. All rights reserved.
+ * 
+ * Sun Microsystems, Inc. has intellectual property rights relating to
+ * technology embodied in the product that is described in this
+ * document. In particular, and without limitation, these intellectual
+ * property rights may include one or more of the U.S. patents listed at
+ * http://www.sun.com/patents and one or more additional patents or
+ * pending patent applications in the U.S. and in other countries.
+ * 
+ * U.S. Government Rights - Commercial software. Government users are
+ * subject to the Sun Microsystems, Inc. standard license agreement and
+ * applicable provisions of the FAR and its supplements.
+ * 
+ * Use is subject to license terms.
+ * 
+ * This distribution may include materials developed by third parties.
+ * 
+ * Sun, Sun Microsystems, the Sun logo and Java are trademarks or
+ * registered trademarks of Sun Microsystems, Inc. in the U.S. and other
+ * countries.
+ * 
+ * This product is covered and controlled by U.S. Export Control laws
+ * and may be subject to the export or import laws in other countries.
+ * Nuclear, missile, chemical biological weapons or nuclear maritime end
+ * uses or end users, whether direct or indirect, are strictly
+ * prohibited. Export or reexport to countries subject to U.S. embargo
+ * or to entities identified on U.S. export exclusion lists, including,
+ * but not limited to, the denied persons and specially designated
+ * nationals lists is strictly prohibited.
+ * 
+ * Copyright © 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa
+ * Clara, California 95054, Etats-Unis. Tous droits réservés.
+ * 
+ * Sun Microsystems, Inc. détient les droits de propriété intellectuels
+ * relatifs à la technologie incorporée dans le produit qui est décrit
+ * dans ce document. En particulier, et ce sans limitation, ces droits
+ * de propriété intellectuelle peuvent inclure un ou plus des brevets
+ * américains listés à l'adresse http://www.sun.com/patents et un ou les
+ * brevets supplémentaires ou les applications de brevet en attente aux
+ * Etats - Unis et dans les autres pays.
+ * 
+ * L'utilisation est soumise aux termes de la Licence.
+ * 
+ * Cette distribution peut comprendre des composants développés par des
+ * tierces parties.
+ * 
+ * Sun, Sun Microsystems, le logo Sun et Java sont des marques de
+ * fabrique ou des marques déposées de Sun Microsystems, Inc. aux
+ * Etats-Unis et dans d'autres pays.
+ * 
+ * Ce produit est soumis à la législation américaine en matière de
+ * contrôle des exportations et peut être soumis à la règlementation en
+ * vigueur dans d'autres pays dans le domaine des exportations et
+ * importations. Les utilisations, ou utilisateurs finaux, pour des
+ * armes nucléaires,des missiles, des armes biologiques et chimiques ou
+ * du nucléaire maritime, directement ou indirectement, sont strictement
+ * interdites. Les exportations ou réexportations vers les pays sous
+ * embargo américain, ou vers des entités figurant sur les listes
+ * d'exclusion d'exportation américaines, y compris, mais de manière non
+ * exhaustive, la liste de personnes qui font objet d'un ordre de ne pas
+ * participer, d'une façon directe ou indirecte, aux exportations des
+ * produits ou des services qui sont régis par la législation américaine
+ * en matière de contrôle des exportations et la liste de ressortissants
+ * spécifiquement désignés, sont rigoureusement interdites.
+ */
+
 package com.sun.gi.comm.users.server.impl;
 
 import java.io.IOException;
@@ -27,281 +95,282 @@ public class SGSUserImpl implements SGSUser, TransportProtocolServer {
     private UserID userID;
 
     private Map<ChannelID, SGSChannel> channelMap =
-	new HashMap<ChannelID, SGSChannel>();
+        new HashMap<ChannelID, SGSChannel>();
 
     private TransportProtocol transport;
 
     private UserValidator[] validators;
     private int validatorCounter;
     private boolean connected = true;
-    private boolean TRACE = true; 
-
 
     public SGSUserImpl(Router router, TransportProtocolTransmitter xmitter,
-	    UserValidator[] validators) {
-	this.validators = validators;
-	this.router = router;
-	transport = new BinaryPktProtocol();
-	transport.setTransmitter(xmitter);
-	transport.setServer(this);
-	try {
-	    userID = new UserID();
-	    transport.deliverServerID(UserID.SERVER_ID.toByteArray());
-	} catch (InstantiationException e) {
-	    e.printStackTrace();
-	}
+            UserValidator[] validators) {
+        this.validators = validators;
+        this.router = router;
+        transport = new BinaryPktProtocol();
+        transport.setTransmitter(xmitter);
+        transport.setServer(this);
+        try {
+            userID = new UserID();
+            transport.deliverServerID(UserID.SERVER_ID.toByteArray());
+        } catch (InstantiationException e) {
+            e.printStackTrace();
+        }
     }
 
     public void joinedChan(SGSChannel channel) throws IOException {
-	channelMap.put(channel.channelID(), channel);
+        channelMap.put(channel.channelID(), channel);
 
-	transport.deliverJoinedChannel(channel.getName(),
-	    channel.channelID().toByteArray());
+        transport.deliverJoinedChannel(channel.getName(),
+                channel.channelID().toByteArray());
     }
 
     public void leftChan(SGSChannel channel) throws IOException {
-	channelMap.remove(channel.channelID());
+        channelMap.remove(channel.channelID());
 
-	if (connected) {
-	    transport.deliverLeftChannel(channel.channelID().toByteArray());
-	}
+        if (connected) {
+            transport.deliverLeftChannel(channel.channelID().toByteArray());
+        }
     }
 
     public void msgReceived(byte[] channel, byte[] from, boolean reliable,
-	    ByteBuffer data) throws IOException {
-	transport.deliverUnicastMsg(channel, from, userID.toByteArray(),
-	    reliable, data);
+            ByteBuffer data) throws IOException {
+        transport.deliverUnicastMsg(channel, from, userID.toByteArray(),
+                reliable, data);
     }
 
     public void userJoinedSystem(byte[] user) throws IOException {
-	transport.deliverUserJoined(user);
+        transport.deliverUserJoined(user);
     }
 
     public void userLeftSystem(byte[] user) throws IOException {
-	transport.deliverUserLeft(user);
+        transport.deliverUserLeft(user);
     }
 
     public void userJoinedChannel(byte[] channelID, byte[] user)
-	    throws IOException {
-	transport.deliverUserJoinedChannel(channelID, user);
+            throws IOException {
+        transport.deliverUserJoinedChannel(channelID, user);
     }
 
     public void userLeftChannel(byte[] channel, byte[] user)
-	    throws IOException {
-	transport.deliverUserLeftChannel(channel, user);
+        throws IOException
+    {
+        transport.deliverUserLeftChannel(channel, user);
     }
 
-    public void reconnectKeyReceived(byte[] key, long ttl)
-	    throws IOException {
-	transport.deliverReconnectKey(userID.toByteArray(), key, ttl);
+    public void reconnectKeyReceived(byte[] key, long ttl) throws IOException {
+        transport.deliverReconnectKey(userID.toByteArray(), key, ttl);
     }
 
     public UserID getUserID() {
-	return userID;
+        return userID;
     }
 
     public void deregistered() {
-	// TODO Auto-generated method stub
+    // TODO Auto-generated method stub
     }
 
     // TransportProtocolServer callbacks
 
-    public void rcvUnicastMsg(boolean reliable, byte[] chanID, 
-	    byte[] to, ByteBuffer databuff) {
-	SGSChannel chan;
-	try {
-	    chan = channelMap.get(new ChannelID(chanID));
-	    // FIXME: should never be NULL,
-	    // if it is we want an exception to figure out why
-	    ByteBuffer newbuff = databuff.duplicate();
-	    newbuff.position(newbuff.limit());
-	    chan.unicastData(userID, new UserID(to), newbuff, reliable);
-	} catch (InstantiationException e) {
-	    // TODO Auto-generated catch block
-	    e.printStackTrace();
-	}
+    public void rcvUnicastMsg(boolean reliable, byte[] chanID, byte[] to,
+            ByteBuffer databuff)
+    {
+        SGSChannel chan;
+        try {
+            chan = channelMap.get(new ChannelID(chanID));
+            // FIXME: should never be NULL,
+            // if it is we want an exception to figure out why
+            ByteBuffer newbuff = databuff.duplicate();
+            newbuff.position(newbuff.limit());
+            chan.unicastData(userID, new UserID(to), newbuff, reliable);
+        } catch (InstantiationException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
     }
 
     public void rcvMulticastMsg(boolean reliable, byte[] chanID,
-	    byte[][] tolist, ByteBuffer databuff) {
-	SGSChannel chan;
-	try {
-	    chan = channelMap.get(new ChannelID(chanID));
+            byte[][] tolist, ByteBuffer databuff)
+    {
+        SGSChannel chan;
+        try {
+            chan = channelMap.get(new ChannelID(chanID));
 
-	    UserID[] ids = new UserID[tolist.length];
-	    for (int i = 0; i < ids.length; i++) {
-		ids[i] = new UserID(tolist[i]);
-	    }
-	    // FIXME: should never be NULL,
-	    // if it is we want an exception to figure out why
-	    ByteBuffer newbuff = databuff.duplicate();
-	    newbuff.position(newbuff.limit());
-	    chan.multicastData(userID, ids, newbuff, reliable);
-	} catch (InstantiationException e) {
-	    // TODO Auto-generated catch block
-	    e.printStackTrace();
-	}
+            UserID[] ids = new UserID[tolist.length];
+            for (int i = 0; i < ids.length; i++) {
+                ids[i] = new UserID(tolist[i]);
+            }
+            // FIXME: should never be NULL,
+            // if it is we want an exception to figure out why
+            ByteBuffer newbuff = databuff.duplicate();
+            newbuff.position(newbuff.limit());
+            chan.multicastData(userID, ids, newbuff, reliable);
+        } catch (InstantiationException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
     }
 
-    public void rcvBroadcastMsg(boolean reliable, byte[] chanID, 
-	    ByteBuffer databuff) {
-	try {
-	    SGSChannel chan = channelMap.get(new ChannelID(chanID));
-	    // FIXME: should never be NULL,
-	    // if it is we want an exception to figure out why
-	    ByteBuffer newbuff = databuff.duplicate();
-	    newbuff.position(newbuff.limit());
-	    chan.broadcastData(userID, newbuff, reliable);
-	} catch (InstantiationException e) {
-	    // TODO Auto-generated catch block
-	    e.printStackTrace();
-	}
+    public void rcvBroadcastMsg(boolean reliable, byte[] chanID,
+            ByteBuffer databuff) {
+        try {
+            SGSChannel chan = channelMap.get(new ChannelID(chanID));
+            // FIXME: should never be NULL,
+            // if it is we want an exception to figure out why
+            ByteBuffer newbuff = databuff.duplicate();
+            newbuff.position(newbuff.limit());
+            chan.broadcastData(userID, newbuff, reliable);
+        } catch (InstantiationException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
     }
 
     public void rcvConnectReq() {
-	subject = new Subject();	
-	try {
-	    if (validators == null) {
-		router.registerUser(this,subject);
-		transport.deliverUserAccepted(userID.toByteArray());
-	    } else {				
-		startValidation();
-	    }
-	} catch (InstantiationException e) {
-	    // TODO Auto-generated catch block
-	    e.printStackTrace();
-	} catch (IOException e) {
-	    // TODO Auto-generated catch block
-	    e.printStackTrace();
-	}
+        subject = new Subject();
+        try {
+            if (validators == null) {
+                router.registerUser(this, subject);
+                transport.deliverUserAccepted(userID.toByteArray());
+            } else {
+                startValidation();
+            }
+        } catch (InstantiationException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
     }
 
     private void startValidation() {
-	validatorCounter = 0;	
-	validators[0].reset(subject);
-	doValidationReq();
+        validatorCounter = 0;
+        validators[0].reset(subject);
+        doValidationReq();
     }
 
     /**
      * doValidationReq
      */
     private void doValidationReq() {
-	Callback[] cb = validators[validatorCounter].nextDataRequest();
-	while ((cb == null)&&(validatorCounter<validators.length)){
-	    if (!validators[validatorCounter].authenticated()){ // rejected
-		try {
-		    transport.deliverUserRejected("Validation failed");
-		    return;
-		} catch (IOException e) {					
-		    e.printStackTrace();
-		}
-		// FIXME need to disconnect the connection
-	    } else { // go on
-		validatorCounter++;
-		if (validatorCounter<validators.length){
-		    validators[validatorCounter].reset(subject);
-		    cb = validators[validatorCounter].nextDataRequest();
-		} else {
-		    cb = null;
-		}
-	    }
-	}
-	if (cb == null){ // we have done them all and are authenticated
-	    try {				
-		transport.deliverUserAccepted(userID.toByteArray());
-		router.registerUser(this,subject);
-	    } catch (InstantiationException e) {				
-		e.printStackTrace();
-	    } catch (IOException e) {				
-		e.printStackTrace();
-	    }			
-	} else { // next CBs to request
-	    try {
-		transport.deliverValidationRequest(cb);
-	    } catch (UnsupportedCallbackException e) {				
-		e.printStackTrace();
-	    } catch (IOException e) {				
-		e.printStackTrace();
-	    }
-	}
+        Callback[] cb = validators[validatorCounter].nextDataRequest();
+        while ((cb == null) && (validatorCounter < validators.length)) {
+            if (!validators[validatorCounter].authenticated()) { // rejected
+                try {
+                    transport.deliverUserRejected("Validation failed");
+                    return;
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                // FIXME need to disconnect the connection
+            } else { // go on
+                validatorCounter++;
+                if (validatorCounter < validators.length) {
+                    validators[validatorCounter].reset(subject);
+                    cb = validators[validatorCounter].nextDataRequest();
+                } else {
+                    cb = null;
+                }
+            }
+        }
+        if (cb == null) {
+            // we have done them all and are authenticated
+            try {
+                transport.deliverUserAccepted(userID.toByteArray());
+                router.registerUser(this, subject);
+            } catch (InstantiationException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        } else {
+            // next CBs to request
+            try {
+                transport.deliverValidationRequest(cb);
+            } catch (UnsupportedCallbackException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     public void rcvValidationResp(Callback[] cbs) {
-	validators[validatorCounter].dataResponse(cbs);
-	doValidationReq();
+        validators[validatorCounter].dataResponse(cbs);
+        doValidationReq();
     }
 
     public void rcvReconnectReq(byte[] user, byte[] key) {
-	try {
-	    userID = new UserID(user);
-	    if (router.validateReconnectKey(userID, key)) {
-		router.registerUser(this,subject);
-	    } else {
-		transport.deliverUserRejected("Reconnect key failure");
-	    }
-	} catch (IOException e) {
-	    e.printStackTrace();
-	} catch (InstantiationException e1) {
-	    // TODO Auto-generated catch block
-	    e1.printStackTrace();
-	}
+        try {
+            userID = new UserID(user);
+            if (router.validateReconnectKey(userID, key)) {
+                router.registerUser(this, subject);
+            } else {
+                transport.deliverUserRejected("Reconnect key failure");
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (InstantiationException e1) {
+            // TODO Auto-generated catch block
+            e1.printStackTrace();
+        }
     }
 
     public void rcvServerMsg(boolean reliable, ByteBuffer databuff) {
-	router.serverMessage(reliable,userID,databuff);
+        router.serverMessage(reliable, userID, databuff);
     }
 
     public void rcvReqLeaveChan(byte[] chanID) {
-	try {
-	    SGSChannel chan = channelMap.get(new ChannelID(chanID));
-	    if (!chan.isLocked()) {
-		chan.leave(this);
-	    }
-	    else {
-		//System.out.println("Channel is locked, can't leave");
-		transport.deliverChannelLocked(chan.getName(),
-		    userID.toByteArray());
-	    }
-	} catch (InstantiationException e) {			
-	    e.printStackTrace();
-	}
-	catch (IOException ioe) {
-	    ioe.printStackTrace();
-	}
+        try {
+            SGSChannel chan = channelMap.get(new ChannelID(chanID));
+            if (!chan.isLocked()) {
+                chan.leave(this);
+            } else {
+                // System.out.println("Channel is locked, can't leave");
+                transport.deliverChannelLocked(chan.getName(),
+                        userID.toByteArray());
+            }
+        } catch (InstantiationException e) {
+            e.printStackTrace();
+        } catch (IOException ioe) {
+            ioe.printStackTrace();
+        }
     }
 
     public void rcvReqJoinChan(String channame) {
-	SGSChannel chan = router.openChannel(channame);
-	if (!chan.isLocked()) {
-	    chan.join(this);
-	} else {
-	    //System.out.println("Channel is locked, can't join");
-	    try {
-		transport.deliverChannelLocked(channame, userID.toByteArray());
-	    } catch (IOException ioe) {
-		ioe.printStackTrace();
-	    }
-	}
+        SGSChannel chan = router.openChannel(channame);
+        if (!chan.isLocked()) {
+            chan.join(this);
+        } else {
+            // System.out.println("Channel is locked, can't join");
+            try {
+                transport.deliverChannelLocked(channame, userID.toByteArray());
+            } catch (IOException ioe) {
+                ioe.printStackTrace();
+            }
+        }
     }
 
     /**
-     * Passes packet data arriving on the raw connection
-     * to be processed by the user.
-     *
+     * Passes packet data arriving on the raw connection to be processed
+     * by the user.
+     * 
      * @param inputBuffer the incoming data, ready for get() operations
      */
     protected void packetReceived(ByteBuffer inputBuffer) {
-	transport.packetReceived(inputBuffer);		
+        transport.packetReceived(inputBuffer);
     }
 
     /**
-     * Called by the raw connection to indicate that the
-     * conenction has been lost.
+     * Called by the raw connection to indicate that the conenction has
+     * been lost.
      */
     protected void disconnected() {
-	connected = false; 
-	// XXX currently this just immediately dereigsters user.  
-	// This must be modified for fail-over when we support multiple stacks
-	router.deregisterUser(this);		
+        connected = false;
+        // XXX currently this just immediately dereigsters user.
+        // This must be modified for fail-over when we support multiple
+        // stacks
+        router.deregisterUser(this);
     }
 }
