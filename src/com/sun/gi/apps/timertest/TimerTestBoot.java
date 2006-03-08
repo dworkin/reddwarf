@@ -1,12 +1,71 @@
-/**
- *
- * <p>Title: TimerTestBoot.java</p>
- * <p>Description: </p>
- * <p>Copyright: Copyright (c) 2004 Sun Microsystems, Inc.</p>
- * <p>Company: Sun Microsystems, Inc</p>
- * @author Jeff Kesselman
- * @version 1.0
+/*
+ * Copyright © 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa
+ * Clara, California 95054, U.S.A. All rights reserved.
+ * 
+ * Sun Microsystems, Inc. has intellectual property rights relating to
+ * technology embodied in the product that is described in this
+ * document. In particular, and without limitation, these intellectual
+ * property rights may include one or more of the U.S. patents listed at
+ * http://www.sun.com/patents and one or more additional patents or
+ * pending patent applications in the U.S. and in other countries.
+ * 
+ * U.S. Government Rights - Commercial software. Government users are
+ * subject to the Sun Microsystems, Inc. standard license agreement and
+ * applicable provisions of the FAR and its supplements.
+ * 
+ * Use is subject to license terms.
+ * 
+ * This distribution may include materials developed by third parties.
+ * 
+ * Sun, Sun Microsystems, the Sun logo and Java are trademarks or
+ * registered trademarks of Sun Microsystems, Inc. in the U.S. and other
+ * countries.
+ * 
+ * This product is covered and controlled by U.S. Export Control laws
+ * and may be subject to the export or import laws in other countries.
+ * Nuclear, missile, chemical biological weapons or nuclear maritime end
+ * uses or end users, whether direct or indirect, are strictly
+ * prohibited. Export or reexport to countries subject to U.S. embargo
+ * or to entities identified on U.S. export exclusion lists, including,
+ * but not limited to, the denied persons and specially designated
+ * nationals lists is strictly prohibited.
+ * 
+ * Copyright © 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa
+ * Clara, California 95054, Etats-Unis. Tous droits réservés.
+ * 
+ * Sun Microsystems, Inc. détient les droits de propriété intellectuels
+ * relatifs à la technologie incorporée dans le produit qui est décrit
+ * dans ce document. En particulier, et ce sans limitation, ces droits
+ * de propriété intellectuelle peuvent inclure un ou plus des brevets
+ * américains listés à l'adresse http://www.sun.com/patents et un ou les
+ * brevets supplémentaires ou les applications de brevet en attente aux
+ * Etats - Unis et dans les autres pays.
+ * 
+ * L'utilisation est soumise aux termes de la Licence.
+ * 
+ * Cette distribution peut comprendre des composants développés par des
+ * tierces parties.
+ * 
+ * Sun, Sun Microsystems, le logo Sun et Java sont des marques de
+ * fabrique ou des marques déposées de Sun Microsystems, Inc. aux
+ * Etats-Unis et dans d'autres pays.
+ * 
+ * Ce produit est soumis à la législation américaine en matière de
+ * contrôle des exportations et peut être soumis à la règlementation en
+ * vigueur dans d'autres pays dans le domaine des exportations et
+ * importations. Les utilisations, ou utilisateurs finaux, pour des
+ * armes nucléaires,des missiles, des armes biologiques et chimiques ou
+ * du nucléaire maritime, directement ou indirectement, sont strictement
+ * interdites. Les exportations ou réexportations vers les pays sous
+ * embargo américain, ou vers des entités figurant sur les listes
+ * d'exclusion d'exportation américaines, y compris, mais de manière non
+ * exhaustive, la liste de personnes qui font objet d'un ordre de ne pas
+ * participer, d'une façon directe ou indirecte, aux exportations des
+ * produits ou des services qui sont régis par la législation américaine
+ * en matière de contrôle des exportations et la liste de ressortissants
+ * spécifiquement désignés, sont rigoureusement interdites.
  */
+
 package com.sun.gi.apps.timertest;
 
 import com.sun.gi.gloutils.pdtimer.PDTimer;
@@ -17,65 +76,66 @@ import com.sun.gi.logic.SimTimerListener;
 import com.sun.gi.logic.SimTask.ACCESS_TYPE;
 
 /**
- *
- * <p>Title: TimerTestBoot.java</p>
- * <p>Description: </p>
- * <p>Copyright: Copyright (c) 2004 Sun Microsystems, Inc.</p>
- * <p>Company: Sun Microsystems, Inc</p>
  * @author Jeff Kesselman
  * @version 1.0
  */
-public class TimerTestBoot implements SimBoot, SimTimerListener {
-	GLOReference pdTimer = null;
-	long oneSecEvent;
-	long tenSecEvent;
-	long fiveSecEvent;
+public class TimerTestBoot implements SimBoot<TimerTestBoot>, SimTimerListener
+{
+    private static final long serialVersionUID = 1L;
 
-	/* (non-Javadoc)
-	 * @see com.sun.gi.logic.SimBoot#boot(com.sun.gi.logic.SimTask, boolean)
-	 */
-	public void boot(GLOReference gloRef, boolean firstBoot) {
-		System.out.println("TimerTestBoot running");
-		try {			
-			/*
-			oneSecEvent = task.registerTimerEvent(1000l,true,thisobj);
-			fiveSecEvent = task.registerTimerEvent(5000l,false,thisobj);
-			tenSecEvent = task.registerTimerEvent(10000l,true,thisobj);
-			*/
-			SimTask task = SimTask.getCurrent();
-			PDTimer timer;
-			if (firstBoot){ // not instantiated yet
-				timer = new PDTimer(task);
-				pdTimer = task.createGLO(timer,null);
-				TimerCount tc = new TimerCount();
-				GLOReference tcRef = task.createGLO(tc,null);
-				timer.addTimerEvent(task,ACCESS_TYPE.GET,1,true,tcRef,"increment",new Object[]{});
-			} else {
-				timer=(PDTimer)pdTimer.get(task);
-			}
-			timer.start(task,1);
-			
-		} catch (InstantiationException e) {			
-			e.printStackTrace();
-		}		
+    GLOReference pdTimer = null;
+    long oneSecEvent;
+    long tenSecEvent;
+    long fiveSecEvent;
 
-	}
+    /*
+     * (non-Javadoc)
+     * 
+     * @see com.sun.gi.logic.SimBoot#boot(com.sun.gi.logic.SimTask,
+     * boolean)
+     */
+    public void boot(GLOReference<? extends TimerTestBoot> gloRef,
+            boolean firstBoot)
+    {
+        System.out.println("TimerTestBoot running");
+        try {
+            /*
+             * oneSecEvent =
+             * task.registerTimerEvent(1000l,true,thisobj); fiveSecEvent =
+             * task.registerTimerEvent(5000l,false,thisobj); tenSecEvent =
+             * task.registerTimerEvent(10000l,true,thisobj);
+             */
+            SimTask task = SimTask.getCurrent();
+            PDTimer timer;
+            if (firstBoot) { // not instantiated yet
+                timer = new PDTimer(task);
+                pdTimer = task.createGLO(timer, null);
+                GLOReference<TimerCount> tcRef =
+                    task.createGLO(new TimerCount());
+                timer.addTimerEvent(task, ACCESS_TYPE.GET, 1, true, tcRef,
+                        "increment", new Object[] {});
+            } else {
+                timer = (PDTimer) pdTimer.get(task);
+            }
+            timer.start(task, 1);
 
-	/* (non-Javadoc)
-	 * @see com.sun.gi.logic.SimTimerListener#timerEvent(com.sun.gi.logic.SimTask, long)
-	 */
-	public void timerEvent(long eventID) {
-		SimTask task = SimTask.getCurrent();
-		if (eventID==oneSecEvent){
-			System.out.println("One second pulse recvd (repeats)");			
-		} else if (eventID == fiveSecEvent){
-			System.out.println("Five second pulse received (should *not* repeat)");
-		} else if (eventID == tenSecEvent){
-			System.out.println("Ten second pulse recieved (repeats)");
-		} else {
-			System.err.println("Unrecognized time event ID:"+eventID);
-		}
-		
-	}
+        } catch (InstantiationException e) {
+            e.printStackTrace();
+        }
+
+    }
+
+    public void timerEvent(long eventID) {
+        if (eventID == oneSecEvent) {
+            System.out.println("One second pulse recvd (repeats)");
+        } else if (eventID == fiveSecEvent) {
+            System.out.println("Five second pulse received (should *not* repeat)");
+        } else if (eventID == tenSecEvent) {
+            System.out.println("Ten second pulse recieved (repeats)");
+        } else {
+            System.err.println("Unrecognized time event ID:" + eventID);
+        }
+
+    }
 
 }
