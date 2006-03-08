@@ -8,6 +8,7 @@
  */
 package com.sun.gi.objectstore.tso.dataspace;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -24,18 +25,6 @@ import com.sun.gi.objectstore.NonExistantObjectIDException;
 public interface DataSpace {
 
     static final long INVALID_ID = Long.MIN_VALUE;
-
-    /**
-     * Allocates and returns a new, unused object identifier.  <p>
-     *
-     * The ID is guaranteed to be unused and unique for the life of
-     * this DataSpace.  It is not guaranteed to have any fixed
-     * relationship to any other object identifiers previously
-     * returned by this method.  <p>
-     *
-     * @return a newly allocated object identifier
-     */
-    // long getNextID();
 
     /**
      * Returns a copy of the object as a <code>byte</code> array
@@ -130,7 +119,8 @@ public interface DataSpace {
      * (What is <code>clear</code> supposed to do?  Or is this now
      * unused and should be removed?  -DJE)
      */
-    void atomicUpdate(boolean clear, Map<Long, byte[]> updateMap)
+    void atomicUpdate(boolean clear, Map<Long, byte[]> updateMap,
+	    List<Long> deleted)
 	    throws DataSpaceClosedException;
 
     /**
@@ -183,14 +173,8 @@ public interface DataSpace {
     /**
      * Closes the DataSpace, preventing further updates.  <p>
      *
-     * All other operations (including allocation of new objects via
-     * {@link #getNextID() getNextID} are permitted when the DataSpace
-     * is closed.  <p>
-     *
-     * (Do we want to prevent getNextID when the DataSpace is closed? 
-     * Do we want to prevent all operations?  Should there be a way to
-     * reopen a DataSpace that has been closed short of creating a new
-     * DataSpace with the same appID?  -DJE)
+     * All other operations are permitted when the DataSpace is
+     * closed.  <p>
      */
     void close();
 
@@ -206,5 +190,5 @@ public interface DataSpace {
      * @throws NonExistantObjectIDException if no object with the
      * given <em>objectID</em> exists
      */
-    void destroy(long objectID) throws NonExistantObjectIDException;
+    // void destroy(long objectID) throws NonExistantObjectIDException;
 }
