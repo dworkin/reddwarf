@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project basedir="." default="release.bin" name="SGS">
+<project basedir="." default="release.j2se.bin" name="SGS">
 
     <target name="help">
 	<echo message="Please run: $ ant -v -projecthelp" />
@@ -53,7 +53,7 @@
 	<ant dir="J2MEAPI/J2MEClientAPI" target="clean" /> 
     </target>
 
-    <target name="realclean" depends="clean">
+    <target name="realclean" depends="clean,clean.j2meAPI">
 	<delete dir="doc" />
 	<delete dir="release" />
 	<delete file="ProjectDarkstar.zip" />
@@ -326,12 +326,15 @@
 
     <!-- Release Targets -->
 
-    <target name="release" depends="release.bin,release.docs,release.examples">
+    <target name="release" depends="release.j2se,release.j2me">
 	<zip destfile="ProjectDarkstar.zip" basedir="release" />
     </target>
 
-    <target name="release.bin" depends="release.server,release.j2seAPI, 
-    	release.apps,release.clients"/>
+    <!-- J2SE release targets -->
+
+    <target name="release.j2se" depends="release.j2se.bin,release.docs,release.examples"/>
+
+    <target name="release.j2se.bin" depends="release.server,release.j2seAPI,release.apps,release.clients"/>
 
     <target name="release.server" depends="build.server">
 	<jar destfile="release/ProjectDarkstar.jar">
@@ -371,12 +374,6 @@
 	</jar>
     </target>
 	
-    <target name="release.j2meAPI" depends="build.j2meAPI">
-	<copy todir="release" >
-	    <fileset dir="J2MEAPI/J2MEClientAPI/dist" />
-	</copy>	
-    </target>
-
     <target name="release.docs" depends="docs">
 	<copy todir="release/docs" >
 	    <fileset dir="doc/doxygen">
@@ -452,6 +449,16 @@
     <target name="release.examples" >
 	<zip destfile="release/Examples.zip" basedir="src"
 	    includes="com/sun/gi/apps/chattest/**"/>
+    </target>
+
+    <!-- J2ME release targets -->
+
+    <target name="release.j2me" depends="release.j2meAPI"/>
+
+    <target name="release.j2meAPI" depends="build.j2meAPI">
+	<copy todir="release" >
+	    <fileset dir="J2MEAPI/J2MEClientAPI/dist" />
+	</copy>	
     </target>
 
 </project>
