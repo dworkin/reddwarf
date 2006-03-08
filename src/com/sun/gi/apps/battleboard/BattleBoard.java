@@ -69,6 +69,7 @@
 package com.sun.gi.apps.battleboard;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
@@ -110,6 +111,7 @@ public class BattleBoard implements Serializable {
     private PositionValue board[][];
     private int startCities;
     private int survivingCities;
+    private transient ArrayList<BoardListener> listeners;
 
     public enum PositionValue {
 
@@ -264,6 +266,43 @@ public class BattleBoard implements Serializable {
     }
 
     /**
+     * Adds a <code>BoardListener</code> to the list of listeners.
+     *
+     * @param listener the BoardListener to add
+     */
+    public synchronized void addBoardListener(BoardListener listener) {
+        if (listeners == null) {
+            listeners = new ArrayList<BoardListener>();
+        }
+        listeners.add(listener);
+    }
+    
+    /**
+     * Removes a <code>BoardListener</code> from the list of listeners.
+     *
+     * @param listener the BoardListener to remove.
+     */
+    public synchronized void removeBoardListener(BoardListener listener) {
+        if (listeners != null) {
+            listeners.remove(listener);
+        }
+    }
+    
+    /**
+     * Fires off a boardChanged event to all BoardListeners.
+     *
+     * @param x the x location of the square that changed.
+     * @param y the y location of the square that changed.
+     */
+    private synchronized void fireBoardEvent(int x, int y) {
+        if (listeners != null) {
+            for (BoardListener listener : listeners) {
+                listener.boardChanged(this, x, y);
+            }
+        }
+    }
+
+    /**
      * Returns the number of cities on the board at the start of the
      * game.
      * 
@@ -379,6 +418,7 @@ public class BattleBoard implements Serializable {
 
         PositionValue rc = getBoardPosition(x, y);
         board[x][y] = state;
+	fireBoardEvent(x, y);
         return rc;
     }
 
