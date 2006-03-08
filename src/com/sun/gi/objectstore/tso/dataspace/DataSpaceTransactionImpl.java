@@ -215,7 +215,6 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
         try {
             dataSpace.atomicUpdate(clear, updateMap);
         } catch (DataSpaceClosedException e) {
-
             e.printStackTrace();
         }
         resetTransaction();

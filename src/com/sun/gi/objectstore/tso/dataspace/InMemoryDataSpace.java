@@ -70,6 +70,7 @@ package com.sun.gi.objectstore.tso.dataspace;
 
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -145,7 +146,6 @@ public class InMemoryDataSpace implements DataSpace {
             lockSet.remove(new Long(objectID));
             lockSet.notifyAll();
         }
-
     }
 
     /**
@@ -174,10 +174,14 @@ public class InMemoryDataSpace implements DataSpace {
     /**
      * {@inheritDoc}
      */
-    public void atomicUpdate(boolean clear, Map<Long, byte[]> updateMap) {
+    public void atomicUpdate(boolean clear, Map<Long, byte[]> updateMap,
+    	    List<Long> deleted) {
         // insert set is ignored in this case as its uneeded detail
         synchronized (dataSpace) {
             dataSpace.putAll(updateMap);
+	    for (Long oid : deleted) {
+		dataSpace.remove(oid);
+	    }
         }
     }
 
@@ -231,15 +235,6 @@ public class InMemoryDataSpace implements DataSpace {
      * {@inheritDoc}
      */
     public void close() {
-    // TODO Auto-generated method stub
-    }
-
-    /**
-     * NOT IMPLEMENTED
-     * 
-     * {@inheritDoc}
-     */
-    public void destroy(long objectID) {
     // TODO Auto-generated method stub
     }
 }

@@ -79,10 +79,11 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
-import java.util.Map.Entry;
 
 import com.sun.gi.objectstore.NonExistantObjectIDException;
 
@@ -1076,11 +1077,14 @@ public class HadbDataSpace implements DataSpace {
      * {@inheritDoc}
      */
     public synchronized void atomicUpdate(boolean clear,
-            Map<Long, byte[]> updateMap) throws DataSpaceClosedException {
+            Map<Long, byte[]> updateMap, List<Long> deleted)
+	    throws DataSpaceClosedException
+    {
         Map<String, Long> dummyNewNames = new HashMap<String, Long>();
         Set<Long> dummyIdSet = new HashSet<Long>();
+	Set<Long> deleteSet = new HashSet<Long>(deleted);
 
-        atomicUpdate(clear, dummyNewNames, dummyIdSet, updateMap, dummyIdSet);
+        atomicUpdate(clear, dummyNewNames, deleteSet, updateMap, dummyIdSet);
     }
 
     private synchronized void atomicUpdate(boolean clear,

@@ -177,18 +177,4 @@ public interface DataSpace {
      * closed.  <p>
      */
     void close();
-
-    /**
-     * Destroys the object associated with objectID and removes the
-     * name associated with that ID (if any).  <p>
-     * 
-     * destroy is an immediate (non-transactional) change to the
-     * DataSpace.
-     * 
-     * @param The objectID of the object to destroy
-     *
-     * @throws NonExistantObjectIDException if no object with the
-     * given <em>objectID</em> exists
-     */
-    // void destroy(long objectID) throws NonExistantObjectIDException;
 }

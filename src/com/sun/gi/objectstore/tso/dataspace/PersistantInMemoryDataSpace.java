@@ -79,6 +79,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Map.Entry;
@@ -98,7 +99,8 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 
         byte[][] updateData;
 
-        Long[] updateIDs;
+        long[] updateIDs;
+	long[] deletedIDs;
 
         long nextID;
 
@@ -110,10 +112,12 @@ public class PersistantInMemoryDataSpace implements DataSpace {
          * @param deleteIDs2
          * @param id
          */
-        public DiskUpdateRecord(Long[] updateIDs, byte[][] updateData, long id) {
+        public DiskUpdateRecord(long[] updateIDs, byte[][] updateData,
+		long[] deletedIDs, long id) {
 
             this.updateIDs = updateIDs;
             this.updateData = updateData;
+	    this.deletedIDs = deletedIDs;
             this.nextID = id;
         }
 
@@ -292,6 +296,13 @@ public class PersistantInMemoryDataSpace implements DataSpace {
             }
         }
 
+	for (int i = 0; i < rec.deletedIDs.length; i++) {
+            if (TRACEDISK) {
+                System.out.println("          Deleting " + rec.deletedIDs[i]);
+            }
+	    destroy(rec.deletedIDs[i]);
+	}
+
         try {
             if (TRACEDISK) {
                 System.out.println("      Setting next ID = " + rec.nextID);
@@ -311,7 +322,6 @@ public class PersistantInMemoryDataSpace implements DataSpace {
                 System.out.println("      Trans comitted");
             }
         } catch (SQLException e1) {
-
             e1.printStackTrace();
         }
     }
@@ -502,6 +512,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
                 }
             }
             lockSet.add(new Long(objectID));
+	    lockSet.notifyAll();
         }
     }
 
@@ -542,7 +553,8 @@ public class PersistantInMemoryDataSpace implements DataSpace {
     /**
      * {@inheritDoc}
      */
-    public void atomicUpdate(boolean clear, Map<Long, byte[]> updateMap)
+    public void atomicUpdate(boolean clear, Map<Long, byte[]> updateMap,
+	    List<Long> deleted)
             throws DataSpaceClosedException {
         if (closed) {
             throw new DataSpaceClosedException();
@@ -555,28 +567,29 @@ public class PersistantInMemoryDataSpace implements DataSpace {
             }
 
         }
-        // asynchronously update the persistant storage
-        // IMPORTANT: This update record will pin the objects in memory
-        // and thus
-        // in the cache until it is complete This is VERY important so
-        // that
-        // things
-        // don't get cleaned out of the cache until they have been
-        // persisted.
-        // It is acceptable to lose transactions, if the entire system
-        // dies, but
-        // that
-        // is the only time. Even in this case those lost must be atomic
-        // (all or
-        // nothing.)
 
-        Long[] updateIDs = new Long[updateMap.entrySet().size()];
+	// asynchronously update the persistant storage IMPORTANT: 
+	// This update record will pin the objects in memory and thus
+	// in the cache until it is complete This is VERY important so
+	// that things don't get cleaned out of the cache until they
+	// have been persisted.  It is acceptable to lose
+	// transactions, if the entire system dies, but that is the
+	// only time.  Even in this case those lost must be atomic
+	// (all or nothing.)
+
+        long[] updateIDs = new long[updateMap.entrySet().size()];
         byte[][] updateData = new byte[updateMap.entrySet().size()][];
         int i = 0;
         for (Entry<Long, byte[]> e : updateMap.entrySet()) {
             updateIDs[i] = e.getKey();
             updateData[i++] = e.getValue();
         }
+
+	long[] deletedIDs = new long[deleted.size()];
+	i = 0; 
+	for (long oid : deleted) {
+	    deletedIDs[i] = oid;
+	}
 
         /*
          * Try to throttle back: if the queue is shorter than 40, let it
@@ -617,7 +630,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
             } else {
                 // Carry on.
             }
-        } catch (Exception e) {
+        } catch (InterruptedException e) {
             // ignore
         }
 
@@ -628,11 +641,10 @@ public class PersistantInMemoryDataSpace implements DataSpace {
                             + commitRegisterCounter++);
                 }
                 diskUpdateQueue.add(new DiskUpdateRecord(updateIDs, updateData,
-                        id));
+                        deletedIDs, id));
                 diskUpdateQueueMutex.notifyAll();
             }
         }
-
     }
 
     /**
@@ -696,13 +708,10 @@ public class PersistantInMemoryDataSpace implements DataSpace {
                         clearObjTableStmnt.execute();
                         clearNameTableStmnt.execute();
                         conn.commit();
-
                     }
                 }
             }
-
         } catch (SQLException e) {
-
             e.printStackTrace();
         }
 
@@ -756,6 +765,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
             reverseNameSpace.clear();
             reverseNameSpace = null;
         }
+	closeWaitMutex.notifyAll();
     }
 
     /**
@@ -801,9 +811,18 @@ public class PersistantInMemoryDataSpace implements DataSpace {
     }
 
     /**
-     * {@inheritDoc}
+     * Destroys the object associated with objectID and removes the
+     * name associated with that ID (if any).  <p>
+     * 
+     * destroy is an immediate (non-transactional) change to the
+     * DataSpace.
+     * 
+     * @param The objectID of the object to destroy
+     *
+     * @throws NonExistantObjectIDException if no object with the
+     * given <em>objectID</em> exists
      */
-    public void destroy(long objectID) {
+    private void destroy(long objectID) {
         synchronized (nameSpace) {
             String name = reverseNameSpace.get(objectID);
             if (name != null) {
@@ -822,10 +841,8 @@ public class PersistantInMemoryDataSpace implements DataSpace {
                 deleteNameStmnt.execute();
                 deleteInsertConn.commit();
             } catch (SQLException e) {
-
                 e.printStackTrace();
             }
-
         }
     }
 }
