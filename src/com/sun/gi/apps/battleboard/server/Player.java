@@ -193,9 +193,11 @@ public class Player implements SimUserDataListener {
 
         // check that the player doesn't already exist
         /*
-         * GLOReference playerRef = getRef(uid); if (playerRef != null) { //
-         * XXX // delete it? update it with this uid? // kick the new
-         * guy off? kick the old guy? }
+         * GLOReference playerRef = getRef(uid);
+	 * if (playerRef != null) {
+	 *  // XXX delete it? update it with this uid?
+	 *  // kick the new guy off? kick the old guy?
+	 * }
          */
 
         String userName = subject.getPrincipals().iterator().next().getName();
@@ -206,7 +208,6 @@ public class Player implements SimUserDataListener {
         // We're interested in direct server data sent by the user.
         task.addUserDataListener(uid, playerRef);
         Matchmaker.get().addUserID(uid);
-
     }
 
     public static void userLeft(UserID uid) {
@@ -221,7 +222,6 @@ public class Player implements SimUserDataListener {
         if (playerRef != null) {
             playerRef.delete(task);
         }
-
     }
 
     // SimUserDataListener methods

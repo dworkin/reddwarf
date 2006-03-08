@@ -147,7 +147,7 @@ public class PlayerHistory implements GLO {
      * @return a string representing known about this player.
      */
     public String toString() {
-        return "playerName: " + playerName + " won: " + gamesWon + " lost: "
-                + gamesLost;
+        return "playerName: " + playerName + " won: " + gamesWon +
+		" lost: " + gamesLost;
     }
 }

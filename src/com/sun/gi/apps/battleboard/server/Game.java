@@ -142,8 +142,8 @@ public class Game implements GLO {
 
         SimTask task = SimTask.getCurrent();
 
-        gameName = "GameChannel-"
-                + SequenceGLO.getNext(task, "GameChannelSequence");
+        gameName = "GameChannel-" +
+		SequenceGLO.getNext(task, "GameChannelSequence");
 
         log.info("New game channel is `" + gameName + "'");
 
@@ -185,9 +185,11 @@ public class Game implements GLO {
 
         if (log.isLoggable(Level.FINE)) {
             log.finest("playerBoards size " + playerBoards.size());
-            for (Map.Entry<String, GLOReference<Board>> x : playerBoards.entrySet()) {
-                log.finest("playerBoard[" + x.getKey() + "]=`" + x.getValue()
-                        + "'");
+            for (Map.Entry<String, GLOReference<Board>> x :
+			playerBoards.entrySet())
+	    {
+                log.finest("playerBoard[" + x.getKey() + "]=`" +
+			x.getValue() + "'");
             }
         }
 
@@ -207,8 +209,8 @@ public class Game implements GLO {
         Board board = new Board(playerName, boardWidth, boardHeight, numCities);
         board.populate();
 
-        GLOReference<Board> ref = task.createGLO(board, gameName + "-board-"
-                + playerName);
+        GLOReference<Board> ref = task.createGLO(board, gameName +
+		"-board-" + playerName);
 
         log.finer("createBoard[" + playerName + "] returning " + ref);
         return ref;
@@ -237,8 +239,8 @@ public class Game implements GLO {
         spectators.clear();
         playerBoards.clear();
 
-        // Queue a reaper task to destroy this Game GLO
-        // XXX do this...
+        // Destroy this Game GLO
+	thisRef.delete(task);
     }
 
     protected void sendJoinOK() {
@@ -309,15 +311,15 @@ public class Game implements GLO {
         ByteBuffer byteBuffer = ByteBuffer.wrap(buf.toString().getBytes());
         byteBuffer.position(byteBuffer.limit());
 
-        log.finest("Game: Broadcasting " + byteBuffer.position() + " bytes on "
-                + channel);
+        log.finest("Game: Broadcasting " + byteBuffer.position() +
+		" bytes on " + channel);
 
         task.sendData(channel, uids, byteBuffer.asReadOnlyBuffer(), true);
     }
 
     protected void sendMoveStarted(Player player) {
-        StringBuffer buf = new StringBuffer("move-started "
-                + player.getPlayerName());
+        StringBuffer buf = new StringBuffer("move-started " +
+		player.getPlayerName());
         broadcast(buf);
     }
 
@@ -347,8 +349,8 @@ public class Game implements GLO {
 
         GLOReference<Board> boardRef = playerBoards.get(bombedPlayerNick);
         if (boardRef == null) {
-            log.warning(player.getPlayerName()
-                    + " tried to bomb non-existant player " + bombedPlayerNick);
+            log.warning(player.getPlayerName() +
+		    " tried to bomb non-existant player " + bombedPlayerNick);
             handlePass(player);
             return;
         }
@@ -363,8 +365,8 @@ public class Game implements GLO {
 
         if ((x < 0) || (x >= board.getWidth()) || (y < 0)
                 || (y >= board.getHeight())) {
-            log.warning(player.getPlayerName()
-                    + " tried to move outside the board");
+            log.warning(player.getPlayerName() +
+		    " tried to move outside the board");
             handlePass(player);
             return;
         }
@@ -423,11 +425,12 @@ public class Game implements GLO {
             if (players.size() == 1) {
                 GLOReference<Player> playerRef = players.get(0);
                 Player winner = playerRef.peek(task);
-                GLOReference<PlayerHistory> historyRef = nameToHistory.get(winner.getUserName());
+                GLOReference<PlayerHistory> historyRef =
+			nameToHistory.get(winner.getUserName());
                 PlayerHistory history = historyRef.get(task);
                 history.win();
-                log.finer(winner.getUserName() + " summary: "
-                        + history.toString());
+                log.finer(winner.getUserName() + " summary: " +
+			history.toString());
             }
 
             // queue a new task to handle end of game
@@ -463,11 +466,14 @@ public class Game implements GLO {
         }
 
         if (loser == null) {
-            log.severe("Can't find losing Player nicknamed `" + loserNick + "'");
+            log.severe("Can't find losing Player nicknamed `" +
+		    loserNick + "'");
             return;
         }
 
-        GLOReference<PlayerHistory> historyRef = nameToHistory.get(loser.getUserName());
+        GLOReference<PlayerHistory> historyRef =
+		nameToHistory.get(loser.getUserName());
+
         PlayerHistory history = historyRef.get(task);
         history.lose();
 

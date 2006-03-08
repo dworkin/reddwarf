@@ -105,7 +105,8 @@ public class Matchmaker implements GLO {
 
     private static final long serialVersionUID = 1;
 
-    private static Logger log = Logger.getLogger("com.sun.gi.apps.battleboard.server");
+    private static Logger log =
+	    Logger.getLogger("com.sun.gi.apps.battleboard.server");
 
     private static final String MATCHMAKER_GLO_NAME = "matchmaker";
 
@@ -113,7 +114,8 @@ public class Matchmaker implements GLO {
 
     private int PLAYERS_PER_GAME = 2;
 
-    private Set<GLOReference<Player>> waitingPlayers = new HashSet<GLOReference<Player>>();
+    private Set<GLOReference<Player>> waitingPlayers =
+	    new HashSet<GLOReference<Player>>();
 
     public static Matchmaker get() {
         SimTask task = SimTask.getCurrent();
