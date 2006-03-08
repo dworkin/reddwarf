@@ -1,286 +1,241 @@
-/**
- *
- * <p>Title: InMemoryDataSpaceTransaction.java</p>
- * <p>Description: </p>
- * <p>Copyright: Copyright (c) 2004 Sun Microsystems, Inc.</p>
- * <p>Company: Sun Microsystems, Inc</p>
- * @author Jeff Kesselman
- * @version 1.0
+/*
+ * Copyright © 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa
+ * Clara, California 95054, U.S.A. All rights reserved.
+ * 
+ * Sun Microsystems, Inc. has intellectual property rights relating to
+ * technology embodied in the product that is described in this
+ * document. In particular, and without limitation, these intellectual
+ * property rights may include one or more of the U.S. patents listed at
+ * http://www.sun.com/patents and one or more additional patents or
+ * pending patent applications in the U.S. and in other countries.
+ * 
+ * U.S. Government Rights - Commercial software. Government users are
+ * subject to the Sun Microsystems, Inc. standard license agreement and
+ * applicable provisions of the FAR and its supplements.
+ * 
+ * Use is subject to license terms.
+ * 
+ * This distribution may include materials developed by third parties.
+ * 
+ * Sun, Sun Microsystems, the Sun logo and Java are trademarks or
+ * registered trademarks of Sun Microsystems, Inc. in the U.S. and other
+ * countries.
+ * 
+ * This product is covered and controlled by U.S. Export Control laws
+ * and may be subject to the export or import laws in other countries.
+ * Nuclear, missile, chemical biological weapons or nuclear maritime end
+ * uses or end users, whether direct or indirect, are strictly
+ * prohibited. Export or reexport to countries subject to U.S. embargo
+ * or to entities identified on U.S. export exclusion lists, including,
+ * but not limited to, the denied persons and specially designated
+ * nationals lists is strictly prohibited.
+ * 
+ * Copyright © 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa
+ * Clara, California 95054, Etats-Unis. Tous droits réservés.
+ * 
+ * Sun Microsystems, Inc. détient les droits de propriété intellectuels
+ * relatifs à la technologie incorporée dans le produit qui est décrit
+ * dans ce document. En particulier, et ce sans limitation, ces droits
+ * de propriété intellectuelle peuvent inclure un ou plus des brevets
+ * américains listés à l'adresse http://www.sun.com/patents et un ou les
+ * brevets supplémentaires ou les applications de brevet en attente aux
+ * Etats - Unis et dans les autres pays.
+ * 
+ * L'utilisation est soumise aux termes de la Licence.
+ * 
+ * Cette distribution peut comprendre des composants développés par des
+ * tierces parties.
+ * 
+ * Sun, Sun Microsystems, le logo Sun et Java sont des marques de
+ * fabrique ou des marques déposées de Sun Microsystems, Inc. aux
+ * Etats-Unis et dans d'autres pays.
+ * 
+ * Ce produit est soumis à la législation américaine en matière de
+ * contrôle des exportations et peut être soumis à la règlementation en
+ * vigueur dans d'autres pays dans le domaine des exportations et
+ * importations. Les utilisations, ou utilisateurs finaux, pour des
+ * armes nucléaires,des missiles, des armes biologiques et chimiques ou
+ * du nucléaire maritime, directement ou indirectement, sont strictement
+ * interdites. Les exportations ou réexportations vers les pays sous
+ * embargo américain, ou vers des entités figurant sur les listes
+ * d'exclusion d'exportation américaines, y compris, mais de manière non
+ * exhaustive, la liste de personnes qui font objet d'un ordre de ne pas
+ * participer, d'une façon directe ou indirecte, aux exportations des
+ * produits ou des services qui sont régis par la législation américaine
+ * en matière de contrôle des exportations et la liste de ressortissants
+ * spécifiquement désignés, sont rigoureusement interdites.
  */
+
 package com.sun.gi.objectstore.tso.dataspace;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
+import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.io.ObjectInputStream;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 
 import com.sun.gi.objectstore.NonExistantObjectIDException;
 import com.sun.gi.objectstore.tso.DataSpaceTransaction;
 import com.sun.gi.utils.classes.CLObjectInputStream;
 
 /**
- * 
- * <p>
- * Title: InMemoryDataSpaceTransaction.java
- * </p>
- * <p>
- * Description:
- * </p>
- * <p>
- * Copyright: Copyright (c) 2004 Sun Microsystems, Inc.
- * </p>
- * <p>
- * Company: Sun Microsystems, Inc
- * </p>
- * 
  * @author Jeff Kesselman
  * @version 1.0
  */
 public class DataSpaceTransactionImpl implements DataSpaceTransaction {
-	private DataSpace dataSpace;
 
+    private DataSpace dataSpace;
+    private ClassLoader loader;
+    private Map<Long, Serializable> localObjectCache = new HashMap<Long, Serializable>();
+    private Map<Long, byte[]> updateMap = new HashMap<Long, byte[]>();
+    private Set<Long> locksHeld = new HashSet<Long>();
+    private boolean clear = false;
 
-	private ClassLoader loader;	
-	
-	private Map<Long, Serializable> localObjectCache = new HashMap<Long,Serializable>();
-	
-	private Map<Long, byte[]> updateMap = new HashMap<Long,byte[]>();
-	
-	private Set<Long> locksHeld = new HashSet<Long>();
+    public DataSpaceTransactionImpl(ClassLoader loader, DataSpace dataSpace) {
+        this.dataSpace = dataSpace;
+        this.loader = loader;
 
-	private boolean clear = false;
-	
-	
-	
-	/**
-	 * @param appID
-	 * @param loader2
-	 * @param dataSpace
-	 * @param backup
-	 */
-	public DataSpaceTransactionImpl(ClassLoader loader,
-			DataSpace dataSpace) {
-		this.dataSpace = dataSpace;
-		this.loader = loader;
-	
-	}
+    }
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.DataSpaceTransaction#create(java.io.Serializable)
-	 */
-	public long create(Serializable object, String name) {
-		return dataSpace.create(serialize(object),name);	
-	}
+    public long create(Serializable object, String name) {
+        return dataSpace.create(serialize(object), name);
+    }
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.DataSpaceTransaction#destroy(long)
-	 */
-	public void destroy(long objectID) {
-		try {
-			dataSpace.destroy(objectID);
-		} catch (NonExistantObjectIDException e) {
-			// XXX: should do something.
-		}
-	}
+    public void destroy(long objectID) {
+        try {
+            dataSpace.destroy(objectID);
+        } catch (NonExistantObjectIDException e) {
+            // XXX: should do something.
+        }
+    }
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.DataSpaceTransaction#read(long)
-	 */
-	public Serializable read(long objectID) throws NonExistantObjectIDException {
-		Long id = new Long(objectID);
-		Serializable obj = localObjectCache.get(id);
-		if ((obj == null)&&(!clear)) { // if clear, pretend nothing in the data space
-			byte[] objbytes = dataSpace.getObjBytes(objectID);			
-			if (objbytes==null){
-				throw new NonExistantObjectIDException();
-			}
-			obj = deserialize(objbytes);
-			localObjectCache.put(new Long(objectID), obj);
-		}
-		return obj;
-	}
+    public Serializable read(long objectID) throws NonExistantObjectIDException {
+        Long id = new Long(objectID);
+        Serializable obj = localObjectCache.get(id);
+        if ((obj == null) && (!clear)) { // if clear, pretend nothing
+                                            // in the data space
+            byte[] objbytes = dataSpace.getObjBytes(objectID);
+            if (objbytes == null) {
+                throw new NonExistantObjectIDException();
+            }
+            obj = deserialize(objbytes);
+            localObjectCache.put(new Long(objectID), obj);
+        }
+        return obj;
+    }
 
-	/**
-	 * @param objbytes
-	 * @param loader2
-	 * @return
-	 */
-	private Serializable deserialize(byte[] objbytes) {
-		ByteArrayInputStream bais = new ByteArrayInputStream(objbytes);
-		try {			
-			ObjectInputStream ois = new CLObjectInputStream(bais,loader);
-			Serializable obj = (Serializable) ois.readObject();
-			ois.close();
-			return obj;
-		} catch (IOException e) {
-			e.printStackTrace();
-		} catch (ClassNotFoundException e) {
-			e.printStackTrace();
-		} catch (SecurityException e) {
-			e.printStackTrace();		
-		} catch (IllegalArgumentException e) {
-			e.printStackTrace();
-		}
-		return null;
-	}
+    private Serializable deserialize(byte[] objbytes) {
+        ByteArrayInputStream bais = new ByteArrayInputStream(objbytes);
+        try {
+            ObjectInputStream ois = new CLObjectInputStream(bais, loader);
+            Serializable obj = (Serializable) ois.readObject();
+            ois.close();
+            return obj;
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (ClassNotFoundException e) {
+            e.printStackTrace();
+        } catch (SecurityException e) {
+            e.printStackTrace();
+        } catch (IllegalArgumentException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
 
-	
+    public void lock(long objectID) throws NonExistantObjectIDException {
+        dataSpace.lock(objectID);
+        locksHeld.add(objectID);
+    }
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.DataSpaceTransaction#lock(long)
-	 */
-	public void lock(long objectID) throws NonExistantObjectIDException {
-		dataSpace.lock(objectID);
-		locksHeld.add(objectID);
-	}
+    public void release(long objectID) {
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.DataSpaceTransaction#release(long)
-	 */
-	public void release(long objectID) {
+        System.out.println("DataSpaceTransactionImpl.release");
 
-		System.out.println("DataSpaceTransactionImpl.release");
+        try {
+            dataSpace.release(objectID);
+        } catch (NonExistantObjectIDException e) {
+            // XXX: should note the error.
+        }
 
-		try {
-			dataSpace.release(objectID);
-		} catch (NonExistantObjectIDException e) {
-			// XXX: should note the error.
-		}
+        locksHeld.remove(objectID);
+    }
 
-		locksHeld.remove(objectID);
-	}
+    public void write(long objectID, Serializable obj) {
+        updateMap.put(new Long(objectID), serialize(obj));
+    }
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.DataSpaceTransaction#write(long,
-	 *      com.sun.gi.objectstore.tso.TSOTransaction.DataHeader)
-	 */
-	public void write(long objectID, Serializable obj) {		
-		updateMap.put(new Long(objectID), serialize(obj));
-	}
+    private byte[] serialize(Serializable obj) {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        byte[] buf = null;
+        try {
+            ObjectOutputStream oas = new ObjectOutputStream(baos);
+            oas.writeObject(obj);
+            oas.flush();
+            oas.close();
+            buf = baos.toByteArray();
+            baos.reset();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return buf;
+    }
 
-	/**
-	 * @param obj
-	 * @return
-	 */
-	private byte[] serialize(Serializable obj) {
-		ByteArrayOutputStream baos = new ByteArrayOutputStream();
-		byte[] buf = null;
-		try {
-			ObjectOutputStream oas = new ObjectOutputStream(baos);
-			oas.writeObject(obj);
-			oas.flush();
-			oas.close();
-			buf = baos.toByteArray();
-			baos.reset();
-		} catch (IOException e) {			
-			e.printStackTrace();
-		}
-		return buf;
-	}
+    public void clear() {
+        clear = true;
+        resetTransaction();
+    }
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.DataSpaceTransaction#clear()
-	 */
-	public void clear() {
-		clear  = true;
-		resetTransaction();
-	}
-	
-	private void resetTransaction(){
-		updateMap.clear();
-		localObjectCache.clear();
-		//release left over locks
+    private void resetTransaction() {
+        updateMap.clear();
+        localObjectCache.clear();
+        // release left over locks
 
-		try {
-		    dataSpace.release(locksHeld);
-		} catch (NonExistantObjectIDException e) {
-		}
+        try {
+            dataSpace.release(locksHeld);
+        } catch (NonExistantObjectIDException e) {
+            // ignore
+        }
 
-		/*
-		for(Long id : locksHeld){
-			try {
-				dataSpace.release(id);
-			} catch (NonExistantObjectIDException e) {
-				// XXX: note the excecption.
-			}
-		}
-		*/
+        /*
+         * for(Long id : locksHeld){ try { dataSpace.release(id); }
+         * catch (NonExistantObjectIDException e) { // XXX: note the
+         * excecption. } }
+         */
 
-		locksHeld.clear();
-	}
+        locksHeld.clear();
+    }
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.DataSpaceTransaction#commit()
-	 */
-	public void commit() {
-		try {
-			dataSpace.atomicUpdate(clear,updateMap);
-		} catch (DataSpaceClosedException e) {
-			
-			e.printStackTrace();
-		}
-		resetTransaction();
-	}
+    public void commit() {
+        try {
+            dataSpace.atomicUpdate(clear, updateMap);
+        } catch (DataSpaceClosedException e) {
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.DataSpaceTransaction#abort()
-	 */
-	public void abort() {
-		resetTransaction();
-		
-	}
+            e.printStackTrace();
+        }
+        resetTransaction();
+    }
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see com.sun.gi.objectstore.tso.DataSpaceTransaction#lookupName(java.lang.String)
-	 */
-	public long lookupName(String name) {				
-		Long l = dataSpace.lookup(name);
-		if (l == null){
-			return DataSpace.INVALID_ID;
-		}
-		return l.longValue();
-	}
+    public void abort() {
+        resetTransaction();
 
-	/**
-	 * 
-	 */
-	public void close() {
-		abort();		
-	}
+    }
 
-	
+    public long lookupName(String name) {
+        Long l = dataSpace.lookup(name);
+        if (l == null) {
+            return DataSpace.INVALID_ID;
+        }
+        return l.longValue();
+    }
 
+    public void close() {
+        abort();
+    }
 
 }
