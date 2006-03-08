@@ -328,7 +328,7 @@
     </target>
 
     <target name="release.bin" depends="release.server,release.j2seAPI, 
-    	release.j2meAPI, release.apps,release.clients"/>
+    	release.apps,release.clients"/>
 
     <target name="release.server" depends="build.server">
 	<jar destfile="release/ProjectDarkstar.jar">
