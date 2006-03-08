@@ -145,7 +145,7 @@ public class TCPIPUserManager implements NIOSocketManagerListener, UserManager
     // NIOSocketManagerListener methods
 
     public void newConnection(final NIOConnection connection) {
-        log.info("New connection received by server");
+        log.finer("New connection received by server");
 
         final SGSUserImpl user = new SGSUserImpl(router,
                 new TransportProtocolTransmitter() {
