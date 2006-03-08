@@ -43,11 +43,14 @@
     </target>
 
     <target name="clean">
-		<delete dir="bin" />
-		<delete quiet="true">
-	  		<fileset dir="release" includes="**/*.jar"/>
-		</delete>
-    	 <ant dir="J2MEAPI/J2MEClientAPI" target="clean" /> 
+	<delete dir="bin" />
+	<delete quiet="true">
+	    <fileset dir="release" includes="**/*.jar"/>
+	</delete>
+    </target>
+
+    <target name="clean.j2meAPI">
+	<ant dir="J2MEAPI/J2MEClientAPI" target="clean" /> 
     </target>
 
     <target name="realclean" depends="clean">
