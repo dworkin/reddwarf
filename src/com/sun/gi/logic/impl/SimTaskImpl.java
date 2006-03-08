@@ -155,7 +155,8 @@ public class SimTaskImpl extends SimTask {
 
 			case ATTEMPT:
 				runobj = startObject.attempt(this);
-				if (runobj == null) { // attempt failed
+				if (runobj == null) {
+					// attempt failed
 					trans.abort();
 					return;
 				}
@@ -180,10 +181,12 @@ public class SimTaskImpl extends SimTask {
 			ex.printStackTrace();
 			trans.abort();
 		} catch (DeadlockException de) {
+		        // the transaction has already been aborted
 			deferredCommands.clear();
 			gloIDMap.clear();
 			gloAccessMap.clear();
-			simulation.queueTask(this); // requeue for later execution
+			// requeue for later execution
+			simulation.queueTask(this);
 		}
 	}
 
