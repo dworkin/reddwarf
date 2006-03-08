@@ -102,6 +102,12 @@ public class Player implements SimUserDataListener {
      */
     private UserID myUserID;
 
+    // Reference count of this GLO's listeners.
+    // XXX This is a workaround for the non-deterministic
+    // order in which userLeft and userLeftChannel get called,
+    // which lead to NPEs after Player deletion.
+    private int listenerCount = 0;
+
     /**
      * The name under which the player is playing (i.e., a screen name
      * for this user). This need not be related in any way to the user
@@ -193,7 +199,7 @@ public class Player implements SimUserDataListener {
 
         // check that the player doesn't already exist
         /*
-         * GLOReference playerRef = getRef(uid);
+         * GLOReference<Player> playerRef = getRef(uid);
 	 * if (playerRef != null) {
 	 *  // XXX delete it? update it with this uid?
 	 *  // kick the new guy off? kick the old guy?
@@ -208,20 +214,55 @@ public class Player implements SimUserDataListener {
         // We're interested in direct server data sent by the user.
         task.addUserDataListener(uid, playerRef);
         Matchmaker.get().addUserID(uid);
+
+	playerRef.get(task).incrementReferenceCount();
     }
 
     public static void userLeft(UserID uid) {
         log.fine("User " + uid + " left server");
 
-        SimTask task = SimTask.getCurrent();
+        GLOReference<Player> playerRef = getRef(uid);
+	if (playerRef != null) {
+	    SimTask task = SimTask.getCurrent();
+	    playerRef.get(task).decrementReferenceCount();
+	} else {
+	    log.finer("userLeft for unknown uid " + uid);
+	}
+    }
 
-        // In the future we may want the player object to persist.
-        // The PlayerHistory does persist, but in this implementation
-        // we delete the Player GLO on logout.
-        GLOReference playerRef = Player.getRef(uid);
-        if (playerRef != null) {
-            playerRef.delete(task);
-        }
+    private void incrementReferenceCount() {
+	listenerCount++;
+	log.finest("Listener count is now " + listenerCount + " for " +
+	    getPlayerName() + " (" +
+	    getUserName() + ") uid " + myUserID);
+
+    }
+
+    private void decrementReferenceCount() {
+
+	listenerCount--;
+
+	log.finest("Listener count is now " + listenerCount + " for " +
+	    getPlayerName() + " (" +
+	    getUserName() + ") uid " + myUserID);
+
+	if (listenerCount == 0) {
+	    log.finer("Deleting Player GLO");
+
+	    SimTask task = SimTask.getCurrent();
+
+	    // XXX: Because userLeft and userLeftChannel may happen
+	    // in any order, we do the deletion here after checking
+	    // that nobody else will send us an event.
+
+	    // In the future we may want the player object to persist,
+	    // so all this would have to change.
+
+	    // The PlayerHistory does persist, but in this implementation
+	    // we delete the Player GLO on logout.
+
+	    task.destroyGLO(Player.getRef(myUserID));
+	}
     }
 
     // SimUserDataListener methods
@@ -233,6 +274,8 @@ public class Player implements SimUserDataListener {
             log.warning("Player: Got UID " + uid + " expected " + myUserID);
             return;
         }
+
+	incrementReferenceCount();
 
         SimTask task = SimTask.getCurrent();
         if (myGameRef != null) {
@@ -272,6 +315,8 @@ public class Player implements SimUserDataListener {
 		matchmaker.leftChannel(cid, uid);
 	    }
         }
+
+	decrementReferenceCount();
     }
 
     public void userDataReceived(UserID uid, ByteBuffer data) {
@@ -281,6 +326,10 @@ public class Player implements SimUserDataListener {
             log.warning("Player: Got UID " + uid + " expected " + myUserID);
             return;
         }
+
+	if (listenerCount <= 0) {
+	    log.warning("No listeners! listenerCount is " + listenerCount);
+	}
 
         SimTask task = SimTask.getCurrent();
         if (myGameRef != null) {

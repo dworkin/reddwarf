@@ -219,28 +219,6 @@ public class Game implements GLO {
     public void endGame() {
         SimTask task = SimTask.getCurrent();
         log.finer("Ending Game");
-        // Tell all the players this game is over
-        for (GLOReference<Player> ref : players) {
-            Player p = ref.get(task);
-            p.gameEnded(thisRef);
-        }
-
-        // Close this game's channel
-        task.closeChannel(channel);
-        channel = null;
-
-        // Destroy all the players' boards
-        for (GLOReference ref : playerBoards.values()) {
-            ref.delete(task);
-        }
-
-        // null the lists and maps so they can be GC'd
-        players.clear();
-        spectators.clear();
-        playerBoards.clear();
-
-        // Destroy this Game GLO
-	thisRef.delete(task);
     }
 
     protected void sendJoinOK() {
@@ -562,5 +540,54 @@ public class Game implements GLO {
      */
     public void leftChannel(ChannelID cid, UserID uid) {
         log.finer("Game: User " + uid + " left channel " + cid);
+
+        SimTask task = SimTask.getCurrent();
+
+        GLOReference<Player> playerRef = Player.getRef(uid);
+
+        if (playerRef == null) {
+            log.warning("No PlayerRef found for uid " + uid);
+        }
+
+        // Tell the player this game is over
+	Player player = playerRef.get(task);
+        if (player == null) {
+            log.warning("No Player found for uid " + uid);
+        }
+
+	log.finer("Game end for for " +
+	    player.getPlayerName() + " (" +
+	    player.getUserName() + ") uid " + uid);
+
+	player.gameEnded(thisRef);
+
+	players.remove(playerRef);
+	spectators.remove(playerRef);
+	playerBoards.remove(player.getPlayerName());
+
+	if (log.isLoggable(Level.FINEST)) {
+	    log.finest(players.size() + " players, " +
+		    spectators.size() + " spectators, " +
+		    playerBoards.size() + " boards");
+	}
+
+	if (players.isEmpty() && spectators.isEmpty()) {
+
+	    // The last player left, so destroy this Game
+	    log.finer("Destroying game");
+
+	    // Destroy all the players' boards
+	    for (GLOReference ref : playerBoards.values()) {
+		task.destroyGLO(ref);
+	    }
+
+	    // null the lists and maps so they can be GC'd
+	    players = null;
+	    spectators = null;
+	    playerBoards = null;
+
+	    // Destroy this Game GLO
+	    task.destroyGLO(thisRef);
+	}
     }
 }
