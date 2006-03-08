@@ -127,11 +127,11 @@
 	</javac>
     </target>
 
-    <target name="build.j2meAPI">
-       <ant dir="J2MEAPI/J2MEClientAPI" target="jar"/>
+    <target name="build.j2meAPI" depends="init">
+        <ant dir="J2MEAPI/J2MEClientAPI" target="jar"/>
     </target>
 
-    <target name="build.clients" depends="build.j2seAPI,build.j2meAPI">
+    <target name="build.clients" depends="build.j2seAPI">
 	<javac srcdir="src" destdir="bin" source="5" target="5"
 		debug="${debug}" optimize="${optimize}"
 		deprecation="${deprecated}">
@@ -368,11 +368,11 @@
 	</jar>
     </target>
 	
-	<target name="release.j2meAPI" depends="build.j2meAPI">
-		<copy todir="release" >
-			<fileset dir="J2MEAPI/J2MEClientAPI/dist" />
-		</copy>	
-	</target>
+    <target name="release.j2meAPI" depends="build.j2meAPI">
+	<copy todir="release" >
+	    <fileset dir="J2MEAPI/J2MEClientAPI/dist" />
+	</copy>	
+    </target>
 
     <target name="release.docs" depends="docs">
 	<copy todir="release/docs" >
