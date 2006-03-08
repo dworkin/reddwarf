@@ -74,8 +74,10 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -94,6 +96,7 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
     private Map<Long, Serializable> localObjectCache = new HashMap<Long, Serializable>();
     private Map<Long, byte[]> updateMap = new HashMap<Long, byte[]>();
     private Set<Long> locksHeld = new HashSet<Long>();
+    private List<Long> deletedObjects = new ArrayList<Long>();
     private boolean clear = false;
 
     public DataSpaceTransactionImpl(ClassLoader loader, DataSpace dataSpace) {
@@ -106,16 +109,15 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
         return dataSpace.create(serialize(object), name);
     }
 
-    public void destroy(long objectID) {
-        try {
-            dataSpace.destroy(objectID);
-        } catch (NonExistantObjectIDException e) {
-            // XXX: should do something.
-        }
+    public void destroy(long objectID) {      
+         deletedObjects.add(objectID);       
     }
 
     public Serializable read(long objectID) throws NonExistantObjectIDException {
         Long id = new Long(objectID);
+        if (deletedObjects.contains(objectID)){ // it gone
+        	 throw new NonExistantObjectIDException();
+        }
         Serializable obj = localObjectCache.get(id);
         if ((obj == null) && (!clear)) { // if clear, pretend nothing
                                             // in the data space
@@ -194,6 +196,7 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
     private void resetTransaction() {
         updateMap.clear();
         localObjectCache.clear();
+        deletedObjects.clear();
         // release left over locks
 
         try {
@@ -213,7 +216,7 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 
     public void commit() {
         try {
-            dataSpace.atomicUpdate(clear, updateMap);
+            dataSpace.atomicUpdate(clear, updateMap, deletedObjects);
         } catch (DataSpaceClosedException e) {
             e.printStackTrace();
         }
@@ -229,6 +232,9 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
         Long l = dataSpace.lookup(name);
         if (l == null) {
             return DataSpace.INVALID_ID;
+        }
+        if (deletedObjects.contains(l)){
+        	return DataSpace.INVALID_ID;
         }
         return l.longValue();
     }

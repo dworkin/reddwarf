@@ -101,6 +101,7 @@ public class TSOTransaction implements Transaction {
     private DataSpace mainDataSpace;
     private Map<Long, Serializable> lockedObjectsMap = new HashMap<Long, Serializable>();
     private List<Long> createdIDsList = new ArrayList<Long>();
+    private List<Long> deletedIDsList = new ArrayList<Long>();
 
     // private Map<Long, TSODataHeader> newObjectHeaders = new
     // HashMap<Long,TSODataHeader>();
@@ -193,8 +194,8 @@ public class TSOTransaction implements Transaction {
     public void destroy(long objectID) throws DeadlockException,
             NonExistantObjectIDException {
         TSODataHeader hdr = (TSODataHeader) mainTrans.read(objectID);
-        createTrans.destroy(hdr.objectID); // destroy object
-        createTrans.destroy(objectID); // destroy header
+        mainTrans.destroy(hdr.objectID); // destroy object
+        mainTrans.destroy(objectID); // destroy header
     }
 
     /*
