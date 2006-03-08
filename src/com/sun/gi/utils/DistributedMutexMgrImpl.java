@@ -102,7 +102,7 @@ public class DistributedMutexMgrImpl
 
     private List listeners = new ArrayList();
     private static final boolean DEBUG = false;
-    private boolean done = false;
+    volatile boolean done = false;
     private static final long TIMEOUT = 3000;
 
     public DistributedMutexMgrImpl(ReliableMulticaster reliable) {
@@ -414,9 +414,10 @@ public class DistributedMutexMgrImpl
     void doRelease(DistributedMutexImpl mutex) {
         synchronized (lists) {
             mutex.clearAcks(); // reset for new req
-            mutex.tieBreaker = random.nextLong(); // so it doesnt get
-                                                    // stuck with a bad
-                                                    // value
+           
+            // tiebreaker, so it doesnt get stuck with a bad value
+            mutex.tieBreaker = random.nextLong();
+
             lists.blockedMutexes.remove(mutex);
             lists.pendingMutexes.add(mutex);
         }
