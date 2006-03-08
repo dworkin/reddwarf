@@ -71,6 +71,7 @@ package com.sun.gi.objectstore.tso.dataspace;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -79,7 +80,6 @@ import com.sun.gi.objectstore.tso.dataspace.monitor.AtomicUpdateTraceRecord;
 import com.sun.gi.objectstore.tso.dataspace.monitor.ClearTraceRecord;
 import com.sun.gi.objectstore.tso.dataspace.monitor.CloseTraceRecord;
 import com.sun.gi.objectstore.tso.dataspace.monitor.CreateTraceRecord;
-import com.sun.gi.objectstore.tso.dataspace.monitor.DestroyTraceRecord;
 import com.sun.gi.objectstore.tso.dataspace.monitor.GetAppIdTraceRecord;
 import com.sun.gi.objectstore.tso.dataspace.monitor.GetObjBytesTraceRecord;
 import com.sun.gi.objectstore.tso.dataspace.monitor.LockTraceRecord;
@@ -234,19 +234,22 @@ public class MonitoredDataSpace implements DataSpace {
     /**
      * {@inheritDoc}
      */
-    public void atomicUpdate(boolean clear, Map<Long, byte[]> updateMap)
-            throws DataSpaceClosedException {
+    public void atomicUpdate(boolean clear, Map<Long, byte[]> updateMap,
+            List<Long> deleted)
+            throws DataSpaceClosedException
+    {
         long startTime = loggingEnabled() ? System.currentTimeMillis() : -1;
         DataSpaceClosedException re = null;
 
         try {
-            dataSpace.atomicUpdate(clear, updateMap);
+            dataSpace.atomicUpdate(clear, updateMap, deleted);
         } catch (DataSpaceClosedException e) {
             re = e;
         }
 
         if (loggingEnabled()) {
-            log(new AtomicUpdateTraceRecord(startTime, clear, updateMap));
+            log(new AtomicUpdateTraceRecord(startTime, clear, updateMap,
+                    deleted));
         }
 
         if (re != null) {
@@ -325,28 +328,6 @@ public class MonitoredDataSpace implements DataSpace {
         }
 
         return oid;
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public void destroy(long objectID) throws NonExistantObjectIDException {
-        long startTime = loggingEnabled() ? System.currentTimeMillis() : -1;
-        NonExistantObjectIDException seenException = null;
-
-        try {
-            dataSpace.destroy(objectID);
-        } catch (NonExistantObjectIDException e) {
-            seenException = e;
-        }
-
-        if (loggingEnabled()) {
-            log(new DestroyTraceRecord(startTime, objectID));
-        }
-
-        if (seenException != null) {
-            throw seenException;
-        }
     }
 
     /**

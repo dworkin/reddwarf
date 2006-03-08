@@ -71,20 +71,24 @@ package com.sun.gi.objectstore.tso.dataspace.monitor;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import com.sun.gi.objectstore.tso.dataspace.DataSpace;
 import com.sun.gi.objectstore.tso.dataspace.DataSpaceClosedException;
 
 public class AtomicUpdateTraceRecord extends TraceRecord
-        implements Serializable {
+        implements Serializable
+{
     private static final long serialVersionUID = 2L;
     protected final boolean clear;
     protected final Map<Long, Integer> updateMap;
+    protected final List<Long> deleted;
 
     public AtomicUpdateTraceRecord(long startTime, boolean clear,
-            Map<Long, byte[]> updateMap) {
+            Map<Long, byte[]> updateMap, List<Long> deleted) {
         super(startTime);
 
         this.clear = clear;
@@ -92,6 +96,7 @@ public class AtomicUpdateTraceRecord extends TraceRecord
         for (Long oid : updateMap.keySet()) {
             this.updateMap.put(oid, new Integer(updateMap.get(oid).length));
         }
+        this.deleted = new ArrayList<Long>(deleted);
     }
 
     public void replay(DataSpace dataSpace, ReplayState replayState) {
@@ -100,14 +105,26 @@ public class AtomicUpdateTraceRecord extends TraceRecord
         for (Long oid : updateMap.keySet()) {
             long mappedOid = replayState.getMappedOid(oid);
             if (mappedOid == DataSpace.INVALID_ID) {
-                System.out.println("Unknown updated OID in atomicUpdate replay");
+                System.err.println("Unknown updated OID in atomicUpdate replay");
             } else {
                 mappedUpdateMap.put(mappedOid, new byte[updateMap.get(oid)]);
             }
         }
+        
+        // XXX Dan, is this correct?  I added it to mimic the above,
+        // but if deletes don't need this checking you can remove it. -JM
+        List<Long> mappedDeleted = new ArrayList<Long>();
+        for (Long oid : deleted) {
+            long mappedOid = replayState.getMappedOid(oid);
+            if (mappedOid == DataSpace.INVALID_ID) {
+                System.err.println("Unknown deleted OID in atomicUpdate replay");
+            } else {
+                mappedDeleted.add(mappedOid);
+            }
+        }
 
         try {
-            dataSpace.atomicUpdate(clear, mappedUpdateMap);
+            dataSpace.atomicUpdate(clear, mappedUpdateMap, mappedDeleted);
         } catch (DataSpaceClosedException e) {
             // XXX: unexpected
         }

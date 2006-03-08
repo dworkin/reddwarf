@@ -812,15 +812,11 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 
     /**
      * Destroys the object associated with objectID and removes the
-     * name associated with that ID (if any).  <p>
+     * name associated with that ID (if any).
+     * <p>
+     * destroy is a transactional change to the database.
      * 
-     * destroy is an immediate (non-transactional) change to the
-     * DataSpace.
-     * 
-     * @param The objectID of the object to destroy
-     *
-     * @throws NonExistantObjectIDException if no object with the
-     * given <em>objectID</em> exists
+     * @param objectID The objectID of the object to destroy
      */
     private void destroy(long objectID) {
         synchronized (nameSpace) {
