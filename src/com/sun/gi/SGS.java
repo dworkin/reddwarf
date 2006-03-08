@@ -140,7 +140,7 @@ public class SGS {
 		installFile = installProperty;
 	    }
 	    if (verbose) {
-		System.out.println("Loading configuration from: " + installFile);
+		System.err.println("Loading configuration from: " + installFile);
 	    }
 	    InstallationLoader installation = new InstallationURL(new URL(
 		    installFile));
@@ -179,7 +179,7 @@ public class SGS {
 		startupGame(routerTransportManager, game, installationReport);
 	    }
 	    reportUpdater = new ReportUpdater(reportManager);
-	    installationReport.dump(System.out);
+	    installationReport.dump(System.err);
 	    reportUpdater.addReport(installationReport);
 	} catch (Exception ex) {
 	    ex.printStackTrace();
@@ -224,7 +224,7 @@ public class SGS {
 		if ((cleanProperty != null)
 			&& (cleanProperty.equalsIgnoreCase("true"))) {
 		    if (verbose) {
-			System.out.println("Clearing Object Store");
+			System.err.println("Clearing Object Store");
 		    }
 		    ostore.clear();
 		}

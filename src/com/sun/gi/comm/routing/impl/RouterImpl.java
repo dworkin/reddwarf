@@ -74,6 +74,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.security.auth.Subject;
 
@@ -93,6 +95,8 @@ import com.sun.gi.utils.types.BYTEARRAY;
 
 public class RouterImpl implements Router {
 
+    static Logger log = Logger.getLogger("com.sun.gi.comm.routing");
+
     private Map<UserID, SGSUser> userMap = new ConcurrentHashMap<UserID, SGSUser>();
 
     private TransportManager transportManager;
@@ -105,8 +109,6 @@ public class RouterImpl implements Router {
 
     private ByteBuffer hdr = ByteBuffer.allocate(256);
     private List<RouterListener> listeners = new ArrayList<RouterListener>();
-
-    private static final boolean TRACEKEYS = true;
 
     protected int keySecondsToLive;
 
@@ -157,8 +159,8 @@ public class RouterImpl implements Router {
                             synchronized (currentKeys) {
                                 currentKeys.put(uid, ba);
                             }
-                            if (TRACEKEYS) {
-                                System.out.println("Received key " + ba.toHex()
+                            if (log.isLoggable(Level.FINER)) {
+                                log.finer("Received key " + ba.toHex()
                                         + " for user " + uid.toString());
                             }
                         } catch (InstantiationException e) {
@@ -170,7 +172,8 @@ public class RouterImpl implements Router {
             }
 
             public void channelClosed() {
-                SGSERRORCODES.FatalErrors.RouterFailure.fail("Router control channel failed.");
+                SGSERRORCODES.FatalErrors.RouterFailure.fail(
+                        "Router control channel failed.");
             }
         });
         // initialize key TTL
@@ -228,8 +231,8 @@ public class RouterImpl implements Router {
                 e.printStackTrace();
             }
             xmitConnectKey(user.getUserID(), keybytes);
-            if (TRACEKEYS) {
-                System.out.println("Generated key " + keybytes.toString()
+            if (log.isLoggable(Level.FINER)) {
+                log.finer("Generated key " + keybytes.toString()
                         + " for user " + user.toString());
             }
         }
@@ -259,7 +262,7 @@ public class RouterImpl implements Router {
             try {
                 user.userLeftSystem(uidbytes);
             } catch (IOException e) {
-                System.out.println("Exception sending UserLeft to user id="
+                log.warning("Exception sending UserLeft to user id "
                         + user.getUserID());
                 e.printStackTrace();
             }
@@ -280,7 +283,7 @@ public class RouterImpl implements Router {
                     user.userJoinedSystem(uidbytes);
                 }
             } catch (IOException e) {
-                System.out.println("Exception sending UserJOined to user id="
+                log.warning("Exception sending UserJoined to user id "
                         + user.getUserID());
                 e.printStackTrace();
             }
@@ -304,7 +307,7 @@ public class RouterImpl implements Router {
         issueNewKey(user);
         reportUserJoined(user.getUserID().toByteArray());
         fireUserJoined(user.getUserID(), subject);
-        // send already connected users to new joiner
+        // send already-connected users to new joiner
         for (UserID oldUserID : userMap.keySet()) {
             if (oldUserID != user.getUserID()) {
                 user.userJoinedSystem(oldUserID.toByteArray());
@@ -443,29 +446,29 @@ public class RouterImpl implements Router {
         synchronized (currentKeys) {
             BYTEARRAY currentKey = currentKeys.get(uid);
             if (currentKey == null) {
-                if (TRACEKEYS) {
-                    System.out.println("No key available for ID: "
+                if (log.isLoggable(Level.FINER)) {
+                    log.finer("No key available for ID: "
                             + uid.toString());
                 }
                 return false;
             }
             if (currentKey.equals(key)) {
-                if (TRACEKEYS) {
-                    System.out.println("Current Key validated for ID: "
+                if (log.isLoggable(Level.FINER)) {
+                    log.finer("Current Key validated for ID: "
                             + uid.toString());
                 }
                 return true;
             }
             BYTEARRAY pastKey = previousKeys.get(uid);
             if ((pastKey != null) && (pastKey.equals(key))) {
-                if (TRACEKEYS) {
-                    System.out.println("Past Key validated for ID: "
+                if (log.isLoggable(Level.FINER)) {
+                    log.finer("Past Key validated for ID: "
                             + uid.toString());
                 }
                 return true;
             }
-            if (TRACEKEYS) {
-                System.out.println("Incorrect Key for ID: " + uid.toString());
+            if (log.isLoggable(Level.FINER)) {
+                log.finer("Incorrect Key for ID: " + uid.toString());
             }
             return false;
         }

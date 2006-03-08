@@ -8,7 +8,7 @@ import com.sun.gi.objectstore.tso.dataspace.DataSpace;
 
 /**
  * <p>Title: ObjectStore.java</p>
- * <p>Description: This interface defines a Darkstar ObjectStore</p>
+ * <p>Description: This interface defines an SGS ObjectStore</p>
  * <p>Copyright: Copyright (c) 2004 Sun Microsystems, Inc.</p>
  * <p>Company: Sun Microsystems, Inc</p>
  * @author Jeff Kesselman
@@ -26,7 +26,7 @@ public interface ObjectStore {
    * <p>All interractions with data stored in the ObejctStore must ocurr under a transactional context.
    * This method returns a Transaction object that implements that context.</p>
    * <p>Every app has a seperate space in the ObjectStore that is segregated by AppID. AppIDs are assigned 
-   * to apps when they are installed into the Darkstar back-end.  
+   * to apps when they are installed into the SGS back-end.  
    * (The true primary key of any Object stored in the Objectstore is a composite of the AppID and 
    * its ObjectID.)</p>
    * <p>Every app also has its own class loader for loading the classes as required by the 

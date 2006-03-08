@@ -550,7 +550,7 @@ public class ChatTestClient extends JFrame implements ClientConnectionManagerLis
 	 * @param userID			the ID of the user attemping to join/leave
 	 */
 	public void channelLocked(String channelName, byte[] userID) {
-		System.out.println("ChatTestClient received locked notification: " + channelName);
+		System.err.println("ChatTestClient received locked notification: " + channelName);
 	}
 
 }

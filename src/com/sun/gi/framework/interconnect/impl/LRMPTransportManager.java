@@ -24,7 +24,6 @@ public class LRMPTransportManager
   private Map chanMap = new HashMap();
   private Map oldChanMap = new HashMap();
   private boolean echo=false;
-private boolean TRACE=false;
 
   public LRMPTransportManager() {
     String prop = System.getProperty("sgs.lrmp.mcastaddress");
@@ -62,8 +61,7 @@ private boolean TRACE=false;
    * @param lRMPSocketManager LRMPSocketManager
    */
   public void socketClosed(LRMPSocketManager lRMPSocketManager) {
-    System.out.println("ERROR: LRMP Socket Closed!  Should never happen!");
-    System.exit(300);
+    throw new RuntimeException("LRMP Socket Closed!  Should never happen!");
   }
 
   /**
@@ -77,9 +75,7 @@ private boolean TRACE=false;
     ByteBuffer buff = ByteBuffer.wrap(inpkt.getData(),
                                       inpkt.getOffset(), inpkt.getLength());    
     byte op = buff.get();
-    if (TRACE){
-    	System.out.println("Processing transport pkt opcode: "+op);
-    }
+    //System.err.println("Processing transport pkt opcode: "+op);
     switch (op) {
       case OP_CHANNEL_ANNOUNCE:
         SGSUUID uuID = new StatisticalUUID();

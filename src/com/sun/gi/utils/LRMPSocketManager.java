@@ -53,7 +53,7 @@ public class LRMPSocketManager
         packetArrived(packet);
       }
       if (DEBUGPKTS){
-    	  System.out.println("LRMPTRansportMgr sent packet");
+    	  System.err.println("LRMPTRansportMgr sent packet");
       }
     }
     catch (Exception ex) {
@@ -83,7 +83,7 @@ public class LRMPSocketManager
       try {
         inpkt = ps.receive();
         if (DEBUGPKTS){
-      	  System.out.println("LRMPTRansportMgr sent packet");
+      	  System.err.println("LRMPTRansportMgr sent packet");
         }
         packetArrived(inpkt);        
       }

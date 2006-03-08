@@ -160,7 +160,7 @@ public class RawSocketManagerImpl implements RawSocketManager {
 	private ByteChannel getChannel(long socketID) {
 		SocketInfo info = socketMap.get(socketID);
 		if (info == null) {		// attempt to reference a channel that is no longer valid.
-			System.out.println("No channel in map, ID: " + socketID);
+			System.err.println("No channel in map, ID: " + socketID);
 			new Throwable().printStackTrace();
 			return null;
 		}

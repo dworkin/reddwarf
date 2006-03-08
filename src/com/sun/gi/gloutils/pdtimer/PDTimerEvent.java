@@ -1,6 +1,7 @@
 package com.sun.gi.gloutils.pdtimer;
 
 import java.lang.reflect.Method;
+import java.util.logging.Logger;
 
 import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
@@ -22,6 +23,7 @@ public class PDTimerEvent implements GLO {
 	 * hardwired serial version UID
 	 */
 	private static final long serialVersionUID = 1L;
+        private static Logger log = Logger.getLogger("com.sun.gi.gloutils.pdtimer");
 	public boolean isActive=true;
 	ACCESS_TYPE accessType;
 	long delay;
@@ -90,7 +92,7 @@ public class PDTimerEvent implements GLO {
 
 	public void reset(SimTask task) {
 		task.access_check(ACCESS_TYPE.GET,this);
-		System.out.println("Restting event");
+		log.finest("Restting event");
 		isActive=true;
 		
 	}

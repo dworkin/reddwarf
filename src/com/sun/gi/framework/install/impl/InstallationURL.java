@@ -68,12 +68,12 @@ public class InstallationURL implements InstallationLoader {
 						String classpath = drec.getClasspathURL().trim();
 						if (classpath.substring(0,5).equalsIgnoreCase("file:")&&
 								(!classpath.substring(5,7).equals("//"))){
-							// realtive file URL, money with it
+							// realtive file URL, monkey with it
 							URL ctext = new URL(drecURL.getProtocol()+":"+
 								drecURL.getPath());
 							URL turl = new URL(ctext,classpath.substring(5));
 							classpath = turl.toExternalForm();
-							System.out.println("Modified cp:"+classpath);
+							//System.err.println("Modified cp:"+classpath);
 							((DeploymentRecImpl)drec).setClasspathURL(classpath);
 						}
 					}

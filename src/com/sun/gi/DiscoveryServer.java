@@ -161,7 +161,7 @@ public class DiscoveryServer {
                         StatusReport report =
                             reportManager.getReport(reportNames[i]);
                         if (report != null) {
-                            report.dump(System.out);
+                            report.dump(System.err);
                             addReportToDiscoveryFile(report);
                         }
                     }
@@ -169,7 +169,7 @@ public class DiscoveryServer {
                 endDiscoveryFile();
                 long time = System.currentTimeMillis();
                 long wakeUpTime = time + fileUpdatePeriod;
-                System.out.println("Wakeup Time:" + wakeUpTime);
+                System.err.println("Wakeup Time:" + wakeUpTime);
                 while (wakeUpTime > time) {
                     try {
                         Thread.sleep(wakeUpTime - time);
@@ -178,7 +178,7 @@ public class DiscoveryServer {
                     }
                     time = System.currentTimeMillis();
                 }
-                System.out.println("WOke up at: " + System.currentTimeMillis());
+                System.err.println("Woke up at: " + System.currentTimeMillis());
             }
         } catch (IOException ex) {
             ex.printStackTrace();
@@ -260,16 +260,16 @@ public class DiscoveryServer {
                 gameMap.put(ti, grec);
             } else {
                 if (!grec.name.equals(gameName)) {
-                    System.out.println("WARNING: name mismatch on ID " + gameID
+                    System.err.println("WARNING: name mismatch on ID " + gameID
                             + ":");
-                    System.out.println("<< " + grec.name);
-                    System.out.println(">> " + gameName);
+                    System.err.println("<< " + grec.name);
+                    System.err.println(">> " + gameName);
                 }
                 if (!grec.description.equals(gameDescr)) {
-                    System.out.println("WARNING: description mismatch on ID "
+                    System.err.println("WARNING: description mismatch on ID "
                             + gameID + ":");
-                    System.out.println("<< " + grec.description);
-                    System.out.println(">> " + gameDescr);
+                    System.err.println("<< " + grec.description);
+                    System.err.println(">> " + gameDescr);
                 }
             }
             // now do user managers

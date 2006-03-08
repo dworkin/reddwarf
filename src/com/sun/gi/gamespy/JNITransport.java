@@ -9,7 +9,7 @@ public class JNITransport {
 
   public static void initialize()
   {
-    System.out.println("initting");
+    System.err.println("init GameSpy");
     System.loadLibrary("GameSpyJNI");
     init();
   }

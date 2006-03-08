@@ -6,7 +6,7 @@ import com.sun.gi.comm.users.validation.UserValidatorFactory;
 
 /**
  * Defines the primary class necessary to
- * implement the server side of a Darkstar UserManager.  A user manager
+ * implement the server side of an SGS UserManager.  A user manager
  * is responsible for creating a SGSUser for each legitimately logged in
  * user and reigstering it with the Router.  It is strongly recommended
  * that implementors use the provided SGSUserImpl class for their SGSUsers.
@@ -27,11 +27,11 @@ public interface UserManager {
 
     /**
      * Provides the name of a class that a client should
-     * instantiate in order to connect to this Darkstar
+     * instantiate in order to connect to this SGS
      * Server UserManager.  That class implements the
      * UserManagerClient interface.
      *
-     * @return the fully-qualified name of the Darkstar UserManagerClient
+     * @return the fully-qualified name of the SGS UserManagerClient
      *         class correspoding to this server-side UserManager.
      */
     public String getClientClassname();

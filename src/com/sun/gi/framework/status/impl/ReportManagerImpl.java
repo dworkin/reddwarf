@@ -105,7 +105,7 @@ public class ReportManagerImpl
    * channelClosed
    */
   public void channelClosed() {
-    System.out.println("ERROR! Report channel has been closed!");
+    throw new RuntimeException("Report channel has been closed!");
   }
 
   /**

@@ -8,8 +8,12 @@ import javax.security.auth.callback.PasswordCallback;
 import javax.security.auth.callback.TextInputCallback;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.logging.Logger;
 
 public class ValidationDataProtocol {
+
+    private static Logger log = Logger.getLogger("com.sun.gi.comm.users");
+
     public static final byte CB_TYPE_NAME = 1;
 
     public static final byte CB_TYPE_PASSWORD = 2;
@@ -127,7 +131,7 @@ public class ValidationDataProtocol {
 		String name = new String(strbytes);
 		NameCallback namecb;
 		if (prompt.length()==0){
-		    System.out.println("Error: Received illegal name callback with no prompt.");
+		    log.warning("Received name callback with no prompt.");
 		    prompt = "<UNSPECIFIED>";
 		}
 		if (defaulttext.length()==0){
@@ -150,7 +154,7 @@ public class ValidationDataProtocol {
 		buff.get(strbytes);
 		String password = new String(strbytes);
 		if (prompt.length()==0){
-		    System.out.println("Error: Received illegal name callback with no prompt.");
+		    log.warning("Received password callback with no prompt.");
 		    prompt = "<UNSPECIFIED>";
 		}
 		PasswordCallback pcb = new PasswordCallback(prompt, false);
@@ -172,7 +176,7 @@ public class ValidationDataProtocol {
 		buff.get(strbytes);
 		String response = new String(strbytes);
 		if (prompt.length()==0){
-		    System.out.println("Error: Received illegal name callback with no prompt.");
+		    log.warning("Received text-input callback with no prompt.");
 		    prompt = "<UNSPECIFIED>";
 		}
 		TextInputCallback tcb;
@@ -187,8 +191,7 @@ public class ValidationDataProtocol {
 		break;
 
 	    default:
-		System.out.println("Error: Illegal login callback type: "
-			+ cbType);
+		log.warning("Unknown login callback type: " + cbType);
 		return null;
 	    }
 	}

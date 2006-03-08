@@ -52,7 +52,7 @@ public interface DeploymentRec {
 	
 	/**
 	 * This is set after the creation the rec itself so must be visible in the interface
-	 * @param ID id assigned to this application whe it was installed into Darkstar
+	 * @param ID id assigned to this application whe it was installed into SGS
 	 * 
 	 */
 	public void setID(int ID);

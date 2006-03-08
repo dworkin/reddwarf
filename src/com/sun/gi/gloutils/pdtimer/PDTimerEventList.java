@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.Map.Entry;
+import java.util.logging.Logger;
 
 import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
@@ -32,6 +33,7 @@ import com.sun.gi.logic.SimTask.ACCESS_TYPE;
  * @version 1.0
  */
 public class PDTimerEventList implements GLO {
+        private static Logger log = Logger.getLogger("com.sun.gi.gloutils.pdtimer");
 	private SortedMap<Long, GLOReference> timerEvents = new TreeMap<Long, GLOReference>();
 	private static final int BIGCLEANUP_PERIOD = 100;
 	private int bigCleanupCountdown = BIGCLEANUP_PERIOD;
@@ -50,7 +52,7 @@ public class PDTimerEventList implements GLO {
 	//Tick is desgined to be called with ACCESS.PEEK
 	public void tick(SimTask task, long time) {
 		task.access_check(ACCESS_TYPE.PEEK,this);
-		System.out.println("Ticking timer list");
+		log.finest("Ticking timer list");
 		List<GLOReference> cleanupList = new ArrayList<GLOReference>();
 		for (Entry<Long, GLOReference> entry : timerEvents.entrySet()) {
 			if (entry.getKey() <= time) {
@@ -119,7 +121,7 @@ public class PDTimerEventList implements GLO {
 	public void cleanup(List<GLOReference> cleanupList) {
 		SimTask task = SimTask.getCurrent();
 		task.access_check(ACCESS_TYPE.GET,this);
-		System.out.println("DOing cleanup");
+		log.finest("Doing cleanup");
 		if (--bigCleanupCountdown==0){ // do a big cleanup
 			bigCleanup(task);
 		} else { // do a normal destributed cleanup
