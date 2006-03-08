@@ -87,19 +87,20 @@ import com.sun.gi.comm.discovery.DiscoveredUserManager;
 public class DiscoveryXMLHandler extends DefaultHandler {
     DiscoveredGame[] games;
     List<DiscoveredGameImpl> gameList = new ArrayList<DiscoveredGameImpl>();
-    List<DiscoveredUserManagerImpl> userManagerList = new ArrayList<DiscoveredUserManagerImpl>();
+    List<DiscoveredUserManagerImpl> userManagerList =
+        new ArrayList<DiscoveredUserManagerImpl>();
 
     public void startElement(String uri, String localName, String qName,
-            Attributes attributes) throws SAXException {
-        // System.out.println("local name ="+localName);
-        // System.out.println("qname ="+qName);
+            Attributes attributes) throws SAXException
+    {
+        // System.err.println("local name ="+localName);
+        // System.err.println("qname ="+qName);
 
-        if (qName.equalsIgnoreCase("DISCOVERY")) { // start of
-                                                    // discovery
-                                                    // document
+        if (qName.equalsIgnoreCase("DISCOVERY")) {
+            // start of discovery document
             gameList.clear();
-        } else if (qName.equalsIgnoreCase("GAME")) { // start of game
-                                                        // record
+        } else if (qName.equalsIgnoreCase("GAME")) {
+            // start of game record
             String gameName = attributes.getValue("name");
             int id = Integer.parseInt(attributes.getValue("id"));
             gameList.add(new DiscoveredGameImpl(id, gameName));
@@ -117,15 +118,15 @@ public class DiscoveryXMLHandler extends DefaultHandler {
 
     public void endElement(String uri, String localName, String qName)
             throws SAXException {
-        if (qName.equalsIgnoreCase("DISCOVERY")) { // start of
-                                                    // discovery
-                                                    // document
+        if (qName.equalsIgnoreCase("DISCOVERY")) {
+            // start of discovery document
             games = new DiscoveredGame[gameList.size()];
             gameList.toArray(games);
             gameList.clear();
-        } else if (qName.equalsIgnoreCase("GAME")) { // start of game
-                                                        // record
-            DiscoveredUserManager[] mgrs = new DiscoveredUserManager[userManagerList.size()];
+        } else if (qName.equalsIgnoreCase("GAME")) {
+            // start of game record
+            DiscoveredUserManager[] mgrs =
+                new DiscoveredUserManager[userManagerList.size()];
             userManagerList.toArray(mgrs);
             gameList.get(gameList.size() - 1).setUserManagers(mgrs);
             userManagerList.clear();
@@ -142,11 +143,11 @@ public class DiscoveryXMLHandler extends DefaultHandler {
             DiscoveryXMLHandler hdlr = new DiscoveryXMLHandler();
             parser.parse(new File("FakeDiscovery.xml"), hdlr);
             for (DiscoveredGame game : hdlr.discoveredGames()) {
-                System.out.println("Game: " + game.getName() + " ("
-                        + game.getId() + ")");
+                System.err.println("Game: " + game.getName() + " (" +
+                        game.getId() + ")");
                 for (DiscoveredUserManager mgr : game.getUserManagers()) {
-                    System.out.println("    User Manager:"
-                            + mgr.getClientClass());
+                    System.err.println("    User Manager:" +
+                            mgr.getClientClass());
                 }
             }
 
@@ -163,7 +164,6 @@ public class DiscoveryXMLHandler extends DefaultHandler {
     }
 
     public DiscoveredGame[] discoveredGames() {
-        // TODO Auto-generated method stub
         return games;
     }
 

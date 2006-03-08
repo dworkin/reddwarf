@@ -85,11 +85,11 @@ import com.sun.gi.comm.discovery.DiscoveredGame;
 import com.sun.gi.comm.discovery.Discoverer;
 
 public class URLDiscoverer implements Discoverer {
+
     URL url;
 
     public URLDiscoverer(URL url) {
         this.url = url;
-
     }
 
     /**
@@ -108,8 +108,8 @@ public class URLDiscoverer implements Discoverer {
             }
             conn.connect();
             InputStream content = conn.getInputStream();
-            System.out.println("Found discovery stream of size: "
-                    + content.available());
+            System.err.println("Found discovery stream of size: " +
+                    content.available());
             // parse XML here
             try {
                 SAXParser parser = SAXParserFactory.newInstance().newSAXParser();
@@ -133,13 +133,13 @@ public class URLDiscoverer implements Discoverer {
     static public void main(String[] args) {
 
         try {
-            URLDiscoverer disco = new URLDiscoverer(new File(
+            URLDiscoverer disco =
+                new URLDiscoverer(new File(
                     "FakeDiscovery.xml").toURI().toURL());
             DiscoveredGame[] games = disco.games();
-            System.out.println("Discovered " + games.length + " games.");
+            System.err.println("Discovered " + games.length + " games.");
         } catch (MalformedURLException ex) {
             ex.printStackTrace();
         }
-
     }
 }

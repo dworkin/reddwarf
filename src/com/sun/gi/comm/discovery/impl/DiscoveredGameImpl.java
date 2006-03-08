@@ -72,6 +72,7 @@ import com.sun.gi.comm.discovery.DiscoveredGame;
 import com.sun.gi.comm.discovery.DiscoveredUserManager;
 
 public class DiscoveredGameImpl implements DiscoveredGame {
+
     int id;
     String name;
     DiscoveredUserManager[] userManagers;
@@ -111,5 +112,4 @@ public class DiscoveredGameImpl implements DiscoveredGame {
     public void setUserManagers(DiscoveredUserManager[] mgrs) {
         userManagers = mgrs;
     }
-
 }
