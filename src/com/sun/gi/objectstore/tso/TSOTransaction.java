@@ -232,7 +232,7 @@ public class TSOTransaction implements Transaction {
             if (timestampInterrupted) {
                 keyTrans.abort();
                 abort();
-                throw new TimestampInterruptException();
+                throw new DeadlockException();
             } else if (!block) {
                 keyTrans.abort();
                 return null;

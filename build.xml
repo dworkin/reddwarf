@@ -43,10 +43,11 @@
     </target>
 
     <target name="clean">
-	<delete dir="bin" />
-	<delete quiet="true">
-	  <fileset dir="release" includes="**/*.jar"/>
-	</delete>
+		<delete dir="bin" />
+		<delete quiet="true">
+	  		<fileset dir="release" includes="**/*.jar"/>
+		</delete>
+    	 <ant dir="J2MEAPI/J2MEClientAPI" target="clean" /> 
     </target>
 
     <target name="realclean" depends="clean">
@@ -126,7 +127,11 @@
 	</javac>
     </target>
 
-    <target name="build.clients" depends="build.j2seAPI">
+    <target name="build.j2meAPI">
+       <ant dir="J2MEAPI/J2MEClientAPI" target="jar"/>
+    </target>
+
+    <target name="build.clients" depends="build.j2seAPI,build.j2meAPI">
 	<javac srcdir="src" destdir="bin" source="5" target="5"
 		debug="${debug}" optimize="${optimize}"
 		deprecation="${deprecated}">
@@ -322,7 +327,8 @@
 	<zip destfile="ProjectDarkstar.zip" basedir="release" />
     </target>
 
-    <target name="release.bin" depends="release.server,release.j2seAPI, release.apps,release.clients"/>
+    <target name="release.bin" depends="release.server,release.j2seAPI, 
+    	release.j2meAPI, release.apps,release.clients"/>
 
     <target name="release.server" depends="build.server">
 	<jar destfile="release/ProjectDarkstar.jar">
@@ -361,6 +367,12 @@
 	    </fileset>
 	</jar>
     </target>
+	
+	<target name="release.j2meAPI" depends="build.j2meAPI">
+		<copy todir="release" >
+			<fileset dir="J2MEAPI/J2MEClientAPI/dist" />
+		</copy>	
+	</target>
 
     <target name="release.docs" depends="docs">
 	<copy todir="release/docs" >
