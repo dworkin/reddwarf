@@ -237,10 +237,16 @@ public class Player implements SimUserDataListener {
         SimTask task = SimTask.getCurrent();
         if (myGameRef != null) {
             // We currently support only one game per player
-            myGameRef.get(task).joinedChannel(cid, uid);
+	    Game game = myGameRef.get(task);
+	    if (game != null) {
+		game.joinedChannel(cid, uid);
+	    }
         } else {
             // If no game, dispatch to the matchmaker
-            Matchmaker.get().joinedChannel(cid, uid);
+            Matchmaker matchmaker = Matchmaker.get();
+	    if (matchmaker != null) {
+		matchmaker.joinedChannel(cid, uid);
+	    }
         }
     }
 
@@ -255,10 +261,16 @@ public class Player implements SimUserDataListener {
         SimTask task = SimTask.getCurrent();
         if (myGameRef != null) {
             // We currently support only one game per player
-            myGameRef.get(task).leftChannel(cid, uid);
+	    Game game = myGameRef.get(task);
+	    if (game != null) {
+		game.leftChannel(cid, uid);
+	    }
         } else {
             // If no game, dispatch to the matchmaker
-            Matchmaker.get().leftChannel(cid, uid);
+            Matchmaker matchmaker = Matchmaker.get();
+	    if (matchmaker != null) {
+		matchmaker.leftChannel(cid, uid);
+	    }
         }
     }
 
@@ -273,15 +285,22 @@ public class Player implements SimUserDataListener {
         SimTask task = SimTask.getCurrent();
         if (myGameRef != null) {
             // We currently support only one game per player
-            myGameRef.get(task).userDataReceived(myUserID, data);
+	    Game game = myGameRef.get(task);
+	    if (game != null) {
+		game.userDataReceived(myUserID, data);
+	    }
         } else {
             // If no game, dispatch to the matchmaker
-            Matchmaker.get().userDataReceived(uid, data);
+            Matchmaker matchmaker = Matchmaker.get();
+	    if (matchmaker != null) {
+		matchmaker.userDataReceived(uid, data);
+	    }
         }
     }
 
     public void dataArrivedFromChannel(ChannelID cid, UserID uid,
-            ByteBuffer data) {
-    // no-op, since we don't evesdrop channel data in this app
+            ByteBuffer data)
+    {
+	// no-op, since we don't evesdrop channel data in this app
     }
 }
