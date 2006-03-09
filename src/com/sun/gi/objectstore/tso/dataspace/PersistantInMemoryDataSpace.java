@@ -556,6 +556,27 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	byte[][] updateDataCopy = (debugCopy) ?
 	    	    new byte[updateMap.entrySet().size()][] : null;
 
+	{
+	    Set<Long> oidSet = new HashSet<Long>();
+	    for (Long oid : deleted) {
+		if (oidSet.contains(oid)) {
+		    log.warning("duplicate deleted oid: " + oid);
+		} else {
+		    oidSet.add(oid);
+		}
+	    }
+	    oidSet.clear();
+
+	    for (Long oid : updateMap.keySet()) {
+		if (oidSet.contains(oid)) {
+		    log.warning("duplicate update oid: " + oid);
+		} else {
+		    oidSet.add(oid);
+		}
+	    }
+	    oidSet.clear();
+	}
+
 	int i = 0;
         int queueLength;
 
