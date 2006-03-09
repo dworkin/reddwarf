@@ -36,6 +36,7 @@
     	<mkdir dir="release/apps/jeffboard"/>
     	<mkdir dir="release/apps/glotest"/>
     	<mkdir dir="release/apps/jnwn"/>
+    	<mkdir dir="release/client"/>
     	<mkdir dir="release/derby"/>
     	<mkdir dir="release/jrms"/>
     	<mkdir dir="release/examples"/>
@@ -299,9 +300,8 @@
     </target>
 
     <target name="BattleBoard">
-	<java classname="com.sun.gi.apps.battleboard.client.BattleBoardClient"
-		failonerror="true" fork="true">
-	    <classpath refid="project.classpath" />
+	<echo message="BROKEN!  Ant on Linux won't let us input on stdin"\>
+	<java jar="release/BattleBoardClient.jar" failonerror="true" fork="true">
 	    <sysproperty key="java.util.logging.config.file"
 			 file="logging.properties" />
 	</java>
@@ -382,7 +382,27 @@
 	</copy>
     </target>
 
-    <target name="release.clients" depends="build.clients"/>
+    <target name="release.clients" depends="release.client.battleboard,release.client.other"/>
+
+    <target name="release.client.other" depends="build.clients"/>
+
+    <target name="release.client.battleboard" depends="build.clients">
+	<jar destfile="release/client/BattleBoardClient.jar">
+	    <manifest>
+		<attribute name="Class-Path"
+			   value="../ProjectDarkstarClientAPI.jar"/>
+		<attribute name="Main-Class"
+			   value="com.sun.gi.apps.battleboard.client.BattleBoardClient"/>
+	    </manifest>
+	    <fileset dir="bin">
+		<include name="com/sun/gi/apps/battleboard/*.class"/>
+		<include name="com/sun/gi/apps/battleboard/client/**"/>
+	    </fileset>
+	    <fileset dir="src">
+		<include name="com/sun/gi/apps/battleboard/client/swing/imgs/**"/>
+	    </fileset>
+	</jar>
+    </target>
 
     <target name="release.apps"
 	depends="release.trivialboot,release.timertest,release.chattest,release.jeffboard,release.battleboard,release.glotest,release.matchmaker">

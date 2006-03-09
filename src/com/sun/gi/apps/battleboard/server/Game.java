@@ -577,7 +577,7 @@ public class Game implements GLO {
 	    log.finer("Destroying game");
 
 	    // Destroy all the players' boards
-	    for (GLOReference ref : playerBoards.values()) {
+	    for (GLOReference<? extends GLO> ref : playerBoards.values()) {
 		task.destroyGLO(ref);
 	    }
 

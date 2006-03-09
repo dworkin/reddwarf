@@ -76,6 +76,7 @@ import java.util.Map;
 import java.util.logging.Logger;
 
 import com.sun.gi.apps.battleboard.BattleBoard;
+import com.sun.gi.apps.battleboard.client.swing.Client;
 import com.sun.gi.comm.users.client.ClientChannel;
 import com.sun.gi.comm.users.client.ClientChannelListener;
 import com.sun.gi.comm.users.client.ClientConnectionManager;
@@ -205,6 +206,8 @@ public class BattleBoardPlayer implements ClientChannelListener {
              */
 
             display = new TextDisplay(playerBoards);
+	    //BattleBoard[] boardArray = new BattleBoard[playerBoards.size()];
+            //display = new Client(playerBoards.toArray(boardArray));
         } else if ((gameState == GameState.BEGIN_MOVE)
                 && "move-started".equals(cmd)) {
             if (myName.equals(tokens[1])) {

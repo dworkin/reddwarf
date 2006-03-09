@@ -376,9 +376,11 @@ public class BattleBoard implements Serializable {
         if (isHit(x, y)) {
             rc = PositionValue.HIT;
             hit();
+	} else if (isBombedCity(x, y)) {
+	    rc = PositionValue.HIT;
         } else if (isNearMiss(x, y)) {
             rc = PositionValue.NEAR;
-        } else {
+	} else {
             rc = PositionValue.MISS;
         }
 
@@ -456,6 +458,21 @@ public class BattleBoard implements Serializable {
     }
 
     /**
+     * Tests whether a given position is a previously bombed city
+     * (i.e. currently occupied by a hit)
+     *
+     * @param x the <em>x</em> coordinate of the bomb
+     *
+     * @param y the <em>y</em> coordinate of the bomb
+     *
+     * @return <code>true</code> if the given position contains a
+     * hit, <code>false</code> otherwise
+     */
+    public boolean isBombedCity(int x, int y) {
+	return getBoardPosition(x, y) == PositionValue.HIT;
+    }
+
+    /**
      * Tests whether a given position is a near miss (not currently
      * occupied by a city, but adjacent to a position that is).
      * 
@@ -477,7 +494,7 @@ public class BattleBoard implements Serializable {
             throw new IllegalArgumentException("illegal y: " + y);
         }
 
-        if (isHit(x, y)) {
+	if (isHit(x, y) || isBombedCity(x, y)) {
             return false;
         }
 
@@ -490,7 +507,7 @@ public class BattleBoard implements Serializable {
             for (int j = min_y; j <= max_y; j++) {
                 if ((i == x) && (j == y)) {
                     continue;
-                } else if (isHit(i, j)) {
+		} else if (isHit(i, j) || isBombedCity(i, j)) {
                     return true;
                 }
             }
