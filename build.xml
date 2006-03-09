@@ -300,7 +300,7 @@
     </target>
 
     <target name="BattleBoard">
-	<echo message="BROKEN!  Ant on Linux won't let us input on stdin"\>
+	<echo message="BROKEN!  Ant on Linux won't let us input on stdin"/>
 	<java jar="release/BattleBoardClient.jar" failonerror="true" fork="true">
 	    <sysproperty key="java.util.logging.config.file"
 			 file="logging.properties" />
