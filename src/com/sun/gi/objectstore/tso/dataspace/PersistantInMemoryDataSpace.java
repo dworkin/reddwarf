@@ -75,6 +75,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -83,6 +84,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Map.Entry;
+import java.util.logging.Logger;
 
 import com.sun.gi.objectstore.NonExistantObjectIDException;
 
@@ -95,10 +97,12 @@ import com.sun.gi.objectstore.NonExistantObjectIDException;
  */
 public class PersistantInMemoryDataSpace implements DataSpace {
 
+    private static Logger log =
+	    Logger.getLogger("com.sun.gi.objectstore.tso.dataspace");
+
     class DiskUpdateRecord {
-
-        byte[][] updateData;
-
+        byte[][] updateDataRef;
+        byte[][] updateDataCopy;
         long[] updateIDs;
 	long[] deletedIDs;
 
@@ -112,23 +116,25 @@ public class PersistantInMemoryDataSpace implements DataSpace {
          * @param deleteIDs2
          * @param id
          */
-        public DiskUpdateRecord(long[] updateIDs, byte[][] updateData,
+        public DiskUpdateRecord(long[] updateIDs,
+		byte[][] updateDataRef, byte[][] updateDataCopy,
 		long[] deletedIDs, long id) {
 
             this.updateIDs = updateIDs;
-            this.updateData = updateData;
+            this.updateDataRef = updateDataRef;
+            this.updateDataCopy = updateDataCopy;
 	    this.deletedIDs = deletedIDs;
 
 	    synchronized (idMutex) {
 		this.nextID = id;
 	    }
         }
-
     }
 
     private long appID;
 
-    private Map<Long, SoftReference<byte[]>> dataSpace = new LinkedHashMap<Long, SoftReference<byte[]>>();
+    private Map<Long, SoftReference<byte[]>> dataSpace =
+	    new LinkedHashMap<Long, SoftReference<byte[]>>();
 
     private Map<String, Long> nameSpace = new LinkedHashMap<String, Long>();
     private Map<Long, String> reverseNameSpace = new HashMap<Long, String>();
@@ -143,68 +149,47 @@ public class PersistantInMemoryDataSpace implements DataSpace {
     private String dataConnURL;
 
     private static final String SCHEMA = "SIMSERVER";
-
     private static final String OBJBASETBL = "OBJECTS";
-
     private static final String NAMEBASETBL = "NAMEDIRECTORY";
-
     private static final String INFOTBL = "APPINFO";
-
     private static final String INFOTBLNAME = SCHEMA + "." + INFOTBL;
 
     private String NAMETBL;
-
     private String NAMETBLNAME;
-
     private String OBJTBL;
-
     private String OBJTBLNAME;
 
     private Connection conn;
-
     private Connection updateConn;
-
     private Connection deleteInsertConn;
 
     private PreparedStatement getObjStmnt;
-
     private PreparedStatement getNameStmnt;
-
     private PreparedStatement updateObjStmnt;
-
     private PreparedStatement insertObjStmnt;
 
-    private PreparedStatement updateNameStmnt; // XXX unused?
-
     private PreparedStatement insertNameStmnt;
-
     private PreparedStatement updateInfoStmnt;
-
-    private PreparedStatement insertInfoStmnt; // XXX unused?
-
     private PreparedStatement deleteObjStmnt;
-    
     private PreparedStatement deleteNameStmnt;
-
     private PreparedStatement clearObjTableStmnt;
-
     private PreparedStatement lockObjTableStmnt;
-
     private PreparedStatement clearNameTableStmnt;
-
     private PreparedStatement lockNameTableStmnt;
 
     volatile boolean closed = false;
-
     volatile boolean done = false;
 
-    volatile LinkedList<DiskUpdateRecord> diskUpdateQueue = new LinkedList<DiskUpdateRecord>();
+    volatile LinkedList<DiskUpdateRecord> diskUpdateQueue =
+	    new LinkedList<DiskUpdateRecord>();
 
     Object closeWaitMutex = new Object();
 
     private static final boolean TRACEDISK = false;
 
     private volatile int commitRegisterCounter = 1;
+
+    private boolean debugCopy = true;
 
     public PersistantInMemoryDataSpace(long appID) {
         this.appID = appID;
@@ -283,21 +268,31 @@ public class PersistantInMemoryDataSpace implements DataSpace {
             System.out.println("      Starting commit");
         }
 
-        if (TRACEDISK && (rec.updateData.length > 0)) {
+        if (TRACEDISK && (rec.updateDataRef.length > 0)) {
             System.out.println("      Starting updates");
         }
-        for (int i = 0; i < rec.updateData.length; i++) {
+        for (int i = 0; i < rec.updateDataRef.length; i++) {
             if (TRACEDISK) {
                 System.out.println("          Updating " + rec.updateIDs[i]);
             }
             try { // update
-                updateObjStmnt.setBytes(1, rec.updateData[i]);
+                updateObjStmnt.setBytes(1, rec.updateDataRef[i]);
                 updateObjStmnt.setLong(2, rec.updateIDs[i]);
                 updateObjStmnt.execute();
             } catch (SQLException e1) {
                 e1.printStackTrace();
             }
         }
+
+	if (debugCopy) {
+	    for (int i = 0; i < rec.updateDataRef.length; i++) {
+		if (!Arrays.equals(rec.updateDataCopy[i],
+			rec.updateDataRef[i])) {
+		    log.severe("Assumption violated: data changed: oid = " +
+			    rec.updateIDs[i]);
+		}
+	    }
+	}
 
 	for (int i = 0; i < rec.deletedIDs.length; i++) {
             if (TRACEDISK) {
@@ -397,8 +392,6 @@ public class PersistantInMemoryDataSpace implements DataSpace {
                 + NAMETBLNAME + " VALUES(?,?)");
         updateObjStmnt = updateConn.prepareStatement("UPDATE " + OBJTBLNAME
                 + " SET OBJBYTES=? WHERE OBJID=?");
-        updateNameStmnt = updateConn.prepareStatement("UPDATE " + NAMETBLNAME
-                + " SET NAME=? WHERE OBJID=?");
         deleteObjStmnt = deleteInsertConn.prepareStatement("DELETE FROM "
                 + OBJTBLNAME + " WHERE OBJID = ?");
         deleteNameStmnt = deleteInsertConn.prepareStatement("DELETE FROM "
@@ -434,22 +427,6 @@ public class PersistantInMemoryDataSpace implements DataSpace {
     }
 
     // internal routines to the system, used by transactions
-    /*
-     * (non-Javadoc)
-     * 
-     * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#getNextID()
-     */
-    /*
-     * (non-Javadoc)
-     * 
-     * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#getNextID()
-     */
-    public long getNextID() {
-        synchronized (idMutex) {
-            return id++;
-        }
-    }
-
     /**
      * {@inheritDoc}
      */
@@ -477,7 +454,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
             try {
                 getObjStmnt.setLong(1, objectID);
                 ResultSet rs = getObjStmnt.executeQuery();
-                conn.commit();
+                getObjStmnt.getConnection().commit();
                 if (rs.next()) {
                     objbytes = rs.getBytes("OBJBYTES");
                     dataSpace.put(objectID, new SoftReference<byte[]>(objbytes));
@@ -498,95 +475,120 @@ public class PersistantInMemoryDataSpace implements DataSpace {
      * {@inheritDoc}
      */
     public void lock(long objectID) throws NonExistantObjectIDException {
-        synchronized (dataSpace) {
-            if (!dataSpace.containsKey(objectID)) {
-                if (loadCache(objectID) == null) {
-                    throw new NonExistantObjectIDException(
-                            "Can't find objectID " + objectID);
-                }
-            }
-        }
-        synchronized (lockSet) {
-            while (lockSet.contains(objectID)) {
-                try {
-                    lockSet.wait();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
-            lockSet.add(new Long(objectID));
-	    lockSet.notifyAll();
-        }
+
+	synchronized (lockSet) {
+	    while (lockSet.contains(objectID)) {
+		try {
+		    lockSet.wait();
+		} catch (InterruptedException e) {
+		    e.printStackTrace();
+		}
+	    }
+	    synchronized (dataSpace) {
+		if (!dataSpace.containsKey(objectID)) {
+		    if (loadCache(objectID) == null) {
+			throw new NonExistantObjectIDException(
+				"Can't find objectID " + objectID);
+		    }
+		} else {
+		    lockSet.add(new Long(objectID));
+		    lockSet.notifyAll();
+		}
+	    }
+	}
     }
 
     /**
      * {@inheritDoc}
      */
     public void release(long objectID) throws NonExistantObjectIDException {
-        synchronized (lockSet) {
-            lockSet.remove(new Long(objectID));
-            lockSet.notifyAll();
-        }
-
+	synchronized (lockSet) {
+	    lockSet.remove(new Long(objectID));
+	    lockSet.notifyAll();
+	}
     }
 
     /**
      * {@inheritDoc}
      */
     public void release(Set<Long> objectIDs)
-            throws NonExistantObjectIDException {
-        NonExistantObjectIDException re = null;
+            throws NonExistantObjectIDException
+    {
+	NonExistantObjectIDException re = null;
 
-        for (long oid : objectIDs) {
-            try {
-                release(oid);
-            } catch (NonExistantObjectIDException e) {
-                re = e;
-            }
-        }
+	synchronized (lockSet) {
 
-        // If any of the releases threw an exception, throw it
-        // here.
+	    /*
+	     * Attempt all of the releases.  Then if any of the releases
+	     * threw an exception, pick the last one and rethrow it.  This
+	     * is less than perfect.  -DJE
+	     */
 
-        if (re != null) {
-            throw re;
-        }
+	    for (long oid : objectIDs) {
+		try {
+		    release(oid);
+		} catch (NonExistantObjectIDException e) {
+		    re = e;
+		}
+	    }
+
+	    lockSet.notifyAll();
+
+	    if (re != null) {
+		throw re;
+	    }
+	}
     }
 
     /**
      * {@inheritDoc}
      */
-    public void atomicUpdate(boolean clear, Map<Long, byte[]> updateMap,
-	    List<Long> deleted)
+    public synchronized void atomicUpdate(boolean clear,
+	    Map<Long, byte[]> updateMap, List<Long> deleted)
             throws DataSpaceClosedException {
+
         if (closed) {
             throw new DataSpaceClosedException();
         }
-        synchronized (dataSpace) {
-
-            for (Entry<Long, byte[]> e : updateMap.entrySet()) {
-                dataSpace.put(e.getKey(), new SoftReference<byte[]>(
-                        e.getValue()));
-            }
-
-        }
-
-	// asynchronously update the persistant storage IMPORTANT: 
-	// This update record will pin the objects in memory and thus
-	// in the cache until it is complete This is VERY important so
-	// that things don't get cleaned out of the cache until they
-	// have been persisted.  It is acceptable to lose
-	// transactions, if the entire system dies, but that is the
-	// only time.  Even in this case those lost must be atomic
-	// (all or nothing.)
 
         long[] updateIDs = new long[updateMap.entrySet().size()];
-        byte[][] updateData = new byte[updateMap.entrySet().size()][];
-        int i = 0;
-        for (Entry<Long, byte[]> e : updateMap.entrySet()) {
-            updateIDs[i] = e.getKey();
-            updateData[i++] = e.getValue();
-        }
+        byte[][] updateDataRef = new byte[updateMap.entrySet().size()][];
+	byte[][] updateDataCopy = (debugCopy) ?
+	    	    new byte[updateMap.entrySet().size()][] : null;
+
+	int i = 0;
+        int queueLength;
+
+	if (updateMap.size() > 0) {
+	    
+	    /*
+	     * DJE:  cloning the data should be unnecessary, but
+	     * if a reference leaks out of the transaction and is
+	     * modified after a commit, then we want to make sure
+	     * that what we send to the disk is the state at the
+	     * commit, not whatever someone put in there later. 
+	     * So if debugging is turned on, then store not only a
+	     * reference to the data, but a copy, and later check
+	     * to see whether the two still match when it's time
+	     * to write this stuff to the disk. 
+	     */
+
+	    synchronized (dataSpace) {
+		for (Entry<Long, byte[]> e : updateMap.entrySet()) {
+		    Long key = e.getKey();
+		    byte[] value = e.getValue();
+		
+		    dataSpace.put(key, new SoftReference<byte[]>(value));
+
+		    updateIDs[i] = key;
+		    updateDataRef[i] = value;
+		    if (debugCopy) {
+			updateDataCopy[i] = value.clone();
+		    }
+		    i++;
+		}
+	    }
+	}
 
 	long[] deletedIDs = new long[deleted.size()];
 	i = 0; 
@@ -594,60 +596,21 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	    deletedIDs[i] = oid;
 	}
 
-        /*
-         * Try to throttle back: if the queue is shorter than 40, let it
-         * go. If the queue is 40-80, then sleep for 20ms, which should
-         * be long enough to move something off the queue (by rough
-         * guess), leaving the system in steady state. As the queue gets
-         * longer, back off more and more aggressively to allow the
-         * system to catch up.
-         * 
-         * Note that because the queue is swallowed whole by the
-         * draining thread it may appear to instantly go to zero length.
-         * This should not have any impact on this heuristic, because we
-         * care how long the queue gets before the switch.
-         */
+	synchronized (diskUpdateQueueMutex) {
+	    if (!closed) { // closed while we were processing
+		if (TRACEDISK) {
+		    System.out.println("Queuing commit #"
+			    + commitRegisterCounter++);
+		}
+		diskUpdateQueue.add(new DiskUpdateRecord(updateIDs,
+			updateDataRef, updateDataCopy,
+			deletedIDs, id));
+	    }
+	    queueLength = diskUpdateQueue.size();
+	    diskUpdateQueueMutex.notifyAll();
+	}
 
-        int queueLength;
-        synchronized (diskUpdateQueueMutex) {
-            queueLength = diskUpdateQueue.size();
-        }
-
-        try {
-            if (queueLength > 150) {
-                System.out.println("\t\tXXX XXX XXX XXX falling behind "
-                        + queueLength);
-                Thread.sleep(80);
-            } else if (queueLength > 100) {
-                // System.out.println("\t\tXXX XXX XXX falling behind "
-                // + queueLength);
-                Thread.sleep(55);
-            } else if (queueLength > 70) {
-                // System.out.println("\t\tXXX XXX falling behind " +
-                // queueLength);
-                Thread.sleep(35);
-            } else if (queueLength > 50) {
-                // System.out.println("\t\tXXX falling behind " +
-                // queueLength);
-                Thread.sleep(20);
-            } else {
-                // Carry on.
-            }
-        } catch (InterruptedException e) {
-            // ignore
-        }
-
-        synchronized (diskUpdateQueueMutex) {
-            if (!closed) { // closed while we were processing
-                if (TRACEDISK) {
-                    System.out.println("Queuing commit #"
-                            + commitRegisterCounter++);
-                }
-                diskUpdateQueue.add(new DiskUpdateRecord(updateIDs, updateData,
-                        deletedIDs, id));
-                diskUpdateQueueMutex.notifyAll();
-            }
-        }
+	throttle(queueLength);
     }
 
     /**
@@ -655,33 +618,22 @@ public class PersistantInMemoryDataSpace implements DataSpace {
      */
     public Long lookup(String name) {
         Long retval = null;
+
         synchronized (nameSpace) {
             retval = nameSpace.get(name);
             if (retval == null) {
-                retval = loadNameCache(name);
-            }
-        }
-        return retval;
-    }
-
-    /**
-     * @param name
-     * @return Long
-     */
-    private Long loadNameCache(String name) {
-        Long retval = null;
-        synchronized (nameSpace) {
-            try {
-                getNameStmnt.setString(1, name);
-                ResultSet rs = getNameStmnt.executeQuery();
-                conn.commit();
-                if (rs.next()) {
-                    retval = rs.getLong("OBJID");
-                    nameSpace.put(name, retval);
-                }
-                rs.close();
-            } catch (SQLException e) {
-                e.printStackTrace();
+		try {
+		    getNameStmnt.setString(1, name);
+		    ResultSet rs = getNameStmnt.executeQuery();
+		    conn.commit();
+		    if (rs.next()) {
+			retval = rs.getLong("OBJID");
+			nameSpace.put(name, retval);
+		    }
+		    rs.close();
+		} catch (SQLException e) {
+		    e.printStackTrace();
+		}
             }
         }
         return retval;
@@ -831,16 +783,69 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 		}
 	    }
             dataSpace.remove(objectID);
-
-	    try {
-		deleteObjStmnt.setLong(1, objectID);
-		deleteObjStmnt.execute();
-		deleteNameStmnt.setLong(1, objectID);
-		deleteNameStmnt.execute();
-		deleteInsertConn.commit();
-	    } catch (SQLException e) {
-		e.printStackTrace();
-	    }
 	}
+
+	// destroyed objects lose their locks.
+
+	synchronized (lockSet) {
+	    lockSet.remove(objectID);
+	}
+
+	try {
+	    deleteObjStmnt.setLong(1, objectID);
+	    deleteObjStmnt.execute();
+	    deleteNameStmnt.setLong(1, objectID);
+	    deleteNameStmnt.execute();
+	    deleteInsertConn.commit();
+	} catch (SQLException e) {
+	    e.printStackTrace();
+	}
+    }
+
+    private long getNextID() {
+        synchronized (idMutex) {
+            return id++;
+        }
+    }
+
+    private void throttle(int queueLength) {
+
+        /*
+	 * Try to throttle back:  if the queue is shorter than 40, let
+	 * it go.  If the queue is 40-80, then sleep for 20ms, which
+	 * should be long enough to move something off the queue (by
+	 * rough guess), leaving the system in steady state.  As the
+	 * queue gets longer, back off more and more aggressively to
+	 * allow the system to catch up.
+         * 
+	 * Note that because the queue is swallowed whole by the
+	 * draining thread it may appear to instantly go to zero
+	 * length.  This should not have any impact on this heuristic,
+	 * because we care how long the queue gets before the switch.
+         */
+
+        try {
+            if (queueLength > 150) {
+                System.out.println("\t\tXXX XXX XXX XXX falling behind "
+                        + queueLength);
+                Thread.sleep(80);
+            } else if (queueLength > 100) {
+                System.out.println("\t\tXXX XXX XXX falling behind "
+			+ queueLength);
+                Thread.sleep(55);
+            } else if (queueLength > 70) {
+                // System.out.println("\t\tXXX XXX falling behind " +
+                // queueLength);
+                Thread.sleep(35);
+            } else if (queueLength > 50) {
+                // System.out.println("\t\tXXX falling behind " +
+                // queueLength);
+                Thread.sleep(20);
+            } else {
+                // Carry on.
+            }
+        } catch (InterruptedException e) {
+            // ignore
+        }
     }
 }
