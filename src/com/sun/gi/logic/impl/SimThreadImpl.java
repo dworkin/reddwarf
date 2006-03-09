@@ -118,6 +118,5 @@ public class SimThreadImpl extends Thread implements SimThread {
             this.task = aTask;
             notifyAll();
         }
-
     }
 }

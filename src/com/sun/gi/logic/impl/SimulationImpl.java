@@ -232,16 +232,17 @@ public class SimulationImpl implements Simulation {
 
     // internal
     private SimTask newTask(ACCESS_TYPE access, long startObject,
-            Method startMethod, Object[] params) {
+            Method startMethod, Object[] params)
+    {
         return new SimTaskImpl(this, loader, access, startObject, startMethod,
                 params);
     }
 
     // external
     public SimTask newTask(ACCESS_TYPE access, GLOReference ref, Method method,
-            Object[] params) {
+            Object[] params)
+    {
         return newTask(access, ((GLOReferenceImpl) ref).objID, method, params);
-
     }
 
     /**
@@ -350,17 +351,13 @@ public class SimulationImpl implements Simulation {
                     queueTask(newTask(gloID, userLeftChannelMethod, params));
                 }
             } catch (SecurityException e) {
-
                 e.printStackTrace();
             } catch (NoSuchMethodException e) {
-
                 e.printStackTrace();
             } catch (ClassNotFoundException e) {
-
                 e.printStackTrace();
             }
         }
-
     }
 
     /**
@@ -387,7 +384,6 @@ public class SimulationImpl implements Simulation {
                 e.printStackTrace();
             }
         }
-
     }
 
     protected void fireChannelDataPacket(ChannelID cid, UserID from,
@@ -395,9 +391,8 @@ public class SimulationImpl implements Simulation {
         List<Long> listeners = userDataListeners.get(from);
         if (listeners != null) {
             Set<ChannelID> channels = userEvesdropChannels.get(from);
-            if ((channels == null) || !channels.contains(cid)) { // we
-                                                                    // arent
-                // evesdropping
+            if ((channels == null) || !channels.contains(cid)) {
+                // we aren't evesdropping
                 return;
             }
             ByteBuffer outBuff = buff.duplicate();
@@ -429,13 +424,10 @@ public class SimulationImpl implements Simulation {
                 queueTask(newTask(gloID, userLeftMethod, params));
             }
         } catch (SecurityException e) {
-
             e.printStackTrace();
         } catch (NoSuchMethodException e) {
-
             e.printStackTrace();
         } catch (ClassNotFoundException e) {
-
             e.printStackTrace();
         }
     }
@@ -450,13 +442,10 @@ public class SimulationImpl implements Simulation {
                 queueTask(newTask(gloID, userJoinedMethod, params));
             }
         } catch (SecurityException e) {
-
             e.printStackTrace();
         } catch (NoSuchMethodException e) {
-
             e.printStackTrace();
         } catch (ClassNotFoundException e) {
-
             e.printStackTrace();
         }
     }
@@ -510,7 +499,8 @@ public class SimulationImpl implements Simulation {
     }
 
     public SimTask newTask(GLOReference ref, Method methodToCall,
-            Object[] params) {
+            Object[] params)
+    {
         return newTask(ACCESS_TYPE.GET, ref, methodToCall, params);
     }
 
@@ -521,8 +511,8 @@ public class SimulationImpl implements Simulation {
     // Hooks into the RawSocketManager, added 1/16/2006
 
     public long openSocket(long socketID, ACCESS_TYPE access, long objID,
-            String host, int port, boolean reliable) {
-
+            String host, int port, boolean reliable)
+    {
         return kernel.openSocket(socketID, this, access, objID, host, port,
                 reliable);
     }

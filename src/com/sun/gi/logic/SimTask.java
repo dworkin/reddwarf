@@ -246,7 +246,7 @@ public abstract class SimTask {
      * 
      * @param ref A GLOReference to the GLO to be destroyed.
      */
-    public abstract void destroyGLO(GLOReference ref);
+    public abstract void destroyGLO(GLOReference<? extends GLO> ref);
 
     /**
      * This method opens a comm channel and returns an ID for it. If the

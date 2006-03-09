@@ -177,32 +177,23 @@ public class SimKernelImpl implements SimKernel {
         }
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see com.sun.gi.logic.SimKernel#returnToThreadPool(com.sun.gi.logic.impl.SimThreadImpl)
-     */
     public void returnToThreadPool(SimThreadImpl impl) {
         synchronized (threadPool) {
             threadPool.add(impl);
-            threadPool.notify(); // Sten added 1/13/06 -- prevents
-                                    // deadlocks if the pool is waiting.
+            
+            // Sten added 1/13/06 -- prevents deadlocks if the pool is waiting.
+            threadPool.notify();
         }
 
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see com.sun.gi.logic.SimKernel#setTimerManager(com.sun.gi.framework.timer.TimerManager)
-     */
     public void setTimerManager(TimerManager timerManager) {
         this.timerManager = timerManager;
-
     }
 
     public long registerTimerEvent(long tid, ACCESS_TYPE access,
-            Simulation sim, long objID, long delay, boolean repeat) {
+            Simulation sim, long objID, long delay, boolean repeat)
+    {
         return timerManager.registerEvent(tid, sim, access, objID, delay,
                 repeat);
     }
@@ -238,8 +229,8 @@ public class SimKernelImpl implements SimKernel {
      * with the socket.
      */
     public long openSocket(long sid, Simulation sim, ACCESS_TYPE access,
-            long objID, String host, int port, boolean reliable) {
-
+            long objID, String host, int port, boolean reliable)
+    {
         return socketManager.openSocket(sid, sim, access, objID, host, port,
                 reliable);
     }
@@ -269,23 +260,11 @@ public class SimKernelImpl implements SimKernel {
         socketManager.closeSocket(socketID);
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see com.sun.gi.logic.SimKernel#getNextTimerID()
-     */
     public long getNextTimerID() {
-        // TODO Auto-generated method stub
         return timerManager.getNextTimerID();
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see com.sun.gi.logic.SimKernel#getNextSocketID()
-     */
     public long getNextSocketID() {
         return socketManager.getNextSocketID();
     }
-
 }
