@@ -118,7 +118,10 @@ public class PersistantInMemoryDataSpace implements DataSpace {
             this.updateIDs = updateIDs;
             this.updateData = updateData;
 	    this.deletedIDs = deletedIDs;
-            this.nextID = id;
+
+	    synchronized (idMutex) {
+		this.nextID = id;
+	    }
         }
 
     }
@@ -773,40 +776,40 @@ public class PersistantInMemoryDataSpace implements DataSpace {
      */
     public long create(byte[] data, String name) {
         Long createId;
-        if (name != null) {
-            synchronized (nameSpace) {
-                createId = lookup(name);
-                if (createId != null) {
-                    return DataSpace.INVALID_ID;
-                }
+	synchronized (dataSpace) {
+	    if (name != null) {
+		synchronized (nameSpace) {
+		    createId = lookup(name);
+		    if (createId != null) {
+			return DataSpace.INVALID_ID;
+		    }
 
-                createId = new Long(getNextID());
-                nameSpace.put(name, createId);
-                reverseNameSpace.put(createId, name);
-            }
-            try {
-                insertNameStmnt.setString(1, name);
-                insertNameStmnt.setLong(2, createId);
-                insertNameStmnt.execute();
-            } catch (SQLException e) {
-                e.printStackTrace();
-                return DataSpace.INVALID_ID;
-            }
-        } else {
-            createId = new Long(getNextID());
-        }
-        synchronized (dataSpace) {
+		    createId = new Long(getNextID());
+		    nameSpace.put(name, createId);
+		    reverseNameSpace.put(createId, name);
+		}
+		try {
+		    insertNameStmnt.setString(1, name);
+		    insertNameStmnt.setLong(2, createId);
+		    insertNameStmnt.execute();
+		} catch (SQLException e) {
+		    e.printStackTrace();
+		    return DataSpace.INVALID_ID;
+		}
+	    } else {
+		createId = new Long(getNextID());
+	    }
             dataSpace.put(createId, new SoftReference<byte[]>(data));
-        }
-        try {
-            insertObjStmnt.setLong(1, createId);
-            insertObjStmnt.setBytes(2, data);
-            insertObjStmnt.execute();
-            deleteInsertConn.commit();
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return DataSpace.INVALID_ID;
-        }
+	    try {
+		insertObjStmnt.setLong(1, createId);
+		insertObjStmnt.setBytes(2, data);
+		insertObjStmnt.execute();
+		insertObjStmnt.getConnection().commit();
+	    } catch (SQLException e) {
+		e.printStackTrace();
+		return DataSpace.INVALID_ID;
+	    }
+	}
         return createId;
     }
 
@@ -819,26 +822,25 @@ public class PersistantInMemoryDataSpace implements DataSpace {
      * @param objectID The objectID of the object to destroy
      */
     private void destroy(long objectID) {
-        synchronized (nameSpace) {
-            String name = reverseNameSpace.get(objectID);
-            if (name != null) {
-                reverseNameSpace.remove(objectID);
-                nameSpace.remove(name);
-            }
-        }
-        synchronized (dataSpace) {
+	synchronized (dataSpace) {
+	    synchronized (nameSpace) {
+		String name = reverseNameSpace.get(objectID);
+		if (name != null) {
+		    reverseNameSpace.remove(objectID);
+		    nameSpace.remove(name);
+		}
+	    }
             dataSpace.remove(objectID);
-        }
-        synchronized (deleteInsertConn) {
-            try {
-                deleteObjStmnt.setLong(1, objectID);
-                deleteObjStmnt.execute();
-                deleteNameStmnt.setLong(1, objectID);
-                deleteNameStmnt.execute();
-                deleteInsertConn.commit();
-            } catch (SQLException e) {
-                e.printStackTrace();
-            }
-        }
+
+	    try {
+		deleteObjStmnt.setLong(1, objectID);
+		deleteObjStmnt.execute();
+		deleteNameStmnt.setLong(1, objectID);
+		deleteNameStmnt.execute();
+		deleteInsertConn.commit();
+	    } catch (SQLException e) {
+		e.printStackTrace();
+	    }
+	}
     }
 }
