@@ -168,6 +168,7 @@ public class TSOTransaction implements Transaction {
 		TSODataHeader exitingHeader =
 		    (TSODataHeader) createTrans.read(headerID);
 		if (! exitingHeader.createNotCommitted) {
+		    createTrans.release(headerID);
 		    return ObjectStore.INVALID_ID;
 		}
 		// else a previous, race-winning create must have aborted.
