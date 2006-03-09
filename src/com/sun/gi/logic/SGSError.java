@@ -23,4 +23,11 @@ public class SGSError extends Error {
 	public SGSError(String message){
 		super(message);
 	}
+
+	/**
+	 * 
+	 */
+	public SGSError() {
+		// TODO Auto-generated constructor stub
+	}
 }

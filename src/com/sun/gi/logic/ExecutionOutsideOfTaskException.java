@@ -74,5 +74,23 @@ package com.sun.gi.logic;
  */
 public class ExecutionOutsideOfTaskException extends SGSError {
 
-    private static final long serialVersionUID = 1L;
+	
+    /**
+	 * 
+	 */
+	public ExecutionOutsideOfTaskException() {
+		super();
+		// TODO Auto-generated constructor stub
+	}
+
+	/**
+	 * @param message
+	 */
+	public ExecutionOutsideOfTaskException(String message) {
+		super(message);
+		// TODO Auto-generated constructor stub
+	}
+
+	
+	private static final long serialVersionUID = 1L;
 }

@@ -68,6 +68,8 @@
 
 package com.sun.gi.objectstore;
 
+import com.sun.gi.logic.SGSError;
+
 /**
  * <p>
  * DeadlockException is thrown when a GET attempt would result in a
