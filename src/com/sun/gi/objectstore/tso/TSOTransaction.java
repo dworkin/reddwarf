@@ -164,7 +164,9 @@ public class TSOTransaction implements Transaction {
 	    // we were beat there
             headerID = lookup(name);
 	    try {
-		TSODataHeader exitingHeader = (TSODataHeader) lock(headerID);
+		createTrans.lock(headerID);
+		TSODataHeader exitingHeader =
+		    (TSODataHeader) createTrans.read(headerID);
 		if (! exitingHeader.createNotCommitted) {
 		    return ObjectStore.INVALID_ID;
 		}
