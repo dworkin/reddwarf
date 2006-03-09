@@ -71,6 +71,7 @@ package com.sun.gi.apps.battleboard.server;
 import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.sun.gi.comm.routing.ChannelID;
@@ -252,8 +253,8 @@ public class Matchmaker implements GLO {
 
         SimTask task = SimTask.getCurrent();
         for (GLOReference<Player> ref : waitingPlayers) {
-            Player player = ref.peek(task);
-            if (playerName.equals(player.getPlayerName())) {
+            Player peekedPlayer = ref.peek(task);
+            if (playerName.equals(peekedPlayer.getPlayerName())) {
                 log.warning("Matchmaker already has `" + playerName);
                 sendAlreadyJoined(uid);
                 return;
@@ -297,6 +298,14 @@ public class Matchmaker implements GLO {
 	    waitingPlayers.size() + " waiting");
 
         if (waitingPlayers.size() == PLAYERS_PER_GAME) {
+	    if (log.isLoggable(Level.FINEST)) {
+		log.finest("Creating a new game for:");
+		for (GLOReference<Player> ref : waitingPlayers) {
+		    Player peekedPlayer = ref.peek(task);
+		    log.finest("    " + peekedPlayer.getPlayerName());
+		}
+	    }
+
             Game.create(waitingPlayers);
             waitingPlayers.clear();
         }
