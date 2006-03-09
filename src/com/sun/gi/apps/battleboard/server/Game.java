@@ -415,8 +415,8 @@ public class Game implements GLO {
             try {
                 task.queueTask(thisRef, Game.class.getMethod("endGame"),
                         new Object[] {});
-            } catch (Exception e) {
-                e.printStackTrace();
+            } catch (NoSuchMethodException e) {
+                throw new RuntimeException(e.getMessage());
             }
 
             // Someone won, so don't start the next move
