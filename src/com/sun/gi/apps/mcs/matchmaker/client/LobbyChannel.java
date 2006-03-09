@@ -199,7 +199,6 @@ public class LobbyChannel implements ILobbyChannel, ClientChannelListener {
                                 // do anything
             return;
         }
-        System.out.println("LobbyChannel.dataArrived " + from);
         // TODO sten: test isServerID once that works
         int command = protocol.readUnsignedByte(data);
         if (command == PLAYER_ENTERED_LOBBY) {
@@ -212,27 +211,35 @@ public class LobbyChannel implements ILobbyChannel, ClientChannelListener {
             UserID id = protocol.readUserID(data);
             listener.receiveText(from, protocol.readString(data), true);
         } else if (command == GAME_CREATED) {
-            SGSUUID uuid = protocol.readUUID(data);
-            String name = protocol.readString(data);
-            String description = protocol.readString(data);
-            String channelName = protocol.readString(data);
-            boolean isProtected = protocol.readBoolean(data);
-            int numParams = data.getInt();
-            HashMap<String, Object> paramMap = new HashMap<String, Object>();
-            for (int i = 0; i < numParams; i++) {
-                String param = protocol.readString(data);
-                Object value = protocol.readParamValue(data);
-                paramMap.put(param, value);
-            }
-            GameDescriptor game = new GameDescriptor(uuid, name, description,
-                    channelName, isProtected, paramMap);
-            listener.gameCreated(game);
+
+            listener.gameCreated(readGameDescriptor(data));
         } else if (command == PLAYER_JOINED_GAME) {
             SGSUUID userID = protocol.readUUID(data);
             SGSUUID gameID = protocol.readUUID(data);
             listener.playerJoinedGame(gameID.toByteArray(),
                     userID.toByteArray());
+        } else if (command == GAME_STARTED) {
+        	listener.gameStarted(readGameDescriptor(data));
+        } else if (command == GAME_DELETED) {
+        	listener.gameDeleted(readGameDescriptor(data));
         }
+    }
+    
+    private GameDescriptor readGameDescriptor(ByteBuffer data) {
+        SGSUUID uuid = protocol.readUUID(data);
+        String name = protocol.readString(data);
+        String description = protocol.readString(data);
+        String channelName = protocol.readString(data);
+        boolean isProtected = protocol.readBoolean(data);
+        int numParams = data.getInt();
+        HashMap<String, Object> paramMap = new HashMap<String, Object>();
+        for (int i = 0; i < numParams; i++) {
+            String param = protocol.readString(data);
+            Object value = protocol.readParamValue(data);
+            paramMap.put(param, value);
+        }
+       return  new GameDescriptor(uuid, name, description,
+                channelName, isProtected, paramMap);
     }
 
     /**

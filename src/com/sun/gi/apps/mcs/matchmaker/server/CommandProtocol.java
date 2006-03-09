@@ -108,6 +108,11 @@ public final class CommandProtocol implements Serializable {
     public final static int SERVER_LISTENING = 0x10;
     public final static int ERROR = 0x11;
 
+    public final static int LEAVE_LOBBY = 0x66;
+    public final static int LEAVE_GAME = 0x67;
+    public final static int LEFT_LOBBY = 0x68;
+    public final static int LEFT_GAME = 0x69;
+    
     public final static int LIST_FOLDER_REQUEST = 0x70;
     public final static int LIST_FOLDER_RESPONSE = 0x71;
 
@@ -137,7 +142,7 @@ public final class CommandProtocol implements Serializable {
     public final static int CREATE_GAME = 0x96;
     public final static int CREATE_GAME_FAILED = 0x97;
     public final static int GAME_CREATED = 0x98;
-    public final static int GAME_STARTED = 0x9A;
+    public final static int GAME_STARTED = 0x9A;		// sent to lobby
 
     public final static int PLAYER_JOINED_GAME = 0x9B;  // sent to lobby
     public final static int PLAYER_ENTERED_GAME = 0xB0; // sent to game room

@@ -114,7 +114,6 @@ public class GameChannel implements IGameChannel, ClientChannelListener {
             // if no one is listening, no reason to do anything
             return;
         }
-        System.out.println("GameChannel.dataArrived " + from);
         // TODO sten: test isServerID once that works
         int command = protocol.readUnsignedByte(data);
         if (command == PLAYER_ENTERED_GAME) {

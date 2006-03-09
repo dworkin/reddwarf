@@ -83,6 +83,10 @@ public interface ILobbyChannelListener {
     public void createGameFailed(String name, String reason);
 
     public void gameCreated(GameDescriptor game);
+    
+    public void gameStarted(GameDescriptor game);
+    
+    public void gameDeleted(GameDescriptor game);
 
     public void playerJoinedGame(byte[] gameID, byte[] player);
 }

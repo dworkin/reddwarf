@@ -241,8 +241,7 @@ public class MatchMakerBoot
         URL url = null;
         try {
             url = new URL("file:apps/matchmaker/matchmaker_config.xml");
-            // url = new
-            // URL("file:release/apps/matchmaker/matchmaker_config.xml");
+           //  url = new URL("file:release/apps/matchmaker/matchmaker_config.xml");
         } catch (IOException ioe) {
             ioe.printStackTrace();
         }

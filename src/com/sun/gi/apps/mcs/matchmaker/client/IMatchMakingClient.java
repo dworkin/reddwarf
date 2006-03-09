@@ -127,6 +127,10 @@ public interface IMatchMakingClient {
     public void joinGame(byte[] gameID);
 
     public void joinGame(byte[] gameID, String password);
+    
+    public void leaveLobby();
+    
+    public void leaveGame();
 
     /**
      * Called as a pass-through to the ClientConnectionManager during

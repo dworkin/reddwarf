@@ -109,6 +109,10 @@ public interface IMatchMakingClientListener {
     public void joinedLobby(ILobbyChannel channel);
 
     public void joinedGame(IGameChannel channel);
+    
+    public void leftLobby();
+    
+    public void leftGame();
 
     /**
      * Called when the client has successfully connected to the server
@@ -126,4 +130,11 @@ public interface IMatchMakingClientListener {
      * @param callbacks the security call backs
      */
     public void validationRequest(Callback[] callbacks);
+    
+    /**
+     * Called when some command request encounters an error.
+     * 
+     * @param message		a message detailing the error condition
+     */
+    public void error(String message);
 }

@@ -103,8 +103,8 @@ import com.sun.gi.utils.StatisticalUUID;
  */
 public class MatchMakingClient
         implements IMatchMakingClient, ClientConnectionManagerListener,
-                    ClientChannelListener
-{
+                    ClientChannelListener {
+	
     private IMatchMakingClientListener listener;
     private ClientConnectionManager manager;
     private HashMap<String, LobbyChannel> lobbyMap;
@@ -157,8 +157,7 @@ public class MatchMakingClient
     }
 
     public void joinLobby(byte[] lobbyID, String password) {
-        List list = new LinkedList();
-        list.add(JOIN_LOBBY);
+        List list = protocol.createCommandList(JOIN_LOBBY);
         list.add(createUUID(lobbyID));
         if (password != null) {
             list.add(password);
@@ -172,14 +171,21 @@ public class MatchMakingClient
     }
 
     public void joinGame(byte[] gameID, String password) {
-        List list = new LinkedList();
-        list.add(JOIN_GAME);
+        List list = protocol.createCommandList(JOIN_GAME);
         list.add(createUUID(gameID));
         if (password != null) {
             list.add(password);
         }
 
         sendCommand(list);
+    }
+    
+    public void leaveLobby() {
+    	sendCommand(protocol.createCommandList(LEAVE_LOBBY));
+    }
+    
+    public void leaveGame() {
+    	sendCommand(protocol.createCommandList(LEAVE_GAME));
     }
 
     /**
@@ -322,7 +328,14 @@ public class MatchMakingClient
             gameParametersResponse(data);
         } else if (command == CREATE_GAME_FAILED) {
             createGameFailed(data);
+        } else if (command == ERROR) {
+        	listener.error(protocol.readString(data));
+        } else if (command == LEFT_LOBBY) {
+        	listener.leftLobby();
+        } else if (command == LEFT_GAME) {
+        	listener.leftGame();
         }
+        
     }
 
     /**

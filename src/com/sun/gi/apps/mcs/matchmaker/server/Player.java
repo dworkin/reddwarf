@@ -154,7 +154,12 @@ public class Player implements SimUserDataListener {
             updatePlayerReadyRequest(task, data);
         } else if (commandCode == START_GAME_REQUEST) {
             startGame(task);
+        } else if (commandCode == LEAVE_LOBBY) {
+        	leaveLobby(task);
+        } else if (commandCode == LEAVE_GAME) {
+        	leaveGame(task);
         }
+        
 
     }
 
@@ -185,27 +190,36 @@ public class Player implements SimUserDataListener {
                                     // add to the either the lobby or
                                     // game list.
             if (cid.equals(task.openChannel(LOBBY_MANAGER_CONTROL_CHANNEL))) {
-                List list = new LinkedList();
-                list.add(SERVER_LISTENING);
+                List list = protocol.createCommandList(SERVER_LISTENING);
                 sendResponse(task, list);
+                
                 return;
             }
+            
             GLOMap<SGSUUID, GLOReference<Lobby>> lobbyMap =
-                (GLOMap<SGSUUID, GLOReference<Lobby>>) task.findGLO(
-                        "LobbyMap").peek(task);
+                (GLOMap<SGSUUID, GLOReference<Lobby>>) task.findGLO("LobbyMap").peek(task);
             GLOReference<Lobby> lobbyRef = lobbyMap.get(cid);
             if (lobbyRef != null) {
                 currentLobby = lobbyRef;
                 Lobby lobby = lobbyRef.get(task);
                 lobby.addUser(uid);
+                
+                // send the games to the user
+                for (GLOReference<GameRoom> gRef : lobby.getGameRoomList()) {
+                	GameRoom curGame = gRef.peek(task);
+                    List list = protocol.createCommandList(GAME_CREATED);
+                    packGameDescriptor(list, curGame);
+                    sendResponse(task, list, cid);
+                }
 
                 // send lobby joined message
-                List list = new LinkedList();
-                list.add(PLAYER_ENTERED_LOBBY);
+                List list = protocol.createCommandList(PLAYER_ENTERED_LOBBY);
                 list.add(userID);
                 list.add(userName);
-                System.out.println("send player entered lobby " + userName);
                 sendMulticastResponse(task, lobby.getUsers(), list, cid);
+                
+                sendRetroJoins(task, lobby.getUsers(), PLAYER_ENTERED_LOBBY, cid);
+                
             } else { // must have been a game room
                 GLOMap<SGSUUID, GLOReference<GameRoom>> gameRoomMap =
                     (GLOMap<SGSUUID, GLOReference<GameRoom>>) task.findGLO(
@@ -215,15 +229,13 @@ public class Player implements SimUserDataListener {
                     currentGameRoom = gameRef;
                     GameRoom gameRoom = gameRef.get(task);
                     gameRoom.addUser(uid);
-
+                    
                     // send playerJoinedGame message to lobby
                     List lobbyList = new LinkedList();
                     lobbyList.add(PLAYER_JOINED_GAME);
                     lobbyList.add(uid);
                     lobbyList.add(gameRoom.getGameID());
 
-                    // TODO sten: assumes that player keeps lobby ref.
-                    // verify.
                     Lobby lobby = currentLobby.peek(task);
                     sendMulticastResponse(task, lobby.getUsers(), lobbyList,
                             lobby.getChannelID());
@@ -233,6 +245,9 @@ public class Player implements SimUserDataListener {
                     grList.add(PLAYER_ENTERED_GAME);
                     grList.add(uid);
                     grList.add(userName);
+                    
+                    sendRetroJoins(task, gameRoom.getUsers(), PLAYER_ENTERED_GAME, 
+                    				gameRoom.getChannelID());
 
                     sendMulticastResponse(task, gameRoom.getUsers(), grList,
                             gameRoom.getChannelID());
@@ -243,7 +258,7 @@ public class Player implements SimUserDataListener {
         }
 
     }
-
+    
     /**
      * <p>
      * Called when a user leaves a channel. There's only work to do if
@@ -274,15 +289,15 @@ public class Player implements SimUserDataListener {
         SimTask task = SimTask.getCurrent();
         if (uid.equals(userID)) { // it was this player who left,
                                     // cleanup -- remove from any lists.
-            if (currentGameRoom != null) { // the player left a game
+        	if (currentGameRoom != null) { // the player left a game
                                             // room
                 GameRoom gameRoom = (GameRoom) currentGameRoom.get(task);
                 if (cid.equals(gameRoom.getChannelID())) { // user left
                                                             // from this
                                                             // channel
-                    gameRoom.removeUser(uid);
+                	gameRoom.removeUser(uid);
 
-                    Lobby lobby = (Lobby) currentLobby.get(task);
+                    Lobby lobby = currentLobby != null ? currentLobby.peek(task) : null;
 
                     // if this was the host, kick everyone out and kill
                     // the game
@@ -294,38 +309,75 @@ public class Player implements SimUserDataListener {
 
                         // Send notification to the Lobby that the game
                         // was killed
-                        List list = new LinkedList();
-                        list.add(GAME_DELETED);
-                        list.add(gameRoom.getGameID());
-
-                        sendResponse(task, list, lobby.getChannelID());
+                        if (lobby != null) {
+	                        List list = protocol.createCommandList(GAME_DELETED);
+	                        packGameDescriptor(list, gameRoom);
+	
+	                        sendMulticastResponse(task, lobby.getUsers(), list, lobby.getChannelID());
+                        }
                     }
 
                     // currentGameRoom.delete(task);
                     currentGameRoom = null;
 
-                    // rejoin lobby
-                    task.join(uid, lobby.getChannelID());
-
                     // send PlayerLeftGame message to lobby
-                    List list = new LinkedList();
-                    list.add(PLAYER_LEFT_GAME);
-                    list.add(uid);
-                    list.add(gameRoom.getGameID());
-
-                    sendResponse(task, list, lobby.getChannelID());
+                    if (lobby != null) {
+	                    List list = protocol.createCommandList(PLAYER_LEFT_GAME);
+	                    list.add(uid);
+	                    list.add(gameRoom.getGameID());
+	
+	                    sendMulticastResponse(task, lobby.getUsers(), list, lobby.getChannelID());
+                    }
+                    
+                    List leftList = protocol.createCommandList(LEFT_GAME);
+                    sendResponse(task, leftList);
+                    
                 }
-            } else if (currentLobby != null) {
+            } 
+        	if (currentLobby != null) {
                 Lobby lobby = (Lobby) currentLobby.get(task);
-                lobby.removeUser(uid);
-                // currentLobby.delete(task);
-                currentLobby = null;
+                if (cid.equals(lobby.getChannelID())) {
+	                lobby.removeUser(uid);
+	                // currentLobby.delete(task);
+	                currentLobby = null;
+	                
+	                List leftList = protocol.createCommandList(LEFT_LOBBY);
+	                sendResponse(task, leftList);
+                }
             }
         }
     }
 
     public String getUserName() {
         return userName;
+    }
+    
+    /**
+     * Send a "catch-up" join message to the user for every player already on
+     * the given channel.
+     * 
+     * @param users				the list of users
+     * @param commandCode		the type of entry (lobby or game room)
+     * @param cid				the ChannelID down which to send the message
+     */
+    private void sendRetroJoins(SimTask task, List<UserID> users, int commandCode, ChannelID cid) {
+    	for (UserID curUser : users) {
+    		if (curUser.equals(userID)) {
+    			continue;
+    		}
+    		GLOReference<Player> pRef = task.findGLO(curUser.toString());
+    		if (pRef == null) {
+    			continue;
+    		}
+    		Player curPlayer = pRef.peek(task);
+    		
+    		List list = protocol.createCommandList(commandCode);
+    		list.add(curUser);
+    		list.add(curPlayer.getUserName());
+    		
+    		sendResponse(task, list, cid);
+    	}
+    	
     }
 
     /**
@@ -457,6 +509,22 @@ public class Player implements SimUserDataListener {
         }
         sendResponse(task, list);
     }
+    
+    private void leaveLobby(SimTask task) {
+    	if (currentLobby == null) {
+    		sendErrorResponse(task, "Not connected to a lobby.");
+    	}
+    	Lobby lobby = currentLobby.peek(task);
+    	task.leave(userID, lobby.getChannelID());
+    }
+    
+    private void leaveGame(SimTask task) {
+    	if (currentGameRoom == null) {
+    		sendErrorResponse(task, "Not connected to a game.");
+    	}
+    	GameRoom game = currentGameRoom.peek(task);
+    	task.leave(userID, game.getChannelID());
+    }
 
     /**
      * Attempts to join this user to the Lobby channel specified in the
@@ -468,8 +536,6 @@ public class Player implements SimUserDataListener {
      */
     private void joinLobby(SimTask task, ByteBuffer data) {
         System.out.println("joinLobby request");
-        // TODO sten: perhaps this should send a response instead of
-        // silently returning
         if (currentLobby != null) {
             sendErrorResponse(task, "Already connected to a lobby");
             return;
@@ -512,12 +578,17 @@ public class Player implements SimUserDataListener {
      */
     private void sendErrorResponse(SimTask task, String message) {
         List list = protocol.createCommandList(ERROR);
+        list.add(message);
         sendResponse(task, list);
     }
 
     private void startGame(SimTask task) {
         if (currentGameRoom == null) {
+        	sendErrorResponse(task, "Start failed.  Not connected to a game room.");
             return;
+        }
+        if (currentLobby == null) {
+        	sendErrorResponse(task, "Start failed.  Not connected to a lobby.");
         }
         GameRoom gameRoom = currentGameRoom.peek(task);
         UserID host = gameRoom.getHost();
@@ -532,12 +603,21 @@ public class Player implements SimUserDataListener {
                     gameRoom.getChannelID());
             return;
         }
-        System.out.println("Player: create game successful");
 
+        Lobby lobby = currentLobby.peek(task);
+        
         List list = protocol.createCommandList(GAME_STARTED);
         packGameDescriptor(list, gameRoom);
 
-        sendResponse(task, list, gameRoom.getChannelID());
+        // send identical message to both game room and lobby
+        sendMulticastResponse(task, gameRoom.getUsers(), list, gameRoom.getChannelID());
+        sendMulticastResponse(task, lobby.getUsers(), list, lobby.getChannelID());
+        
+        // unjoin all game players from the lobby.
+        for(UserID curUser : gameRoom.getUsers()) {
+        	System.out.println("unjoining " + curUser.toString());
+        	task.leave(curUser, lobby.getChannelID());
+        }
     }
 
     private void sendStartGameFailed(SimTask task, String reason, ChannelID cid) {
@@ -612,6 +692,7 @@ public class Player implements SimUserDataListener {
         if (gameRoom.isPasswordProtected()) {
             String password = protocol.readString(data);
             if (!password.equals(gameRoom.getPassword())) {
+            	sendErrorResponse(task, "Incorrect password for Game");
                 return;
             }
         }
@@ -721,8 +802,7 @@ public class Player implements SimUserDataListener {
             gr.addGameParameter(entry.getKey(), entry.getValue());
         }
 
-        List list = new LinkedList();
-        list.add(GAME_CREATED);
+        List list = protocol.createCommandList(GAME_CREATED);
         packGameDescriptor(list, gr);
 
         sendMulticastResponse(task, lobby.getUsers(), list,

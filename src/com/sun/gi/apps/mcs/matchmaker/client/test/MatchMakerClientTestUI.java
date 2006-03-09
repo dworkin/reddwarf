@@ -112,8 +112,8 @@ import com.sun.gi.utils.SGSUUID;
 import com.sun.gi.utils.StatisticalUUID;
 
 public class MatchMakerClientTestUI extends JFrame
-        implements IMatchMakingClientListener
-{
+        implements IMatchMakingClientListener {
+	
     private MatchMakingClient mmClient;
     private ClientConnectionManager manager;
     private DefaultMutableTreeNode root;
@@ -125,6 +125,8 @@ public class MatchMakerClientTestUI extends JFrame
     private JTextArea incomingText;
 
     private JButton connectButton;
+    private JButton joinLobby;
+    private JButton joinGame;
 
     public MatchMakerClientTestUI() {
         super();
@@ -146,16 +148,20 @@ public class MatchMakerClientTestUI extends JFrame
             }
         });
 
-        JButton joinLobby = new JButton("Join Lobby");
+        joinLobby = new JButton("Join Lobby");
         joinLobby.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
-                LobbyDescriptor lobby = getSelectedLobby();
-                if (lobby == null) {
-                    return;
-                }
-                System.out.println("attempt to join lobby "
-                        + lobby.getLobbyID().toString());
-                mmClient.joinLobby(lobby.getLobbyID().toByteArray(), null);
+            	if (joinLobby.getText().startsWith("Join")) {
+	                LobbyDescriptor lobby = getSelectedLobby();
+	                if (lobby == null) {
+	                    return;
+	                }
+	                mmClient.joinLobby(lobby.getLobbyID().toByteArray(), null);
+            	}
+            	else {
+            		mmClient.leaveLobby();
+            	}
+                
             }
         });
 
@@ -166,14 +172,19 @@ public class MatchMakerClientTestUI extends JFrame
             }
         });
 
-        JButton joinGame = new JButton("Join Game");
+        joinGame = new JButton("Join Game");
         joinGame.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
-                GameDescriptor game = lobbyPanel.getSelectedGame();
-                if (game == null) {
-                    return;
+                if (joinGame.getText().startsWith("Join")) {
+	            	GameDescriptor game = lobbyPanel.getSelectedGame();
+	                if (game == null) {
+	                    return;
+	                }
+	                mmClient.joinGame(game.getGameID().toByteArray());
                 }
-                mmClient.joinGame(game.getGameID().toByteArray());
+                else {
+                	mmClient.leaveGame();
+                }
             }
         });
 
@@ -373,13 +384,26 @@ public class MatchMakerClientTestUI extends JFrame
     }
 
     public void joinedLobby(ILobbyChannel channel) {
-        lobbyPanel.setLobby(channel);
+        joinLobby.setText("Leave Lobby");
+    	lobbyPanel.setLobby(channel);
     }
 
     public void joinedGame(IGameChannel channel) {
-        System.out.println("joinedGame: " + channel.getName());
-        gamePanel.setGame(channel, lobbyPanel.gameMap.get(channel.getName()));
+    	joinGame.setText("Leave Game");
+    	gamePanel.setGame(channel, lobbyPanel.gameMap.get(channel.getName()));
 
+    }
+    
+    public void leftLobby() {
+    	joinLobby.setText("Join Lobby");
+    	receiveServerMessage("Left Lobby");
+    	lobbyPanel.resetLobby();
+    }
+    
+    public void leftGame() {
+    	joinGame.setText("Join Game");
+    	receiveServerMessage("Left Game");
+    	gamePanel.resetGame();
     }
 
     public void connected(byte[] myID) {
@@ -391,6 +415,15 @@ public class MatchMakerClientTestUI extends JFrame
     public void disconnected() {
         setStatus("Disconnected");
         connectButton.setText("Connect");
+    }
+    
+    /**
+     * Called when some command request encounters an error.
+     * 
+     * @param message		a message detailing the error condition
+     */
+    public void error(String message) {
+    	receiveServerMessage("<ERROR> " + message);
     }
 
     public void validationRequest(Callback[] callbacks) {
@@ -570,9 +603,24 @@ public class MatchMakerClientTestUI extends JFrame
             lobbyDescription.setText(lobby.getDescription());
             isPasswordProtected.setSelected(lobby.isPasswordProtected());
             maxUsers = lobby.getMaxUsers();
-            numUsers = lobby.getNumUsers();
             updateNumUsers();
             channel.requestGameParameters();
+        }
+        
+        void resetLobby() {
+        	LobbyPanel.this.channel = null;
+        	lobbyName.setText("");
+        	lobbyDescription.setText("");
+        	isPasswordProtected.setSelected(false);
+        	numUsers = 0;
+        	maxUsers = 0;
+        	updateNumUsers();
+        	gameListModel.removeAllElements();
+        	userListModel.removeAllElements();
+        	userMap.clear();
+        	gameMap.clear();
+        	parametersModel.clear();
+        
         }
 
         void createGame() {
@@ -604,7 +652,7 @@ public class MatchMakerClientTestUI extends JFrame
         private void updateNumUsers() {
             numUserLabel.setText("Users: " + numUsers + "/" + maxUsers);
         }
-
+        
         public void playerEntered(byte[] player, String name) {
             receiveServerMessage(name + " Entered Lobby " + lobbyName.getText());
             userMap.put(byteArrayToString(player), name);
@@ -654,6 +702,14 @@ public class MatchMakerClientTestUI extends JFrame
             receiveServerMessage("<Lobby> "
                     + userMap.get(byteArrayToString(player)) + " Joined Game ");
         }
+        
+        public void gameStarted(GameDescriptor game) {
+        	receiveServerMessage("<Lobby> Game Started " + game.getName());
+        }
+        
+        public void gameDeleted(GameDescriptor game) {
+        	receiveServerMessage("<Lobby> Game Deleted " + game.getName());
+        }
     }
 
     private class GameParametersTableModel extends AbstractTableModel {
@@ -677,6 +733,12 @@ public class MatchMakerClientTestUI extends JFrame
 
         public int getRowCount() {
             return params.size();
+        }
+        
+        public void clear() {
+        	params.clear();
+        	values.clear();
+        	fireTableDataChanged();
         }
 
         public Object getValueAt(int row, int col) {
@@ -755,6 +817,16 @@ public class MatchMakerClientTestUI extends JFrame
             gameName.setText(descriptor.getName() + ", "
                     + descriptor.getDescription());
             updateGameParameters(descriptor.getGameParameters());
+        }
+        
+        public void resetGame() {
+        	GamePanel.this.channel = null;
+        	GamePanel.this.descriptor = null;
+        	gameName.setText("");
+        	userMap.clear();
+        	userTableModel.clear();
+        	parametersModel.clear();
+        	isPasswordProtected.setSelected(false);
         }
 
         public void ready() {
@@ -838,6 +910,12 @@ public class MatchMakerClientTestUI extends JFrame
             usernames.remove(userName);
             readyState.remove(index);
             fireTableDataChanged();
+        }
+        
+        public void clear() {
+        	usernames.clear();
+        	readyState.clear();
+        	fireTableDataChanged();
         }
 
         public int getColumnCount() {

@@ -169,6 +169,15 @@ public class MatchMakerClientTest implements IMatchMakingClientListener {
          * "secret"); }
          */
     }
+    
+    /**
+     * Called when some command request encounters an error.
+     * 
+     * @param message		a message detailing the error condition
+     */
+    public void error(String message) {
+    	System.out.println("<ERROR> " + message);
+    }
 
     public void foundUserName(String userName, byte[] userID) {
         System.out.println("foundUserName: " + userName + " userID "
@@ -230,6 +239,14 @@ public class MatchMakerClientTest implements IMatchMakingClientListener {
             public void playerJoinedGame(byte[] gameID, byte[] player) {
                 System.out.println("LobbyChannelListener: playerJoinedGame ");
             }
+            
+            public void gameStarted(GameDescriptor game) {
+            	
+            }
+            
+            public void gameDeleted(GameDescriptor game) {
+            	
+            }
         });
         channel.requestGameParameters();
     }
@@ -262,6 +279,14 @@ public class MatchMakerClientTest implements IMatchMakingClientListener {
 
             }
         });
+    }
+    
+    public void leftLobby() {
+    	
+    }
+    
+    public void leftGame() {
+    	
     }
 
     public void connected(byte[] myID) {

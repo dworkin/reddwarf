@@ -105,7 +105,7 @@ public class Lobby extends ChannelRoom {
     private boolean canHostChangeSettings;
     private int maxConnectionTime; // in minutes?
     private HashMap<String, Object> gameParameters;
-    private List<GLOReference> gameRoomList;
+    private List<GLOReference<GameRoom>> gameRoomList;
     private List<UserID> playerList;
 
     public Lobby(String name, String description, String password,
@@ -114,7 +114,7 @@ public class Lobby extends ChannelRoom {
         super(name, description, password, channelName, cid);
 
         gameParameters = new HashMap<String, Object>();
-        gameRoomList = new LinkedList<GLOReference>();
+        gameRoomList = new LinkedList<GLOReference<GameRoom>>();
         this.playerList = new LinkedList<UserID>();
     }
 
@@ -158,8 +158,12 @@ public class Lobby extends ChannelRoom {
         return maxConnectionTime;
     }
 
-    public void addGameRoom(GLOReference grRef) {
+    public void addGameRoom(GLOReference<GameRoom> grRef) {
         gameRoomList.add(grRef);
+    }
+    
+    public List<GLOReference<GameRoom>> getGameRoomList() {
+    	return Collections.unmodifiableList(gameRoomList);
     }
 
     public void addGameParameter(String key, Object value) {
