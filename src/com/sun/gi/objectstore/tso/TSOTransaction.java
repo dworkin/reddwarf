@@ -159,19 +159,22 @@ public class TSOTransaction implements Transaction {
         TSODataHeader hdr = new TSODataHeader(time, tiebreaker,
                 System.currentTimeMillis() + TIMEOUT, transactionID,
                 ObjectStore.INVALID_ID);
-        long headerID = createTrans.create(hdr, name);
-        while (headerID == DataSpace.INVALID_ID) { // we were beat
-                                                    // there
+        long headerID = createTrans.create(hdr, name); // check that the winner has the lock
+        while (headerID == DataSpace.INVALID_ID) {
+	    // we were beat there
             headerID = lookup(name);
-            try {
-                lock(headerID);
-                return ObjectStore.INVALID_ID;
-            } catch (NonExistantObjectIDException e) {
-                // means its been removed out from under us, so create
-                // is okay
-                // try again
-                headerID = createTrans.create(hdr, name);
-            } // wait til we can acquire a lock
+	    try {
+		exitingHeader = lock(headerID);
+		if (! exitingHeader.createNotCommitted) {
+		    return ObjectStore.INVALID_ID;
+		}
+		// else a previous, race-winning create must have aborted.
+		// Let the while loop terminate and init the new object.
+	    } catch (NonExistantObjectIDException e) {
+		// means its been removed out from under us, so create
+		// is okay try again
+		headerID = createTrans.create(hdr, name);
+	    } // wait til we can acquire a lock
         }
         long id = mainTrans.create(object, null);
         hdr.objectID = id;
