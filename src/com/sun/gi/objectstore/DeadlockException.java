@@ -81,7 +81,7 @@ package com.sun.gi.objectstore;
  * @version 1.0
  */
 
-public class DeadlockException extends RuntimeException {
+public class DeadlockException extends SGSError {
 
     private static final long serialVersionUID = 1L;
 

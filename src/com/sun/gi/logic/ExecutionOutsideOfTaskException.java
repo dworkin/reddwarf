@@ -72,7 +72,7 @@ package com.sun.gi.logic;
  * @author Jeff Kesselman
  * @version 1.0
  */
-public class ExecutionOutsideOfTaskException extends RuntimeException {
+public class ExecutionOutsideOfTaskException extends SGSError {
 
     private static final long serialVersionUID = 1L;
 }

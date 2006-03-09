@@ -31,6 +31,7 @@
     <property name="obfuscator.destjar" value="${build.dir}/obfuscated.jar"/>
     <property name="dist.jar" value="${output.name}.jar"/>
     <property name="dist.jad" value="${output.name}.jad"/>
+	<property name= "dist.javadoc.dir" value="javadoc"/>
     <property name="manifest.midlets" value=""/>
     <property name="manifest.midlet.vendor" value="MIDlet-Vendor: Sun Microsystems"/>
     <property name="manifest.midlet.version" value="MIDlet-Version: 1.0"/>
@@ -158,18 +159,15 @@
     </target>
     
     <target name="javadoc" depends="init">
-        <mkdir dir="${dist.javadoc.dir}"/>
-        <javadoc source="${javac.source}" destdir="${dist.javadoc.dir}" bootclasspath="${platform.bootclasspath}" notree="${javadoc.notree}" use="${javadoc.use}" nonavbar="${javadoc.nonavbar}" noindex="${javadoc.noindex}" splitindex="${javadoc.splitindex}" author="${javadoc.author}" version="${javadoc.version}" windowtitle="${javadoc.windowtitle}" private="${javadoc.private}">
-            <classpath>
-                <path path="${libs.classpath}"/>
-            </classpath>
-            <sourcepath>
-                <pathelement location="${preprocessed.dir}"/>
-            </sourcepath>
-            <fileset dir="${preprocessed.dir}"/>
-        </javadoc>
-        <antcall target="browse-javadoc"/>
+    	<javadoc destdir="doc/javadoc/api" sourcepath="src"
+    			classpathref="project.classpath" access="public">
+    		    <package name="*" />
+    		<excludepackage name="com.sun.gi.apps.*" />
+    		    <tag name="todo" description="To do:" />
+    	</javadoc>
+    	<zip destfile="J2MEClientApiDocs.zip" basedir="doc" />
     </target>
+        
     <target name="clean" depends="init" description="Clean build products.">
         <antcall target="do-clean" inheritall="true" inheritrefs="true"/>
     </target>
