@@ -189,7 +189,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 
     private volatile int commitRegisterCounter = 1;
 
-    private boolean debugCopy = true;
+    private boolean debug = true;
 
     public PersistantInMemoryDataSpace(long appID) {
         this.appID = appID;
@@ -284,7 +284,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
             }
         }
 
-	if (debugCopy) {
+	if (debug) {
 	    for (int i = 0; i < rec.updateDataRef.length; i++) {
 		if (!Arrays.equals(rec.updateDataCopy[i],
 			rec.updateDataRef[i])) {
@@ -553,10 +553,10 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 
         long[] updateIDs = new long[updateMap.entrySet().size()];
         byte[][] updateDataRef = new byte[updateMap.entrySet().size()][];
-	byte[][] updateDataCopy = (debugCopy) ?
+	byte[][] updateDataCopy = (debug) ?
 	    	    new byte[updateMap.entrySet().size()][] : null;
 
-	{
+	if (debug) {
 	    Set<Long> oidSet = new HashSet<Long>();
 	    for (Long oid : deleted) {
 		if (oidSet.contains(oid)) {
@@ -603,7 +603,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 
 		    updateIDs[i] = key;
 		    updateDataRef[i] = value;
-		    if (debugCopy) {
+		    if (debug) {
 			updateDataCopy[i] = value.clone();
 		    }
 		    i++;
@@ -772,7 +772,9 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	    } else {
 		createId = new Long(getNextID());
 	    }
+
             dataSpace.put(createId, new SoftReference<byte[]>(data));
+
 	    try {
 		insertObjStmnt.setLong(1, createId);
 		insertObjStmnt.setBytes(2, data);
@@ -783,6 +785,11 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 		return DataSpace.INVALID_ID;
 	    }
 	}
+
+	synchronized (lockSet) {
+	    lockSet.add(createId);
+	}
+
         return createId;
     }
 
@@ -807,7 +814,6 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	}
 
 	// destroyed objects lose their locks.
-
 	synchronized (lockSet) {
 	    lockSet.remove(objectID);
 	}
