@@ -235,6 +235,8 @@ public class Matchmaker implements GLO {
 
         log.fine("Matchmaker: join from `" + playerName + "'");
 
+	log.finer("Matchmaker before join has " +
+	    waitingPlayers.size() + " waiting");
         /*
          * XXX: DJE: this is confusing: can we not have two users with
          * the same playerName WAITING, but there could be two users
@@ -265,7 +267,11 @@ public class Matchmaker implements GLO {
          */
 
         GLOReference<Player> playerRef = Player.getRef(uid);
+
+	log.finer("Matchmaker about to get Player object for " + playerName);
         Player player = playerRef.get(task);
+	log.finer("Matchmaker got Player object for " + playerName);
+
         player.setPlayerName(playerName);
         waitingPlayers.add(playerRef);
 
@@ -286,6 +292,9 @@ public class Matchmaker implements GLO {
          * waitingPlayers can be updated by another thread at the same
          * time? (if so, then we have more synching to do!)
          */
+
+	log.finer("Matchmaker after join has " +
+	    waitingPlayers.size() + " waiting");
 
         if (waitingPlayers.size() == PLAYERS_PER_GAME) {
             Game.create(waitingPlayers);
