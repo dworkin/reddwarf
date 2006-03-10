@@ -506,6 +506,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 		if (!dataSpace.containsKey(objectID)) {
 		    if (graveyard.contains(objectID)
 			    || loadCache(objectID) == null) {
+			lockSet.notifyAll();
 			throw new NonExistantObjectIDException(
 				"Can't find objectID " + objectID);
 		    }
