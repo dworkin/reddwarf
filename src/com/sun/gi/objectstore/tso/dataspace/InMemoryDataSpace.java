@@ -186,10 +186,12 @@ public class InMemoryDataSpace implements DataSpace {
     	    List<Long> deleted) {
 	if (log.isLoggable(Level.FINEST)) {
 	    Long[] upArray = new Long[updateMap.size()];
-	    Long[] delArray = new Long[deleted.size()];
 	    updateMap.keySet().toArray(upArray);
-	    deleted.toArray(delArray);
+	    Arrays.sort(upArray);
 	    log.finest("update ids: " + Arrays.toString(upArray));
+	    Long[] delArray = new Long[deleted.size()];
+	    deleted.toArray(delArray);
+	    Arrays.sort(delArray);
 	    log.finest("delete ids: " + Arrays.toString(delArray));
 	}
         // insert set is ignored in this case as its uneeded detail
@@ -208,12 +210,14 @@ public class InMemoryDataSpace implements DataSpace {
             	reverseNameMap.remove(oid);
 	    }
 	}
+	/*
         synchronized (lockSet) {
             for (Long oid : deleted) {
 		lockSet.remove(oid);
 	    }
 	    lockSet.notifyAll();
 	}
+	*/
 	// JMEGQ end changes
     }
 

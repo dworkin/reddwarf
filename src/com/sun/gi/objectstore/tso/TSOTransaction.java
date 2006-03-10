@@ -183,7 +183,7 @@ public class TSOTransaction implements Transaction {
         long id = mainTrans.create(object, null);
         hdr.objectID = id;
         createTrans.write(headerID, hdr);
-	log.finer("createTrans for " + name + " committing");
+	log.finer("txn " + transactionID + " createTrans for " + name + " committing");
         createTrans.commit();
         createTrans.release(headerID);
         hdr.free = true;
@@ -245,13 +245,13 @@ public class TSOTransaction implements Transaction {
                 } else {
                     keyTrans.abort();
                 }
-		log.finest("About to wait for header id " + objectID);
+		log.finest("txn " + transactionID + " About to wait for header id " + objectID);
                 waitForWakeup(hdr.timeoutTime);
             }
             // System.out.println("wokeup "+transactionID);
             keyTrans.abort();
             keyTrans.lock(objectID);
-            log.finest("About to re-read header id " + objectID);
+            log.finest("txn " + transactionID + " About to re-read header id " + objectID);
             hdr = (TSODataHeader) keyTrans.read(objectID);
             //System.out.println("hdr="+hdr);
         }
@@ -327,9 +327,11 @@ public class TSOTransaction implements Transaction {
                     e.printStackTrace();
                 }
             }
+	    log.finer("keyTrans commit-1 txn " + transactionID);
             keyTrans.commit();
         }
         if (commit) {
+	    log.finer("mainTrans commit txn " + transactionID);
             mainTrans.commit();
         } else {
 //	    if (log.isLoggable(Level.FINEST)) {
@@ -342,7 +344,9 @@ public class TSOTransaction implements Transaction {
                     keyTrans.destroy(l);
                 }
             }
+	    log.finer("keyTrans commit-2 txn " + transactionID);
             keyTrans.commit();
+	    log.finer("mainTrans abort txn " + transactionID);
             mainTrans.abort();
         }
         lockedObjectsMap.clear();

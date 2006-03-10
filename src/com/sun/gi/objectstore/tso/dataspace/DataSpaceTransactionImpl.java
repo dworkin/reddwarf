@@ -171,7 +171,7 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
     }
 
     public void write(long objectID, Serializable obj) {
-        updateMap.put(new Long(objectID), serialize(obj));
+        updateMap.put(objectID, serialize(obj));
     }
 
     private byte[] serialize(Serializable obj) {
