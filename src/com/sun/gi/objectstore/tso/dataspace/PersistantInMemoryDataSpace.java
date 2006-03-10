@@ -141,8 +141,17 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 
     private Set<Long> lockSet = new HashSet<Long>();
 
+    /*
+     * The graveyard is where oids go to die before are removed from
+     * the database.
+     */
+    private Set<Long> graveyard = new HashSet<Long>();
+
     private Object idMutex = new Object();
     Object diskUpdateQueueMutex = new Object();
+
+    private Object cachedStateMutex = new Object();
+
 
     private volatile long id = 1;
 
@@ -172,6 +181,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
     private PreparedStatement updateInfoStmnt;
     private PreparedStatement deleteObjStmnt;
     private PreparedStatement deleteNameStmnt;
+    private PreparedStatement deleteNameByOIDStmnt;
     private PreparedStatement clearObjTableStmnt;
     private PreparedStatement lockObjTableStmnt;
     private PreparedStatement clearNameTableStmnt;
@@ -299,6 +309,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
                 System.out.println("          Deleting " + rec.deletedIDs[i]);
             }
 	    destroy(rec.deletedIDs[i]);
+	    graveyard.remove(rec.deletedIDs[i]);
 	}
 
         try {
@@ -394,8 +405,10 @@ public class PersistantInMemoryDataSpace implements DataSpace {
                 + " SET OBJBYTES=? WHERE OBJID=?");
         deleteObjStmnt = deleteInsertConn.prepareStatement("DELETE FROM "
                 + OBJTBLNAME + " WHERE OBJID = ?");
-        deleteNameStmnt = deleteInsertConn.prepareStatement("DELETE FROM "
+        deleteNameByOIDStmnt = deleteInsertConn.prepareStatement("DELETE FROM "
                 + NAMETBLNAME + " WHERE OBJID = ?");
+        deleteNameStmnt = deleteInsertConn.prepareStatement("DELETE FROM "
+                + NAMETBLNAME + " WHERE NAME = ?");
         updateInfoStmnt = updateConn.prepareStatement("UPDATE " + INFOTBLNAME
                 + " SET NEXTOBJID=? WHERE APPID=?");
         lockObjTableStmnt = conn.prepareStatement("LOCK TABLE " + OBJTBLNAME
@@ -432,7 +445,11 @@ public class PersistantInMemoryDataSpace implements DataSpace {
      */
     public byte[] getObjBytes(long objectID) {
         byte[] objbytes = null;
-        synchronized (dataSpace) {
+        synchronized (cachedStateMutex) {
+	    if (graveyard.contains(objectID)) {
+		dataSpace.remove(objectID);
+		return null;
+	    }
             SoftReference<byte[]> ref = dataSpace.get(objectID);
             if (ref != null) {
                 objbytes = ref.get();
@@ -441,7 +458,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
                 }
             }
             if (objbytes == null) {
-                objbytes = loadCache(objectID);
+		objbytes = loadCache(objectID);
             }
         }
         return objbytes;
@@ -450,7 +467,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 
     private byte[] loadCache(long objectID) {
         byte[] objbytes = null;
-        synchronized (dataSpace) {
+        synchronized (cachedStateMutex) {
             try {
                 getObjStmnt.setLong(1, objectID);
                 ResultSet rs = getObjStmnt.executeQuery();
@@ -462,6 +479,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
                 if (objbytes == null) {
                     System.out.println("GOT A NULL OBJBYTES in loadCache "
                             + objectID);
+		    (new Exception()).printStackTrace();
                 }
                 rs.close(); // cleanup and free locks
             } catch (SQLException e) {
@@ -484,17 +502,18 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 		    e.printStackTrace();
 		}
 	    }
-	    synchronized (dataSpace) {
+	    synchronized (cachedStateMutex) {
 		if (!dataSpace.containsKey(objectID)) {
-		    if (loadCache(objectID) == null) {
+		    if (graveyard.contains(objectID)
+			    || loadCache(objectID) == null) {
 			throw new NonExistantObjectIDException(
 				"Can't find objectID " + objectID);
 		    }
 		} else {
 		    lockSet.add(new Long(objectID));
-		    lockSet.notifyAll();
 		}
 	    }
+	    lockSet.notifyAll();
 	}
     }
 
@@ -531,7 +550,6 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 		    re = e;
 		}
 	    }
-
 	    lockSet.notifyAll();
 
 	    if (re != null) {
@@ -547,14 +565,12 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	    Map<Long, byte[]> updateMap, List<Long> deleted)
             throws DataSpaceClosedException {
 
+	int i = 0;
+	int queueLength = 0;
+
         if (closed) {
             throw new DataSpaceClosedException();
         }
-
-        long[] updateIDs = new long[updateMap.entrySet().size()];
-        byte[][] updateDataRef = new byte[updateMap.entrySet().size()][];
-	byte[][] updateDataCopy = (debug) ?
-	    	    new byte[updateMap.entrySet().size()][] : null;
 
 	if (debug) {
 	    Set<Long> oidSet = new HashSet<Long>();
@@ -577,47 +593,70 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	    oidSet.clear();
 	}
 
-	int i = 0;
-        int queueLength;
+	/*
+	 * DJE:  cloning the data should be unnecessary, but
+	 * if a reference leaks out of the transaction and is
+	 * modified after a commit, then we want to make sure
+	 * that what we send to the disk is the state at the
+	 * commit, not whatever someone put in there later. 
+	 * So if debugging is turned on, then store not only a
+	 * reference to the data, but a copy, and later check
+	 * to see whether the two still match when it's time
+	 * to write this stuff to the disk. 
+	 */
 
-	if (updateMap.size() > 0) {
-	    
-	    /*
-	     * DJE:  cloning the data should be unnecessary, but
-	     * if a reference leaks out of the transaction and is
-	     * modified after a commit, then we want to make sure
-	     * that what we send to the disk is the state at the
-	     * commit, not whatever someone put in there later. 
-	     * So if debugging is turned on, then store not only a
-	     * reference to the data, but a copy, and later check
-	     * to see whether the two still match when it's time
-	     * to write this stuff to the disk. 
-	     */
+	i = 0;
+        long[] updateIDs = new long[updateMap.entrySet().size()];
+        byte[][] updateDataRef = new byte[updateMap.entrySet().size()][];
+	byte[][] updateDataCopy = (debug) ?
+	    	    new byte[updateMap.entrySet().size()][] : null;
 
-	    synchronized (dataSpace) {
-		for (Entry<Long, byte[]> e : updateMap.entrySet()) {
-		    Long key = e.getKey();
-		    byte[] value = e.getValue();
-		
-		    dataSpace.put(key, new SoftReference<byte[]>(value));
+	for (Entry<Long, byte[]> e : updateMap.entrySet()) {
+	    Long key = e.getKey();
+	    byte[] value = e.getValue();
 
-		    updateIDs[i] = key;
-		    updateDataRef[i] = value;
-		    if (debug) {
-			updateDataCopy[i] = value.clone();
-		    }
-		    i++;
-		}
+	    updateIDs[i] = key;
+	    updateDataRef[i] = value;
+	    if (debug) {
+		updateDataCopy[i] = value.clone();
 	    }
+	    i++;
 	}
 
-	long[] deletedIDs = new long[deleted.size()];
 	i = 0; 
+	long[] deletedIDs = new long[deleted.size()];
 	for (long oid : deleted) {
-	    deletedIDs[i] = oid;
+	    deletedIDs[i++] = oid;
 	}
 
 	synchronized (diskUpdateQueueMutex) {
+	    synchronized (lockSet) {
+		synchronized (cachedStateMutex) {
+
+		    i = 0;
+		    for (Entry<Long, byte[]> e : updateMap.entrySet()) {
+			Long key = e.getKey();
+			byte[] value = e.getValue();
+			dataSpace.put(key, new SoftReference<byte[]>(value));
+		    }
+
+		    i = 0; 
+		    for (long oid : deleted) {
+
+			// destroyed objects lose their locks.
+			lockSet.remove(oid);
+
+			String name = reverseNameSpace.get(oid);
+			if (name != null) {
+			    reverseNameSpace.remove(oid);
+			    nameSpace.remove(name);
+			}
+			graveyard.add(oid);
+		    }
+		}
+		lockSet.notifyAll();
+	    }
+
 	    if (!closed) { // closed while we were processing
 		if (TRACEDISK) {
 		    System.out.println("Queuing commit #"
@@ -640,8 +679,12 @@ public class PersistantInMemoryDataSpace implements DataSpace {
     public Long lookup(String name) {
         Long retval = null;
 
-        synchronized (nameSpace) {
+        synchronized (cachedStateMutex) {
             retval = nameSpace.get(name);
+	    if (graveyard.contains(retval)) {
+		return null;
+	    }
+
             if (retval == null) {
 		try {
 		    getNameStmnt.setString(1, name);
@@ -673,24 +716,21 @@ public class PersistantInMemoryDataSpace implements DataSpace {
     public void clear() {
         try {
             synchronized (diskUpdateQueueMutex) {
-                synchronized (dataSpace) {
-                    synchronized (nameSpace) {
-                        dataSpace.clear();
-                        nameSpace.clear();
-                        reverseNameSpace.clear();
-                        diskUpdateQueue.clear();
-                        lockObjTableStmnt.execute();
-                        lockNameTableStmnt.execute();
-                        clearObjTableStmnt.execute();
-                        clearNameTableStmnt.execute();
-                        conn.commit();
-                    }
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-
+                synchronized (cachedStateMutex) {
+		    dataSpace.clear();
+		    nameSpace.clear();
+		    reverseNameSpace.clear();
+		    diskUpdateQueue.clear();
+		    lockObjTableStmnt.execute();
+		    lockNameTableStmnt.execute();
+		    clearObjTableStmnt.execute();
+		    clearNameTableStmnt.execute();
+		    conn.commit();
+		}
+	    }
+	} catch (SQLException e) {
+	    e.printStackTrace();
+	}
     }
 
     /**
@@ -740,8 +780,9 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 
             reverseNameSpace.clear();
             reverseNameSpace = null;
+
+	    closeWaitMutex.notifyAll();
         }
-	closeWaitMutex.notifyAll();
     }
 
     /**
@@ -749,45 +790,68 @@ public class PersistantInMemoryDataSpace implements DataSpace {
      */
     public long create(byte[] data, String name) {
         Long createId;
-	synchronized (dataSpace) {
-	    if (name != null) {
-		synchronized (nameSpace) {
-		    createId = lookup(name);
-		    if (createId != null) {
-			return DataSpace.INVALID_ID;
-		    }
 
-		    createId = new Long(getNextID());
-		    nameSpace.put(name, createId);
-		    reverseNameSpace.put(createId, name);
-		}
-		try {
-		    insertNameStmnt.setString(1, name);
-		    insertNameStmnt.setLong(2, createId);
-		    insertNameStmnt.execute();
-		} catch (SQLException e) {
-		    e.printStackTrace();
+	/*
+	 * XXX objects are NOT created locked.  If they need to be
+	 * created and locked, then the entire cachedStateMutex block
+	 * must be enclosed in a synchronized (lockSet) block, and
+	 * this outer block must end with lockSet.add(createId). 
+	 * Because of lock ordering, you must hold the lockSet lock
+	 * before doing any of this, because you can't release the
+	 * cachedStateMutex before acquiring the lockSet lock.  -DJE
+	 */
+
+	synchronized (cachedStateMutex) {
+	    if (name != null) {
+		createId = lookup(name);
+		if (createId != null) {
 		    return DataSpace.INVALID_ID;
 		}
+
+		createId = new Long(getNextID());
+		nameSpace.put(name, createId);
+		reverseNameSpace.put(createId, name);
 	    } else {
 		createId = new Long(getNextID());
 	    }
 
             dataSpace.put(createId, new SoftReference<byte[]>(data));
+	}
 
+	/*
+	 * Now that the cached state is updated, release all locks and
+	 * update the database.
+	 *
+	 * There may be a potential race condition with deleted names
+	 * going to the database and popping up during recovery.  I'm
+	 * not sure that this is a problem, nor do a I see an easy way
+	 * to tickle this.  But if a race appears, it may be necessary
+	 * to protect these database ops inside the cachedStateMutex
+	 * (and lockSet lock, if that turns out to be necessary).
+	 */
+
+	if (name != null) {
 	    try {
-		insertObjStmnt.setLong(1, createId);
-		insertObjStmnt.setBytes(2, data);
-		insertObjStmnt.execute();
-		insertObjStmnt.getConnection().commit();
+		deleteNameStmnt.setString(1, name);
+		deleteNameStmnt.execute();
+
+		insertNameStmnt.setString(1, name);
+		insertNameStmnt.setLong(2, createId);
+		insertNameStmnt.execute();
 	    } catch (SQLException e) {
 		e.printStackTrace();
 		return DataSpace.INVALID_ID;
 	    }
 	}
 
-	synchronized (lockSet) {
-	    lockSet.add(createId);
+	try {
+	    insertObjStmnt.setLong(1, createId);
+	    insertObjStmnt.setBytes(2, data);
+	    insertObjStmnt.execute();
+	    insertObjStmnt.getConnection().commit();
+	} catch (SQLException e) {
+	    e.printStackTrace();
+	    return DataSpace.INVALID_ID;
 	}
 
         return createId;
@@ -795,34 +859,16 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 
     /**
      * Destroys the object associated with objectID and removes the
-     * name associated with that ID (if any).
-     * <p>
-     * destroy is a transactional change to the database.
+     * name associated with that ID (if any).  <p>
      * 
      * @param objectID The objectID of the object to destroy
      */
     private void destroy(long objectID) {
-	synchronized (dataSpace) {
-	    synchronized (nameSpace) {
-		String name = reverseNameSpace.get(objectID);
-		if (name != null) {
-		    reverseNameSpace.remove(objectID);
-		    nameSpace.remove(name);
-		}
-	    }
-            dataSpace.remove(objectID);
-	}
-
-	// destroyed objects lose their locks.
-	synchronized (lockSet) {
-	    lockSet.remove(objectID);
-	}
-
 	try {
 	    deleteObjStmnt.setLong(1, objectID);
 	    deleteObjStmnt.execute();
-	    deleteNameStmnt.setLong(1, objectID);
-	    deleteNameStmnt.execute();
+	    deleteNameByOIDStmnt.setLong(1, objectID);
+	    deleteNameByOIDStmnt.execute();
 	    deleteInsertConn.commit();
 	} catch (SQLException e) {
 	    e.printStackTrace();
