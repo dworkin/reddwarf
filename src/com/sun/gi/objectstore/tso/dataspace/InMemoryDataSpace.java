@@ -183,12 +183,24 @@ public class InMemoryDataSpace implements DataSpace {
             dataSpace.putAll(updateMap);
             for (Long oid : deleted) {
             	dataSpace.remove(oid);
+            }
+        }
+	// JMEGQ begin changes
+        synchronized (nameSpace) {
+            for (Long oid : deleted) {
             	String name = reverseNameMap.get(oid);
             	//System.out.println("Removing id,name: "+oid+","+name);
             	nameSpace.remove(name);
             	reverseNameMap.remove(oid);
-            }
-        }
+	    }
+	}
+        synchronized (lockSet) {
+            for (Long oid : deleted) {
+		lockSet.remove(oid);
+	    }
+	    lockSet.notifyAll();
+	}
+	// JMEGQ end changes
     }
 
     /**
