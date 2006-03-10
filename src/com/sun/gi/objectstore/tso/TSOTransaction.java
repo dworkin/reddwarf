@@ -245,21 +245,21 @@ public class TSOTransaction implements Transaction {
                 } else {
                     keyTrans.abort();
                 }
-		if (log.isLoggable(Level.FINEST)) {
-		    log.finest("txn " + transactionID +
+		if (log.isLoggable(Level.FINER)) {
+		    log.finer("txn " + transactionID +
 			" about to wait for header id " + objectID +
-			" until " + String.format("%TFT%TT.%tL", hdr.timeoutTime));
+			" until " + String.format("%tFT%tT.%tL", hdr.timeoutTime));
 		}
                 waitForWakeup(hdr.timeoutTime);
             }
             // System.out.println("wokeup "+transactionID);
             keyTrans.abort();
             keyTrans.lock(objectID);
-            log.finest("txn " + transactionID + " about to re-read header id " + objectID);
+            log.finer("txn " + transactionID + " about to re-read header id " + objectID);
             hdr = (TSODataHeader) keyTrans.read(objectID);
             //System.out.println("hdr="+hdr);
 	    if (hdr.free) {
-		log.finest("txn " + transactionID + " got header id " + objectID);
+		log.finer("txn " + transactionID + " got header id " + objectID);
 	    }
         }
         if (hdr.createNotCommitted) {
