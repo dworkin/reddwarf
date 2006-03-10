@@ -105,7 +105,8 @@ public class TSOTransaction implements Transaction {
     private ClassLoader loader;
     private DataSpaceTransaction mainTrans, keyTrans, createTrans;
     private DataSpace mainDataSpace;
-    private Map<Long, Serializable> lockedObjectsMap = new HashMap<Long, Serializable>();
+    private Map<Long, Serializable> lockedObjectsMap =
+        new HashMap<Long, Serializable>();
     private List<Long> createdIDsList = new ArrayList<Long>();
 
     // private Map<Long, TSODataHeader> newObjectHeaders = new
@@ -113,17 +114,9 @@ public class TSOTransaction implements Transaction {
 
     private boolean timestampInterrupted;
 
-    private static long TIMEOUT;
-
-    {
-        TIMEOUT = 2000 * 60; // default timeout is 2 min
-        String toStr = System.getProperty("sgs.objectstore.timeout");
-        if (toStr != null) {
-            TIMEOUT = Integer.parseInt(toStr);
-        }
-    }
-
-    // static init
+    private static long TIMEOUT =
+        Integer.parseInt(System.getProperty("sgs.objectstore.timeout",
+                "120000" /* millisecs */));
 
     TSOTransaction(TSOObjectStore ostore, ClassLoader loader, long time,
             long tiebreaker, DataSpace mainDataSpace) {
@@ -146,7 +139,7 @@ public class TSOTransaction implements Transaction {
         keyTrans = new DataSpaceTransactionImpl(loader, mainDataSpace);
         createTrans = new DataSpaceTransactionImpl(loader, mainDataSpace);
         timestampInterrupted = false;
-	time = System.currentTimeMillis();
+	//time = System.currentTimeMillis();
         ostore.registerActiveTransaction(this);
     }
 
@@ -269,7 +262,7 @@ public class TSOTransaction implements Transaction {
         }
         hdr.free = false;
         hdr.time = time;
-        hdr.timeoutTime = time + TIMEOUT;
+        //hdr.timeoutTime = time + TIMEOUT;
         hdr.tiebreaker = tiebreaker;
         hdr.availabilityListeners.remove(transactionID);
         hdr.uuid = transactionID;
