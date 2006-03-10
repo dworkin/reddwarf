@@ -307,6 +307,11 @@ public class TSOTransaction implements Transaction {
     private void processLockedObjects(boolean commit) {
         List<SGSUUID> listeners = new ArrayList<SGSUUID>();
         synchronized (keyTrans) {
+//	    if (log.isLoggable(Level.FINEST)) {
+//		Long[] updatedIDs = new Long[entry.size()];
+//		entry.keySet().toArray(updatedIDs);
+//		log.finest("keyTrans.updating " + Arrays.toString(updatedIDs));
+//	    }
             for (Entry<Long, Serializable> entry : lockedObjectsMap.entrySet()) {
                 Long l = entry.getKey();
                 try {
@@ -314,10 +319,8 @@ public class TSOTransaction implements Transaction {
                     TSODataHeader hdr = (TSODataHeader) keyTrans.read(l);
                     hdr.free = true;
                     keyTrans.write(l, hdr);
-		    log.finest("keyTrans.update-header " + l);
                     listeners.addAll(hdr.availabilityListeners);
                     if (commit) {
-			log.finest("keyTrans.update-data " + hdr.objectID);
                         mainTrans.write(hdr.objectID, entry.getValue());
                     }
                 } catch (NonExistantObjectIDException e) {
@@ -329,9 +332,13 @@ public class TSOTransaction implements Transaction {
         if (commit) {
             mainTrans.commit();
         } else {
+//	    if (log.isLoggable(Level.FINEST)) {
+//		Long[] nukedCreateIDs = new Long[createdIDsList.size()];
+//		createdIDsList.toArray(nukedCreateIDs);
+//		log.finest("keyTrans.destroy-created " + Arrays.toString(nukedCreateIDs));
+//	    }
             synchronized (keyTrans) {
                 for (Long l : createdIDsList) {
-		    log.finest("keyTrans.destroy-created " + l);
                     keyTrans.destroy(l);
                 }
             }
