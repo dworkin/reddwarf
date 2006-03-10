@@ -248,7 +248,7 @@ public class TSOTransaction implements Transaction {
 		if (log.isLoggable(Level.FINEST)) {
 		    log.finest("txn " + transactionID +
 			" about to wait for header id " + objectID +
-			" until " + String.format("%TFT%tT.%tL", hdr.timeoutTime));
+			" until " + String.format("%TFT%TT.%tL", hdr.timeoutTime));
 		}
                 waitForWakeup(hdr.timeoutTime);
             }
