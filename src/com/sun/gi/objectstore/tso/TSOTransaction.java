@@ -107,7 +107,6 @@ public class TSOTransaction implements Transaction {
     private DataSpace mainDataSpace;
     private Map<Long, Serializable> lockedObjectsMap = new HashMap<Long, Serializable>();
     private List<Long> createdIDsList = new ArrayList<Long>();
-    private List<Long> deletedIDsList = new ArrayList<Long>();
 
     // private Map<Long, TSODataHeader> newObjectHeaders = new
     // HashMap<Long,TSODataHeader>();
@@ -147,6 +146,7 @@ public class TSOTransaction implements Transaction {
         keyTrans = new DataSpaceTransactionImpl(loader, mainDataSpace);
         createTrans = new DataSpaceTransactionImpl(loader, mainDataSpace);
         timestampInterrupted = false;
+	time = System.currentTimeMillis();
         ostore.registerActiveTransaction(this);
     }
 
@@ -269,6 +269,7 @@ public class TSOTransaction implements Transaction {
         }
         hdr.free = false;
         hdr.time = time;
+        hdr.timeoutTime = time + TIMEOUT;
         hdr.tiebreaker = tiebreaker;
         hdr.availabilityListeners.remove(transactionID);
         hdr.uuid = transactionID;
@@ -374,7 +375,7 @@ public class TSOTransaction implements Transaction {
             mainTrans.abort();
         }
         lockedObjectsMap.clear();
-        deletedIDsList.clear();
+        createdIDsList.clear();
         ostore.notifyAvailabilityListeners(listeners);
         ostore.deregisterActiveTransaction(this);
     }
