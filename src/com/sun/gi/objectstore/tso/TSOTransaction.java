@@ -74,6 +74,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.logging.Logger;
+import java.util.logging.Level;
 
 import com.sun.gi.objectstore.DeadlockException;
 import com.sun.gi.objectstore.NonExistantObjectIDException;
@@ -89,6 +91,9 @@ import com.sun.gi.utils.StatisticalUUID;
  * @version 1.0
  */
 public class TSOTransaction implements Transaction {
+
+    private static Logger log =
+	Logger.getLogger("com.sun.gi.objectstore.tso");
 
     private TSOObjectStore ostore;
     private SGSUUID transactionID;
@@ -136,11 +141,6 @@ public class TSOTransaction implements Transaction {
         return transactionID;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see com.sun.gi.objectstore.Transaction#start()
-     */
     public void start() {
         mainTrans = new DataSpaceTransactionImpl(loader, mainDataSpace);
         keyTrans = new DataSpaceTransactionImpl(loader, mainDataSpace);
@@ -149,38 +149,41 @@ public class TSOTransaction implements Transaction {
         ostore.registerActiveTransaction(this);
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see com.sun.gi.objectstore.Transaction#create(java.io.Serializable,
-     * java.lang.String)
-     */
     public long create(Serializable object, String name) {
         TSODataHeader hdr = new TSODataHeader(time, tiebreaker,
                 System.currentTimeMillis() + TIMEOUT, transactionID,
                 ObjectStore.INVALID_ID);
         long headerID = createTrans.create(hdr, name);
-        while (headerID == DataSpace.INVALID_ID) { // we were beat
-                                                    // there
+	if (log.isLoggable(Level.FINER)) {
+	    if (headerID != DataSpace.INVALID_ID) {
+		log.fine("Won create of " + name + " with id " + headerID);
+	    } else {
+		log.fine("Lost create of " + name);
+	    }
+	}
+        while (headerID == DataSpace.INVALID_ID) {
+	    // we were beat there
             headerID = lookup(name);
             try {
                 lock(headerID);
                 return ObjectStore.INVALID_ID;
             } catch (NonExistantObjectIDException e) {
                 // means its been removed out from under us, so create
-                // is okay
-                // try again
+                // is okay try again
             	//System.out.println("Create aborted ina nother trans");
+		log.finer("Loser is new winner for create of " + name);
                 headerID = createTrans.create(hdr, name);               
                 //System.out.println("new hdr id="+headerID);
                 //if (headerID<0) {
                 //	System.exit(-99);
                 //}
-            } // wait til we can acquire a lock
+            }
+	    // loop until we can acquire a lock
         }
         long id = mainTrans.create(object, null);
         hdr.objectID = id;
         createTrans.write(headerID, hdr);
+	log.finer("createTrans for " + name + " committing");
         createTrans.commit();
         createTrans.release(headerID);
         hdr.free = true;
@@ -193,11 +196,6 @@ public class TSOTransaction implements Transaction {
         return headerID;
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see com.sun.gi.objectstore.Transaction#destroy(long)
-     */
     public void destroy(long objectID) throws DeadlockException,
             NonExistantObjectIDException {
         TSODataHeader hdr = (TSODataHeader) mainTrans.read(objectID);
@@ -205,11 +203,6 @@ public class TSOTransaction implements Transaction {
         mainTrans.destroy(objectID); // destroy header
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see com.sun.gi.objectstore.Transaction#peek(long)
-     */
     public Serializable peek(long objectID) throws NonExistantObjectIDException {
         TSODataHeader hdr = (TSODataHeader) mainTrans.read(objectID);
         if ((hdr.createNotCommitted) && (!hdr.uuid.equals(transactionID))) {
@@ -218,11 +211,6 @@ public class TSOTransaction implements Transaction {
         return mainTrans.read(hdr.objectID);
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see com.sun.gi.objectstore.Transaction#lock(long, boolean)
-     */
     public Serializable lock(long objectID, boolean block)
             throws DeadlockException, NonExistantObjectIDException {
         Serializable obj = lockedObjectsMap.get(objectID);
@@ -257,12 +245,13 @@ public class TSOTransaction implements Transaction {
                 } else {
                     keyTrans.abort();
                 }
+		log.finest("About to wait for header id " + objectID);
                 waitForWakeup(hdr.timeoutTime);
             }
             // System.out.println("wokeup "+transactionID);
             keyTrans.abort();
             keyTrans.lock(objectID);
-            System.out.println("About to read header");
+            log.finest("About to re-read header id " + objectID);
             hdr = (TSODataHeader) keyTrans.read(objectID);
             //System.out.println("hdr="+hdr);
         }
@@ -306,21 +295,11 @@ public class TSOTransaction implements Transaction {
 
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see com.sun.gi.objectstore.Transaction#lock(long)
-     */
     public Serializable lock(long objectID) throws DeadlockException,
             NonExistantObjectIDException {
         return lock(objectID, true);
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see com.sun.gi.objectstore.Transaction#lookup(java.lang.String)
-     */
     public long lookup(String name) {
         return mainTrans.lookupName(name);
     }
@@ -360,54 +339,31 @@ public class TSOTransaction implements Transaction {
         deletedIDsList.clear();
         ostore.notifyAvailabilityListeners(listeners);
         ostore.deregisterActiveTransaction(this);
-
-    } /*
-         * (non-Javadoc)
-         * 
-         * @see com.sun.gi.objectstore.Transaction#abort()
-         */
+    }
 
     public void abort() {
+	log.finer("aborting txn " + transactionID);
         processLockedObjects(false);
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see com.sun.gi.objectstore.Transaction#commit()
-     */
     public void commit() {
+	log.finer("committing txn " + transactionID);
         processLockedObjects(true);
 
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see com.sun.gi.objectstore.Transaction#getCurrentAppID()
-     */
     public long getCurrentAppID() {
         return ostore.getAppID();
     }
 
-    /*
-     * (non-Javadoc)
-     * 
-     * @see com.sun.gi.objectstore.Transaction#clear()
-     */
     public void clear() {
         ostore.clear();
     }
 
-    /**
-     * 
-     */
     public void timeStampInterrupt() {
         timestampInterrupted = true;
         synchronized (this) {
             this.notifyAll();
         }
-
     }
-
 }
