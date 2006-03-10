@@ -184,16 +184,6 @@ public class InMemoryDataSpace implements DataSpace {
      */
     public void atomicUpdate(boolean clear, Map<Long, byte[]> updateMap,
     	    List<Long> deleted) {
-	if (log.isLoggable(Level.FINEST)) {
-	    Long[] upArray = new Long[updateMap.size()];
-	    updateMap.keySet().toArray(upArray);
-	    Arrays.sort(upArray);
-	    log.finest("update ids: " + Arrays.toString(upArray));
-	    Long[] delArray = new Long[deleted.size()];
-	    deleted.toArray(delArray);
-	    Arrays.sort(delArray);
-	    log.finest("delete ids: " + Arrays.toString(delArray));
-	}
         // insert set is ignored in this case as its uneeded detail
         synchronized (dataSpace) {
             dataSpace.putAll(updateMap);

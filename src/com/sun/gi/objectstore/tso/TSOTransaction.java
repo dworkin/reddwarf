@@ -69,6 +69,7 @@
 package com.sun.gi.objectstore.tso;
 
 import java.io.Serializable;
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -188,8 +189,7 @@ public class TSOTransaction implements Transaction {
         createTrans.release(headerID);
         hdr.free = true;
         hdr.createNotCommitted = false;
-        mainTrans.write(headerID, hdr); // will free when mainTrans
-                                        // commits
+        mainTrans.write(headerID, hdr); // will free when mainTrans commits
         lockedObjectsMap.put(headerID, object);
         createdIDsList.add(headerID);
         createdIDsList.add(hdr.objectID);
@@ -245,15 +245,22 @@ public class TSOTransaction implements Transaction {
                 } else {
                     keyTrans.abort();
                 }
-		log.finest("txn " + transactionID + " About to wait for header id " + objectID);
+		if (log.isLoggable(Level.FINEST)) {
+		    log.finest("txn " + transactionID +
+			" about to wait for header id " + objectID +
+			" until " + String.format("%TFT%tT.%tL", hdr.timeoutTime));
+		}
                 waitForWakeup(hdr.timeoutTime);
             }
             // System.out.println("wokeup "+transactionID);
             keyTrans.abort();
             keyTrans.lock(objectID);
-            log.finest("txn " + transactionID + " About to re-read header id " + objectID);
+            log.finest("txn " + transactionID + " about to re-read header id " + objectID);
             hdr = (TSODataHeader) keyTrans.read(objectID);
             //System.out.println("hdr="+hdr);
+	    if (hdr.free) {
+		log.finest("txn " + transactionID + " got header id " + objectID);
+	    }
         }
         if (hdr.createNotCommitted) {
             mainTrans.destroy(hdr.objectID);
@@ -307,11 +314,14 @@ public class TSOTransaction implements Transaction {
     private void processLockedObjects(boolean commit) {
         List<SGSUUID> listeners = new ArrayList<SGSUUID>();
         synchronized (keyTrans) {
-//	    if (log.isLoggable(Level.FINEST)) {
-//		Long[] updatedIDs = new Long[entry.size()];
-//		entry.keySet().toArray(updatedIDs);
-//		log.finest("keyTrans.updating " + Arrays.toString(updatedIDs));
-//	    }
+	    if (log.isLoggable(Level.FINEST)) {
+		long[] updatedIDs = new long[lockedObjectsMap.size()];
+		int i = 0;
+		for (long key : lockedObjectsMap.keySet()) {
+		    updatedIDs[i++] = key;
+		}
+		log.finest("keyTrans releasing " + Arrays.toString(updatedIDs));
+	    }
             for (Entry<Long, Serializable> entry : lockedObjectsMap.entrySet()) {
                 Long l = entry.getKey();
                 try {
@@ -331,14 +341,24 @@ public class TSOTransaction implements Transaction {
             keyTrans.commit();
         }
         if (commit) {
-	    log.finer("mainTrans commit txn " + transactionID);
+	    if (log.isLoggable(Level.FINEST)) {
+		long[] updatedIDs = new long[lockedObjectsMap.size()];
+		int i = 0;
+		for (long key : lockedObjectsMap.keySet()) {
+		    updatedIDs[i++] = key + 1; // NOTE: ObjectID == (HeaderID + 1)
+		}
+		log.finest("main committing " + Arrays.toString(updatedIDs));
+	    }
             mainTrans.commit();
         } else {
-//	    if (log.isLoggable(Level.FINEST)) {
-//		Long[] nukedCreateIDs = new Long[createdIDsList.size()];
-//		createdIDsList.toArray(nukedCreateIDs);
-//		log.finest("keyTrans.destroy-created " + Arrays.toString(nukedCreateIDs));
-//	    }
+	    if (log.isLoggable(Level.FINEST)) {
+		long[] abortCreateIDs = new long[createdIDsList.size()];
+		int i = 0;
+		for (long key : createdIDsList) {
+		    abortCreateIDs[i++] = key;
+		}
+		log.finest("keyTrans nuking creates: " + Arrays.toString(abortCreateIDs));
+	    }
             synchronized (keyTrans) {
                 for (Long l : createdIDsList) {
                     keyTrans.destroy(l);
