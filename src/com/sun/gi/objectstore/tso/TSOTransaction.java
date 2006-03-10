@@ -314,8 +314,10 @@ public class TSOTransaction implements Transaction {
                     TSODataHeader hdr = (TSODataHeader) keyTrans.read(l);
                     hdr.free = true;
                     keyTrans.write(l, hdr);
+		    log.finest("keyTrans.update-header " + l);
                     listeners.addAll(hdr.availabilityListeners);
                     if (commit) {
+			log.finest("keyTrans.update-data " + hdr.objectID);
                         mainTrans.write(hdr.objectID, entry.getValue());
                     }
                 } catch (NonExistantObjectIDException e) {
@@ -329,6 +331,7 @@ public class TSOTransaction implements Transaction {
         } else {
             synchronized (keyTrans) {
                 for (Long l : createdIDsList) {
+		    log.finest("keyTrans.destroy-created " + l);
                     keyTrans.destroy(l);
                 }
             }
