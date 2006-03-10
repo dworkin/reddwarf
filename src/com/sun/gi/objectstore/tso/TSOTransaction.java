@@ -248,7 +248,7 @@ public class TSOTransaction implements Transaction {
 		if (log.isLoggable(Level.FINER)) {
 		    log.finer("txn " + transactionID +
 			" about to wait for header id " + objectID +
-			" until " + String.format("%tFT%tT.%tL", hdr.timeoutTime));
+			" until " + String.format("%1$tF %<tT.%<tL", hdr.timeoutTime));
 		}
                 waitForWakeup(hdr.timeoutTime);
             }
@@ -313,6 +313,8 @@ public class TSOTransaction implements Transaction {
 
     private void processLockedObjects(boolean commit) {
         List<SGSUUID> listeners = new ArrayList<SGSUUID>();
+	log.finer((commit ? "COMMIT " : "ABORT ") + transactionID +
+		" releasing " + lockedObjectsMap.size() + " locks");
         synchronized (keyTrans) {
 	    if (log.isLoggable(Level.FINEST)) {
 		long[] updatedIDs = new long[lockedObjectsMap.size()];
@@ -337,7 +339,7 @@ public class TSOTransaction implements Transaction {
                     e.printStackTrace();
                 }
             }
-	    log.finer("keyTrans commit-1 txn " + transactionID);
+	    log.finest("keyTrans commit-1 txn " + transactionID);
             keyTrans.commit();
         }
         if (commit) {
@@ -360,11 +362,13 @@ public class TSOTransaction implements Transaction {
 		log.finest("keyTrans nuking creates: " + Arrays.toString(abortCreateIDs));
 	    }
             synchronized (keyTrans) {
+		log.finer(transactionID + " keyTrans nuking " +
+		    createdIDsList.size() + " partial creates");
                 for (Long l : createdIDsList) {
                     keyTrans.destroy(l);
                 }
             }
-	    log.finer("keyTrans commit-2 txn " + transactionID);
+	    log.finest("keyTrans commit-2 txn " + transactionID);
             keyTrans.commit();
 	    log.finer("mainTrans abort txn " + transactionID);
             mainTrans.abort();
@@ -376,12 +380,10 @@ public class TSOTransaction implements Transaction {
     }
 
     public void abort() {
-	log.finer("aborting txn " + transactionID);
         processLockedObjects(false);
     }
 
     public void commit() {
-	log.finer("committing txn " + transactionID);
         processLockedObjects(true);
 
     }
