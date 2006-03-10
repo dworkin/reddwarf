@@ -93,7 +93,7 @@ import com.sun.gi.utils.StatisticalUUID;
  * <p>
  * Description: This class is a concrete implementation of the
  * IMatchMakingClient. It communicates with the match making server
- * application via the UserManagerClient for sending commands, and
+ * application via the ClientConnectionManager for sending commands, and
  * listening on the well known lobby control channel for receiving
  * responses.
  * </p>
@@ -116,7 +116,7 @@ public class MatchMakingClient
     /**
      * Constructs a new MatchMakingClient.
      * 
-     * @param manager the user manager used for server
+     * @param manager the ClientConnectionManager used for server
      * commmunication
      */
     public MatchMakingClient(ClientConnectionManager manager) {
@@ -127,6 +127,11 @@ public class MatchMakingClient
         gameMap = new HashMap<String, GameChannel>();
     }
 
+    /**
+     * Sends a command to the server via the ClientConnectionManager.
+     * 
+     * @param list			the list containing the components of the request packet
+     */
     void sendCommand(List list) {
         manager.sendToServer(protocol.assembleCommand(list), true);
     }
@@ -141,14 +146,26 @@ public class MatchMakingClient
 
         return id;
     }
+    
+    /**
+     * Returns true if the given id is the server's ID.  This is a pass-through
+     * to the ClientConnectionManager for other classes in the match maker
+     * client.
+     * 
+     * @param id			the ID to compare to the server's
+     * 
+     * @return true if the given ID is also the server's ID.
+     */
+    public boolean isServerID(byte[] id) {
+    	return manager.isServerID(id);
+    }
 
     public void setListener(IMatchMakingClientListener listener) {
         this.listener = listener;
     }
 
     public void listFolder(byte[] folderID) {
-        List list = new LinkedList();
-        list.add(LIST_FOLDER_REQUEST);
+        List list = protocol.createCommandList(LIST_FOLDER_REQUEST);
         if (folderID != null) {
             list.add(createUUID(folderID));
         }
@@ -195,8 +212,7 @@ public class MatchMakingClient
      * @param userID
      */
     public void lookupUserName(byte[] userID) {
-        List list = new LinkedList();
-        list.add(LOOKUP_USER_NAME_REQUEST);
+        List list = protocol.createCommandList(LOOKUP_USER_NAME_REQUEST);
         list.add(createUUID(userID));
 
         sendCommand(list);
@@ -264,7 +280,6 @@ public class MatchMakingClient
      * {@inheritDoc}
      */
     public void joinedChannel(ClientChannel channel) {
-        System.out.println("Connected to channel " + channel.getName());
         if (channel.getName().equals(LOBBY_MANAGER_CONTROL_CHANNEL)) {
             channel.setListener(this);
         } else if (channel.getName().indexOf(":") == -1) { // lobby
@@ -309,12 +324,10 @@ public class MatchMakingClient
      * {@inheritDoc}
      */
     public void dataArrived(byte[] from, ByteBuffer data, boolean reliable) {
-        // ignore if not from server
-        // hmm, this doesn't seem to work
-        /*
-         * if (!manager.isServerID(from)) { System.out.println("Not from
-         * server"); return; }
-         */
+        if (!isServerID(from)) { 
+        	return; 
+        }
+         
         int command = protocol.readUnsignedByte(data);
         if (command == SERVER_LISTENING) {
             listener.connected(myID);
@@ -402,7 +415,7 @@ public class MatchMakingClient
         HashMap<String, Object> paramMap = new HashMap<String, Object>();
         for (int i = 0; i < numParams; i++) {
             String param = protocol.readString(data);
-            Object value = protocol.readParamValue(data);
+            Object value = protocol.readParamValue(data, true);
             paramMap.put(param, value);
         }
         LobbyChannel lobby = lobbyMap.get(lobbyName);

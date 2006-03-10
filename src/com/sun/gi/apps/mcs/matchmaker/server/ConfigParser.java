@@ -68,6 +68,8 @@
 
 package com.sun.gi.apps.mcs.matchmaker.server;
 
+import static com.sun.gi.apps.mcs.matchmaker.server.CommandProtocol.*;
+
 import java.io.IOException;
 import java.net.URL;
 
@@ -85,6 +87,8 @@ import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.utils.SGSUUID;
+import com.sun.gi.utils.StatisticalUUID;
+
 
 /**
  * <p>
@@ -199,20 +203,15 @@ public class ConfigParser {
         // populate the game parameters
         NodeList gameParametersNodeList =
             element.getElementsByTagName("GameParameters");
-        //HashMap<String, Object> gameParameterMap = new HashMap<String, Object>();
         if (gameParametersNodeList.getLength() == 1) {
             NodeList gameAttributeList =
                 ((Element) gameParametersNodeList.item(0)).getElementsByTagName("GameParameter");
             for (int i = 0; i < gameAttributeList.getLength(); i++) {
                 Node curNode = gameAttributeList.item(i);
-                if (curNode instanceof Element
-                        && curNode.getNodeName().equals("GameParameter")) {
+                if (curNode instanceof Element && curNode.getNodeName().equals("GameParameter")) {
                     Element curGameAttribute = (Element) curNode;
-                    // System.out.println("curGameAttrib " +
-                    // curGameAttribute.getAttribute("name"));
-                    lobby.addGameParameter(
-                            curGameAttribute.getAttribute("name"),
-                            mapAttributeType(curGameAttribute));
+                    lobby.addGameParameter(curGameAttribute.getAttribute("name"),
+                    		mapAttributeType(curGameAttribute));
                 }
             }
         }
@@ -234,21 +233,53 @@ public class ConfigParser {
         return lobbyRef;
     }
 
+    private Integer mapType(Element element) {
+    	if (!element.hasAttribute("type")) {
+    		return TYPE_STRING;
+    	}
+    	String type = element.getAttribute("type");
+        if (type.equalsIgnoreCase("int")) {
+            return TYPE_INTEGER;
+        } else if (type.equalsIgnoreCase("boolean")) {
+            return TYPE_BOOLEAN;
+        } else if (type.equalsIgnoreCase("byte")) {
+            return TYPE_BYTE;
+        } else if (type.equalsIgnoreCase("uuid")) {
+        	return TYPE_UUID;
+        }
+        return TYPE_STRING;
+   
+    }
+    
     private Object mapAttributeType(Element element) {
-        String value = element.getAttribute("value");
-        if (!element.hasAttribute("type")) {
+    	String value = element.getAttribute("value");
+    	if (!element.hasAttribute("type")) {
             return value;
         }
         String type = element.getAttribute("type");
+        
         if (type.equalsIgnoreCase("int")) {
-            return Integer.valueOf(value);
+            return value.equals("")  ? 0 : Integer.valueOf(value);
         } else if (type.equalsIgnoreCase("boolean")) {
-            return Boolean.valueOf(value);
+            return value.equals("") ? false: Boolean.valueOf(value);
         } else if (type.equalsIgnoreCase("byte")) {
-            return new UnsignedByte(Integer.valueOf(value));
+            return new UnsignedByte(value.equals("") ? 0 : Integer.valueOf(value));
+        } else if (type.equalsIgnoreCase("uuid")) {
+        	return createUUID(value.equals("") ? new byte[16] : value.getBytes());
         }
 
         return value; // assume string
+    }
+    
+    private SGSUUID createUUID(byte[] bytes) {
+        SGSUUID id = null;
+        try {
+            id = new StatisticalUUID(bytes);
+        } catch (InstantiationException ie) {
+            // ignore
+        }
+
+        return id;
     }
 
     private boolean getBooleanAttribute(Element element, String name) {

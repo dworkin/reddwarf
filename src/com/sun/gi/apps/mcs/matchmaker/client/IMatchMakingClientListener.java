@@ -102,16 +102,51 @@ public interface IMatchMakingClientListener {
     public void listedFolder(SGSUUID folderID, FolderDescriptor[] subFolders,
             LobbyDescriptor[] lobbies);
 
+    /**
+     * Called in response to the LookupUserName request.
+     * 
+     * @param userName			the username matching the given ID, or an empty
+     * 							String if not found
+     * @param userID			the user ID used in the original request
+     */
     public void foundUserName(String userName, byte[] userID);
 
+    /**
+     * Called in response to the LookupUserIDRequest.
+     * 
+     * @param userName			the username used in the original request
+     * @param userID			the user ID matching the username, or null if not found.
+     */
     public void foundUserID(String userName, byte[] userID);
 
+    /**
+     * Called when the user is joined to a lobby.  The given channel can be
+     * used to issue commands on the lobby.
+     * 
+     * @param channel			the channel of communication with the lobby
+     */
     public void joinedLobby(ILobbyChannel channel);
 
+    /**
+     * Called when the user is joined to a game.  The given channel can be 
+     * used to issue commands to the game.
+     * 
+     * @param channel			the channel of communication with the game
+     */
     public void joinedGame(IGameChannel channel);
     
+    /**
+     * A confirmation call-back that the user has left whichever lobby
+     * they were previously connected to.
+     *
+     */
     public void leftLobby();
     
+    /**
+     * A confirmation call-back that the user has left whichever game
+     * room they were previously connected to.
+     *
+     */
     public void leftGame();
 
     /**
@@ -121,6 +156,11 @@ public interface IMatchMakingClientListener {
      */
     public void connected(byte[] myID);
 
+    /**
+     * Called as confirmation that the client has disconnected from the server.
+     * The disconnect may or may not have been client initiated.
+     *
+     */
     public void disconnected();
 
     /**

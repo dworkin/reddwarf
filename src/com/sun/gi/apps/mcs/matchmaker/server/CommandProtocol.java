@@ -151,11 +151,11 @@ public final class CommandProtocol implements Serializable {
     public final static int GAME_DELETED = 0x99;        // sent to lobby
 
     // type codes
-    private final static int TYPE_INTEGER = 0x1;
-    private final static int TYPE_BOOLEAN = 0x2;
-    private final static int TYPE_STRING = 0x3;
-    private final static int TYPE_BYTE = 0x4;
-    private final static int TYPE_UUID = 0x5;
+    final static int TYPE_INTEGER = 0x1;
+    final static int TYPE_BOOLEAN = 0x2;
+    final static int TYPE_STRING = 0x3;
+    final static int TYPE_BYTE = 0x4;
+    final static int TYPE_UUID = 0x5;
 
     public CommandProtocol() {}
 
@@ -342,17 +342,22 @@ public final class CommandProtocol implements Serializable {
 
         return bytes;
     }
+    
+    public Object readParamValue(ByteBuffer data) {
+    	return readParamValue(data, false);
+    }
 
     /**
      * Reads the next unsigned byte off the buffer, maps it to a type,
      * and reads the resulting object off the buffer as that type.
      * 
-     * @param data the buffer to read from
+     * @param data 				the buffer to read from
+     * @param useDefault		if true, will use a default value instead of null
      * 
      * @return an object matching the type specified from the initial
      * byte
      */
-    public Object readParamValue(ByteBuffer data) {
+    public Object readParamValue(ByteBuffer data, boolean useDefault) {
         int type = readUnsignedByte(data);
         if (type == TYPE_BOOLEAN) {
             return readBoolean(data);
@@ -361,13 +366,25 @@ public final class CommandProtocol implements Serializable {
         } else if (type == TYPE_INTEGER) {
             return data.getInt();
         } else if (type == TYPE_STRING) {
-            return readString(data);
+            String str = readString(data);
+            return str == null ? "" : str;
         } else if (type == TYPE_UUID) {
-            return readUUID(data);
+            SGSUUID uuid = readUUID(data);
+            return uuid == null ? defaultUUID() : uuid;
         }
 
         // unknown type
-        return null;
+        return useDefault ? "" : null;
+    }
+    
+    private SGSUUID defaultUUID() {
+        SGSUUID sgsuuid = null;
+        try {
+            sgsuuid = new StatisticalUUID(new byte[16]);
+        } catch (InstantiationException ie) {
+            ie.printStackTrace();
+        }
+        return sgsuuid;
     }
 
     /**

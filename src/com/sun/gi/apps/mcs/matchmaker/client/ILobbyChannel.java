@@ -70,18 +70,66 @@ package com.sun.gi.apps.mcs.matchmaker.client;
 
 import java.util.HashMap;
 
+/**
+ * 
+ * <p>Title: ILobbyChannel</p>
+ * 
+ * <p>Description: The ILobbyChannel interface handles all communication with
+ * a server side Lobby.  A client is given a ILobbyChannel instance after 
+ * successfully connecting to a lobby.</p>
+ * 
+ * <p>Copyright: Copyright (c) 2006</p>
+ * <p>Company: Sun Microsystems, TMI</p>
+ * 
+ * @author	Sten Anderson
+ * @version 1.0
+ */
 public interface ILobbyChannel {
 
-    public String getName();
+    /**
+     * Returns the name of this lobby.  This name is unique across the lobby
+     * system.
+     * 
+     * @return the lobby name
+     */
+	public String getName();
 
+	/**
+	 * Sets the listener to receive the call-backs for the lobby commands.
+	 * 
+	 * @param listener
+	 */
     public void setListener(ILobbyChannelListener listener);
 
+    /**
+     * Broadcasts a message to all the other users in the lobby.
+     * 
+     * @param text		the message to broadcast
+     */
     public void sendText(String text);
 
+    /**
+     * Sends a message to the given user in the lobby.
+     * 
+     * @param user			the user ID to which to send the message
+     * @param text			the message
+     */
     public void sendPrivateText(byte[] user, String text);
 
+    /**
+     * Requests the a Map of GameParameters in the form of key: Parameter name, 
+     * value: default value.
+     */
     public void requestGameParameters();
 
+    /**
+     * Attempts to create a game room in this lobby with the given parameters.
+     * 
+     * @param name				the name of the game
+     * @param description		the game's description
+     * @param password			an optional password
+     * @param gameParameters	the map of game parameters (parameter name - value)
+     */
     public void createGame(String name, String description, String password,
             HashMap<String, Object> gameParameters);
 }

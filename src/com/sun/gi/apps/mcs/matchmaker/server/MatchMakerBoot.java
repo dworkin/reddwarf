@@ -147,11 +147,10 @@ public class MatchMakerBoot
     }
 
     private void openChannels(SimTask task,
-            GLOReference<GLOMap<SGSUUID, GLOReference>> gloMapRef)
-    {
+            GLOReference<GLOMap<SGSUUID, GLOReference>> gloMapRef) {
+    	
         GLOMap<SGSUUID, GLOReference> gloMap = gloMapRef.get(task);
         Iterator iterator = gloMap.keySet().iterator();
-        //List<GLOReference> channelRooms = new LinkedList<GLOReference>();
         HashMap<SGSUUID, GLOReference> map =
             new HashMap<SGSUUID, GLOReference>();
         while (iterator.hasNext()) {
@@ -171,9 +170,7 @@ public class MatchMakerBoot
 
     /*
      * Called when a new user connects to the server. A new Player
-     * object is constructed and set as the user's "command proxy". A
-     * new task is queued to join the user to the Lobby Manager Control
-     * channel.
+     * object is constructed and set as the user's "command proxy". 
      * 
      * @see com.sun.gi.logic.SimUserListener#userJoined
      */

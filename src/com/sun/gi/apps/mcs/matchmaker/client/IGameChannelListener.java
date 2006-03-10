@@ -68,17 +68,70 @@
 
 package com.sun.gi.apps.mcs.matchmaker.client;
 
+/**
+ * 
+ * <p>Title: IGameChannelListener</p>
+ * 
+ * <p>Description: The IGameChannelListener signs up to receive the responses 
+ * from a IGameChannel's command requests.</p>
+ * 
+ * <p>Copyright: Copyright (c) 2006</p>
+ * <p>Company: Sun Microsystems, TMI</p>
+ * 
+ * @author	Sten Anderson
+ * @version 1.0
+ */
 public interface IGameChannelListener {
 
-    public void playerEntered(byte[] player, String name);
+    /**
+     * Called when a player enters the game room.  This call back is fired once
+     * for each user as they join the room.  It is also fired once for each player
+     * already connected to the game room when a player first joins to receive the 
+     * names of the players.
+     * 
+     * @param player		the user ID of the player.
+     * @param name			the user name of the player
+     */
+	public void playerEntered(byte[] player, String name);
 
+    /**
+     * Fired once each time a player leaves the game room.
+     * 
+     * @param player			the ID of the player that left
+     */
     public void playerLeft(byte[] player);
 
+    
+    /**
+     * Called when a text message is received on the game room channel.
+     * 
+     * @param from			the user ID of the sender
+     * @param text			the message
+     * @param wasPrivate	if true, this user was the only recipient of the message
+     */
     public void receiveText(byte[] from, String text, boolean wasPrivate);
 
+    /**
+     * Called to announce the ready state of the given player.  All players in
+     * the game room must indicate their readiness before a game can be started.
+     * 
+     * @param player		the player
+     * @param isReady		is true, the player is ready to start the game
+     */
     public void playerReady(byte[] player, boolean isReady);
 
+    /**
+     * Called in response to IGameChannel.startGame() when the command fails.
+     * 
+     * @param reason		the reason for the failure
+     */
     public void startGameFailed(String reason);
 
+    /**
+     * Called as confirmation to the IGameChannel.startGame() that the command
+     * completely successfully.
+     * 
+     * @param game
+     */
     public void gameStarted(GameDescriptor game);
 }

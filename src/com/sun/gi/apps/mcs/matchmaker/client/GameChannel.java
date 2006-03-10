@@ -106,7 +106,9 @@ public class GameChannel implements IGameChannel, ClientChannelListener {
     }
 
     public void playerLeft(byte[] playerID) {
-
+    	if (listener != null) {
+    		listener.playerLeft(playerID);
+    	}
     }
 
     public void dataArrived(byte[] from, ByteBuffer data, boolean reliable) {
@@ -114,7 +116,10 @@ public class GameChannel implements IGameChannel, ClientChannelListener {
             // if no one is listening, no reason to do anything
             return;
         }
-        // TODO sten: test isServerID once that works
+        if (!mmClient.isServerID(from)) {
+        	return;
+        }
+        
         int command = protocol.readUnsignedByte(data);
         if (command == PLAYER_ENTERED_GAME) {
             SGSUUID userID = protocol.readUUID(data);
@@ -126,7 +131,6 @@ public class GameChannel implements IGameChannel, ClientChannelListener {
             listener.playerReady(userID.toByteArray(), ready);
         } else if (command == START_GAME_REQUEST) {
             // means there was a failure.
-            System.out.println("game channel: start game failed");
             listener.startGameFailed(protocol.readString(data));
         } else if (command == GAME_STARTED) {
             SGSUUID uuid = protocol.readUUID(data);

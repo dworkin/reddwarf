@@ -122,21 +122,51 @@ public interface IMatchMakingClient {
      */
     public void lookupUserID(String username);
 
+    /**
+     * Attempts to join to the lobby with the given lobbyID.
+     * 
+     * @param lobbyID			the unique ID of the lobby to join 
+     * @param password			the password to access the lobby
+     */
     public void joinLobby(byte[] lobbyID, String password);
 
+    /**
+     * Attempts to join a non-password protected game room given
+     * by the gameID.
+     * 
+     * @param gameID			the unique ID of the game room
+     */
     public void joinGame(byte[] gameID);
 
+    
+    /**
+     * Attempts to join a password protected game room given by gameID.
+     * 
+     * @param gameID			the unique ID of the game room
+     * @param password			the game room's password
+     */
     public void joinGame(byte[] gameID, String password);
     
+    /**
+     * Attempts to leave the currently connected lobby.  The client should not
+     * assume it has left the lobby until it receives the 
+     * IMatchMakingClientListener.leftLobby() callback.
+     */
     public void leaveLobby();
     
+    /**
+     * Attempts to leave the currently connected game room.  The client should not
+     * assume it has left the game room until it receives the 
+     * IMatchMakingClientListener.leftLobby() callback.
+     */
     public void leaveGame();
 
     /**
      * Called as a pass-through to the ClientConnectionManager during
-     * login authentication.
+     * login authentication.  The client should set the call backs as
+     * appropriate.
      * 
-     * @param cb the security callbacks
+     * @param cb 				the security callbacks
      */
     public void sendValidationResponse(Callback[] cb);
 

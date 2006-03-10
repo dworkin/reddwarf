@@ -128,5 +128,9 @@ class UnsignedByte extends Number {
     public int compareTo(UnsignedByte b) {
         return b.intValue() == value ? 0 : b.intValue() > value ? -1 : 1;
     }
+    
+    public String toString() {
+    	return "" + value;
+    }
 
 }

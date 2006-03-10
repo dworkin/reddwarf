@@ -111,6 +111,19 @@ import com.sun.gi.comm.users.client.impl.ClientConnectionManagerImpl;
 import com.sun.gi.utils.SGSUUID;
 import com.sun.gi.utils.StatisticalUUID;
 
+/**
+ * 
+ * <p>Title: MatchMakerClientTestUI</p>
+ * 
+ * <p>Description: This class is a Swing UI that serves as a test harness for
+ * the Match Making client.</p>
+ * 
+ * <p>Copyright: Copyright (c) 2006</p>
+ * <p>Company: Sun Microsystems, TMI</p>
+ * 
+ * @author	Sten Anderson
+ * @version 1.0
+ */
 public class MatchMakerClientTestUI extends JFrame
         implements IMatchMakingClientListener {
 	
@@ -653,6 +666,11 @@ public class MatchMakerClientTestUI extends JFrame
             numUserLabel.setText("Users: " + numUsers + "/" + maxUsers);
         }
         
+        private void removeGame(GameDescriptor game) {
+        	gameMap.remove(game.getChannelName());
+        	gameListModel.removeElement(game);
+        }
+        
         public void playerEntered(byte[] player, String name) {
             receiveServerMessage(name + " Entered Lobby " + lobbyName.getText());
             userMap.put(byteArrayToString(player), name);
@@ -693,7 +711,6 @@ public class MatchMakerClientTestUI extends JFrame
 
         public void gameCreated(GameDescriptor game) {
             gameListModel.addElement(game);
-            System.out.println("gameCreated " + game.getChannelName());
             gameMap.put(game.getChannelName(), game);
             receiveServerMessage("Game Created: " + game.getName());
         }
@@ -705,10 +722,12 @@ public class MatchMakerClientTestUI extends JFrame
         
         public void gameStarted(GameDescriptor game) {
         	receiveServerMessage("<Lobby> Game Started " + game.getName());
+        	removeGame(game);
         }
         
         public void gameDeleted(GameDescriptor game) {
         	receiveServerMessage("<Lobby> Game Deleted " + game.getName());
+        	removeGame(game);
         }
     }
 

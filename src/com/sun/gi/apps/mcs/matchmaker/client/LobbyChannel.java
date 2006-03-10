@@ -105,15 +105,12 @@ public class LobbyChannel implements ILobbyChannel, ClientChannelListener {
         channel.sendBroadcastData(buffer, true);
     }
 
-    // TODO sten: implement this
     public void sendPrivateText(byte[] user, String text) {
         List list = protocol.createCommandList(SEND_PRIVATE_TEXT);
         list.add(createUserID(user));
         list.add(text);
         ByteBuffer buffer = protocol.assembleCommand(list);
 
-        System.out.println("LobbyChannel: Sending private text to "
-                + user.length);
         channel.sendUnicastData(user, buffer, true);
     }
 
@@ -127,7 +124,6 @@ public class LobbyChannel implements ILobbyChannel, ClientChannelListener {
     }
 
     public void requestGameParameters() {
-        System.out.println("LobbyChannel: requesting game params");
         List list = protocol.createCommandList(GAME_PARAMETERS_REQUEST);
 
         mmClient.sendCommand(list);
@@ -199,7 +195,10 @@ public class LobbyChannel implements ILobbyChannel, ClientChannelListener {
                                 // do anything
             return;
         }
-        // TODO sten: test isServerID once that works
+        if (!mmClient.isServerID(from)) {
+        	return;
+        }
+        
         int command = protocol.readUnsignedByte(data);
         if (command == PLAYER_ENTERED_LOBBY) {
             SGSUUID userID = protocol.readUUID(data);

@@ -182,7 +182,7 @@ public class Lobby extends ChannelRoom {
     public Map<String, Object> getGameParamters() {
         return Collections.unmodifiableMap(gameParameters);
     }
-
+    
     public void addUser(UserID user) {
         if (!playerList.contains(user)) {
             playerList.add(user);
@@ -191,6 +191,10 @@ public class Lobby extends ChannelRoom {
 
     public void removeUser(UserID user) {
         playerList.remove(user);
+    }
+    
+    public void removeGameRoom(GLOReference<GameRoom> grRef) {
+    	gameRoomList.remove(grRef);
     }
 
     public List<UserID> getUsers() {

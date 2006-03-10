@@ -99,10 +99,11 @@ public class GameRoom extends ChannelRoom {
     private UserID host;
     private HashMap<String, Object> gameParameters;
     private HashMap<UserID, Boolean> userMap; // users mapped to ready state.
+    private boolean starting = false;
 
     public GameRoom(String name, String description, String password,
-            String channelName, ChannelID cid, UserID host)
-    {
+            String channelName, ChannelID cid, UserID host) {
+    	
         super(name, description, password, channelName, cid);
 
         userMap = new HashMap<UserID, Boolean>();
@@ -122,6 +123,15 @@ public class GameRoom extends ChannelRoom {
     public void addGameParameter(String key, Object value) {
         gameParameters.put(key, value);
     }
+    
+    public boolean isStarting() {
+    	return starting;
+    }
+    
+    public void setStarting(boolean b) {
+    	starting = b;
+    }
+   
 
     /**
      * Returns a read-only view of the game parameters map.
@@ -165,6 +175,10 @@ public class GameRoom extends ChannelRoom {
     public int getNumPlayers() {
         return userMap.size();
     }
+    
+    public boolean isPlayerReady(UserID userID) {
+    	return userMap.get(userID);
+    }
 
     /**
      * Returns true if all joined players have indicated that they are
@@ -173,7 +187,7 @@ public class GameRoom extends ChannelRoom {
      * @return true if all players are ready for game start.
      */
     public boolean arePlayersReady() {
-        return ! userMap.containsValue(false);
+        return !userMap.containsValue(false);
     }
 
 }

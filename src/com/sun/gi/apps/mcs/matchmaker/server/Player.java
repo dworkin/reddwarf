@@ -231,8 +231,7 @@ public class Player implements SimUserDataListener {
                     gameRoom.addUser(uid);
                     
                     // send playerJoinedGame message to lobby
-                    List lobbyList = new LinkedList();
-                    lobbyList.add(PLAYER_JOINED_GAME);
+                    List lobbyList = protocol.createCommandList(PLAYER_JOINED_GAME);
                     lobbyList.add(uid);
                     lobbyList.add(gameRoom.getGameID());
 
@@ -241,16 +240,29 @@ public class Player implements SimUserDataListener {
                             lobby.getChannelID());
 
                     // send playerEnteredGame to game room
-                    List grList = new LinkedList();
-                    grList.add(PLAYER_ENTERED_GAME);
+                    List grList = protocol.createCommandList(PLAYER_ENTERED_GAME);
                     grList.add(uid);
                     grList.add(userName);
                     
                     sendRetroJoins(task, gameRoom.getUsers(), PLAYER_ENTERED_GAME, 
                     				gameRoom.getChannelID());
-
+                    
                     sendMulticastResponse(task, gameRoom.getUsers(), grList,
                             gameRoom.getChannelID());
+                    
+                    // send the 'ready' state (if true) of each player already connected
+                    for (UserID curUser : gameRoom.getUsers()) {
+                    	
+                    	boolean isReady = gameRoom.isPlayerReady(curUser);
+                    	if (curUser.equals(userID) || !isReady) {
+                    		continue;
+                    	}
+	                    List list = protocol.createCommandList(PLAYER_READY_UPDATE);
+	                    list.add(curUser);
+	                    list.add(isReady);
+	                    
+	                    sendResponse(task, list, gameRoom.getChannelID());
+                    }                    
                 }
 
             }
@@ -275,29 +287,33 @@ public class Player implements SimUserDataListener {
      * <p>
      * If they left a Game Room, things are a bit more involved. The
      * player is removed from the Game Room's user list, and a message
-     * is sent out to the Lobby that the player left the game.
+     * is sent out to the Lobby that the player left the game, unless they left
+     * because the game is about to start, in which case, no message is sent.
      * Additionally, if the player leaving is the game host, then the
      * game is shut down. Shutting down the game involves "leaving" all
      * the joined players (which results in more PlayerLeftGame messages
      * to the Lobby), and then sending out a GameDeleted message to the
-     * Lobby.
+     * Lobby.  In order to insure that the GameDeleted message is the last 
+     * one sent out, the last player leaving the game room sends the message.
      * </p>
      * 
      * @see com.sun.gi.logic.SimUserDataListener#userLeftChannel
      */
     public void userLeftChannel(ChannelID cid, UserID uid) {
         SimTask task = SimTask.getCurrent();
-        if (uid.equals(userID)) { // it was this player who left,
-                                    // cleanup -- remove from any lists.
-        	if (currentGameRoom != null) { // the player left a game
-                                            // room
+        if (uid.equals(userID)) { // it was this player who left.
+                                  
+        	if (currentGameRoom != null) { // the player left a game room
                 GameRoom gameRoom = (GameRoom) currentGameRoom.get(task);
                 if (cid.equals(gameRoom.getChannelID())) { // user left
                                                             // from this
                                                             // channel
                 	gameRoom.removeUser(uid);
-
-                    Lobby lobby = currentLobby != null ? currentLobby.peek(task) : null;
+                	Lobby lobby = currentLobby != null ? currentLobby.get(task) : null;
+                	if (gameRoom.isStarting()) {
+                		currentGameRoom = null;
+                		return;
+                	}
 
                     // if this was the host, kick everyone out and kill
                     // the game
@@ -305,20 +321,7 @@ public class Player implements SimUserDataListener {
                         for (UserID curPlayer : gameRoom.getUsers()) {
                             task.leave(curPlayer, gameRoom.getChannelID());
                         }
-                        gameRoom.removeAllUsers();
-
-                        // Send notification to the Lobby that the game
-                        // was killed
-                        if (lobby != null) {
-	                        List list = protocol.createCommandList(GAME_DELETED);
-	                        packGameDescriptor(list, gameRoom);
-	
-	                        sendMulticastResponse(task, lobby.getUsers(), list, lobby.getChannelID());
-                        }
                     }
-
-                    // currentGameRoom.delete(task);
-                    currentGameRoom = null;
 
                     // send PlayerLeftGame message to lobby
                     if (lobby != null) {
@@ -331,6 +334,21 @@ public class Player implements SimUserDataListener {
                     
                     List leftList = protocol.createCommandList(LEFT_GAME);
                     sendResponse(task, leftList);
+                    
+                    // If this is the last person leaving the game room, 
+                    // send notification to the Lobby that the game was killed
+                    // and remove the game from the lobby list
+                    if (lobby != null && gameRoom.getUsers().size() == 0) {
+                    	lobby.removeGameRoom(currentGameRoom);
+                    	
+                        List list = protocol.createCommandList(GAME_DELETED);
+                        packGameDescriptor(list, gameRoom);
+
+                        sendMulticastResponse(task, lobby.getUsers(), list, lobby.getChannelID());
+                    }
+                    
+                    // currentGameRoom.delete(task);
+                    currentGameRoom = null;
                     
                 }
             } 
@@ -399,8 +417,7 @@ public class Player implements SimUserDataListener {
                 folderID);
         System.out.println("folderID = " + folderID + " targetFolder "
                 + targetFolder.getName());
-        List list = new LinkedList();
-        list.add(LIST_FOLDER_RESPONSE);
+        List list = protocol.createCommandList(LIST_FOLDER_RESPONSE);
         list.add(folderID == null ? root.getFolderID() : folderID);
         if (targetFolder != null) {
             list.add(targetFolder.getFolders().size());
@@ -450,8 +467,7 @@ public class Player implements SimUserDataListener {
             id = userMap.get(username);
         }
 
-        List list = new LinkedList();
-        list.add(LOOKUP_USER_ID_RESPONSE);
+        List list = protocol.createCommandList(LOOKUP_USER_ID_RESPONSE);
         list.add(username);
         list.add(id);
 
@@ -469,8 +485,7 @@ public class Player implements SimUserDataListener {
             }
         }
 
-        List list = new LinkedList();
-        list.add(LOOKUP_USER_NAME_RESPONSE);
+        List list = protocol.createCommandList(LOOKUP_USER_NAME_RESPONSE);
         list.add(username);
         list.add(id);
 
@@ -494,8 +509,7 @@ public class Player implements SimUserDataListener {
                 lobby = requestedPlayer.getCurrentLobby().peek(task);
             }
         }
-        List list = new LinkedList();
-        list.add(LOCATE_USER_RESPONSE);
+        List list = protocol.createCommandList(LOCATE_USER_RESPONSE);
         list.add(requestedID);
         list.add(lobby != null ? 1 : 0); // number of lobbies -- only
                                             // one allowed
@@ -550,6 +564,7 @@ public class Player implements SimUserDataListener {
             Lobby lobby = lobbyRef.peek(task);
             if (lobby.getNumPlayers() == lobby.getMaxPlayers()) {
                 // TODO sten: perhaps in the future spawn a new lobby.
+            	sendErrorResponse(task, "Lobby at max users");
                 return;
             }
             if (lobby.isPasswordProtected()) {
@@ -590,7 +605,7 @@ public class Player implements SimUserDataListener {
         if (currentLobby == null) {
         	sendErrorResponse(task, "Start failed.  Not connected to a lobby.");
         }
-        GameRoom gameRoom = currentGameRoom.peek(task);
+        GameRoom gameRoom = currentGameRoom.get(task);
         UserID host = gameRoom.getHost();
         // only the host can start the game.
         if (!host.equals(userID)) {
@@ -604,7 +619,9 @@ public class Player implements SimUserDataListener {
             return;
         }
 
-        Lobby lobby = currentLobby.peek(task);
+        gameRoom.setStarting(true);
+        Lobby lobby = currentLobby.get(task);
+        lobby.removeGameRoom(currentGameRoom);
         
         List list = protocol.createCommandList(GAME_STARTED);
         packGameDescriptor(list, gameRoom);
@@ -615,11 +632,11 @@ public class Player implements SimUserDataListener {
         
         // unjoin all game players from the lobby.
         for(UserID curUser : gameRoom.getUsers()) {
-        	System.out.println("unjoining " + curUser.toString());
         	task.leave(curUser, lobby.getChannelID());
+        	task.leave(curUser, gameRoom.getChannelID());
         }
     }
-
+    
     private void sendStartGameFailed(SimTask task, String reason, ChannelID cid) {
         List list = protocol.createCommandList(START_GAME_REQUEST);
         list.add(reason);
@@ -629,6 +646,7 @@ public class Player implements SimUserDataListener {
 
     private void updatePlayerReadyRequest(SimTask task, ByteBuffer data) {
         if (currentGameRoom == null) {
+        	sendErrorResponse(task, "Not connected to a game room");
             return;
         }
         boolean ready = protocol.readBoolean(data);
@@ -656,10 +674,8 @@ public class Player implements SimUserDataListener {
         sendPlayerReadyUpdate(task, ready, gameRoom);
     }
 
-    private void sendPlayerReadyUpdate(SimTask task, boolean ready,
-            GameRoom game) {
-        List list = new LinkedList();
-        list.add(PLAYER_READY_UPDATE);
+    private void sendPlayerReadyUpdate(SimTask task, boolean ready, GameRoom game) {
+        List list = protocol.createCommandList(PLAYER_READY_UPDATE);
         list.add(userID);
         list.add(ready);
 
@@ -677,6 +693,7 @@ public class Player implements SimUserDataListener {
     private void joinGame(SimTask task, ByteBuffer data) {
         if (currentGameRoom != null) { // can't connect if already
                                         // connected to a game.
+        	sendErrorResponse(task, "Already connected to a game room");
             return;
         }
         SGSUUID gameID = protocol.readUUID(data);
@@ -686,6 +703,7 @@ public class Player implements SimUserDataListener {
                 "GameRoomMap").peek(task);
         GLOReference<GameRoom> gameRef = gameRoomMap.get(gameID);
         if (gameRef == null) {
+        	sendErrorResponse(task, "Requested game room does not exist");
             return;
         }
         GameRoom gameRoom = gameRef.peek(task);
@@ -707,27 +725,23 @@ public class Player implements SimUserDataListener {
      * @param task the SimTask
      */
     private void gameParametersRequest(SimTask task) {
-        List list = new LinkedList();
-        list.add(GAME_PARAMETERS_RESPONSE);
+        List list = protocol.createCommandList(GAME_PARAMETERS_RESPONSE);
         if (currentLobby != null) {
             Lobby lobby = currentLobby.peek(task);
             list.add(lobby.getChannelName());
             Map<String, Object> gameParameters = lobby.getGameParamters();
-            System.out.println("gameParameters.size " + gameParameters.size()
-                    + " maxPlayers " + lobby.getMaxPlayers());
             list.add(gameParameters.size());
             for (String curKey : gameParameters.keySet()) {
-                System.out.println("adding param " + curKey);
                 list.add(curKey);
                 Object value = gameParameters.get(curKey);
-                System.out.println("value: " + value + " class "
-                        + value.getClass().getName());
+                System.out.println("adding param " + curKey + " value " + value);
                 list.add(protocol.mapType(value));
                 list.add(value);
 
             }
         } else {
-            System.out.println("current lobby is null");
+            sendErrorResponse(task, "Not connected to a lobby");
+            return;
         }
 
         sendResponse(task, list);
@@ -753,8 +767,7 @@ public class Player implements SimUserDataListener {
     private void createGame(SimTask task, ByteBuffer data) {
         String gameName = protocol.readString(data);
         if (currentLobby == null) { // bail out early if not connected.
-            sendGameCreateFailedResponse(task, null, gameName,
-                    "Not connected to a lobby");
+            sendGameCreateFailedResponse(task, null, gameName, "Not connected to a lobby");
             return;
         }
 
@@ -805,13 +818,11 @@ public class Player implements SimUserDataListener {
         List list = protocol.createCommandList(GAME_CREATED);
         packGameDescriptor(list, gr);
 
-        sendMulticastResponse(task, lobby.getUsers(), list,
-                lobby.getChannelID());
+        sendMulticastResponse(task, lobby.getUsers(), list, lobby.getChannelID());
 
         // join the user that created this game as the host after the
         // CREATE_GAME message has been sent.
         task.join(userID, cid);
-
     }
 
     /**
@@ -843,8 +854,8 @@ public class Player implements SimUserDataListener {
 
     private void sendGameCreateFailedResponse(SimTask task,
             String lobbyChannelName, String gameName, String message) {
-        List list = new LinkedList();
-        list.add(CREATE_GAME_FAILED);
+    	
+        List list = protocol.createCommandList(CREATE_GAME_FAILED);
         list.add(gameName);
         list.add(message);
         list.add(lobbyChannelName);
@@ -860,6 +871,7 @@ public class Player implements SimUserDataListener {
 
     private void sendMulticastResponse(SimTask task, List<UserID> users,
             List list, ChannelID cid) {
+    	
         sendResponse(task, users.toArray(new UserID[users.size()]), list, cid);
     }
 
@@ -871,7 +883,6 @@ public class Player implements SimUserDataListener {
             ChannelID cid) {
         ByteBuffer data = protocol.assembleCommand(list);
 
-        // TODO sten: refactor sendData for unicast (or not)
         task.sendData(cid, to, data, true);
     }
 

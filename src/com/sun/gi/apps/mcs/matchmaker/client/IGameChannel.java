@@ -68,15 +68,57 @@
 
 package com.sun.gi.apps.mcs.matchmaker.client;
 
+/**
+ * 
+ * <p>Title: IGameChannel</p>
+ * 
+ * <p>Description: The IGameChannel interface handles all communication with
+ * a server side Game Room.  A client is given a IGameChannel instance after 
+ * successfully connecting to a game room.</p>
+ * 
+ * <p>Copyright: Copyright (c) 2006</p>
+ * <p>Company: Sun Microsystems, TMI</p>
+ * 
+ * @author	Sten Anderson
+ * @version 1.0
+ */
 public interface IGameChannel {
 
+    /**
+     * Returns the name of this game room.  This name is unique across the lobby
+     * system.
+     * 
+     * @return the game room name
+     */
     public String getName();
 
+	/**
+	 * Sets the listener to receive the call-backs for the game room commands.
+	 * 
+	 * @param listener
+	 */
     public void setListener(IGameChannelListener listener);
 
+    /**
+     * Broadcasts a message to all the other users in the game room.
+     * 
+     * @param text		the message to broadcast
+     */
     public void sendText(String text);
 
+    /**
+     * Each player in a game room must indicate that they are "ready"
+     * for the game to start.  The given GameDescriptor's game parameters
+     * must match that of the game room's stated parameters. 
+     * 
+     * @param game			the descriptor of the game as this player sees it
+     * @param ready			if true, this player's state will be set to "ready".
+     */
     public void ready(GameDescriptor game, boolean ready);
 
+    /**
+     * Attempts to start the game as detailed by the game room's
+     * game parameters.  Only the host can start a game.
+     */
     public void startGame();
 }

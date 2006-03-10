@@ -70,23 +70,90 @@ package com.sun.gi.apps.mcs.matchmaker.client;
 
 import java.util.HashMap;
 
+/**
+ * 
+ * <p>Title: ILobbyChannelListener</p>
+ * 
+ * <p>Description: The ILobbyChannelListener signs up to receive the responses 
+ * from a ILobbyChannel's command requests.</p>
+ * 
+ * <p>Copyright: Copyright (c) 2006</p>
+ * <p>Company: Sun Microsystems, TMI</p>
+ * 
+ * @author	Sten Anderson
+ * @version 1.0
+ */
 public interface ILobbyChannelListener {
 
-    public void playerEntered(byte[] player, String name);
+    /**
+     * Called when a player enters the lobby.  This call back is fired once
+     * for each user as they join the lobby.  It is also fired once for each player
+     * already connected to the lobby when a player first joins to receive the 
+     * names of the players.
+     * 
+     * @param player		the user ID of the player.
+     * @param name			the user name of the player
+     */
+	public void playerEntered(byte[] player, String name);
 
-    public void playerLeft(byte[] player);
+    /**
+     * Fired once each time a player leaves the lobby.
+     * 
+     * @param player			the ID of the player that left
+     */
+	public void playerLeft(byte[] player);
 
-    public void receiveText(byte[] from, String text, boolean wasPrivate);
+    /**
+     * Called when a text message is received on the lobby channel.
+     * 
+     * @param from			the user ID of the sender
+     * @param text			the message
+     * @param wasPrivate	if true, this user was the only recipient of the message
+     */
+	public void receiveText(byte[] from, String text, boolean wasPrivate);
 
+	/**
+	 * Called in response to the ILobbyChannel.requestGameParameters() command.
+	 * 
+	 * @param parameters			a map of default game parameters
+	 */
     public void receivedGameParameters(HashMap<String, Object> parameters);
 
+    /**
+     * Called when a ILobbyChannel.createGame request fails.
+     * 
+     * @param name			the proposed game name
+     * @param reason		the reason for the failure
+     */
     public void createGameFailed(String name, String reason);
 
+    /**
+     * Called when a game room is successfully created in the lobby. 
+     * 
+     * @param game			a descriptor detailing the newly created game room
+     */
     public void gameCreated(GameDescriptor game);
     
+    /**
+     * Called when a game has been started.  When a game starts, its players leave
+     * the lobby, and the associated game room is deleted.
+     * 
+     * @param game			a descriptor detailing the newly started game
+     */
     public void gameStarted(GameDescriptor game);
     
+    /**
+     * Called when a game room in the lobby has been deleted.
+     * 
+     * @param game			a descriptor detailing the deleted game room
+     */
     public void gameDeleted(GameDescriptor game);
 
+    /**
+     * Called when the given player joins a game room.
+     * 
+     * @param gameID		the unique ID of the game room joined
+     * @param player		the unique ID of the player who joined
+     */
     public void playerJoinedGame(byte[] gameID, byte[] player);
 }
