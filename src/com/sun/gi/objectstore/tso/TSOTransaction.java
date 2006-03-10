@@ -159,30 +159,25 @@ public class TSOTransaction implements Transaction {
         TSODataHeader hdr = new TSODataHeader(time, tiebreaker,
                 System.currentTimeMillis() + TIMEOUT, transactionID,
                 ObjectStore.INVALID_ID);
-        long headerID = createTrans.create(hdr, name); // check that the winner has the lock
-        while (headerID == DataSpace.INVALID_ID) {
-	    // we were beat there
+        long headerID = createTrans.create(hdr, name);
+        while (headerID == DataSpace.INVALID_ID) { // we were beat
+                                                    // there
             headerID = lookup(name);
-	    try {
-		createTrans.lock(headerID);
-		TSODataHeader exitingHeader =
-		    (TSODataHeader) createTrans.read(headerID);
-		if (! exitingHeader.createNotCommitted) {
-		    createTrans.release(headerID);
-		    return ObjectStore.INVALID_ID;
-		}
-		// else a previous, race-winning create must have aborted.
-		// Let the while loop terminate and init the new object.
-	    } catch (NonExistantObjectIDException e) {
-		// means its been removed out from under us, so create
-		// is okay try again
-		headerID = createTrans.create(hdr, name);
-	    } // wait til we can acquire a lock
+            try {
+                lock(headerID);
+                return ObjectStore.INVALID_ID;
+            } catch (NonExistantObjectIDException e) {
+                // means its been removed out from under us, so create
+                // is okay
+                // try again
+                headerID = createTrans.create(hdr, name);
+            } // wait til we can acquire a lock
         }
         long id = mainTrans.create(object, null);
         hdr.objectID = id;
         createTrans.write(headerID, hdr);
         createTrans.commit();
+        createTrans.release(headerID);
         hdr.free = true;
         hdr.createNotCommitted = false;
         mainTrans.write(headerID, hdr); // will free when mainTrans
@@ -231,8 +226,7 @@ public class TSOTransaction implements Transaction {
         keyTrans.lock(objectID);
         TSODataHeader hdr = (TSODataHeader) keyTrans.read(objectID);
         while (!hdr.free) {
-            if (System.currentTimeMillis() > hdr.timeoutTime) { // timed
-                                                                // out
+            if (System.currentTimeMillis() > hdr.timeoutTime) { // timed out
                 ostore.requestTimeoutInterrupt(hdr.uuid);
                 hdr.free = true;
             }
