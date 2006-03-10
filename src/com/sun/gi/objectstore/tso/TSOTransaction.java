@@ -170,7 +170,12 @@ public class TSOTransaction implements Transaction {
                 // means its been removed out from under us, so create
                 // is okay
                 // try again
-                headerID = createTrans.create(hdr, name);
+            	//System.out.println("Create aborted ina nother trans");
+                headerID = createTrans.create(hdr, name);               
+                //System.out.println("new hdr id="+headerID);
+                //if (headerID<0) {
+                //	System.exit(-99);
+                //}
             } // wait til we can acquire a lock
         }
         long id = mainTrans.create(object, null);
@@ -184,6 +189,7 @@ public class TSOTransaction implements Transaction {
                                         // commits
         lockedObjectsMap.put(headerID, object);
         createdIDsList.add(headerID);
+        createdIDsList.add(hdr.objectID);
         return headerID;
     }
 
@@ -254,8 +260,11 @@ public class TSOTransaction implements Transaction {
                 waitForWakeup(hdr.timeoutTime);
             }
             // System.out.println("wokeup "+transactionID);
+            keyTrans.abort();
             keyTrans.lock(objectID);
+            System.out.println("About to read header");
             hdr = (TSODataHeader) keyTrans.read(objectID);
+            //System.out.println("hdr="+hdr);
         }
         if (hdr.createNotCommitted) {
             mainTrans.destroy(hdr.objectID);
@@ -344,9 +353,11 @@ public class TSOTransaction implements Transaction {
                     keyTrans.destroy(l);
                 }
             }
+            keyTrans.commit();
             mainTrans.abort();
         }
         lockedObjectsMap.clear();
+        deletedIDsList.clear();
         ostore.notifyAvailabilityListeners(listeners);
         ostore.deregisterActiveTransaction(this);
 

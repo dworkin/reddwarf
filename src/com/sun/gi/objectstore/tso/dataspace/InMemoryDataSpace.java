@@ -68,6 +68,7 @@
 
 package com.sun.gi.objectstore.tso.dataspace;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -87,12 +88,13 @@ public class InMemoryDataSpace implements DataSpace {
     Map<Long, byte[]> dataSpace = new LinkedHashMap<Long, byte[]>();
 
     Map<String, Long> nameSpace = new LinkedHashMap<String, Long>();
-
+    Map<Long, String> reverseNameMap = new HashMap<Long,String>(); 
     Set<Long> lockSet = new HashSet<Long>();
 
     private Object idMutex = new Object();
 
     private int id = 1;
+	
 
     public InMemoryDataSpace(long appID) {
         this.appID = appID;
@@ -179,9 +181,13 @@ public class InMemoryDataSpace implements DataSpace {
         // insert set is ignored in this case as its uneeded detail
         synchronized (dataSpace) {
             dataSpace.putAll(updateMap);
-	    for (Long oid : deleted) {
-		dataSpace.remove(oid);
-	    }
+            for (Long oid : deleted) {
+            	dataSpace.remove(oid);
+            	String name = reverseNameMap.get(oid);
+            	//System.out.println("Removing id,name: "+oid+","+name);
+            	nameSpace.remove(name);
+            	reverseNameMap.remove(oid);
+            }
         }
     }
 
@@ -218,10 +224,15 @@ public class InMemoryDataSpace implements DataSpace {
         long createId = DataSpace.INVALID_ID;
         synchronized (nameSpace) {
             if (nameSpace.containsKey(name)) {
+            	System.out.println("Name space already contains "+name);
                 return DataSpace.INVALID_ID;
             }
             createId = getNextID();
-            nameSpace.put(name, createId);
+            if (name!=null){
+            	nameSpace.put(name, createId);
+            	reverseNameMap.put(createId,name);
+            }
+            //System.out.println("Creating id,name: "+createId+","+name);
         }
         synchronized (dataSpace) {
             dataSpace.put(createId, data);

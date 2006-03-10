@@ -59,8 +59,8 @@ public class OstoreTest {
 	public static void main(String[] args) {
 		ObjectStore ostore = null;
 		try {
-			ostore = new TSOObjectStore(new PersistantInMemoryDataSpace(1));
-			// ostore = new TSOObjectStore(new InMemoryDataSpace(1));
+			//ostore = new TSOObjectStore(new PersistantInMemoryDataSpace(1));
+			 ostore = new TSOObjectStore(new InMemoryDataSpace(1));
 		} catch (InstantiationException e3) {
 			e3.printStackTrace();
 			System.exit(1);

@@ -110,7 +110,8 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
     }
 
     public void destroy(long objectID) {      
-         deletedObjects.add(objectID);       
+         deletedObjects.add(objectID); 
+         localObjectCache.remove(objectID);
     }
 
     public Serializable read(long objectID) throws NonExistantObjectIDException {
@@ -125,6 +126,7 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
             if (objbytes == null) {
                 throw new NonExistantObjectIDException();
             }
+            //System.out.println("Obejct came from DataSpace");
             obj = deserialize(objbytes);
             localObjectCache.put(new Long(objectID), obj);
         }
@@ -198,7 +200,6 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
         localObjectCache.clear();
         deletedObjects.clear();
         // release left over locks
-
         try {
             dataSpace.release(locksHeld);
         } catch (NonExistantObjectIDException e) {
