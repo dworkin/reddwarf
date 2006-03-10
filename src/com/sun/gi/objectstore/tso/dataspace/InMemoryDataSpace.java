@@ -68,12 +68,15 @@
 
 package com.sun.gi.objectstore.tso.dataspace;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Logger;
+import java.util.logging.Level;
 
 import com.sun.gi.objectstore.NonExistantObjectIDException;
 
@@ -90,6 +93,9 @@ public class InMemoryDataSpace implements DataSpace {
     Map<String, Long> nameSpace = new LinkedHashMap<String, Long>();
     Map<Long, String> reverseNameMap = new HashMap<Long,String>(); 
     Set<Long> lockSet = new HashSet<Long>();
+
+    private static Logger log =
+	Logger.getLogger("com.sun.gi.objectstore.tso");
 
     private Object idMutex = new Object();
 
@@ -178,6 +184,14 @@ public class InMemoryDataSpace implements DataSpace {
      */
     public void atomicUpdate(boolean clear, Map<Long, byte[]> updateMap,
     	    List<Long> deleted) {
+	if (log.isLoggable(Level.FINEST)) {
+	    Long[] upArray = new Long[updateMap.size()];
+	    Long[] delArray = new Long[deleted.size()];
+	    updateMap.keySet().toArray(upArray);
+	    deleted.toArray(delArray);
+	    log.finest("update ids: " + Arrays.toString(upArray));
+	    log.finest("delete ids: " + Arrays.toString(delArray));
+	}
         // insert set is ignored in this case as its uneeded detail
         synchronized (dataSpace) {
             dataSpace.putAll(updateMap);
