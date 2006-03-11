@@ -170,7 +170,6 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 
     private Connection conn;
     private Connection updateConn;
-    private Connection deleteInsertConn;
 
     private PreparedStatement getObjStmnt;
     private PreparedStatement getNameStmnt;
@@ -308,7 +307,16 @@ public class PersistantInMemoryDataSpace implements DataSpace {
             if (TRACEDISK) {
                 log.finest("          Deleting " + rec.deletedIDs[i]);
             }
-	    destroy(rec.deletedIDs[i]);
+
+	    try {
+		deleteObjStmnt.setLong(1, rec.deletedIDs[i]);
+		deleteObjStmnt.execute();
+		deleteNameByOIDStmnt.setLong(1, rec.deletedIDs[i]);
+		deleteNameByOIDStmnt.execute();
+	    } catch (SQLException e) {
+		e.printStackTrace();
+	    }
+
 	    graveyard.remove(rec.deletedIDs[i]);
 	}
 
@@ -341,7 +349,6 @@ public class PersistantInMemoryDataSpace implements DataSpace {
     private void checkTables() throws SQLException {
         conn = getDataConnection();
         updateConn = getDataConnection();
-        deleteInsertConn = getDataConnection();
         DatabaseMetaData md = conn.getMetaData();
         ResultSet rs = md.getTables(null, SCHEMA, OBJTBL, null);
         if (rs.next()) {
@@ -397,17 +404,17 @@ public class PersistantInMemoryDataSpace implements DataSpace {
                 + " O  " + "WHERE O.OBJID = ?");
         getNameStmnt = conn.prepareStatement("SELECT * FROM " + NAMETBLNAME
                 + " N  " + "WHERE N.NAME = ?");
-        insertObjStmnt = deleteInsertConn.prepareStatement("INSERT INTO "
+        insertObjStmnt = updateConn.prepareStatement("INSERT INTO "
                 + OBJTBLNAME + " VALUES(?,?)");
-        insertNameStmnt = deleteInsertConn.prepareStatement("INSERT INTO "
+        insertNameStmnt = updateConn.prepareStatement("INSERT INTO "
                 + NAMETBLNAME + " VALUES(?,?)");
         updateObjStmnt = updateConn.prepareStatement("UPDATE " + OBJTBLNAME
                 + " SET OBJBYTES=? WHERE OBJID=?");
-        deleteObjStmnt = deleteInsertConn.prepareStatement("DELETE FROM "
+        deleteObjStmnt = updateConn.prepareStatement("DELETE FROM "
                 + OBJTBLNAME + " WHERE OBJID = ?");
-        deleteNameByOIDStmnt = deleteInsertConn.prepareStatement("DELETE FROM "
+        deleteNameByOIDStmnt = updateConn.prepareStatement("DELETE FROM "
                 + NAMETBLNAME + " WHERE OBJID = ?");
-        deleteNameStmnt = deleteInsertConn.prepareStatement("DELETE FROM "
+        deleteNameStmnt = updateConn.prepareStatement("DELETE FROM "
                 + NAMETBLNAME + " WHERE NAME = ?");
         updateInfoStmnt = updateConn.prepareStatement("UPDATE " + INFOTBLNAME
                 + " SET NEXTOBJID=? WHERE APPID=?");
@@ -768,12 +775,6 @@ public class PersistantInMemoryDataSpace implements DataSpace {
                 // XXX:
             }
 
-            try {
-                deleteInsertConn.close();
-            } catch (SQLException e) {
-                // XXX:
-            }
-
             diskUpdateQueue.clear();
             diskUpdateQueue = null;
 
@@ -869,6 +870,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
      * @param objectID The objectID of the object to destroy
      */
     private void destroy(long objectID) {
+	/*
 	try {
 	    deleteObjStmnt.setLong(1, objectID);
 	    deleteObjStmnt.execute();
@@ -878,6 +880,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	} catch (SQLException e) {
 	    e.printStackTrace();
 	}
+	*/
     }
 
     private long getNextID() {
