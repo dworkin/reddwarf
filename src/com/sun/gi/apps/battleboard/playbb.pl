@@ -18,14 +18,13 @@ $Class	= 'com.sun.gi.apps.battleboard.client.BattleBoardClient';
 
 if (@ARGV < 3) {
     $x = @ARGV;
-    print "$x usage: $0 UserName UserPasswd PlayerName [opponents]\n";
+    print "$x usage: $0 UserName UserPasswd PlayerName\n";
     exit(1);
 }
 
 $UserName   = shift @ARGV;
 $UserPasswd = shift @ARGV;
 $PlayerName = shift @ARGV;
-@opponents  = @ARGV;
 
 $Command	= "java -cp bin $Props $Class";
 
@@ -35,7 +34,7 @@ $GamesLost   = 0;
 $GamesError  = 0;
 
 for (;;) {
-    $rc = play($Command, $UserName, $UserPasswd, $PlayerName, @opponents);
+    $rc = play($Command, $UserName, $UserPasswd, $PlayerName);
     $GamesPlayed += 1;
     if ($rc == 1) {
 	$GamesWon += 1;
@@ -54,11 +53,6 @@ sub play {
 
     my $pid = open2(*Reader, *Writer, $cmd);
 
-    print Writer "$user\n";
-    print Writer "$passwd\n";
-    print Writer "$player\n";
-    flush STDOUT;
-
     while (my $line = <Reader>) {
 	if (!($line =~ /\|/)) {
 	    print "== $line";
@@ -68,32 +62,39 @@ sub play {
 
 	if ($line eq "User Name:") {
 	    print Writer "$user\n";
+	    flush Writer;
 	}
 	elsif ($line eq "Password:") {
 	    print Writer "$passwd\n";
+	    flush Writer;
 	}
 	elsif ($line eq "Enter your handle [$user]:") {
 	    print Writer "$player\n";
+	    flush Writer;
 	    last;
 	}
     }
+
+    print "Starting game...\n";
+    flush STDOUT;
 
     for (my $x = 0; $x < $BoardWidth; $x++) {
 	for (my $y = 0; $y < $BoardHeight; $y++) {
 
 	    while (my $line = <Reader>) {
 		if ($line =~ /^\s+$/) {
-		    next;
+			next;
 		}
 		if (!($line =~ /\*/)) {
 		    print "== $line";
+		    flush STDOUT;
 		}
 
 		$line =~ s/\s+$//;
 
 		if ($line eq "player x y, or pass") {
 		    print Writer "$player $x $y\n";
-		    #sleep(5);
+		    flush Writer;
 		    last;
 		}
 		elsif ($line eq "YOU WIN!") {

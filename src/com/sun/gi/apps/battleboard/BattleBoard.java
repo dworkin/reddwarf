@@ -212,7 +212,8 @@ public class BattleBoard implements Serializable {
      * each city
      */
     public List<BattleBoardLocation> populate() {
-        List<BattleBoardLocation> cityLocations = new LinkedList<BattleBoardLocation>();
+        List<BattleBoardLocation> cityLocations =
+		new LinkedList<BattleBoardLocation>();
         int count = startCities;
 
         /*
