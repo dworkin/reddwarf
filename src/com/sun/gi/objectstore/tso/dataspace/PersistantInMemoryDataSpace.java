@@ -455,23 +455,33 @@ public class PersistantInMemoryDataSpace implements DataSpace {
         byte[] objbytes = null;
         synchronized (cachedStateMutex) {
 	    if (graveyard.contains(objectID)) {
+		log.finer("getObjBytes obj in graveyard " + objectID);
 		dataSpace.remove(objectID);
 		return null;
 	    }
             SoftReference<byte[]> ref = dataSpace.get(objectID);
             if (ref != null) {
                 objbytes = ref.get();
-                if (objbytes == null) { // ref dead
-                    dataSpace.remove(objectID);
-		    return null;
-                }
-            }
-            if (objbytes == null) {
+		if (objbytes != null) {
+		    return objbytes;
+		}
+
+		log.warning("attempting to ressurect object " + objectID);
 		objbytes = loadCache(objectID);
+		if (objbytes != null) {
+		    return objbytes;
+		}
+
+		log.warning("ressurection failed " + objectID);
+		dataSpace.remove(objectID);
+		return null;
+            } else {
+		if (objbytes == null) {
+		    log.warning("getObjBytes had null at loadCache " + objectID);
+		}
             }
         }
         return objbytes;
-
     }
 
     private byte[] loadCache(long objectID) {
@@ -483,8 +493,16 @@ public class PersistantInMemoryDataSpace implements DataSpace {
                 getObjStmnt.getConnection().commit();
                 if (rs.next()) {
                     objbytes = rs.getBytes("OBJBYTES");
+		    if (objbytes == null) {
+			log.warning("object is null in the database: " +
+				objectID);
+		    }
                     dataSpace.put(objectID, new SoftReference<byte[]>(objbytes));
-                }
+                } else {
+		    log.warning("object is not in the database: " +
+			    objectID);
+		}
+
 		/*
                 if (objbytes == null) {
                     log.warning("GOT A NULL OBJBYTES in loadCache "
@@ -649,6 +667,11 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 		    for (Entry<Long, byte[]> e : updateMap.entrySet()) {
 			Long key = e.getKey();
 			byte[] value = e.getValue();
+
+			if (value == null) {
+			    log.warning("about to write value of null for " +
+				    key);
+			}
 			dataSpace.put(key, new SoftReference<byte[]>(value));
 		    }
 
@@ -819,6 +842,10 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 		reverseNameSpace.put(createId, name);
 	    } else {
 		createId = new Long(getNextID());
+	    }
+
+	    if (data == null) {
+		log.warning("creating null object " + createId);
 	    }
 
             dataSpace.put(createId, new SoftReference<byte[]>(data));
