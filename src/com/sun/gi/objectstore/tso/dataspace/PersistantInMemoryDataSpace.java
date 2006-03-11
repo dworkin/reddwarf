@@ -240,10 +240,10 @@ public class PersistantInMemoryDataSpace implements DataSpace {
                                 }
                             } else {
                                 if (diskUpdateQueue.size() > 200) {
-                                    System.out.println("GRAVE-WARNING: diskUpdateQueue size : "
+                                    log.severe("GRAVE-WARNING: diskUpdateQueue size : "
                                             + diskUpdateQueue.size());
                                 } else if (diskUpdateQueue.size() > 100) {
-                                    System.out.println("WARNING: diskUpdateQueue size : "
+                                    log.severe("WARNING: diskUpdateQueue size : "
                                             + diskUpdateQueue.size());
                                 }
 
@@ -255,7 +255,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
                             while (recList.size() > 0) {
                                 DiskUpdateRecord rec = recList.remove();
                                 if (TRACEDISK) {
-                                    System.out.println("      Doing Commit #"
+                                    log.finer("      Doing Commit #"
                                             + commitCount++);
                                 }
                                 doDiskUpdate(rec);
@@ -275,15 +275,15 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 
     protected void doDiskUpdate(DiskUpdateRecord rec) {
         if (TRACEDISK) {
-            System.out.println("      Starting commit");
+            log.finer("      Starting commit");
         }
 
         if (TRACEDISK && (rec.updateDataRef.length > 0)) {
-            System.out.println("      Starting updates");
+            log.finest("      Starting updates");
         }
         for (int i = 0; i < rec.updateDataRef.length; i++) {
             if (TRACEDISK) {
-                System.out.println("          Updating " + rec.updateIDs[i]);
+                log.finest("          Updating " + rec.updateIDs[i]);
             }
             try { // update
                 updateObjStmnt.setBytes(1, rec.updateDataRef[i]);
@@ -306,7 +306,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 
 	for (int i = 0; i < rec.deletedIDs.length; i++) {
             if (TRACEDISK) {
-                System.out.println("          Deleting " + rec.deletedIDs[i]);
+                log.finest("          Deleting " + rec.deletedIDs[i]);
             }
 	    destroy(rec.deletedIDs[i]);
 	    graveyard.remove(rec.deletedIDs[i]);
@@ -314,7 +314,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 
         try {
             if (TRACEDISK) {
-                System.out.println("      Setting next ID = " + rec.nextID);
+                log.finest("      Setting next ID = " + rec.nextID);
             }
             updateInfoStmnt.setLong(1, rec.nextID);
             updateInfoStmnt.setLong(2, appID);
@@ -324,11 +324,11 @@ public class PersistantInMemoryDataSpace implements DataSpace {
         }
         try {
             if (TRACEDISK) {
-                System.out.println("      COmitting trans");
+                log.finer("      Comitting trans");
             }
             updateConn.commit();
             if (TRACEDISK) {
-                System.out.println("      Trans comitted");
+                log.finer("      Trans comitted");
             }
         } catch (SQLException e1) {
             e1.printStackTrace();
@@ -345,9 +345,9 @@ public class PersistantInMemoryDataSpace implements DataSpace {
         DatabaseMetaData md = conn.getMetaData();
         ResultSet rs = md.getTables(null, SCHEMA, OBJTBL, null);
         if (rs.next()) {
-            System.out.println("Found Objects table");
+            log.finer("Found Objects table");
         } else {
-            System.out.println("Creating Objects table");
+            log.finer("Creating Objects table");
             String s = "CREATE TABLE " + OBJTBLNAME + " ("
                     + "OBJID BIGINT NOT NULL," + "OBJBYTES BLOB,"
                     + "PRIMARY KEY (OBJID))";
@@ -357,9 +357,9 @@ public class PersistantInMemoryDataSpace implements DataSpace {
         rs.close();
         rs = md.getTables(null, SCHEMA, NAMETBL, null);
         if (rs.next()) {
-            System.out.println("Found Name table");
+            log.finer("Found Name table");
         } else {
-            System.out.println("Creating Name table");
+            log.finer("Creating Name table");
             PreparedStatement stmnt = conn.prepareStatement("CREATE TABLE "
                     + NAMETBLNAME + "("
                     + "NAME VARCHAR(255) NOT NULL, OBJID BIGINT NOT NULL,"
@@ -369,9 +369,9 @@ public class PersistantInMemoryDataSpace implements DataSpace {
         rs.close();
         rs = md.getTables(null, SCHEMA, INFOTBL, null);
         if (rs.next()) {
-            System.out.println("Found info table");
+            log.finer("Found info table");
         } else {
-            System.out.println("Creating info table");
+            log.finer("Creating info table");
             PreparedStatement stmnt = conn.prepareStatement("CREATE TABLE "
                     + INFOTBLNAME + "(" + "APPID BIGINT NOT NULL,"
                     + "NEXTOBJID BIGINT," + "PRIMARY KEY(APPID))");
@@ -381,15 +381,15 @@ public class PersistantInMemoryDataSpace implements DataSpace {
                 + INFOTBLNAME + " I  " + "WHERE I.APPID = " + appID);
         rs = stmnt.executeQuery();
         if (!rs.next()) { // entry does not exist
-            System.out.println("Creating new entry in info table for appID "
+            log.finer("Creating new entry in info table for appID "
                     + appID);
             stmnt = conn.prepareStatement("INSERT INTO " + INFOTBLNAME
                     + " VALUES(" + appID + "," + id + ")");
             stmnt.execute();
         } else {
             id = rs.getLong("NEXTOBJID");
-            System.out.println("Found entry in info table for appID " + appID);
-            System.out.println("Next objID = " + id);
+            log.finer("Found entry in info table for appID " + appID);
+            log.finer("Next objID = " + id);
         }
         rs.close();
         conn.commit();
@@ -444,6 +444,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
      * {@inheritDoc}
      */
     public byte[] getObjBytes(long objectID) {
+	log.finest("getObjBytes on " + objectID);
         byte[] objbytes = null;
         synchronized (cachedStateMutex) {
 	    if (graveyard.contains(objectID)) {
@@ -455,6 +456,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
                 objbytes = ref.get();
                 if (objbytes == null) { // ref dead
                     dataSpace.remove(objectID);
+		    return null;
                 }
             }
             if (objbytes == null) {
@@ -476,11 +478,13 @@ public class PersistantInMemoryDataSpace implements DataSpace {
                     objbytes = rs.getBytes("OBJBYTES");
                     dataSpace.put(objectID, new SoftReference<byte[]>(objbytes));
                 }
+		/*
                 if (objbytes == null) {
-                    System.out.println("GOT A NULL OBJBYTES in loadCache "
+                    log.warning("GOT A NULL OBJBYTES in loadCache "
                             + objectID);
 		    (new Exception()).printStackTrace();
                 }
+		*/
                 rs.close(); // cleanup and free locks
             } catch (SQLException e) {
                 e.printStackTrace();
@@ -660,7 +664,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 
 	    if (!closed) { // closed while we were processing
 		if (TRACEDISK) {
-		    System.out.println("Queuing commit #"
+		    log.finer("Queuing commit #"
 			    + commitRegisterCounter++);
 		}
 		diskUpdateQueue.add(new DiskUpdateRecord(updateIDs,
@@ -900,19 +904,19 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 
         try {
             if (queueLength > 150) {
-                System.out.println("\t\tXXX XXX XXX XXX falling behind "
+                log.warning("\t\tXXX XXX XXX XXX falling behind "
                         + queueLength);
                 Thread.sleep(80);
             } else if (queueLength > 100) {
-                System.out.println("\t\tXXX XXX XXX falling behind "
+                log.warning("\t\tXXX XXX XXX falling behind "
 			+ queueLength);
                 Thread.sleep(55);
             } else if (queueLength > 70) {
-                // System.out.println("\t\tXXX XXX falling behind " +
+                // log.warning("\t\tXXX XXX falling behind " +
                 // queueLength);
                 Thread.sleep(35);
             } else if (queueLength > 50) {
-                // System.out.println("\t\tXXX falling behind " +
+                // log.warning("\t\tXXX falling behind " +
                 // queueLength);
                 Thread.sleep(20);
             } else {

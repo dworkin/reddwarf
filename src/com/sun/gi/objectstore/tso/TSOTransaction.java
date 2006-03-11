@@ -1,26 +1,26 @@
 /*
  * Copyright © 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa
  * Clara, California 95054, U.S.A. All rights reserved.
- * 
+ *
  * Sun Microsystems, Inc. has intellectual property rights relating to
  * technology embodied in the product that is described in this
  * document. In particular, and without limitation, these intellectual
  * property rights may include one or more of the U.S. patents listed at
  * http://www.sun.com/patents and one or more additional patents or
  * pending patent applications in the U.S. and in other countries.
- * 
+ *
  * U.S. Government Rights - Commercial software. Government users are
  * subject to the Sun Microsystems, Inc. standard license agreement and
  * applicable provisions of the FAR and its supplements.
- * 
+ *
  * Use is subject to license terms.
- * 
+ *
  * This distribution may include materials developed by third parties.
- * 
+ *
  * Sun, Sun Microsystems, the Sun logo and Java are trademarks or
  * registered trademarks of Sun Microsystems, Inc. in the U.S. and other
  * countries.
- * 
+ *
  * This product is covered and controlled by U.S. Export Control laws
  * and may be subject to the export or import laws in other countries.
  * Nuclear, missile, chemical biological weapons or nuclear maritime end
@@ -29,10 +29,10 @@
  * or to entities identified on U.S. export exclusion lists, including,
  * but not limited to, the denied persons and specially designated
  * nationals lists is strictly prohibited.
- * 
+ *
  * Copyright © 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa
  * Clara, California 95054, Etats-Unis. Tous droits réservés.
- * 
+ *
  * Sun Microsystems, Inc. détient les droits de propriété intellectuels
  * relatifs à la technologie incorporée dans le produit qui est décrit
  * dans ce document. En particulier, et ce sans limitation, ces droits
@@ -40,16 +40,16 @@
  * américains listés à l'adresse http://www.sun.com/patents et un ou les
  * brevets supplémentaires ou les applications de brevet en attente aux
  * Etats - Unis et dans les autres pays.
- * 
+ *
  * L'utilisation est soumise aux termes de la Licence.
- * 
+ *
  * Cette distribution peut comprendre des composants développés par des
  * tierces parties.
- * 
+ *
  * Sun, Sun Microsystems, le logo Sun et Java sont des marques de
  * fabrique ou des marques déposées de Sun Microsystems, Inc. aux
  * Etats-Unis et dans d'autres pays.
- * 
+ *
  * Ce produit est soumis à la législation américaine en matière de
  * contrôle des exportations et peut être soumis à la règlementation en
  * vigueur dans d'autres pays dans le domaine des exportations et
@@ -96,58 +96,88 @@ public class TSOTransaction implements Transaction {
     private static Logger log =
 	Logger.getLogger("com.sun.gi.objectstore.tso");
 
-    private TSOObjectStore ostore;
-    private SGSUUID transactionID;
+    private final TSOObjectStore ostore;
+    private final SGSUUID transactionID;
+    private final ClassLoader loader;
 
-    private long time;
-    private long tiebreaker;
+    /**
+     * initialAttemptTime is the time at which this transaction
+     * was created.  If we abort() and requeue due to a
+     * DeadlockException, we maintain our initialAttemptTime so
+     * that we are more and more certain to win all the locks we
+     * need.  If we were to simply reset it on each attempt, we
+     * might never make forward progress.
+     * <p>
+     * A transaction that commits or aborts normally will never
+     * run again, and may not be reused or reset.
+     */
+    private final long initialAttemptTime;
 
-    private ClassLoader loader;
-    private DataSpaceTransaction mainTrans, keyTrans, createTrans;
+    private final long tiebreaker;
+
+    private long currentTransactionDeadline;
+
+    private final Map<Long, Serializable> lockedObjectsMap;
+    private final List<Long> createdIDsList;
+
+    private DataSpaceTransaction mainTrans;
+    private DataSpaceTransaction keyTrans;
+    private DataSpaceTransaction createTrans;
     private DataSpace mainDataSpace;
-    private Map<Long, Serializable> lockedObjectsMap =
-        new HashMap<Long, Serializable>();
-    private List<Long> createdIDsList = new ArrayList<Long>();
 
-    // private Map<Long, TSODataHeader> newObjectHeaders = new
-    // HashMap<Long,TSODataHeader>();
-
-    private boolean timestampInterrupted;
+    private volatile boolean timestampInterrupted;
 
     private static long TIMEOUT =
         Integer.parseInt(System.getProperty("sgs.objectstore.timeout",
                 "120000" /* millisecs */));
 
-    TSOTransaction(TSOObjectStore ostore, ClassLoader loader, long time,
-            long tiebreaker, DataSpace mainDataSpace) {
-
+    TSOTransaction(TSOObjectStore ostore, ClassLoader loader,
+	    long creationTime, long tiebreaker, DataSpace mainDataSpace)
+    {
         this.ostore = ostore;
+        this.transactionID = new StatisticalUUID();
         this.loader = loader;
-        transactionID = new StatisticalUUID();
-        this.time = time;
+        this.initialAttemptTime = creationTime;
         this.tiebreaker = tiebreaker;
+        this.currentTransactionDeadline = 1;
         this.mainDataSpace = mainDataSpace;
-
+	this.lockedObjectsMap= new HashMap<Long, Serializable>();
+	this.createdIDsList = new ArrayList<Long>();
     }
 
     public SGSUUID getUUID() {
         return transactionID;
     }
 
+    /**
+     * Acquires database resources needed to begin the transaction.
+     * If this transaction aborted due to DeadlockException and has
+     * been requeued, start() prepares it for another try.  However,
+     * that is the *only* permitted re-use of a TSOTransaction.
+     */
     public void start() {
+	if (currentTransactionDeadline == 0) {
+	    // On commit, we set this to catch invalid reuse situations.
+	    // TSOTransaction is intended to be reused only if an abort
+	    // occurs and has been re-queued for another attempt.
+	    throw new IllegalStateException("Invalid reuse of TSOTransaction");
+	}
         mainTrans = new DataSpaceTransactionImpl(loader, mainDataSpace);
         keyTrans = new DataSpaceTransactionImpl(loader, mainDataSpace);
         createTrans = new DataSpaceTransactionImpl(loader, mainDataSpace);
+	currentTransactionDeadline = System.currentTimeMillis() + TIMEOUT;
         timestampInterrupted = false;
-	//time = System.currentTimeMillis();
         ostore.registerActiveTransaction(this);
     }
 
     public long create(Serializable object, String name) {
-        TSODataHeader hdr = new TSODataHeader(time, tiebreaker,
-                System.currentTimeMillis() + TIMEOUT, transactionID,
+
+        TSODataHeader hdr = new TSODataHeader(initialAttemptTime,
+		tiebreaker, currentTransactionDeadline, transactionID,
                 ObjectStore.INVALID_ID);
+
         long headerID = createTrans.create(hdr, name);
+
 	if (log.isLoggable(Level.FINER)) {
 	    if (headerID != DataSpace.INVALID_ID) {
 		log.fine("Won create of " + name + " with id " + headerID);
@@ -155,82 +185,158 @@ public class TSOTransaction implements Transaction {
 		log.fine("Lost create of " + name);
 	    }
 	}
+
         while (headerID == DataSpace.INVALID_ID) {
-	    // we were beat there
+	    // Someone else beat us to the create()
             headerID = lookup(name);
             try {
                 lock(headerID);
+		// If the other TSOTransaction (who won the create race)
+		// ends up aborting, and if we then end up with the GET
+		// lock on this oid, then we'll get thrown
+		// a NonExistantObjectID exception, which is handled
+		// in the catch block below.
+		//
+		// If the other transaction committed, though, we'll
+		// eventually acquire the lock without an exception.
+		// This means we were beaten to a commited create(),
+		// so we must return *INVALID_ID* to our caller so
+		// he knows he lost the race and can re-get the
+		// object committed by the winner.
+		//
+		// (If we had simply returned the object ID, our
+		// caller would have no way of knowing that someone
+		// else's object is the one that got created).
+
                 return ObjectStore.INVALID_ID;
+
             } catch (NonExistantObjectIDException e) {
-                // means its been removed out from under us, so create
-                // is okay try again
-            	//System.out.println("Create aborted ina nother trans");
-		log.finer("Loser is new winner for create of " + name);
-                headerID = createTrans.create(hdr, name);               
-                //System.out.println("new hdr id="+headerID);
-                //if (headerID<0) {
-                //	System.exit(-99);
-                //}
+                // This exception means that we had originally lost
+		// the create race, but the winner ended up aborting
+		// and the object hasn't really been created.
+		//
+		// So we try again -- but we loop in order to check
+		// for a race on this round.
+
+		log.finer("txn " + transactionID +
+			" former loser is new winner for create of " + name);
+                headerID = createTrans.create(hdr, name);
             }
+
 	    // loop until we can acquire a lock
         }
+
         long id = mainTrans.create(object, null);
         hdr.objectID = id;
+
+	// Immediately (with the headerID lock held) commit the
+	// partial-create header so that other attempts to create
+	// will wait for our main (eventual) commit or abort.
         createTrans.write(headerID, hdr);
-	log.finer("txn " + transactionID + " createTrans for " + name + " committing");
+	log.finer("txn " + transactionID +
+		" createTrans for " + name + " committing");
         createTrans.commit();
         createTrans.release(headerID);
+
+	// Set up the header and objects as they should be if
+	// the main transaction commits.
         hdr.free = true;
         hdr.createNotCommitted = false;
         mainTrans.write(headerID, hdr); // will free when mainTrans commits
         lockedObjectsMap.put(headerID, object);
         createdIDsList.add(headerID);
         createdIDsList.add(hdr.objectID);
+
         return headerID;
     }
 
     public void destroy(long objectID) throws DeadlockException,
-            NonExistantObjectIDException {
+            NonExistantObjectIDException
+    {
+	// Note that 'objectID' is actually the id of the object's
+	// *TSODataHeader* in the database.  The header has a field
+	// named objectID which is the 'real' objectID of its contents.
+	// Users of TSOTransaction refer to objects by their headerIDs.
+
         TSODataHeader hdr = (TSODataHeader) mainTrans.read(objectID);
+        if ((hdr.createNotCommitted) && (!hdr.owner.equals(transactionID))) {
+            return;
+        }
         mainTrans.destroy(hdr.objectID); // destroy object
         mainTrans.destroy(objectID); // destroy header
     }
 
-    public Serializable peek(long objectID) throws NonExistantObjectIDException {
+    public Serializable peek(long objectID) throws NonExistantObjectIDException
+    {
+	// Note that 'objectID' is actually the id of the object's
+	// *TSODataHeader* in the database.  The header has a field
+	// named objectID which is the 'real' objectID of its contents.
+	// Users of TSOTransaction refer to objects by their headerIDs.
+
         TSODataHeader hdr = (TSODataHeader) mainTrans.read(objectID);
-        if ((hdr.createNotCommitted) && (!hdr.uuid.equals(transactionID))) {
+        if ((hdr.createNotCommitted) && (!hdr.owner.equals(transactionID))) {
             return null;
         }
         return mainTrans.read(hdr.objectID);
     }
 
-    public Serializable lock(long objectID, boolean block)
-            throws DeadlockException, NonExistantObjectIDException {
+    public Serializable lock(long objectID, boolean shouldBlock)
+            throws DeadlockException, NonExistantObjectIDException
+    {
         Serializable obj = lockedObjectsMap.get(objectID);
-        if (obj != null) { // already locked
+        if (obj != null) {
+	    // We've already locked it -- return the cached copy.
             return obj;
         }
+
+	// Note that 'objectID' is actually the id of the object's
+	// *TSODataHeader* in the database.  The header has a field
+	// named objectID which is the 'real' objectID of its contents.
+	// Users of TSOTransaction refer to objects by their headerIDs.
+
         keyTrans.lock(objectID);
         TSODataHeader hdr = (TSODataHeader) keyTrans.read(objectID);
         while (!hdr.free) {
-            if (System.currentTimeMillis() > hdr.timeoutTime) { // timed out
-                ostore.requestTimeoutInterrupt(hdr.uuid);
-                hdr.free = true;
+
+            if (System.currentTimeMillis() > hdr.currentTransactionDeadline) {
+		// The lock is stale, grab it ourselves
+                ostore.requestTimeoutInterrupt(hdr.owner);
+		// We'll be taking the lock, so break out of this loop.
+		// Do *not* update hdr.free, in case we need to
+		// do a deadline-abort (look for deadline-abort below).
+		break;
             }
+
+            if (!shouldBlock) {
+		// This is an attempt() call, so we should neither
+		// block nor steal the lock from younger transactions
+		// if they currently hold it.
+		// Checked *before* timestampInterrupted, because
+		// if we're not going to block we can just keep
+		// running along -- we only accept the interrupt
+		// if we discover we'll block.
+                keyTrans.abort();
+                return null;
+	    }
+
             if (timestampInterrupted) {
+		// We were interrupted and are about to block, so
+		// honor the interruption and abort.
                 keyTrans.abort();
                 abort();
                 throw new DeadlockException();
-            } else if (!block) {
-                keyTrans.abort();
-                return null;
             }
-            if ((time < hdr.time)
-                    || ((time == hdr.time) && (tiebreaker < hdr.tiebreaker))) {
-                ostore.requestTimestampInterrupt(hdr.uuid);
+
+	    if (hdr.youngerThan(initialAttemptTime, tiebreaker)) {
+		// We are more senior than the current owner
+		// of the lock; tell him to give it up!
+                ostore.requestTimestampInterrupt(hdr.owner);
             }
-            // System.out.println("Waiting for wakeup "+transactionID);
+
             synchronized (this) {
+		// Synchronize early so we have a chance to add ourselves
+		// as a listener -- we must be sure to get notifyAll'd
+		// if an interrupt comes in from our objectStore.
                 if (!hdr.availabilityListeners.contains(transactionID)) {
                     hdr.availabilityListeners.add(transactionID);
                     keyTrans.write(objectID, hdr);
@@ -241,59 +347,91 @@ public class TSOTransaction implements Transaction {
 		if (log.isLoggable(Level.FINER)) {
 		    log.finer("txn " + transactionID +
 			" about to wait for header id " + objectID +
-			" until " + String.format("%1$tF %<tT.%<tL", hdr.timeoutTime));
+			" until " +
+			String.format("%1$tF %<tT.%<tL",
+				hdr.currentTransactionDeadline));
 		}
-                waitForWakeup(hdr.timeoutTime);
+                waitForWakeup(hdr.currentTransactionDeadline);
             }
-            // System.out.println("wokeup "+transactionID);
+
+	    // @@ This abort has a non-obvious use: it clears
+	    // the DataTransaction's cache of loaded objects,
+	    // so when we read the header again we will see
+	    // the updated copy, not a cached copy.
             keyTrans.abort();
+
             keyTrans.lock(objectID);
-            log.finer("txn " + transactionID + " about to re-read header id " + objectID);
+
+            log.finer("txn " + transactionID +
+		" about to re-read header id " + objectID);
+
             hdr = (TSODataHeader) keyTrans.read(objectID);
-            //System.out.println("hdr="+hdr);
+
 	    if (hdr.free) {
-		log.finer("txn " + transactionID + " got header id " + objectID);
+		log.finer("txn " + transactionID +
+		    " got header id " + objectID);
 	    }
         }
+
         if (hdr.createNotCommitted) {
-            mainTrans.destroy(hdr.objectID);
-            mainTrans.destroy(objectID);
-            return null;
+	    // A create has partially aborted, leaving some junk behind.
+	    // Clean it out and let our caller do the right thing.
+	    // Our caller may be create(), in which case he will catch
+	    // this exception and create the object.
+            keyTrans.destroy(hdr.objectID);
+            keyTrans.destroy(objectID);
+	    keyTrans.commit();
+	    throw new NonExistantObjectIDException();
         }
+
+	if (System.currentTimeMillis() > currentTransactionDeadline) {
+	    // We've run past our deadline: do a deadline-abort.
+
+	    if (!hdr.free) {
+		// We stole the lock from someone and broke out of
+		// the loop above.  We need to mark it as "free" and
+		// write the header so everyone else knows it's unlocked.
+		hdr.free = true;
+	    }
+
+	    abort();
+	    throw new DeadlockException();
+	}
+
+	// Take ownership of this header
         hdr.free = false;
-        hdr.time = time;
-        //hdr.timeoutTime = time + TIMEOUT;
+        hdr.owner = transactionID;
+        hdr.initialAttemptTime = initialAttemptTime;
         hdr.tiebreaker = tiebreaker;
+        hdr.currentTransactionDeadline = currentTransactionDeadline;
         hdr.availabilityListeners.remove(transactionID);
-        hdr.uuid = transactionID;
         keyTrans.write(objectID, hdr);
         keyTrans.commit();
+
+	// Now that we have the lock, get the object and cache it.
         obj = mainTrans.read(hdr.objectID);
         lockedObjectsMap.put(objectID, obj);
+
         return obj;
     }
 
     /**
-     * @param l
-     * 
+     * @param deadline the absolute time at which to wake up
+     * if we have not yet been notified, in milliseconds since
+     * the Unix epoch.
      */
-    private void waitForWakeup(long l) {
-        // System.out.println("GOing into wait "+transactionID);
-        // System.out.flush();
+    private void waitForWakeup(long deadline) {
         synchronized (this) {
             try {
-                long now = System.currentTimeMillis();
-                if (now < l) {
-                    this.wait(l - now);
+                long waitTime = deadline - System.currentTimeMillis();
+                if (waitTime > 0) {
+                    this.wait(waitTime);
                 }
-
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                //e.printStackTrace();
+		log.fine("txn " + transactionID + " interrupted");
             }
         }
-        // System.out.println("Coming out of wait "+transactionID);
-        // System.out.flush();
-
     }
 
     public Serializable lock(long objectID) throws DeadlockException,
@@ -362,7 +500,7 @@ public class TSOTransaction implements Transaction {
                     keyTrans.destroy(l);
                 }
             }
-	    log.finest("keyTrans commit-2 txn " + transactionID);
+	    log.finest("keyTrans commit-destroy txn " + transactionID);
             keyTrans.commit();
 	    log.finer("mainTrans abort txn " + transactionID);
             mainTrans.abort();
@@ -380,6 +518,9 @@ public class TSOTransaction implements Transaction {
     public void commit() {
         processLockedObjects(true);
 
+	// Use the deadline as a sentinel in case someone tries to
+	// reuse this transaction.
+	currentTransactionDeadline = 0;
     }
 
     public long getCurrentAppID() {

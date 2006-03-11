@@ -159,7 +159,7 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 
     public void release(long objectID) {
 
-        System.out.println("DataSpaceTransactionImpl.release");
+        //System.out.println("DataSpaceTransactionImpl.release");
 
         try {
             dataSpace.release(objectID);

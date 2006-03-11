@@ -82,33 +82,38 @@ public class TSODataHeader implements Serializable {
 
     private static final long serialVersionUID = 1L;
     
-    public long time;
-    public long tiebreaker;
-    public long timeoutTime;
-    public SGSUUID uuid;
-    public boolean free;
-    public boolean createNotCommitted;
-    public Set<SGSUUID> availabilityListeners;
     public long objectID;
+    public boolean createNotCommitted;
+    public boolean free;
 
-    public TSODataHeader(long time, long tiebreaker, long timeoutTime,
-            SGSUUID uuid, long objID) {
-        this.time = time;
+    // The following fields are only valid when free is false.
+
+    public SGSUUID owner;
+    public long initialAttemptTime;
+    public long tiebreaker;
+    public long currentTransactionDeadline;
+    public Set<SGSUUID> availabilityListeners;
+
+    public TSODataHeader(long initialAttemptTime, long tiebreaker,
+	    long currentTransactionDeadline,
+            SGSUUID owner, long objID) {
+        this.initialAttemptTime = initialAttemptTime;
         this.tiebreaker = tiebreaker;
-        this.uuid = uuid;
+        this.owner = owner;
         this.objectID = objID;
-        this.timeoutTime = timeoutTime;
+        this.currentTransactionDeadline = currentTransactionDeadline;
         free = false; // create in locked state
         createNotCommitted = true;
         availabilityListeners = new HashSet<SGSUUID>();
     }
 
-    public boolean before(TSODataHeader other) {
-        if (time < other.time) {
-            return true;
-        } else if ((time == other.time) && (tiebreaker < other.tiebreaker)) {
-            // XXX this looks like it should return true; why doesn't it?
-        }
-        return false;
+    public boolean youngerThan(TSODataHeader other) {
+	return youngerThan(other.initialAttemptTime, other.tiebreaker);
+    }
+
+    public boolean youngerThan(long otherTime, long otherTiebreaker) {
+        return ((otherTime < initialAttemptTime)
+	        ||  (   (otherTime == initialAttemptTime)
+		     && (otherTiebreaker < tiebreaker)));
     }
 }

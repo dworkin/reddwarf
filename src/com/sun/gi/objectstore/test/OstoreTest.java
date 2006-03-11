@@ -6,48 +6,30 @@ import com.sun.gi.objectstore.Transaction;
 import java.io.Serializable;
 import com.sun.gi.objectstore.DeadlockException;
 import com.sun.gi.objectstore.tso.TSOObjectStore;
-import com.sun.gi.objectstore.tso.dataspace.InMemoryDataSpace;
+//import com.sun.gi.objectstore.tso.dataspace.InMemoryDataSpace;
 import com.sun.gi.objectstore.tso.dataspace.PersistantInMemoryDataSpace;
 
-/**
- * <p>
- * Title:
- * </p>
- * <p>
- * Description:
- * </p>
- * <p>
- * Copyright: Copyright (c) 2003
- * </p>
- * <p>
- * Company:
- * </p>
- * 
- * @author not attributable
- * @version 1.0
- */
-
 class DataObject implements Serializable {
-	/**
-	 * 
-	 */
-	private static final long serialVersionUID = -5105752483489836216L;
+    /**
+     *
+     */
+    private static final long serialVersionUID = -5105752483489836216L;
 
-	int i;
+    int i;
 
-	double d;
+    double d;
 
-	String s;
+    String s;
 
-	public DataObject(int i, double d, String s) {
-		this.d = d;
-		this.s = s;
-		this.i = i;
-	}
+    public DataObject(int i, double d, String s) {
+	this.d = d;
+	this.s = s;
+	this.i = i;
+    }
 
-	public String toString() {
-		return "Iint = " + i + ", double = " + d + ", String= " + s;
-	}
+    public String toString() {
+	return "Iint = " + i + ", double = " + d + ", String= " + s;
+    }
 }
 
 public class OstoreTest {
@@ -59,8 +41,8 @@ public class OstoreTest {
 	public static void main(String[] args) {
 		ObjectStore ostore = null;
 		try {
-			//ostore = new TSOObjectStore(new PersistantInMemoryDataSpace(1));
-			 ostore = new TSOObjectStore(new InMemoryDataSpace(1));
+			ostore = new TSOObjectStore(new PersistantInMemoryDataSpace(1));
+			//ostore = new TSOObjectStore(new InMemoryDataSpace(1));
 		} catch (InstantiationException e3) {
 			e3.printStackTrace();
 			System.exit(1);
@@ -222,12 +204,12 @@ public class OstoreTest {
 	private static void testCreate(ObjectStore ostore) {
 		System.out.println("Named create blocking tests");
 		final Transaction t1 = ostore.newTransaction(null);
-		t1.start();		
+		t1.start();
 		final Transaction t2 = ostore.newTransaction(null);
 		t2.start();
-		
+
 		DataObject obj = new DataObject(55, 3.14, "This is a test!");
-		
+
 		// commit test
 		long time = System.currentTimeMillis();
 		final long objid = t1.create(obj, "CreationTests");
@@ -265,13 +247,15 @@ public class OstoreTest {
 		} catch (NonExistantObjectIDException e) {
 			System.out.println("Failure: claims obj does not exist.");
 		}
-		
-		// abort test
-		t1.start();
-		t2.start();
 
-		
-		final long objid2 = t1.create(obj, "CreationTests2");
+		// abort test
+		final Transaction t3 = ostore.newTransaction(null);
+		t3.start();
+		final Transaction t4 = ostore.newTransaction(null);
+		t4.start();
+
+
+		final long objid2 = t3.create(obj, "CreationTests2");
 		if (objid2 == ObjectStore.INVALID_ID){
 			System.out.println("Error: invalid id from initial create");
 			System.exit(1);
@@ -286,11 +270,11 @@ public class OstoreTest {
 
 						e.printStackTrace();
 					}
-					t1.abort();
-					System.out.println(".... t1 aborted");
+					t3.abort();
+					System.out.println(".... t3 aborted");
 				}
 			}).start();
-			obj = (DataObject) t2.lock(objid2);
+			obj = (DataObject) t4.lock(objid2);
 			if (System.currentTimeMillis() < time + 5000) {
 				System.out.println("ERROR: did not block!");
 				System.exit(1);
@@ -300,20 +284,22 @@ public class OstoreTest {
 					System.exit(1);
 				}
 				System.out.println("Success: blocked til abort!");
-				t2.abort();
+				t4.abort();
 			}
 		} catch (DeadlockException e) {
 			e.printStackTrace();
 		} catch (NonExistantObjectIDException e) {
 			System.out.println("Success: claims obj does not exist.");
 		}
-		
-		// create v. create and commit test
-		t1.start();
-		t2.start();
 
-		
-		final long objid3 = t1.create(obj, "CreationTests3");
+		// create v. create and commit test
+		final Transaction t5 = ostore.newTransaction(null);
+		t5.start();
+		final Transaction t6 = ostore.newTransaction(null);
+		t6.start();
+
+
+		final long objid3 = t5.create(obj, "CreationTests3");
 		if (objid3 == ObjectStore.INVALID_ID){
 			System.out.println("Error: invalid id from initial create");
 			System.exit(1);
@@ -328,11 +314,11 @@ public class OstoreTest {
 
 						e.printStackTrace();
 					}
-					t1.commit();
-					System.out.println(".... t1 aborted");
+					t5.commit();
+					System.out.println(".... t5 aborted");
 				}
 			}).start();
-			long objid4 = t2.create(obj, "CreationTests3");
+			long objid4 = t6.create(obj, "CreationTests3");
 			if (System.currentTimeMillis() < time + 5000) {
 				System.out.println("ERROR: did not block!");
 				System.exit(1);
@@ -342,18 +328,20 @@ public class OstoreTest {
 					System.exit(1);
 				}
 				System.out.println("Success: blocked til commit and returned INVALID_ID");
-				t2.abort();
+				t6.abort();
 			}
 		} catch (DeadlockException e) {
 			e.printStackTrace();
 		}
-		
-//		 create v. create and abort test
-		t1.start();
-		t2.start();
 
-		
-		final long objid4 = t1.create(obj, "CreationTests4");
+//		 create v. create and abort test
+		final Transaction t7 = ostore.newTransaction(null);
+		t7.start();
+		final Transaction t8 = ostore.newTransaction(null);
+		t8.start();
+
+
+		final long objid4 = t7.create(obj, "CreationTests4");
 		if (objid4 == ObjectStore.INVALID_ID){
 			System.out.println("Error: invalid id from initial create");
 			System.exit(1);
@@ -365,14 +353,13 @@ public class OstoreTest {
 					try {
 						Thread.sleep(5000);
 					} catch (InterruptedException e) {
-
 						e.printStackTrace();
 					}
-					t1.abort();
-					System.out.println(".... t1 aborted");
+					t7.abort();
+					System.out.println(".... t7 aborted");
 				}
 			}).start();
-			long objid5 = t2.create(obj, "CreationTests4");
+			long objid5 = t8.create(obj, "CreationTests4");
 			if (System.currentTimeMillis() < time + 5000) {
 				System.out.println("ERROR: did not block!");
 				System.exit(1);
@@ -381,13 +368,39 @@ public class OstoreTest {
 					System.out.println("Error: blocked but failed returned INVALID_ID");
 					System.exit(1);
 				}
-				System.out.println("Success: blocked til abort and returned"+objid5);
-				t2.abort();
+				System.out.println("Success: blocked til abort and returned "+objid5);
+				secret_objid = objid5;
+				t8.commit();
 			}
 		} catch (DeadlockException e) {
 			e.printStackTrace();
 		}
-		
+
+		// Double-check
+		final Transaction t9 = ostore.newTransaction(null);
+		t9.start();
+		System.out.println("Double-checking previous get; sleep 3");
+		try {
+		    Thread.sleep(3000);
+		} catch (InterruptedException e) {
+		    e.printStackTrace();
+		}
+		obj = null;
+		System.out.println("About to get objID " + secret_objid);
+		try {
+		    obj = (DataObject) t9.lock(secret_objid);
+		} catch (NonExistantObjectIDException e) {
+		    System.out.println("Caught non-existant");
+		}
+		if (obj == null) {
+		    System.out.println("ERROR: double-check got null");
+		    System.exit(1);
+		}
+		System.out.println("Success: double-check returned "+obj);
+		t9.abort();
+
 	}
+
+    static volatile long secret_objid = 0;
 
 }
