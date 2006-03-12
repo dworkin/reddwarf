@@ -113,10 +113,7 @@ public interface DataSpaceTransaction {
      */
     void write(long objectID, Serializable obj);
 
-    /**
-     * 
-     */
-    void clear();
+    
 
     void forget(long objectID);
 
