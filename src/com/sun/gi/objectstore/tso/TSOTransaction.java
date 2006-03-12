@@ -99,7 +99,7 @@ public class TSOTransaction implements Transaction {
 	Logger.getLogger("com.sun.gi.objectstore.tso");
 
     private final TSOObjectStore ostore;
-    private final SGSUUID transactionID;
+    final SGSUUID transactionID;
     private final ClassLoader loader;
 
     /**
@@ -113,11 +113,11 @@ public class TSOTransaction implements Transaction {
      * A transaction that commits or aborts normally will never
      * run again, and may not be reused or reset.
      */
-    private final long initialAttemptTime;
+    final long initialAttemptTime;
 
-    private final long tiebreaker;
+    final long tiebreaker;
 
-    private long currentTransactionDeadline;
+    long currentTransactionDeadline;
 
     private final Map<Long, Serializable> lockedObjectsMap;
     private final Set<Long> createdIDs;
@@ -172,9 +172,7 @@ public class TSOTransaction implements Transaction {
 
     public long create(Serializable object, String name) {
 
-        TSODataHeader hdr = new TSODataHeader(initialAttemptTime,
-		tiebreaker, currentTransactionDeadline, transactionID,
-                ObjectStore.INVALID_ID);
+        TSODataHeader hdr = new TSODataHeader(this);
 
         long headerID = trans.create(hdr, name);
 
@@ -236,25 +234,26 @@ public class TSOTransaction implements Transaction {
 	    throw new IllegalStateException("TSOTransaction.create failed");
 	}
 
+	hdr.hdrID = headerID;
+
 	// XXX Later, we can just get the next sequence number
 	// and store that in the header, and defer the actual
 	// write of the object data until commit time.
         long id = trans.create(object, null);
         hdr.objectID = id;
 
-	// Immediately (with the headerID lock held) commit the
-	// partial-create header so that other attempts to create
-	// will wait for our main (eventual) commit or abort.
-        trans.write(headerID, hdr);
-	log.finer("txn " + transactionID +
-		" trans for " + name + " committing");
-        trans.commit();
-        trans.release(headerID);
-
-	// lockedObjectsMap maps headerIDs to the *real objects* to which they refer
+	// lockedObjectsMap maps headerIDs to the *real objects*
+	// to which they refer
         lockedObjectsMap.put(headerID, object);
         createdIDs.add(headerID);
 
+	// With the headerID lock held, commit the partial-create
+	// header so that other attempts to create will wait for
+	// our overall commit or abort later.
+        trans.write(headerID, hdr);
+        trans.commit();
+	log.finer("txn " + transactionID +
+		" trans for " + name + " commit " + hdr);
         return headerID;
     }
 
@@ -355,13 +354,14 @@ public class TSOTransaction implements Transaction {
 		// running along -- we only accept the interrupt
 		// if we discover we'll block.
                 trans.release(objectID);
+
                 return null;
 	    }
 
             if (timestampInterrupted) {
 		// We were interrupted and are about to block, so
 		// honor the interruption and abort.
-                trans.release(objectID);
+
                 abort();
                 throw new DeadlockException();
             }
@@ -448,8 +448,6 @@ public class TSOTransaction implements Transaction {
 
 		listeners.remove(transactionID);
 		ostore.notifyAvailabilityListeners(listeners);
-
-		trans.release(objectID);
 	    }
 
 	    abort();
@@ -464,13 +462,10 @@ public class TSOTransaction implements Transaction {
         hdr.currentTransactionDeadline = currentTransactionDeadline;
         hdr.availabilityListeners.remove(transactionID);
         trans.write(objectID, hdr);
-        trans.commit();
-	log.finest("got get-lock, writing header " + hdr);
 
-	// Now that we have the GET-lock, get the object and cache it.
         obj = trans.read(hdr.objectID);
-
-        trans.release(objectID);
+        trans.commit();
+	log.finest("got get-lock, wrote " + hdr);
 
         lockedObjectsMap.put(objectID, obj);
         return obj;

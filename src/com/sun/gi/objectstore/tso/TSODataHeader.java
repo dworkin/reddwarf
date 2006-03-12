@@ -69,8 +69,11 @@
 package com.sun.gi.objectstore.tso;
 
 import java.io.Serializable;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
+
+import static com.sun.gi.objectstore.ObjectStore.INVALID_ID;
 
 import com.sun.gi.utils.SGSUUID;
 
@@ -80,8 +83,9 @@ import com.sun.gi.utils.SGSUUID;
  */
 public class TSODataHeader implements Serializable {
 
-    private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 2L;
     
+    public long hdrID; // not really needed, good for debugging
     public long objectID;
     public boolean createNotCommitted;
     public boolean free;
@@ -94,14 +98,14 @@ public class TSODataHeader implements Serializable {
     public long currentTransactionDeadline;
     public Set<SGSUUID> availabilityListeners;
 
-    public TSODataHeader(long initialAttemptTime, long tiebreaker,
-	    long currentTransactionDeadline,
-            SGSUUID owner, long objID) {
-        this.initialAttemptTime = initialAttemptTime;
-        this.tiebreaker = tiebreaker;
-        this.owner = owner;
-        this.objectID = objID;
-        this.currentTransactionDeadline = currentTransactionDeadline;
+    public TSODataHeader(TSOTransaction parent)
+    {
+        this.initialAttemptTime = parent.initialAttemptTime;
+        this.tiebreaker = parent.tiebreaker;
+        this.owner = parent.transactionID;
+        this.objectID = INVALID_ID;
+        this.hdrID = INVALID_ID;
+        this.currentTransactionDeadline = parent.currentTransactionDeadline;
         free = false; // create in locked state
         createNotCommitted = true;
         availabilityListeners = new HashSet<SGSUUID>();
@@ -115,5 +119,31 @@ public class TSODataHeader implements Serializable {
         return ((otherTime < initialAttemptTime)
 	        ||  (   (otherTime == initialAttemptTime)
 		     && (otherTiebreaker < tiebreaker)));
+    }
+
+    public String toString() {
+	StringBuilder sb = new StringBuilder();
+	sb.append("TSOhdr{")
+	  .append(createNotCommitted ? "INVALID,hdrID=" : "valid,hdrID=")
+	  .append(hdrID);
+
+	if (free) {
+	    sb.append(",free}");
+	} else {
+	    SGSUUID[] listenArray = new SGSUUID[availabilityListeners.size()];
+	    availabilityListeners.toArray(listenArray);
+	    sb.append(",owner=")
+	      .append(owner)
+	      .append(",seniority=")
+	      .append(initialAttemptTime)
+	      .append(",tiebreak=")
+	      .append(tiebreaker)
+	      .append(",expiry=")
+	      .append(currentTransactionDeadline)
+	      .append(",listeners=")
+	      .append(Arrays.toString(listenArray))
+	      .append("}");
+	}
+	return sb.toString();
     }
 }
