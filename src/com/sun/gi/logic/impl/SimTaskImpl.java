@@ -80,6 +80,7 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.Queue;
 import java.util.logging.Logger;
+import java.util.logging.Level;
 
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
@@ -163,50 +164,57 @@ public class SimTaskImpl extends SimTask {
             trans.commit();
             processDeferredCommands();
         } catch (InvocationTargetException ex) {
-            ex.printStackTrace();
 	    Throwable realException = ex.getCause();
-
-	    // XXX fix this stuff -- is it InvokationTarget or
-	    // the "real" exceptions that should be caught? or both?
+	    log.throwing(getClass().getName(), "run", realException);
 
 	    if (realException instanceof DeadlockException) {
-		// the transaction has already been aborted
-		deferredCommands.clear();
-		gloIDMap.clear();
-		gloAccessMap.clear();
-		// requeue for later execution
-		log.fine("Requeue after deadlock txn " +
-			((com.sun.gi.objectstore.tso.TSOTransaction)
-			    trans).getUUID());
-		try {
-		    Thread.sleep(1000); // XXX for debugging; tune or fix
-		} catch (InterruptedException ie) {
-		    // ignore
-		}
-		simulation.queueTask(this);
+		requeueAfterDeadlock();
 	    } else {
+		realException.printStackTrace();
 		trans.abort();
 	    }
         } catch (IllegalArgumentException ex) {
-            System.err.println("Exception on task execution:");
-            System.err.println("Class of target:" +
-		(runobj == null ? null : runobj.getClass()));
-            System.err.println("Name of method: " + startMethod.getName());
-            System.err.println("Class of method: "
-                    + startMethod.getDeclaringClass());
+	    if (log.isLoggable(Level.WARNING)) {
+		log.warning("Exception on task execution:" +
+		    "\n  target: " + (runobj == null
+			? "<null> "
+			: runobj.getClass().getName()) +
+		    (startMethod == null ? "<null method>"
+			: ("\n  method: " + startMethod.getName() +
+			   "\n  declared on: " +
+			   startMethod.getDeclaringClass().getName())));
+	    }
             ex.printStackTrace();
             trans.abort();
         } catch (IllegalAccessException ex) {
             ex.printStackTrace();
             trans.abort();
         } catch (DeadlockException de) {
-            // the transaction has already been aborted
-            deferredCommands.clear();
-            gloIDMap.clear();
-            gloAccessMap.clear();
-            // requeue for later execution
-            simulation.queueTask(this);
+	    log.throwing(getClass().getName(), "run", de);
+	    requeueAfterDeadlock();
         }
+    }
+
+    protected void requeueAfterDeadlock() {
+	log.warning("Requeue after deadlock txn " +
+		((com.sun.gi.objectstore.tso.TSOTransaction)
+		    trans).getUUID());
+
+	// the transaction has already been aborted
+	deferredCommands.clear();
+	gloIDMap.clear();
+	gloAccessMap.clear();
+
+	// XXX sleep a bit to give the other guy
+	// a chance to run.  Sleeping is a bit ugly; we
+	// should either find a different mechanism or
+	// tune this carefully. -jm
+	try {
+	    Thread.sleep(500);
+	} catch (InterruptedException ie) { }
+
+	// requeue for later execution
+	simulation.queueTask(this);
     }
 
     public GLOReference<? extends GLO> makeReference(long id) {
