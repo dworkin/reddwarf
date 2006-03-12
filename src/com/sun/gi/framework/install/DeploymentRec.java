@@ -72,6 +72,9 @@ import java.util.List;
 
 public interface DeploymentRec {
 
+	public void setRootURL(String string);
+	
+	public String getRootURL();
     /**
      * listUserManagers
      * 

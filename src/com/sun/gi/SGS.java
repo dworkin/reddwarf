@@ -230,12 +230,21 @@ public class SGS {
 		    }
 		    ostore.clear();
 		}
+//		 set app info system properties
+	    String name = game.getName();
+	    // convert spaces to underbars
+	    name = name.replaceAll(" ","_").toLowerCase();
+	    String prefix = "sgs.game."+name+".";
+	    String rootProp =prefix+"rootURL";
+	    //System.out.println(rootProp+" to "+game.getRootURL());
+	    System.setProperty(rootProp,game.getRootURL());
 		sim = new SimulationImpl(kernel, ostore, router, game);
 	    } catch (InstantiationException e) {
 
 		e.printStackTrace();
 		return null;
 	    }
+	    
 	}
 
 	// create user managers

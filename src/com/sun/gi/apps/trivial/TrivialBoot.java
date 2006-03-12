@@ -87,6 +87,14 @@ public class TrivialBoot implements SimBoot<TrivialBoot> {
         if (firstBoot) {
             System.out.println("First boot of trivial test");
         }
+        SimTask task = SimTask.getCurrent();
+        String appname = task.getAppName();
+        System.out.println("appname="+appname);
+        String propName = "sgs.game."+
+			appname.replaceAll(" ","_").toLowerCase()+".rootURL";
+        System.out.println("property name="+propName);
+        String root = System.getProperty(propName);
+        System.out.println("Root URL: "+root);
 
         System.out.println("Ran TrivialBoot.boot " + (count++) + " times");
 
@@ -94,8 +102,7 @@ public class TrivialBoot implements SimBoot<TrivialBoot> {
             System.out.println("Testing queue of a GLO as a task parmaq"
                     + " (should throw exception)");
             Method m;
-            try {
-                SimTask task = SimTask.getCurrent();
+            try {                
                 m = getClass().getMethod("illegalTask",
                         new Class[] { GLOReference.class, TrivialBoot.class });
                 task.queueTask(task.makeReference(this), m,

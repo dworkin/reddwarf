@@ -81,6 +81,7 @@ public class DeploymentRecImpl implements DeploymentRec {
 
     String name;
     String classpathURL = null;
+    String rootURL=null;
 
     String bootClass = null;
 
@@ -95,6 +96,14 @@ public class DeploymentRecImpl implements DeploymentRec {
      */
     public DeploymentRecImpl(String gameName) {
         name = gameName;
+    }
+    
+    public void setRootURL(String dir){
+    		rootURL = dir;
+    }
+    
+    public String getRootURL(){
+    		return rootURL;
     }
 
     public void setGLEapp(String bootClassFQDN, String classpathURL) {
