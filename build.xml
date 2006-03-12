@@ -156,6 +156,7 @@
 	    <include name="com/sun/gi/apps/**" />
 	    <exclude name="com/sun/gi/apps/*/*.java" />
 	    <exclude name="com/sun/gi/apps/**/server/**" />
+	    <exclude name="com/sun/gi/apps/hack/**" />
 	    <include name="com/sun/gi/client/**" />
 	</javac>
     </target>
@@ -257,7 +258,7 @@
 	<javac srcdir="src" destdir="bin" source="5" target="5"
 		debug="${debug}" optimize="${optimize}"
 		deprecation="${deprecated}">
-	    <compilerarg value="-Xlint:all,-serial"/>
+	    <compilerarg value="-Xlint:all,-serial,-unchecked"/>
 	    <classpath refid="build.j2se.client.classpath" />
 	    <include name="com/sun/gi/apps/hack/client/**/*.java" />
 	    <include name="com/sun/gi/apps/hack/share/**/*.java" />
