@@ -273,74 +273,86 @@ public class PersistantInMemoryDataSpace implements DataSpace {
     }
 
     protected void doDiskUpdate(DiskUpdateRecord rec) {
-        if (TRACEDISK) {
-            log.finer("      Starting commit");
-        }
+	synchronized (cachedStateMutex) {
+	    if (TRACEDISK) {
+		log.finer("      Starting commit");
+	    }
 
-        if (TRACEDISK && (rec.updateDataRef.length > 0)) {
-            log.finest("      Starting updates");
-        }
-        for (int i = 0; i < rec.updateDataRef.length; i++) {
-            if (TRACEDISK) {
-                log.finest("          Updating " + rec.updateIDs[i]);
-            }
-            try { // update
-                updateObjStmnt.setBytes(1, rec.updateDataRef[i]);
-                updateObjStmnt.setLong(2, rec.updateIDs[i]);
-                updateObjStmnt.execute();
-            } catch (SQLException e1) {
-                e1.printStackTrace();
-            }
-        }
-
-	if (debug) {
+	    if (TRACEDISK && (rec.updateDataRef.length > 0)) {
+		log.finest("      Starting updates");
+	    }
 	    for (int i = 0; i < rec.updateDataRef.length; i++) {
-		if (!Arrays.equals(rec.updateDataCopy[i],
-			rec.updateDataRef[i])) {
-		    log.severe("Assumption violated: data changed: oid = " +
-			    rec.updateIDs[i]);
+		if (TRACEDISK) {
+		    log.finest("          Updating " + rec.updateIDs[i]);
+		}
+		try { // update
+		    updateObjStmnt.setBytes(1, rec.updateDataRef[i]);
+		    updateObjStmnt.setLong(2, rec.updateIDs[i]);
+		    updateObjStmnt.execute();
+		} catch (SQLException e1) {
+		    e1.printStackTrace();
 		}
 	    }
-	}
 
-	for (int i = 0; i < rec.deletedIDs.length; i++) {
-            if (TRACEDISK) {
-                log.finest("          Deleting " + rec.deletedIDs[i]);
-            }
-
-	    try {
-		deleteObjStmnt.setLong(1, rec.deletedIDs[i]);
-		deleteObjStmnt.execute();
-		deleteNameByOIDStmnt.setLong(1, rec.deletedIDs[i]);
-		deleteNameByOIDStmnt.execute();
-	    } catch (SQLException e) {
-		e.printStackTrace();
+	    if (debug) {
+		for (int i = 0; i < rec.updateDataRef.length; i++) {
+		    if (!Arrays.equals(rec.updateDataCopy[i],
+			    rec.updateDataRef[i])) {
+			log.severe("Assumption violated: data changed: oid = " +
+				rec.updateIDs[i]);
+		    }
+		}
 	    }
 
-	    graveyard.remove(rec.deletedIDs[i]);
-	}
+	    for (int i = 0; i < rec.deletedIDs.length; i++) {
+		if (TRACEDISK) {
+		    log.finest("          Deleting " + rec.deletedIDs[i]);
+		}
 
-        try {
-            if (TRACEDISK) {
-                log.finest("      Setting next ID = " + rec.nextID);
-            }
-            updateInfoStmnt.setLong(1, rec.nextID);
-            updateInfoStmnt.setLong(2, appID);
-            updateInfoStmnt.execute();
-        } catch (SQLException e1) {
-            e1.printStackTrace();
-        }
-        try {
-            if (TRACEDISK) {
-                log.finer("      Comitting trans");
-            }
-            updateConn.commit();
-            if (TRACEDISK) {
-                log.finer("      Trans comitted");
-            }
-        } catch (SQLException e1) {
-            e1.printStackTrace();
-        }
+		try {
+		    deleteObjStmnt.setLong(1, rec.deletedIDs[i]);
+		    deleteObjStmnt.execute();
+		    deleteNameByOIDStmnt.setLong(1, rec.deletedIDs[i]);
+		    deleteNameByOIDStmnt.execute();
+		} catch (SQLException e) {
+		    e.printStackTrace();
+		}
+	    }
+
+	    try {
+		if (TRACEDISK) {
+		    log.finest("      Setting next ID = " + rec.nextID);
+		}
+		updateInfoStmnt.setLong(1, rec.nextID);
+		updateInfoStmnt.setLong(2, appID);
+		updateInfoStmnt.execute();
+	    } catch (SQLException e1) {
+		e1.printStackTrace();
+	    }
+
+	    try {
+		if (TRACEDISK) {
+		    log.finer("      Comitting trans");
+		}
+		updateConn.commit();
+		if (TRACEDISK) {
+		    log.finer("      Trans comitted");
+		}
+	    } catch (SQLException e1) {
+		e1.printStackTrace();
+	    }
+
+	    /*
+	     * And now the deed is done...  the commit has made the
+	     * deleted objects vanish wrt new transactions and
+	     * therefore we can remove the deleted oids, if any, from
+	     * the graveyard.
+	     */
+
+	    for (int i = 0; i < rec.deletedIDs.length; i++) {
+		graveyard.remove(rec.deletedIDs[i]);
+	    }
+	}
     }
 
     /**
@@ -466,7 +478,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 		    return objbytes;
 		}
 
-		log.warning("attempting to ressurect object " + objectID);
+		log.finest("attempting to ressurect object " + objectID);
 		objbytes = loadCache(objectID);
 		if (objbytes != null) {
 		    return objbytes;
@@ -497,19 +509,13 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 			log.warning("object is null in the database: " +
 				objectID);
 		    }
-                    dataSpace.put(objectID, new SoftReference<byte[]>(objbytes));
+                    dataSpace.put(objectID,
+			    new SoftReference<byte[]>(objbytes));
                 } else {
 		    log.warning("object is not in the database: " +
 			    objectID);
 		}
 
-		/*
-                if (objbytes == null) {
-                    log.warning("GOT A NULL OBJBYTES in loadCache "
-                            + objectID);
-		    (new Exception()).printStackTrace();
-                }
-		*/
                 rs.close(); // cleanup and free locks
             } catch (SQLException e) {
                 e.printStackTrace();
@@ -829,13 +835,15 @@ public class PersistantInMemoryDataSpace implements DataSpace {
         Long createId;
 
 	/*
-	 * XXX objects are NOT created locked.  If they need to be
-	 * created and locked, then the entire cachedStateMutex block
-	 * must be enclosed in a synchronized (lockSet) block, and
-	 * this outer block must end with lockSet.add(createId). 
-	 * Because of lock ordering, you must hold the lockSet lock
-	 * before doing any of this, because you can't release the
-	 * cachedStateMutex before acquiring the lockSet lock.  -DJE
+	 * XXX note that objects are NOT created locked!
+	 *
+	 * If they need to be created and locked, then the entire
+	 * cachedStateMutex block must be enclosed in a synchronized
+	 * (lockSet) block, and this outer block must end with
+	 * lockSet.add(createId).  Because of lock ordering, you must
+	 * hold the lockSet lock before doing any of this, because you
+	 * can't release the cachedStateMutex before acquiring the
+	 * lockSet lock.  -DJE
 	 */
 
 	synchronized (cachedStateMutex) {
@@ -857,45 +865,51 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	    }
 
             dataSpace.put(createId, new SoftReference<byte[]>(data));
-	}
 
-	/*
-	 * Now that the cached state is updated, release all locks and
-	 * update the database.
-	 *
-	 * There may be a potential race condition with deleted names
-	 * going to the database and popping up during recovery.  I'm
-	 * not sure that this is a problem, nor do a I see an easy way
-	 * to tickle this.  But if a race appears, it may be necessary
-	 * to protect these database ops inside the cachedStateMutex
-	 * (and lockSet lock, if that turns out to be necessary).
-	 */
+	    /*
+	     * Now that the cached state is updated, update the
+	     * database.  DO NOT RELEASE THE cachedStateMutex yet
+	     * because otherwise another thread might jump in changes
+	     * to the cache can become inconsistent with the database. 
+	     * There may be as many as three commits, and they need to
+	     * protected as a single, operation.
+	     */
 
-	if (name != null) {
+	    if (name != null) {
+		try {
+		    deleteNameStmnt.setString(1, name);
+		    deleteNameStmnt.execute();
+		    deleteNameStmnt.getConnection().commit();
+
+		    /*
+		     * apparently need to commit before doing an
+		     * insert, in order to avoid the appearance of a
+		     * duplicate key.
+		     */
+
+		    insertNameStmnt.setString(1, name);
+		    insertNameStmnt.setLong(2, createId);
+		    insertNameStmnt.execute();
+		    insertNameStmnt.getConnection().commit();
+		} catch (SQLException e) {
+		    log.warning("failed to add obj " + createId +
+			    " with name " + name);
+		    e.printStackTrace();
+		    return DataSpace.INVALID_ID;
+		}
+	    }
+
 	    try {
-		deleteNameStmnt.setString(1, name);
-		deleteNameStmnt.execute();
-
-		insertNameStmnt.setString(1, name);
-		insertNameStmnt.setLong(2, createId);
-		insertNameStmnt.execute();
+		insertObjStmnt.setLong(1, createId);
+		insertObjStmnt.setBytes(2, data);
+		insertObjStmnt.execute();
+		insertObjStmnt.getConnection().commit();
 	    } catch (SQLException e) {
 		log.throwing(getClass().getName(),
 			"create[" + name + "]/" + createId, e);
 		e.printStackTrace();
 		return DataSpace.INVALID_ID;
 	    }
-	}
-
-	try {
-	    insertObjStmnt.setLong(1, createId);
-	    insertObjStmnt.setBytes(2, data);
-	    insertObjStmnt.execute();
-	    insertObjStmnt.getConnection().commit();
-	} catch (SQLException e) {
-	    log.throwing(getClass().getName(), "create[obj]/" + createId, e);
-	    e.printStackTrace();
-	    return DataSpace.INVALID_ID;
 	}
 
         return createId;
@@ -907,7 +921,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
      * 
      * @param objectID The objectID of the object to destroy
      */
-    private void destroy(long objectID) {
+    private void olddestroy(long objectID) {
 	/*
 	try {
 	    deleteObjStmnt.setLong(1, objectID);
