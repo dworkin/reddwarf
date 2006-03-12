@@ -349,9 +349,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	     * the graveyard.
 	     */
 
-	    for (int i = 0; i < rec.deletedIDs.length; i++) {
-		graveyard.remove(rec.deletedIDs[i]);
-	    }
+	    graveyard.remove(Arrays.asList(rec.deletedIDs));
 	}
     }
 
@@ -478,13 +476,13 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 		    return objbytes;
 		}
 
-		log.finest("attempting to ressurect object " + objectID);
+		log.finest("attempting to resurrect object " + objectID);
 		objbytes = loadCache(objectID);
 		if (objbytes != null) {
 		    return objbytes;
 		}
 
-		log.warning("ressurection failed " + objectID);
+		log.warning("resurrection failed " + objectID);
 		dataSpace.remove(objectID);
 		return null;
             } else {
@@ -586,13 +584,13 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 		try {
 		    release(oid);
 		} catch (NonExistantObjectIDException e) {
-		    log.throwing(getClass().getName(), "release", e);
 		    re = e;
 		}
 	    }
 	    lockSet.notifyAll();
 
 	    if (re != null) {
+		log.throwing(getClass().getName(), "release", re);
 		throw re;
 	    }
 	}
@@ -894,6 +892,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 		} catch (SQLException e) {
 		    log.warning("failed to add obj " + createId +
 			    " with name " + name);
+		    log.throwing(getClass().getName(), "create", e);
 		    e.printStackTrace();
 		    return DataSpace.INVALID_ID;
 		}
@@ -905,8 +904,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 		insertObjStmnt.execute();
 		insertObjStmnt.getConnection().commit();
 	    } catch (SQLException e) {
-		log.throwing(getClass().getName(),
-			"create[" + name + "]/" + createId, e);
+		log.throwing(getClass().getName(), "create", e);
 		e.printStackTrace();
 		return DataSpace.INVALID_ID;
 	    }

@@ -274,13 +274,17 @@ public class TSOTransaction implements Transaction {
         return headerID;
     }
 
-    public void destroy(long objectID) throws DeadlockException,
-            NonExistantObjectIDException
+    public void destroy(long objectID)
+	    throws DeadlockException, NonExistantObjectIDException
     {
 	// Note that 'objectID' is actually the id of the object's
 	// *TSODataHeader* in the database.  The header has a field
 	// named objectID which is the 'real' objectID of its contents.
 	// Users of TSOTransaction refer to objects by their headerIDs.
+
+	if (objectID == DataSpace.INVALID_ID) {
+	    throw new NonExistantObjectIDException();
+	}
 
         TSODataHeader hdr = (TSODataHeader) trans.read(objectID);
         if ((hdr.createNotCommitted) && (!hdr.owner.equals(txnID))) {
@@ -290,12 +294,17 @@ public class TSOTransaction implements Transaction {
 	deletedIDs.add(objectID);
     }
 
-    public Serializable peek(long objectID) throws NonExistantObjectIDException
+    public Serializable peek(long objectID)
+	    throws NonExistantObjectIDException
     {
 	// Note that 'objectID' is actually the id of the object's
 	// *TSODataHeader* in the database.  The header has a field
 	// named objectID which is the 'real' objectID of its contents.
 	// Users of TSOTransaction refer to objects by their headerIDs.
+
+	if (objectID == DataSpace.INVALID_ID) {
+	    throw new NonExistantObjectIDException();
+	}
 
 	// It was deleted in this transaction, show it as gone.
 	if (deletedIDs.contains(objectID)) {
@@ -332,6 +341,10 @@ public class TSOTransaction implements Transaction {
     public Serializable lock(long objectID, boolean shouldBlock)
             throws DeadlockException, NonExistantObjectIDException
     {
+	if (objectID == DataSpace.INVALID_ID) {
+	    throw new NonExistantObjectIDException();
+	}
+
 	// It was deleted in this transaction, show it as gone.
 	if (deletedIDs.contains(objectID)) {
 	    return null;
