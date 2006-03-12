@@ -99,8 +99,8 @@ public class TSOTransaction implements Transaction {
 	Logger.getLogger("com.sun.gi.objectstore.tso");
 
     private final TSOObjectStore ostore;
-    final SGSUUID transactionID;
     private final ClassLoader loader;
+    final SGSUUID txnID;
 
     /**
      * initialAttemptTime is the time at which this transaction
@@ -128,6 +128,8 @@ public class TSOTransaction implements Transaction {
 
     private volatile boolean timestampInterrupted;
 
+    private static final boolean DEBUG = true;
+
     private static long TIMEOUT =
         Integer.parseInt(System.getProperty("sgs.objectstore.timeout",
                 "10000" /* "120000" */ /* millisecs */));
@@ -136,7 +138,7 @@ public class TSOTransaction implements Transaction {
 	    long creationTime, long tiebreaker, DataSpace dataSpace)
     {
         this.ostore = ostore;
-        this.transactionID = new StatisticalUUID();
+        this.txnID = new StatisticalUUID();
         this.loader = loader;
         this.initialAttemptTime = creationTime;
         this.tiebreaker = tiebreaker;
@@ -148,7 +150,7 @@ public class TSOTransaction implements Transaction {
     }
 
     public SGSUUID getUUID() {
-        return transactionID;
+        return txnID;
     }
 
     /**
@@ -180,11 +182,13 @@ public class TSOTransaction implements Transaction {
 
         long headerID = trans.create(hdr, name);
 
-	if (log.isLoggable(Level.FINER)) {
-	    if (headerID != DataSpace.INVALID_ID) {
-		log.fine("txn " + transactionID + " won create of " + name);
-	    } else {
-		log.fine("txn " + transactionID + " lost create of " + name);
+	if (DEBUG) {
+	    if (log.isLoggable(Level.FINER)) {
+		if (headerID != DataSpace.INVALID_ID) {
+		    log.fine("txn " + txnID + " won create of " + name);
+		} else {
+		    log.fine("txn " + txnID + " lost create of " + name);
+		}
 	    }
 	}
 
@@ -222,8 +226,11 @@ public class TSOTransaction implements Transaction {
 		// So we try again -- but we loop in order to check
 		// for a race on this round.
 
-		log.finer("txn " + transactionID +
-			" former loser is new winner for create of " + name);
+		if (DEBUG) {
+		    log.finer("txn " + txnID +
+			" former loser wins create of " + name);
+		}
+
                 headerID = trans.create(hdr, name);
             }
 
@@ -238,7 +245,7 @@ public class TSOTransaction implements Transaction {
 	    throw new IllegalStateException("TSOTransaction.create failed");
 	}
 
-	hdr.hdrID = headerID;
+	hdr.hdrID = headerID; // (LOG) set if using hdrID in TSODataHeader
 
 	// XXX Later, we can just get the next sequence number
 	// and store that in the header, and defer the actual
@@ -257,8 +264,12 @@ public class TSOTransaction implements Transaction {
 	// our overall commit or abort later.
         trans.write(headerID, hdr);
         trans.commit();
-	log.finer("txn " + transactionID +
-		" trans for " + name + " commit " + hdr);
+
+	if (DEBUG) {
+	    log.finer("txn " + txnID +
+		    " trans for " + name + " commit " + hdr);
+	}
+
         return headerID;
     }
 
@@ -271,7 +282,7 @@ public class TSOTransaction implements Transaction {
 	// Users of TSOTransaction refer to objects by their headerIDs.
 
         TSODataHeader hdr = (TSODataHeader) trans.read(objectID);
-        if ((hdr.createNotCommitted) && (!hdr.owner.equals(transactionID))) {
+        if ((hdr.createNotCommitted) && (!hdr.owner.equals(txnID))) {
 	    // It's only paritally created, so we don't see it.
             return;
         }
@@ -298,9 +309,11 @@ public class TSOTransaction implements Transaction {
         }
 
         TSODataHeader hdr = (TSODataHeader) trans.read(objectID);
-        if ((hdr.createNotCommitted) && (!hdr.owner.equals(transactionID))) {
+        if ((hdr.createNotCommitted) && (!hdr.owner.equals(txnID))) {
 	    // It's only paritally created, so we don't see it.
-	    log.fine("Someone else has partially created " + objectID);
+	    if (DEBUG) {
+		log.fine("Someone else has partially created " + objectID);
+	    }
             return null;
         }
 
@@ -343,8 +356,9 @@ public class TSOTransaction implements Transaction {
             if (now > currentTransactionDeadline) {
 		// We're out of time; abort and see if we make it on
 		// the next try (when we're requeued due to DeadlockException)
-		log.warning("txn " + transactionID +
-			" out of time for " + hdr);
+
+		log.warning("txn " + txnID + " out of time for " + hdr);
+
 		abort();
 		throw new DeadlockException();
 	    }
@@ -355,8 +369,9 @@ public class TSOTransaction implements Transaction {
 		// We'll be taking the lock, so break out of this loop.
 		// Do *not* update hdr.free, in case we need to
 		// do a deadline-abort (look for deadline-abort below).
-		log.warning("txn " + transactionID +
-			" grabbing stale lock " + hdr);
+
+		log.warning("txn " + txnID + " grabbing stale lock " + hdr);
+
 		break;
             }
 
@@ -370,8 +385,10 @@ public class TSOTransaction implements Transaction {
 		// if we discover we'll block.
                 trans.release(objectID);
 
-		log.fine("txn " + transactionID +
-			" would block, returning null " + hdr);
+		if (DEBUG) {
+		    log.fine("txn " + txnID +
+			    " would block, returning null " + hdr);
+		}
 
                 return null;
 	    }
@@ -380,8 +397,9 @@ public class TSOTransaction implements Transaction {
 		// We were interrupted and are about to block, so
 		// honor the interruption and abort.
 
-		log.fine("txn " + transactionID +
-			" was interrupted, aborting " + hdr);
+		if (DEBUG) {
+		    log.fine("txn " + txnID + " interrupted, abort " + hdr);
+		}
 
                 abort();
                 throw new DeadlockException();
@@ -391,8 +409,9 @@ public class TSOTransaction implements Transaction {
 		// We are more senior than the current owner
 		// of the lock; tell him to give it up!
 
-		log.fine("txn " + transactionID +
-			" pulling seniority on " + hdr);
+		if (DEBUG) {
+		    log.fine("txn " + txnID + " pulling seniority on " + hdr);
+		}
 
 		ostore.requestTimestampInterrupt(hdr.owner);
 	    }
@@ -401,38 +420,49 @@ public class TSOTransaction implements Transaction {
 		// Synchronize early so we have a chance to add ourselves
 		// as a listener -- we must be sure to get notifyAll'd
 		// if an interrupt comes in from our objectStore.
-                if (!hdr.availabilityListeners.contains(transactionID)) {
-                    hdr.availabilityListeners.add(transactionID);
+                if (!hdr.availabilityListeners.contains(txnID)) {
+                    hdr.availabilityListeners.add(txnID);
                     trans.write(objectID, hdr);
-		    log.finer("txn " + transactionID +
-			    " adding self as availListener to " + hdr);
+
+		    if (DEBUG) {
+			log.finer("txn " + txnID +
+				" adding self as availListener to " + hdr);
+		    }
+
                     trans.commit();
                 } else {
                     trans.abort();
                 }
-		if (log.isLoggable(Level.FINER)) {
-		    SGSUUID[] listeners =
-			new SGSUUID[hdr.availabilityListeners.size()];
-		    hdr.availabilityListeners.toArray(listeners);
-		    log.finer("txn " + transactionID +
-			" about to wait for " + hdr);
+
+		if (DEBUG) {
+		    if (log.isLoggable(Level.FINER)) {
+			SGSUUID[] listeners =
+			    new SGSUUID[hdr.availabilityListeners.size()];
+			hdr.availabilityListeners.toArray(listeners);
+			log.finer("txn " + txnID +
+			    " about to wait for " + hdr);
+		    }
 		}
+
                 waitForWakeup(hdr.currentTransactionDeadline);
             }
 
             trans.lock(objectID);
             trans.forget(objectID);
 
-            log.finer("txn " + transactionID +
-		" about to re-read hdr " + objectID);
+	    if (DEBUG) {
+		log.finer("txn " + txnID + " re-reading " + objectID);
+	    }
 
             hdr = (TSODataHeader) trans.read(objectID);
 
-	    log.finer("txn " + transactionID + " read hdr " + hdr);
+	    if (DEBUG) {
+		log.finer("txn " + txnID + " read hdr " + hdr);
+	    }
         }
 
         if (hdr.createNotCommitted) {
-	    log.warning("txn " + transactionID +
+	    log.warning("txn " + txnID +
 		    " found partial create for " + objectID +
 		    " -- scrubbing");
 
@@ -449,7 +479,7 @@ public class TSOTransaction implements Transaction {
 	if (System.currentTimeMillis() > currentTransactionDeadline) {
 	    // We've run past our deadline: do a deadline-abort.
 
-	    log.warning("txn " + transactionID +
+	    log.warning("txn " + txnID +
 		    " is past its deadline for " + objectID +
 		    " -- throwing a DeadlockException");
 
@@ -462,11 +492,14 @@ public class TSOTransaction implements Transaction {
 			new ArrayList(hdr.availabilityListeners);
 		hdr.availabilityListeners.clear();
 		trans.write(objectID, hdr);
-		log.fine("txn " + transactionID +
-			" stale-abort update " + hdr);
+
+		if (DEBUG) {
+		    log.fine("txn " + txnID + " stale-abort update " + hdr);
+		}
+
 		trans.commit();
 
-		listeners.remove(transactionID);
+		listeners.remove(txnID);
 		ostore.notifyAvailabilityListeners(listeners);
 	    }
 
@@ -476,16 +509,19 @@ public class TSOTransaction implements Transaction {
 
 	// Take ownership of this header
         hdr.free = false;
-        hdr.owner = transactionID;
+        hdr.owner = txnID;
         hdr.initialAttemptTime = initialAttemptTime;
         hdr.tiebreaker = tiebreaker;
         hdr.currentTransactionDeadline = currentTransactionDeadline;
-        hdr.availabilityListeners.remove(transactionID);
+        hdr.availabilityListeners.remove(txnID);
         trans.write(objectID, hdr);
 
         obj = trans.read(hdr.objectID);
         trans.commit();
-	log.finest("got get-lock, wrote " + hdr);
+
+	if (DEBUG) {
+	    log.finest("got get-lock, wrote " + hdr);
+	}
 
         lockedObjectsMap.put(objectID, obj);
         return obj;
@@ -505,26 +541,28 @@ public class TSOTransaction implements Transaction {
                 }
             } catch (InterruptedException e) {
                 //e.printStackTrace();
-		log.fine("txn " + transactionID + " interrupted");
+		log.fine("txn " + txnID + " interrupted");
             }
         }
     }
 
     public void abort() {
 
-	if (log.isLoggable(Level.FINEST)) {
-	    long[] abortCreateIDs = new long[createdIDs.size()];
-	    int i = 0;
-	    for (long key : createdIDs) {
-		abortCreateIDs[i++] = key;
+	if (DEBUG) {
+	    if (log.isLoggable(Level.FINEST)) {
+		long[] abortCreateIDs = new long[createdIDs.size()];
+		int i = 0;
+		for (long key : createdIDs) {
+		    abortCreateIDs[i++] = key;
+		}
+		Arrays.sort(abortCreateIDs);
+		log.finest("trans nuking " + createdIDs.size() +
+			" partial creates: " +
+			Arrays.toString(abortCreateIDs));
+	    } else {
+		log.finer(txnID + " trans nuking " +
+			createdIDs.size() + " partial creates");
 	    }
-	    Arrays.sort(abortCreateIDs);
-	    log.finest("trans nuking " + createdIDs.size() +
-		    " partial creates: " +
-		    Arrays.toString(abortCreateIDs));
-	} else {
-	    log.finer(transactionID + " trans nuking " +
-		    createdIDs.size() + " partial creates");
 	}
 
         Set<SGSUUID> listeners = new HashSet<SGSUUID>();
@@ -538,7 +576,11 @@ public class TSOTransaction implements Transaction {
 		}
 		TSODataHeader hdr = (TSODataHeader) trans.read(l);
 		listeners.addAll(hdr.availabilityListeners);
-		log.finest("destroy invalid " + hdr);
+
+		if (DEBUG) {
+		    log.finest("destroy invalid " + hdr);
+		}
+
 		trans.destroy(hdr.objectID);
 		trans.destroy(l);
 		lockedObjectsMap.remove(l);
@@ -559,7 +601,9 @@ public class TSOTransaction implements Transaction {
 		hdr.free = true;
 		trans.write(l, hdr);
 		lockedObjectsMap.remove(l);
-		log.finest("abort-delete " + hdr);
+		if (DEBUG) {
+		    log.finest("abort-delete " + hdr);
+		}
 	    } catch (Exception e) {
 		// XXX Remember to throw something at the end
 		e.printStackTrace();
@@ -578,13 +622,17 @@ public class TSOTransaction implements Transaction {
 		hdr.free = true;
 		//hdr.createNotCommitted = false; // not needed for everyone
 		trans.write(l, hdr);
-		log.finest("abort-update " + hdr);
+		if (DEBUG) {
+		    log.finest("abort-update " + hdr);
+		}
 	    } catch (NonExistantObjectIDException e) {
 		e.printStackTrace();
 	    }
 	}
 
-	log.finest("abort commiting txn " + transactionID);
+	if (DEBUG) {
+	    log.finest("abort commiting txn " + txnID);
+	}
 	trans.commit();
 
         lockedObjectsMap.clear();
@@ -596,26 +644,28 @@ public class TSOTransaction implements Transaction {
 
     public void commit() {
 
-	if (log.isLoggable(Level.FINEST)) {
-	    int i;
+	if (DEBUG) {
+	    if (log.isLoggable(Level.FINEST)) {
+		int i;
 
-	    long[] dbgDeleted = new long[deletedIDs.size()];
-	    i = 0;
-	    for (long key : deletedIDs) {
-		dbgDeleted[i++] = key;
-	    }
-	    Arrays.sort(dbgDeleted);
-	    log.finest("trans in txn " + transactionID +
-		    " deleting " + Arrays.toString(dbgDeleted));
+		long[] dbgDeleted = new long[deletedIDs.size()];
+		i = 0;
+		for (long key : deletedIDs) {
+		    dbgDeleted[i++] = key;
+		}
+		Arrays.sort(dbgDeleted);
+		log.finest("trans in txn " + txnID +
+			" deleting " + Arrays.toString(dbgDeleted));
 
-	    long[] dbgLocked = new long[lockedObjectsMap.size()];
-	    i = 0;
-	    for (long key : lockedObjectsMap.keySet()) {
-		dbgLocked[i++] = key;
+		long[] dbgLocked = new long[lockedObjectsMap.size()];
+		i = 0;
+		for (long key : lockedObjectsMap.keySet()) {
+		    dbgLocked[i++] = key;
+		}
+		Arrays.sort(dbgLocked);
+		log.finest("trans in txn " + txnID +
+			" updating/locked " + Arrays.toString(dbgLocked));
 	    }
-	    Arrays.sort(dbgLocked);
-	    log.finest("trans in txn " + transactionID +
-		    " updating/locked " + Arrays.toString(dbgLocked));
 	}
 
         Set<SGSUUID> listeners = new HashSet<SGSUUID>();
@@ -649,18 +699,29 @@ public class TSOTransaction implements Transaction {
 		}
 		TSODataHeader hdr = (TSODataHeader) trans.read(l);
 		listeners.addAll(hdr.availabilityListeners);
-		log.finest("commit-update hdr before (" + l + " ) " + hdr);
+
+		if (DEBUG) {
+		    log.finest("commit-update hdr before (" + l + " ) " + hdr);
+		}
+
 		hdr.free = true;
 		hdr.createNotCommitted = false; // not needed for everyone
 		trans.write(l, hdr);
 		trans.write(hdr.objectID, entry.getValue());
-		log.finest("commit-update hdr after " + hdr);
+
+		if (DEBUG) {
+		    log.finest("commit-update hdr after " + hdr);
+		}
+
 	    } catch (NonExistantObjectIDException e) {
 		e.printStackTrace();
 	    }
 	}
 
-	log.finest("commit commiting txn " + transactionID);
+	if (DEBUG) {
+	    log.finest("commit commiting txn " + txnID);
+	}
+
 	trans.commit();
 
         lockedObjectsMap.clear();

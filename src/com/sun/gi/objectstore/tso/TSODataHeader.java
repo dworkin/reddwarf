@@ -85,7 +85,7 @@ public class TSODataHeader implements Serializable {
 
     private static final long serialVersionUID = 2L;
     
-    public long hdrID; // not really needed, good for debugging
+    public long hdrID; // LOG not really needed, good for debugging
     public long objectID;
     public boolean createNotCommitted;
     public boolean free;
@@ -100,11 +100,12 @@ public class TSODataHeader implements Serializable {
 
     public TSODataHeader(TSOTransaction parent)
     {
+        this.hdrID = INVALID_ID; // LOG set if using hdrID
+
         this.initialAttemptTime = parent.initialAttemptTime;
         this.tiebreaker = parent.tiebreaker;
-        this.owner = parent.transactionID;
+        this.owner = parent.txnID;
         this.objectID = INVALID_ID;
-        this.hdrID = INVALID_ID;
         this.currentTransactionDeadline = parent.currentTransactionDeadline;
         free = false; // create in locked state
         createNotCommitted = true;
@@ -124,8 +125,9 @@ public class TSODataHeader implements Serializable {
     public String toString() {
 	StringBuilder sb = new StringBuilder();
 	sb.append("TSOhdr{")
-	  .append(createNotCommitted ? "INVALID,hdrID=" : "valid,hdrID=")
-	  .append(hdrID);
+	  .append(createNotCommitted ? "INVALID" : "valid");
+	  
+	sb.append(",hdrID=").append(hdrID); // LOG print if using hdrID
 
 	if (free) {
 	    sb.append(",free}");
