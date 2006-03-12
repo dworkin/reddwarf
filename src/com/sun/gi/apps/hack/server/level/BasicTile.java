@@ -19,6 +19,7 @@ import com.sun.gi.apps.hack.server.Item;
 import com.sun.gi.apps.hack.server.level.LevelBoard.ActionResult;
 
 import java.io.Serializable;
+import java.util.logging.Logger;
 
 
 /**
@@ -32,6 +33,8 @@ import java.io.Serializable;
  */
 public abstract class BasicTile implements Tile
 {
+    private static Logger log =
+	Logger.getLogger("com.sun.gi.apps.hack.server");
 
     // the id of this tile
     private int id;
@@ -130,14 +133,14 @@ public abstract class BasicTile implements Tile
 
         // make sure that there's a character here
         if (this.mgrRef == null) {
-            System.out.println("tried to remove a null char from a tile");
+            log.warning("tried to remove a null char from a tile");
             return false;
         }
 
         // make sure that the character here is the one being removed
         if (! this.mgrRef.equals(mgrRef)) {
             SimTask task = SimTask.getCurrent();
-            System.out.println("not equal on removal: " +
+            log.severe("not equal on removal: " +
                                mgrRef.peek(task).toString() + " != " +
                                this.mgrRef.peek(task).toString());
             return false;

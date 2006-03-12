@@ -192,6 +192,9 @@ public class SimTaskImpl extends SimTask {
         } catch (DeadlockException de) {
 	    log.throwing(getClass().getName(), "run", de);
 	    requeueAfterDeadlock();
+        } catch (RuntimeException ex) {
+	    log.throwing(getClass().getName(), "run", ex);
+            trans.abort();
         }
     }
 
