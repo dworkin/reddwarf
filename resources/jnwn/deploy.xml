@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<GAMEAPP gamename="BattleTrolls"> 
+<GAMEAPP gamename="JNWN"> 
     <GLEAPP bootclass="com.sun.gi.apps.jnwn.JNWN" classpathURL="file:JNWN.jar" />
     <USERMANAGER serverclass="com.sun.gi.comm.users.server.impl.TCPIPUserManager" reconnect_key_ttl="30">
 	<PARAMETER tag="host" value="129.148.173.231" />
