@@ -111,8 +111,6 @@ public class AtomicUpdateTraceRecord extends TraceRecord
             }
         }
         
-        // XXX Dan, is this correct?  I added it to mimic the above,
-        // but if deletes don't need this checking you can remove it. -JM
         List<Long> mappedDeleted = new ArrayList<Long>();
         for (Long oid : deleted) {
             long mappedOid = replayState.getMappedOid(oid);
