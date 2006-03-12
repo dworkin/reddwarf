@@ -458,6 +458,10 @@ public class SimTaskImpl extends SimTask {
             boolean setting) {
         deferredCommands.add(new DeferredChannelSnoop(uid, cid, setting));
     }
+    
+    public String getAppName(){
+		return simulation.getAppName();
+    }
 
     private void processDeferredCommands() {
         while (!deferredCommands.isEmpty()) {
@@ -743,4 +747,6 @@ class DeferredChannelSnoop implements DeferredSimCommand {
     public void execute(Simulation sim) {
         sim.enableEvesdropping(uid, cid, enable);
     }
+    
+    
 }
