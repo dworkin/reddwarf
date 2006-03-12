@@ -73,6 +73,7 @@ import java.security.SecureRandom;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Logger;
 
 import com.sun.gi.objectstore.ObjectStore;
 import com.sun.gi.objectstore.Transaction;
@@ -85,6 +86,8 @@ import com.sun.gi.utils.SGSUUID;
  * @version 1.0
  */
 public class TSOObjectStore implements ObjectStore {
+
+    private static Logger log = Logger.getLogger("com.sun.gi.objectstore.tso");
 
     DataSpace dataSpace;
     SecureRandom random;
@@ -159,6 +162,7 @@ public class TSOObjectStore implements ObjectStore {
             TSOTransaction trans = localTransactionIDMap.get(uuid);
             if (trans != null) {
                 // System.out.println("Notfying "+uuid);
+                log.finest("Waking up txn " + uuid);
                 synchronized (trans) {
                     trans.notifyAll();
                 }

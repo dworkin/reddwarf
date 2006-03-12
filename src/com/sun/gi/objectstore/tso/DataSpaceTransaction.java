@@ -118,6 +118,8 @@ public interface DataSpaceTransaction {
      */
     void clear();
 
+    void forget(long objectID);
+
     /**
      * 
      */

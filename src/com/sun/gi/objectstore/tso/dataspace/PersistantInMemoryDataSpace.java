@@ -686,6 +686,8 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 			    reverseNameSpace.remove(oid);
 			    nameSpace.remove(name);
 			}
+			log.finer("Adding " + oid + " to graveyard");
+			dataSpace.remove(oid);
 			graveyard.add(oid);
 		    }
 		}

@@ -111,7 +111,6 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
 
     public void destroy(long objectID) {      
          deletedObjects.add(objectID); 
-         localObjectCache.remove(objectID);
     }
 
     public Serializable read(long objectID) throws NonExistantObjectIDException {
@@ -188,6 +187,10 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
             e.printStackTrace();
         }
         return buf;
+    }
+
+    public void forget(long objectID) {
+        localObjectCache.remove(objectID);
     }
 
     public void clear() {
