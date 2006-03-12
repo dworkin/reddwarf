@@ -384,17 +384,22 @@ public class TSOTransaction implements Transaction {
                     trans.abort();
                 }
 		if (log.isLoggable(Level.FINER)) {
+		    SGSUUID[] listeners =
+			new SGSUUID[hdr.availabilityListeners.size()];
+		    hdr.availabilityListeners.toArray(listeners);
 		    log.finer("txn " + transactionID +
 			" about to wait for header id " + objectID +
 			" until " +
 			String.format("%1$tF %<tT.%<tL",
-				hdr.currentTransactionDeadline));
+				hdr.currentTransactionDeadline) +
+			" owner=" + hdr.owner +
+			" listeners="+Arrays.toString(listeners));
 		}
                 waitForWakeup(hdr.currentTransactionDeadline);
             }
 
-            trans.forget(objectID);
             trans.lock(objectID);
+            trans.forget(objectID);
 
             log.finer("txn " + transactionID +
 		" about to re-read header id " + objectID);
@@ -460,6 +465,7 @@ public class TSOTransaction implements Transaction {
         hdr.availabilityListeners.remove(transactionID);
         trans.write(objectID, hdr);
         trans.commit();
+	log.finest("got get-lock, writing header " + hdr);
 
 	// Now that we have the GET-lock, get the object and cache it.
         obj = trans.read(hdr.objectID);
@@ -626,6 +632,8 @@ public class TSOTransaction implements Transaction {
 		hdr.createNotCommitted = false; // not needed for everyone
 		trans.write(l, hdr);
 		trans.write(hdr.objectID, entry.getValue());
+		log.finest("update commit header for id " + l +
+		    " to " + hdr);
 	    } catch (NonExistantObjectIDException e) {
 		e.printStackTrace();
 	    }
