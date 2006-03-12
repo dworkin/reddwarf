@@ -396,11 +396,10 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
     }
 
     /**
-     * This method is a synonym for abort().
-     *
+     * Does nothing.  Formerly a synonym for abort().
      */
     public void close() {
-        abort();
+        // resetTransaction();
     }
 
 }
