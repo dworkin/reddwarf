@@ -536,8 +536,11 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 		    if (graveyard.contains(objectID)
 			    || loadCache(objectID) == null) {
 			lockSet.notifyAll();
-			throw new NonExistantObjectIDException(
+			NonExistantObjectIDException ex =
+			    new NonExistantObjectIDException(
 				"Can't find objectID " + objectID);
+			log.throwing(getClass().getName(), "lock", ex);
+			throw ex;
 		    }
 		} else {
 		    lockSet.add(new Long(objectID));
@@ -577,6 +580,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 		try {
 		    release(oid);
 		} catch (NonExistantObjectIDException e) {
+		    log.throwing(getClass().getName(), "release", e);
 		    re = e;
 		}
 	    }
@@ -599,7 +603,9 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	int queueLength = 0;
 
         if (closed) {
-            throw new DataSpaceClosedException();
+            DataSpaceClosedException ex = new DataSpaceClosedException();
+	    log.throwing(getClass().getName(), "atomicUpdate", ex);
+            throw ex;
         }
 
 	if (debug) {
@@ -874,6 +880,8 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 		insertNameStmnt.setLong(2, createId);
 		insertNameStmnt.execute();
 	    } catch (SQLException e) {
+		log.throwing(getClass().getName(),
+			"create[" + name + "]/" + createId, e);
 		e.printStackTrace();
 		return DataSpace.INVALID_ID;
 	    }
@@ -885,6 +893,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	    insertObjStmnt.execute();
 	    insertObjStmnt.getConnection().commit();
 	} catch (SQLException e) {
+	    log.throwing(getClass().getName(), "create[obj]/" + createId, e);
 	    e.printStackTrace();
 	    return DataSpace.INVALID_ID;
 	}

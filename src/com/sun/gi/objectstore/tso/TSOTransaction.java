@@ -185,7 +185,8 @@ public class TSOTransaction implements Transaction {
 	if (DEBUG) {
 	    if (log.isLoggable(Level.FINER)) {
 		if (headerID != DataSpace.INVALID_ID) {
-		    log.fine("txn " + txnID + " won create of " + name);
+		    log.fine("txn " + txnID + " won create of " + name +
+			" with hdrID " + headerID);
 		} else {
 		    log.fine("txn " + txnID + " lost create of " + name);
 		}

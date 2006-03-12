@@ -129,6 +129,8 @@ public class TSODataHeader implements Serializable {
 	  
 	sb.append(",hdrID=").append(hdrID); // LOG print if using hdrID
 
+	sb.append(",objID=").append(objectID);
+
 	if (free) {
 	    sb.append(",free}");
 	} else {
