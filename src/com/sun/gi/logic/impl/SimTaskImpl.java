@@ -79,6 +79,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Queue;
+import java.util.logging.Logger;
 
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
@@ -95,6 +96,8 @@ import com.sun.gi.objectstore.tso.dataspace.DataSpace;
 import com.sun.gi.utils.classes.CLObjectInputStream;
 
 public class SimTaskImpl extends SimTask {
+
+    private static Logger log = Logger.getLogger("com.sun.gi.logic");
 
     private Transaction trans;
     private ACCESS_TYPE accessType;
@@ -161,10 +164,33 @@ public class SimTaskImpl extends SimTask {
             processDeferredCommands();
         } catch (InvocationTargetException ex) {
             ex.printStackTrace();
-            trans.abort();
+	    Throwable realException = ex.getCause();
+
+	    // XXX fix this stuff -- is it InvokationTarget or
+	    // the "real" exceptions that should be caught? or both?
+
+	    if (realException instanceof DeadlockException) {
+		// the transaction has already been aborted
+		deferredCommands.clear();
+		gloIDMap.clear();
+		gloAccessMap.clear();
+		// requeue for later execution
+		log.fine("Requeue after deadlock txn " +
+			((com.sun.gi.objectstore.tso.TSOTransaction)
+			    trans).getUUID());
+		try {
+		    Thread.sleep(1000); // XXX for debugging; tune or fix
+		} catch (InterruptedException ie) {
+		    // ignore
+		}
+		simulation.queueTask(this);
+	    } else {
+		trans.abort();
+	    }
         } catch (IllegalArgumentException ex) {
             System.err.println("Exception on task execution:");
-            System.err.println("Class of target:" + runobj.getClass());
+            System.err.println("Class of target:" +
+		(runobj == null ? null : runobj.getClass()));
             System.err.println("Name of method: " + startMethod.getName());
             System.err.println("Class of method: "
                     + startMethod.getDeclaringClass());
