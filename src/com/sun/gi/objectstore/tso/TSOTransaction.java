@@ -119,7 +119,7 @@ public class TSOTransaction implements Transaction {
 
     private long currentTransactionDeadline;
 
-    private final Map<Long, Serializable> updateMap;
+    private final Map<Long, Serializable> lockedObjectsMap;
     private final Set<Long> createdIDs;
     private final Set<Long> deletedIDs;
 
@@ -142,7 +142,7 @@ public class TSOTransaction implements Transaction {
         this.tiebreaker = tiebreaker;
         this.currentTransactionDeadline = 1;
         this.dataSpace = dataSpace;
-	this.updateMap= new HashMap<Long, Serializable>();
+	this.lockedObjectsMap= new HashMap<Long, Serializable>();
 	this.createdIDs = new HashSet<Long>();
 	this.deletedIDs = new HashSet<Long>();
     }
@@ -251,8 +251,8 @@ public class TSOTransaction implements Transaction {
         trans.commit();
         trans.release(headerID);
 
-	// updateMap maps headerIDs to the *real objects* to which they refer
-        updateMap.put(headerID, object);
+	// lockedObjectsMap maps headerIDs to the *real objects* to which they refer
+        lockedObjectsMap.put(headerID, object);
         createdIDs.add(headerID);
 
         return headerID;
@@ -287,7 +287,7 @@ public class TSOTransaction implements Transaction {
 	}
 
 	// There's a GET lock on it already, or we created it.
-        Serializable obj = updateMap.get(objectID);
+        Serializable obj = lockedObjectsMap.get(objectID);
         if (obj != null) {
 	    // We've got a locked copy, so return it.
             return obj;
@@ -313,7 +313,7 @@ public class TSOTransaction implements Transaction {
 	    return null;
 	}
 
-        Serializable obj = updateMap.get(objectID);
+        Serializable obj = lockedObjectsMap.get(objectID);
         if (obj != null) {
 	    // We've already locked it -- return the cached copy.
             return obj;
@@ -472,7 +472,7 @@ public class TSOTransaction implements Transaction {
 
         trans.release(objectID);
 
-        updateMap.put(objectID, obj);
+        lockedObjectsMap.put(objectID, obj);
         return obj;
     }
 
@@ -534,7 +534,7 @@ public class TSOTransaction implements Transaction {
 		listeners.addAll(hdr.availabilityListeners);
 		trans.destroy(hdr.objectID);
 		trans.destroy(l);
-		updateMap.remove(l);
+		lockedObjectsMap.remove(l);
 	    } catch (Exception e) {
 		// XXX Remember to throw something at the end
 		e.printStackTrace();
@@ -551,14 +551,14 @@ public class TSOTransaction implements Transaction {
 		listeners.addAll(hdr.availabilityListeners);
 		hdr.free = true;
 		trans.write(l, hdr);
-		updateMap.remove(l);
+		lockedObjectsMap.remove(l);
 	    } catch (Exception e) {
 		// XXX Remember to throw something at the end
 		e.printStackTrace();
 	    }
 	}
 
-	for (Entry<Long, Serializable> entry : updateMap.entrySet()) {
+	for (Entry<Long, Serializable> entry : lockedObjectsMap.entrySet()) {
 	    Long l = entry.getKey();
 	    try {
 		if (! dataspaceLocks.contains(l)) {
@@ -578,7 +578,7 @@ public class TSOTransaction implements Transaction {
 	log.finest("abort commiting txn " + transactionID);
 	trans.commit();
 
-        updateMap.clear();
+        lockedObjectsMap.clear();
         createdIDs.clear();
         deletedIDs.clear();
         ostore.notifyAvailabilityListeners(new ArrayList(listeners));
@@ -588,9 +588,9 @@ public class TSOTransaction implements Transaction {
     public void commit() {
 
 	if (log.isLoggable(Level.FINEST)) {
-	    long[] updatedIDs = new long[updateMap.size()];
+	    long[] updatedIDs = new long[lockedObjectsMap.size()];
 	    int i = 0;
-	    for (long key : updateMap.keySet()) {
+	    for (long key : lockedObjectsMap.keySet()) {
 		updatedIDs[i++] = key;
 	    }
 	    Arrays.sort(updatedIDs);
@@ -611,14 +611,14 @@ public class TSOTransaction implements Transaction {
 		listeners.addAll(hdr.availabilityListeners);
 		trans.destroy(hdr.objectID);
 		trans.destroy(l);
-		updateMap.remove(l);
+		lockedObjectsMap.remove(l);
 	    } catch (Exception e) {
 		// XXX Remember to throw something at the end
 		e.printStackTrace();
 	    }
 	}
 
-	for (Entry<Long, Serializable> entry : updateMap.entrySet())
+	for (Entry<Long, Serializable> entry : lockedObjectsMap.entrySet())
 	{
 	    Long l = entry.getKey();
 	    try {
@@ -642,7 +642,7 @@ public class TSOTransaction implements Transaction {
 	log.finest("commit commiting txn " + transactionID);
 	trans.commit();
 
-        updateMap.clear();
+        lockedObjectsMap.clear();
         createdIDs.clear();
         deletedIDs.clear();
         ostore.notifyAvailabilityListeners(new ArrayList(listeners));

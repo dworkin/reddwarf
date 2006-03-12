@@ -101,8 +101,8 @@ import com.sun.gi.logic.impl.SimKernelImpl;
 import com.sun.gi.logic.impl.SimulationImpl;
 import com.sun.gi.objectstore.ObjectStore;
 import com.sun.gi.objectstore.tso.TSOObjectStore;
-import com.sun.gi.objectstore.tso.dataspace.InMemoryDataSpace;
-//import com.sun.gi.objectstore.tso.dataspace.PersistantInMemoryDataSpace;
+//import com.sun.gi.objectstore.tso.dataspace.InMemoryDataSpace;
+import com.sun.gi.objectstore.tso.dataspace.PersistantInMemoryDataSpace;
 import com.sun.gi.utils.SGSUUID;
 import com.sun.gi.utils.StatisticalUUID;
 
@@ -220,8 +220,8 @@ public class SGS {
 	if (game.getBootClass() != null) {
 	    Simulation sim = null;
 	    try {
-		//ostore = new TSOObjectStore(new PersistantInMemoryDataSpace(gameID));
-		ostore = new TSOObjectStore(new InMemoryDataSpace(gameID));
+		ostore = new TSOObjectStore(new PersistantInMemoryDataSpace(gameID));
+		//ostore = new TSOObjectStore(new InMemoryDataSpace(gameID));
 		String cleanProperty = System.getProperty("sgs.ostore.startclean");
 		if ((cleanProperty != null)
 			&& (cleanProperty.equalsIgnoreCase("true"))) {

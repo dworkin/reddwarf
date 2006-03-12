@@ -236,7 +236,11 @@
 	<java dir="release" classname="com.sun.gi.SGS" failonerror="true" fork="yes">
 	    <arg value="-C"/>
 	    <arg value="-V"/>
-	    <classpath refid="project.classpath"/>
+	    <!-- <classpath refid="project.classpath"/> -->
+	    <classpath>
+		<pathelement location="release/ProjectDarkstar.jar"/>
+		<pathelement location="release/${derby.jarfile}"/>
+	    </classpath>
 	    <sysproperty key="java.util.logging.config.file"
 			 file="logging.properties"/>
 	</java>
@@ -384,9 +388,9 @@
 
     <target name="release.clients" depends="release.client.battleboard,release.client.other"/>
 
-    <target name="release.client.other" depends="build.clients"/>
+    <target name="release.client.other" depends="build.clients,release.j2seAPI"/>
 
-    <target name="release.client.battleboard" depends="build.clients">
+    <target name="release.client.battleboard" depends="build.clients,release.j2seAPI">
 	<jar destfile="release/client/BattleBoardClient.jar">
 	    <manifest>
 		<attribute name="Class-Path"
@@ -423,8 +427,12 @@
     </target>
 
     <target name="release.battleboard" depends="build.battleboard">
-	<jar destfile="release/apps/battleboard/BattleBoard.jar"
-	    basedir="bin" includes="com/sun/gi/apps/battleboard/server/**" />
+	<jar destfile="release/apps/battleboard/BattleBoard.jar">
+	    <fileset dir="bin">
+		<include name="com/sun/gi/apps/battleboard/*.class"/>
+		<include name="com/sun/gi/apps/battleboard/server/**"/>
+	    </fileset>
+	</jar>
 	<copy file="resources/battleboard_deployment.xml"
 	    todir="release/apps/battleboard" />
     </target>

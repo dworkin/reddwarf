@@ -205,9 +205,9 @@ public class BattleBoardPlayer implements ClientChannelListener {
              * build the display.
              */
 
-            display = new TextDisplay(playerBoards);
-	    //BattleBoard[] boardArray = new BattleBoard[playerBoards.size()];
-            //display = new Client(playerBoards.toArray(boardArray));
+            //display = new TextDisplay(playerBoards);
+	    BattleBoard[] boardArray = new BattleBoard[playerBoards.size()];
+            display = new Client(playerBoards.toArray(boardArray));
         } else if ((gameState == GameState.BEGIN_MOVE)
                 && "move-started".equals(cmd)) {
             if (myName.equals(tokens[1])) {
@@ -237,7 +237,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
             }
             gameState = GameState.GAME_OVER;
             connectionManager.disconnect();
-            System.exit(0);
+            //System.exit(0);
         }
     }
 
