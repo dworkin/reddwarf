@@ -1,0 +1,135 @@
+
+/*
+ * BasicCharacterManager.java
+ *
+ * Created by: seth proctor (sp76946)
+ * Created on: Sun Mar  5, 2006	 3:05:49 AM
+ * Desc: 
+ *
+ */
+
+package com.sun.gi.apps.hack.server;
+
+import com.sun.gi.logic.GLOReference;
+import com.sun.gi.logic.SimTask;
+
+import com.sun.gi.apps.hack.server.level.Level;
+
+import com.sun.gi.apps.hack.share.Board;
+
+
+/**
+ * This abstract implementation of <code>CharacterManager</code> provides
+ * some of the common functionality for all managers, and is extended by
+ * the managers for players and AIs.
+ *
+ * @since 1.0
+ * @author Seth Proctor
+ */
+public abstract class BasicCharacterManager implements CharacterManager
+{
+
+    // a reference to the current level
+    private GLOReference<? extends Level> levelRef;
+
+    // the position on the current level
+    private int xPos;
+    private int yPos;
+
+    // a unique identifier for doing equality
+    private String uniqueID;
+
+    /**
+     * Creates an instance of <code>BasicCharacterManager</code>.
+     *
+     * @param uniqueID a unique identifier for this instance
+     */
+    protected BasicCharacterManager(String uniqueID) {
+        this.uniqueID = uniqueID;
+
+        xPos = -1;
+        yPos = -1;
+    }
+
+    /**
+     * Returns the current level where this manager is playing.
+     *
+     * @return the current level
+     */
+    public GLOReference<? extends Level> getCurrentLevel() {
+        return levelRef;
+    }
+
+    /**
+     * Sets the current level.
+     *
+     * @param levelRef a reference to a level
+     */
+    public void setCurrentLevel(GLOReference<? extends Level> levelRef) {
+        this.levelRef = levelRef;
+    }
+
+    /**
+     * Sets the current character's position on the current level.
+     *
+     * @param x the x-coordinate
+     * @param y the y-coordinate
+     */
+    public void setLevelPosition(int x, int y) {
+        xPos = x;
+        yPos = y;
+    }
+
+    /**
+     * Returns the current character's x-coordinate.
+     *
+     * @return the x-coordinate
+     */
+    public int getLevelXPos() {
+        return xPos;
+    }
+
+    /**
+     * Returns the current character's x-coordinate.
+     *
+     * @return the x-coordinate
+     */
+    public int getLevelYPos() {
+        return yPos;
+    }
+
+    /**
+     * Returns a unique representation of this manager.
+     *
+     * @return a <code>String</code> representation
+     */
+    public String toString() {
+        return uniqueID;
+    }
+
+    /**
+     * Compares another instance of <code>BasicCharacterManager</code>
+     * against this one for equality.
+     *
+     * @param obj an instance of <code>BasicCharacterManager</code>
+     *
+     * @return true if the objects are equal, false otherwise
+     */
+    public boolean equals(Object obj) {
+        if (! (obj instanceof CharacterManager))
+            return false;
+
+        return toString().equals(obj.toString());
+    }
+
+    /**
+     * Returns a hash code for this manager, which is calculated by getting
+     * the hash code on the value from <code>toString</code>.
+     *
+     * @return a hash code
+     */
+    public int hashCode() {
+        return toString().hashCode();
+    }
+
+}

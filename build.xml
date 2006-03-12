@@ -23,6 +23,17 @@
 	<pathelement location="resources/libs/servlet/org.mortbay.jetty.jar" />
     </path>
 
+    <path id="build.j2se.app.classpath">
+	<pathelement location="resources/libs/${jrms.jarfile}" />
+	<pathelement location="resources/libs/${derby.jarfile}" />
+	<pathelement location="release/ProjectDarkstar.jar" />
+    </path>
+
+    <path id="build.j2se.client.classpath">
+	<pathelement location="bin" />
+	<pathelement location="release/ProjectDarkstarClientAPI.jar" />
+    </path>
+
     <target name="init">
         <mkdir dir="bin"/>
         <mkdir dir="doc"/>
@@ -30,6 +41,7 @@
     	<mkdir dir="release/apps"/>
     	<mkdir dir="release/apps/trivial_boot"/>
     	<mkdir dir="release/apps/battleboard"/>
+    	<mkdir dir="release/apps/hack"/>
     	<mkdir dir="release/apps/chat_test"/>
     	<mkdir dir="release/apps/matchmaker"/>
     	<mkdir dir="release/apps/timer_test"/>
@@ -230,6 +242,28 @@
 	</javac>
     </target>
 
+    <target name="build.hack" depends="init,release.server">
+	<javac srcdir="src" destdir="bin" source="5" target="5"
+		debug="${debug}" optimize="${optimize}"
+		deprecation="${deprecated}">
+	    <compilerarg value="-Xlint:all,-serial"/>
+	    <classpath refid="build.j2se.app.classpath" />
+	    <include name="com/sun/gi/apps/hack/server/**/*.java" />
+	    <include name="com/sun/gi/apps/hack/share/**/*.java" />
+	</javac>
+    </target>
+
+    <target name="build.client.hack" depends="init,release.j2seAPI">
+	<javac srcdir="src" destdir="bin" source="5" target="5"
+		debug="${debug}" optimize="${optimize}"
+		deprecation="${deprecated}">
+	    <compilerarg value="-Xlint:all,-serial"/>
+	    <classpath refid="build.j2se.client.classpath" />
+	    <include name="com/sun/gi/apps/hack/client/**/*.java" />
+	    <include name="com/sun/gi/apps/hack/share/**/*.java" />
+	</javac>
+    </target>
+
     <!-- Runnable Servers -->
 
     <target name="SGS-clean">
@@ -305,7 +339,14 @@
 
     <target name="BattleBoard">
 	<echo message="BROKEN!  Ant on Linux won't let us input on stdin"/>
-	<java jar="release/BattleBoardClient.jar" failonerror="true" fork="true">
+	<java jar="release/client/BattleBoardClient.jar" failonerror="true" fork="true">
+	    <sysproperty key="java.util.logging.config.file"
+			 file="logging.properties" />
+	</java>
+    </target>
+
+    <target name="Hack">
+	<java jar="release/client/HackClient.jar" failonerror="true" fork="true">
 	    <sysproperty key="java.util.logging.config.file"
 			 file="logging.properties" />
 	</java>
@@ -386,7 +427,7 @@
 	</copy>
     </target>
 
-    <target name="release.clients" depends="release.client.battleboard,release.client.other"/>
+    <target name="release.clients" depends="release.client.battleboard,release.client.hack,release.client.other"/>
 
     <target name="release.client.other" depends="build.clients,release.j2seAPI"/>
 
@@ -408,8 +449,28 @@
 	</jar>
     </target>
 
+    <target name="release.client.hack" depends="build.client.hack,release.j2seAPI,build.server">
+	<jar destfile="release/client/HackClient.jar">
+	    <manifest>
+		<attribute name="Class-Path"
+			   value="../ProjectDarkstarClientAPI.jar"/>
+		<attribute name="Main-Class"
+			   value="com.sun.gi.apps.hack.client.Client"/>
+	    </manifest>
+	    <fileset dir="bin">
+		<include name="com/sun/gi/apps/hack/client/**/*.class"/>
+		<include name="com/sun/gi/apps/hack/share/**/*.class"/>
+		<include name="com/sun/gi/comm/routing/**/*ID.class"/>
+		<include name="com/sun/gi/utils/*UUID.class"/>
+	    </fileset>
+	    <fileset dir="resources/hack">
+		<include name="data/**"/>
+	    </fileset>
+	</jar>
+    </target>
+
     <target name="release.apps"
-	depends="release.trivialboot,release.timertest,release.chattest,release.jeffboard,release.battleboard,release.glotest,release.matchmaker">
+	depends="release.trivialboot,release.timertest,release.chattest,release.jeffboard,release.battleboard,release.hack,release.glotest,release.matchmaker">
     </target>
 
     <target name="release.trivialboot" depends="build.trivial">
@@ -435,6 +496,20 @@
 	</jar>
 	<copy file="resources/battleboard_deployment.xml"
 	    todir="release/apps/battleboard" />
+    </target>
+
+    <target name="release.hack" depends="build.hack">
+	<jar destfile="release/apps/hack/Hack.jar">
+	    <fileset dir="bin">
+		<include name="com/sun/gi/apps/hack/server/**/*.class"/>
+		<include name="com/sun/gi/apps/hack/share/**/*.class"/>
+	    </fileset>
+	</jar>
+	<copy file="resources/hack/deploy.xml"
+	    todir="release/apps/hack" />
+	<copy todir="release/apps/hack">
+	    <fileset dir="resources/hack" includes="data/**"/>
+	</copy>
     </target>
 
     <target name="release.glotest" depends="build.glotest">
