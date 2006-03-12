@@ -88,20 +88,21 @@ import com.sun.gi.objectstore.NonExistantObjectIDException;
  */
 public class InMemoryDataSpace implements DataSpace {
     long appID;
+    volatile boolean closed = false;
     Map<Long, byte[]> dataSpace = new LinkedHashMap<Long, byte[]>();
 
     Map<String, Long> nameSpace = new LinkedHashMap<String, Long>();
-    Map<Long, String> reverseNameMap = new HashMap<Long,String>(); 
+    Map<Long, String> reverseNameSpace = new HashMap<Long, String>(); 
     Set<Long> lockSet = new HashSet<Long>();
 
     private static Logger log =
 	Logger.getLogger("com.sun.gi.objectstore.tso");
 
     private Object idMutex = new Object();
+    private Object cachedStateMutex = new Object();
 
     private int id = 1;
 	
-
     public InMemoryDataSpace(long appID) {
         this.appID = appID;
     }
@@ -119,7 +120,7 @@ public class InMemoryDataSpace implements DataSpace {
      * {@inheritDoc}
      */
     public byte[] getObjBytes(long objectID) {
-        synchronized (dataSpace) {
+        synchronized (cachedStateMutex) {
             return dataSpace.get(new Long(objectID));
         }
     }
@@ -129,11 +130,6 @@ public class InMemoryDataSpace implements DataSpace {
      */
     public void lock(long objectID) throws NonExistantObjectIDException {
 
-        synchronized (dataSpace) {
-            if (!dataSpace.containsKey(objectID)) {
-                throw new NonExistantObjectIDException();
-            }
-        }
         synchronized (lockSet) {
             while (lockSet.contains(objectID)) {
                 try {
@@ -142,7 +138,15 @@ public class InMemoryDataSpace implements DataSpace {
                     e.printStackTrace();
                 }
             }
-            lockSet.add(new Long(objectID));
+	    synchronized (cachedStateMutex) {
+		if (!dataSpace.containsKey(objectID)) {
+		    lockSet.notifyAll();
+		    throw new NonExistantObjectIDException();
+		} else {
+		    lockSet.add(new Long(objectID));
+		    lockSet.notifyAll();
+		}
+            }
         }
     }
 
@@ -160,62 +164,71 @@ public class InMemoryDataSpace implements DataSpace {
      * {@inheritDoc}
      */
     public void release(Set<Long> objectIDs)
-            throws NonExistantObjectIDException {
+            throws NonExistantObjectIDException
+    {
         NonExistantObjectIDException re = null;
 
-        for (long oid : objectIDs) {
-            try {
-                release(oid);
-            } catch (NonExistantObjectIDException e) {
-                re = e;
-            }
-        }
+	synchronized (lockSet) {
+	    
+	    /*
+	     * Attempt all of the releases.  Then if any of the
+	     * releases threw an exception, pick the last one and
+	     * rethrow it.  This is less than perfect.  -DJE
+	     */
 
-        // If any of the releases threw an exception, throw it
-        // here.
+	    for (long oid : objectIDs) {
+		try {
+		    release(oid);
+		} catch (NonExistantObjectIDException e) {
+		    re = e;
+		}
+	    }
 
-        if (re != null) {
-            throw re;
-        }
+	    // If any of the releases threw an exception, throw it
+	    // here.
+
+	    if (re != null) {
+		throw re;
+	    }
+	}
     }
 
     /**
      * {@inheritDoc}
      */
-    public void atomicUpdate(boolean clear, Map<Long, byte[]> updateMap,
-    	    List<Long> deleted) {
-        // insert set is ignored in this case as its uneeded detail
-        synchronized (dataSpace) {
-            dataSpace.putAll(updateMap);
-            for (Long oid : deleted) {
-            	dataSpace.remove(oid);
-            }
-        }
-	// JMEGQ begin changes
-        synchronized (nameSpace) {
-            for (Long oid : deleted) {
-            	String name = reverseNameMap.get(oid);
-            	//System.out.println("Removing id,name: "+oid+","+name);
-            	nameSpace.remove(name);
-            	reverseNameMap.remove(oid);
-	    }
+    public void atomicUpdate(boolean clear,
+    	    Map<Long, byte[]> updateMap, List<Long> deleted)
+	    throws DataSpaceClosedException {
+
+	if (closed) {
+	    throw new DataSpaceClosedException();
 	}
-	/*
-        synchronized (lockSet) {
-            for (Long oid : deleted) {
-		lockSet.remove(oid);
+
+	synchronized (lockSet) {
+	    synchronized (cachedStateMutex) {
+
+		dataSpace.putAll(updateMap);
+		for (Long oid : deleted) {
+		    lockSet.remove(oid);
+
+		    String name = reverseNameSpace.get(oid);
+		    if (name != null) {
+			nameSpace.remove(name);
+			reverseNameSpace.remove(oid);
+		    }
+
+		    dataSpace.remove(oid);
+		}
 	    }
 	    lockSet.notifyAll();
-	}
-	*/
-	// JMEGQ end changes
+        }
     }
 
     /**
      * {@inheritDoc}
      */
     public Long lookup(String name) {
-        synchronized (nameSpace) {
+        synchronized (cachedStateMutex) {
             return nameSpace.get(name);
         }
     }
@@ -233,39 +246,46 @@ public class InMemoryDataSpace implements DataSpace {
      * {@inheritDoc}
      */
     public void clear() {
-    // TODO Auto-generated method stub
-
+	synchronized (cachedStateMutex) {
+	    dataSpace.clear();
+	    nameSpace.clear();
+	    reverseNameSpace.clear();
+	}
     }
 
     /**
      * {@inheritDoc}
      */
     public long create(byte[] data, String name) {
-        long createId = DataSpace.INVALID_ID;
-        synchronized (nameSpace) {
-            if (nameSpace.containsKey(name)) {
-            	System.out.println("Name space already contains "+name);
-                return DataSpace.INVALID_ID;
-            }
-            createId = getNextID();
+        Long createId;
+
+        synchronized (cachedStateMutex) {
             if (name!=null){
+		if (nameSpace.containsKey(name)) {
+		    // System.out.println("Name space already contains "+name);
+		    return DataSpace.INVALID_ID;
+		}
+		createId = new Long(getNextID());
             	nameSpace.put(name, createId);
-            	reverseNameMap.put(createId,name);
-            }
-            //System.out.println("Creating id,name: "+createId+","+name);
-        }
-        synchronized (dataSpace) {
+            	reverseNameSpace.put(createId, name);
+            } else {
+		createId = new Long(getNextID());
+	    }
+
+	    if (data == null) {
+		log.warning("creating null object " + createId);
+	    }
+
             dataSpace.put(createId, data);
         }
+
         return createId;
     }
 
     /**
-     * NOT IMPLEMENTED.
-     * 
      * {@inheritDoc}
      */
     public void close() {
-    // TODO Auto-generated method stub
+	closed = true;
     }
 }
