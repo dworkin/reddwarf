@@ -568,9 +568,9 @@ public class PersistantInMemoryDataSpace implements DataSpace {
 	synchronized (lockSet) {
 
 	    /*
-	     * Attempt all of the releases.  Then if any of the releases
-	     * threw an exception, pick the last one and rethrow it.  This
-	     * is less than perfect.  -DJE
+	     * Attempt all of the releases.  Then if any of the
+	     * releases threw an exception, pick the last one and
+	     * rethrow it.  This is less than perfect.  -DJE
 	     */
 
 	    for (long oid : objectIDs) {
