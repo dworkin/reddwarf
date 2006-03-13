@@ -68,18 +68,17 @@
 
 package com.sun.gi.objectstore.tso;
 
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.logging.Logger;
-
 import com.sun.gi.objectstore.ObjectStore;
 import com.sun.gi.objectstore.Transaction;
 import com.sun.gi.objectstore.tso.dataspace.DataSpace;
 import com.sun.gi.objectstore.tso.dataspace.DataSpaceTransactionImpl;
 import com.sun.gi.utils.SGSUUID;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.logging.Logger;
 
 /**
  * @author Jeff Kesselman
@@ -102,6 +101,16 @@ public class TSOObjectStore implements ObjectStore {
             e.printStackTrace();
             throw new InstantiationException();
         }
+    }
+
+    /**
+     * Returns the mapping from a {@link SGSUUID} to a {@link
+     * TSOTransaction}.  <p>
+     *
+     * Should be hidden from the light of day.
+     */
+    TSOTransaction sgsuuid2transaction(SGSUUID uid) {
+	return localTransactionIDMap.get(uid);
     }
 
     /*
@@ -157,7 +166,7 @@ public class TSOObjectStore implements ObjectStore {
     /**
      * @param listeners
      */
-    public void notifyAvailabilityListeners(List<SGSUUID> listeners) {
+    public void notifyAvailabilityListeners(Collection<SGSUUID> listeners) {
         for (SGSUUID uuid : listeners) {
             TSOTransaction trans = localTransactionIDMap.get(uuid);
             if (trans != null) {

@@ -72,9 +72,6 @@ import com.sun.gi.objectstore.tso.dataspace.DataSpace;
 
 /**
  * An SGS ObjectStore
- * 
- * @author Jeff Kesselman
- * @version 1.0
  */
 public interface ObjectStore {
 
@@ -87,23 +84,19 @@ public interface ObjectStore {
     public static final long INVALID_ID = DataSpace.INVALID_ID;
 
     /**
-     * <p>
-     * All interractions with data stored in the ObejctStore must ocurr
-     * under a transactional context. This method returns a Transaction
-     * object that implements that context.
-     * </p>
-     * <p>
-     * Every app has a seperate space in the ObjectStore that is
-     * segregated by AppID. AppIDs are assigned to apps when they are
-     * installed into the SGS back-end. (The true primary key of any
-     * Object stored in the Objectstore is a composite of the AppID and
-     * its ObjectID.)
-     * </p>
-     * <p>
+     * Creates a Transaction object that implements a transaction context.  <p>
+     *
+     * All interactions with data stored in the ObjectStore must
+     * occur within the context of a transaction. <p>
+     *
+     * Each app has its own space (and namespace) in the ObjectStore, denoted
+     * by its <code>appID</code>. 
+     * An <code>appID</code> is assigned to an app when it is 
+     * installed into the SGS back-end. <p>
+     *
      * Every app also has its own class loader for loading the classes
      * as required by the deserialization during fetch from the
      * ObjectStore
-     * </p>
      * 
      * @param loader The App's class loader
      *
@@ -111,15 +104,15 @@ public interface ObjectStore {
      *
      * @see Transaction
      */
-    public Transaction newTransaction(ClassLoader loader);
+    Transaction newTransaction(ClassLoader loader);
 
     /**
-     * 
+     * Erases the contents of the ObjectStore.
      */
-    public void clear();
+    void clear();
 
     /**
-     * 
+     * Closes the connection to the ObjectStore.
      */
-    public void close();
+    void close();
 }

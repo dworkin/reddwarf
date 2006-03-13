@@ -363,117 +363,182 @@ public class TSOTransaction implements Transaction {
 
         trans.lock(objectID);
         TSODataHeader hdr = (TSODataHeader) trans.read(objectID);
-        while (!hdr.free) {
+	for (;;) {
+	    while (!hdr.free && !hdr.owner.equals(txnID)) {
 
-            long now = System.currentTimeMillis();
+		long now = System.currentTimeMillis();
 
-            if (now > currentTransactionDeadline) {
-		// We're out of time; abort and see if we make it on
-		// the next try (when we're requeued due to DeadlockException)
+		if (now > currentTransactionDeadline) {
+		    // We're out of time; abort and see if we make it
+		    // on the next try (when we're requeued due to
+		    // DeadlockException)
 
-		log.warning("txn " + txnID + " out of time for " + hdr);
+		    log.warning("txn " + txnID + " out of time for " + hdr);
 
-		abort();
-		throw new DeadlockException();
-	    }
-
-            if (now > hdr.currentTransactionDeadline) {
-		// The lock is stale, grab it ourselves
-                ostore.requestTimeoutInterrupt(hdr.owner);
-		// We'll be taking the lock, so break out of this loop.
-		// Do *not* update hdr.free, in case we need to
-		// do a deadline-abort (look for deadline-abort below).
-
-		log.warning("txn " + txnID + " grabbing stale lock " + hdr);
-
-		break;
-            }
-
-            if (!shouldBlock) {
-		// This is an attempt() call, so we should neither
-		// block nor steal the lock from younger transactions
-		// if they currently hold it.
-		// Checked *before* timestampInterrupted, because
-		// if we're not going to block we can just keep
-		// running along -- we only accept the interrupt
-		// if we discover we'll block.
-                trans.release(objectID);
-
-		if (DEBUG) {
-		    log.fine("txn " + txnID +
-			    " would block, returning null " + hdr);
+		    abort();
+		    throw new DeadlockException();
 		}
 
-                return null;
-	    }
+		if (now > hdr.currentTransactionDeadline) {
+		    // The lock is stale, grab it ourselves
+		    ostore.requestTimeoutInterrupt(hdr.owner);
+		    // We'll be taking the lock, so break out of this loop.
+		    // Do *not* update hdr.free, in case we need to
+		    // do a deadline-abort (look for deadline-abort below).
 
-            if (timestampInterrupted) {
-		// We were interrupted and are about to block, so
-		// honor the interruption and abort.
+		    log.warning("txn " + txnID + " grabbing stale lock " + hdr);
 
-		if (DEBUG) {
-		    log.fine("txn " + txnID + " interrupted, abort " + hdr);
+		    break;
 		}
 
-                abort();
-                throw new DeadlockException();
-            }
-
-	    if (hdr.youngerThan(initialAttemptTime, tiebreaker)) {
-		// We are more senior than the current owner
-		// of the lock; tell him to give it up!
-
-		if (DEBUG) {
-		    log.fine("txn " + txnID + " pulling seniority on " + hdr);
-		}
-
-		ostore.requestTimestampInterrupt(hdr.owner);
-	    }
-
-            synchronized (this) {
-		// Synchronize early so we have a chance to add ourselves
-		// as a listener -- we must be sure to get notifyAll'd
-		// if an interrupt comes in from our objectStore.
-                if (!hdr.availabilityListeners.contains(txnID)) {
-                    hdr.availabilityListeners.add(txnID);
-                    trans.write(objectID, hdr);
+		if (!shouldBlock) {
+		    // This is an attempt() call, so we should neither
+		    // block nor steal the lock from younger transactions
+		    // if they currently hold it.
+		    // Checked *before* timestampInterrupted, because
+		    // if we're not going to block we can just keep
+		    // running along -- we only accept the interrupt
+		    // if we discover we'll block.
+		    trans.release(objectID);
 
 		    if (DEBUG) {
-			log.finer("txn " + txnID +
-				" adding self as availListener to " + hdr);
+			log.fine("txn " + txnID +
+				" would block, returning null " + hdr);
 		    }
 
-                    trans.commit();
-                } else {
-                    trans.abort();
-                }
-
-		if (DEBUG) {
-		    if (log.isLoggable(Level.FINER)) {
-			SGSUUID[] listeners =
-			    new SGSUUID[hdr.availabilityListeners.size()];
-			hdr.availabilityListeners.toArray(listeners);
-			log.finer("txn " + txnID +
-			    " about to wait for " + hdr);
-		    }
+		    return null;
 		}
 
-                waitForWakeup(hdr.currentTransactionDeadline);
-            }
+		if (timestampInterrupted) {
+		    // We were interrupted and are about to block, so
+		    // honor the interruption and abort.
 
-            trans.lock(objectID);
-            trans.forget(objectID);
+		    if (DEBUG) {
+			log.fine("txn " + txnID + " interrupted, abort " + hdr);
+		    }
 
-	    if (DEBUG) {
-		log.finer("txn " + txnID + " re-reading " + objectID);
+		    abort();
+		    throw new DeadlockException();
+		}
+
+		if (hdr.youngerThan(initialAttemptTime, tiebreaker)) {
+		    // We are more senior than the current owner
+		    // of the lock; tell him to give it up!
+
+		    if (DEBUG) {
+			log.fine("txn " + txnID + " pulling seniority on " + hdr);
+		    }
+
+		    ostore.requestTimestampInterrupt(hdr.owner);
+		}
+
+		synchronized (this) {
+		    // Synchronize early so we have a chance to add ourselves
+		    // as a listener -- we must be sure to get notifyAll'd
+		    // if an interrupt comes in from our objectStore.
+		    if (!hdr.availabilityListeners.contains(txnID)) {
+			hdr.availabilityListeners.add(txnID);
+			trans.write(objectID, hdr);
+
+			if (DEBUG) {
+			    log.finer("txn " + txnID +
+				    " adding self as availListener to " + hdr);
+			}
+
+			trans.commit();
+		    } else {
+			trans.abort();
+		    }
+
+		    if (DEBUG) {
+			if (log.isLoggable(Level.FINER)) {
+			    SGSUUID[] listeners =
+				new SGSUUID[hdr.availabilityListeners.size()];
+			    hdr.availabilityListeners.toArray(listeners);
+			    log.finer("txn " + txnID +
+				" about to wait for " + hdr);
+			}
+		    }
+
+		    waitForWakeup(hdr.currentTransactionDeadline);
+		}
+
+		trans.lock(objectID);
+		trans.forget(objectID);
+
+		if (DEBUG) {
+		    log.finer("txn " + txnID + " re-reading " + objectID);
+		}
+
+		hdr = (TSODataHeader) trans.read(objectID);
+
+		if (DEBUG) {
+		    log.finer("txn " + txnID + " read hdr " + hdr);
+		}
 	    }
 
-            hdr = (TSODataHeader) trans.read(objectID);
+	    // Next, we sleep on the object until awakened.  But there
+	    // might be many sleepers; who should we get it?  Let's see
+	    // who was assigned this lock, and who else is waiting for
+	    // this lock.  If there's someone senior to us, give it to
+	    // him.  -DJE
 
-	    if (DEBUG) {
-		log.finer("txn " + txnID + " read hdr " + hdr);
+	    /*
+	     * It's our baby.  So it's up to us to do the assignment, or
+	     * just run ourself.
+	     */
+
+	    Set<TSOTransaction> xactions = new HashSet<TSOTransaction>();
+
+	    // assertion:  we don't need to make a copy of the
+	    // listeners list.  They won't change out from
+	    // under us, at least not in the single-stack
+	    // case. -DJE
+
+	    // assume that we're going to win, then try to disprove
+	    TSOTransaction senior = this;
+
+	    for (SGSUUID uid : hdr.availabilityListeners) {
+		TSOTransaction tsot = ostore.sgsuuid2transaction(uid);
+
+		if ((tsot.initialAttemptTime < senior.initialAttemptTime) ||
+			((tsot.initialAttemptTime == senior.initialAttemptTime) &&
+			    (tsot.tiebreaker < senior.tiebreaker))) {
+		    senior = tsot;
+		}
 	    }
-        }
+
+	    if (senior == null || senior.txnID.equals(txnID)) {
+		if (senior == null) {
+		    log.finer("nobody wanted the object: I'm grabbing it: " +
+			    objectID);
+		} else {
+		    log.finer("I am the senior waiter: " + objectID);
+		}
+		break;
+	    } else {
+
+		// making sure that we get woken up when it is our
+		// turn, at some distant point in the future.
+
+		hdr.availabilityListeners.add(txnID);
+
+		log.finer("handing from " + txnID + " to " + senior.txnID);
+
+		// XXX hand the lock to that guy.
+		
+		hdr.free = false;
+		hdr.owner = senior.txnID;
+		hdr.initialAttemptTime = senior.initialAttemptTime;
+		hdr.tiebreaker = senior.tiebreaker;
+		hdr.currentTransactionDeadline =
+			senior.currentTransactionDeadline;
+		trans.write(objectID, hdr);
+		trans.commit();
+
+		ostore.notifyAvailabilityListeners(hdr.availabilityListeners);
+	    }
+	}
 
         if (hdr.createNotCommitted) {
 	    log.warning("txn " + txnID +
@@ -503,7 +568,7 @@ public class TSOTransaction implements Transaction {
 		// write the header so everyone else knows it's unlocked.
 		hdr.free = true;
 		List<SGSUUID> listeners =
-			new ArrayList(hdr.availabilityListeners);
+			new ArrayList<SGSUUID>(hdr.availabilityListeners);
 		hdr.availabilityListeners.clear();
 		trans.write(objectID, hdr);
 
@@ -547,6 +612,11 @@ public class TSOTransaction implements Transaction {
      * the Unix epoch.
      */
     private void waitForWakeup(long deadline) {
+
+	// DJE:  why don't we loop if interrupted?  Doesn't seem to be
+	// any way to distinguish waking up because have the lock
+	// versus just waking up?
+
         synchronized (this) {
             try {
                 long waitTime = deadline - System.currentTimeMillis();
@@ -652,7 +722,7 @@ public class TSOTransaction implements Transaction {
         lockedObjectsMap.clear();
         createdIDs.clear();
         deletedIDs.clear();
-        ostore.notifyAvailabilityListeners(new ArrayList(listeners));
+        ostore.notifyAvailabilityListeners(new ArrayList<SGSUUID>(listeners));
         ostore.deregisterActiveTransaction(this);
     }
 
@@ -741,7 +811,7 @@ public class TSOTransaction implements Transaction {
         lockedObjectsMap.clear();
         createdIDs.clear();
         deletedIDs.clear();
-        ostore.notifyAvailabilityListeners(new ArrayList(listeners));
+        ostore.notifyAvailabilityListeners(new ArrayList<SGSUUID>(listeners));
         ostore.deregisterActiveTransaction(this);
 
 	// Use the deadline as a sentinel in case someone tries to
