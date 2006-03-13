@@ -3,11 +3,11 @@
 
     <property name="output.name" value="JMEChatClient"/>
     <property name="libs.j2me_ant_ext.classpath" value="lib/org-netbeans-modules-kjava-antext.jar"/>
-    <!-- Change this property to point to the JME Darkstar client library -->
-    <property name="libs.darkstar.client.classpath" value="C:\\dev\\sunlabs\\DarkstarJMEClientExternal\\dist\\DarkstarJMEClient.jar"/>
+    <!-- Change this property to point to the JME SGS client library -->
+    <property name="libs.sgs.client.classpath" value="C:/dev/sunlabs/SunGameServerJMEClientExternal/dist/SunGameServerJMEClient.jar"/>
     <!-- Change this property to point to your installation of the Wireless toolkit 2.2 -->
-    <property name="platform.home" value="C:\\Documents and Settings\\as93050\\.netbeans\\4.0\\emulators\\wtk22_win\\emulator\\wtk22"/>
-    <property name="platforms.J2ME_Wireless_Toolkit_2_2.home" value="C:\\Documents and Settings\\as93050\\.netbeans\\4.0\\emulators\\wtk22_win\\emulator\\wtk22"/>
+    <property name="platform.home" value="C:/Documents and Settings/as93050/.netbeans/4.0/emulators/wtk22_win/emulator/wtk22"/>
+    <property name="platforms.J2ME_Wireless_Toolkit_2_2.home" value="C:/Documents and Settings/as93050/.netbeans/4.0/emulators/wtk22_win/emulator/wtk22"/>
     <property name="platforms.J2ME_Wireless_Toolkit_2_2.type" value="UEI-1.0.1"/>    
     <property name="platform.bootclasspath" value="${platform.home}/lib/wma20.jar:${platform.home}/lib/jsr082.jar:${platform.home}/lib/jsr184.jar:${platform.home}/lib/j2me-ws.jar:${platform.home}/lib/mmapi.jar:${platform.home}/lib/jsr75.jar:${platform.home}/lib/cldcapi11.jar:${platform.home}/lib/midpapi20.jar"/>
     <property name="platform.type" value="UEI-1.0"/>
@@ -36,7 +36,7 @@
     <property name="dist.jad" value="${output.name}.jad"/>    
     <property name="manifest.midlet.vendor" value="MIDlet-Vendor: Sun Microsystems"/>
     <property name="manifest.midlet.version" value="MIDlet-Version: 1.0"/>
-    <property name="manifest.midlet.name" value="MIDlet-Name: DarkstarJMEClient"/>
+    <property name="manifest.midlet.name" value="MIDlet-Name: SunGameServerJMEClient"/>
     <property name="manifest.pushregistry" value=""/>
     <property name="manifest.apipermissions" value=""/>
     <property name="javac.encoding" value="Cp1252"/>
@@ -65,7 +65,7 @@
     </target>
     
     <target name="extract-libs">
-        <unzip src="${libs.darkstar.client.classpath}" dest="${build.classes.dir}">
+        <unzip src="${libs.sgs.client.classpath}" dest="${build.classes.dir}">
             <patternset>
                 <include name="**/*.class"/>
                 <exclude name="**/*.jad"/>          
@@ -77,7 +77,7 @@
         <mkdir dir="${build.classes.dir}"/>
         <javac includeantruntime="false" source="${javac.source}" target="${javac.target}" deprecation="${javac.deprecation}" optimize="${javac.optimize}" debug="${javac.debug}" destdir="${build.classes.dir}" srcdir="${src.dir}" bootclasspath="${platform.bootclasspath}" >           
             <classpath>
-                <path path="${libs.darkstar.client.classpath}"/>
+                <path path="${libs.sgs.client.classpath}"/>
             </classpath>
         </javac>
     </target>

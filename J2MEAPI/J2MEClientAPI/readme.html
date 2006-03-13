@@ -3,14 +3,14 @@
 <head>
   <meta content="text/html; charset=ISO-8859-1"
  http-equiv="content-type">
-  <title>Darkstar JME Client README</title>
+  <title>Sun Game Server JME Client README</title>
 </head>
 <body>
-<h1>Darkstar JME Client README</h1>
+<h1>Sun Game Server JME Client README</h1>
 <h2>Introduction</h2>
-The Darkstar JME Client code provides support for mobile clients to
-talk to the Darkstar server. It provides support for mobile clients to
-send and receive messages to/from darkstar over HTTP.<br>
+The Sun Game Server (SGS) JME Client code provides support for mobile clients
+to talk to the SGS server. It provides support for mobile clients to
+send and receive messages to/from SGS over HTTP.<br>
 <h2>Building the code</h2>
 The code was developed using Netbeans Mobility, the provided build.xml
 should
@@ -27,7 +27,7 @@ A parameter was added to the Discovery XML.<br>
 specifies the frequency that the client should poll for events</li>
 </ul>
 <h2>Midlet Requirements</h2>
-A midlet that uses the Darkstar client library needs to specify the
+A midlet that uses the SGS client library needs to specify the
 following additonal attributes in the JAD file<br>
 <ul>
   <li>UsrMgrClassName:
@@ -40,9 +40,8 @@ is the location of the Discovery.xml file<br>
 <h2>Important Classes/Interfaces</h2>
 <ul>
   <li>JMEClientListenerInterface&nbsp; - Clients need to implement this
-interface to receive events from Darkstar</li>
-  <li>JMEClientManager - Used to send events/message to the Darkstar
-server<br>
+interface to receive events from the SGS</li>
+  <li>JMEClientManager - Used to send events/message to the SGS server<br>
   </li>
 </ul>
 <br>

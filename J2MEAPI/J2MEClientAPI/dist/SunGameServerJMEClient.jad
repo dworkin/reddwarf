@@ -1,6 +1,6 @@
 MIDlet-Jar-Size: 44085
-MIDlet-Jar-URL: DarkstarJMEClient.jar
-MIDlet-Name: DarkstarJMEClient
+MIDlet-Jar-URL: SunGameServerJMEClient.jar
+MIDlet-Name: SunGameServerJMEClient
 MIDlet-Vendor: Vendor
 MIDlet-Version: 1.0
 MicroEdition-Configuration: CLDC-1.1

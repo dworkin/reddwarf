@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project name="DarkstarJMEClient" default="jar" basedir="." >
+<project name="SunGameServerJMEClient" default="jar" basedir="." >
 
-    <property name="output.name" value="DarkstarJMEClient"/>
+    <property name="output.name" value="SunGameServerJMEClient"/>
     <property name="libs.j2me_ant_ext.classpath" value="lib/org-netbeans-modules-kjava-antext.jar"/>
     <property name="libs.KXML.classpath" value="lib/kxml2-min-2.2.2.jar"/>
     <!-- Change this property to point to your installation of the Wireless toolkit 2.2 -->
@@ -35,7 +35,7 @@
     <property name="manifest.midlets" value=""/>
     <property name="manifest.midlet.vendor" value="MIDlet-Vendor: Sun Microsystems"/>
     <property name="manifest.midlet.version" value="MIDlet-Version: 1.0"/>
-    <property name="manifest.midlet.name" value="MIDlet-Name: DarkstarJMEClient"/>
+    <property name="manifest.midlet.name" value="MIDlet-Name: SunGameServerJMEClient"/>
     <property name="manifest.pushregistry" value=""/>
     <property name="manifest.apipermissions" value=""/>
     <property name="javac.encoding" value="Cp1252"/>
