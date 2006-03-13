@@ -73,6 +73,7 @@ import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -498,13 +499,16 @@ public class TSOTransaction implements Transaction {
 	    // assume that we're going to win, then try to disprove
 	    TSOTransaction senior = this;
 
-	    for (SGSUUID uid : hdr.availabilityListeners) {
+	    Iterator<SGSUUID> it;
+	    for (it = hdr.availabilityListeners.iterator(); it.hasNext();) {
+		SGSUUID uid = it.next();
 		TSOTransaction tsot = ostore.sgsuuid2transaction(uid);
 
 		if (tsot == null) {
 		    // that transaction is gone, skip it
 		    log.warning("txn " + uid +
 			" is null, but still a listener for " + objectID);
+		    it.remove();
 		    continue;
 		}
 
