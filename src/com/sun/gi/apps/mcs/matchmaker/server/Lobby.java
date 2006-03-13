@@ -103,14 +103,16 @@ public class Lobby extends ChannelRoom {
     private boolean canHostBoot;
     private boolean canHostBan;
     private boolean canHostChangeSettings;
-    private int maxConnectionTime; // in minutes?
+    private int maxConnectionTime;
+    private int maxPlayersInGameRoom = 0;
+    private int minPlayersInGameRoomStart = 0;
+    private int maxPlayersInGameRoomStart = 0;
     private HashMap<String, Object> gameParameters;
     private List<GLOReference<GameRoom>> gameRoomList;
     private List<UserID> playerList;
 
     public Lobby(String name, String description, String password,
-            String channelName, ChannelID cid)
-    {
+            String channelName, ChannelID cid) {
         super(name, description, password, channelName, cid);
 
         gameParameters = new HashMap<String, Object>();
@@ -120,6 +122,30 @@ public class Lobby extends ChannelRoom {
 
     public void setMaxPlayers(int num) {
         maxPlayers = num;
+    }
+    
+    public void setMaxPlayersInGameRoom(int num) {
+    	maxPlayersInGameRoom = num;
+    }
+    
+    public int getMaxPlayersInGameRoom() {
+    	return maxPlayersInGameRoom;
+    }
+    
+    public void setMinPlayersInGameRoomStart(int num) {
+    	minPlayersInGameRoomStart = num;
+    }
+    
+    public int getMinPlayersInGameRoomStart() {
+    	return minPlayersInGameRoomStart;
+    }
+    
+    public void setMaxPlayersInGameRoomStart(int num) {
+    	maxPlayersInGameRoomStart = num;
+    }
+    
+    public int getMaxPlayersInGameRoomStart() {
+    	return maxPlayersInGameRoomStart;
     }
 
     public void setCanHostBoot(boolean b) {

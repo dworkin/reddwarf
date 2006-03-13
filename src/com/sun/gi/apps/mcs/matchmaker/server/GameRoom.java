@@ -76,6 +76,7 @@ import java.util.Map;
 
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
+import com.sun.gi.logic.GLOReference;
 import com.sun.gi.utils.SGSUUID;
 
 /**
@@ -97,18 +98,22 @@ public class GameRoom extends ChannelRoom {
     private static final long serialVersionUID = 1L;
 
     private UserID host;
+    private int maxPlayers;
     private HashMap<String, Object> gameParameters;
     private HashMap<UserID, Boolean> userMap; // users mapped to ready state.
     private boolean starting = false;
+    private GLOReference<Lobby> parentLobby;		// a reference to the lobby to
+    												// which this game room belongs
 
     public GameRoom(String name, String description, String password,
-            String channelName, ChannelID cid, UserID host) {
+            String channelName, ChannelID cid, UserID host, GLOReference<Lobby> lobby) {
     	
         super(name, description, password, channelName, cid);
 
         userMap = new HashMap<UserID, Boolean>();
 
         this.host = host;
+        this.parentLobby = lobby;
         gameParameters = new HashMap<String, Object>();
     }
 
@@ -131,7 +136,18 @@ public class GameRoom extends ChannelRoom {
     public void setStarting(boolean b) {
     	starting = b;
     }
+    
+    public GLOReference<Lobby> getLobby() {
+    	return parentLobby;
+    }
+    
+    public void setMaxPlayers(int num) {
+    	maxPlayers = num;
+    }
    
+    public int getMaxPlayers() {
+    	return maxPlayers;
+    }
 
     /**
      * Returns a read-only view of the game parameters map.

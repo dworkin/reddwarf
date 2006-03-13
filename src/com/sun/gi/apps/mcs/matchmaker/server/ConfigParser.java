@@ -199,6 +199,9 @@ public class ConfigParser {
                 "canHostChangeSettingsAfterCreate"));
         lobby.setMaxConnectionTime(getIntAttribute(element, "maxConnectionTime"));
         lobby.setMaxPlayers(getIntAttribute(element, "maxPlayersInLobby"));
+        lobby.setMaxPlayersInGameRoom(getIntAttribute(element, "maxPlayersInGameRoom"));
+        lobby.setMinPlayersInGameRoomStart(getIntAttribute(element, "minPlayersInGameRoomStart"));
+        lobby.setMaxPlayersInGameRoomStart(getIntAttribute(element, "maxPlayersInGameRoomStart"));
 
         // populate the game parameters
         NodeList gameParametersNodeList =

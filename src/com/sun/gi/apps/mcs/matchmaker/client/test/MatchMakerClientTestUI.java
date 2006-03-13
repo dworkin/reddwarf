@@ -637,18 +637,23 @@ public class MatchMakerClientTestUI extends JFrame
         }
 
         void createGame() {
-            channel.createGame("My Game", "My description", null,
+        	if (channel != null) {
+        		channel.createGame("My Game", "My description", null,
                     gameParameters);
+        	}
         }
 
         void sendText(String message) {
-            channel.sendText(message);
+            if (channel != null) {
+            	channel.sendText(message);
+            }
         }
 
         void sendPrivateText(String message) {
-            byte[] userID = lookupUserID((String) userList.getSelectedValue());
-            System.out.println("private text: " + byteArrayToString(userID));
-            channel.sendPrivateText(userID, message);
+        	if (channel != null) {
+        		byte[] userID = lookupUserID((String) userList.getSelectedValue());
+        		channel.sendPrivateText(userID, message);
+        	}
         }
 
         private byte[] lookupUserID(String username) {
@@ -849,11 +854,15 @@ public class MatchMakerClientTestUI extends JFrame
         }
 
         public void ready() {
-            channel.ready(descriptor, true);
+            if (channel != null) {
+            	channel.ready(descriptor, true);
+            }
         }
 
         public void startGame() {
-            channel.startGame();
+        	if (channel != null) {
+        		channel.startGame();
+        	}
         }
 
         private void updateGameParameters(HashMap<String, Object> parameters) {

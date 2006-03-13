@@ -309,7 +309,6 @@ public class Player implements SimUserDataListener {
                                                             // from this
                                                             // channel
                 	gameRoom.removeUser(uid);
-                	Lobby lobby = currentLobby != null ? currentLobby.get(task) : null;
                 	if (gameRoom.isStarting()) {
                 		currentGameRoom = null;
                 		return;
@@ -323,14 +322,13 @@ public class Player implements SimUserDataListener {
                         }
                     }
 
+                    Lobby lobby = gameRoom.getLobby().get(task);
                     // send PlayerLeftGame message to lobby
-                    if (lobby != null) {
-	                    List list = protocol.createCommandList(PLAYER_LEFT_GAME);
-	                    list.add(uid);
-	                    list.add(gameRoom.getGameID());
-	
-	                    sendMulticastResponse(task, lobby.getUsers(), list, lobby.getChannelID());
-                    }
+                    List playerLeftList = protocol.createCommandList(PLAYER_LEFT_GAME);
+                    playerLeftList.add(uid);
+                    playerLeftList.add(gameRoom.getGameID());
+
+                    sendMulticastResponse(task, lobby.getUsers(), playerLeftList, lobby.getChannelID());
                     
                     List leftList = protocol.createCommandList(LEFT_GAME);
                     sendResponse(task, leftList);
@@ -338,7 +336,7 @@ public class Player implements SimUserDataListener {
                     // If this is the last person leaving the game room, 
                     // send notification to the Lobby that the game was killed
                     // and remove the game from the lobby list
-                    if (lobby != null && gameRoom.getUsers().size() == 0) {
+                    if (gameRoom.getNumPlayers() == 0) {
                     	lobby.removeGameRoom(currentGameRoom);
                     	
                         List list = protocol.createCommandList(GAME_DELETED);
@@ -349,7 +347,7 @@ public class Player implements SimUserDataListener {
                     
                     // currentGameRoom.delete(task);
                     currentGameRoom = null;
-                    
+                    return;
                 }
             } 
         	if (currentLobby != null) {
@@ -361,6 +359,11 @@ public class Player implements SimUserDataListener {
 	                
 	                List leftList = protocol.createCommandList(LEFT_LOBBY);
 	                sendResponse(task, leftList);
+	                
+	                if (currentGameRoom != null) {
+	                	GameRoom gr = currentGameRoom.peek(task);
+	                	task.leave(userID, gr.getChannelID());
+	                }
                 }
             }
         }
@@ -535,6 +538,7 @@ public class Player implements SimUserDataListener {
     private void leaveGame(SimTask task) {
     	if (currentGameRoom == null) {
     		sendErrorResponse(task, "Not connected to a game.");
+    		return;
     	}
     	GameRoom game = currentGameRoom.peek(task);
     	task.leave(userID, game.getChannelID());
@@ -549,7 +553,6 @@ public class Player implements SimUserDataListener {
      * @param data the buffer containing the command parameters
      */
     private void joinLobby(SimTask task, ByteBuffer data) {
-        System.out.println("joinLobby request");
         if (currentLobby != null) {
             sendErrorResponse(task, "Already connected to a lobby");
             return;
@@ -562,7 +565,7 @@ public class Player implements SimUserDataListener {
         GLOReference<Lobby> lobbyRef = lobbyMap.get(lobbyID);
         if (lobbyRef != null) {
             Lobby lobby = lobbyRef.peek(task);
-            if (lobby.getNumPlayers() == lobby.getMaxPlayers()) {
+            if (lobby.getMaxPlayers() > 0 && lobby.getNumPlayers() >= lobby.getMaxPlayers()) {
                 // TODO sten: perhaps in the future spawn a new lobby.
             	sendErrorResponse(task, "Lobby at max users");
                 return;
@@ -609,18 +612,25 @@ public class Player implements SimUserDataListener {
         UserID host = gameRoom.getHost();
         // only the host can start the game.
         if (!host.equals(userID)) {
-            sendStartGameFailed(task, "Only the host can start a game",
-                    gameRoom.getChannelID());
+            sendErrorResponse(task, "Only the host can start a game");
             return;
         }
         if (!gameRoom.arePlayersReady()) {
-            sendStartGameFailed(task, "Not all players are ready",
-                    gameRoom.getChannelID());
+            sendErrorResponse(task, "Not all players are ready");
             return;
         }
+        Lobby lobby = gameRoom.getLobby().get(task);
+        if (lobby.getMinPlayersInGameRoomStart() > 0 && gameRoom.getNumPlayers() < lobby.getMinPlayersInGameRoomStart()) {
+        	sendErrorResponse(task, "Not enough players to start game");
+        	return;
+        }
 
+        if (lobby.getMaxPlayersInGameRoomStart() > 0 && gameRoom.getNumPlayers() > lobby.getMaxPlayersInGameRoomStart()) {
+        	sendErrorResponse(task, "Too many players to start game");
+        	return;
+        }
+        
         gameRoom.setStarting(true);
-        Lobby lobby = currentLobby.get(task);
         lobby.removeGameRoom(currentGameRoom);
         
         List list = protocol.createCommandList(GAME_STARTED);
@@ -714,6 +724,10 @@ public class Player implements SimUserDataListener {
                 return;
             }
         }
+        if (gameRoom.getMaxPlayers() > 0 && gameRoom.getNumPlayers() >= gameRoom.getMaxPlayers()) {
+        	sendErrorResponse(task, "Game Room at max players");
+            return;
+        }
         task.join(userID, gameRoom.getChannelID());
     }
 
@@ -800,10 +814,11 @@ public class Player implements SimUserDataListener {
         task.lock(cid, true); // game access is controled by the server
 
         GLOReference<GameRoom> grRef = task.createGLO(new GameRoom(gameName,
-                description, password, channelName, cid, userID));
+                description, password, channelName, cid, userID, currentLobby));
         lobby.addGameRoom(grRef);
 
         GameRoom gr = grRef.get(task);
+        gr.setMaxPlayers(lobby.getMaxPlayersInGameRoom());
 
         // add to the game room map for easy look-up by gameID
         GLOMap<SGSUUID, GLOReference<GameRoom>> gameRoomMap =
@@ -838,6 +853,7 @@ public class Player implements SimUserDataListener {
         list.add(game.getDescription());
         list.add(game.getChannelName());
         list.add(game.isPasswordProtected());
+        list.add(game.getMaxPlayers());
 
         Map<String, Object> gameParams = game.getGameParamters();
         list.add(gameParams.size());

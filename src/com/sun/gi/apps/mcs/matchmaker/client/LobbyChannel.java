@@ -230,6 +230,7 @@ public class LobbyChannel implements ILobbyChannel, ClientChannelListener {
         String description = protocol.readString(data);
         String channelName = protocol.readString(data);
         boolean isProtected = protocol.readBoolean(data);
+        int maxPlayers = data.getInt();
         int numParams = data.getInt();
         HashMap<String, Object> paramMap = new HashMap<String, Object>();
         for (int i = 0; i < numParams; i++) {
