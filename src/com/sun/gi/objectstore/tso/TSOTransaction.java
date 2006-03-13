@@ -515,8 +515,8 @@ public class TSOTransaction implements Transaction {
 		}
 	    }
 
-	    if (senior == null || senior.txnID.equals(txnID)) {
-		if (senior == null) {
+	    if (senior.txnID.equals(txnID)) {
+		if (hdr.availabilityListeners.isEmpty()) {
 		    log.finer("nobody wanted the object: I'm grabbing it: " +
 			    objectID);
 		} else {
