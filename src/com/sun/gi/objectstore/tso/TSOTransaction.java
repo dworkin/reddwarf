@@ -501,6 +501,13 @@ public class TSOTransaction implements Transaction {
 	    for (SGSUUID uid : hdr.availabilityListeners) {
 		TSOTransaction tsot = ostore.sgsuuid2transaction(uid);
 
+		if (tsot == null) {
+		    // that transaction is gone, skip it
+		    log.warning("txn " + uid +
+			" is null, but still a listener for " + objectID);
+		    continue;
+		}
+
 		if ((tsot.initialAttemptTime < senior.initialAttemptTime) ||
 			((tsot.initialAttemptTime == senior.initialAttemptTime) &&
 			    (tsot.tiebreaker < senior.tiebreaker))) {
