@@ -66,15 +66,6 @@
  * spécifiquement désignés, sont rigoureusement interdites.
  */
 
-/**
- *
- * <p>Title: SwordWorldClient.java</p>
- * <p>Description: </p>
- * <p>Copyright: Copyright (c) 2004 Sun Microsystems, Inc.</p>
- * <p>Company: Sun Microsystems, Inc</p>
- * @author Jeff Kesselman
- * @version 1.0
- */
 package com.sun.gi.apps.swordworld.client;
 
 import java.awt.BorderLayout;
@@ -101,11 +92,9 @@ import com.sun.gi.comm.users.client.ClientConnectionManagerListener;
 import com.sun.gi.comm.users.client.impl.ClientConnectionManagerImpl;
 
 /**
- *
  * <p>Title: SwordWorldClient.java</p>
  * <p>Description: </p>
- * <p>Copyright: Copyright (c) 2004 Sun Microsystems, Inc.</p>
- * <p>Company: Sun Microsystems, Inc</p>
+ *
  * @author Jeff Kesselman
  * @version 1.0
  */

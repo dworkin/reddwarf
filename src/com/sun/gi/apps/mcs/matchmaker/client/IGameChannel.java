@@ -76,9 +76,6 @@ package com.sun.gi.apps.mcs.matchmaker.client;
  * a server side Game Room.  A client is given a IGameChannel instance after 
  * successfully connecting to a game room.</p>
  * 
- * <p>Copyright: Copyright (c) 2006</p>
- * <p>Company: Sun Microsystems, TMI</p>
- * 
  * @author	Sten Anderson
  * @version 1.0
  */

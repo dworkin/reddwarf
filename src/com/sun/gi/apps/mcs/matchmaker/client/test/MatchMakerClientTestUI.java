@@ -118,9 +118,6 @@ import com.sun.gi.utils.StatisticalUUID;
  * <p>Description: This class is a Swing UI that serves as a test harness for
  * the Match Making client.</p>
  * 
- * <p>Copyright: Copyright (c) 2006</p>
- * <p>Company: Sun Microsystems, TMI</p>
- * 
  * @author	Sten Anderson
  * @version 1.0
  */

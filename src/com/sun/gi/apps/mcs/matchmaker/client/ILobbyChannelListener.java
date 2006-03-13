@@ -77,9 +77,6 @@ import java.util.HashMap;
  * <p>Description: The ILobbyChannelListener signs up to receive the responses 
  * from a ILobbyChannel's command requests.</p>
  * 
- * <p>Copyright: Copyright (c) 2006</p>
- * <p>Company: Sun Microsystems, TMI</p>
- * 
  * @author	Sten Anderson
  * @version 1.0
  */

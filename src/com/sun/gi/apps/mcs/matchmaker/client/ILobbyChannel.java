@@ -78,9 +78,6 @@ import java.util.HashMap;
  * a server side Lobby.  A client is given a ILobbyChannel instance after 
  * successfully connecting to a lobby.</p>
  * 
- * <p>Copyright: Copyright (c) 2006</p>
- * <p>Company: Sun Microsystems, TMI</p>
- * 
  * @author	Sten Anderson
  * @version 1.0
  */

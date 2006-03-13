@@ -75,9 +75,6 @@ package com.sun.gi.apps.mcs.matchmaker.client;
  * <p>Description: The IGameChannelListener signs up to receive the responses 
  * from a IGameChannel's command requests.</p>
  * 
- * <p>Copyright: Copyright (c) 2006</p>
- * <p>Company: Sun Microsystems, TMI</p>
- * 
  * @author	Sten Anderson
  * @version 1.0
  */

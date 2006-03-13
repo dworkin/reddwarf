@@ -66,10 +66,6 @@
  * spécifiquement désignés, sont rigoureusement interdites.
  */
 
-/*
- * <p>Copyright: Copyright (c) 2006 Sun Microsystems, Inc.</p>
- */
-
 package com.sun.gi.objectstore.hadbtest;
 
 import com.sun.gi.objectstore.tso.dataspace.DataSpace;

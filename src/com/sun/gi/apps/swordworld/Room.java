@@ -67,11 +67,9 @@
  */
 
 /**
- *
  * <p>Title: Room.java</p>
  * <p>Description: </p>
- * <p>Copyright: Copyright (c) 2004 Sun Microsystems, Inc.</p>
- * <p>Company: Sun Microsystems, Inc</p>
+ *
  * @author Jeff Kesselman
  * @version 1.0
  */
