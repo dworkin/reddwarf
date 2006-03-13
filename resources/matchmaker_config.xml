@@ -1,68 +1,73 @@
 <Folder name="Root" description="Root Folder">
 
-	<Folder name="Newbies" description="Easy skill set">
-	
-		<Lobby 	name="Lords of the Jungle" 
-				description="New players only" 
-				password="secret"
-				maxPlayersInLobby="2"
-				allowHostToBoot="true"
-				allowHostToBootBan="false"
-				maxConnectionTime="2"	 >
-				
+	<Folder name="Beginner Rooms" description="">
+		<Lobby name="Gazelle's Speakeasy" description="" maxPlayersInLobby="20" allowHostToBoot="true" allowHostToBootBan="true" 
+			maxConnectionTime="120" maxPlayersInGameRoom="2" minPlayersInGameRoomStart="2" maxPlayersInGameRoomStart="2">
 			<GameParameters>
-			
-				<GameParameter name="timeLimit" value="15" />
-				<GameParameter name="gameType" value="Free For All" />
-				
+				<GameParameter name="gameType" type="string" />
+				<GameParameter name="host" type="uuid" />
+				<GameParameter name="victoryByTotems" type="int" value="10" />
+				<GameParameter name="numberOfLevels" type="int" value="3" />
 			</GameParameters>
-			
 		</Lobby>
-				
-		
+
+		<Lobby name="Baboon's Bistro" description="" maxPlayersInLobby="20" allowHostToBoot="true" allowHostToBootBan="true" 
+			maxConnectionTime="120" maxPlayersInGameRoom="2" minPlayersInGameRoomStart="2" maxPlayersInGameRoomStart="2">
+			<GameParameters>
+				<GameParameter name="gameType" type="string" />
+				<GameParameter name="victoryByTotems" type="int" value="10" />
+				<GameParameter name="numberOfLevels" type="int" value="3" />
+			</GameParameters>
+		</Lobby>
 	</Folder>
-	
-	<Folder name="Advanced" description="Expert skill set">
-	
-		
-		<Lobby 	name="Baboons Rule!" 
-				description="Experienced players only" 
-				password="secret"
-				maxPlayersInLobby="2"
-				allowHostToBoot="true"
-				allowHostToBootBan="false"
-				canHostChangeSettingsAfterCreate="false"
-				maxConnectionTime="2"	 >
-				
+
+	<Folder name="Intermediate Rooms" description="">
+		<Lobby name="Vulture's All-You-Can-Eatery" description="" maxPlayersInLobby="20" allowHostToBoot="true" allowHostToBootBan="true" 
+			maxConnectionTime="120" maxPlayersInGameRoom="2" minPlayersInGameRoomStart="2" maxPlayersInGameRoomStart="2">
 			<GameParameters>
-			
-				<GameParameter name="timeLimit" type="int" value="15" />
-				<GameParameter name="gameType" type="string" value="Team Play" />
-				
+				<GameParameter name="gameType" type="string" />
+				<GameParameter name="victoryByTotems" type="int" value="10" />
+				<GameParameter name="numberOfLevels" type="int" value="3" />
 			</GameParameters>
-			
 		</Lobby>
-		
-		<Folder name="Tournament" description="Experts compete one on one">
-		
-			<Lobby 	name="Tournaments of the Jungle" 
-					description="Tournament players only" 
-					password="secret"
-					maxPlayersInLobby="2"
-					allowHostToBoot="true"
-					allowHostToBootBan="false"
-					maxConnectionTime="2"	 >
-					
-				<GameParameters>
-				
-					<GameParameter name="timeLimit" value="15" />
-					<GameParameter name="gameType" value="Free For All" />
-					
-				</GameParameters>
-				
-			</Lobby>
-			
-		</Folder>				
-		
-	</Folder>	
+
+		<Lobby name="Hyena's Brouhaha" description="" maxPlayersInLobby="20" allowHostToBoot="true" allowHostToBootBan="true" 
+			maxConnectionTime="120" maxPlayersInGameRoom="2" minPlayersInGameRoomStart="2" maxPlayersInGameRoomStart="2">
+			<GameParameters>
+				<GameParameter name="gameType" type="string" />
+				<GameParameter name="victoryByTotems" type="int" value="10" />
+				<GameParameter name="numberOfLevels" type="int" value="3" />
+			</GameParameters>
+		</Lobby>
+
+		<Lobby name="The Lion's Meow" description="" maxPlayersInLobby="20" allowHostToBoot="true" allowHostToBootBan="true" 
+			maxConnectionTime="120" maxPlayersInGameRoom="2" minPlayersInGameRoomStart="2" maxPlayersInGameRoomStart="2">
+			<GameParameters>
+				<GameParameter name="gameType" type="string" />
+				<GameParameter name="victoryByTotems" type="int" value="10" />
+				<GameParameter name="numberOfLevels" type="int" value="3" />
+			</GameParameters>
+		</Lobby>
+	</Folder>
+
+	<Folder name="Expert Rooms" description="">
+		<Lobby name="Rhinos Anonymous" description="" maxPlayersInLobby="20" allowHostToBoot="true" allowHostToBootBan="true" 
+			maxConnectionTime="120" maxPlayersInGameRoom="2" minPlayersInGameRoomStart="2" maxPlayersInGameRoomStart="2">
+			<GameParameters>
+				<GameParameter name="gameType" type="string" />
+				<GameParameter name="victoryByTotems" type="int" value="10" />
+				<GameParameter name="numberOfLevels" type="int" value="3" />
+			</GameParameters>
+		</Lobby>
+
+		<Lobby name="The Elephant Bar" description="" maxPlayersInLobby="20" allowHostToBoot="true" allowHostToBootBan="true" 
+			maxConnectionTime="120" maxPlayersInGameRoom="2" minPlayersInGameRoomStart="2" maxPlayersInGameRoomStart="2">
+			<GameParameters>
+				<GameParameter name="gameType" type="string" />
+				<GameParameter name="victoryByTotems" type="int" value="10" />
+				<GameParameter name="numberOfLevels" type="int" value="3" />
+			</GameParameters>
+		</Lobby>
+	</Folder>
+
 </Folder>
