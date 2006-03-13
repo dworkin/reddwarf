@@ -26,12 +26,12 @@
     <path id="build.j2se.app.classpath">
 	<pathelement location="resources/libs/${jrms.jarfile}" />
 	<pathelement location="resources/libs/${derby.jarfile}" />
-	<pathelement location="release/ProjectDarkstar.jar" />
+	<pathelement location="release/SunGameServer.jar" />
     </path>
 
     <path id="build.j2se.client.classpath">
 	<pathelement location="bin" />
-	<pathelement location="release/ProjectDarkstarClientAPI.jar" />
+	<pathelement location="release/SunGameServerClientAPI.jar" />
     </path>
 
     <target name="init">
@@ -69,7 +69,7 @@
     <target name="realclean" depends="clean,clean.j2meAPI">
 	<delete dir="doc" />
 	<delete dir="release" />
-	<delete file="ProjectDarkstar.zip" />
+	<delete file="SunGameServer.zip" />
     </target>
 
     <!-- Documentation targets -->
@@ -273,7 +273,7 @@
 	    <arg value="-V"/>
 	    <!-- <classpath refid="project.classpath"/> -->
 	    <classpath>
-		<pathelement location="release/ProjectDarkstar.jar"/>
+		<pathelement location="release/SunGameServer.jar"/>
 		<pathelement location="release/${derby.jarfile}"/>
 	    </classpath>
 	    <sysproperty key="java.util.logging.config.file"
@@ -376,7 +376,7 @@
 
     <!--<target name="release" depends="release.j2se,release.j2me">-->
     <target name="release" depends="release.j2se">
-	<zip destfile="ProjectDarkstar.zip">
+	<zip destfile="SunGameServer.zip">
 	    <fileset dir="release">
 		<exclude name="persistant_store/**"/>
 	    </fileset>
@@ -391,7 +391,7 @@
     <target name="release.j2se.bin" depends="release.server,release.j2seAPI,release.apps,release.clients"/>
 
     <target name="release.server" depends="build.server">
-	<jar destfile="release/ProjectDarkstar.jar">
+	<jar destfile="release/SunGameServer.jar">
 	    <manifest>
 		<attribute name="Class-Path"
 			   value="${jrms.jarfile} ${derby.jarfile}"/>
@@ -404,19 +404,19 @@
 		<exclude name="com/sun/gi/comm/users/client/**"/>
 	    </fileset>
 	</jar>
-	<copy file="resources/startDarkstar.sh" todir="release" />
+	<copy file="resources/startSGS.sh" todir="release" />
 	<copy file="resources/startDiscovery.sh" todir="release" />
-	<chmod file="release/startDarkstar.sh" perm="755" />
+	<chmod file="release/startSGS.sh" perm="755" />
 	<chmod file="release/startDiscovery.sh" perm="755" />
 	<copy file="resources/libs/${jrms.jarfile}" todir="release/jrms" />
 	<copy file="resources/libs/${derby.jarfile}" todir="release/derby" />
 	<copy file="resources/Install.txt" todir="release" />
 	<copy file="resources/passwd.txt" todir="release" />
-    <copy file="resources/FakeDiscovery.xml" todir="release" />
+	<copy file="resources/FakeDiscovery.xml" todir="release" />
     </target>
 
     <target name="release.j2seAPI" depends="build.j2seAPI">
-	<jar destfile="release/ProjectDarkstarClientAPI.jar">
+	<jar destfile="release/SunGameServerClientAPI.jar">
 	    <fileset dir="bin">
 		<include name="com/sun/gi/comm/users/client/**"/>
 		<include name="com/sun/gi/comm/users/protocol/**"/>
@@ -444,7 +444,7 @@
 	<jar destfile="release/client/BattleBoardClient.jar">
 	    <manifest>
 		<attribute name="Class-Path"
-			   value="../ProjectDarkstarClientAPI.jar"/>
+			   value="../SunGameServerClientAPI.jar"/>
 		<attribute name="Main-Class"
 			   value="com.sun.gi.apps.battleboard.client.BattleBoardClient"/>
 	    </manifest>
@@ -462,7 +462,7 @@
 	<jar destfile="release/client/HackClient.jar">
 	    <manifest>
 		<attribute name="Class-Path"
-			   value="../ProjectDarkstarClientAPI.jar"/>
+			   value="../SunGameServerClientAPI.jar"/>
 		<attribute name="Main-Class"
 			   value="com.sun.gi.apps.hack.client.Client"/>
 	    </manifest>

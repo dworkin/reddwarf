@@ -326,9 +326,8 @@ public class ChatTestClient extends JFrame
                     new URLDiscoverer(
                             new File("FakeDiscovery.xml").toURI().toURL()));
             // mgr = new ClientConnectionManagerImpl("ChatTest",
-            // new URLDiscoverer(
-            // new
-            // URL("http://alpha-darkstar.sunlabs.com/discovery.xml")));
+            //     new URLDiscoverer(
+            //         new URL("http://yourhost.example.com/discovery.xml")));
 
             mgr.setListener(this);
 

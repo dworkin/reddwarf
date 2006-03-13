@@ -1,3 +1,2 @@
 #!/bin/sh
-java -classpath ProjectDarkstar.jar com.sun.gi.DiscoveryServer
-
+exec java -classpath SunGameServer.jar com.sun.gi.DiscoveryServer

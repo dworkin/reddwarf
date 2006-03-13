@@ -172,9 +172,9 @@ public class HadbTest {
 	    // XXX: MUST take these from a config file.
 
 	    String hadbHosts = "129.148.75.63:15025,129.148.75.60:15005";
-	    String dbaseName = "darkstar";
+	    String dbaseName = "sungameserver";
 	    String userName = "system";
-	    String userPasswd = "darkstar";
+	    String userPasswd = "sungameserver";
 
 	    // dataConnURL = "jdbc:sun:hadb:" + dbaseName + ":" +
 	    // 	    hadbHosts + ";create=true";

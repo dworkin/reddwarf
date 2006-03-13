@@ -146,7 +146,7 @@ public class HadbDataSpace implements DataSpace {
 
     private String hadbHosts = null;
     private String hadbUserName = "system";
-    private String hadbPassword = "darkstar";
+    private String hadbPassword = "sungameserver";
     private String hadbDBname = null;
 
     /**
@@ -195,7 +195,7 @@ public class HadbDataSpace implements DataSpace {
             // XXX: MUST take these from a config file.
             // hadbHosts = "129.148.75.63:15025,129.148.75.60:15005";
             // String userName = "system";
-            // String userPasswd = "darkstar";
+            // String userPasswd = "sungameserver";
 
             String dataConnURL = "jdbc:sun:hadb:" + hadbHosts + ";create=true";
 
@@ -288,7 +288,7 @@ public class HadbDataSpace implements DataSpace {
                 System.getProperty("dataspace.hadb.username", "system"));
 
         hadbPassword = hadbParams.getProperty("dataspace.hadb.password",
-                System.getProperty("dataspace.hadb.password", "darkstar"));
+                System.getProperty("dataspace.hadb.password", "sungameserver"));
 
         // DO NOT USE: leave hadbDBname null.
         // Setting the database name to anything other than the default

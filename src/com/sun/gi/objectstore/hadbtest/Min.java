@@ -91,7 +91,7 @@ public class Min {
 	try {
 	    con = DriverManager.getConnection(
 		    "jdbc:sun:hadb:129.148.75.63:15025,129.148.75.60:15005",
-		    "system", "darkstar");
+		    "system", "sungameserver");
 	    md = con.getMetaData();
 	    rs = md.getTables(null, SCHEMA, OBJTBL, null);
 

@@ -75,7 +75,7 @@ public class TestGetTables {
 	Class.forName ("com.sun.hadb.jdbc.Driver");
 	Connection con = DriverManager.getConnection(
 		"jdbc:sun:hadb:129.148.75.63:15025,129.148.75.60:15005",
-		"system", "darkstar");
+		"system", "sungameserver");
 	Statement stmt = con.createStatement();
 	try {
 	    stmt.executeUpdate("DROP TABLE MYSC.FOO");
