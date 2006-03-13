@@ -348,8 +348,10 @@
 
     <target name="Hack">
 	<java jar="release/client/HackClient.jar" failonerror="true" fork="true">
+	    <!--
 	    <sysproperty key="java.util.logging.config.file"
 			 file="logging.properties" />
+	    -->
 	</java>
     </target>
 
@@ -372,13 +374,19 @@
 
     <!-- Release Targets -->
 
-    <target name="release" depends="release.j2se,release.j2me">
-	<zip destfile="ProjectDarkstar.zip" basedir="release" />
+    <!--<target name="release" depends="release.j2se,release.j2me">-->
+    <target name="release" depends="release.j2se">
+	<zip destfile="ProjectDarkstar.zip">
+	    <fileset dir="release">
+		<exclude name="persistant_store/**"/>
+	    </fileset>
+	</zip>
     </target>
 
     <!-- J2SE release targets -->
 
     <target name="release.j2se" depends="release.j2se.bin,release.docs,release.examples"/>
+    <!-- <target name="release.j2se" depends="release.j2se.bin"/> -->
 
     <target name="release.j2se.bin" depends="release.server,release.j2seAPI,release.apps,release.clients"/>
 
