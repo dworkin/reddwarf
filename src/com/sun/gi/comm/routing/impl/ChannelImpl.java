@@ -122,7 +122,12 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
             hdr.putInt(tobytes.length);
             hdr.put(tobytes);
             buffs[1] = message;
-            transportChannel.sendData(buffs);
+            try {
+				transportChannel.sendData(buffs);
+			} catch (IOException e) {
+				
+				e.printStackTrace();
+			}
         }
         sendToLocalUser(from.toByteArray(), to.toByteArray(), message, reliable);
         router.channelDataPacket(this, from, message, reliable);
@@ -149,7 +154,12 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
                 hdr.put(tobytes);
             }
             buffs[1] = message;
-            transportChannel.sendData(buffs);
+            try {
+				transportChannel.sendData(buffs);
+			} catch (IOException e) {
+				
+				e.printStackTrace();
+			}
         }
         byte[][] toArray = new byte[tolist.length][];
         for (int i = 0; i < toArray.length; i++) {
@@ -170,7 +180,12 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
             hdr.putInt(frombytes.length);
             hdr.put(frombytes);
             buffs[1] = message;
-            transportChannel.sendData(buffs);
+            try {
+				transportChannel.sendData(buffs);
+			} catch (IOException e) {
+				
+				e.printStackTrace();
+			}
         }
         broadcastToLocalUsers(from.toByteArray(), message, reliable);
         router.channelDataPacket(this, from, message, reliable);

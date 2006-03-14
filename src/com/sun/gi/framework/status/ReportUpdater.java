@@ -115,5 +115,6 @@ public class ReportUpdater {
      */
     public void addReport(StatusReport installationReport) {
         reports.add(installationReport);
+       
     }
 }

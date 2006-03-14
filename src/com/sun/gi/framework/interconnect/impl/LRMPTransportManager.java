@@ -95,11 +95,16 @@ public class LRMPTransportManager
     //private DatagramPacket outpkt = new DatagramPacket(outbytes, 65);
     private ReversableMap idMap = new ReversableMap();
     private static final byte OP_CHANNEL_ANNOUNCE = 1;
-    private static final byte OP_CHANNEL_REMOVE = 2;
-    private static final byte OP_DATA = 3;
+    private static final byte OP_CHANNEL_REMOVE = 2;  
+    private static final byte OP_DATA_INCOMPLETE = 4;
+    private static final byte OP_DATA_END = 5;
+	private static final int LRMPMTU = 1140;
     private Map chanMap = new HashMap();
     private Map oldChanMap = new HashMap();
+    private SGSUUID managerID = new StatisticalUUID();
     //private boolean echo = false;
+	private Map<SGSUUID,ByteBuffer> mgrInputBuffer =
+		new HashMap<SGSUUID,ByteBuffer>();
 
     public LRMPTransportManager() {
         String prop = System.getProperty("sgs.lrmp.mcastaddress");
@@ -122,6 +127,7 @@ public class LRMPTransportManager
             tp.setMaxDataRate(100000);
             tp.setOrdered(true);
             tp.setTTL(ttl);
+            
             cmgr = new LRMPSocketManager(tp);
             cmgr.setEcho(false);
             cmgr.addListener(this);
@@ -146,10 +152,8 @@ public class LRMPTransportManager
      * @param lRMPSocketManager LRMPSocketManager
      * @param inpkt DatagramPacket
      */
-    public void packetArrived(LRMPSocketManager lRMPSocketManager,
-            DatagramPacket inpkt) {
-        ByteBuffer buff = ByteBuffer.wrap(inpkt.getData(), inpkt.getOffset(),
-                inpkt.getLength());
+    public synchronized void processPacket(LRMPSocketManager lRMPSocketManager,
+            ByteBuffer buff) {
         byte op = buff.get();
         // System.err.println("Processing transport pkt opcode: "+op);
         switch (op) {
@@ -191,16 +195,34 @@ public class LRMPTransportManager
                 }
                 break;
 
-            case OP_DATA:
+            case OP_DATA_INCOMPLETE:
+            case OP_DATA_END:
+            		StatisticalUUID mgrID = new StatisticalUUID();
+            		mgrID.read(buff);  
+            		int packetSize = buff.getInt(); 
                 uuID = new StatisticalUUID();
-                uuID.read(buff);
-                chan = (LRMPTransportChannel) chanMap.get(uuID);
-                if (chan == null) {
-                    chan = (LRMPTransportChannel) oldChanMap.get(uuID);
-                }
-                if (chan != null) {
-                    ByteBuffer data = buff.slice();
-                    chan.doRecieveData(data);
+                uuID.read(buff);                    
+                ByteBuffer inbuff = mgrInputBuffer.get(mgrID);
+        			if ((inbuff==null)||(inbuff.capacity()<packetSize)){
+        				inbuff = ByteBuffer.allocate(packetSize);
+        				mgrInputBuffer.put(mgrID,inbuff);
+        			}
+        			inbuff.put(buff);
+        			if (op == OP_DATA_END){        				
+        				chan = (LRMPTransportChannel) chanMap.get(uuID);
+        				if (chan == null) {
+        					chan = (LRMPTransportChannel) oldChanMap.get(uuID);
+        				}
+        				if (chan != null) { 
+        					inbuff.flip();  
+        					if (inbuff.remaining()!=packetSize){
+        						System.err.println("Error: expect "+packetSize+
+        								"bytes but got "+inbuff.remaining());
+        						System.exit(-98);
+        					}
+        					chan.doRecieveData(inbuff.duplicate());
+        				}
+        				inbuff.clear();
                 }
                 break;
         }
@@ -281,34 +303,63 @@ public class LRMPTransportManager
     }
 
     // for use by LRMPTransportChannel
-    void sendData(SGSUUID uuid, ByteBuffer data) throws IOException {
+    public synchronized void sendData(SGSUUID uuid, ByteBuffer data) throws IOException {
         data.flip();
-        int sz = data.remaining() + uuid.ioByteSize() + 1;
-        ByteBuffer outbuff = ByteBuffer.allocate(sz);
-        outbuff.put(OP_DATA);
-        uuid.write(outbuff);
-        outbuff.put(data);
-        cmgr.send(new DatagramPacket(outbuff.array(), sz));
+        int totalDataSize = data.remaining();
+        int hdrSize = managerID.ioByteSize()+uuid.ioByteSize()+1+4;
+        byte[] transfer = new byte[LRMPMTU-hdrSize];
+        while(data.remaining()+hdrSize >LRMPMTU){
+        		ByteBuffer outbuff = ByteBuffer.allocate(LRMPMTU);        		
+        		outbuff.put(OP_DATA_INCOMPLETE);
+        		managerID.write(outbuff);
+        		outbuff.putInt(totalDataSize);
+            uuid.write(outbuff);
+            data.get(transfer);
+            outbuff.put(transfer);
+            cmgr.send(new DatagramPacket(outbuff.array(),LRMPMTU));
+        }
+        ByteBuffer outbuff = ByteBuffer.allocate(data.remaining()+hdrSize);
+		outbuff.put(OP_DATA_END);
+		managerID.write(outbuff);
+		outbuff.putInt(totalDataSize);
+		uuid.write(outbuff);
+		int endSz = data.remaining();
+		transfer = new byte[endSz];
+		data.get(transfer);
+		outbuff.put(transfer);
+		outbuff.flip();
+		cmgr.send(new DatagramPacket(outbuff.array(),outbuff.remaining()));  
     }
 
-    /**
+    
+	
+
+	/**
      * sendData
      * 
      * @param uuID UUID
      * @param byteBuffers ByteBuffer[]
+	 * @throws IOException 
      */
-    public void sendData(SGSUUID uuID, ByteBuffer[] byteBuffers) {
-        int sz = uuID.ioByteSize() + 1;
+    public synchronized void sendData(SGSUUID uuID, ByteBuffer[] byteBuffers) throws IOException {
+    		int sz=0;
         for (int i = 0; i < byteBuffers.length; i++) {
             byteBuffers[i].flip();
             sz += byteBuffers[i].remaining();
         }
         ByteBuffer outbuff = ByteBuffer.allocate(sz);
-        outbuff.put(OP_DATA);
-        uuID.write(outbuff);
         for (int i = 0; i < byteBuffers.length; i++) {
             outbuff.put(byteBuffers[i]);
         }
-        cmgr.send(new DatagramPacket(outbuff.array(), sz));
+        sendData(uuID,outbuff);
     }
+
+	/* (non-Javadoc)
+	 * @see com.sun.gi.utils.LRMPSocketListener#packetArrived(com.sun.gi.utils.LRMPSocketManager, java.net.DatagramPacket)
+	 */
+	public void packetArrived(LRMPSocketManager lRMPSocketManager, DatagramPacket inpkt) {
+		processPacket(lRMPSocketManager,ByteBuffer.wrap(inpkt.getData(),inpkt.getOffset(),
+				inpkt.getLength()));
+		
+	}
 }

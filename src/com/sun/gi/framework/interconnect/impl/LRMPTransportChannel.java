@@ -166,8 +166,9 @@ public class LRMPTransportChannel implements TransportChannel {
      * sendData
      * 
      * @param byteBuffers ByteBuffer[]
+     * @throws IOException 
      */
-    public void sendData(ByteBuffer[] byteBuffers) {
+    public void sendData(ByteBuffer[] byteBuffers) throws IOException {
         transportManager.sendData(uuID, byteBuffers);
     }
 

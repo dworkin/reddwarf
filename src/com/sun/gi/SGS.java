@@ -86,7 +86,7 @@ import com.sun.gi.framework.install.UserMgrRec;
 import com.sun.gi.framework.install.ValidatorRec;
 import com.sun.gi.framework.install.impl.InstallationURL;
 import com.sun.gi.framework.interconnect.TransportManager;
-//import com.sun.gi.framework.interconnect.impl.LRMPTransportManager;
+import com.sun.gi.framework.interconnect.impl.LRMPTransportManager;
 import com.sun.gi.framework.interconnect.impl.NullTransportManager;
 import com.sun.gi.framework.rawsocket.impl.RawSocketManagerImpl;
 import com.sun.gi.framework.status.ReportManager;
@@ -146,8 +146,8 @@ public class SGS {
 	    InstallationLoader installation = new InstallationURL(new URL(
 		    installFile));
 	    // start framework services
-	    //transportManager = new LRMPTransportManager();
-	    transportManager = new NullTransportManager();
+	    transportManager = new LRMPTransportManager();
+	    //transportManager = new NullTransportManager();
 	    reportManager = new ReportManagerImpl(transportManager, REPORTTTL);
 	    long heartbeat = 1000; // 1 sec heartbeat default
 	    String hbprop = System.getProperty("sgs.framework.timer.heartbeat");

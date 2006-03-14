@@ -112,6 +112,12 @@ public class RCUser extends JInternalFrame implements SGSUser {
     public RCUser(Router router, String userName) {
         super(userName);
         myRouter = router;
+        try {
+			myID = new UserID();
+		} catch (InstantiationException e1) {
+			
+			e1.printStackTrace();
+		}
         setSize(200, 200);
         Container c = getContentPane();
         desktop = new JDesktopPane();

@@ -114,7 +114,7 @@ public class StatusReportImpl implements StatusReport {
             return null;
         }
 
-        public void write(ByteBuffer buff) {
+        public void write(ByteBuffer buff) {      
             buff.putInt(name.length());
             buff.put(name.getBytes());
             buff.putInt(parameters.size());
@@ -197,7 +197,7 @@ public class StatusReportImpl implements StatusReport {
             }
         }
 
-        public void dump(PrintStream outstrm, String prefix) {
+        public void dump(PrintStream outstrm, String prefix) {        		
             prefix += "." + name;
             for (Entry<String, String> entry : parameters.entrySet()) {
                 String key = entry.getKey();
@@ -208,6 +208,7 @@ public class StatusReportImpl implements StatusReport {
             for (ReportBlock block : children) {
                 block.dump(outstrm, prefix);
             }
+           
         }
     }
 
@@ -373,5 +374,6 @@ public class StatusReportImpl implements StatusReport {
 
     public void dump(PrintStream outstrm) {
         root.dump(outstrm, "");
+        outstrm.println("Binary Size = "+reportSize());
     }
 }
