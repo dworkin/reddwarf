@@ -6,8 +6,8 @@
 
 #include "ClientConnectionManager.h"
 
-using namespace Darkstar;
-using namespace Darkstar::Internal;
+using namespace SGS;
+using namespace SGS::Internal;
 
 ClientChannel::ClientChannel(ClientConnectionManager* manager, const std::wstring& channelName, const ChannelID& channelID) :
 	mID(channelID),

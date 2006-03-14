@@ -21,8 +21,8 @@ int _wtoi(const wchar_t*)
 }
 #endif
 
-using namespace Darkstar;
-using namespace Darkstar::Internal;
+using namespace SGS;
+using namespace SGS::Internal;
 
 EXPORT_USERMANAGERCLIENT(L"com.sun.gi.comm.users.client.impl.TCPIPUserManagerClient", TCPIPUserManagerClient);
 

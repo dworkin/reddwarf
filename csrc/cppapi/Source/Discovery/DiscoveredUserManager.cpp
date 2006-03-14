@@ -2,8 +2,8 @@
 
 #include "DiscoveredUserManager.h"
 
-using namespace Darkstar;
-using namespace Darkstar::Internal;
+using namespace SGS;
+using namespace SGS::Internal;
 
 DiscoveredUserManager::DiscoveredUserManager(const std::wstring& clientClass) :
 	mClientClass(clientClass)

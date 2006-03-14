@@ -26,7 +26,7 @@
 
 #include "Client\DefaultUserManagerPolicy.h"
 
-using namespace Darkstar;
+using namespace SGS;
 
 class ConsoleListener : public IClientConnectionManagerListener, public IClientChannelListener
 {

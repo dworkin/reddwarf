@@ -1,7 +1,7 @@
 #ifndef _Platform_h
 #define _Platform_h
 
-namespace Darkstar
+namespace SGS
 {
 	class ISocketManager;
 	struct IStream;

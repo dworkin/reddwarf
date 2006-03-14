@@ -5,7 +5,7 @@
 #include "../ISocketManager.h"
 #include "IP4Address.h"
 
-namespace Darkstar
+namespace SGS
 {
 	namespace Internal
 	{

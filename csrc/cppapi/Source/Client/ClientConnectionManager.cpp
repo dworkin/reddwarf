@@ -15,8 +15,8 @@
 
 #include "Platform/Platform.h"
 
-using namespace Darkstar;
-using namespace Darkstar::Internal;
+using namespace SGS;
+using namespace SGS::Internal;
 
 ClientConnectionManager::ClientConnectionManager(const std::wstring& gameName, IDiscoverer* discoverer, IUserManagerPolicy* policy) :
 	mDiscoverer(discoverer),

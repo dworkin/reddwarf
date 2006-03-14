@@ -7,7 +7,7 @@
 #include "Socket/ISocketManagerListener.h"
 #include "Socket/ISocketListener.h"
 
-namespace Darkstar
+namespace SGS
 {
 	class IUserManagerClientListener;
 	class ITransportProtocol;

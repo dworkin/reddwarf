@@ -1,7 +1,7 @@
 #ifndef _IUserManagerClientListener_h
 #define _IUserManagerClientListener_h
 
-namespace Darkstar
+namespace SGS
 {
 	struct ChannelID;
 	struct UserID;

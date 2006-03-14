@@ -1,7 +1,7 @@
 #ifndef _IDiscoveredUserManager_h
 #define _IDiscoveredUserManager_h
 
-namespace Darkstar
+namespace SGS
 {
 	class CLIENTAPI IDiscoveredUserManager
 	{

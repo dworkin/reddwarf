@@ -24,7 +24,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="..\..\DarkStar\ClientAPI\Source,..\ThirdParty\boost_1_33_1"
+				AdditionalIncludeDirectories="..\cppapi\Source,..\ThirdParty\boost_1_33_1"
 				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
@@ -76,7 +76,7 @@
 			CharacterSet="1">
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories="..\..\DarkStar\ClientAPI\Source,..\ThirdParty\boost_1_33_1"
+				AdditionalIncludeDirectories="..\cppapi\Source,..\ThirdParty\boost_1_33_1"
 				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS"
 				RuntimeLibrary="2"
 				ForceConformanceInForLoopScope="TRUE"

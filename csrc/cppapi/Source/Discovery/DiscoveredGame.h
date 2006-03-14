@@ -3,7 +3,7 @@
 
 #include "IDiscoveredGame.h"
 
-namespace Darkstar
+namespace SGS
 {
 	namespace Internal
 	{

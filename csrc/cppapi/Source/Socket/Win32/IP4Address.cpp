@@ -8,8 +8,8 @@
 
 #include "IP4Address.h"
 
-using namespace Darkstar;
-using namespace Darkstar::Internal;
+using namespace SGS;
+using namespace SGS::Internal;
 
 IP4Address IP4Address::FromString(const wchar_t* address, uint16 defaultPort)
 {

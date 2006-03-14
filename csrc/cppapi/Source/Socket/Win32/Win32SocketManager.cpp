@@ -13,8 +13,8 @@
 
 #include "Win32Socket.h"
 
-using namespace Darkstar;
-using namespace Darkstar::Internal;
+using namespace SGS;
+using namespace SGS::Internal;
 
 Win32SocketManager::Win32SocketManager() :
 	mpListener(NULL)

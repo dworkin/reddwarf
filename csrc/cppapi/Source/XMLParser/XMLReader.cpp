@@ -7,7 +7,7 @@
 #include "Expat-1.95.8/Source/lib/expat_config.h"
 #include "Expat-1.95.8/Source/lib/expat.h"
 
-namespace Darkstar
+namespace SGS
 {
 	namespace Internal
 	{
@@ -21,7 +21,7 @@ namespace Darkstar
 	}
 }
 
-Darkstar::XMLReader::XMLReader(Darkstar::IStream* pStream) :
+SGS::XMLReader::XMLReader(SGS::IStream* pStream) :
 	mpStream(pStream),
 	mParser(XML_ParserCreate(NULL)),
 	mpCurrentElement(NULL)
@@ -34,17 +34,17 @@ Darkstar::XMLReader::XMLReader(Darkstar::IStream* pStream) :
 	XML_SetCharacterDataHandler(mParser, &Internal::XMLAdapter::OnCharacterData);
 }
 
-Darkstar::XMLReader::~XMLReader()
+SGS::XMLReader::~XMLReader()
 {
 	if (mParser != NULL)
 		XML_ParserFree(mParser);
 
 	delete mpCurrentElement;
-	for (std::list<Darkstar::XMLElement*>::iterator iter = mElements.begin(); iter != mElements.end(); ++iter)
+	for (std::list<SGS::XMLElement*>::iterator iter = mElements.begin(); iter != mElements.end(); ++iter)
 		delete *iter;
 }
 
-bool Darkstar::XMLReader::IsEOF()
+bool SGS::XMLReader::IsEOF()
 {
 	if (!mParser || !mpStream)
 		return true;
@@ -55,7 +55,7 @@ bool Darkstar::XMLReader::IsEOF()
 	}
 }
 
-const Darkstar::XMLElement& Darkstar::XMLReader::ReadElement()
+const SGS::XMLElement& SGS::XMLReader::ReadElement()
 {
 	//ASSERT(mParser);
 	//ASSERT(mpStream);
@@ -79,7 +79,7 @@ public:
 
 #define throwXmlError(xmlFile, xmlLine, what)	throw xml_error(__FILE__, __LINE__, xmlFile, xmlLine, what)
 
-void Darkstar::XMLReader::Parse()
+void SGS::XMLReader::Parse()
 {
 	while (mElements.empty() && !mpStream->IsEOF())
 	{
@@ -106,10 +106,10 @@ void Darkstar::XMLReader::Parse()
 	}
 }
 
-void XMLCALL Darkstar::Internal::XMLAdapter::OnStartElement(void *userData, const XML_Char *name, const XML_Char **atts)
+void XMLCALL SGS::Internal::XMLAdapter::OnStartElement(void *userData, const XML_Char *name, const XML_Char **atts)
 {
-	Darkstar::XMLElement* pElement = new Darkstar::XMLElement; 
-	pElement->kind = Darkstar::kStart; 
+	SGS::XMLElement* pElement = new SGS::XMLElement; 
+	pElement->kind = SGS::kStart; 
 	pElement->name = name; 
 	while ( *atts != NULL )
 	{
@@ -118,26 +118,26 @@ void XMLCALL Darkstar::Internal::XMLAdapter::OnStartElement(void *userData, cons
 		pElement->attributes[key] = value; 
 	}
 
-	Darkstar::XMLReader* pThis = reinterpret_cast<Darkstar::XMLReader*>(userData);
+	SGS::XMLReader* pThis = reinterpret_cast<SGS::XMLReader*>(userData);
 	pThis->mElements.push_back(pElement); 
 }
 
-void XMLCALL Darkstar::Internal::XMLAdapter::OnEndElement(void *userData, const XML_Char *name)
+void XMLCALL SGS::Internal::XMLAdapter::OnEndElement(void *userData, const XML_Char *name)
 {
-	Darkstar::XMLElement* pElement = new Darkstar::XMLElement; 
-	pElement->kind = Darkstar::kEnd; 
+	SGS::XMLElement* pElement = new SGS::XMLElement; 
+	pElement->kind = SGS::kEnd; 
 	pElement->name = name; 
 
-	Darkstar::XMLReader* pThis = reinterpret_cast<Darkstar::XMLReader*>(userData);
+	SGS::XMLReader* pThis = reinterpret_cast<SGS::XMLReader*>(userData);
 	pThis->mElements.push_back(pElement); 
 }
 
-void XMLCALL Darkstar::Internal::XMLAdapter::OnCharacterData(void *userData, const XML_Char *s, int len)
+void XMLCALL SGS::Internal::XMLAdapter::OnCharacterData(void *userData, const XML_Char *s, int len)
 {
-	Darkstar::XMLElement* pElement = new Darkstar::XMLElement; 
-	pElement->kind = Darkstar::kText; 
+	SGS::XMLElement* pElement = new SGS::XMLElement; 
+	pElement->kind = SGS::kText; 
 	pElement->name = std::wstring( s, len ); 
 
-	Darkstar::XMLReader* pThis = reinterpret_cast<Darkstar::XMLReader*>(userData);
+	SGS::XMLReader* pThis = reinterpret_cast<SGS::XMLReader*>(userData);
 	pThis->mElements.push_back(pElement); 
 }

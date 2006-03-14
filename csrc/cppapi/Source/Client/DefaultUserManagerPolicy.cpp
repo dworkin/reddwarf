@@ -5,7 +5,7 @@
 #include "Discovery\IDiscoveredGame.h"
 #include "Discovery\IDiscoveredUserManager.h"
 
-using namespace Darkstar;
+using namespace SGS;
 
 DefaultUserManagerPolicy::DefaultUserManagerPolicy()
 {

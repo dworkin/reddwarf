@@ -3,8 +3,8 @@
 
 #include "LibHTTPStream.h"
 
-using namespace Darkstar;
-using namespace Darkstar::Internal;
+using namespace SGS;
+using namespace SGS::Internal;
 
 LibHTTPStream::LibHTTPStream(int templateID, int connectionID, int requestID, int contentLength) :
 	mTemplateID(templateID),

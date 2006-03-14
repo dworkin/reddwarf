@@ -1,7 +1,7 @@
 #ifndef _ClientAlreadyConnectedException_h
 #define _ClientAlreadyConnectedException_h
 
-namespace Darkstar
+namespace SGS
 {
 	class CLIENTAPI ClientAlreadyConnectedException : public std::exception
 	{

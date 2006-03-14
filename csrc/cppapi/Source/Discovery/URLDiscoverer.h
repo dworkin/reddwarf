@@ -3,7 +3,7 @@
 
 #include "IDiscoverer.h"
 
-namespace Darkstar
+namespace SGS
 {
 	class CLIENTAPI URLDiscoverer : public IDiscoverer
 	{

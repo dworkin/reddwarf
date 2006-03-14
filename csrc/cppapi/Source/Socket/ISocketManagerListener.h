@@ -1,7 +1,7 @@
 #ifndef _ISocketManagerListener_h
 #define _ISocketManagerListener_h
 
-namespace Darkstar
+namespace SGS
 {
 	class ISocket;
 

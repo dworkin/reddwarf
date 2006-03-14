@@ -14,8 +14,8 @@
 #include "Socket/ISocketListener.h"
 #include "Socket/ISocketManagerListener.h"
 
-using namespace Darkstar;
-using namespace Darkstar::Internal;
+using namespace SGS;
+using namespace SGS::Internal;
 
 const size_t kMaxDatagramPacketSize = 2048;
 

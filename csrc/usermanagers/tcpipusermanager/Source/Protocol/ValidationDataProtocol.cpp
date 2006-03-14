@@ -7,8 +7,8 @@
 
 #include "Platform/Platform.h"
 
-using namespace Darkstar;
-using namespace Darkstar::Internal;
+using namespace SGS;
+using namespace SGS::Internal;
 
 namespace
 {

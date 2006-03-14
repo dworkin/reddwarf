@@ -1,7 +1,7 @@
 #ifndef _ByteBuffer_h
 #define _ByteBuffer_h
 
-namespace Darkstar
+namespace SGS
 {
 	namespace Internal
 	{

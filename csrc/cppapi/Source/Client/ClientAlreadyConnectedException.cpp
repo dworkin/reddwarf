@@ -2,7 +2,7 @@
 
 #include "ClientAlreadyConnectedException.h"
 
-using namespace Darkstar;
+using namespace SGS;
 
 ClientAlreadyConnectedException::ClientAlreadyConnectedException(const std::string& /*message*/) :
 	std::exception()

@@ -5,7 +5,7 @@
 #include "Client/ChannelID.h"
 #include "Client/ReconnectionKey.h"
 
-namespace Darkstar
+namespace SGS
 {
 	class ICallback;
 	class ITransportProtocolClient;

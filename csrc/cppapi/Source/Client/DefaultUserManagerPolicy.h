@@ -3,7 +3,7 @@
 
 #include "IUserManagerPolicy.h"
 
-namespace Darkstar
+namespace SGS
 {
 	class CLIENTAPI DefaultUserManagerPolicy : public IUserManagerPolicy
 	{

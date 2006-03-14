@@ -1,7 +1,7 @@
 #ifndef _ByteBufferPool_h
 #define _ByteBufferPool_h
 
-namespace Darkstar
+namespace SGS
 {
 	namespace Internal
 	{

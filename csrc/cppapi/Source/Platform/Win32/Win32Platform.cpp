@@ -12,12 +12,12 @@
 #include "Socket/Win32/Win32SocketManager.h"
 #include "Win32FileStream.h"
 
-using namespace Darkstar;
-using namespace Darkstar::Internal;
+using namespace SGS;
+using namespace SGS::Internal;
 
 namespace
 {
-	Darkstar::IStream* OpenFileStream(const wchar_t* path)
+	SGS::IStream* OpenFileStream(const wchar_t* path)
 	{
 		HANDLE hFile = CreateFile(path, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 		if (hFile != INVALID_HANDLE_VALUE)
@@ -27,7 +27,7 @@ namespace
 	}
 }
 
-namespace Darkstar
+namespace SGS
 {
 	namespace Platform
 	{

@@ -4,7 +4,7 @@
 #include "IClientChannel.h"
 #include "ChannelID.h"
 
-namespace Darkstar
+namespace SGS
 {
 	class IClientChannelListener;
 	class ClientConnectionManager;

@@ -1,7 +1,7 @@
 #ifndef _ITransportProtocolTransmitter_h
 #define _ITransportProtocolTransmitter_h
 
-namespace Darkstar
+namespace SGS
 {
 	struct BufferDescriptor;
 

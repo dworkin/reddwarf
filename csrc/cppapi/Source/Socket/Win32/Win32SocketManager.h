@@ -3,7 +3,7 @@
 
 #include "../ISocketManager.h"
 
-namespace Darkstar
+namespace SGS
 {
 	namespace Internal
 	{

@@ -3,7 +3,7 @@
 
 #include "ITransportProtocol.h"
 
-namespace Darkstar
+namespace SGS
 {
 	class ITransportProtocolClient;
 	class ITransportProtocolTransmitter;

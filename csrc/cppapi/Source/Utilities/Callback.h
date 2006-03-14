@@ -1,7 +1,7 @@
 #ifndef _Callback_h
 #define _Callback_h
 
-namespace Darkstar
+namespace SGS
 {
 	class CLIENTAPI ICallback
 	{

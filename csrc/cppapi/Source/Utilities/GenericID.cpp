@@ -2,7 +2,7 @@
 
 #include "GenericID.h"
 
-using namespace Darkstar;
+using namespace SGS;
 
 GenericID::GenericID() :
 	Length(0)

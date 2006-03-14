@@ -1,7 +1,7 @@
 #ifndef _IDiscoverer_h
 #define _IDiscoverer_h
 
-namespace Darkstar
+namespace SGS
 {
 	class IDiscoveredGame;
 

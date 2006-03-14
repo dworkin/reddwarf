@@ -9,7 +9,7 @@
 #include "IUserManagerClient.h"
 #include "IUserManagerClientListener.h"
 
-namespace Darkstar
+namespace SGS
 {
 	class IDiscoverer;
 	class IDiscoveredGame;

@@ -1,6 +1,6 @@
 #pragma once
 
-namespace Darkstar
+namespace SGS
 {
 	enum SeekOrigin
 	{

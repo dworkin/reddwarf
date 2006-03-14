@@ -9,7 +9,7 @@
 
 #include "LibHTTPStream.h"
 
-namespace Darkstar
+namespace SGS
 {
 	namespace Platform
 	{
@@ -42,7 +42,7 @@ namespace Darkstar
 		{
 			std::string url = WStringToUTF8(name);
 
-			int templateId = sceHttpCreateTemplate("Darkstar/1.0 (PSP)", SCE_HTTP_VERSION_1_1, SCE_HTTP_ENABLE /* use system proxy settings */);
+			int templateId = sceHttpCreateTemplate("SGS/1.0 (PSP)", SCE_HTTP_VERSION_1_1, SCE_HTTP_ENABLE /* use system proxy settings */);
 			if (templateId >= 0)
 			{
 				int connectionId = sceHttpCreateConnectionWithURL(templateId, url.c_str(), SCE_HTTP_DISABLE /* no keepalive */);
@@ -61,7 +61,7 @@ namespace Darkstar
 								SceULong64 contentLength;
 								result = sceHttpGetContentLength(requestId, &contentLength);
 								if (result >= 0)
-									return new Darkstar::Internal::LibHTTPStream(templateId, connectionId, requestId, contentLength);
+									return new SGS::Internal::LibHTTPStream(templateId, connectionId, requestId, contentLength);
 							}
 						}
 

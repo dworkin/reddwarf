@@ -1,7 +1,7 @@
 #ifndef _GenericID_h
 #define _GenericID_h
 
-namespace Darkstar
+namespace SGS
 {
 	struct CLIENTAPI GenericID
 	{

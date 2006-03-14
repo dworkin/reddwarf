@@ -1,7 +1,7 @@
 #ifndef _IClientConnectionManagerListener_h
 #define _IClientConnectionManagerListener_h
 
-namespace Darkstar
+namespace SGS
 {
 	struct UserID;
 	class ICallback;

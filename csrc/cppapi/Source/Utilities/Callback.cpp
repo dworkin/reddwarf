@@ -2,7 +2,7 @@
 
 #include "Callback.h"
 
-using namespace Darkstar;
+using namespace SGS;
 
 ICallback::~ICallback()
 {

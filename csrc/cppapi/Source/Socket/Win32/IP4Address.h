@@ -1,7 +1,7 @@
 #ifndef _IP4Address_h
 #define _IP4Address_h
 
-namespace Darkstar
+namespace SGS
 {
 	namespace Internal
 	{

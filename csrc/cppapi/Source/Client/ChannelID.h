@@ -3,7 +3,7 @@
 
 #include "Utilities/GenericID.h"
 
-namespace Darkstar
+namespace SGS
 {
 	struct CLIENTAPI ChannelID : public GenericID
 	{

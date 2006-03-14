@@ -34,10 +34,10 @@ WIN32_CPPFLAGS=/D "WIN32" /D "_WINDOWS"
 LIB32=lib.exe
 LIB32_FLAGS=/NOLOGO
 
-all: "$(OUTDIR)\Darkstar.lib"
+all: "$(OUTDIR)\SunGameServer.lib"
 
-"$(OUTDIR)\Darkstar.lib": $(SRCS) $(WIN32_SRCS) $(HEADERS) $(WIN32_HEADERS)
+"$(OUTDIR)\SunGameServer.lib": $(SRCS) $(WIN32_SRCS) $(HEADERS) $(WIN32_HEADERS)
 	$(CPP) $(CPPFLAGS) $(CROSS_CPPFLAGS) $(CFG_CPPFLAGS) /c $(SRCS)
 	$(CPP) $(CPPFLAGS) $(WIN32_CPPFLAGS) $(CFG_CPPFLAGS) /c $(WIN32_SRCS)
-	$(LIB32) /OUT:"$(OUTDIR)/Darkstar.lib" $(LIB32_FLAGS) $(OBJS)
+	$(LIB32) /OUT:"$(OUTDIR)/SunGameServer.lib" $(LIB32_FLAGS) $(OBJS)
 	@echo Done

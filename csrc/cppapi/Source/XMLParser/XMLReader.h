@@ -5,7 +5,7 @@
 struct XML_ParserStruct;
 typedef wchar_t XML_Char;
 
-namespace Darkstar
+namespace SGS
 {
 	struct IStream;
 	
@@ -31,6 +31,6 @@ namespace Darkstar
 		XMLElement* mpCurrentElement;
 		std::list<XMLElement*> mElements;
 
-		friend class Darkstar::Internal::XMLAdapter;
+		friend class SGS::Internal::XMLAdapter;
 	};
 }

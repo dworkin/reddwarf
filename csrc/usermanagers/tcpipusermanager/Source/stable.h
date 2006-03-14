@@ -37,6 +37,6 @@
 //
 // Other Stuff
 //
-#include "Darkstar.h"
+#include "SGS.h"
 
 #endif

@@ -1,7 +1,7 @@
 #ifndef _ValidationDataProtocol_h
 #define _ValidationDataProtocol_h
 
-namespace Darkstar
+namespace SGS
 {
 	class ICallback;
 

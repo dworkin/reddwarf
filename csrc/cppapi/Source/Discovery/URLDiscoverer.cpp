@@ -18,8 +18,8 @@ int _wtoi(const wchar_t*)
 }
 #endif
 
-using namespace Darkstar;
-using namespace Darkstar::Internal;
+using namespace SGS;
+using namespace SGS::Internal;
 
 URLDiscoverer::URLDiscoverer(const std::wstring& url) :
 	mURL(url)
