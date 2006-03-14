@@ -474,7 +474,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
         rs.close();
         conn.commit();
 
-	rs = stmnt.executeQuery("SELECT NAME, OBJID " + NAMETBLNAME);
+	rs = stmnt.executeQuery("SELECT NAME, OBJID FROM " + NAMETBLNAME);
         while (rs.next()) {
 	    String name = rs.getString(1);
 	    long objectID = rs.getLong(2);
