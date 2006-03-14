@@ -139,6 +139,11 @@ public class BattleBoardServer
          */
 
         task.addUserListener(thisGLO);
+
+	/*
+	 * Let the Matchmaker open its channel.
+	 */
+	Matchmaker.get().boot();
     }
 
     // SimUserListener methods

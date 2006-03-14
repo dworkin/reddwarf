@@ -111,7 +111,7 @@ public class Matchmaker implements GLO {
 
     private static final String MATCHMAKER_GLO_NAME = "matchmaker";
 
-    private final ChannelID channel;
+    private ChannelID channel;
 
     private int PLAYERS_PER_GAME = 2;
 
@@ -164,10 +164,15 @@ public class Matchmaker implements GLO {
     }
 
     /**
+     * Only allow construction via the create() static method.
+     */
+    protected Matchmaker() { }
+
+    /**
      * Creates the matchmaker channel so we can talk to non-playing
      * clients.
      */
-    protected Matchmaker() {
+    public void boot() {
         SimTask task = SimTask.getCurrent();
         channel = task.openChannel("matchmaker");
         task.lock(channel, true);
