@@ -75,6 +75,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -151,7 +152,6 @@ public class PersistantInMemoryDataSpace implements DataSpace {
     Object diskUpdateQueueMutex = new Object();
 
     private Object cachedStateMutex = new Object();
-
 
     private volatile long id = 1;
 
@@ -461,12 +461,11 @@ public class PersistantInMemoryDataSpace implements DataSpace {
      * @throws SQLException
      */
     private void reloadDataspace() throws SQLException {
+	ResultSet rs;
 	log.finer("Beginning dataspace reload");
+	Statement stmnt = conn.createStatement();
 
-        PreparedStatement stmnt =
-		conn.prepareStatement("SELECT OBJID FROM " + OBJTBLNAME);
-
-        ResultSet rs = stmnt.executeQuery();
+	rs = stmnt.executeQuery("SELECT OBJID FROM " + OBJTBLNAME);
         while (rs.next()) {
 	    long objectID = rs.getLong(1);
             log.finest("Init cache slot for objectID " + objectID);
@@ -475,14 +474,13 @@ public class PersistantInMemoryDataSpace implements DataSpace {
         rs.close();
         conn.commit();
 
-        stmnt = conn.prepareStatement(
-		"SELECT NAME, OBJID FROM " + NAMETBLNAME);
-	rs = stmnt.executeQuery();
+	rs = stmnt.executeQuery("SELECT NAME, OBJID " + NAMETBLNAME);
         while (rs.next()) {
 	    String name = rs.getString(1);
 	    long objectID = rs.getLong(2);
             log.finest("Init name mapping `" + name + "' => " + objectID);
 	    nameSpace.put(name, objectID);
+	    reverseNameSpace.put(objectID, name);
         }
         rs.close();
         conn.commit();
