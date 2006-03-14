@@ -188,11 +188,13 @@ public class SimTaskImpl extends SimTask {
             trans.abort();
         } catch (IllegalAccessException ex) {
             ex.printStackTrace();
+	    log.throwing(getClass().getName(), "run", ex);
             trans.abort();
         } catch (DeadlockException de) {
 	    log.throwing(getClass().getName(), "run", de);
 	    requeueAfterDeadlock();
         } catch (RuntimeException ex) {
+            ex.printStackTrace();
 	    log.throwing(getClass().getName(), "run", ex);
             trans.abort();
         }

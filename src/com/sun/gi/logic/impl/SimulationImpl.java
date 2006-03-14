@@ -81,6 +81,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Logger;
 
 import javax.security.auth.Subject;
 
@@ -101,6 +102,8 @@ import com.sun.gi.objectstore.ObjectStore;
 import com.sun.gi.objectstore.Transaction;
 
 public class SimulationImpl implements Simulation {
+
+    private static Logger log = Logger.getLogger("com.sun.gi.logic");
 
     long appID;
     private String appName;
@@ -163,20 +166,21 @@ public class SimulationImpl implements Simulation {
 
                 Class bootclass = loader.loadClass(bootClassName);
 
-                Method startMethod = bootclass.getMethod("boot", new Class[] {
-                        GLOReference.class, boolean.class });
+                Method startMethod = bootclass.getMethod("boot",
+			new Class[] { GLOReference.class, boolean.class });
 
                 // Check for existing boot object in objectstore...
 
-                Transaction trans = ostore.newTransaction(bootclass.getClassLoader());
+                Transaction trans =
+			ostore.newTransaction(bootclass.getClassLoader());
 
                 trans.start();
                 boolean firstTime = false;
                 long bootObjectID = trans.lookup("BOOT");
                 if (bootObjectID == ObjectStore.INVALID_ID) {
                     // boot object doesn't exist; create it
-                    bootObjectID = trans.create((GLO) bootclass.newInstance(),
-                            "BOOT");
+                    bootObjectID =
+			trans.create((GLO) bootclass.newInstance(), "BOOT");
                     if (bootObjectID == ObjectStore.INVALID_ID) {
                         // we lost a create race
                         bootObjectID = trans.lookup("BOOT");
@@ -185,6 +189,10 @@ public class SimulationImpl implements Simulation {
                     }
                 }
                 trans.commit();
+
+		log.fine("BootObj for app " + appID +
+			" is objectID " + bootObjectID);
+
                 queueTask(newTask(bootObjectID, startMethod, new Object[] {
                         new GLOReferenceImpl(bootObjectID), firstTime }));
 
