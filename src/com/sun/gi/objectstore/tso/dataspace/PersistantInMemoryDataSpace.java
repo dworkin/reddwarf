@@ -218,6 +218,7 @@ public class PersistantInMemoryDataSpace implements DataSpace {
             // objectIDManager = new SharedDataObjectIDManager(
             // new JRMSSharedDataManager(),this);
             checkTables();
+            reloadDataspace();
 
             // start update thread
             new Thread(new Runnable() {
@@ -454,6 +455,39 @@ public class PersistantInMemoryDataSpace implements DataSpace {
             e.printStackTrace();
         }
         return null;
+    }
+
+    /**
+     * @throws SQLException
+     */
+    private void reloadDataspace() throws SQLException {
+	log.finer("Beginning dataspace reload");
+
+        PreparedStatement stmnt =
+		conn.prepareStatement("SELECT OBJID FROM " + OBJTBLNAME);
+
+        ResultSet rs = stmnt.executeQuery();
+        while (rs.next()) {
+	    long objectID = rs.getLong(1);
+            log.finest("Init cache slot for objectID " + objectID);
+	    dataSpace.put(objectID, new SoftReference<byte[]>(null));
+        }
+        rs.close();
+        conn.commit();
+
+        stmnt = conn.prepareStatement(
+		"SELECT NAME, OBJID FROM " + NAMETBLNAME);
+	rs = stmnt.executeQuery();
+        while (rs.next()) {
+	    String name = rs.getString(1);
+	    long objectID = rs.getLong(2);
+            log.finest("Init name mapping `" + name + "' => " + objectID);
+	    nameSpace.put(name, objectID);
+        }
+        rs.close();
+        conn.commit();
+
+	log.finer("Finished dataspace reload");
     }
 
     // internal routines to the system, used by transactions
