@@ -95,10 +95,25 @@ public class WalkMeshCheatDetector implements CheatDetector {
 	Point2f start = new Point2f(info.lastPos.x, info.lastPos.y);
 	Point2f end   = new Point2f(info.pos.x, info.pos.y);
 
+	if (start.distanceSquared(end) < EPSILON_SQUARED) {
+	    log.finest("No motion; didn't cheat");
+	    return false;
+	}
+
 	try {
 	    Point2f hit = theMesh.clipWalk(start, end);
-	    return (hit.distanceSquared(end) < EPSILON_SQUARED);
+	    log.finest("Walkmesh says hit = (" + hit.x + ", " + hit.y + ")");
+	    if (hit.distanceSquared(end) < EPSILON_SQUARED) {
+		// Move was legal
+		return false;
+	    } else {
+		// Cheater!  Go back whence you came
+		info.pos.x = info.lastPos.x;
+		info.pos.y = info.lastPos.y;
+		return true;
+	    }
 	} catch (RuntimeException e) {
+	    log.finest("Walkmesh exception; assuming cheater off the map");
 	    log.throwing(getClass().getName(), "detectWalkCheat", e);
 	    return false;
 	}
