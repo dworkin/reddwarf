@@ -209,6 +209,7 @@ public class SimulationImpl implements Simulation {
 		// machine is quite finished yet on this one.
 
 		if (knownUsers.contains(uid)) {
+		    log.info("user left: " + uid);
 		    // leavingUsers.add(uid);
 		} else {
 		    log.warning("user " + uid + " leaving but was not joined.");
@@ -630,7 +631,6 @@ public class SimulationImpl implements Simulation {
     }
 
     public boolean hasTasks() {
-	log.info("has Tasks");
 	synchronized (userStateMutex) {
 	    synchronized (taskQueues) {
 		if (!backdoorQueue.isEmpty()) {
@@ -640,13 +640,13 @@ public class SimulationImpl implements Simulation {
 		for (UserID uid : readyUsers) {
 		    log.finer("has Tasks: considering user " + uid);
 		    if (!taskQueues.get(uid).isEmpty()) {
-			log.info("has Tasks: user tasks");
+			log.info("has Tasks: user " + uid);
 			return true;
 		    }
 		}
 	    }
 	}
-	log.info("has Tasks: apparently no tasks");
+	log.info("has Tasks: no waiting tasks");
 	return false;
     }
 
@@ -672,45 +672,46 @@ public class SimulationImpl implements Simulation {
 		// scheduled; they're no more likely to run than anyone
 		// else.
 
-		while (task == null) {
+		if (backdoorQueue.isEmpty() && readyUsers.isEmpty()) {
+		    log.warning("nothing to do: problem!");
+		    return null;
+		}
 
-		    if (backdoorQueue.isEmpty() && readyUsers.isEmpty()) {
-			log.warning("nothing to do: problem!");
-			return null;
-		    }
+		// DJE: If there's something on the backdoor queue, then
+		// flip a coin over whether or not to take it.
+		// Otherwise, walk through the readUserList looking
+		// for something to take.    If that fails, then go
+		// back to the backdoor queue and take what's there.
+		// If that fails, there's nothing to do!
 
-		    if (!backdoorQueue.isEmpty() && random.nextBoolean()) {
-			task = backdoorQueue.remove(0);
-		    } else {
-			List<UserID> readyUserList =
-				new ArrayList<UserID>(readyUsers);
-			if (readyUserList.isEmpty()) {
-			    continue;
-			} else {
-			    int luckyUserNum =
-				    random.nextInt(readyUserList.size());
-			    UserID luckyUserID =
-				    readyUserList.get(luckyUserNum);
+		if (!backdoorQueue.isEmpty() && random.nextBoolean()) {
+		    task = backdoorQueue.remove(0);
+		    log.info("took newTask from backdoorQueue");
+		} else if (!readyUsers.isEmpty()) {
+		    List<UserID> readyUserList =
+			    new ArrayList<UserID>(readyUsers);
+		    Collections.shuffle(readyUserList);
 
-			    List<SimTask> luckyUserQueue =
-				    taskQueues.get(luckyUserID);
-			    if (luckyUserQueue == null ||
-				    luckyUserQueue.isEmpty()) {
-				// D'oh!
-				continue;
-			    }
-			    task = luckyUserQueue.remove(0);
-			    if (task != null) {
-
-				// DJE:  immediately mark the user as
-				// "busy".  This must be done before
-				// releasing the userStateMutex.
-
-				userIsReady(luckyUserID, false);
-			    }
+		    for (UserID uid : readyUserList) {
+			List<SimTask> queue =
+				taskQueues.get(uid);
+			if (queue != null && !queue.isEmpty()) {
+			    task = queue.remove(0);
+			    log.info("took newTask from readyUser " + uid);
+			    break;
 			}
 		    }
+		} else if (!backdoorQueue.isEmpty()) {
+		    log.info("took newTask from backdoor on the rebound");
+		    task = backdoorQueue.remove(0);
+		} else {
+		    task = null;
 		}
+
+		if (task == null) {
+		    log.info("newTask returning NULL");
+		}
+		userIsReady(task.getUserID(), false);
 	    }
 	    return task;
 	}
