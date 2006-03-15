@@ -741,10 +741,12 @@ public class SimulationImpl implements Simulation {
 
 		if (task == null) {
 		    log.warning("newTask returning NULL");
+		    return null;
+		} else {
+		    userIsReady(task.getUserID(), false);
+		    return task;
 		}
-		userIsReady(task.getUserID(), false);
 	    }
-	    return task;
 	}
     }
 
