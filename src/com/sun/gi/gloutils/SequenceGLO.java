@@ -136,6 +136,10 @@ public class SequenceGLO implements GLO {
         if (initialValue == null) {
             throw new NullPointerException("initialValue is null");
         }
+
+	// BigIntegers are immutable, so we don't need to worry that
+	// someone will use the ref to change it out from under us.
+
         this.value = initialValue;
     }
 

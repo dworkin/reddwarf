@@ -90,7 +90,7 @@ public class SchedulerGLO implements GLO {
     private final List<TaskDescriptor> tasks =
 	    new LinkedList<TaskDescriptor>();
     private GLOReference<? extends SchedulerGLO> baseRef = null;
-    private int pos = 0;
+    private int currentTaskNum = 0;
 
     protected SchedulerGLO(List<? extends TaskDescriptor> tasks) {
 	if (tasks == null) {
@@ -141,15 +141,27 @@ public class SchedulerGLO implements GLO {
     // a final field.
     // -jm
     public void processNext() throws Throwable {
-	if (tasks.isEmpty()) {
+	SimTask simTask = SimTask.getCurrent();
+
+	if (currentTaskNum == tasks.size()) {
+	    TaskDescriptor subtask;
+
+	    // XXX Do we want to destroy the subtasks?  Who knows,
+	    // someone might assume that they can reuse them. -DJE
+	    //
+	    // for (int i = 0; i < tasks.size(); i++) {
+	    //    subtask = tasks.get(currentTaskNum);
+	    //    simTask.destroyGLO(subtask);
+	    // }
+
+	    simTask.destroyGLO(baseRef);
 	    return;
 	}
 
-	SimTask simTask = SimTask.getCurrent();
-	TaskDescriptor td = tasks.remove(0);
+	TaskDescriptor td = tasks.get(currentTaskNum++);
 
 	/* run the thing!!! */
-	log.fine("processNext at position " + pos);
+	log.fine("processNext at index " + currentTaskNum);
 
 	GLOReference<? extends GLO> targetRef = td.getTarget();
 
@@ -238,7 +250,7 @@ public class SchedulerGLO implements GLO {
 	}
 
 	// on to the next one.
-	pos++;
+	currentTaskNum++;
 	simTask.queueTask(baseRef, processNext, new Object[0]);
     }
 
