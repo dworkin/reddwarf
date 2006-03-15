@@ -239,6 +239,7 @@
 	    <classpath refid="project.classpath" />
 	    <classpath location="NWNSupport.jar"/>
 	    <classpath location="/usr/share/java/java3d/j3dutils.jar"/>
+	    <classpath location="/usr/share/java/java3d/vecmath.jar"/>
 	    <include name="com/sun/gi/apps/jnwn/**" />
 	</javac>
     </target>
