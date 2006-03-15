@@ -1,2 +1,2 @@
 #!/bin/sh
-exec java -Dij.protocol=jdbc:derby:release/persistant_store -jar etc/ij.jar
+exec java -Dij.protocol=jdbc:derby:release/persistant_store -jar tools/ij.jar
