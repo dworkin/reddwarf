@@ -95,6 +95,7 @@ import com.sun.gi.apps.hack.share.KeyMessages;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.logging.Logger;
 
 
 /**
@@ -107,6 +108,8 @@ import java.util.Set;
  */
 public class SimpleLevel implements Level
 {
+
+    private static Logger log = Logger.getLogger("com.sun.gi.apps.hack.server");
 
     // a reference to ourself, which we'll get lazily
     private GLOReference<? extends Level> selfRef = null;
@@ -193,10 +196,20 @@ public class SimpleLevel implements Level
             // find a legal space to place this character
             x = NSidedDie.rollNSided(levelWidth) - 1;
             y = NSidedDie.rollNSided(levelHeight) - 1;
-        } while (! board.testMove(x, y, mgrRef));
 
-        // add the character
-        addCharacter(mgrRef, x, y);
+            // loop until we find a space to successfully add the character
+        } while (! (board.testMove(x, y, mgrRef) &&
+                    addCharacter(mgrRef, x, y)));
+
+        if (log.isLoggable(java.util.logging.Level.FINE)) {
+            CharacterManager cmgr = mgrRef.peek(SimTask.getCurrent());
+            com.sun.gi.apps.hack.server.Character ch =
+                cmgr.getCurrentCharacter();
+            log.fine(name + " adding " + ch.getName() +
+                    " [" + ch.getID() + "] at (" + x + ", " + y + ")");
+        }
+
+        
     }
 
     /**
@@ -210,19 +223,25 @@ public class SimpleLevel implements Level
      *               <code>Character</code> is joining this <code>Level</code>
      * @param startX the starting x-coordinate
      * @param startY the starting y-coordinate
+     * 
+     * @return true upon success, otherwise false.
      */
-    public void addCharacter(GLOReference<? extends CharacterManager> mgrRef,
+    public boolean addCharacter(GLOReference<? extends CharacterManager> mgrRef,
                              int startX, int startY) {
-        // keep track of the character
-        characters.add(mgrRef);
-
         // let the manager know what level it's on, and where on that
         // level it starts
         CharacterManager mgr = mgrRef.get(SimTask.getCurrent());
         mgr.setCurrentLevel(getSelfRef());
         mgr.setLevelPosition(startX, startY);
-        // FIXME: we need to check that this succeeded
-        board.addCharacterAt(startX, startY, mgrRef);
+
+        if (! board.addCharacterAt(startX, startY, mgrRef)) {
+            mgr.setCurrentLevel(null);
+            mgr.setLevelPosition(-1, -1);
+            return false;
+        }
+
+        // keep track of the character
+        characters.add(mgrRef);
 
         // now we need to send the board and position to the character
         mgr.sendBoard(getBoardSnapshot());
@@ -230,6 +249,8 @@ public class SimpleLevel implements Level
         // finally, update everyone about the new charcater
         sendUpdate(new BoardSpace(startX, startY,
                                   board.getAt(startX, startY)));
+
+        return true;
     }
 
     /**

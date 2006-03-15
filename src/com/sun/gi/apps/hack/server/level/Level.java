@@ -123,8 +123,10 @@ public interface Level extends GLO
      *               <code>Character</code> is joining this <code>Level</code>
      * @param startX the starting x-coordinate
      * @param startY the starting y-coordinate
+     * 
+     * @return true upon success, otherwise false
      */
-    public void addCharacter(GLOReference<? extends CharacterManager> mgrRef,
+    public boolean addCharacter(GLOReference<? extends CharacterManager> mgrRef,
                              int startX, int startY);
 
     /**
