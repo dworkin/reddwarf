@@ -129,9 +129,30 @@ public class AICharacterManager extends BasicCharacterManager
      * @return a reference to a new manager
      */
     public static GLOReference<AICharacterManager> newInstance() {
-        AICharacterManager mgr = new AICharacterManager();
-        mgr.selfRef = SimTask.getCurrent().createGLO(mgr, mgr.toString());
-        return mgr.selfRef;
+        /* XXX: the previous implementation was technically wrong,
+         * although it might have worked.  In order to continue working
+         * with the object to which we've created a GLOReference, we
+         * <b>must</b> get() the object from the newly created GLOReference,
+         * and <b>must not</b> continue using the instance that was passed
+         * to createGLO as the "template object."
+         *
+         * <pre>
+         *   AICharacterManager mgr = new AICharacterManager();
+         *   // WRONG to modify mgr (by setting mgr.selfRef) in the next line!
+         *   mgr.selfRef = SimTask.getCurrent().createGLO(mgr, mgr.toString());
+         *   // NO GUARANTEE that mgr.selfRef's new value will be saved!
+         *   return mgr.selfRef;
+         * </pre>
+         */
+
+        SimTask task = SimTask.getCurrent();
+        AICharacterManager mgrTemplate = new AICharacterManager();
+        GLOReference<AICharacterManager> mgrRef =
+            task.createGLO(mgrTemplate, mgrTemplate.toString());
+        AICharacterManager createdMgr = mgrRef.get(task);
+        // Obtain the created GLO from the ref, and modify it.
+        createdMgr.selfRef = mgrRef;
+        return mgrRef;
     }
 
     /**
