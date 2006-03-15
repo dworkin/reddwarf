@@ -143,13 +143,13 @@ public class MatchMakerClientTest implements IMatchMakingClientListener {
      * @param lobbies an array of lobbies contained by the requested
      * folder
      */
-    public void listedFolder(SGSUUID folderID, FolderDescriptor[] subFolders,
+    public void listedFolder(byte[] folderID, FolderDescriptor[] subFolders,
             LobbyDescriptor[] lobbies) {
         System.out.println("Listed folder: folderID: " + folderID);
         for (FolderDescriptor f : subFolders) {
             System.out.println("\tFolder: " + f.getName() + " "
                     + f.getDescription() + " " + f.getFolderID());
-            mmClient.listFolder(f.getFolderID().toByteArray());
+            mmClient.listFolder(f.getFolderID());
         }
         /*
          * for (LobbyDescriptor l : lobbies) {

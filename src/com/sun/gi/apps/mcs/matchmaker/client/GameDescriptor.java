@@ -70,18 +70,17 @@ package com.sun.gi.apps.mcs.matchmaker.client;
 
 import java.util.HashMap;
 
-import com.sun.gi.utils.SGSUUID;
 
 public class GameDescriptor {
 
-    private SGSUUID gameID;
+    private byte[] gameID;
     private String name;
     private String description;
     private boolean passwordProtected;
     private String channelName;
     private HashMap<String, Object> gameParameters;
 
-    public GameDescriptor(SGSUUID id, String name, String desc,
+    public GameDescriptor(byte[] id, String name, String desc,
             String channelName, boolean passwordProtected,
             HashMap<String, Object> params)
     {
@@ -93,7 +92,7 @@ public class GameDescriptor {
         this.gameParameters = params;
     }
 
-    public SGSUUID getGameID() {
+    public byte[] getGameID() {
         return gameID;
     }
 

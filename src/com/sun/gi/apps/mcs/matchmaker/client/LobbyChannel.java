@@ -79,7 +79,6 @@ import com.sun.gi.apps.mcs.matchmaker.server.CommandProtocol;
 import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.comm.users.client.ClientChannel;
 import com.sun.gi.comm.users.client.ClientChannelListener;
-import com.sun.gi.utils.SGSUUID;
 
 public class LobbyChannel implements ILobbyChannel, ClientChannelListener {
 
@@ -201,9 +200,9 @@ public class LobbyChannel implements ILobbyChannel, ClientChannelListener {
         
         int command = protocol.readUnsignedByte(data);
         if (command == PLAYER_ENTERED_LOBBY) {
-            SGSUUID userID = protocol.readUUID(data);
+            byte[] userID = protocol.readUUIDAsBytes(data);
             String name = protocol.readString(data);
-            listener.playerEntered(userID.toByteArray(), name);
+            listener.playerEntered(userID, name);
         } else if (command == SEND_TEXT) {
             listener.receiveText(from, protocol.readString(data), false);
         } else if (command == SEND_PRIVATE_TEXT) {
@@ -213,10 +212,9 @@ public class LobbyChannel implements ILobbyChannel, ClientChannelListener {
 
             listener.gameCreated(readGameDescriptor(data));
         } else if (command == PLAYER_JOINED_GAME) {
-            SGSUUID userID = protocol.readUUID(data);
-            SGSUUID gameID = protocol.readUUID(data);
-            listener.playerJoinedGame(gameID.toByteArray(),
-                    userID.toByteArray());
+            byte[] userID = protocol.readUUIDAsBytes(data);
+            byte[] gameID = protocol.readUUIDAsBytes(data);
+            listener.playerJoinedGame(gameID, userID);
         } else if (command == GAME_STARTED) {
         	listener.gameStarted(readGameDescriptor(data));
         } else if (command == GAME_DELETED) {
@@ -225,7 +223,7 @@ public class LobbyChannel implements ILobbyChannel, ClientChannelListener {
     }
     
     private GameDescriptor readGameDescriptor(ByteBuffer data) {
-        SGSUUID uuid = protocol.readUUID(data);
+        byte[] uuid = protocol.readUUIDAsBytes(data);
         String name = protocol.readString(data);
         String description = protocol.readString(data);
         String channelName = protocol.readString(data);

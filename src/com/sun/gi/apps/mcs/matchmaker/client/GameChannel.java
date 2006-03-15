@@ -78,7 +78,6 @@ import static com.sun.gi.apps.mcs.matchmaker.server.CommandProtocol.*;
 import com.sun.gi.apps.mcs.matchmaker.server.CommandProtocol;
 import com.sun.gi.comm.users.client.ClientChannel;
 import com.sun.gi.comm.users.client.ClientChannelListener;
-import com.sun.gi.utils.SGSUUID;
 
 public class GameChannel implements IGameChannel, ClientChannelListener {
 
@@ -122,18 +121,18 @@ public class GameChannel implements IGameChannel, ClientChannelListener {
         
         int command = protocol.readUnsignedByte(data);
         if (command == PLAYER_ENTERED_GAME) {
-            SGSUUID userID = protocol.readUUID(data);
+            byte[] userID = protocol.readUUIDAsBytes(data);
             String name = protocol.readString(data);
-            listener.playerEntered(userID.toByteArray(), name);
+            listener.playerEntered(userID, name);
         } else if (command == PLAYER_READY_UPDATE) {
-            SGSUUID userID = protocol.readUUID(data);
+            byte[] userID = protocol.readUUIDAsBytes(data);
             boolean ready = protocol.readBoolean(data);
-            listener.playerReady(userID.toByteArray(), ready);
+            listener.playerReady(userID, ready);
         } else if (command == START_GAME_REQUEST) {
             // means there was a failure.
             listener.startGameFailed(protocol.readString(data));
         } else if (command == GAME_STARTED) {
-            SGSUUID uuid = protocol.readUUID(data);
+            byte[] uuid = protocol.readUUIDAsBytes(data);
             String name = protocol.readString(data);
             String description = protocol.readString(data);
             String channelName = protocol.readString(data);

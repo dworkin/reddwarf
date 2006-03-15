@@ -82,8 +82,6 @@ import com.sun.gi.comm.users.client.ClientChannel;
 import com.sun.gi.comm.users.client.ClientChannelListener;
 import com.sun.gi.comm.users.client.ClientConnectionManager;
 import com.sun.gi.comm.users.client.ClientConnectionManagerListener;
-import com.sun.gi.utils.SGSUUID;
-import com.sun.gi.utils.StatisticalUUID;
 
 /**
  * <p>
@@ -136,15 +134,23 @@ public class MatchMakingClient
         manager.sendToServer(protocol.assembleCommand(list), true);
     }
 
-    private SGSUUID createUUID(byte[] bytes) {
-        SGSUUID id = null;
-        try {
-            id = new StatisticalUUID(bytes);
-        } catch (InstantiationException ie) {
-            // ignore
+    /**
+     * Takes the given byte array, and copies it to a byte array
+     * with the first element containing the length of the array
+     * (as a byte).
+     * 
+     * @param bytes			a collections of bytes representing an UUID
+     * 
+     * @return the same byte array prefixed by the length
+     */
+    private byte[] createUUID(byte[] bytes) {
+    	byte[] uuid = new byte[bytes.length + 1];
+        uuid[0] = (byte) bytes.length;
+        for (int i = 1; i < uuid.length; i++) {
+        	uuid[i] = bytes[i - 1];
         }
-
-        return id;
+    	
+    	return uuid;
     }
     
     /**
@@ -366,13 +372,13 @@ public class MatchMakingClient
      * lobby detail.
      */
     private void listFolderResponse(ByteBuffer data) {
-        SGSUUID folderID = protocol.readUUID(data);
+        byte[] folderID = protocol.readUUIDAsBytes(data);
         int numFolders = data.getInt();
         FolderDescriptor[] subfolders = new FolderDescriptor[numFolders];
         for (int i = 0; i < numFolders; i++) {
             String curFolderName = protocol.readString(data);
             String curFolderDescription = protocol.readString(data);
-            SGSUUID curFolderID = protocol.readUUID(data);
+            byte[] curFolderID = protocol.readUUIDAsBytes(data);
             subfolders[i] = new FolderDescriptor(curFolderID, curFolderName,
                     curFolderDescription);
         }
@@ -382,7 +388,7 @@ public class MatchMakingClient
             String curLobbyName = protocol.readString(data);
             String curLobbyChannelName = protocol.readString(data);
             String curLobbyDescription = protocol.readString(data);
-            SGSUUID curLobbyID = protocol.readUUID(data);
+            byte[] curLobbyID = protocol.readUUIDAsBytes(data);
             int numUsers = data.getInt();
             int maxUsers = data.getInt();
             boolean isPasswordProtected = protocol.readBoolean(data);
@@ -396,17 +402,16 @@ public class MatchMakingClient
 
     private void lookupUserNameResponse(ByteBuffer data) {
         String userName = protocol.readString(data);
-        SGSUUID userID = protocol.readUUID(data);
+        byte[] userID = protocol.readUUIDAsBytes(data);
 
-        listener.foundUserName(userName, userID.toByteArray());
+        listener.foundUserName(userName, userID);
     }
 
     private void lookupUserIDResponse(ByteBuffer data) {
         String userName = protocol.readString(data);
-        SGSUUID userID = protocol.readUUID(data);
+        byte[] userID = protocol.readUUIDAsBytes(data);
 
-        listener.foundUserID(userName, userID != null ? userID.toByteArray()
-                : null);
+        listener.foundUserID(userName, userID);
     }
 
     private void gameParametersResponse(ByteBuffer data) {

@@ -68,7 +68,6 @@
 
 package com.sun.gi.apps.mcs.matchmaker.client;
 
-import com.sun.gi.utils.SGSUUID;
 
 /**
  * <p>
@@ -85,7 +84,7 @@ import com.sun.gi.utils.SGSUUID;
  */
 public class LobbyDescriptor {
 
-    private SGSUUID lobbyID;
+    private byte[] lobbyID;
     private String name;
     private String channelName;
     private String description;
@@ -93,7 +92,7 @@ public class LobbyDescriptor {
     private int maxUsers;
     private boolean passwordProtected;
 
-    public LobbyDescriptor(SGSUUID id, String name, String channelName,
+    public LobbyDescriptor(byte[] id, String name, String channelName,
             String desc, int numUsers, int maxUsers, boolean passwordProtected)
     {
         this.lobbyID = id;
@@ -105,7 +104,7 @@ public class LobbyDescriptor {
         this.passwordProtected = passwordProtected;
     }
 
-    public SGSUUID getLobbyID() {
+    public byte[] getLobbyID() {
         return lobbyID;
     }
 

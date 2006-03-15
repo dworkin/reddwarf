@@ -68,7 +68,6 @@
 
 package com.sun.gi.apps.mcs.matchmaker.client;
 
-import com.sun.gi.utils.SGSUUID;
 
 /**
  * <p>
@@ -85,17 +84,17 @@ import com.sun.gi.utils.SGSUUID;
  */
 public class FolderDescriptor {
 
-    private SGSUUID folderID;
+    private byte[] folderID;
     private String  name;
     private String  description;
 
-    public FolderDescriptor(SGSUUID id, String name, String desc) {
+    public FolderDescriptor(byte[] id, String name, String desc) {
         this.folderID = id;
         this.name = name;
         this.description = desc;
     }
 
-    public SGSUUID getFolderID() {
+    public byte[] getFolderID() {
         return folderID;
     }
 

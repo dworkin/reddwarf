@@ -108,8 +108,6 @@ import com.sun.gi.apps.mcs.matchmaker.client.MatchMakingClient;
 import com.sun.gi.comm.discovery.impl.URLDiscoverer;
 import com.sun.gi.comm.users.client.ClientConnectionManager;
 import com.sun.gi.comm.users.client.impl.ClientConnectionManagerImpl;
-import com.sun.gi.utils.SGSUUID;
-import com.sun.gi.utils.StatisticalUUID;
 
 /**
  * 
@@ -166,7 +164,7 @@ public class MatchMakerClientTestUI extends JFrame
 	                if (lobby == null) {
 	                    return;
 	                }
-	                mmClient.joinLobby(lobby.getLobbyID().toByteArray(), null);
+	                mmClient.joinLobby(lobby.getLobbyID(), null);
             	}
             	else {
             		mmClient.leaveLobby();
@@ -190,7 +188,7 @@ public class MatchMakerClientTestUI extends JFrame
 	                if (game == null) {
 	                    return;
 	                }
-	                mmClient.joinGame(game.getGameID().toByteArray());
+	                mmClient.joinGame(game.getGameID());
                 }
                 else {
                 	mmClient.leaveGame();
@@ -314,15 +312,6 @@ public class MatchMakerClientTestUI extends JFrame
         return new DefaultTreeModel(root);
     }
 
-    private SGSUUID createUUID(byte[] bytes) {
-        SGSUUID id = null;
-        try {
-            id = new StatisticalUUID(bytes);
-        } catch (InstantiationException ie) {}
-
-        return id;
-    }
-
     private void setStatus(String status) {
         setTitle("Match Maker Client Test: " + status);
     }
@@ -342,15 +331,14 @@ public class MatchMakerClientTestUI extends JFrame
             return;
         }
     }
-
-    public void listedFolder(SGSUUID folderID, FolderDescriptor[] subFolders,
+    
+    public void listedFolder(byte[] folderID, FolderDescriptor[] subFolders,
             LobbyDescriptor[] lobbies) {
 
-        DefaultMutableTreeNode node = findFolderNode(folderID, root);
+    	DefaultMutableTreeNode node = findFolderNode(folderID, root);
         if (node == null) {
             node = root;
         }
-
         for (FolderDescriptor f : subFolders) {
             treeModel.insertNodeInto(new FolderNode(f), node,
                     node.getChildCount());
@@ -361,16 +349,16 @@ public class MatchMakerClientTestUI extends JFrame
             lobbyMap.put(l.getChannelName(), l);
         }
         for (FolderDescriptor f : subFolders) {
-            mmClient.listFolder(f.getFolderID().toByteArray());
+            mmClient.listFolder(f.getFolderID());
         }
     }
 
-    private FolderNode findFolderNode(SGSUUID folderID,
+    private FolderNode findFolderNode(byte[] folderID,
             DefaultMutableTreeNode node) {
         for (int i = 0; i < node.getChildCount(); i++) {
             if (node.getChildAt(i) instanceof FolderNode) {
                 FolderNode curNode = (FolderNode) node.getChildAt(i);
-                if (curNode.getFolderID().equals(folderID)) {
+                if (compareBytes(curNode.getFolderID(), folderID)) {
                     return curNode;
                 } else if (curNode.getChildCount() > 0) {
                     FolderNode subFolder = findFolderNode(folderID, curNode);
@@ -381,6 +369,18 @@ public class MatchMakerClientTestUI extends JFrame
             }
         }
         return null;
+    }
+    
+    private boolean compareBytes(byte[] array1, byte[] array2) {
+    	if (array1.length != array2.length) {
+    		return false;
+    	}
+    	for (int i = 0; i < array1.length; i++) {
+    		if (array1[i] != array2[i]) {
+    			return false;
+    		}
+    	}
+    	return true;
     }
 
     public void foundUserName(String userName, byte[] userID) {
@@ -468,7 +468,7 @@ public class MatchMakerClientTestUI extends JFrame
             return folder.getName();
         }
 
-        public SGSUUID getFolderID() {
+        public byte[] getFolderID() {
             return folder.getFolderID();
         }
 
@@ -491,7 +491,7 @@ public class MatchMakerClientTestUI extends JFrame
             return lobby.getName();
         }
 
-        public SGSUUID getLobbyID() {
+        public byte[] getLobbyID() {
             return lobby.getLobbyID();
         }
 

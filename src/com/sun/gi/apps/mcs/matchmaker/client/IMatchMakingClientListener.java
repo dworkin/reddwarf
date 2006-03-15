@@ -70,7 +70,6 @@ package com.sun.gi.apps.mcs.matchmaker.client;
 
 import javax.security.auth.callback.Callback;
 
-import com.sun.gi.utils.SGSUUID;
 
 /**
  * <p>
@@ -99,7 +98,7 @@ public interface IMatchMakingClientListener {
      * @param lobbies an array of lobbies contained by the requested
      * folder
      */
-    public void listedFolder(SGSUUID folderID, FolderDescriptor[] subFolders,
+    public void listedFolder(byte[] folderID, FolderDescriptor[] subFolders,
             LobbyDescriptor[] lobbies);
 
     /**
