@@ -74,6 +74,7 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -82,6 +83,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.logging.Logger;
+import java.util.Random;
 
 import javax.security.auth.Subject;
 
@@ -90,6 +92,7 @@ import com.sun.gi.comm.routing.Router;
 import com.sun.gi.comm.routing.RouterListener;
 import com.sun.gi.comm.routing.SGSChannel;
 import com.sun.gi.comm.routing.UserID;
+import com.sun.gi.utils.StatisticalUUID;
 import com.sun.gi.framework.install.DeploymentRec;
 import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
@@ -114,9 +117,44 @@ public class SimulationImpl implements Simulation {
     ClassLoader loader;
 
     private List<Long> userListeners = new ArrayList<Long>();
-    private Map<UserID, List<Long>> userDataListeners = new HashMap<UserID, List<Long>>();
-    private List<SimTask> taskQueue = new LinkedList<SimTask>();
-    private Map<UserID, Set<ChannelID>> userEvesdropChannels = new HashMap<UserID, Set<ChannelID>>();
+    private Map<UserID, List<Long>> userDataListeners =
+	    new HashMap<UserID, List<Long>>();
+    // private List<SimTask> taskQueue = new LinkedList<SimTask>();
+    private Map<UserID, Set<ChannelID>> userEvesdropChannels =
+	    new HashMap<UserID, Set<ChannelID>>();
+
+
+    // DJE:  A map of the state of each user.  Every user is always in
+    // one of the two sets:  readyUsers or busyUsers.  A user is ready
+    // if there is not already an in-progress task for that user (it's
+    // not whether the USER is busy; it's whether the system is busy
+    // doing something for the user).  Transitions from one set are
+    // always protected by userStateMutex.
+
+    protected Object userStateMutex = new Object();
+    protected Set<UserID> readyUsers =
+	    Collections.synchronizedSet(new HashSet<UserID>());
+    protected Set<UserID> busyUsers =
+	    Collections.synchronizedSet(new HashSet<UserID>());
+
+    // DJE:  A list of all of the known active UserIDs.  At every
+    // visible moment, should be the union of readyUsers and
+    // busyUsers.  Used for bookkeeping; may be redundant eventually. 
+    // Protected by userStateMutex as well.
+
+    protected Set<UserID> knownUsers =
+	    Collections.synchronizedSet(new HashSet<UserID>());
+
+    // DJE: A map between UserIDs and Queues of pending tasks 
+
+    protected Map<UserID, List<SimTask>> taskQueues =
+	    Collections.synchronizedMap(
+		    new HashMap<UserID, List<SimTask>>());
+    protected List<SimTask> backdoorQueue =
+	    Collections.synchronizedList(new LinkedList<SimTask>());
+
+    // DJE: source of randomness for selecting task queues
+    private Random random = new Random();
 
     /**
      * Constructor
@@ -137,23 +175,60 @@ public class SimulationImpl implements Simulation {
             }
 
             public void userJoined(UserID uid, Subject subject) {
+		log.fine("user " + uid + " joining");
+		// DJE create queue for the user.
+		if (!knownUsers.contains(uid)) {
+		    knownUsers.add(uid);
+
+		    // If we didn't even know about this user, then we
+		    // must not be running anything for them (so
+		    // they're ready) and we must not have a taskQueue
+		    // for them.
+
+		    readyUsers.add(uid);
+		    if (!taskQueues.containsKey(uid)) {
+			taskQueues.put(uid,
+				Collections.synchronizedList(
+					new LinkedList<SimTask>()));
+		    }
+		} else {
+		    log.warning("user " + uid + " was already joined.");
+		}
                 fireUserJoined(uid, subject);
             }
 
             public void userLeft(UserID uid) {
+		log.fine("user " + uid + " leaving");
+
+		// DJE mark queue for this user as leaving.  (NOT
+		// DONE RIGHT NOW) We can remove their queues and
+		// other bookkeeping if their queue drains while we
+		// still think they're dead wood.  The difficulty is
+		// figuring out when the queue is really drained;
+		// tasks might get requeued.  Not sure if the state
+		// machine is quite finished yet on this one.
+
+		if (knownUsers.contains(uid)) {
+		    // leavingUsers.add(uid);
+		} else {
+		    log.warning("user " + uid + " leaving but was not joined.");
+		}
                 fireUserLeft(uid);
             }
 
             public void userJoinedChannel(UserID uid, ChannelID cid) {
+		log.fine("user " + uid + " joined channel " + cid);
                 fireUserJoinedChannel(uid, cid);
             }
 
             public void userLeftChannel(UserID uid, ChannelID cid) {
+		log.fine("user " + uid + " left channel " + cid);
                 fireUserLeftChannel(uid, cid);
             }
 
             public void channelDataPacket(ChannelID cid, UserID from,
                     ByteBuffer buff) {
+		log.fine("user " + from + " sent data to channel " + cid);
                 fireChannelDataPacket(cid, from, buff);
             }
         });
@@ -194,7 +269,8 @@ public class SimulationImpl implements Simulation {
 			" is objectID " + bootObjectID);
 
                 queueTask(newTask(bootObjectID, startMethod, new Object[] {
-                        new GLOReferenceImpl(bootObjectID), firstTime }));
+                        new GLOReferenceImpl(bootObjectID), firstTime}, 
+				null));
 
             } catch (MalformedURLException e) {
                 e.printStackTrace();
@@ -215,12 +291,74 @@ public class SimulationImpl implements Simulation {
     }
 
     /**
-     * @param task
      */
     public void queueTask(SimTask task) {
-        synchronized (taskQueue) {
-            taskQueue.add(task);
-        }
+	if (task.getUserID() == null) {
+	    log.finer("backdoor task queued");
+	    backdoorQueue.add(task);
+	} else {
+	    UserID uid = task.getUserID();
+
+	    if (!knownUsers.contains(uid)) {
+		log.warning("attempt to queue task for unknown uid " + uid);
+		// GIVE UP
+		return ;
+	    }
+	    synchronized (taskQueues) {
+		// add the task to the front of the queue for this uid.
+		if (!taskQueues.containsKey(uid)) {
+		    log.severe("attempt to queue task for unknown uid " + uid);
+		    // GIVE UP
+		    return ;
+		}
+		List<SimTask> uidQueue = taskQueues.get(uid);
+		uidQueue.add(task);
+
+		// These will be interesting, at least for debugging.
+		log.fine("queue for uid " + uid + " has length " +
+			uidQueue.size());
+	    }
+	}
+
+	kernel.simHasNewTask();
+    }
+
+
+    /**
+     * DJE this is entirely new.
+     *
+     * The impl here should be folded back into queueTask, since the
+     * primary difference is whether the task is put on the head of
+     * the queue or the tail.
+     */
+    public void requeueTask(SimTask task) {
+	if (task.getUserID() == null) {
+	    log.finer("backdoor task re-queued");
+	    backdoorQueue.add(0, task);
+	} else {
+	    UserID uid = task.getUserID();
+
+	    if (!knownUsers.contains(uid)) {
+		log.warning("attempt to queue task for unknown uid " + uid);
+		// GIVE UP
+		return ;
+	    }
+	    synchronized (taskQueues) {
+		// add the task to the front of the queue for this uid.
+		if (!taskQueues.containsKey(uid)) {
+		    log.severe("attempt to queue task for unknown uid " + uid);
+		    // GIVE UP
+		    return ;
+		}
+		List<SimTask> uidQueue = taskQueues.get(uid);
+		uidQueue.add(0, task);
+
+		// These will be interesting, at least for debugging.
+		log.fine("queue for uid " + uid + " has length " +
+			uidQueue.size());
+	    }
+	}
+
         kernel.simHasNewTask();
     }
 
@@ -240,17 +378,18 @@ public class SimulationImpl implements Simulation {
 
     // internal
     private SimTask newTask(ACCESS_TYPE access, long startObject,
-            Method startMethod, Object[] params)
+            Method startMethod, Object[] params, UserID uid)
     {
         return new SimTaskImpl(this, loader, access, startObject, startMethod,
-                params);
+                params, uid);
     }
 
     // external
     public SimTask newTask(ACCESS_TYPE access, GLOReference ref, Method method,
-            Object[] params)
+            Object[] params, UserID uid)
     {
-        return newTask(access, ((GLOReferenceImpl) ref).objID, method, params);
+        return newTask(access, ((GLOReferenceImpl) ref).objID, method,
+		params, uid);
     }
 
     /**
@@ -266,7 +405,7 @@ public class SimulationImpl implements Simulation {
             Object[] params = { id, subject };
             for (Iterator i = userListeners.iterator(); i.hasNext();) {
                 long objID = ((Long) i.next()).longValue();
-                queueTask(newTask(objID, userJoinedMethod, params));
+                queueTask(newTask(objID, userJoinedMethod, params, id));
             }
         } catch (ClassNotFoundException ex) {
             ex.printStackTrace();
@@ -290,7 +429,7 @@ public class SimulationImpl implements Simulation {
             Object[] params = { id };
             for (Iterator i = userListeners.iterator(); i.hasNext();) {
                 long objID = ((Long) i.next()).longValue();
-                queueTask(newTask(objID, userJoinedMethod, params));
+                queueTask(newTask(objID, userJoinedMethod, params, id));
             }
         } catch (ClassNotFoundException ex) {
             ex.printStackTrace();
@@ -356,7 +495,7 @@ public class SimulationImpl implements Simulation {
                         new Class[] { ChannelID.class, UserID.class });
                 Object[] params = { cid, uid };
                 for (Long gloID : listenerIDs) {
-                    queueTask(newTask(gloID, userLeftChannelMethod, params));
+                    queueTask(newTask(gloID, userLeftChannelMethod, params, uid));
                 }
             } catch (SecurityException e) {
                 e.printStackTrace();
@@ -382,7 +521,7 @@ public class SimulationImpl implements Simulation {
                         new Class[] { ChannelID.class, UserID.class });
                 Object[] params = { cid, uid };
                 for (Long gloID : listenerIDs) {
-                    queueTask(newTask(gloID, userJoinedChannelMethod, params));
+                    queueTask(newTask(gloID, userJoinedChannelMethod, params, uid));
                 }
             } catch (SecurityException e) {
                 e.printStackTrace();
@@ -411,8 +550,12 @@ public class SimulationImpl implements Simulation {
                         "dataArrivedFromChannel", ChannelID.class,
                         UserID.class, ByteBuffer.class);
                 for (Long uid : listeners) {
+
+		    // DJE:  this looks a little different from the
+		    // others.  Review.
+
                     queueTask(newTask(uid.longValue(), m, new Object[] { cid,
-                            from, outBuff.duplicate() }));
+                            from, outBuff.duplicate() }, from));
                 }
             } catch (SecurityException e) {
                 e.printStackTrace();
@@ -429,7 +572,7 @@ public class SimulationImpl implements Simulation {
                     new Class[] { UserID.class });
             Object[] params = { uid };
             for (Long gloID : userListeners) {
-                queueTask(newTask(gloID, userLeftMethod, params));
+                queueTask(newTask(gloID, userLeftMethod, params, uid));
             }
         } catch (SecurityException e) {
             e.printStackTrace();
@@ -447,7 +590,7 @@ public class SimulationImpl implements Simulation {
                     new Class[] { UserID.class, Subject.class });
             Object[] params = { uid, subject };
             for (Long gloID : userListeners) {
-                queueTask(newTask(gloID, userJoinedMethod, params));
+                queueTask(newTask(gloID, userJoinedMethod, params, uid));
             }
         } catch (SecurityException e) {
             e.printStackTrace();
@@ -468,7 +611,7 @@ public class SimulationImpl implements Simulation {
             List<Long> listeners = userDataListeners.get(from);
             if (listeners != null) {
                 for (long objID : listeners) {
-                    queueTask(newTask(objID, userJoinedMethod, params));
+                    queueTask(newTask(objID, userJoinedMethod, params, from));
                 }
             }
         } catch (ClassNotFoundException ex) {
@@ -480,20 +623,129 @@ public class SimulationImpl implements Simulation {
         }
     }
 
-    public SimTask newTask(long objID, Method method, Object[] params) {
-        return newTask(ACCESS_TYPE.GET, objID, method, params);
+    public SimTask newTask(long objID, Method method, Object[] params,
+	    UserID uid)
+    {
+        return newTask(ACCESS_TYPE.GET, objID, method, params, uid);
     }
 
     public boolean hasTasks() {
-        synchronized (taskQueue) {
-            return !taskQueue.isEmpty();
-        }
+	log.info("has Tasks");
+	synchronized (userStateMutex) {
+	    synchronized (taskQueues) {
+		if (!backdoorQueue.isEmpty()) {
+		    log.info("has Tasks: backdoor tasks");
+		    return true;
+		}
+		for (UserID uid : readyUsers) {
+		    log.finer("has Tasks: considering user " + uid);
+		    if (!taskQueues.get(uid).isEmpty()) {
+			log.info("has Tasks: user tasks");
+			return true;
+		    }
+		}
+	    }
+	}
+	log.info("has Tasks: apparently no tasks");
+	return false;
     }
 
     public SimTask nextTask() {
-        synchronized (taskQueue) {
-            return taskQueue.remove(0);
-        }
+
+	log.info("next Task: choosing something");
+	SimTask task = null;
+
+	// DJE:  CHECK:  I'm assuming that the caller knows that if
+	// this returns null, then there was a snafu, but to do
+	// nothing.  Even if hasTasks indicates that there are tasks
+	// ready to run, there is a race condition between that check
+	// and actually choosing a candidate.  The only way to really
+	// check whether there is something to run is find something
+	// or fail.
+
+	synchronized (userStateMutex) {
+	    synchronized (taskQueues) {
+
+		// DJE:  Rather than doing something clever, I'm doing
+		// something simple, and trusting to randomness to even
+		// things out.  This is unfair to users with lots of tasks
+		// scheduled; they're no more likely to run than anyone
+		// else.
+
+		while (task == null) {
+
+		    if (backdoorQueue.isEmpty() && readyUsers.isEmpty()) {
+			log.warning("nothing to do: problem!");
+			return null;
+		    }
+
+		    if (!backdoorQueue.isEmpty() && random.nextBoolean()) {
+			task = backdoorQueue.remove(0);
+		    } else {
+			List<UserID> readyUserList =
+				new ArrayList<UserID>(readyUsers);
+			if (readyUserList.isEmpty()) {
+			    continue;
+			} else {
+			    int luckyUserNum =
+				    random.nextInt(readyUserList.size());
+			    UserID luckyUserID =
+				    readyUserList.get(luckyUserNum);
+
+			    List<SimTask> luckyUserQueue =
+				    taskQueues.get(luckyUserID);
+			    if (luckyUserQueue == null ||
+				    luckyUserQueue.isEmpty()) {
+				// D'oh!
+				continue;
+			    }
+			    task = luckyUserQueue.remove(0);
+			    if (task != null) {
+
+				// DJE:  immediately mark the user as
+				// "busy".  This must be done before
+				// releasing the userStateMutex.
+
+				userIsReady(luckyUserID, false);
+			    }
+			}
+		    }
+		}
+	    }
+	    return task;
+	}
+    }
+
+    private void userIsReady(UserID user, boolean ready) {
+
+	log.finer("user " + user + " readiness " + ready);
+
+	if (user == null) {
+	    return;
+	}
+
+	synchronized (userStateMutex) {
+	    if (ready) {
+		readyUsers.add(user);
+		busyUsers.remove(user);
+	    } else {
+		readyUsers.remove(user);
+		busyUsers.add(user);
+	    }
+	}
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void taskDone(SimTask task) {
+	if (task == null) {
+	    // unexpected!
+
+	    log.severe("task is null");
+	    return;
+	}
+	userIsReady(task.getUserID(), true);
     }
 
     public ChannelID openChannel(String name) {
@@ -507,9 +759,9 @@ public class SimulationImpl implements Simulation {
     }
 
     public SimTask newTask(GLOReference ref, Method methodToCall,
-            Object[] params)
+            Object[] params, UserID uid)
     {
-        return newTask(ACCESS_TYPE.GET, ref, methodToCall, params);
+        return newTask(ACCESS_TYPE.GET, ref, methodToCall, params, uid);
     }
 
     public ObjectStore getObjectStore() {

@@ -120,11 +120,12 @@ public interface Simulation {
      * @param ref A reference to the GLO to invoke to start the task
      * @param methodToCall The method to invoke on the GLO
      * @param params The parameters to pass to that method
+     * @param uid The UserID on whose behalf the task exists
      * 
      * @return the created SimTask.
      */
     public SimTask newTask(GLOReference<? extends GLO> ref,
-            Method methodToCall, Object[] params);
+            Method methodToCall, Object[] params, UserID uid);
 
     /**
      * Creates a SimTask object that can then be queued for executon.
@@ -140,11 +141,12 @@ public interface Simulation {
      * @param ref A reference to the GLO to invoke to start the task
      * @param methodToCall The method to invoke on the GLO
      * @param params The parameters to pass to that method
+     * @param uid The UserID on whose behalf the task exists
      * 
      * @return the created SimTask.
      */
     public SimTask newTask(ACCESS_TYPE access, GLOReference<? extends GLO> ref,
-            Method methodToCall, Object[] params);
+            Method methodToCall, Object[] params, UserID uid);
 
     /**
      * Returns the string that has been assigned as the name of the game
@@ -202,6 +204,12 @@ public interface Simulation {
      * @param impl
      */
     public void queueTask(SimTask impl);
+
+    /**
+     * Like queue, but puts the task on the front of the queue
+     * for immediate retry.
+     */
+    public void requeueTask(SimTask impl);
 
     /**
      * @param string
@@ -320,4 +328,14 @@ public interface Simulation {
      * @param setting Whether to evesdrop or not
      */
     public void enableEvesdropping(UserID uid, ChannelID cid, boolean setting);
+
+    /**
+     * Inform the simulation that the given task should be considered
+     * complete, because it successfully executed or because it ended
+     * in an unrecoverable error and should not be requeued.
+     *
+     * @param task the task that is done
+     */
+    void taskDone(SimTask task);
+
 }

@@ -154,7 +154,7 @@ public class TimerManagerImpl implements TimerManager {
                                         rec.accessType,
                                         new GLOReferenceImpl<SimTimerListener>(rec.objID),
                                         callbackMethod,
-                                        new Object[] { rec.evtID }));
+                                        new Object[] { rec.evtID }, null));
                                 if (rec.repeatTime > 0) {
                                     rec.triggerTime = time + rec.repeatTime;
                                 } else {

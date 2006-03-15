@@ -147,8 +147,10 @@ public class SimKernelImpl implements SimKernel {
                                 while ((threadPool.size() > 0)
                                         && (sim.hasTasks())) {
                                     SimTask task = sim.nextTask();
-                                    SimThread thread = threadPool.remove(0);
-                                    thread.execute(task);
+				    if (task != null) {
+					SimThread thread = threadPool.remove(0);
+					thread.execute(task);
+				    }
                                 }
                             }
                         }
@@ -161,19 +163,20 @@ public class SimKernelImpl implements SimKernel {
     public void addSimulation(Simulation sim) {
         synchronized (simList) {
             simList.add(sim);
-            simList.notify();
+            simList.notifyAll();
         }
     }
 
     public void simHasNewTask() {
         synchronized (simList) {
-            simList.notify();
+            simList.notifyAll();
         }
     }
 
     public void removeSimulation(Simulation sim) {
         synchronized (simList) {
             simList.remove(sim);
+            simList.notifyAll();
         }
     }
 
@@ -182,7 +185,7 @@ public class SimKernelImpl implements SimKernel {
             threadPool.add(impl);
             
             // Sten added 1/13/06 -- prevents deadlocks if the pool is waiting.
-            threadPool.notify();
+            threadPool.notifyAll();
         }
 
     }
