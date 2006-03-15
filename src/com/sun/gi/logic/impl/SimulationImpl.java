@@ -128,13 +128,17 @@ public class SimulationImpl implements Simulation {
     // one of the two sets:  readyUsers or busyUsers.  A user is ready
     // if there is not already an in-progress task for that user (it's
     // not whether the USER is busy; it's whether the system is busy
-    // doing something for the user).  Transitions from one set are
-    // always protected by userStateMutex.
+    // doing something for the user).  A user may also be a lame duck,
+    // which means that the "leave" task has been queued but not
+    // processed.  Transitions from one set are always protected by
+    // userStateMutex.
 
     protected Object userStateMutex = new Object();
     protected Set<UserID> readyUsers =
 	    Collections.synchronizedSet(new HashSet<UserID>());
     protected Set<UserID> busyUsers =
+	    Collections.synchronizedSet(new HashSet<UserID>());
+    protected Set<UserID> lameDuckUsers =
 	    Collections.synchronizedSet(new HashSet<UserID>());
 
     // DJE:  A list of all of the known active UserIDs.  At every
@@ -176,60 +180,87 @@ public class SimulationImpl implements Simulation {
 
             public void userJoined(UserID uid, Subject subject) {
 		log.fine("user " + uid + " joining");
-		// DJE create queue for the user.
-		if (!knownUsers.contains(uid)) {
-		    knownUsers.add(uid);
 
-		    // If we didn't even know about this user, then we
-		    // must not be running anything for them (so
-		    // they're ready) and we must not have a taskQueue
-		    // for them.
+		// DJE create local state for the user.
+		synchronized (userStateMutex) {
+		    if (!knownUsers.contains(uid)) {
+			knownUsers.add(uid);
 
-		    readyUsers.add(uid);
-		    if (!taskQueues.containsKey(uid)) {
-			taskQueues.put(uid,
-				Collections.synchronizedList(
-					new LinkedList<SimTask>()));
+			// If we didn't even know about this user,
+			// then we must not be running anything for
+			// them (so they're ready) and we must not
+			// have a taskQueue for them.
+
+			readyUsers.add(uid);
+			if (!taskQueues.containsKey(uid)) {
+			    taskQueues.put(uid,
+				    Collections.synchronizedList(
+					    new LinkedList<SimTask>()));
+			}
+		    } else {
+			log.warning("user " + uid + " was already joined.");
 		    }
-		} else {
-		    log.warning("user " + uid + " was already joined.");
 		}
                 fireUserJoined(uid, subject);
             }
 
             public void userLeft(UserID uid) {
-		log.fine("user " + uid + " leaving");
+		log.info("user " + uid + " leaving");
 
-		// DJE mark queue for this user as leaving.  (NOT
-		// DONE RIGHT NOW) We can remove their queues and
-		// other bookkeeping if their queue drains while we
-		// still think they're dead wood.  The difficulty is
-		// figuring out when the queue is really drained;
-		// tasks might get requeued.  Not sure if the state
-		// machine is quite finished yet on this one.
+		fireUserLeft(uid);
 
-		if (knownUsers.contains(uid)) {
-		    log.info("user left: " + uid);
-		    // leavingUsers.add(uid);
-		} else {
-		    log.warning("user " + uid + " leaving but was not joined.");
+		// DJE note the assymetry wrt userJoin:  we need to
+		// queue up the "leave" message BEFORE we can declare
+		// the user a lame duck.
+
+		synchronized (userStateMutex) {
+
+		    // DJE mark this user as a lame duck.  We can
+		    // remove their queues and other bookkeeping if
+		    // their queue drains while we still think they're
+		    // dead wood.
+
+		    if (knownUsers.contains(uid)) {
+			log.fine("user left: " + uid);
+			lameDuckUsers.add(uid);
+		    } else {
+			log.warning("user " + uid +
+				" leaving but was not joined.");
+		    }
 		}
-                fireUserLeft(uid);
-            }
+	    }
 
             public void userJoinedChannel(UserID uid, ChannelID cid) {
 		log.fine("user " + uid + " joined channel " + cid);
+		synchronized (userStateMutex) {
+		    if (lameDuckUsers.contains(uid)) {
+			log.warning("joinedChannel user " + uid +
+				" is a lame duck");
+		    }
+		}
                 fireUserJoinedChannel(uid, cid);
             }
 
             public void userLeftChannel(UserID uid, ChannelID cid) {
 		log.fine("user " + uid + " left channel " + cid);
+		synchronized (userStateMutex) {
+		    if (lameDuckUsers.contains(uid)) {
+			log.warning("leftChannel user " + uid +
+				" is a lame duck");
+		    }
+		}
                 fireUserLeftChannel(uid, cid);
             }
 
             public void channelDataPacket(ChannelID cid, UserID from,
                     ByteBuffer buff) {
 		log.fine("user " + from + " sent data to channel " + cid);
+		synchronized (userStateMutex) {
+		    if (lameDuckUsers.contains(from)) {
+			log.warning("channelDataPacket user " + from +
+				" is a lame duck");
+		    }
+		}
                 fireChannelDataPacket(cid, from, buff);
             }
         });
@@ -634,25 +665,25 @@ public class SimulationImpl implements Simulation {
 	synchronized (userStateMutex) {
 	    synchronized (taskQueues) {
 		if (!backdoorQueue.isEmpty()) {
-		    log.info("has Tasks: backdoor tasks");
+		    log.fine("has Tasks: backdoor tasks");
 		    return true;
 		}
 		for (UserID uid : readyUsers) {
-		    log.finer("has Tasks: considering user " + uid);
+		    // log.finer("has Tasks: considering user " + uid);
 		    if (!taskQueues.get(uid).isEmpty()) {
-			log.info("has Tasks: user " + uid);
+			log.finer("has Tasks: user " + uid);
 			return true;
 		    }
 		}
 	    }
 	}
-	log.info("has Tasks: no waiting tasks");
+	log.fine("has Tasks: no waiting tasks");
 	return false;
     }
 
     public SimTask nextTask() {
 
-	log.info("next Task: choosing something");
+	log.fine("next Task: choosing something");
 	SimTask task = null;
 
 	// DJE:  CHECK:  I'm assuming that the caller knows that if
@@ -686,7 +717,7 @@ public class SimulationImpl implements Simulation {
 
 		if (!backdoorQueue.isEmpty() && random.nextBoolean()) {
 		    task = backdoorQueue.remove(0);
-		    log.info("took newTask from backdoorQueue");
+		    log.finer("took newTask from backdoorQueue");
 		} else if (!readyUsers.isEmpty()) {
 		    List<UserID> readyUserList =
 			    new ArrayList<UserID>(readyUsers);
@@ -697,19 +728,19 @@ public class SimulationImpl implements Simulation {
 				taskQueues.get(uid);
 			if (queue != null && !queue.isEmpty()) {
 			    task = queue.remove(0);
-			    log.info("took newTask from readyUser " + uid);
+			    log.finer("took newTask from readyUser " + uid);
 			    break;
 			}
 		    }
 		} else if (!backdoorQueue.isEmpty()) {
-		    log.info("took newTask from backdoor on the rebound");
+		    log.finer("took newTask from backdoor on the rebound");
 		    task = backdoorQueue.remove(0);
 		} else {
 		    task = null;
 		}
 
 		if (task == null) {
-		    log.info("newTask returning NULL");
+		    log.warning("newTask returning NULL");
 		}
 		userIsReady(task.getUserID(), false);
 	    }
@@ -719,7 +750,7 @@ public class SimulationImpl implements Simulation {
 
     private void userIsReady(UserID user, boolean ready) {
 
-	log.finer("user " + user + " readiness " + ready);
+	log.info("user " + user + " readiness " + ready);
 
 	if (user == null) {
 	    return;
@@ -729,11 +760,36 @@ public class SimulationImpl implements Simulation {
 	    if (ready) {
 		readyUsers.add(user);
 		busyUsers.remove(user);
+
+		if (lameDuckUsers.contains(user)) {
+		    log.info("lame duck user " + user);
+		    synchronized (taskQueues) {
+			List<SimTask> tasks = taskQueues.get(user);
+			if ((tasks == null) || tasks.isEmpty()) {
+			    log.info("removing lame duck user " + user);
+			    taskQueues.remove(user);
+			    readyUsers.remove(user);
+			    busyUsers.remove(user);
+			    lameDuckUsers.remove(user);
+			} else {
+			    log.info("preserving lame duck user " + user +
+				    " length " + tasks.size());
+			}
+		    }
+		}
 	    } else {
 		readyUsers.remove(user);
 		busyUsers.add(user);
 	    }
+
+	    log.info("ready " + ready +
+		    " #taskQueues " + taskQueues.size() +
+		    " #readyUsers " + readyUsers.size() +
+		    " #busyUsers " + busyUsers.size() + 
+		    " #lameDuckUsers " + lameDuckUsers.size());
 	}
+
+	kernel.simHasNewTask();
     }
 
     /**

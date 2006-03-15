@@ -112,36 +112,42 @@ public class SimKernelImpl implements SimKernel {
 
         new Thread(new Runnable() {
             public void run() {
+
                 while (true) {
                     synchronized (simList) {
                         boolean tasksAvailable = false;
                         while (!tasksAvailable) {
+			    log.finest("looking for tasks to run");
                             for (Simulation sim : simList) {
                                 if (sim.hasTasks()) {
                                     tasksAvailable = true;
+				    log.finer("there are tasks available");
                                     break;
                                 }
                             }
                             if (!tasksAvailable) {
                                 try {
-                                    simList.wait();
+                                    simList.wait(5000);
                                 } catch (InterruptedException e) {
                                     e.printStackTrace();
                                 }
                             }
                         }
+			simList.notifyAll();
                     }
                     // has sim tasks, now wait to have threads
                     synchronized (threadPool) {
-			log.info("waiting for a free thread");
-                        while (threadPool.size() == 0) {
+			log.finer("waiting for a free thread");
+                        while (threadPool.isEmpty()) {
                             try {
                                 threadPool.wait();
                             } catch (InterruptedException e) {
                                 e.printStackTrace();
                             }
+			    log.finer("re-trying threadPool");
                         }
-			log.info("found free thread(s)");
+			log.finer("found free thread(s)");
+			threadPool.notifyAll();
                     }
                     // have soem of both, match em up
                     synchronized (simList) {
@@ -160,7 +166,9 @@ public class SimKernelImpl implements SimKernel {
 				    }
                                 }
                             }
+			    threadPool.notifyAll();
                         }
+			simList.notifyAll();
                     }
                 }
             }
