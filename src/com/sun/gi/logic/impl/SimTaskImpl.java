@@ -139,7 +139,14 @@ public class SimTaskImpl extends SimTask {
 
         setAsCurrent();
 
-        this.trans = simulation.getObjectStore().newTransaction(loader);
+	if (this.trans == null) {
+	    this.trans = simulation.getObjectStore().newTransaction(loader);
+	} else {
+	    log.finest("Task for " + uid +
+		" reusing trans " +
+		((com.sun.gi.objectstore.tso.TSOTransaction) trans).getUUID());
+	}
+
         this.trans.start(); // tell trans its waking up to begin anew
 
         GLO runobj = null;
