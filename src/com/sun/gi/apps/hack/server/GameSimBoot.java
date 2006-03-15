@@ -167,8 +167,6 @@ public class GameSimBoot implements SimBoot<GameSimBoot>, SimUserListener
         // a timer that gets called back periodically
         GLOReference<GameChangeManager> gcmRef =
             GameChangeManager.getInstance();
-        task.registerTimerEvent(GameChangeManager.CHANGE_MANAGER_FREQUENCY,
-                                true, gcmRef);
 
         // next, setup the "lobby" where players will choose characters and
         // games to play
@@ -188,6 +186,10 @@ public class GameSimBoot implements SimBoot<GameSimBoot>, SimUserListener
         } catch (Exception e) {
             e.printStackTrace();
         }
+
+        // Now that things are set up, run the event updater
+        task.registerTimerEvent(GameChangeManager.CHANGE_MANAGER_FREQUENCY,
+                                true, gcmRef);
     }
 
     /**
