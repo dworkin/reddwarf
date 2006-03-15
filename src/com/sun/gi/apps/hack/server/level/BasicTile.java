@@ -245,7 +245,7 @@ public abstract class BasicTile implements Tile
      *
      * @return whether or not the item was removed successfully
      */
-    public boolean removeItem(GLOReference<? extends Item> mgrRef) {
+    public boolean removeItem(GLOReference<? extends Item> itemRef) {
         // check that there's an item here
         if (this.itemRef == null)
             return false;
