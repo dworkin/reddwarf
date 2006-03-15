@@ -168,7 +168,7 @@ public final class CommandProtocol implements Serializable {
      * 
      * <ul>
      * <li>The Command Code as an Integer, which will be packed into
-     * the bufferas an unsigned byte.</li>
+     * the buffer as an unsigned byte.</li>
      * <li>Strings are packed as bytes with a leading int indicating
      * its length.</li>
      * <li>UUIDs are packed as bytes with a leading int indicated its
@@ -219,6 +219,9 @@ public final class CommandProtocol implements Serializable {
             } else if (curObj instanceof UnsignedByte) {
                 byteList.add(((UnsignedByte) curObj).byteValue());
                 bufferSize++;
+            } else if (curObj instanceof byte[]) {
+            	byteList.add(curObj);
+            	bufferSize += ((byte[]) curObj).length;
             }
         }
 
@@ -300,6 +303,21 @@ public final class CommandProtocol implements Serializable {
         }
         return sgsuuid;
     }
+    
+    /**
+     * Reads an UUID from the given ByteBuffer as an array of bytes.
+     * 
+     * @param data the buffer to read the UUID from
+     * 
+     * @return a byte array read from the given buffer
+     */
+    public byte[] readUUIDAsBytes(ByteBuffer data) {
+        byte[] uuid = readBytes(data, true);
+        if (uuid.length == 0) {
+            return null;
+        }
+        return uuid;
+    }    
 
     public String readString(ByteBuffer data) {
         String str = null;

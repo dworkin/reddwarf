@@ -219,18 +219,10 @@ public class ConfigParser {
             }
         }
 
-        // System.out.println("Lobby: " + channelName + "
-        // maxPlayersInLobby: " + lobby.getMaxPlayers() + " allowBoot: "
-        // + lobby.getCanHostBoot() +
-        // " allowBan: " + lobby.getCanHostBan() + " changeSettings: " +
-        // lobby.getCanHostChangeSettings() + " maxConnect: " +
-        // lobby.getMaxConnectionTime());
-
         GLOReference<Lobby> lobbyRef = task.createGLO(lobby);
 
         GLOMap<SGSUUID, GLOReference<Lobby>> lobbyMap =
             (GLOMap<SGSUUID, GLOReference<Lobby>>) task.findGLO("LobbyMap").get(task);
-        // System.out.println("storing lobby: " + cid);
         lobbyMap.put(cid, lobbyRef);
 
         return lobbyRef;

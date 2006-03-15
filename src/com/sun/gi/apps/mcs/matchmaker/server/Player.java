@@ -748,7 +748,7 @@ public class Player implements SimUserDataListener {
             for (String curKey : gameParameters.keySet()) {
                 list.add(curKey);
                 Object value = gameParameters.get(curKey);
-                System.out.println("adding param " + curKey + " value " + value);
+                //System.out.println("adding param " + curKey + " value " + value);
                 list.add(protocol.mapType(value));
                 list.add(value);
 
