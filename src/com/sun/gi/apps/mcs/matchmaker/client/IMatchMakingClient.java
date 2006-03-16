@@ -169,5 +169,14 @@ public interface IMatchMakingClient {
      * @param cb 				the security callbacks
      */
     public void sendValidationResponse(Callback[] cb);
+    
+    /**
+     * Sends the command to the server that the current game this user is 
+     * connected to is completed.  Completed games are eligible for
+     * clean up.  There is no server response to this command.
+     *
+     * @param gameID		the unique identifier of the game
+     */
+    public void completeGame(byte[] gameID);
 
 }

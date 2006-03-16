@@ -170,13 +170,11 @@ public class MatchMakerClientTest implements IMatchMakingClientListener {
          */
     }
     
-    /**
-     * Called when some command request encounters an error.
-     * 
-     * @param message		a message detailing the error condition
+    /*
+     * inherited JDoc
      */
-    public void error(String message) {
-    	System.out.println("<ERROR> " + message);
+    public void error(int errorCode) {
+    	System.out.println("<ERROR> " + errorCode);
     }
 
     public void foundUserName(String userName, byte[] userID) {
@@ -219,9 +217,9 @@ public class MatchMakerClientTest implements IMatchMakingClientListener {
                         parameters);
             }
 
-            public void createGameFailed(String name, String reason) {
+            public void createGameFailed(String name, int errorCode) {
                 System.out.println("LobbyChannelListener: createGameFailed "
-                        + name + " reason " + reason);
+                        + name + " reason " + errorCode);
             }
 
             public void gameCreated(GameDescriptor game) {
@@ -278,6 +276,8 @@ public class MatchMakerClientTest implements IMatchMakingClientListener {
             public void gameStarted(GameDescriptor game) {
 
             }
+            
+            public void gameCompleted() {}
         });
     }
     

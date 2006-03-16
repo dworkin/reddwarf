@@ -109,6 +109,8 @@ import com.sun.gi.comm.discovery.impl.URLDiscoverer;
 import com.sun.gi.comm.users.client.ClientConnectionManager;
 import com.sun.gi.comm.users.client.impl.ClientConnectionManagerImpl;
 
+import static com.sun.gi.apps.mcs.matchmaker.common.CommandProtocol.*;
+
 /**
  * 
  * <p>Title: MatchMakerClientTestUI</p>
@@ -176,7 +178,9 @@ public class MatchMakerClientTestUI extends JFrame
         JButton createGame = new JButton("Create Game");
         createGame.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
-                lobbyPanel.createGame();
+                String value = JOptionPane.showInputDialog(MatchMakerClientTestUI.this,
+                        "Enter Game Name", "MyGame");
+            	lobbyPanel.createGame(value);
             }
         });
 
@@ -188,7 +192,7 @@ public class MatchMakerClientTestUI extends JFrame
 	                if (game == null) {
 	                    return;
 	                }
-	                mmClient.joinGame(game.getGameID());
+	                mmClient.joinGame(game.getGameID(), "secret");
                 }
                 else {
                 	mmClient.leaveGame();
@@ -209,6 +213,13 @@ public class MatchMakerClientTestUI extends JFrame
                 gamePanel.startGame();
             }
         });
+        
+        JButton endGameButton = new JButton("End Game");
+        endGameButton.addActionListener(new ActionListener() {
+        	public void actionPerformed(ActionEvent e) {
+        		mmClient.completeGame(gamePanel.getGameID());
+        	}
+        });
 
         JPanel buttonPanel = new JPanel();
         buttonPanel.add(connectButton);
@@ -217,6 +228,7 @@ public class MatchMakerClientTestUI extends JFrame
         buttonPanel.add(joinGame);
         buttonPanel.add(readyButton);
         buttonPanel.add(startGameButton);
+        buttonPanel.add(endGameButton);
 
         JSplitPane rightPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
         rightPane.setDividerLocation(250);
@@ -232,14 +244,24 @@ public class MatchMakerClientTestUI extends JFrame
         JButton sendTextButton = new JButton("Send Text");
         sendTextButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
-                lobbyPanel.sendText(chatField.getText());
+                if (gamePanel.hasGame()) {
+                	gamePanel.sendText(chatField.getText());
+                }
+                else {
+                	lobbyPanel.sendText(chatField.getText());
+                }
             }
         });
 
         JButton sendPrivateTextButton = new JButton("Send Private Text");
         sendPrivateTextButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
-                lobbyPanel.sendPrivateText(chatField.getText());
+                if (gamePanel.hasGame()) {
+                	gamePanel.sendPrivateText(chatField.getText());
+                }
+                else {
+                	lobbyPanel.sendPrivateText(chatField.getText());
+                }
             }
         });
 
@@ -258,7 +280,7 @@ public class MatchMakerClientTestUI extends JFrame
         add(splitPane, BorderLayout.CENTER);
         add(bottomPanel, BorderLayout.SOUTH);
 
-        setBounds(300, 200, 700, 600);
+        setBounds(300, 200, 720, 600);
 
         addWindowListener(new WindowAdapter() {
             public void windowClosing(WindowEvent e) {
@@ -427,12 +449,50 @@ public class MatchMakerClientTestUI extends JFrame
         connectButton.setText("Connect");
     }
     
-    /**
-     * Called when some command request encounters an error.
-     * 
-     * @param message		a message detailing the error condition
+    /*
+     * Inherited JDoc
      */
-    public void error(String message) {
+    public void error(int errorCode) {
+    	String message = null;
+    	if (errorCode == NOT_CONNECTED_LOBBY) {
+    		message = "Not connected to a lobby";
+    	}
+    	else if (errorCode == NOT_CONNECTED_GAME) {
+    		message = "Not connected to a game";
+    	}
+    	else if (errorCode == CONNECTED_GAME) {
+    		message = "Already connected to a game";
+    	}
+    	else if (errorCode == CONNECTED_LOBBY) {
+    		message = "Already connected to a lobby";
+    	}
+    	else if (errorCode == PLAYER_NOT_HOST) {
+    		message = "Only the host can start a game";
+    	}
+    	else if (errorCode == PLAYERS_NOT_READY) {
+    		message = "The game cannot start until all players are ready";
+    	}
+    	else if (errorCode == LESS_THAN_MIN_PLAYERS) {
+    		message = "Too few players to start game";
+    	}
+    	else if (errorCode == GREATER_THAN_MAX_PLAYERS) {
+    		message = "Too many players to start game";
+    	}
+    	else if (errorCode == MAX_PLAYERS) {
+    		message = "Already at max players";
+    	}
+    	else if (errorCode == INCORRECT_PASSWORD) {
+    		message = "Incorrect Password";
+    	}
+    	else if (errorCode == INVALID_GAME) {
+    		message = "Invalid Game";
+    	}
+    	else if (errorCode == INVALID_LOBBY) {
+    		message = "Invalid Lobby";
+    	}
+    	else {
+    		message = "Unknown Error";
+    	}
     	receiveServerMessage("<ERROR> " + message);
     }
 
@@ -633,9 +693,9 @@ public class MatchMakerClientTestUI extends JFrame
         
         }
 
-        void createGame() {
+        void createGame(String gameName) {
         	if (channel != null) {
-        		channel.createGame("My Game", "My description", null,
+        		channel.createGame(gameName, "My description", "secret",
                     gameParameters);
         	}
         }
@@ -654,13 +714,15 @@ public class MatchMakerClientTestUI extends JFrame
         }
 
         private byte[] lookupUserID(String username) {
-            Iterator<String> iterator = userMap.keySet().iterator();
-            while (iterator.hasNext()) {
-                String curID = iterator.next();
-                if (username.equals(userMap.get(curID))) {
-                    return stringToByteArray(curID);
-                }
-            }
+        	if (username != null) {
+	            Iterator<String> iterator = userMap.keySet().iterator();
+	            while (iterator.hasNext()) {
+	                String curID = iterator.next();
+	                if (username.equals(userMap.get(curID))) {
+	                    return stringToByteArray(curID);
+	                }
+	            }
+        	}
             return new byte[0];
         }
 
@@ -706,7 +768,26 @@ public class MatchMakerClientTestUI extends JFrame
             parametersModel.fireTableDataChanged();
         }
 
-        public void createGameFailed(String name, String reason) {
+        public void createGameFailed(String name, int errorCode) {
+        	String reason = null;
+        	if (errorCode == NOT_CONNECTED_LOBBY) {
+        		reason = "Not connected to a lobby";
+        	}
+        	else if (errorCode == INVALID_GAME_PARAMETERS) {
+        		reason = "Invalid game parameters";
+        	}
+        	else if (errorCode == INVALID_GAME_NAME) {
+        		reason = "Invalid game name";
+        	}
+        	else if (errorCode == CONNECTED_GAME) {
+        		reason = "Already connected to a game";
+        	}
+        	else if (errorCode == GAME_EXISTS) {
+        		reason = "Game already exists";
+        	}
+        	else {
+        		reason = "Unknown Error";
+        	}
             receiveServerMessage("LobbyPanel createGameFailed: " + name
                     + " reason " + reason);
         }
@@ -840,6 +921,46 @@ public class MatchMakerClientTestUI extends JFrame
             updateGameParameters(descriptor.getGameParameters());
         }
         
+        public boolean hasGame() {
+        	return GamePanel.this.channel != null;
+        }
+        
+        public byte[] getGameID() {
+        	return descriptor.getGameID();
+        }
+        
+        void sendText(String message) {
+            if (channel != null) {
+            	channel.sendText(message);
+            }
+        }
+
+        void sendPrivateText(String message) {
+        	if (channel != null) {
+        		byte[] userID = lookupUserID(getSelectedUserName());
+        		channel.sendPrivateText(userID, message);
+        	}
+        }
+        
+        private String getSelectedUserName() {
+        	int row = userTable.getSelectedRow();
+        	if (row >= 0) {
+        		return (String) userTableModel.getValueAt(row, 0);
+        	}
+        	return "";
+        }
+        
+        private byte[] lookupUserID(String username) {
+            Iterator<String> iterator = userMap.keySet().iterator();
+            while (iterator.hasNext()) {
+                String curID = iterator.next();
+                if (username.equals(userMap.get(curID))) {
+                    return stringToByteArray(curID);
+                }
+            }
+            return new byte[0];
+        }
+        
         public void resetGame() {
         	GamePanel.this.channel = null;
         	GamePanel.this.descriptor = null;
@@ -848,6 +969,7 @@ public class MatchMakerClientTestUI extends JFrame
         	userTableModel.clear();
         	parametersModel.clear();
         	isPasswordProtected.setSelected(false);
+        	joinGame.setText("Join Game");
         }
 
         public void ready() {
@@ -907,6 +1029,11 @@ public class MatchMakerClientTestUI extends JFrame
 
         public void gameStarted(GameDescriptor game) {
             receiveServerMessage("<Game Room> Game Started " + game.getName());
+        }
+        
+        public void gameCompleted() {
+        	resetGame();
+        	receiveServerMessage("<Game Room> Game Completed");
         }
 
     }

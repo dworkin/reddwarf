@@ -73,13 +73,26 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static com.sun.gi.apps.mcs.matchmaker.server.CommandProtocol.*;
+import static com.sun.gi.apps.mcs.matchmaker.common.CommandProtocol.*;
 
-import com.sun.gi.apps.mcs.matchmaker.server.CommandProtocol;
+import com.sun.gi.apps.mcs.matchmaker.common.CommandProtocol;
 import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.comm.users.client.ClientChannel;
 import com.sun.gi.comm.users.client.ClientChannelListener;
 
+/**
+ * 
+ * <p>Title: LobbyChannel</p>
+ * 
+ * <p>Description: An implementation of ILobbyChannel that uses SGS
+ * ClientChannels for communication.</p>
+ * 
+ * <p>Copyright: Copyright (c) 2006</p>
+ * <p>Company: Sun Microsystems, TMI</p>
+ * 
+ * @author	Sten Anderson
+ * @version 1.0
+ */
 public class LobbyChannel implements ILobbyChannel, ClientChannelListener {
 
     private ClientChannel channel;
@@ -130,6 +143,10 @@ public class LobbyChannel implements ILobbyChannel, ClientChannelListener {
 
     public void createGame(String name, String description, String password,
             HashMap<String, Object> gameParameters) {
+    	
+    	if (name == null || gameParameters == null) {
+    		return;
+    	}
         List list = protocol.createCommandList(CREATE_GAME);
         list.add(name);
         list.add(description);
@@ -155,9 +172,9 @@ public class LobbyChannel implements ILobbyChannel, ClientChannelListener {
         }
     }
 
-    void createGameFailed(String game, String reason) {
+    void createGameFailed(String game, int errorCode) {
         if (listener != null) {
-            listener.createGameFailed(game, reason);
+            listener.createGameFailed(game, errorCode);
         }
     }
 
@@ -194,20 +211,22 @@ public class LobbyChannel implements ILobbyChannel, ClientChannelListener {
                                 // do anything
             return;
         }
+        int command = protocol.readUnsignedByte(data);
+        if (command == SEND_TEXT) {
+        	listener.receiveText(from, protocol.readString(data), false);
+        } else if (command == SEND_PRIVATE_TEXT) {
+        	UserID id = protocol.readUserID(data);
+        	listener.receiveText(from, protocol.readString(data), true);
+        
+        }	
         if (!mmClient.isServerID(from)) {
         	return;
         }
         
-        int command = protocol.readUnsignedByte(data);
         if (command == PLAYER_ENTERED_LOBBY) {
             byte[] userID = protocol.readUUIDAsBytes(data);
             String name = protocol.readString(data);
             listener.playerEntered(userID, name);
-        } else if (command == SEND_TEXT) {
-            listener.receiveText(from, protocol.readString(data), false);
-        } else if (command == SEND_PRIVATE_TEXT) {
-            UserID id = protocol.readUserID(data);
-            listener.receiveText(from, protocol.readString(data), true);
         } else if (command == GAME_CREATED) {
 
             listener.gameCreated(readGameDescriptor(data));

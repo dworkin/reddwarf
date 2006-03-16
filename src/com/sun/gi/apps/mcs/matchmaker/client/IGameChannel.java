@@ -102,6 +102,14 @@ public interface IGameChannel {
      * @param text		the message to broadcast
      */
     public void sendText(String text);
+    
+    /**
+     * Sends a message to the given user in the lobby.
+     * 
+     * @param user			the user ID to which to send the message
+     * @param text			the message
+     */
+    public void sendPrivateText(byte[] user, String text);
 
     /**
      * Each player in a game room must indicate that they are "ready"

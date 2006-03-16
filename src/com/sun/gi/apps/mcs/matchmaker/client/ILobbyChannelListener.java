@@ -120,9 +120,9 @@ public interface ILobbyChannelListener {
      * Called when a ILobbyChannel.createGame request fails.
      * 
      * @param name			the proposed game name
-     * @param reason		the reason for the failure
+     * @param errorCode		the error code
      */
-    public void createGameFailed(String name, String reason);
+    public void createGameFailed(String name, int errorCode);
 
     /**
      * Called when a game room is successfully created in the lobby. 

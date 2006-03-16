@@ -73,12 +73,26 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static com.sun.gi.apps.mcs.matchmaker.server.CommandProtocol.*;
+import static com.sun.gi.apps.mcs.matchmaker.common.CommandProtocol.*;
 
-import com.sun.gi.apps.mcs.matchmaker.server.CommandProtocol;
+import com.sun.gi.apps.mcs.matchmaker.common.CommandProtocol;
+import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.comm.users.client.ClientChannel;
 import com.sun.gi.comm.users.client.ClientChannelListener;
 
+/**
+ * 
+ * <p>Title: GameChannel</p>
+ * 
+ * <p>Description: An implementation of IGameChannel that uses SGS ClientChannels 
+ * for its communication.</p>
+ * 
+ * <p>Copyright: Copyright (c) 2006</p>
+ * <p>Company: Sun Microsystems, TMI</p>
+ * 
+ * @author	Sten Anderson
+ * @version 1.0
+ */
 public class GameChannel implements IGameChannel, ClientChannelListener {
 
     private IGameChannelListener listener;
@@ -97,7 +111,28 @@ public class GameChannel implements IGameChannel, ClientChannelListener {
     }
 
     public void sendText(String text) {
+        List list = protocol.createCommandList(SEND_TEXT);
+        list.add(text);
+        ByteBuffer buffer = protocol.assembleCommand(list);
+        channel.sendBroadcastData(buffer, true);
+    }
 
+    public void sendPrivateText(byte[] user, String text) {
+        List list = protocol.createCommandList(SEND_PRIVATE_TEXT);
+        list.add(createUserID(user));
+        list.add(text);
+        ByteBuffer buffer = protocol.assembleCommand(list);
+
+        channel.sendUnicastData(user, buffer, true);
+    }
+    
+    private UserID createUserID(byte[] bytes) {
+        UserID id = null;
+        try {
+            id = new UserID(bytes);
+        } catch (InstantiationException ie) {}
+
+        return id;
     }
 
     public void playerJoined(byte[] playerID) {
@@ -115,11 +150,18 @@ public class GameChannel implements IGameChannel, ClientChannelListener {
             // if no one is listening, no reason to do anything
             return;
         }
+        int command = protocol.readUnsignedByte(data);
+        if (command == SEND_TEXT) {
+        	listener.receiveText(from, protocol.readString(data), false);
+        } else if (command == SEND_PRIVATE_TEXT) {
+        	UserID id = protocol.readUserID(data);
+        	listener.receiveText(from, protocol.readString(data), true);
+        
+        }
         if (!mmClient.isServerID(from)) {
         	return;
         }
         
-        int command = protocol.readUnsignedByte(data);
         if (command == PLAYER_ENTERED_GAME) {
             byte[] userID = protocol.readUUIDAsBytes(data);
             String name = protocol.readString(data);
@@ -154,7 +196,9 @@ public class GameChannel implements IGameChannel, ClientChannelListener {
     }
 
     public void channelClosed() {
-
+    	if (listener != null) {
+    		listener.gameCompleted();
+    	}
     }
 
     public String getName() {

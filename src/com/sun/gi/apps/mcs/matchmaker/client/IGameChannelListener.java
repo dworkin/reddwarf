@@ -131,4 +131,10 @@ public interface IGameChannelListener {
      * @param game
      */
     public void gameStarted(GameDescriptor game);
+    
+    /**
+     * This is called when the channel is closed down.
+     *
+     */
+    public void gameCompleted();
 }

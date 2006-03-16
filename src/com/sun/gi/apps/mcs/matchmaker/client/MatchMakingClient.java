@@ -75,9 +75,9 @@ import java.util.List;
 
 import javax.security.auth.callback.Callback;
 
-import static com.sun.gi.apps.mcs.matchmaker.server.CommandProtocol.*;
+import static com.sun.gi.apps.mcs.matchmaker.common.CommandProtocol.*;
 
-import com.sun.gi.apps.mcs.matchmaker.server.CommandProtocol;
+import com.sun.gi.apps.mcs.matchmaker.common.CommandProtocol;
 import com.sun.gi.comm.users.client.ClientChannel;
 import com.sun.gi.comm.users.client.ClientChannelListener;
 import com.sun.gi.comm.users.client.ClientConnectionManager;
@@ -210,7 +210,14 @@ public class MatchMakingClient
     public void leaveGame() {
     	sendCommand(protocol.createCommandList(LEAVE_GAME));
     }
-
+    
+    public void completeGame(byte[] gameID) {
+    	List list = protocol.createCommandList(GAME_COMPLETED);
+    	list.add(createUUID(gameID));
+    	
+    	sendCommand(list);
+    }
+    
     /**
      * Attempts to find the user name of a currently connected user with
      * the given ID.
@@ -348,7 +355,7 @@ public class MatchMakingClient
         } else if (command == CREATE_GAME_FAILED) {
             createGameFailed(data);
         } else if (command == ERROR) {
-        	listener.error(protocol.readString(data));
+        	listener.error(protocol.readUnsignedByte(data));
         } else if (command == LEFT_LOBBY) {
         	listener.leftLobby();
         } else if (command == LEFT_GAME) {
@@ -361,7 +368,6 @@ public class MatchMakingClient
      * {@inheritDoc}
      */
     public void channelClosed() {
-
     }
 
     /**
@@ -431,14 +437,14 @@ public class MatchMakingClient
 
     private void createGameFailed(ByteBuffer data) {
         String game = protocol.readString(data);
-        String desc = protocol.readString(data);
+        int errorCode = protocol.readUnsignedByte(data);
         String lobbyName = protocol.readString(data);
         if (lobbyName == null) {
             return;
         }
         LobbyChannel lobby = lobbyMap.get(lobbyName);
         if (lobby != null) {
-            lobby.createGameFailed(game, desc);
+            lobby.createGameFailed(game, errorCode);
         }
     }
 }

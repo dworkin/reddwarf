@@ -171,9 +171,10 @@ public interface IMatchMakingClientListener {
     public void validationRequest(Callback[] callbacks);
     
     /**
-     * Called when some command request encounters an error.
+     * Called when some command request encounters an error.  The error code
+     * is defined in CommandProtocol.
      * 
-     * @param message		a message detailing the error condition
+     * @param errorCode		a code detailing the error condition
      */
-    public void error(String message);
+    public void error(int errorCode);
 }
