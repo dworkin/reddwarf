@@ -218,6 +218,7 @@
 	    <!-- <compilerarg value="-Xlint:unchecked"/> -->
 	    <classpath refid="project.classpath" />
 	    <include name="com/sun/gi/apps/mcs/matchmaker/server/**" />
+	    <include name="com/sun/gi/apps/mcs/matchmaker/common/**" />
 	</javac>
     </target>
 
@@ -537,8 +538,12 @@
     </target>
 
     <target name="release.matchmaker" depends="build.matchmaker">
-	<jar destfile="release/apps/matchmaker/MatchMaker.jar"
-	    basedir="bin" includes="com/sun/gi/apps/mcs/matchmaker/server/**" />
+	<jar destfile="release/apps/matchmaker/MatchMaker.jar">
+	    <fileset dir="bin">
+		<include name="com/sun/gi/apps/mcs/matchmaker/server/**/*.class"/>
+		<include name="com/sun/gi/apps/mcs/matchmaker/common/**/*.class"/>
+	    </fileset>
+	</jar>
 	<copy file="resources/matchmaker_deployment.xml"
 	    todir="release/apps/matchmaker" />
 	<copy file="resources/matchmaker_config.xml"
