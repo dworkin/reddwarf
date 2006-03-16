@@ -96,10 +96,11 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.logging.Logger;
 
 public class NIOSocketManager implements Runnable {
@@ -112,7 +113,7 @@ public class NIOSocketManager implements Runnable {
     private int udpBufSize;
 
     private Set<NIOSocketManagerListener> listeners =
-	new TreeSet<NIOSocketManagerListener>();
+	new HashSet<NIOSocketManagerListener>();
 
     private List<NIOConnection> initiatorQueue =
 	new ArrayList<NIOConnection>();
@@ -127,8 +128,8 @@ public class NIOSocketManager implements Runnable {
 	new ArrayList<SelectableChannel>();
 
     public NIOSocketManager() throws IOException {
-        this(128 * 1024,  // tcp buffer size
-              64 * 1024); // udp buffer size
+        this(128 * 1024,  // tcp buffer size in bytes
+              64 * 1024); // udp buffer size in bytes
     }
 
     public NIOSocketManager(int tcpBufferSize, int udpBufferSize)
@@ -141,7 +142,6 @@ public class NIOSocketManager implements Runnable {
     }
 
     public void acceptConnectionsOn(SocketAddress addr) throws IOException {
-        // log.entering("NIOSocketManager", "acceptConnectionsOn");
 
         ServerSocketChannel channel = ServerSocketChannel.open();
         channel.configureBlocking(false);
@@ -151,12 +151,9 @@ public class NIOSocketManager implements Runnable {
             acceptorQueue.add(channel);
         }
         selector.wakeup();
-
-        // log.exiting("NIOSocketManager", "acceptConnectionsOn");
     }
 
     public NIOConnection makeConnectionTo(SocketAddress addr) {
-        // log.entering("NIOSocketManager", "makeConnectionTo");
 
         try {
             SocketChannel sc = SocketChannel.open();
@@ -170,12 +167,14 @@ public class NIOSocketManager implements Runnable {
             try {
                 conn = new NIOConnection(this, sc, dc, tcpBufSize, udpBufSize);
             } catch (OutOfMemoryError e) {
-                e.printStackTrace();
                 log.severe("Can't allocate buffers for connection");
+                log.throwing(getClass().getName(), "makeConnectionTo", e);
+                e.printStackTrace();
                 try {
                     sc.close();
                     dc.close();
                 } catch (IOException ie) {
+		    log.throwing(getClass().getName(), "makeConnectionTo", ie);
                     // ignore
                 }
                 return null;
@@ -189,16 +188,14 @@ public class NIOSocketManager implements Runnable {
             return conn;
         } catch (IOException ex) {
             ex.printStackTrace();
+	    log.throwing(getClass().getName(), "makeConnectionTo", ex);
             return null;
-            // } finally {
-            // log.exiting("NIOSocketManager", "makeConnectionTo");
         }
     }
 
     // This runs the actual polled input
 
     public void run() {
-        // log.entering("NIOSocketManager", "run");
 
         while (true) { // until shutdown() is called
 
@@ -208,6 +205,7 @@ public class NIOSocketManager implements Runnable {
                         conn.registerConnect(selector);
                     } catch (IOException ex) {
                         ex.printStackTrace();
+			log.throwing(getClass().getName(), "run", ex);
                     }
                 }
                 initiatorQueue.clear();
@@ -219,6 +217,7 @@ public class NIOSocketManager implements Runnable {
                         conn.open(selector);
                     } catch (IOException ex) {
                         ex.printStackTrace();
+			log.throwing(getClass().getName(), "run", ex);
                     }
                 }
                 receiverQueue.clear();
@@ -228,8 +227,9 @@ public class NIOSocketManager implements Runnable {
                 for (ServerSocketChannel chan : acceptorQueue) {
                     try {
                         chan.register(selector, OP_ACCEPT);
-                    } catch (ClosedChannelException ex2) {
-                        ex2.printStackTrace();
+                    } catch (ClosedChannelException ex) {
+                        ex.printStackTrace();
+			log.throwing(getClass().getName(), "run", ex);
                     }
                 }
                 acceptorQueue.clear();
@@ -264,16 +264,15 @@ public class NIOSocketManager implements Runnable {
                 }
             } catch (IOException e) {
                 e.printStackTrace();
+		log.throwing(getClass().getName(), "run", e);
             }
         }
-        // log.exiting("NIOSocketManager", "run");
     }
 
     /**
      * processSocketEvents
      */
     private void processSocketEvents() {
-        // log.entering("NIOSocketManager", "processSocketEvents");
 
         Iterator<SelectionKey> i = selector.selectedKeys().iterator();
 
@@ -302,36 +301,31 @@ public class NIOSocketManager implements Runnable {
                 handleWrite(key);
             }
         }
-
-        // log.exiting("NIOSocketManager", "processSocketEvents");
     }
 
     private void handleRead(SelectionKey key) {
-        // log.entering("NIOSocketManager", "handleRead");
-        ReadWriteSelectorHandler h = (ReadWriteSelectorHandler) key.attachment();
+        ReadWriteSelectorHandler h =
+	    (ReadWriteSelectorHandler) key.attachment();
         try {
             h.handleRead(key);
-        } catch (IOException ex) {
+        } catch (IOException e) {
+	    log.throwing(getClass().getName(), "handleRead", e);
             h.handleClose();
-            // } finally {
-            // log.exiting("NIOSocketManager", "handleRead");
         }
     }
 
     private void handleWrite(SelectionKey key) {
-        // log.entering("NIOSocketManager", "handleWrite");
-        ReadWriteSelectorHandler h = (ReadWriteSelectorHandler) key.attachment();
+        ReadWriteSelectorHandler h =
+	    (ReadWriteSelectorHandler) key.attachment();
         try {
             h.handleWrite(key);
-        } catch (IOException ex) {
+        } catch (IOException e) {
+	    log.throwing(getClass().getName(), "handleWrite", e);
             h.handleClose();
-            // } finally {
-            // log.exiting("NIOSocketManager", "handleWrite");
         }
     }
 
     private void handleAccept(SelectionKey key) {
-        // log.entering("NIOSocketManager", "handleAccept");
         // Get channel
         ServerSocketChannel serverChannel = (ServerSocketChannel) key.channel();
 
@@ -352,12 +346,14 @@ public class NIOSocketManager implements Runnable {
             try {
                 conn = new NIOConnection(this, sc, dc, tcpBufSize, udpBufSize);
             } catch (OutOfMemoryError e) {
-                e.printStackTrace();
                 log.severe("Can't allocate buffers for connection");
+                e.printStackTrace();
+		log.throwing(getClass().getName(), "handleAccept", e);
                 try {
                     sc.close();
                     dc.close();
                 } catch (IOException ie) {
+		    log.throwing(getClass().getName(), "handleAccept", ie);
                     // ignore
                 }
                 return;
@@ -390,11 +386,10 @@ public class NIOSocketManager implements Runnable {
             }
         } catch (IOException ex) {
             ex.printStackTrace();
+	    log.throwing(getClass().getName(), "handleAccept", ex);
             if (conn != null) {
                 conn.disconnect();
             }
-        } finally {
-            //log.exiting("NIOSocketManager", "handleAccept");
         }
     }
 
@@ -406,8 +401,6 @@ public class NIOSocketManager implements Runnable {
     }
 
     private void handleConnect(SelectionKey key) {
-        //log.entering("NIOSocketManager", "handleConnect");
-
         NIOConnection conn = (NIOConnection) key.attachment();
         try {
             conn.processConnect(key);
@@ -415,13 +408,12 @@ public class NIOSocketManager implements Runnable {
                 l.connected(conn);
             }
         } catch (IOException ex) {
+	    log.throwing(getClass().getName(), "handleConnect", ex);
             log.warning("NIO connect failure: " + ex.getMessage());
             conn.disconnect();
             for (NIOSocketManagerListener l : listeners) {
                 l.connectionFailed(conn);
             }
-            //} finally {
-            //log.exiting("NIOSocketManager", "handleConnect");
         }
     }
 
@@ -439,7 +431,7 @@ public class NIOSocketManager implements Runnable {
             selector.close();
         } catch (IOException e) {
             e.printStackTrace();
+	    log.throwing(getClass().getName(), "shutdown", e);
         }
     }
-
 }

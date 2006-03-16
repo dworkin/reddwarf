@@ -179,6 +179,7 @@ public class NIOConnection implements SelectorHandler {
             try {
                 key = channel.register(sel, OP_READ, this);
             } catch (IOException e) {
+                log.throwing(getClass().getName(), "open", e);
                 e.printStackTrace();
             }
         }
@@ -283,6 +284,7 @@ public class NIOConnection implements SelectorHandler {
                 log.fine("Closing " + channel);
                 channel.close();
             } catch (IOException e) {
+                log.throwing(getClass().getName(), "close", e);
                 e.printStackTrace();
             }
         }
