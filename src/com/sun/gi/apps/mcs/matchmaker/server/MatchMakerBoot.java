@@ -77,6 +77,7 @@ import java.util.Set;
 
 import javax.security.auth.Subject;
 
+import com.sun.gi.apps.mcs.matchmaker.common.CommandProtocol;
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.logic.GLOReference;
@@ -139,15 +140,25 @@ public class MatchMakerBoot
     private void initChannels(SimTask task) {
         GLOReference<GLOMap<SGSUUID, GLOReference>> lobbyRef =
             task.findGLO("LobbyMap");
-        openChannels(task, lobbyRef);
+        openChannels(task, lobbyRef, true);
 
         GLOReference<GLOMap<SGSUUID, GLOReference>> gameRoomRef =
             task.findGLO("GameRoomMap");
-        openChannels(task, gameRoomRef);
+        openChannels(task, gameRoomRef, false);
     }
 
+    /**
+     * Iterates through the given map of channel room references and
+     * refreshes their channel ID.  If refreshMapping is true, it will 
+     * also re-map the channel room to the new CID.
+     * 
+     * @param task
+     * @param gloMapRef
+     * @param refreshMapping		
+     */
     private void openChannels(SimTask task,
-            GLOReference<GLOMap<SGSUUID, GLOReference>> gloMapRef) {
+            GLOReference<GLOMap<SGSUUID, GLOReference>> gloMapRef, 
+            boolean refreshMapping) {
     	
         GLOMap<SGSUUID, GLOReference> gloMap = gloMapRef.get(task);
         Iterator iterator = gloMap.keySet().iterator();
@@ -158,7 +169,12 @@ public class MatchMakerBoot
             ChannelRoom curRoom = (ChannelRoom) ref.get(task);
             ChannelID cid = task.openChannel(curRoom.getChannelName());
             curRoom.setChannelID(cid);
-            map.put(cid, ref);
+            if (refreshMapping) {
+            	map.put(cid, ref);
+            }
+        }
+        if (!refreshMapping) {
+        	return;
         }
         gloMap.clear();
         Iterator<SGSUUID> mapIterator = map.keySet().iterator();

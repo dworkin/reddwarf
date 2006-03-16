@@ -87,7 +87,8 @@ import com.sun.gi.utils.SGSUUID;
  * <p>
  * Description: Represents a Game Room in the match making application.
  * A GameRoom Channel name is in the form of
- * FolderName.SubFolderName.LobbyName:GameRoomName.
+ * FolderName.SubFolderName.LobbyName:GameRoomNamexxx, where xxx is the 
+ * game ID.
  * </p>
  * 
  * @author Sten Anderson
@@ -101,12 +102,13 @@ public class GameRoom extends ChannelRoom {
     private int maxPlayers;
     private HashMap<String, Object> gameParameters;
     private HashMap<UserID, Boolean> userMap; // users mapped to ready state.
-    private boolean starting = false;
+    private boolean started = false;
+    private SGSUUID gameID;
     private GLOReference<Lobby> parentLobby;		// a reference to the lobby to
     												// which this game room belongs
 
     public GameRoom(String name, String description, String password,
-            String channelName, ChannelID cid, UserID host, GLOReference<Lobby> lobby) {
+            String channelName, ChannelID cid, UserID host, GLOReference<Lobby> lobby, SGSUUID gameID) {
     	
         super(name, description, password, channelName, cid);
 
@@ -114,11 +116,12 @@ public class GameRoom extends ChannelRoom {
 
         this.host = host;
         this.parentLobby = lobby;
+        this.gameID = gameID;
         gameParameters = new HashMap<String, Object>();
     }
 
     public SGSUUID getGameID() {
-        return getChannelID();
+        return gameID;
     }
 
     public UserID getHost() {
@@ -129,12 +132,12 @@ public class GameRoom extends ChannelRoom {
         gameParameters.put(key, value);
     }
     
-    public boolean isStarting() {
-    	return starting;
+    public boolean hasStarted() {
+    	return started;
     }
     
-    public void setStarting(boolean b) {
-    	starting = b;
+    public void setStarted(boolean b) {
+    	started = b;
     }
     
     public GLOReference<Lobby> getLobby() {

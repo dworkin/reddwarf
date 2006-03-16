@@ -68,7 +68,7 @@
 
 package com.sun.gi.apps.mcs.matchmaker.server;
 
-import static com.sun.gi.apps.mcs.matchmaker.server.CommandProtocol.*;
+import static com.sun.gi.apps.mcs.matchmaker.common.CommandProtocol.*;
 
 import java.io.IOException;
 import java.net.URL;
@@ -83,6 +83,7 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
+import com.sun.gi.apps.mcs.matchmaker.common.UnsignedByte;
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask;
