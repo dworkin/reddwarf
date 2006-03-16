@@ -226,7 +226,7 @@ public class Player implements SimUserDataListener {
 	    SimTask task = SimTask.getCurrent();
 	    playerRef.get(task).decrementReferenceCount();
 	} else {
-	    log.finer("userLeft for unknown uid " + uid);
+	    log.warning("userLeft for unknown uid " + uid);
 	}
     }
 
@@ -317,6 +317,10 @@ public class Player implements SimUserDataListener {
         }
 
 	decrementReferenceCount();
+
+	if (listenerCount == 0) {
+            log.warning("userLeftChannel after userLeft!");
+	}
     }
 
     public void userDataReceived(UserID uid, ByteBuffer data) {
