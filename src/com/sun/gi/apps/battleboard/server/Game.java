@@ -115,7 +115,8 @@ public class Game implements GLO {
 
     private static final long serialVersionUID = 1;
 
-    private static Logger log = Logger.getLogger("com.sun.gi.apps.battleboard.server");
+    private static Logger log =
+	Logger.getLogger("com.sun.gi.apps.battleboard.server");
 
     private String gameName;
     private ChannelID channel;
