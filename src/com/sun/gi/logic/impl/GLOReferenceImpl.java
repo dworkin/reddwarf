@@ -105,7 +105,6 @@ public class GLOReferenceImpl<T extends GLO>
 	    throws IOException, ClassNotFoundException
     {
         in.defaultReadObject();
-	currentTask = SimTask.getCurrent();
     }
 
     /**
@@ -122,13 +121,20 @@ public class GLOReferenceImpl<T extends GLO>
 	return objID;
     }
 
-    private void checkCurrentTask(SimTask other) {
-	if (this.currentTask != other) {
+    private void checkActiveTask(SimTask other) {
+	if (SimTask.getCurrent() != other) {
 	    throw new ExecutionOutsideOfTaskException();
 	}
     }
 
+    private void checkCurrentTask() {
+	if (currentTask == null) {
+	    currentTask = SimTask.getCurrent();
+	}
+    }
+
     public void delete() {
+	checkCurrentTask();
 	this.delete(currentTask);
     }
 
@@ -136,7 +142,7 @@ public class GLOReferenceImpl<T extends GLO>
      * {@inheritDoc}
      */
     public void delete(SimTask task) {
-	checkCurrentTask(task);
+	checkActiveTask(task);
         try {
             task.getTransaction().destroy(objID);
         } catch (NonExistantObjectIDException e) {
@@ -145,6 +151,7 @@ public class GLOReferenceImpl<T extends GLO>
     }
 
     public T get() {
+	checkCurrentTask();
 	return get(currentTask);
     }
 
@@ -152,7 +159,7 @@ public class GLOReferenceImpl<T extends GLO>
      * {@inheritDoc}
      */
     public T get(SimTask task) {
-	checkCurrentTask(task);
+	checkActiveTask(task);
 	T obj = null;
 
 	try {
@@ -167,6 +174,7 @@ public class GLOReferenceImpl<T extends GLO>
     }
 
     public T peek() {
+	checkCurrentTask();
 	return peek(currentTask);
     }
 
@@ -174,7 +182,7 @@ public class GLOReferenceImpl<T extends GLO>
      * {@inheritDoc}
      */
     public T peek(SimTask task) {
-	checkCurrentTask(task);
+	checkActiveTask(task);
 	T obj = null;
 
 	try {
@@ -189,6 +197,7 @@ public class GLOReferenceImpl<T extends GLO>
     }
 
     public T attempt() {
+	checkCurrentTask();
 	return attempt(currentTask);
     }
 
@@ -196,7 +205,7 @@ public class GLOReferenceImpl<T extends GLO>
      * {@inheritDoc}
      */
     public T attempt(SimTask task) {
-	checkCurrentTask(task);
+	checkActiveTask(task);
 	T obj = null;
 
 	try {
