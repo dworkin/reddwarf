@@ -73,6 +73,7 @@ import java.io.ObjectInputStream;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import com.sun.gi.logic.ExecutionOutsideOfTaskException;
 import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask.ACCESS_TYPE;
@@ -86,9 +87,17 @@ public class GLOReferenceImpl<T extends GLO>
 
     private static Logger log = Logger.getLogger("com.sun.gi.logic");
 
+    private transient SimTask currentTask;
+
     private final long objID;
 
     public GLOReferenceImpl(long id) {
+	currentTask = null;
+	objID = id;
+    }
+
+    public GLOReferenceImpl(SimTask curTask, long id) {
+	currentTask = curTask;
         objID = id;
     }
 
@@ -96,6 +105,7 @@ public class GLOReferenceImpl<T extends GLO>
 	    throws IOException, ClassNotFoundException
     {
         in.defaultReadObject();
+	currentTask = SimTask.getCurrent();
     }
 
     /**
@@ -112,10 +122,21 @@ public class GLOReferenceImpl<T extends GLO>
 	return objID;
     }
 
+    private void checkCurrentTask(SimTask other) {
+	if (this.currentTask != other) {
+	    throw new ExecutionOutsideOfTaskException();
+	}
+    }
+
+    public void delete() {
+	this.delete(currentTask);
+    }
+
     /**
      * {@inheritDoc}
      */
     public void delete(SimTask task) {
+	checkCurrentTask(task);
         try {
             task.getTransaction().destroy(objID);
         } catch (NonExistantObjectIDException e) {
@@ -123,10 +144,15 @@ public class GLOReferenceImpl<T extends GLO>
         }
     }
 
+    public T get() {
+	return get(currentTask);
+    }
+
     /**
      * {@inheritDoc}
      */
     public T get(SimTask task) {
+	checkCurrentTask(task);
 	T obj = null;
 
 	try {
@@ -140,10 +166,15 @@ public class GLOReferenceImpl<T extends GLO>
         return obj;
     }
 
+    public T peek() {
+	return peek(currentTask);
+    }
+
     /**
      * {@inheritDoc}
      */
     public T peek(SimTask task) {
+	checkCurrentTask(task);
 	T obj = null;
 
 	try {
@@ -157,10 +188,15 @@ public class GLOReferenceImpl<T extends GLO>
         return obj;
     }
 
+    public T attempt() {
+	return attempt(currentTask);
+    }
+
     /**
      * {@inheritDoc}
      */
     public T attempt(SimTask task) {
+	checkCurrentTask(task);
 	T obj = null;
 
 	try {

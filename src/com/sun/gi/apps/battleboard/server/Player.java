@@ -142,14 +142,11 @@ public class Player implements SimUserDataListener {
     }
 
     public static GLOReference<Player> getRef(UserID uid) {
-        SimTask task = SimTask.getCurrent();
-        return task.findGLO(gloKeyForUID(uid));
+        return SimTask.getCurrent().findGLO(gloKeyForUID(uid));
     }
 
     public static Player get(UserID uid) {
-        SimTask task = SimTask.getCurrent();
-        GLOReference<Player> ref = getRef(uid);
-        return ref.get(task);
+        return getRef(uid).get();
     }
 
     public String getUserName() {
@@ -167,7 +164,7 @@ public class Player implements SimUserDataListener {
     public void gameStarted(GLOReference<Game> gameRef) {
         SimTask task = SimTask.getCurrent();
         myGameRef = gameRef;
-        Game game = gameRef.peek(task);
+        Game game = gameRef.peek();
 
         String playerHistoryName = myUserName + ".history";
         GLOReference<PlayerHistory> historyRef = task.createGLO(
@@ -250,10 +247,9 @@ public class Player implements SimUserDataListener {
             return;
         }
 
-        SimTask task = SimTask.getCurrent();
         if (myGameRef != null) {
             // We currently support only one game per player
-	    Game game = myGameRef.get(task);
+	    Game game = myGameRef.get();
 	    if (game != null) {
 		game.joinedChannel(cid, uid);
 	    }
@@ -274,10 +270,9 @@ public class Player implements SimUserDataListener {
             return;
         }
 
-        SimTask task = SimTask.getCurrent();
         if (myGameRef != null) {
             // We currently support only one game per player
-	    Game game = myGameRef.get(task);
+	    Game game = myGameRef.get();
 	    if (game != null) {
 		game.leftChannel(cid, uid);
 	    }
@@ -298,10 +293,9 @@ public class Player implements SimUserDataListener {
             return;
         }
 
-        SimTask task = SimTask.getCurrent();
         if (myGameRef != null) {
             // We currently support only one game per player
-	    Game game = myGameRef.get(task);
+	    Game game = myGameRef.get();
 	    if (game != null) {
 		game.userDataReceived(myUserID, data);
 	    }

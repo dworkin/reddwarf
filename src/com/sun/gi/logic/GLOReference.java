@@ -92,6 +92,8 @@ public interface GLOReference<T extends GLO> {
      */
     T get(SimTask task);
 
+    T get();
+
     /**
      * Returns a task-local copy of the referenced {@link GLO}. 
      * Changes to this local copy will <em>not</em> get stored in the
@@ -104,6 +106,8 @@ public interface GLOReference<T extends GLO> {
      * @return the task-local in memory instance of the GLO
      */
     T peek(SimTask task);
+
+    T peek();
 
     /**
      * Performs a non-blocking attempts to <code>get</code> the given
@@ -119,6 +123,8 @@ public interface GLOReference<T extends GLO> {
      */
     T attempt(SimTask task);
 
+    T attempt();
+
     /**
      * Removes the associated GLO from the objectstore, destroying all
      * persistence data for it.
@@ -126,4 +132,6 @@ public interface GLOReference<T extends GLO> {
      * @param task The SimTask context
      */
     void delete(SimTask task);
+
+    void delete();
 }

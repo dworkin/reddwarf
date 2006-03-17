@@ -134,7 +134,7 @@ public class Matchmaker implements GLO {
 
     public static Matchmaker get() {
         SimTask task = SimTask.getCurrent();
-        return (Matchmaker) task.findGLO(MATCHMAKER_GLO_NAME).get(task);
+        return (Matchmaker) task.findGLO(MATCHMAKER_GLO_NAME).get();
     }
 
     public static GLOReference<Matchmaker> create() {
@@ -270,9 +270,8 @@ public class Matchmaker implements GLO {
          * the join.
          */
 
-        SimTask task = SimTask.getCurrent();
         for (GLOReference<Player> ref : waitingPlayers) {
-            Player peekedPlayer = ref.peek(task);
+            Player peekedPlayer = ref.peek();
             if (playerName.equals(peekedPlayer.getPlayerName())) {
                 log.warning("Matchmaker already has `" + playerName);
                 sendAlreadyJoined(uid);
@@ -289,7 +288,7 @@ public class Matchmaker implements GLO {
         GLOReference<Player> playerRef = Player.getRef(uid);
 
 	log.finer("Matchmaker about to get Player object for " + playerName);
-        Player player = playerRef.get(task);
+        Player player = playerRef.get();
 	log.finer("Matchmaker got Player object for " + playerName);
 
         player.setPlayerName(playerName);
@@ -320,7 +319,7 @@ public class Matchmaker implements GLO {
 	    if (log.isLoggable(Level.FINEST)) {
 		log.finest("Creating a new game for:");
 		for (GLOReference<Player> ref : waitingPlayers) {
-		    Player peekedPlayer = ref.peek(task);
+		    Player peekedPlayer = ref.peek();
 		    log.finest("    " + peekedPlayer.getPlayerName());
 		}
 	    }
