@@ -92,6 +92,7 @@ public class SimThreadImpl extends Thread implements SimThread {
     public void run() {
         do {
             kernel.returnToThreadPool(this);
+
             synchronized (this) {
                 while (task == null) {
                     try {

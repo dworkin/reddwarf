@@ -568,4 +568,10 @@ public abstract class SimTask {
      * @return The name of the application of which this task is part
      */
     public abstract String getAppName();
+
+	/**
+	 * Returns the UserID of this task.
+	 * @return the UserID of this task
+	 */
+	public abstract UserID getUserID();
 }

@@ -485,7 +485,7 @@ public class RawSocketManagerImpl implements RawSocketManager {
         }
 
         SimTask task = info.simulation.newTask(info.access,
-                new GLOReferenceImpl<GLO>(info.gloID), cbMethod, args);
+                new GLOReferenceImpl<GLO>(info.gloID), cbMethod, args, null);
 
         info.simulation.queueTask(task);
 

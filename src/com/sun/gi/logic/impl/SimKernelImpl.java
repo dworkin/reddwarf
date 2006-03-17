@@ -73,6 +73,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.logging.Logger;
 
 import com.sun.gi.framework.rawsocket.RawSocketManager;
 import com.sun.gi.framework.timer.TimerManager;
@@ -83,6 +84,8 @@ import com.sun.gi.logic.Simulation;
 import com.sun.gi.logic.SimTask.ACCESS_TYPE;
 
 public class SimKernelImpl implements SimKernel {
+
+    private static Logger log = Logger.getLogger("com.sun.gi.logic");
 
     private TimerManager timerManager;
     private RawSocketManager socketManager;
@@ -109,49 +112,63 @@ public class SimKernelImpl implements SimKernel {
 
         new Thread(new Runnable() {
             public void run() {
+
                 while (true) {
                     synchronized (simList) {
                         boolean tasksAvailable = false;
                         while (!tasksAvailable) {
+			    log.finest("looking for tasks to run");
                             for (Simulation sim : simList) {
                                 if (sim.hasTasks()) {
                                     tasksAvailable = true;
+				    log.finer("there are tasks available");
                                     break;
                                 }
                             }
                             if (!tasksAvailable) {
                                 try {
-                                    simList.wait();
+                                    simList.wait(5000);
                                 } catch (InterruptedException e) {
                                     e.printStackTrace();
                                 }
                             }
                         }
+			simList.notifyAll();
                     }
                     // has sim tasks, now wait to have threads
                     synchronized (threadPool) {
-                        while (threadPool.size() == 0) {
+			log.finer("waiting for a free thread");
+                        while (threadPool.isEmpty()) {
                             try {
                                 threadPool.wait();
                             } catch (InterruptedException e) {
                                 e.printStackTrace();
                             }
+			    log.finer("re-trying threadPool");
                         }
+			log.finer("found free thread(s)");
+			threadPool.notifyAll();
                     }
                     // have soem of both, match em up
                     synchronized (simList) {
                         synchronized (threadPool) {
-                            Iterator iter = simList.iterator();
-                            while ((threadPool.size() > 0) && (iter.hasNext())) {
-                                Simulation sim = (Simulation) iter.next();
-                                while ((threadPool.size() > 0)
-                                        && (sim.hasTasks())) {
+			    log.finer("simList size: " + simList.size() +
+				    " threadPool size: " + threadPool.size());
+			    for (Simulation sim : simList) {
+				if (threadPool.isEmpty()) {
+				    break;
+				}
+				if (sim.hasTasks()) {
                                     SimTask task = sim.nextTask();
-                                    SimThread thread = threadPool.remove(0);
-                                    thread.execute(task);
+				    if (task != null) {
+					SimThread thread = threadPool.remove(0);
+					thread.execute(task);
+				    }
                                 }
                             }
+			    threadPool.notifyAll();
                         }
+			simList.notifyAll();
                     }
                 }
             }
@@ -161,28 +178,29 @@ public class SimKernelImpl implements SimKernel {
     public void addSimulation(Simulation sim) {
         synchronized (simList) {
             simList.add(sim);
-            simList.notify();
+            simList.notifyAll();
         }
     }
 
     public void simHasNewTask() {
         synchronized (simList) {
-            simList.notify();
+            simList.notifyAll();
         }
     }
 
     public void removeSimulation(Simulation sim) {
         synchronized (simList) {
             simList.remove(sim);
+            simList.notifyAll();
         }
     }
 
     public void returnToThreadPool(SimThreadImpl impl) {
         synchronized (threadPool) {
             threadPool.add(impl);
-            
+
             // Sten added 1/13/06 -- prevents deadlocks if the pool is waiting.
-            threadPool.notify();
+            threadPool.notifyAll();
         }
 
     }

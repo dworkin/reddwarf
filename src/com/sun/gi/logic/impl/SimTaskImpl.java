@@ -107,6 +107,7 @@ public class SimTaskImpl extends SimTask {
     private Object[] startArgs;
     private Simulation simulation;
     private ClassLoader loader;
+    private UserID uid;
 
     Map<GLO, Long> gloIDMap;
     private Map<GLO, ACCESS_TYPE> gloAccessMap;
@@ -114,7 +115,8 @@ public class SimTaskImpl extends SimTask {
     private Queue<DeferredSimCommand> deferredCommands;
 
     public SimTaskImpl(Simulation sim, ClassLoader loader, ACCESS_TYPE access,
-            long startObjectID, Method startMethod, Object[] startArgs)
+            long startObjectID, Method startMethod, Object[] startArgs,
+	    UserID uid)
     {
         this.simulation = sim;
         this.startObject = this.makeReference(startObjectID);
@@ -125,6 +127,7 @@ public class SimTaskImpl extends SimTask {
         Object newargs[] = new Object[startArgs.length];
         System.arraycopy(startArgs, 0, newargs, 0, startArgs.length);
         this.startArgs = newargs;
+	this.uid = uid;
 
         gloIDMap = new HashMap<GLO, Long>();
         gloAccessMap = new HashMap<GLO, ACCESS_TYPE>();
@@ -138,6 +141,10 @@ public class SimTaskImpl extends SimTask {
 
 	if (this.trans == null) {
 	    this.trans = simulation.getObjectStore().newTransaction(loader);
+	} else {
+	    log.finest("Task for " + uid +
+		" reusing trans " +
+		((com.sun.gi.objectstore.tso.TSOTransaction) trans).getUUID());
 	}
 
         this.trans.start(); // tell trans its waking up to begin anew
@@ -158,6 +165,9 @@ public class SimTaskImpl extends SimTask {
                     if (runobj == null) {
                         // attempt failed
                         trans.abort();
+
+			// DJE: we're done with this.
+			simulation.taskDone(this);
                         return;
                     }
                     break;
@@ -167,23 +177,35 @@ public class SimTaskImpl extends SimTask {
             trans.commit();
             processDeferredCommands();
 
+	    // DJE If we reach this, then the task is finished.
+
         } catch (DeadlockException de) {
 	    log.throwing(getClass().getName(), "run", de);
 	    requeueAfterDeadlock();
+
+	    // DJE: NOT finished or dead
+
         } catch (InvocationTargetException ex) {
 	    Throwable realException = ex.getCause();
 	    log.throwing(getClass().getName(), "run", realException);
 
 	    if (realException instanceof DeadlockException) {
 		requeueAfterDeadlock();
+
+		// DJE: NOT finished or dead
+
 	    } else {
 		realException.printStackTrace();
 		trans.abort();
+
+		// DJE: If we reach this, then the task is DEAD.
 	    }
         } catch (IllegalAccessException ex) {
             ex.printStackTrace();
 	    log.throwing(getClass().getName(), "run", ex);
             trans.abort();
+
+	    // DJE: If we reach this, then the task is DEAD.
         } catch (RuntimeException ex) {
 	    if (log.isLoggable(Level.WARNING)) {
 		log.warning("Exception on task execution:" +
@@ -195,10 +217,14 @@ public class SimTaskImpl extends SimTask {
 			   "\n  declared on: " +
 			   startMethod.getDeclaringClass().getName())));
 	    }
-	    log.throwing(getClass().getName(), "run", ex);
             ex.printStackTrace();
+	    log.throwing(getClass().getName(), "run", ex);
             trans.abort();
+
+	    // DJE: If we reach this, then the task is DEAD.
         }
+
+	simulation.taskDone(this);
     }
 
     protected void requeueAfterDeadlock() {
@@ -215,12 +241,13 @@ public class SimTaskImpl extends SimTask {
 	// a chance to run.  Sleeping is a bit ugly; we
 	// should either find a different mechanism or
 	// tune this carefully. -jm
+	// DJE: pruning back the sleep time (from 500 to 50ms)
 	try {
-	    Thread.sleep(500);
+	    Thread.sleep(50);
 	} catch (InterruptedException ie) { }
 
 	// requeue for later execution
-	simulation.queueTask(this);
+	simulation.requeueTask(this);
     }
 
     public GLOReference<? extends GLO> makeReference(long id) {
@@ -338,7 +365,8 @@ public class SimTaskImpl extends SimTask {
             Object[] parameters) {
         try {
             deferredCommands.add(new DeferredNewTask(simulation.newTask(
-                    theAccessType, target, method, scrubAndCopy(parameters))));
+                    theAccessType, target, method, scrubAndCopy(parameters),
+		    uid)));
         } catch (SecurityException e) {
             e.printStackTrace();
         } catch (IOException e) {
@@ -462,8 +490,8 @@ public class SimTaskImpl extends SimTask {
         deferredCommands.add(new DeferredChannelSnoop(uid, cid, setting));
     }
     
-    public String getAppName(){
-		return simulation.getAppName();
+    public String getAppName() {
+	return simulation.getAppName();
     }
 
     private void processDeferredCommands() {
@@ -472,6 +500,13 @@ public class SimTaskImpl extends SimTask {
             // System.err.println("exec deffered " + cmd.getClass());
             cmd.execute(simulation);
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public UserID getUserID() {
+	return uid;
     }
 }
 
@@ -750,6 +785,4 @@ class DeferredChannelSnoop implements DeferredSimCommand {
     public void execute(Simulation sim) {
         sim.enableEvesdropping(uid, cid, enable);
     }
-    
-    
 }
