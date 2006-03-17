@@ -121,6 +121,7 @@ public class TSOTransaction implements Transaction {
     long currentTransactionDeadline;
 
     private final Map<Long, Serializable> lockedObjectsMap;
+    private final Map<Long, Serializable> peekedObjectsMap;
     private final Set<Long> createdIDs;
     private final Set<Long> deletedIDs;
 
@@ -146,6 +147,7 @@ public class TSOTransaction implements Transaction {
         this.currentTransactionDeadline = 1;
         this.dataSpace = dataSpace;
 	this.lockedObjectsMap= new HashMap<Long, Serializable>();
+	this.peekedObjectsMap= new HashMap<Long, Serializable>();
 	this.createdIDs = new HashSet<Long>();
 	this.deletedIDs = new HashSet<Long>();
     }
@@ -301,21 +303,28 @@ public class TSOTransaction implements Transaction {
 	// Note that 'objectID' is actually the id of the object's
 	// *TSODataHeader* in the database.  The header has a field
 	// named objectID which is the 'real' objectID of its contents.
-	// Users of TSOTransaction refer to objects by their headerIDs.
+	// Users of TSOTransaction refer to objects by their headerIDs,
+	// unbeknownst to them.
 
 	if (objectID == DataSpace.INVALID_ID) {
 	    throw new NonExistantObjectIDException();
 	}
 
-	// It was deleted in this transaction, show it as gone.
+	// Was it deleted in this transaction? If so, show it as gone.
 	if (deletedIDs.contains(objectID)) {
 	    return null;
 	}
 
-	// There's a GET lock on it already, or we created it.
+	// Is there a GET lock on it already from an earlier lock/create?
         Serializable obj = lockedObjectsMap.get(objectID);
         if (obj != null) {
 	    // We've got a locked copy, so return it.
+            return obj;
+        }
+
+	// Have we PEEKed at it before?
+        obj = peekedObjectsMap.get(objectID);
+        if (obj != null) {
             return obj;
         }
 
@@ -328,9 +337,17 @@ public class TSOTransaction implements Transaction {
             return null;
         }
 
-	// XXX put this in a "peeked" map, and check that too.
+	// Go get it, and save it so that future peek() calls in 
+	// the context of this TSOTransaction return the same object.
+	// However, note well that any time a get() is done, any calls
+	// to peek() or get() afterwards always return the object
+	// obtained by get(), and objects peeked() before a get()
+	// will not reflect changes made after the call to get().
 
-        return trans.read(hdr.objectID);
+	obj = trans.read(hdr.objectID);
+        peekedObjectsMap.put(objectID, obj);
+
+        return obj;
     }
 
     public Serializable lock(long objectID)
@@ -613,6 +630,12 @@ public class TSOTransaction implements Transaction {
 	    log.finest("got get-lock, wrote " + hdr);
 	}
 
+	// GET supersedes PEEK
+	if (DEBUG && peekedObjectsMap.containsKey(objectID)) {
+	    log.finest("txn " + txnID + " GET superseding PEEK for " + hdr);
+	}
+	peekedObjectsMap.remove(objectID);
+
         lockedObjectsMap.put(objectID, obj);
         return obj;
     }
@@ -730,6 +753,7 @@ public class TSOTransaction implements Transaction {
 	}
 	trans.commit();
 
+        peekedObjectsMap.clear();
         lockedObjectsMap.clear();
         createdIDs.clear();
         deletedIDs.clear();
@@ -796,7 +820,7 @@ public class TSOTransaction implements Transaction {
 		listeners.addAll(hdr.availabilityListeners);
 
 		if (DEBUG) {
-		    log.finest("commit-update hdr before (" + l + " ) " + hdr);
+		    log.finest("commit-update hdr before (" + l + ") " + hdr);
 		}
 
 		hdr.free = true;
@@ -819,6 +843,7 @@ public class TSOTransaction implements Transaction {
 
 	trans.commit();
 
+        peekedObjectsMap.clear();
         lockedObjectsMap.clear();
         createdIDs.clear();
         deletedIDs.clear();
