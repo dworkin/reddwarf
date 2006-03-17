@@ -85,6 +85,7 @@ import java.util.logging.Level;
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.logic.AccessTypeViolationException;
+import com.sun.gi.logic.ExecutionOutsideOfTaskException;
 import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask;
@@ -99,52 +100,61 @@ import com.sun.gi.utils.classes.CLObjectInputStream;
 public class SimTaskImpl extends SimTask {
 
     private static Logger log = Logger.getLogger("com.sun.gi.logic");
+    private static final boolean DEBUG = true;
 
-    private Transaction trans;
-    private ACCESS_TYPE accessType;
-    private GLOReference startObject;
-    private Method startMethod;
-    private Object[] startArgs;
-    private Simulation simulation;
-    private ClassLoader loader;
-    private UserID uid;
+    private int executionCount;
 
-    Map<GLO, Long> gloIDMap;
-    private Map<GLO, ACCESS_TYPE> gloAccessMap;
+    private final Transaction trans;
+    private final ACCESS_TYPE accessType;
+    private final GLOReference startObject;
+    private final Method startMethod;
+    private final Object[] startArgs;
+    private final Simulation simulation;
+    private final ClassLoader loader;
+    private final UserID uid;
 
-    private Queue<DeferredSimCommand> deferredCommands;
+    private final Map<GLO, Long> gloIDMap;
+    private final Map<GLO, ACCESS_TYPE> gloAccessMap;
+    private final Queue<DeferredSimCommand> deferredCommands;
 
     public SimTaskImpl(Simulation sim, ClassLoader loader, ACCESS_TYPE access,
             long startObjectID, Method startMethod, Object[] startArgs,
 	    UserID uid)
     {
         this.simulation = sim;
-        this.startObject = this.makeReference(startObjectID);
-        this.startMethod = startMethod;
         this.loader = loader;
         this.accessType = access;
-        this.simulation = sim;
-        Object newargs[] = new Object[startArgs.length];
-        System.arraycopy(startArgs, 0, newargs, 0, startArgs.length);
-        this.startArgs = newargs;
+        this.startObject = this.makeReference(startObjectID);
+        this.startMethod = startMethod;
+        this.startArgs = (Object[]) startArgs.clone();
 	this.uid = uid;
 
-        gloIDMap = new HashMap<GLO, Long>();
-        gloAccessMap = new HashMap<GLO, ACCESS_TYPE>();
+	this.executionCount = 0;
+	this.trans = simulation.getObjectStore().newTransaction(loader);
 
-        deferredCommands = new LinkedList<DeferredSimCommand>();
+        this.gloIDMap = new HashMap<GLO, Long>();
+        this.gloAccessMap = new HashMap<GLO, ACCESS_TYPE>();
+
+        this.deferredCommands = new LinkedList<DeferredSimCommand>();
+    }
+
+    protected void checkTaskIsCurrent() {
+	if (DEBUG && (this != SimTask.getCurrent())) {
+	    throw new ExecutionOutsideOfTaskException();
+	}
     }
 
     public void execute() {
 
+	executionCount++;
+
         setAsCurrent();
 
-	if (this.trans == null) {
-	    this.trans = simulation.getObjectStore().newTransaction(loader);
-	} else {
+	if (DEBUG && executionCount > 1) {
 	    log.finest("Task for " + uid +
-		" reusing trans " +
-		((com.sun.gi.objectstore.tso.TSOTransaction) trans).getUUID());
+		" reusing txn " + 
+		((com.sun.gi.objectstore.tso.TSOTransaction) trans).getUUID() +
+		" for try #" + executionCount);
 	}
 
         this.trans.start(); // tell trans its waking up to begin anew
@@ -256,6 +266,7 @@ public class SimTaskImpl extends SimTask {
 
     public <T extends GLO> GLOReference<T> lookupReferenceFor(T glo)
     {
+	checkTaskIsCurrent();
         Long oid = gloIDMap.get(glo);
         if (oid == null) {
             log.warning("No existing GLOReference found for GLO " + glo);
@@ -273,30 +284,37 @@ public class SimTaskImpl extends SimTask {
     }
 
     public void addUserListener(GLOReference ref) {
+	checkTaskIsCurrent();
         deferredCommands.add(new DeferredUserListener(
                 ((GLOReferenceImpl) ref).getObjID()));
     }
 
     public GLOReference findGLO(String gloName) {
+	checkTaskIsCurrent();
         long oid = trans.lookup(gloName);
         return (oid == DataSpace.INVALID_ID) ? null : makeReference(oid);
     }
 
     public void sendData(ChannelID cid, UserID to, ByteBuffer data,
             boolean reliable) {
+	checkTaskIsCurrent();
         deferredCommands.add(new DeferredUnicast(cid, to, data, reliable));
     }
 
     public void sendData(ChannelID cid, UserID[] to, ByteBuffer data,
             boolean reliable) {
+	checkTaskIsCurrent();
         deferredCommands.add(new DeferredMulticast(cid, to, data, reliable));
     }
 
-    public void broadcastData(ChannelID cid, ByteBuffer data, boolean reliable) {
+    public void broadcastData(ChannelID cid, ByteBuffer data, boolean reliable)
+    {
+	checkTaskIsCurrent();
         deferredCommands.add(new DeferredBroadcast(cid, data, reliable));
     }
 
     public void addUserDataListener(UserID user, GLOReference ref) {
+	checkTaskIsCurrent();
         deferredCommands.add(new DeferredUserDataListener(user, ref));
     }
 
@@ -314,6 +332,7 @@ public class SimTaskImpl extends SimTask {
     public <T extends GLO> GLOReference<T> createGLO(T templateObj,
                 String name)
     {
+	checkTaskIsCurrent();
         long oid = trans.create(templateObj, name);
         if (oid == ObjectStore.INVALID_ID) {
             return null;
@@ -333,15 +352,18 @@ public class SimTaskImpl extends SimTask {
      * @return A GLOReference that references the newly created GLO
      */
     public <T extends GLO> GLOReference<T> createGLO(T templateObj) {
+	checkTaskIsCurrent();
         return createGLO(templateObj, null);
     }
 
     public void destroyGLO(GLOReference<? extends GLO> ref) {
+	checkTaskIsCurrent();
         ref.delete(this);
     }
 
     public long registerTimerEvent(ACCESS_TYPE access, long delay,
             boolean repeat, GLOReference ref) {
+	checkTaskIsCurrent();
 
         long tid = simulation.getNextTimerID();
         DeferredNewTimer rec = new DeferredNewTimer(tid, access, delay, repeat,
@@ -357,12 +379,14 @@ public class SimTaskImpl extends SimTask {
 
     public long registerTimerEvent(long delay, boolean repeat,
             GLOReference reference) {
+	checkTaskIsCurrent();
         return registerTimerEvent(ACCESS_TYPE.GET, delay, repeat, reference);
     }
 
     public void queueTask(ACCESS_TYPE theAccessType,
             GLOReference<? extends GLO> target, Method method,
             Object[] parameters) {
+	checkTaskIsCurrent();
         try {
             deferredCommands.add(new DeferredNewTask(simulation.newTask(
                     theAccessType, target, method, scrubAndCopy(parameters),
@@ -410,10 +434,12 @@ public class SimTaskImpl extends SimTask {
 
     public void queueTask(GLOReference<? extends GLO> target, Method method,
             Object[] parameters) {
+	checkTaskIsCurrent();
         queueTask(ACCESS_TYPE.GET, target, method, parameters);
     }
 
     public void access_check(ACCESS_TYPE theAccessType, GLO glo) {
+	checkTaskIsCurrent();
         ACCESS_TYPE gloAcc = gloAccessMap.get(glo);
         if (gloAcc != theAccessType) {
             throw new AccessTypeViolationException("Expected " + theAccessType
@@ -423,6 +449,7 @@ public class SimTaskImpl extends SimTask {
 
     public long openSocket(ACCESS_TYPE access, GLOReference ref, String host,
             int port, boolean reliable) {
+	checkTaskIsCurrent();
         long sid = simulation.getNextSocketID();
         deferredCommands.add(new DeferredSocketOpen(sid, access,
                 ((GLOReferenceImpl) ref).getObjID(), host, port, reliable));
@@ -430,14 +457,17 @@ public class SimTaskImpl extends SimTask {
     }
 
     public void sendRawSocketData(long socketID, ByteBuffer data) {
+	checkTaskIsCurrent();
         deferredCommands.add(new DeferredSocketSend(socketID, data));
     }
 
     public void closeSocket(long socketID) {
+	checkTaskIsCurrent();
         deferredCommands.add(new DeferredSocketClose(socketID));
     }
 
     public ChannelID openChannel(String string) {
+	checkTaskIsCurrent();
         // @@ It should be ok to open the channel immediately -jm
         return simulation.openChannel(string);
     }
@@ -450,6 +480,7 @@ public class SimTaskImpl extends SimTask {
      * @param cid the ChannelID
      */
     public void join(UserID uid, ChannelID cid) {
+	checkTaskIsCurrent();
         deferredCommands.add(new DeferredChannelJoin(uid, cid));
     }
 
@@ -461,6 +492,7 @@ public class SimTaskImpl extends SimTask {
      * @param cid the ChannelID
      */
     public void leave(UserID uid, ChannelID cid) {
+	checkTaskIsCurrent();
         deferredCommands.add(new DeferredChannelLeave(uid, cid));
     }
 
@@ -472,6 +504,7 @@ public class SimTaskImpl extends SimTask {
      * @param shouldLock if true, lock the channel, otherwise unlock it.
      */
     public void lock(ChannelID cid, boolean shouldLock) {
+	checkTaskIsCurrent();
         deferredCommands.add(new DeferredChannelLock(cid, shouldLock));
     }
 
@@ -482,11 +515,13 @@ public class SimTaskImpl extends SimTask {
      * @param cid the ID of the channel to close.
      */
     public void closeChannel(ChannelID cid) {
+	checkTaskIsCurrent();
         deferredCommands.add(new DeferredChannelClose(cid));
     }
 
     public void setEvesdroppingEnabled(UserID uid, ChannelID cid,
             boolean setting) {
+	checkTaskIsCurrent();
         deferredCommands.add(new DeferredChannelSnoop(uid, cid, setting));
     }
     
