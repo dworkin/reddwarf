@@ -136,7 +136,10 @@ public class SimTaskImpl extends SimTask {
 
         setAsCurrent();
 
-        this.trans = simulation.getObjectStore().newTransaction(loader);
+	if (this.trans == null) {
+	    this.trans = simulation.getObjectStore().newTransaction(loader);
+	}
+
         this.trans.start(); // tell trans its waking up to begin anew
 
         GLO runobj = null;
@@ -163,6 +166,10 @@ public class SimTaskImpl extends SimTask {
             startMethod.invoke(runobj, startArgs);
             trans.commit();
             processDeferredCommands();
+
+        } catch (DeadlockException de) {
+	    log.throwing(getClass().getName(), "run", de);
+	    requeueAfterDeadlock();
         } catch (InvocationTargetException ex) {
 	    Throwable realException = ex.getCause();
 	    log.throwing(getClass().getName(), "run", realException);
@@ -173,7 +180,11 @@ public class SimTaskImpl extends SimTask {
 		realException.printStackTrace();
 		trans.abort();
 	    }
-        } catch (IllegalArgumentException ex) {
+        } catch (IllegalAccessException ex) {
+            ex.printStackTrace();
+	    log.throwing(getClass().getName(), "run", ex);
+            trans.abort();
+        } catch (RuntimeException ex) {
 	    if (log.isLoggable(Level.WARNING)) {
 		log.warning("Exception on task execution:" +
 		    "\n  target: " + (runobj == null
@@ -184,18 +195,8 @@ public class SimTaskImpl extends SimTask {
 			   "\n  declared on: " +
 			   startMethod.getDeclaringClass().getName())));
 	    }
-            ex.printStackTrace();
-            trans.abort();
-        } catch (IllegalAccessException ex) {
-            ex.printStackTrace();
 	    log.throwing(getClass().getName(), "run", ex);
-            trans.abort();
-        } catch (DeadlockException de) {
-	    log.throwing(getClass().getName(), "run", de);
-	    requeueAfterDeadlock();
-        } catch (RuntimeException ex) {
             ex.printStackTrace();
-	    log.throwing(getClass().getName(), "run", ex);
             trans.abort();
         }
     }
