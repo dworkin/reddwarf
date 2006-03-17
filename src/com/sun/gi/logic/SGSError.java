@@ -76,14 +76,11 @@ package com.sun.gi.logic;
  * @version 1.0
  */
 public class SGSError extends Error {
-	public SGSError(String message){
-		super(message);
-	}
 
-	/**
-	 * 
-	 */
-	public SGSError() {
-		// TODO Auto-generated constructor stub
-	}
+    public SGSError() {
+    }
+
+    public SGSError(String message){
+	super(message);
+    }
 }

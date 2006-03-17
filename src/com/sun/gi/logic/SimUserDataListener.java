@@ -83,19 +83,19 @@ import com.sun.gi.comm.routing.UserID;
 public interface SimUserDataListener extends GLO {
 
     /**
-     * This method is the start method of a task that gets queued
-     * whenever data arrives for a user ID that this GLO has been bound
-     * to as a reciever.
+     * The start method of a task that gets queued whenever data
+     * arrives for a user ID that this GLO has been bound to as a
+     * reciever.
      *
      * @param from UserID the UserID the data came from
-     * @param data byte[] the data sent.
+     *
+     * @param data byte[] the data sent
      */
-    public void userDataReceived(UserID from, ByteBuffer data);
+    void userDataReceived(UserID from, ByteBuffer data);
 
-    public void userJoinedChannel(ChannelID cid, UserID uid);
+    void userJoinedChannel(ChannelID cid, UserID uid);
 
-    public void userLeftChannel(ChannelID cid, UserID uid);
+    void userLeftChannel(ChannelID cid, UserID uid);
 
-    public void dataArrivedFromChannel(ChannelID cid, UserID from,
-            ByteBuffer buff);
+    void dataArrivedFromChannel(ChannelID cid, UserID from, ByteBuffer buff);
 }

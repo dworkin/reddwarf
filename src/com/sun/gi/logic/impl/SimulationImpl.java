@@ -231,7 +231,7 @@ public class SimulationImpl implements Simulation {
      * 
      */
     public void addUserListener(GLOReference ref) {
-        addUserListener(((GLOReferenceImpl) ref).objID);
+        addUserListener(((GLOReferenceImpl) ref).getObjID());
     }
 
     public void addUserListener(long objID) {
@@ -250,7 +250,8 @@ public class SimulationImpl implements Simulation {
     public SimTask newTask(ACCESS_TYPE access, GLOReference ref, Method method,
             Object[] params)
     {
-        return newTask(access, ((GLOReferenceImpl) ref).objID, method, params);
+        return newTask(access, ((GLOReferenceImpl) ref).getObjID(),
+		method, params);
     }
 
     /**
@@ -343,7 +344,7 @@ public class SimulationImpl implements Simulation {
             dataListeners = new ArrayList<Long>();
             userDataListeners.put(id, dataListeners);
         }
-        dataListeners.add(new Long(((GLOReferenceImpl) ref).objID));
+        dataListeners.add(new Long(((GLOReferenceImpl) ref).getObjID()));
     }
 
     protected void fireUserLeftChannel(UserID uid, ChannelID cid) {

@@ -86,21 +86,21 @@ import com.sun.gi.logic.impl.SimThreadImpl;
  */
 public interface SimKernel {
 
-    public void addSimulation(Simulation sim);
+    void addSimulation(Simulation sim);
 
-    public void simHasNewTask();
+    void simHasNewTask();
 
-    public void removeSimulation(Simulation sim);
+    void removeSimulation(Simulation sim);
 
     /**
      * @param impl
      */
-    public void returnToThreadPool(SimThreadImpl impl);
+    void returnToThreadPool(SimThreadImpl impl);
 
     /**
      * @param timerManager
      */
-    public void setTimerManager(TimerManager timerManager);
+    void setTimerManager(TimerManager timerManager);
 
     /**
      * 
@@ -112,7 +112,7 @@ public interface SimKernel {
      * @param repeat
      * @return an identifier that refers to the timer event
      */
-    public long registerTimerEvent(long tid, ACCESS_TYPE access,
+    long registerTimerEvent(long tid, ACCESS_TYPE access,
             Simulation sim, long objID, long delay, boolean repeat);
 
     // Hooks into the RawSocketManager, added 1/16/2006
@@ -122,7 +122,7 @@ public interface SimKernel {
      *
      * @param socketManager the RawSocketManager to set
      */
-    public void setRawSocketManager(RawSocketManager socketManager);
+    void setRawSocketManager(RawSocketManager socketManager);
 
     /**
      * Requests that a socket be opened at the given host on the given
@@ -143,7 +143,7 @@ public interface SimKernel {
      * @return an identifier that can be used for future communication
      * with the socket.
      */
-    public long openSocket(long socketID, Simulation sim, ACCESS_TYPE access,
+    long openSocket(long socketID, Simulation sim, ACCESS_TYPE access,
             long objID, String host, int port, boolean reliable);
 
     /**
@@ -156,7 +156,7 @@ public interface SimKernel {
      * 
      * @return the number of bytes sent.
      */
-    public long sendRawSocketData(long socketID, ByteBuffer data);
+    long sendRawSocketData(long socketID, ByteBuffer data);
 
     /**
      * Requests that the socket matching the given socketID be closed.
@@ -165,15 +165,15 @@ public interface SimKernel {
      * 
      * @param socketID the identifier of the socket
      */
-    public void closeSocket(long socketID);
+    void closeSocket(long socketID);
 
     /**
      * @return the next timer id.
      */
-    public long getNextTimerID();
+    long getNextTimerID();
 
     /**
      * @return the next socket id.
      */
-    public long getNextSocketID();
+    long getNextSocketID();
 }

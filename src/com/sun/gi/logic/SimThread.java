@@ -75,11 +75,11 @@ package com.sun.gi.logic;
 public interface SimThread {
 
     /**
-     * Starts a SimTask executing on this thread. Blocks if there is
-     * already a task executing on this thread. It returns when the new
+     * Starts a SimTask executing on this thread.  Blocks if there is
+     * already a task executing on this thread.  Returns when the new
      * task has begun execution.
      * 
      * @param task the task for this SimThread to execute next
      */
-    public void execute(SimTask task);
+    void execute(SimTask task);
 }
