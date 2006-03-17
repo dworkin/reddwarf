@@ -97,7 +97,7 @@ import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.nio.channels.WritableByteChannel;
 import java.util.Set;
-import java.util.TreeSet;
+import java.util.HashSet;
 import java.util.logging.Logger;
 
 // TODO: Set SO_RCVBUF and SO_SNDBUF on the channels
@@ -109,22 +109,21 @@ public class NIOConnection implements SelectorHandler {
     protected final PacketHandler tcpHandler;
     protected final PacketHandler udpHandler;
 
-    // made available for filling by the manager
-    protected ByteBuffer inputBuffer;
-
-    protected ByteBuffer sizeHeader;
-    protected int currentPacketSize = -1;
-    protected ByteBuffer outputHeader = ByteBuffer.allocate(4);
-
-    Set<NIOConnectionListener> listeners = new TreeSet<NIOConnectionListener>();
+    Set<NIOConnectionListener> listeners =
+	new HashSet<NIOConnectionListener>();
 
     public NIOConnection(NIOSocketManager mgr, SocketChannel sockChannel,
             DatagramChannel dgramChannel, int tcpBufSize, int udpBufSize) {
 
         socketManager = mgr;
 
-        tcpHandler = new PacketHandler(this, sockChannel, tcpBufSize);
-        udpHandler = new PacketHandler(this, dgramChannel, udpBufSize);
+	try {
+	    tcpHandler = new PacketHandler(this, sockChannel, tcpBufSize);
+	    udpHandler = new PacketHandler(this, dgramChannel, udpBufSize);
+	} catch (OutOfMemoryError e) {
+	    disconnect();
+	    throw e;
+	}
     }
 
     public void open(Selector sel) throws IOException {
@@ -373,9 +372,8 @@ public class NIOConnection implements SelectorHandler {
      * @param reliable boolean
      */
     public synchronized void send(ByteBuffer[] packetParts, boolean reliable)
-            throws IOException {
-        // log.entering("NIOChannel", "send[]");
-
+            throws IOException
+    {
         PacketHandler h = reliable ? tcpHandler : udpHandler;
         h.send(packetParts);
     }

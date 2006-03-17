@@ -89,6 +89,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.channels.ClosedChannelException;
+import java.nio.channels.ClosedSelectorException;
 import java.nio.channels.DatagramChannel;
 import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
@@ -108,23 +109,24 @@ public class NIOSocketManager implements Runnable {
     private static Logger log = Logger.getLogger("com.sun.gi.utils.nio");
 
     private Selector selector;
+    private volatile boolean shutdown;
 
     private int tcpBufSize;
     private int udpBufSize;
 
-    private Set<NIOSocketManagerListener> listeners =
+    private final Set<NIOSocketManagerListener> listeners =
 	new HashSet<NIOSocketManagerListener>();
 
-    private List<NIOConnection> initiatorQueue =
+    private final List<NIOConnection> initiatorQueue =
 	new ArrayList<NIOConnection>();
 
-    private List<NIOConnection> receiverQueue =
+    private final List<NIOConnection> receiverQueue =
 	new ArrayList<NIOConnection>();
 
-    private List<ServerSocketChannel> acceptorQueue =
+    private final List<ServerSocketChannel> acceptorQueue =
 	new ArrayList<ServerSocketChannel>();
 
-    private List<SelectableChannel> writeQueue =
+    private final List<SelectableChannel> writeQueue =
 	new ArrayList<SelectableChannel>();
 
     public NIOSocketManager() throws IOException {
@@ -135,10 +137,15 @@ public class NIOSocketManager implements Runnable {
     public NIOSocketManager(int tcpBufferSize, int udpBufferSize)
             throws IOException {
 
-        selector = Selector.open();
+	shutdown = false;
+	selector = null;
         this.tcpBufSize = tcpBufferSize;
         this.udpBufSize = udpBufferSize;
         new Thread(this).start();
+    }
+    
+    protected void openSelector() throws IOException {
+	selector = Selector.open();
     }
 
     public void acceptConnectionsOn(SocketAddress addr) throws IOException {
@@ -197,62 +204,64 @@ public class NIOSocketManager implements Runnable {
 
     public void run() {
 
-        while (true) { // until shutdown() is called
+        while (! shutdown) {
 
-            synchronized (initiatorQueue) {
-                for (NIOConnection conn : initiatorQueue) {
-                    try {
-                        conn.registerConnect(selector);
-                    } catch (IOException ex) {
-                        ex.printStackTrace();
-			log.throwing(getClass().getName(), "run", ex);
-                    }
-                }
-                initiatorQueue.clear();
-            }
+	    if ((selector == null) || (! selector.isOpen())) {
+		try {
+		    openSelector();
+		} catch (IOException e) {
+		    log.severe("Could not open the selector!");
+		    // TODO:  need to take more drastic action
+		}
+	    }
 
-            synchronized (receiverQueue) {
-                for (NIOConnection conn : receiverQueue) {
-                    try {
-                        conn.open(selector);
-                    } catch (IOException ex) {
-                        ex.printStackTrace();
-			log.throwing(getClass().getName(), "run", ex);
-                    }
-                }
-                receiverQueue.clear();
-            }
+	    try {
+		synchronized (initiatorQueue) {
+		    for (NIOConnection conn : initiatorQueue) {
+			try {
+			    conn.registerConnect(selector);
+			} catch (IOException ex) {
+			    ex.printStackTrace();
+			    log.throwing(getClass().getName(), "run", ex);
+			}
+		    }
+		    initiatorQueue.clear();
+		}
 
-            synchronized (acceptorQueue) {
-                for (ServerSocketChannel chan : acceptorQueue) {
-                    try {
-                        chan.register(selector, OP_ACCEPT);
-                    } catch (ClosedChannelException ex) {
-                        ex.printStackTrace();
-			log.throwing(getClass().getName(), "run", ex);
-                    }
-                }
-                acceptorQueue.clear();
-            }
+		synchronized (receiverQueue) {
+		    for (NIOConnection conn : receiverQueue) {
+			try {
+			    conn.open(selector);
+			} catch (IOException ex) {
+			    ex.printStackTrace();
+			    log.throwing(getClass().getName(), "run", ex);
+			}
+		    }
+		    receiverQueue.clear();
+		}
 
-            synchronized (writeQueue) {
-                for (SelectableChannel chan : writeQueue) {
-                    SelectionKey key = chan.keyFor(selector);
-                    if (key == null) { // XXX: DJE
-                        log.warning("key is null");
-                        continue;
-                    }
-                    if (key.isValid()) {
-                        key.interestOps(key.interestOps() | OP_WRITE);
-                    }
-                }
-                writeQueue.clear();
-            }
+		synchronized (acceptorQueue) {
+		    for (ServerSocketChannel chan : acceptorQueue) {
+			try {
+			    chan.register(selector, OP_ACCEPT);
+			} catch (ClosedChannelException ex) {
+			    ex.printStackTrace();
+			    log.throwing(getClass().getName(), "run", ex);
+			}
+		    }
+		    acceptorQueue.clear();
+		}
 
-            if (!selector.isOpen())
-                break;
+		synchronized (writeQueue) {
+		    for (SelectableChannel chan : writeQueue) {
+			SelectionKey key = chan.keyFor(selector);
+			if (key != null && key.isValid()) {
+			    key.interestOps(key.interestOps() | OP_WRITE);
+			}
+		    }
+		    writeQueue.clear();
+		}
 
-            try {
                 log.finest("Calling select");
 
                 int n = selector.select();
@@ -262,8 +271,9 @@ public class NIOSocketManager implements Runnable {
                 if (n > 0) {
                     processSocketEvents();
                 }
+            } catch (ClosedSelectorException e) {
+		log.throwing(getClass().getName(), "run", e);
             } catch (IOException e) {
-                e.printStackTrace();
 		log.throwing(getClass().getName(), "run", e);
             }
         }
@@ -428,6 +438,7 @@ public class NIOSocketManager implements Runnable {
 
     public void shutdown() {
         try {
+	    shutdown = true;
             selector.close();
         } catch (IOException e) {
             e.printStackTrace();
