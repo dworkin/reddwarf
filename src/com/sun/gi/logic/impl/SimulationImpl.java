@@ -205,7 +205,7 @@ public class SimulationImpl implements Simulation {
             }
 
             public void userLeft(UserID uid) {
-		log.info("user " + uid + " leaving");
+		log.fine("user " + uid + " leaving");
 
 		fireUserLeft(uid);
 
@@ -752,7 +752,7 @@ public class SimulationImpl implements Simulation {
 
     private void userIsReady(UserID user, boolean ready) {
 
-	log.info("user " + user + " readiness " + ready);
+	log.fine("user " + user + " readiness " + ready);
 
 	if (user == null) {
 	    return;
@@ -764,17 +764,17 @@ public class SimulationImpl implements Simulation {
 		busyUsers.remove(user);
 
 		if (lameDuckUsers.contains(user)) {
-		    log.info("lame duck user " + user);
+		    log.finer("lame duck user " + user);
 		    synchronized (taskQueues) {
 			List<SimTask> tasks = taskQueues.get(user);
 			if ((tasks == null) || tasks.isEmpty()) {
-			    log.info("removing lame duck user " + user);
+			    log.fine("removing lame duck user " + user);
 			    taskQueues.remove(user);
 			    readyUsers.remove(user);
 			    busyUsers.remove(user);
 			    lameDuckUsers.remove(user);
 			} else {
-			    log.info("preserving lame duck user " + user +
+			    log.finer("preserving lame duck user " + user +
 				    " length " + tasks.size());
 			}
 		    }
@@ -784,7 +784,7 @@ public class SimulationImpl implements Simulation {
 		busyUsers.add(user);
 	    }
 
-	    log.info("ready " + ready +
+	    log.finer("ready " + ready +
 		    " #taskQueues " + taskQueues.size() +
 		    " #readyUsers " + readyUsers.size() +
 		    " #busyUsers " + busyUsers.size() + 
