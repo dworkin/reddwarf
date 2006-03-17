@@ -118,14 +118,15 @@ public class Game implements GLO {
     private static Logger log =
 	Logger.getLogger("com.sun.gi.apps.battleboard.server");
 
-    private String gameName;
-    private ChannelID channel;
-    private GLOReference<Game> thisRef;
-    private LinkedList<GLOReference<Player>> players;
-    private LinkedList<GLOReference<Player>> spectators;
-    private Map<String, GLOReference<Board>> playerBoards;
+    private final String gameName;
+    private final ChannelID channel;
+    private final LinkedList<GLOReference<Player>> players;
+    private final LinkedList<GLOReference<Player>> spectators;
+    private final Map<String, GLOReference<Board>> playerBoards;
+    private final Map<String, GLOReference<PlayerHistory>> nameToHistory;
+
     private GLOReference<Player> currentPlayerRef;
-    private Map<String, GLOReference<PlayerHistory>> nameToHistory;
+    private int userCount;
 
     /*
      * The default BattleBoard game is defined in the {@link
@@ -137,9 +138,9 @@ public class Game implements GLO {
      * to create a board of the desired size and number of cities.
      */
 
-    private int boardWidth = BattleBoard.DEFAULT_BOARD_WIDTH;
-    private int boardHeight = BattleBoard.DEFAULT_BOARD_WIDTH;
-    private int numCities = BattleBoard.DEFAULT_NUM_CITIES;
+    private final int boardWidth = BattleBoard.DEFAULT_BOARD_WIDTH;
+    private final int boardHeight = BattleBoard.DEFAULT_BOARD_WIDTH;
+    private final int numCities = BattleBoard.DEFAULT_NUM_CITIES;
 
     /**
      * Creates a new BattleBoard game object for a set of players.
@@ -176,6 +177,8 @@ public class Game implements GLO {
         nameToHistory = new HashMap<String, GLOReference<PlayerHistory>>();
         channel = task.openChannel(gameName);
         task.lock(channel, true);
+
+	userCount = 0;
     }
 
     /**
@@ -187,35 +190,17 @@ public class Game implements GLO {
      */
     public static GLOReference<Game> create(Set<GLOReference<Player>> players) {
         SimTask task = SimTask.getCurrent();
-        GLOReference<Game> ref = task.createGLO(new Game(players));
+	GLOReference<Game> gameRef = task.createGLO(new Game(players));
+	ChannelID chan = gameRef.get(task).channel;
 
-        ref.get(task).boot(ref);
-        return ref;
-    }
-
-    protected void boot(GLOReference<Game> ref) {
-        SimTask task = SimTask.getCurrent();
-
-        thisRef = ref;
-
-        if (log.isLoggable(Level.FINE)) {
-            log.finest("playerBoards size " + playerBoards.size());
-            for (Map.Entry<String, GLOReference<Board>> x :
-			playerBoards.entrySet())
-	    {
-                log.finest("playerBoard[" + x.getKey() + "]=`" +
-			x.getValue() + "'");
-            }
-        }
-
+	// Join all the players onto this game's channel
         for (GLOReference<Player> playerRef : players) {
-            Player p = playerRef.get(task);
-            p.gameStarted(thisRef);
+            Player player = playerRef.get(task);
+            player.gameStarted(gameRef);
+            task.join(player.getUID(), chan);
         }
 
-        sendJoinOK();
-        sendTurnOrder();
-        startNextMove();
+	return gameRef;
     }
 
     protected GLOReference<Board> createBoard(String playerName) {
@@ -235,7 +220,6 @@ public class Game implements GLO {
         SimTask task = SimTask.getCurrent();
         for (GLOReference<Player> ref : players) {
             Player p = ref.peek(task);
-            task.join(p.getUID(), channel);
             sendJoinOK(p);
         }
     }
@@ -529,11 +513,35 @@ public class Game implements GLO {
     // Channel Join/Leave methods
 
     /**
-     * XXX: We should wait until we get joinedChannel from all our
+     * Wait until we get joinedChannel from all our
      * players before starting the game.
      */
     public void joinedChannel(ChannelID cid, UserID uid) {
         log.finer("Game: User " + uid + " joined channel " + cid);
+
+	userCount++;
+
+	if (userCount < players.size()) {
+	    return;
+	}
+
+        log.finer("Everyone's on the channel, start the game");
+
+        SimTask task = SimTask.getCurrent();
+
+        if (log.isLoggable(Level.FINE)) {
+            log.finest("playerBoards size " + playerBoards.size());
+            for (Map.Entry<String, GLOReference<Board>> x :
+			playerBoards.entrySet())
+	    {
+                log.finest("playerBoard[" + x.getKey() + "]=`" +
+			x.getValue() + "'");
+            }
+        }
+
+        sendJoinOK();
+        sendTurnOrder();
+        startNextMove();
     }
 
     /**
@@ -561,7 +569,7 @@ public class Game implements GLO {
 	    player.getPlayerName() + " (" +
 	    player.getUserName() + ") uid " + uid);
 
-	player.gameEnded(thisRef);
+	player.gameEnded(task.lookupReferenceFor(this));
 
 	players.remove(playerRef);
 	spectators.remove(playerRef);
@@ -583,13 +591,8 @@ public class Game implements GLO {
 		task.destroyGLO(ref);
 	    }
 
-	    // null the lists and maps so they can be GC'd
-	    players = null;
-	    spectators = null;
-	    playerBoards = null;
-
 	    // Destroy this Game GLO
-	    task.destroyGLO(thisRef);
+	    task.destroyGLO(task.lookupReferenceFor(this));
 	}
     }
 }
