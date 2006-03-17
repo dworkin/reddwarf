@@ -138,9 +138,9 @@ public class NIOSocketManager implements Runnable {
             throws IOException {
 
 	shutdown = false;
-	selector = null;
         this.tcpBufSize = tcpBufferSize;
         this.udpBufSize = udpBufferSize;
+	openSelector();
         new Thread(this).start();
     }
     
