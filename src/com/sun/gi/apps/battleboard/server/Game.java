@@ -230,11 +230,6 @@ public class Game implements GLO {
         return ref;
     }
 
-    public void endGame() {
-        SimTask task = SimTask.getCurrent();
-        log.finer("Ending Game");
-    }
-
     protected void sendJoinOK() {
         SimTask task = SimTask.getCurrent();
         for (GLOReference<Player> ref : players) {
@@ -423,14 +418,6 @@ public class Game implements GLO {
                 history.win();
                 log.finer(winner.getUserName() + " summary: " +
 			history.toString());
-            }
-
-            // queue a new task to handle end of game
-            try {
-                task.queueTask(thisRef, Game.class.getMethod("endGame"),
-                        new Object[] {});
-            } catch (NoSuchMethodException e) {
-                throw new RuntimeException(e.getMessage());
             }
 
             // Someone won, so don't start the next move
