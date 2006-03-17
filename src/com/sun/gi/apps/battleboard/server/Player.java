@@ -104,7 +104,8 @@ public class Player implements SimUserDataListener {
 
     private static final long serialVersionUID = 1;
 
-    private static Logger log = Logger.getLogger("com.sun.gi.apps.battleboard.server");
+    private static Logger log =
+	Logger.getLogger("com.sun.gi.apps.battleboard.server");
 
     /**
      * The username for the user.
@@ -115,12 +116,6 @@ public class Player implements SimUserDataListener {
      * The current UserID of this user, if logged in.
      */
     private UserID myUserID;
-
-    // Reference count of this GLO's listeners.
-    // XXX This is a workaround for the non-deterministic
-    // order in which userLeft and userLeftChannel get called,
-    // which lead to NPEs after Player deletion.
-    private int listenerCount = 0;
 
     /**
      * The name under which the player is playing (i.e., a screen name
@@ -228,8 +223,6 @@ public class Player implements SimUserDataListener {
         // We're interested in direct server data sent by the user.
         task.addUserDataListener(uid, playerRef);
         Matchmaker.get().addUserID(uid);
-
-	playerRef.get(task).incrementReferenceCount();
     }
 
     public static void userLeft(UserID uid) {
@@ -237,45 +230,13 @@ public class Player implements SimUserDataListener {
 
         GLOReference<Player> playerRef = getRef(uid);
 	if (playerRef != null) {
-	    SimTask task = SimTask.getCurrent();
-	    playerRef.get(task).decrementReferenceCount();
-	} else {
-	    log.warning("userLeft for unknown uid " + uid);
-	}
-    }
-
-    private void incrementReferenceCount() {
-	listenerCount++;
-	log.finest("Listener count is now " + listenerCount + " for " +
-	    getPlayerName() + " (" +
-	    getUserName() + ") uid " + myUserID);
-
-    }
-
-    private void decrementReferenceCount() {
-
-	listenerCount--;
-
-	log.finest("Listener count is now " + listenerCount + " for " +
-	    getPlayerName() + " (" +
-	    getUserName() + ") uid " + myUserID);
-
-	if (listenerCount == 0) {
-	    log.finer("Deleting Player GLO");
-
-	    SimTask task = SimTask.getCurrent();
-
-	    // XXX: Because userLeft and userLeftChannel may happen
-	    // in any order, we do the deletion here after checking
-	    // that nobody else will send us an event.
-
-	    // In the future we may want the player object to persist,
-	    // so all this would have to change.
-
-	    // The PlayerHistory does persist, but in this implementation
+	    // The PlayerHistory GLO stays, but in this implementation
 	    // we delete the Player GLO on logout.
 
-	    task.destroyGLO(Player.getRef(myUserID));
+	    log.finer("Deleting Player GLO");
+	    SimTask.getCurrent().destroyGLO(playerRef);
+	} else {
+	    log.warning("userLeft for unknown uid " + uid);
 	}
     }
 
@@ -288,8 +249,6 @@ public class Player implements SimUserDataListener {
             log.warning("Player: Got UID " + uid + " expected " + myUserID);
             return;
         }
-
-	incrementReferenceCount();
 
         SimTask task = SimTask.getCurrent();
         if (myGameRef != null) {
@@ -329,12 +288,6 @@ public class Player implements SimUserDataListener {
 		matchmaker.leftChannel(cid, uid);
 	    }
         }
-
-	decrementReferenceCount();
-
-	if (listenerCount == 0) {
-            log.warning("userLeftChannel after userLeft!");
-	}
     }
 
     public void userDataReceived(UserID uid, ByteBuffer data) {
@@ -344,10 +297,6 @@ public class Player implements SimUserDataListener {
             log.warning("Player: Got UID " + uid + " expected " + myUserID);
             return;
         }
-
-	if (listenerCount <= 0) {
-	    log.warning("No listeners! listenerCount is " + listenerCount);
-	}
 
         SimTask task = SimTask.getCurrent();
         if (myGameRef != null) {
