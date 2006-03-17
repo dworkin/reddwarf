@@ -127,10 +127,8 @@ public class PDTimerEventList implements GLO {
             try {
                 Method cleanupMethod = PDTimerEventList.class.getMethod(
                         "cleanup", List.class);
-                task.queueTask(ACCESS_TYPE.GET, task.makeReference(this),
+                task.queueTask(ACCESS_TYPE.GET, task.lookupReferenceFor(this),
                         cleanupMethod, new Object[] { cleanupList });
-            } catch (InstantiationException e) {
-                e.printStackTrace();
             } catch (SecurityException e) {
                 e.printStackTrace();
             } catch (NoSuchMethodException e) {

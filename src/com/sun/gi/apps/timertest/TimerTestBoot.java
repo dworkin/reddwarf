@@ -112,31 +112,25 @@ public class TimerTestBoot implements SimBoot<TimerTestBoot>, SimTimerListener
             boolean firstBoot)
     {
         System.out.println("TimerTestBoot running");
-        try {
-            /*
-             * oneSecEvent =
-             * task.registerTimerEvent(1000l,true,thisobj); fiveSecEvent =
-             * task.registerTimerEvent(5000l,false,thisobj); tenSecEvent =
-             * task.registerTimerEvent(10000l,true,thisobj);
-             */
-            SimTask task = SimTask.getCurrent();
-            PDTimer timer;
-            if (firstBoot) { // not instantiated yet
-                timer = new PDTimer(task);
-                pdTimer = task.createGLO(timer, null);
-                GLOReference<TimerCount> tcRef =
-                    task.createGLO(new TimerCount());
-                timer.addTimerEvent(task, ACCESS_TYPE.GET, 1, true, tcRef,
-                        "increment", new Object[] {});
-            } else {
-                timer = (PDTimer) pdTimer.get(task);
-            }
-            timer.start(task, 1);
 
-        } catch (InstantiationException e) {
-            e.printStackTrace();
-        }
-
+	/*
+	 * oneSecEvent = task.registerTimerEvent(1000l,true,thisobj);
+	 * fiveSecEvent = task.registerTimerEvent(5000l,false,thisobj);
+	 * tenSecEvent = task.registerTimerEvent(10000l,true,thisobj);
+	 */
+	SimTask task = SimTask.getCurrent();
+	PDTimer timer;
+	if (firstBoot) { // not instantiated yet
+	    timer = new PDTimer(task);
+	    pdTimer = task.createGLO(timer, null);
+	    GLOReference<TimerCount> tcRef =
+		task.createGLO(new TimerCount());
+	    timer.addTimerEvent(task, ACCESS_TYPE.GET, 1, true, tcRef,
+		    "increment", new Object[] {});
+	} else {
+	    timer = (PDTimer) pdTimer.get(task);
+	}
+	timer.start(task, 1);
     }
 
     public void timerEvent(long eventID) {

@@ -119,13 +119,11 @@ public class TrivialBoot implements SimBoot<TrivialBoot> {
             try {                
                 m = getClass().getMethod("illegalTask",
                         new Class[] { GLOReference.class, TrivialBoot.class });
-                task.queueTask(task.makeReference(this), m,
+                task.queueTask(task.lookupReferenceFor(this), m,
                         new Object[] { this });
             } catch (SecurityException e) {
                 e.printStackTrace();
             } catch (NoSuchMethodException e) {
-                e.printStackTrace();
-            } catch (InstantiationException e) {
                 e.printStackTrace();
             }
 

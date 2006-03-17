@@ -254,14 +254,14 @@ public class SimTaskImpl extends SimTask {
         return new GLOReferenceImpl<GLO>(id);
     }
 
-    public <T extends GLO> GLOReference<T> makeReference(T glo)
-            throws InstantiationException
+    public <T extends GLO> GLOReference<T> lookupReferenceFor(T glo)
     {
-        Long idl = gloIDMap.get(glo);
-        if (idl == null) {
-            throw new InstantiationException("Have no ID for supposed GLO ");
+        Long oid = gloIDMap.get(glo);
+        if (oid == null) {
+            log.warning("No existing GLOReference found for GLO " + glo);
+	    return null;
         }
-        return (GLOReference<T>) makeReference(idl.longValue());
+        return (GLOReference<T>) makeReference(oid.longValue());
     }
 
     public Transaction getTransaction() {
@@ -314,11 +314,11 @@ public class SimTaskImpl extends SimTask {
     public <T extends GLO> GLOReference<T> createGLO(T templateObj,
                 String name)
     {
-        long objid = trans.create(templateObj, name);
-        if (objid == ObjectStore.INVALID_ID) {
+        long oid = trans.create(templateObj, name);
+        if (oid == ObjectStore.INVALID_ID) {
             return null;
         }
-        GLOReferenceImpl ref = (GLOReferenceImpl) makeReference(objid);
+        GLOReferenceImpl ref = (GLOReferenceImpl) makeReference(oid);
         registerGLOID(ref.getObjID(), templateObj, ACCESS_TYPE.GET);
         return (GLOReference<T>) ref;
     }

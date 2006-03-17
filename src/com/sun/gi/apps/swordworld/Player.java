@@ -179,7 +179,7 @@ public class Player implements SimUserDataListener {
 				// Sicne we dont have a GLOReference to ourselves
 				// handy, we ask the SimTask to make us
 				// one
-				GLOReference<Player> myRef = simTask.makeReference(this);
+				GLOReference<Player> myRef = simTask.lookupReferenceFor(this);
 				// now we ask the Room GLO for the description.
 				String out = roomGLO.getDescription(myRef);
 				// We take the string description and write

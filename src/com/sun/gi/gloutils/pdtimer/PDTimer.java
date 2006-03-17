@@ -107,15 +107,9 @@ public class PDTimer implements SimTimerListener {
         timerListRef = task.createGLO(list, null);
     }
 
-    public void start(SimTask task, long heartbeat)
-            throws InstantiationException {
-
-        try {
-            task.registerTimerEvent(ACCESS_TYPE.PEEK, heartbeat * 1000, true,
-                    task.makeReference(this));
-        } catch (InstantiationException e) {
-            e.printStackTrace();
-        }
+    public void start(SimTask task, long heartbeat) {
+	task.registerTimerEvent(ACCESS_TYPE.PEEK, heartbeat * 1000, true,
+		task.lookupReferenceFor(this));
     }
 
     public void timerEvent(long eventID) {

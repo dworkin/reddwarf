@@ -121,7 +121,7 @@ public class SocketServicer
         // System.out.flush();
 
         /*
-         * try { GLOReference thisRef = task.makeReference(this);
+         * try { GLOReference thisRef = task.lookupReferenceFor(this);
          * task.registerTimerEvent(ACCESS_TYPE.GET, 5000, true,
          * thisRef); } catch (InstantiationException ie) {
          * ie.printStackTrace(); }

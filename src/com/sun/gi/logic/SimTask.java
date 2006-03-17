@@ -109,17 +109,6 @@ public abstract class SimTask {
     public abstract void execute();
 
     /**
-     * A utility call used by other parts of the system. It takes a Game Logic
-     * Object (GLO) ID and wraps it in a GLOReference.
-     * 
-     * @param id
-     *            the GLO id
-     * 
-     * @return a GLOReference that may be used by another GLO
-     */
-    public abstract GLOReference<? extends GLO> makeReference(long id);
-
-    /**
      * Gets the transaction associated with this SimTask. A SimTask only has a
      * transaction associated with it during execution.
      * 
@@ -331,38 +320,21 @@ public abstract class SimTask {
 	    boolean b, GLOReference<? extends SimTimerListener> reference);
 
     /**
-     * This method makes a GLORefrence for a GLO.  It is used to get a
-     * GLO refernce when all you have is a Java reference to the GLO
-     * in question.
+     * Returns the GLOReference from which the given GLO was obtained
+     * previously in this SimTask.
      * 
-     * Note that this only makes sense from inside a Task that has
-     * acquired the GLO through lock, peek or attempt.  Use elsewhere
-     * will result in an InstantiationException.
+     * Note: this operation is only valid for GLOs that have been acquired
+     * previously in the course of this SimTask, using get, peek, or attempt.
+     * If called with a GLOReference that has not been dereferenced in the
+     * current SimTask, null will be returned.
      * 
      * @param glo The GLO to make a GLOreference to.
      * 
-     * @return a GLOReference that points to the given GLO.
-     * 
-     * @throws InstantiationException if the attempt to make a
-     * GLOReference fails.
+     * @return the GLOReference that was used to obtain <i>glo</i> during this
+     * SimTask's execution, or null if the GLOReference has not been
+     * dereferenced before.
      */
-    public abstract <T extends GLO> GLOReference<T> makeReference(T glo)
-	    throws InstantiationException;
-
-    /**
-     * <b>THIS IS AN INTERNAL FUNCTION AND SHOULD NEVER BE CALLED BY
-     * SGS APPLICATION CODE!</b>
-     * 
-     * It is used by the system as GLOs are acquired to store data
-     * about them in the SimTask for use by other methods.
-     * 
-     * @param objID The ID of the object
-     *
-     * @param glo A pointer to the GLO itself
-     *
-     * @param access The access type used to acquire the object
-     */
-    public abstract void registerGLOID(long objID, GLO glo, ACCESS_TYPE access);
+    public abstract <T extends GLO> GLOReference<T> lookupReferenceFor(T glo);
 
     /**
      * This method is used to queue a child task for execution.  A
@@ -551,6 +523,21 @@ public abstract class SimTask {
     }
 
     /**
+     * <b>THIS IS AN INTERNAL FUNCTION AND SHOULD NEVER BE CALLED BY
+     * SGS APPLICATION CODE!</b>
+     * 
+     * It is used by the system as GLOs are acquired to store data
+     * about them in the SimTask for use by other methods.
+     * 
+     * @param objID The ID of the object
+     *
+     * @param glo A pointer to the GLO itself
+     *
+     * @param access The access type used to acquire the object
+     */
+    public abstract void registerGLOID(long objID, GLO glo, ACCESS_TYPE access);
+
+    /**
      * Sets the {@link SimTask} returned by
      * <code>SimTask.getCurrent()</code>.  <p>
      *
@@ -569,9 +556,22 @@ public abstract class SimTask {
      */
     public abstract String getAppName();
 
-	/**
-	 * Returns the UserID of this task.
-	 * @return the UserID of this task
-	 */
-	public abstract UserID getUserID();
+    /**
+     * Returns the UserID of this task.
+     * @return the UserID of this task
+     */
+    public abstract UserID getUserID();
+
+    /**
+     * <b>This is an internal function and should never be called by
+     * SGS application code!</b>
+     *
+     * A utility call used by other parts of the system. It takes a Game Logic
+     * Object (GLO) ID and wraps it in a GLOReference.
+     * 
+     * @param id the GLO id to which a reference will be created
+     * 
+     * @return a GLOReference that may be used by another GLO.
+     */
+    public abstract GLOReference<? extends GLO> makeReference(long id);
 }

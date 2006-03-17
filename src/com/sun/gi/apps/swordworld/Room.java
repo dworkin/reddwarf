@@ -202,7 +202,7 @@ public class Room implements GLO {
 		SimTask simTask = SimTask.getCurrent();
 		Player player = playerRef.get(simTask);
 		try {
-			player.setCurrentRoom(simTask.makeReference(this));
+			player.setCurrentRoom(simTask.lookupReferenceFor(this));
 		} catch (InstantiationException e) {
 			System.out.println("Failed to create a this-reference");
 			e.printStackTrace();
