@@ -261,7 +261,7 @@ public class SimTaskImpl extends SimTask {
     }
 
     public GLOReference<? extends GLO> makeReference(long id) {
-        return new GLOReferenceImpl<GLO>(this, id);
+        return new GLOReferenceImpl<GLO>(id);
     }
 
     public <T extends GLO> GLOReference<T> lookupReferenceFor(T glo)

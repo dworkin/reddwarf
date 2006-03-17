@@ -73,7 +73,6 @@ import java.io.ObjectInputStream;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.sun.gi.logic.ExecutionOutsideOfTaskException;
 import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask.ACCESS_TYPE;
@@ -87,17 +86,9 @@ public class GLOReferenceImpl<T extends GLO>
 
     private static Logger log = Logger.getLogger("com.sun.gi.logic");
 
-    private transient SimTask currentTask;
-
     private final long objID;
 
     public GLOReferenceImpl(long id) {
-	currentTask = null;
-	objID = id;
-    }
-
-    public GLOReferenceImpl(SimTask curTask, long id) {
-	currentTask = curTask;
         objID = id;
     }
 
@@ -121,28 +112,10 @@ public class GLOReferenceImpl<T extends GLO>
 	return objID;
     }
 
-    private void checkActiveTask(SimTask other) {
-	if (SimTask.getCurrent() != other) {
-	    throw new ExecutionOutsideOfTaskException();
-	}
-    }
-
-    private void checkCurrentTask() {
-	if (currentTask == null) {
-	    currentTask = SimTask.getCurrent();
-	}
-    }
-
-    public void delete() {
-	checkCurrentTask();
-	this.delete(currentTask);
-    }
-
     /**
      * {@inheritDoc}
      */
     public void delete(SimTask task) {
-	checkActiveTask(task);
         try {
             task.getTransaction().destroy(objID);
         } catch (NonExistantObjectIDException e) {
@@ -150,16 +123,10 @@ public class GLOReferenceImpl<T extends GLO>
         }
     }
 
-    public T get() {
-	checkCurrentTask();
-	return get(currentTask);
-    }
-
     /**
      * {@inheritDoc}
      */
     public T get(SimTask task) {
-	checkActiveTask(task);
 	T obj = null;
 
 	try {
@@ -173,16 +140,10 @@ public class GLOReferenceImpl<T extends GLO>
         return obj;
     }
 
-    public T peek() {
-	checkCurrentTask();
-	return peek(currentTask);
-    }
-
     /**
      * {@inheritDoc}
      */
     public T peek(SimTask task) {
-	checkActiveTask(task);
 	T obj = null;
 
 	try {
@@ -196,16 +157,10 @@ public class GLOReferenceImpl<T extends GLO>
         return obj;
     }
 
-    public T attempt() {
-	checkCurrentTask();
-	return attempt(currentTask);
-    }
-
     /**
      * {@inheritDoc}
      */
     public T attempt(SimTask task) {
-	checkActiveTask(task);
 	T obj = null;
 
 	try {
