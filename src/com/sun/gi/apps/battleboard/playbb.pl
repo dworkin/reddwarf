@@ -84,7 +84,6 @@
 
 use FileHandle;
 use IPC::Open2;
-use POSIX ":sys_wait_h"; # for WNOHANG
 
 # NOTE:  if the BoardWidth and BoardHeight are not at least as large
 # as the actual board, then there is no guarantee that the game will
@@ -115,20 +114,8 @@ $GamesLost   = 0;
 $GamesError  = 0;
 
 
-# Set a process reaper to avoid zombies.
-# Reproduced from the perlipc man page.
-sub REAPER {
-    my $child;
-    # If a second child dies while in the signal handler caused by the
-    # first death, we won't get another signal. So must loop here else
-    # we will leave the unreaped child as a zombie. And the next time
-    # two children die we get another zombie. And so on.
-    while (($child = waitpid(-1,WNOHANG)) > 0) {
-	#$Kid_Status{$child} = $?;
-    }
-    $SIG{CHLD} = \&REAPER;  # sysV requires that we re-register
-}
-$SIG{CHLD} = \&REAPER;
+# Avoid zombie processes
+$SIG{CHLD} = 'IGNORE';
 
 
 # Play some games
