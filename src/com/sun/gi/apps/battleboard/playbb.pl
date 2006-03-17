@@ -144,13 +144,40 @@ sub play {
     print "Starting game...\n";
     flush STDOUT;
 
-    for (my $x = 0; $x < $BoardWidth; $x++) {
-	for (my $y = 0; $y < $BoardHeight; $y++) {
+    $rc = tryAll($player, $BoardWidth, $BoardHeight);
+ 
+    close Reader;
+    close Writer;
+    kill "TERM", $pid;
+    wait;
+
+    return $rc;
+}
+
+sub tryAll {
+    my ($player, $width, $height) = @_;
+
+    for (my $x = 0; $x < $width; $x++) {
+	for (my $y = 0; $y < $height; $y++) {
 
 	    while (my $line = <Reader>) {
+		if (!$line) {
+		    last;
+		}
+
 		if ($line =~ /^\s+$/) {
 			next;
 		}
+		if ($line =~ /^active/) {
+		    next;
+		}
+		if ($line =~ /0\ \ 1\ \ 2/) {
+		    next;
+		}
+		if ($line =~ /surviving\ /) {
+		    next;
+		}
+
 		if (!($line =~ /\*/)) {
 		    print "== $line";
 		    flush STDOUT;
@@ -164,31 +191,19 @@ sub play {
 		    last;
 		}
 		elsif ($line eq "YOU WIN!") {
-		    close Reader;
-		    close Writer;
-		    wait;
 		    return 1;
 		}
 		elsif ($line =~ /WINS!$/) {
-		    close Reader;
-		    close Writer;
-		    wait;
 		    return 0;
 		}
 		elsif ($line =~ /is not in the game\.$/) {
-		    kill "TERM", $pid;
-		    close Reader;
-		    close Writer;
-		    wait;
 		    return -1;
 		}
 		elsif ($line =~ /Connection refused/) {
-		    close Reader;
-		    close Writer;
-		    wait;
 		    return -2;
 		}
 	    }
+
 	}
     }
 }
