@@ -179,17 +179,34 @@ public class SimTaskImpl extends SimTask {
 
 	    // DJE If we reach this, then the task is finished.
 
+        } catch (DeadlockException de) {
+	    log.throwing(getClass().getName(), "run", de);
+	    requeueAfterDeadlock();
+
+	    // DJE: NOT finished or dead
+
         } catch (InvocationTargetException ex) {
 	    Throwable realException = ex.getCause();
 	    log.throwing(getClass().getName(), "run", realException);
 
 	    if (realException instanceof DeadlockException) {
 		requeueAfterDeadlock();
+
+		// DJE: NOT finished or dead
+
 	    } else {
 		realException.printStackTrace();
 		trans.abort();
+
+		// DJE: If we reach this, then the task is DEAD.
 	    }
-        } catch (IllegalArgumentException ex) {
+        } catch (IllegalAccessException ex) {
+            ex.printStackTrace();
+	    log.throwing(getClass().getName(), "run", ex);
+            trans.abort();
+
+	    // DJE: If we reach this, then the task is DEAD.
+        } catch (RuntimeException ex) {
 	    if (log.isLoggable(Level.WARNING)) {
 		log.warning("Exception on task execution:" +
 		    "\n  target: " + (runobj == null
@@ -201,28 +218,10 @@ public class SimTaskImpl extends SimTask {
 			   startMethod.getDeclaringClass().getName())));
 	    }
             ex.printStackTrace();
-            trans.abort();
-
-	    // DJE: If we reach this, then the task is DEAD.
-
-        } catch (IllegalAccessException ex) {
-            ex.printStackTrace();
-	    log.throwing(getClass().getName(), "run", ex);
-            trans.abort();
-	    // DJE: If we reach this, then the task is DEAD.
-
-        } catch (DeadlockException de) {
-	    log.throwing(getClass().getName(), "run", de);
-	    requeueAfterDeadlock();
-
-	    // DJE: NOT finished or dead
-        } catch (RuntimeException ex) {
-            ex.printStackTrace();
 	    log.throwing(getClass().getName(), "run", ex);
             trans.abort();
 
 	    // DJE: If we reach this, then the task is DEAD.
-
         }
 
 	simulation.taskDone(this);
@@ -275,7 +274,7 @@ public class SimTaskImpl extends SimTask {
 
     public void addUserListener(GLOReference ref) {
         deferredCommands.add(new DeferredUserListener(
-                ((GLOReferenceImpl) ref).objID));
+                ((GLOReferenceImpl) ref).getObjID()));
     }
 
     public GLOReference findGLO(String gloName) {
@@ -320,7 +319,7 @@ public class SimTaskImpl extends SimTask {
             return null;
         }
         GLOReferenceImpl ref = (GLOReferenceImpl) makeReference(objid);
-        registerGLOID(ref.objID, templateObj, ACCESS_TYPE.GET);
+        registerGLOID(ref.getObjID(), templateObj, ACCESS_TYPE.GET);
         return (GLOReference<T>) ref;
     }
 
@@ -346,7 +345,7 @@ public class SimTaskImpl extends SimTask {
 
         long tid = simulation.getNextTimerID();
         DeferredNewTimer rec = new DeferredNewTimer(tid, access, delay, repeat,
-                ((GLOReferenceImpl) ref).objID);
+                ((GLOReferenceImpl) ref).getObjID());
         deferredCommands.add(rec);
         return tid;
     }
@@ -426,7 +425,7 @@ public class SimTaskImpl extends SimTask {
             int port, boolean reliable) {
         long sid = simulation.getNextSocketID();
         deferredCommands.add(new DeferredSocketOpen(sid, access,
-                ((GLOReferenceImpl) ref).objID, host, port, reliable));
+                ((GLOReferenceImpl) ref).getObjID(), host, port, reliable));
         return sid;
     }
 
@@ -681,7 +680,7 @@ class DeferredUserDataListener implements DeferredSimCommand {
 
     public DeferredUserDataListener(UserID uid, GLOReference glo) {
         this.uid = uid; // XXX does this need to be cloned?
-        this.objID = ((GLOReferenceImpl) glo).objID;
+        this.objID = ((GLOReferenceImpl) glo).getObjID();
     }
 
     public void execute(Simulation sim) {

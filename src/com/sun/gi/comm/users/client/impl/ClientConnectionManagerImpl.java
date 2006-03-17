@@ -245,6 +245,13 @@ public class ClientConnectionManagerImpl
                 // valid reconn key
                 listener.failOverInProgress();
                 reconnecting = true;
+
+		try {
+		    Thread.sleep(connWaitMS);
+		} catch (InterruptedException e) {
+		    // doesn't matter.
+		}
+
                 connect(umanager);
             } else { // we cant fail over
                 connected = false;

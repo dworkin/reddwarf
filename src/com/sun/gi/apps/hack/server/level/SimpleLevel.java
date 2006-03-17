@@ -1,70 +1,84 @@
 /*
- * Copyright © 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa
- * Clara, California 95054, U.S.A. All rights reserved.
- * 
- * Sun Microsystems, Inc. has intellectual property rights relating to
- * technology embodied in the product that is described in this
- * document. In particular, and without limitation, these intellectual
- * property rights may include one or more of the U.S. patents listed at
- * http://www.sun.com/patents and one or more additional patents or
- * pending patent applications in the U.S. and in other countries.
- * 
- * U.S. Government Rights - Commercial software. Government users are
- * subject to the Sun Microsystems, Inc. standard license agreement and
- * applicable provisions of the FAR and its supplements.
- * 
- * Use is subject to license terms.
- * 
- * This distribution may include materials developed by third parties.
- * 
- * Sun, Sun Microsystems, the Sun logo and Java are trademarks or
- * registered trademarks of Sun Microsystems, Inc. in the U.S. and other
- * countries.
- * 
- * This product is covered and controlled by U.S. Export Control laws
- * and may be subject to the export or import laws in other countries.
- * Nuclear, missile, chemical biological weapons or nuclear maritime end
- * uses or end users, whether direct or indirect, are strictly
- * prohibited. Export or reexport to countries subject to U.S. embargo
- * or to entities identified on U.S. export exclusion lists, including,
- * but not limited to, the denied persons and specially designated
- * nationals lists is strictly prohibited.
- * 
- * Copyright © 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa
- * Clara, California 95054, Etats-Unis. Tous droits réservés.
- * 
- * Sun Microsystems, Inc. détient les droits de propriété intellectuels
- * relatifs à la technologie incorporée dans le produit qui est décrit
- * dans ce document. En particulier, et ce sans limitation, ces droits
- * de propriété intellectuelle peuvent inclure un ou plus des brevets
- * américains listés à l'adresse http://www.sun.com/patents et un ou les
- * brevets supplémentaires ou les applications de brevet en attente aux
- * Etats - Unis et dans les autres pays.
- * 
- * L'utilisation est soumise aux termes de la Licence.
- * 
- * Cette distribution peut comprendre des composants développés par des
- * tierces parties.
- * 
- * Sun, Sun Microsystems, le logo Sun et Java sont des marques de
- * fabrique ou des marques déposées de Sun Microsystems, Inc. aux
- * Etats-Unis et dans d'autres pays.
- * 
- * Ce produit est soumis à la législation américaine en matière de
- * contrôle des exportations et peut être soumis à la règlementation en
- * vigueur dans d'autres pays dans le domaine des exportations et
- * importations. Les utilisations, ou utilisateurs finaux, pour des
- * armes nucléaires,des missiles, des armes biologiques et chimiques ou
- * du nucléaire maritime, directement ou indirectement, sont strictement
- * interdites. Les exportations ou réexportations vers les pays sous
- * embargo américain, ou vers des entités figurant sur les listes
- * d'exclusion d'exportation américaines, y compris, mais de manière non
- * exhaustive, la liste de personnes qui font objet d'un ordre de ne pas
- * participer, d'une façon directe ou indirecte, aux exportations des
- * produits ou des services qui sont régis par la législation américaine
- * en matière de contrôle des exportations et la liste de ressortissants
- * spécifiquement désignés, sont rigoureusement interdites.
- */
+ Copyright (c) 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa
+ Clara, California 95054, U.S.A. All rights reserved.
+ 
+ Sun Microsystems, Inc. has intellectual property rights relating to
+ technology embodied in the product that is described in this document.
+ In particular, and without limitation, these intellectual property rights
+ may include one or more of the U.S. patents listed at
+ http://www.sun.com/patents and one or more additional patents or pending
+ patent applications in the U.S. and in other countries.
+ 
+ U.S. Government Rights - Commercial software. Government users are subject
+ to the Sun Microsystems, Inc. standard license agreement and applicable
+ provisions of the FAR and its supplements.
+ 
+ This distribution may include materials developed by third parties.
+ 
+ Sun, Sun Microsystems, the Sun logo and Java are trademarks or registered
+ trademarks of Sun Microsystems, Inc. in the U.S. and other countries.
+ 
+ UNIX is a registered trademark in the U.S. and other countries, exclusively
+ licensed through X/Open Company, Ltd.
+ 
+ Products covered by and information contained in this service manual are
+ controlled by U.S. Export Control laws and may be subject to the export
+ or import laws in other countries. Nuclear, missile, chemical biological
+ weapons or nuclear maritime end uses or end users, whether direct or
+ indirect, are strictly prohibited. Export or reexport to countries subject
+ to U.S. embargo or to entities identified on U.S. export exclusion lists,
+ including, but not limited to, the denied persons and specially designated
+ nationals lists is strictly prohibited.
+ 
+ DOCUMENTATION IS PROVIDED "AS IS" AND ALL EXPRESS OR IMPLIED CONDITIONS,
+ REPRESENTATIONS AND WARRANTIES, INCLUDING ANY IMPLIED WARRANTY OF
+ MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE OR NON-INFRINGEMENT,
+ ARE DISCLAIMED, EXCEPT TO THE EXTENT THAT SUCH DISCLAIMERS ARE HELD TO BE
+ LEGALLY INVALID.
+ 
+ Copyright © 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
+ California 95054, Etats-Unis. Tous droits réservés.
+ 
+ Sun Microsystems, Inc. détient les droits de propriété intellectuels
+ relatifs à la technologie incorporée dans le produit qui est décrit dans
+ ce document. En particulier, et ce sans limitation, ces droits de
+ propriété intellectuelle peuvent inclure un ou plus des brevets américains
+ listés à l'adresse http://www.sun.com/patents et un ou les brevets
+ supplémentaires ou les applications de brevet en attente aux Etats -
+ Unis et dans les autres pays.
+ 
+ Cette distribution peut comprendre des composants développés par des
+ tierces parties.
+ 
+ Sun, Sun Microsystems, le logo Sun et Java sont des marques de fabrique
+ ou des marques déposées de Sun Microsystems, Inc. aux Etats-Unis et dans
+ d'autres pays.
+ 
+ UNIX est une marque déposée aux Etats-Unis et dans d'autres pays et
+ licenciée exlusivement par X/Open Company, Ltd.
+ 
+ see above Les produits qui font l'objet de ce manuel d'entretien et les
+ informations qu'il contient sont regis par la legislation americaine en
+ matiere de controle des exportations et peuvent etre soumis au droit
+ d'autres pays dans le domaine des exportations et importations.
+ Les utilisations finales, ou utilisateurs finaux, pour des armes
+ nucleaires, des missiles, des armes biologiques et chimiques ou du
+ nucleaire maritime, directement ou indirectement, sont strictement
+ interdites. Les exportations ou reexportations vers des pays sous embargo
+ des Etats-Unis, ou vers des entites figurant sur les listes d'exclusion
+ d'exportation americaines, y compris, mais de maniere non exclusive, la
+ liste de personnes qui font objet d'un ordre de ne pas participer, d'une
+ facon directe ou indirecte, aux exportations des produits ou des services
+ qui sont regi par la legislation americaine en matiere de controle des
+ exportations et la liste de ressortissants specifiquement designes, sont
+ rigoureusement interdites.
+ 
+ LA DOCUMENTATION EST FOURNIE "EN L'ETAT" ET TOUTES AUTRES CONDITIONS,
+ DECLARATIONS ET GARANTIES EXPRESSES OU TACITES SONT FORMELLEMENT EXCLUES,
+ DANS LA MESURE AUTORISEE PAR LA LOI APPLICABLE, Y COMPRIS NOTAMMENT TOUTE
+ GARANTIE IMPLICITE RELATIVE A LA QUALITE MARCHANDE, A L'APTITUDE A UNE
+ UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
+*/
 
 
 /*
@@ -95,6 +109,7 @@ import com.sun.gi.apps.hack.share.KeyMessages;
 
 import java.util.HashSet;
 import java.util.Set;
+import java.util.logging.Logger;
 
 
 /**
@@ -107,6 +122,8 @@ import java.util.Set;
  */
 public class SimpleLevel implements Level
 {
+
+    private static Logger log = Logger.getLogger("com.sun.gi.apps.hack.server");
 
     // a reference to ourself, which we'll get lazily
     private GLOReference<? extends Level> selfRef = null;
@@ -193,10 +210,20 @@ public class SimpleLevel implements Level
             // find a legal space to place this character
             x = NSidedDie.rollNSided(levelWidth) - 1;
             y = NSidedDie.rollNSided(levelHeight) - 1;
-        } while (! board.testMove(x, y, mgrRef));
 
-        // add the character
-        addCharacter(mgrRef, x, y);
+            // loop until we find a space to successfully add the character
+        } while (! (board.testMove(x, y, mgrRef) &&
+                    addCharacter(mgrRef, x, y)));
+
+        if (log.isLoggable(java.util.logging.Level.FINE)) {
+            CharacterManager cmgr = mgrRef.peek(SimTask.getCurrent());
+            com.sun.gi.apps.hack.server.Character ch =
+                cmgr.getCurrentCharacter();
+            log.fine(name + " adding " + ch.getName() +
+                    " [" + ch.getID() + "] at (" + x + ", " + y + ")");
+        }
+
+        
     }
 
     /**
@@ -210,19 +237,25 @@ public class SimpleLevel implements Level
      *               <code>Character</code> is joining this <code>Level</code>
      * @param startX the starting x-coordinate
      * @param startY the starting y-coordinate
+     * 
+     * @return true upon success, otherwise false.
      */
-    public void addCharacter(GLOReference<? extends CharacterManager> mgrRef,
+    public boolean addCharacter(GLOReference<? extends CharacterManager> mgrRef,
                              int startX, int startY) {
-        // keep track of the character
-        characters.add(mgrRef);
-
         // let the manager know what level it's on, and where on that
         // level it starts
         CharacterManager mgr = mgrRef.get(SimTask.getCurrent());
         mgr.setCurrentLevel(getSelfRef());
         mgr.setLevelPosition(startX, startY);
-        // FIXME: we need to check that this succeeded
-        board.addCharacterAt(startX, startY, mgrRef);
+
+        if (! board.addCharacterAt(startX, startY, mgrRef)) {
+            mgr.setCurrentLevel(null);
+            mgr.setLevelPosition(-1, -1);
+            return false;
+        }
+
+        // keep track of the character
+        characters.add(mgrRef);
 
         // now we need to send the board and position to the character
         mgr.sendBoard(getBoardSnapshot());
@@ -230,6 +263,8 @@ public class SimpleLevel implements Level
         // finally, update everyone about the new charcater
         sendUpdate(new BoardSpace(startX, startY,
                                   board.getAt(startX, startY)));
+
+        return true;
     }
 
     /**

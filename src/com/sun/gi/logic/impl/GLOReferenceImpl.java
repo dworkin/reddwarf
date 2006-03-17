@@ -70,11 +70,13 @@ package com.sun.gi.logic.impl;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
-import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.SimTask.ACCESS_TYPE;
+import com.sun.gi.logic.SimTask;
 import com.sun.gi.objectstore.NonExistantObjectIDException;
 
 public class GLOReferenceImpl<T extends GLO>
@@ -82,101 +84,124 @@ public class GLOReferenceImpl<T extends GLO>
 {
     private static final long serialVersionUID = 1L;
 
-    long objID;
+    private static Logger log = Logger.getLogger("com.sun.gi.logic");
 
-    transient boolean peeked;
-
-    transient T objectCache;
+    private final long objID;
 
     public GLOReferenceImpl(long id) {
         objID = id;
-        objectCache = null;
     }
 
-    private void initTransients() {
-        peeked = false;
-        objectCache = null;
-    }
-
-    private void readObject(ObjectInputStream in) throws IOException,
-            ClassNotFoundException {
+    private void readObject(ObjectInputStream in)
+	    throws IOException, ClassNotFoundException
+    {
         in.defaultReadObject();
-        initTransients();
     }
 
+    /**
+     * Returns the OID of the underlying object, as implemented by the
+     * DataSpace.  This is package private because this is an
+     * implementation detail that should not be allowed to leak out
+     * into the public API.  Although we use this everywhere in the
+     * simulator impl right now, it's not something that should
+     * escape.
+     *
+     * @return the OID of the underlying object
+     */
+    long getObjID() {
+	return objID;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     public void delete(SimTask task) {
         try {
             task.getTransaction().destroy(objID);
         } catch (NonExistantObjectIDException e) {
-            e.printStackTrace();
+	    log.throwing(getClass().getName(), "delete", e);
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public T get(SimTask task) {
-        if ((objectCache == null) || peeked) {
-            try {
-                objectCache = (T) task.getTransaction().lock(objID);
-            } catch (NonExistantObjectIDException e) {
-                e.printStackTrace();
-            }
-	    if (objectCache != null) {
-		task.registerGLOID(objID, objectCache, ACCESS_TYPE.GET);
-	    }
-            peeked = false;
-        }
-        return objectCache;
+	T obj = null;
+
+	try {
+	    obj = (T) task.getTransaction().lock(objID);
+	} catch (NonExistantObjectIDException e) {
+	    log.throwing(getClass().getName(), "get", e);
+	}
+	if (obj != null) {
+	    task.registerGLOID(objID, obj, ACCESS_TYPE.GET);
+	}
+        return obj;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public T peek(SimTask task) {
-        if (objectCache == null && (! peeked)) {
-            try {
-                objectCache = (T) task.getTransaction().peek(objID);
-            } catch (NonExistantObjectIDException e) {
-                e.printStackTrace();
-            }
-	    if (objectCache != null) {
-		task.registerGLOID(objID, objectCache, ACCESS_TYPE.PEEK);
-	    }
-            peeked = true;
-        }
-        return objectCache;
+	T obj = null;
+
+	try {
+	    obj = (T) task.getTransaction().peek(objID);
+	} catch (NonExistantObjectIDException e) {
+	    log.throwing(getClass().getName(), "peek", e);
+	}
+	if (obj != null) {
+	    task.registerGLOID(objID, obj, ACCESS_TYPE.PEEK);
+	}
+        return obj;
     }
 
-    public GLOReference<T> shallowCopy() {
-        return new GLOReferenceImpl(objID);
-    }
-
+    /**
+     * {@inheritDoc}
+     */
     public T attempt(SimTask task) {
-        if ((objectCache == null) || peeked) {
-            try {
-                objectCache = (T) task.getTransaction().lock(objID, false);
-            } catch (NonExistantObjectIDException e) {
-                e.printStackTrace();
-            }
-            if (objectCache != null) {
-		task.registerGLOID(objID, objectCache, ACCESS_TYPE.ATTEMPT);
-		// was gotten with ATTEMPT
-	    }
-            peeked = false;
-        }
-        return objectCache;
+	T obj = null;
+
+	try {
+	    obj = (T) task.getTransaction().lock(objID, false);
+	} catch (NonExistantObjectIDException e) {
+	    log.throwing(getClass().getName(), "attempt", e);
+	}
+	if (obj != null) {
+	    task.registerGLOID(objID, obj, ACCESS_TYPE.ATTEMPT);
+	}
+        return obj;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public int compareTo(Object arg0) {
+	if (arg0 == null) {
+	    return -1;
+	}
+
         GLOReferenceImpl other = (GLOReferenceImpl) arg0;
-        if (objID < other.objID) {
+        if (objID < other.getObjID()) {
             return -1;
-        } else if (objID > other.objID) {
+        } else if (objID > other.getObjID()) {
             return 1;
         } else {
             return 0;
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public int hashCode() {
         return (int) objID;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public boolean equals(Object other) {
         return (compareTo(other) == 0);
     }

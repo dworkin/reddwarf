@@ -1,70 +1,84 @@
 /*
- * Copyright © 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa
- * Clara, California 95054, U.S.A. All rights reserved.
- * 
- * Sun Microsystems, Inc. has intellectual property rights relating to
- * technology embodied in the product that is described in this
- * document. In particular, and without limitation, these intellectual
- * property rights may include one or more of the U.S. patents listed at
- * http://www.sun.com/patents and one or more additional patents or
- * pending patent applications in the U.S. and in other countries.
- * 
- * U.S. Government Rights - Commercial software. Government users are
- * subject to the Sun Microsystems, Inc. standard license agreement and
- * applicable provisions of the FAR and its supplements.
- * 
- * Use is subject to license terms.
- * 
- * This distribution may include materials developed by third parties.
- * 
- * Sun, Sun Microsystems, the Sun logo and Java are trademarks or
- * registered trademarks of Sun Microsystems, Inc. in the U.S. and other
- * countries.
- * 
- * This product is covered and controlled by U.S. Export Control laws
- * and may be subject to the export or import laws in other countries.
- * Nuclear, missile, chemical biological weapons or nuclear maritime end
- * uses or end users, whether direct or indirect, are strictly
- * prohibited. Export or reexport to countries subject to U.S. embargo
- * or to entities identified on U.S. export exclusion lists, including,
- * but not limited to, the denied persons and specially designated
- * nationals lists is strictly prohibited.
- * 
- * Copyright © 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa
- * Clara, California 95054, Etats-Unis. Tous droits réservés.
- * 
- * Sun Microsystems, Inc. détient les droits de propriété intellectuels
- * relatifs à la technologie incorporée dans le produit qui est décrit
- * dans ce document. En particulier, et ce sans limitation, ces droits
- * de propriété intellectuelle peuvent inclure un ou plus des brevets
- * américains listés à l'adresse http://www.sun.com/patents et un ou les
- * brevets supplémentaires ou les applications de brevet en attente aux
- * Etats - Unis et dans les autres pays.
- * 
- * L'utilisation est soumise aux termes de la Licence.
- * 
- * Cette distribution peut comprendre des composants développés par des
- * tierces parties.
- * 
- * Sun, Sun Microsystems, le logo Sun et Java sont des marques de
- * fabrique ou des marques déposées de Sun Microsystems, Inc. aux
- * Etats-Unis et dans d'autres pays.
- * 
- * Ce produit est soumis à la législation américaine en matière de
- * contrôle des exportations et peut être soumis à la règlementation en
- * vigueur dans d'autres pays dans le domaine des exportations et
- * importations. Les utilisations, ou utilisateurs finaux, pour des
- * armes nucléaires,des missiles, des armes biologiques et chimiques ou
- * du nucléaire maritime, directement ou indirectement, sont strictement
- * interdites. Les exportations ou réexportations vers les pays sous
- * embargo américain, ou vers des entités figurant sur les listes
- * d'exclusion d'exportation américaines, y compris, mais de manière non
- * exhaustive, la liste de personnes qui font objet d'un ordre de ne pas
- * participer, d'une façon directe ou indirecte, aux exportations des
- * produits ou des services qui sont régis par la législation américaine
- * en matière de contrôle des exportations et la liste de ressortissants
- * spécifiquement désignés, sont rigoureusement interdites.
- */
+ Copyright (c) 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa
+ Clara, California 95054, U.S.A. All rights reserved.
+ 
+ Sun Microsystems, Inc. has intellectual property rights relating to
+ technology embodied in the product that is described in this document.
+ In particular, and without limitation, these intellectual property rights
+ may include one or more of the U.S. patents listed at
+ http://www.sun.com/patents and one or more additional patents or pending
+ patent applications in the U.S. and in other countries.
+ 
+ U.S. Government Rights - Commercial software. Government users are subject
+ to the Sun Microsystems, Inc. standard license agreement and applicable
+ provisions of the FAR and its supplements.
+ 
+ This distribution may include materials developed by third parties.
+ 
+ Sun, Sun Microsystems, the Sun logo and Java are trademarks or registered
+ trademarks of Sun Microsystems, Inc. in the U.S. and other countries.
+ 
+ UNIX is a registered trademark in the U.S. and other countries, exclusively
+ licensed through X/Open Company, Ltd.
+ 
+ Products covered by and information contained in this service manual are
+ controlled by U.S. Export Control laws and may be subject to the export
+ or import laws in other countries. Nuclear, missile, chemical biological
+ weapons or nuclear maritime end uses or end users, whether direct or
+ indirect, are strictly prohibited. Export or reexport to countries subject
+ to U.S. embargo or to entities identified on U.S. export exclusion lists,
+ including, but not limited to, the denied persons and specially designated
+ nationals lists is strictly prohibited.
+ 
+ DOCUMENTATION IS PROVIDED "AS IS" AND ALL EXPRESS OR IMPLIED CONDITIONS,
+ REPRESENTATIONS AND WARRANTIES, INCLUDING ANY IMPLIED WARRANTY OF
+ MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE OR NON-INFRINGEMENT,
+ ARE DISCLAIMED, EXCEPT TO THE EXTENT THAT SUCH DISCLAIMERS ARE HELD TO BE
+ LEGALLY INVALID.
+ 
+ Copyright © 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
+ California 95054, Etats-Unis. Tous droits réservés.
+ 
+ Sun Microsystems, Inc. détient les droits de propriété intellectuels
+ relatifs à la technologie incorporée dans le produit qui est décrit dans
+ ce document. En particulier, et ce sans limitation, ces droits de
+ propriété intellectuelle peuvent inclure un ou plus des brevets américains
+ listés à l'adresse http://www.sun.com/patents et un ou les brevets
+ supplémentaires ou les applications de brevet en attente aux Etats -
+ Unis et dans les autres pays.
+ 
+ Cette distribution peut comprendre des composants développés par des
+ tierces parties.
+ 
+ Sun, Sun Microsystems, le logo Sun et Java sont des marques de fabrique
+ ou des marques déposées de Sun Microsystems, Inc. aux Etats-Unis et dans
+ d'autres pays.
+ 
+ UNIX est une marque déposée aux Etats-Unis et dans d'autres pays et
+ licenciée exlusivement par X/Open Company, Ltd.
+ 
+ see above Les produits qui font l'objet de ce manuel d'entretien et les
+ informations qu'il contient sont regis par la legislation americaine en
+ matiere de controle des exportations et peuvent etre soumis au droit
+ d'autres pays dans le domaine des exportations et importations.
+ Les utilisations finales, ou utilisateurs finaux, pour des armes
+ nucleaires, des missiles, des armes biologiques et chimiques ou du
+ nucleaire maritime, directement ou indirectement, sont strictement
+ interdites. Les exportations ou reexportations vers des pays sous embargo
+ des Etats-Unis, ou vers des entites figurant sur les listes d'exclusion
+ d'exportation americaines, y compris, mais de maniere non exclusive, la
+ liste de personnes qui font objet d'un ordre de ne pas participer, d'une
+ facon directe ou indirecte, aux exportations des produits ou des services
+ qui sont regi par la legislation americaine en matiere de controle des
+ exportations et la liste de ressortissants specifiquement designes, sont
+ rigoureusement interdites.
+ 
+ LA DOCUMENTATION EST FOURNIE "EN L'ETAT" ET TOUTES AUTRES CONDITIONS,
+ DECLARATIONS ET GARANTIES EXPRESSES OU TACITES SONT FORMELLEMENT EXCLUES,
+ DANS LA MESURE AUTORISEE PAR LA LOI APPLICABLE, Y COMPRIS NOTAMMENT TOUTE
+ GARANTIE IMPLICITE RELATIVE A LA QUALITE MARCHANDE, A L'APTITUDE A UNE
+ UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
+*/
 
 package com.sun.gi.apps.mcs.matchmaker.client.test;
 
@@ -108,8 +122,8 @@ import com.sun.gi.apps.mcs.matchmaker.client.MatchMakingClient;
 import com.sun.gi.comm.discovery.impl.URLDiscoverer;
 import com.sun.gi.comm.users.client.ClientConnectionManager;
 import com.sun.gi.comm.users.client.impl.ClientConnectionManagerImpl;
-import com.sun.gi.utils.SGSUUID;
-import com.sun.gi.utils.StatisticalUUID;
+
+import static com.sun.gi.apps.mcs.matchmaker.common.CommandProtocol.*;
 
 /**
  * 
@@ -166,7 +180,7 @@ public class MatchMakerClientTestUI extends JFrame
 	                if (lobby == null) {
 	                    return;
 	                }
-	                mmClient.joinLobby(lobby.getLobbyID().toByteArray(), null);
+	                mmClient.joinLobby(lobby.getLobbyID(), null);
             	}
             	else {
             		mmClient.leaveLobby();
@@ -178,7 +192,9 @@ public class MatchMakerClientTestUI extends JFrame
         JButton createGame = new JButton("Create Game");
         createGame.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
-                lobbyPanel.createGame();
+                String value = JOptionPane.showInputDialog(MatchMakerClientTestUI.this,
+                        "Enter Game Name", "MyGame");
+            	lobbyPanel.createGame(value);
             }
         });
 
@@ -190,7 +206,7 @@ public class MatchMakerClientTestUI extends JFrame
 	                if (game == null) {
 	                    return;
 	                }
-	                mmClient.joinGame(game.getGameID().toByteArray());
+	                mmClient.joinGame(game.getGameID(), "secret");
                 }
                 else {
                 	mmClient.leaveGame();
@@ -211,6 +227,13 @@ public class MatchMakerClientTestUI extends JFrame
                 gamePanel.startGame();
             }
         });
+        
+        JButton endGameButton = new JButton("End Game");
+        endGameButton.addActionListener(new ActionListener() {
+        	public void actionPerformed(ActionEvent e) {
+        		mmClient.completeGame(gamePanel.getGameID());
+        	}
+        });
 
         JPanel buttonPanel = new JPanel();
         buttonPanel.add(connectButton);
@@ -219,6 +242,7 @@ public class MatchMakerClientTestUI extends JFrame
         buttonPanel.add(joinGame);
         buttonPanel.add(readyButton);
         buttonPanel.add(startGameButton);
+        buttonPanel.add(endGameButton);
 
         JSplitPane rightPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
         rightPane.setDividerLocation(250);
@@ -234,14 +258,24 @@ public class MatchMakerClientTestUI extends JFrame
         JButton sendTextButton = new JButton("Send Text");
         sendTextButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
-                lobbyPanel.sendText(chatField.getText());
+                if (gamePanel.hasGame()) {
+                	gamePanel.sendText(chatField.getText());
+                }
+                else {
+                	lobbyPanel.sendText(chatField.getText());
+                }
             }
         });
 
         JButton sendPrivateTextButton = new JButton("Send Private Text");
         sendPrivateTextButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
-                lobbyPanel.sendPrivateText(chatField.getText());
+                if (gamePanel.hasGame()) {
+                	gamePanel.sendPrivateText(chatField.getText());
+                }
+                else {
+                	lobbyPanel.sendPrivateText(chatField.getText());
+                }
             }
         });
 
@@ -260,7 +294,7 @@ public class MatchMakerClientTestUI extends JFrame
         add(splitPane, BorderLayout.CENTER);
         add(bottomPanel, BorderLayout.SOUTH);
 
-        setBounds(300, 200, 700, 600);
+        setBounds(300, 200, 720, 600);
 
         addWindowListener(new WindowAdapter() {
             public void windowClosing(WindowEvent e) {
@@ -314,15 +348,6 @@ public class MatchMakerClientTestUI extends JFrame
         return new DefaultTreeModel(root);
     }
 
-    private SGSUUID createUUID(byte[] bytes) {
-        SGSUUID id = null;
-        try {
-            id = new StatisticalUUID(bytes);
-        } catch (InstantiationException ie) {}
-
-        return id;
-    }
-
     private void setStatus(String status) {
         setTitle("Match Maker Client Test: " + status);
     }
@@ -342,15 +367,14 @@ public class MatchMakerClientTestUI extends JFrame
             return;
         }
     }
-
-    public void listedFolder(SGSUUID folderID, FolderDescriptor[] subFolders,
+    
+    public void listedFolder(byte[] folderID, FolderDescriptor[] subFolders,
             LobbyDescriptor[] lobbies) {
 
-        DefaultMutableTreeNode node = findFolderNode(folderID, root);
+    	DefaultMutableTreeNode node = findFolderNode(folderID, root);
         if (node == null) {
             node = root;
         }
-
         for (FolderDescriptor f : subFolders) {
             treeModel.insertNodeInto(new FolderNode(f), node,
                     node.getChildCount());
@@ -361,16 +385,16 @@ public class MatchMakerClientTestUI extends JFrame
             lobbyMap.put(l.getChannelName(), l);
         }
         for (FolderDescriptor f : subFolders) {
-            mmClient.listFolder(f.getFolderID().toByteArray());
+            mmClient.listFolder(f.getFolderID());
         }
     }
 
-    private FolderNode findFolderNode(SGSUUID folderID,
+    private FolderNode findFolderNode(byte[] folderID,
             DefaultMutableTreeNode node) {
         for (int i = 0; i < node.getChildCount(); i++) {
             if (node.getChildAt(i) instanceof FolderNode) {
                 FolderNode curNode = (FolderNode) node.getChildAt(i);
-                if (curNode.getFolderID().equals(folderID)) {
+                if (compareBytes(curNode.getFolderID(), folderID)) {
                     return curNode;
                 } else if (curNode.getChildCount() > 0) {
                     FolderNode subFolder = findFolderNode(folderID, curNode);
@@ -381,6 +405,18 @@ public class MatchMakerClientTestUI extends JFrame
             }
         }
         return null;
+    }
+    
+    private boolean compareBytes(byte[] array1, byte[] array2) {
+    	if (array1.length != array2.length) {
+    		return false;
+    	}
+    	for (int i = 0; i < array1.length; i++) {
+    		if (array1[i] != array2[i]) {
+    			return false;
+    		}
+    	}
+    	return true;
     }
 
     public void foundUserName(String userName, byte[] userID) {
@@ -427,12 +463,50 @@ public class MatchMakerClientTestUI extends JFrame
         connectButton.setText("Connect");
     }
     
-    /**
-     * Called when some command request encounters an error.
-     * 
-     * @param message		a message detailing the error condition
+    /*
+     * Inherited JDoc
      */
-    public void error(String message) {
+    public void error(int errorCode) {
+    	String message = null;
+    	if (errorCode == NOT_CONNECTED_LOBBY) {
+    		message = "Not connected to a lobby";
+    	}
+    	else if (errorCode == NOT_CONNECTED_GAME) {
+    		message = "Not connected to a game";
+    	}
+    	else if (errorCode == CONNECTED_GAME) {
+    		message = "Already connected to a game";
+    	}
+    	else if (errorCode == CONNECTED_LOBBY) {
+    		message = "Already connected to a lobby";
+    	}
+    	else if (errorCode == PLAYER_NOT_HOST) {
+    		message = "Only the host can start a game";
+    	}
+    	else if (errorCode == PLAYERS_NOT_READY) {
+    		message = "The game cannot start until all players are ready";
+    	}
+    	else if (errorCode == LESS_THAN_MIN_PLAYERS) {
+    		message = "Too few players to start game";
+    	}
+    	else if (errorCode == GREATER_THAN_MAX_PLAYERS) {
+    		message = "Too many players to start game";
+    	}
+    	else if (errorCode == MAX_PLAYERS) {
+    		message = "Already at max players";
+    	}
+    	else if (errorCode == INCORRECT_PASSWORD) {
+    		message = "Incorrect Password";
+    	}
+    	else if (errorCode == INVALID_GAME) {
+    		message = "Invalid Game";
+    	}
+    	else if (errorCode == INVALID_LOBBY) {
+    		message = "Invalid Lobby";
+    	}
+    	else {
+    		message = "Unknown Error";
+    	}
     	receiveServerMessage("<ERROR> " + message);
     }
 
@@ -468,7 +542,7 @@ public class MatchMakerClientTestUI extends JFrame
             return folder.getName();
         }
 
-        public SGSUUID getFolderID() {
+        public byte[] getFolderID() {
             return folder.getFolderID();
         }
 
@@ -491,7 +565,7 @@ public class MatchMakerClientTestUI extends JFrame
             return lobby.getName();
         }
 
-        public SGSUUID getLobbyID() {
+        public byte[] getLobbyID() {
             return lobby.getLobbyID();
         }
 
@@ -633,9 +707,9 @@ public class MatchMakerClientTestUI extends JFrame
         
         }
 
-        void createGame() {
+        void createGame(String gameName) {
         	if (channel != null) {
-        		channel.createGame("My Game", "My description", null,
+        		channel.createGame(gameName, "My description", "secret",
                     gameParameters);
         	}
         }
@@ -654,13 +728,15 @@ public class MatchMakerClientTestUI extends JFrame
         }
 
         private byte[] lookupUserID(String username) {
-            Iterator<String> iterator = userMap.keySet().iterator();
-            while (iterator.hasNext()) {
-                String curID = iterator.next();
-                if (username.equals(userMap.get(curID))) {
-                    return stringToByteArray(curID);
-                }
-            }
+        	if (username != null) {
+	            Iterator<String> iterator = userMap.keySet().iterator();
+	            while (iterator.hasNext()) {
+	                String curID = iterator.next();
+	                if (username.equals(userMap.get(curID))) {
+	                    return stringToByteArray(curID);
+	                }
+	            }
+        	}
             return new byte[0];
         }
 
@@ -706,7 +782,26 @@ public class MatchMakerClientTestUI extends JFrame
             parametersModel.fireTableDataChanged();
         }
 
-        public void createGameFailed(String name, String reason) {
+        public void createGameFailed(String name, int errorCode) {
+        	String reason = null;
+        	if (errorCode == NOT_CONNECTED_LOBBY) {
+        		reason = "Not connected to a lobby";
+        	}
+        	else if (errorCode == INVALID_GAME_PARAMETERS) {
+        		reason = "Invalid game parameters";
+        	}
+        	else if (errorCode == INVALID_GAME_NAME) {
+        		reason = "Invalid game name";
+        	}
+        	else if (errorCode == CONNECTED_GAME) {
+        		reason = "Already connected to a game";
+        	}
+        	else if (errorCode == GAME_EXISTS) {
+        		reason = "Game already exists";
+        	}
+        	else {
+        		reason = "Unknown Error";
+        	}
             receiveServerMessage("LobbyPanel createGameFailed: " + name
                     + " reason " + reason);
         }
@@ -840,6 +935,46 @@ public class MatchMakerClientTestUI extends JFrame
             updateGameParameters(descriptor.getGameParameters());
         }
         
+        public boolean hasGame() {
+        	return GamePanel.this.channel != null;
+        }
+        
+        public byte[] getGameID() {
+        	return descriptor.getGameID();
+        }
+        
+        void sendText(String message) {
+            if (channel != null) {
+            	channel.sendText(message);
+            }
+        }
+
+        void sendPrivateText(String message) {
+        	if (channel != null) {
+        		byte[] userID = lookupUserID(getSelectedUserName());
+        		channel.sendPrivateText(userID, message);
+        	}
+        }
+        
+        private String getSelectedUserName() {
+        	int row = userTable.getSelectedRow();
+        	if (row >= 0) {
+        		return (String) userTableModel.getValueAt(row, 0);
+        	}
+        	return "";
+        }
+        
+        private byte[] lookupUserID(String username) {
+            Iterator<String> iterator = userMap.keySet().iterator();
+            while (iterator.hasNext()) {
+                String curID = iterator.next();
+                if (username.equals(userMap.get(curID))) {
+                    return stringToByteArray(curID);
+                }
+            }
+            return new byte[0];
+        }
+        
         public void resetGame() {
         	GamePanel.this.channel = null;
         	GamePanel.this.descriptor = null;
@@ -848,6 +983,7 @@ public class MatchMakerClientTestUI extends JFrame
         	userTableModel.clear();
         	parametersModel.clear();
         	isPasswordProtected.setSelected(false);
+        	joinGame.setText("Join Game");
         }
 
         public void ready() {
@@ -907,6 +1043,11 @@ public class MatchMakerClientTestUI extends JFrame
 
         public void gameStarted(GameDescriptor game) {
             receiveServerMessage("<Game Room> Game Started " + game.getName());
+        }
+        
+        public void gameCompleted() {
+        	resetGame();
+        	receiveServerMessage("<Game Room> Game Completed");
         }
 
     }

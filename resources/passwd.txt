@@ -5,3 +5,9 @@ guest2  guest2
 guest3  guest3
 guest4  guest4
 guest5  guest5
+bot01   bot01
+bot02   bot02
+bot03   bot03
+bot04   bot04
+bot05   bot05
+bot06   bot06

@@ -69,11 +69,11 @@
 package com.sun.gi.logic;
 
 /**
- * All GLOs must refer to other GLOs through GLOReferences. This allows
- * the persistance mechanisms to work correctly. If a GLO has a normal
- * java reference to another GLO as a field then that second GLO's state
- * becoems part of the state of the first GLO as oppsoed to an
- * independant object in the objectstore.
+ * All {@link GLO}s must refer to other GLOs through GLOReferences in
+ * order for the persistance mechanisms to work correctly.  If a GLO
+ * has a normal Java reference to another GLO as a member, then that
+ * second GLO's state becomes part of the state of the first GLO as
+ * opposed to an independant object in the ObjectStore.
  * 
  * @author Jeff Kesselman
  * @version 1.0
@@ -81,50 +81,43 @@ package com.sun.gi.logic;
 public interface GLOReference<T extends GLO> {
 
     /**
-     * Locks the referenced GLO for write and returns a reference to an
-     * in memory instantiation of it. Multiple get() calls on
-     * GLOReferences that reference the same GLO will only cause one
-     * lock and will all return the same instance.
+     * Locks the referenced {@link GLO} for write and returns a
+     * reference to an in-memory instantiation of it.  Multiple get()
+     * calls on GLOReferences that reference the same GLO will only
+     * cause one lock and all will return the same instance.
      * 
-     * @param task The SimTask context
+     * @param task The {@link SimTask} context
      * 
      * @return the in-memory instance of the GLO
      */
-    public T get(SimTask task);
+    T get(SimTask task);
 
     /**
-     * Returns a task-local copy of the referenced GLO that will not get
-     * stored back to the objectstore. Peek is like get() except that
-     * the object is not write locked. Multiple calls to peek() on
+     * Returns a task-local copy of the referenced {@link GLO}. 
+     * Changes to this local copy will <em>not</em> get stored in the
+     * ObjectStore.  Peek is like get() except that the object is not
+     * write locked.  Multiple calls to peek() on GLOReferences that
+     * reference the same GLO will return the same task-local copy.
+     * 
+     * @param task The SimTask context
+     * 
+     * @return the task-local in memory instance of the GLO
+     */
+    T peek(SimTask task);
+
+    /**
+     * Performs a non-blocking attempts to <code>get</code> the given
+     * GLO.  If the object is not locked, it is locked and returned as
+     * in get().  If the object is already locked, it returns
+     * <code>null</code> immediately .  Multiple calls to attempt() on
      * GLOReferences that reference the same GLO will return the same
      * task-local copy.
      * 
      * @param task The SimTask context
      * 
-     * @return the task-local instance.
+     * @return The in-memory instance of the GLO, or <code>null</code>.
      */
-    public T peek(SimTask task);
-
-    /**
-     * A non-blocking version of get(). If the object is not locked, it
-     * is locked and returned as in get(). If the object is already
-     * locked, it returns null. Multiple calls to attempt() on
-     * GLOReferences that reference the same GLO will return the same
-     * task-local copy.
-     * 
-     * @param task The SimTask context
-     * 
-     * @return The in-memory instance of the GLO, or null.
-     */
-    public T attempt(SimTask task);
-
-    /**
-     * This method makes a copy of an GLOReference that references the
-     * same GLO.
-     * 
-     * @return GLOReference the new GLOReference.
-     */
-    public GLOReference<T> shallowCopy();
+    T attempt(SimTask task);
 
     /**
      * Removes the associated GLO from the objectstore, destroying all
@@ -132,5 +125,5 @@ public interface GLOReference<T extends GLO> {
      * 
      * @param task The SimTask context
      */
-    public void delete(SimTask task);
+    void delete(SimTask task);
 }

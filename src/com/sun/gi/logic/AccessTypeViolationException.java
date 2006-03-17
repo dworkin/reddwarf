@@ -76,8 +76,13 @@ public class AccessTypeViolationException extends SGSError {
 
     private static final long serialVersionUID = 1L;
 
+    public AccessTypeViolationException() {
+        super();
+    }
+
     /**
-     * @param string
+     * @param string a description of the context in which the
+     * exception occurred.
      */
     public AccessTypeViolationException(String string) {
         super(string);

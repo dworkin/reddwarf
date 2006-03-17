@@ -107,13 +107,12 @@ import com.sun.gi.utils.SGSUUID;
 import com.sun.gi.utils.StatisticalUUID;
 
 /**
- * 
  * <p>
  * Title: SGS
  * </p>
  * <p>
  * Description: The Sun Game Server. This is the master app class that
- * gets instantiated. It coordinbates the creation and inter-wiring of
+ * gets instantiated. It coordinates the creation and inter-wiring of
  * all the levels of the game sever that are resident in a single slice.
  * </p>
  */

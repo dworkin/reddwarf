@@ -82,14 +82,14 @@ import com.sun.gi.comm.routing.UserID;
 public interface SimUserListener extends GLO {
 
     /**
-     * This method is the start method of a task queued when a user
-     * joins the game.
+     * The start method of a task queued when a user joins the game.
      * 
      * @param uid The ID of the user joining
-     * @param subject A javax.auth Subject that contains details such as
-     * authorizations
+     *
+     * @param subject A {@link Subject} that contains details such
+     * as authorizations
      */
-    public void userJoined(UserID uid, Subject subject);
+    void userJoined(UserID uid, Subject subject);
 
     /**
      * This method is the start method of a task queued when a user
@@ -97,5 +97,5 @@ public interface SimUserListener extends GLO {
      * 
      * @param uid The ID of the user leaving the game
      */
-    public void userLeft(UserID uid);
+    void userLeft(UserID uid);
 }

@@ -2,7 +2,7 @@
 <GAMEAPP gamename="MatchMaker">    
 	<GLEAPP bootclass="com.sun.gi.apps.mcs.matchmaker.server.MatchMakerBoot" classpathURL="file:MatchMaker.jar" />    	
 	<USERMANAGER serverclass="com.sun.gi.comm.users.server.impl.TCPIPUserManager" reconnect_key_ttl="30">        
-		<PARAMETER tag="host" value="127.0.0.1" />        
+		<PARAMETER tag="host" value="129.148.173.231" />        
 		<PARAMETER tag="port" value="1160" />  
 		<VALIDATOR moduleclass="com.sun.gi.comm.users.validation.impl.FlatFileUserValidator">
 <!--			<PARAMETER tag="password_file_url" value="file:passwd.txt" /> -->

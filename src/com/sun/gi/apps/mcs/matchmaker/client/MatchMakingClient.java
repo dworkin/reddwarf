@@ -1,70 +1,84 @@
 /*
- * Copyright © 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa
- * Clara, California 95054, U.S.A. All rights reserved.
- * 
- * Sun Microsystems, Inc. has intellectual property rights relating to
- * technology embodied in the product that is described in this
- * document. In particular, and without limitation, these intellectual
- * property rights may include one or more of the U.S. patents listed at
- * http://www.sun.com/patents and one or more additional patents or
- * pending patent applications in the U.S. and in other countries.
- * 
- * U.S. Government Rights - Commercial software. Government users are
- * subject to the Sun Microsystems, Inc. standard license agreement and
- * applicable provisions of the FAR and its supplements.
- * 
- * Use is subject to license terms.
- * 
- * This distribution may include materials developed by third parties.
- * 
- * Sun, Sun Microsystems, the Sun logo and Java are trademarks or
- * registered trademarks of Sun Microsystems, Inc. in the U.S. and other
- * countries.
- * 
- * This product is covered and controlled by U.S. Export Control laws
- * and may be subject to the export or import laws in other countries.
- * Nuclear, missile, chemical biological weapons or nuclear maritime end
- * uses or end users, whether direct or indirect, are strictly
- * prohibited. Export or reexport to countries subject to U.S. embargo
- * or to entities identified on U.S. export exclusion lists, including,
- * but not limited to, the denied persons and specially designated
- * nationals lists is strictly prohibited.
- * 
- * Copyright © 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa
- * Clara, California 95054, Etats-Unis. Tous droits réservés.
- * 
- * Sun Microsystems, Inc. détient les droits de propriété intellectuels
- * relatifs à la technologie incorporée dans le produit qui est décrit
- * dans ce document. En particulier, et ce sans limitation, ces droits
- * de propriété intellectuelle peuvent inclure un ou plus des brevets
- * américains listés à l'adresse http://www.sun.com/patents et un ou les
- * brevets supplémentaires ou les applications de brevet en attente aux
- * Etats - Unis et dans les autres pays.
- * 
- * L'utilisation est soumise aux termes de la Licence.
- * 
- * Cette distribution peut comprendre des composants développés par des
- * tierces parties.
- * 
- * Sun, Sun Microsystems, le logo Sun et Java sont des marques de
- * fabrique ou des marques déposées de Sun Microsystems, Inc. aux
- * Etats-Unis et dans d'autres pays.
- * 
- * Ce produit est soumis à la législation américaine en matière de
- * contrôle des exportations et peut être soumis à la règlementation en
- * vigueur dans d'autres pays dans le domaine des exportations et
- * importations. Les utilisations, ou utilisateurs finaux, pour des
- * armes nucléaires,des missiles, des armes biologiques et chimiques ou
- * du nucléaire maritime, directement ou indirectement, sont strictement
- * interdites. Les exportations ou réexportations vers les pays sous
- * embargo américain, ou vers des entités figurant sur les listes
- * d'exclusion d'exportation américaines, y compris, mais de manière non
- * exhaustive, la liste de personnes qui font objet d'un ordre de ne pas
- * participer, d'une façon directe ou indirecte, aux exportations des
- * produits ou des services qui sont régis par la législation américaine
- * en matière de contrôle des exportations et la liste de ressortissants
- * spécifiquement désignés, sont rigoureusement interdites.
- */
+ Copyright (c) 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa
+ Clara, California 95054, U.S.A. All rights reserved.
+ 
+ Sun Microsystems, Inc. has intellectual property rights relating to
+ technology embodied in the product that is described in this document.
+ In particular, and without limitation, these intellectual property rights
+ may include one or more of the U.S. patents listed at
+ http://www.sun.com/patents and one or more additional patents or pending
+ patent applications in the U.S. and in other countries.
+ 
+ U.S. Government Rights - Commercial software. Government users are subject
+ to the Sun Microsystems, Inc. standard license agreement and applicable
+ provisions of the FAR and its supplements.
+ 
+ This distribution may include materials developed by third parties.
+ 
+ Sun, Sun Microsystems, the Sun logo and Java are trademarks or registered
+ trademarks of Sun Microsystems, Inc. in the U.S. and other countries.
+ 
+ UNIX is a registered trademark in the U.S. and other countries, exclusively
+ licensed through X/Open Company, Ltd.
+ 
+ Products covered by and information contained in this service manual are
+ controlled by U.S. Export Control laws and may be subject to the export
+ or import laws in other countries. Nuclear, missile, chemical biological
+ weapons or nuclear maritime end uses or end users, whether direct or
+ indirect, are strictly prohibited. Export or reexport to countries subject
+ to U.S. embargo or to entities identified on U.S. export exclusion lists,
+ including, but not limited to, the denied persons and specially designated
+ nationals lists is strictly prohibited.
+ 
+ DOCUMENTATION IS PROVIDED "AS IS" AND ALL EXPRESS OR IMPLIED CONDITIONS,
+ REPRESENTATIONS AND WARRANTIES, INCLUDING ANY IMPLIED WARRANTY OF
+ MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE OR NON-INFRINGEMENT,
+ ARE DISCLAIMED, EXCEPT TO THE EXTENT THAT SUCH DISCLAIMERS ARE HELD TO BE
+ LEGALLY INVALID.
+ 
+ Copyright © 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
+ California 95054, Etats-Unis. Tous droits réservés.
+ 
+ Sun Microsystems, Inc. détient les droits de propriété intellectuels
+ relatifs à la technologie incorporée dans le produit qui est décrit dans
+ ce document. En particulier, et ce sans limitation, ces droits de
+ propriété intellectuelle peuvent inclure un ou plus des brevets américains
+ listés à l'adresse http://www.sun.com/patents et un ou les brevets
+ supplémentaires ou les applications de brevet en attente aux Etats -
+ Unis et dans les autres pays.
+ 
+ Cette distribution peut comprendre des composants développés par des
+ tierces parties.
+ 
+ Sun, Sun Microsystems, le logo Sun et Java sont des marques de fabrique
+ ou des marques déposées de Sun Microsystems, Inc. aux Etats-Unis et dans
+ d'autres pays.
+ 
+ UNIX est une marque déposée aux Etats-Unis et dans d'autres pays et
+ licenciée exlusivement par X/Open Company, Ltd.
+ 
+ see above Les produits qui font l'objet de ce manuel d'entretien et les
+ informations qu'il contient sont regis par la legislation americaine en
+ matiere de controle des exportations et peuvent etre soumis au droit
+ d'autres pays dans le domaine des exportations et importations.
+ Les utilisations finales, ou utilisateurs finaux, pour des armes
+ nucleaires, des missiles, des armes biologiques et chimiques ou du
+ nucleaire maritime, directement ou indirectement, sont strictement
+ interdites. Les exportations ou reexportations vers des pays sous embargo
+ des Etats-Unis, ou vers des entites figurant sur les listes d'exclusion
+ d'exportation americaines, y compris, mais de maniere non exclusive, la
+ liste de personnes qui font objet d'un ordre de ne pas participer, d'une
+ facon directe ou indirecte, aux exportations des produits ou des services
+ qui sont regi par la legislation americaine en matiere de controle des
+ exportations et la liste de ressortissants specifiquement designes, sont
+ rigoureusement interdites.
+ 
+ LA DOCUMENTATION EST FOURNIE "EN L'ETAT" ET TOUTES AUTRES CONDITIONS,
+ DECLARATIONS ET GARANTIES EXPRESSES OU TACITES SONT FORMELLEMENT EXCLUES,
+ DANS LA MESURE AUTORISEE PAR LA LOI APPLICABLE, Y COMPRIS NOTAMMENT TOUTE
+ GARANTIE IMPLICITE RELATIVE A LA QUALITE MARCHANDE, A L'APTITUDE A UNE
+ UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
+*/
 
 package com.sun.gi.apps.mcs.matchmaker.client;
 
@@ -75,15 +89,13 @@ import java.util.List;
 
 import javax.security.auth.callback.Callback;
 
-import static com.sun.gi.apps.mcs.matchmaker.server.CommandProtocol.*;
+import static com.sun.gi.apps.mcs.matchmaker.common.CommandProtocol.*;
 
-import com.sun.gi.apps.mcs.matchmaker.server.CommandProtocol;
+import com.sun.gi.apps.mcs.matchmaker.common.CommandProtocol;
 import com.sun.gi.comm.users.client.ClientChannel;
 import com.sun.gi.comm.users.client.ClientChannelListener;
 import com.sun.gi.comm.users.client.ClientConnectionManager;
 import com.sun.gi.comm.users.client.ClientConnectionManagerListener;
-import com.sun.gi.utils.SGSUUID;
-import com.sun.gi.utils.StatisticalUUID;
 
 /**
  * <p>
@@ -136,15 +148,23 @@ public class MatchMakingClient
         manager.sendToServer(protocol.assembleCommand(list), true);
     }
 
-    private SGSUUID createUUID(byte[] bytes) {
-        SGSUUID id = null;
-        try {
-            id = new StatisticalUUID(bytes);
-        } catch (InstantiationException ie) {
-            // ignore
+    /**
+     * Takes the given byte array, and copies it to a byte array
+     * with the first element containing the length of the array
+     * (as a byte).
+     * 
+     * @param bytes			a collections of bytes representing an UUID
+     * 
+     * @return the same byte array prefixed by the length
+     */
+    private byte[] createUUID(byte[] bytes) {
+    	byte[] uuid = new byte[bytes.length + 1];
+        uuid[0] = (byte) bytes.length;
+        for (int i = 1; i < uuid.length; i++) {
+        	uuid[i] = bytes[i - 1];
         }
-
-        return id;
+    	
+    	return uuid;
     }
     
     /**
@@ -204,7 +224,14 @@ public class MatchMakingClient
     public void leaveGame() {
     	sendCommand(protocol.createCommandList(LEAVE_GAME));
     }
-
+    
+    public void completeGame(byte[] gameID) {
+    	List list = protocol.createCommandList(GAME_COMPLETED);
+    	list.add(createUUID(gameID));
+    	
+    	sendCommand(list);
+    }
+    
     /**
      * Attempts to find the user name of a currently connected user with
      * the given ID.
@@ -342,7 +369,7 @@ public class MatchMakingClient
         } else if (command == CREATE_GAME_FAILED) {
             createGameFailed(data);
         } else if (command == ERROR) {
-        	listener.error(protocol.readString(data));
+        	listener.error(protocol.readUnsignedByte(data));
         } else if (command == LEFT_LOBBY) {
         	listener.leftLobby();
         } else if (command == LEFT_GAME) {
@@ -355,7 +382,6 @@ public class MatchMakingClient
      * {@inheritDoc}
      */
     public void channelClosed() {
-
     }
 
     /**
@@ -366,13 +392,13 @@ public class MatchMakingClient
      * lobby detail.
      */
     private void listFolderResponse(ByteBuffer data) {
-        SGSUUID folderID = protocol.readUUID(data);
+        byte[] folderID = protocol.readUUIDAsBytes(data);
         int numFolders = data.getInt();
         FolderDescriptor[] subfolders = new FolderDescriptor[numFolders];
         for (int i = 0; i < numFolders; i++) {
             String curFolderName = protocol.readString(data);
             String curFolderDescription = protocol.readString(data);
-            SGSUUID curFolderID = protocol.readUUID(data);
+            byte[] curFolderID = protocol.readUUIDAsBytes(data);
             subfolders[i] = new FolderDescriptor(curFolderID, curFolderName,
                     curFolderDescription);
         }
@@ -382,7 +408,7 @@ public class MatchMakingClient
             String curLobbyName = protocol.readString(data);
             String curLobbyChannelName = protocol.readString(data);
             String curLobbyDescription = protocol.readString(data);
-            SGSUUID curLobbyID = protocol.readUUID(data);
+            byte[] curLobbyID = protocol.readUUIDAsBytes(data);
             int numUsers = data.getInt();
             int maxUsers = data.getInt();
             boolean isPasswordProtected = protocol.readBoolean(data);
@@ -396,17 +422,16 @@ public class MatchMakingClient
 
     private void lookupUserNameResponse(ByteBuffer data) {
         String userName = protocol.readString(data);
-        SGSUUID userID = protocol.readUUID(data);
+        byte[] userID = protocol.readUUIDAsBytes(data);
 
-        listener.foundUserName(userName, userID.toByteArray());
+        listener.foundUserName(userName, userID);
     }
 
     private void lookupUserIDResponse(ByteBuffer data) {
         String userName = protocol.readString(data);
-        SGSUUID userID = protocol.readUUID(data);
+        byte[] userID = protocol.readUUIDAsBytes(data);
 
-        listener.foundUserID(userName, userID != null ? userID.toByteArray()
-                : null);
+        listener.foundUserID(userName, userID);
     }
 
     private void gameParametersResponse(ByteBuffer data) {
@@ -426,14 +451,14 @@ public class MatchMakingClient
 
     private void createGameFailed(ByteBuffer data) {
         String game = protocol.readString(data);
-        String desc = protocol.readString(data);
+        int errorCode = protocol.readUnsignedByte(data);
         String lobbyName = protocol.readString(data);
         if (lobbyName == null) {
             return;
         }
         LobbyChannel lobby = lobbyMap.get(lobbyName);
         if (lobby != null) {
-            lobby.createGameFailed(game, desc);
+            lobby.createGameFailed(game, errorCode);
         }
     }
 }

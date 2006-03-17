@@ -1,70 +1,84 @@
 /*
- * Copyright © 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa
- * Clara, California 95054, U.S.A. All rights reserved.
- * 
- * Sun Microsystems, Inc. has intellectual property rights relating to
- * technology embodied in the product that is described in this
- * document. In particular, and without limitation, these intellectual
- * property rights may include one or more of the U.S. patents listed at
- * http://www.sun.com/patents and one or more additional patents or
- * pending patent applications in the U.S. and in other countries.
- * 
- * U.S. Government Rights - Commercial software. Government users are
- * subject to the Sun Microsystems, Inc. standard license agreement and
- * applicable provisions of the FAR and its supplements.
- * 
- * Use is subject to license terms.
- * 
- * This distribution may include materials developed by third parties.
- * 
- * Sun, Sun Microsystems, the Sun logo and Java are trademarks or
- * registered trademarks of Sun Microsystems, Inc. in the U.S. and other
- * countries.
- * 
- * This product is covered and controlled by U.S. Export Control laws
- * and may be subject to the export or import laws in other countries.
- * Nuclear, missile, chemical biological weapons or nuclear maritime end
- * uses or end users, whether direct or indirect, are strictly
- * prohibited. Export or reexport to countries subject to U.S. embargo
- * or to entities identified on U.S. export exclusion lists, including,
- * but not limited to, the denied persons and specially designated
- * nationals lists is strictly prohibited.
- * 
- * Copyright © 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa
- * Clara, California 95054, Etats-Unis. Tous droits réservés.
- * 
- * Sun Microsystems, Inc. détient les droits de propriété intellectuels
- * relatifs à la technologie incorporée dans le produit qui est décrit
- * dans ce document. En particulier, et ce sans limitation, ces droits
- * de propriété intellectuelle peuvent inclure un ou plus des brevets
- * américains listés à l'adresse http://www.sun.com/patents et un ou les
- * brevets supplémentaires ou les applications de brevet en attente aux
- * Etats - Unis et dans les autres pays.
- * 
- * L'utilisation est soumise aux termes de la Licence.
- * 
- * Cette distribution peut comprendre des composants développés par des
- * tierces parties.
- * 
- * Sun, Sun Microsystems, le logo Sun et Java sont des marques de
- * fabrique ou des marques déposées de Sun Microsystems, Inc. aux
- * Etats-Unis et dans d'autres pays.
- * 
- * Ce produit est soumis à la législation américaine en matière de
- * contrôle des exportations et peut être soumis à la règlementation en
- * vigueur dans d'autres pays dans le domaine des exportations et
- * importations. Les utilisations, ou utilisateurs finaux, pour des
- * armes nucléaires,des missiles, des armes biologiques et chimiques ou
- * du nucléaire maritime, directement ou indirectement, sont strictement
- * interdites. Les exportations ou réexportations vers les pays sous
- * embargo américain, ou vers des entités figurant sur les listes
- * d'exclusion d'exportation américaines, y compris, mais de manière non
- * exhaustive, la liste de personnes qui font objet d'un ordre de ne pas
- * participer, d'une façon directe ou indirecte, aux exportations des
- * produits ou des services qui sont régis par la législation américaine
- * en matière de contrôle des exportations et la liste de ressortissants
- * spécifiquement désignés, sont rigoureusement interdites.
- */
+ Copyright (c) 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa
+ Clara, California 95054, U.S.A. All rights reserved.
+ 
+ Sun Microsystems, Inc. has intellectual property rights relating to
+ technology embodied in the product that is described in this document.
+ In particular, and without limitation, these intellectual property rights
+ may include one or more of the U.S. patents listed at
+ http://www.sun.com/patents and one or more additional patents or pending
+ patent applications in the U.S. and in other countries.
+ 
+ U.S. Government Rights - Commercial software. Government users are subject
+ to the Sun Microsystems, Inc. standard license agreement and applicable
+ provisions of the FAR and its supplements.
+ 
+ This distribution may include materials developed by third parties.
+ 
+ Sun, Sun Microsystems, the Sun logo and Java are trademarks or registered
+ trademarks of Sun Microsystems, Inc. in the U.S. and other countries.
+ 
+ UNIX is a registered trademark in the U.S. and other countries, exclusively
+ licensed through X/Open Company, Ltd.
+ 
+ Products covered by and information contained in this service manual are
+ controlled by U.S. Export Control laws and may be subject to the export
+ or import laws in other countries. Nuclear, missile, chemical biological
+ weapons or nuclear maritime end uses or end users, whether direct or
+ indirect, are strictly prohibited. Export or reexport to countries subject
+ to U.S. embargo or to entities identified on U.S. export exclusion lists,
+ including, but not limited to, the denied persons and specially designated
+ nationals lists is strictly prohibited.
+ 
+ DOCUMENTATION IS PROVIDED "AS IS" AND ALL EXPRESS OR IMPLIED CONDITIONS,
+ REPRESENTATIONS AND WARRANTIES, INCLUDING ANY IMPLIED WARRANTY OF
+ MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE OR NON-INFRINGEMENT,
+ ARE DISCLAIMED, EXCEPT TO THE EXTENT THAT SUCH DISCLAIMERS ARE HELD TO BE
+ LEGALLY INVALID.
+ 
+ Copyright © 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
+ California 95054, Etats-Unis. Tous droits réservés.
+ 
+ Sun Microsystems, Inc. détient les droits de propriété intellectuels
+ relatifs à la technologie incorporée dans le produit qui est décrit dans
+ ce document. En particulier, et ce sans limitation, ces droits de
+ propriété intellectuelle peuvent inclure un ou plus des brevets américains
+ listés à l'adresse http://www.sun.com/patents et un ou les brevets
+ supplémentaires ou les applications de brevet en attente aux Etats -
+ Unis et dans les autres pays.
+ 
+ Cette distribution peut comprendre des composants développés par des
+ tierces parties.
+ 
+ Sun, Sun Microsystems, le logo Sun et Java sont des marques de fabrique
+ ou des marques déposées de Sun Microsystems, Inc. aux Etats-Unis et dans
+ d'autres pays.
+ 
+ UNIX est une marque déposée aux Etats-Unis et dans d'autres pays et
+ licenciée exlusivement par X/Open Company, Ltd.
+ 
+ see above Les produits qui font l'objet de ce manuel d'entretien et les
+ informations qu'il contient sont regis par la legislation americaine en
+ matiere de controle des exportations et peuvent etre soumis au droit
+ d'autres pays dans le domaine des exportations et importations.
+ Les utilisations finales, ou utilisateurs finaux, pour des armes
+ nucleaires, des missiles, des armes biologiques et chimiques ou du
+ nucleaire maritime, directement ou indirectement, sont strictement
+ interdites. Les exportations ou reexportations vers des pays sous embargo
+ des Etats-Unis, ou vers des entites figurant sur les listes d'exclusion
+ d'exportation americaines, y compris, mais de maniere non exclusive, la
+ liste de personnes qui font objet d'un ordre de ne pas participer, d'une
+ facon directe ou indirecte, aux exportations des produits ou des services
+ qui sont regi par la legislation americaine en matiere de controle des
+ exportations et la liste de ressortissants specifiquement designes, sont
+ rigoureusement interdites.
+ 
+ LA DOCUMENTATION EST FOURNIE "EN L'ETAT" ET TOUTES AUTRES CONDITIONS,
+ DECLARATIONS ET GARANTIES EXPRESSES OU TACITES SONT FORMELLEMENT EXCLUES,
+ DANS LA MESURE AUTORISEE PAR LA LOI APPLICABLE, Y COMPRIS NOTAMMENT TOUTE
+ GARANTIE IMPLICITE RELATIVE A LA QUALITE MARCHANDE, A L'APTITUDE A UNE
+ UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
+*/
 
 package com.sun.gi.apps.mcs.matchmaker.server;
 
@@ -74,14 +88,17 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-import static com.sun.gi.apps.mcs.matchmaker.server.CommandProtocol.*;
+import static com.sun.gi.apps.mcs.matchmaker.common.CommandProtocol.*;
 
+import com.sun.gi.apps.mcs.matchmaker.common.CommandProtocol;
+import com.sun.gi.apps.mcs.matchmaker.common.UnsignedByte;
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.SimUserDataListener;
 import com.sun.gi.utils.SGSUUID;
+import com.sun.gi.utils.StatisticalUUID;
 
 /**
  * <p>
@@ -158,6 +175,8 @@ public class Player implements SimUserDataListener {
         	leaveLobby(task);
         } else if (commandCode == LEAVE_GAME) {
         	leaveGame(task);
+        } else if (commandCode == GAME_COMPLETED) {
+        	gameCompleted(task, data);
         }
         
 
@@ -167,6 +186,32 @@ public class Player implements SimUserDataListener {
             ByteBuffer buff)
     {
 
+    }
+    
+    /**
+     * Once a game is started, it stays around until the GAME_COMPLETED 
+     * command is received from the host.  Once this command is received,
+     * the users are unjoined from the channel (which implicitly closes it).
+     * 
+     * @param task			the SimTask
+     * @param data			the buffer containing the game ID
+     */
+    private void gameCompleted(SimTask task, ByteBuffer data) {
+    	SGSUUID gameID = protocol.readUUID(data);
+        GLOMap<SGSUUID, GLOReference<GameRoom>> gameRoomMap =
+            (GLOMap<SGSUUID, GLOReference<GameRoom>>) task.findGLO(
+                "GameRoomMap").peek(task);
+        GLOReference<GameRoom> gameRef = gameRoomMap.get(gameID);
+        if (gameRef == null) {
+        	sendErrorResponse(task, INVALID_GAME);
+            return;
+        }
+        GameRoom gameRoom = gameRef.get(task);
+        if (!gameRoom.getHost().equals(userID)) {
+        	sendErrorResponse(task, PLAYER_NOT_HOST);
+        	return;
+        }
+        cleanupGame(task, gameRoom);
     }
 
     /**
@@ -220,12 +265,30 @@ public class Player implements SimUserDataListener {
                 
                 sendRetroJoins(task, lobby.getUsers(), PLAYER_ENTERED_LOBBY, cid);
                 
+                // send retro joins for users joining games in the lobby
+                // this must be sent last in order to receive the user names
+                // from the PLAYER_ENTERED_LOBBY retrojoins.
+                for (GLOReference<GameRoom> grRef : lobby.getGameRoomList()) {
+                	GameRoom gr = grRef.peek(task);
+                	for (UserID curUser : gr.getUsers()) {
+                        List joinedGameList = protocol.createCommandList(PLAYER_JOINED_GAME);
+                        joinedGameList.add(curUser);
+                        joinedGameList.add(gr.getGameID());
+                        sendResponse(task, joinedGameList, cid);
+                	}
+                }
+                
             } else { // must have been a game room
-                GLOMap<SGSUUID, GLOReference<GameRoom>> gameRoomMap =
-                    (GLOMap<SGSUUID, GLOReference<GameRoom>>) task.findGLO(
-                        "GameRoomMap").peek(task);
-                GLOReference<GameRoom> gameRef = gameRoomMap.get(cid);
-                if (gameRef != null) {
+            	Lobby lobby = currentLobby.peek(task);
+            	GLOReference<GameRoom> gameRef = null;
+            	for (GLOReference<GameRoom> curGameRef : lobby.getGameRoomList()) {
+            		GameRoom gr = curGameRef.peek(task);
+            		if (gr.getChannelID().equals(cid)) {
+            			gameRef = curGameRef;
+            			break;
+            		}
+            	}
+            	if (gameRef != null) {
                     currentGameRoom = gameRef;
                     GameRoom gameRoom = gameRef.get(task);
                     gameRoom.addUser(uid);
@@ -235,7 +298,6 @@ public class Player implements SimUserDataListener {
                     lobbyList.add(uid);
                     lobbyList.add(gameRoom.getGameID());
 
-                    Lobby lobby = currentLobby.peek(task);
                     sendMulticastResponse(task, lobby.getUsers(), lobbyList,
                             lobby.getChannelID());
 
@@ -309,17 +371,16 @@ public class Player implements SimUserDataListener {
                                                             // from this
                                                             // channel
                 	gameRoom.removeUser(uid);
-                	if (gameRoom.isStarting()) {
-                		currentGameRoom = null;
-                		return;
-                	}
 
                     // if this was the host, kick everyone out and kill
                     // the game
                     if (gameRoom.getHost().equals(uid)) {
-                        for (UserID curPlayer : gameRoom.getUsers()) {
-                            task.leave(curPlayer, gameRoom.getChannelID());
-                        }
+                    	cleanupGame(task, gameRoom);
+                    }
+                    
+                    if (gameRoom.hasStarted()) {
+                    	currentGameRoom = null;
+                    	return;
                     }
 
                     Lobby lobby = gameRoom.getLobby().get(task);
@@ -345,7 +406,6 @@ public class Player implements SimUserDataListener {
                         sendMulticastResponse(task, lobby.getUsers(), list, lobby.getChannelID());
                     }
                     
-                    // currentGameRoom.delete(task);
                     currentGameRoom = null;
                     return;
                 }
@@ -362,7 +422,9 @@ public class Player implements SimUserDataListener {
 	                
 	                if (currentGameRoom != null) {
 	                	GameRoom gr = currentGameRoom.peek(task);
-	                	task.leave(userID, gr.getChannelID());
+	                	if (!gr.hasStarted()) {
+	                		task.leave(userID, gr.getChannelID());
+	                	}
 	                }
                 }
             }
@@ -399,6 +461,22 @@ public class Player implements SimUserDataListener {
     		sendResponse(task, list, cid);
     	}
     	
+    }
+    
+    /**
+     * Unjoins remaining users from the game and removes it
+     * from the game map.
+     * 
+     * @param gameRoom		the GameRoom, should have GET access
+     */
+    private void cleanupGame(SimTask task, GameRoom gameRoom) {
+        for (UserID curUser : gameRoom.getUsers()) {
+        	task.leave(curUser, gameRoom.getChannelID());
+        }
+        GLOMap<SGSUUID, GLOReference<GameRoom>> gameRoomMap =
+            (GLOMap<SGSUUID, GLOReference<GameRoom>>) task.findGLO(
+                "GameRoomMap").get(task);
+        gameRoomMap.remove(gameRoom.getGameID());
     }
 
     /**
@@ -528,16 +606,15 @@ public class Player implements SimUserDataListener {
     }
     
     private void leaveLobby(SimTask task) {
-    	if (currentLobby == null) {
-    		sendErrorResponse(task, "Not connected to a lobby.");
+    	if (!checkLobby(task)) {
+    		return;
     	}
     	Lobby lobby = currentLobby.peek(task);
     	task.leave(userID, lobby.getChannelID());
     }
     
     private void leaveGame(SimTask task) {
-    	if (currentGameRoom == null) {
-    		sendErrorResponse(task, "Not connected to a game.");
+    	if (!checkGameRoom(task)) {
     		return;
     	}
     	GameRoom game = currentGameRoom.peek(task);
@@ -554,7 +631,7 @@ public class Player implements SimUserDataListener {
      */
     private void joinLobby(SimTask task, ByteBuffer data) {
         if (currentLobby != null) {
-            sendErrorResponse(task, "Already connected to a lobby");
+            sendErrorResponse(task, CONNECTED_LOBBY);
             return;
         }
 
@@ -563,74 +640,83 @@ public class Player implements SimUserDataListener {
             (GLOMap<SGSUUID, GLOReference<Lobby>>) task.findGLO(
                 "LobbyMap").peek(task);
         GLOReference<Lobby> lobbyRef = lobbyMap.get(lobbyID);
-        if (lobbyRef != null) {
-            Lobby lobby = lobbyRef.peek(task);
-            if (lobby.getMaxPlayers() > 0 && lobby.getNumPlayers() >= lobby.getMaxPlayers()) {
-                // TODO sten: perhaps in the future spawn a new lobby.
-            	sendErrorResponse(task, "Lobby at max users");
+        if (lobbyRef == null) { 
+        	sendErrorResponse(task, INVALID_LOBBY);
+        }
+        Lobby lobby = lobbyRef.peek(task);
+        if (lobby.getMaxPlayers() > 0 && lobby.getNumPlayers() >= lobby.getMaxPlayers()) {
+        	sendErrorResponse(task, MAX_PLAYERS);
+            return;
+        }
+        if (lobby.isPasswordProtected()) {
+            String password = data.hasRemaining() ? protocol.readString(data) : null;
+            if (password == null || !lobby.getPassword().equals(password)) {
+                sendErrorResponse(task, INCORRECT_PASSWORD);
                 return;
             }
-            if (lobby.isPasswordProtected()) {
-                String password = protocol.readString(data);
-                if (lobby.getPassword().equals(password)) {
-                    task.join(userID, lobby.getChannelID());
-                } else {
-                    sendErrorResponse(task, "password mismatch for lobbyID "
-                            + lobbyID);
-                    return;
-                }
-            } else {
-                task.join(userID, lobby.getChannelID());
-            }
+        } 
+        task.join(userID, lobby.getChannelID());
 
-        } else {
-            sendErrorResponse(task, "lobby not found: " + lobbyID);
-        }
     }
-
+ 
     /**
      * Sends a response of ERROR on the control channel with a message
      * detailing the failure.
      * 
-     * @param message the reason for the error
+     * @param errorCode			the reason for the error
      */
-    private void sendErrorResponse(SimTask task, String message) {
+    private void sendErrorResponse(SimTask task, int errorCode) {
         List list = protocol.createCommandList(ERROR);
-        list.add(message);
+        list.add(new UnsignedByte(errorCode));
         sendResponse(task, list);
     }
 
-    private void startGame(SimTask task) {
+    private boolean checkGameRoom(SimTask task) {
         if (currentGameRoom == null) {
-        	sendErrorResponse(task, "Start failed.  Not connected to a game room.");
-            return;
+        	sendErrorResponse(task, NOT_CONNECTED_GAME);
+        	return false;
         }
+        return true;
+    }
+    
+    private boolean checkLobby(SimTask task) {
         if (currentLobby == null) {
-        	sendErrorResponse(task, "Start failed.  Not connected to a lobby.");
+        	sendErrorResponse(task, NOT_CONNECTED_LOBBY);
+        	return false;
         }
+        return true;
+    }
+    
+    private void startGame(SimTask task) {
+    	if (!checkGameRoom(task)) {
+    		return;
+    	}
+    	if (!checkLobby(task)) {
+    		return;
+    	}
+
         GameRoom gameRoom = currentGameRoom.get(task);
         UserID host = gameRoom.getHost();
         // only the host can start the game.
         if (!host.equals(userID)) {
-            sendErrorResponse(task, "Only the host can start a game");
+            sendErrorResponse(task, PLAYER_NOT_HOST);
             return;
         }
         if (!gameRoom.arePlayersReady()) {
-            sendErrorResponse(task, "Not all players are ready");
+            sendErrorResponse(task, PLAYERS_NOT_READY);
             return;
         }
         Lobby lobby = gameRoom.getLobby().get(task);
         if (lobby.getMinPlayersInGameRoomStart() > 0 && gameRoom.getNumPlayers() < lobby.getMinPlayersInGameRoomStart()) {
-        	sendErrorResponse(task, "Not enough players to start game");
+        	sendErrorResponse(task, LESS_THAN_MIN_PLAYERS);
         	return;
         }
 
         if (lobby.getMaxPlayersInGameRoomStart() > 0 && gameRoom.getNumPlayers() > lobby.getMaxPlayersInGameRoomStart()) {
-        	sendErrorResponse(task, "Too many players to start game");
+        	sendErrorResponse(task, GREATER_THAN_MAX_PLAYERS);
         	return;
         }
         
-        gameRoom.setStarting(true);
         lobby.removeGameRoom(currentGameRoom);
         
         List list = protocol.createCommandList(GAME_STARTED);
@@ -639,12 +725,14 @@ public class Player implements SimUserDataListener {
         // send identical message to both game room and lobby
         sendMulticastResponse(task, gameRoom.getUsers(), list, gameRoom.getChannelID());
         sendMulticastResponse(task, lobby.getUsers(), list, lobby.getChannelID());
+
+        gameRoom.setStarted(true);
         
         // unjoin all game players from the lobby.
         for(UserID curUser : gameRoom.getUsers()) {
         	task.leave(curUser, lobby.getChannelID());
-        	task.leave(curUser, gameRoom.getChannelID());
         }
+        
     }
     
     private void sendStartGameFailed(SimTask task, String reason, ChannelID cid) {
@@ -655,10 +743,9 @@ public class Player implements SimUserDataListener {
     }
 
     private void updatePlayerReadyRequest(SimTask task, ByteBuffer data) {
-        if (currentGameRoom == null) {
-        	sendErrorResponse(task, "Not connected to a game room");
-            return;
-        }
+    	if (!checkGameRoom(task)) {
+    		return;
+    	}
         boolean ready = protocol.readBoolean(data);
         GameRoom gameRoom = currentGameRoom.get(task);
         if (ready) {
@@ -703,7 +790,7 @@ public class Player implements SimUserDataListener {
     private void joinGame(SimTask task, ByteBuffer data) {
         if (currentGameRoom != null) { // can't connect if already
                                         // connected to a game.
-        	sendErrorResponse(task, "Already connected to a game room");
+        	sendErrorResponse(task, CONNECTED_GAME);
             return;
         }
         SGSUUID gameID = protocol.readUUID(data);
@@ -713,21 +800,22 @@ public class Player implements SimUserDataListener {
                 "GameRoomMap").peek(task);
         GLOReference<GameRoom> gameRef = gameRoomMap.get(gameID);
         if (gameRef == null) {
-        	sendErrorResponse(task, "Requested game room does not exist");
+        	sendErrorResponse(task, INVALID_GAME);
             return;
         }
         GameRoom gameRoom = gameRef.peek(task);
         if (gameRoom.isPasswordProtected()) {
-            String password = protocol.readString(data);
-            if (!password.equals(gameRoom.getPassword())) {
-            	sendErrorResponse(task, "Incorrect password for Game");
+            String password = data.hasRemaining() ? protocol.readString(data) : null;
+            if (password == null || !password.equals(gameRoom.getPassword())) {
+            	sendErrorResponse(task, INCORRECT_PASSWORD);
                 return;
             }
         }
         if (gameRoom.getMaxPlayers() > 0 && gameRoom.getNumPlayers() >= gameRoom.getMaxPlayers()) {
-        	sendErrorResponse(task, "Game Room at max players");
+        	sendErrorResponse(task, MAX_PLAYERS);
             return;
         }
+        //System.out.println("joining user to " + gameRoom.getChannelID());
         task.join(userID, gameRoom.getChannelID());
     }
 
@@ -739,23 +827,21 @@ public class Player implements SimUserDataListener {
      * @param task the SimTask
      */
     private void gameParametersRequest(SimTask task) {
+    	if (!checkLobby(task)) {
+    		return;
+    	}
         List list = protocol.createCommandList(GAME_PARAMETERS_RESPONSE);
-        if (currentLobby != null) {
-            Lobby lobby = currentLobby.peek(task);
-            list.add(lobby.getChannelName());
-            Map<String, Object> gameParameters = lobby.getGameParamters();
-            list.add(gameParameters.size());
-            for (String curKey : gameParameters.keySet()) {
-                list.add(curKey);
-                Object value = gameParameters.get(curKey);
-                System.out.println("adding param " + curKey + " value " + value);
-                list.add(protocol.mapType(value));
-                list.add(value);
+        Lobby lobby = currentLobby.peek(task);
+        list.add(lobby.getChannelName());
+        Map<String, Object> gameParameters = lobby.getGameParamters();
+        list.add(gameParameters.size());
+        for (String curKey : gameParameters.keySet()) {
+            list.add(curKey);
+            Object value = gameParameters.get(curKey);
+            //System.out.println("adding param " + curKey + " value " + value);
+            list.add(protocol.mapType(value));
+            list.add(value);
 
-            }
-        } else {
-            sendErrorResponse(task, "Not connected to a lobby");
-            return;
         }
 
         sendResponse(task, list);
@@ -781,8 +867,27 @@ public class Player implements SimUserDataListener {
     private void createGame(SimTask task, ByteBuffer data) {
         String gameName = protocol.readString(data);
         if (currentLobby == null) { // bail out early if not connected.
-            sendGameCreateFailedResponse(task, null, gameName, "Not connected to a lobby");
+            sendGameCreateFailedResponse(task, null, gameName, NOT_CONNECTED_LOBBY);
             return;
+        }
+        Lobby lobby = currentLobby.get(task);
+        if (currentGameRoom != null) {
+            sendGameCreateFailedResponse(task, lobby.getChannelName(), gameName, CONNECTED_GAME);
+            return;
+        }
+        
+        if (!filterGameName(gameName)) {
+            sendGameCreateFailedResponse(task, lobby.getChannelName(), gameName, 
+										INVALID_GAME_NAME);
+            return;
+        }
+        for (GLOReference<GameRoom> grRef : lobby.getGameRoomList()) {
+        	GameRoom gr = grRef.peek(task);
+        	if (gr.getName().equals(gameName)) {
+        		sendGameCreateFailedResponse(task, lobby.getChannelName(), gameName, 
+        									GAME_EXISTS);
+        		return;
+        	}
         }
 
         String description = protocol.readString(data);
@@ -799,22 +904,24 @@ public class Player implements SimUserDataListener {
                     protocol.readParamValue(data));
         }
 
-        Lobby lobby = currentLobby.get(task);
         Map<String, Object> lobbyParameters = lobby.getGameParamters();
 
         // bail out if all of the expected parameters are not present.
         if (!gameParams.keySet().equals(lobbyParameters.keySet())) {
-            sendGameCreateFailedResponse(task, lobby.getChannelName(),
-                    gameName, "Parameters mis-match.");
+            sendGameCreateFailedResponse(task, lobby.getChannelName(), gameName, 
+                    					INVALID_GAME_PARAMETERS);
             return;
         }
 
-        String channelName = lobby.getChannelName() + ":" + gameName;
+        SGSUUID gameID = new StatisticalUUID();
+        
+        String channelName = lobby.getChannelName() + ":" + gameName + uuidToByteString(gameID);
+        //System.out.println("GameChannel: " + channelName);
         ChannelID cid = task.openChannel(channelName);
         task.lock(cid, true); // game access is controled by the server
 
         GLOReference<GameRoom> grRef = task.createGLO(new GameRoom(gameName,
-                description, password, channelName, cid, userID, currentLobby));
+                description, password, channelName, cid, userID, currentLobby, gameID));
         lobby.addGameRoom(grRef);
 
         GameRoom gr = grRef.get(task);
@@ -839,6 +946,40 @@ public class Player implements SimUserDataListener {
         // CREATE_GAME message has been sent.
         task.join(userID, cid);
     }
+    
+    /**
+     * Converts an UUID to a string with all the bytes run together.
+     * 
+     * @param uuid
+     * @return
+     */
+    private String uuidToByteString(SGSUUID uuid) {
+    	StringBuffer buffer = new StringBuffer();
+    	byte[] bytes = uuid.toByteArray();
+    	for (byte b : bytes) {
+    		buffer.append((int) (b & 0xFF));
+    	}
+    	return buffer.toString();
+    }
+    
+    /**
+     * Filters the given name against simple criteria.  In the future this
+     * will be replaced by a pluggable filter. 
+     * 
+     * @param name
+     * @return true if the given name passes the filter
+     */
+    private boolean filterGameName(String name) {
+    	if (name == null || name.length() == 0) {
+    		return false;
+    	}
+    	for (int i = 0; i < name.length(); i++) {
+    		if (!Character.isWhitespace(name.charAt(i))) {
+    			return true;
+    		}
+    	}
+    	return false;
+    }
 
     /**
      * Puts the details of a game room into the given list for
@@ -848,7 +989,7 @@ public class Player implements SimUserDataListener {
      * @param game the game
      */
     private void packGameDescriptor(List list, GameRoom game) {
-        list.add(game.getChannelID());
+        list.add(game.getGameID());
         list.add(game.getName());
         list.add(game.getDescription());
         list.add(game.getChannelName());
@@ -869,11 +1010,11 @@ public class Player implements SimUserDataListener {
     }
 
     private void sendGameCreateFailedResponse(SimTask task,
-            String lobbyChannelName, String gameName, String message) {
+            String lobbyChannelName, String gameName, int errorCode) {
     	
         List list = protocol.createCommandList(CREATE_GAME_FAILED);
         list.add(gameName);
-        list.add(message);
+        list.add(new UnsignedByte(errorCode));
         list.add(lobbyChannelName);
 
         sendResponse(task, list);
