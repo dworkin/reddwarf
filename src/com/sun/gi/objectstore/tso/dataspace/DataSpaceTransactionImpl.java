@@ -138,8 +138,10 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
      * 
      * @param object  A template object used to create the initial
      * serialized image mapped to the ID returned.
-     * @param name Either a name to map to the returned ID, or null
-     * @returns the ID of the stored object or INVALID_ID if the
+     *
+     * @param name Either a name to map to the returned ID, or <code>null</code>
+     *
+     * @return the ID of the stored object or INVALID_ID if the
      * name was already in use at the time the store attempt was made.
      * 
      */
@@ -173,11 +175,12 @@ public class DataSpaceTransactionImpl implements DataSpaceTransaction {
      * returned unless the forget() call is made that ID.
      * 
      * @param objectID  The ID of the object to fetch from the DataSpace
-     * @returns A deserialized copy of the object last written to that ID.
+     *
+     * @return A deserialized copy of the object last written to that ID
+     *
      * @throws NonExistantObjectIDException if the provided ID does not map to
-     * any object currently stored in the DataSpace.
+     * any object currently stored in the DataSpace
      */
-
     public Serializable read(long objectID) throws NonExistantObjectIDException {
         Long id = new Long(objectID);
         if (deletedObjects.contains(objectID)){ // it gone

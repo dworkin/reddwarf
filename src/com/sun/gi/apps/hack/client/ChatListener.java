@@ -119,8 +119,8 @@ public interface ChatListener
     /**
      * Notify the listener when a message has arrived.
      *
-     * @param the name of the sender
-     * @param the messsage itself
+     * @param sender the name of the sender
+     * @param message the messsage itself
      */
     public void messageArrived(UserID sender, String message);
 

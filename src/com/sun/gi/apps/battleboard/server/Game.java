@@ -377,7 +377,7 @@ public class Game implements GLO {
     /**
      * Permits the given player to pass.
      *
-     * @param the player who passes
+     * @param player the player who passes
      */
     protected void handlePass(Player player) {
         StringBuffer buf = new StringBuffer("move-ended ");
@@ -393,7 +393,7 @@ public class Game implements GLO {
      *
      * @param player the player whose turn it is
      *
-     * @tokens the tokens of the command
+     * @param tokens the tokens of the command
      */
     protected void handleMove(Player player, String[] tokens) {
         SimTask task = SimTask.getCurrent();
@@ -496,7 +496,7 @@ public class Game implements GLO {
     /**
      * Handles the situation when a player loses.
      *
-     * @param lowerNick the nickname of the losing player
+     * @param loserNick the nickname of the losing player
      */
     protected void handlePlayerLoss(String loserNick) {
         SimTask task = SimTask.getCurrent();

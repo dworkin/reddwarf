@@ -280,15 +280,15 @@ public abstract class SimTask {
      * 
      * @see PDTimer
      * 
-     * @param delay Amount of time in seconds between heartbeat
+     * @param delay Length of time, in seconds, between heartbeat
      * callbacks
      *
-     * @param repeat Should this repeat every delay-seconds or is it a
-     * one-shot?
+     * @param repeat If <code>true</code> then repeat every delay-seconds,
+     * if <code>false</code> then only do this once
      *
-     * @param ref The SimTimerListener to star the Task with.
+     * @param ref The SimTimerListener with which to start the Task.
      * 
-     * @return an id for this timer event registration
+     * @return an ID for this timer event registration
      */
     public abstract long registerTimerEvent(long delay, boolean repeat,
 	    GLOReference<? extends SimTimerListener> ref);
@@ -306,18 +306,18 @@ public abstract class SimTask {
      * @param access What kind of access (get/peek/attempt) the Task
      * will use to acquire the GLO referred to by ref
      *
-     * @param delay Amount of time in seconds between heartbeat
+     * @param delay Length of time in seconds between heartbeat
      * callbacks
      *
-     * @param repeat Should this repeat every delay-seconds or is it a
-     * one-shot?
+     * @param repeat If <code>true</code> then repeat every delay-seconds,
+     * if <code>false</code> then only do this once
      *
-     * @param ref The SimTimerListener to star the Task with.
+     * @param reference The SimTimerListener with which to start the Task.
      * 
-     * @return an id for this timer event registration
+     * @return an ID for this timer event registration
      */
-    public abstract long registerTimerEvent(ACCESS_TYPE access, long l,
-	    boolean b, GLOReference<? extends SimTimerListener> reference);
+    public abstract long registerTimerEvent(ACCESS_TYPE access, long delay,
+	    boolean repeat, GLOReference<? extends SimTimerListener> reference);
 
     /**
      * Returns the GLOReference from which the given GLO was obtained
@@ -358,9 +358,6 @@ public abstract class SimTask {
      * This is a convenience method, the same as queueTask above but
      * without an Access type parameter.  GET access is assumed if you
      * use this call.
-     * 
-     * @see queueTask(ACCESS_TYPE accessType, GLOReference<?  extends
-     * GLO> target, Method method, Object[] parameters);
      * 
      * @param target The Task's initial GLO
      *
