@@ -82,8 +82,13 @@
 
 package com.sun.gi.apps.battleboard.server;
 
-import static com.sun.gi.apps.battleboard.BattleBoard.PositionValue.CITY;
-
+import com.sun.gi.apps.battleboard.BattleBoard;
+import com.sun.gi.comm.routing.ChannelID;
+import com.sun.gi.comm.routing.UserID;
+import com.sun.gi.gloutils.SequenceGLO;
+import com.sun.gi.logic.GLO;
+import com.sun.gi.logic.GLOReference;
+import com.sun.gi.logic.SimTask;
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.HashMap;
@@ -93,17 +98,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import com.sun.gi.apps.battleboard.BattleBoard;
-import com.sun.gi.comm.routing.ChannelID;
-import com.sun.gi.comm.routing.UserID;
-import com.sun.gi.gloutils.SequenceGLO;
-import com.sun.gi.logic.GLO;
-import com.sun.gi.logic.GLOReference;
-import com.sun.gi.logic.SimTask;
+import static com.sun.gi.apps.battleboard.BattleBoard.PositionValue.CITY;
 
 /**
  * Game encapuslates the server-side management of a BattleBoard game.
+ * <p>
  * Once created with a set of players, a Game will create a new
  * communication channel and begin the BattleBoard protocol with the
  * players. Once the game has started, the Game reacts to player
@@ -120,35 +119,72 @@ public class Game implements GLO {
 
     private final String gameName;
     private final ChannelID channel;
+
+    /*
+     * Players who are attached to the game and are still engaged
+     * (they have cities, and have not withdrawn).
+     */
     private final LinkedList<GLOReference<Player>> players;
+
+    /*
+     * Players who have quit or lost the game may linger as
+     * spectators, if they wish.
+     */
     private final LinkedList<GLOReference<Player>> spectators;
+
+    /*
+     * The current board of each player.
+     */
     private final Map<String, GLOReference<Board>> playerBoards;
+
+    /*
+     * A mapping from the player name to the GLOReference for the
+     * GLO that contains their "history" (how many games they've
+     * won/lost).
+     */
     private final Map<String, GLOReference<PlayerHistory>> nameToHistory;
 
+    /*
+     * The currentPlayer is the player currently making a move.
+     */
+
     private GLOReference<Player> currentPlayerRef;
+
+    /*
+     * The number of users currently attached to the game.  This is
+     * used to decide when there are enough players to actually begin
+     * play.
+     */
     private int userCount;
 
     /*
      * The default BattleBoard game is defined in the {@link
      * BattleBoard} class.
      * 
-     * For the sake of simplicity, this implementation does not support
-     * different numbers of players and/or different board sizes. These
-     * would not be hard to change; just change the call to createBoard
-     * to create a board of the desired size and number of cities.
+     * For the sake of simplicity, this implementation does not
+     * include any way of specifying a different number of players
+     * and/or different board sizes.  These would not be hard to
+     * change; just change the call to createBoard to create a board
+     * of the desired size and number of cities.
      */
-
     private final int boardWidth = BattleBoard.DEFAULT_BOARD_WIDTH;
     private final int boardHeight = BattleBoard.DEFAULT_BOARD_WIDTH;
     private final int numCities = BattleBoard.DEFAULT_NUM_CITIES;
 
     /**
-     * Creates a new BattleBoard game object for a set of players.
+     * Creates a new BattleBoard game object for a given set of
+     * players.
      * 
      * @param newPlayers a set of GLOReferences to Player GLOs
      */
     protected Game(Set<GLOReference<Player>> newPlayers) {
 
+	/*
+	 * Error checking:  without players, we can't proceed.  Note
+	 * that this impl permits a single player game, which is
+	 * permitted by the spec (but isn't usually very much fun to
+	 * play).
+	 */ 
         if (newPlayers == null) {
             throw new NullPointerException("newPlayers is null");
         }
@@ -163,18 +199,40 @@ public class Game implements GLO {
 
         log.info("New game channel is `" + gameName + "'");
 
+	/*
+	 * Create the list of players from the set of players, and
+	 * shuffle the order of the list to get the turn order.
+	 */
         players = new LinkedList<GLOReference<Player>>(newPlayers);
         Collections.shuffle(players);
 
+	/*
+	 * Create the spectators list (initially empty).
+	 */ 
         spectators = new LinkedList<GLOReference<Player>>();
 
+	/*
+	 * Create the map between player names and their boards, and
+	 * then populate it with freshly-created boards for each
+	 * player.
+	 *
+	 * Note that to keep this implementation simple, the server
+	 * chooses the board of each player:  the player has no
+	 * control over where his or her cities are placed.
+	 */
         playerBoards = new HashMap<String, GLOReference<Board>>();
         for (GLOReference<Player> playerRef : players) {
-            Player p = playerRef.get(task);
-            playerBoards.put(p.getPlayerName(), createBoard(p.getPlayerName()));
+            Player player = playerRef.get(task);
+            playerBoards.put(player.getPlayerName(),
+		    createBoard(player.getPlayerName()));
         }
 
+	/*
+	 * Create a map from player name to GLOReferences to the GLOs
+	 * that store the history of each player to cache this info.
+	 */
         nameToHistory = new HashMap<String, GLOReference<PlayerHistory>>();
+
         channel = task.openChannel(gameName);
         task.lock(channel, true);
 
@@ -191,18 +249,29 @@ public class Game implements GLO {
     public static GLOReference<Game> create(Set<GLOReference<Player>> players) {
         SimTask task = SimTask.getCurrent();
 	GLOReference<Game> gameRef = task.createGLO(new Game(players));
-	ChannelID chan = gameRef.get(task).channel;
+	ChannelID channel = gameRef.get(task).channel;
 
-	// Join all the players onto this game's channel
+	/*
+	 * Join all of the players onto this game's channel.
+	 */
         for (GLOReference<Player> playerRef : players) {
             Player player = playerRef.get(task);
             player.gameStarted(gameRef);
-            task.join(player.getUID(), chan);
+            task.join(player.getUID(), channel);
         }
 
 	return gameRef;
     }
 
+    /**
+     * Creates a board for the given playerName.  <p>
+     *
+     * The city locations are chosen randomly.
+     *
+     * @param playerName the name of the player
+     *
+     * @return a {@link GLOReference} for the new {@link Board}.
+     */
     protected GLOReference<Board> createBoard(String playerName) {
         SimTask task = SimTask.getCurrent();
 
@@ -216,14 +285,26 @@ public class Game implements GLO {
         return ref;
     }
 
+    /**
+     * Sends the "ok" message, which indicates to a player that he or
+     * she has been chosen to join a game, to all of the players.
+     */
     protected void sendJoinOK() {
         SimTask task = SimTask.getCurrent();
         for (GLOReference<Player> ref : players) {
-            Player p = ref.peek(task);
-            sendJoinOK(p);
+            Player player = ref.peek(task);
+            sendJoinOK(player);
         }
     }
 
+    /**
+     * Sends the "ok" message to a particular player. <p>
+     *
+     * This message includes the list of city locations for the player,
+     * in order to display them on his/her screen.
+     *
+     * @param player the player to whom to send the message
+     */
     protected void sendJoinOK(Player player) {
         SimTask task = SimTask.getCurrent();
 
@@ -253,48 +334,24 @@ public class Game implements GLO {
                 byteBuffer.asReadOnlyBuffer(), true);
     }
 
+    /**
+     * Broadcasts the turn order to all of the players.
+     */
     protected void sendTurnOrder() {
         SimTask task = SimTask.getCurrent();
         StringBuffer buf = new StringBuffer("turn-order ");
 
         for (GLOReference<Player> playerRef : players) {
-            Player p = playerRef.peek(task);
-            buf.append(" " + p.getPlayerName());
+            Player player = playerRef.peek(task);
+            buf.append(" " + player.getPlayerName());
         }
 
         broadcast(buf);
     }
 
-    protected void broadcast(StringBuffer buf) {
-        SimTask task = SimTask.getCurrent();
-        UserID[] uids = new UserID[players.size() + spectators.size()];
-
-        int i = 0;
-        for (GLOReference<Player> ref : players) {
-            Player p = ref.peek(task);
-            uids[i++] = p.getUID();
-        }
-
-        for (GLOReference<Player> ref : spectators) {
-            Player p = ref.peek(task);
-            uids[i++] = p.getUID();
-        }
-
-        ByteBuffer byteBuffer = ByteBuffer.wrap(buf.toString().getBytes());
-        byteBuffer.position(byteBuffer.limit());
-
-        log.finest("Game: Broadcasting " + byteBuffer.position() +
-		" bytes on " + channel);
-
-        task.sendData(channel, uids, byteBuffer.asReadOnlyBuffer(), true);
-    }
-
-    protected void sendMoveStarted(Player player) {
-        StringBuffer buf = new StringBuffer("move-started " +
-		player.getPlayerName());
-        broadcast(buf);
-    }
-
+    /**
+     * Starts the next move.
+     */
     protected void startNextMove() {
         SimTask task = SimTask.getCurrent();
         log.finest("Running Game.startNextMove");
@@ -305,6 +362,23 @@ public class Game implements GLO {
         sendMoveStarted(player);
     }
 
+    /**
+     * Informs all of the players that it is the turn of the given
+     * player.
+     *
+     * @param player the player whose move is starting
+     */
+    protected void sendMoveStarted(Player player) {
+        StringBuffer buf = new StringBuffer("move-started " +
+		player.getPlayerName());
+        broadcast(buf);
+    }
+
+    /**
+     * Permits the given player to pass.
+     *
+     * @param the player who passes
+     */
     protected void handlePass(Player player) {
         StringBuffer buf = new StringBuffer("move-ended ");
         buf.append(player.getPlayerName());
@@ -314,6 +388,13 @@ public class Game implements GLO {
         startNextMove();
     }
 
+    /**
+     * Handles the logic of one move.
+     *
+     * @param player the player whose turn it is
+     *
+     * @tokens the tokens of the command
+     */
     protected void handleMove(Player player, String[] tokens) {
         SimTask task = SimTask.getCurrent();
 
@@ -412,6 +493,11 @@ public class Game implements GLO {
         startNextMove();
     }
 
+    /**
+     * Handles the situation when a player loses.
+     *
+     * @param lowerNick the nickname of the losing player
+     */
     protected void handlePlayerLoss(String loserNick) {
         SimTask task = SimTask.getCurrent();
 
@@ -444,6 +530,13 @@ public class Game implements GLO {
         log.fine(loserNick + " summary: " + history.toString());
     }
 
+    /**
+     * Handles the response from a move.
+     *
+     * @param playerRef a GLOReference for the player
+     *
+     * @param tokens the components of the response
+     */
     protected void handleResponse(GLOReference<Player> playerRef,
             String[] tokens) {
 
@@ -466,7 +559,37 @@ public class Game implements GLO {
         }
     }
 
-    // Class-specific utilities.
+    // Class-specific utility methods.
+
+    /**
+     * Broadcasts a given message to all of the players.
+     *
+     * @param buf the message to broadcast
+     */
+    private void broadcast(StringBuffer buf) {
+        SimTask task = SimTask.getCurrent();
+        UserID[] uids = new UserID[players.size() + spectators.size()];
+
+        int i = 0;
+        for (GLOReference<Player> ref : players) {
+            Player player = ref.peek(task);
+            uids[i++] = player.getUID();
+        }
+
+        for (GLOReference<Player> ref : spectators) {
+            Player player = ref.peek(task);
+            uids[i++] = player.getUID();
+        }
+
+        ByteBuffer byteBuffer = ByteBuffer.wrap(buf.toString().getBytes());
+        byteBuffer.position(byteBuffer.limit());
+
+        log.finest("Game: Broadcasting " + byteBuffer.position() +
+		" bytes on " + channel);
+
+        task.sendData(channel, uids, byteBuffer.asReadOnlyBuffer(), true);
+    }
+
 
     /**
      * Adds a new PlayerHistory GLOReference to the set of histories
@@ -486,6 +609,10 @@ public class Game implements GLO {
 
     /**
      * Handle data that was sent directly to the server.
+     *
+     * @param uid the UserID of the sender
+     *
+     * @param data the buffer of data received
      */
     public void userDataReceived(UserID uid, ByteBuffer data) {
         log.finest("Game: Direct data from user " + uid);
@@ -513,8 +640,12 @@ public class Game implements GLO {
     // Channel Join/Leave methods
 
     /**
-     * Wait until we get joinedChannel from all our
-     * players before starting the game.
+     * Waits until we get joinedChannel from all our players before
+     * starting the game.
+     *
+     * @param cid the ChannelID
+     *
+     * @param uid the UserID of the sender
      */
     public void joinedChannel(ChannelID cid, UserID uid) {
         log.finer("Game: User " + uid + " joined channel " + cid);

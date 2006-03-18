@@ -93,10 +93,8 @@ import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.SimUserListener;
 
 /**
- * The BattleBoard server.
+ * The {@link SimBoot} class of the BattleBoard server application. 
  * <p>
- * 
- * There's not much to this class:
  */
 public class BattleBoardServer
         implements SimBoot<BattleBoardServer>, SimUserListener {
@@ -132,15 +130,15 @@ public class BattleBoardServer
         log.info("Booting BattleBoard Server as appID " + task.getAppID());
 
         /*
-         * firstBoot is true if and only if this is the first time the
-         * boot method has been called for this app on this system (or
-         * if evidence that the app has already been started has been
-         * removed -- for example if someone removes all the data
-         * associated with this app from the ObjectStore). Therefore
-         * when firstBoot is true, we do all the initialization.
+	 * firstBoot is true if and only if this is the first time the
+	 * boot method has been called for this app on this system (or
+	 * if evidence that the app has already been started has been
+	 * removed -- for example if someone removes all the data
+	 * associated with this app from the ObjectStore).  Therefore
+	 * when firstBoot is true, we do all the initialization.
          * 
-         * For this app, initialization is very simple: all we need to
-         * do is to create the matchmaker.
+	 * For this app, server, initialization is very simple:  all
+	 * we need to do is to create the matchmaker.
          */
 
         if (firstBoot) {
@@ -148,8 +146,8 @@ public class BattleBoardServer
         }
 
         /*
-         * Register this object as the handler for login and disconnect
-         * events for all users on this app.
+	 * Register this object as the handler for login and
+	 * disconnect events for all users of this app.
          */
 
         task.addUserListener(thisGLO);
@@ -157,6 +155,7 @@ public class BattleBoardServer
 	/*
 	 * Let the Matchmaker open its channel.
 	 */
+
 	Matchmaker.get().boot();
     }
 

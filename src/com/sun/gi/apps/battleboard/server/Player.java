@@ -82,17 +82,15 @@
 
 package com.sun.gi.apps.battleboard.server;
 
-import java.nio.ByteBuffer;
-import java.util.logging.Logger;
-import java.util.regex.Pattern;
-
-import javax.security.auth.Subject;
-
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.SimUserDataListener;
+import java.nio.ByteBuffer;
+import java.util.logging.Logger;
+import java.util.regex.Pattern;
+import javax.security.auth.Subject;
 
 /**
  * A server-side BattleBoard Player holds basic data (such as username),

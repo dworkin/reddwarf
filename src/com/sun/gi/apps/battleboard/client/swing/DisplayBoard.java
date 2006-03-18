@@ -115,6 +115,7 @@ public class DisplayBoard extends JPanel implements BoardListener
     private static final int GRIDSIZE = 16;
     private int GRIDXOFFSET = 0;
     private static final int GRIDYOFFSET = 23;
+    /*
     private static final Color BGCOLOR = new Color(60, 50, 50);
     private static final Color NAMECOLOR = new Color(255, 255, 255);
     private static final Color VACANTCOLOR = new Color(70, 70, 70);
@@ -123,6 +124,17 @@ public class DisplayBoard extends JPanel implements BoardListener
     private static final Color NEARCOLOR = new Color(180, 180, 0);
     private static final Color MISSCOLOR = new Color(60, 50, 50);
     private static final Color HITCOLOR = new Color(255, 0, 0);
+    private static final Color DONECOLOR = new Color(60, 60, 60);
+    */
+
+    private static final Color BGCOLOR = Color.WHITE;
+    private static final Color NAMECOLOR = Color.BLACK;
+    private static final Color VACANTCOLOR = Color.LIGHT_GRAY;
+    private static final Color CITYCOLOR = Color.BLUE;
+    private static final Color UNKNOWNCOLOR = Color.WHITE;
+    private static final Color MISSCOLOR = Color.YELLOW;
+    private static final Color NEARCOLOR = Color.GREEN;
+    private static final Color HITCOLOR = Color.RED;
     private static final Color DONECOLOR = new Color(60, 60, 60);
     
     private static final Font TITLEFONT = new Font("Sans-serif",

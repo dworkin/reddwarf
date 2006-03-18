@@ -82,39 +82,36 @@
 
 package com.sun.gi.apps.battleboard.server;
 
+import com.sun.gi.comm.routing.ChannelID;
+import com.sun.gi.comm.routing.UserID;
+import com.sun.gi.logic.GLO;
+import com.sun.gi.logic.GLOReference;
+import com.sun.gi.logic.SimTask;
 import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.sun.gi.comm.routing.ChannelID;
-import com.sun.gi.comm.routing.UserID;
-import com.sun.gi.logic.GLO;
-import com.sun.gi.logic.GLOReference;
-import com.sun.gi.logic.SimTask;
-
 /**
- * Matchmaker is responsible for collecting Players together until there
- * are enough to start a new Game.
- * <p>
+ * Matchmaker is responsible for collecting Players together until
+ * there are enough to start a new Game.  <p>
  * 
  * This very basic implementation starts a new game as soon as
- * <code>PLAYERS_PER_GAME</code> players have arrived. More
+ * <code>PLAYERS_PER_GAME</code> players have arrived.  More
  * sophisticated implementations would allow players to specify
  * constraints on the games (for example, if there are other players
  * that prefer to play together, or if players are ranked and want to
- * play against players of roughly equal skill, etc) and the Matchmaker
- * would attempt to satisfy those constraints when placing players into
- * Games.
- * <p>
+ * play against players of roughly equal skill, etc) and the
+ * Matchmaker would attempt to satisfy those constraints when placing
+ * players into Games.  <p>
  * 
- * Users specify what playerName they wish to use. In this example,
+ * Users specify what playerName they wish to use.  In this example,
  * there is no persistant binding between a user and a playerName; a
  * user can use as many different playerNames as he or she wishes, and
- * different users can use the same playerName. The only restriction is
- * that all of the playerNames joined into a particular game must be
- * unique. XXX: DJE: is that correct?
+ * different users can use the same playerName.  The only restriction
+ * is that all of the playerNames joined into a particular game must
+ * be unique.  XXX:  DJE:  is that correct?
  */
 public class Matchmaker implements GLO {
 
@@ -303,14 +300,6 @@ public class Matchmaker implements GLO {
          * partition the set of players into games. This has the
          * possible advantage of releasing the lock on this player,
          * which we otherwise continue to hold.
-         */
-
-        /*
-         * XXX: DJE: I removed the whole "check if it's more than
-         * PLAYERS_PER_GAME" logic because that never seems to happen
-         * and I thought it was impossible anyway... Can it happen that
-         * waitingPlayers can be updated by another thread at the same
-         * time? (if so, then we have more synching to do!)
          */
 
 	log.finer("Matchmaker after join has " +
