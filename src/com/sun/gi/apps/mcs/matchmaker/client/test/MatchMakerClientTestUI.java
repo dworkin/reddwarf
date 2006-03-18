@@ -243,6 +243,8 @@ public class MatchMakerClientTestUI extends JFrame
         buttonPanel.add(readyButton);
         buttonPanel.add(startGameButton);
         buttonPanel.add(endGameButton);
+        
+        incomingText = new JTextArea(3, 40);
 
         JSplitPane rightPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
         rightPane.setDividerLocation(250);
@@ -278,8 +280,6 @@ public class MatchMakerClientTestUI extends JFrame
                 }
             }
         });
-
-        incomingText = new JTextArea(3, 40);
 
         JPanel chatPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         chatPanel.add(chatField);
@@ -575,41 +575,9 @@ public class MatchMakerClientTestUI extends JFrame
 
     }
 
-    private byte[] stringToByteArray(String str) {
-        StringTokenizer tokenizer = new StringTokenizer(str, " ");
-        byte[] array = new byte[tokenizer.countTokens()];
-        int index = 0;
-        while (tokenizer.hasMoreTokens()) {
-            array[index] = Byte.parseByte(tokenizer.nextToken());
-            index++;
-        }
-        return array;
-    }
+    private class LobbyPanel extends ChannelRoomPanel implements ILobbyChannelListener {
 
-    /**
-     * Convert a byte array to a String by stringing the contents
-     * together. Makes for easy hashing.
-     * 
-     * @param array
-     * @return
-     */
-    private String byteArrayToString(byte[] array) {
-        StringBuffer buffer = new StringBuffer();
-        for (int i = 0; i < array.length; i++) {
-            buffer.append(array[i] + " ");
-        }
-        return buffer.toString();
-    }
-
-    private class LobbyPanel extends JPanel implements ILobbyChannelListener {
-
-        private JLabel lobbyName;
-        private JLabel lobbyDescription;
-        private JLabel numUserLabel;
-        private JCheckBox isPasswordProtected;
         private ILobbyChannel channel;
-        private int numUsers = 0;
-        private int maxUsers = 0;
         private DefaultListModel userListModel;
         private JList userList;
         private JList gameList;
@@ -617,26 +585,11 @@ public class MatchMakerClientTestUI extends JFrame
         private GameParametersTableModel parametersModel;
         private HashMap<String, Object> gameParameters;
 
-        private HashMap<String, String> userMap;
-
         HashMap<String, GameDescriptor> gameMap;
 
         LobbyPanel() {
-            super(new BorderLayout());
-
-            userMap = new HashMap<String, String>();
+        	super("Lobby", incomingText);
             gameMap = new HashMap<String, GameDescriptor>();
-
-            JPanel topPanel = new JPanel();
-            topPanel.add(new JLabel("Current Lobby:"));
-            topPanel.add(lobbyName = new JLabel());
-            topPanel.add(lobbyDescription = new JLabel());
-
-            JPanel centerPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-            centerPanel.add(numUserLabel = new JLabel("Users: 0/?"));
-            centerPanel.add(isPasswordProtected = new JCheckBox(
-                    "Password Protected"));
-            isPasswordProtected.setEnabled(false);
 
             int listHeight = 150;
             JTable gameParametersTable = new JTable(
@@ -670,8 +623,6 @@ public class MatchMakerClientTestUI extends JFrame
             bottomPanel.add(gameListPanel, BorderLayout.CENTER);
             bottomPanel.add(gameParametersPanel, BorderLayout.EAST);
 
-            add(topPanel, BorderLayout.NORTH);
-            add(centerPanel, BorderLayout.CENTER);
             add(bottomPanel, BorderLayout.SOUTH);
         }
 
@@ -683,25 +634,16 @@ public class MatchMakerClientTestUI extends JFrame
             LobbyPanel.this.channel = channel;
             channel.setListener(LobbyPanel.this);
             LobbyDescriptor lobby = lobbyMap.get(channel.getName());
-            lobbyName.setText(lobby.getName());
-            lobbyDescription.setText(lobby.getDescription());
-            isPasswordProtected.setSelected(lobby.isPasswordProtected());
-            maxUsers = lobby.getMaxUsers();
-            updateNumUsers();
+            setDetails(lobby.getName(), lobby.getDescription(), lobby.isPasswordProtected(), 
+            		lobby.getMaxUsers());
             channel.requestGameParameters();
         }
         
         void resetLobby() {
+        	super.reset();
         	LobbyPanel.this.channel = null;
-        	lobbyName.setText("");
-        	lobbyDescription.setText("");
-        	isPasswordProtected.setSelected(false);
-        	numUsers = 0;
-        	maxUsers = 0;
-        	updateNumUsers();
         	gameListModel.removeAllElements();
         	userListModel.removeAllElements();
-        	userMap.clear();
         	gameMap.clear();
         	parametersModel.clear();
         
@@ -727,49 +669,20 @@ public class MatchMakerClientTestUI extends JFrame
         	}
         }
 
-        private byte[] lookupUserID(String username) {
-        	if (username != null) {
-	            Iterator<String> iterator = userMap.keySet().iterator();
-	            while (iterator.hasNext()) {
-	                String curID = iterator.next();
-	                if (username.equals(userMap.get(curID))) {
-	                    return stringToByteArray(curID);
-	                }
-	            }
-        	}
-            return new byte[0];
-        }
-
-        private void updateNumUsers() {
-            numUserLabel.setText("Users: " + numUsers + "/" + maxUsers);
-        }
-        
         private void removeGame(GameDescriptor game) {
         	gameMap.remove(game.getChannelName());
         	gameListModel.removeElement(game);
         }
         
         public void playerEntered(byte[] player, String name) {
-            receiveServerMessage(name + " Entered Lobby " + lobbyName.getText());
-            userMap.put(byteArrayToString(player), name);
-            numUsers++;
-            updateNumUsers();
+        	super.playerEntered(player, name);
+
             userListModel.addElement(name);
         }
 
         public void playerLeft(byte[] player) {
-            numUsers--;
-            updateNumUsers();
-            String name = userMap.remove(byteArrayToString(player));
-            receiveServerMessage(name + " Left Lobby " + lobbyName.getText());
+            String name = removePlayer(player);
             userListModel.removeElement(name);
-        }
-
-        public void receiveText(byte[] from, String text, boolean wasPrivate) {
-            String userName = userMap.get(byteArrayToString(from));
-            incomingText.setText(incomingText.getText() + "<Lobby> " + userName
-                    + "" + (wasPrivate ? " (privately)" : "") + ": " + text
-                    + "\n");
         }
 
         public void receivedGameParameters(HashMap<String, Object> parameters) {
@@ -814,7 +727,7 @@ public class MatchMakerClientTestUI extends JFrame
 
         public void playerJoinedGame(byte[] gameID, byte[] player) {
             receiveServerMessage("<Lobby> "
-                    + userMap.get(byteArrayToString(player)) + " Joined Game ");
+                    + getUserName(player) + " Joined Game ");
         }
         
         public void gameStarted(GameDescriptor game) {
@@ -869,12 +782,8 @@ public class MatchMakerClientTestUI extends JFrame
         }
     }
 
-    private class GamePanel extends JPanel implements IGameChannelListener {
+    private class GamePanel extends ChannelRoomPanel implements IGameChannelListener {
 
-        private JLabel gameName;
-        private JLabel gameDescription;
-        private JLabel numUserLabel;
-        private JCheckBox isPasswordProtected;
         private IGameChannel channel;
         private GameDescriptor descriptor;
         private HashMap<String, String> userMap;
@@ -883,20 +792,7 @@ public class MatchMakerClientTestUI extends JFrame
         private JTable userTable;
 
         GamePanel() {
-            super(new BorderLayout());
-
-            userMap = new HashMap<String, String>();
-
-            JPanel topPanel = new JPanel();
-            topPanel.add(new JLabel("Current Game:"));
-            topPanel.add(gameName = new JLabel());
-            topPanel.add(gameDescription = new JLabel());
-
-            JPanel centerPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-            centerPanel.add(numUserLabel = new JLabel("Users: 0/?"));
-            centerPanel.add(isPasswordProtected = new JCheckBox(
-                    "Password Protected"));
-            isPasswordProtected.setEnabled(false);
+        	super("Game Room", incomingText);
 
             int listHeight = 100;
             JTable gameParametersTable = new JTable(
@@ -921,8 +817,6 @@ public class MatchMakerClientTestUI extends JFrame
             bottomPanel.add(userListPanel, BorderLayout.WEST);
             bottomPanel.add(gameParametersPanel, BorderLayout.EAST);
 
-            add(topPanel, BorderLayout.NORTH);
-            add(centerPanel, BorderLayout.CENTER);
             add(bottomPanel, BorderLayout.SOUTH);
         }
 
@@ -930,9 +824,9 @@ public class MatchMakerClientTestUI extends JFrame
             GamePanel.this.channel = channel;
             GamePanel.this.descriptor = descriptor;
             channel.setListener(GamePanel.this);
-            gameName.setText(descriptor.getName() + ", "
-                    + descriptor.getDescription());
             updateGameParameters(descriptor.getGameParameters());
+            setDetails(descriptor.getName(), descriptor.getDescription(), 
+            		descriptor.isPasswordProtected(), 0);
         }
         
         public boolean hasGame() {
@@ -964,25 +858,13 @@ public class MatchMakerClientTestUI extends JFrame
         	return "";
         }
         
-        private byte[] lookupUserID(String username) {
-            Iterator<String> iterator = userMap.keySet().iterator();
-            while (iterator.hasNext()) {
-                String curID = iterator.next();
-                if (username.equals(userMap.get(curID))) {
-                    return stringToByteArray(curID);
-                }
-            }
-            return new byte[0];
-        }
         
         public void resetGame() {
+        	super.reset();
         	GamePanel.this.channel = null;
         	GamePanel.this.descriptor = null;
-        	gameName.setText("");
-        	userMap.clear();
         	userTableModel.clear();
         	parametersModel.clear();
-        	isPasswordProtected.setSelected(false);
         	joinGame.setText("Join Game");
         }
 
@@ -1008,29 +890,17 @@ public class MatchMakerClientTestUI extends JFrame
         }
 
         public void playerEntered(byte[] player, String name) {
-            receiveServerMessage("<Game Room> " + name + " Entered Game "
-                    + gameName.getText());
-            userMap.put(byteArrayToString(player), name);
+        	super.playerEntered(player, name);
             userTableModel.addUser(name);
         }
 
         public void playerLeft(byte[] player) {
-            String name = userMap.remove(byteArrayToString(player));
+        	String name = removePlayer(player);
             userTableModel.removeUser(name);
-            receiveServerMessage("<Game Room> " + name + " Left Game "
-                    + gameName.getText());
-        }
-
-        public void receiveText(byte[] from, String text, boolean wasPrivate) {
-            String userName = userMap.get(byteArrayToString(from));
-            incomingText.setText(incomingText.getText() + "<Game Room> "
-                    + userName + "" + (wasPrivate ? " (privately)" : "") + ": "
-                    + text + "\n");
-
         }
 
         public void playerReady(byte[] player, boolean ready) {
-            String userName = userMap.get(byteArrayToString(player));
+            String userName = getUserName(player);
             receiveServerMessage("<Game Room> " + userName + " is "
                     + (ready ? "" : "not ") + "ready");
             userTableModel.updateReady(userName, ready);
