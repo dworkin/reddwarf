@@ -80,50 +80,51 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-/**
- * <p>Title: RoomObject.java</p>
- * <p>Description: </p>
- *
- * @author Jeff Kesselman
- * @version 1.0
- */
 package com.sun.gi.apps.swordworld;
 
 import com.sun.gi.logic.GLO;
 
 /**
- * This Game Logic Class is used to create Game Logic Objects that
- * rerpesent items in the Room.  Currently only one tem is created
- * on startup by SwordWorldBoot-- a shiney sword.  (Hence the
- * name of the demo.)
- * <p>Title: RoomObject.java</p>
- * <p>Description: </p>
- * <p>Company: Sun Microsystems, Inc</p>
+ * Implements Game Logic Objects that represent items in the Room. 
+ * Currently only one item is created on startup by SwordWorldBoot-- a
+ * bright, shiny new sword.  (Hence the name of the demo.)
+ *
  * @author Jeff Kesselman
+ *
  * @version 1.0
  */
 public class RoomObject implements GLO {
-	//This is a string describing the object
-	private String description;
-	
-	/**
-	 * @param string
-	 */
-	public RoomObject(String string) {
-		description = string;
-	}
+    /**
+     * All GLOs should define a <code>serialVersionUID</code> because
+     * they are serialized.  This turns off version checking so we can
+     * change the class and still load old data that might already be
+     * in the ObjectStore.
+     */
+    private static final long serialVersionUID = 1L;
 
-	/**
-	 * This method is called by the Room GLO in order to assist
-	 * it in putting together a list of room contents.
-	 * @return The item's description
-	 */
-	public String getDescription() {
-		// TODO Auto-generated method stub
-		return description;
-	}
+    /**
+     * The description of the item.
+     */
+    private String description;
+    
+    /**
+     * Creates a RoomObject with the given description.
+     *
+     * @param description a description of the object
+     */
+    public RoomObject(String description) {
+	    this.description = description;
+    }
 
-	
-	
-	
+    /**
+     * Returns the description of the item. <p>
+     *
+     * Used by the {@link Room} GLO in order to assist
+     * it in putting together a list of room contents.
+     *
+     * @return The description of the item
+     */
+    public String getDescription() {
+	return description;
+    }
 }

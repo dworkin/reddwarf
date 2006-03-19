@@ -85,40 +85,54 @@ package com.sun.gi.apps.swordworld;
 import java.util.ArrayList;
 
 /**
- * 
+ * Utility class containing string utilities used by the {@link
+ * Player} object to break up the input string from the client into
+ * tokens.
  *
- * <p>Title: StringUtils.java</p>
- * <p>Description: </p>
- * <p>  This is a class  that holds some string parsing utilities
- * that are used by the Player object to break up the input string from the
- * client into understandable words.
- * <p>Company: Sun Microsystems, Inc</p>
- * @author Jeff Kesselman
- * @version 1.0
+ * @author Jeff Kesselman @version 1.0
  */
 public abstract class StringUtils {
 
+    /**
+     * Breaks up a string into sub-strings delimited by the given
+     * delimiter string.  Ignores any instances of the delimiter at
+     * the start and end of the string.
+     *
+     * @param str The string to break up
+     *
+     * @param delim The string to be used as a delimiter (most
+     * commonly " ")
+     *
+     * @return the list of sub-strings
+     */
     public static String[] explode(String str, String delim) {
         return explode(str, delim, true);
     }
 
     /**
-     * This class breaks a strign up into sub-strings seperated by the
-     * passed in delimiter.  If trim is true then it takes any delimiters 
-     * off the start and end of the string before breaking it up.
+     * Breaks up a string into sub-strings delimited by the given
+     * delimiter string.  If <code>trim</code> is true then it also
+     * trims any instances of the delimiter off the start and end of
+     * the string before breaking it.
+     *
      * @param str The string to break up
-     * @param delim The string to be used as a delimiter (most commonly " ")
-     * @param trim Whether to remove elading and trailing delimeters or not
+     *
+     * @param delim The string to be used as a delimiter (most
+     * commonly " ")
+     *
+     * @param trim if <code>true</code>, remove remove leading and
+     * trailing instances of the delimeter
+     *
      * @return the list of sub-strings
      */
     public static String[] explode(String str, String delim, boolean trim) {
         ArrayList<String> plist = new ArrayList<String>();
         if (str.indexOf(delim) == -1){
-        	return new String[]{str};
+	    return new String[] { str };
         }
         while (str.length() > 0) {
             int delimpos = str.indexOf(delim);
-            
+
             String leftString = str.substring(0, delimpos);
             if (leftString.length() > 0) {
                 if (trim) {
@@ -130,45 +144,5 @@ public abstract class StringUtils {
         }
         String[] retarray = new String[plist.size()];
         return plist.toArray(retarray);
-    }
-
-    public static String bytesToHex(byte[] bytes, int start, int length) {
-        StringBuffer buff = new StringBuffer();
-        for (int i = 0; i < length; i++) {
-            buff.append(byteToHex(bytes[i + start]));
-        }
-        return buff.toString();
-    }
-
-    public static String bytesToHex(byte[] bytes) {
-        return bytesToHex(bytes, 0, bytes.length);
-    }
-
-    private static String[] hexDigits = { "A", "B", "C", "D", "E", "F" };
-
-    public static String byteToHex(byte b) {
-        return halfByteToHex((byte) (b >> 4)) + halfByteToHex((byte) (b & 0xF));
-    }
-
-    private static String halfByteToHex(byte b) {
-        b &= (byte) 0xF;
-        if (b < 10)
-            return String.valueOf((int) b);
-        return hexDigits[b - 10];
-    }
-
-    public static String bytesToQuads(byte[] bytes) {
-        StringBuffer buff = new StringBuffer();
-        for (int i = 0; i < bytes.length; i++) {
-            buff.append(String.valueOf((int) (bytes[i])));
-            if (i + 1 < bytes.length) {
-                buff.append(":");
-            }
-        }
-        return buff.toString();
-    }
-
-    public static String bytesToHex(byte[] from, int i) {
-        return bytesToHex(from, i, from.length - i);
     }
 }

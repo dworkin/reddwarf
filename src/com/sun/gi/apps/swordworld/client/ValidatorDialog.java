@@ -92,7 +92,6 @@ import java.awt.event.ActionListener;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.ChoiceCallback;
 import javax.security.auth.callback.ConfirmationCallback;
@@ -109,34 +108,38 @@ import javax.swing.JPasswordField;
 import javax.swing.JTextField;
 
 /**
- * This class provides a Swing GUI for server validation fulfillment.
+ * A Swing GUI for server validation fulfillment.  <p>
+ *
  * When connecting to a server application via a UserManager, the
  * UserManager will attempt to validate the user based on the
  * applications validation settings as specified in its deployment
- * descriptor. In the case of the CommTest application, a name and a
- * password are required.
+ * descriptor.  In the case of the SwordWorld application, a name and
+ * a password are required.
  * 
  */
 public class ValidatorDialog extends JDialog {
 
     private static final long serialVersionUID = 1L;
 
-    // The array of javax.security.auth.callbacks.CallBacks
+    // The array of javax.security.auth.callbacks.Callbacks
     Callback[] callbacks;
 
     // an array of UI components that parallel callbacks[] in size and order.
     List<Component> dataFields = new ArrayList<Component>();
 
     /**
-     * Constructs a new ValidatorDialog. The dialog iterates through the
-     * CallBack array and displays the appropriate UI based on the type
-     * of CallBack. In the case of CommTest, the CallBacks are of type
-     * NameCallBack and PasswordCallBack. This causes both a "username"
-     * textfield, and a "password" input field to be rendered on the
-     * dialog.
+     * Creates a new ValidatorDialog for the given frame and
+     * callbacks.  <p>
+     *
+     * The dialog iterates through the Callback array and displays the
+     * appropriate UI based on the type of Callback.  In the case of
+     * CommTest, the Callbacks are of type NameCallback and
+     * PasswordCallback.  This causes both a "username" textfield, and
+     * a "password" input field to be rendered on the dialog.
      * 
      * @param parent the dialog's parent frame
-     * @param cbs an array of CallBacks
+     *
+     * @param cbs an array of Callbacks
      */
     public ValidatorDialog(Frame parent, Callback[] cbs) {
         super(parent, "Validation Information Required", true);
@@ -148,8 +151,10 @@ public class ValidatorDialog extends JDialog {
         JButton validateButton = new JButton("CONTINUE");
         c.add(validateButton, BorderLayout.SOUTH);
 
-        // when pressed, set the data from the UI components to the
-        // matching CallBacks.
+	/*
+	 * when pressed, set the data from the UI components to the
+	 * matching Callbacks.
+	 */
         validateButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                 transcribeToCallbacks();
@@ -158,11 +163,13 @@ public class ValidatorDialog extends JDialog {
             }
         });
 
-        // Iterate through the javax.security.auth.callback.CallBacks
-        // and render the appropriate UI accordingly.
-        // For each CallBack, the matching UI Component is stored in
-        // the dataFields array. The order is important, as they will
-        // be retrieved along side their matching CallBack.
+	/*
+	 * Iterate through the javax.security.auth.callback.Callbacks
+	 * and render the appropriate UI accordingly.  For each
+	 * Callback, the matching UI Component is stored in the
+	 * dataFields array.  The order is important, as they will be
+	 * retrieved along side their matching Callback.
+	 */
         for (Callback cb : cbs) {
             if (cb instanceof ChoiceCallback) {
                 ChoiceCallback ccb = (ChoiceCallback) cb;
@@ -199,7 +206,6 @@ public class ValidatorDialog extends JDialog {
             } else if (cb instanceof TextOutputCallback) {
                 TextOutputCallback tcb = (TextOutputCallback) cb;
                 validationPanel.add(new JLabel(tcb.getMessage()));
-
             }
         }
         pack();
@@ -207,10 +213,9 @@ public class ValidatorDialog extends JDialog {
     }
 
     /**
-     * Called when the validation button is pressed. It iterates through
-     * the array of CallBacks and takes the data from the matching UI
-     * component and sets it in the CallBack.
-     * 
+     * Called when the validation button is pressed.  It iterates
+     * through the array of Callbacks and takes the data from the
+     * matching UI component and sets it in the Callback.
      */
     protected void transcribeToCallbacks() {
         Iterator iter = dataFields.iterator();
@@ -241,6 +246,5 @@ public class ValidatorDialog extends JDialog {
                 // no response required
             }
         }
-
     }
 }
