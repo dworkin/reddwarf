@@ -82,8 +82,9 @@
 
 package com.sun.gi.apps.jeffboard;
 
-import java.io.DataInputStream;
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -118,12 +119,13 @@ public class StringExploder {
 
     public static void main(String[] args) {
         String input = "";
-        DataInputStream instrm = new DataInputStream(System.in);
+        BufferedReader inStream = new BufferedReader(
+		    new InputStreamReader(System.in));
         while (!input.equals("quit")) {
             System.out.print("String to explode: ");
             String[] output;
             try {
-                output = StringExploder.explode(instrm.readLine());
+                output = StringExploder.explode(inStream.readLine());
                 if (output == null) {
                     System.err.println("No return values");
                 } else {
@@ -132,11 +134,8 @@ public class StringExploder {
                     }
                 }
             } catch (IOException e) {
-
                 e.printStackTrace();
             }
-
         }
-
     }
 }
