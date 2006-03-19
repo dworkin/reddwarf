@@ -203,16 +203,6 @@ public class Player implements SimUserDataListener {
         SimTask task = SimTask.getCurrent();
 
         String gloKey = gloKeyForUID(uid);
-
-        // check that the player doesn't already exist
-        /*
-         * GLOReference<Player> playerRef = getRef(uid);
-	 * if (playerRef != null) {
-	 *  // XXX delete it? update it with this uid?
-	 *  // kick the new guy off? kick the old guy?
-	 * }
-         */
-
         String userName = subject.getPrincipals().iterator().next().getName();
         Player player = new Player(userName, uid);
 

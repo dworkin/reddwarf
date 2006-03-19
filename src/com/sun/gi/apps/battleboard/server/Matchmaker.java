@@ -111,7 +111,7 @@ import java.util.logging.Logger;
  * user can use as many different playerNames as he or she wishes, and
  * different users can use the same playerName.  The only restriction
  * is that all of the playerNames joined into a particular game must
- * be unique.  XXX:  DJE:  is that correct?
+ * be unique.
  */
 public class Matchmaker implements GLO {
 
@@ -145,7 +145,6 @@ public class Matchmaker implements GLO {
          * matchmaker, and it does so with a mutex (or "GET-lock" held).
          * But better safe than sorry...
          */
-
         GLOReference<Matchmaker> ref = task.findGLO(MATCHMAKER_GLO_NAME);
         if (ref != null) {
             log.severe("matchmaker GLO already exists");
@@ -160,14 +159,11 @@ public class Matchmaker implements GLO {
          * terribly wrong), so this is purely defensive against errors
          * elsewhere.
          */
-
         if (ref == null) {
             ref = task.findGLO(MATCHMAKER_GLO_NAME);
             if (ref == null) {
                 log.severe("matchmaker createGLO failed");
                 throw new RuntimeException("matchmaker createGLO failed");
-            } else {
-                log.severe("matchmaker GLO creation race");
             }
         }
 
@@ -254,19 +250,12 @@ public class Matchmaker implements GLO {
 
 	log.finer("Matchmaker before join has " +
 	    waitingPlayers.size() + " waiting");
-        /*
-         * XXX: DJE: this is confusing: can we not have two users with
-         * the same playerName WAITING, but there could be two users
-         * using the same playerName but in two different games? I'm not
-         * sure I like that.
-         */
 
         /*
          * Before adding this user under the given playerName, check
          * that the playerName is not already in use. If so, then reject
          * the join.
          */
-
         SimTask task = SimTask.getCurrent();
         for (GLOReference<Player> ref : waitingPlayers) {
             Player peekedPlayer = ref.peek(task);
@@ -282,12 +271,8 @@ public class Matchmaker implements GLO {
          * name of that player to playerName, and add the playerRef to
          * the set of waiting players.
          */
-
         GLOReference<Player> playerRef = Player.getRef(uid);
-
-	log.finer("Matchmaker about to get Player object for " + playerName);
         Player player = playerRef.get(task);
-	log.finer("Matchmaker got Player object for " + playerName);
 
         player.setPlayerName(playerName);
         waitingPlayers.add(playerRef);
@@ -301,7 +286,6 @@ public class Matchmaker implements GLO {
          * possible advantage of releasing the lock on this player,
          * which we otherwise continue to hold.
          */
-
 	log.finer("Matchmaker after join has " +
 	    waitingPlayers.size() + " waiting");
 
