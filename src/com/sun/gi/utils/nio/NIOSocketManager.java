@@ -130,7 +130,7 @@ public class NIOSocketManager implements Runnable {
 	new ArrayList<SelectableChannel>();
 
     public NIOSocketManager() throws IOException {
-        this(128 * 1024,  // tcp buffer size in bytes
+        this(512 * 1024,  // tcp buffer size in bytes
               64 * 1024); // udp buffer size in bytes
     }
 
