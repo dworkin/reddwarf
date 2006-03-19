@@ -483,8 +483,8 @@ public class BattleBoardPlayer implements ClientChannelListener {
 
             if ((x < 0) || (x >= myBoard.getWidth()) || (y < 0)
                     || (y >= myBoard.getHeight())) {
-                log.warning("impossible board position " + "(" + x + ", " + y
-                        + ")");
+                log.warning("impossible board position " + "(" + x + ", " +
+			y + ")");
                 return GameState.END_MOVE;
             }
 
@@ -492,8 +492,8 @@ public class BattleBoardPlayer implements ClientChannelListener {
 
             log.fine(bombedPlayer + " bombed (" + x + ", " + y
                     + ") with outcome " + outcome);
-            display.message(currPlayer + " bombed " + bombedPlayer + " at " + x
-                    + "," + y + " with outcome " + outcome);
+            display.message(currPlayer + " bombed " + bombedPlayer + " at " +
+		    x + "," + y + " with outcome " + outcome);
 
             if ("HIT".equals(outcome) || "LOSS".equals(outcome)) {
                 board.update(x, y, BattleBoard.PositionValue.HIT);
@@ -508,7 +508,8 @@ public class BattleBoardPlayer implements ClientChannelListener {
                         display.message("Better luck next time.");
                         lost = true;
                     } else {
-                        display.message(bombedPlayer + " lost their last city.");
+                        display.message(bombedPlayer +
+				" lost their last city.");
                     }
                 } else {
                     if (bombedPlayer.equals(myName)) {

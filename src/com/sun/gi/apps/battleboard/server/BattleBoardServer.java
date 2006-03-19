@@ -106,16 +106,15 @@ public class BattleBoardServer
     // SimBoot methods
 
     /**
-     * Boots the BattleBoard application.
-     * <p>
+     * Boots the BattleBoard application.  <p>
      * 
-     * Invoked by the SGS stack when BattleBoard is booted. If
+     * Invoked by the SGS stack when BattleBoard is booted.  If
      * <code>firstBoot</code> is true, this call represents the first
-     * time that this method has been called for this application across
-     * all stacks for the current instance of the app server. When this
-     * is true, additional intialization may be necessary. Otherwise,
-     * this app has been booted already and is simply being brought up
-     * in a new stack.
+     * time that this method has been called for this application
+     * across all stacks for the current instance of the app server. 
+     * When this is true, additional intialization may be necessary. 
+     * Otherwise, this app has been booted already and is simply being
+     * brought up in a new stack.
      * 
      * @param thisGLO a GLOReference to this server itself
      * 

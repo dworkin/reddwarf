@@ -590,7 +590,6 @@ public class Game implements GLO {
         task.sendData(channel, uids, byteBuffer.asReadOnlyBuffer(), true);
     }
 
-
     /**
      * Adds a new PlayerHistory GLOReference to the set of histories
      * associated with this game.
@@ -676,8 +675,7 @@ public class Game implements GLO {
     }
 
     /**
-     * XXX: When a player leaves unexpectedly, we should treat it as a
-     * "withdraw" command, when we implement withdraw.
+     * {@inheritDoc}
      */
     public void leftChannel(ChannelID cid, UserID uid) {
         log.finer("Game: User " + uid + " left channel " + cid);

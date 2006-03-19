@@ -104,15 +104,13 @@ public class Messages extends JPanel {
         int hgt = getHeight();
         g.fillRect(0, 0, wid, hgt);
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
-                           RenderingHints.VALUE_ANTIALIAS_ON);
+		RenderingHints.VALUE_ANTIALIAS_ON);
         g.setColor(BGCOLOR);
-        g.fillRoundRect(3, 3, wid-6, hgt-20, 16, 16);
+        g.fillRoundRect(3, 3, wid - 6, hgt - 20, 16, 16);
     }
     
     public void addMessage(String message) {
         label.setText(message);
         repaint();
     }
-    
-    
 }

@@ -83,13 +83,13 @@
 package com.sun.gi.apps.battleboard.client.swing;
 
 import com.sun.gi.apps.battleboard.BattleBoard;
-import com.sun.gi.apps.battleboard.client.Display;
 import com.sun.gi.apps.battleboard.client.BattleBrain;
+import com.sun.gi.apps.battleboard.client.Display;
 import com.sun.gi.apps.battleboard.client.RandomBrain;
-import javax.swing.*;
 import java.awt.*;
-import java.awt.geom.*;
 import java.awt.event.*;
+import java.awt.geom.*;
+import javax.swing.*;
 
 public class Client extends JFrame implements Display, MoveListener {
     /** the delegate for generating moves, or null to use the UI */
@@ -115,10 +115,12 @@ public class Client extends JFrame implements Display, MoveListener {
     private Object queueLock = new Object();
     
     /**
-     * Creates a new instance of <code>Client</code>: a <code>JFrame</code>
-     * that holds <code>BattleBoard</code>s and displays messages.
+     * Creates a new instance of <code>Client</code>:  a
+     * <code>JFrame</code> that holds <code>BattleBoard</code>s and
+     * displays messages.
      *
-     * @param boards an array of <code>BattleBoard</code>s to be displayed.
+     * @param boards an array of <code>BattleBoard</code>s to be
+     * displayed.
      */
     public Client(BattleBoard[] boards) {
         setDefaultCloseOperation(EXIT_ON_CLOSE);
@@ -145,13 +147,13 @@ public class Client extends JFrame implements Display, MoveListener {
      * Replaces any currently displayed <code>BattleBoard</code>s with
      * the suplied set.
      *
-     * @param boards an array of <code>BattleBoard</code>s, one corresponding
-     * to each player.
+     * @param boards an array of <code>BattleBoard</code>s, one
+     * corresponding to each player.
      */
     public void setBoards(BattleBoard[] boards) {
         this.boards = boards;
         this.displayBoards = new DisplayBoard[boards.length];
-        for (int i=0; i<boards.length; i++) {
+        for (int i = 0; i < boards.length; i++) {
             displayBoards[i] = new DisplayBoard(boards[i], boardset);
             displayBoards[i].addMoveListener(this);
         }
@@ -159,17 +161,18 @@ public class Client extends JFrame implements Display, MoveListener {
     }
     
     /**
-     * Gets the index (into <code>boards</code> or <code>displayBoards</code>)
-     * of the specified named player.
+     * Gets the index (into <code>boards</code> or
+     * <code>displayBoards</code>) of the specified named player.
      *
-     * @param name the name of the player (may be null)
-     * @return the index of that player, or -1 if <code>name</code> was null
-     * or a board specifying that name was not found.
+     * @param name the name of the player (may be <code>null</code>)
+     *
+     * @return the index of that player, or -1 if <code>name</code>
+     * was null or a board specifying that name was not found.
      */
     private int getPlayerIndex(String name) {
-        for (int i=0; i<boards.length; i++) {
+        for (int i = 0; i < boards.length; i++) {
             BattleBoard board = boards[i];
-            if (board != null && board.getPlayerName().equals(name)) {
+            if ((board != null) && board.getPlayerName().equals(name)) {
                 return i;
             }
         }
@@ -177,10 +180,10 @@ public class Client extends JFrame implements Display, MoveListener {
     }
     
     /**
-     * Sets the <code>BattleBrain</code> delegate that will provide moves.
-     * <p>
-     * If <code>delegate</code> is set to <code>null</code> (the
-     * default), the user must generate the moves from the interface.
+     * Sets the <code>BattleBrain</code> delegate that will provide
+     * moves.  <p> If <code>delegate</code> is set to
+     * <code>null</code> (the default), the user must generate the
+     * moves from the interface.
      *
      * @param delegate a BattleBrain delegate for generating move
      * commands, or null to allow the user to generate moves through
@@ -221,7 +224,7 @@ public class Client extends JFrame implements Display, MoveListener {
     public void removePlayer(String playerName) {
         // figure out which BattleBoard to invalidate
         int idx = getPlayerIndex(playerName);
-        if (idx>=0) {
+        if (idx >= 0) {
             displayBoards[idx].endBoard();
             boards[idx] = null;
         }
@@ -277,17 +280,17 @@ public class Client extends JFrame implements Display, MoveListener {
         }
     }
 
-    
     public static void main(String[] args) {
         String names[] = new String[] {"Mike", "David", "Steve", "Jon",
             "George", "Gertrude", "MaryBeth", "Alice"};
         BattleBoard bb[] = new BattleBoard[names.length];
-        for (int i=0; i<names.length; i++) {
+
+        for (int i = 0; i < names.length; i++) {
             bb[i] = new BattleBoard(names[i], 10, 10, 4);
             bb[i].populate();
         }
         Client c = new Client(bb);
-        if (args.length>0) {
+        if (args.length > 0) {
             c.setBrainDelegate(new RandomBrain());
         }
         c.showBoards(names[1]);
@@ -297,7 +300,7 @@ public class Client extends JFrame implements Display, MoveListener {
         while (true) {
             int check = 0;
             do {
-                counter = (counter+1) % bb.length;
+                counter = (counter + 1) % bb.length;
                 if (check++ > bb.length) {
                     System.out.println("DONE!");
                     return;
@@ -306,10 +309,9 @@ public class Client extends JFrame implements Display, MoveListener {
             c.showBoards(names[counter]);
             String move[] = c.getMove();
 	    if (move.length == 3) {
-		for (int i=0; i<bb.length; i++) {
+		for (int i = 0; i < bb.length; i++) {
 		    if (bb[i] != null && 
-			bb[i].getPlayerName().equals(move[0]))
-		    {
+			    bb[i].getPlayerName().equals(move[0])) {
 			int x = Integer.parseInt(move[1]);
 			int y = Integer.parseInt(move[2]);
 			bb[i].bombBoardPosition(x, y);
@@ -324,7 +326,5 @@ public class Client extends JFrame implements Display, MoveListener {
                 Thread.sleep(600);
             } catch (InterruptedException ie) {}
         }
-
     }
-
 }

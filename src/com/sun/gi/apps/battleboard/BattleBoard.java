@@ -166,7 +166,7 @@ public class BattleBoard implements Serializable {
      * Default constructor, not for public use.
      */
     protected BattleBoard() {
-    // no-op
+	// no-op
     }
 
     /**
@@ -307,6 +307,7 @@ public class BattleBoard implements Serializable {
      * Fires off a boardChanged event to all BoardListeners.
      *
      * @param x the x location of the square that changed.
+     *
      * @param y the y location of the square that changed.
      */
     private synchronized void fireBoardEvent(int x, int y) {

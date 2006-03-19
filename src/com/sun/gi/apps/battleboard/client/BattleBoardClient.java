@@ -138,24 +138,6 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
             "battleboard.interactive", "true"));
 
     public BattleBoardClient() {
-    // no-op
-    }
-
-    /**
-     * 
-     */
-    public void run() {
-        try {
-            mgr = new ClientConnectionManagerImpl("BattleBoard",
-                    new URLDiscoverer(
-                            new File("FakeDiscovery.xml").toURI().toURL()));
-            mgr.setListener(this);
-            String[] classNames = mgr.getUserManagerClassNames();
-            mgr.connect(classNames[0]);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return;
-        }
     }
 
     protected void showPrompt(String prompt) {
@@ -166,25 +148,20 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
         System.out.flush();
     }
 
-    public void visitNameCallback(NameCallback cb) {
-        log.finer("visitNameCallback");
-        if (userName != null) {
-            cb.setName(userName);
-        } else {
-            showPrompt(cb.getPrompt());
-            String line = getLine();
-            userName = wsRegexp.matcher(line).replaceAll("");
-            cb.setName(line);
-        }
-    }
-
-    public void visitPasswordCallback(PasswordCallback cb) {
-        log.finer("visitPasswordCallback");
-        if (userPassword != null) {
-            cb.setPassword(userPassword.toCharArray());
-        } else {
-            showPrompt(cb.getPrompt());
-            cb.setPassword(getLine().toCharArray());
+    /**
+     * Gets a line of input from the keyboard.
+     *
+     * @return a line of input from the keyboard
+     */
+    protected String getLine() {
+        try {
+            BufferedReader input = new BufferedReader(new InputStreamReader(
+                    System.in));
+            String line = input.readLine();
+            return (line == null) ? "" : line;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return "";
         }
     }
 
@@ -211,25 +188,31 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
         mgr.sendValidationResponse(callbacks);
     }
 
-    protected void sendJoinReq(ClientChannel chan) {
-        String cmd = "join " + playerName;
-        ByteBuffer buf = ByteBuffer.wrap(cmd.getBytes());
-        buf.position(buf.limit());
-        mgr.sendToServer(buf, true);
-    }
-
-    protected String getLine() {
-        try {
-            BufferedReader input = new BufferedReader(new InputStreamReader(
-                    System.in));
-            String line = input.readLine();
-            return (line == null) ? "" : line;
-        } catch (IOException e) {
-            e.printStackTrace();
-            return "";
+    public void visitNameCallback(NameCallback cb) {
+        log.finer("visitNameCallback");
+        if (userName != null) {
+            cb.setName(userName);
+        } else {
+            showPrompt(cb.getPrompt());
+            String line = getLine();
+            userName = wsRegexp.matcher(line).replaceAll("");
+            cb.setName(line);
         }
     }
 
+    public void visitPasswordCallback(PasswordCallback cb) {
+        log.finer("visitPasswordCallback");
+        if (userPassword != null) {
+            cb.setPassword(userPassword.toCharArray());
+        } else {
+            showPrompt(cb.getPrompt());
+            cb.setPassword(getLine().toCharArray());
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     public void connected(byte[] myID) {
         log.fine("connected");
 
@@ -317,20 +300,20 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
             }
 
             /*
-             * This Matchmaker channel listener, isn't strictly needed.
-             * The server will manage the process of joining this client
-             * to the correct Game channel when enough players are
-             * present.
+	     * This Matchmaker channel listener isn't strictly needed. 
+	     * The server will manage the process of joining this
+	     * client to the correct Game channel when enough players
+	     * are present.
              * 
-             * A more sophisticated game might match players to games
-             * based on various parameters.
+	     * A more sophisticated game might match players to games
+	     * based on various parameters.
              * 
-             * This listener will also get called back if the Matchmaker
-             * channel closes for some reason, which a client may wish
-             * to handle.
+	     * This listener will also get called back if the
+	     * Matchmaker channel closes for some reason, which a
+	     * client may wish to handle.
              * 
-             * Any non-trivial listener should be implemented as a
-             * full-fledged class rather than as an anonynmous class.
+	     * Any non-trivial listener should be implemented as a
+	     * full-fledged class rather than as an anonynmous class.
              */
             channel.setListener(new ClientChannelListener() {
                 public void playerJoined(byte[] playerID) {
@@ -363,7 +346,32 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
 
         // Ok, must be a new game channel we've joined
         if (state == State.JOINING_GAME) {
-            channel.setListener(new BattleBoardPlayer(mgr, channel, playerName));
+            channel.setListener(
+		    new BattleBoardPlayer(mgr, channel, playerName));
+        }
+    }
+
+    protected void sendJoinReq(ClientChannel chan) {
+        String cmd = "join " + playerName;
+        ByteBuffer buf = ByteBuffer.wrap(cmd.getBytes());
+        buf.position(buf.limit());
+        mgr.sendToServer(buf, true);
+    }
+
+    /**
+     * Set up and begin the game.
+     */
+    public void run() {
+        try {
+            mgr = new ClientConnectionManagerImpl("BattleBoard",
+                    new URLDiscoverer(
+                            new File("FakeDiscovery.xml").toURI().toURL()));
+            mgr.setListener(this);
+            String[] classNames = mgr.getUserManagerClassNames();
+            mgr.connect(classNames[0]);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return;
         }
     }
 

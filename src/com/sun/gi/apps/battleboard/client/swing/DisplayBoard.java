@@ -127,20 +127,20 @@ public class DisplayBoard extends JPanel implements BoardListener
     private static final Color DONECOLOR = new Color(60, 60, 60);
     */
 
-    private static final Color BGCOLOR = Color.WHITE;
+    private static final Color BGCOLOR = Color.LIGHT_GRAY;
     private static final Color NAMECOLOR = Color.BLACK;
-    private static final Color VACANTCOLOR = Color.LIGHT_GRAY;
+    private static final Color VACANTCOLOR = Color.WHITE;
     private static final Color CITYCOLOR = Color.BLUE;
     private static final Color UNKNOWNCOLOR = Color.WHITE;
-    private static final Color MISSCOLOR = Color.YELLOW;
+    private static final Color MISSCOLOR = Color.DARK_GRAY;
     private static final Color NEARCOLOR = Color.GREEN;
     private static final Color HITCOLOR = Color.RED;
-    private static final Color DONECOLOR = new Color(60, 60, 60);
+    private static final Color DONECOLOR = Color.DARK_GRAY;
     
-    private static final Font TITLEFONT = new Font("Sans-serif",
-                                                   Font.BOLD, 14);
+    private static final Font TITLEFONT =
+	    new Font("Sans-serif", Font.BOLD, 14);
     private static final FontRenderContext frc =
-        new FontRenderContext(new AffineTransform(), true, true);
+	    new FontRenderContext(new AffineTransform(), true, true);
     
     /** Mapping from PositionValue to Color */
     private static HashMap<BattleBoard.PositionValue,Color> colors;
@@ -184,8 +184,8 @@ public class DisplayBoard extends JPanel implements BoardListener
         int bwid = board.getWidth();
         int bhgt = board.getHeight();
         values = new Color[bwid*bhgt];
-        for (int y = 0; y<bhgt; y++) {
-            for (int x = 0; x<bwid; x++) {
+        for (int y = 0; y < bhgt; y++) {
+            for (int x = 0; x < bwid; x++) {
                 values[x+y*bwid] = colors.get(board.getBoardPosition(x, y));
             }
         }
@@ -206,7 +206,8 @@ public class DisplayBoard extends JPanel implements BoardListener
     }
     
     private void buildTitle() {
-        this.title = board.getPlayerName() + " (" + board.getSurvivingCities() +
+        this.title = board.getPlayerName() + " (" +
+		    board.getSurvivingCities() +
                     "/" + board.getStartCities() + ")";
     }
 
@@ -215,13 +216,13 @@ public class DisplayBoard extends JPanel implements BoardListener
      */
     public void boardChanged(BattleBoard board, int x, int y) {
         Point p = getLocation();
-        int cornerx = x*GRIDSIZE + GRIDXOFFSET;
-        int cornery = y*GRIDSIZE + GRIDYOFFSET;
+        int cornerx = x * GRIDSIZE + GRIDXOFFSET;
+        int cornery = y * GRIDSIZE + GRIDYOFFSET;
         BattleBoard.PositionValue pv = board.getBoardPosition(x, y);
         if (pv == BattleBoard.PositionValue.HIT) {
             // wait 150 ms, then set the color.
             // repaint will happen as the zapper animates the explosion.
-            final int pos = x+y*board.getWidth();
+            final int pos = x + y * board.getWidth();
             final Color color = colors.get(pv);
             new Thread(new Runnable() {
                 public void run() {
@@ -232,10 +233,10 @@ public class DisplayBoard extends JPanel implements BoardListener
                 }
             }).start();
         } else {
-            animations.add(new Animation(x, y, values[x+y*board.getWidth()], 
-                                     colors.get(pv)));
+            animations.add(new Animation(x, y,
+		    values[x + y * board.getWidth()], colors.get(pv)));
         }
-        values[x+y*board.getWidth()] = null;
+        values[x + y * board.getWidth()] = null;
         if (zapper != null) {
             zapper.zap(cornerx + GRIDSIZE/2 + p.x,
                        cornery + GRIDSIZE/2 + p.y,
@@ -259,12 +260,12 @@ public class DisplayBoard extends JPanel implements BoardListener
         }
         g.fillRect(0, 0, getWidth(), getHeight());
         g.setColor(BGCOLOR);
-        g.fillRect(3, 3, getWidth()-6, getHeight()-6);
+        g.fillRect(3, 3, getWidth() - 6, getHeight() - 6);
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
                            RenderingHints.VALUE_ANTIALIAS_ON);
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
                            RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-        GRIDXOFFSET = (getWidth() - board.getWidth()*GRIDSIZE)/2;
+        GRIDXOFFSET = (getWidth() - board.getWidth() * GRIDSIZE) / 2;
         if (done) {
             g.setColor(DONECOLOR);
         } else {
@@ -272,20 +273,21 @@ public class DisplayBoard extends JPanel implements BoardListener
         }
         g.setFont(TITLEFONT);
         int wid = (int)TITLEFONT.getStringBounds(title, frc).getWidth();
-        g.drawString(title, (getWidth()-wid)/2, GRIDYOFFSET-4);
+        g.drawString(title, (getWidth()-wid) / 2, GRIDYOFFSET - 4);
         int bwid = board.getWidth();
         for (int x = 0; x < bwid; x++) {
-            for (int y = 0; y<board.getHeight(); y++) {
+            for (int y = 0; y < board.getHeight(); y++) {
                 if (!done) {
-                    Color c = values[x+y*bwid];
+                    Color c = values[x + y * bwid];
                     if (c == null) {
                         continue;
                     }
                     g.setColor(c);
                 }
-                int cornerx = x*GRIDSIZE + GRIDXOFFSET;
-                int cornery = y*GRIDSIZE + GRIDYOFFSET;
-                g.fillOval(cornerx+1, cornery+1, GRIDSIZE-2, GRIDSIZE-2);
+                int cornerx = x * GRIDSIZE + GRIDXOFFSET;
+                int cornery = y * GRIDSIZE + GRIDYOFFSET;
+                g.fillOval(cornerx + 1, cornery + 1,
+			GRIDSIZE - 2, GRIDSIZE - 2);
             }
         }
         // now draw animations
@@ -333,9 +335,9 @@ public class DisplayBoard extends JPanel implements BoardListener
         if (x < GRIDXOFFSET || y < GRIDYOFFSET || done) {
             return;
         }
-        x = (x-GRIDXOFFSET)/GRIDSIZE;
-        y = (y-GRIDYOFFSET)/GRIDSIZE;
-        if (x<board.getWidth() && y<board.getHeight()) {
+        x = (x - GRIDXOFFSET) / GRIDSIZE;
+        y = (y - GRIDYOFFSET) / GRIDSIZE;
+        if (x < board.getWidth() && y < board.getHeight()) {
             String move[] = new String[3];
             move[0] = board.getPlayerName();
             move[1] = String.valueOf(x);
@@ -375,24 +377,25 @@ public class DisplayBoard extends JPanel implements BoardListener
         int frame;
         
         public Animation(int x, int y, Color from, Color to) {
-            this.idx= x+y*board.getWidth();
-            this.cornerx = x*GRIDSIZE + GRIDXOFFSET;
-            this.cornery = y*GRIDSIZE + GRIDYOFFSET;
+            this.idx= x + y * board.getWidth();
+            this.cornerx = x * GRIDSIZE + GRIDXOFFSET;
+            this.cornery = y * GRIDSIZE + GRIDYOFFSET;
             this.from = from;
             this.to = to;
         }
         
         public Rectangle paintNext(Graphics g) {
-            if (frame<15) {
+            if (frame < 15) {
                 g.setColor(from);
             } else {
                 g.setColor(to);
             }
-            float cos = (float)Math.cos(frame*Math.PI/30);
-            int wid = (int)Math.abs(cos*(GRIDSIZE-2));
-            g.fillOval(cornerx+ (GRIDSIZE-wid)/2, cornery+1, wid, GRIDSIZE-2);
+            float cos = (float)Math.cos(frame * Math.PI/30);
+            int wid = (int)Math.abs(cos * (GRIDSIZE-2));
+            g.fillOval(cornerx+ (GRIDSIZE - wid) / 2, cornery + 1,
+		    wid, GRIDSIZE - 2);
             frame++;
-            if (frame>30) {
+            if (frame > 30) {
                 values[idx] = to;
                 return null;
             } else {
@@ -400,5 +403,4 @@ public class DisplayBoard extends JPanel implements BoardListener
             }
         }
     }
-
 }

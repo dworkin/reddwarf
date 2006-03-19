@@ -86,7 +86,7 @@ import java.awt.Rectangle;
 
 public interface Zapper {
 
-    public void zap(int x, int y, boolean fireball);
-    
-    public void setSource(Rectangle r);
+    void zap(int x, int y, boolean fireball);
+
+    void setSource(Rectangle r);
 }

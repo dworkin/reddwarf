@@ -82,15 +82,17 @@
 
 package com.sun.gi.apps.battleboard.client.swing;
 
-import javax.swing.*;
-import javax.swing.border.*;
 import java.awt.*;
 import java.awt.geom.*;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.net.URL;
+import javax.swing.*;
+import javax.swing.border.*;
 
 public class BoardSet extends JPanel implements Zapper
 {
@@ -102,12 +104,20 @@ public class BoardSet extends JPanel implements Zapper
     private Image[] explosion;
     
     public BoardSet() {
-        explosion = new Image[17];
-        for (int i=0; i<explosion.length; i++) {
-            URL url = getClass().getResource("imgs/exp"+(i+1)+".png");
+	List<Image> images = new LinkedList<Image>();
+
+	int i = 0;
+	for (;;) {
+            URL url = getClass().getResource("imgs/exp" + (i++ + 1) + ".png");
+	    if (url == null) {
+		break;
+	    }
             ImageIcon icn = new ImageIcon(url);
-            explosion[i] = icn.getImage();
+	    images.add(icn.getImage());
         }
+
+        Image[] tmpExplosion = new Image[images.size()];
+	explosion = images.toArray(tmpExplosion);
     }
     
     public void setBoards(DisplayBoard[] boards) {
@@ -115,13 +125,13 @@ public class BoardSet extends JPanel implements Zapper
         removeAll();
         // try to keep width less than 800 pixels wide
         int wid = 0;
-        for (int i=0; i<boards.length; i++) {
+        for (int i = 0; i < boards.length; i++) {
             wid += boards[i].getPreferredSize().width;
         }
         int h = (int)Math.ceil((float)wid/700f);
         int w = (int)Math.ceil((float)boards.length/(float)h);
         setLayout(new GridLayout(h, w, 20, 20));
-        for (int i=0; i<boards.length; i++) {
+        for (int i = 0; i < boards.length; i++) {
             add(boards[i]);
         }
         setBackground(Color.black);
@@ -160,8 +170,8 @@ public class BoardSet extends JPanel implements Zapper
     
     public void zap(int x, int y, boolean fireball) {
         if (fireball) {
-            animations.add(new Animation(x-15, y-25, explosion));
-            repaint(x-15, y-25, 35, 50);
+            animations.add(new Animation(x - 15, y - 25, explosion));
+            repaint(x - 15, y - 25, 35, 50);
         }
     }
     
@@ -184,7 +194,7 @@ public class BoardSet extends JPanel implements Zapper
         public Rectangle paintNext(Graphics g) {
             g.drawImage(frames[frame], x, y, null);
             frame++;
-            if (frame>=frames.length) {
+            if (frame >= frames.length) {
                 return null;
             } else {
                 return new Rectangle(x, y, frames[frame].getWidth(null),
@@ -192,5 +202,4 @@ public class BoardSet extends JPanel implements Zapper
             }
         }
     }
-
 }
