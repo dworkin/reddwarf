@@ -177,14 +177,17 @@ public class DisplayBoard extends JPanel implements BoardListener
         values = new Color[bwid * bhgt];
         for (int y = 0; y < bhgt; y++) {
             for (int x = 0; x < bwid; x++) {
-                values[x + y * bwid] = colors.get(board.getBoardPosition(x, y));
+                values[x + y * bwid] =
+			colors.get(board.getBoardPosition(x, y));
             }
         }
-        int twid = (int)TITLEFONT.getStringBounds(title, frc).getWidth() + MARGINWIDTH;
+        int twid = (int)TITLEFONT.getStringBounds(title, frc).getWidth() +
+		MARGINWIDTH;
         int gwid = board.getWidth() * GRIDSIZE;
         int wid = gwid > twid ? gwid : twid;
         wid += (2 * MARGINWIDTH);
-        int hgt = board.getHeight() * GRIDSIZE + GRIDYOFFSET + (2 * MARGINWIDTH);
+        int hgt = board.getHeight() * GRIDSIZE + GRIDYOFFSET +
+		(2 * MARGINWIDTH);
         GRIDXOFFSET = (wid - gwid) / 2;
         setPreferredSize(new Dimension(wid, hgt));
         board.addBoardListener(this);
@@ -198,8 +201,8 @@ public class DisplayBoard extends JPanel implements BoardListener
     
     private void buildTitle() {
         this.title = board.getPlayerName() + " (" +
-		    board.getSurvivingCities() +
-                    "/" + board.getStartCities() + ")";
+		board.getSurvivingCities() +
+		"/" + board.getStartCities() + ")";
     }
 
     /**
@@ -252,7 +255,8 @@ public class DisplayBoard extends JPanel implements BoardListener
         g.fillRect(0, 0, getWidth(), getHeight());
         g.setColor(BGCOLOR);
         g.fillRect(MARGINWIDTH, MARGINWIDTH,
-		getWidth() - (2 * MARGINWIDTH), getHeight() - (2 * MARGINWIDTH));
+		getWidth() - (2 * MARGINWIDTH), getHeight() -
+			(2 * MARGINWIDTH));
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
 		RenderingHints.VALUE_ANTIALIAS_ON);
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,

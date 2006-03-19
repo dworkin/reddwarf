@@ -178,22 +178,21 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
     public void validationRequest(Callback[] callbacks) {
         log.fine("validationRequest");
 
-        for (Callback cb : callbacks) {
-            try {
-                if (cb == null) {
-                    // shouldn't happen.
-                    log.warning("null callback");
-                } else if (cb instanceof NameCallback) {
-                    visitNameCallback((NameCallback) cb);
-                } else if (cb instanceof PasswordCallback) {
-                    visitPasswordCallback((PasswordCallback) cb);
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-
-        mgr.sendValidationResponse(callbacks);
+	for (Callback cb : callbacks) {
+	    try {
+		if (cb == null) {
+		    // shouldn't happen.
+		    log.warning("null callback");
+		} else if (cb instanceof NameCallback) {
+		    visitNameCallback((NameCallback) cb);
+		} else if (cb instanceof PasswordCallback) {
+		    visitPasswordCallback((PasswordCallback) cb);
+		}
+	    } catch (Exception e) {
+		e.printStackTrace();
+	    }
+	}
+	mgr.sendValidationResponse(callbacks);
     }
 
     public void visitNameCallback(NameCallback cb) {
@@ -238,6 +237,7 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
      */
     public void connectionRefused(String message) {
         log.info("connectionRefused");
+	System.exit(1);
     }
 
     /**
@@ -287,25 +287,25 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
      * {@inheritDoc}
      */
     public void joinedChannel(final ClientChannel channel) {
-        log.fine("joinedChannel " + channel.getName());
+        log.info("joinedChannel " + channel.getName());
 
         if (channel.getName().equals("matchmaker")) {
-
             if (playerName == null) {
 
-                /*
-                 * If the user hasn't provided a playerName, offer that
-                 * they use their userName as their playerName.
-                 */
+		/*
+		 * If the user hasn't provided a playerName, offer
+		 * that they use their userName as their
+		 * playerName.
+		 */
 
-                playerName = userName;
-                showPrompt("Enter your handle [" + userName + "]");
-                String line = getLine();
-                if (line.length() > 0) {
-                    // Spaces aren't allowed
-                    playerName = wsRegexp.matcher(line).replaceAll("");
-                }
-            }
+		playerName = userName;
+		showPrompt("Enter your handle [" + userName + "]");
+		String line = getLine();
+		if (line.length() > 0) {
+		    // Spaces aren't allowed
+		    playerName = wsRegexp.matcher(line).replaceAll("");
+		}
+	    }
 
             /*
 	     * This Matchmaker channel listener isn't strictly needed. 
