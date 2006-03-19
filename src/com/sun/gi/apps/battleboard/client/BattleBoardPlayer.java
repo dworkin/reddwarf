@@ -109,6 +109,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
     private String myName;
     private BattleBoard myBoard;
     private boolean lost = false;
+    private boolean swingMode;
 
     /**
      * The game play is in one of several states: waiting for a board to
@@ -136,10 +137,11 @@ public class BattleBoardPlayer implements ClientChannelListener {
      * @param playerName the name of the player
      */
     public BattleBoardPlayer(ClientConnectionManager connectionManager,
-            ClientChannel chan, String playerName) {
+            ClientChannel chan, String playerName, boolean swingMode) {
         this.connectionManager = connectionManager;
         this.channel = chan;
         this.myName = playerName;
+	this.swingMode = swingMode;
 
         /*
          * We don't have all the info we need to create the display at
@@ -162,10 +164,9 @@ public class BattleBoardPlayer implements ClientChannelListener {
     public void playerLeft(byte[] playerID) {
         log.fine("playerLeft on " + channel.getName());
 
-        // XXX: Exit if someone left unexpectedly
         if (gameState != GameState.GAME_OVER) {
             gameState = GameState.GAME_OVER;
-            log.severe("Exiting because another player left");
+            log.info("Exiting because the other player left");
             connectionManager.disconnect();
             System.exit(-1);
         }
@@ -219,9 +220,13 @@ public class BattleBoardPlayer implements ClientChannelListener {
              * build the display.
              */
 
-            display = new TextDisplay(playerBoards);
-	    //BattleBoard[] boardArray = new BattleBoard[playerBoards.size()];
-            //display = new Client(playerBoards.toArray(boardArray));
+	    if (swingMode) {
+		BattleBoard[] boardArray =
+			new BattleBoard[playerBoards.size()];
+		display = new Client(playerBoards.toArray(boardArray));
+	    } else {
+		display = new TextDisplay(playerBoards);
+	    }
         } else if ((gameState == GameState.BEGIN_MOVE)
                 && "move-started".equals(cmd)) {
             if (myName.equals(tokens[1])) {

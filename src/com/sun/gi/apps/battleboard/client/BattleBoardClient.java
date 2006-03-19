@@ -82,6 +82,12 @@
 
 package com.sun.gi.apps.battleboard.client;
 
+import com.sun.gi.comm.discovery.impl.URLDiscoverer;
+import com.sun.gi.comm.users.client.ClientChannel;
+import com.sun.gi.comm.users.client.ClientChannelListener;
+import com.sun.gi.comm.users.client.ClientConnectionManager;
+import com.sun.gi.comm.users.client.ClientConnectionManagerListener;
+import com.sun.gi.comm.users.client.impl.ClientConnectionManagerImpl;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -89,17 +95,9 @@ import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
-
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.NameCallback;
 import javax.security.auth.callback.PasswordCallback;
-
-import com.sun.gi.comm.discovery.impl.URLDiscoverer;
-import com.sun.gi.comm.users.client.ClientChannel;
-import com.sun.gi.comm.users.client.ClientChannelListener;
-import com.sun.gi.comm.users.client.ClientConnectionManager;
-import com.sun.gi.comm.users.client.ClientConnectionManagerListener;
-import com.sun.gi.comm.users.client.impl.ClientConnectionManagerImpl;
 
 public class BattleBoardClient implements ClientConnectionManagerListener {
 
@@ -121,28 +119,38 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
      * commandline rather than interactively.
      * 
      * The properties battleboard.userName, battleboard.userPassword,
-     * and battleboard.playerName can be used to specify the user name,
-     * password, and player name, respectively.
+     * and battleboard.playerName can be used to specify the user
+     * name, password, and player name, respectively.
      * 
-     * If the "battleboard.interactive" property is "false", then append
-     * a newline to each prompt. This makes it considerably easier to
-     * attach the client to a line-oriented test harness.
+     * If the "battleboard.displayMode" property is "swing", then an
+     * interactive Swing-based GUI is used.  If the displayMode is
+     * "text", then a simple interactive text-based interface is used. 
+     * If the displayMode is "batch" then an even simpler text-based
+     * interface, designed for use by the test scripts, is used.
      */
 
-    private String userName = System.getProperty("battleboard.userName", null);
-    private String userPassword = System.getProperty(
-            "battleboard.userPassword", null);
-    private String playerName = System.getProperty("battleboard.playerName",
-            null);
-    private static boolean nonInteractive = "false".equals(System.getProperty(
-            "battleboard.interactive", "true"));
+    private String userName =
+	    System.getProperty("battleboard.userName", null);
+    private String userPassword =
+	    System.getProperty("battleboard.userPassword", null);
+    private String playerName =
+	    System.getProperty("battleboard.playerName", null);
+    private String displayMode =
+	    System.getProperty("battleboard.displayMode", "swing");
+
+    private boolean batchMode = "batch".equals(displayMode);
+    private boolean swingMode = "swing".equals(displayMode);
 
     public BattleBoardClient() {
     }
 
+    public boolean isBatchMode() {
+	return batchMode;
+    }
+
     protected void showPrompt(String prompt) {
         System.out.print(prompt + ": ");
-        if (nonInteractive) {
+        if (batchMode) {
             System.out.println();
         }
         System.out.flush();
@@ -347,7 +355,7 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
         // Ok, must be a new game channel we've joined
         if (state == State.JOINING_GAME) {
             channel.setListener(
-		    new BattleBoardPlayer(mgr, channel, playerName));
+		    new BattleBoardPlayer(mgr, channel, playerName, swingMode));
         }
     }
 
@@ -375,9 +383,30 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
         }
     }
 
+    private void setParams(String userName, String userPassword,
+	    String playerName) {
+	if (userName != null) {
+	    this.userName = userName;
+	}
+	if (userPassword != null) {
+	    this.userPassword = userPassword;
+	}
+	if (playerName != null) {
+	    this.playerName = playerName;
+	}
+    }
+
     // main()
 
     public static void main(String[] args) {
-        new BattleBoardClient().run();
+	BattleBoardClient client = new BattleBoardClient();
+
+	if (args.length == 2) {
+	    client.setParams(args[0], args[1], args[0]);
+	} else if (args.length == 3) {
+	    client.setParams(args[0], args[1], args[2]);
+	}
+
+        client.run();
     }
 }

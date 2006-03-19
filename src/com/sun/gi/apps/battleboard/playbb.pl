@@ -93,7 +93,7 @@ use IPC::Open2;
 $BoardWidth	= 4;
 $BoardHeight	= 4;
 
-$Props	= '-Dbattleboard.interactive=false';
+$Props	= '-Dbattleboard.displayMode=batch';
 $Class	= 'com.sun.gi.apps.battleboard.client.BattleBoardClient';
 
 if (@ARGV < 3) {
@@ -221,7 +221,6 @@ sub tryAll {
 		    return -2;
 		}
 	    }
-
 	}
     }
 }

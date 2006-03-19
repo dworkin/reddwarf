@@ -236,7 +236,7 @@ public class Client extends JFrame implements Display, MoveListener {
      * @param message the String to display
      */
     public void message(String message) {
-        System.out.println(message);
+        // System.out.println(message);
         messages.addMessage(message);
     }
 
@@ -281,8 +281,7 @@ public class Client extends JFrame implements Display, MoveListener {
     }
 
     public static void main(String[] args) {
-        String names[] = new String[] {"Mike", "David", "Steve", "Jon",
-            "George", "Gertrude", "MaryBeth", "Alice"};
+        String names[] = new String[] { "Alice", "Bob", "Carol", "Eve" };
         BattleBoard bb[] = new BattleBoard[names.length];
 
         for (int i = 0; i < names.length; i++) {
@@ -293,8 +292,7 @@ public class Client extends JFrame implements Display, MoveListener {
         if (args.length > 0) {
             c.setBrainDelegate(new RandomBrain());
         }
-        c.showBoards(names[1]);
-        c.removePlayer(names[2]);
+        c.showBoards(names[0]);
         c.message("Let the match begin!");
         int counter = -1;
         while (true) {

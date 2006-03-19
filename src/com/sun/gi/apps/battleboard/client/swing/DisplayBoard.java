@@ -97,8 +97,8 @@ import java.util.HashMap;
 /**
  * The board display looks like this:
  * <pre>
- *    PLAYER NAME (2/2)   &lt;- 20 px height
- *     o o o o o o o o    &lt;- 10 px height
+ *    PLAYER NAME (2/2)   &lt;- GRIDYOFFSET px height
+ *     o o o o o o o o    &lt;- GRIDSIZE px height
  *     o o o o o o o o
  *     o o o o o o o o
  *     o o o o o o o o
@@ -112,21 +112,12 @@ import java.util.HashMap;
  */
 public class DisplayBoard extends JPanel implements BoardListener
 {
-    private static final int GRIDSIZE = 16;
+    private static final int GRIDSIZE = 32;
     private int GRIDXOFFSET = 0;
-    private static final int GRIDYOFFSET = 23;
-    /*
-    private static final Color BGCOLOR = new Color(60, 50, 50);
-    private static final Color NAMECOLOR = new Color(255, 255, 255);
-    private static final Color VACANTCOLOR = new Color(70, 70, 70);
-    private static final Color CITYCOLOR = new Color(0, 255, 0);
-    private static final Color UNKNOWNCOLOR = new Color(0, 0, 0);
-    private static final Color NEARCOLOR = new Color(180, 180, 0);
-    private static final Color MISSCOLOR = new Color(60, 50, 50);
-    private static final Color HITCOLOR = new Color(255, 0, 0);
-    private static final Color DONECOLOR = new Color(60, 60, 60);
-    */
+    private static final int GRIDYOFFSET = 40;
+    private static final int MARGINWIDTH = 10;
 
+    private static final Color MOVECOLOR = Color.CYAN;
     private static final Color BGCOLOR = Color.LIGHT_GRAY;
     private static final Color NAMECOLOR = Color.BLACK;
     private static final Color VACANTCOLOR = Color.WHITE;
@@ -138,12 +129,12 @@ public class DisplayBoard extends JPanel implements BoardListener
     private static final Color DONECOLOR = Color.DARK_GRAY;
     
     private static final Font TITLEFONT =
-	    new Font("Sans-serif", Font.BOLD, 14);
+	    new Font("Sans-serif", Font.BOLD, 18);
     private static final FontRenderContext frc =
 	    new FontRenderContext(new AffineTransform(), true, true);
     
     /** Mapping from PositionValue to Color */
-    private static HashMap<BattleBoard.PositionValue,Color> colors;
+    private static HashMap<BattleBoard.PositionValue, Color> colors;
     
     /** The board */
     private BattleBoard board;
@@ -183,18 +174,18 @@ public class DisplayBoard extends JPanel implements BoardListener
         buildTitle();
         int bwid = board.getWidth();
         int bhgt = board.getHeight();
-        values = new Color[bwid*bhgt];
+        values = new Color[bwid * bhgt];
         for (int y = 0; y < bhgt; y++) {
             for (int x = 0; x < bwid; x++) {
-                values[x+y*bwid] = colors.get(board.getBoardPosition(x, y));
+                values[x + y * bwid] = colors.get(board.getBoardPosition(x, y));
             }
         }
-        int twid = (int)TITLEFONT.getStringBounds(title, frc).getWidth()+3;
-        int gwid = board.getWidth()*GRIDSIZE;
+        int twid = (int)TITLEFONT.getStringBounds(title, frc).getWidth() + MARGINWIDTH;
+        int gwid = board.getWidth() * GRIDSIZE;
         int wid = gwid > twid ? gwid : twid;
-        wid += 6;
-        int hgt = board.getHeight()*GRIDSIZE + GRIDYOFFSET + 6;
-        GRIDXOFFSET = (wid-gwid)/2;
+        wid += (2 * MARGINWIDTH);
+        int hgt = board.getHeight() * GRIDSIZE + GRIDYOFFSET + (2 * MARGINWIDTH);
+        GRIDXOFFSET = (wid - gwid) / 2;
         setPreferredSize(new Dimension(wid, hgt));
         board.addBoardListener(this);
         setCursor(Cursor.getPredefinedCursor(Cursor.CROSSHAIR_CURSOR));
@@ -238,8 +229,8 @@ public class DisplayBoard extends JPanel implements BoardListener
         }
         values[x + y * board.getWidth()] = null;
         if (zapper != null) {
-            zapper.zap(cornerx + GRIDSIZE/2 + p.x,
-                       cornery + GRIDSIZE/2 + p.y,
+            zapper.zap(cornerx + GRIDSIZE / 2 + p.x,
+                       cornery + GRIDSIZE / 2 + p.y,
                        pv == BattleBoard.PositionValue.HIT);
         }
         // what did it turn into?
@@ -254,17 +245,18 @@ public class DisplayBoard extends JPanel implements BoardListener
     public void paint(Graphics g1) {
         Graphics2D g = (Graphics2D)g1;
         if (active) {
-            g.setColor(Color.cyan);
+            g.setColor(MOVECOLOR);
         } else {
-            g.setColor(Color.black);
+            g.setColor(BGCOLOR);
         }
         g.fillRect(0, 0, getWidth(), getHeight());
         g.setColor(BGCOLOR);
-        g.fillRect(3, 3, getWidth() - 6, getHeight() - 6);
+        g.fillRect(MARGINWIDTH, MARGINWIDTH,
+		getWidth() - (2 * MARGINWIDTH), getHeight() - (2 * MARGINWIDTH));
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
-                           RenderingHints.VALUE_ANTIALIAS_ON);
+		RenderingHints.VALUE_ANTIALIAS_ON);
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING,
-                           RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+		RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
         GRIDXOFFSET = (getWidth() - board.getWidth() * GRIDSIZE) / 2;
         if (done) {
             g.setColor(DONECOLOR);
@@ -273,7 +265,7 @@ public class DisplayBoard extends JPanel implements BoardListener
         }
         g.setFont(TITLEFONT);
         int wid = (int)TITLEFONT.getStringBounds(title, frc).getWidth();
-        g.drawString(title, (getWidth()-wid) / 2, GRIDYOFFSET - 4);
+        g.drawString(title, (getWidth() - wid) / 2, GRIDYOFFSET - 4);
         int bwid = board.getWidth();
         for (int x = 0; x < bwid; x++) {
             for (int y = 0; y < board.getHeight(); y++) {
@@ -377,7 +369,7 @@ public class DisplayBoard extends JPanel implements BoardListener
         int frame;
         
         public Animation(int x, int y, Color from, Color to) {
-            this.idx= x + y * board.getWidth();
+            this.idx = x + y * board.getWidth();
             this.cornerx = x * GRIDSIZE + GRIDXOFFSET;
             this.cornery = y * GRIDSIZE + GRIDYOFFSET;
             this.from = from;
@@ -390,9 +382,9 @@ public class DisplayBoard extends JPanel implements BoardListener
             } else {
                 g.setColor(to);
             }
-            float cos = (float)Math.cos(frame * Math.PI/30);
-            int wid = (int)Math.abs(cos * (GRIDSIZE-2));
-            g.fillOval(cornerx+ (GRIDSIZE - wid) / 2, cornery + 1,
+            float cos = (float)Math.cos(frame * Math.PI / 30);
+            int wid = (int)Math.abs(cos * (GRIDSIZE - 2));
+            g.fillOval(cornerx + (GRIDSIZE - wid) / 2, cornery + 1,
 		    wid, GRIDSIZE - 2);
             frame++;
             if (frame > 30) {
