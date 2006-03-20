@@ -84,6 +84,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
+import java.util.logging.Logger;
 
 import com.sun.gi.objectstore.NonExistantObjectIDException;
 
@@ -91,6 +92,9 @@ import com.sun.gi.objectstore.NonExistantObjectIDException;
  * A {@link DataSpace} based on HADB/JDBC.
  */
 public class HadbDataSpace implements DataSpace {
+
+    private static Logger log =
+	    Logger.getLogger("com.sun.gi.objectstore.tso.dataspace");
 
     boolean debug = true;
     private long appID;
@@ -135,9 +139,11 @@ public class HadbDataSpace implements DataSpace {
     private PreparedStatement updateInfoStmnt;
     private PreparedStatement insertInfoStmnt; // XXX: unused?
     private PreparedStatement updateObjLockStmnt;
+    private PreparedStatement findObjLockStmnt;
     private PreparedStatement updateObjUnlockStmnt;
     private PreparedStatement insertObjLockStmnt;
     private PreparedStatement deleteObjStmnt;
+    private PreparedStatement deleteObjLockStmnt;
     private PreparedStatement deleteNameStmnt;
     private PreparedStatement clearObjTableStmnt; // XXX: unused?
     private PreparedStatement clearNameTableStmnt; // XXX: unused?
@@ -280,15 +286,14 @@ public class HadbDataSpace implements DataSpace {
                 System.getProperty("dataspace.hadb.hosts", null));
         if (hadbHosts == null) {
             hadbHosts = "129.148.75.63:15025,129.148.75.60:15005";
-            // hadbHosts =
-            // "20.20.10.104:15025,20.20.10.103:15085,20.20.11.107:15105,20.20.10.101:15005,20.20.11.105:15065,20.20.10.102:15045";
+            hadbHosts = "20.20.10.104:15025,20.20.10.103:15085,20.20.11.107:15105,20.20.10.101:15005,20.20.11.105:15065,20.20.10.102:15045";
         }
 
         hadbUserName = hadbParams.getProperty("dataspace.hadb.username",
                 System.getProperty("dataspace.hadb.username", "system"));
 
         hadbPassword = hadbParams.getProperty("dataspace.hadb.password",
-                System.getProperty("dataspace.hadb.password", "sungameserver"));
+                System.getProperty("dataspace.hadb.password", "darkstar"));
 
         // DO NOT USE: leave hadbDBname null.
         // Setting the database name to anything other than the default
@@ -532,13 +537,19 @@ public class HadbDataSpace implements DataSpace {
                 + NAMETBLNAME + " VALUES(?,?)");
         updateNameStmnt = updateTransConn.prepareStatement("UPDATE "
                 + NAMETBLNAME + " SET NAME=? WHERE OBJID=?");
-        deleteObjStmnt = updateTransConn.prepareStatement("DELETE FROM "
-                + OBJTBLNAME + " WHERE OBJID=?");
+        deleteObjStmnt = updateTransConn.prepareStatement("DELETE FROM " +
+		OBJTBLNAME + " WHERE OBJID=?");
+        deleteObjLockStmnt = updateTransConn.prepareStatement("DELETE FROM " +
+		OBJLOCKTBLNAME + " WHERE OBJID=?");
 
-        updateObjLockStmnt = updateSingleConn.prepareStatement("UPDATE "
-                + OBJLOCKTBLNAME + " SET OBJLOCK=1 WHERE OBJID=? AND OBJLOCK=0");
-        updateObjUnlockStmnt = updateSingleConn.prepareStatement("UPDATE "
-                + OBJLOCKTBLNAME + " SET OBJLOCK=0 WHERE OBJID=?");
+        updateObjLockStmnt = updateSingleConn.prepareStatement("UPDATE " +
+		OBJLOCKTBLNAME + " SET OBJLOCK=1 WHERE OBJID=? AND OBJLOCK=0");
+        updateObjUnlockStmnt = updateSingleConn.prepareStatement("UPDATE " +
+		OBJLOCKTBLNAME + " SET OBJLOCK=0 WHERE OBJID=?");
+
+        findObjLockStmnt = readConn.prepareStatement("SELECT OBJID FROM " +
+		OBJLOCKTBLNAME + " WHERE OBJID=?");
+
         insertObjLockStmnt = updateSingleConn.prepareStatement("INSERT INTO "
                 + OBJLOCKTBLNAME + " VALUES(?,?)");
 
@@ -931,39 +942,42 @@ public class HadbDataSpace implements DataSpace {
             try {
                 updateObjLockStmnt.setLong(1, objectID);
                 rc = updateObjLockStmnt.executeUpdate();
-                if (rc == 1) {
-                    // updateObjLockStmnt.getConnection().commit();
-                } else {
-                    // updateObjLockStmnt.getConnection().rollback();
-                }
             } catch (SQLException e) {
-                try {
-                    updateObjLockStmnt.getConnection().rollback();
-                } catch (SQLException e2) {
-                    System.out.println("FAILED TO ROLLBACK");
-                    System.out.println(e2);
-                }
                 System.out.println("Blocked on " + objectID);
                 System.out.println(e);
                 e.printStackTrace();
             }
 
             if (rc == 1) {
-                /*
-                 * System.out.println("Got the lock on " + objectID + "
-                 * rc = " + rc);
-                 */
+                // System.out.println("Got the lock on " + objectID + " rc = " + rc);
                 return;
             } else {
-                System.out.println("Missed the lock on " + objectID + " rc = "
-                        + rc);
-                {
-                    (new Exception("missed")).printStackTrace();
-                }
+
+		/*
+		 * If we didn't get the lock, there are two possible
+		 * reasons:  first, the lock doesn't exist, and
+		 * second, that someone else is holding the lock.  We
+		 * need to squander another query to discover which.
+		 */
+
+		try {
+		    findObjLockStmnt.setLong(1, objectID);
+		    ResultSet rs = findObjLockStmnt.executeQuery();
+		    boolean foundSomething = rs.next();
+		    rs.close();
+		    if (!foundSomething) {
+			throw new NonExistantObjectIDException(
+				"nonexistant object " + objectID);
+		    }
+		} catch (SQLException e) {
+		    System.out.println(e);
+		    e.printStackTrace();
+		}
 
                 /*
-                 * If we didn't succeed, then try again, perhaps after a
-                 * short pause. The pause backs off to a maximum of 5ms.
+		 * If we didn't succeed, then try again, perhaps after
+		 * a short pause.  The pause backs off to a maximum of
+		 * 5ms.
                  */
 
                 if (backoffSleep > 0) {
@@ -999,23 +1013,8 @@ public class HadbDataSpace implements DataSpace {
         int rc = -1;
         try {
             updateObjUnlockStmnt.setLong(1, objectID);
-        } catch (SQLException e) {
-            System.out.println("FAILED to set parameters");
-        }
-
-        try {
             rc = updateObjUnlockStmnt.executeUpdate();
-            if (rc == 1) {
-                // updateObjUnlockStmnt.getConnection().commit();
-            } else {
-                // updateObjUnlockStmnt.getConnection().rollback();
-            }
         } catch (SQLException e) {
-            /*
-             * try { // updateObjUnlockStmnt.getConnection().rollback(); }
-             * catch (SQLException e2) { System.out.println("FAILED TO
-             * ROLLBACK"); System.out.println(e2); }
-             */
             System.out.println("Tried to unlock (" + objectID
                     + "): already unlocked.");
             System.out.println(e);
@@ -1023,8 +1022,8 @@ public class HadbDataSpace implements DataSpace {
         }
 
         if (rc == 1) {
-            // System.out.println("Released the lock on " + objectID + "
-            // rc = " + rc);
+            System.out.println("Released the lock on " + objectID +
+		    " rc = " + rc);
             return;
         } else {
             System.out.println("Didn't need to unlock " + objectID + " rc = "
@@ -1095,17 +1094,6 @@ public class HadbDataSpace implements DataSpace {
             throw new DataSpaceClosedException();
         }
 
-        /*
-         * Debugging: commit any outstanding transactions. There
-         * SHOULDN'T be any, but if there's a bug elsewhere, keep it out
-         * of this transaction.
-         * 
-         * try { updateObjStmnt.getConnection().commit(); } catch
-         * (SQLException e) { // XXX: rollback and die // Is there
-         * anything we can do here, other than weep?
-         * e.printStackTrace(); }
-         */
-
         if (newNames.entrySet().size() > 0) {
             for (Entry<String, Long> e : newNames.entrySet()) {
                 long oid = e.getValue();
@@ -1129,7 +1117,6 @@ public class HadbDataSpace implements DataSpace {
                     // XXX: rollback and die
                     e1.printStackTrace();
                 }
-
             }
 
             try {
@@ -1192,6 +1179,10 @@ public class HadbDataSpace implements DataSpace {
             try {
                 deleteObjStmnt.setLong(1, oid);
                 deleteObjStmnt.execute();
+                deleteObjLockStmnt.setLong(1, oid);
+                deleteObjLockStmnt.execute();
+		deleteNameStmnt.setLong(1, oid);
+		deleteNameStmnt.executeUpdate();
             } catch (SQLException e1) {
                 // XXX: rollback and die
                 e1.printStackTrace();
@@ -1305,8 +1296,6 @@ public class HadbDataSpace implements DataSpace {
 
     public void destroy(long objectID) throws NonExistantObjectIDException {
 
-        // XXX: write me.
-
         // XXX: doesn't check for bad objectIDs
 
         try {
@@ -1344,8 +1333,6 @@ public class HadbDataSpace implements DataSpace {
     }
 
     public long create(byte[] data, String name) {
-        // XXX: write me.
-
         if (data == null) {
             throw new NullPointerException("data is null");
         }
@@ -1358,9 +1345,25 @@ public class HadbDataSpace implements DataSpace {
                 insertNameStmnt.setLong(2, oid);
                 insertNameStmnt.executeUpdate();
             } catch (SQLException e) {
-                System.out.println("create: " + e);
-                // Was there already an identical name?
-                // Do we need to commit to find out?
+		try {
+		    insertObjStmnt.getConnection().rollback();
+		} catch (SQLException e2) {
+		    // XXX: Can't even rollback?  Yikes!!!
+		    System.out.println("create: double error" + e);
+		    return DataSpace.INVALID_ID;
+		}
+
+                // If there was already an identical name, then
+		// abandon the attempt.
+
+                if (e.getErrorCode() == 11939) {
+		    return DataSpace.INVALID_ID;
+		} else {
+		    // XXX: what happpened?
+		    // XXX: are there other cases we can handle?
+		    e.printStackTrace();
+		    return DataSpace.INVALID_ID;
+		}
             }
         }
 
