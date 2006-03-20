@@ -549,6 +549,19 @@
 	<copy file="resources/matchmaker_config.xml"
 	    todir="release/apps/matchmaker" />
     </target>
+	
+    <target name="zip.matchmaker" depends="release.matchmaker">
+	<zip destfile="release/apps/matchmaker/MatchMaker.zip" basedir="release" 
+		includes="apps/matchmaker/*" excludes="apps/*">
+	    
+	</zip>
+    </target>
+	
+    <target name="zip.matchmaker.client.source">
+	<zip destfile="release/J2SE_MM_client_src.zip" basedir="src"
+		includes="com/sun/gi/apps/mcs/matchmaker/client/**,
+			com/sun/gi/apps/mcs/matchmaker/common/*" />
+    </target>
 
     <target name="release.timertest" depends="build.timertest">
 	<jar destfile="release/apps/timer_test/TimerTest.jar"
