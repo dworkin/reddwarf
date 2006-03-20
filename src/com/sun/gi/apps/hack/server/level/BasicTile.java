@@ -183,6 +183,31 @@ public abstract class BasicTile implements Tile
     }
 
     /**
+     * Checks if the there is anything currently occupying this tile that
+     * would keep the character from occupying it.
+     *
+     * @param mgrRef the manager for a character
+     *
+     * @return whether or not the character can occupy this tile
+     */
+    public boolean canOccupy(GLOReference<? extends CharacterManager> mgrRef) {
+        // if the space isn't passible, then it can't be occupied
+        if (! isPassable(mgrRef))
+            return false;
+
+        // if there's a character here, then the space can't be occupied
+        // NOTE: if we allow passable characters in the future, then this
+        // needs to be updated
+        if (mgrRef != null)
+            return false;
+
+        // NOTE: if we allow items that block movement, then this will need
+        // to be updated
+
+        return true;
+    }
+
+    /**
      * Adds the given character to this tile if possible. This succeeds
      * if there isn't currently a character on this tile.
      *

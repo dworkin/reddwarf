@@ -124,6 +124,8 @@ public class PassableTile extends BasicTile
      * its general behavior is that characters can occupy it.
      *
      * @param mgrRef the manager for a character
+     *
+     * @return true
      */
     public boolean isPassable(GLOReference<? extends CharacterManager>
                               mgrRef) {

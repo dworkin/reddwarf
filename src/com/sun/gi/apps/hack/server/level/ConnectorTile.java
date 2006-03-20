@@ -164,6 +164,18 @@ public class ConnectorTile implements Tile
     }
 
     /**
+     * Always returns true, because connection points are, by definition,
+     * spaces you can occupy.
+     *
+     * @param mgrRef the manager for a character
+     *
+     * @return true
+     */
+    public boolean canOccupy(GLOReference<? extends CharacterManager> mgrRef) {
+        return true;
+    }
+
+    /**
      * Returns a stack of identifiers, specifying everything on this
      * <code>Tile</code>.
      *

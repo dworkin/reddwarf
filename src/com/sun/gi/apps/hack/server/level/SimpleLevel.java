@@ -123,8 +123,6 @@ import java.util.logging.Logger;
 public class SimpleLevel implements Level
 {
 
-    private static Logger log = Logger.getLogger("com.sun.gi.apps.hack.server");
-
     // a reference to ourself, which we'll get lazily
     private GLOReference<? extends Level> selfRef = null;
 
@@ -212,18 +210,9 @@ public class SimpleLevel implements Level
             y = NSidedDie.rollNSided(levelHeight) - 1;
 
             // loop until we find a space to successfully add the character
-        } while (! (board.testMove(x, y, mgrRef) &&
-                    addCharacter(mgrRef, x, y)));
+        } while (! (board.testMove(x, y, mgrRef)));
 
-        if (log.isLoggable(java.util.logging.Level.FINE)) {
-            CharacterManager cmgr = mgrRef.peek(SimTask.getCurrent());
-            com.sun.gi.apps.hack.server.Character ch =
-                cmgr.getCurrentCharacter();
-            log.fine(name + " adding " + ch.getName() +
-                    " [" + ch.getID() + "] at (" + x + ", " + y + ")");
-        }
-
-        
+        addCharacter(mgrRef, x, y);
     }
 
     /**

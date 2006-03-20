@@ -118,10 +118,6 @@ import java.util.logging.Logger;
 public class SimpleBoard implements LevelBoard
 {
 
-    private static Logger log =
-	    Logger.getLogger("com.sun.gi.apps.hack.server.level");
-    static boolean debug = true;
-
     // the dimension of this board
     private int width;
     private int height;
@@ -168,8 +164,6 @@ public class SimpleBoard implements LevelBoard
                     tiles[x][y] = new PassableTile(id);
             }
         }
-
-	consistent();
     }
 
     /**
@@ -213,11 +207,7 @@ public class SimpleBoard implements LevelBoard
      * @return the set of identifiers at this space
      */
     public int [] getAt(int x, int y) {
-
-	consistent();
-	int[] rc = tiles[x][y].getIdStack();
-	consistent();
-        return rc;
+        return tiles[x][y].getIdStack();
     }
 
     /**
@@ -242,11 +232,7 @@ public class SimpleBoard implements LevelBoard
     public boolean addCharacterAt(int x, int y,
                                   GLOReference<? extends CharacterManager>
                                   mgrRef) {
-        
-	consistent();
-	boolean rc = tiles[x][y].addCharacter(mgrRef);
-	consistent();
-        return rc;
+        return tiles[x][y].addCharacter(mgrRef);
     }
 
     /**
@@ -261,10 +247,7 @@ public class SimpleBoard implements LevelBoard
     public boolean removeCharacterAt(int x, int y,
                                      GLOReference<? extends CharacterManager>
                                      mgrRef) {
-	consistent();
-	boolean rc = tiles[x][y].removeCharacter(mgrRef);
-	consistent();
-        return rc;
+        return tiles[x][y].removeCharacter(mgrRef);
     }
 
     /**
@@ -279,10 +262,7 @@ public class SimpleBoard implements LevelBoard
      */
     public boolean addItemAt(int x, int y,
                              GLOReference<? extends Item> itemRef) {
-	consistent();
-	boolean rc = tiles[x][y].addItem(itemRef);
-	consistent();
-        return rc;
+        return tiles[x][y].addItem(itemRef);
     }
 
     /**
@@ -296,10 +276,7 @@ public class SimpleBoard implements LevelBoard
      */
     public boolean removeItemAt(int x, int y,
                                 GLOReference<? extends Item> itemRef) {
-	consistent();
-	boolean rc = tiles[x][y].removeItem(itemRef);
-	consistent();
-        return rc;
+        return tiles[x][y].removeItem(itemRef);
     }
 
     /**
@@ -314,10 +291,7 @@ public class SimpleBoard implements LevelBoard
      */
     public boolean testMove(int x, int y,
                             GLOReference<? extends CharacterManager> mgrRef) {
-	consistent();
-	boolean rc = tiles[x][y].isPassable(mgrRef);
-	consistent();
-        return rc;
+        return tiles[x][y].canOccupy(mgrRef);
     }
 
     /**
@@ -331,11 +305,8 @@ public class SimpleBoard implements LevelBoard
      * @return the result of attempting the move
      */
     public ActionResult moveTo(int x, int y, CharacterManager mgr) {
-
-	consistent();
-
         // see if the space is passable
-        if (! testMove(x, y, mgr.getReference()))
+        if (! tiles[x][y].isPassable(mgr.getReference()))
             return ActionResult.FAIL;
 
         // try to move onto that space, but remember the previous position
@@ -356,17 +327,13 @@ public class SimpleBoard implements LevelBoard
             if (result == ActionResult.CHARACTER_LEFT)
                 tiles[oldX][oldY].removeCharacter(mgr.getReference());
 
-	    consistent();
             return result;
         }
-
-	consistent();
 
         // ...but if we succeeded, then move the character...
         tiles[oldX][oldY].removeCharacter(mgr.getReference());
         tiles[x][y].addCharacter(mgr.getReference());
 
-	consistent();
         // ...and return success
         return ActionResult.SUCCESS;
     }
@@ -381,42 +348,12 @@ public class SimpleBoard implements LevelBoard
      * @return the result of getting an item
      */
     public ActionResult getItem(int x, int y, CharacterManager mgr) {
-	consistent();
-
         ActionResult result = tiles[x][y].getItem(mgr);
-
-	consistent();
 
         if (result == ActionResult.CHARACTER_LEFT)
             tiles[x][y].removeCharacter(mgr.getReference());
 
-	consistent();
-
         return result;
     }
 
-    public boolean consistent() {
-	if (debug) {
-	    return true;
-	}
-
-	Set<Integer> itemsSeen = new HashSet<Integer>();
-	boolean passed = true;
-
-	for (int x = 0; x < width; x++) {
-	    for (int y = 0; y < height; y++) {
-		int[] items = tiles[x][y].getIdStack();
-		for (int item : items) {
-		    if (itemsSeen.contains(item)) {
-			log.warning("item " + item + " is on two tiles.");
-			(new Exception()).printStackTrace();
-			passed = false;
-		    }
-		    itemsSeen.add(item);
-		}
-	    }
-	}
-
-	return passed;
-    }
 }

@@ -134,14 +134,31 @@ public interface Tile extends Serializable
     public int [] getIdStack();
 
     /**
-     * Returns whether or not this space can be entered by the given
-     * character.
+     * Returns whether or not this space could be entered by the given
+     * character. Note that this only tests if the tile itself is passable.
+     * If there is a character or item on this space that would block
+     * access, it will still return true. If you want to test for the ability
+     * to actually move to the space in its current state, use
+     * <code>canOccupy</code>.
      *
      * @param mgrRef the manager for a character
      *
-     * @return whether or not the character can move to this tile
+     * @return whether or not the tile is passable
      */
     public boolean isPassable(GLOReference<? extends CharacterManager> mgrRef);
+
+    /**
+     * Returns whether or not this tile, in its current state, can be
+     * occupied by the given character. This takes into account the
+     * passability of the tile as well as anything that might currently
+     * occupy it. If you just want a simple test for tile passability,
+     * use <code>isPassable</code>.
+     *
+     * @param mgrRef the manager for a character
+     *
+     * @return whether or not the character can occupy this tile
+     */
+    public boolean canOccupy(GLOReference<? extends CharacterManager> mgrRef);
 
     /**
      * Adds the given character to this tile if possible.
