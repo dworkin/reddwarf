@@ -19,7 +19,7 @@ DefineLevel one
 2 2 2 2 2 2 2 20 2 2
 2 2 2 2 2 2 2 2 2 2
 2 2 2 2 2 2 2 2 2 2
-NPC one Karl 50 3 "leverage synergies" "think outside the box" "I'm logisticating right now" "drink martinis"
+NPC one Karl 50 4 "leverage synergies" "think outside the box" "I'm logisticating right now" "drink martinis"
 NPC one Steve 51 3 "wah chu gaht?" "huh?" "that's really cool"
 NPC one Miriam 54 3 "there's a form for that" "I designed your multicast stack" "try these cookies"
 Monster one Rodent 59
