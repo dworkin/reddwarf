@@ -92,10 +92,10 @@
 
 package com.sun.gi.apps.hack.client;
 
-import com.sun.gi.comm.routing.UserID;
-
 import com.sun.gi.apps.hack.share.CharacterStats;
 import com.sun.gi.apps.hack.share.GameMembershipDetail;
+
+import java.io.IOException;
 
 import java.nio.ByteBuffer;
 
@@ -103,159 +103,121 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Map;
 
-import com.sun.gi.comm.users.client.ClientChannelListener;
-
 
 /**
- *
+ * This class listens for all messages from the lobby.
  *
  * @since 1.0
  * @author Seth Proctor
  */
-public class LobbyChannelListener implements ClientChannelListener
+public class LobbyChannelListener extends GameChannelListener
 {
 
-    //
+    // the listener that gets notified on incoming messages
     private LobbyListener llistener;
 
-    //
-    private ChatListener clistener;
-
     /**
+     * Creates an instance of <code>LobbyListener</code>.
      *
+     * @param lobbyListener the listener for all lobby messages
+     * @param chatListsner the listener for all chat messages
      */
-    public LobbyChannelListener(LobbyListener llistener,
-                                ChatListener clistener) {
-        this.llistener = llistener;
-        this.clistener = clistener;
+    public LobbyChannelListener(LobbyListener lobbyListener,
+                                ChatListener chatListener) {
+        super(chatListener);
+
+        this.llistener = lobbyListener;
     }
 
     /**
-     * A new player has joined the channel this listener is registered on.
+     * Notifies this listener that some data has arrived from a given
+     * player. This should only be called with messages that pertain to
+     * the lobby.
      *
-     * @param playerID The ID of the joining player.
-     */
-    public void playerJoined(byte[] playerID) {
-        try {
-            clistener.playerJoined(new UserID(playerID));
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    /**
-     * A player has left the channel this listener is registered on.
-     *
-     * @param playerID The ID of the leaving player.
-     */
-    public void playerLeft(byte[] playerID) {
-        try {
-            clistener.playerLeft(new UserID(playerID));
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    /**
-     * A packet has arrived for this listener on this channel.
-     *
-     * @param from     the ID of the sending player.
-     * @param data     the packet data
+     * @param from the ID of the sending player.
+     * @param data the packet data
      * @param reliable true if this packet was sent reliably
      */
     public void dataArrived(byte[] from, ByteBuffer data, boolean reliable) {
         if (Arrays.equals(from, Client.SERVER_UID)) {
+            // if this is a message from the server, then it's some
+            // command that we need to process, so get the command code
             int command = (int)(data.get());
-            System.out.println("Lobby Command = " + command);
-            switch (command) {
-            case 0: {
-                try {
-                    byte [] bytes = new byte[data.remaining()];
-                    data.get(bytes);
-                    java.io.ByteArrayInputStream bin =
-                        new java.io.ByteArrayInputStream(bytes);
-                    java.io.ObjectInputStream ois =
-                        new java.io.ObjectInputStream(bin);
-                    Map<UserID,String> uidMap =
-                        (Map<UserID,String>)(ois.readObject());
-                    clistener.addUidMappings(uidMap);
-                } catch (Exception e) {
-                    System.out.println("Object stuff failed");
-                    e.printStackTrace();
-                }
-                break;
-            }
-            case 1: {
-                try {
-                    byte [] bytes = new byte[data.remaining()];
-                    data.get(bytes);
-                    java.io.ByteArrayInputStream bin =
-                        new java.io.ByteArrayInputStream(bytes);
-                    java.io.ObjectInputStream ois =
-                        new java.io.ObjectInputStream(bin);
+
+            // FIXME: this should really be an enumeration
+            try {
+                switch (command) {
+                case 0:
+                    // we got some uid to player name mapping
+                    addUidMappings(data);
+                    break;
+                case 1:
+                    // we were sent game membership updates
                     Collection<GameMembershipDetail> details =
-                        (Collection<GameMembershipDetail>)(ois.readObject());
+                        (Collection<GameMembershipDetail>)(getObject(data));
                     for (GameMembershipDetail detail : details) {
+                        // for each update, see if it's about the lobby
+                        // or some specific dungeon
                         if (! detail.getGame().equals("game:lobby")) {
+                            // it's a specific dungeon, so add the game and
+                            // set the initial count
                             llistener.gameAdded(detail.getGame());
                             llistener.playerCountUpdated(detail.getGame(),
                                                          detail.getCount());
                         } else {
+                            // it's the lobby, so update the count
                             llistener.playerCountUpdated(detail.getCount());
                         }
                     }
-                } catch (Exception e) {
-                    System.out.println("Object stuff failed");
-                    e.printStackTrace();
-                }
-                break; }
-            case 2: {
-                int count = data.getInt();
-                byte [] bytes = new byte[data.remaining()];
-                data.get(bytes);
-                String name = new String(bytes);
-
-                if (name.equals("game:lobby"))
-                    llistener.playerCountUpdated(count);
-                else
-                    llistener.playerCountUpdated(name, count);
-                break; }
-            case 3: {
-                byte [] bytes = new byte[data.remaining()];
-                data.get(bytes);
-                llistener.gameAdded(new String(bytes));
-                break; }
-            case 4: {
-                byte [] bytes = new byte[data.remaining()];
-                data.get(bytes);
-                llistener.gameRemoved(new String(bytes));
-                break; }
-            case 5: {
-                try {
+                    break;
+                case 2: {
+                    // we got a membership count update for some game
+                    int count = data.getInt();
                     byte [] bytes = new byte[data.remaining()];
                     data.get(bytes);
-                    java.io.ByteArrayInputStream bin =
-                        new java.io.ByteArrayInputStream(bytes);
-                    java.io.ObjectInputStream ois =
-                        new java.io.ObjectInputStream(bin);
+                    String name = new String(bytes);
+                    
+                    // see if it's the lobby or some specific dungeon, and
+                    // update the count appropriately
+                    if (name.equals("game:lobby"))
+                        llistener.playerCountUpdated(count);
+                    else
+                        llistener.playerCountUpdated(name, count);
+                    break; }
+                case 3: {
+                    // we heard about a new game
+                    byte [] bytes = new byte[data.remaining()];
+                    data.get(bytes);
+                    llistener.gameAdded(new String(bytes));
+                    break; }
+                case 4: {
+                    // we heard that a game was removed
+                    byte [] bytes = new byte[data.remaining()];
+                    data.get(bytes);
+                    llistener.gameRemoved(new String(bytes));
+                    break; }
+                case 5: {
+                    // we got updated with some character statistics...these
+                    // are characters that the client is allowed to play
                     Collection<CharacterStats> characters =
-                        (Collection<CharacterStats>)(ois.readObject());
+                        (Collection<CharacterStats>)(getObject(data));
                     llistener.setCharacters(characters);
-                } catch (Exception e) {
-                    System.out.println("Object stuff failed");
-                    e.printStackTrace();
+                    break; }
+                default:
+                    // FIXME: we should handle this more gracefully
+                    System.out.println("Unexpected lobby message: " + command);
                 }
-                break; }
+            } catch (IOException ioe) {
+                // FIXME: this should probably handle the error a little more
+                // gracefully, but it's unclear what the right approach is
+                System.out.println("Failed to handle incoming Lobby object");
+                ioe.printStackTrace();
             }
         } else {
-            try {
-                // for now, we assume this is the client
-                byte [] bytes = new byte[data.remaining()];
-                data.get(bytes);
-                clistener.messageArrived(new UserID(from), new String(bytes));
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+            // this isn't a message from the server, so it came from some
+            // other player on our channel...in this game, that can only
+            // mean that we got a chat message
+            notifyChatMessage(from, data);
         }
     }
 
@@ -263,7 +225,7 @@ public class LobbyChannelListener implements ClientChannelListener
      * Notifies this listener that the channel has been closed.
      */
     public void channelClosed() {
-        
+
     }
 
 }

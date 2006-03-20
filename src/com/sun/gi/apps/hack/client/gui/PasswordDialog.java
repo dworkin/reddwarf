@@ -108,7 +108,7 @@ import javax.swing.JTextField;
 
 
 /**
- *
+ * This is a dialog used to prompt the user for a login name and password.
  *
  * @since 1.0
  * @author Seth Proctor
@@ -116,22 +116,26 @@ import javax.swing.JTextField;
 public class PasswordDialog extends JDialog implements ActionListener
 {
 
-    //
+    // the name elements
     private JTextField loginField;
     private String login = null;
 
-    //
+    // the password elements
     private JPasswordField passField;
     private char [] pass = null;
 
     /**
+     * Creates an instance of <code>PasswordDialog</code>.
      *
+     * @param parent the parent for this dialog
+     * @param loginLabel the text label to use for the name field
+     * @param passLabel the text label to use for the password field
      */
     public PasswordDialog(Frame parent, String loginLabel, String passLabel) {
         super(parent, "SGS Login", true);
 
-        loginField = new JTextField(30);
-        passField = new JPasswordField(30);
+        loginField = new JTextField(20);
+        passField = new JPasswordField(20);
 
         JPanel entryPanel = new JPanel(new GridLayout(2, 2));
         entryPanel.add(new JLabel(loginLabel + ":"));
@@ -153,27 +157,36 @@ public class PasswordDialog extends JDialog implements ActionListener
         add(buttonPanel, BorderLayout.SOUTH);
     }
 
+    /**
+     * Called when the user clicks on the OK or Cancel buttons.
+     *
+     * @param ae details about what was clicked
+     */
     public void actionPerformed(ActionEvent ae) {
-        System.out.println("Button is: " + ae.getActionCommand());
-        
+        // if the user hit OK, then get the name and password
         if (ae.getActionCommand().equals("OK")) {
             login = loginField.getText();
             pass = passField.getPassword();
         }
 
+        // regarldess, dispose of the dialog
         setVisible(false);
         dispose();
     }
 
     /**
+     * Returns the login name that the user provided.
      *
+     * @return the login name
      */
     public String getLogin() {
         return login;
     }
 
     /**
+     * Returns the password that the user provided.
      *
+     * @return the password
      */
     public char [] getPassword() {
         return pass;

@@ -119,7 +119,7 @@ public class ChatManager implements ChatListener
     private ClientChannel channel;
 
     /**
-     * Creates a <code>ChatManager</code>.
+     * Creates an instance of <code>ChatManager</code>.
      */
     public ChatManager() {
         listeners = new HashSet<ChatListener>();
@@ -148,10 +148,6 @@ public class ChatManager implements ChatListener
     /**
      * Sends a broadcast chat message to all participants on the current
      * channel.
-     * <p>
-     * NOTE: at the moment, this does not accept any user info or other
-     * meta-data because it's assumed that the server will provide it all,
-     * but this may change.
      *
      * @param message the chat message to send
      */
@@ -162,7 +158,10 @@ public class ChatManager implements ChatListener
     }
 
     /**
+     * Called when a player joins the chat group. This notifies all of the
+     * registered listeners.
      *
+     * @param uid the identifier for the player
      */
     public void playerJoined(UserID uid) {
         for (ChatListener listener : listeners)
@@ -170,7 +169,10 @@ public class ChatManager implements ChatListener
     }
 
     /**
+     * Called when a player leaves the chat group. This notifies all of the
+     * registered listeners.
      *
+     * @param uid the identifier for the player
      */
     public void playerLeft(UserID uid) {
         for (ChatListener listener : listeners)
@@ -178,7 +180,8 @@ public class ChatManager implements ChatListener
     }
 
     /**
-     * Notify the listener when a message has arrived.
+     * Notify the manager when a message has arrived. This notifies all of
+     * the registered listeners.
      *
      * @param sender the id of the sender
      * @param message the messsage itself
@@ -189,7 +192,8 @@ public class ChatManager implements ChatListener
     }
 
     /**
-     *
+     * Notifies the manager about some set of mappings from identifier
+     * to user name. This notifies all of the registered listeners.
      */
     public void addUidMappings(Map<UserID,String> uidMap) {
         for (ChatListener listener : listeners)

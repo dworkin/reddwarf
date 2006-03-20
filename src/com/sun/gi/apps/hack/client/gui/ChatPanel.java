@@ -192,7 +192,9 @@ public class ChatPanel extends JPanel implements ActionListener, ChatListener
     }
 
     /**
+     * Called when a player joins the chat.
      *
+     * @param uid the identifier of the player that joined
      */
     public void playerJoined(UserID uid) {
         if (uidMap.containsKey(uid))
@@ -200,7 +202,9 @@ public class ChatPanel extends JPanel implements ActionListener, ChatListener
     }
 
     /**
+     * Called when a player leaves the chat.
      *
+     * @param uid the identifier of the player that left
      */
     public void playerLeft(UserID uid) {
         if (uidMap.containsKey(uid))
@@ -219,7 +223,10 @@ public class ChatPanel extends JPanel implements ActionListener, ChatListener
     }
 
     /**
+     * Called when there is new information about the mapping from user
+     * identifiers to user names.
      *
+     * @param uidMap the mapping from identifiers to names
      */
     public void addUidMappings(Map<UserID,String> uidMap) {
         this.uidMap.putAll(uidMap);

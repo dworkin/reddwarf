@@ -126,63 +126,74 @@ import javax.swing.JPanel;
 
 
 /**
+ * This is the main class for the client app. It creates the connection
+ * with the server, sets up the GUI elements, and listenes for the major
+ * events from the server game app.
  *
+ * @since 1.0
+ * @author Seth Proctor
  */
 public class Client extends JFrame implements ClientConnectionManagerListener
 {
 
     /**
-     *
+     * The identifier for the server's messages.
      */
     public static final byte [] SERVER_UID = UserID.SERVER_ID.toByteArray();
 
-    //
+    // the connection manager used to handle incoming messages
     private ClientConnectionManager connManager;
 
-    //
+    // the gui and message handlers for interaction with the lobby
     private LobbyManager lmanager;
     private LobbyPanel lobbyPanel;
+    private LobbyChannelListener llistener;
 
-    //
+    // the gui and messages handlers for chatting
     private ChatManager cmanager;
     private ChatPanel chatPanel;
 
-    //
+    // the gui and message handlers for interaction with a dungeon
     private GameManager gmanager;
     private GamePanel gamePanel;
-
-    //
-    private LobbyChannelListener llistener;
-
-    //
     private DungeonChannelListener dlistener;
 
-    // 
+    // the card layour manager for swapping between different panels
     private CardLayout managerLayout;
     private JPanel managerPanel;
 
     /**
+     * Creates an instance of <code>Client</code>. This sets up the GUI
+     * elements and the state for talking with the game server, but does not
+     * establish a connection.
      *
+     * @throws Exception if there is any problem with the initial setup
      */
     public Client() throws Exception {
         super("SGS Demo Game 0.1");
 
+        // listen for events on the root window
         addWindowListener(new BasicWindowMonitor());
 
+        // create the managers
         lmanager = new LobbyManager();
         cmanager = new ChatManager();
         gmanager = new GameManager();
 
+        // setup the listeners to handle communication from the game app
         llistener = new LobbyChannelListener(lmanager, cmanager);
         dlistener = new DungeonChannelListener(gmanager, cmanager, gmanager);
 
         Container c = getContentPane();
         c.setLayout(new BorderLayout());
 
+        // create the GUI panels used for the game elements
         lobbyPanel = new LobbyPanel(lmanager);
         gamePanel = new GamePanel(gmanager);
         chatPanel = new ChatPanel(cmanager, gamePanel);
 
+        // setup a CardLayout for the game and lobby panels, so we can
+        // easily switch between them
         managerLayout = new CardLayout();
         managerPanel = new JPanel(managerLayout);
         managerPanel.add(lobbyPanel, "a");
@@ -191,6 +202,7 @@ public class Client extends JFrame implements ClientConnectionManagerListener
         c.add(managerPanel, BorderLayout.CENTER);
         c.add(chatPanel, BorderLayout.SOUTH);
 
+        // setup the connection details
         URL url = new URL("file:FakeDiscovery.xml");
         connManager =
             new ClientConnectionManagerImpl("Hack",
@@ -201,23 +213,26 @@ public class Client extends JFrame implements ClientConnectionManagerListener
     }
 
     /**
+     * Tries to connect to the game server.
      *
+     * @throws Exception if the connection failes
      */
     public void connect() throws Exception {
-        System.out.println("connect");
         String [] classNames = connManager.getUserManagerClassNames();
         connManager.connect(classNames[0]);
-        System.out.println("finished connect");
     }
 
     /**
+     * Called when the server needs credentials to authenticate the client.
      *
+     * @param callbacks the credential mechanisms
      */
     public void validationRequest(Callback[] callbacks) {
-        System.out.println("validation request");
         NameCallback nameCb = null;
         PasswordCallback passCb = null;
 
+        // look in the callbacks for the details required...in our app, all
+        // authentication is done with username-password pairs
         for (int i = 0; i < callbacks.length; i++) {
             if (callbacks[i] instanceof NameCallback) {
                 nameCb = (NameCallback)(callbacks[i]);
@@ -226,60 +241,128 @@ public class Client extends JFrame implements ClientConnectionManagerListener
             }
         }
 
+        // prompt the user for their login and password...
         PasswordDialog pd = new PasswordDialog(this, nameCb.getPrompt(),
                                                passCb.getPrompt());
         pd.pack();
         pd.setVisible(true);
 
+        // ...and retrieve their inputs
         nameCb.setName(pd.getLogin());
         passCb.setPassword(pd.getPassword());
 
+        // finally, send a response to the authentication request
         connManager.sendValidationResponse(callbacks);
     }
 
-    public void connected(byte[] myID) {}
-    public void connectionRefused(String message) {System.out.println("refused");}
-    public void failOverInProgress() {System.out.println("fail-over");}
-    public void reconnected() {System.out.println("re-connected");}
-    public void disconnected() {System.out.println("dis-connected");}
+    /**
+     * Called when the client establishes a connection.
+     *
+     * @param myID the client's identifier
+     */
+    public void connected(byte[] myID) {
+        
+    }
 
+    /**
+     * Called when a connection attempt is refused.
+     *
+     * @param message an explaination of the refusal
+     */
+    public void connectionRefused(String message) {
+        System.out.println("Connection refused: " + message);
+    }
+
+    /**
+     * Called when a connection fail-over happens. This typically happens
+     * when the server goes down and then comes back up.
+     */
+    public void failOverInProgress() {
+
+    }
+
+    /**
+     * Called when the client has been re-connected to the server.
+     */
+    public void reconnected() {
+
+    }
+
+    /**
+     * Called when the client is disconnected from the server.
+     */
+    public void disconnected() {
+
+    }
+
+    /**
+     * Called when a user joins the game.
+     *
+     * @param userID the joining user's identifier
+     */
     public void userJoined(byte[] userID) {
-        System.out.println("From Client: joined ");
-        //cmanager.messageArrived(new String(userID), "*joined*");
+
     }
 
+    /**
+     * Called when a user leaves the game.
+     *
+     * @param userID the leaving user's identifier
+     */
     public void userLeft(byte[] userID) {
-        System.out.println("From Client: left");
-        //cmanager.messageArrived(new String(userID), "*left*");
+
     }
 
+    /**
+     * Called when the client joins a communication channel. In this game
+     * the client is never on more than one channel at a time, so this
+     * is used to switch between states.
+     *
+     * @param channel the channel that we joined
+     */
     public void joinedChannel(ClientChannel channel) {
-        System.out.println("joined channel: " + channel.getName());
-
-        // clear the chat area, 'cause we're going to a new area
+        // clear the chat area each time we join a new area
         chatPanel.clearMessages();
 
-        // see which type of game we've joined, and install the right listener
+        // see which type of game we've joined, and based on this display
+        // the right panel and set the appropriate listener to handle
+        // messages from the server
         if (channel.getName().equals("game:lobby")) {
+            // we joined the lobby
             lobbyPanel.clearList();
             channel.setListener(llistener);
             managerLayout.first(managerPanel);
         } else {
+            // we joined some dungeon
             gamePanel.showLoadingScreen();
             channel.setListener(dlistener);
             managerLayout.last(managerPanel);
+
+            // request focus so all key presses are captured
             gamePanel.requestFocusInWindow();
         }
 
-        // update the chat managers with the channel, so it knows where to
+        // update the chat manager with the channel, so it knows where to
         // broadcast chat messages
         cmanager.setChannel(channel);
     }
 
-    public void channelLocked(String chan, byte[] userID) {System.out.println("locked channel");}
+    /**
+     * Called when a channel that the client is on is locked. In this game
+     * this method is never called, becase all channels are locked as soon
+     * as they are created, and therefore before a client joins the channel.
+     *
+     * @param channel the channel that was locked
+     * @param userID the user 
+     */
+    public void channelLocked(String channel, byte[] userID) {
+        
+    }
 
     /**
+     * The main-line for the client app.
      *
+     * @param args command-line arguments, which are ignored
      */
     public static void main(String [] args) throws Exception {
         Client client = new Client();

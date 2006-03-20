@@ -109,24 +109,28 @@ import javax.swing.JPanel;
 
 
 /**
+ * This panel renders a dungeon level, and accepts input from the player.
  *
+ * @since 1.0
+ * @author Seth Proctor
  */
 class BoardPanel extends JPanel implements BoardListener
 {
 
-    //
+    // the sprite map used to render the current board
     private Map<Integer,Image> spriteMap;
 
-    //
+    // the off-screen copy of the graphics
     private BufferedImage offscreen;
 
-    //
+    // the size of each sprite
     private int spriteSize = 0;
 
     /**
-     *
+     * Creates an instance of <code>BoardPanel</code>.
      */
     public BoardPanel() {
+        // create a temporary buffer for use until we get a real board
         offscreen = new BufferedImage(50, 50,
                                       BufferedImage.TYPE_INT_RGB);
         Graphics g = offscreen.createGraphics();
@@ -136,7 +140,7 @@ class BoardPanel extends JPanel implements BoardListener
     }
 
     /**
-     *
+     * Display the screen that is used until the board is ready.
      */
     public void showLoadingScreen() {
         offscreen = new BufferedImage(getWidth(), getHeight(),
@@ -150,7 +154,11 @@ class BoardPanel extends JPanel implements BoardListener
     }
 
     /**
+     * Sets the mapping from identifier to image that is used for the
+     * current board.
      *
+     * @param spriteSize the size of each sprite
+     * @param spriteMap the mapping of identifier to image
      */
     public void setSpriteMap(int spriteSize, Map<Integer,Image> spriteMap) {
         this.spriteSize = spriteSize;
@@ -158,7 +166,9 @@ class BoardPanel extends JPanel implements BoardListener
     }
 
     /**
+     * Changes the panel to render the given board.
      *
+     * @param board the new board to render
      */
     public void changeBoard(Board board) {
         int w = board.getWidth() * spriteSize;
@@ -183,7 +193,7 @@ class BoardPanel extends JPanel implements BoardListener
     }
 
     /**
-     *
+     * Private helper that renders a single space.
      */
     private void updateSpace(Graphics g, int x, int y, int [] ids) {
         for (int i = 0; i < ids.length; i++)
@@ -192,7 +202,9 @@ class BoardPanel extends JPanel implements BoardListener
     }
 
     /**
+     * Applies the given updates to the board.
      *
+     * @param spaces an array of updates to specific spaces
      */
     public void updateSpaces(BoardSpace [] spaces) {
         Graphics g = offscreen.createGraphics();
@@ -206,7 +218,9 @@ class BoardPanel extends JPanel implements BoardListener
     }
 
     /**
+     * Called when there's a message from the server.
      *
+     * @param message the message sent from the server
      */
     public void hearMessage(String message) {
         // FIXME: this should be painted on the board somewhere, but for
@@ -215,7 +229,9 @@ class BoardPanel extends JPanel implements BoardListener
     }
 
     /**
+     * Called to update the on-screen display of the board.
      *
+     * @param g the graphcs object to draw onto
      */
     public void paint(Graphics g) {
         g.drawImage(offscreen, 0, 0, this);

@@ -102,7 +102,12 @@ import javax.swing.JPanel;
 
 
 /**
- *
+ * This panel displays details about one player character.
+ * <p>
+ * Note that this is a fairly naive, simple implementation. This should be
+ * updated to handle changes more effectively, and to display things more
+ * aesthetically. For now, this class is used to centralize this
+ * functionality so it's easy to update.
  *
  * @since 1.0
  * @author Seth Proctor
@@ -110,7 +115,7 @@ import javax.swing.JPanel;
 class PlayerInfoPanel extends JPanel implements PlayerListener
 {
 
-    //
+    // the labels used to display the character detail
     private JLabel nameLabel;
     private JLabel hpLabel;
     private JLabel strengthLabel;
@@ -119,14 +124,14 @@ class PlayerInfoPanel extends JPanel implements PlayerListener
     private JLabel wisdomLabel;
     private JLabel constitutionLabel;
     private JLabel charismaLabel;
-    
 
     /**
-     *
+     * Creates an instance of <code>PlayerInfoPanel</code>.
      */
     public PlayerInfoPanel() {
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
         
+        // create all the labels
         nameLabel = new JLabel();
         hpLabel = new JLabel();
         strengthLabel = new JLabel();
@@ -136,8 +141,10 @@ class PlayerInfoPanel extends JPanel implements PlayerListener
         constitutionLabel = new JLabel();
         charismaLabel = new JLabel();
         
+        // initialize all the labels
         setLabels("", 0, 0, 0, 0, 0, 0, 0, 0);
 
+        // add all the labels to the GUI
         add(nameLabel);
         add(hpLabel);
         add(strengthLabel);
@@ -146,12 +153,10 @@ class PlayerInfoPanel extends JPanel implements PlayerListener
         add(wisdomLabel);
         add(constitutionLabel);
         add(charismaLabel);
-
-        //setSize(50, 150);
     }
 
     /**
-     *
+     * Private helper used to set the text of all labels.
      */
     private void setLabels(String name, int strength, int intelligence,
                            int dexterity, int wisdom, int constitution,
@@ -167,7 +172,10 @@ class PlayerInfoPanel extends JPanel implements PlayerListener
     }
 
     /**
+     * Sets which character this panel is currently displaying.
      *
+     * @param id the sprite id for the character
+     * @param stats the statistics for the character
      */
     public void setCharacter(int id, CharacterStats stats) {
         setLabels(stats.getName(), stats.getStrength(),
@@ -178,7 +186,8 @@ class PlayerInfoPanel extends JPanel implements PlayerListener
     }
 
     /**
-     *
+     * Updates the current character detail. Note that this may be removed,
+     * since it isn't currently being used.
      */
     public void updateCharacter(/*FIXME: define this type*/) {
 

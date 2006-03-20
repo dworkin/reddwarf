@@ -115,7 +115,7 @@ import javax.swing.event.ListSelectionListener;
 
 
 /**
- *
+ * A panel that manages all the lobby GUI elements.
  *
  * @since 1.0
  * @author Seth Proctor
@@ -124,35 +124,39 @@ public class LobbyPanel extends JPanel
     implements ActionListener, ListSelectionListener
 {
 
-    //
+    // the manager for the list of games that are available to play
     private GameList list;
 
-    //
+    // the manager for talking to the lobby
     private LobbyManager manager;
 
-    //
+    // the panel used to choose players and see their stata
     private CharacterPanel characterPanel;
 
-    //
+    // the button you hit to join a game
     private JButton joinButton;
 
-    //
+    // a label displaying the current lobby count
     private JLabel countLabel;
 
-    //
+    // which game is currently selected in the list
     private int currentSelection = -1;
 
     /**
+     * Creates an instance of <code>LobbyPanel</code>.
      *
+     * @param lobbyManager the manager used to talk with the server
      */
     public LobbyPanel(LobbyManager lobbyManager) {
         super(new BorderLayout(4, 4));
 
         this.manager = lobbyManager;
 
+        // create the manager for the list...
         list = new GameList(this);
         lobbyManager.addLobbyListener(list);
 
+        // ...and create the GUI list element to render the game details
         JList jlist = new JList(list);
         jlist.setVisibleRowCount(12);
         jlist.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
@@ -160,6 +164,8 @@ public class LobbyPanel extends JPanel
 
         characterPanel = new CharacterPanel();
 
+        // start the join button as disabled, so we only turn it on when
+        // some game has been selected
         joinButton = new JButton("Join");
         joinButton.addActionListener(this);
         joinButton.setEnabled(false);
@@ -173,7 +179,8 @@ public class LobbyPanel extends JPanel
     }
 
     /**
-     *
+     * Clears the current list of games. Typically, this is done each time
+     * the player returns to the lobby.
      */
     public void clearList() {
         list.clearList();
@@ -181,36 +188,45 @@ public class LobbyPanel extends JPanel
     }
 
     /**
+     * Called when the user clicks on the join button.
      *
+     * @param ae details about the action
      */
     public void actionPerformed(ActionEvent ae) {
-        manager.action(list.getNameAt(currentSelection),
-                       characterPanel.getCharacterName());
+        manager.joinGame(list.getNameAt(currentSelection),
+                         characterPanel.getCharacterName());
     }
 
     /**
+     * Called when the selected item in the GUI list changes.
      *
+     * @param e details about what is changing
      */
     public void valueChanged(ListSelectionEvent e) {
         if (! e.getValueIsAdjusting()) {
-            //
+            // get a pointer to the GUI list element
             JList list = (JList)(e.getSource());
 
-            //
+            // get the current selection, and toggle the button on or off
+            // based on whether anything is selected
             currentSelection = list.getSelectedIndex();
             joinButton.setEnabled(! list.isSelectionEmpty());
         }
     }
 
     /**
+     * Called when the lobby count changes.
      *
+     * @param count the new lobby membership count
      */
     public void updateLobbyCount(int count) {
         countLabel.setText("Players in Lobby: " + count);
     }
 
     /**
+     * Sets the characters that are available for the player to use.
      *
+     * @param characters the character details
      */
     public void setCharacters(Collection<CharacterStats> characters) {
         characterPanel.setCharacters(characters);

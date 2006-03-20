@@ -104,7 +104,7 @@ import javax.swing.JPanel;
 
 
 /**
- *
+ * This is a panel used to show interaction with a dungeon.
  *
  * @since 1.0
  * @author Seth Proctor
@@ -112,17 +112,19 @@ import javax.swing.JPanel;
 public class GamePanel extends JPanel implements KeyListener
 {
 
-    //
+    // the panel that renders the board
     private BoardPanel boardPanel;
 
-    //
+    // the panel that shows character detail
     private PlayerInfoPanel playerInfoPanel;
 
-    //
+    // the listener used to forward user actions
     private CommandListener commListener;
 
     /**
+     * Creates an instance of <code>GamePanel</code>.
      *
+     * @param gameManager the manager used to handle user actions
      */
     public GamePanel(GameManager gameManager) {
         super(new BorderLayout(4, 4), true);
@@ -146,28 +148,36 @@ public class GamePanel extends JPanel implements KeyListener
     }
 
     /**
-     *
+     * Tells the panel to render a screen that shows a loading message.
      */
     public void showLoadingScreen() {
         boardPanel.showLoadingScreen();
     }
 
     /**
+     * Called when the user presses a key. This drives all user interaction.
      *
+     * @param e the event describing the key press
      */
     public void keyPressed(KeyEvent e) {
         commListener.action(e.getKeyCode());
     }
 
     /**
+     * Called when the user releases a key. This is ignored, since all
+     * actions are triggered from <code>keyPressed</code>.
      *
+     * @param e the event describing the key released
      */
     public void keyReleased(KeyEvent e) {
 
     }
 
     /**
+     * Called when the user types a key. This is ignored, since all
+     * actions are triggered from <code>keyPressed</code>.
      *
+     * @param e the event describing the key typed
      */
     public void keyTyped(KeyEvent e) {
         

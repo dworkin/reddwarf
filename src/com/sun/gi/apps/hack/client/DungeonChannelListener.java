@@ -92,10 +92,7 @@
 
 package com.sun.gi.apps.hack.client;
 
-import com.sun.gi.comm.routing.UserID;
-
-import com.sun.gi.comm.users.client.ClientChannelListener;
-
+import com.sun.gi.apps.hack.share.Board;
 import com.sun.gi.apps.hack.share.BoardSpace;
 import com.sun.gi.apps.hack.share.CharacterStats;
 
@@ -115,198 +112,129 @@ import javax.imageio.ImageIO;
 
 
 /**
- *
+ * This class listens for all nessages from a dungeon.
  *
  * @since 1.0
  * @author Seth Proctor
  */
-public class DungeonChannelListener implements ClientChannelListener
+public class DungeonChannelListener extends GameChannelListener
 {
 
-    //
+    // the listener that gets notified on incoming board-related messages
     private BoardListener blistener;
 
-    //
-    private ChatListener clistener;
-
-    //
+    // the listener that gets notified on incoming player-related messages
     private PlayerListener plistener;
 
     /**
+     * Creates an instance of <code>DungeonChannelListener</code>.
      *
+     * @param boardListener the listener for all board messages
+     * @param chatListener the listener for all chat messages
+     * @param playerListener the listener for all player messages
      */
-    public DungeonChannelListener(BoardListener blistener,
-                                  ChatListener clistener,
-                                  PlayerListener plistener) {
-        this.blistener = blistener;
-        this.clistener = clistener;
-        this.plistener = plistener;
+    public DungeonChannelListener(BoardListener boardListener,
+                                  ChatListener chatListener,
+                                  PlayerListener playerListener) {
+        super(chatListener);
+
+        this.blistener = boardListener;
+        this.plistener = playerListener;
     }
 
     /**
-     * A new player has joined the channel this listener is registered on.
+     * Notifies this listener that some data has arrived from a given
+     * player. This should only be called with messages that pertain to
+     * a dungeon.
      *
-     * @param playerID The ID of the joining player.
-     */
-    public void playerJoined(byte[] playerID) {
-        try {
-            clistener.playerJoined(new UserID(playerID));
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    /**
-     * A player has left the channel this listener is registered on.
-     *
-     * @param playerID The ID of the leaving player.
-     */
-    public void playerLeft(byte[] playerID) {
-        try {
-            clistener.playerLeft(new UserID(playerID));
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    /**
-     * A packet has arrived for this listener on this channel.
-     *
-     * @param from     the ID of the sending player.
-     * @param data     the packet data
+     * @param from the ID of the sending player.
+     * @param data the packet data
      * @param reliable true if this packet was sent reliably
      */
     public void dataArrived(byte[] from, ByteBuffer data, boolean reliable) {
-        // FIXME: what we should do at this point is figure out if it's
-        // from the server or another client, and act on this...
-        // ...for now, assume it's just chat data
-
         if (Arrays.equals(from, Client.SERVER_UID)) {
+            // if this is a message from the server, then it's some
+            // command that we need to process, so get the command code
             int command = (int)(data.get());
-            switch (command) {
-            case 0: {
-                try {
-                    byte [] bytes = new byte[data.remaining()];
-                    data.get(bytes);
-                    java.io.ByteArrayInputStream bin =
-                        new java.io.ByteArrayInputStream(bytes);
-                    java.io.ObjectInputStream ois =
-                        new java.io.ObjectInputStream(bin);
-                    Map<UserID,String> uidMap =
-                        (Map<UserID,String>)(ois.readObject());
-                    clistener.addUidMappings(uidMap);
-                } catch (Exception e) {
-                    System.out.println("Object stuff failed");
-                    e.printStackTrace();
-                }
-                break;
-            }
-            case 1: {
-                int spriteSize = data.getInt();
-                try {
-                    byte [] bytes = new byte[data.remaining()];
-                    data.get(bytes);
-                    java.io.ByteArrayInputStream bin =
-                        new java.io.ByteArrayInputStream(bytes);
-                    java.io.ObjectInputStream ois =
-                        new java.io.ObjectInputStream(bin);
+
+            // FIXME: this should really be an enumeration
+            try {
+                switch (command) {
+                case 0:
+                    // we got some uid to player name mapping
+                    addUidMappings(data);
+                    break;
+                case 1:
+                    // we were sent game membership updates
+                    int spriteSize = data.getInt();
                     Map<Integer,byte[]> spriteMap =
-                        (Map<Integer,byte[]>)(ois.readObject());
+                        (Map<Integer,byte[]>)(getObject(data));
                     blistener.setSpriteMap(spriteSize, convertMap(spriteMap));
-                } catch (Exception e) {
-                    System.out.println("Object stuff failed");
-                    e.printStackTrace();
-                }
                 break;
-            }
-            case 2:
-                try {
-                    byte [] bytes = new byte[data.remaining()];
-                    data.get(bytes);
-                    java.io.ByteArrayInputStream bin =
-                        new java.io.ByteArrayInputStream(bytes);
-                    java.io.ObjectInputStream ois =
-                        new java.io.ObjectInputStream(bin);
-                    com.sun.gi.apps.hack.share.Board board =
-                        (com.sun.gi.apps.hack.share.Board)(ois.readObject());
+                case 2:
+                    // we got a complete board update
+                    Board board = (Board)(getObject(data));
                     blistener.changeBoard(board);
-                } catch (Exception e) {
-                    System.out.println("Object stuff failed");
-                    e.printStackTrace();
-                }
                 break;
-            case 3:
-                try {
-                    byte [] bytes = new byte[data.remaining()];
-                    data.get(bytes);
-                    java.io.ByteArrayInputStream bin =
-                        new java.io.ByteArrayInputStream(bytes);
-                    java.io.ObjectInputStream ois =
-                        new java.io.ObjectInputStream(bin);
+                case 3:
+                    // we got some selective space updates
                     Collection<BoardSpace> spaces =
-                        (Collection<BoardSpace>)(ois.readObject());
+                        (Collection<BoardSpace>)(getObject(data));
                     BoardSpace [] s = new BoardSpace[spaces.size()];
                     blistener.updateSpaces(spaces.toArray(s));
-                } catch (Exception e) {
-                    System.out.println("Object stuff failed");
-                    e.printStackTrace();
-                }
                 break;
-            case 4: {
-                byte [] bytes = new byte[data.remaining()];
-                data.get(bytes);
-                String message = new String(bytes);
-                blistener.hearMessage(message);
-                break;
-            }
-            case 64:
-                System.out.println("got character data");
-                int id = data.getInt();
-                try {
+                case 4:
+                    // we heard some message from the server
                     byte [] bytes = new byte[data.remaining()];
                     data.get(bytes);
-                    java.io.ByteArrayInputStream bin =
-                        new java.io.ByteArrayInputStream(bytes);
-                    java.io.ObjectInputStream ois =
-                        new java.io.ObjectInputStream(bin);
-                    CharacterStats stats =
-                        (CharacterStats)(ois.readObject());
+                    String message = new String(bytes);
+                    blistener.hearMessage(message);
+                    break;
+                case 64:
+                    // we were sent updated character statistics
+                    int id = data.getInt();
+                    CharacterStats stats = (CharacterStats)(getObject(data));
                     plistener.setCharacter(id, stats);
-                } catch (Exception e) {
-                    System.out.println("Object stuff failed");
-                    e.printStackTrace();
+                    break;
+                default:
+                    // FIXME: we should handle this more gracefully
+                    System.out.println("Unexpected dungeon message: "
+                                       + command);
                 }
-                break;
-            default:
-                System.out.println("Unexpected command!");
+            } catch (IOException ioe) {
+                // FIXME: this should probably handle the error a little more
+                // gracefully, but it's unclear what the right approach is
+                System.out.println("Failed to handle incoming Dungeon object");
+                ioe.printStackTrace();
             }
         } else {
-            try {
-                // for now, we assume this is the client
-                byte [] bytes = new byte[data.remaining()];
-                data.get(bytes);
-                clistener.messageArrived(new UserID(from), new String(bytes));
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+            // this isn't a message from the server, so it came from some
+            // other player on our channel...in this game, that can only
+            // mean that we got a chat message
+            notifyChatMessage(from, data);
         }
     }
 
     /**
-     *
+     * A private helper that converts the map from the server (that maps
+     * integers to byte arrays) into the form needed on the clie (that
+     * maps integers to images). The server sends the byte array form
+     * because images aren't serializable.
      */
     private Map<Integer,Image> convertMap(Map<Integer,byte[]> map) {
         Map<Integer,Image> newMap = new HashMap<Integer,Image>();
 
-        try {
-            for (int identifier : map.keySet()) {
+        // for each of the identified sprites, try to load the bytes
+        // as a recognizable image format and store in the new map
+        for (int identifier : map.keySet()) {
+            try {
                 ByteArrayInputStream in =
                     new ByteArrayInputStream(map.get(identifier));
                 newMap.put(identifier, ImageIO.read(in));
+            } catch (IOException ioe) {
+                System.out.println("Failed to convert image: " + identifier);
+                ioe.printStackTrace();
             }
-        } catch (IOException ioe) {
-            System.out.println("Failed to convert images");
-            ioe.printStackTrace();
         }
 
         return newMap;

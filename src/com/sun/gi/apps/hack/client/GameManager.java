@@ -110,7 +110,9 @@ import java.util.Map;
 
 
 /**
- *
+ * This class manages all interaction with an interactive game. It is used
+ * to listen for incoming messages and aggregate them to listeners, and to
+ * send messages to the game server for use in the current game.
  *
  * @since 1.0
  * @author Seth Proctor
@@ -119,15 +121,15 @@ public class GameManager implements BoardListener, PlayerListener,
                                     CommandListener
 {
 
-    //
+    // the registered listeners
     private HashSet<BoardListener> boardListeners;
     private HashSet<PlayerListener> playerListeners;
 
-    //
+    // the connection manager, used for sending messages to the server
     private ClientConnectionManager connManager = null;
 
     /**
-     *
+     * Creates an instance of <code>GameManager</code>.
      */
     public GameManager() {
         boardListeners = new HashSet<BoardListener>();
@@ -135,21 +137,29 @@ public class GameManager implements BoardListener, PlayerListener,
     }
 
     /**
+     * Registers a listener for board-related events.
      *
+     * @param listener the listener
      */
     public void addBoardListener(BoardListener listener) {
         boardListeners.add(listener);
     }
 
     /**
+     * Registers a listener for player-related events.
      *
+     * @param listener the listener
      */
     public void addPlayerListener(PlayerListener listener) {
         playerListeners.add(listener);
     }
 
     /**
+     * Sets the connection manager that this class uses for all communication
+     * with the game server. This method may only be called once during
+     * the lifetime of the client.
      *
+     * @param connManager the connection manager
      */
     public void setConnectionManager(ClientConnectionManager connManager) {
         if (this.connManager == null)
@@ -157,18 +167,24 @@ public class GameManager implements BoardListener, PlayerListener,
     }
 
     /**
-     * this is called by the gui code ... an action is a key press to move
-     * us in some direction (which may be illegal, may be an attack, etc.),
-     * a request to take some item, equipping/using some item ... and is
-     * there anything else?
-     * FIXME: define what this looks like, and what parameters it can take
-     * (the current approach of taking a key is temporary)
+     * This method notifies the game server that the client has pressed some
+     * key that signifies an action in the game. The handling of the key
+     * is asynchronous, in that this method returns immediately, and at some
+     * point in the future the server may come back with updates based on
+     * the requested action.
+     *
+     * @param key the key, as defined in <code>java.awt.event.KeyEvent</code>
      */
     public void action(int key) {
-        // make sure that this is a key we care about
         int messageType;
         short message = KeyMessages.NONE;
 
+        // figure out what key was pressed and whether we care about it, and
+        // also what kind of message this requires (move, take, etc.)
+        // Note: this could be done on the server, so that each game could
+        // define what keys it uses, but then it would be harder to map
+        // custom key bindings to each action
+        // FIXME: what's the right approach here?
         switch (key) {
         case KeyEvent.VK_J: message = KeyMessages.LEFT;
             messageType = 1;
@@ -186,19 +202,24 @@ public class GameManager implements BoardListener, PlayerListener,
             messageType = 2;
             break;
         default:
-            // if we got here, this is a key we don't know how to handle,
-            // so just ignore it
+            // if we got here, this is a key we don't handle, so ignore it
             return;
         }
 
+        // FIXME: the message code should be enumerated
         ByteBuffer bb = ByteBuffer.allocate(5);
         bb.put((byte)messageType);
         bb.putShort(message);
+
         connManager.sendToServer(bb, true);
     }
 
     /**
+     * Notifies the manager of the sprite map that should be used. This
+     * notifies all of the registered listeners.
      *
+     * @param spriteSize the size, in pixels, of the sprites
+     * @param spriteMap a map from sprite identifier to sprite image
      */
     public void setSpriteMap(int spriteSize, Map<Integer,Image> spriteMap) {
         for (BoardListener listener : boardListeners)
@@ -206,7 +227,10 @@ public class GameManager implements BoardListener, PlayerListener,
     }
 
     /**
+     * Notifies the manager that the board has changed. This notifies all
+     * of the registered listeners.
      *
+     * @param board the new board where the player is playing
      */
     public void changeBoard(Board board) {
         for (BoardListener listener : boardListeners)
@@ -214,7 +238,10 @@ public class GameManager implements BoardListener, PlayerListener,
     }
 
     /**
+     * Notifies the manager that some set of spaces on the board have changed.
+     * This notifies all of the registered listeners.
      *
+     * @param spaces the changed space detail
      */
     public void updateSpaces(BoardSpace [] spaces) {
         for (BoardListener listener : boardListeners)
@@ -222,7 +249,10 @@ public class GameManager implements BoardListener, PlayerListener,
     }
 
     /**
+     * Notifies the manager of a message. This notifies all of the registered
+     * listeners
      *
+     * @param message the message that the player should "hear"
      */
     public void hearMessage(String message) {
         for (BoardListener listener : boardListeners)
@@ -230,7 +260,11 @@ public class GameManager implements BoardListener, PlayerListener,
     }
 
     /**
+     * Called to tell the manager about the character that the client is
+     * currently using. This notifies all of the registered listeners.
      *
+     * @param id the character's identifier, which specifies their sprite
+     * @param stats the characters's statistics
      */
     public void setCharacter(int id, CharacterStats stats) {
         for (PlayerListener listener : playerListeners)
@@ -238,7 +272,8 @@ public class GameManager implements BoardListener, PlayerListener,
     }
 
     /**
-     *
+     * Called to update aspects of the player's currrent character. This
+     * notifies all of the registered listeners.
      */
     public void updateCharacter(/*FIXME: define this type*/) {
         for (PlayerListener listener : playerListeners)

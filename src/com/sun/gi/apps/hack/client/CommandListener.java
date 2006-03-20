@@ -94,7 +94,9 @@ package com.sun.gi.apps.hack.client;
 
 
 /**
- *
+ * This interface defines a class that listens for commands from the player.
+ * Specifically, it supports key-presses. It may be extended to support
+ * other kinds of commands from the player.
  *
  * @since 1.0
  * @author Seth Proctor
@@ -103,8 +105,9 @@ public interface CommandListener
 {
 
     /**
-     * FIXME: define what this looks like, and what parameters it can take
-     * (the current approach of taking a key is temporary)
+     * Called when the user presses a key.
+     *
+     * @param key the key, as defined in <code>java.awt.event.KeyEvent</code>
      */
     public void action(int key);
 
