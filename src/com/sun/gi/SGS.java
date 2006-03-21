@@ -125,7 +125,7 @@ public class SGS {
     SimKernel kernel;
     ObjectStore ostore;
     private boolean verbose = false;
-    private String installFile = "file:Install.txt";
+    private String installFile = "file:SGS-apps.conf";
     private static final long REPORTTTL = 1000;
 
     public SGS() {
