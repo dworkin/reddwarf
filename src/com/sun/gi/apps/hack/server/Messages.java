@@ -148,7 +148,7 @@ public class Messages
      * serializes the data and sends the object to the client.
      *
      * @param task the task
-     * @param the message code, which will be included before the data
+     * @param command the message code, which will be included before the data
      * @param data the message, which must be <code>Serializable</code>
      * @param channel the channel to send the message on
      * @param users the set of users to send to
@@ -191,7 +191,7 @@ public class Messages
      * @param task the task
      * @param uidMap the <code>Map</code> of UserIDs to login names
      * @param channel the channel to send the message on
-     * @param user the user to send to
+     * @param uid the user to send to
      */
     public static void sendUidMap(SimTask task, Map<UserID,String> uidMap,
                                   ChannelID channel, UserID uid) {
@@ -227,7 +227,7 @@ public class Messages
      * @param task the task
      * @param games the <code>Collection</code> of games and their detail
      * @param channel the channel to send the message on
-     * @param user the users to send to
+     * @param uid the users to send to
      */
     public static void sendLobbyWelcome(SimTask task,
                                         Collection<GameMembershipDetail> games,
@@ -245,7 +245,7 @@ public class Messages
      * @param name the name of the game that changed
      * @param count the updated membership count
      * @param channel the channel to send the message on
-     * @param user the users to send to
+     * @param users the users to send to
      */
     public static void sendGameCountChanged(SimTask task, String name,
                                             int count, ChannelID channel,
@@ -265,7 +265,7 @@ public class Messages
      * @param task the task
      * @param name the name of the game that was added
      * @param channel the channel to send the message on
-     * @param user the users to send to
+     * @param users the users to send to
      */
     public static void sendGameAdded(SimTask task, String name,
                                      ChannelID channel, UserID [] users) {
@@ -283,7 +283,7 @@ public class Messages
      * @param task the task
      * @param name the name of the game that was added
      * @param channel the channel to send the message on
-     * @param user the users to send to
+     * @param users the users to send to
      */
     public static void sendGameRemoved(SimTask task, String name,
                                        ChannelID channel, UserID [] users) {
@@ -301,7 +301,7 @@ public class Messages
      * @param task the task
      * @param stats the collection of character statistics
      * @param channel the channel to send the message on
-     * @param user the user to send to
+     * @param uid the user to send to
      */
     public static void sendPlayerCharacters(SimTask task,
                                             Collection<CharacterStats> stats,
@@ -318,9 +318,9 @@ public class Messages
      * typically done with each level.
      *
      * @param task the task
-     * @param sprites the mapping from identifier to sprite
+     * @param spriteMap the mapping from identifier to sprite
      * @param channel the channel to send the message on
-     * @param user the user to send to
+     * @param uid the user to send to
      */
     public static void sendSpriteMap(SimTask task, SpriteMap spriteMap,
                                      ChannelID channel, UserID uid) {
@@ -341,7 +341,7 @@ public class Messages
      * @param task the task
      * @param board the <code>Board</code> to send
      * @param channel the channel to send the message on
-     * @param user the user to send to
+     * @param uid the user to send to
      */
     public static void sendBoard(SimTask task, Board board, ChannelID channel,
                                  UserID uid) {
@@ -368,7 +368,7 @@ public class Messages
      * @param task the task
      * @param message the message to send
      * @param channel the channel to send the message on
-     * @param user the user to send to
+     * @param uid the user to send to
      */
     public static void sendTextMessage(SimTask task, String message,
                                        ChannelID channel, UserID uid) {
@@ -391,7 +391,7 @@ public class Messages
      * @param id the character's id
      * @param stats the character's statistics
      * @param channel the channel to send the message on
-     * @param user the user to send to
+     * @param uid the user to send to
      */
     public static void sendCharacter(SimTask task, int id,
                                      CharacterStats stats, ChannelID channel,

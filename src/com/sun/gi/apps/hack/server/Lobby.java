@@ -151,7 +151,7 @@ public class Lobby implements Game, GameChangeListener
      * and that enforces the singleton.
      *
      * @param task the task this is running in
-     * @param mcmRef a reference to the manager we'll notify when lobby
+     * @param gcmRef a reference to the manager we'll notify when lobby
      *               membership counts change
      */
     private Lobby(SimTask task, GLOReference<GameChangeManager> gcmRef) {
@@ -184,8 +184,7 @@ public class Lobby implements Game, GameChangeListener
      * programming to protect against future models that may change our
      * current access assumptions.
      *
-     * @param task the task this is running in
-     * @param mcmRef a reference to the manager we'll notify when lobby
+     * @param gcmRef a reference to the manager we'll notify when lobby
      *               membership counts change
      *
      * @return a reference to the single <code>Lobby</code>

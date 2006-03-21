@@ -139,7 +139,7 @@ public class ImpassableTile extends BasicTile
      * characters interacting. Characters need to override default behavior
      * to be on this tile, so this generally returns <code>FAIL</code>.
      *
-     * @param mgrRef the manager for a character
+     * @param characterManager the manager for a character
      */
     public ActionResult moveTo(CharacterManager characterManager) {
         // FIXME: we should check if the character overrides this behavior,

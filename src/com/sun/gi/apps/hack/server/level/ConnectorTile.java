@@ -242,7 +242,7 @@ public class ConnectorTile implements Tile
      *
      * @return false
      */
-    public boolean removeItem(GLOReference<? extends Item> mgrRef) {
+    public boolean removeItem(GLOReference<? extends Item> itemRef) {
         return false;
     }
 

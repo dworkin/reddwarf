@@ -137,7 +137,7 @@ public class PassableTile extends BasicTile
      * a character on this tile, then this method leads to the two
      * characters interacting.
      *
-     * @param mgrRef the manager for a character
+     * @param mgr the manager for a character
      */
     public ActionResult moveTo(CharacterManager mgr) {
         // moving to this tile when empty is always allowed, so we just need

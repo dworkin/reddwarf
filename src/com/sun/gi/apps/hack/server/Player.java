@@ -385,14 +385,15 @@ public class Player implements SimUserDataListener
      * details about broadcast messages, see this class' implementation of
      * <code>dataArrivedFromChannel</code>
      *
-     * @param the user id, which is always this <code>Player</code>'s
+     * @param uid the user id, which is always this <code>Player</code>'s
      *            current uid
      * @param data the message
      */
     public void userDataReceived(UserID uid, ByteBuffer data) {
-	// XXX: if we get requeued due to a DeadlockException,
-	// our data buffer is in the wrong place.  Rewind it.
-	data.rewind();
+        // due to a temporary bug in the system, if we get requeued due to
+        // a DeadlockException, our data buffer is in the wrong place, so
+        // we rewind it here to be safe
+        data.rewind();
 
         // call the message handler to interpret the message ... note that the
         // proxy model here means that we're blocking the player, and not the
@@ -418,10 +419,7 @@ public class Player implements SimUserDataListener
                                        ByteBuffer data) {
         // this method is never called
 
-	// XXX: if it were, and if we get requeued due to
-	// a DeadlockException,  our data buffer would be
-	// in the wrong place and we'd have to rewind it.
-	//data.rewind();
+        // NOTE: see comment in userDataReceived about rewinding the data
     }
 
     /**

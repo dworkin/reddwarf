@@ -188,7 +188,7 @@ public interface Level extends GLO
      *
      * @return true if we moved in the requested direction, false otherwise
      */
-    public boolean move(CharacterManager mg, int direction);
+    public boolean move(CharacterManager mgr, int direction);
 
     /**
      * Tries to take items at the character's current location.

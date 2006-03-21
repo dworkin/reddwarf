@@ -201,7 +201,7 @@ public class GameChangeManager implements SimTimerListener
     /**
      * Notifies the manager that a game was added to the app.
      *
-     * @string name the name of the <code>Game</code>
+     * @param game the name of the <code>Game</code>
      */
     public void notifyGameAdded(String game) {
         addedGames.add(game);
@@ -213,7 +213,7 @@ public class GameChangeManager implements SimTimerListener
     /**
      * Notifies the manager that a game was removed from the app.
      *
-     * @string name the name of the <code>Game</code>
+     * @param game the name of the <code>Game</code>
      */
     public void notifyGameRemoved(String game) {
         removedGames.add(game);

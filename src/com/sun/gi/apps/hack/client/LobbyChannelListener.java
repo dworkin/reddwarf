@@ -120,7 +120,7 @@ public class LobbyChannelListener extends GameChannelListener
      * Creates an instance of <code>LobbyListener</code>.
      *
      * @param lobbyListener the listener for all lobby messages
-     * @param chatListsner the listener for all chat messages
+     * @param chatListener the listener for all chat messages
      */
     public LobbyChannelListener(LobbyListener lobbyListener,
                                 ChatListener chatListener) {

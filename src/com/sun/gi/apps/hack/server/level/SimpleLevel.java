@@ -393,10 +393,6 @@ public class SimpleLevel implements Level
         int x = mgr.getLevelXPos();
         int y = mgr.getLevelYPos();
 
-        // FIXME: this isn't working yet
-
-        System.out.println("trying to take an item");
-
         // try to take the item at our position
         ActionResult result = board.getItem(x, y, mgr);
 
@@ -413,6 +409,8 @@ public class SimpleLevel implements Level
 
         // let everyone know that we got the item
         sendUpdate(new BoardSpace(x, y, board.getAt(x, y)));
+
+        // FIXME: we should let the character know that they got the item
 
         return true;
     }

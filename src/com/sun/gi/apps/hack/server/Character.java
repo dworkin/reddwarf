@@ -146,7 +146,7 @@ public interface Character extends Serializable
      * uses a double-dispatch model where we call back the other
      * character through their <code>collidedInto</code> method.
      *
-     * @parma character the character that collided with us
+     * @param character the character that collided with us
      *
      * @return the result of processing our interaction
      */

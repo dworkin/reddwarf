@@ -115,16 +115,16 @@ public interface GameChangeListener extends GLO
     /**
      * Notifies the listener that games were added to the app.
      *
-     * @string names the names of the added <code>Game</code>s
+     * @param names the names of the added <code>Game</code>s
      */
-    public void gameAdded(Collection<String> name);
+    public void gameAdded(Collection<String> names);
 
     /**
      * Notifies the listener that games were removed from the app.
      *
-     * @string names the names of the removed <code>Game</code>s
+     * @param names the names of the removed <code>Game</code>s
      */
-    public void gameRemoved(Collection<String> name);
+    public void gameRemoved(Collection<String> names);
 
     /**
      * Notifies the listener that some game membership information has

@@ -184,7 +184,7 @@ public interface Tile extends Serializable
     /**
      * Adds the given item to this tile if possible.
      *
-     * @param itemREf the manager for the item
+     * @param itemRef the manager for the item
      *
      * @return whether or not the item was added successfully
      */
@@ -198,7 +198,7 @@ public interface Tile extends Serializable
      *
      * @return whether or not the item was removed successfully
      */
-    public boolean removeItem(GLOReference<? extends Item> mgrRef);
+    public boolean removeItem(GLOReference<? extends Item> itemRef);
 
     /**
      * Test to move the given character to this tile. Note that this does

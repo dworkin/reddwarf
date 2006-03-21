@@ -146,7 +146,7 @@ public interface LevelBoard extends Board
      *
      * @param x the x-coordinate
      * @param y the y-coordinate
-     * @param mgrRef a reference to the item's manager
+     * @param itemRef a reference to the item's manager
      *
      * @return true if the operation succeeded, false otherwise
      */
@@ -158,7 +158,7 @@ public interface LevelBoard extends Board
      *
      * @param x the x-coordinate
      * @param y the y-coordinate
-     * @param mgrRef a reference to the item's manager
+     * @param itemRef a reference to the item's manager
      *
      * @return true if the operation succeeded, false otherwise
      */

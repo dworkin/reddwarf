@@ -173,7 +173,7 @@ public class NPCharacter extends AICharacter
      * based on the list of messages. We always return <code>FAIL</code>
      * since we never yield our position
      *
-     * @parma character the character that collided with us
+     * @param character the character that collided with us
      *
      * @return <code>ActionResult.FAIL</code>
      */

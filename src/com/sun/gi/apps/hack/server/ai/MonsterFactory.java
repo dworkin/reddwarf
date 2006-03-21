@@ -112,8 +112,8 @@ public class MonsterFactory
      * Creates an instance of <code>AICharacterManager</code< and returns
      * a reference to the new instance
      *
-     * @parma id the character's identifier
-     * @pasrm string the chatacter's name
+     * @param id the character's identifier
+     * @param type the chatacter's name
      */
     public static GLOReference<AICharacterManager> getMonster(int id,
                                                               String type) {

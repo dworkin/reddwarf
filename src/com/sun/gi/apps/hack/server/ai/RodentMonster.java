@@ -180,7 +180,7 @@ public class RodentMonster extends MonsterCharacter
     /**
      * Called when you collide with the character.
      *
-     * @param the character we hit
+     * @param character the character we hit
      *
      * @return boolean if any statistics changed
      */

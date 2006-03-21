@@ -192,6 +192,15 @@ public class PlayerCharacterManager extends BasicCharacterManager
     }
 
     /**
+     * Returns the number of characters managed by this class.
+     *
+     * @return the number of manager characters
+     */
+    public int getCharacterCount() {
+        return characterMap.size();
+    }
+
+    /**
      * Returns the characters managed by this class.
      *
      * @return the managed characters
@@ -212,7 +221,7 @@ public class PlayerCharacterManager extends BasicCharacterManager
     /**
      * Adds a character to this manager.
      *
-     * @parameter character the character to add
+     * @param character the character to add
      */
     public void addCharacter(PlayerCharacter character) {
         characterMap.put(character.getName(), character);
@@ -222,8 +231,6 @@ public class PlayerCharacterManager extends BasicCharacterManager
      * Tries to remove the given sharacter from the manager.
      *
      * @param name the character to remove
-     *
-     * @return true if the removal succeded, false otherwise
      */
     public void removeCharacter(String name) {
         characterMap.remove(name);

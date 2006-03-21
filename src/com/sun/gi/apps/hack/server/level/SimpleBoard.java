@@ -103,7 +103,6 @@ import java.io.StreamTokenizer;
 
 import java.util.Set;
 import java.util.HashSet;
-import java.util.logging.Logger;
 
 
 /**
@@ -256,7 +255,7 @@ public class SimpleBoard implements LevelBoard
      *
      * @param x the x-coordinate
      * @param y the y-coordinate
-     * @param mgrRef a reference to the item's manager
+     * @param itemRef a reference to the item's manager
      *
      * @return true if the operation succeeded, false otherwise
      */
@@ -270,7 +269,7 @@ public class SimpleBoard implements LevelBoard
      *
      * @param x the x-coordinate
      * @param y the y-coordinate
-     * @param mgrRef a reference to the item's manager
+     * @param itemRef a reference to the item's manager
      *
      * @return true if the operation succeeded, false otherwise
      */
@@ -343,7 +342,7 @@ public class SimpleBoard implements LevelBoard
      * this actually will remove items from the tile if they are
      * successfully taken.
      *
-     * @param characterManager the manager for a character
+     * @param mgr the manager for a character
      *
      * @return the result of getting an item
      */

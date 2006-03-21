@@ -142,7 +142,7 @@ public class ChatPanel extends JPanel implements ActionListener, ChatListener
     /**
      * Creates a <code>Chatmanager</code>.
      *
-     * @param chatmanager the manager that recieves chat messages
+     * @param chatManager the manager that recieves chat messages
      * @param focusPanel the panel that shares focus with us
      */
     public ChatPanel(ChatManager chatManager, JComponent focusPanel) {
