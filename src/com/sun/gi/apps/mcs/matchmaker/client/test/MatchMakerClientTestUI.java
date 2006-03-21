@@ -357,7 +357,7 @@ public class MatchMakerClientTestUI extends JFrame
             manager = new ClientConnectionManagerImpl(
                     "MatchMaker",
                     new URLDiscoverer(
-                            new File("resources/FakeDiscovery.xml").toURI().toURL()));
+                            new File("FakeDiscovery.xml").toURI().toURL()));
             mmClient = new MatchMakingClient(manager);
             mmClient.setListener(this);
             String[] classNames = manager.getUserManagerClassNames();

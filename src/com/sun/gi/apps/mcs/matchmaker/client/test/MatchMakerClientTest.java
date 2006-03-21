@@ -130,7 +130,7 @@ public class MatchMakerClientTest implements IMatchMakingClientListener {
         try {
             ClientConnectionManager manager = new ClientConnectionManagerImpl(
                     "MatchMaker", new URLDiscoverer(new File(
-                            "resources/FakeDiscovery.xml").toURI().toURL()));
+                            "FakeDiscovery.xml").toURI().toURL()));
             mmClient = new MatchMakingClient(manager);
             mmClient.setListener(this);
             String[] classNames = manager.getUserManagerClassNames();
