@@ -366,7 +366,7 @@ public class Player implements SimUserDataListener {
         if (uid.equals(userID)) { // it was this player who left.
                                   
         	if (currentGameRoom != null) { // the player left a game room
-                GameRoom gameRoom = (GameRoom) currentGameRoom.get(task);
+                GameRoom gameRoom = currentGameRoom.get(task);
                 if (cid.equals(gameRoom.getChannelID())) { // user left
                                                             // from this
                                                             // channel
@@ -411,7 +411,7 @@ public class Player implements SimUserDataListener {
                 }
             } 
         	if (currentLobby != null) {
-                Lobby lobby = (Lobby) currentLobby.get(task);
+                Lobby lobby = currentLobby.get(task);
                 if (cid.equals(lobby.getChannelID())) {
 	                lobby.removeUser(uid);
 	                // currentLobby.delete(task);
@@ -493,7 +493,7 @@ public class Player implements SimUserDataListener {
         if (data.hasRemaining()) {
             folderID = protocol.readUUID(data);
         }
-        Folder root = (Folder) folderRoot.peek(task);
+        Folder root = folderRoot.peek(task);
         Folder targetFolder = folderID == null ? root : root.findFolder(task,
                 folderID);
         System.out.println("folderID = " + folderID + " targetFolder "
@@ -957,7 +957,7 @@ public class Player implements SimUserDataListener {
     	StringBuffer buffer = new StringBuffer();
     	byte[] bytes = uuid.toByteArray();
     	for (byte b : bytes) {
-    		buffer.append((int) (b & 0xFF));
+    		buffer.append(((int) b) & 0xFF);
     	}
     	return buffer.toString();
     }
