@@ -287,7 +287,7 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
      * {@inheritDoc}
      */
     public void joinedChannel(final ClientChannel channel) {
-        log.info("joinedChannel " + channel.getName());
+        log.fine("joinedChannel " + channel.getName());
 
         if (channel.getName().equals("matchmaker")) {
             if (playerName == null) {
@@ -364,6 +364,7 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
         ByteBuffer buf = ByteBuffer.wrap(cmd.getBytes());
         buf.position(buf.limit());
         mgr.sendToServer(buf, true);
+        System.out.println("Waiting for players");
     }
 
     /**

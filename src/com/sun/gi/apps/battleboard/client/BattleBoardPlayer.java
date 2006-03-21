@@ -256,7 +256,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
             }
             gameState = GameState.GAME_OVER;
             connectionManager.disconnect();
-            System.exit(0);
+            display.gameOver();
         }
     }
 

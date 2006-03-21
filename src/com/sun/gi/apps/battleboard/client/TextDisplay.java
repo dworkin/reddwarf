@@ -295,6 +295,13 @@ public class TextDisplay implements Display {
     }
 
     /**
+     * {@inheritDoc}
+     */
+    public void gameOver() {
+        System.exit(0);
+    }
+
+    /**
      * Prints the lines at the top and bottom of the boards display that
      * show which board is "highlighted". Used by showBoards.
      * 

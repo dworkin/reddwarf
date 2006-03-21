@@ -119,17 +119,17 @@ public class DisplayBoard extends JPanel implements BoardListener
     private static final int GRIDYOFFSET = 40;
     private static final int MARGINWIDTH = 10;
 
-    private static final Color MOVECOLOR = Color.CYAN;
-    private static final Color BGCOLOR = Color.LIGHT_GRAY;
-    private static final Color NAMECOLOR = Color.BLACK;
-    private static final Color VACANTCOLOR = Color.WHITE;
-    private static final Color CITYCOLOR = Color.BLUE;
-    private static final Color UNKNOWNCOLOR = Color.WHITE;
-    private static final Color MISSCOLOR = Color.DARK_GRAY;
-    private static final Color NEARCOLOR = Color.GREEN;
-    private static final Color HITCOLOR = Color.RED;
-    private static final Color DONECOLOR = Color.DARK_GRAY;
-    
+    private static final Color MOVECOLOR     = new Color(0x60ff60);
+    private static final Color BGCOLOR       = new Color(0xe0e0e0);
+    private static final Color NAMECOLOR     = new Color(0x000000);
+    private static final Color VACANTCOLOR   = new Color(0xffffff);
+    private static final Color CITYCOLOR     = new Color(0x3030ff);
+    private static final Color UNKNOWNCOLOR  = new Color(0x000000);
+    private static final Color MISSCOLOR     = new Color(0xe0e0e0);
+    private static final Color NEARCOLOR     = new Color(0xffff00);
+    private static final Color HITCOLOR      = new Color(0xff0000);
+    private static final Color DONECOLOR     = new Color(0x404040);
+
     private static final Font TITLEFONT =
 	    new Font("Sans-serif", Font.BOLD, 18);
     private static final FontRenderContext frc =

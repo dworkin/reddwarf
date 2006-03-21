@@ -242,6 +242,13 @@ public class Client extends JFrame implements Display, MoveListener {
         // System.out.println(message);
         messages.addMessage(message);
     }
+ 
+    /**
+     * Waits for the user to close the window.
+     */
+    public void gameOver() {
+        // no-op
+    }
 
     /**
      * Gets a move from the user and returns the Strings corresponding

@@ -127,4 +127,9 @@ public interface Display {
      * the name of the player to bomb) and the operands.
      */
     String[] getMove();
+
+    /**
+     * Notify the display that the game has ended.
+     */
+    void gameOver();
 }
