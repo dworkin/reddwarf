@@ -105,7 +105,9 @@ import javax.swing.JTextField;
 /**
  */
 public class SwordWorldClient extends JFrame 
-	implements ClientConnectionManagerListener {
+	implements ClientConnectionManagerListener
+{
+    private static final long serialVersionUID = 1L;
 
     JTextArea outputArea = new JTextArea();
     ClientConnectionManager mgr;
