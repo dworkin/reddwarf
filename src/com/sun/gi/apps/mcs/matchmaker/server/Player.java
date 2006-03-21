@@ -951,7 +951,7 @@ public class Player implements SimUserDataListener {
      * Converts an UUID to a string with all the bytes run together.
      * 
      * @param uuid
-     * @return
+     * @return the uuid as a String of bytes
      */
     private String uuidToByteString(SGSUUID uuid) {
     	StringBuffer buffer = new StringBuffer();
