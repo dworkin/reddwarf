@@ -134,10 +134,8 @@ public class HadbDataSpace implements DataSpace {
     private PreparedStatement getNameStmnt;
     private PreparedStatement updateObjStmnt;
     private PreparedStatement insertObjStmnt;
-    private PreparedStatement updateNameStmnt; // XXX: unused?
     private PreparedStatement insertNameStmnt;
     private PreparedStatement updateInfoStmnt;
-    private PreparedStatement insertInfoStmnt; // XXX: unused?
     private PreparedStatement updateObjLockStmnt;
     private PreparedStatement findObjLockStmnt;
     private PreparedStatement updateObjUnlockStmnt;
@@ -181,8 +179,7 @@ public class HadbDataSpace implements DataSpace {
         try {
             Class.forName("com.sun.hadb.jdbc.Driver");
         } catch (Exception e) {
-            System.out.println("ERROR: Failed to load the HADB JDBC driver.");
-            System.out.println(e);
+	    log.severe("ERROR: Failed to load the HADB JDBC driver: " + e);
             throw e;
         }
 
@@ -205,7 +202,7 @@ public class HadbDataSpace implements DataSpace {
 
             String dataConnURL = "jdbc:sun:hadb:" + hadbHosts + ";create=true";
 
-            System.out.println("XXX\t\tdataConnURL: " + dataConnURL);
+	    log.fine("dataConnURL: " + dataConnURL);
 
             // XXX: Do we really need all these connections?
 
@@ -233,7 +230,7 @@ public class HadbDataSpace implements DataSpace {
                     // This isn't necessarily an error. The cases
                     // need to be subdivided more carefully.
 
-                    System.out.println("ERROR: Failed to drop all tables.");
+                    log.warning("Failed to drop all tables.");
                 }
             }
 
@@ -254,7 +251,7 @@ public class HadbDataSpace implements DataSpace {
             try {
                 fis = new FileInputStream(hadbParamFile);
             } catch (IOException e) {
-                System.out.println("ERROR: failed to open params file ("
+                log.warning("failed to open params file ("
                         + hadbParamFile + "): " + e);
                 return false;
             }
@@ -263,12 +260,12 @@ public class HadbDataSpace implements DataSpace {
                 try {
                     hadbParams.load(fis);
                 } catch (IOException e) {
-                    System.out.println("ERROR: failed to read params file ("
+                    log.warning("failed to read params file ("
                             + hadbParamFile + "): " + e);
                     hadbParams.clear();
                     return false;
                 } catch (IllegalArgumentException e) {
-                    System.out.println("ERROR: params file (" + hadbParamFile
+                    log.warning("params file (" + hadbParamFile
                             + ") contains errors: " + e);
                     hadbParams.clear();
                     return false;
@@ -303,12 +300,10 @@ public class HadbDataSpace implements DataSpace {
                 System.getProperty("dataspace.hadb.dbname", null));
 
         if (debug) {
-            System.out.println("PARAM: dataspace.hadb.hosts: " + hadbHosts);
-            System.out.println("PARAM: dataspace.hadb.username: "
-                    + hadbUserName);
-            System.out.println("PARAM: dataspace.hadb.password: "
-                    + hadbPassword);
-            System.out.println("PARAM: dataspace.hadb.dbname: "
+            log.info("PARAM: dataspace.hadb.hosts: " + hadbHosts);
+            log.info("PARAM: dataspace.hadb.username: " + hadbUserName);
+            log.info("PARAM: dataspace.hadb.password: " + hadbPassword);
+            log.info("PARAM: dataspace.hadb.dbname: "
                     + ((hadbDBname == null) ? "null" : hadbDBname));
         }
 
@@ -327,7 +322,7 @@ public class HadbDataSpace implements DataSpace {
      */
     private synchronized boolean dropTables() {
 
-        System.out.println("INFO: Dropping all tables!");
+        log.info("Dropping all tables!");
 
         boolean allSucceeded = true;
         for (String name : getTableNames()) {
@@ -348,7 +343,7 @@ public class HadbDataSpace implements DataSpace {
      * clearing the infotbl is almost guaranteed to be disasterous).
      */
     public synchronized boolean clearTables() {
-        System.out.println("INFO: Clearing tables!");
+        log.info("INFO: Clearing tables!");
 
         boolean allSucceeded = true;
         for (String name : getTableNames()) {
@@ -369,8 +364,8 @@ public class HadbDataSpace implements DataSpace {
             updateTransConn.commit();
             idConn.commit();
         } catch (Exception e) {
-            System.out.println("ERROR: FAILED to prepare/commit " + tableName);
-            System.out.println("\t" + e);
+            log.severe("ERROR: FAILED to prepare/commit " +
+		    tableName + " " + e);
             e.printStackTrace();
         }
 
@@ -379,10 +374,9 @@ public class HadbDataSpace implements DataSpace {
         try {
             stmnt = schemaConn.createStatement();
             stmnt.execute(s);
-            System.out.println("INFO: Dropped " + tableName);
+            log.finer("Dropped " + tableName);
         } catch (SQLException e) {
-            System.out.println("ERROR: FAILED to drop " + tableName);
-            System.out.println("\t" + e);
+            log.severe("FAILED to drop " + tableName + " " + e);
             /* e.printStackTrace(); */
             return false;
         }
@@ -398,8 +392,8 @@ public class HadbDataSpace implements DataSpace {
             updateTransConn.commit();
             idConn.commit();
         } catch (Exception e) {
-            System.out.println("ERROR: FAILED to prepare/commit " + tableName);
-            System.out.println("\t" + e);
+            log.severe("ERROR: FAILED to prepare/commit " +
+		    tableName + " " + e);
             e.printStackTrace();
         }
 
@@ -408,10 +402,9 @@ public class HadbDataSpace implements DataSpace {
         try {
             stmnt = schemaConn.createStatement();
             stmnt.execute(s);
-            System.out.println("INFO: Deleted contents of " + tableName);
+            log.fine("Deleted contents of " + tableName);
         } catch (SQLException e) {
-            System.out.println("ERROR: FAILED to delete " + tableName);
-            System.out.println("\t" + e);
+            log.severe("FAILED to delete " + tableName + " " + e);
             /* e.printStackTrace(); */
             return false;
         }
@@ -443,21 +436,21 @@ public class HadbDataSpace implements DataSpace {
             stmnt = schemaConn.createStatement();
             rs = stmnt.executeQuery(s);
             if (!rs.next()) {
-                System.out.println("INFO: SCHEMA does not exist: " + SCHEMA);
+		log.info("SCHEMA does not exist: " + SCHEMA);
                 schemaExists = false;
             } else {
-                System.out.println("INFO: SCHEMA already exists: " + SCHEMA);
+                log.fine("SCHEMA already exists: " + SCHEMA);
                 schemaExists = true;
             }
             rs.close();
         } catch (SQLException e) {
-            System.out.println("INFO: SCHEMA error: " + e);
+            log.severe("SCHEMA error: " + e);
             schemaExists = false;
         }
 
         if (!schemaExists) {
             try {
-                System.out.println("INFO: Creating Schema");
+                log.info("INFO: Creating Schema");
                 String s = "CREATE SCHEMA " + SCHEMA;
                 stmnt = schemaConn.createStatement();
                 stmnt.execute(s);
@@ -468,10 +461,10 @@ public class HadbDataSpace implements DataSpace {
                  */
 
                 if (e.getErrorCode() != 11751) {
-                    System.out.println("ERROR: SCHEMA issue: " + e);
+                    log.severe("SCHEMA problem: " + e);
                     throw e;
                 } else {
-                    System.out.println("INFO: SCHEMA already exists: " + e);
+                    log.info("SCHEMA already exists: " + e);
                 }
             }
         }
@@ -489,30 +482,30 @@ public class HadbDataSpace implements DataSpace {
             }
             rs.close();
         } catch (SQLException e) {
-            System.out.println("ERROR: failure finding schema" + e);
+            log.severe("failure finding schema" + e);
             throw e;
         }
 
         if (foundTables.contains(OBJBASETBL.toLowerCase())) {
-            System.out.println("INFO: Found Objects table");
+            log.fine("Found Objects table");
         } else {
             createObjTable();
         }
 
         if (foundTables.contains(OBJLOCKBASETBL.toLowerCase())) {
-            System.out.println("INFO: Found object lock table");
+            log.fine("Found object lock table");
         } else {
             createObjLockTable();
         }
 
         if (foundTables.contains(NAMEBASETBL.toLowerCase())) {
-            System.out.println("INFO: Found Name table");
+            log.fine("Found Name table");
         } else {
             createNameTable();
         }
 
         if (foundTables.contains(INFOBASETBL.toLowerCase())) {
-            System.out.println("INFO: Found info table");
+            log.fine("INFO: Found info table");
         } else {
             createInfoTable();
         }
@@ -535,8 +528,6 @@ public class HadbDataSpace implements DataSpace {
 
         insertNameStmnt = updateTransConn.prepareStatement("INSERT INTO "
                 + NAMETBLNAME + " VALUES(?,?)");
-        updateNameStmnt = updateTransConn.prepareStatement("UPDATE "
-                + NAMETBLNAME + " SET NAME=? WHERE OBJID=?");
         deleteObjStmnt = updateTransConn.prepareStatement("DELETE FROM " +
 		OBJTBLNAME + " WHERE OBJID=?");
         deleteObjLockStmnt = updateTransConn.prepareStatement("DELETE FROM " +
@@ -573,7 +564,8 @@ public class HadbDataSpace implements DataSpace {
     }
 
     private boolean createObjTable() {
-        System.out.println("INFO: Creating Objects table");
+	log.info("Creating Objects table " + OBJTBLNAME);
+
         Statement stmnt;
         String s = "CREATE TABLE " + OBJTBLNAME + " ("
                 + "OBJID DOUBLE INT NOT NULL, " + "OBJBYTES BLOB, "
@@ -582,7 +574,7 @@ public class HadbDataSpace implements DataSpace {
             stmnt = schemaConn.createStatement();
             stmnt.execute(s);
         } catch (Exception e) {
-            System.out.println("ERROR: FAILED to create: " + e);
+            log.severe("FAILED to create table: " + OBJTBLNAME + " " + e);
             return false;
         }
 
@@ -590,7 +582,8 @@ public class HadbDataSpace implements DataSpace {
     }
 
     private boolean createInfoTable() {
-        System.out.println("INFO: Creating info table");
+        log.info("Creating info table " + INFOTBLNAME);
+
         Statement stmnt;
         ResultSet rs;
 
@@ -601,19 +594,17 @@ public class HadbDataSpace implements DataSpace {
             stmnt = schemaConn.createStatement();
             stmnt.execute(s);
         } catch (SQLException e) {
-            // XXX
-            System.out.println("ERROR: FAILED to create: " + e);
+            log.severe("FAILED to create table: " + INFOTBLNAME + " " + e);
             return false;
         }
 
-        s = "SELECT * FROM " + INFOTBLNAME + " I  " + "WHERE I.APPID = "
-                + appID;
+        s = "SELECT * FROM " + INFOTBLNAME + " I  " +
+		"WHERE I.APPID = " + appID;
         try {
             stmnt = schemaConn.createStatement();
             rs = stmnt.executeQuery(s);
             if (!rs.next()) { // entry does not exist
-                System.out.println("INFO: Creating new entry in info table for appID "
-                        + appID);
+                log.fine("Creating new entry in info table for appID " + appID);
                 stmnt = schemaConn.createStatement();
                 s = "INSERT INTO " + INFOTBLNAME + " VALUES(" + appID + ","
                         + defaultIdStart + "," + defaultIdBlockSize + ")";
@@ -623,23 +614,20 @@ public class HadbDataSpace implements DataSpace {
                  * If the table is being re-created, make sure that the
                  * cached state for the table is invalidated as well.
                  */
-
                 currentIdBlockBase = DataSpace.INVALID_ID;
-                // System.out.println("invalidating currentIdBlockBase:
-                // " + currentIdBlockBase);
             }
             rs.close();
         } catch (SQLException e) {
-            System.out.println("ERROR: FAILED to create: " + e);
+            log.severe("FAILED to create " + INFOTBLNAME + ": " + e);
             return false;
-            // XXX: ??
         }
 
         return true;
     }
 
     private boolean createObjLockTable() {
-        System.out.println("INFO: Creating object Lock table");
+        log.info("Creating object Lock table " + OBJLOCKTBLNAME);
+
         String s = "CREATE TABLE " + OBJLOCKTBLNAME + " ("
                 + "OBJID DOUBLE INT NOT NULL," + "OBJLOCK INT NOT NULL,"
                 + "PRIMARY KEY (OBJID)" + ")";
@@ -647,15 +635,15 @@ public class HadbDataSpace implements DataSpace {
             Statement stmnt = schemaConn.createStatement();
             stmnt.execute(s);
         } catch (SQLException e) {
-            // XXX
-            System.out.println("ERROR: FAILED to create: " + e);
+            log.severe("FAILED to create " + OBJLOCKTBLNAME + ": " + e);
             return false;
         }
         return true;
     }
 
     private boolean createNameTable() {
-        System.out.println("INFO: Creating Name table");
+        log.info("Creating name table " + NAMETBLNAME);
+
         String s = "CREATE TABLE " + NAMETBLNAME + "("
                 + "NAME VARCHAR(255) NOT NULL, " + "OBJID DOUBLE INT NOT NULL,"
                 + "PRIMARY KEY (NAME)" + ")";
@@ -663,8 +651,7 @@ public class HadbDataSpace implements DataSpace {
             Statement stmnt = schemaConn.createStatement();
             stmnt.execute(s);
         } catch (SQLException e) {
-            // XXX
-            System.out.println("ERROR: FAILED to create: " + e);
+            log.severe("FAILED to create " + NAMETBLNAME + ": " + e);
             return false;
         }
 
@@ -674,12 +661,9 @@ public class HadbDataSpace implements DataSpace {
             Statement stmnt = schemaConn.createStatement();
             stmnt.execute(s);
         } catch (SQLException e) {
-            // XXX
-            System.out.println("ERROR: FAILED to create: " + e);
-            e.printStackTrace();
+            log.warning("FAILED to create reverse name index: " + e);
             return false;
         }
-
         return true;
     }
 
@@ -695,7 +679,7 @@ public class HadbDataSpace implements DataSpace {
             conn.setTransactionIsolation(isolation);
             return conn;
         } catch (Exception e) {
-            System.out.println(e);
+	    log.severe("FAILED to get Connection: " + e);
             e.printStackTrace();
         }
         return null;
@@ -704,17 +688,17 @@ public class HadbDataSpace implements DataSpace {
     /*
      * Internal parameters for object ID generation:
      * 
-     * defaultIdStart is where the object ID numbers start. It is only
-     * used to initialize the database and should never be used
-     * directly. (only IDs taken from the database are guaranteed valid)
+     * defaultIdStart is where the object ID numbers start.  It is
+     * only used to initialize the database and should never be used
+     * directly.  (only IDs taken from the database are guaranteed
+     * valid)
      * 
      * defaultIdBlockSize is the number of object IDs grabbed at one
-     * time. This is currently very small, for debugging. Should be at
-     * least 1000 for real use.
+     * time.  Should be at least 1000 for real use.
      */
 
-    private final long defaultIdStart = 10;
-    private final long defaultIdBlockSize = 10;
+    private final long defaultIdBlockSize = 1000;
+    private final long defaultIdStart = defaultIdBlockSize;
 
     /*
      * Internal variables for object ID generation:
@@ -741,22 +725,15 @@ public class HadbDataSpace implements DataSpace {
          * accessed from the database.
          */
 
-        // System.out.println("currentIdBlockBase = " +
-        // currentIdBlockBase);
-        if ((currentIdBlockBase == DataSpace.INVALID_ID)
-                || (currentIdBlockOffset >= defaultIdBlockSize)) {
+	log.finest("currentIdBlockBase = " + currentIdBlockBase);
+
+        if ((currentIdBlockBase == DataSpace.INVALID_ID) ||
+		(currentIdBlockOffset >= defaultIdBlockSize)) {
             long newIdBlockBase = 0;
             int newIdBlockSize = 0;
             boolean success = false;
 
-            // System.out.println("going to database for new blockID " +
-            // currentIdBlockBase);
-            try {
-                // DJE: idConn.commit();
-            } catch (Exception e) {
-                System.out.println("UNEXPECTED EXCEPTION: " + e);
-            }
-
+	    log.fine("going to database to find the new blockBase");
             try {
                 long backoffSleep = 0;
                 while (!success) {
@@ -770,20 +747,17 @@ public class HadbDataSpace implements DataSpace {
 
                     ResultSet rs = getIdStmnt.executeQuery();
                     if (!rs.next()) {
-                        System.out.println("appID table entry absent for "
-                                + appID);
+                        log.severe("appID table entry absent for " + appID);
                         // XXX: FATAL unexpected error.
                     }
                     newIdBlockBase = rs.getLong("NEXTIDBLOCKBASE"); // "2"
                     newIdBlockSize = rs.getInt("IDBLOCKSIZE"); // "3"
+		    rs.close();
 
-                    /*
-                     * System.out.println("NEXTIDBLOCKBASE/IDBLOCKSIZE " +
-                     * newIdBlockBase + "/" + newIdBlockSize);
-                     */
+		    log.fine("NEXTIDBLOCKBASE/IDBLOCKSIZE " +
+			    newIdBlockBase + "/" + newIdBlockSize);
 
                     int rc;
-
                     updateInfoStmnt.setLong(1, newIdBlockBase + newIdBlockSize);
                     updateInfoStmnt.setLong(2, appID);
                     updateInfoStmnt.setLong(3, newIdBlockBase);
@@ -798,22 +772,18 @@ public class HadbDataSpace implements DataSpace {
                         }
                     } catch (SQLException e) {
                         if (e.getErrorCode() == 2097) {
-                            /* System.out.println("CONTENTION THROW "); */
+                            log.info("contention for info table");
                             success = false;
                             updateInfoStmnt.getConnection().rollback();
                             try {
-                                Thread.sleep(2);
+                                Thread.sleep(10);
                             } catch (Exception e2) {
                                 // ignore
                             }
                         } else {
-                            System.out.println("YY " + e + " "
-                                    + e.getErrorCode());
+			    log.severe("unexpected exception: " + e);
                             e.printStackTrace();
                         }
-                    } finally {
-                        // System.out.println("\t\tClosing...");
-                        rs.close();
                     }
 
                     /*
@@ -836,8 +806,7 @@ public class HadbDataSpace implements DataSpace {
                     }
                 }
             } catch (SQLException e) {
-                // XXX
-                System.out.println("TT " + e + " " + e.getErrorCode());
+		log.severe("unexpected exception: " + e);
                 e.printStackTrace();
             }
 
@@ -846,37 +815,30 @@ public class HadbDataSpace implements DataSpace {
         }
 
         long newOID = currentIdBlockBase + currentIdBlockOffset++;
-        // System.out.println("NEW OID " + newOID);
+        log.finest("new ObjectID = " + newOID);
 
         /*
-         * For the sake of convenience, create the object lock
-         * immediately, instead of waiting for the atomic update to
-         * occur. This streamlines the update (and allows us to lock
-         * objects that exist in the world but don't exist in the
-         * objtable).
+	 * For the sake of convenience, create the object lock
+	 * immediately, instead of waiting for the atomic update to
+	 * occur.  This streamlines the update (and allows us to lock
+	 * objects that exist in the world but don't exist in the
+	 * objtable).
          */
 
         try {
-            // System.out.println("inserting oid " + newOID);
             insertObjLockStmnt.setLong(1, newOID);
             insertObjLockStmnt.setInt(2, 0);
-        } catch (SQLException e) {
-            // XXX: ??
-        }
-
-        try {
             insertObjLockStmnt.executeUpdate();
             insertObjLockStmnt.getConnection().commit();
-            // System.out.println("SUCCESS for OID: " + newOID);
+            log.finest("SUCCESS creating locks for ObjectID " + newOID);
         } catch (SQLException e) {
             try {
                 insertObjLockStmnt.getConnection().rollback();
             } catch (SQLException e2) {
-                System.out.println("FAILED TO ROLLBACK");
-                System.out.println(e2);
+                log.severe("FAILED to rollback attempt to create locks " + e2);
             }
-            System.out.println("FAILURE for OID: " + newOID);
-            System.out.println(e);
+	    log.severe("FAILED to create locks for ObjectID " + newOID +
+		    ": " + e);
             e.printStackTrace();
         }
 
@@ -893,13 +855,13 @@ public class HadbDataSpace implements DataSpace {
             ResultSet rs = getObjStmnt.executeQuery();
             // getObjStmnt.getConnection().commit();
             if (rs.next()) {
-                // objbytes = rs.getBytes("OBJBYTES");
                 Blob b = rs.getBlob("OBJBYTES");
                 objbytes = b.getBytes(1L, (int) b.length());
             }
             rs.close(); // cleanup and free locks
         } catch (SQLException e) {
-            System.out.println(e);
+	    log.severe("failed to getObjBytes for object " + objectID +
+		    " " + e);
             e.printStackTrace();
         }
         return objbytes;
@@ -943,13 +905,12 @@ public class HadbDataSpace implements DataSpace {
                 updateObjLockStmnt.setLong(1, objectID);
                 rc = updateObjLockStmnt.executeUpdate();
             } catch (SQLException e) {
-                System.out.println("Blocked on " + objectID);
-                System.out.println(e);
+                log.finer("Blocked on " + objectID + " " + e);
                 e.printStackTrace();
             }
 
             if (rc == 1) {
-                // System.out.println("Got the lock on " + objectID + " rc = " + rc);
+		log.finest("Got the lock on " + objectID);
                 return;
             } else {
 
@@ -970,7 +931,7 @@ public class HadbDataSpace implements DataSpace {
 				"nonexistant object " + objectID);
 		    }
 		} catch (SQLException e) {
-		    System.out.println(e);
+		    log.severe("exception when finding a lock: " + e);
 		    e.printStackTrace();
 		}
 
@@ -1002,12 +963,12 @@ public class HadbDataSpace implements DataSpace {
             throws NonExistantObjectIDException {
 
         /*
-         * Similar to lock, except it doesn't poll. If the update fails,
-         * it assumes that's because the lock is already unlocked, and
-         * rolls back.
+	 * Similar to lock, except it doesn't poll.  If the update
+	 * fails, it assumes that's because the lock is already
+	 * unlocked, and rolls back.
          * 
-         * There might be a race condition here: can't tell without
-         * looking at the actual packets, which is bad. -DJE
+	 * There might be a race condition here:  can't tell without
+	 * looking at the actual packets, which is scary.  -DJE
          */
 
         int rc = -1;
@@ -1015,20 +976,17 @@ public class HadbDataSpace implements DataSpace {
             updateObjUnlockStmnt.setLong(1, objectID);
             rc = updateObjUnlockStmnt.executeUpdate();
         } catch (SQLException e) {
-            System.out.println("Tried to unlock (" + objectID
-                    + "): already unlocked.");
-            System.out.println(e);
+	    log.info("Tried to unlock (" + objectID +
+		    "): already unlocked: " + e);
             e.printStackTrace();
         }
 
         if (rc == 1) {
-            System.out.println("Released the lock on " + objectID +
-		    " rc = " + rc);
+            log.finest("Released the lock on " + objectID);
             return;
         } else {
-            System.out.println("Didn't need to unlock " + objectID + " rc = "
-                    + rc);
             // XXX: not an error. This is a diagnostic only.
+            log.finest("Didn't need to unlock " + objectID);
         }
     }
 
@@ -1037,6 +995,9 @@ public class HadbDataSpace implements DataSpace {
      */
     public void release(Set<Long> objectIDs)
             throws NonExistantObjectIDException {
+
+	Long[] oids = new Long[objectIDs.size()];
+	objectIDs.toArray(oids);
 
         /*
          * Similar to lock, except it doesn't poll. If the update fails,
@@ -1048,25 +1009,25 @@ public class HadbDataSpace implements DataSpace {
          */
 
         int[] updateCounts = new int[0];
-        for (long oid : objectIDs) {
+        for (long oid : oids) {
             try {
                 updateObjUnlockStmnt.setLong(1, oid);
                 updateObjUnlockStmnt.addBatch();
             } catch (SQLException e) {
-                System.out.println("FAILED to set parameters");
+                log.severe("Failed to set batch parameters in release: " + e);
             }
         }
 
         try {
             updateCounts = updateObjUnlockStmnt.executeBatch();
         } catch (SQLException e) {
-            System.out.println(e);
+	    log.severe("Failed to execute release: " + e);
             e.printStackTrace();
         }
 
-        for (int rc : updateCounts) {
-            if (rc != 1) {
-                System.out.println("failed to release something");
+        for (int i = 0; i < updateCounts.length; i++) {
+            if (updateCounts[i] != 1) {
+                log.warning("failed to release objectID " + oids[i]);
                 throw new NonExistantObjectIDException("unknown obj released.");
             }
         }
@@ -1252,84 +1213,37 @@ public class HadbDataSpace implements DataSpace {
             idConn.commit();
             idConn.close();
         } catch (SQLException e) {
-            System.out.println("can't close idConn " + e);
+            log.warning("can't close idConn " + e);
         }
 
         try {
             updateTransConn.commit();
             updateTransConn.close();
         } catch (SQLException e) {
-            System.out.println("can't close updateTransConn " + e);
+            log.warning("can't close updateTransConn " + e);
         }
 
         try {
             updateSingleConn.close();
         } catch (SQLException e) {
-            System.out.println("can't close updateSingleConn " + e);
+            log.warning("can't close updateSingleConn " + e);
         }
 
         try {
             schemaConn.close();
         } catch (SQLException e) {
-            System.out.println("can't close schemaConn " + e);
+            log.warning("can't close schemaConn " + e);
         }
 
         try {
             readConn.close();
         } catch (SQLException e) {
-            System.out.println("can't close readConn " + e);
+            log.warning("can't close readConn " + e);
         }
 
-        System.out.println("CLOSED");
+        log.info("DataSpace CLOSED");
 
         closed = true;
-    }
-
-    /*
-     * {@inheritDoc}
-     * 
-     * @see com.sun.gi.objectstore.tso.dataspace.DataSpace#newName(java.lang.String)
-     */
-    public boolean newName(String name) {
-        return false;
-    }
-
-    public void destroy(long objectID) throws NonExistantObjectIDException {
-
-        // XXX: doesn't check for bad objectIDs
-
-        try {
-            deleteObjStmnt.setLong(1, objectID);
-            deleteObjStmnt.executeUpdate();
-
-        } catch (SQLException e) {
-            try {
-                deleteObjStmnt.getConnection().rollback();
-            } catch (SQLException e2) {
-                // XXX: DO SOMETHING.
-            }
-
-            // XXX: need to double-check that this is WHY
-            // we got into this state.
-
-            throw new NonExistantObjectIDException("object " + objectID
-                    + " does not exist");
-        }
-
-        try {
-            deleteNameStmnt.setLong(1, objectID);
-            deleteNameStmnt.executeUpdate();
-
-            deleteObjStmnt.getConnection().commit();
-        } catch (SQLException e) {
-            try {
-                deleteObjStmnt.getConnection().rollback();
-            } catch (SQLException e2) {
-                // XXX: DO SOMETHING.
-            }
-        }
-
-        return;
     }
 
     public long create(byte[] data, String name) {
@@ -1348,8 +1262,7 @@ public class HadbDataSpace implements DataSpace {
 		try {
 		    insertObjStmnt.getConnection().rollback();
 		} catch (SQLException e2) {
-		    // XXX: Can't even rollback?  Yikes!!!
-		    System.out.println("create: double error" + e);
+		    log.severe("create: double error" + e);
 		    return DataSpace.INVALID_ID;
 		}
 
