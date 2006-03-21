@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * LobbyPanel.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Sun Feb 26, 2006	 8:44:37 PM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.client.gui;
 
 import com.sun.gi.apps.hack.client.LobbyManager;

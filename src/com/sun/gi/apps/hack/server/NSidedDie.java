@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * NSidedDie.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Wed Mar  1, 2006	 3:14:29 AM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.server;
 
 import java.util.Random;

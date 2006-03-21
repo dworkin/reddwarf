@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * AICharacter.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Sun Mar  5, 2006	 2:58:01 AM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.server.ai;
 
 import com.sun.gi.apps.hack.server.Character;

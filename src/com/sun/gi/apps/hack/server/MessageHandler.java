@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * MessageHandler.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Mon Feb 27, 2006	 8:53:32 PM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.server;
 
 import java.io.Serializable;

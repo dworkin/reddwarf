@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * PlayerConnector.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Tue Mar  7, 2006	 7:48:46 PM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.server.level;
 
 import com.sun.gi.logic.GLOReference;

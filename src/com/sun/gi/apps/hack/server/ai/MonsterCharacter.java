@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * MonsterCharacter.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Tue Mar  7, 2006	 3:14:12 AM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.server.ai;
 
 import com.sun.gi.logic.GLOReference;

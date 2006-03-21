@@ -79,16 +79,6 @@
  GARANTIE IMPLICITE RELATIVE A LA QUALITE MARCHANDE, A L'APTITUDE A UNE
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
-
-
-/*
- * OneWayConnector.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Sun Mar  5, 2006	10:39:24 PM
- * Desc: 
- *
- */
 package com.sun.gi.apps.hack.server.level;
 
 import com.sun.gi.logic.GLOReference;

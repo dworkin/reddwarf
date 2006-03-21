@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * CharacterPanel.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Thu Mar  9, 2006	 1:31:11 AM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.client.gui;
 
 import com.sun.gi.apps.hack.share.CharacterStats;

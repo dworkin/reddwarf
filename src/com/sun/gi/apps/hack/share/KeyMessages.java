@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * KeyMessages.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Sat Mar  4, 2006	 9:39:20 PM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.share;
 
 

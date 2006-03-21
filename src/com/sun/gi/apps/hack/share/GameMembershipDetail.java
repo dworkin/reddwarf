@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * GameMembershipDetail.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Tue Feb 28, 2006	 6:29:09 PM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.share;
 
 import java.io.Serializable;

@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * BoardPanel.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Thu Feb 16, 2006	 2:56:46 PM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.client.gui;
 
 import com.sun.gi.apps.hack.client.BoardListener;

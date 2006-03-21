@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * ChatManager.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Sat Feb 25, 2006	 6:11:10 PM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.client;
 
 import com.sun.gi.comm.users.client.ClientChannel;

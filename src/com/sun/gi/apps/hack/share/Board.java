@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * Board.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Thu Feb 16, 2006	 4:46:19 PM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.share;
 
 import java.io.Serializable;

@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * RodentMonster.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Thu Mar  9, 2006	11:35:56 AM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.server.ai;
 
 import com.sun.gi.logic.GLOReference;

@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * PlayerCharacter.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Mon Mar  6, 2006	 9:23:05 PM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.server;
 
 import com.sun.gi.logic.GLOReference;

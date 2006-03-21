@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * Dungeon.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Sun Feb 26, 2006	 2:50:22 PM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.server;
 
 import com.sun.gi.comm.routing.ChannelID;

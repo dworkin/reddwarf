@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * BoardListener.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Sat Feb 25, 2006	 9:43:45 PM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.client;
 
 import com.sun.gi.apps.hack.share.Board;

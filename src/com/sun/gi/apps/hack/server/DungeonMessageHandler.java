@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * DungeonMessageHandler.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Mon Feb 27, 2006	 9:24:09 PM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.server;
 
 import com.sun.gi.logic.GLOReference;

@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * GamePanel.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Sat Feb 25, 2006	 4:32:31 PM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.client.gui;
 
 import com.sun.gi.apps.hack.client.CommandListener;

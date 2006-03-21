@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * Connector.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Fri Mar  3, 2006	 9:40:32 PM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.server.level;
 
 import com.sun.gi.logic.GLO;

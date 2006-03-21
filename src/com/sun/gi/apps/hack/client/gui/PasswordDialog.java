@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * PasswordDialog.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Fri Feb 17, 2006	 7:43:01 PM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.client.gui;
 
 import java.awt.BorderLayout;

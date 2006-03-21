@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * BasicTile.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Sun Mar  5, 2006	 8:30:09 PM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.server.level;
 
 import com.sun.gi.logic.GLOReference;

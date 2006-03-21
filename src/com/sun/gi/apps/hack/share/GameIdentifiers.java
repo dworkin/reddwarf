@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * GameIdentifiers.java
- *
- * Created by: seth proctor (stp)
- * Created on: Mon Feb 20, 2006	12:13:42 PM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.share;
 
 

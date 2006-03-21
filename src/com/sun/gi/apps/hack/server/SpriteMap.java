@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * SpriteMap.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Wed Mar  8, 2006	11:56:44 PM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.server;
 
 import com.sun.gi.logic.GLO;

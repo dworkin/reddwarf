@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * GameChangeManager.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Tue Feb 28, 2006	 6:23:23 PM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.server;
 
 import com.sun.gi.logic.GLOReference;

@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * Client.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Fri Feb 17, 2006	 6:05:34 PM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.client;
 
 import com.sun.gi.comm.discovery.impl.URLDiscoverer;

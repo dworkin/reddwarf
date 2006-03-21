@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * PlayerInfoPanel.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Sat Feb 25, 2006	 6:50:16 PM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.client.gui;
 
 import com.sun.gi.apps.hack.client.PlayerListener;

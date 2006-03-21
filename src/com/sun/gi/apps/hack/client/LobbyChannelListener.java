@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * LobbyChannelListener.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Sun Feb 26, 2006	 3:42:17 PM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.client;
 
 import com.sun.gi.apps.hack.share.CharacterStats;

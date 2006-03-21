@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * DungeonFactory.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Thu Mar  9, 2006	 6:06:06 PM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.server.level;
 
 import com.sun.gi.logic.GLOReference;

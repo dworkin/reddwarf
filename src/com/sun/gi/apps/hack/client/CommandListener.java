@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * CommandListener.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Sun Feb 26, 2006	 7:01:36 PM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.client;
 
 

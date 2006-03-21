@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * CharacterManager.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Fri Mar  3, 2006	 9:44:27 PM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.server;
 
 import com.sun.gi.logic.GLO;

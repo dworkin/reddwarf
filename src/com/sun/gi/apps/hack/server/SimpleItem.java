@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * SimpleItem.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Thu Mar  9, 2006	 2:30:55 AM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.server;
 
 import com.sun.gi.apps.hack.server.level.LevelBoard.ActionResult;

@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * ConnectorTile.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Sat Mar  4, 2006	 9:24:54 PM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.server.level;
 
 import com.sun.gi.logic.GLOReference;

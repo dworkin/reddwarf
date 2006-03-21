@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * ChatPanel.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Sat Feb 25, 2006	 5:52:06 PM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.client.gui;
 
 import com.sun.gi.utils.SGSUUID;

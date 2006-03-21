@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * BoardSpace.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Sat Feb 25, 2006	 9:56:05 PM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.share;
 
 import java.io.Serializable;

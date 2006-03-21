@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * GameList.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Sun Feb 26, 2006	 9:20:13 PM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.client.gui;
 
 import com.sun.gi.apps.hack.client.LobbyListener;

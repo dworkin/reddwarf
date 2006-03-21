@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * Character.java
- *
- * Created by: seth proctor (stp)
- * Created on: Thu Feb 23, 2006	 1:29:53 PM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.server;
 
 import com.sun.gi.apps.hack.server.level.LevelBoard.ActionResult;

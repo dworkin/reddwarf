@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * GameSimBoot.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Fri Feb 17, 2006	 4:39:10 PM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.server;
 
 import com.sun.gi.comm.routing.UserID;

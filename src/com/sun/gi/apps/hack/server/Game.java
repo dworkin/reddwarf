@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * Game.java
- *
- * Created by: seth proctor (stp)
- * Created on: Mon Feb 20, 2006	 6:11:45 PM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.server;
 
 import com.sun.gi.comm.routing.UserID;

@@ -80,16 +80,6 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-
-/*
- * Player.java
- *
- * Created by: seth proctor (stp)
- * Created on: Mon Feb 20, 2006	 4:59:43 PM
- * Desc: 
- *
- */
-
 package com.sun.gi.apps.hack.server;
 
 import com.sun.gi.comm.routing.ChannelID;
