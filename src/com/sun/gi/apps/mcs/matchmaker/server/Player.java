@@ -556,7 +556,7 @@ public class Player implements SimUserDataListener {
     }
 
     private void lookupUserNameRequest(SimTask task, ByteBuffer data) {
-        UserID id = protocol.readUserID(data);
+        UserID id = (UserID) protocol.readUserID(data);
         String username = null;
         if (id != null) {
             GLOReference<Player> pRef = task.findGLO(id.toString());
@@ -581,7 +581,7 @@ public class Player implements SimUserDataListener {
      * @param data the data buffer
      */
     private void locateUserRequest(SimTask task, ByteBuffer data) {
-        UserID requestedID = protocol.readUserID(data);
+        UserID requestedID = (UserID) protocol.readUserID(data);
         GLOReference<Player> requestedRef = task.findGLO(requestedID.toString());
         Lobby lobby = null;
         if (requestedRef != null) {

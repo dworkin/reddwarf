@@ -88,7 +88,6 @@ import java.nio.ByteBuffer;
 import java.util.LinkedList;
 import java.util.List;
 
-import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.utils.SGSUUID;
 import com.sun.gi.utils.StatisticalUUID;
 
@@ -299,18 +298,18 @@ public final class CommandProtocol implements Serializable {
 
     /**
      * Reads a UUID from the current position on the ByteBuffer and
-     * returns a UserID. The first byte read is the length of the UUID.
+     * returns a SGSUUID. The first byte read is the length of the UUID.
      * 
      * @param data the ByteBuffer containing the UUID info.
      * 
-     * @return an UserID based on the UUID read from the buffer.
+     * @return an SGSUUID based on the UUID read from the buffer.
      */
-    public UserID readUserID(ByteBuffer data) {
+    public SGSUUID readUserID(ByteBuffer data) {
         byte[] uuid = readBytes(data, true);
 
-        UserID id = null;
+        SGSUUID id = null;
         try {
-            id = new UserID(uuid);
+            id = new StatisticalUUID(uuid);
         } catch (InstantiationException ie) {
             ie.printStackTrace();
         }

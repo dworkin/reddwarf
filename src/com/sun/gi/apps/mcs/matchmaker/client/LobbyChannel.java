@@ -90,9 +90,10 @@ import java.util.Map;
 import static com.sun.gi.apps.mcs.matchmaker.common.CommandProtocol.*;
 
 import com.sun.gi.apps.mcs.matchmaker.common.CommandProtocol;
-import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.comm.users.client.ClientChannel;
 import com.sun.gi.comm.users.client.ClientChannelListener;
+import com.sun.gi.utils.SGSUUID;
+import com.sun.gi.utils.StatisticalUUID;
 
 /**
  * 
@@ -140,10 +141,10 @@ public class LobbyChannel implements ILobbyChannel, ClientChannelListener {
         channel.sendUnicastData(user, buffer, true);
     }
 
-    private UserID createUserID(byte[] bytes) {
-        UserID id = null;
+    private SGSUUID createUserID(byte[] bytes) {
+        SGSUUID id = null;
         try {
-            id = new UserID(bytes);
+            id = new StatisticalUUID(bytes);
         } catch (InstantiationException ie) {}
 
         return id;
@@ -229,7 +230,7 @@ public class LobbyChannel implements ILobbyChannel, ClientChannelListener {
         if (command == SEND_TEXT) {
         	listener.receiveText(from, protocol.readString(data), false);
         } else if (command == SEND_PRIVATE_TEXT) {
-        	UserID id = protocol.readUserID(data);
+        	SGSUUID id = protocol.readUserID(data);
         	listener.receiveText(from, protocol.readString(data), true);
         
         }	
