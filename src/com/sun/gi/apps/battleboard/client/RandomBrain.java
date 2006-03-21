@@ -86,7 +86,7 @@ import com.sun.gi.apps.battleboard.BattleBoard;
 import java.util.Random;
 
 /**
- * A {@link Brain} that chooses moves at random.
+ * A {@link BattleBrain} that chooses moves at random.
  */
 public class RandomBrain implements BattleBrain {
 

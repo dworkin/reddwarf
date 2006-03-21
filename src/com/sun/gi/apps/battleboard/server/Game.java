@@ -609,6 +609,9 @@ public class Game implements GLO {
     /**
      * Handle data that was sent directly to the server.
      *
+     * The Player GLO's userDataReceived handler forwards these events
+     * to us since we want to collect them across the entire channel.
+     *
      * @param uid the UserID of the sender
      *
      * @param data the buffer of data received
@@ -642,9 +645,12 @@ public class Game implements GLO {
      * Waits until we get joinedChannel from all our players before
      * starting the game.
      *
+     * The Player GLO's userJoined handler forwards these events to
+     * us since we want to collect them across the entire channel.
+     *
      * @param cid the ChannelID
      *
-     * @param uid the UserID of the sender
+     * @param uid the UserID of the joiner
      */
     public void joinedChannel(ChannelID cid, UserID uid) {
         log.finer("Game: User " + uid + " joined channel " + cid);
@@ -675,7 +681,15 @@ public class Game implements GLO {
     }
 
     /**
-     * {@inheritDoc}
+     * Waits until we get leftChannel from all our players before
+     * deleting the game.
+     *
+     * The Player GLO's userLeft handler forwards these events to
+     * us since we want to collect them across the entire channel.
+     *
+     * @param cid the ChannelID
+     *
+     * @param uid the UserID of the departing user
      */
     public void leftChannel(ChannelID cid, UserID uid) {
         log.finer("Game: User " + uid + " left channel " + cid);
