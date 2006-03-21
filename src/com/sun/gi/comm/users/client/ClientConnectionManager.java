@@ -68,6 +68,9 @@
 
 package com.sun.gi.comm.users.client;
 
+import com.sun.gi.utils.SGSUUID;
+import com.sun.gi.utils.StatisticalUUID;
+
 import java.nio.ByteBuffer;
 
 import javax.security.auth.callback.Callback;
@@ -217,4 +220,6 @@ public interface ClientConnectionManager {
      * @return true iff userid is the SGS server's user id
      */
     public boolean isServerID(byte[] userid);
+
+    public static final SGSUUID SERVER_ID = new StatisticalUUID(-1, -1);
 }
