@@ -101,7 +101,6 @@ import com.sun.gi.apps.hack.server.Item;
 import com.sun.gi.apps.hack.server.level.LevelBoard.ActionResult;
 
 import java.io.Serializable;
-import java.util.logging.Logger;
 
 
 /**
@@ -115,8 +114,6 @@ import java.util.logging.Logger;
  */
 public abstract class BasicTile implements Tile
 {
-    private static Logger log =
-	Logger.getLogger("com.sun.gi.apps.hack.server");
 
     // the id of this tile
     private int id;
@@ -198,7 +195,7 @@ public abstract class BasicTile implements Tile
         // if there's a character here, then the space can't be occupied
         // NOTE: if we allow passable characters in the future, then this
         // needs to be updated
-        if (mgrRef != null)
+        if (this.mgrRef != null)
             return false;
 
         // NOTE: if we allow items that block movement, then this will need
@@ -236,18 +233,16 @@ public abstract class BasicTile implements Tile
      */
     public boolean removeCharacter(GLOReference<? extends CharacterManager>
                                    mgrRef) {
-        // FIXME: these invariants should be logged
-
         // make sure that there's a character here
         if (this.mgrRef == null) {
-            log.warning("tried to remove a null char from a tile");
+            System.out.println("tried to remove a null char from a tile");
             return false;
         }
 
         // make sure that the character here is the one being removed
         if (! this.mgrRef.equals(mgrRef)) {
             SimTask task = SimTask.getCurrent();
-            log.severe("not equal on removal: " +
+            System.out.println("not equal on removal: " +
                                mgrRef.peek(task).toString() + " != " +
                                this.mgrRef.peek(task).toString());
             return false;
@@ -328,6 +323,9 @@ public abstract class BasicTile implements Tile
      * @return the result of getting an item
      */
     public ActionResult getItem(CharacterManager characterManager) {
+        if (itemRef == null)
+            return ActionResult.FAIL;
+
         // give this item the chance to react (most items are passive,
         // but you could immediately affect the user here)
         return itemRef.get(SimTask.getCurrent()).giveTo(characterManager);
