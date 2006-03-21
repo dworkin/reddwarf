@@ -195,11 +195,6 @@ public class HadbDataSpace implements DataSpace {
         INFOTBLNAME = SCHEMA + "." + INFOBASETBL;
 
         try {
-            // XXX: MUST take these from a config file.
-            // hadbHosts = "129.148.75.63:15025,129.148.75.60:15005";
-            // String userName = "system";
-            // String userPasswd = "sungameserver";
-
             String dataConnURL = "jdbc:sun:hadb:" + hadbHosts + ";create=true";
 
 	    log.fine("dataConnURL: " + dataConnURL);
@@ -1027,6 +1022,17 @@ public class HadbDataSpace implements DataSpace {
 
         for (int i = 0; i < updateCounts.length; i++) {
             if (updateCounts[i] != 1) {
+
+		/*
+		 * 3/21/06 - this is not necessarily an error because
+		 * the current DataSpaceTransactionImpl.commit (and
+		 * perhaps abort) can release the locks on objects it
+		 * just deleted.  Therefore it's very common to see
+		 * this exception during CORRECT execution.  This
+		 * warning will nag someone to fix this after GDC. 
+		 * -DJE
+		 */
+
                 log.warning("failed to release objectID " + oids[i]);
                 throw new NonExistantObjectIDException("unknown obj released.");
             }
@@ -1037,55 +1043,10 @@ public class HadbDataSpace implements DataSpace {
      * {@inheritDoc}
      */
     public synchronized void atomicUpdate(boolean clear,
-            Map<Long, byte[]> updateMap, List<Long> deleted)
-	    throws DataSpaceClosedException
-    {
-        Map<String, Long> dummyNewNames = new HashMap<String, Long>();
-        Set<Long> dummyIdSet = new HashSet<Long>();
-	Set<Long> deleteSet = new HashSet<Long>(deleted);
-
-        atomicUpdate(clear, dummyNewNames, deleteSet, updateMap, dummyIdSet);
-    }
-
-    private synchronized void atomicUpdate(boolean clear,
-            Map<String, Long> newNames, Set<Long> deleteSet,
-            Map<Long, byte[]> updateMap, Set<Long> insertIDs)
+	    Map<Long, byte[]> updateMap, List<Long> deleteList)
             throws DataSpaceClosedException {
         if (closed) {
             throw new DataSpaceClosedException();
-        }
-
-        if (newNames.entrySet().size() > 0) {
-            for (Entry<String, Long> e : newNames.entrySet()) {
-                long oid = e.getValue();
-                String name = e.getKey();
-
-                /*
-                 * If something is in the deleteSet, then there's no
-                 * need to insert it because we're going to remove it as
-                 * part of this atomic op.
-                 */
-
-                if (deleteSet.contains(oid)) {
-                    continue;
-                }
-
-                try {
-                    insertNameStmnt.setString(1, name);
-                    insertNameStmnt.setLong(2, oid);
-                    insertNameStmnt.addBatch();
-                } catch (SQLException e1) {
-                    // XXX: rollback and die
-                    e1.printStackTrace();
-                }
-            }
-
-            try {
-                insertNameStmnt.executeBatch();
-            } catch (SQLException e1) {
-                // XXX: rollback and die
-                e1.printStackTrace();
-            }
         }
 
         if (updateMap.entrySet().size() > 0) {
@@ -1093,36 +1054,21 @@ public class HadbDataSpace implements DataSpace {
                 long oid = e.getKey();
                 byte[] data = e.getValue();
 
-                if (deleteSet.contains(oid)) {
+                if (deleteList.contains(oid)) {
                     continue;
                 }
 
                 try {
-                    if (insertIDs.contains(oid)) {
-                        insertObjStmnt.setLong(1, oid);
-                        insertObjStmnt.setBytes(2, data);
-                        insertObjStmnt.addBatch();
-                    } else {
-                        updateObjStmnt.setBytes(1, data);
-                        updateObjStmnt.setLong(2, oid);
-                        updateObjStmnt.addBatch();
-                    }
+		    updateObjStmnt.setBytes(1, data);
+		    updateObjStmnt.setLong(2, oid);
+		    updateObjStmnt.addBatch();
                 } catch (SQLException e1) {
                     // XXX: rollback and die
                     e1.printStackTrace();
                 }
             }
 
-            if (insertIDs.size() > 0) {
-                try {
-                    insertObjStmnt.executeBatch();
-                } catch (SQLException e1) {
-                    // XXX: rollback and die
-                    e1.printStackTrace();
-                }
-            }
-
-            if ((updateMap.entrySet().size() - insertIDs.size()) > 0) {
+            if (updateMap.entrySet().size() > 0) {
                 try {
                     updateObjStmnt.executeBatch();
                 } catch (SQLException e1) {
@@ -1132,11 +1078,7 @@ public class HadbDataSpace implements DataSpace {
             }
         }
 
-        for (long oid : deleteSet) {
-            if (insertIDs.contains(oid)) {
-                continue;
-            }
-
+        for (long oid : deleteList) {
             try {
                 deleteObjStmnt.setLong(1, oid);
                 deleteObjStmnt.execute();
@@ -1161,7 +1103,6 @@ public class HadbDataSpace implements DataSpace {
             // Is there anything we can do here, other than weep?
             e.printStackTrace();
         }
-
     }
 
     /**
