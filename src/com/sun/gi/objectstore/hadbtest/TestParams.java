@@ -221,7 +221,7 @@ public class TestParams {
 
     private void initialize() {
 
-	dataSpaceType = (String) params.getProperty("hadbtest.dataSpaceType",
+	dataSpaceType = params.getProperty("hadbtest.dataSpaceType",
 		System.getProperty("hadbtest.dataSpaceType",
 			"persistant-inmem"));
 
@@ -232,8 +232,8 @@ public class TestParams {
 			System.getProperty("hadbtest.doTrace",
 				"false")));
 
-	traceFileName = (String) params.getProperty("hadbtest.traceFileName",
-		(String) System.getProperty("hadbtest.traceFileName",
+	traceFileName = params.getProperty("hadbtest.traceFileName",
+		System.getProperty("hadbtest.traceFileName",
 			null));
 
 	objSize = (int) new Integer(
