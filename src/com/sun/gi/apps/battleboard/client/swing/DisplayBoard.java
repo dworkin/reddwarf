@@ -112,6 +112,8 @@ import java.util.HashMap;
  */
 public class DisplayBoard extends JPanel implements BoardListener
 {
+    private static final long serialVersionUID = 1L;
+
     private static final int GRIDSIZE = 32;
     private int GRIDXOFFSET = 0;
     private static final int GRIDYOFFSET = 40;

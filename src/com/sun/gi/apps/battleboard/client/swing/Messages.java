@@ -87,6 +87,8 @@ import javax.swing.*;
 
 public class Messages extends JPanel {
 
+    private static final long serialVersionUID = 1L;
+
     private JLabel label;
     private Color BGCOLOR = new Color(150, 130, 130);
     

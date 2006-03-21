@@ -96,6 +96,8 @@ import javax.swing.border.*;
 
 public class BoardSet extends JPanel implements Zapper
 {
+    private static final long serialVersionUID = 1L;
+
     private DisplayBoard[] boards;
     private Rectangle src;
     private ArrayList<Animation> animations = new ArrayList<Animation>();

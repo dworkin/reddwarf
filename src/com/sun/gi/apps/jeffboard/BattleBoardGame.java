@@ -347,6 +347,9 @@ public class BattleBoardGame implements GLO {
 }
 
 class BattleMap implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
     List<int[]> cityList = new ArrayList<int[]>();
     private boolean withdrawn = false;
 

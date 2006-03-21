@@ -77,6 +77,8 @@ package com.sun.gi.logic;
  */
 public class SGSError extends Error {
 
+    private static final long serialVersionUID = 1L;
+
     public SGSError() {
     }
 

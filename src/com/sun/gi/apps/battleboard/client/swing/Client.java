@@ -92,6 +92,9 @@ import java.awt.geom.*;
 import javax.swing.*;
 
 public class Client extends JFrame implements Display, MoveListener {
+
+    private static final long serialVersionUID = 1L;
+
     /** the delegate for generating moves, or null to use the UI */
     private BattleBrain delegate;
     
