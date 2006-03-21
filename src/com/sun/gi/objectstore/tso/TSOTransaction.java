@@ -130,7 +130,7 @@ public class TSOTransaction implements Transaction {
 
     private volatile boolean timestampInterrupted;
 
-    private static final boolean DEBUG = true;
+    private static final boolean DEBUG = false;
 
     private static long TIMEOUT =
         Integer.parseInt(System.getProperty("sgs.objectstore.timeout",
