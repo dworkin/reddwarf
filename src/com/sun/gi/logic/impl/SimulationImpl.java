@@ -224,7 +224,7 @@ public class SimulationImpl implements Simulation {
 			log.fine("user left: " + uid);
 			lameDuckUsers.add(uid);
 		    } else {
-			log.warning("user " + uid +
+			log.info("user " + uid +
 				" leaving but was not joined.");
 		    }
 		}
@@ -234,7 +234,7 @@ public class SimulationImpl implements Simulation {
 		log.fine("user " + uid + " joined channel " + cid);
 		synchronized (userStateMutex) {
 		    if (lameDuckUsers.contains(uid)) {
-			log.warning("joinedChannel user " + uid +
+			log.info("joinedChannel user " + uid +
 				" is a lame duck");
 		    }
 		}
@@ -245,7 +245,7 @@ public class SimulationImpl implements Simulation {
 		log.fine("user " + uid + " left channel " + cid);
 		synchronized (userStateMutex) {
 		    if (lameDuckUsers.contains(uid)) {
-			log.warning("leftChannel user " + uid +
+			log.info("leftChannel user " + uid +
 				" is a lame duck");
 		    }
 		}
@@ -257,7 +257,7 @@ public class SimulationImpl implements Simulation {
 		log.fine("user " + from + " sent data to channel " + cid);
 		synchronized (userStateMutex) {
 		    if (lameDuckUsers.contains(from)) {
-			log.warning("channelDataPacket user " + from +
+			log.info("channelDataPacket user " + from +
 				" is a lame duck");
 		    }
 		}
@@ -740,7 +740,7 @@ public class SimulationImpl implements Simulation {
 		}
 
 		if (task == null) {
-		    log.warning("newTask returning NULL");
+		    log.fine("newTask returning NULL");
 		    return null;
 		} else {
 		    userIsReady(task.getUserID(), false);

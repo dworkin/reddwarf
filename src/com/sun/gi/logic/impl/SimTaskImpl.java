@@ -126,7 +126,7 @@ public class SimTaskImpl extends SimTask {
         this.accessType = access;
         this.startObject = this.makeReference(startObjectID);
         this.startMethod = startMethod;
-        this.startArgs = (Object[]) startArgs.clone();
+        this.startArgs = startArgs.clone();
 	this.uid = uid;
 
 	this.executionCount = 0;
@@ -238,7 +238,7 @@ public class SimTaskImpl extends SimTask {
     }
 
     protected void requeueAfterDeadlock() {
-	log.warning("Requeue after deadlock txn " +
+	log.info("Requeue after deadlock txn " +
 		((com.sun.gi.objectstore.tso.TSOTransaction)
 		    trans).getUUID());
 
