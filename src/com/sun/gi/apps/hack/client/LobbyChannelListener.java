@@ -139,7 +139,7 @@ public class LobbyChannelListener extends GameChannelListener
      * @param reliable true if this packet was sent reliably
      */
     public void dataArrived(byte[] from, ByteBuffer data, boolean reliable) {
-        if (Arrays.equals(from, Client.SERVER_UID)) {
+        if (Client.SERVER_UID.equals(from)) {
             // if this is a message from the server, then it's some
             // command that we need to process, so get the command code
             int command = (int)(data.get());
@@ -153,6 +153,7 @@ public class LobbyChannelListener extends GameChannelListener
                     break;
                 case 1:
                     // we were sent game membership updates
+                    @SuppressWarnings("unchecked")
                     Collection<GameMembershipDetail> details =
                         (Collection<GameMembershipDetail>)(getObject(data));
                     for (GameMembershipDetail detail : details) {
@@ -199,6 +200,7 @@ public class LobbyChannelListener extends GameChannelListener
                 case 5: {
                     // we got updated with some character statistics...these
                     // are characters that the client is allowed to play
+                    @SuppressWarnings("unchecked")
                     Collection<CharacterStats> characters =
                         (Collection<CharacterStats>)(getObject(data));
                     llistener.setCharacters(characters);

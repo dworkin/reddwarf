@@ -78,9 +78,9 @@
 
 package com.sun.gi.apps.hack.client;
 
-import com.sun.gi.comm.routing.UserID;
-
 import com.sun.gi.comm.users.client.ClientChannelListener;
+import com.sun.gi.utils.SGSUUID;
+import com.sun.gi.utils.StatisticalUUID;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -88,6 +88,7 @@ import java.io.ObjectInputStream;
 
 import java.nio.ByteBuffer;
 
+import java.util.Collections;
 import java.util.Map;
 
 
@@ -117,7 +118,7 @@ public abstract class GameChannelListener implements ClientChannelListener
      */
     public void playerJoined(byte[] playerID) {
         try {
-            chatListener.playerJoined(new UserID(playerID));
+            chatListener.playerJoined(new StatisticalUUID(playerID));
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -130,7 +131,7 @@ public abstract class GameChannelListener implements ClientChannelListener
      */
     public void playerLeft(byte[] playerID) {
         try {
-            chatListener.playerLeft(new UserID(playerID));
+            chatListener.playerLeft(new StatisticalUUID(playerID));
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -148,7 +149,7 @@ public abstract class GameChannelListener implements ClientChannelListener
             byte [] bytes = new byte[data.remaining()];
             data.get(bytes);
             String message = new String(bytes);
-            chatListener.messageArrived(new UserID(playerID), message);
+            chatListener.messageArrived(new StatisticalUUID(playerID), message);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -160,7 +161,8 @@ public abstract class GameChannelListener implements ClientChannelListener
      * @param data encoded mapping from user identifier to string
      */
     protected void addUidMappings(ByteBuffer data) throws IOException {
-        Map<UserID,String> map = (Map<UserID,String>)(getObject(data));
+        @SuppressWarnings("unchecked")
+        Map<SGSUUID,String> map = (Map<SGSUUID,String>)(getObject(data));
         chatListener.addUidMappings(map);
     }
 

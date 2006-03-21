@@ -92,9 +92,8 @@
 
 package com.sun.gi.apps.hack.client;
 
-import com.sun.gi.comm.routing.UserID;
-
 import com.sun.gi.comm.users.client.ClientChannel;
+import com.sun.gi.utils.SGSUUID;
 
 import java.nio.ByteBuffer;
 
@@ -163,7 +162,7 @@ public class ChatManager implements ChatListener
      *
      * @param uid the identifier for the player
      */
-    public void playerJoined(UserID uid) {
+    public void playerJoined(SGSUUID uid) {
         for (ChatListener listener : listeners)
             listener.playerJoined(uid);
     }
@@ -174,7 +173,7 @@ public class ChatManager implements ChatListener
      *
      * @param uid the identifier for the player
      */
-    public void playerLeft(UserID uid) {
+    public void playerLeft(SGSUUID uid) {
         for (ChatListener listener : listeners)
             listener.playerLeft(uid);
     }
@@ -186,7 +185,7 @@ public class ChatManager implements ChatListener
      * @param sender the id of the sender
      * @param message the messsage itself
      */
-    public void messageArrived(UserID sender, String message) {
+    public void messageArrived(SGSUUID sender, String message) {
         for (ChatListener listener : listeners)
             listener.messageArrived(sender, message);
     }
@@ -195,7 +194,7 @@ public class ChatManager implements ChatListener
      * Notifies the manager about some set of mappings from identifier
      * to user name. This notifies all of the registered listeners.
      */
-    public void addUidMappings(Map<UserID,String> uidMap) {
+    public void addUidMappings(Map<SGSUUID,String> uidMap) {
         for (ChatListener listener : listeners)
             listener.addUidMappings(uidMap);
     }

@@ -94,13 +94,13 @@ package com.sun.gi.apps.hack.client;
 
 import com.sun.gi.comm.discovery.impl.URLDiscoverer;
 
-import com.sun.gi.comm.routing.UserID;
-
 import com.sun.gi.comm.users.client.ClientChannel;
 import com.sun.gi.comm.users.client.ClientConnectionManager;
 import com.sun.gi.comm.users.client.ClientConnectionManagerListener;
 
 import com.sun.gi.comm.users.client.impl.ClientConnectionManagerImpl;
+
+import com.sun.gi.utils.SGSUUID;
 
 import com.sun.gi.apps.hack.client.gui.ChatPanel;
 import com.sun.gi.apps.hack.client.gui.GamePanel;
@@ -135,11 +135,10 @@ import javax.swing.JPanel;
  */
 public class Client extends JFrame implements ClientConnectionManagerListener
 {
-
     /**
      * The identifier for the server's messages.
      */
-    public static final byte [] SERVER_UID = UserID.SERVER_ID.toByteArray();
+    public static final SGSUUID SERVER_UID = ClientConnectionManager.SERVER_ID;
 
     // the connection manager used to handle incoming messages
     private ClientConnectionManager connManager;

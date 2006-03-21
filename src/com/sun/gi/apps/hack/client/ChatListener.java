@@ -92,7 +92,7 @@
 
 package com.sun.gi.apps.hack.client;
 
-import com.sun.gi.comm.routing.UserID;
+import com.sun.gi.utils.SGSUUID;
 
 import java.util.Map;
 
@@ -112,14 +112,14 @@ public interface ChatListener
      *
      * @param uid the identifier for the player
      */
-    public void playerJoined(UserID uid);
+    public void playerJoined(SGSUUID uid);
 
     /**
      * Called when a player leaves the chat group.
      *
      * @param uid the identifier for the player
      */
-    public void playerLeft(UserID uid);
+    public void playerLeft(SGSUUID uid);
 
     /**
      * Notify the listener when a message has arrived.
@@ -127,7 +127,7 @@ public interface ChatListener
      * @param sender the identifier for the sender
      * @param message the messsage itself
      */
-    public void messageArrived(UserID sender, String message);
+    public void messageArrived(SGSUUID sender, String message);
 
     /**
      * Notifies the listener about some set of mappings from identifier
@@ -141,6 +141,6 @@ public interface ChatListener
      *
      * @param uidMap a map from user identifier to user name
      */
-    public void addUidMappings(Map<UserID,String> uidMap);
+    public void addUidMappings(Map<SGSUUID,String> uidMap);
 
 }

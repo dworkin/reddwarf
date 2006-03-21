@@ -92,7 +92,7 @@
 
 package com.sun.gi.apps.hack.client.gui;
 
-import com.sun.gi.comm.routing.UserID;
+import com.sun.gi.utils.SGSUUID;
 
 import com.sun.gi.apps.hack.client.ChatListener;
 import com.sun.gi.apps.hack.client.ChatManager;
@@ -137,7 +137,7 @@ public class ChatPanel extends JPanel implements ActionListener, ChatListener
     private JComponent focusPanel;
 
     // the mapping from uid to name
-    private Map<UserID,String> uidMap;
+    private Map<SGSUUID,String> uidMap;
 
     /**
      * Creates a <code>Chatmanager</code>.
@@ -148,7 +148,7 @@ public class ChatPanel extends JPanel implements ActionListener, ChatListener
     public ChatPanel(ChatManager chatManager, JComponent focusPanel) {
         super(new BorderLayout(4, 4));
 
-        uidMap = new HashMap<UserID,String>();
+        uidMap = new HashMap<SGSUUID,String>();
 
         // track the manager, and add ourselves as a listener
         this.chatManager = chatManager;
@@ -196,7 +196,7 @@ public class ChatPanel extends JPanel implements ActionListener, ChatListener
      *
      * @param uid the identifier of the player that joined
      */
-    public void playerJoined(UserID uid) {
+    public void playerJoined(SGSUUID uid) {
         if (uidMap.containsKey(uid))
             textArea.append(uidMap.get(uid) + ": *joined*\n");
     }
@@ -206,7 +206,7 @@ public class ChatPanel extends JPanel implements ActionListener, ChatListener
      *
      * @param uid the identifier of the player that left
      */
-    public void playerLeft(UserID uid) {
+    public void playerLeft(SGSUUID uid) {
         if (uidMap.containsKey(uid))
             textArea.append(uidMap.get(uid) + ": *left*\n");
     }
@@ -217,7 +217,7 @@ public class ChatPanel extends JPanel implements ActionListener, ChatListener
      * @param sender the name of the sender
      * @param message the message itself
      */
-    public void messageArrived(UserID sender, String message) {
+    public void messageArrived(SGSUUID sender, String message) {
         if (uidMap.containsKey(sender))
             textArea.append(uidMap.get(sender) + ": " + message + "\n");
     }
@@ -228,7 +228,7 @@ public class ChatPanel extends JPanel implements ActionListener, ChatListener
      *
      * @param uidMap the mapping from identifiers to names
      */
-    public void addUidMappings(Map<UserID,String> uidMap) {
+    public void addUidMappings(Map<SGSUUID,String> uidMap) {
         this.uidMap.putAll(uidMap);
     }
 

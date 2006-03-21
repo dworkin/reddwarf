@@ -152,7 +152,7 @@ public class DungeonChannelListener extends GameChannelListener
      * @param reliable true if this packet was sent reliably
      */
     public void dataArrived(byte[] from, ByteBuffer data, boolean reliable) {
-        if (Arrays.equals(from, Client.SERVER_UID)) {
+        if (Client.SERVER_UID.equals(from)) {
             // if this is a message from the server, then it's some
             // command that we need to process, so get the command code
             int command = (int)(data.get());
@@ -167,6 +167,7 @@ public class DungeonChannelListener extends GameChannelListener
                 case 1:
                     // we were sent game membership updates
                     int spriteSize = data.getInt();
+                    @SuppressWarnings("unchecked")
                     Map<Integer,byte[]> spriteMap =
                         (Map<Integer,byte[]>)(getObject(data));
                     blistener.setSpriteMap(spriteSize, convertMap(spriteMap));
@@ -178,6 +179,7 @@ public class DungeonChannelListener extends GameChannelListener
                 break;
                 case 3:
                     // we got some selective space updates
+                    @SuppressWarnings("unchecked")
                     Collection<BoardSpace> spaces =
                         (Collection<BoardSpace>)(getObject(data));
                     BoardSpace [] s = new BoardSpace[spaces.size()];
