@@ -133,7 +133,7 @@ public class InstallationFile implements InstallationLoader {
 
     public static void main(String[] args) {
         if (args.length == 0) {
-            args = new String[] { "Install.txt" };
+            args = new String[] { "SGS-apps.conf" };
         }
         try {
             InstallationLoader inst = new InstallationFile(new File(args[0]));

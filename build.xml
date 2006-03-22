@@ -8,30 +8,35 @@
     <property name="debug" value="true" />
     <property name="optimize" value="true" />
     <property name="deprecated" value="true" />
+    <property name="default.lint" value="all,-unchecked" />
 
     <property name="jrms.version" value="1.1" />
-    <property name="jrms.jarfile" value="jrms/jrms-${jrms.version}.jar" />
+    <property name="jrms.jarfile" value="jrms-${jrms.version}.jar" />
     <property name="derby.version" value="10.1.2.1" />
-    <property name="derby.jarfile" value="derby/derby-${derby.version}.jar" />
+    <property name="derby.jarfile" value="derby-${derby.version}.jar" />
 
     <path id="project.classpath">
 	<pathelement location="bin" />
-	<pathelement location="resources/libs/${jrms.jarfile}" />
-	<pathelement location="resources/libs/${derby.jarfile}" />
+	<pathelement location="resources/libs/jrms/${jrms.jarfile}" />
+	<pathelement location="resources/libs/derby/${derby.jarfile}" />
 	<pathelement location="resources/libs/servlet/javax.servlet.jar" />
 	<pathelement location="resources/libs/servlet/commons-logging.jar" />
 	<pathelement location="resources/libs/servlet/org.mortbay.jetty.jar" />
     </path>
 
-    <path id="build.j2se.app.classpath">
-	<pathelement location="resources/libs/${jrms.jarfile}" />
-	<pathelement location="resources/libs/${derby.jarfile}" />
+    <path id="build.j2se.server.classpath">
+	<pathelement location="resources/libs/jrms/${jrms.jarfile}" />
+	<pathelement location="resources/libs/derby/${derby.jarfile}" />
+    </path>
+
+    <path id="j2se.server.classpath">
+	<pathelement location="release/lib/${jrms.jarfile}" />
+	<pathelement location="release/lib/${derby.jarfile}" />
 	<pathelement location="release/SunGameServer.jar" />
     </path>
 
     <path id="build.j2se.client.classpath">
-	<pathelement location="bin" />
-	<pathelement location="release/SunGameServerClientAPI.jar" />
+	<pathelement location="release/SGSClient.jar" />
     </path>
 
     <target name="init">
@@ -66,7 +71,7 @@
 	<ant dir="J2MEAPI/J2MEClientAPI" target="clean" /> 
     </target>
 
-    <target name="realclean" depends="clean,clean.j2meAPI">
+    <target name="realclean" depends="clean, clean.j2meAPI">
 	<delete dir="doc" />
 	<delete dir="release" />
 	<delete file="SunGameServer.zip" />
@@ -74,11 +79,13 @@
 
     <!-- Documentation targets -->
 
-    <target name="docs" depends="javadocs,doxygen" />
+    <target name="docs" depends="javadocs" />
 
-    <target name="doxygen" depends="doxygen-internal,doxygen-api" />
+    <target name="docs.api" depends="javadocs.api, doxygen.api" />
 
-    <target name="doxygen-api" depends="init">
+    <target name="doxygen" depends="doxygen.internal, doxygen.api" />
+
+    <target name="doxygen.api" depends="init">
 	<exec executable="doxygen" failonerror="true">
 	    <arg value="java-client-api.doxygen" />
 	</exec>
@@ -90,27 +97,151 @@
 	</exec>
     </target>
 
-    <target name="doxygen-internal" depends="init">
+    <target name="doxygen.internal" depends="init">
 	<exec executable="doxygen" failonerror="true">
 	    <arg value="java.doxygen" />
 	</exec>
     </target>
 
-    <target name="javadocs" depends="javadocs-internal,javadocs-api" />
+    <target name="javadocs" depends="javadocs.api, javadocs.examples" />
 
-    <target name="javadocs-internal" depends="init">
+    <target name="javadocs.internal" depends="init">
 	<javadoc destdir="doc/javadoc/internal" sourcepath="src"
-		classpathref="project.classpath" access="private">
+		classpathref="j2se.server.classpath" access="private">
 	    <package name="com.sun.gi.*" />
 	    <tag name="todo" description="To do:" />
 	</javadoc>
     </target>
 
-    <target name="javadocs-api" depends="init">
-	<javadoc destdir="doc/javadoc/api" sourcepath="src"
-		classpathref="project.classpath" access="public">
+    <target name="javadocs.api" depends="javadocs.api.client, javadocs.api.server, javadocs.api.stackext"/>
+
+    <target name="javadocs.api.client" depends="init">
+	<mkdir  dir="tmp"/>
+	<copy todir="tmp">
+	    <fileset dir="src">
+                <include name="com/sun/gi/comm/users/client/ClientAlreadyConnectedException.java"/>
+                <include name="com/sun/gi/comm/users/client/ClientChannel.java"/>
+                <include name="com/sun/gi/comm/users/client/ClientChannelListener.java"/>
+                <include name="com/sun/gi/comm/users/client/ClientConnectionManager.java"/>
+                <include name="com/sun/gi/comm/users/client/ClientConnectionManagerListener.java"/>
+                <include name="com/sun/gi/comm/users/client/UserManagerClient.java"/>
+                <include name="com/sun/gi/comm/users/client/UserManagerClientListener.java"/>
+                <include name="com/sun/gi/comm/users/client/UserManagerPolicy.java"/>
+                <include name="com/sun/gi/comm/users/client/impl/ClientConnectionManagerImpl.java"/>
+                <include name="com/sun/gi/comm/users/client/impl/DefaultUserManagerPolicy.java"/>
+                <include name="com/sun/gi/comm/discovery/DiscoveredUserManager.java"/>
+                <include name="com/sun/gi/comm/discovery/DiscoveredGame.java"/>
+                <include name="com/sun/gi/comm/discovery/Discoverer.java"/>
+                <include name="com/sun/gi/utils/SGSUUID.java"/>
+                <include name="com/sun/gi/utils/StatisticalUUID.java"/>
+                <include name="com/sun/gi/utils/nio/*.java"/>
+                <include name="com/sun/gi/utils/types/*.java"/>
+            </fileset>
+        </copy>
+        <javadoc destdir="doc/javadoc/api/client" sourcepath="tmp" access="public">
 	    <package name="com.sun.gi.*" />
-	    <tag name="todo" description="To do:" />
+        </javadoc>
+	<delete dir="tmp"/>
+    </target>
+
+    <target name="javadocs.api.server" depends="init">
+	<mkdir  dir="tmp"/>
+	<copy todir="tmp">
+	    <fileset dir="src">
+                <include name="com/sun/gi/logic/ExecutionOutsideOfTaskException.java"/>
+                <include name="com/sun/gi/logic/GLO.java"/>
+                <include name="com/sun/gi/logic/GLOReference.java"/>
+                <include name="com/sun/gi/logic/SimBoot.java"/>
+                <include name="com/sun/gi/logic/SimUserListener.java"/>
+                <include name="com/sun/gi/logic/SimUserDataListener.java"/>
+                <include name="com/sun/gi/logic/SimTimerListener.java"/>
+                <include name="com/sun/gi/logic/SimTask.java"/>
+                <include name="com/sun/gi/logic/SGSError.java"/>
+                <include name="com/sun/gi/framework/rawsocket/SimRawSocketListener.java"/>
+                <include name="com/sun/gi/comm/routing/UserID.java"/>
+                <include name="com/sun/gi/comm/routing/ChannelID.java"/>
+                <include name="com/sun/gi/gloutils/**/*.java"/>
+                <include name="com/sun/gi/apps/chattest.java"/>
+                <include name="com/sun/gi/utils/SGSUUID.java"/>
+                <include name="com/sun/gi/utils/StatisticalUUID.java"/>
+                <include name="com/sun/gi/utils/nio/*.java"/>
+                <include name="com/sun/gi/utils/types/*.java"/>
+            </fileset>
+        </copy>
+        <javadoc destdir="doc/javadoc/api/server" sourcepath="tmp" access="public">
+	    <package name="com.sun.gi.*" />
+        </javadoc>
+	<delete dir="tmp"/>
+    </target>
+
+    <target name="javadocs.api.stackext" depends="init">
+	<mkdir  dir="tmp"/>
+	<copy todir="tmp">
+	    <fileset dir="src">
+                <include name="com/sun/gi/comm/users/protocol/TransportProtocol.java"/>
+                <include name="com/sun/gi/comm/users/protocol/TransportProtocolClient.java"/>
+                <include name="com/sun/gi/comm/users/protocol/TransportProtocolServer.java"/>
+                <include name="com/sun/gi/comm/users/protocol/TransportProtocolTransmitter.java"/>
+                <include name="com/sun/gi/comm/users/protocol/impl/BinaryPktProtocol.java"/>
+                <include name="com/sun/gi/comm/users/protocol/impl/ValidationDataProtocol.java"/>
+                <include name="com/sun/gi/comm/users/client/impl/TCPIPUserManagerClient.java"/>
+                <include name="com/sun/gi/comm/users/client/UserManagerClient.java"/>
+                <include name="com/sun/gi/comm/users/client/UserManagerClientListener.java"/>
+                <include name="com/sun/gi/comm/users/client/UserManagerPolicy.java"/>
+                <include name="com/sun/gi/comm/users/client/impl/DefaultUserManagerPolicy.java"/>
+                <include name="com/sun/gi/comm/users/server/impl/TCPIPUserManager.java"/>
+                <include name="com/sun/gi/comm/users/server/impl/SGSUserImpl.java"/>
+                <include name="com/sun/gi/comm/users/server/UserManager.java"/>
+                <include name="com/sun/gi/comm/users/server/SGSUser.java"/>
+                <include name="com/sun/gi/comm/discovery/DiscoveredUserManager.java"/>
+                <include name="com/sun/gi/comm/discovery/DiscoveredGame.java"/>
+                <include name="com/sun/gi/comm/discovery/Discoverer.java"/>
+                <include name="com/sun/gi/comm/routing/Router.java"/>
+                <include name="com/sun/gi/comm/routing/RouterListener.java"/>
+                <include name="com/sun/gi/comm/routing/UserID.java"/>
+                <include name="com/sun/gi/comm/routing/ChannelID.java"/>
+                <include name="com/sun/gi/comm/routing/SGSChannel.java"/>
+                <include name="com/sun/gi/comm/users/validation/UserValidatorFactory.java"/>
+                <include name="com/sun/gi/comm/users/validation/UserValidator.java"/>
+                <include name="com/sun/gi/utils/SGSUUID.java"/>
+                <include name="com/sun/gi/utils/StatisticalUUID.java"/>
+                <include name="com/sun/gi/utils/nio/*.java"/>
+                <include name="com/sun/gi/utils/types/*.java"/>
+            </fileset>
+        </copy>
+        <javadoc destdir="doc/javadoc/api/stack-extension" sourcepath="tmp" access="public">
+	    <package name="com.sun.gi.*" />
+        </javadoc>
+	<delete dir="tmp"/>
+    </target>
+
+    <target name="javadocs.examples" depends="javadocs.example.battleboard, javadocs.example.chattest, javadocs.example.matchmaker, javadocs.example.hack"/>
+
+    <target name="javadocs.example.battleboard" depends="init">
+	<javadoc destdir="doc/javadoc/battleboard" sourcepath="src"
+		classpathref="project.classpath" access="public">
+	    <package name="com.sun.gi.apps.battleboard.*" />
+	</javadoc>
+    </target>
+
+    <target name="javadocs.example.chattest" depends="init">
+	<javadoc destdir="doc/javadoc/chattest" sourcepath="src"
+		classpathref="project.classpath" access="public">
+	    <package name="com.sun.gi.apps.chattest.*" />
+	</javadoc>
+    </target>
+
+    <target name="javadocs.example.matchmaker" depends="init">
+	<javadoc destdir="doc/javadoc/matchmaker" sourcepath="src"
+		classpathref="project.classpath" access="public">
+	    <package name="com.sun.gi.apps.mcs.matchmaker.*" />
+	</javadoc>
+    </target>
+
+    <target name="javadocs.example.hack" depends="init">
+	<javadoc destdir="doc/javadoc/hack" sourcepath="src"
+		classpathref="project.classpath" access="public">
+	    <package name="com.sun.gi.apps.hack.*" />
 	</javadoc>
     </target>
 
@@ -120,10 +251,16 @@
 	<javac srcdir="src" destdir="bin" source="5" target="5"
 		debug="${debug}" optimize="${optimize}"
 		deprecation="${deprecated}">
-	    <!-- <compilerarg value="-Xlint:unchecked"/> -->
-	    <classpath refid="project.classpath" />
+	    <classpath refid="build.j2se.server.classpath" />
+	    <compilerarg value="-Xlint:${default.lint}"/>
 	    <exclude name="com/sun/gi/apps/**" />
 	    <exclude name="com/sun/gi/client/**" />
+	    <exclude name="com/sun/gi/objectstore/test/**" />
+	    <exclude name="com/sun/gi/objectstore/hadbtest/**" />
+	    <exclude name="com/sun/gi/objectstore/tso/dataspace/monitor/**" />
+	    <exclude name="com/sun/gi/objectstore/tso/dataspace/HadbDataSpace.java" />
+	    <exclude name="com/sun/gi/utils/http/**" />
+	    <exclude name="com/sun/gi/**/JME*.java" />
 	</javac>
     </target>
 
@@ -132,14 +269,15 @@
 	<javac srcdir="src" sourcepath="" destdir="bin" source="5" target="5"
 		debug="${debug}" optimize="${optimize}"
 		deprecation="${deprecated}">
-	    <compilerarg value="-Xlint:unchecked"/>
-	    <classpath refid="project.classpath" />
-	    <include name = "com/sun/gi/comm/users/client/**" />
-	    <include name = "com/sun/gi/comm/users/protocol/**" />
-	    <include name = "com/sun/gi/validation/**" />
-	    <include name = "com/sun/gi/comm/discovery/**" />
-	    <include name = "com/sun/gi/utils/nio/**" />
-	    <include name = "com/sun/gi/utils/types/**" />
+	    <compilerarg value="-Xlint:${default.lint}"/>
+	    <include name="com/sun/gi/comm/users/client/**" />
+	    <include name="com/sun/gi/comm/users/protocol/**" />
+	    <include name="com/sun/gi/validation/**" />
+	    <include name="com/sun/gi/comm/discovery/**" />
+	    <include name="com/sun/gi/utils/StatisticalUUID.java" />
+	    <include name="com/sun/gi/utils/SGSUUID.java" />
+	    <include name="com/sun/gi/utils/nio/**" />
+	    <include name="com/sun/gi/utils/types/**" />
 	</javac>
     </target>
 
@@ -147,26 +285,12 @@
         <ant dir="J2MEAPI/J2MEClientAPI" target="jar"/>
     </target>
 
-    <target name="build.clients" depends="build.j2seAPI">
-	<javac srcdir="src" destdir="bin" source="5" target="5"
-		debug="${debug}" optimize="${optimize}"
-		deprecation="${deprecated}">
-	    <!-- <compilerarg value="-Xlint:all"/> -->
-	    <classpath refid="project.classpath" />
-	    <include name="com/sun/gi/apps/**" />
-	    <exclude name="com/sun/gi/apps/*/*.java" />
-	    <exclude name="com/sun/gi/apps/**/server/**" />
-	    <exclude name="com/sun/gi/apps/hack/**" />
-	    <include name="com/sun/gi/client/**" />
-	</javac>
-    </target>
-
     <target name="build.chat" depends="init">
 	<javac srcdir="src" destdir="bin" source="5" target="5"
 		debug="${debug}" optimize="${optimize}"
 		deprecation="${deprecated}">
-	    <!-- <compilerarg value="-Xlint:unchecked"/> -->
-	    <classpath refid="project.classpath" />
+	    <compilerarg value="-Xlint:all"/>
+	    <classpath refid="build.j2se.client.classpath" />
 	    <include name="com/sun/gi/apps/chattest/ChatTestBoot.java" />
 	</javac>
     </target>
@@ -176,7 +300,7 @@
 		debug="${debug}" optimize="${optimize}"
 		deprecation="${deprecated}">
 	    <compilerarg value="-Xlint:all"/>
-	    <classpath refid="project.classpath" />
+	    <classpath refid="build.j2se.client.classpath" />
 	    <include name="com/sun/gi/apps/trivial/TrivialBoot.java" />
 	</javac>
     </target>
@@ -185,8 +309,8 @@
 	<javac srcdir="src" destdir="bin" source="5" target="5"
 		debug="${debug}" optimize="${optimize}"
 		deprecation="${deprecated}">
-	    <!-- <compilerarg value="-Xlint:unchecked"/> -->
-	    <classpath refid="project.classpath" />
+	    <compilerarg value="-Xlint:all"/>
+	    <classpath refid="build.j2se.client.classpath" />
 	    <include name="com/sun/gi/apps/timertest/**" />
 	</javac>
     </target>
@@ -196,7 +320,7 @@
 		debug="${debug}" optimize="${optimize}"
 		deprecation="${deprecated}">
 	    <compilerarg value="-Xlint:all"/>
-	    <classpath refid="project.classpath" />
+	    <classpath refid="build.j2se.client.classpath" />
 	    <include name="com/sun/gi/apps/battleboard/server/**" />
 	</javac>
     </target>
@@ -205,8 +329,8 @@
 	<javac srcdir="src" destdir="bin" source="5" target="5"
 		debug="${debug}" optimize="${optimize}"
 		deprecation="${deprecated}">
-	    <!-- <compilerarg value="-Xlint:unchecked"/> -->
-	    <classpath refid="project.classpath" />
+	    <compilerarg value="-Xlint:all"/>
+	    <classpath refid="build.j2se.client.classpath" />
 	    <include name="com/sun/gi/apps/jeffboard/**" />
 	</javac>
     </target>
@@ -215,8 +339,8 @@
 	<javac srcdir="src" destdir="bin" source="5" target="5"
 		debug="${debug}" optimize="${optimize}"
 		deprecation="${deprecated}">
-	    <!-- <compilerarg value="-Xlint:unchecked"/> -->
-	    <classpath refid="project.classpath" />
+	    <compilerarg value="-Xlint:${default.lint}"/>
+	    <classpath refid="build.j2se.client.classpath" />
 	    <include name="com/sun/gi/apps/mcs/matchmaker/server/**" />
 	    <include name="com/sun/gi/apps/mcs/matchmaker/common/**" />
 	</javac>
@@ -227,7 +351,7 @@
 		debug="${debug}" optimize="${optimize}"
 		deprecation="${deprecated}">
 	    <compilerarg value="-Xlint:all"/>
-	    <classpath refid="project.classpath" />
+	    <classpath refid="build.j2se.client.classpath" />
 	    <include name="com/sun/gi/apps/glotest/*.java" />
 	</javac>
     </target>
@@ -237,7 +361,7 @@
 		debug="${debug}" optimize="${optimize}"
 		deprecation="${deprecated}">
 	    <compilerarg value="-Xlint:all"/>
-	    <classpath refid="project.classpath" />
+	    <classpath refid="build.j2se.client.classpath" />
 	    <classpath location="NWNSupport.jar"/>
 	    <classpath location="/usr/share/java/java3d/j3dutils.jar"/>
 	    <classpath location="/usr/share/java/java3d/vecmath.jar"/>
@@ -245,22 +369,50 @@
 	</javac>
     </target>
 
-    <target name="build.hack" depends="init,release.server">
+    <target name="build.hack" depends="init, release.server">
 	<javac srcdir="src" destdir="bin" source="5" target="5"
 		debug="${debug}" optimize="${optimize}"
 		deprecation="${deprecated}">
 	    <compilerarg value="-Xlint:all,-serial"/>
-	    <classpath refid="build.j2se.app.classpath" />
+	    <classpath refid="j2se.server.classpath" />
 	    <include name="com/sun/gi/apps/hack/server/**/*.java" />
 	    <include name="com/sun/gi/apps/hack/share/**/*.java" />
 	</javac>
     </target>
 
-    <target name="build.client.hack" depends="init,release.j2seAPI">
+    <target name="build.clients" depends="build.client.matchmaker, build.client.other"/>
+
+    <target name="build.client.matchmaker" depends="release.j2seAPI">
 	<javac srcdir="src" destdir="bin" source="5" target="5"
 		debug="${debug}" optimize="${optimize}"
 		deprecation="${deprecated}">
-	    <compilerarg value="-Xlint:all,-serial,-unchecked"/>
+	    <compilerarg value="-Xlint:all,-unchecked,-serial"/>
+	    <classpath refid="build.j2se.client.classpath" />
+	    <include name="com/sun/gi/apps/mcs/matchmaker/**" />
+	    <exclude name="com/sun/gi/apps/mcs/matchmaker/server/**" />
+	</javac>
+    </target>
+
+    <target name="build.client.other" depends="release.j2seAPI">
+	<javac srcdir="src" destdir="bin" source="5" target="5"
+		debug="${debug}" optimize="${optimize}"
+		deprecation="${deprecated}">
+	    <compilerarg value="-Xlint:all"/>
+	    <classpath refid="build.j2se.client.classpath" />
+	    <include name="com/sun/gi/client/**" />
+	    <include name="com/sun/gi/apps/**" />
+	    <exclude name="com/sun/gi/apps/*/*.java" />
+	    <exclude name="com/sun/gi/apps/**/server/**" />
+	    <exclude name="com/sun/gi/apps/hack/**" />
+	    <exclude name="com/sun/gi/apps/mcs/**" />
+	</javac>
+    </target>
+
+    <target name="build.client.hack" depends="init, release.j2seAPI">
+	<javac srcdir="src" destdir="bin" source="5" target="5"
+		debug="${debug}" optimize="${optimize}"
+		deprecation="${deprecated}">
+	    <compilerarg value="-Xlint:all,-serial"/>
 	    <classpath refid="build.j2se.client.classpath" />
 	    <include name="com/sun/gi/apps/hack/client/**/*.java" />
 	    <include name="com/sun/gi/apps/hack/share/**/*.java" />
@@ -270,26 +422,22 @@
     <!-- Runnable Servers -->
 
     <target name="SGS-clean">
-	<java dir="release" classname="com.sun.gi.SGS" failonerror="true" fork="yes">
+	<java dir="release" jar="release/SunGameServer.jar" failonerror="true" fork="yes">
 	    <arg value="-C"/>
 	    <arg value="-V"/>
-	    <!-- <classpath refid="project.classpath"/> -->
-	    <classpath>
-		<pathelement location="release/SunGameServer.jar"/>
-		<pathelement location="release/${derby.jarfile}"/>
-	    </classpath>
+	    <classpath refid="j2se.app.classpath"/>
 	    <sysproperty key="java.util.logging.config.file"
 			 file="logging.properties"/>
 	</java>
     </target>
 
     <target name="SGS-jnwn-clean">
-	<java dir="release" classname="com.sun.gi.SGS" failonerror="true" fork="yes">
+	<java dir="release" jar="release/SunGameServer.jar" failonerror="true" fork="yes">
 	    <arg value="-C"/>
 	    <arg value="-V"/>
 	    <arg value="-I"/>
 	    <arg value="file:JNWN-server.txt" />
-	    <classpath refid="project.classpath"/>
+	    <classpath refid="j2se.app.classpath"/>
 	    <classpath location="NWNSupport.jar"/>
 	    <classpath location="genesisfx.jar"/>
 	    <classpath location="/usr/share/java/java3d/j3dcore.jar"/>
@@ -302,19 +450,19 @@
     </target>
 
     <target name="SGS">
-	<java dir="release" classname="com.sun.gi.SGS" failonerror="true" fork="yes">
+	<java dir="release" jar="release/SunGameServer.jar" failonerror="true" fork="yes">
 	    <arg value="-V" />
-	    <classpath refid="project.classpath" />
+	    <classpath refid="j2se.app.classpath" />
 	    <sysproperty key="java.util.logging.config.file"
 			 file="logging.properties" />
 	</java>
     </target>
 
     <target name="SGS2">
-	<java dir="release" classname="com.sun.gi.SGS" failonerror="true" fork="yes">
+	<java dir="release" jar="release/SunGameServer.jar" failonerror="true" fork="yes">
 	    <arg value="-I"/>
-	    <arg value="file:Install2.txt" />
-	    <classpath refid="project.classpath" />
+	    <arg value="file:SGS-apps-2.conf" />
+	    <classpath refid="j2se.app.classpath" />
 	    <sysproperty key="java.util.logging.config.file"
 			 file="logging.properties" />
 	</java>
@@ -325,7 +473,7 @@
     <target name="ChatTest">
 	<java classname="com.sun.gi.apps.commtest.client.ChatTestClient"
 		failonerror="true" fork="yes">
-	    <classpath refid="project.classpath" />
+	    <classpath refid="build.j2se.client.classpath" />
 	    <sysproperty key="java.util.logging.config.file"
 			 file="logging.properties" />
 	</java>
@@ -334,14 +482,14 @@
     <target name="ChatTest2">
 	<java classname="com.sun.gi.apps.commtest.client.ChatTestClient"
 		failonerror="true" fork="yes">
-	    <classpath refid="project.classpath" />
+	    <classpath refid="build.j2se.client.classpath" />
 	    <sysproperty key="java.util.logging.config.file"
 			 file="logging.properties" />
 	</java>
     </target>
 
     <target name="BattleBoard">
-	<echo message="BROKEN!  Ant on Linux won't let us input on stdin"/>
+	<echo message="WARNING:  Ant on Linux won't let us input on stdin; run manually"/>
 	<java jar="release/client/BattleBoardClient.jar" failonerror="true" fork="true">
 	    <sysproperty key="java.util.logging.config.file"
 			 file="logging.properties" />
@@ -350,16 +498,15 @@
 
     <target name="Hack">
 	<java jar="release/client/HackClient.jar" failonerror="true" fork="true">
-	    <!--
+	    <classpath refid="build.j2se.client.classpath" />
 	    <sysproperty key="java.util.logging.config.file"
 			 file="logging.properties" />
-	    -->
 	</java>
     </target>
 
     <target name="MatchMakerClientTestUI">
 	<java classname="com.sun.gi.apps.mcs.matchmaker.client.test.MatchMakerClientTestUI" failonerror="true" fork="true">
-	    <classpath refid="project.classpath" />
+	    <classpath refid="build.j2se.client.classpath" />
 	    <sysproperty key="java.util.logging.config.file"
 			 file="logging.properties" />
 	</java>
@@ -368,7 +515,7 @@
     <target name="DIRC">
 	<java classname="com.sun.gi.client.dirc.DIRC"
 		failonerror="true" fork="true">
-	    <classpath refid="project.classpath" />
+	    <classpath refid="build.j2se.client.classpath" />
 	    <sysproperty key="java.util.logging.config.file"
 			 file="logging.properties" />
 	</java>
@@ -376,7 +523,7 @@
 
     <!-- Release Targets -->
 
-    <!--<target name="release" depends="release.j2se,release.j2me">-->
+    <!--<target name="release" depends="release.j2se, release.j2me">-->
     <target name="release" depends="release.j2se">
 	<zip destfile="SunGameServer.zip">
 	    <fileset dir="release">
@@ -387,16 +534,15 @@
 
     <!-- J2SE release targets -->
 
-    <target name="release.j2se" depends="release.j2se.bin,release.docs,release.examples"/>
-    <!-- <target name="release.j2se" depends="release.j2se.bin"/> -->
+    <target name="release.j2se" depends="release.j2se.bin, release.docs, release.examples"/>
 
-    <target name="release.j2se.bin" depends="release.server,release.j2seAPI,release.apps,release.clients"/>
+    <target name="release.j2se.bin" depends="release.server, release.j2seAPI, release.apps, release.clients"/>
 
     <target name="release.server" depends="build.server">
 	<jar destfile="release/SunGameServer.jar">
 	    <manifest>
 		<attribute name="Class-Path"
-			   value="${jrms.jarfile} ${derby.jarfile}"/>
+			   value="lib/${jrms.jarfile} lib/${derby.jarfile}"/>
 		<attribute name="Main-Class"
 			   value="com.sun.gi.SGS"/>
 	    </manifest>
@@ -410,20 +556,22 @@
 	<copy file="resources/startDiscovery.sh" todir="release" />
 	<chmod file="release/startSGS.sh" perm="755" />
 	<chmod file="release/startDiscovery.sh" perm="755" />
-	<copy file="resources/libs/${jrms.jarfile}" todir="release/jrms" />
-	<copy file="resources/libs/${derby.jarfile}" todir="release/derby" />
-	<copy file="resources/Install.txt" todir="release" />
+	<copy file="resources/libs/jrms/${jrms.jarfile}" todir="release/lib" />
+	<copy file="resources/libs/derby/${derby.jarfile}" todir="release/lib" />
+	<copy file="resources/SGS-apps.conf" todir="release" />
 	<copy file="resources/passwd.txt" todir="release" />
 	<copy file="resources/FakeDiscovery.xml" todir="release" />
     </target>
 
     <target name="release.j2seAPI" depends="build.j2seAPI">
-	<jar destfile="release/SunGameServerClientAPI.jar">
+	<jar destfile="release/SGSClient.jar">
 	    <fileset dir="bin">
 		<include name="com/sun/gi/comm/users/client/**"/>
 		<include name="com/sun/gi/comm/users/protocol/**"/>
 		<include name="com/sun/gi/validation/**"/>
 		<include name="com/sun/gi/comm/discovery/**"/>
+                <include name="com/sun/gi/utils/StatisticalUUID.class" />
+                <include name="com/sun/gi/utils/SGSUUID.class" />
 		<include name="com/sun/gi/utils/nio/**"/>
 		<include name="com/sun/gi/utils/types/**"/>
 	    </fileset>
@@ -438,15 +586,15 @@
 	</copy>
     </target>
 
-    <target name="release.clients" depends="release.client.battleboard,release.client.hack,release.client.other"/>
+    <target name="release.clients" depends="release.client.battleboard, release.client.hack, release.client.chattest, release.client.matchmaker, release.client.other"/>
 
-    <target name="release.client.other" depends="build.clients,release.j2seAPI"/>
+    <target name="release.client.other" depends="build.clients, release.j2seAPI"/>
 
-    <target name="release.client.battleboard" depends="build.clients,release.j2seAPI">
+    <target name="release.client.battleboard" depends="build.clients, release.j2seAPI">
 	<jar destfile="release/client/BattleBoardClient.jar">
 	    <manifest>
 		<attribute name="Class-Path"
-			   value="../SunGameServerClientAPI.jar"/>
+			   value="SGSClient.jar"/>
 		<attribute name="Main-Class"
 			   value="com.sun.gi.apps.battleboard.client.BattleBoardClient"/>
 	    </manifest>
@@ -460,11 +608,40 @@
 	</jar>
     </target>
 
-    <target name="release.client.hack" depends="build.client.hack,release.j2seAPI,build.server">
+    <target name="release.client.chattest" depends="build.clients, release.j2seAPI">
+	<jar destfile="release/client/ChatTestClient.jar">
+	    <manifest>
+		<attribute name="Class-Path"
+			   value="SGSClient.jar"/>
+		<attribute name="Main-Class"
+			   value="com.sun.gi.apps.chattest.client.ChatTestClient"/>
+	    </manifest>
+	    <fileset dir="bin">
+		<include name="com/sun/gi/apps/chattest/client/**/*.class"/>
+	    </fileset>
+	</jar>
+    </target>
+
+    <target name="release.client.matchmaker" depends="build.client.matchmaker, release.j2seAPI">
+	<jar destfile="release/client/MatchmakerTestClient.jar">
+	    <manifest>
+		<attribute name="Class-Path"
+			   value="SGSClient.jar"/>
+		<attribute name="Main-Class"
+			   value="com.sun.gi.apps.mcs.matchmaker.client.test.MatchMakerClientTestUI"/>
+	    </manifest>
+	    <fileset dir="bin">
+		<include name="com/sun/gi/apps/mcs/matchmaker/client/**/*.class"/>
+		<include name="com/sun/gi/apps/mcs/matchmaker/common/**/*.class"/>
+	    </fileset>
+	</jar>
+    </target>
+
+    <target name="release.client.hack" depends="build.client.hack, release.j2seAPI">
 	<jar destfile="release/client/HackClient.jar">
 	    <manifest>
 		<attribute name="Class-Path"
-			   value="../SunGameServerClientAPI.jar"/>
+			   value="SGSClient.jar"/>
 		<attribute name="Main-Class"
 			   value="com.sun.gi.apps.hack.client.Client"/>
 	    </manifest>
@@ -472,7 +649,6 @@
 		<include name="com/sun/gi/apps/hack/client/**/*.class"/>
 		<include name="com/sun/gi/apps/hack/share/**/*.class"/>
 		<include name="com/sun/gi/comm/routing/**/*ID.class"/>
-		<include name="com/sun/gi/utils/*UUID.class"/>
 	    </fileset>
 	    <fileset dir="resources/hack">
 		<include name="data/**"/>
@@ -481,7 +657,7 @@
     </target>
 
     <target name="release.apps"
-	depends="release.trivialboot,release.timertest,release.chattest,release.jeffboard,release.battleboard,release.hack,release.glotest,release.matchmaker">
+	depends="release.trivialboot, release.timertest, release.chattest, release.jeffboard, release.battleboard, release.hack, release.glotest, release.matchmaker">
     </target>
 
     <target name="release.trivialboot" depends="build.trivial">
@@ -550,19 +726,6 @@
 	    todir="release/apps/matchmaker" />
     </target>
 	
-    <target name="zip.matchmaker" depends="release.matchmaker">
-	<zip destfile="release/apps/matchmaker/MatchMaker.zip" basedir="release" 
-		includes="apps/matchmaker/*" excludes="apps/*">
-	    
-	</zip>
-    </target>
-	
-    <target name="zip.matchmaker.client.source">
-	<zip destfile="release/J2SE_MM_client_src.zip" basedir="src"
-		includes="com/sun/gi/apps/mcs/matchmaker/client/**,
-			com/sun/gi/apps/mcs/matchmaker/common/*" />
-    </target>
-
     <target name="release.timertest" depends="build.timertest">
 	<jar destfile="release/apps/timer_test/TimerTest.jar"
 	    basedir="bin" includes="com/sun/gi/apps/timertest/**" />
@@ -577,9 +740,23 @@
 	    todir="release/apps/jnwn" />
     </target>
 
+    <!-- J2SE zip targets -->
+
     <target name="release.examples" >
 	<zip destfile="release/Examples.zip" basedir="src"
 	    includes="com/sun/gi/apps/chattest/**"/>
+    </target>
+
+    <target name="zip.matchmaker" depends="release.matchmaker">
+	<zip destfile="release/apps/matchmaker/MatchMaker.zip" basedir="release" 
+		includes="apps/matchmaker/*" excludes="apps/*">
+	</zip>
+    </target>
+	
+    <target name="zip.matchmaker.client.source">
+	<zip destfile="release/J2SE_MM_client_src.zip" basedir="src"
+		includes="com/sun/gi/apps/mcs/matchmaker/client/**,
+			com/sun/gi/apps/mcs/matchmaker/common/*" />
     </target>
 
     <!-- J2ME release targets -->

@@ -149,7 +149,7 @@ public class InstallationURL implements InstallationLoader {
 
     public static void main(String[] args) {
         if (args.length == 0) {
-            args = new String[] { "file:Install.txt" };
+            args = new String[] { "file:SGS-apps.conf" };
         }
         try {
             InstallationLoader inst = new InstallationURL(new URL(args[0]));
