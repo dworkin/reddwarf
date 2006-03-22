@@ -114,7 +114,6 @@ public class BYTEARRAY implements Comparable {
      * @param obj the reference object with which to compare.
      * @return <code>true</code> if this object is the same as the obj
      * argument; <code>false</code> otherwise.
-     * @todo Implement this java.lang.Object method
      */
     public boolean equals(Object obj) {
         return (compareTo(obj) == 0);
@@ -124,7 +123,6 @@ public class BYTEARRAY implements Comparable {
      * Returns a hash code value for the object.
      * 
      * @return a hash code value for this object.
-     * @todo Implement this java.lang.Object method
      */
     public int hashCode() {
 
