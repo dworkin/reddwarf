@@ -82,6 +82,13 @@
 
 package com.sun.gi.apps.hack.server;
 
+import com.sun.gi.logic.GLOReference;
+import com.sun.gi.logic.SimTask;
+
+import com.sun.gi.apps.hack.share.CharacterStats;
+
+import java.lang.reflect.Method;
+
 import java.nio.ByteBuffer;
 
 
@@ -95,11 +102,18 @@ import java.nio.ByteBuffer;
 public class CreatorMessageHandler implements MessageHandler
 {
 
+    // a reference to the lobby
+    private GLOReference<Lobby> lobbyRef;
+
+    // the current character stats
+    private CharacterStats currentStats;
+    private int characterId;
+
     /**
      * Creates a new <code>CreatorMessageHandler</code>.
      */
     public CreatorMessageHandler() {
-
+        lobbyRef = SimTask.getCurrent().findGLO(Lobby.IDENTIFIER);
     }
 
     /**
@@ -115,12 +129,81 @@ public class CreatorMessageHandler implements MessageHandler
         // FIXME: we should use an enum to define the messages
         try {
             switch (command) {
-                // FIXME: implement messages
+            case 1:
+                // get the id and create the stats
+                characterId = data.getInt();
+                currentStats = getNewStats(characterId);
+                player.sendCharacterStats(SimTask.getCurrent(), -1,
+                                          currentStats);
+                break;
+            case 2:
+                // get the name...
+                byte [] bytes = new byte[data.remaining()];
+                data.get(bytes);
+                String characterName = new String(bytes);
+
+                // ...create the character...
+                PlayerCharacter pc = setupCharacter(player, characterName);
+                player.getCharacterManager().get(SimTask.getCurrent()).
+                    addCharacter(pc);
+
+                // ...and go to the lobby
+                moveToLobby(player);
+                break;
+            case 3:
+                // go to the lobby
+                moveToLobby(player);
+                break;
             }
         } catch (Exception e) {
             // FIXME: here what we want to do is either log the error, or
             // send back a generic error response
         }
+    }
+
+    /**
+     *
+     */
+    private CharacterStats getNewStats(int id) {
+        // FIXME: this should change based on the character class, but for
+        // now it's purely random
+        int hp = NSidedDie.roll20Sided() + NSidedDie.roll20Sided();
+        return new CharacterStats("", NSidedDie.roll20Sided(),
+                                  NSidedDie.roll20Sided(),
+                                  NSidedDie.roll20Sided(),
+                                  NSidedDie.roll20Sided(),
+                                  NSidedDie.roll20Sided(),
+                                  NSidedDie.roll20Sided(), hp, hp);
+    }
+
+    /**
+     *
+     */
+    private PlayerCharacter setupCharacter(Player player, String name) {
+        CharacterStats stats =
+            new CharacterStats(name, currentStats.getStrength(),
+                               currentStats.getIntelligence(),
+                               currentStats.getDexterity(),
+                               currentStats.getWisdom(),
+                               currentStats.getConstitution(),
+                               currentStats.getCharisma(),
+                               currentStats.getHitPoints(),
+                               currentStats.getMaxHitPoints());
+
+        return new PlayerCharacter(player.getReference(), characterId,
+                                   stats);
+    }
+
+    /**
+     *
+     */
+    private void moveToLobby(Player player) throws Exception {
+        // FIXME: would it be safe to just invoke this directly?
+        GLOReference<Player> playerRef = player.getReference();
+        Method method =
+            Player.class.getMethod("moveToGame", GLOReference.class);
+        SimTask.getCurrent().queueTask(playerRef, method,
+                                       new Object [] {lobbyRef});
     }
 
 }

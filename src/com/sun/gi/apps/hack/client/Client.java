@@ -93,6 +93,7 @@ import com.sun.gi.comm.users.client.impl.ClientConnectionManagerImpl;
 import com.sun.gi.utils.SGSUUID;
 
 import com.sun.gi.apps.hack.client.gui.ChatPanel;
+import com.sun.gi.apps.hack.client.gui.CreatorPanel;
 import com.sun.gi.apps.hack.client.gui.GamePanel;
 import com.sun.gi.apps.hack.client.gui.LobbyPanel;
 import com.sun.gi.apps.hack.client.gui.PasswordDialog;
@@ -138,6 +139,11 @@ public class Client extends JFrame implements ClientConnectionManagerListener
     private LobbyPanel lobbyPanel;
     private LobbyChannelListener llistener;
 
+    // the gui and message handlers for interacting with character creation
+    private CreatorManager crmanager;
+    private CreatorPanel creatorPanel;
+    private CreatorChannelListener crListener;
+
     // the gui and messages handlers for chatting
     private ChatManager cmanager;
     private ChatPanel chatPanel;
@@ -166,11 +172,13 @@ public class Client extends JFrame implements ClientConnectionManagerListener
 
         // create the managers
         lmanager = new LobbyManager();
+        crmanager = new CreatorManager();
         cmanager = new ChatManager();
         gmanager = new GameManager();
 
         // setup the listeners to handle communication from the game app
         llistener = new LobbyChannelListener(lmanager, cmanager);
+        crListener = new CreatorChannelListener(crmanager, cmanager);
         dlistener = new DungeonChannelListener(gmanager, cmanager, gmanager);
 
         Container c = getContentPane();
@@ -178,6 +186,7 @@ public class Client extends JFrame implements ClientConnectionManagerListener
 
         // create the GUI panels used for the game elements
         lobbyPanel = new LobbyPanel(lmanager);
+        creatorPanel = new CreatorPanel(crmanager);
         gamePanel = new GamePanel(gmanager);
         chatPanel = new ChatPanel(cmanager, gamePanel);
 
@@ -185,8 +194,10 @@ public class Client extends JFrame implements ClientConnectionManagerListener
         // easily switch between them
         managerLayout = new CardLayout();
         managerPanel = new JPanel(managerLayout);
-        managerPanel.add(lobbyPanel, "a");
-        managerPanel.add(gamePanel, "b");
+        managerPanel.add(new JPanel(), "blank");
+        managerPanel.add(lobbyPanel, "lobby");
+        managerPanel.add(creatorPanel, "creator");
+        managerPanel.add(gamePanel, "game");
 
         c.add(managerPanel, BorderLayout.CENTER);
         c.add(chatPanel, BorderLayout.SOUTH);
@@ -198,6 +209,7 @@ public class Client extends JFrame implements ClientConnectionManagerListener
                                             new URLDiscoverer(url));
         connManager.setListener(this);
         lmanager.setConnectionManager(connManager);
+        crmanager.setConnectionManager(connManager);
         gmanager.setConnectionManager(connManager);
     }
 
@@ -320,12 +332,16 @@ public class Client extends JFrame implements ClientConnectionManagerListener
             // we joined the lobby
             lobbyPanel.clearList();
             channel.setListener(llistener);
-            managerLayout.first(managerPanel);
+            managerLayout.show(managerPanel, "lobby");
+        } else if (channel.getName().equals("game:creator")) {
+            // we joined the creator
+            channel.setListener(crListener);
+            managerLayout.show(managerPanel, "creator");
         } else {
             // we joined some dungeon
             gamePanel.showLoadingScreen();
             channel.setListener(dlistener);
-            managerLayout.last(managerPanel);
+            managerLayout.show(managerPanel, "game");
 
             // request focus so all key presses are captured
             gamePanel.requestFocusInWindow();

@@ -93,6 +93,7 @@ import com.sun.gi.apps.hack.server.level.Level;
 
 import com.sun.gi.apps.hack.share.Board;
 import com.sun.gi.apps.hack.share.BoardSpace;
+import com.sun.gi.apps.hack.share.CharacterStats;
 
 import java.nio.ByteBuffer;
 
@@ -188,25 +189,10 @@ public class Player implements SimUserDataListener
      * removed when we can do character creation on the client
      */
     private void setupCharacterManager(GLOReference<Player> ref) {
-        // FIXME: just for testing
-        com.sun.gi.apps.hack.share.CharacterStats stats =
-            new com.sun.gi.apps.hack.share.CharacterStats("seth", 20, 20, 20, 20, 20, 20, 50, 50);
-        com.sun.gi.apps.hack.share.CharacterStats stats2 =
-            new com.sun.gi.apps.hack.share.CharacterStats("strongbad", 20, 20, 5, 20, 20, 10, 50, 50);
-
-        PlayerCharacterManager mgr = new PlayerCharacterManager(ref);
-        //mgr.setRef(characterManagerRef);
-        mgr.addCharacter(new PlayerCharacter(ref, 41, stats));
-        mgr.addCharacter(new PlayerCharacter(ref, 3, stats2));
-        mgr.setCurrentCharacter("seth");
-        characterManagerRef = SimTask.getCurrent().createGLO(mgr);
+        characterManagerRef =
+            SimTask.getCurrent().createGLO(new PlayerCharacterManager(ref));
         characterManagerRef.get(SimTask.getCurrent()).
-            setRef(characterManagerRef);   
-        
-        //characterManagerRef =
-        //SimTask.getCurrent().createGLO(new PlayerCharacterManager(ref));
-        //characterManagerRef.get(SimTask.getCurrent()).
-        //setRef(characterManagerRef);        
+            setRef(characterManagerRef);        
     }
 
     /**
@@ -442,6 +428,17 @@ public class Player implements SimUserDataListener
     public void sendCharacter(SimTask task, PlayerCharacter character) {
         Messages.sendCharacter(task, character.getID(),
                                character.getStatistics(), channel, currentUid);
+    }
+
+    /**
+     * Sends a set of character statistics to the player.
+     *
+     * @param task the task for this action
+     * @param id the character's identifier
+     * @param stats the character statistics
+     */
+    public void sendCharacterStats(SimTask task, int id, CharacterStats stats) {
+        Messages.sendCharacter(task, id, stats, channel, currentUid);
     }
 
     /**

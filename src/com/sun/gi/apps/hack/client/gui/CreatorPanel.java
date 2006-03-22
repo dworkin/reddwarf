@@ -80,146 +80,151 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-package com.sun.gi.apps.hack.server;
 
-import com.sun.gi.comm.routing.ChannelID;
-import com.sun.gi.comm.routing.UserID;
+/*
+ * CreatorPanel.java
+ *
+ * Created by: seth proctor (stp)
+ * Created on: Tue Mar 21, 2006	 1:04:39 PM
+ * Desc: 
+ *
+ */
 
-import com.sun.gi.logic.GLOReference;
-import com.sun.gi.logic.SimTask;
+package com.sun.gi.apps.hack.client.gui;
+
+import com.sun.gi.apps.hack.client.CreatorListener;
+import com.sun.gi.apps.hack.client.CreatorManager;
 
 import com.sun.gi.apps.hack.share.CharacterStats;
 
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JComboBox;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JTextField;
+
 
 /**
- * The creator is where all players can create new characters. It maintains
- * a list of who is currently creating characters, so those players can
- * chat with each other. Beyond this, there is no interactivity, and nothing
- * that the creator game pushes out players.
+ * This is a panel used to interact with the player's charcaters.
  *
  * @since 1.0
  * @author Seth Proctor
  */
-public class Creator implements Game
+public class CreatorPanel extends JPanel
+    implements CreatorListener, ActionListener
 {
 
+    // the manager used to send messages to the creator
+    private CreatorManager creatorManager;
+
+    // the popup with the list of charcater classes
+    JComboBox characterClassPopup;
+
+    // the names of the charcter classes
+    // FIXME: hard-coded for now, so we just include a few
+    private static final String [] classNames = { "Barbarian",
+                                                  "Mexican Wrestler",
+                                                  "Priest", "Theif",
+                                                  "Warior", "Wizzard" };
+
+    // the identifiers for the character classes
+    // FIXME: hard-coded for now
+    private static final int [] classIdentifiers = { 47, 3, 43, 44, 41, 42 };
+
+    // the panel that displays character details
+    private PlayerInfoPanel playerInfoPanel;
+
+    // the entry field for the character name
+    private JTextField nameField;
+
     /**
-     * The identifier for the creator
-     */
-    public static final String IDENTIFIER = NAME_PREFIX + "creator";
-
-    // the channel used for all players currently in the lobby
-    private ChannelID channel;
-
-    // the number of players interacting with the creator
-    private int playerCount = 0;
-
-    /**
-     * Creates an instance of <code>Creator</code>. In practice there should
-     * only ever be one of these, so we don't all direct access to the
-     * constructor. Instead, you get access through <code>getInstance</code>
-     * and that enforces the singleton.
+     * Creates an instance of <code>CreatorPanel</code>.
      *
-     * @param task the task this is running in
+     * @param creatorManager the manager used to interact with the creator
      */
-    private Creator(SimTask task) {
-        // create a channel for all clients in the creator, but lock it so
-        // that we control who can enter and leave the channel
-        channel = task.openChannel(IDENTIFIER);
-        task.lock(channel, true);
+    public CreatorPanel(CreatorManager creatorManager) {
+        this.creatorManager = creatorManager;
+
+        creatorManager.addCreatorListener(this);
+
+        setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
+
+        nameField = new JTextField(20);
+        JPanel namePanel = new JPanel();
+        namePanel.add(new JLabel("Name: "));
+        namePanel.add(nameField);
+        add(namePanel);
+
+        characterClassPopup = new JComboBox(classNames);
+        JPanel classPanel = new JPanel();
+        classPanel.add(new JLabel("Class: "));
+        classPanel.add(characterClassPopup);
+        add(classPanel);
+
+        playerInfoPanel = new PlayerInfoPanel();
+        add(playerInfoPanel);
+
+        JButton rollButton = new JButton("Re-roll stats");
+        rollButton.addActionListener(this);
+        JButton cancelButton = new JButton("Cancel");
+        cancelButton.addActionListener(this);
+        JButton createButton = new JButton("Create");
+        createButton.addActionListener(this);
+
+        JPanel buttonPanel = new JPanel();
+        buttonPanel.add(rollButton);
+        buttonPanel.add(cancelButton);
+        buttonPanel.add(createButton);
+        add(buttonPanel);
     }
 
     /**
-     * Provides access to the single instance of <code>Creator</code>. If
-     * the creator hasn't already been created, then a new instance is
-     * created and added as a registered <code>GLO</code>. If the creator
-     * already exists then nothing new is created.
-     * <p>
-     * See the comments in <code>Lobby</code> for details on this pattern.
+     * Called when an item in the character class popup is selected, or when
+     * one of the buttons is pressed.
      *
-     * @return a reference to the single <code>Creator</code>
+     * @param e detail of the selection change
      */
-    public static GLOReference<Creator> getInstance() {
-        SimTask task = SimTask.getCurrent();
+    public void actionPerformed(ActionEvent e) {
+        if (e.getSource() instanceof JComboBox) {
+            // get a reference to the popup widget and get the stats
+            JComboBox cb = (JComboBox)(e.getSource());
+            int index = cb.getSelectedIndex();
+            
+            if (index > 0) {
+                // clear stats
+                playerInfoPanel.clearCharacter();
+                creatorManager.rollForStats(classIdentifiers[index]);
+            }
+        } else {
+            // see which button got hit
+            String cmd = e.getActionCommand();
 
-        // try to get an existing reference
-        GLOReference<Creator> creatorRef = task.findGLO(IDENTIFIER);
-
-        // if we couldn't find a reference, then create it
-        if (creatorRef == null) {
-            creatorRef = task.createGLO(new Creator(task), IDENTIFIER);
-
-            // if doing the create returned null then someone beat us to
-            // it, so get their already-registered reference
-            if (creatorRef == null)
-                creatorRef = task.findGLO(IDENTIFIER);
+            if (cmd.equals("Create")) {
+                // create the character
+                creatorManager.createCurrentCharacter(nameField.getText());
+            } else if (cmd.equals("Cancel")) {
+                // cancel character creation
+                creatorManager.cancelCreation();
+            } else {
+                // get new stats
+                int index = characterClassPopup.getSelectedIndex();
+                creatorManager.rollForStats(classIdentifiers[index]);
+            }
         }
-
-        // return the reference
-        return creatorRef;
     }
 
     /**
-     * Joins a player to the creator. This is done when a player logs into
-     * the game app for the very first time, and each time that they want
-     * to manage their characters.
+     * Notifies the listener of new character statistics.
      *
-     * @param player the <code>Player</code> joining the creator
+     * @param id the character's identifier
+     * @param stats the new statistics
      */
-    public void join(Player player) {
-        SimTask task = SimTask.getCurrent();
-
-        playerCount++;
-
-        // add the player to the channel
-        UserID uid = player.getCurrentUid();
-        task.join(uid, channel);
-
-        // NOTE: the idea of this "game" is that it should be used to
-        // manage existing characters, create new ones, and delete ones
-        // you don't want any more ... for the present, however, it's
-        // just used to create characters one at a time, so we don't
-        // actually need to send anything to the user now
-    }
-
-    /**
-     * Removes a player from the creator.
-     *
-     * @param player the <code>Player</code> leaving the creator
-     */
-    public void leave(Player player) {
-        playerCount--;
-
-        // remove the player from the channel
-        SimTask.getCurrent().leave(player.getCurrentUid(), channel);
-    }
-
-    /**
-     * Creates a new instance of a <code>CreatorMessageHandler</code>.
-     *
-     * @return a <code>CreatorMessageHandler</code>
-     */
-    public MessageHandler createMessageHandler() {
-        return new CreatorMessageHandler();
-    }
-
-    /**
-     * Returns the name of the creator. This is also specified by the local
-     * field <code>IDENTIFIER</code>.
-     *
-     * @return the name
-     */
-    public String getName() {
-        return IDENTIFIER;
-    }
-
-    /**
-     * Returns the number of players currently in the creator.
-     *
-     * @return the number of players in the creator
-     */
-    public int numPlayers() {
-        return playerCount;
+    public void changeStatistics(int id, CharacterStats stats) {
+        playerInfoPanel.setCharacter(id, stats);
     }
 
 }

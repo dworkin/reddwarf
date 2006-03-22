@@ -119,7 +119,7 @@ public class GameSimBoot implements SimBoot<GameSimBoot>, SimUserListener
      * games available through this app instance.
      */
     public static final String DUNGEON_FILE_DEFAULT =
-	"apps/hack/data/dungeons";
+        "apps/hack/data/dungeons";
 
     /**
      * The Java property you define to override the standard dungeons
@@ -137,6 +137,9 @@ public class GameSimBoot implements SimBoot<GameSimBoot>, SimUserListener
 
     // the lobby reference
     private GLOReference<Lobby> lobbyRef = null;
+
+    // the creator reference
+    private GLOReference<Creator> creatorRef = null;
 
     // a local map of uids to references to the players the uids represent
     private HashMap<UserID,GLOReference<Player>> playerMap;
@@ -179,7 +182,8 @@ public class GameSimBoot implements SimBoot<GameSimBoot>, SimUserListener
         // add the lobby as a listener for membership change events
         gcmRef.get(task).addGameChangeListener(lobbyRef);
 
-        // FIXME: create the character creator here
+        // setup the creator game, which is used for character management
+        creatorRef = Creator.getInstance();
 
         // finally, load and setup all the games that are defined for this
         // app, by looking in the dungeons file
@@ -226,13 +230,26 @@ public class GameSimBoot implements SimBoot<GameSimBoot>, SimUserListener
         playerMap.put(uid, playerRef);
         player.setCurrentUid(uid);
 
-        // now that we have a valid Player ref, send it off to the lobby
-        // FIXME: This should actually go to the creator if the player
-        // doesn't yet have any characters
+        // now that we have a valid Player ref, send it off to the lobby,
+        // unless they have no characters, in which case they need to go
+        // to the creator first
         try {
             Method method =
                 Player.class.getMethod("moveToGame", GLOReference.class);
-            task.queueTask(playerRef, method, new Object [] {lobbyRef});
+            GLOReference<? extends Game> gameRef = null;
+
+            if (player.getCharacterManager().peek(task).
+                getCharacterCount() == 0) {
+                // the player currently has no characters, so send them
+                // to the creator
+                gameRef = creatorRef;
+            } else {
+                // the player has some characters already created, so send
+                // them right to the lobby
+                gameRef = lobbyRef;
+            }
+
+            task.queueTask(playerRef, method, new Object [] {gameRef});
         } catch (NoSuchMethodException nsme) {
             throw new IllegalStateException(nsme.getMessage());
         }

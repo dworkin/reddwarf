@@ -80,146 +80,117 @@
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
 
-package com.sun.gi.apps.hack.server;
 
-import com.sun.gi.comm.routing.ChannelID;
-import com.sun.gi.comm.routing.UserID;
+/*
+ * CreatorManager.java
+ *
+ * Created by: seth proctor (stp)
+ * Created on: Tue Mar 21, 2006	 1:53:01 PM
+ * Desc: 
+ *
+ */
 
-import com.sun.gi.logic.GLOReference;
-import com.sun.gi.logic.SimTask;
+package com.sun.gi.apps.hack.client;
+
+import com.sun.gi.comm.users.client.ClientConnectionManager;
 
 import com.sun.gi.apps.hack.share.CharacterStats;
 
+import java.nio.ByteBuffer;
+
+import java.util.HashSet;
+
 
 /**
- * The creator is where all players can create new characters. It maintains
- * a list of who is currently creating characters, so those players can
- * chat with each other. Beyond this, there is no interactivity, and nothing
- * that the creator game pushes out players.
+ * This manager handles all messages from and to the creator on the server.
  *
  * @since 1.0
  * @author Seth Proctor
  */
-public class Creator implements Game
+public class CreatorManager implements CreatorListener
 {
 
-    /**
-     * The identifier for the creator
-     */
-    public static final String IDENTIFIER = NAME_PREFIX + "creator";
+    // the connection manager, used to send messages to the server
+    private ClientConnectionManager connManager = null;
 
-    // the channel used for all players currently in the lobby
-    private ChannelID channel;
-
-    // the number of players interacting with the creator
-    private int playerCount = 0;
+    // the listeners
+    private HashSet<CreatorListener> listeners;
 
     /**
-     * Creates an instance of <code>Creator</code>. In practice there should
-     * only ever be one of these, so we don't all direct access to the
-     * constructor. Instead, you get access through <code>getInstance</code>
-     * and that enforces the singleton.
-     *
-     * @param task the task this is running in
+     * Creates a new instance of <code>CreatorManager</code>.
      */
-    private Creator(SimTask task) {
-        // create a channel for all clients in the creator, but lock it so
-        // that we control who can enter and leave the channel
-        channel = task.openChannel(IDENTIFIER);
-        task.lock(channel, true);
+    public CreatorManager() {
+        listeners = new HashSet<CreatorListener>();
     }
 
     /**
-     * Provides access to the single instance of <code>Creator</code>. If
-     * the creator hasn't already been created, then a new instance is
-     * created and added as a registered <code>GLO</code>. If the creator
-     * already exists then nothing new is created.
-     * <p>
-     * See the comments in <code>Lobby</code> for details on this pattern.
      *
-     * @return a reference to the single <code>Creator</code>
      */
-    public static GLOReference<Creator> getInstance() {
-        SimTask task = SimTask.getCurrent();
-
-        // try to get an existing reference
-        GLOReference<Creator> creatorRef = task.findGLO(IDENTIFIER);
-
-        // if we couldn't find a reference, then create it
-        if (creatorRef == null) {
-            creatorRef = task.createGLO(new Creator(task), IDENTIFIER);
-
-            // if doing the create returned null then someone beat us to
-            // it, so get their already-registered reference
-            if (creatorRef == null)
-                creatorRef = task.findGLO(IDENTIFIER);
-        }
-
-        // return the reference
-        return creatorRef;
+    public void addCreatorListener(CreatorListener listener) {
+        listeners.add(listener);
     }
 
     /**
-     * Joins a player to the creator. This is done when a player logs into
-     * the game app for the very first time, and each time that they want
-     * to manage their characters.
+     * Sets the connection manager that this class uses for all communication
+     * with the game server. This method may only be called once during
+     * the lifetime of the client.
      *
-     * @param player the <code>Player</code> joining the creator
+     * @param connManager the connection manager
      */
-    public void join(Player player) {
-        SimTask task = SimTask.getCurrent();
-
-        playerCount++;
-
-        // add the player to the channel
-        UserID uid = player.getCurrentUid();
-        task.join(uid, channel);
-
-        // NOTE: the idea of this "game" is that it should be used to
-        // manage existing characters, create new ones, and delete ones
-        // you don't want any more ... for the present, however, it's
-        // just used to create characters one at a time, so we don't
-        // actually need to send anything to the user now
+    public void setConnectionManager(ClientConnectionManager connManager) {
+        if (this.connManager == null)
+            this.connManager = connManager;
     }
 
     /**
-     * Removes a player from the creator.
+     * Requests new statistics be rolled for the given character
      *
-     * @param player the <code>Player</code> leaving the creator
+     * @param charClass the type of character
      */
-    public void leave(Player player) {
-        playerCount--;
+    public void rollForStats(int charClass) {
+        ByteBuffer bb = ByteBuffer.allocate(5);
 
-        // remove the player from the channel
-        SimTask.getCurrent().leave(player.getCurrentUid(), channel);
+        bb.put((byte)1);
+        bb.putInt(charClass);
+
+        connManager.sendToServer(bb, true);
     }
 
     /**
-     * Creates a new instance of a <code>CreatorMessageHandler</code>.
+     * Requests that the server create the current character as one owned
+     * by the player. This ends the character creation.
      *
-     * @return a <code>CreatorMessageHandler</code>
+     * @param name the character's name
      */
-    public MessageHandler createMessageHandler() {
-        return new CreatorMessageHandler();
+    public void createCurrentCharacter(String name) {
+        ByteBuffer bb = ByteBuffer.allocate(1 + name.length());
+
+        bb.put((byte)2);
+        bb.put(name.getBytes());
+
+        connManager.sendToServer(bb, true);
     }
 
     /**
-     * Returns the name of the creator. This is also specified by the local
-     * field <code>IDENTIFIER</code>.
-     *
-     * @return the name
+     * Requests that character creation finish without creating a character.
      */
-    public String getName() {
-        return IDENTIFIER;
+    public void cancelCreation() {
+        ByteBuffer bb = ByteBuffer.allocate(1);
+
+        bb.put((byte)3);
+
+        connManager.sendToServer(bb, true);
     }
 
     /**
-     * Returns the number of players currently in the creator.
+     * Notifies the listener of new character statistics.
      *
-     * @return the number of players in the creator
+     * @param id the character's identifier
+     * @param stats the new statistics
      */
-    public int numPlayers() {
-        return playerCount;
+    public void changeStatistics(int id, CharacterStats stats) {
+        for (CreatorListener listener : listeners)
+            listener.changeStatistics(id, stats);
     }
 
 }

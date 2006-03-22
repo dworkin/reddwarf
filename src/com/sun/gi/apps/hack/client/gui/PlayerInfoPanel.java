@@ -131,8 +131,8 @@ class PlayerInfoPanel extends JPanel implements PlayerListener
         constitutionLabel = new JLabel();
         charismaLabel = new JLabel();
         
-        // initialize all the labels
-        setLabels("", 0, 0, 0, 0, 0, 0, 0, 0);
+        // initialize the character stats
+        clearCharacter();
 
         // add all the labels to the GUI
         add(nameLabel);
@@ -173,6 +173,13 @@ class PlayerInfoPanel extends JPanel implements PlayerListener
                   stats.getWisdom(), stats.getConstitution(),
                   stats.getCharisma(), stats.getHitPoints(),
                   stats.getMaxHitPoints());
+    }
+
+    /**
+     * Clears the character statistics.
+     */
+    public void clearCharacter() {
+        setLabels("", 0, 0, 0, 0, 0, 0, 0, 0);
     }
 
     /**
