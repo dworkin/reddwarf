@@ -275,10 +275,8 @@ public abstract class SimTask {
      * back GLO.  (a "get")
      * 
      * It is a primative function that in of itself will not scale. 
-     * APplications should generally use theincluded Persistant
+     * Applications should generally use theincluded Persistant
      * Destributed Timer utility (which itself uses this) PDTimer.
-     * 
-     * @see PDTimer
      * 
      * @param delay Length of time, in seconds, between heartbeat
      * callbacks
@@ -298,10 +296,8 @@ public abstract class SimTask {
      * stack-local heartbat timer.
      * 
      * It is a primative function that in of itself will not scale. 
-     * APplications should generally use theincluded Persistant
+     * Applications should generally use theincluded Persistant
      * Destributed Timer utility (which itself uses this) PDTimer.
-     * 
-     * @see PDTimer
      * 
      * @param access What kind of access (get/peek/attempt) the Task
      * will use to acquire the GLO referred to by ref
