@@ -464,9 +464,6 @@ public class HadbTest {
 
     private long currentIdBlockOffset = 0;
 
-    /**
-     * {@inheritDoc}
-     */
     public synchronized long getNextID() {
 
 	/*
@@ -536,9 +533,6 @@ public class HadbTest {
 	return (currentIdBlockBase + currentIdBlockOffset++);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public byte[] getObjBytes(long objectID) {
 	byte[] objbytes = null;
 	try {
@@ -555,9 +549,6 @@ public class HadbTest {
 	return objbytes;
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public void lock(long objectID) throws NonExistantObjectIDException {
 	/*
 	synchronized (dataSpace) {
@@ -580,9 +571,6 @@ public class HadbTest {
 	*/
     }
 
-    /**
-     * {@inheritDoc}
-     */
     public void release(long objectID) {
 	synchronized (lockSet) {
 	    lockSet.remove(new Long(objectID));

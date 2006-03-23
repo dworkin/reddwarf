@@ -168,8 +168,9 @@ public class ObjectCreator {
 	int chunkSize = 100;
 	for (int base = 0; base < count; base += chunkSize) {
 	    System.out.println("chunk base: " + base);
-	    Transaction trans = beginTransaction(appId);
-
+	    Transaction trans;
+	    
+	    trans = beginTransaction(appId);
 	    trans.start();
 	    for (int i = 0; i + base < count && i < chunkSize; i++) {
 		newOIDs[i + base] = addFillerObj(trans, appId, objSize, base + i);
@@ -178,6 +179,7 @@ public class ObjectCreator {
 	    commitTransaction(trans);
 
 	    if (selfId) {
+		trans = beginTransaction(appId);
 		trans.start();
 		FillerObject fo;
 
