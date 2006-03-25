@@ -95,15 +95,8 @@ import java.util.HashMap;
  * @author	Sten Anderson
  * @version 1.0
  */
-public interface ILobbyChannel {
+public interface ILobbyChannel extends IChannelRoom {
 
-    /**
-     * Returns the name of this lobby.  This name is unique across the lobby
-     * system.
-     * 
-     * @return the lobby name
-     */
-	public String getName();
 
 	/**
 	 * Sets the listener to receive the call-backs for the lobby commands.
@@ -112,21 +105,7 @@ public interface ILobbyChannel {
 	 */
     public void setListener(ILobbyChannelListener listener);
 
-    /**
-     * Broadcasts a message to all the other users in the lobby.
-     * 
-     * @param text		the message to broadcast
-     */
-    public void sendText(String text);
-
-    /**
-     * Sends a message to the given user in the lobby.
-     * 
-     * @param user			the user ID to which to send the message
-     * @param text			the message
-     */
-    public void sendPrivateText(byte[] user, String text);
-
+ 
     /**
      * Requests the a Map of GameParameters in the form of key: Parameter name, 
      * value: default value.

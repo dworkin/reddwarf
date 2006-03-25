@@ -82,6 +82,8 @@
 
 package com.sun.gi.apps.mcs.matchmaker.client;
 
+import java.util.HashMap;
+
 /**
  * 
  * <p>Title: IGameChannel</p>
@@ -93,15 +95,8 @@ package com.sun.gi.apps.mcs.matchmaker.client;
  * @author	Sten Anderson
  * @version 1.0
  */
-public interface IGameChannel {
+public interface IGameChannel extends IChannelRoom {
 
-    /**
-     * Returns the name of this game room.  This name is unique across the lobby
-     * system.
-     * 
-     * @return the game room name
-     */
-    public String getName();
 
 	/**
 	 * Sets the listener to receive the call-backs for the game room commands.
@@ -109,21 +104,6 @@ public interface IGameChannel {
 	 * @param listener
 	 */
     public void setListener(IGameChannelListener listener);
-
-    /**
-     * Broadcasts a message to all the other users in the game room.
-     * 
-     * @param text		the message to broadcast
-     */
-    public void sendText(String text);
-    
-    /**
-     * Sends a message to the given user in the lobby.
-     * 
-     * @param user			the user ID to which to send the message
-     * @param text			the message
-     */
-    public void sendPrivateText(byte[] user, String text);
 
     /**
      * Each player in a game room must indicate that they are "ready"
@@ -140,4 +120,26 @@ public interface IGameChannel {
      * game parameters.  Only the host can start a game.
      */
     public void startGame();
+    
+    /**
+     * Attempts to boot (and optionally ban) the given player from the game.
+     * 
+     * @param player			the player to boot
+     * @param isBanned			if true the player is also banned from returning
+     */
+    public void boot(byte[] player, boolean isBanned);
+    
+    /**
+     * Attempts to update the game with the given parameters.  The player
+     * must be the host to update the game.  If a parameter is not changing
+     * it should not be included (or should be null).
+     * 
+     * @param name
+     * @param description
+     * @param password
+     * @param gameParameters
+     */
+    public void updateGame(String name, String description, String password, 
+    		HashMap<String, Object> gameParameters);
+    	
 }

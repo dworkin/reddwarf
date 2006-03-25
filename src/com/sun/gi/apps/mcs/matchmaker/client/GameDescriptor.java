@@ -93,17 +93,19 @@ public class GameDescriptor {
     private boolean passwordProtected;
     private String channelName;
     private HashMap<String, Object> gameParameters;
+    private int maxUsers;
 
     public GameDescriptor(byte[] id, String name, String desc,
-            String channelName, boolean passwordProtected,
-            HashMap<String, Object> params)
-    {
+            String channelName, int maxUsers, boolean passwordProtected,
+            HashMap<String, Object> params) {
+    	
         this.gameID = id;
         this.name = name;
         this.description = desc;
         this.channelName = channelName;
         this.passwordProtected = passwordProtected;
         this.gameParameters = params;
+        this.maxUsers = maxUsers;
     }
 
     public byte[] getGameID() {
@@ -120,6 +122,10 @@ public class GameDescriptor {
 
     public String getChannelName() {
         return channelName;
+    }
+    
+    public int getMaxUsers() {
+    	return maxUsers;
     }
 
     public boolean isPasswordProtected() {

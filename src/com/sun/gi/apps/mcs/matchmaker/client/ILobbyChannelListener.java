@@ -94,34 +94,8 @@ import java.util.HashMap;
  * @author	Sten Anderson
  * @version 1.0
  */
-public interface ILobbyChannelListener {
+public interface ILobbyChannelListener extends IChannelRoomListener {
 
-    /**
-     * Called when a player enters the lobby.  This call back is fired once
-     * for each user as they join the lobby.  It is also fired once for each player
-     * already connected to the lobby when a player first joins to receive the 
-     * names of the players.
-     * 
-     * @param player		the user ID of the player.
-     * @param name			the user name of the player
-     */
-	public void playerEntered(byte[] player, String name);
-
-    /**
-     * Fired once each time a player leaves the lobby.
-     * 
-     * @param player			the ID of the player that left
-     */
-	public void playerLeft(byte[] player);
-
-    /**
-     * Called when a text message is received on the lobby channel.
-     * 
-     * @param from			the user ID of the sender
-     * @param text			the message
-     * @param wasPrivate	if true, this user was the only recipient of the message
-     */
-	public void receiveText(byte[] from, String text, boolean wasPrivate);
 
 	/**
 	 * Called in response to the ILobbyChannel.requestGameParameters() command.
@@ -145,13 +119,6 @@ public interface ILobbyChannelListener {
      */
     public void gameCreated(GameDescriptor game);
     
-    /**
-     * Called when a game has been started.  When a game starts, its players leave
-     * the lobby, and the associated game room is deleted.
-     * 
-     * @param game			a descriptor detailing the newly started game
-     */
-    public void gameStarted(GameDescriptor game);
     
     /**
      * Called when a game room in the lobby has been deleted.
@@ -167,4 +134,6 @@ public interface ILobbyChannelListener {
      * @param player		the unique ID of the player who joined
      */
     public void playerJoinedGame(byte[] gameID, byte[] player);
+      
+    
 }

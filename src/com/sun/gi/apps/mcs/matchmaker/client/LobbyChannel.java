@@ -90,10 +90,9 @@ import java.util.Map;
 import static com.sun.gi.apps.mcs.matchmaker.common.CommandProtocol.*;
 
 import com.sun.gi.apps.mcs.matchmaker.common.CommandProtocol;
+import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.comm.users.client.ClientChannel;
 import com.sun.gi.comm.users.client.ClientChannelListener;
-import com.sun.gi.utils.SGSUUID;
-import com.sun.gi.utils.StatisticalUUID;
 
 /**
  * 
@@ -108,52 +107,22 @@ import com.sun.gi.utils.StatisticalUUID;
  * @author	Sten Anderson
  * @version 1.0
  */
-public class LobbyChannel implements ILobbyChannel, ClientChannelListener {
+public class LobbyChannel extends ChannelRoom implements ILobbyChannel, ClientChannelListener {
 
-    private ClientChannel channel;
     private ILobbyChannelListener listener;
-    private CommandProtocol protocol;
-    private MatchMakingClient mmClient;
 
     public LobbyChannel(ClientChannel chan, MatchMakingClient client) {
-        this.channel = chan;
-        protocol = new CommandProtocol();
-        this.mmClient = client;
+    	super(chan, client);
     }
 
     public void setListener(ILobbyChannelListener listener) {
         this.listener = listener;
     }
 
-    public void sendText(String text) {
-        List list = protocol.createCommandList(SEND_TEXT);
-        list.add(text);
-        ByteBuffer buffer = protocol.assembleCommand(list);
-        channel.sendBroadcastData(buffer, true);
-    }
-
-    public void sendPrivateText(byte[] user, String text) {
-        List list = protocol.createCommandList(SEND_PRIVATE_TEXT);
-        list.add(createUserID(user));
-        list.add(text);
-        ByteBuffer buffer = protocol.assembleCommand(list);
-
-        channel.sendUnicastData(user, buffer, true);
-    }
-
-    private SGSUUID createUserID(byte[] bytes) {
-        SGSUUID id = null;
-        try {
-            id = new StatisticalUUID(bytes);
-        } catch (InstantiationException ie) {}
-
-        return id;
-    }
-
     public void requestGameParameters() {
         List list = protocol.createCommandList(GAME_PARAMETERS_REQUEST);
 
-        mmClient.sendCommand(list);
+        sendCommand(list);
     }
 
     public void createGame(String name, String description, String password,
@@ -169,16 +138,8 @@ public class LobbyChannel implements ILobbyChannel, ClientChannelListener {
         if (password != null) {
             list.add(password);
         }
-        list.add(gameParameters.size());
-
-        for (Map.Entry<String, Object> entry : gameParameters.entrySet()) {
-            String curKey = entry.getKey();
-            list.add(curKey);
-            Object value = entry.getValue();
-            list.add(protocol.mapType(value));
-            list.add(value);
-        }
-        mmClient.sendCommand(list);
+        packGameParameters(list, gameParameters);
+        sendCommand(list);
     }
 
     void receiveGameParameters(HashMap<String, Object> params) {
@@ -195,13 +156,6 @@ public class LobbyChannel implements ILobbyChannel, ClientChannelListener {
 
     // implemented methods from ClientChannelListener
 
-    /**
-     * A new player has joined the channel this listener is registered
-     * on.
-     * 
-     * @param playerID The ID of the joining player.
-     */
-    public void playerJoined(byte[] playerID) {}
 
     /**
      * A player has left the channel this listener is registered on.
@@ -227,14 +181,7 @@ public class LobbyChannel implements ILobbyChannel, ClientChannelListener {
             return;
         }
         int command = protocol.readUnsignedByte(data);
-        if (command == SEND_TEXT) {
-        	listener.receiveText(from, protocol.readString(data), false);
-        } else if (command == SEND_PRIVATE_TEXT) {
-        	SGSUUID id = protocol.readUserID(data);
-        	listener.receiveText(from, protocol.readString(data), true);
-        
-        }	
-        if (!mmClient.isServerID(from)) {
+        if (processCommand(command, listener, from, data)) {
         	return;
         }
         
@@ -243,45 +190,15 @@ public class LobbyChannel implements ILobbyChannel, ClientChannelListener {
             String name = protocol.readString(data);
             listener.playerEntered(userID, name);
         } else if (command == GAME_CREATED) {
-
             listener.gameCreated(readGameDescriptor(data));
         } else if (command == PLAYER_JOINED_GAME) {
             byte[] userID = protocol.readUUIDAsBytes(data);
             byte[] gameID = protocol.readUUIDAsBytes(data);
             listener.playerJoinedGame(gameID, userID);
-        } else if (command == GAME_STARTED) {
-        	listener.gameStarted(readGameDescriptor(data));
         } else if (command == GAME_DELETED) {
         	listener.gameDeleted(readGameDescriptor(data));
         }
     }
     
-    private GameDescriptor readGameDescriptor(ByteBuffer data) {
-        byte[] uuid = protocol.readUUIDAsBytes(data);
-        String name = protocol.readString(data);
-        String description = protocol.readString(data);
-        String channelName = protocol.readString(data);
-        boolean isProtected = protocol.readBoolean(data);
-        int maxPlayers = data.getInt();
-        int numParams = data.getInt();
-        HashMap<String, Object> paramMap = new HashMap<String, Object>();
-        for (int i = 0; i < numParams; i++) {
-            String param = protocol.readString(data);
-            Object value = protocol.readParamValue(data);
-            paramMap.put(param, value);
-        }
-       return  new GameDescriptor(uuid, name, description,
-                channelName, isProtected, paramMap);
-    }
 
-    /**
-     * Notifies this listener that the channel has been closed.
-     */
-    public void channelClosed() {
-
-    }
-
-    public String getName() {
-        return channel.getName();
-    }
 }

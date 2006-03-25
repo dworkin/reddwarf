@@ -90,10 +90,9 @@ import java.util.Map;
 import static com.sun.gi.apps.mcs.matchmaker.common.CommandProtocol.*;
 
 import com.sun.gi.apps.mcs.matchmaker.common.CommandProtocol;
+import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.comm.users.client.ClientChannel;
 import com.sun.gi.comm.users.client.ClientChannelListener;
-import com.sun.gi.utils.SGSUUID;
-import com.sun.gi.utils.StatisticalUUID;
 
 /**
  * 
@@ -108,50 +107,16 @@ import com.sun.gi.utils.StatisticalUUID;
  * @author	Sten Anderson
  * @version 1.0
  */
-public class GameChannel implements IGameChannel, ClientChannelListener {
+public class GameChannel extends ChannelRoom implements IGameChannel, ClientChannelListener {
 
     private IGameChannelListener listener;
-    private MatchMakingClient mmClient;
-    private ClientChannel channel;
-    private CommandProtocol protocol;
 
     public GameChannel(ClientChannel chan, MatchMakingClient client) {
-        this.channel = chan;
-        protocol = new CommandProtocol();
-        this.mmClient = client;
+    	super(chan, client);
     }
 
     public void setListener(IGameChannelListener listener) {
         this.listener = listener;
-    }
-
-    public void sendText(String text) {
-        List list = protocol.createCommandList(SEND_TEXT);
-        list.add(text);
-        ByteBuffer buffer = protocol.assembleCommand(list);
-        channel.sendBroadcastData(buffer, true);
-    }
-
-    public void sendPrivateText(byte[] user, String text) {
-        List list = protocol.createCommandList(SEND_PRIVATE_TEXT);
-        list.add(createUserID(user));
-        list.add(text);
-        ByteBuffer buffer = protocol.assembleCommand(list);
-
-        channel.sendUnicastData(user, buffer, true);
-    }
-    
-    private SGSUUID createUserID(byte[] bytes) {
-        SGSUUID id = null;
-        try {
-            id = new StatisticalUUID(bytes);
-        } catch (InstantiationException ie) {}
-
-        return id;
-    }
-
-    public void playerJoined(byte[] playerID) {
-
     }
 
     public void playerLeft(byte[] playerID) {
@@ -166,14 +131,7 @@ public class GameChannel implements IGameChannel, ClientChannelListener {
             return;
         }
         int command = protocol.readUnsignedByte(data);
-        if (command == SEND_TEXT) {
-        	listener.receiveText(from, protocol.readString(data), false);
-        } else if (command == SEND_PRIVATE_TEXT) {
-        	SGSUUID id = protocol.readUserID(data);
-        	listener.receiveText(from, protocol.readString(data), true);
-        
-        }
-        if (!mmClient.isServerID(from)) {
+        if (processCommand(command, listener, from, data)) {
         	return;
         }
         
@@ -186,26 +144,20 @@ public class GameChannel implements IGameChannel, ClientChannelListener {
             boolean ready = protocol.readBoolean(data);
             listener.playerReady(userID, ready);
         } else if (command == START_GAME_REQUEST) {
-            // means there was a failure.
             listener.startGameFailed(protocol.readString(data));
-        } else if (command == GAME_STARTED) {
-            byte[] uuid = protocol.readUUIDAsBytes(data);
-            String name = protocol.readString(data);
-            String description = protocol.readString(data);
-            String channelName = protocol.readString(data);
-            boolean isProtected = protocol.readBoolean(data);
-            int maxPlayers = data.getInt();
-            int numParams = data.getInt();
-            HashMap<String, Object> paramMap = new HashMap<String, Object>();
-            for (int i = 0; i < numParams; i++) {
-                String param = protocol.readString(data);
-                Object value = protocol.readParamValue(data);
-                paramMap.put(param, value);
-            }
-            GameDescriptor game =
-                new GameDescriptor(uuid, name, description, channelName,
-                        isProtected, paramMap);
-            listener.gameStarted(game);
+    	} else if (command == BOOT_FAILED) {
+        	byte[] playerID = protocol.readUUIDAsBytes(data);
+        	boolean isBanned = protocol.readBoolean(data);
+        	int errorCode = protocol.readUnsignedByte(data);
+        	listener.bootFailed(playerID, isBanned, errorCode);
+        } else if (command == UPDATE_GAME_FAILED) {
+        	String gameName = protocol.readString(data);
+        	String gameDescription = protocol.readString(data);
+        	HashMap<String, Object> gameParams = readGameParameters(data);
+        	GameDescriptor game = new GameDescriptor(null, gameName, gameDescription, 
+        			null, 0, false, gameParams);
+        	int errorCode = protocol.readUnsignedByte(data);
+        	listener.updateGameFailed(game, errorCode);
         }
 
     }
@@ -216,29 +168,38 @@ public class GameChannel implements IGameChannel, ClientChannelListener {
     	}
     }
 
-    public String getName() {
-        return channel.getName();
-    }
-
     public void ready(GameDescriptor game, boolean ready) {
         List list = protocol.createCommandList(UPDATE_PLAYER_READY_REQUEST);
         list.add(ready);
         if (ready) {
             HashMap<String, Object> gameParameters = game.getGameParameters();
-            list.add(gameParameters.size());
-            for (Map.Entry<String, Object> entry : gameParameters.entrySet()) {
-                String curKey = entry.getKey();
-                list.add(curKey);
-                Object value = entry.getValue();
-                list.add(protocol.mapType(value));
-                list.add(value);
-            }
+            packGameParameters(list, gameParameters);
         }
-        mmClient.sendCommand(list);
+        sendCommand(list);
     }
+    
 
     public void startGame() {
         List list = protocol.createCommandList(START_GAME_REQUEST);
-        mmClient.sendCommand(list);
+        sendCommand(list);
+    }
+    
+    public void boot(byte[] player, boolean isBanned) {
+    	List list = protocol.createCommandList(BOOT_REQUEST);
+    	list.add(createUserID(player));
+    	list.add(isBanned);
+    	sendCommand(list);
+    }
+    
+    public void updateGame(String name, String description, String password, 
+    		HashMap<String, Object> gameParameters) {
+    	
+    	List list = protocol.createCommandList(UPDATE_GAME_REQUEST);
+    	list.add(name);
+    	list.add(description);
+    	list.add(password);
+    	packGameParameters(list, gameParameters);
+    	
+    	sendCommand(list);
     }
 }

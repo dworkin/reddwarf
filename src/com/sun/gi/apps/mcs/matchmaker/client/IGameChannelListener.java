@@ -92,35 +92,7 @@ package com.sun.gi.apps.mcs.matchmaker.client;
  * @author	Sten Anderson
  * @version 1.0
  */
-public interface IGameChannelListener {
-
-    /**
-     * Called when a player enters the game room.  This call back is fired once
-     * for each user as they join the room.  It is also fired once for each player
-     * already connected to the game room when a player first joins to receive the 
-     * names of the players.
-     * 
-     * @param player		the user ID of the player.
-     * @param name			the user name of the player
-     */
-	public void playerEntered(byte[] player, String name);
-
-    /**
-     * Fired once each time a player leaves the game room.
-     * 
-     * @param player			the ID of the player that left
-     */
-    public void playerLeft(byte[] player);
-
-    
-    /**
-     * Called when a text message is received on the game room channel.
-     * 
-     * @param from			the user ID of the sender
-     * @param text			the message
-     * @param wasPrivate	if true, this user was the only recipient of the message
-     */
-    public void receiveText(byte[] from, String text, boolean wasPrivate);
+public interface IGameChannelListener extends IChannelRoomListener {
 
     /**
      * Called to announce the ready state of the given player.  All players in
@@ -139,16 +111,27 @@ public interface IGameChannelListener {
     public void startGameFailed(String reason);
 
     /**
-     * Called as confirmation to the IGameChannel.startGame() that the command
-     * completely successfully.
-     * 
-     * @param game
-     */
-    public void gameStarted(GameDescriptor game);
-    
-    /**
      * This is called when the channel is closed down.
      *
      */
     public void gameCompleted();
+    
+    
+    /**
+     * Call back response to a boot request that fails.
+     * 
+     * @param playerID
+     * @param isBanned
+     * @param errorCode
+     */
+    public void bootFailed(byte[] playerID, boolean isBanned, int errorCode);
+    
+    /**
+     * Call back response to a game update request that fails.
+     * 
+     * @param game
+     * @param errorCode
+     */
+    public void updateGameFailed(GameDescriptor game, int errorCode);
+    
 }

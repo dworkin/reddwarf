@@ -86,6 +86,7 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 
 import javax.security.auth.callback.Callback;
 
@@ -148,23 +149,21 @@ public class MatchMakingClient
         manager.sendToServer(protocol.assembleCommand(list), true);
     }
 
-    /**
-     * Takes the given byte array, and copies it to a byte array
-     * with the first element containing the length of the array
-     * (as a byte).
-     * 
-     * @param bytes			a collections of bytes representing an UUID
-     * 
-     * @return the same byte array prefixed by the length
-     */
-    private byte[] createUUID(byte[] bytes) {
-    	byte[] uuid = new byte[bytes.length + 1];
-        uuid[0] = (byte) bytes.length;
-        for (int i = 1; i < uuid.length; i++) {
-        	uuid[i] = bytes[i - 1];
+    protected void packGameParamters(List list, HashMap<String, Object> gameParameters) {
+        list.add(gameParameters.size());
+
+        for (Map.Entry<String, Object> entry : gameParameters.entrySet()) {
+            String curKey = entry.getKey();
+            list.add(curKey);
+            Object value = entry.getValue();
+            list.add(protocol.mapType(value));
+            if (value instanceof byte[]) {
+            	list.add(protocol.createUUID((byte[]) value));
+            }
+            else { 
+            	list.add(value);
+            }
         }
-    	
-    	return uuid;
     }
     
     /**
@@ -187,7 +186,7 @@ public class MatchMakingClient
     public void listFolder(byte[] folderID) {
         List list = protocol.createCommandList(LIST_FOLDER_REQUEST);
         if (folderID != null) {
-            list.add(createUUID(folderID));
+            list.add(protocol.createUUID(folderID));
         }
 
         sendCommand(list);
@@ -195,7 +194,7 @@ public class MatchMakingClient
 
     public void joinLobby(byte[] lobbyID, String password) {
         List list = protocol.createCommandList(JOIN_LOBBY);
-        list.add(createUUID(lobbyID));
+        list.add(protocol.createUUID(lobbyID));
         if (password != null) {
             list.add(password);
         }
@@ -209,7 +208,7 @@ public class MatchMakingClient
 
     public void joinGame(byte[] gameID, String password) {
         List list = protocol.createCommandList(JOIN_GAME);
-        list.add(createUUID(gameID));
+        list.add(protocol.createUUID(gameID));
         if (password != null) {
             list.add(password);
         }
@@ -227,7 +226,7 @@ public class MatchMakingClient
     
     public void completeGame(byte[] gameID) {
     	List list = protocol.createCommandList(GAME_COMPLETED);
-    	list.add(createUUID(gameID));
+    	list.add(protocol.createUUID(gameID));
     	
     	sendCommand(list);
     }
@@ -240,7 +239,7 @@ public class MatchMakingClient
      */
     public void lookupUserName(byte[] userID) {
         List list = protocol.createCommandList(LOOKUP_USER_NAME_REQUEST);
-        list.add(createUUID(userID));
+        list.add(protocol.createUUID(userID));
 
         sendCommand(list);
     }
@@ -269,12 +268,10 @@ public class MatchMakingClient
     }
 
     public void connected(byte[] myID) {
-        System.out.println("connected");
         this.myID = myID;
     }
 
     public void connectionRefused(String message) {
-        System.out.println("Connection Refused:  shouldn't have happened.");
     }
 
     public void failOverInProgress() {
