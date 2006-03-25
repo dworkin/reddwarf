@@ -78,13 +78,14 @@
  DANS LA MESURE AUTORISEE PAR LA LOI APPLICABLE, Y COMPRIS NOTAMMENT TOUTE
  GARANTIE IMPLICITE RELATIVE A LA QUALITE MARCHANDE, A L'APTITUDE A UNE
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
-*/
+ */
 
 package com.sun.gi.apps.mcs.matchmaker.client.test;
 
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.WindowAdapter;
@@ -96,6 +97,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.StringTokenizer;
+import java.util.Map.Entry;
 
 import javax.security.auth.callback.Callback;
 import javax.security.auth.callback.NameCallback;
@@ -119,6 +121,7 @@ import com.sun.gi.apps.mcs.matchmaker.client.ILobbyChannelListener;
 import com.sun.gi.apps.mcs.matchmaker.client.IMatchMakingClientListener;
 import com.sun.gi.apps.mcs.matchmaker.client.LobbyDescriptor;
 import com.sun.gi.apps.mcs.matchmaker.client.MatchMakingClient;
+import com.sun.gi.apps.mcs.matchmaker.common.UnsignedByte;
 import com.sun.gi.comm.discovery.impl.URLDiscoverer;
 import com.sun.gi.comm.users.client.ClientConnectionManager;
 import com.sun.gi.comm.users.client.impl.ClientConnectionManagerImpl;
@@ -127,860 +130,1102 @@ import static com.sun.gi.apps.mcs.matchmaker.common.CommandProtocol.*;
 
 /**
  * 
- * <p>Title: MatchMakerClientTestUI</p>
+ * <p>
+ * Title: MatchMakerClientTestUI
+ * </p>
  * 
- * <p>Description: This class is a Swing UI that serves as a test harness for
- * the Match Making client.</p>
+ * <p>
+ * Description: This class is a Swing UI that serves as a test harness for the
+ * Match Making client.
+ * </p>
  * 
- * @author	Sten Anderson
+ * @author Sten Anderson
  * @version 1.0
  */
-public class MatchMakerClientTestUI extends JFrame
-        implements IMatchMakingClientListener {
+public class MatchMakerClientTestUI extends JFrame implements
+		IMatchMakingClientListener {
+
+	private MatchMakingClient mmClient;
+	private ClientConnectionManager manager;
+	private DefaultMutableTreeNode root;
+	private JTree tree;
+	private DefaultTreeModel treeModel;
+	private LobbyPanel lobbyPanel;
+	private GamePanel gamePanel;
+	private HashMap<String, LobbyDescriptor> lobbyMap;
+	private JTextArea incomingText;
+	private JScrollPane incomingScrollPane;
+	private JButton connectButton;
+	private JButton joinLobby;
+	private JButton joinGame;
+
+	public MatchMakerClientTestUI() {
+		super();
+
+		setStatus("Not Connected");
+
+		lobbyMap = new HashMap<String, LobbyDescriptor>();
+
+		JPanel treePanel = doTreeLayout();
+
+		connectButton = new JButton("Connect");
+		connectButton.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				if (connectButton.getText().equals("Connect")) {
+					gamePanel.setParentUI(MatchMakerClientTestUI.this);
+					lobbyPanel.setParentUI(MatchMakerClientTestUI.this);
+					connect();
+				} else {
+					manager.disconnect();
+				}
+			}
+		});
+
+		joinLobby = new JButton("Join Lobby");
+		joinLobby.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				if (joinLobby.getText().startsWith("Join")) {
+					LobbyDescriptor lobby = getSelectedLobby();
+					if (lobby == null) {
+						return;
+					}
+					mmClient.joinLobby(lobby.getLobbyID(), null);
+				} else {
+					mmClient.leaveLobby();
+				}
+
+			}
+		});
+
+		JButton createGame = new JButton("Create Game");
+		createGame.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				GameInputDialog dialog = new GameInputDialog();
+				GameDescriptor descriptor = dialog.promptForParameters(
+							new GameDescriptor(null, null, null, null, 0, false, 
+											lobbyPanel.getGameParameters()));
+
+				lobbyPanel.createGame(descriptor, dialog.getPassword());
+			}
+		});
+
+		joinGame = new JButton("Join Game");
+		joinGame.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				if (joinGame.getText().startsWith("Join")) {
+					GameDescriptor game = lobbyPanel.getSelectedGame();
+					if (game == null) {
+						return;
+					}
+					String password = game.isPasswordProtected() ? 
+							JOptionPane.showInputDialog(null, "Enter Password") : null;
+					mmClient.joinGame(game.getGameID(), password);
+				} else {
+					mmClient.leaveGame();
+				}
+			}
+		});
+
+		JButton readyButton = new JButton("Ready");
+		readyButton.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				gamePanel.ready();
+			}
+		});
+
+		JButton startGameButton = new JButton("Start Game");
+		startGameButton.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				gamePanel.startGame();
+			}
+		});
+
+		JButton endGameButton = new JButton("End Game");
+		endGameButton.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				mmClient.completeGame(gamePanel.getGameID());
+			}
+		});
+
+		final JCheckBox shouldBan = new JCheckBox("Ban");
+
+		JButton bootButton = new JButton("Boot Player");
+		bootButton.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				gamePanel.boot(shouldBan.isSelected());
+			}
+		});
+
+		JButton updateGameButton = new JButton("Update Game");
+		updateGameButton.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				GameInputDialog dialog = new GameInputDialog();
+				GameDescriptor descriptor = dialog.promptForParameters(
+												gamePanel.getGameDescriptor());				
+				gamePanel.updateGame(descriptor, dialog.getPassword());
+			}
+		});
+
+		JPanel buttonPanel = new JPanel(new BorderLayout());
+		JPanel topButtonPanel = new JPanel();
+		topButtonPanel.add(connectButton);
+		topButtonPanel.add(joinLobby);
+		topButtonPanel.add(createGame);
+		topButtonPanel.add(joinGame);
+		topButtonPanel.add(readyButton);
+
+		JPanel bottomButtonPanel = new JPanel();
+		bottomButtonPanel.add(shouldBan);
+		bottomButtonPanel.add(bootButton);
+		bottomButtonPanel.add(startGameButton);
+		bottomButtonPanel.add(endGameButton);
+		bottomButtonPanel.add(updateGameButton);
+
+		buttonPanel.add(topButtonPanel, BorderLayout.NORTH);
+		buttonPanel.add(bottomButtonPanel, BorderLayout.SOUTH);
+
+		incomingText = new JTextArea(3, 40);
+
+		JSplitPane rightPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
+		rightPane.setDividerLocation(250);
+		rightPane.setTopComponent(lobbyPanel = new LobbyPanel());
+		rightPane.setBottomComponent(gamePanel = new GamePanel());
+
+		JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
+		splitPane.setDividerLocation(200);
+		splitPane.setLeftComponent(treePanel);
+		splitPane.setRightComponent(rightPane);
+
+		final JTextField chatField = new JTextField(35);
+		JButton sendTextButton = new JButton("Send Text");
+		sendTextButton.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				if (gamePanel.hasGame()) {
+					gamePanel.sendText(chatField.getText());
+				} else {
+					lobbyPanel.sendText(chatField.getText());
+				}
+			}
+		});
+
+		JButton sendPrivateTextButton = new JButton("Send Private Text");
+		sendPrivateTextButton.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				if (gamePanel.hasGame()) {
+					gamePanel.sendPrivateText(chatField.getText());
+				} else {
+					lobbyPanel.sendPrivateText(chatField.getText());
+				}
+			}
+		});
+
+		JPanel chatPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+		chatPanel.add(chatField);
+		chatPanel.add(sendTextButton);
+		chatPanel.add(sendPrivateTextButton);
+
+		JPanel bottomPanel = new JPanel(new BorderLayout());
+		incomingScrollPane = new JScrollPane(incomingText);
+		bottomPanel.add(incomingScrollPane, BorderLayout.NORTH);
+		bottomPanel.add(chatPanel, BorderLayout.CENTER);
+		bottomPanel.add(buttonPanel, BorderLayout.SOUTH);
+
+		add(splitPane, BorderLayout.CENTER);
+		add(bottomPanel, BorderLayout.SOUTH);
+
+		setBounds(300, 200, 720, 630);
+
+		addWindowListener(new WindowAdapter() {
+			public void windowClosing(WindowEvent e) {
+				if (manager != null) {
+					manager.disconnect();
+				}
+				System.exit(0);
+			}
+		});
+
+		setVisible(true);
+	}
+
+	protected void receiveServerMessage(String message) {
+		incomingText.setText(incomingText.getText() + message + "\n");
+		incomingText
+				.setCaretPosition(incomingText.getDocument().getLength() - 1);
+	}
 	
-    private MatchMakingClient mmClient;
-    private ClientConnectionManager manager;
-    private DefaultMutableTreeNode root;
-    private JTree tree;
-    private DefaultTreeModel treeModel;
-    private LobbyPanel lobbyPanel;
-    private GamePanel gamePanel;
-    private HashMap<String, LobbyDescriptor> lobbyMap;
-    private JTextArea incomingText;
-
-    private JButton connectButton;
-    private JButton joinLobby;
-    private JButton joinGame;
-
-    public MatchMakerClientTestUI() {
-        super();
-
-        setStatus("Not Connected");
-
-        lobbyMap = new HashMap<String, LobbyDescriptor>();
-
-        JPanel treePanel = doTreeLayout();
-
-        connectButton = new JButton("Connect");
-        connectButton.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                if (connectButton.getText().equals("Connect")) {
-                    connect();
-                } else {
-                    manager.disconnect();
-                }
-            }
-        });
-
-        joinLobby = new JButton("Join Lobby");
-        joinLobby.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-            	if (joinLobby.getText().startsWith("Join")) {
-	                LobbyDescriptor lobby = getSelectedLobby();
-	                if (lobby == null) {
-	                    return;
-	                }
-	                mmClient.joinLobby(lobby.getLobbyID(), null);
-            	}
-            	else {
-            		mmClient.leaveLobby();
-            	}
-                
-            }
-        });
-
-        JButton createGame = new JButton("Create Game");
-        createGame.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                String value = JOptionPane.showInputDialog(MatchMakerClientTestUI.this,
-                        "Enter Game Name", "MyGame");
-            	lobbyPanel.createGame(value);
-            }
-        });
-
-        joinGame = new JButton("Join Game");
-        joinGame.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                if (joinGame.getText().startsWith("Join")) {
-	            	GameDescriptor game = lobbyPanel.getSelectedGame();
-	                if (game == null) {
-	                    return;
-	                }
-	                mmClient.joinGame(game.getGameID(), "secret");
-                }
-                else {
-                	mmClient.leaveGame();
-                }
-            }
-        });
-
-        JButton readyButton = new JButton("Ready");
-        readyButton.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                gamePanel.ready();
-            }
-        });
-
-        JButton startGameButton = new JButton("Start Game");
-        startGameButton.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                gamePanel.startGame();
-            }
-        });
-        
-        JButton endGameButton = new JButton("End Game");
-        endGameButton.addActionListener(new ActionListener() {
-        	public void actionPerformed(ActionEvent e) {
-        		mmClient.completeGame(gamePanel.getGameID());
-        	}
-        });
-
-        JPanel buttonPanel = new JPanel();
-        buttonPanel.add(connectButton);
-        buttonPanel.add(joinLobby);
-        buttonPanel.add(createGame);
-        buttonPanel.add(joinGame);
-        buttonPanel.add(readyButton);
-        buttonPanel.add(startGameButton);
-        buttonPanel.add(endGameButton);
-        
-        incomingText = new JTextArea(3, 40);
-
-        JSplitPane rightPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
-        rightPane.setDividerLocation(250);
-        rightPane.setTopComponent(lobbyPanel = new LobbyPanel());
-        rightPane.setBottomComponent(gamePanel = new GamePanel());
-
-        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
-        splitPane.setDividerLocation(200);
-        splitPane.setLeftComponent(treePanel);
-        splitPane.setRightComponent(rightPane);
-
-        final JTextField chatField = new JTextField(35);
-        JButton sendTextButton = new JButton("Send Text");
-        sendTextButton.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                if (gamePanel.hasGame()) {
-                	gamePanel.sendText(chatField.getText());
-                }
-                else {
-                	lobbyPanel.sendText(chatField.getText());
-                }
-            }
-        });
-
-        JButton sendPrivateTextButton = new JButton("Send Private Text");
-        sendPrivateTextButton.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                if (gamePanel.hasGame()) {
-                	gamePanel.sendPrivateText(chatField.getText());
-                }
-                else {
-                	lobbyPanel.sendPrivateText(chatField.getText());
-                }
-            }
-        });
-
-        JPanel chatPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        chatPanel.add(chatField);
-        chatPanel.add(sendTextButton);
-        chatPanel.add(sendPrivateTextButton);
-
-        JPanel bottomPanel = new JPanel(new BorderLayout());
-        bottomPanel.add(new JScrollPane(incomingText), BorderLayout.NORTH);
-        bottomPanel.add(chatPanel, BorderLayout.CENTER);
-        bottomPanel.add(buttonPanel, BorderLayout.SOUTH);
-
-        add(splitPane, BorderLayout.CENTER);
-        add(bottomPanel, BorderLayout.SOUTH);
-
-        setBounds(300, 200, 720, 600);
-
-        addWindowListener(new WindowAdapter() {
-            public void windowClosing(WindowEvent e) {
-                if (manager != null) {
-                    manager.disconnect();
-                }
-                System.exit(0);
-            }
-        });
-
-        setVisible(true);
-    }
-
-    private void receiveServerMessage(String message) {
-        incomingText.setText(incomingText.getText() + "<Server>: " + message
-                + "\n");
-    }
-
-    private LobbyDescriptor getSelectedLobby() {
-        Object selection = tree.getLastSelectedPathComponent();
-        LobbyDescriptor lobby = null;
-        if (selection != null && selection instanceof LobbyNode) {
-            lobby = ((LobbyNode) selection).getDescriptor();
-        }
-        return lobby;
-    }
-
-    private JPanel doTreeLayout() {
-        treeModel = createTreeModel();
-        tree = new JTree(treeModel);
-        tree.addTreeSelectionListener(new TreeSelectionListener() {
-            public void valueChanged(TreeSelectionEvent e) {
-                TreePath path = e.getNewLeadSelectionPath();
-                if (path != null) {
-                    TreeNode node = (TreeNode) path.getLastPathComponent();
-                }
-            }
-        });
-        tree.setRootVisible(true);
-        tree.setShowsRootHandles(true);
-
-        JPanel p = new JPanel(new BorderLayout());
-        p.add(new JScrollPane(tree), BorderLayout.CENTER);
-
-        return p;
-    }
-
-    public DefaultTreeModel createTreeModel() {
-        root = new DefaultMutableTreeNode("Folders");
-
-        return new DefaultTreeModel(root);
-    }
-
-    private void setStatus(String status) {
-        setTitle("Match Maker Client Test: " + status);
-    }
-
-    public void connect() {
-        try {
-            manager = new ClientConnectionManagerImpl(
-                    "MatchMaker",
-                    new URLDiscoverer(
-                            new File("FakeDiscovery.xml").toURI().toURL()));
-            mmClient = new MatchMakingClient(manager);
-            mmClient.setListener(this);
-            String[] classNames = manager.getUserManagerClassNames();
-            manager.connect(classNames[0]);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return;
-        }
-    }
-    
-    public void listedFolder(byte[] folderID, FolderDescriptor[] subFolders,
-            LobbyDescriptor[] lobbies) {
-
-    	DefaultMutableTreeNode node = findFolderNode(folderID, root);
-        if (node == null) {
-            node = root;
-        }
-        for (FolderDescriptor f : subFolders) {
-            treeModel.insertNodeInto(new FolderNode(f), node,
-                    node.getChildCount());
-        }
-        for (LobbyDescriptor l : lobbies) {
-            treeModel.insertNodeInto(new LobbyNode(l), node,
-                    node.getChildCount());
-            lobbyMap.put(l.getChannelName(), l);
-        }
-        for (FolderDescriptor f : subFolders) {
-            mmClient.listFolder(f.getFolderID());
-        }
-    }
-
-    private FolderNode findFolderNode(byte[] folderID,
-            DefaultMutableTreeNode node) {
-        for (int i = 0; i < node.getChildCount(); i++) {
-            if (node.getChildAt(i) instanceof FolderNode) {
-                FolderNode curNode = (FolderNode) node.getChildAt(i);
-                if (compareBytes(curNode.getFolderID(), folderID)) {
-                    return curNode;
-                } else if (curNode.getChildCount() > 0) {
-                    FolderNode subFolder = findFolderNode(folderID, curNode);
-                    if (subFolder != null) {
-                        return subFolder;
-                    }
-                }
-            }
-        }
-        return null;
-    }
-    
-    private boolean compareBytes(byte[] array1, byte[] array2) {
-    	if (array1.length != array2.length) {
-    		return false;
-    	}
-    	for (int i = 0; i < array1.length; i++) {
-    		if (array1[i] != array2[i]) {
-    			return false;
-    		}
-    	}
-    	return true;
-    }
-
-    public void foundUserName(String userName, byte[] userID) {
-    // TODO Auto-generated method stub
-
-    }
-
-    public void foundUserID(String userName, byte[] userID) {
-    // TODO Auto-generated method stub
-
-    }
-
-    public void joinedLobby(ILobbyChannel channel) {
-        joinLobby.setText("Leave Lobby");
-    	lobbyPanel.setLobby(channel);
-    }
-
-    public void joinedGame(IGameChannel channel) {
-    	joinGame.setText("Leave Game");
-    	gamePanel.setGame(channel, lobbyPanel.gameMap.get(channel.getName()));
-
-    }
-    
-    public void leftLobby() {
-    	joinLobby.setText("Join Lobby");
-    	receiveServerMessage("Left Lobby");
-    	lobbyPanel.resetLobby();
-    }
-    
-    public void leftGame() {
-    	joinGame.setText("Join Game");
-    	receiveServerMessage("Left Game");
-    	gamePanel.resetGame();
-    }
-
-    public void connected(byte[] myID) {
-        setStatus("Connected");
-        connectButton.setText("Disconnect");
-        mmClient.listFolder(null);
-    }
-
-    public void disconnected() {
-        setStatus("Disconnected");
-        connectButton.setText("Connect");
-    }
-    
-    /*
-     * Inherited JDoc
-     */
-    public void error(int errorCode) {
-    	String message = null;
-    	if (errorCode == NOT_CONNECTED_LOBBY) {
-    		message = "Not connected to a lobby";
-    	}
-    	else if (errorCode == NOT_CONNECTED_GAME) {
-    		message = "Not connected to a game";
-    	}
-    	else if (errorCode == CONNECTED_GAME) {
-    		message = "Already connected to a game";
-    	}
-    	else if (errorCode == CONNECTED_LOBBY) {
-    		message = "Already connected to a lobby";
-    	}
-    	else if (errorCode == PLAYER_NOT_HOST) {
-    		message = "Only the host can start a game";
-    	}
-    	else if (errorCode == PLAYERS_NOT_READY) {
-    		message = "The game cannot start until all players are ready";
-    	}
-    	else if (errorCode == LESS_THAN_MIN_PLAYERS) {
-    		message = "Too few players to start game";
-    	}
-    	else if (errorCode == GREATER_THAN_MAX_PLAYERS) {
-    		message = "Too many players to start game";
-    	}
-    	else if (errorCode == MAX_PLAYERS) {
-    		message = "Already at max players";
-    	}
-    	else if (errorCode == INCORRECT_PASSWORD) {
-    		message = "Incorrect Password";
-    	}
-    	else if (errorCode == INVALID_GAME) {
-    		message = "Invalid Game";
-    	}
-    	else if (errorCode == INVALID_LOBBY) {
-    		message = "Invalid Lobby";
-    	}
-    	else {
-    		message = "Unknown Error";
-    	}
-    	receiveServerMessage("<ERROR> " + message);
-    }
-
-    public void validationRequest(Callback[] callbacks) {
-        for (Callback cb : callbacks) {
-            if (cb instanceof NameCallback) {
-                String value = JOptionPane.showInputDialog(this,
-                        "Enter Username", "guest1");
-                ((NameCallback) cb).setName(value);
-            }
-        }
-        mmClient.sendValidationResponse(callbacks);
-    }
-
-    public static void main(String[] args) {
-        new MatchMakerClientTestUI();
-    }
-
-    private class FolderNode extends DefaultMutableTreeNode {
-
-        private FolderDescriptor folder;
-
-        public FolderNode(FolderDescriptor f) {
-            folder = f;
-
-        }
-
-        public boolean isLeaf() {
-            return false;
-        }
-
-        public String toString() {
-            return folder.getName();
-        }
-
-        public byte[] getFolderID() {
-            return folder.getFolderID();
-        }
-
-    }
-
-    private class LobbyNode extends DefaultMutableTreeNode {
-
-        private LobbyDescriptor lobby;
-
-        public LobbyNode(LobbyDescriptor l) {
-            lobby = l;
-
-        }
-
-        public boolean isLeaf() {
-            return true;
-        }
-
-        public String toString() {
-            return lobby.getName();
-        }
-
-        public byte[] getLobbyID() {
-            return lobby.getLobbyID();
-        }
-
-        public LobbyDescriptor getDescriptor() {
-            return lobby;
-        }
-
-    }
-
-    private class LobbyPanel extends ChannelRoomPanel implements ILobbyChannelListener {
-
-        private ILobbyChannel channel;
-        private DefaultListModel userListModel;
-        private JList userList;
-        private JList gameList;
-        private DefaultListModel gameListModel;
-        private GameParametersTableModel parametersModel;
-        private HashMap<String, Object> gameParameters;
-
-        HashMap<String, GameDescriptor> gameMap;
-
-        LobbyPanel() {
-        	super("Lobby", incomingText);
-            gameMap = new HashMap<String, GameDescriptor>();
-
-            int listHeight = 150;
-            JTable gameParametersTable = new JTable(
-                    parametersModel = new GameParametersTableModel());
-            JScrollPane tablePane = new JScrollPane(gameParametersTable);
-            tablePane.setPreferredSize(new Dimension(200, listHeight));
-
-            JPanel gameParametersPanel = new JPanel(new BorderLayout());
-            gameParametersPanel.add(new JLabel("Game Params"),
-                    BorderLayout.NORTH);
-            gameParametersPanel.add(tablePane, BorderLayout.CENTER);
-
-            JScrollPane gameListPane = new JScrollPane(gameList = new JList(
-                    gameListModel = new DefaultListModel()));
-            gameListPane.setPreferredSize(new Dimension(150, listHeight));
-
-            JPanel gameListPanel = new JPanel(new BorderLayout());
-            gameListPanel.add(new JLabel("Game List"), BorderLayout.NORTH);
-            gameListPanel.add(gameListPane, BorderLayout.CENTER);
-
-            JScrollPane userListPane = new JScrollPane(userList = new JList(
-                    userListModel = new DefaultListModel()));
-            userListPane.setPreferredSize(new Dimension(150, listHeight));
-
-            JPanel userListPanel = new JPanel(new BorderLayout());
-            userListPanel.add(new JLabel("User List"), BorderLayout.NORTH);
-            userListPanel.add(userListPane, BorderLayout.CENTER);
-
-            JPanel bottomPanel = new JPanel(new BorderLayout());
-            bottomPanel.add(userListPanel, BorderLayout.WEST);
-            bottomPanel.add(gameListPanel, BorderLayout.CENTER);
-            bottomPanel.add(gameParametersPanel, BorderLayout.EAST);
-
-            add(bottomPanel, BorderLayout.SOUTH);
-        }
-
-        public GameDescriptor getSelectedGame() {
-            return (GameDescriptor) gameList.getSelectedValue();
-        }
-
-        void setLobby(ILobbyChannel channel) {
-            LobbyPanel.this.channel = channel;
-            channel.setListener(LobbyPanel.this);
-            LobbyDescriptor lobby = lobbyMap.get(channel.getName());
-            setDetails(lobby.getName(), lobby.getDescription(), lobby.isPasswordProtected(), 
-            		lobby.getMaxUsers());
-            channel.requestGameParameters();
-        }
-        
-        void resetLobby() {
-        	super.reset();
-        	LobbyPanel.this.channel = null;
-        	gameListModel.removeAllElements();
-        	userListModel.removeAllElements();
-        	gameMap.clear();
-        	parametersModel.clear();
-        
-        }
-
-        void createGame(String gameName) {
-        	if (channel != null) {
-        		channel.createGame(gameName, "My description", "secret",
-                    gameParameters);
-        	}
-        }
-
-        void sendText(String message) {
-            if (channel != null) {
-            	channel.sendText(message);
-            }
-        }
-
-        void sendPrivateText(String message) {
-        	if (channel != null) {
-        		byte[] userID = lookupUserID((String) userList.getSelectedValue());
-        		channel.sendPrivateText(userID, message);
-        	}
-        }
-
-        private void removeGame(GameDescriptor game) {
-        	gameMap.remove(game.getChannelName());
-        	gameListModel.removeElement(game);
-        }
-        
-        public void playerEntered(byte[] player, String name) {
-        	super.playerEntered(player, name);
-
-            userListModel.addElement(name);
-        }
-
-        public void playerLeft(byte[] player) {
-            String name = removePlayer(player);
-            userListModel.removeElement(name);
-        }
-
-        public void receivedGameParameters(HashMap<String, Object> parameters) {
-            gameParameters = parameters;
-            Iterator<String> iterator = parameters.keySet().iterator();
-            while (iterator.hasNext()) {
-                String curKey = iterator.next();
-                parametersModel.addParameter(curKey, parameters.get(curKey));
-            }
-            parametersModel.fireTableDataChanged();
-        }
-
-        public void createGameFailed(String name, int errorCode) {
-        	String reason = null;
-        	if (errorCode == NOT_CONNECTED_LOBBY) {
-        		reason = "Not connected to a lobby";
-        	}
-        	else if (errorCode == INVALID_GAME_PARAMETERS) {
-        		reason = "Invalid game parameters";
-        	}
-        	else if (errorCode == INVALID_GAME_NAME) {
-        		reason = "Invalid game name";
-        	}
-        	else if (errorCode == CONNECTED_GAME) {
-        		reason = "Already connected to a game";
-        	}
-        	else if (errorCode == GAME_EXISTS) {
-        		reason = "Game already exists";
-        	}
-        	else {
-        		reason = "Unknown Error";
-        	}
-            receiveServerMessage("LobbyPanel createGameFailed: " + name
-                    + " reason " + reason);
-        }
-
-        public void gameCreated(GameDescriptor game) {
-            gameListModel.addElement(game);
-            gameMap.put(game.getChannelName(), game);
-            receiveServerMessage("Game Created: " + game.getName());
-        }
-
-        public void playerJoinedGame(byte[] gameID, byte[] player) {
-            receiveServerMessage("<Lobby> "
-                    + getUserName(player) + " Joined Game ");
-        }
-        
-        public void gameStarted(GameDescriptor game) {
-        	receiveServerMessage("<Lobby> Game Started " + game.getName());
-        	removeGame(game);
-        }
-        
-        public void gameDeleted(GameDescriptor game) {
-        	receiveServerMessage("<Lobby> Game Deleted " + game.getName());
-        	removeGame(game);
-        }
-    }
-
-    private class GameParametersTableModel extends AbstractTableModel {
-
-        private List<String> params;
-        private List values;
-
-        GameParametersTableModel() {
-            params = new LinkedList<String>();
-            values = new LinkedList();
-        }
-
-        public void addParameter(String param, Object value) {
-            params.add(param);
-            values.add(value);
-        }
-
-        public int getColumnCount() {
-            return 2;
-        }
-
-        public int getRowCount() {
-            return params.size();
-        }
-        
-        public void clear() {
-        	params.clear();
-        	values.clear();
-        	fireTableDataChanged();
-        }
-
-        public Object getValueAt(int row, int col) {
-            if (col == 0) {
-                return params.get(row);
-            }
-            return values.get(row);
-        }
-
-        public String getColumnName(int col) {
-            return col == 0 ? "Parameter" : "Value";
-        }
-    }
-
-    private class GamePanel extends ChannelRoomPanel implements IGameChannelListener {
-
-        private IGameChannel channel;
-        private GameDescriptor descriptor;
-        private HashMap<String, String> userMap;
-        private GameUsersTableModel userTableModel;
-        private GameParametersTableModel parametersModel;
-        private JTable userTable;
-
-        GamePanel() {
-        	super("Game Room", incomingText);
-
-            int listHeight = 100;
-            JTable gameParametersTable = new JTable(
-                    parametersModel = new GameParametersTableModel());
-            JScrollPane tablePane = new JScrollPane(gameParametersTable);
-            tablePane.setPreferredSize(new Dimension(250, listHeight));
-
-            JPanel gameParametersPanel = new JPanel(new BorderLayout());
-            gameParametersPanel.add(new JLabel("Game Params"),
-                    BorderLayout.NORTH);
-            gameParametersPanel.add(tablePane, BorderLayout.CENTER);
-
-            JScrollPane userListPane = new JScrollPane(userTable = new JTable(
-                    userTableModel = new GameUsersTableModel()));
-            userListPane.setPreferredSize(new Dimension(220, listHeight));
-
-            JPanel userListPanel = new JPanel(new BorderLayout());
-            userListPanel.add(new JLabel("User List"), BorderLayout.NORTH);
-            userListPanel.add(userListPane, BorderLayout.CENTER);
-
-            JPanel bottomPanel = new JPanel(new BorderLayout());
-            bottomPanel.add(userListPanel, BorderLayout.WEST);
-            bottomPanel.add(gameParametersPanel, BorderLayout.EAST);
-
-            add(bottomPanel, BorderLayout.SOUTH);
-        }
-
-        public void setGame(IGameChannel channel, GameDescriptor descriptor) {
-            GamePanel.this.channel = channel;
-            GamePanel.this.descriptor = descriptor;
-            channel.setListener(GamePanel.this);
-            updateGameParameters(descriptor.getGameParameters());
-            setDetails(descriptor.getName(), descriptor.getDescription(), 
-            		descriptor.isPasswordProtected(), 0);
-        }
-        
-        public boolean hasGame() {
-        	return GamePanel.this.channel != null;
-        }
-        
-        public byte[] getGameID() {
-        	return descriptor.getGameID();
-        }
-        
-        void sendText(String message) {
-            if (channel != null) {
-            	channel.sendText(message);
-            }
-        }
-
-        void sendPrivateText(String message) {
-        	if (channel != null) {
-        		byte[] userID = lookupUserID(getSelectedUserName());
-        		channel.sendPrivateText(userID, message);
-        	}
-        }
-        
-        private String getSelectedUserName() {
-        	int row = userTable.getSelectedRow();
-        	if (row >= 0) {
-        		return (String) userTableModel.getValueAt(row, 0);
-        	}
-        	return "";
-        }
-        
-        
-        public void resetGame() {
-        	super.reset();
-        	GamePanel.this.channel = null;
-        	GamePanel.this.descriptor = null;
-        	userTableModel.clear();
-        	parametersModel.clear();
-        	joinGame.setText("Join Game");
-        }
-
-        public void ready() {
-            if (channel != null) {
-            	channel.ready(descriptor, true);
-            }
-        }
-
-        public void startGame() {
-        	if (channel != null) {
-        		channel.startGame();
-        	}
-        }
-
-        private void updateGameParameters(HashMap<String, Object> parameters) {
-            Iterator<String> iterator = parameters.keySet().iterator();
-            while (iterator.hasNext()) {
-                String curKey = iterator.next();
-                parametersModel.addParameter(curKey, parameters.get(curKey));
-            }
-            parametersModel.fireTableDataChanged();
-        }
-
-        public void playerEntered(byte[] player, String name) {
-        	super.playerEntered(player, name);
-            userTableModel.addUser(name);
-        }
-
-        public void playerLeft(byte[] player) {
-        	String name = removePlayer(player);
-            userTableModel.removeUser(name);
-        }
-
-        public void playerReady(byte[] player, boolean ready) {
-            String userName = getUserName(player);
-            receiveServerMessage("<Game Room> " + userName + " is "
-                    + (ready ? "" : "not ") + "ready");
-            userTableModel.updateReady(userName, ready);
-        }
-
-        public void startGameFailed(String reason) {
-            receiveServerMessage("<Game Room> Start Game Failed: " + reason);
-
-        }
-
-        public void gameStarted(GameDescriptor game) {
-            receiveServerMessage("<Game Room> Game Started " + game.getName());
-        }
-        
-        public void gameCompleted() {
-        	resetGame();
-        	receiveServerMessage("<Game Room> Game Completed");
-        }
-
-    }
-
-    private class GameUsersTableModel extends AbstractTableModel {
-
-        private List<String> usernames;
-        private List<Boolean> readyState;
-
-        GameUsersTableModel() {
-            usernames = new LinkedList<String>();
-            readyState = new LinkedList<Boolean>();
-        }
-
-        public void addUser(String userName) {
-            usernames.add(userName);
-            readyState.add(false);
-            fireTableDataChanged();
-        }
-
-        public void removeUser(String userName) {
-            int index = usernames.indexOf(userName);
-            if (index == -1) {
-                return;
-            }
-            usernames.remove(userName);
-            readyState.remove(index);
-            fireTableDataChanged();
-        }
-        
-        public void clear() {
-        	usernames.clear();
-        	readyState.clear();
-        	fireTableDataChanged();
-        }
-
-        public int getColumnCount() {
-            return 2;
-        }
-
-        public int getRowCount() {
-            return usernames.size();
-        }
-
-        public void updateReady(String userName, boolean ready) {
-            int index = usernames.indexOf(userName);
-            if (index == -1) {
-                return;
-            }
-            readyState.set(index, ready);
-            fireTableDataChanged();
-        }
-
-        public Object getValueAt(int row, int col) {
-            if (col == 0) {
-                return usernames.get(row);
-            }
-            return readyState.get(row);
-        }
-
-        public String getColumnName(int col) {
-            return col == 0 ? "User" : "Ready?";
-        }
-    }
+	private LobbyDescriptor getSelectedLobby() {
+		Object selection = tree.getLastSelectedPathComponent();
+		LobbyDescriptor lobby = null;
+		if (selection != null && selection instanceof LobbyNode) {
+			lobby = ((LobbyNode) selection).getDescriptor();
+		}
+		return lobby;
+	}
+
+	private JPanel doTreeLayout() {
+		treeModel = createTreeModel();
+		tree = new JTree(treeModel);
+		tree.addTreeSelectionListener(new TreeSelectionListener() {
+			public void valueChanged(TreeSelectionEvent e) {
+				TreePath path = e.getNewLeadSelectionPath();
+				if (path != null) {
+					TreeNode node = (TreeNode) path.getLastPathComponent();
+				}
+			}
+		});
+		tree.setRootVisible(true);
+		tree.setShowsRootHandles(true);
+
+		JPanel p = new JPanel(new BorderLayout());
+		p.add(new JScrollPane(tree), BorderLayout.CENTER);
+
+		return p;
+	}
+
+	public DefaultTreeModel createTreeModel() {
+		root = new DefaultMutableTreeNode("Folders");
+
+		return new DefaultTreeModel(root);
+	}
+
+	private void setStatus(String status) {
+		setTitle("Match Maker Client Test: " + status);
+	}
+
+	public void connect() {
+		try {
+			manager = new ClientConnectionManagerImpl("MatchMaker",
+					new URLDiscoverer(new File("resources/FakeDiscovery.xml")
+							.toURI().toURL()));
+			mmClient = new MatchMakingClient(manager);
+			mmClient.setListener(this);
+			String[] classNames = manager.getUserManagerClassNames();
+			manager.connect(classNames[0]);
+		} catch (Exception e) {
+			e.printStackTrace();
+			return;
+		}
+	}
+
+	public void listedFolder(byte[] folderID, FolderDescriptor[] subFolders,
+			LobbyDescriptor[] lobbies) {
+
+		DefaultMutableTreeNode node = findFolderNode(folderID, root);
+		if (node == null) {
+			node = root;
+		}
+		for (FolderDescriptor f : subFolders) {
+			treeModel.insertNodeInto(new FolderNode(f), node, node
+					.getChildCount());
+		}
+		for (LobbyDescriptor l : lobbies) {
+			treeModel.insertNodeInto(new LobbyNode(l), node, node
+					.getChildCount());
+			lobbyMap.put(l.getChannelName(), l);
+		}
+		for (FolderDescriptor f : subFolders) {
+			mmClient.listFolder(f.getFolderID());
+		}
+	}
+
+	private FolderNode findFolderNode(byte[] folderID,
+			DefaultMutableTreeNode node) {
+		for (int i = 0; i < node.getChildCount(); i++) {
+			if (node.getChildAt(i) instanceof FolderNode) {
+				FolderNode curNode = (FolderNode) node.getChildAt(i);
+				if (compareBytes(curNode.getFolderID(), folderID)) {
+					return curNode;
+				} else if (curNode.getChildCount() > 0) {
+					FolderNode subFolder = findFolderNode(folderID, curNode);
+					if (subFolder != null) {
+						return subFolder;
+					}
+				}
+			}
+		}
+		return null;
+	}
+
+	private boolean compareBytes(byte[] array1, byte[] array2) {
+		if (array1.length != array2.length) {
+			return false;
+		}
+		for (int i = 0; i < array1.length; i++) {
+			if (array1[i] != array2[i]) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	public void foundUserName(String userName, byte[] userID) {
+		// TODO Auto-generated method stub
+
+	}
+
+	public void foundUserID(String userName, byte[] userID) {
+		// TODO Auto-generated method stub
+
+	}
+
+	public void joinedLobby(ILobbyChannel channel) {
+		joinLobby.setText("Leave Lobby");
+		lobbyPanel.setLobby(channel);
+	}
+
+	public void joinedGame(IGameChannel channel) {
+		joinGame.setText("Leave Game");
+		gamePanel.setGame(channel, lobbyPanel.gameMap.get(channel.getName()));
+
+	}
+
+	public void leftLobby() {
+		joinLobby.setText("Join Lobby");
+		receiveServerMessage("Left Lobby");
+		lobbyPanel.resetLobby();
+	}
+
+	public void leftGame() {
+		joinGame.setText("Join Game");
+		receiveServerMessage("Left Game");
+		gamePanel.resetGame();
+	}
+
+	public void connected(byte[] myID) {
+		setStatus("Connected");
+		connectButton.setText("Disconnect");
+		mmClient.listFolder(null);
+	}
+
+	public void disconnected() {
+		setStatus("Disconnected");
+		connectButton.setText("Connect");
+	}
+
+	/*
+	 * Inherited JDoc
+	 */
+	public void error(int errorCode) {
+		String message = mapErrorCode(errorCode);
+		receiveServerMessage("<ERROR> " + message);
+	}
+
+	private String mapErrorCode(int errorCode) {
+		String message = null;
+
+		if (errorCode == NOT_CONNECTED_LOBBY) {
+			message = "Not connected to a lobby";
+		} else if (errorCode == NOT_CONNECTED_GAME) {
+			message = "Not connected to a game";
+		} else if (errorCode == CONNECTED_GAME) {
+			message = "Already connected to a game";
+		} else if (errorCode == CONNECTED_LOBBY) {
+			message = "Already connected to a lobby";
+		} else if (errorCode == PLAYER_NOT_HOST) {
+			message = "The requested action can only be performed by the host";
+		} else if (errorCode == PLAYERS_NOT_READY) {
+			message = "The game cannot start until all players are ready";
+		} else if (errorCode == LESS_THAN_MIN_PLAYERS) {
+			message = "Too few players to start game";
+		} else if (errorCode == GREATER_THAN_MAX_PLAYERS) {
+			message = "Too many players to start game";
+		} else if (errorCode == MAX_PLAYERS) {
+			message = "Already at max players";
+		} else if (errorCode == INCORRECT_PASSWORD) {
+			message = "Incorrect Password";
+		} else if (errorCode == INVALID_GAME) {
+			message = "Invalid Game";
+		} else if (errorCode == INVALID_GAME_NAME) {
+			message = "Invalid Game Name";
+		} else if (errorCode == INVALID_LOBBY) {
+			message = "Invalid Lobby";
+		} else if (errorCode == BOOT_NOT_SUPPORTED) {
+			message = "Lobby does not support booting of players";
+		} else if (errorCode == BAN_NOT_SUPPORTED) {
+			message = "Lobby does not support banning of players";
+		} else if (errorCode == BOOT_SELF) {
+			message = "You can't boot yourself";
+		} else if (errorCode == PLAYER_BANNED) {
+			message = "You have been banned from this game";
+		} else {
+			message = "Unknown Error";
+		}
+
+		return message;
+	}
+
+	public void validationRequest(Callback[] callbacks) {
+		for (Callback cb : callbacks) {
+			if (cb instanceof NameCallback) {
+				String value = JOptionPane.showInputDialog(this,
+						"Enter Username", "guest1");
+				((NameCallback) cb).setName(value);
+			}
+		}
+		mmClient.sendValidationResponse(callbacks);
+	}
+
+	public static void main(String[] args) {
+		new MatchMakerClientTestUI();
+	}
+
+	private class FolderNode extends DefaultMutableTreeNode {
+
+		private FolderDescriptor folder;
+
+		public FolderNode(FolderDescriptor f) {
+			folder = f;
+
+		}
+
+		public boolean isLeaf() {
+			return false;
+		}
+
+		public String toString() {
+			return folder.getName();
+		}
+
+		public byte[] getFolderID() {
+			return folder.getFolderID();
+		}
+
+	}
+
+	private class LobbyNode extends DefaultMutableTreeNode {
+
+		private LobbyDescriptor lobby;
+
+		public LobbyNode(LobbyDescriptor l) {
+			lobby = l;
+
+		}
+
+		public boolean isLeaf() {
+			return true;
+		}
+
+		public String toString() {
+			return lobby.getName();
+		}
+
+		public byte[] getLobbyID() {
+			return lobby.getLobbyID();
+		}
+
+		public LobbyDescriptor getDescriptor() {
+			return lobby;
+		}
+
+	}
+
+	private class LobbyPanel extends ChannelRoomPanel implements
+			ILobbyChannelListener {
+
+		private ILobbyChannel channel;
+
+		private DefaultListModel userListModel;
+
+		private JList userList;
+
+		private JList gameList;
+
+		private DefaultListModel gameListModel;
+
+		private GameParametersTableModel parametersModel;
+
+		private HashMap<String, Object> gameParameters;
+
+		private JCheckBox bootBox;
+
+		private JCheckBox banBox;
+
+		HashMap<String, GameDescriptor> gameMap;
+
+		LobbyPanel() {
+			super("Lobby");
+			gameMap = new HashMap<String, GameDescriptor>();
+
+			int listHeight = 150;
+			JTable gameParametersTable = new GameParametersTable(
+					parametersModel = new GameParametersTableModel(), false);
+			JScrollPane tablePane = new JScrollPane(gameParametersTable);
+			tablePane.setPreferredSize(new Dimension(200, listHeight));
+
+			JPanel gameParametersPanel = new JPanel(new BorderLayout());
+			gameParametersPanel.add(new JLabel("Game Params"),
+					BorderLayout.NORTH);
+			gameParametersPanel.add(tablePane, BorderLayout.CENTER);
+
+			JScrollPane gameListPane = new JScrollPane(gameList = new JList(
+					gameListModel = new DefaultListModel()));
+			gameListPane.setPreferredSize(new Dimension(150, listHeight));
+
+			JPanel gameListPanel = new JPanel(new BorderLayout());
+			gameListPanel.add(new JLabel("Game List"), BorderLayout.NORTH);
+			gameListPanel.add(gameListPane, BorderLayout.CENTER);
+
+			JScrollPane userListPane = new JScrollPane(userList = new JList(
+					userListModel = new DefaultListModel()));
+			userListPane.setPreferredSize(new Dimension(150, listHeight));
+
+			JPanel userListPanel = new JPanel(new BorderLayout());
+			userListPanel.add(new JLabel("User List"), BorderLayout.NORTH);
+			userListPanel.add(userListPane, BorderLayout.CENTER);
+
+			JPanel bottomPanel = new JPanel(new BorderLayout());
+			bottomPanel.add(userListPanel, BorderLayout.WEST);
+			bottomPanel.add(gameListPanel, BorderLayout.CENTER);
+			bottomPanel.add(gameParametersPanel, BorderLayout.EAST);
+
+			bootBox = new JCheckBox("Can Host Boot?");
+			bootBox.setEnabled(false);
+			banBox = new JCheckBox("Can Host Ban?");
+			banBox.setEnabled(false);
+
+			addToCenter(bootBox);
+			addToCenter(banBox);
+
+			add(bottomPanel, BorderLayout.SOUTH);
+		}
+
+		public GameDescriptor getSelectedGame() {
+			return (GameDescriptor) gameList.getSelectedValue();
+		}
+
+		void setLobby(ILobbyChannel channel) {
+			LobbyPanel.this.channel = channel;
+			channel.setListener(LobbyPanel.this);
+			LobbyDescriptor lobby = lobbyMap.get(channel.getName());
+			setDetails(lobby.getName(), lobby.getDescription(), lobby
+					.isPasswordProtected(), lobby.getMaxUsers());
+			channel.requestGameParameters();
+		}
+
+		void resetLobby() {
+			super.reset();
+			LobbyPanel.this.channel = null;
+			gameListModel.removeAllElements();
+			userListModel.removeAllElements();
+			gameMap.clear();
+			parametersModel.clear();
+
+		}
+
+		void createGame(GameDescriptor game, String password) {
+			if (channel != null && game != null) {
+				channel.createGame(game.getName(), game.getDescription(),
+										password.equals("") ? null : password,
+										game.getGameParameters());
+			}
+		}
+
+		void sendText(String message) {
+			if (channel != null) {
+				channel.sendText(message);
+			}
+		}
+
+		void sendPrivateText(String message) {
+			if (channel != null) {
+				byte[] userID = lookupUserID((String) userList
+						.getSelectedValue());
+				channel.sendPrivateText(userID, message);
+			}
+		}
+
+		private void removeGame(GameDescriptor game) {
+			gameMap.remove(game.getChannelName());
+			gameListModel.removeElement(game);
+		}
+
+		public void playerEntered(byte[] player, String name) {
+			super.playerEntered(player, name);
+
+			userListModel.addElement(name);
+		}
+
+		public void playerLeft(byte[] player) {
+			String name = removePlayer(player);
+			userListModel.removeElement(name);
+		}
+
+		public void receivedGameParameters(HashMap<String, Object> parameters) {
+			gameParameters = parameters;
+			Iterator<String> iterator = parameters.keySet().iterator();
+			while (iterator.hasNext()) {
+				String curKey = iterator.next();
+				parametersModel.addParameter(curKey, parameters.get(curKey));
+			}
+			parametersModel.fireTableDataChanged();
+		}
+
+		public HashMap<String, Object> getGameParameters() {
+			return parametersModel.getGameParameters();
+		}
+
+		public void playerBootedFromGame(byte[] booter, byte[] bootee,
+				boolean isBanned) {
+
+			super.playerBootedFromGame(booter, bootee, isBanned);
+
+		}
+
+		public void createGameFailed(String name, int errorCode) {
+			String reason = null;
+			if (errorCode == NOT_CONNECTED_LOBBY) {
+				reason = "Not connected to a lobby";
+			} else if (errorCode == INVALID_GAME_PARAMETERS) {
+				reason = "Invalid game parameters";
+			} else if (errorCode == INVALID_GAME_NAME) {
+				reason = "Invalid game name";
+			} else if (errorCode == CONNECTED_GAME) {
+				reason = "Already connected to a game";
+			} else if (errorCode == GAME_EXISTS) {
+				reason = "Game already exists";
+			} else {
+				reason = "Unknown Error";
+			}
+			receiveServerMessage("LobbyPanel createGameFailed: " + name
+					+ " reason " + reason);
+		}
+
+		public void gameCreated(GameDescriptor game) {
+			gameListModel.addElement(game);
+			gameMap.put(game.getChannelName(), game);
+			receiveServerMessage("Game Created: " + game.getName());
+		}
+
+		public void playerJoinedGame(byte[] gameID, byte[] player) {
+			receiveServerMessage("<Lobby> " + getUserName(player)
+					+ " Joined Game ");
+		}
+
+		public void gameStarted(GameDescriptor game) {
+			receiveServerMessage("<Lobby> Game Started " + game.getName());
+			removeGame(game);
+		}
+
+		public void gameDeleted(GameDescriptor game) {
+			receiveServerMessage("<Lobby> Game Deleted " + game.getName());
+			removeGame(game);
+		}
+
+		public void gameUpdated(GameDescriptor game) {
+			super.gameUpdated(game);
+		}
+	}
+
+	private class GameParametersTable extends JTable {
+
+		private boolean canEdit;
+
+		GameParametersTable(GameParametersTableModel model, boolean canEdit) {
+			super(model);
+			GameParametersTable.this.canEdit = canEdit;
+		}
+
+		public boolean isCellEditable(int row, int column) {
+			return canEdit && column == 1;
+		}
+	}
+
+	private class GameParametersTableModel extends AbstractTableModel {
+
+		private List<String> params;
+
+		private List values;
+
+		GameParametersTableModel() {
+			params = new LinkedList<String>();
+			values = new LinkedList();
+		}
+
+		public void setData(HashMap<String, Object> map) {
+			clear();
+			for (Entry<String, Object> curEntry : map.entrySet()) {
+				addParameter(curEntry.getKey(), curEntry.getValue());
+			}
+			fireTableDataChanged();
+		}
+
+		public void addParameter(String param, Object value) {
+			params.add(param);
+			values.add(value);
+		}
+
+		public int getColumnCount() {
+			return 2;
+		}
+
+		public HashMap<String, Object> getGameParameters() {
+			HashMap<String, Object> map = new HashMap<String, Object>();
+			for (int i = 0; i < params.size(); i++) {
+				map.put(params.get(i), values.get(i));
+			}
+
+			return map;
+		}
+		
+	    private String byteArrayToString(byte[] bytes) {
+	    	StringBuffer buffer = new StringBuffer();
+	    	for (byte b : bytes) {
+	    		buffer.append((int) (b & 0xFF));
+	    	}
+	    	return buffer.toString();
+	    }
+
+		public void setValueAt(Object value, int row, int col) {
+			String strValue = (String) value;
+			if (col != 1) {
+				return;
+			}
+			Object oldValue = values.get(row);
+			Object newValue = null;
+			if (oldValue instanceof Integer) {
+				newValue = Integer.parseInt(strValue);
+			} else if (oldValue instanceof Boolean) {
+				newValue = Boolean.parseBoolean(strValue);
+			} else if (oldValue instanceof UnsignedByte) {
+				newValue = new UnsignedByte(Integer.parseInt(strValue));
+			} else if (oldValue instanceof byte[]) { // don't support editing
+														// UUIDs
+				return;
+			} else {
+				newValue = strValue;
+			}
+			values.set(row, newValue);
+
+		}
+
+		public int getRowCount() {
+			return params.size();
+		}
+
+		public void clear() {
+			params.clear();
+			values.clear();
+			fireTableDataChanged();
+		}
+
+		public Object getValueAt(int row, int col) {
+			if (col == 0) {
+				return params.get(row);
+			}
+			Object value = values.get(row);
+			if (value instanceof byte[]) {
+				return byteArrayToString((byte[]) value);
+			}
+			return value;
+		}
+
+		public String getColumnName(int col) {
+			return col == 0 ? "Parameter" : "Value";
+		}
+	}
+
+	private class GamePanel extends ChannelRoomPanel implements
+			IGameChannelListener {
+
+		private IGameChannel channel;
+		private GameDescriptor descriptor;
+		private HashMap<String, String> userMap;
+		private GameUsersTableModel userTableModel;
+		private GameParametersTableModel parametersModel;
+		private JTable userTable;
+
+		GamePanel() {
+			super("Game Room");
+
+			int listHeight = 100;
+			JTable gameParametersTable = new GameParametersTable(
+					parametersModel = new GameParametersTableModel(), false);
+			JScrollPane tablePane = new JScrollPane(gameParametersTable);
+			tablePane.setPreferredSize(new Dimension(250, listHeight));
+
+			JPanel gameParametersPanel = new JPanel(new BorderLayout());
+			gameParametersPanel.add(new JLabel("Game Params"),
+					BorderLayout.NORTH);
+			gameParametersPanel.add(tablePane, BorderLayout.CENTER);
+
+			JScrollPane userListPane = new JScrollPane(userTable = new JTable(
+					userTableModel = new GameUsersTableModel()));
+			userListPane.setPreferredSize(new Dimension(220, listHeight));
+
+			JPanel userListPanel = new JPanel(new BorderLayout());
+			userListPanel.add(new JLabel("User List"), BorderLayout.NORTH);
+			userListPanel.add(userListPane, BorderLayout.CENTER);
+
+			JPanel bottomPanel = new JPanel(new BorderLayout());
+			bottomPanel.add(userListPanel, BorderLayout.WEST);
+			bottomPanel.add(gameParametersPanel, BorderLayout.EAST);
+
+			add(bottomPanel, BorderLayout.SOUTH);
+		}
+
+		public void setGame(IGameChannel channel, GameDescriptor descriptor) {
+			GamePanel.this.channel = channel;
+			GamePanel.this.descriptor = descriptor;
+			channel.setListener(GamePanel.this);
+			updateGameParameters(descriptor.getGameParameters());
+			setDetails(descriptor.getName(), descriptor.getDescription(),
+					descriptor.isPasswordProtected(), descriptor.getMaxUsers());
+		}
+
+		public void boot(boolean shouldBan) {
+			if (channel != null) {
+				byte[] userID = lookupUserID(getSelectedUserName());
+				channel.boot(userID, shouldBan);
+			}
+		}
+
+		public boolean hasGame() {
+			return GamePanel.this.channel != null;
+		}
+
+		public byte[] getGameID() {
+			return descriptor.getGameID();
+		}
+
+		void sendText(String message) {
+			if (channel != null) {
+				channel.sendText(message);
+			}
+		}
+
+		void sendPrivateText(String message) {
+			if (channel != null) {
+				byte[] userID = lookupUserID(getSelectedUserName());
+				channel.sendPrivateText(userID, message);
+			}
+		}
+
+		public void updateGame(GameDescriptor gameDescriptor, String password) {
+			if (channel != null && gameDescriptor != null) {
+				channel.updateGame(gameDescriptor.getName(), 
+							gameDescriptor.getDescription(), 
+							(password.equals("") ? null : password), 
+							gameDescriptor.getGameParameters());
+			}
+		}
+
+		private String getSelectedUserName() {
+			int row = userTable.getSelectedRow();
+			if (row >= 0) {
+				return (String) userTableModel.getValueAt(row, 0);
+			}
+			return "";
+		}
+
+		public void resetGame() {
+			super.reset();
+			GamePanel.this.channel = null;
+			GamePanel.this.descriptor = null;
+			userTableModel.clear();
+			parametersModel.clear();
+			joinGame.setText("Join Game");
+		}
+
+		public void ready() {
+			if (channel != null) {
+				channel.ready(descriptor, true);
+			}
+		}
+
+		public void startGame() {
+			if (channel != null) {
+				channel.startGame();
+			}
+		}
+
+		private void updateGameParameters(HashMap<String, Object> parameters) {
+			Iterator<String> iterator = parameters.keySet().iterator();
+			while (iterator.hasNext()) {
+				String curKey = iterator.next();
+				parametersModel.addParameter(curKey, parameters.get(curKey));
+			}
+			parametersModel.fireTableDataChanged();
+		}
+
+		public void playerEntered(byte[] player, String name) {
+			super.playerEntered(player, name);
+			userTableModel.addUser(name);
+		}
+
+		public void playerLeft(byte[] player) {
+			String name = removePlayer(player);
+			userTableModel.removeUser(name);
+		}
+
+		public void playerBootedFromGame(byte[] booter, byte[] bootee,
+				boolean isBanned) {
+
+			super.playerBootedFromGame(booter, bootee, isBanned);
+
+		}
+
+		public void playerReady(byte[] player, boolean ready) {
+			String userName = getUserName(player);
+			receiveServerMessage("<Game Room> " + userName + " is "
+					+ (ready ? "" : "not ") + "ready");
+			userTableModel.updateReady(userName, ready);
+		}
+
+		public void startGameFailed(String reason) {
+			receiveServerMessage("<Game Room> Start Game Failed: " + reason);
+
+		}
+
+		public void gameStarted(GameDescriptor game) {
+			receiveServerMessage("<Game Room> Game Started " + game.getName());
+		}
+
+		public void gameCompleted() {
+			resetGame();
+			receiveServerMessage("<Game Room> Game Completed");
+		}
+
+		public void bootFailed(byte[] playerID, boolean isBanned, int errorCode) {
+			receiveServerMessage("<Game Room> Boot attempt of "
+					+ getUserName(playerID) + " failed "
+					+ mapErrorCode(errorCode));
+		}
+		
+		private void updateDescriptor(GameDescriptor game) {
+			GamePanel.this.descriptor = game;
+			setDetails(game.getName(), game.getDescription(), 
+					game.isPasswordProtected(), game.getMaxUsers());
+			parametersModel.setData(game.getGameParameters());
+		}
+
+		public void gameUpdated(GameDescriptor game) {
+			super.gameUpdated(game);
+			updateDescriptor(game);
+		}
+		
+		public void updateGameFailed(GameDescriptor game, int errorCode) {
+			receiveServerMessage("<Game Room> Game Update Failed: " + 
+					game.getName() + ", error: " + errorCode + " " + mapErrorCode(errorCode));
+		}
+		
+		public GameDescriptor getGameDescriptor() {
+			return descriptor;
+		}
+	}
+
+	private class GameUsersTableModel extends AbstractTableModel {
+
+		private List<String> usernames;
+
+		private List<Boolean> readyState;
+
+		GameUsersTableModel() {
+			usernames = new LinkedList<String>();
+			readyState = new LinkedList<Boolean>();
+		}
+
+		public void addUser(String userName) {
+			usernames.add(userName);
+			readyState.add(false);
+			fireTableDataChanged();
+		}
+
+		public void removeUser(String userName) {
+			int index = usernames.indexOf(userName);
+			if (index == -1) {
+				return;
+			}
+			usernames.remove(userName);
+			readyState.remove(index);
+			fireTableDataChanged();
+		}
+
+		public void clear() {
+			usernames.clear();
+			readyState.clear();
+			fireTableDataChanged();
+		}
+
+		public int getColumnCount() {
+			return 2;
+		}
+
+		public int getRowCount() {
+			return usernames.size();
+		}
+
+		public void updateReady(String userName, boolean ready) {
+			int index = usernames.indexOf(userName);
+			if (index == -1) {
+				return;
+			}
+			readyState.set(index, ready);
+			fireTableDataChanged();
+		}
+
+		public Object getValueAt(int row, int col) {
+			if (col == 0) {
+				return usernames.get(row);
+			}
+			return readyState.get(row);
+		}
+
+		public String getColumnName(int col) {
+			return col == 0 ? "User" : "Ready?";
+		}
+	}
+
+	private class GameInputDialog {
+
+		private String password;
+
+		private GameDescriptor descriptor;
+
+		public GameDescriptor promptForParameters(GameDescriptor game) {
+			JPanel panel = new JPanel(new BorderLayout());
+			JTextField nameField = new JTextField(game.getName(), 20);
+			JTextField descriptionField = new JTextField(game.getDescription(), 20);
+			JTextField passwordField = new JTextField(20);
+
+			JPanel topPanel = new JPanel(new GridLayout(3, 2));
+			topPanel.add(new JLabel("Name"));
+			topPanel.add(nameField);
+			topPanel.add(new JLabel("Description"));
+			topPanel.add(descriptionField);
+			topPanel.add(new JLabel("Password"));
+			topPanel.add(passwordField);
+
+			panel.add(topPanel, BorderLayout.NORTH);
+
+			GameParametersTableModel gameTableModel = new GameParametersTableModel();
+			gameTableModel.setData(game.getGameParameters());
+			JScrollPane userListPane = new JScrollPane(new GameParametersTable(
+					gameTableModel, true));
+			userListPane.setPreferredSize(new Dimension(220, 150));
+
+			panel.add(userListPane, BorderLayout.SOUTH);
+
+			JOptionPane optionPane = new JOptionPane(panel,
+					JOptionPane.QUESTION_MESSAGE, JOptionPane.OK_CANCEL_OPTION);
+
+			JDialog dialog = optionPane.createDialog(null,
+					"Specify Game Parameters");
+			dialog.setVisible(true);
+			Integer ret = (Integer) optionPane.getValue();
+
+			if (ret == null || ret == JOptionPane.CANCEL_OPTION) {
+				return null; // the dialog was closed -- assume a cancel
+								// operation.
+			}
+			password = passwordField.getText();
+			
+			return new GameDescriptor(null, nameField.getText(), descriptionField.getText(), 
+					null, 0, !password.equals(""), gameTableModel.getGameParameters());
+		}
+
+		public String getPassword() {
+			return password;
+		}
+	}
 
 }
