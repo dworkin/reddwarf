@@ -90,7 +90,6 @@ import java.util.Map;
 import static com.sun.gi.apps.mcs.matchmaker.common.CommandProtocol.*;
 
 import com.sun.gi.apps.mcs.matchmaker.common.CommandProtocol;
-import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.comm.users.client.ClientChannel;
 import com.sun.gi.comm.users.client.ClientChannelListener;
 
