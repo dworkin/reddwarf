@@ -87,6 +87,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
@@ -116,6 +117,7 @@ public class GameRoom extends ChannelRoom {
     private int maxPlayers;
     private HashMap<String, Object> gameParameters;
     private HashMap<UserID, Boolean> userMap; // users mapped to ready state.
+    private List<UserID> bannedList;
     private boolean started = false;
     private SGSUUID gameID;
     private GLOReference<Lobby> parentLobby;		// a reference to the lobby to
@@ -132,8 +134,9 @@ public class GameRoom extends ChannelRoom {
         this.parentLobby = lobby;
         this.gameID = gameID;
         gameParameters = new HashMap<String, Object>();
+        bannedList = new LinkedList<UserID>();
     }
-
+    
     public SGSUUID getGameID() {
         return gameID;
     }
@@ -144,6 +147,28 @@ public class GameRoom extends ChannelRoom {
 
     public void addGameParameter(String key, Object value) {
         gameParameters.put(key, value);
+    }
+    
+    /**
+     * Returns true if the requested key from the given Entry is updated with 
+     * the given value. False will be returned if the key does not exist, 
+     * or if the values are not different.  
+     * 
+     * @param entry			an entry to update, the key must exist
+     * 						and the values must be different
+     * 
+     * @return true if the parameter update was successful.
+     */
+    public boolean updateGameParameter(Entry<String, Object> entry) {
+    	
+    	if (!gameParameters.containsKey(entry.getKey())) {
+    		return false;
+    	}
+    	if (gameParameters.get(entry.getKey()).equals(entry.getValue())) {
+    		return false;
+    	}
+    	gameParameters.put(entry.getKey(), entry.getValue());
+    	return true;
     }
     
     public boolean hasStarted() {
@@ -164,6 +189,37 @@ public class GameRoom extends ChannelRoom {
    
     public int getMaxPlayers() {
     	return maxPlayers;
+    }
+    
+    /**
+     * Attempts to boot (and optionally ban) the given player from the game.
+     * 
+     * @param player		the player to boot/ban
+     * @param shouldBan		if true, will add the player to the "banned" list
+     * 
+     * @return true if the boot/ban was successful, false if the
+     * 			player was not found.
+     */
+    public boolean bootPlayer(UserID player, boolean shouldBan) {
+    	if (!userMap.containsKey(player)) {
+    		return false;
+    	}
+    	userMap.remove(player);
+    	if (!bannedList.contains(player)) {
+    		bannedList.add(player);
+    	}
+    	return true;
+    }
+    
+    /**
+     * Returns true if the given player has been banned from this game.
+     * 
+     * @param player			the player
+     * 
+     * @return true if this player is banned
+     */
+    public boolean isPlayerBanned(UserID player) {
+    	return bannedList.contains(player);
     }
 
     /**

@@ -129,7 +129,6 @@ public class MatchMakerBoot
     {
         SimTask task = SimTask.getCurrent();
         if (firstBoot) {
-            System.out.println("MatchMakerBoot: firstBoot");
             if (task.findGLO("UsernameMap") == null) {
                 task.createGLO(new GLOMap<String, UserID>(), "UsernameMap");
             }
@@ -206,11 +205,9 @@ public class MatchMakerBoot
      */
     public void userJoined(UserID uid, Subject subject) {
         SimTask task = SimTask.getCurrent();
-        System.out.println("Match Maker User Joined");
 
         GLOMap<String, UserID> userMap =
             (GLOMap<String, UserID>) task.findGLO("UsernameMap").get(task);
-        System.out.println("userJoined: map size " + userMap.size());
         // TODO sten: don't know how to handle duplicate logins yet.
         // if (!userMap.containsKey(uid)) {
         Set<Principal> principles = subject.getPrincipals();
@@ -254,8 +251,6 @@ public class MatchMakerBoot
             System.out.println("removing " + player.getUserName() + " from map");
             userMap.remove(uid);
         }
-        // this currently throws an exception
-        // pRef.delete(task);
     }
 
     /**

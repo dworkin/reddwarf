@@ -87,6 +87,9 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+
+import sun.reflect.generics.tree.BottomSignature;
 
 import static com.sun.gi.apps.mcs.matchmaker.common.CommandProtocol.*;
 
@@ -149,7 +152,7 @@ public class Player implements SimUserDataListener {
      */
     public void userDataReceived(UserID from, ByteBuffer data) {
         SimTask task = SimTask.getCurrent();
-        System.out.println("UserDataReceived from: " + from.toString());
+        //System.out.println("UserDataReceived from: " + from.toString());
         int commandCode = protocol.readUnsignedByte(data);
         if (commandCode == LIST_FOLDER_REQUEST) {
             listFolderRequest(task, data);
@@ -177,6 +180,10 @@ public class Player implements SimUserDataListener {
         	leaveGame(task);
         } else if (commandCode == GAME_COMPLETED) {
         	gameCompleted(task, data);
+        } else if (commandCode == BOOT_REQUEST) {
+        	bootPlayer(task, data);
+        } else if (commandCode == UPDATE_GAME_REQUEST) {
+        	updateGameRequest(task, data);
         }
         
 
@@ -366,7 +373,7 @@ public class Player implements SimUserDataListener {
         if (uid.equals(userID)) { // it was this player who left.
                                   
         	if (currentGameRoom != null) { // the player left a game room
-                GameRoom gameRoom = currentGameRoom.get(task);
+                GameRoom gameRoom = (GameRoom) currentGameRoom.get(task);
                 if (cid.equals(gameRoom.getChannelID())) { // user left
                                                             // from this
                                                             // channel
@@ -411,7 +418,7 @@ public class Player implements SimUserDataListener {
                 }
             } 
         	if (currentLobby != null) {
-                Lobby lobby = currentLobby.get(task);
+                Lobby lobby = (Lobby) currentLobby.get(task);
                 if (cid.equals(lobby.getChannelID())) {
 	                lobby.removeUser(uid);
 	                // currentLobby.delete(task);
@@ -493,7 +500,7 @@ public class Player implements SimUserDataListener {
         if (data.hasRemaining()) {
             folderID = protocol.readUUID(data);
         }
-        Folder root = folderRoot.peek(task);
+        Folder root = (Folder) folderRoot.peek(task);
         Folder targetFolder = folderID == null ? root : root.findFolder(task,
                 folderID);
         System.out.println("folderID = " + folderID + " targetFolder "
@@ -556,7 +563,7 @@ public class Player implements SimUserDataListener {
     }
 
     private void lookupUserNameRequest(SimTask task, ByteBuffer data) {
-        UserID id = (UserID) protocol.readUserID(data);
+        UserID id = protocol.readUserID(data);
         String username = null;
         if (id != null) {
             GLOReference<Player> pRef = task.findGLO(id.toString());
@@ -581,7 +588,7 @@ public class Player implements SimUserDataListener {
      * @param data the data buffer
      */
     private void locateUserRequest(SimTask task, ByteBuffer data) {
-        UserID requestedID = (UserID) protocol.readUserID(data);
+        UserID requestedID = protocol.readUserID(data);
         GLOReference<Player> requestedRef = task.findGLO(requestedID.toString());
         Lobby lobby = null;
         if (requestedRef != null) {
@@ -619,6 +626,112 @@ public class Player implements SimUserDataListener {
     	}
     	GameRoom game = currentGameRoom.peek(task);
     	task.leave(userID, game.getChannelID());
+    }
+    
+    private void updateGameRequest(SimTask task, ByteBuffer data) {
+    	if (!checkLobby(task)) {
+    		return;
+    	}
+    	if (!checkGameRoom(task)) {
+    		return;
+    	}
+    	
+    	String gameName = protocol.readString(data);
+    	String gameDescription = protocol.readString(data);
+    	String password = protocol.readString(data);
+    	HashMap<String, Object> gameParameters = readGameParameters(data);
+    	
+    	GameRoom gameRoom = currentGameRoom.get(task);
+    	if (gameName != null) {
+    		if (!filterGameName(gameName)) {
+    			sendGameUpdateFailedResponse(task, gameName, gameDescription,  
+    					gameParameters, INVALID_GAME_NAME, gameRoom.getChannelID());
+    			return;
+    		}
+    		gameRoom.setName(gameName);
+    	}
+    	if (gameDescription != null) {
+    		gameRoom.setDescription(gameDescription);
+    	}
+    	if (password != null) {
+    		gameRoom.setPassword(password);
+    	}
+    	for (Entry<String, Object> curEntry : gameParameters.entrySet()) {
+    		gameRoom.updateGameParameter(curEntry);
+    	}
+    	
+    	List list = protocol.createCommandList(GAME_UPDATED);
+    	packGameDescriptor(list, gameRoom);
+    	
+    	sendMulticastResponse(task, gameRoom.getUsers(), list, gameRoom.getChannelID());
+    	
+    	Lobby lobby = currentLobby.peek(task);
+    	sendMulticastResponse(task, lobby.getUsers(), list, lobby.getChannelID());
+    }
+    
+    private void bootPlayer(SimTask task, ByteBuffer data) {
+    	UserID bootee = protocol.readUserID(data);
+    	boolean shouldBan = protocol.readBoolean(data);
+    	if (!checkGameRoom(task)) {
+    		return;
+    	}
+    	GameRoom gameRoom = currentGameRoom.get(task);
+    	if (currentLobby == null) {
+    		sendBootFailedResponse(task, bootee, shouldBan, NOT_CONNECTED_LOBBY, gameRoom.getChannelID());
+    		return;
+    	}
+    	Lobby lobby = currentLobby.peek(task);
+    	if (!lobby.getCanHostBoot()) {
+    		sendBootFailedResponse(task, bootee, shouldBan, BOOT_NOT_SUPPORTED, gameRoom.getChannelID());
+    		return;
+    	}
+    	if (shouldBan && !lobby.getCanHostBan()) {
+    		sendBootFailedResponse(task, bootee, shouldBan, BAN_NOT_SUPPORTED, gameRoom.getChannelID());
+    		return;
+    	}
+    	if (userID.equals(bootee)) {
+    		sendBootFailedResponse(task, bootee, shouldBan, BOOT_SELF, gameRoom.getChannelID());
+    		return;
+    	}
+    	if (!gameRoom.getHost().equals(userID)) {
+    		sendBootFailedResponse(task, bootee, shouldBan, PLAYER_NOT_HOST, gameRoom.getChannelID());
+    		return;
+    	}
+    	
+    	List list = protocol.createCommandList(PLAYER_BOOTED_FROM_GAME);
+    	list.add(userID);
+    	list.add(bootee);
+    	list.add(shouldBan);
+    	
+    	// send the message notification before actually booting so that the boot
+    	// message arrives before the 'left channel' message.
+    	sendMulticastResponse(task, gameRoom.getUsers(), list, gameRoom.getChannelID());
+    	sendMulticastResponse(task, lobby.getUsers(), list, lobby.getChannelID());
+    	
+    	gameRoom.bootPlayer(bootee, shouldBan);
+    	task.leave(bootee, gameRoom.getChannelID());
+    }
+    
+    private void sendGameUpdateFailedResponse(SimTask task, String gameName, 
+    		String gameDescription, HashMap<String, Object> params, 
+    		int errorCode, ChannelID cid) {
+    	
+    	List list = protocol.createCommandList(UPDATE_GAME_FAILED);
+    	list.add(gameName);
+    	list.add(gameDescription);
+    	packGameParameters(list, params);
+    	list.add(new UnsignedByte(errorCode));
+    	
+    	sendResponse(task, list, cid);
+    }
+    
+    private void sendBootFailedResponse(SimTask task, UserID bootee, boolean isBanned, int errorCode, ChannelID cid) {
+    	List list = protocol.createCommandList(BOOT_FAILED);
+    	list.add(bootee);
+    	list.add(isBanned);
+    	list.add(new UnsignedByte(errorCode));
+    	
+    	sendResponse(task, list, cid);
     }
 
     /**
@@ -741,6 +854,17 @@ public class Player implements SimUserDataListener {
 
         sendResponse(task, list, cid);
     }
+    
+    private HashMap<String, Object> readGameParameters(ByteBuffer data) {
+        int numParams = data.getInt();
+        HashMap<String, Object> gameParams = new HashMap<String, Object>();
+        for (int i = 0; i < numParams; i++) {
+        	String key = protocol.readString(data);
+        	Object value = protocol.readParamValue(data, true);
+            gameParams.put(key, value);
+        }
+        return gameParams;
+    }
 
     private void updatePlayerReadyRequest(SimTask task, ByteBuffer data) {
     	if (!checkGameRoom(task)) {
@@ -749,12 +873,7 @@ public class Player implements SimUserDataListener {
         boolean ready = protocol.readBoolean(data);
         GameRoom gameRoom = currentGameRoom.get(task);
         if (ready) {
-            int numParams = data.getInt();
-            HashMap<String, Object> gameParams = new HashMap<String, Object>();
-            for (int i = 0; i < numParams; i++) {
-                gameParams.put(protocol.readString(data),
-                        protocol.readParamValue(data));
-            }
+            HashMap<String, Object> gameParams = readGameParameters(data);
 
             Map<String, Object> masterParameters = gameRoom.getGameParamters();
 
@@ -782,7 +901,8 @@ public class Player implements SimUserDataListener {
     /**
      * Attempts to join this user to the Game Room channel specified in
      * the data buffer. If the game is password protected, then a
-     * password is read off the buffer and compared.
+     * password is read off the buffer and compared.  The game room's list
+     * of banned players is also checked against the attempted joinee.
      * 
      * @param task the SimTask
      * @param data the buffer containing the command parameters
@@ -814,6 +934,10 @@ public class Player implements SimUserDataListener {
         if (gameRoom.getMaxPlayers() > 0 && gameRoom.getNumPlayers() >= gameRoom.getMaxPlayers()) {
         	sendErrorResponse(task, MAX_PLAYERS);
             return;
+        }
+        if (gameRoom.isPlayerBanned(userID)) {
+        	sendErrorResponse(task, PLAYER_BANNED);
+        	return;
         }
         //System.out.println("joining user to " + gameRoom.getChannelID());
         task.join(userID, gameRoom.getChannelID());
@@ -897,12 +1021,7 @@ public class Player implements SimUserDataListener {
             password = protocol.readString(data);
         }
 
-        int numParams = data.getInt();
-        HashMap<String, Object> gameParams = new HashMap<String, Object>();
-        for (int i = 0; i < numParams; i++) {
-            gameParams.put(protocol.readString(data),
-                    protocol.readParamValue(data));
-        }
+        HashMap<String, Object> gameParams = readGameParameters(data);
 
         Map<String, Object> lobbyParameters = lobby.getGameParamters();
 
@@ -951,13 +1070,16 @@ public class Player implements SimUserDataListener {
      * Converts an UUID to a string with all the bytes run together.
      * 
      * @param uuid
-     * @return the uuid as a String of bytes
+     * @return
      */
     private String uuidToByteString(SGSUUID uuid) {
+    	return byteArrayToString(uuid.toByteArray());
+    }
+    
+    private String byteArrayToString(byte[] bytes) {
     	StringBuffer buffer = new StringBuffer();
-    	byte[] bytes = uuid.toByteArray();
     	for (byte b : bytes) {
-    		buffer.append(((int) b) & 0xFF);
+    		buffer.append((int) (b & 0xFF));
     	}
     	return buffer.toString();
     }
@@ -996,7 +1118,10 @@ public class Player implements SimUserDataListener {
         list.add(game.isPasswordProtected());
         list.add(game.getMaxPlayers());
 
-        Map<String, Object> gameParams = game.getGameParamters();
+        packGameParameters(list, game.getGameParamters());
+    }
+    
+    private void packGameParameters(List list, Map<String, Object> gameParams) {
         list.add(gameParams.size());
 
         for (Map.Entry<String, Object> entry : gameParams.entrySet()) {
@@ -1005,6 +1130,9 @@ public class Player implements SimUserDataListener {
             
             Object value = entry.getValue();
             list.add(protocol.mapType(value));
+            if (value instanceof byte[]) {
+            	value = protocol.createUUID((byte[]) value);
+            }
             list.add(value);
         }
     }

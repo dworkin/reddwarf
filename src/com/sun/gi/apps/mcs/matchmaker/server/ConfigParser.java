@@ -208,8 +208,8 @@ public class ConfigParser {
                 password, channelName, cid);
 
         // set the lobby attributes that may or may not be present
-        lobby.setCanHostBan(getBooleanAttribute(element, "AllowHostToBootBan"));
-        lobby.setCanHostBoot(getBooleanAttribute(element, "AllowHostToBoot"));
+        lobby.setCanHostBan(getBooleanAttribute(element, "allowHostToBootBan"));
+        lobby.setCanHostBoot(getBooleanAttribute(element, "allowHostToBoot"));
         lobby.setCanHostChangeSettings(getBooleanAttribute(element,
                 "canHostChangeSettingsAfterCreate"));
         lobby.setMaxConnectionTime(getIntAttribute(element, "maxConnectionTime"));
@@ -217,7 +217,7 @@ public class ConfigParser {
         lobby.setMaxPlayersInGameRoom(getIntAttribute(element, "maxPlayersInGameRoom"));
         lobby.setMinPlayersInGameRoomStart(getIntAttribute(element, "minPlayersInGameRoomStart"));
         lobby.setMaxPlayersInGameRoomStart(getIntAttribute(element, "maxPlayersInGameRoomStart"));
-
+        
         // populate the game parameters
         NodeList gameParametersNodeList =
             element.getElementsByTagName("GameParameters");

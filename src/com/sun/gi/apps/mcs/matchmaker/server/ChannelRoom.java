@@ -118,13 +118,25 @@ public abstract class ChannelRoom implements GLO {
     public String getName() {
         return name;
     }
+    
+    public void setName(String name) {
+    	this.name = name;
+    }
 
     public String getDescription() {
         return description;
     }
+    
+    public void setDescription(String desc) {
+    	this.description = desc;
+    }
 
     public String getPassword() {
         return password;
+    }
+    
+    public void setPassword(String pw) {
+    	this.password = pw;
     }
 
     public String getChannelName() {
