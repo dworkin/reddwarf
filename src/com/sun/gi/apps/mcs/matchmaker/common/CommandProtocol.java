@@ -88,6 +88,7 @@ import java.nio.ByteBuffer;
 import java.util.LinkedList;
 import java.util.List;
 
+import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.utils.SGSUUID;
 import com.sun.gi.utils.StatisticalUUID;
 
@@ -164,6 +165,13 @@ public final class CommandProtocol implements Serializable {
 
     public final static int GAME_DELETED = 0x99;        // sent to lobby
     public final static int GAME_COMPLETED = 0x9D;
+    public final static int GAME_UPDATED = 0x9E;
+    
+    public final static int UPDATE_GAME_REQUEST = 0xB1;
+    public final static int UPDATE_GAME_FAILED = 0xB2;
+    public final static int BOOT_REQUEST = 0xB5;
+    public final static int BOOT_FAILED = 0xB6;
+    public final static int PLAYER_BOOTED_FROM_GAME = 0xB7;
 
     // error codes
     public final static int NOT_CONNECTED_LOBBY = 0x12;
@@ -181,6 +189,10 @@ public final class CommandProtocol implements Serializable {
     public final static int INVALID_GAME_PARAMETERS = 0x1E;
     public final static int INVALID_GAME_NAME = 0x1F;
     public final static int GAME_EXISTS = 0x20;
+    public final static int BOOT_NOT_SUPPORTED = 0x21;
+    public final static int BAN_NOT_SUPPORTED = 0x22;
+    public final static int BOOT_SELF = 0x23;
+    public final static int PLAYER_BANNED = 0x24;
 
     
     // type codes
@@ -264,14 +276,10 @@ public final class CommandProtocol implements Serializable {
         ByteBuffer buffer = ByteBuffer.allocate(bufferSize);
         for (Object curObj : byteList) {
             if (curObj instanceof Byte) {
-                // System.out.println("adding Byte " + curObj);
                 buffer.put((Byte) curObj);
             } else if (curObj instanceof Integer) {
-                // System.out.println("adding Integer " + curObj);
                 buffer.putInt((Integer) curObj);
             } else if (curObj instanceof byte[]) {
-                // System.out.println("adding byte[] " + ((byte[])
-                // curObj).length);
                 buffer.put((byte[]) curObj);
             }
         }
@@ -298,18 +306,18 @@ public final class CommandProtocol implements Serializable {
 
     /**
      * Reads a UUID from the current position on the ByteBuffer and
-     * returns a SGSUUID. The first byte read is the length of the UUID.
+     * returns a UserID. The first byte read is the length of the UUID.
      * 
      * @param data the ByteBuffer containing the UUID info.
      * 
-     * @return an SGSUUID based on the UUID read from the buffer.
+     * @return an UserID based on the UUID read from the buffer.
      */
-    public SGSUUID readUserID(ByteBuffer data) {
+    public UserID readUserID(ByteBuffer data) {
         byte[] uuid = readBytes(data, true);
 
-        SGSUUID id = null;
+        UserID id = null;
         try {
-            id = new StatisticalUUID(uuid);
+            id = new UserID(uuid);
         } catch (InstantiationException ie) {
             ie.printStackTrace();
         }
@@ -352,6 +360,25 @@ public final class CommandProtocol implements Serializable {
         }
         return uuid;
     }    
+    
+    /**
+     * Takes the given byte array, and copies it to a byte array
+     * with the first element containing the length of the array
+     * (as a byte).
+     * 
+     * @param bytes			a collections of bytes representing an UUID
+     * 
+     * @return the same byte array prefixed by the length
+     */
+    public byte[] createUUID(byte[] bytes) {
+    	byte[] uuid = new byte[bytes.length + 1];
+        uuid[0] = (byte) bytes.length;
+        for (int i = 1; i < uuid.length; i++) {
+        	uuid[i] = bytes[i - 1];
+        }
+    	
+    	return uuid;
+    }
 
     public String readString(ByteBuffer data) {
         String str = null;
@@ -404,12 +431,13 @@ public final class CommandProtocol implements Serializable {
      * and reads the resulting object off the buffer as that type.
      * 
      * @param data 				the buffer to read from
-     * @param useDefault		if true, will use a default value instead of null
+     * @param uuidAsBytes		if true, will read UUIDS as byte arrays instead
+     * 							of the server-side convenience class SGSUUID.
      * 
      * @return an object matching the type specified from the initial
      * byte
      */
-    public Object readParamValue(ByteBuffer data, boolean useDefault) {
+    public Object readParamValue(ByteBuffer data, boolean uuidAsBytes) {
         int type = readUnsignedByte(data);
         if (type == TYPE_BOOLEAN) {
             return readBoolean(data);
@@ -421,36 +449,24 @@ public final class CommandProtocol implements Serializable {
             String str = readString(data);
             return str == null ? "" : str;
         } else if (type == TYPE_UUID) {
-            SGSUUID uuid = readUUID(data);
-            return uuid == null ? defaultUUID() : uuid;
+        	if (uuidAsBytes) {
+        		byte[] uuid = readUUIDAsBytes(data);
+        		return uuid != null ? uuid : new byte[16]; 
+        	}
+        	return readUUID(data);
         }
 
         // unknown type
-        return useDefault ? "" : null;
+        return null;
     }
     
     /**
-     * Returns a "zero" UUID (which isn't very unique at all).
-     * 
-     * @return	a 16 byte UUID consisting of zeros.
-     */
-    private SGSUUID defaultUUID() {
-        SGSUUID sgsuuid = null;
-        try {
-            sgsuuid = new StatisticalUUID(new byte[16]);
-        } catch (InstantiationException ie) {
-            ie.printStackTrace();
-        }
-        return sgsuuid;
-    }
-
-    /**
-     * Returns one of the CommandCodes.TYPE_X values based of the object
+     * Returns one of the CommandProtocol.TYPE_X values based of the object
      * type of "value".
      * 
      * @param value the value to map to a type
      * 
-     * @return of the the CommandCodes.TYPE_X static ints.
+     * @return of the the CommandProtocol.TYPE_X static ints.
      */
     public UnsignedByte mapType(Object value) {
         if (value instanceof Integer) {
@@ -461,7 +477,7 @@ public final class CommandProtocol implements Serializable {
             return new UnsignedByte(TYPE_STRING);
         } else if (value instanceof UnsignedByte) {
             return new UnsignedByte(TYPE_BYTE);
-        } else if (value instanceof SGSUUID) {
+        } else if (value instanceof SGSUUID || value instanceof byte[]) {
             return new UnsignedByte(TYPE_UUID);
         }
 
