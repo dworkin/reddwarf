@@ -90,9 +90,12 @@ import java.util.Iterator;
 import java.util.StringTokenizer;
 
 import javax.swing.JCheckBox;
+import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JTextArea;
+
+import com.sun.gi.apps.mcs.matchmaker.client.GameDescriptor;
 
 /**
  * 
@@ -118,14 +121,14 @@ public class ChannelRoomPanel extends JPanel {
 	private JCheckBox isPasswordProtected;
 	private int numUsers = 0;
 	private int maxUsers = 0;
-	private JTextArea outputText;
+	private MatchMakerClientTestUI parentUI;
 	private String type;
+	private JPanel centerPanel;
 	
-	public ChannelRoomPanel(String type, JTextArea outputText) {
+	public ChannelRoomPanel(String type) {
 		super(new BorderLayout());
 		
 		this.type = type;
-		this.outputText = outputText;
 		
 		userMap = new HashMap<String, String>();
 		
@@ -134,7 +137,7 @@ public class ChannelRoomPanel extends JPanel {
         topPanel.add(name = new JLabel());
         topPanel.add(description = new JLabel());
 		
-        JPanel centerPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        centerPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         centerPanel.add(numUserLabel = new JLabel("Users: 0/?"));
         centerPanel.add(isPasswordProtected = new JCheckBox(
         		"Password Protected"));
@@ -142,6 +145,16 @@ public class ChannelRoomPanel extends JPanel {
         
         add(topPanel, BorderLayout.NORTH);
         add(centerPanel, BorderLayout.CENTER);
+	}
+	
+	public void setParentUI(MatchMakerClientTestUI parentUI) {
+		if (this.parentUI == null) {
+			this.parentUI = parentUI;
+		}
+	}
+	
+	public void addToCenter(JComponent c) {
+		centerPanel.add(c);
 	}
 	
     private void updateNumUsers() {
@@ -173,7 +186,7 @@ public class ChannelRoomPanel extends JPanel {
     
     public void receiveText(byte[] from, String text, boolean wasPrivate) {
         String userName = getUserName(from);
-        addToOutputText("<" + type + "> " + userName + "" + 
+        parentUI.receiveServerMessage(getPrefix() + userName + "" + 
         		(wasPrivate ? " (privately)" : "") + ": " + text);
 
     }
@@ -217,25 +230,40 @@ public class ChannelRoomPanel extends JPanel {
         userMap.put(byteArrayToString(player), userName);
         numUsers++;
         updateNumUsers();
-        addToOutputText("<Server> : <" + type + "> " + userName + " Entered Game "
-                + name.getText());
-    }
-    
-    private void addToOutputText(String message) {
-        outputText.setText(outputText.getText() + message + "\n");
+        parentUI.receiveServerMessage(getPrefix() + userName + " Entered " +
+                type + " " + name.getText());
     }
     
     protected String removePlayer(byte[] player) {
         numUsers--;
         updateNumUsers();
         String userName = userMap.remove(byteArrayToString(player));
-        addToOutputText("<Server> : <" + type + "> " + userName + " Left Game "
-                + name.getText());
+        parentUI.receiveServerMessage(getPrefix() + userName + " Left " +
+                type + " " + name.getText());
         return userName;
+    }
+    
+    protected void playerBootedFromGame(byte[] booter, byte[] bootee, 
+			boolean isBanned) {
+
+    	parentUI.receiveServerMessage(getPrefix() + getUserName(booter) + 
+    						" has booted "  + (isBanned ? "(and banned) " : "") + 
+		getUserName(bootee) + " from the game");
+
     }
     
     protected String getUserName(byte[] player) {
     	return userMap.get(byteArrayToString(player));
     }
+    
+    private String getPrefix() {
+    	return "<" + type + ">: ";
+    }
+    
+    public void gameUpdated(GameDescriptor game) {
+    	parentUI.receiveServerMessage(getPrefix() + game.getName() + 
+    			" has been updated.");
+    }
+    
 
 }
