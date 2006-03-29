@@ -97,7 +97,13 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
+import com.sun.gi.apps.mcs.matchmaker.common.BooleanByteWrapper;
+import com.sun.gi.apps.mcs.matchmaker.common.ByteWrapper;
+import com.sun.gi.apps.mcs.matchmaker.common.IntegerByteWrapper;
+import com.sun.gi.apps.mcs.matchmaker.common.StringByteWrapper;
+import com.sun.gi.apps.mcs.matchmaker.common.UUIDByteWrapper;
 import com.sun.gi.apps.mcs.matchmaker.common.UnsignedByte;
+import com.sun.gi.apps.mcs.matchmaker.common.UnsignedByteWrapper;
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask;
@@ -261,36 +267,26 @@ public class ConfigParser {
    
     }
     
-    private Object mapAttributeType(Element element) {
+    private ByteWrapper mapAttributeType(Element element) {
     	String value = element.getAttribute("value");
     	if (!element.hasAttribute("type")) {
-            return value;
+            return new StringByteWrapper(value);
         }
         String type = element.getAttribute("type");
         
         if (type.equalsIgnoreCase("int")) {
-            return value.equals("")  ? 0 : Integer.valueOf(value);
+            return new IntegerByteWrapper(value.equals("")  ? 0 : Integer.valueOf(value));
         } else if (type.equalsIgnoreCase("boolean")) {
-            return value.equals("") ? false: Boolean.valueOf(value);
+            return new BooleanByteWrapper(value.equals("") ? false: Boolean.valueOf(value));
         } else if (type.equalsIgnoreCase("byte")) {
-            return new UnsignedByte(value.equals("") ? 0 : Integer.valueOf(value));
+            return new UnsignedByteWrapper(new UnsignedByte(value.equals("") ? 0 : Integer.valueOf(value)));
         } else if (type.equalsIgnoreCase("uuid")) {
-        	return createUUID(value.equals("") ? new byte[16] : value.getBytes());
+        	return new UUIDByteWrapper(value.equals("") ? new byte[16] : value.getBytes());
         }
 
-        return value; // assume string
+        return new StringByteWrapper(value); // assume string
     }
     
-    private SGSUUID createUUID(byte[] bytes) {
-        SGSUUID id = null;
-        try {
-            id = new StatisticalUUID(bytes);
-        } catch (InstantiationException ie) {
-            // ignore
-        }
-
-        return id;
-    }
 
     private boolean getBooleanAttribute(Element element, String name) {
         return element.hasAttribute(name)

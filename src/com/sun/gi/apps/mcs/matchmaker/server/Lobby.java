@@ -88,6 +88,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import com.sun.gi.apps.mcs.matchmaker.common.ByteWrapper;
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.logic.GLOReference;
@@ -121,7 +122,7 @@ public class Lobby extends ChannelRoom {
     private int maxPlayersInGameRoom = 0;
     private int minPlayersInGameRoomStart = 0;
     private int maxPlayersInGameRoomStart = 0;
-    private HashMap<String, Object> gameParameters;
+    private HashMap<String, ByteWrapper> gameParameters;
     private List<GLOReference<GameRoom>> gameRoomList;
     private List<UserID> playerList;
 
@@ -129,7 +130,7 @@ public class Lobby extends ChannelRoom {
             String channelName, ChannelID cid) {
         super(name, description, password, channelName, cid);
 
-        gameParameters = new HashMap<String, Object>();
+        gameParameters = new HashMap<String, ByteWrapper>();
         gameRoomList = new LinkedList<GLOReference<GameRoom>>();
         this.playerList = new LinkedList<UserID>();
     }
@@ -206,7 +207,7 @@ public class Lobby extends ChannelRoom {
     	return Collections.unmodifiableList(gameRoomList);
     }
 
-    public void addGameParameter(String key, Object value) {
+    public void addGameParameter(String key, ByteWrapper value) {
         gameParameters.put(key, value);
     }
 
@@ -219,7 +220,7 @@ public class Lobby extends ChannelRoom {
      * 
      * @return a read-only view of the game parameters map.
      */
-    public Map<String, Object> getGameParamters() {
+    public Map<String, ByteWrapper> getGameParamters() {
         return Collections.unmodifiableMap(gameParameters);
     }
     

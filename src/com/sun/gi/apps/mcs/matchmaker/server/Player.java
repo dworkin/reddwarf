@@ -93,6 +93,8 @@ import sun.reflect.generics.tree.BottomSignature;
 
 import static com.sun.gi.apps.mcs.matchmaker.common.CommandProtocol.*;
 
+import com.sun.gi.apps.mcs.matchmaker.common.ByteWrapper;
+import com.sun.gi.apps.mcs.matchmaker.common.CommandList;
 import com.sun.gi.apps.mcs.matchmaker.common.CommandProtocol;
 import com.sun.gi.apps.mcs.matchmaker.common.UnsignedByte;
 import com.sun.gi.comm.routing.ChannelID;
@@ -190,8 +192,7 @@ public class Player implements SimUserDataListener {
     }
 
     public void dataArrivedFromChannel(ChannelID id, UserID from,
-            ByteBuffer buff)
-    {
+            ByteBuffer buff) {
 
     }
     
@@ -204,7 +205,7 @@ public class Player implements SimUserDataListener {
      * @param data			the buffer containing the game ID
      */
     private void gameCompleted(SimTask task, ByteBuffer data) {
-    	SGSUUID gameID = protocol.readUUID(data);
+    	SGSUUID gameID = readUUID(data);
         GLOMap<SGSUUID, GLOReference<GameRoom>> gameRoomMap =
             (GLOMap<SGSUUID, GLOReference<GameRoom>>) task.findGLO(
                 "GameRoomMap").peek(task);
@@ -242,7 +243,7 @@ public class Player implements SimUserDataListener {
                                     // add to the either the lobby or
                                     // game list.
             if (cid.equals(task.openChannel(LOBBY_MANAGER_CONTROL_CHANNEL))) {
-                List list = protocol.createCommandList(SERVER_LISTENING);
+                CommandList list = new CommandList(SERVER_LISTENING);
                 sendResponse(task, list);
                 
                 return;
@@ -259,14 +260,14 @@ public class Player implements SimUserDataListener {
                 // send the games to the user
                 for (GLOReference<GameRoom> gRef : lobby.getGameRoomList()) {
                 	GameRoom curGame = gRef.peek(task);
-                    List list = protocol.createCommandList(GAME_CREATED);
+                    CommandList list = new CommandList(GAME_CREATED);
                     packGameDescriptor(list, curGame);
                     sendResponse(task, list, cid);
                 }
 
                 // send lobby joined message
-                List list = protocol.createCommandList(PLAYER_ENTERED_LOBBY);
-                list.add(userID);
+                CommandList list = new CommandList(PLAYER_ENTERED_LOBBY);
+                list.add(userID.toByteArray());
                 list.add(userName);
                 sendMulticastResponse(task, lobby.getUsers(), list, cid);
                 
@@ -278,9 +279,9 @@ public class Player implements SimUserDataListener {
                 for (GLOReference<GameRoom> grRef : lobby.getGameRoomList()) {
                 	GameRoom gr = grRef.peek(task);
                 	for (UserID curUser : gr.getUsers()) {
-                        List joinedGameList = protocol.createCommandList(PLAYER_JOINED_GAME);
-                        joinedGameList.add(curUser);
-                        joinedGameList.add(gr.getGameID());
+                        CommandList joinedGameList = new CommandList(PLAYER_JOINED_GAME);
+                        joinedGameList.add(curUser.toByteArray());
+                        joinedGameList.add(gr.getGameID().toByteArray());
                         sendResponse(task, joinedGameList, cid);
                 	}
                 }
@@ -301,16 +302,16 @@ public class Player implements SimUserDataListener {
                     gameRoom.addUser(uid);
                     
                     // send playerJoinedGame message to lobby
-                    List lobbyList = protocol.createCommandList(PLAYER_JOINED_GAME);
-                    lobbyList.add(uid);
-                    lobbyList.add(gameRoom.getGameID());
+                    CommandList lobbyList = new CommandList(PLAYER_JOINED_GAME);
+                    lobbyList.add(uid.toByteArray());
+                    lobbyList.add(gameRoom.getGameID().toByteArray());
 
                     sendMulticastResponse(task, lobby.getUsers(), lobbyList,
                             lobby.getChannelID());
 
                     // send playerEnteredGame to game room
-                    List grList = protocol.createCommandList(PLAYER_ENTERED_GAME);
-                    grList.add(uid);
+                    CommandList grList = new CommandList(PLAYER_ENTERED_GAME);
+                    grList.add(uid.toByteArray());
                     grList.add(userName);
                     
                     sendRetroJoins(task, gameRoom.getUsers(), PLAYER_ENTERED_GAME, 
@@ -326,8 +327,8 @@ public class Player implements SimUserDataListener {
                     	if (curUser.equals(userID) || !isReady) {
                     		continue;
                     	}
-	                    List list = protocol.createCommandList(PLAYER_READY_UPDATE);
-	                    list.add(curUser);
+	                    CommandList list = new CommandList(PLAYER_READY_UPDATE);
+	                    list.add(curUser.toByteArray());
 	                    list.add(isReady);
 	                    
 	                    sendResponse(task, list, gameRoom.getChannelID());
@@ -392,13 +393,13 @@ public class Player implements SimUserDataListener {
 
                     Lobby lobby = gameRoom.getLobby().get(task);
                     // send PlayerLeftGame message to lobby
-                    List playerLeftList = protocol.createCommandList(PLAYER_LEFT_GAME);
-                    playerLeftList.add(uid);
-                    playerLeftList.add(gameRoom.getGameID());
+                    CommandList playerLeftList = new CommandList(PLAYER_LEFT_GAME);
+                    playerLeftList.add(uid.toByteArray());
+                    playerLeftList.add(gameRoom.getGameID().toByteArray());
 
                     sendMulticastResponse(task, lobby.getUsers(), playerLeftList, lobby.getChannelID());
                     
-                    List leftList = protocol.createCommandList(LEFT_GAME);
+                    CommandList leftList = new CommandList(LEFT_GAME);
                     sendResponse(task, leftList);
                     
                     // If this is the last person leaving the game room, 
@@ -407,7 +408,7 @@ public class Player implements SimUserDataListener {
                     if (gameRoom.getNumPlayers() == 0) {
                     	lobby.removeGameRoom(currentGameRoom);
                     	
-                        List list = protocol.createCommandList(GAME_DELETED);
+                        CommandList list = new CommandList(GAME_DELETED);
                         packGameDescriptor(list, gameRoom);
 
                         sendMulticastResponse(task, lobby.getUsers(), list, lobby.getChannelID());
@@ -424,7 +425,7 @@ public class Player implements SimUserDataListener {
 	                // currentLobby.delete(task);
 	                currentLobby = null;
 	                
-	                List leftList = protocol.createCommandList(LEFT_LOBBY);
+	                CommandList leftList = new CommandList(LEFT_LOBBY);
 	                sendResponse(task, leftList);
 	                
 	                if (currentGameRoom != null) {
@@ -461,8 +462,8 @@ public class Player implements SimUserDataListener {
     		}
     		Player curPlayer = pRef.peek(task);
     		
-    		List list = protocol.createCommandList(commandCode);
-    		list.add(curUser);
+    		CommandList list = new CommandList(commandCode);
+    		list.add(curUser.toByteArray());
     		list.add(curPlayer.getUserName());
     		
     		sendResponse(task, list, cid);
@@ -498,15 +499,15 @@ public class Player implements SimUserDataListener {
     private void listFolderRequest(SimTask task, ByteBuffer data) {
         SGSUUID folderID = null;
         if (data.hasRemaining()) {
-            folderID = protocol.readUUID(data);
+            folderID = readUUID(data);
         }
         Folder root = (Folder) folderRoot.peek(task);
         Folder targetFolder = folderID == null ? root : root.findFolder(task,
                 folderID);
         System.out.println("folderID = " + folderID + " targetFolder "
                 + targetFolder.getName());
-        List list = protocol.createCommandList(LIST_FOLDER_RESPONSE);
-        list.add(folderID == null ? root.getFolderID() : folderID);
+        CommandList list = new CommandList(LIST_FOLDER_RESPONSE);
+        list.add(folderID == null ? root.getFolderID().toByteArray() : folderID.toByteArray());
         if (targetFolder != null) {
             list.add(targetFolder.getFolders().size());
             for (GLOReference<Folder> folderRef : targetFolder.getFolders()) {
@@ -515,7 +516,7 @@ public class Player implements SimUserDataListener {
                 // list out the contents of the current folder
                 list.add(curFolder.getName());
                 list.add(curFolder.getDescription());
-                list.add(curFolder.getFolderID());
+                list.add(curFolder.getFolderID().toByteArray());
 
             }
 
@@ -528,7 +529,7 @@ public class Player implements SimUserDataListener {
                 list.add(curLobby.getName());
                 list.add(curLobby.getChannelName());
                 list.add(curLobby.getDescription());
-                list.add(curLobby.getLobbyID());
+                list.add(curLobby.getLobbyID().toByteArray());
                 list.add(curLobby.getNumPlayers());
                 list.add(curLobby.getMaxPlayers());
                 list.add(curLobby.isPasswordProtected());
@@ -555,15 +556,15 @@ public class Player implements SimUserDataListener {
             id = userMap.get(username);
         }
 
-        List list = protocol.createCommandList(LOOKUP_USER_ID_RESPONSE);
+        CommandList list = new CommandList(LOOKUP_USER_ID_RESPONSE);
         list.add(username);
-        list.add(id);
+        list.add(id.toByteArray());
 
         sendResponse(task, list);
     }
 
     private void lookupUserNameRequest(SimTask task, ByteBuffer data) {
-        UserID id = protocol.readUserID(data);
+        UserID id = readUserID(data);
         String username = null;
         if (id != null) {
             GLOReference<Player> pRef = task.findGLO(id.toString());
@@ -573,9 +574,9 @@ public class Player implements SimUserDataListener {
             }
         }
 
-        List list = protocol.createCommandList(LOOKUP_USER_NAME_RESPONSE);
+        CommandList list = new CommandList(LOOKUP_USER_NAME_RESPONSE);
         list.add(username);
-        list.add(id);
+        list.add(id.toByteArray());
 
         sendResponse(task, list);
     }
@@ -588,7 +589,7 @@ public class Player implements SimUserDataListener {
      * @param data the data buffer
      */
     private void locateUserRequest(SimTask task, ByteBuffer data) {
-        UserID requestedID = protocol.readUserID(data);
+        UserID requestedID = readUserID(data);
         GLOReference<Player> requestedRef = task.findGLO(requestedID.toString());
         Lobby lobby = null;
         if (requestedRef != null) {
@@ -597,14 +598,14 @@ public class Player implements SimUserDataListener {
                 lobby = requestedPlayer.getCurrentLobby().peek(task);
             }
         }
-        List list = protocol.createCommandList(LOCATE_USER_RESPONSE);
-        list.add(requestedID);
+        CommandList list = new CommandList(LOCATE_USER_RESPONSE);
+        list.add(requestedID.toByteArray());
         list.add(lobby != null ? 1 : 0); // number of lobbies -- only
                                             // one allowed
         if (lobby != null) {
             list.add(lobby.getName());
             list.add(lobby.getDescription());
-            list.add(lobby.getLobbyID());
+            list.add(lobby.getLobbyID().toByteArray());
             list.add(lobby.getNumPlayers());
             list.add(lobby.getMaxPlayers());
             list.add(lobby.isPasswordProtected());
@@ -639,7 +640,7 @@ public class Player implements SimUserDataListener {
     	String gameName = protocol.readString(data);
     	String gameDescription = protocol.readString(data);
     	String password = protocol.readString(data);
-    	HashMap<String, Object> gameParameters = readGameParameters(data);
+    	HashMap<String, ByteWrapper> gameParameters = readGameParameters(data);
     	
     	GameRoom gameRoom = currentGameRoom.get(task);
     	if (gameName != null) {
@@ -653,14 +654,12 @@ public class Player implements SimUserDataListener {
     	if (gameDescription != null) {
     		gameRoom.setDescription(gameDescription);
     	}
-    	if (password != null) {
-    		gameRoom.setPassword(password);
-    	}
-    	for (Entry<String, Object> curEntry : gameParameters.entrySet()) {
+   		gameRoom.setPassword(password);
+    	for (Entry<String, ByteWrapper> curEntry : gameParameters.entrySet()) {
     		gameRoom.updateGameParameter(curEntry);
     	}
     	
-    	List list = protocol.createCommandList(GAME_UPDATED);
+    	CommandList list = new CommandList(GAME_UPDATED);
     	packGameDescriptor(list, gameRoom);
     	
     	sendMulticastResponse(task, gameRoom.getUsers(), list, gameRoom.getChannelID());
@@ -670,7 +669,7 @@ public class Player implements SimUserDataListener {
     }
     
     private void bootPlayer(SimTask task, ByteBuffer data) {
-    	UserID bootee = protocol.readUserID(data);
+    	UserID bootee = readUserID(data);
     	boolean shouldBan = protocol.readBoolean(data);
     	if (!checkGameRoom(task)) {
     		return;
@@ -698,9 +697,9 @@ public class Player implements SimUserDataListener {
     		return;
     	}
     	
-    	List list = protocol.createCommandList(PLAYER_BOOTED_FROM_GAME);
-    	list.add(userID);
-    	list.add(bootee);
+    	CommandList list = new CommandList(PLAYER_BOOTED_FROM_GAME);
+    	list.add(userID.toByteArray());
+    	list.add(bootee.toByteArray());
     	list.add(shouldBan);
     	
     	// send the message notification before actually booting so that the boot
@@ -713,10 +712,10 @@ public class Player implements SimUserDataListener {
     }
     
     private void sendGameUpdateFailedResponse(SimTask task, String gameName, 
-    		String gameDescription, HashMap<String, Object> params, 
+    		String gameDescription, HashMap<String, ByteWrapper> params, 
     		int errorCode, ChannelID cid) {
     	
-    	List list = protocol.createCommandList(UPDATE_GAME_FAILED);
+    	CommandList list = new CommandList(UPDATE_GAME_FAILED);
     	list.add(gameName);
     	list.add(gameDescription);
     	packGameParameters(list, params);
@@ -726,8 +725,8 @@ public class Player implements SimUserDataListener {
     }
     
     private void sendBootFailedResponse(SimTask task, UserID bootee, boolean isBanned, int errorCode, ChannelID cid) {
-    	List list = protocol.createCommandList(BOOT_FAILED);
-    	list.add(bootee);
+    	CommandList list = new CommandList(BOOT_FAILED);
+    	list.add(bootee.toByteArray());
     	list.add(isBanned);
     	list.add(new UnsignedByte(errorCode));
     	
@@ -748,7 +747,7 @@ public class Player implements SimUserDataListener {
             return;
         }
 
-        SGSUUID lobbyID = protocol.readUUID(data);
+        SGSUUID lobbyID = readUUID(data);
         GLOMap<SGSUUID, GLOReference<Lobby>> lobbyMap =
             (GLOMap<SGSUUID, GLOReference<Lobby>>) task.findGLO(
                 "LobbyMap").peek(task);
@@ -779,7 +778,7 @@ public class Player implements SimUserDataListener {
      * @param errorCode			the reason for the error
      */
     private void sendErrorResponse(SimTask task, int errorCode) {
-        List list = protocol.createCommandList(ERROR);
+        CommandList list = new CommandList(ERROR);
         list.add(new UnsignedByte(errorCode));
         sendResponse(task, list);
     }
@@ -832,7 +831,7 @@ public class Player implements SimUserDataListener {
         
         lobby.removeGameRoom(currentGameRoom);
         
-        List list = protocol.createCommandList(GAME_STARTED);
+        CommandList list = new CommandList(GAME_STARTED);
         packGameDescriptor(list, gameRoom);
 
         // send identical message to both game room and lobby
@@ -849,18 +848,18 @@ public class Player implements SimUserDataListener {
     }
     
     private void sendStartGameFailed(SimTask task, String reason, ChannelID cid) {
-        List list = protocol.createCommandList(START_GAME_REQUEST);
+        CommandList list = new CommandList(START_GAME_REQUEST);
         list.add(reason);
 
         sendResponse(task, list, cid);
     }
     
-    private HashMap<String, Object> readGameParameters(ByteBuffer data) {
+    private HashMap<String, ByteWrapper> readGameParameters(ByteBuffer data) {
         int numParams = data.getInt();
-        HashMap<String, Object> gameParams = new HashMap<String, Object>();
+        HashMap<String, ByteWrapper> gameParams = new HashMap<String, ByteWrapper>();
         for (int i = 0; i < numParams; i++) {
         	String key = protocol.readString(data);
-        	Object value = protocol.readParamValue(data, true);
+        	ByteWrapper value = protocol.readParamValue(data);
             gameParams.put(key, value);
         }
         return gameParams;
@@ -873,9 +872,9 @@ public class Player implements SimUserDataListener {
         boolean ready = protocol.readBoolean(data);
         GameRoom gameRoom = currentGameRoom.get(task);
         if (ready) {
-            HashMap<String, Object> gameParams = readGameParameters(data);
+            HashMap<String, ByteWrapper> gameParams = readGameParameters(data);
 
-            Map<String, Object> masterParameters = gameRoom.getGameParamters();
+            Map<String, ByteWrapper> masterParameters = gameRoom.getGameParamters();
 
             // bail out if all of the parameters are not equal.
             if (!gameParams.equals(masterParameters)) {
@@ -891,8 +890,8 @@ public class Player implements SimUserDataListener {
     }
 
     private void sendPlayerReadyUpdate(SimTask task, boolean ready, GameRoom game) {
-        List list = protocol.createCommandList(PLAYER_READY_UPDATE);
-        list.add(userID);
+        CommandList list = new CommandList(PLAYER_READY_UPDATE);
+        list.add(userID.toByteArray());
         list.add(ready);
 
         sendMulticastResponse(task, game.getUsers(), list, game.getChannelID());
@@ -913,7 +912,7 @@ public class Player implements SimUserDataListener {
         	sendErrorResponse(task, CONNECTED_GAME);
             return;
         }
-        SGSUUID gameID = protocol.readUUID(data);
+        SGSUUID gameID = readUUID(data);
 
         GLOMap<SGSUUID, GLOReference<GameRoom>> gameRoomMap =
             (GLOMap<SGSUUID, GLOReference<GameRoom>>) task.findGLO(
@@ -954,16 +953,16 @@ public class Player implements SimUserDataListener {
     	if (!checkLobby(task)) {
     		return;
     	}
-        List list = protocol.createCommandList(GAME_PARAMETERS_RESPONSE);
+        CommandList list = new CommandList(GAME_PARAMETERS_RESPONSE);
         Lobby lobby = currentLobby.peek(task);
         list.add(lobby.getChannelName());
-        Map<String, Object> gameParameters = lobby.getGameParamters();
+        Map<String, ByteWrapper> gameParameters = lobby.getGameParamters();
         list.add(gameParameters.size());
         for (String curKey : gameParameters.keySet()) {
             list.add(curKey);
-            Object value = gameParameters.get(curKey);
-            //System.out.println("adding param " + curKey + " value " + value);
-            list.add(protocol.mapType(value));
+            ByteWrapper value = gameParameters.get(curKey);
+            //list.add(protocol.mapType(value));
+            list.add(value.getType());
             list.add(value);
 
         }
@@ -1021,9 +1020,9 @@ public class Player implements SimUserDataListener {
             password = protocol.readString(data);
         }
 
-        HashMap<String, Object> gameParams = readGameParameters(data);
+        HashMap<String, ByteWrapper> gameParams = readGameParameters(data);
 
-        Map<String, Object> lobbyParameters = lobby.getGameParamters();
+        Map<String, ByteWrapper> lobbyParameters = lobby.getGameParamters();
 
         // bail out if all of the expected parameters are not present.
         if (!gameParams.keySet().equals(lobbyParameters.keySet())) {
@@ -1052,11 +1051,11 @@ public class Player implements SimUserDataListener {
                 "GameRoomMap").get(task);
         gameRoomMap.put(gr.getGameID(), grRef);
 
-        for (Map.Entry<String, Object> entry : gameParams.entrySet()) {
+        for (Map.Entry<String, ByteWrapper> entry : gameParams.entrySet()) {
             gr.addGameParameter(entry.getKey(), entry.getValue());
         }
 
-        List list = protocol.createCommandList(GAME_CREATED);
+        CommandList list = new CommandList(GAME_CREATED);
         packGameDescriptor(list, gr);
 
         sendMulticastResponse(task, lobby.getUsers(), list, lobby.getChannelID());
@@ -1110,8 +1109,8 @@ public class Player implements SimUserDataListener {
      * @param list the list in which to put the game details
      * @param game the game
      */
-    private void packGameDescriptor(List list, GameRoom game) {
-        list.add(game.getGameID());
+    private void packGameDescriptor(CommandList list, GameRoom game) {
+        list.add(game.getGameID().toByteArray());
         list.add(game.getName());
         list.add(game.getDescription());
         list.add(game.getChannelName());
@@ -1121,18 +1120,14 @@ public class Player implements SimUserDataListener {
         packGameParameters(list, game.getGameParamters());
     }
     
-    private void packGameParameters(List list, Map<String, Object> gameParams) {
+    private void packGameParameters(CommandList list, Map<String, ByteWrapper> gameParams) {
         list.add(gameParams.size());
 
-        for (Map.Entry<String, Object> entry : gameParams.entrySet()) {
+        for (Map.Entry<String, ByteWrapper> entry : gameParams.entrySet()) {
             String curKey = entry.getKey();
             list.add(curKey);
-            
-            Object value = entry.getValue();
-            list.add(protocol.mapType(value));
-            if (value instanceof byte[]) {
-            	value = protocol.createUUID((byte[]) value);
-            }
+            ByteWrapper value = entry.getValue();
+            list.add(value.getType());
             list.add(value);
         }
     }
@@ -1140,35 +1135,80 @@ public class Player implements SimUserDataListener {
     private void sendGameCreateFailedResponse(SimTask task,
             String lobbyChannelName, String gameName, int errorCode) {
     	
-        List list = protocol.createCommandList(CREATE_GAME_FAILED);
+        CommandList list = new CommandList(CREATE_GAME_FAILED);
         list.add(gameName);
         list.add(new UnsignedByte(errorCode));
         list.add(lobbyChannelName);
 
         sendResponse(task, list);
     }
-
-    private void sendResponse(SimTask task, List list) {
+    
+    private void sendResponse(SimTask task, CommandList list) {
         ChannelID cid = task.openChannel(LOBBY_MANAGER_CONTROL_CHANNEL);
 
         sendResponse(task, list, cid);
     }
-
+    
     private void sendMulticastResponse(SimTask task, List<UserID> users,
-            List list, ChannelID cid) {
+            CommandList list, ChannelID cid) {
     	
         sendResponse(task, users.toArray(new UserID[users.size()]), list, cid);
     }
+    
+    private void sendResponse(SimTask task, UserID[] to, CommandList list,
+            ChannelID cid) {
 
-    private void sendResponse(SimTask task, List list, ChannelID cid) {
-        sendResponse(task, new UserID[] { userID }, list, cid);
+        task.sendData(cid, to, list.getByteBuffer(), true);
     }
 
-    private void sendResponse(SimTask task, UserID[] to, List list,
-            ChannelID cid) {
-        ByteBuffer data = protocol.assembleCommand(list);
+    private void sendResponse(SimTask task, CommandList list, ChannelID cid) {
+        sendResponse(task, new UserID[] { userID }, list, cid);
+    }
+    
+    /**
+     * Reads an SGSUUID from the given ByteBuffer.
+     * 
+     * @param data the buffer to read the UUID from
+     * 
+     * @return an SGSUUID read from the given buffer
+     */
+    public SGSUUID readUUID(ByteBuffer data) {
+        byte[] uuid = protocol.readUUIDAsBytes(data);
+        if (uuid == null) {
+            return null;
+        }
+        SGSUUID sgsuuid = null;
+        try {
+            sgsuuid = new StatisticalUUID(uuid);
+        } catch (InstantiationException ie) {
+            ie.printStackTrace();
+        }
+        return sgsuuid;
+    }    
+    
+    /**
+     * Reads a UUID from the current position on the ByteBuffer and
+     * returns a UserID. The first byte read is the length of the UUID.
+     * 
+     * @param data the ByteBuffer containing the UUID info.
+     * 
+     * @return an UserID based on the UUID read from the buffer.
+     */
+    public UserID readUserID(ByteBuffer data) {
+        byte[] uuid = protocol.readUUIDAsBytes(data);
 
-        task.sendData(cid, to, data, true);
+        if (uuid == null) {
+        	return null;
+        }
+        
+        UserID id = null;
+        try {
+            id = new UserID(uuid);
+        } catch (InstantiationException ie) {
+            ie.printStackTrace();
+        }
+
+        return id;
     }
 
 }

@@ -79,26 +79,15 @@
  GARANTIE IMPLICITE RELATIVE A LA QUALITE MARCHANDE, A L'APTITUDE A UNE
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
-
-package com.sun.gi.apps.mcs.matchmaker.client;
+package com.sun.gi.apps.mcs.matchmaker.common;
 
 import java.nio.ByteBuffer;
-import java.util.HashMap;
-import java.util.Map;
-
-import static com.sun.gi.apps.mcs.matchmaker.common.CommandProtocol.*;
-
-import com.sun.gi.apps.mcs.matchmaker.common.CommandList;
-import com.sun.gi.apps.mcs.matchmaker.common.CommandProtocol;
-import com.sun.gi.comm.users.client.ClientChannel;
-import com.sun.gi.comm.users.client.ClientChannelListener;
 
 /**
  * 
- * <p>Title: GameChannel</p>
+ * <p>Title: UnsignedByteWrapper</p>
  * 
- * <p>Description: An implementation of IGameChannel that uses SGS ClientChannels 
- * for its communication.</p>
+ * <p>Description: This class is a byte wrapper around an unsigned byte.</p>
  * 
  * <p>Copyright: Copyright (c) 2006</p>
  * <p>Company: Sun Microsystems, TMI</p>
@@ -106,99 +95,31 @@ import com.sun.gi.comm.users.client.ClientChannelListener;
  * @author	Sten Anderson
  * @version 1.0
  */
-public class GameChannel extends ChannelRoom implements IGameChannel, ClientChannelListener {
+public class UnsignedByteWrapper implements ByteWrapper {
 
-    private IGameChannelListener listener;
+	private UnsignedByte value;
+	
+	public UnsignedByteWrapper(UnsignedByte b) {
+		this.value = b;
+	}
+	
+	public UnsignedByte getType() {
+		return new UnsignedByte(TYPE_BYTE);
+	}
 
-    public GameChannel(ClientChannel chan, MatchMakingClient client) {
-    	super(chan, client);
-    }
+	public void writeBytes(ByteBuffer buffer) {
+		buffer.put(value.byteValue());
+	}
 
-    public void setListener(IGameChannelListener listener) {
-        this.listener = listener;
-    }
+	public int getLength() {
+		return 1;
+	}
+	
+	public String toString() {
+		return "" + value;
+	}
 
-    public void playerLeft(byte[] playerID) {
-    	if (listener != null) {
-    		listener.playerLeft(playerID);
-    	}
-    }
-
-    public void dataArrived(byte[] from, ByteBuffer data, boolean reliable) {
-        if (listener == null) {
-            // if no one is listening, no reason to do anything
-            return;
-        }
-        int command = protocol.readUnsignedByte(data);
-        if (processCommand(command, listener, from, data)) {
-        	return;
-        }
-        
-        if (command == PLAYER_ENTERED_GAME) {
-            byte[] userID = protocol.readUUIDAsBytes(data);
-            String name = protocol.readString(data);
-            listener.playerEntered(userID, name);
-        } else if (command == PLAYER_READY_UPDATE) {
-            byte[] userID = protocol.readUUIDAsBytes(data);
-            boolean ready = protocol.readBoolean(data);
-            listener.playerReady(userID, ready);
-        } else if (command == START_GAME_REQUEST) {
-            listener.startGameFailed(protocol.readString(data));
-    	} else if (command == BOOT_FAILED) {
-        	byte[] playerID = protocol.readUUIDAsBytes(data);
-        	boolean isBanned = protocol.readBoolean(data);
-        	int errorCode = protocol.readUnsignedByte(data);
-        	listener.bootFailed(playerID, isBanned, errorCode);
-        } else if (command == UPDATE_GAME_FAILED) {
-        	String gameName = protocol.readString(data);
-        	String gameDescription = protocol.readString(data);
-        	HashMap<String, Object> gameParams = readGameParameters(data);
-        	GameDescriptor game = new GameDescriptor(null, gameName, gameDescription, 
-        			null, 0, false, gameParams);
-        	int errorCode = protocol.readUnsignedByte(data);
-        	listener.updateGameFailed(game, errorCode);
-        }
-
-    }
-
-    public void channelClosed() {
-    	if (listener != null) {
-    		listener.gameCompleted();
-    	}
-    }
-
-    public void ready(GameDescriptor game, boolean ready) {
-        CommandList list = new CommandList(UPDATE_PLAYER_READY_REQUEST);
-        list.add(ready);
-        if (ready) {
-            HashMap<String, Object> gameParameters = game.getGameParameters();
-            packGameParameters(list, gameParameters);
-        }
-        sendCommand(list);
-    }
-    
-
-    public void startGame() {
-        CommandList list = new CommandList(START_GAME_REQUEST);
-        sendCommand(list);
-    }
-    
-    public void boot(byte[] player, boolean isBanned) {
-    	CommandList list = new CommandList(BOOT_REQUEST);
-    	list.add(player);
-    	list.add(isBanned);
-    	sendCommand(list);
-    }
-    
-    public void updateGame(String name, String description, String password, 
-    		HashMap<String, Object> gameParameters) {
-    	
-    	CommandList list = new CommandList(UPDATE_GAME_REQUEST);
-    	list.add(name);
-    	list.add(description);
-    	list.add(password);
-    	packGameParameters(list, gameParameters);
-    	
-    	sendCommand(list);
-    }
+	public Object getValue() {
+		return value.intValue();
+	}
 }

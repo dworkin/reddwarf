@@ -86,10 +86,11 @@ import static com.sun.gi.apps.mcs.matchmaker.common.CommandProtocol.*;
 
 import java.nio.ByteBuffer;
 import java.util.HashMap;
-import java.util.List;
+import java.util.Map;
 
+import com.sun.gi.apps.mcs.matchmaker.common.ByteWrapper;
+import com.sun.gi.apps.mcs.matchmaker.common.CommandList;
 import com.sun.gi.apps.mcs.matchmaker.common.CommandProtocol;
-import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.comm.users.client.ClientChannel;
 
 /**
@@ -117,35 +118,34 @@ public abstract class ChannelRoom implements IChannelRoom {
     }
     
     public void sendText(String text) {
-        List list = protocol.createCommandList(SEND_TEXT);
+        CommandList list = new CommandList(SEND_TEXT);
         list.add(text);
-        ByteBuffer buffer = protocol.assembleCommand(list);
-        channel.sendBroadcastData(buffer, true);
+        
+        channel.sendBroadcastData(list.getByteBuffer(), true);
     }
 
     public void sendPrivateText(byte[] user, String text) {
-        List list = protocol.createCommandList(SEND_PRIVATE_TEXT);
-        list.add(createUserID(user));
+        CommandList list = new CommandList(SEND_PRIVATE_TEXT);
+        list.add(user);
         list.add(text);
-        ByteBuffer buffer = protocol.assembleCommand(list);
 
-        channel.sendUnicastData(user, buffer, true);
+        channel.sendUnicastData(user, list.getByteBuffer(), true);
     }
     
-    protected void packGameParameters(List list, HashMap<String, Object> params) {
-    	mmClient.packGameParamters(list, params);
-    }
+    protected void packGameParameters(CommandList list, HashMap<String, Object> gameParameters) {
+        list.add(gameParameters.size());
 
-    protected UserID createUserID(byte[] bytes) {
-        UserID id = null;
-        try {
-            id = new UserID(bytes);
-        } catch (InstantiationException ie) {}
-
-        return id;
+        for (Map.Entry<String, Object> entry : gameParameters.entrySet()) {
+            String curKey = entry.getKey();
+            list.add(curKey);
+            ByteWrapper value = protocol.createByteWrapper(entry.getValue());
+            //list.add(protocol.mapType(value));
+            list.add(value.getType());
+           	list.add(value);
+        }
     }
     
-    protected void sendCommand(List commandList) {
+    protected void sendCommand(CommandList commandList) {
     	mmClient.sendCommand(commandList);
     }
     
@@ -181,7 +181,7 @@ public abstract class ChannelRoom implements IChannelRoom {
         	listener.receiveText(from, protocol.readString(data), false);
         	return true;
         } else if (command == SEND_PRIVATE_TEXT) {
-        	UserID id = protocol.readUserID(data);
+        	byte[] id = protocol.readUUIDAsBytes(data);
         	listener.receiveText(from, protocol.readString(data), true);
         	return true;
         }
@@ -228,8 +228,8 @@ public abstract class ChannelRoom implements IChannelRoom {
         HashMap<String, Object> paramMap = new HashMap<String, Object>();
         for (int i = 0; i < numParams; i++) {
             String param = protocol.readString(data);
-            Object value = protocol.readParamValue(data, true);
-            paramMap.put(param, value);
+            ByteWrapper value = protocol.readParamValue(data);
+            paramMap.put(param, value.getValue());
         }
         return paramMap;
     }

@@ -92,6 +92,8 @@ import javax.security.auth.callback.Callback;
 
 import static com.sun.gi.apps.mcs.matchmaker.common.CommandProtocol.*;
 
+import com.sun.gi.apps.mcs.matchmaker.common.ByteWrapper;
+import com.sun.gi.apps.mcs.matchmaker.common.CommandList;
 import com.sun.gi.apps.mcs.matchmaker.common.CommandProtocol;
 import com.sun.gi.comm.users.client.ClientChannel;
 import com.sun.gi.comm.users.client.ClientChannelListener;
@@ -145,27 +147,10 @@ public class MatchMakingClient
      * 
      * @param list			the list containing the components of the request packet
      */
-    void sendCommand(List list) {
-        manager.sendToServer(protocol.assembleCommand(list), true);
+    void sendCommand(CommandList list) {
+    	manager.sendToServer(list.getByteBuffer(), true);
     }
 
-    protected void packGameParamters(List list, HashMap<String, Object> gameParameters) {
-        list.add(gameParameters.size());
-
-        for (Map.Entry<String, Object> entry : gameParameters.entrySet()) {
-            String curKey = entry.getKey();
-            list.add(curKey);
-            Object value = entry.getValue();
-            list.add(protocol.mapType(value));
-            if (value instanceof byte[]) {
-            	list.add(protocol.createUUID((byte[]) value));
-            }
-            else { 
-            	list.add(value);
-            }
-        }
-    }
-    
     /**
      * Returns true if the given id is the server's ID.  This is a pass-through
      * to the ClientConnectionManager for other classes in the match maker
@@ -184,17 +169,17 @@ public class MatchMakingClient
     }
 
     public void listFolder(byte[] folderID) {
-        List list = protocol.createCommandList(LIST_FOLDER_REQUEST);
+        CommandList list = new CommandList(LIST_FOLDER_REQUEST);
         if (folderID != null) {
-            list.add(protocol.createUUID(folderID));
+            list.add(folderID);
         }
 
         sendCommand(list);
     }
 
     public void joinLobby(byte[] lobbyID, String password) {
-        List list = protocol.createCommandList(JOIN_LOBBY);
-        list.add(protocol.createUUID(lobbyID));
+        CommandList list = new CommandList(JOIN_LOBBY);
+        list.add(lobbyID);
         if (password != null) {
             list.add(password);
         }
@@ -207,8 +192,8 @@ public class MatchMakingClient
     }
 
     public void joinGame(byte[] gameID, String password) {
-        List list = protocol.createCommandList(JOIN_GAME);
-        list.add(protocol.createUUID(gameID));
+        CommandList list = new CommandList(JOIN_GAME);
+        list.add(gameID);
         if (password != null) {
             list.add(password);
         }
@@ -217,16 +202,16 @@ public class MatchMakingClient
     }
     
     public void leaveLobby() {
-    	sendCommand(protocol.createCommandList(LEAVE_LOBBY));
+    	sendCommand(new CommandList(LEAVE_LOBBY));
     }
     
     public void leaveGame() {
-    	sendCommand(protocol.createCommandList(LEAVE_GAME));
+    	sendCommand(new CommandList(LEAVE_GAME));
     }
     
     public void completeGame(byte[] gameID) {
-    	List list = protocol.createCommandList(GAME_COMPLETED);
-    	list.add(protocol.createUUID(gameID));
+    	CommandList list = new CommandList(GAME_COMPLETED);
+    	list.add(gameID);
     	
     	sendCommand(list);
     }
@@ -238,8 +223,8 @@ public class MatchMakingClient
      * @param userID
      */
     public void lookupUserName(byte[] userID) {
-        List list = protocol.createCommandList(LOOKUP_USER_NAME_REQUEST);
-        list.add(protocol.createUUID(userID));
+        CommandList list = new CommandList(LOOKUP_USER_NAME_REQUEST);
+        list.add(userID);
 
         sendCommand(list);
     }
@@ -251,7 +236,7 @@ public class MatchMakingClient
      * @param username
      */
     public void lookupUserID(String username) {
-        List list = protocol.createCommandList(LOOKUP_USER_ID_REQUEST);
+        CommandList list = new CommandList(LOOKUP_USER_ID_REQUEST);
         list.add(username);
 
         sendCommand(list);
@@ -437,8 +422,8 @@ public class MatchMakingClient
         HashMap<String, Object> paramMap = new HashMap<String, Object>();
         for (int i = 0; i < numParams; i++) {
             String param = protocol.readString(data);
-            Object value = protocol.readParamValue(data, true);
-            paramMap.put(param, value);
+            ByteWrapper value = protocol.readParamValue(data);
+            paramMap.put(param, value.getValue());
         }
         LobbyChannel lobby = lobbyMap.get(lobbyName);
         if (lobby != null) {

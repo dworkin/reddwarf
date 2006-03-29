@@ -84,11 +84,11 @@ package com.sun.gi.apps.mcs.matchmaker.client;
 
 import java.nio.ByteBuffer;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import static com.sun.gi.apps.mcs.matchmaker.common.CommandProtocol.*;
 
+import com.sun.gi.apps.mcs.matchmaker.common.CommandList;
 import com.sun.gi.apps.mcs.matchmaker.common.CommandProtocol;
 import com.sun.gi.comm.users.client.ClientChannel;
 import com.sun.gi.comm.users.client.ClientChannelListener;
@@ -119,7 +119,7 @@ public class LobbyChannel extends ChannelRoom implements ILobbyChannel, ClientCh
     }
 
     public void requestGameParameters() {
-        List list = protocol.createCommandList(GAME_PARAMETERS_REQUEST);
+        CommandList list = new CommandList(GAME_PARAMETERS_REQUEST);
 
         sendCommand(list);
     }
@@ -130,7 +130,7 @@ public class LobbyChannel extends ChannelRoom implements ILobbyChannel, ClientCh
     	if (name == null || gameParameters == null) {
     		return;
     	}
-        List list = protocol.createCommandList(CREATE_GAME);
+        CommandList list = new CommandList(CREATE_GAME);
         list.add(name);
         list.add(description);
         list.add(password != null);

@@ -85,12 +85,7 @@ package com.sun.gi.apps.mcs.matchmaker.common;
 import java.io.Serializable;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
-import java.util.LinkedList;
-import java.util.List;
 
-import com.sun.gi.comm.routing.UserID;
-import com.sun.gi.utils.SGSUUID;
-import com.sun.gi.utils.StatisticalUUID;
 
 /**
  * <p>
@@ -227,7 +222,7 @@ public final class CommandProtocol implements Serializable {
      * 
      * @return a ByteBuffer representing the contents of the list.
      */
-    public ByteBuffer assembleCommand(List list) {
+    /*public ByteBuffer assembleCommand(List list) {
         List byteList = new LinkedList();
         byteList.add(getUnsignedByte((Integer) list.get(0)));
         int bufferSize = 1;
@@ -284,14 +279,7 @@ public final class CommandProtocol implements Serializable {
             }
         }
         return buffer;
-    }
-
-    public List createCommandList(int commandCode) {
-        List list = new LinkedList();
-        list.add(commandCode);
-
-        return list;
-    }
+    }*/
 
     /**
      * Converts the given int to an unsigned byte (by downcasting).
@@ -304,48 +292,6 @@ public final class CommandProtocol implements Serializable {
         return (byte) b;
     }
 
-    /**
-     * Reads a UUID from the current position on the ByteBuffer and
-     * returns a UserID. The first byte read is the length of the UUID.
-     * 
-     * @param data the ByteBuffer containing the UUID info.
-     * 
-     * @return an UserID based on the UUID read from the buffer.
-     */
-    public UserID readUserID(ByteBuffer data) {
-        byte[] uuid = readBytes(data, true);
-
-        UserID id = null;
-        try {
-            id = new UserID(uuid);
-        } catch (InstantiationException ie) {
-            ie.printStackTrace();
-        }
-
-        return id;
-    }
-
-    /**
-     * Reads an SGSUUID from the given ByteBuffer.
-     * 
-     * @param data the buffer to read the UUID from
-     * 
-     * @return an SGSUUID read from the given buffer
-     */
-    public SGSUUID readUUID(ByteBuffer data) {
-        byte[] uuid = readBytes(data, true);
-        if (uuid.length == 0) {
-            return null;
-        }
-        SGSUUID sgsuuid = null;
-        try {
-            sgsuuid = new StatisticalUUID(uuid);
-        } catch (InstantiationException ie) {
-            ie.printStackTrace();
-        }
-        return sgsuuid;
-    }
-    
     /**
      * Reads an UUID from the given ByteBuffer as an array of bytes.
      * 
@@ -361,24 +307,6 @@ public final class CommandProtocol implements Serializable {
         return uuid;
     }    
     
-    /**
-     * Takes the given byte array, and copies it to a byte array
-     * with the first element containing the length of the array
-     * (as a byte).
-     * 
-     * @param bytes			a collections of bytes representing an UUID
-     * 
-     * @return the same byte array prefixed by the length
-     */
-    public byte[] createUUID(byte[] bytes) {
-    	byte[] uuid = new byte[bytes.length + 1];
-        uuid[0] = (byte) bytes.length;
-        for (int i = 1; i < uuid.length; i++) {
-        	uuid[i] = bytes[i - 1];
-        }
-    	
-    	return uuid;
-    }
 
     public String readString(ByteBuffer data) {
         String str = null;
@@ -422,69 +350,55 @@ public final class CommandProtocol implements Serializable {
         return bytes;
     }
     
-    public Object readParamValue(ByteBuffer data) {
-    	return readParamValue(data, false);
-    }
-
     /**
      * Reads the next unsigned byte off the buffer, maps it to a type,
      * and reads the resulting object off the buffer as that type.
      * 
      * @param data 				the buffer to read from
-     * @param uuidAsBytes		if true, will read UUIDS as byte arrays instead
-     * 							of the server-side convenience class SGSUUID.
      * 
      * @return an object matching the type specified from the initial
      * byte
      */
-    public Object readParamValue(ByteBuffer data, boolean uuidAsBytes) {
+    public ByteWrapper readParamValue(ByteBuffer data) {
         int type = readUnsignedByte(data);
         if (type == TYPE_BOOLEAN) {
-            return readBoolean(data);
+            return new BooleanByteWrapper(readBoolean(data));
         } else if (type == TYPE_BYTE) {
-            return readUnsignedByte(data);
+            return new UnsignedByteWrapper(new UnsignedByte(readUnsignedByte(data)));
         } else if (type == TYPE_INTEGER) {
-            return data.getInt();
+            return new IntegerByteWrapper(data.getInt());
         } else if (type == TYPE_STRING) {
             String str = readString(data);
-            return str == null ? "" : str;
+            str = str == null ? "" : str;
+            return new StringByteWrapper(str);
         } else if (type == TYPE_UUID) {
-        	if (uuidAsBytes) {
-        		byte[] uuid = readUUIDAsBytes(data);
-        		return uuid != null ? uuid : new byte[16]; 
-        	}
-        	return readUUID(data);
+    		byte[] uuid = readUUIDAsBytes(data);
+    		uuid =  uuid != null ? uuid : new byte[16];
+    		return new UUIDByteWrapper(uuid);
         }
-
         // unknown type
         return null;
     }
     
-    /**
-     * Returns one of the CommandProtocol.TYPE_X values based of the object
-     * type of "value".
-     * 
-     * @param value the value to map to a type
-     * 
-     * @return of the the CommandProtocol.TYPE_X static ints.
-     */
-    public UnsignedByte mapType(Object value) {
-        if (value instanceof Integer) {
-            return new UnsignedByte(TYPE_INTEGER);
-        } else if (value instanceof Boolean) {
-            return new UnsignedByte(TYPE_BOOLEAN);
-        } else if (value instanceof String) {
-            return new UnsignedByte(TYPE_STRING);
-        } else if (value instanceof UnsignedByte) {
-            return new UnsignedByte(TYPE_BYTE);
-        } else if (value instanceof SGSUUID || value instanceof byte[]) {
-            return new UnsignedByte(TYPE_UUID);
-        }
-
-        // unknown, or unsupported type.
-        return new UnsignedByte(0);
-
+    public ByteWrapper createByteWrapper(Object obj) {
+    	if (obj instanceof String) {
+    		return new StringByteWrapper((String) obj);
+    	}
+    	else if (obj instanceof Boolean) {
+    		return new BooleanByteWrapper((Boolean) obj);
+    	}
+    	else if (obj instanceof Integer) {
+    		return new IntegerByteWrapper((Integer) obj);
+    	}
+    	else if (obj instanceof byte[]) {
+    		return new UUIDByteWrapper((byte[]) obj);
+    	}
+    	else if (obj instanceof UnsignedByte) {
+    		return new UnsignedByteWrapper((UnsignedByte) obj);
+    	}
+    	return null;
     }
+    
 
     /**
      * Reads a regular old Java signed byte off the buffer and converts

@@ -973,7 +973,7 @@ public class MatchMakerClientTestUI extends JFrame implements
 		}
 
 		public void boot(boolean shouldBan) {
-			if (channel != null) {
+			if (channel != null && getSelectedUserName() != null) {
 				byte[] userID = lookupUserID(getSelectedUserName());
 				channel.boot(userID, shouldBan);
 			}

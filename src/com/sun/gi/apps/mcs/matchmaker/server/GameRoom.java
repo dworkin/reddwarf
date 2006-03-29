@@ -89,6 +89,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import com.sun.gi.apps.mcs.matchmaker.common.ByteWrapper;
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.logic.GLOReference;
@@ -115,7 +116,7 @@ public class GameRoom extends ChannelRoom {
 
     private UserID host;
     private int maxPlayers;
-    private HashMap<String, Object> gameParameters;
+    private HashMap<String, ByteWrapper> gameParameters;
     private HashMap<UserID, Boolean> userMap; // users mapped to ready state.
     private List<UserID> bannedList;
     private boolean started = false;
@@ -133,7 +134,7 @@ public class GameRoom extends ChannelRoom {
         this.host = host;
         this.parentLobby = lobby;
         this.gameID = gameID;
-        gameParameters = new HashMap<String, Object>();
+        gameParameters = new HashMap<String, ByteWrapper>();
         bannedList = new LinkedList<UserID>();
     }
     
@@ -145,7 +146,7 @@ public class GameRoom extends ChannelRoom {
         return host;
     }
 
-    public void addGameParameter(String key, Object value) {
+    public void addGameParameter(String key, ByteWrapper value) {
         gameParameters.put(key, value);
     }
     
@@ -159,7 +160,7 @@ public class GameRoom extends ChannelRoom {
      * 
      * @return true if the parameter update was successful.
      */
-    public boolean updateGameParameter(Entry<String, Object> entry) {
+    public boolean updateGameParameter(Entry<String, ByteWrapper> entry) {
     	
     	if (!gameParameters.containsKey(entry.getKey())) {
     		return false;
@@ -205,7 +206,7 @@ public class GameRoom extends ChannelRoom {
     		return false;
     	}
     	userMap.remove(player);
-    	if (!bannedList.contains(player)) {
+    	if (shouldBan && !bannedList.contains(player)) {
     		bannedList.add(player);
     	}
     	return true;
@@ -227,7 +228,7 @@ public class GameRoom extends ChannelRoom {
      * 
      * @return a read-only view of the game parameters map.
      */
-    public Map<String, Object> getGameParamters() {
+    public Map<String, ByteWrapper> getGameParamters() {
         return Collections.unmodifiableMap(gameParameters);
     }
 

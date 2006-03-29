@@ -152,6 +152,6 @@ public abstract class ChannelRoom implements GLO {
     }
 
     public boolean isPasswordProtected() {
-        return password != null;
+        return password != null && !password.equals("");
     }
 }
