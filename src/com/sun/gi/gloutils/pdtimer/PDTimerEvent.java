@@ -77,6 +77,9 @@ import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.SimTask.ACCESS_TYPE;
 
 /**
+ * This class represents an event to be triggered by the PDTimer.
+ * All the methods are for use by PDTimer.  As far as the app is
+ * concerned this is an opaque class. 
  * @author Jeff Kesselman
  * @version 1.0
  */
@@ -85,7 +88,7 @@ public class PDTimerEvent implements GLO {
     private static final long serialVersionUID = 1L;
     private static Logger log = Logger.getLogger("com.sun.gi.gloutils.pdtimer");
 
-    public boolean isActive = true;
+    boolean isActive = true;
     ACCESS_TYPE accessType;
     long delay;
     boolean repeat;
@@ -101,7 +104,7 @@ public class PDTimerEvent implements GLO {
      * @param methodName
      * @param parameters
      */
-    public PDTimerEvent(ACCESS_TYPE access, long delay, boolean repeat,
+    PDTimerEvent(ACCESS_TYPE access, long delay, boolean repeat,
             GLOReference target, String methodName, Object[] parameters) {
         // TODO Auto-generated constructor stub
         this.accessType = access;
@@ -115,7 +118,7 @@ public class PDTimerEvent implements GLO {
     /**
      * @param task
      */
-    public void fire(SimTask task) {
+    void fire(SimTask task) {
         if (!isActive) {
             System.err.println("ERROR: Nonactive timer event fired!");
             return;
@@ -138,29 +141,29 @@ public class PDTimerEvent implements GLO {
 
     }
 
-    public long delayTime() {
+    long delayTime() {
         return delay;
     }
 
-    public boolean requiresCleanup() {
+    boolean requiresCleanup() {
         return !isActive;
     }
 
-    public boolean isRepeating() {
+    boolean isRepeating() {
         return repeat;
     }
 
-    public void reset(SimTask task) {
+    void reset(SimTask task) {
         task.access_check(ACCESS_TYPE.GET, this);
         log.finest("Restting event");
         isActive = true;
     }
 
-    public boolean isMoribund() {
+    boolean isMoribund() {
         return (!isActive) && (!repeat);
     }
 
-    public boolean isActive() {
+    boolean isActive() {
         return isActive;
     }
 }

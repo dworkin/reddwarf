@@ -84,6 +84,8 @@ import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.SimTask.ACCESS_TYPE;
 
 /**
+ * This class is aprt of the logic of the PDTimer.
+ * Apps using the PDTimer never need be aware of it.
  * @author Jeff Kesselman
  * @version 1.0
  */
@@ -96,12 +98,12 @@ public class PDTimerEventList implements GLO {
 
     private static final long serialVersionUID = 1L;
 
-    public PDTimerEventList() throws InstantiationException {
+    PDTimerEventList() throws InstantiationException {
         super();
     }
 
     /** Tick is designed to be called with ACCESS.PEEK */
-    public void tick(SimTask task, long time) {
+    void tick(SimTask task, long time) {
         task.access_check(ACCESS_TYPE.PEEK, this);
         log.finest("Ticking timer list");
         List<GLOReference<PDTimerEvent>> cleanupList =
@@ -144,7 +146,7 @@ public class PDTimerEventList implements GLO {
      * @param task
      * @param evntRef
      */
-    public void addEvent(SimTask task, GLOReference<PDTimerEvent> evntRef) {
+    void addEvent(SimTask task, GLOReference<PDTimerEvent> evntRef) {
         task.access_check(ACCESS_TYPE.GET, this);
         PDTimerEvent evnt = evntRef.peek(task);
         long fireTime = evnt.delayTime() + System.currentTimeMillis();
@@ -163,7 +165,7 @@ public class PDTimerEventList implements GLO {
      * 
      * @param eventRef
      */
-    public void removeEvent(GLOReference<PDTimerEvent> eventRef) {
+    void removeEvent(GLOReference<PDTimerEvent> eventRef) {
         Iterator<Entry<Long, HashSet<GLOReference<PDTimerEvent>>>> it;
         for (it = timerEvents.entrySet().iterator(); it.hasNext();) {
             Entry<Long, HashSet<GLOReference<PDTimerEvent>>> entry = it.next();
@@ -181,7 +183,7 @@ public class PDTimerEventList implements GLO {
      * Called from a task.
      * Designed to be called with ACCESS.GET
      */
-    public void cleanup(List<GLOReference<PDTimerEvent>> cleanupList) {
+    void cleanup(List<GLOReference<PDTimerEvent>> cleanupList) {
         SimTask task = SimTask.getCurrent();
         task.access_check(ACCESS_TYPE.GET, this);
         log.finest("Doing cleanup");
@@ -207,22 +209,16 @@ public class PDTimerEventList implements GLO {
      * To handle lost cleanups, scrubs the whole list.
      * Designed to be called with ACCESS.GET
      */
-    private void bigCleanup(SimTask task) {
+    void bigCleanup(SimTask task) {
+    		List<GLOReference<PDTimerEvent>> eventsToClean = 
+    			new ArrayList<GLOReference<PDTimerEvent>>();    	
         long time = System.currentTimeMillis();
         for (Entry<Long, HashSet<GLOReference<PDTimerEvent>>> entry : timerEvents.entrySet()) {
             if (entry.getKey().longValue() <= time) {
                 for (GLOReference<PDTimerEvent> ref : entry.getValue()) {
                     PDTimerEvent evnt = ref.get(task);
                     if (evnt.requiresCleanup()) { // needs to be cleaned
-                        if (evnt.isRepeating()) {
-                            System.out.println("re-installing");
-                            removeEvent(ref); // FIXME: Breaks iterator!
-                            evnt.reset(task); // resets it for next ring
-                            addEvent(task, ref); // FIXME: Breaks iterator!
-                        } else if (evnt.isMoribund()) {
-                            removeEvent(ref); // FIXME: Breaks iterator!
-                            ref.delete(task);
-                        }
+                    		eventsToClean.add(ref); 
                     }
                 }
             } else {
@@ -230,6 +226,8 @@ public class PDTimerEventList implements GLO {
                 break;
             }
         }
+        // now clean
+        cleanup(eventsToClean);
     }
 
 }
