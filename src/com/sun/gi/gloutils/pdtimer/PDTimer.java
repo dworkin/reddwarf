@@ -95,6 +95,10 @@ public class PDTimer implements SimTimerListener {
 
     GLOReference<PDTimerEventList> timerListRef = null;
 
+    /**
+     * Constructor for a PDTimer object
+     * @param task The current SimTask
+     */
     public PDTimer(SimTask task) {
         log.fine("init PDTimer");
         PDTimerEventList list = null;
@@ -107,11 +111,24 @@ public class PDTimer implements SimTimerListener {
         timerListRef = task.createGLO(list, null);
     }
 
+    /**
+     * This method registers the PDTimer with the slice's
+     * heartbeat manager for heartbeat callbacks.
+     * 
+     * @param task The Current SimTask
+     * @param heartbeat How many ms between heartbeats. Note that
+     * setting this too low can flood your slice's system event queue
+     * and seriously degrade performance.
+     */
     public void start(SimTask task, long heartbeat) {
-	task.registerTimerEvent(ACCESS_TYPE.PEEK, heartbeat * 1000, true,
+	task.registerTimerEvent(ACCESS_TYPE.PEEK, heartbeat, true,
 		task.lookupReferenceFor(this));
     }
 
+    /**
+     * A callback used  by the System heartbeat manager. <b>Not for
+     * app user.</b>
+     */
     public void timerEvent(long eventID) {
         // Note that when this is called we have just been PEEKed.
         // Thsi is intentional to prvent needless blocking by the
@@ -122,6 +139,23 @@ public class PDTimer implements SimTimerListener {
         PDTimerEventList eventList = timerListRef.peek(task);
         eventList.tick(task, System.currentTimeMillis());
     }
+    
+    /**
+     * This method is called to register an event for timed callback.
+     * @param task The Current SimTask
+     * @param ACCESS_TYPE The kind of access that is used by the system 
+     * to fetch the target obejct when the timed event is triggered.
+     * @param delay How long from now the event happens (in ms)
+     * @param repeat If false then the event will get triggered one, in approximately 
+     * delay seconds.  If true the the event will get triggered repeatedly, approximately
+     * every delay seconds.
+     * @param target The object to start the event task with.
+     * @param methodName The name of the method on the object to start the
+     * event with.
+     * @param parameters The parameters to pass to the start method.
+     * 
+     * @returns A GLOReference to a PDTimerEvent object.
+     */
 
     public GLOReference<PDTimerEvent> addTimerEvent(SimTask task,
             ACCESS_TYPE access, long delay, boolean repeat,
@@ -135,6 +169,11 @@ public class PDTimer implements SimTimerListener {
         return evntRef;
     }
 
+    /**
+     * This method cancles a previosuly registered event.
+     * @param task The current SimTask
+     * @param eventRef a GLOReference to the event to cancel
+     */
     public void removeTimerEvent(SimTask task,
             GLOReference<PDTimerEvent> eventRef)
     {
