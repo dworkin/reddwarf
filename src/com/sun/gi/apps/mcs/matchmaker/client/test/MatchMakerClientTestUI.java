@@ -155,9 +155,17 @@ public class MatchMakerClientTestUI extends JFrame implements
 	private HashMap<String, LobbyDescriptor> lobbyMap;
 	private JTextArea incomingText;
 	private JScrollPane incomingScrollPane;
-	private JButton connectButton;
-	private JButton joinLobby;
-	private JButton joinGame;
+	
+	private JMenuItem connectItem;
+	private JMenuItem disconnectItem;
+	private JMenuItem locateUserItem;
+	
+	private JMenu lobbyMenu;
+	private JMenu gameMenu;
+	private JMenuItem joinLobby;
+	private JMenuItem leaveLobby;
+	private JMenuItem createGame;
+	private JMenuItem joinGame;
 
 	public MatchMakerClientTestUI() {
 		super();
@@ -167,122 +175,6 @@ public class MatchMakerClientTestUI extends JFrame implements
 		lobbyMap = new HashMap<String, LobbyDescriptor>();
 
 		JPanel treePanel = doTreeLayout();
-
-		connectButton = new JButton("Connect");
-		connectButton.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				if (connectButton.getText().equals("Connect")) {
-					gamePanel.setParentUI(MatchMakerClientTestUI.this);
-					lobbyPanel.setParentUI(MatchMakerClientTestUI.this);
-					connect();
-				} else {
-					manager.disconnect();
-				}
-			}
-		});
-
-		joinLobby = new JButton("Join Lobby");
-		joinLobby.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				if (joinLobby.getText().startsWith("Join")) {
-					LobbyDescriptor lobby = getSelectedLobby();
-					if (lobby == null) {
-						return;
-					}
-					mmClient.joinLobby(lobby.getLobbyID(), null);
-				} else {
-					mmClient.leaveLobby();
-				}
-
-			}
-		});
-
-		JButton createGame = new JButton("Create Game");
-		createGame.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				GameInputDialog dialog = new GameInputDialog();
-				GameDescriptor descriptor = dialog.promptForParameters(
-							new GameDescriptor(null, null, null, null, 0, false, 
-											lobbyPanel.getGameParameters()));
-
-				lobbyPanel.createGame(descriptor, dialog.getPassword());
-			}
-		});
-
-		joinGame = new JButton("Join Game");
-		joinGame.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				if (joinGame.getText().startsWith("Join")) {
-					GameDescriptor game = lobbyPanel.getSelectedGame();
-					if (game == null) {
-						return;
-					}
-					String password = game.isPasswordProtected() ? 
-							JOptionPane.showInputDialog(null, "Enter Password") : null;
-					mmClient.joinGame(game.getGameID(), password);
-				} else {
-					mmClient.leaveGame();
-				}
-			}
-		});
-
-		JButton readyButton = new JButton("Ready");
-		readyButton.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				gamePanel.ready();
-			}
-		});
-
-		JButton startGameButton = new JButton("Start Game");
-		startGameButton.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				gamePanel.startGame();
-			}
-		});
-
-		JButton endGameButton = new JButton("End Game");
-		endGameButton.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				mmClient.completeGame(gamePanel.getGameID());
-			}
-		});
-
-		final JCheckBox shouldBan = new JCheckBox("Ban");
-
-		JButton bootButton = new JButton("Boot Player");
-		bootButton.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				gamePanel.boot(shouldBan.isSelected());
-			}
-		});
-
-		JButton updateGameButton = new JButton("Update Game");
-		updateGameButton.addActionListener(new ActionListener() {
-			public void actionPerformed(ActionEvent e) {
-				GameInputDialog dialog = new GameInputDialog();
-				GameDescriptor descriptor = dialog.promptForParameters(
-												gamePanel.getGameDescriptor());				
-				gamePanel.updateGame(descriptor, dialog.getPassword());
-			}
-		});
-
-		JPanel buttonPanel = new JPanel(new BorderLayout());
-		JPanel topButtonPanel = new JPanel();
-		topButtonPanel.add(connectButton);
-		topButtonPanel.add(joinLobby);
-		topButtonPanel.add(createGame);
-		topButtonPanel.add(joinGame);
-		topButtonPanel.add(readyButton);
-
-		JPanel bottomButtonPanel = new JPanel();
-		bottomButtonPanel.add(shouldBan);
-		bottomButtonPanel.add(bootButton);
-		bottomButtonPanel.add(startGameButton);
-		bottomButtonPanel.add(endGameButton);
-		bottomButtonPanel.add(updateGameButton);
-
-		buttonPanel.add(topButtonPanel, BorderLayout.NORTH);
-		buttonPanel.add(bottomButtonPanel, BorderLayout.SOUTH);
 
 		incomingText = new JTextArea(3, 40);
 
@@ -328,10 +220,11 @@ public class MatchMakerClientTestUI extends JFrame implements
 		incomingScrollPane = new JScrollPane(incomingText);
 		bottomPanel.add(incomingScrollPane, BorderLayout.NORTH);
 		bottomPanel.add(chatPanel, BorderLayout.CENTER);
-		bottomPanel.add(buttonPanel, BorderLayout.SOUTH);
 
 		add(splitPane, BorderLayout.CENTER);
 		add(bottomPanel, BorderLayout.SOUTH);
+		
+		createMenu();
 
 		setBounds(300, 200, 720, 630);
 
@@ -345,6 +238,169 @@ public class MatchMakerClientTestUI extends JFrame implements
 		});
 
 		setVisible(true);
+	}
+	
+	private void createMenu() {
+		JMenuBar menuBar = new JMenuBar();
+		
+		connectItem = new JMenuItem("Connect");
+		connectItem.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				gamePanel.setParentUI(MatchMakerClientTestUI.this);
+				lobbyPanel.setParentUI(MatchMakerClientTestUI.this);
+				connect();
+			}
+		});
+		connectItem.setAccelerator(KeyStroke.getKeyStroke("control alt C"));
+		
+		disconnectItem = new JMenuItem("Disconnect");
+		disconnectItem.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				manager.disconnect();
+			}
+		});
+		
+		locateUserItem = new JMenuItem("Locate User");
+		
+		JMenu userMenu = new JMenu("User");
+		userMenu.add(connectItem);
+		userMenu.add(disconnectItem);
+		userMenu.addSeparator();
+		userMenu.add(locateUserItem);
+		
+		joinLobby = new JMenuItem("Join Lobby");
+		joinLobby.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				LobbyDescriptor lobby = getSelectedLobby();
+				if (lobby == null) {
+					return;
+				}
+				mmClient.joinLobby(lobby.getLobbyID(), null);
+			}
+		});
+		
+		leaveLobby = new JMenuItem("Leave Lobby");
+		leaveLobby.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				mmClient.leaveLobby();
+			}
+		});
+		
+		createGame = new JMenuItem("Create Game");
+		createGame.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				GameInputDialog dialog = new GameInputDialog();
+				GameDescriptor descriptor = dialog.promptForParameters(
+							new GameDescriptor(null, null, null, null, 0, false, 
+											lobbyPanel.getGameParameters()));
+
+				lobbyPanel.createGame(descriptor, dialog.getPassword());
+			}
+		});
+		
+		joinGame = new JMenuItem("Join Game");
+		joinGame.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				GameDescriptor game = lobbyPanel.getSelectedGame();
+				if (game == null) {
+					return;
+				}
+				String password = game.isPasswordProtected() ? 
+						JOptionPane.showInputDialog(null, "Enter Password") : null;
+				mmClient.joinGame(game.getGameID(), password);
+			}
+		});
+		
+		lobbyMenu = new JMenu("Lobby");
+		lobbyMenu.add(joinLobby);
+		lobbyMenu.add(leaveLobby);
+		lobbyMenu.addSeparator();
+		lobbyMenu.add(createGame);
+		lobbyMenu.add(joinGame);
+		
+		
+		JMenuItem readyItem= new JMenuItem("Ready");
+		readyItem.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				gamePanel.ready();
+			}
+		});
+
+		JMenuItem startGameItem = new JMenuItem("Start Game");
+		startGameItem.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				gamePanel.startGame();
+			}
+		});
+
+		JMenuItem endGameItem = new JMenuItem("End Game");
+		endGameItem.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				mmClient.completeGame(gamePanel.getGameID());
+			}
+		});
+		
+		JMenuItem bootItem = new JMenuItem("Boot Player");
+		bootItem.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				gamePanel.boot(false);
+			}
+		});
+		
+		JMenuItem banItem = new JMenuItem("Ban Player");
+		banItem.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				gamePanel.boot(true);
+			}
+		});
+
+		JMenuItem updateGameItem = new JMenuItem("Update Game");
+		updateGameItem.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				GameInputDialog dialog = new GameInputDialog();
+				GameDescriptor descriptor = dialog.promptForParameters(
+												gamePanel.getGameDescriptor());				
+				gamePanel.updateGame(descriptor, dialog.getPassword());
+			}
+		});
+		
+		JMenuItem leaveItem = new JMenuItem("Leave Game");
+		leaveItem.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				mmClient.leaveGame();
+			}
+		});		
+		
+		gameMenu = new JMenu("Game");
+		gameMenu.add(readyItem);
+		gameMenu.add(startGameItem);
+		gameMenu.add(endGameItem);
+		gameMenu.addSeparator();
+		gameMenu.add(updateGameItem);
+		gameMenu.add(bootItem);
+		gameMenu.add(banItem);
+		gameMenu.add(leaveItem);
+		
+		menuBar.add(userMenu);
+		menuBar.add(lobbyMenu);
+		menuBar.add(gameMenu);
+		
+		setJMenuBar(menuBar);
+		
+		enableMenus(false);
+	}
+	
+	/**
+	 * Enables/disables portions of the menus based on connected state.
+	 * 
+	 * @param connected		if true, then the app is connected to the server
+	 */
+	private void enableMenus(boolean connected) {
+		connectItem.setEnabled(!connected);
+		disconnectItem.setEnabled(connected);
+		locateUserItem.setEnabled(connected);
+		lobbyMenu.setEnabled(connected);
+		gameMenu.setEnabled(connected);
 	}
 
 	protected void receiveServerMessage(String message) {
@@ -469,7 +525,6 @@ public class MatchMakerClientTestUI extends JFrame implements
 	}
 
 	public void joinedLobby(ILobbyChannel channel) {
-		joinLobby.setText("Leave Lobby");
 		lobbyPanel.setLobby(channel);
 	}
 
@@ -480,7 +535,6 @@ public class MatchMakerClientTestUI extends JFrame implements
 	}
 
 	public void leftLobby() {
-		joinLobby.setText("Join Lobby");
 		receiveServerMessage("Left Lobby");
 		lobbyPanel.resetLobby();
 	}
@@ -493,13 +547,13 @@ public class MatchMakerClientTestUI extends JFrame implements
 
 	public void connected(byte[] myID) {
 		setStatus("Connected");
-		connectButton.setText("Disconnect");
+		enableMenus(true);
 		mmClient.listFolder(null);
 	}
 
 	public void disconnected() {
 		setStatus("Disconnected");
-		connectButton.setText("Connect");
+		enableMenus(false);
 	}
 
 	/*
