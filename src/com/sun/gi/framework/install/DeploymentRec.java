@@ -127,4 +127,12 @@ public interface DeploymentRec {
      * into SGS
      */
     public void setID(int ID);
+    
+    /**
+     * Returns a List of ChannelFilter descriptors based on the 
+     * deployment descriptor.
+     * 
+     * @return
+     */
+    public List<ChannelFilterRec> getChannelFilters();
 }

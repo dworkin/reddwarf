@@ -65,116 +65,49 @@
  * en matière de contrôle des exportations et la liste de ressortissants
  * spécifiquement désignés, sont rigoureusement interdites.
  */
-
 package com.sun.gi.framework.install.impl;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-
+import com.sun.gi.comm.users.filter.ChannelFilter;
 import com.sun.gi.framework.install.ChannelFilterRec;
-import com.sun.gi.framework.install.DeploymentRec;
-import com.sun.gi.framework.install.UserMgrRec;
 
-public class DeploymentRecImpl implements DeploymentRec {
+/**
+ * 
+ * <p>Title: ChannelFilterRecImpl</p>
+ * 
+ * <p>Description: Concrete implementation of the ChannelFilterRec interface.
+ * This class creates concrete implementations of the specific subclass of 
+ * the ChannelFilter interface as defined by <code>className</code>.</p>
+ * 
+ * <p>Copyright: Copyright (c) 2006</p>
+ * <p>Company: Sun Microsystems, TMI</p>
+ * 
+ * @author	Sten Anderson
+ * @version 1.0
+ */
+public class ChannelFilterRecImpl implements ChannelFilterRec {
+	
+	private String className;
 
-    int id;
-
-    String name;
-    String classpathURL = null;
-    String rootURL=null;
-
-    String bootClass = null;
-
-    Map bootClassParameters = null;
-
-    List<UserMgrRec> userManagers = new ArrayList<UserMgrRec>();
-    List<ChannelFilterRec> channelFilters = new ArrayList<ChannelFilterRec>();
-
-    /**
-     * InstallRec
-     * 
-     * @param gameName
-     */
-    public DeploymentRecImpl(String gameName) {
-        name = gameName;
-    }
-    
-    public void setRootURL(String dir){
-    		rootURL = dir;
-    }
-    
-    public String getRootURL(){
-    		return rootURL;
-    }
-
-    public void setGLEapp(String bootClassFQDN, String classpathURL) {
-        bootClass = bootClassFQDN;
-        this.classpathURL = classpathURL;
-    }
-
-    /**
-     * makeParameterMap
-     * 
-     * @param paramList List
-     *
-     * @return Map
-     */
-    public static Map makeParameterMap(List paramList) {
-        return null;
-    }
-
-    public void addUserManager(UserMgrRec rec) {
-        userManagers.add(rec);
-    }
-
-    public List<UserMgrRec> getUserManagers() {
-        return userManagers;
-    }
-    
-    public List<ChannelFilterRec> getChannelFilters() {
-    	return channelFilters;
-    }
-    
-    public void addChannelFilter(ChannelFilterRec filter) {
-    	channelFilters.add(filter);
-    }
-
-    public int userManagerCount() {
-        return userManagers.size();
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public String getDescription() {
-        return "";
-    }
-
-    public void setID(int id) {
-        this.id = id;
-    }
-
-    public int getID() {
-
-        return id;
-    }
-
-    public String getClasspathURL() {
-        return classpathURL;
-    }
-
-    public String getBootClass() {
-        return bootClass;
-    }
-
-    /**
-     * @param classpath
-     */
-    public void setClasspathURL(String classpath) {
-        classpathURL = classpath;
-
-    }
+	public ChannelFilterRecImpl(String className) {
+		this.className = className;
+	}
+	
+	public ChannelFilter createChannelFilter() {
+		ChannelFilter filter = null;
+		try {
+			Class<ChannelFilter> filterClass = (Class<ChannelFilter>) Class.forName(className);
+			filter = filterClass.newInstance();
+		}
+		catch (ClassNotFoundException cnf) {
+			cnf.printStackTrace();
+		}
+		catch (InstantiationException ie) {
+			ie.printStackTrace();
+		}
+		catch (IllegalAccessException iae) {
+			iae.printStackTrace();
+		}
+		return filter;
+	}
 
 }

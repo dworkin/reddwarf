@@ -79,108 +79,36 @@
  GARANTIE IMPLICITE RELATIVE A LA QUALITE MARCHANDE, A L'APTITUDE A UNE
  UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
 */
+package com.sun.gi.comm.users.filter;
 
-package com.sun.gi.comm.routing;
-
-import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.List;
-
-import javax.security.auth.Subject;
-
-import com.sun.gi.comm.users.server.SGSUser;
-import com.sun.gi.framework.install.ChannelFilterRec;
 
 /**
- * This interface defines the fundemental functionality of a Router.
- * Routers create and dispose of UserIds and move messages to users by
- * way of their user IDs.
  * 
- * <p>
- * Title: Router
- * </p>
- * <p>
- * Description: A tier 1 message router
- * </p>
+ * <p>Title: ChannelFilter</p>
  * 
- * @author Jeff Kesselman
+ * <p>Description: This interface defines methods for filtering content on
+ * channels.</p>
+ * 
+ * <p>Copyright: Copyright (c) 2006</p>
+ * <p>Company: Sun Microsystems, TMI</p>
+ * 
+ * @author	Sten Anderson
  * @version 1.0
  */
-public interface Router {
+public interface ChannelFilter {
+	
+	/**
+	 * Filters the given message.  If true is returned, the message passes
+	 * the filter and will be delivered to the intended recipients on the 
+	 * channel (unless another filter blocks it).  If false is returned, 
+	 * the message will be discarded.
+	 * 
+	 * @param message			the message to filter
+	 * 
+	 * @return true if the message passes the rules of the filter, false 
+	 * 			otherwise. 
+	 */
+	public boolean filter(ByteBuffer message);
 
-    /**
-     * This call is made in order to allocate a new unqiue UserID.
-     * 
-     * @param user
-     * @param subject
-     * 
-     * @throws IOException
-     */
-    public void registerUser(SGSUser user, Subject subject)
-            throws InstantiationException, IOException;
-
-    /**
-     * This call is used to free a UserID that is no longer needed.
-     * 
-     * @param user The ID to dispose.
-     */
-    public void deregisterUser(SGSUser user);
-
-    public SGSChannel openChannel(String channelName);
-
-    public SGSChannel getChannel(ChannelID cid);
-
-    public boolean validateReconnectKey(UserID uid, byte[] key);
-
-    public void serverMessage(boolean reliable, UserID uid,
-            ByteBuffer databuff);
-
-    public void addRouterListener(RouterListener listener);
-
-    /**
-     * Joins the specified user to the Channel referenced by the given
-     * ChannelID.
-     * 
-     * @param uid the user
-     * @param cid the ChannelID
-     */
-    public void join(UserID uid, ChannelID cid);
-
-    /**
-     * Removes the specified user from the Channel referenced by the
-     * given ChannelID.
-     * 
-     * @param uid the user
-     * @param cid the ChannelID
-     */
-    public void leave(UserID uid, ChannelID cid);
-
-    /**
-     * Locks the given channel based on shouldLock. Users cannot
-     * join/leave locked channels except by way of the Router.
-     * 
-     * @param cid the channel ID
-     * @param shouldLock if true, will lock the channel, otherwise
-     * unlock it.
-     */
-    public void lock(ChannelID cid, boolean shouldLock);
-
-    /**
-     * Closes the local view of the channel mapped to ChannelID. Any
-     * remaining users will be notified as the channel is closing.
-     * 
-     * @param cid the ID of the channel to close.
-     */
-    public void closeChannel(ChannelID cid);
-    
-    /**
-     * Sets the channel filters for this Router.  New channels created by this
-     * Router will have new instances of the filters attached as specified by 
-     * the given filter descriptors. 
-     * 
-     * @param filters		a List of ChannelFilters descriptors that specify 
-     * 						the filters to attach to new channels created
-     * 						by this Router.
-     */
-    public void setChannelFilters(List<ChannelFilterRec> filters);
 }

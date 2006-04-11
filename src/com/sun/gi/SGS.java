@@ -204,6 +204,7 @@ public class SGS {
 	    e.printStackTrace();
 	    return null;
 	}
+	router.setChannelFilters(game.getChannelFilters());
 
 	int gameCount = Integer.parseInt(installationReport.getParameter(
 		"game", "count"));

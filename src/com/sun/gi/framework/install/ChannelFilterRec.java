@@ -65,116 +65,32 @@
  * en matière de contrôle des exportations et la liste de ressortissants
  * spécifiquement désignés, sont rigoureusement interdites.
  */
+package com.sun.gi.framework.install;
 
-package com.sun.gi.framework.install.impl;
+import com.sun.gi.comm.users.filter.ChannelFilter;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-
-import com.sun.gi.framework.install.ChannelFilterRec;
-import com.sun.gi.framework.install.DeploymentRec;
-import com.sun.gi.framework.install.UserMgrRec;
-
-public class DeploymentRecImpl implements DeploymentRec {
-
-    int id;
-
-    String name;
-    String classpathURL = null;
-    String rootURL=null;
-
-    String bootClass = null;
-
-    Map bootClassParameters = null;
-
-    List<UserMgrRec> userManagers = new ArrayList<UserMgrRec>();
-    List<ChannelFilterRec> channelFilters = new ArrayList<ChannelFilterRec>();
-
-    /**
-     * InstallRec
-     * 
-     * @param gameName
-     */
-    public DeploymentRecImpl(String gameName) {
-        name = gameName;
-    }
-    
-    public void setRootURL(String dir){
-    		rootURL = dir;
-    }
-    
-    public String getRootURL(){
-    		return rootURL;
-    }
-
-    public void setGLEapp(String bootClassFQDN, String classpathURL) {
-        bootClass = bootClassFQDN;
-        this.classpathURL = classpathURL;
-    }
-
-    /**
-     * makeParameterMap
-     * 
-     * @param paramList List
-     *
-     * @return Map
-     */
-    public static Map makeParameterMap(List paramList) {
-        return null;
-    }
-
-    public void addUserManager(UserMgrRec rec) {
-        userManagers.add(rec);
-    }
-
-    public List<UserMgrRec> getUserManagers() {
-        return userManagers;
-    }
-    
-    public List<ChannelFilterRec> getChannelFilters() {
-    	return channelFilters;
-    }
-    
-    public void addChannelFilter(ChannelFilterRec filter) {
-    	channelFilters.add(filter);
-    }
-
-    public int userManagerCount() {
-        return userManagers.size();
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public String getDescription() {
-        return "";
-    }
-
-    public void setID(int id) {
-        this.id = id;
-    }
-
-    public int getID() {
-
-        return id;
-    }
-
-    public String getClasspathURL() {
-        return classpathURL;
-    }
-
-    public String getBootClass() {
-        return bootClass;
-    }
-
-    /**
-     * @param classpath
-     */
-    public void setClasspathURL(String classpath) {
-        classpathURL = classpath;
-
-    }
+/**
+ * 
+ * <p>Title: ChannelFilterRec</p>
+ * 
+ * <p>Description: A value object for holding the details of an individual
+ * channel filter as specified from a deployment descriptor.</p>
+ * 
+ * <p>Copyright: Copyright (c) 2006</p>
+ * <p>Company: Sun Microsystems, TMI</p>
+ * 
+ * @author	Sten Anderson
+ * @version 1.0
+ */
+public interface ChannelFilterRec {
+	
+	/**
+	 * Returns a new instance of the implementation of the ChannelFilter
+	 * specified by this descriptor.
+	 * 
+	 * @return		a new instance of the specific subclass of ChannelFilter
+	 * 				as specified by a deployment descriptor
+	 */
+	public ChannelFilter createChannelFilter();
 
 }

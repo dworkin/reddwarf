@@ -79,6 +79,7 @@ import org.xml.sax.Attributes;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;
 
+import com.sun.gi.framework.install.ChannelFilterRec;
 import com.sun.gi.framework.install.DeploymentRec;
 import com.sun.gi.framework.install.UserMgrRec;
 import com.sun.gi.framework.install.ValidatorRec;
@@ -88,6 +89,7 @@ public class DeploymentXMLHandler extends DefaultHandler {
     DeploymentRecImpl drec;
     UserMgrRecImpl umrec;
     ValidatorRecImpl vrec;
+    ChannelFilterRec filterRec;
     boolean inValidator;
 
     public void startElement(String uri, String localName, String qName,
@@ -122,11 +124,15 @@ public class DeploymentXMLHandler extends DefaultHandler {
             String className = attributes.getValue("moduleclass");
             vrec = new ValidatorRecImpl(className);
             umrec.addValidatorModule(vrec);
+        } else if (qName.equalsIgnoreCase("CHANNELFILTER")) {
+        	String className = attributes.getValue("class");
+        	filterRec = new ChannelFilterRecImpl(className);
         }
     }
 
     public void endElement(String uri, String localName, String qName)
             throws SAXException {
+    	
         if (qName.equalsIgnoreCase("GAME")) { // start of game record
             // nothing, all done
         } else if (qName.equalsIgnoreCase("USERMANAGER")) {
@@ -135,6 +141,8 @@ public class DeploymentXMLHandler extends DefaultHandler {
             // no action needed
         } else if (qName.equalsIgnoreCase("VALIDATOR")) {
             inValidator = false;
+        } else if (qName.equalsIgnoreCase("CHANNELFILTER")) {
+        	drec.addChannelFilter(filterRec);
         }
     }
 

@@ -84,7 +84,9 @@ import com.sun.gi.comm.routing.Router;
 import com.sun.gi.comm.routing.RouterListener;
 import com.sun.gi.comm.routing.SGSChannel;
 import com.sun.gi.comm.routing.UserID;
+import com.sun.gi.comm.users.filter.ChannelFilter;
 import com.sun.gi.comm.users.server.SGSUser;
+import com.sun.gi.framework.install.ChannelFilterRec;
 import com.sun.gi.framework.interconnect.TransportChannel;
 import com.sun.gi.framework.interconnect.TransportChannelListener;
 import com.sun.gi.framework.interconnect.TransportManager;
@@ -109,6 +111,7 @@ public class RouterImpl implements Router {
 
     private ByteBuffer hdr = ByteBuffer.allocate(256);
     private List<RouterListener> listeners = new ArrayList<RouterListener>();
+    private List<ChannelFilterRec> channelFilters;
 
     protected int keySecondsToLive;
 
@@ -122,7 +125,9 @@ public class RouterImpl implements Router {
 
     public RouterImpl(TransportManager cmgr) throws IOException {
         transportManager = cmgr;
-
+        
+        channelFilters = new ArrayList<ChannelFilterRec>();
+        
         routerControlChannel = transportManager.openChannel("__SGS_ROUTER_CONTROL");
         routerControlChannel.addListener(new TransportChannelListener() {
             public void dataArrived(ByteBuffer buff) {
@@ -201,6 +206,10 @@ public class RouterImpl implements Router {
                 }
             }
         }).start();
+    }
+    
+    public void setChannelFilters(List<ChannelFilterRec> filters) {
+    	this.channelFilters = filters;
     }
 
     /**
@@ -418,7 +427,10 @@ public class RouterImpl implements Router {
                 return null;
             }
             try {
-                sgschan = new ChannelImpl(this, tchan);
+            	for (ChannelFilterRec curFilter : channelFilters) {
+            		curFilter.createChannelFilter();
+            	}
+                sgschan = new ChannelImpl(this, tchan, createFilters());
                 channelMap.put(sgschan.channelID(), sgschan);
                 channelNameMap.put(channelName, sgschan);
             } catch (IOException e) {
@@ -426,6 +438,23 @@ public class RouterImpl implements Router {
             }
         }
         return sgschan;
+    }
+    
+    /**
+     * Creates a List of ChannelFilters based on the List of channel filter
+     * descriptors.
+     * 
+     * @return a List of ChannelFilters
+     */
+    private List<ChannelFilter> createFilters() {
+    	if (channelFilters == null) {
+    		return null;
+    	}
+    	List<ChannelFilter> filters = new ArrayList<ChannelFilter>();
+    	for (ChannelFilterRec curRec : channelFilters) {
+    		filters.add(curRec.createChannelFilter());
+    	}
+    	return filters;
     }
 
     /**

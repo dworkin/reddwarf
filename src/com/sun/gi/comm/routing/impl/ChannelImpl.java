@@ -71,11 +71,13 @@ package com.sun.gi.comm.routing.impl;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import com.sun.gi.comm.routing.ChannelID;
 import com.sun.gi.comm.routing.SGSChannel;
 import com.sun.gi.comm.routing.UserID;
+import com.sun.gi.comm.users.filter.ChannelFilter;
 import com.sun.gi.comm.users.server.SGSUser;
 import com.sun.gi.framework.interconnect.TransportChannel;
 import com.sun.gi.framework.interconnect.TransportChannelListener;
@@ -89,6 +91,7 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
     private Map<UserID, SGSUser> localUsers = new HashMap<UserID, SGSUser>();
     private RouterImpl router;
     private boolean locked;
+    private List<ChannelFilter> filters;
 
     private enum OPCODE {
         UserJoinedChan,
@@ -99,7 +102,8 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
     }
 
     // only instanceable by RouterImpl
-    ChannelImpl(RouterImpl r, TransportChannel chan) throws IOException {
+    ChannelImpl(RouterImpl r, TransportChannel chan, List<ChannelFilter> filters) 
+    														throws IOException {
         transportChannel = chan;
         transportChannel.addListener(this);
         localID = new ChannelID();
@@ -107,10 +111,16 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
         buffs[0] = hdr;
         router = r;
         locked = false;
+        this.filters = filters;
     }
 
     public void unicastData(UserID from, UserID to, ByteBuffer message,
             boolean reliable) {
+    	
+    	if (!filter(message)) {
+    		return;
+    	}
+    	
         synchronized (hdr) {
             hdr.clear();
             hdr.put((byte) OPCODE.UnicastMessage.ordinal());
@@ -132,7 +142,7 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
         sendToLocalUser(from.toByteArray(), to.toByteArray(), message, reliable);
         router.channelDataPacket(this, from, message, reliable);
     }
-
+    
     public void multicastData(UserID from, UserID[] tolist, ByteBuffer message,
             boolean reliable) {
         multicastData(from, tolist, message, reliable, true);
@@ -140,6 +150,11 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
 
     public void multicastData(UserID from, UserID[] tolist, ByteBuffer message,
             boolean reliable, boolean sendToListeners) {
+    	
+    	if (!filter(message)) {
+    		return;
+    	}
+    	
         synchronized (hdr) {
             hdr.clear();
             hdr.put((byte) OPCODE.MulticastMessage.ordinal());
@@ -172,6 +187,11 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
     }
 
     public void broadcastData(UserID from, ByteBuffer message, boolean reliable) {
+    	
+    	if (!filter(message)) {
+    		return;
+    	}
+    	
         synchronized (hdr) {
             hdr.clear();
             hdr.put((byte) OPCODE.BroadcastMessage.ordinal());
@@ -429,6 +449,31 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
     public void close() {
         transportChannel.removeListener(this);
         channelClosed();
+    }
+    
+    /**
+     * Applies the channels filters (if any) to the given ByteBuffer.
+     * Each filter is applied sequentially.  If at any point, one of the 
+     * filters fail, false is immediately returned without running any 
+     * remaining filters.  If all filters pass, true is returned. 
+     * 
+     * @param message			the message to filter
+     * 
+     * @return true if the message passes all of the filters, false if any
+     * 			of them fail.
+     */
+    private boolean filter(ByteBuffer message) {
+    	if (filters == null) {		// no filter attached
+    		return true;
+    	}
+    	ByteBuffer messageCopy = message.duplicate();
+    	for (ChannelFilter curFilter : filters) {
+    		messageCopy.flip();
+    		if (!curFilter.filter(messageCopy)) {
+    			return false;
+    		}
+    	}
+    	return true;
     }
 
 }
