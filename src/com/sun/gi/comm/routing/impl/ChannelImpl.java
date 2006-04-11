@@ -192,6 +192,7 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
     }
 
     public void join(SGSUser user) {
+        /*
         synchronized (hdr) {
             hdr.clear();
             hdr.put((byte) OPCODE.UserJoinedChan.ordinal());
@@ -204,9 +205,9 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-        }
+        }*/
         try {
-            user.joinedChan(this);
+            user.joinedChan(this);            
             synchronized (localUsers) {
                 for (SGSUser existingUser : localUsers.values()) {
                     user.userJoinedChannel(localIDbytes,

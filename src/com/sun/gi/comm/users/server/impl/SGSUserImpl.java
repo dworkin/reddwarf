@@ -291,8 +291,8 @@ public class SGSUserImpl implements SGSUser, TransportProtocolServer {
         if (cb == null) {
             // we have done them all and are authenticated
             try {
-                transport.deliverUserAccepted(userID.toByteArray());
                 router.registerUser(this, subject);
+                transport.deliverUserAccepted(userID.toByteArray());               
             } catch (InstantiationException e) {
                 e.printStackTrace();
             } catch (IOException e) {
