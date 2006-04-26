@@ -29,6 +29,7 @@ handlers = java.util.logging.FileHandler, java.util.logging.ConsoleHandler
 
 # Limit the messages that are printed on the console to at least this level:
 java.util.logging.ConsoleHandler.level = INFO
+#java.util.logging.ConsoleHandler.level = WARNING
 #java.util.logging.ConsoleHandler.level = ALL
 java.util.logging.FileHandler.level = ALL
 
