@@ -117,7 +117,6 @@ public class Area implements GLO {
 
     public static GLOReference<Area> create() {
 	SimTask task = SimTask.getCurrent();
-	//GLOReference<Area> ref = task.createGLO(new Area(name), gloname);
 	Area templateArea = null;
 	try {
 	    templateArea = AreaFactory.create();
@@ -142,7 +141,7 @@ public class Area implements GLO {
     }
 
     protected Area() {
-	this("FooModule", "foo", 0f, 0f, 0f, 0f, null);
+	this("DEMO - House of Doors", "uncleflakeyshous", 15f, 15f, 0f, 0.78f, null);
     }
 
     protected Area(String moduleName,

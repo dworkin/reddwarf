@@ -97,10 +97,11 @@ import com.worldwizards.nwn.files.KeyTable;
 import com.worldwizards.nwn.files.NWNModuleInfo;
 import com.worldwizards.nwn.files.NWNResource;
 import com.worldwizards.nwn.files.resources.GFF;
-import com.worldwizards.nwn.j3d.AreaLoader;
-import com.worldwizards.nwn.j3d.AreaSceneBase;
+//import com.worldwizards.nwn.j3d.AreaLoader;
+//import com.worldwizards.nwn.j3d.AreaSceneBase;
 //import com.worldwizards.nwn.j3d.WalkMesh;
 import com.worldwizards.nwn.j3d.WalkMeshMap;
+import com.worldwizards.nwn.j3d.WalkMeshMapLoader;
 //import com.worldwizards.nwn.j3d.WalkMeshPosition;
 //import com.worldwizards.nwn.j3d.WalkMeshTracker;
 //import com.worldwizards.nwn.j3d.WalkMesh.Face;
@@ -165,11 +166,16 @@ public class AreaFactory {
 	WalkMeshMap wmm = null;
 
 	try {
+            ByteBuffer areaFile =
+                mgr.getRawResource(areaName, (short) 2012);
+            WalkMeshMapLoader loader = new WalkMeshMapLoader(mgr);
+            wmm = loader.load("start", areaFile, false);
+/*
 	    AreaLoader areaLoader = new AreaLoader(mgr);
 	    ByteBuffer areaBuf = mgr.getRawResource(areaName, (short) 2012);
 	    AreaSceneBase areaSB =
 		(AreaSceneBase) areaLoader.load(areaName, areaBuf, false);
-	    wmm = areaSB.getWalkMeshMap();
+*/
 	} catch (NullPointerException e) {
 	    e.printStackTrace();
 	}

@@ -365,7 +365,11 @@
 	    <classpath location="NWNSupport.jar"/>
 	    <classpath location="/usr/share/java/java3d/j3dutils.jar"/>
 	    <classpath location="/usr/share/java/java3d/vecmath.jar"/>
-	    <include name="com/sun/gi/apps/jnwn/**" />
+	    <include name="com/sun/gi/apps/jnwn/**"/>
+            <!--
+	    <exclude name="com/sun/gi/apps/jnwn/AreaFactory.java"/>
+	    <exclude name="com/sun/gi/apps/jnwn/WalkMeshCheatDetector.java"/>
+            -->
 	</javac>
     </target>
 
@@ -425,7 +429,7 @@
 	<java dir="release" jar="release/SunGameServer.jar" failonerror="true" fork="yes">
 	    <arg value="-C"/>
 	    <arg value="-V"/>
-	    <classpath refid="j2se.app.classpath"/>
+	    <classpath refid="j2se.server.classpath"/>
 	    <sysproperty key="java.util.logging.config.file"
 			 file="logging.properties"/>
 	</java>
@@ -437,7 +441,7 @@
 	    <arg value="-V"/>
 	    <arg value="-I"/>
 	    <arg value="file:JNWN-server.txt" />
-	    <classpath refid="j2se.app.classpath"/>
+	    <classpath refid="j2se.server.classpath"/>
 	    <classpath location="NWNSupport.jar"/>
 	    <classpath location="genesisfx.jar"/>
 	    <classpath location="/usr/share/java/java3d/j3dcore.jar"/>
@@ -452,7 +456,7 @@
     <target name="SGS">
 	<java dir="release" jar="release/SunGameServer.jar" failonerror="true" fork="yes">
 	    <arg value="-V" />
-	    <classpath refid="j2se.app.classpath" />
+	    <classpath refid="j2se.server.classpath" />
 	    <sysproperty key="java.util.logging.config.file"
 			 file="logging.properties" />
 	</java>
@@ -462,7 +466,7 @@
 	<java dir="release" jar="release/SunGameServer.jar" failonerror="true" fork="yes">
 	    <arg value="-I"/>
 	    <arg value="file:SGS-apps-2.conf" />
-	    <classpath refid="j2se.app.classpath" />
+	    <classpath refid="j2se.server.classpath" />
 	    <sysproperty key="java.util.logging.config.file"
 			 file="logging.properties" />
 	</java>
