@@ -158,6 +158,9 @@ public class SGSUserImpl implements SGSUser, TransportProtocolServer {
         } catch (BufferOverflowException e) {
           log.info("User recv buffer overflow forced disconnect: userid = "+userID); 
           forceDisconnect(null);
+        } catch (Exception e){
+          log.info("Unknwon transmit exception forced disconnect: userid = "+userID);   
+          forceDisconnect(null);
         }
     }
 
