@@ -83,9 +83,11 @@
 package com.sun.gi.comm.users.server.impl;
 
 import java.io.IOException;
+import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.logging.Logger;
 
 import javax.security.auth.Subject;
 import javax.security.auth.callback.Callback;
@@ -103,7 +105,7 @@ import com.sun.gi.comm.users.server.SGSUser;
 import com.sun.gi.comm.users.validation.UserValidator;
 
 public class SGSUserImpl implements SGSUser, TransportProtocolServer {
-
+    static Logger log = Logger.getLogger("com.sun.gi.comm.users");
     private Router router;
     private Subject subject;
     private UserID userID;
@@ -116,11 +118,12 @@ public class SGSUserImpl implements SGSUser, TransportProtocolServer {
     private UserValidator[] validators;
     private int validatorCounter;
     private boolean connected = true;
+    
 
     public SGSUserImpl(Router router, TransportProtocolTransmitter xmitter,
             UserValidator[] validators) {
         this.validators = validators;
-        this.router = router;
+        this.router = router;       
         transport = new BinaryPktProtocol();
         transport.setTransmitter(xmitter);
         transport.setServer(this);
@@ -149,8 +152,13 @@ public class SGSUserImpl implements SGSUser, TransportProtocolServer {
 
     public void msgReceived(byte[] channel, byte[] from, boolean reliable,
             ByteBuffer data) throws IOException {
-        transport.deliverUnicastMsg(channel, from, userID.toByteArray(),
+        try {
+            transport.deliverUnicastMsg(channel, from, userID.toByteArray(),
                 reliable, data);
+        } catch (BufferOverflowException e) {
+          log.info("User recv buffer overflow forced disconnect: userid = "+userID); 
+          forceDisconnect(null);
+        }
     }
 
     public void userJoinedSystem(byte[] user) throws IOException {
@@ -386,5 +394,23 @@ public class SGSUserImpl implements SGSUser, TransportProtocolServer {
         // This must be modified for fail-over when we support multiple
         // stacks
         router.deregisterUser(this);
+    }
+
+    /* This call forces a disconnect on the server side to a client.
+     * If reason is not-null it will be sent to the user in a packet before
+     * disconenction.  if it is null however no packet is sent.  
+     * This is necessary if disconnection is being forced for critical communciation
+     * failures such as a buffer overrun.
+     * @see com.sun.gi.comm.users.server.SGSUser#forceDisconnect(java.lang.String)
+     */
+    public void forceDisconnect(String reason) {
+        if (reason!=null){
+            //TODO: send disconnect info packet to user
+        } 
+        try {
+            transport.sendLogoutRequest();
+        } catch (IOException e) {        
+            e.printStackTrace();            
+        }
     }
 }

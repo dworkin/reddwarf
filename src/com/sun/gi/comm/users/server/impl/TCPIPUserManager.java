@@ -87,11 +87,13 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.sun.gi.comm.routing.Router;
 import com.sun.gi.comm.users.protocol.TransportProtocolTransmitter;
 import com.sun.gi.comm.users.server.UserManager;
+import com.sun.gi.comm.users.validation.UserValidator;
 import com.sun.gi.comm.users.validation.UserValidatorFactory;
 import com.sun.gi.utils.nio.NIOConnection;
 import com.sun.gi.utils.nio.NIOConnectionListener;
@@ -120,7 +122,7 @@ public class TCPIPUserManager implements NIOSocketManagerListener, UserManager
         p = (String) params.get("port");
         if (p != null) {
             port = Integer.parseInt(p);
-        }
+        }        
         init();
     }
 
@@ -160,7 +162,10 @@ public class TCPIPUserManager implements NIOSocketManagerListener, UserManager
 
     public void newConnection(final NIOConnection connection) {
         log.finer("New connection received by server");
-
+        UserValidator[] validators = null;
+        if (validatorFactory!= null){
+            validators = validatorFactory.newValidators();
+        }
         final SGSUserImpl user = new SGSUserImpl(router,
                 new TransportProtocolTransmitter() {
 
@@ -180,7 +185,7 @@ public class TCPIPUserManager implements NIOSocketManagerListener, UserManager
                         log.fine("Server disconnecting user");
                         connection.disconnect();
                     }
-                }, validatorFactory.newValidators());
+                }, validators);
 
         connection.addListener(new NIOConnectionListener() {
             public void packetReceived(NIOConnection conn,

@@ -111,4 +111,6 @@ public interface SGSUser {
     UserID getUserID();
 
     public void deregistered();
+    
+    public void forceDisconnect(String reason);
 }
