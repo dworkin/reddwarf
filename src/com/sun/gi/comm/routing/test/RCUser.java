@@ -304,4 +304,12 @@ public class RCUser extends JInternalFrame implements SGSUser {
 
     }
 
+	/* (non-Javadoc)
+	 * @see com.sun.gi.comm.users.server.SGSUser#forceDisconnect(java.lang.String)
+	 */
+	public void forceDisconnect(String reason) {
+		// TODO Auto-generated method stub
+		
+	}
+
 }
