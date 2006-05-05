@@ -70,6 +70,7 @@ package com.sun.gi.framework.install;
 import java.util.Collection;
 
 import com.sun.gi.comm.users.server.UserManager;
+import com.sun.gi.framework.status.StatusReport;
 
 /**
  * 
@@ -91,12 +92,12 @@ public interface SimulationContext {
 	/**
 	 * Starts the associated Simulation.
 	 */
-	public void start();
+	public void start(StatusReport installationReport);
 
 	/**
 	 * Stops the associated Simulation.
 	 */
-	public void stop();
+	public void stop(StatusReport installationReport);
 	
 	/**
 	 * Returns the current status of the Simulation, one of 

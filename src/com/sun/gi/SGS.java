@@ -120,16 +120,16 @@ import com.sun.gi.utils.StatisticalUUID;
  * </p>
  */
 public class SGS {
-    ReportManager reportManager;
+    //ReportManager reportManager;
     TimerManager timerManager;
     TransportManager transportManager;
-    ReportUpdater reportUpdater;
-    SGSUUID sliceID = new StatisticalUUID();
+    //ReportUpdater reportUpdater;
+    //SGSUUID sliceID = new StatisticalUUID();
     SimKernel kernel;
    // ObjectStore ostore;
     private boolean verbose = false;
     private String installFile = "file:SGS-apps.conf";
-    private static final long REPORTTTL = 1000;
+    //private static final long REPORTTTL = 1000;
     private Deployer deployer;
     private ManagerAgent agent;
 
@@ -147,13 +147,13 @@ public class SGS {
 		    if (verbose) {
 			System.err.println("Loading configuration from: " + installFile);
 		    }
-		    InstallationLoader installation = new InstallationURL(new URL(
-			    installFile));
+		    //InstallationLoader installation = new InstallationURL(new URL(
+		//	    installFile));
 		    
 		    // start framework services
 		    transportManager = new LRMPTransportManager();
 		    //transportManager = new NullTransportManager();
-		    reportManager = new ReportManagerImpl(transportManager, REPORTTTL);
+		    //reportManager = new ReportManagerImpl(transportManager, REPORTTTL);
 		    long heartbeat = 1000; // 1 sec heartbeat default
 		    String hbprop = System.getProperty("sgs.framework.timer.heartbeat");
 		    if (hbprop != null) {
@@ -165,8 +165,8 @@ public class SGS {
 		    kernel.setRawSocketManager(new RawSocketManagerImpl());
 	
 		    // start game services
-		    StatusReport installationReport =
-	                reportManager.makeNewReport("_SGS_discover_" + sliceID);
+		    //StatusReport installationReport =
+	            //    reportManager.makeNewReport("_SGS_discover_" + sliceID);
 	
 		    TransportManager routerTransportManager;
 		    /*
@@ -194,9 +194,9 @@ public class SGS {
 		    /*for (DeploymentRec game : installation.listGames()) {
 			startupGame(routerTransportManager, game, installationReport);
 		    }*/
-		    reportUpdater = new ReportUpdater(reportManager);
-		    installationReport.dump(System.err);
-		    reportUpdater.addReport(installationReport);
+		    //reportUpdater = new ReportUpdater(reportManager);
+		    //installationReport.dump(System.err);
+		    //reportUpdater.addReport(installationReport);
 		    
 		} catch (Exception ex) {
 		    ex.printStackTrace();
@@ -209,16 +209,16 @@ public class SGS {
      * Starts the HTML agent for remote management on the given port. 
      */
     private void startManagementAgent(int port) {
-	    agent = new ManagerAgent();
-	    agent.createDeployerMBean(deployer);
-	    agent.createSGSMBean(this);
-	    agent.startHTMLAdapter(port);
+        agent = new ManagerAgent();
+        agent.createDeployerMBean(deployer);
+        agent.createSGSMBean(this);
+        agent.startHTMLAdapter(port);
     }
     
     public void shutdown() {
     	if (deployer != null) {
-    		deployer.stopAll();
-    		agent.shutdown();
+    	    deployer.stopAll();
+    	    agent.shutdown();
     	}
     	System.exit(0);
     }

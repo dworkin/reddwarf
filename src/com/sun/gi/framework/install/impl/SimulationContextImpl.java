@@ -88,6 +88,7 @@ import com.sun.gi.framework.install.UserMgrRec;
 import com.sun.gi.framework.install.ValidatorRec;
 import com.sun.gi.framework.install.SimulationContext.StatusType;
 import com.sun.gi.framework.interconnect.TransportManager;
+import com.sun.gi.framework.status.StatusReport;
 import com.sun.gi.logic.SimKernel;
 import com.sun.gi.logic.Simulation;
 import com.sun.gi.logic.impl.SimulationImpl;
@@ -117,7 +118,11 @@ public class SimulationContextImpl implements SimulationContext {
 	private TransportManager transportManager;
 	private List<UserManager> userManagerList;
 	private Simulation simulation;
-	
+	private int reportID = -1;           // this simulation's entry in the
+                                        // installation report.
+        private String statusBlockName;
+        private boolean firstStart = true;
+        
 	public SimulationContextImpl(SimKernel kernel, TransportManager transportManager, 
 								DeploymentRec deployment) {
 		this.deployment = deployment;
@@ -126,109 +131,112 @@ public class SimulationContextImpl implements SimulationContext {
 		this.userManagerList = new LinkedList<UserManager>();
 	}
 	
-	public void start() {
-		if (deployment == null || status.equals(StatusType.STARTED)) {
-			return;
-		}
-		Router router = null;
-		int gameID = deployment.getID();
-		try {
-		    router = new RouterImpl(transportManager);
-		} catch (Exception e) {
-		    e.printStackTrace();
-		    return;
-		}
-		router.setChannelFilters(deployment.getChannelFilters());
+	public void start(StatusReport installationReport) {
+            if (deployment == null || status.equals(StatusType.STARTED)) {
+            	return;
+            }
+            Router router = null;
+            int gameID = deployment.getID();
+            try {
+                router = new RouterImpl(transportManager);
+            } catch (Exception e) {
+                e.printStackTrace();
+                return;
+            }
+            router.setChannelFilters(deployment.getChannelFilters());
+            
+            if (statusBlockName == null) {
+                int gameCount = Integer.parseInt(installationReport.getParameter(
+                                "game", "count"));
+                statusBlockName = "game." + gameCount;
+                installationReport.setParameter("game", "count",
+                                            Integer.toString(gameCount + 1));
+                
+            }
+            
+            installationReport.setParameter(statusBlockName, "id",
+            	Integer.toString(gameID));
+            installationReport.setParameter(statusBlockName, "description",
+            	deployment.getDescription());
+            installationReport.setParameter(statusBlockName, "name", deployment.getName());
+            		
+            int umgrCount = 0;
+            
+            // create simulation container for game
+            if (deployment.getBootClass() != null) {
+                try {
+                    ObjectStore ostore = new TSOObjectStore(new PersistantInMemoryDataSpace(gameID));
+                    //ostore = new TSOObjectStore(new InMemoryDataSpace(gameID));
+                    String cleanProperty = System.getProperty("sgs.ostore.startclean");
+                    if ((cleanProperty != null)
+                    	&& (cleanProperty.equalsIgnoreCase("true"))) {
+                        ostore.clear();
+                    }
+                    
+            //			 set app info system properties
+            	    String name = deployment.getName();
+            	    // convert spaces to underbars
+            	    name = name.replaceAll(" ","_").toLowerCase();
+            	    String prefix = "sgs.game."+name+".";
+            	    String rootProp =prefix+"rootURL";
+            	    System.setProperty(rootProp, deployment.getRootURL());
+            		simulation = new SimulationImpl(kernel, ostore, router, deployment);
+                } catch (InstantiationException e) {
+            
+            		e.printStackTrace();
+            		return;
+                }
+                
+            }
+            
+            // create user managers
+            for (UserMgrRec umgrRec : deployment.getUserManagers()) {
+                String serverClassName = umgrRec.getServerClassName();
+                String umgrBlock = statusBlockName + ".umgr." + umgrCount;
+                umgrCount++;
+                installationReport.setParameter(statusBlockName + ".umgr", "count", 
+                        Integer.toString(umgrCount));
+                try {
+                    Class serverClass = Class.forName(serverClassName);
+                    Constructor constructor = serverClass.getConstructor(new Class[] {
+                    	Router.class, Map.class });
+                    UserManager umgr = (UserManager) constructor.newInstance(new Object[] {
+                    	router, umgrRec.getParameterMap() });
+                    
+                    userManagerList.add(umgr);
+                    installationReport.setParameter(umgrBlock, "clientClassName",
+                    	umgr.getClientClassname());
+                    Set clientParams = umgr.getClientParams().entrySet();
+                    installationReport.setParameter(umgrBlock + ".params", "count",
+                    			Integer.toString(clientParams.size()));
+                    int c = 0;
+                    for (Iterator i2 = clientParams.iterator(); i2.hasNext();) {
+                        Entry entry = (Entry) i2.next();
+                        installationReport.setParameter(umgrBlock + ".params.keys",
+                    	    Integer.toString(c), (String) entry.getKey());
+                        installationReport.setParameter(umgrBlock
+                    	    + ".params.values", Integer.toString(c),
+                    	    (String) entry.getValue());
+                        c++;
+                    }
+            
+                    if (umgrRec.hasValidatorModules()) {
+                        UserValidatorFactory validatorFactory = new UserValidatorFactoryImpl();
+                        for (ValidatorRec lmoduleRec : umgrRec.getValidatorModules()) {
+                            String loginModuleClassname = lmoduleRec.getValidatorClassName();
+                            Class loginModuleClass = Class.forName(loginModuleClassname);
+                            validatorFactory.addLoginModule(loginModuleClass,
+                    			lmoduleRec.getParameterMap());
+                        }
+                        umgr.setUserValidatorFactory(validatorFactory);
+                    }
+            
+                } catch (Exception ex) {
+                	ex.printStackTrace();
+                }
 
-/*		int gameCount = Integer.parseInt(installationReport.getParameter(
-			"game", "count"));
-		String statusBlockName = "game." + gameCount;
-		installationReport.setParameter(statusBlockName, "id",
-			Integer.toString(gameID));
-		installationReport.setParameter(statusBlockName, "description",
-			game.getDescription());
-		installationReport.setParameter(statusBlockName, "name", game.getName());
-		*/
-		//int umgrCount = 0;
-
-		// create simulation container for game
-		if (deployment.getBootClass() != null) {
-		    try {
-				ObjectStore ostore = new TSOObjectStore(new PersistantInMemoryDataSpace(gameID));
-				//ostore = new TSOObjectStore(new InMemoryDataSpace(gameID));
-				String cleanProperty = System.getProperty("sgs.ostore.startclean");
-				if ((cleanProperty != null)
-					&& (cleanProperty.equalsIgnoreCase("true"))) {
-/*				    if (verbose) {
-						System.err.println("Clearing Object Store");
-					}
-*/					
-				    ostore.clear();
-				}
-	//			 set app info system properties
-			    String name = deployment.getName();
-			    // convert spaces to underbars
-			    name = name.replaceAll(" ","_").toLowerCase();
-			    String prefix = "sgs.game."+name+".";
-			    String rootProp =prefix+"rootURL";
-			    //System.out.println(rootProp+" to "+game.getRootURL());
-			    System.setProperty(rootProp, deployment.getRootURL());
-				simulation = new SimulationImpl(kernel, ostore, router, deployment);
-		    } catch (InstantiationException e) {
-
-				e.printStackTrace();
-				return;
-		    }
-		    
-		}
-
-		// create user managers
-		for (UserMgrRec umgrRec : deployment.getUserManagers()) {
-		    String serverClassName = umgrRec.getServerClassName();
-//		    String umgrBlock = statusBlockName + ".umgr." + umgrCount;
-//		    umgrCount++;
-//		    installationReport.setParameter(statusBlockName + ".umgr", "count",
-//			    Integer.toString(umgrCount));
-		    try {
-				Class serverClass = Class.forName(serverClassName);
-				Constructor constructor = serverClass.getConstructor(new Class[] {
-					Router.class, Map.class });
-				UserManager umgr = (UserManager) constructor.newInstance(new Object[] {
-					router, umgrRec.getParameterMap() });
-				
-				userManagerList.add(umgr);
-/*				installationReport.setParameter(umgrBlock, "clientClassName",
-					umgr.getClientClassname());
-				Set clientParams = umgr.getClientParams().entrySet();
-				installationReport.setParameter(umgrBlock + ".params", "count",
-							Integer.toString(clientParams.size()));
-				int c = 0;
-				for (Iterator i2 = clientParams.iterator(); i2.hasNext();) {
-				    Entry entry = (Entry) i2.next();
-				    installationReport.setParameter(umgrBlock + ".params.keys",
-					    Integer.toString(c), (String) entry.getKey());
-				    installationReport.setParameter(umgrBlock
-					    + ".params.values", Integer.toString(c),
-					    (String) entry.getValue());
-				    c++;
-				}
-*/
-				if (umgrRec.hasValidatorModules()) {
-				    UserValidatorFactory validatorFactory = new UserValidatorFactoryImpl();
-				    for (ValidatorRec lmoduleRec : umgrRec.getValidatorModules()) {
-						String loginModuleClassname = lmoduleRec.getValidatorClassName();
-						Class loginModuleClass = Class.forName(loginModuleClassname);
-						validatorFactory.addLoginModule(loginModuleClass,
-							lmoduleRec.getParameterMap());
-				    }
-				    umgr.setUserValidatorFactory(validatorFactory);
-				}
-
-		    } catch (Exception ex) {
-		    	ex.printStackTrace();
-		    }
-		}
-		status = StatusType.STARTED;
+            }
+            status = StatusType.STARTED;
 	}
 
 	/**
@@ -237,39 +245,42 @@ public class SimulationContextImpl implements SimulationContext {
 	 * This implemenation shuts down all running user managers, closes the 
 	 * object store, and finally removes the Simulation from the SimKernel.
 	 */
-	public void stop() {
-		if (status == StatusType.STOPPED) {
-			return;
-		}
-		
-		for (UserManager curUserManager : userManagerList) {
-			curUserManager.shutdown();
-		}
-		userManagerList.clear();
-		simulation.getObjectStore().close();
-		kernel.removeSimulation(simulation);
-		
-		status = StatusType.STOPPED;
+	public void stop(StatusReport installationReport) {
+            if (status == StatusType.STOPPED) {
+            	return;
+            }
+            
+            for (UserManager curUserManager : userManagerList) {
+            	curUserManager.shutdown();
+            }
+            userManagerList.clear();
+            simulation.getObjectStore().close();
+            kernel.removeSimulation(simulation);
+            
+            // remove all entries of this game from the installationReport
+            installationReport.removeBlock(statusBlockName);
+            
+            status = StatusType.STOPPED;
 	}
 
 	public StatusType getStatus() {
-		return status;
+	    return status;
 	}
 
 	public String getName() {
-		return deployment.getName();
+	    return deployment.getName();
 	}
 
 	public int getID() {
-		return deployment.getID();
+	    return deployment.getID();
 	}
 	
 	public Collection<UserManager> getUserManagers() {
-		return Collections.unmodifiableCollection(userManagerList);
+	    return Collections.unmodifiableCollection(userManagerList);
 	}
 	
 	public String toString() {
-		return "[Simulation Context for " + getName() + " ID " + getID() + "]";
+	    return "[Simulation Context for " + getName() + " ID " + getID() + "]";
 	}
 
 }

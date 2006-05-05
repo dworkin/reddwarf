@@ -80,7 +80,13 @@ import com.sun.gi.framework.install.DeploymentRec;
 import com.sun.gi.framework.install.InstallationLoader;
 import com.sun.gi.framework.install.SimulationContext;
 import com.sun.gi.framework.interconnect.TransportManager;
+import com.sun.gi.framework.status.ReportManager;
+import com.sun.gi.framework.status.ReportUpdater;
+import com.sun.gi.framework.status.StatusReport;
+import com.sun.gi.framework.status.impl.ReportManagerImpl;
 import com.sun.gi.logic.SimKernel;
+import com.sun.gi.utils.SGSUUID;
+import com.sun.gi.utils.StatisticalUUID;
 
 /**
  * 
@@ -98,63 +104,83 @@ import com.sun.gi.logic.SimKernel;
  */
 public class DeployerImpl implements Deployer {
 	
-	private SimKernel kernel;
-	private TransportManager transportManager;
-	private Map<Integer, SimulationContext> contextMap;
-	
-	public DeployerImpl(SimKernel kernel, TransportManager transportManager, 
-										URL url) throws InstantiationException {
-		
-		this.kernel = kernel;
-		this.transportManager = transportManager;
-		contextMap = new HashMap<Integer, SimulationContext>();
-		
-		InstallationLoader loader = null;
-		try {
-			loader = new InstallationURL(url);
-		}
-		catch (Exception e) {
-			e.printStackTrace();
-		}
-		if (loader == null) {
-			throw new InstantiationException("Missing Installation Loader");
-		}
-		for (DeploymentRec curRec : loader.listGames()) {
-			SimulationContext curContext = new SimulationContextImpl(kernel, 
-											transportManager, curRec);
-			contextMap.put(curContext.getID(), curContext);
-		}
-		startAll();
-	}
-	
-	private void startAll() {
-		for (Entry<Integer, SimulationContext> curEntry : contextMap.entrySet()) {
-			startContext(curEntry.getKey());
-		}
-	}
-	
-	public void startContext(int appID) {
-		SimulationContext context = contextMap.get(appID);
-		if (context != null) {
-			context.start();
-		}
-	}
-	
-	public void stopAll() {
-		for (SimulationContext curContext : contextMap.values()) {
-			stopContext(curContext.getID());
-		}
-	}
-
-	public void stopContext(int appID) {
-		SimulationContext context = contextMap.get(appID);
-		if (context != null) {
-			context.stop();
-		}
-	}
-	
-	public Collection<SimulationContext> listContexts() {
-		return Collections.unmodifiableCollection(contextMap.values());
-	}
+    private static final long REPORTTTL = 1000;
+    
+    private SimKernel kernel;
+    private TransportManager transportManager;
+    private Map<Integer, SimulationContext> contextMap;
+    private SGSUUID sliceID = new StatisticalUUID();
+    private StatusReport installationReport;
+    
+    public DeployerImpl(SimKernel kernel, TransportManager transportManager, 
+    					URL url) throws InstantiationException {
+    	
+    	this.kernel = kernel;
+    	this.transportManager = transportManager;
+    	contextMap = new HashMap<Integer, SimulationContext>();
+    	
+    	InstallationLoader loader = null;
+    	try {
+    	    loader = new InstallationURL(url);
+    	}
+    	catch (Exception e) {
+    	    e.printStackTrace();
+    	}
+    	if (loader == null) {
+    	    throw new InstantiationException("Missing Installation Loader");
+    	}
+    	for (DeploymentRec curRec : loader.listGames()) {
+    	    SimulationContext curContext = new SimulationContextImpl(kernel, 
+    						transportManager, curRec);
+    	    contextMap.put(curContext.getID(), curContext);
+    	}
+    	firstStart();
+    }
+    
+    /**
+     * This should be called once on server start, and not ever again.
+     */
+    private void firstStart() {
+        ReportManager reportManager = null;
+        try {
+            reportManager = new ReportManagerImpl(transportManager, REPORTTTL);
+        }
+        catch (IOException ioe) {
+            ioe.printStackTrace();
+        }
+        installationReport = reportManager.makeNewReport("_SGS_discover_" + sliceID);
+        installationReport.setParameter("game", "count", "0");
+        
+        for (Entry<Integer, SimulationContext> curEntry : contextMap.entrySet()) {
+            startContext(curEntry.getKey());
+        }
+        ReportUpdater reportUpdater = new ReportUpdater(reportManager);
+        installationReport.dump(System.err);
+        reportUpdater.addReport(installationReport);
+    }
+    
+    public void startContext(int appID) {
+    	SimulationContext context = contextMap.get(appID);
+    	if (context != null) {
+    	    context.start(installationReport);
+    	}
+    }
+    
+    public void stopAll() {
+    	for (SimulationContext curContext : contextMap.values()) {
+    	    stopContext(curContext.getID());
+    	}
+    }
+    
+    public void stopContext(int appID) {
+    	SimulationContext context = contextMap.get(appID);
+    	if (context != null) {
+    	    context.stop(installationReport);
+    	}
+    }
+    
+    public Collection<SimulationContext> listContexts() {
+    	return Collections.unmodifiableCollection(contextMap.values());
+    }
 
 }

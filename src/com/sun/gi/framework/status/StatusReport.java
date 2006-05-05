@@ -86,6 +86,14 @@ public interface StatusReport {
     public int reportSize();
 
     public void writeReport(ByteBuffer buff);
+    
+    /**
+     * Removes the given block and subsequent sub-blocks from the report.
+     * The root cannot be removed.
+     * 
+     * @param blockPath         the block path
+     */
+    public void removeBlock(String blockPath);
 
     public String rootName();
 

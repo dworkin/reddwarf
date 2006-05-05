@@ -248,8 +248,13 @@ public class DiscoveryServer {
                 "count"));
         for (int g = 0; g < gameCount; g++) {
             String gamePrefix = "game." + g;
-            int gameID = Integer.parseInt(statusReport.getParameter(gamePrefix,
-                    "id"));
+            String gameIDStr = statusReport.getParameter(gamePrefix, "id");
+            
+            // this game was installed, but has since been removed
+            if (gameIDStr == null) {    
+                continue;
+            }
+            int gameID = Integer.parseInt(gameIDStr);
             String gameName = statusReport.getParameter(gamePrefix, "name");
             String gameDescr = statusReport.getParameter(gamePrefix,
                     "description");

@@ -104,6 +104,17 @@ public class StatusReportImpl implements StatusReport {
         public void addChild(ReportBlock blk) {
             children.add(blk);
         }
+        
+        /**
+         * Removes the given ReportBlock if it exists.
+         * 
+         * @param blk           the ReportBlock to remove
+         */
+        public void removeChild(ReportBlock blk) {
+            if (children.contains(blk)) {
+                children.remove(blk);
+            }
+        }
 
         public ReportBlock getChild(String childName) {
             for (ReportBlock block : children) {
@@ -271,6 +282,18 @@ public class StatusReportImpl implements StatusReport {
         }
         return currentBlock;
 
+    }
+    
+    public void removeBlock(String blockPath) {
+        ReportBlock block = getBlock(blockPath);
+
+        // can't remove the root
+        if (block == null || block.equals(root)) {
+            return;
+        }
+        String parentName = blockPath.substring(0, blockPath.lastIndexOf("."));
+        ReportBlock parent = getBlock(parentName);
+        parent.removeChild(block);
     }
 
     /**
