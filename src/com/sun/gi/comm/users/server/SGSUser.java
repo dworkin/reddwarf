@@ -113,4 +113,5 @@ public interface SGSUser {
     public void deregistered();
     
     public void forceDisconnect(String reason);
+    
 }

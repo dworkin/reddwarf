@@ -241,22 +241,22 @@ public class ClientConnectionManagerImpl
                 listener.disconnected();
             }
         } else { // lost connection
-            if ((!exiting) && (keyTimeout > System.currentTimeMillis())) {
-                // valid reconn key
-                listener.failOverInProgress();
-                reconnecting = true;
-
-		try {
-		    Thread.sleep(connWaitMS);
-		} catch (InterruptedException e) {
-		    // doesn't matter.
-		}
-
-                connect(umanager);
-            } else { // we cant fail over
-                connected = false;
-                listener.disconnected();
-            }
+	        if ((!exiting) && (keyTimeout > System.currentTimeMillis())) {
+	            // valid reconn key
+	            listener.failOverInProgress();
+	            reconnecting = true;
+	
+				try {
+				    Thread.sleep(connWaitMS);
+				} catch (InterruptedException e) {
+				    // doesn't matter.
+				}
+	
+	            connect(umanager);
+	        } else { // we cant fail over
+	            connected = false;
+	            listener.disconnected();
+	        }
         }
     }
 

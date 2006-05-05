@@ -110,6 +110,8 @@ public class NIOSocketManager implements Runnable {
 
     private Selector selector;
     private volatile boolean shutdown;
+    
+    private boolean acceptorShutdown = false;
 
     private int tcpBufSize;
     private int udpBufSize;
@@ -128,6 +130,13 @@ public class NIOSocketManager implements Runnable {
 
     private final List<SelectableChannel> writeQueue =
 	new ArrayList<SelectableChannel>();
+    
+    /**
+     * A List of the Server Sockets currently listening on their
+     * respective ports.
+     */
+    private final List<ServerSocketChannel> serverSocketList = 
+    	new ArrayList<ServerSocketChannel>();
 
     public NIOSocketManager() throws IOException {
         this(512 * 1024,  // tcp buffer size in bytes
@@ -149,10 +158,19 @@ public class NIOSocketManager implements Runnable {
     }
 
     public void acceptConnectionsOn(SocketAddress addr) throws IOException {
+    	// if we are in the process of shutting down, no further server sockets
+    	// are allowed.
+    	if (acceptorShutdown) {
+    		return;
+    	}
 
         ServerSocketChannel channel = ServerSocketChannel.open();
         channel.configureBlocking(false);
         channel.socket().bind(addr);
+        
+        synchronized(serverSocketList) {
+        	serverSocketList.add(channel);
+        }
 
         synchronized (acceptorQueue) {
             acceptorQueue.add(channel);
@@ -205,62 +223,66 @@ public class NIOSocketManager implements Runnable {
     public void run() {
 
         while (! shutdown) {
+        	
+        	if (acceptorShutdown) {
+        		closeServerSockets();
+        	}
 
-	    if ((selector == null) || (! selector.isOpen())) {
-		try {
-		    openSelector();
-		} catch (IOException e) {
-		    log.severe("Could not open the selector!");
-		    // TODO:  need to take more drastic action
-		}
-	    }
-
-	    try {
-		synchronized (initiatorQueue) {
-		    for (NIOConnection conn : initiatorQueue) {
+		    if ((selector == null) || (! selector.isOpen())) {
 			try {
-			    conn.registerConnect(selector);
-			} catch (IOException ex) {
-			    ex.printStackTrace();
-			    log.throwing(getClass().getName(), "run", ex);
+			    openSelector();
+			} catch (IOException e) {
+			    log.severe("Could not open the selector!");
+			    // TODO:  need to take more drastic action
 			}
 		    }
-		    initiatorQueue.clear();
-		}
-
-		synchronized (receiverQueue) {
-		    for (NIOConnection conn : receiverQueue) {
-			try {
-			    conn.open(selector);
-			} catch (IOException ex) {
-			    ex.printStackTrace();
-			    log.throwing(getClass().getName(), "run", ex);
+	
+		    try {
+			synchronized (initiatorQueue) {
+			    for (NIOConnection conn : initiatorQueue) {
+				try {
+				    conn.registerConnect(selector);
+				} catch (IOException ex) {
+				    ex.printStackTrace();
+				    log.throwing(getClass().getName(), "run", ex);
+				}
+			    }
+			    initiatorQueue.clear();
 			}
-		    }
-		    receiverQueue.clear();
-		}
-
-		synchronized (acceptorQueue) {
-		    for (ServerSocketChannel chan : acceptorQueue) {
-			try {
-			    chan.register(selector, OP_ACCEPT);
-			} catch (ClosedChannelException ex) {
-			    ex.printStackTrace();
-			    log.throwing(getClass().getName(), "run", ex);
+	
+			synchronized (receiverQueue) {
+			    for (NIOConnection conn : receiverQueue) {
+				try {
+				    conn.open(selector);
+				} catch (IOException ex) {
+				    ex.printStackTrace();
+				    log.throwing(getClass().getName(), "run", ex);
+				}
+			    }
+			    receiverQueue.clear();
 			}
-		    }
-		    acceptorQueue.clear();
-		}
-
-		synchronized (writeQueue) {
-		    for (SelectableChannel chan : writeQueue) {
-			SelectionKey key = chan.keyFor(selector);
-			if (key != null && key.isValid()) {
-			    key.interestOps(key.interestOps() | OP_WRITE);
+	
+			synchronized (acceptorQueue) {
+			    for (ServerSocketChannel chan : acceptorQueue) {
+				try {
+				    chan.register(selector, OP_ACCEPT);
+				} catch (ClosedChannelException ex) {
+				    ex.printStackTrace();
+				    log.throwing(getClass().getName(), "run", ex);
+				}
+			    }
+			    acceptorQueue.clear();
 			}
-		    }
-		    writeQueue.clear();
-		}
+	
+			synchronized (writeQueue) {
+			    for (SelectableChannel chan : writeQueue) {
+				SelectionKey key = chan.keyFor(selector);
+				if (key != null && key.isValid()) {
+				    key.interestOps(key.interestOps() | OP_WRITE);
+				}
+			    }
+			    writeQueue.clear();
+			}
 
                 log.finest("Calling select");
 
@@ -469,7 +491,40 @@ public class NIOSocketManager implements Runnable {
     }
 
     public void shutdown() {
-	shutdown = true;
-	closeSelector();
+		shutdown = true;
+		closeSelector();
+		closeServerSockets();
+    }
+    
+    /**
+     * Attempts to close any server sockets that may be listening for
+     * incoming connections.  This should be called as part of the shutdown
+     * process.
+     */
+    private void closeServerSockets() {
+		synchronized (acceptorQueue) {
+			acceptorQueue.clear();
+		}
+		synchronized (serverSocketList) {
+			for (ServerSocketChannel curChannel : serverSocketList) {
+				try {
+					curChannel.close();
+				}
+				catch (IOException ioe) {
+					ioe.printStackTrace();
+				}
+			}
+			serverSocketList.clear();
+		}
+    }
+    
+    /**
+     * Tells the socket manager to stop accepting incoming connections.
+     * Presumabley this will be followed by a call to shutdown.
+     *
+     */
+    public void shutdownAccept() {
+    	acceptorShutdown = true;
+    	selector.wakeup();
     }
 }

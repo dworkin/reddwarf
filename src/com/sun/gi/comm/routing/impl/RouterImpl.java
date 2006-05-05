@@ -114,6 +114,8 @@ public class RouterImpl implements Router {
     private List<ChannelFilterRec> channelFilters;
 
     protected int keySecondsToLive;
+    
+    private boolean shutdown = false;
 
     private enum OPCODE {
         UserJoined,
@@ -210,6 +212,25 @@ public class RouterImpl implements Router {
     
     public void setChannelFilters(List<ChannelFilterRec> filters) {
     	this.channelFilters = filters;
+    }
+    
+    public void shutdown() {
+    	shutdown = true;
+    	synchronized (userMap) {
+    		for (SGSUser user : userMap.values()) {
+    			user.forceDisconnect(null);
+    		}
+    	}
+    	
+    	// close any channels.  First copy the ChannelIDs to a temp
+    	// list since closing the channel removes it from the channelMap.
+    	List<ChannelID> channelIDList = null;
+    	synchronized (channelMap) {
+    		channelIDList = new ArrayList<ChannelID>(channelMap.keySet());
+    	}
+    	for (ChannelID curChannelID : channelIDList) {
+    		closeChannel(curChannelID);
+    	}
     }
 
     /**
@@ -311,6 +332,10 @@ public class RouterImpl implements Router {
 
     public void registerUser(SGSUser user, Subject subject)
             throws InstantiationException, IOException {
+    	
+    	if (shutdown) {
+    		return;
+    	}
         userMap.put(user.getUserID(), user);
         xmitUserJoined(user.getUserID());
         issueNewKey(user);
@@ -418,6 +443,10 @@ public class RouterImpl implements Router {
 
     public SGSChannel openChannel(String channelName) {
         SGSChannel sgschan = channelNameMap.get(channelName);
+        
+        // TODO: currently it is possible for an app to open another channel
+        // while the router is being shutdown.  We should close this 
+        // hole during the next pass.
         if (sgschan == null) {
             TransportChannel tchan;
             try {

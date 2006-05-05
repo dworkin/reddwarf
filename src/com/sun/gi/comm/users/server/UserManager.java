@@ -122,4 +122,12 @@ public interface UserManager {
      * the UserManagerClient class when it connects to this UserManager.
      */
     public Map<String, String> getClientParams();
+    
+    /**
+     * Initiates the shutdown of this UserManager.  The shutdown process is
+     * implementation specific, but it generally involves cleaning up resources 
+     * and closing network connections.  A UserManager will not accept any new 
+     * connections after shutdown has been initiated.
+     */
+    public void shutdown();
 }

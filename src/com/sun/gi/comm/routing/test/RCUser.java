@@ -311,5 +311,7 @@ public class RCUser extends JInternalFrame implements SGSUser {
 		// TODO Auto-generated method stub
 		
 	}
+	
+	public void disconnect() {}
 
 }

@@ -220,7 +220,6 @@ public class Player implements SimUserDataListener {
 	     */
 
 	    Room roomGLO = currentRoomRef.get(simTask);
-	    
 
 		/*
 		 * the getDescription command requires we pass in a
@@ -253,7 +252,9 @@ public class Player implements SimUserDataListener {
 		 * delivery flag to true.
 		 */
 		simTask.sendData(appChannel, from, outbuff, true);
-	    
+
+
+
 	} else {
 	    if (debug) {
 		System.out.println("unknown command: " + words[0]);

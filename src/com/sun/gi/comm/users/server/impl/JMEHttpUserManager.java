@@ -292,5 +292,9 @@ public class JMEHttpUserManager
         }
         System.out.println("timing out user");
     }
+    
+    public void shutdown() {
+    	// TODO implement me
+    }
 
 }

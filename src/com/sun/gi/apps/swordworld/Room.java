@@ -242,6 +242,7 @@ public class Room implements GLO {
 		SimTask simTask = SimTask.getCurrent();
 		Player player = playerRef.get(simTask);
 
+	    player.setCurrentRoom(simTask.lookupReferenceFor(this));
 		player.setCurrentRoom(simTask.lookupReferenceFor(this));
 
 	}

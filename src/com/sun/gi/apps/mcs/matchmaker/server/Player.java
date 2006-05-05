@@ -1145,6 +1145,7 @@ public class Player implements SimUserDataListener {
     
     private void sendResponse(SimTask task, CommandList list) {
         ChannelID cid = task.openChannel(LOBBY_MANAGER_CONTROL_CHANNEL);
+        
 
         sendResponse(task, list, cid);
     }

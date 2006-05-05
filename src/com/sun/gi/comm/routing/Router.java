@@ -183,4 +183,10 @@ public interface Router {
      * 						by this Router.
      */
     public void setChannelFilters(List<ChannelFilterRec> filters);
+    
+    /**
+     * Initiates shutting down the Router.  In general this includes 
+     * disconnecting all users and closing channels.
+     */
+    public void shutdown();
 }

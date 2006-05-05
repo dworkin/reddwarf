@@ -157,6 +157,19 @@ public class TCPIPUserManager implements NIOSocketManagerListener, UserManager
     public void setUserValidatorFactory(UserValidatorFactory factory) {
         validatorFactory = factory;
     }
+    
+    /**
+     * {@inheritDoc}
+     * <p>
+     * This implementation shuts down the socket manager's listening sockets,
+     * then shuts down the router, and finally shuts down the rest of the 
+     * socket manager.
+     */
+    public void shutdown() {
+    	socketMgr.shutdownAccept();
+    	router.shutdown();
+    	socketMgr.shutdown();
+    }
 
     // NIOSocketManagerListener methods
 
@@ -223,4 +236,5 @@ public class TCPIPUserManager implements NIOSocketManagerListener, UserManager
     public void connectionFailed(NIOConnection connection) {
         throw new UnsupportedOperationException();
     }
+    
 }
