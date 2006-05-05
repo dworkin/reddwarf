@@ -87,7 +87,8 @@ public class ReportUpdater {
                 lastUpdate = System.currentTimeMillis();
                 while (true) {
                     try {
-                        Thread.sleep(updateTime);
+                    		// update report when its 50% expired to ensure against delays in comm
+                        Thread.sleep(updateTime/2);
                     } catch (InterruptedException ex) {
                         ex.printStackTrace();
                     }
