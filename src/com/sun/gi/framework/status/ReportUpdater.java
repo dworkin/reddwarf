@@ -93,7 +93,7 @@ public class ReportUpdater {
                         ex.printStackTrace();
                     }
                     long time = System.currentTimeMillis();
-                    if (time > (lastUpdate + updateTime)) {
+                    if (time > (lastUpdate + (updateTime/2))) {
                         lastUpdate = time;
                         for (StatusReport report : reports) {
                             try {
