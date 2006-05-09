@@ -72,7 +72,8 @@
     </target>
 
     <target name="realclean" depends="clean, clean.j2meAPI">
-	<delete dir="doc" />
+	<delete dir="doc/doxygen" />
+	<delete dir="doc/javadoc" />
 	<delete dir="release" />
 	<delete file="SunGameServer.zip" />
     </target>
