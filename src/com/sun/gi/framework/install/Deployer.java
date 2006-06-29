@@ -69,6 +69,8 @@ package com.sun.gi.framework.install;
 
 import java.util.Collection;
 
+import com.sun.gi.framework.status.ReportManager;
+
 /**
  * 
  * <p>Title: Deployer</p>
@@ -110,5 +112,7 @@ public interface Deployer {
 	 * @return a Collection of installed SimulationContexts
 	 */
 	public Collection<SimulationContext> listContexts();
+
+    
 	
 }

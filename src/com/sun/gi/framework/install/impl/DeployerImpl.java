@@ -137,11 +137,13 @@ public class DeployerImpl implements Deployer {
     	firstStart();
     }
     
+    private ReportManager reportManager=null;
+    
     /**
      * This should be called once on server start, and not ever again.
      */
     private void firstStart() {
-        ReportManager reportManager = null;
+        reportManager = null;
         try {
             reportManager = new ReportManagerImpl(transportManager, REPORTTTL);
         }
@@ -181,6 +183,13 @@ public class DeployerImpl implements Deployer {
     
     public Collection<SimulationContext> listContexts() {
     	return Collections.unmodifiableCollection(contextMap.values());
+    }
+    
+    /**
+     * @return
+     */
+    public ReportManager getReportManager(){
+        return reportManager;
     }
 
 }

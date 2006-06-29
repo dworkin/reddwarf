@@ -174,6 +174,8 @@ public class ReportManagerImpl
         ByteBuffer buff = ByteBuffer.allocate(report.reportSize());
         report.writeReport(buff);
         chan.sendData(buff);
+        buff.flip();
+        dataArrived(buff); // log to self
     }
 
     /**

@@ -80,6 +80,7 @@ import com.sun.gi.comm.routing.impl.RouterImpl;
 import com.sun.gi.comm.users.server.UserManager;
 import com.sun.gi.comm.users.validation.UserValidatorFactory;
 import com.sun.gi.comm.users.validation.impl.UserValidatorFactoryImpl;
+import com.sun.gi.framework.discovery.XMLDiscoveryFileManager;
 import com.sun.gi.framework.install.Deployer;
 import com.sun.gi.framework.install.DeploymentRec;
 import com.sun.gi.framework.install.InstallationLoader;
@@ -132,6 +133,7 @@ public class SGS {
     //private static final long REPORTTTL = 1000;
     private Deployer deployer;
     private ManagerAgent agent;
+    private XMLDiscoveryFileManager localDiscoveryXMLMgr;
 
     public SGS() {
 		String verboseString = System.getProperty("sgs.framework.verbose");
@@ -151,8 +153,8 @@ public class SGS {
 		//	    installFile));
 		    
 		    // start framework services
-		    transportManager = new LRMPTransportManager();
-		    //transportManager = new NullTransportManager();
+		    //transportManager = new LRMPTransportManager();
+		    transportManager = new NullTransportManager();
 		    //reportManager = new ReportManagerImpl(transportManager, REPORTTTL);
 		    long heartbeat = 1000; // 1 sec heartbeat default
 		    String hbprop = System.getProperty("sgs.framework.timer.heartbeat");
@@ -183,6 +185,8 @@ public class SGS {
 		    
 		    deployer = new DeployerImpl(kernel, transportManager, 
 					new URL(installFile));
+                    localDiscoveryXMLMgr = 
+                        new XMLDiscoveryFileManager(((DeployerImpl)deployer).getReportManager());
 		    
 		    int managerPort = Integer.parseInt(
 		    		System.getProperty("sgs.framework.management.port", "0"));
@@ -360,6 +364,11 @@ public class SGS {
 		}
 	    } else {
 		System.err.println("Unrecognized argument `" + args[i] + "'");
+                System.err.println("Recognized switches are: ");
+                System.err.println(" -V (-v)  Verbose operation (note that SGS logs are a better way to get output)");
+                System.err.println(" -C (-c)  Start clean (delete the object store.)");
+                System.err.println(" -I (-i) <conf file url>  Use .conf file from URL");                            
+                System.exit(-1);
 	    }
 	}
 	new SGS();
