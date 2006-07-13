@@ -136,76 +136,77 @@ public class SGS {
     private XMLDiscoveryFileManager localDiscoveryXMLMgr;
 
     public SGS() {
-		String verboseString = System.getProperty("sgs.framework.verbose");
-		if (verboseString != null) {
-		    verbose = verboseString.equalsIgnoreCase("true");
-		}
-		try {
-		    kernel = new SimKernelImpl();
-		    String installProperty = System.getProperty("sgs.framework.installurl");
-		    if (installProperty != null) {
-			installFile = installProperty;
-		    }
-		    if (verbose) {
-			System.err.println("Loading configuration from: " + installFile);
-		    }
-		    //InstallationLoader installation = new InstallationURL(new URL(
-		//	    installFile));
-		    
-		    // start framework services
-		    //transportManager = new LRMPTransportManager();
-		    transportManager = new NullTransportManager();
-		    //reportManager = new ReportManagerImpl(transportManager, REPORTTTL);
-		    long heartbeat = 1000; // 1 sec heartbeat default
-		    String hbprop = System.getProperty("sgs.framework.timer.heartbeat");
-		    if (hbprop != null) {
-			heartbeat = Long.parseLong(hbprop);
-		    }
-		    timerManager = new TimerManagerImpl(heartbeat);
-		    kernel.setTimerManager(timerManager);
-	
-		    kernel.setRawSocketManager(new RawSocketManagerImpl());
-	
-		    // start game services
-		    //StatusReport installationReport =
-	            //    reportManager.makeNewReport("_SGS_discover_" + sliceID);
-	
-		    TransportManager routerTransportManager;
-		    /*
-	                 * XXX: For single-stack case, use a non-multicast,
-	                 * no-op transport at the router layer. This is both
-	                 * faster and works around the lack of
-	                 * message-fragmentation in LRMP (which limits message
-	                 * sizes to UDP-max)
-	                 * 
-	                 * To use the LRMP routing, use: routerTransportManager =
-	                 * transportManager; -jm
-	                 */
-		    routerTransportManager = new NullTransportManager();
-		    
-		    deployer = new DeployerImpl(kernel, transportManager, 
-					new URL(installFile));
-                    localDiscoveryXMLMgr = 
-                        new XMLDiscoveryFileManager(((DeployerImpl)deployer).getReportManager());
-		    
-		    int managerPort = Integer.parseInt(
-		    		System.getProperty("sgs.framework.management.port", "0"));
-		    if (managerPort > 0) {
-		    	startManagementAgent(managerPort);
-		    }
-	
-		    //installationReport.setParameter("game", "count", "0");
-		    /*for (DeploymentRec game : installation.listGames()) {
-			startupGame(routerTransportManager, game, installationReport);
-		    }*/
-		    //reportUpdater = new ReportUpdater(reportManager);
-		    //installationReport.dump(System.err);
-		    //reportUpdater.addReport(installationReport);
-		    
-		} catch (Exception ex) {
-		    ex.printStackTrace();
-		    System.exit(1);
-		}
+	String verboseString = System.getProperty("sgs.framework.verbose");
+	if (verboseString != null) {
+	    verbose = verboseString.equalsIgnoreCase("true");
+	}
+	try {
+	    kernel = new SimKernelImpl();
+	    String installProperty = System.getProperty("sgs.framework.installurl");
+	    if (installProperty != null) {
+		installFile = installProperty;
+	    }
+	    if (verbose) {
+		System.err.println("Loading configuration from: " + installFile);
+	    }
+	    //InstallationLoader installation = new InstallationURL(new URL(
+	//	    installFile));
+	    
+	    // start framework services
+	    //transportManager = new LRMPTransportManager();
+	    transportManager = new NullTransportManager();
+	    //reportManager = new ReportManagerImpl(transportManager, REPORTTTL);
+	    long heartbeat = 1000; // 1 sec heartbeat default
+	    String hbprop = System.getProperty("sgs.framework.timer.heartbeat");
+	    if (hbprop != null) {
+		heartbeat = Long.parseLong(hbprop);
+	    }
+	    timerManager = new TimerManagerImpl(heartbeat);
+	    kernel.setTimerManager(timerManager);
+
+	    kernel.setRawSocketManager(new RawSocketManagerImpl());
+            
+	    // start game services
+	    //StatusReport installationReport =
+            //    reportManager.makeNewReport("_SGS_discover_" + sliceID);
+
+	    TransportManager routerTransportManager;
+	    /*
+                 * XXX: For single-stack case, use a non-multicast,
+                 * no-op transport at the router layer. This is both
+                 * faster and works around the lack of
+                 * message-fragmentation in LRMP (which limits message
+                 * sizes to UDP-max)
+                 * 
+                 * To use the LRMP routing, use: routerTransportManager =
+                 * transportManager; -jm
+                 */
+	    routerTransportManager = new NullTransportManager();
+	    deployer = new DeployerImpl(kernel, transportManager, 
+				new URL(installFile));
+ 	    
+	    int managerPort = Integer.parseInt(
+	    		System.getProperty("sgs.framework.management.port", "0"));
+	    if (managerPort > 0) {
+	    	startManagementAgent(managerPort);
+	    }
+            
+	    localDiscoveryXMLMgr = 
+                new XMLDiscoveryFileManager(((DeployerImpl)deployer).getReportManager());
+
+
+	    //installationReport.setParameter("game", "count", "0");
+	    /*for (DeploymentRec game : installation.listGames()) {
+		startupGame(routerTransportManager, game, installationReport);
+	    }*/
+	    //reportUpdater = new ReportUpdater(reportManager);
+	    //installationReport.dump(System.err);
+	    //reportUpdater.addReport(installationReport);
+	    
+	} catch (Exception ex) {
+	    ex.printStackTrace();
+	    System.exit(1);
+	}
 		
     }
     
@@ -220,6 +221,7 @@ public class SGS {
     }
     
     public void shutdown() {
+        localDiscoveryXMLMgr.shutDown();
     	if (deployer != null) {
     	    deployer.stopAll();
     	    agent.shutdown();
