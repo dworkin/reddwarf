@@ -71,7 +71,6 @@ import java.util.Collection;
 
 import com.sun.gi.comm.users.server.UserManager;
 import com.sun.gi.framework.status.StatusReport;
-import com.sun.gi.objectstore.ObjectStore;
 
 /**
  * 
@@ -88,46 +87,46 @@ import com.sun.gi.objectstore.ObjectStore;
  */
 public interface SimulationContext {
 	
-	public enum StatusType {STARTED, STOPPED}
-	
-	/**
-	 * Starts the associated Simulation.
-	 */
-	public void start(StatusReport installationReport);
-
-	/**
-	 * Stops the associated Simulation.
-	 */
-	public void stop(StatusReport installationReport);
-	
-	/**
-	 * Returns the current status of the Simulation, one of 
-	 * StatusType.STARTED or StatusType.STOPPED.
-	 * 
-	 * @return the current Simulation status
-	 */
-	public StatusType getStatus();
-	
-	/**
-	 * Returns the name of the associated Simulation.
-	 * 
-	 * @return the Simulation's name
-	 */
-	public String getName();
-	
-	/**
-	 * Returns the ID of the associated Simulation.
-	 * 
-	 * @return the Simulation's ID
-	 */
-	public int getID();
-	
-	/**
-	 * Returns a Collection of actively listening UserManagers for this
-	 * Simulation. 
-	 * 
-	 * @return a Collection of active UserManagers 
-	 */
-	public Collection<UserManager> getUserManagers();
+    public enum StatusType {STARTED, STOPPED}
+    
+    /**
+     * Starts the associated Simulation.
+     */
+    public void start(StatusReport installationReport);
+    
+    /**
+     * Stops the associated Simulation.
+     */
+    public void stop(StatusReport installationReport);
+    
+    /**
+     * Returns the current status of the Simulation, one of 
+     * StatusType.STARTED or StatusType.STOPPED.
+     * 
+     * @return the current Simulation status
+     */
+    public StatusType getStatus();
+    
+    /**
+     * Returns the name of the associated Simulation.
+     * 
+     * @return the Simulation's name
+     */
+    public String getName();
+    
+    /**
+     * Returns the ID of the associated Simulation.
+     * 
+     * @return the Simulation's ID
+     */
+    public int getID();
+    
+    /**
+     * Returns a Collection of actively listening UserManagers for this
+     * Simulation. 
+     * 
+     * @return a Collection of active UserManagers 
+     */
+    public Collection<UserManager> getUserManagers();
 
 }

@@ -91,67 +91,67 @@ import javax.management.ObjectName;
  */
 public class HTMLServer implements Runnable, HTMLServerMBean, MBeanRegistration {
 
-	private boolean running = false;
-	private int port;
-	private ServerSocket serverSocket;
-	private MBeanServer mBeanServer;
+    private boolean running = false;
+    private int port;
+    private ServerSocket serverSocket;
+    private MBeanServer mBeanServer;
+    
+    public HTMLServer() {
+    	this(8082);
+    }
+    
+    public HTMLServer(int port) {
+    	this.port = port;
+    }
+    
+    public void run() {
+    	try {
+            serverSocket = new ServerSocket(port);
+            while (running) {
+            	Socket clientSocket = serverSocket.accept();
+            	Thread t = new Thread(new HTMLAdaptor(clientSocket, mBeanServer));
+            	t.start();
+            
+            }
+    	}
+    	catch (IOException ioe) {
+    	    // don't care.
+    	}
+    }
 	
-	public HTMLServer() {
-		this(8082);
-	}
+    /**
+     * Starts the server listening.
+     */
+    public void start() {
+    	running = true;
+    	Thread t = new Thread(this);
+    	t.start();
+    }
 	
-	public HTMLServer(int port) {
-		this.port = port;
-	}
-	
-	public void run() {
-		try {
-			serverSocket = new ServerSocket(port);
-			while (running) {
-				Socket clientSocket = serverSocket.accept();
-				Thread t = new Thread(new HTMLAdaptor(clientSocket, mBeanServer));
-				t.start();
-	
-			}
-		}
-		catch (IOException ioe) {
-			// don't care.
-		}
-	}
-	
-	/**
-	 * Starts the server listening.
-	 */
-	public void start() {
-		running = true;
-		Thread t = new Thread(this);
-		t.start();
-	}
-	
-	/**
-	 * Shuts the server down.
-	 */
-	public void stop() {
-		try {
-			serverSocket.close();
-		}
-		catch (IOException ioe) {
-			ioe.printStackTrace();
-		}
-		running = false;
-	}
-	
-	public void postDeregister() {}
-	
-	public void postRegister(Boolean done) {}
-	
-	public void preDeregister() {}
-	
-	public ObjectName preRegister(MBeanServer mbs, ObjectName name) {
-		this.mBeanServer = mbs;
-		
-		return name;
-	}
+    /**
+     * Shuts the server down.
+     */
+    public void stop() {
+    	try {
+    	    serverSocket.close();
+    	}
+    	catch (IOException ioe) {
+    	    ioe.printStackTrace();
+    	}
+    	running = false;
+    }
+    
+    public void postDeregister() {}
+    
+    public void postRegister(Boolean done) {}
+    
+    public void preDeregister() {}
+    
+    public ObjectName preRegister(MBeanServer mbs, ObjectName name) {
+    	this.mBeanServer = mbs;
+    	
+    	return name;
+    }
 	
 
 }

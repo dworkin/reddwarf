@@ -53,7 +53,7 @@ import com.sun.gi.framework.status.impl.ReportManagerImpl;
  * @author Jeff Kesselman
  * @version 1.0
  */
-public class XMLDiscoveryFileManager {
+public class XMLDiscoveryFileManager implements Runnable {
     class GameRecord {
         String name;
 
@@ -105,6 +105,8 @@ public class XMLDiscoveryFileManager {
     FileLock lock;
 
     String discoveryFileName;
+    
+    private boolean shouldShutDown = false;
 
     static {
         String updatePeriodStr = System.getProperty("sgs.discovery.updateperiod");
@@ -116,7 +118,13 @@ public class XMLDiscoveryFileManager {
     public XMLDiscoveryFileManager(ReportManager reportManager) {
         gameMap = new HashMap<Integer, GameRecord>();
         this.reportManager = reportManager;
-        while (true) {
+
+        Thread t = new Thread(this);
+        t.start();
+    }
+    
+    public void run() {
+        while (!shouldShutDown) {
             String[] reportNames = reportManager.listReports();
             startDiscoveryFile("discovery.xml");
             for (int i = 0; i < reportNames.length; i++) {
@@ -142,9 +150,8 @@ public class XMLDiscoveryFileManager {
             }
             System.err.println("Woke up at: " + System.currentTimeMillis());
         }
-
     }
-
+    
     /**
      * endDiscoveryFile
      */
@@ -264,4 +271,7 @@ public class XMLDiscoveryFileManager {
         discoveryFileName = string;
     }
 
+    public void shutDown() {
+        shouldShutDown = true;
+    }
 }

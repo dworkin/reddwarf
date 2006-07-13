@@ -99,159 +99,159 @@ import com.sun.gi.framework.install.SimulationContext;
  */
 public class HTMLAdaptor implements Runnable {
 	
-	private final static String BANNER_URL = "http://download.java.net/games/ProjectDarkstarHeader.jpg";
-
-	private final static String TITLE = "<title>Project Darkstar Management Console</title>";
-	private final static String ACTION_STRING = "action=";
-	private final static String ID_STRING = "ID=";
+    private final static String BANNER_URL = "http://download.java.net/games/ProjectDarkstarHeader.jpg";
+    
+    private final static String TITLE = "<title>Project Darkstar Management Console</title>";
+    private final static String ACTION_STRING = "action=";
+    private final static String ID_STRING = "ID=";
+    
+    private Socket clientSocket;
+    private MBeanServer server;
+    private boolean shouldShutDown = false;
+    
+    public HTMLAdaptor(Socket clientSocket, MBeanServer server) {
+    	this.clientSocket = clientSocket;
+    	this.server = server;
+    }
+    
+    public void run() {
+    	processRequest();
+    	sendResponse();
+    }
 	
-	private Socket clientSocket;
-	private MBeanServer server;
-	private boolean shouldShutDown = false;
+    private void processRequest() {
+    	try {
+            BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+            String line = in.readLine();			// just need the first line for the query string.
+            if (line == null || line.indexOf('?') == -1) {
+                return;
+            }
+            int queryIndex = line.indexOf('?') + 1;
+            parseQueryString(line.substring(queryIndex, line.indexOf(' ', queryIndex)));
+    	}
+    	catch (Exception e) {
+    		e.printStackTrace();
+    	}
+    }
 	
-	public HTMLAdaptor(Socket clientSocket, MBeanServer server) {
-		this.clientSocket = clientSocket;
-		this.server = server;
-	}
+    private void parseQueryString(String queryString) {
+        if (queryString.indexOf("shutdown") != -1) { // shutdown the entire server
+            shouldShutDown = true;
+            return;
+        }
+        StringTokenizer tokenizer = new StringTokenizer(queryString, "&");
+        String action = tokenizer.nextToken().substring(ACTION_STRING.length());
+        int appID = Integer.parseInt(tokenizer.nextToken().substring(ID_STRING.length()));
+        
+        try {
+            Object[] params = new Object[] {appID};
+            String[] signature = new String[] {"int"};
+            if (action.equals("Stop")) {
+            	server.invoke(new ObjectName(server.getDefaultDomain() + 
+            					":name=Deployer"), "stopContext", params, signature);
+            }
+            else if (action.equals("Start")) {
+            	server.invoke(new ObjectName(server.getDefaultDomain() + 
+            					":name=Deployer"), "startContext", params, signature);	
+            	}
+            }
+        catch (Exception e) {
+        	e.printStackTrace();
+        }
+    }
 	
-	public void run() {
-		processRequest();
-		sendResponse();
-	}
+    private void shutdown() {
+        try {
+            server.invoke(new ObjectName(server.getDefaultDomain() + 
+        			":name=SGS"), "shutdown", null, null);
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 	
-	private void processRequest() {
-		try {
-			BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-			String line = in.readLine();			// just need the first line for the query string.
-			if (line == null || line.indexOf('?') == -1) {
-				return;
-			}
-			int queryIndex = line.indexOf('?') + 1;
-			parseQueryString(line.substring(queryIndex, line.indexOf(' ', queryIndex)));
-		}
-		catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
+    private void sendResponse() {
+    	try {
+            PrintWriter out = new PrintWriter(clientSocket.getOutputStream());
+            String content = "<html>" + TITLE + "<body>" + (shouldShutDown ? 
+            						writeShutDown() : listContexts()) + "</body></html>";
+            out.print("HTTP/1.0 200 OK\r\nContent-length: " + content.length() + "\r\n");
+            out.print("Content-type: text/html\r\n\r\n");
+            out.println(content);
+            
+            out.flush();
+            out.close();
+    	}
+    	catch (Exception e) {
+    	    e.printStackTrace();
+    	}
+    	if (shouldShutDown) {
+    	    shutdown();
+    	}
+    }
 	
-	private void parseQueryString(String queryString) {
-		if (queryString.indexOf("shutdown") != -1) { // shutdown the entire server
-			shouldShutDown = true;
-			return;
-		}
-		StringTokenizer tokenizer = new StringTokenizer(queryString, "&");
-		String action = tokenizer.nextToken().substring(ACTION_STRING.length());
-		int appID = Integer.parseInt(tokenizer.nextToken().substring(ID_STRING.length()));
-		
-		try {
-			Object[] params = new Object[] {appID};
-			String[] signature = new String[] {"int"};
-			if (action.equals("Stop")) {
-				server.invoke(new ObjectName(server.getDefaultDomain() + 
-								":name=Deployer"), "stopContext", params, signature);
-			}
-			else if (action.equals("Start")) {
-				server.invoke(new ObjectName(server.getDefaultDomain() + 
-								":name=Deployer"), "startContext", params, signature);	
-			}
-		}
-		catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
+    private String writeBanner() {
+        return "<center>" + "<img src=\"" + BANNER_URL + "\" alt=\"Project Darkstar " +
+                "Banner\"><p><h2>Management Console</h2></center>";
+    }
+    
+    private String writeShutDown() {
+    	return writeBanner() + "<p><p><center>[The server has been shutdown]</center>";
+    }
 	
-	private void shutdown() {
-		try {
-			server.invoke(new ObjectName(server.getDefaultDomain() + 
-									":name=SGS"), "shutdown", null, null);
-		}
-		catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
+    private String listContexts() {
+    	StringBuffer buffer = new StringBuffer(writeBanner());
+    	try {
+    	
+    	    Collection<SimulationContext> contextList = 
+    	        (Collection<SimulationContext>) server.invoke(new ObjectName(server.getDefaultDomain() + 
+    	        ":name=Deployer"), "listContexts", null, null);
+            buffer.append("<p><p><table width=100% border=1>");
+            buffer.append("<tr><th align=left valign=top>ID</th><th align=left>Name</th>" +
+            			"<th align=left>UserManagers</th>" +
+            			"<th align=left>Status</th><th align=left>Operation</th></tr>");
+            for (SimulationContext curContext : contextList) {
+            	buffer.append("<tr><td>" + curContext.getID() + "</td><td>" + curContext.getName() + 
+    			"</td>");
+    	
+            	if (curContext.getUserManagers().size() > 0) {
+                    buffer.append("<td><ul>");
+                    for (UserManager curUserManager : curContext.getUserManagers()) {
+                    	buffer.append("<li>" + curUserManager.getClass().getName() + "</li>");
+                        Map<String, String> params = curUserManager.getClientParams();
+                        if (params.size() > 0) {
+                            buffer.append("<ul>");
+                            for (Entry<String, String> curEntry : params.entrySet()) {
+                                buffer.append("<li>" + curEntry.getKey() + " = " + 
+                            	curEntry.getValue() + "</li>");
+                            }
+                            buffer.append("</ul>");
+                        }
+                    }
+                    buffer.append("</ul></td>");
+            	}
+            	else {
+            	    buffer.append("<td>None</td>");
+            	}
+    	
+            	buffer.append("<td>" + curContext.getStatus() + "</td><td>" + 
+            	        (curContext.getStatus().equals(SimulationContext.StatusType.STARTED) ? 
+                            writeActionURL("Stop", curContext.getID() + "") : 
+                            writeActionURL("Start", curContext.getID() + "")) + 
+                            "</td></tr>");
+            }
+            buffer.append("</table>");
+            buffer.append("<p><p><a href=\"?shutdown\">[Shutdown Server]</a>");
+    	}
+    	catch (Exception e) {
+    	    e.printStackTrace();
+    	}
+    	return buffer.toString();
+    }
 	
-	private void sendResponse() {
-		try {
-			PrintWriter out = new PrintWriter(clientSocket.getOutputStream());
-			String content = "<html>" + TITLE + "<body>" + (shouldShutDown ? 
-									writeShutDown() : listContexts()) + "</body></html>";
-			out.print("HTTP/1.0 200 OK\r\nContent-length: " + content.length() + "\r\n");
-			out.print("Content-type: text/html\r\n\r\n");
-			out.println(content);
-			
-			out.flush();
-			out.close();
-		}
-		catch (Exception e) {
-			e.printStackTrace();
-		}
-		if (shouldShutDown) {
-			shutdown();
-		}
-	}
-	
-	private String writeBanner() {
-		return "<center>" + "<img src=\"" + BANNER_URL + "\" alt=\"Project Darkstar " +
-				"Banner\"><p><h2>Management Console</h2></center>";
-	}
-	
-	private String writeShutDown() {
-		return writeBanner() + "<p><p><center>[The server has been shutdown]</center>";
-	}
-	
-	private String listContexts() {
-		StringBuffer buffer = new StringBuffer(writeBanner());
-		try {
-		
-			Collection<SimulationContext> contextList = 
-								(Collection<SimulationContext>) server.invoke(new ObjectName(server.getDefaultDomain() + 
-									":name=Deployer"), "listContexts", null, null);
-			buffer.append("<p><p><table width=100% border=1>");
-			buffer.append("<tr><th align=left valign=top>ID</th><th align=left>Name</th>" +
-						"<th align=left>UserManagers</th>" +
-						"<th align=left>Status</th><th align=left>Operation</th></tr>");
-			for (SimulationContext curContext : contextList) {
-				buffer.append("<tr><td>" + curContext.getID() + "</td><td>" + curContext.getName() + 
-						"</td>");
-				
-				if (curContext.getUserManagers().size() > 0) {
-					buffer.append("<td><ul>");
-					for (UserManager curUserManager : curContext.getUserManagers()) {
-						buffer.append("<li>" + curUserManager.getClass().getName() + "</li>");
-						Map<String, String> params = curUserManager.getClientParams();
-						if (params.size() > 0) {
-							buffer.append("<ul>");
-							for (Entry<String, String> curEntry : params.entrySet()) {
-								buffer.append("<li>" + curEntry.getKey() + " = " + 
-											curEntry.getValue() + "</li>");
-							}
-							buffer.append("</ul>");
-						}
-					}
-					buffer.append("</ul></td>");
-				}
-				else {
-					buffer.append("<td>None</td>");
-				}
-				
-				buffer.append("<td>" + curContext.getStatus() + "</td><td>" + 
-						(curContext.getStatus().equals(SimulationContext.StatusType.STARTED) ? 
-								writeActionURL("Stop", curContext.getID() + "") : 
-								writeActionURL("Start", curContext.getID() + "")) + 
-								"</td></tr>");
-			}
-			buffer.append("</table>");
-			buffer.append("<p><p><a href=\"?shutdown\">[Shutdown Server]</a>");
-		}
-		catch (Exception e) {
-			e.printStackTrace();
-		}
-		return buffer.toString();
-	}
-	
-	private String writeActionURL(String action, String value) {
-		return "<A HREF=\"?" + ACTION_STRING + action + "&" + ID_STRING + value 
-				+ "\">" + action + "</A>";
-	}
+    private String writeActionURL(String action, String value) {
+        return "<A HREF=\"?" + ACTION_STRING + action + "&" + ID_STRING + value 
+               + "\">" + action + "</A>";
+    }
 
 }
