@@ -85,6 +85,7 @@ import com.sun.gi.framework.status.ReportUpdater;
 import com.sun.gi.framework.status.StatusReport;
 import com.sun.gi.framework.status.impl.ReportManagerImpl;
 import com.sun.gi.logic.SimKernel;
+import com.sun.gi.objectstore.ObjectStore;
 import com.sun.gi.utils.SGSUUID;
 import com.sun.gi.utils.StatisticalUUID;
 

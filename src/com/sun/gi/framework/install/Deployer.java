@@ -70,6 +70,7 @@ package com.sun.gi.framework.install;
 import java.util.Collection;
 
 import com.sun.gi.framework.status.ReportManager;
+import com.sun.gi.objectstore.ObjectStore;
 
 /**
  * 

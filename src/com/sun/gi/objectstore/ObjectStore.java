@@ -82,7 +82,7 @@ public interface ObjectStore {
      * @see Transaction
      */
     public static final long INVALID_ID = DataSpace.INVALID_ID;
-
+    public static final long SYSTEM_ID = -1;
     /**
      * Creates a Transaction object that implements a transaction context.  <p>
      *

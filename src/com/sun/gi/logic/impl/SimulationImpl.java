@@ -320,6 +320,7 @@ public class SimulationImpl implements Simulation {
             }
         }
         kernel.addSimulation(this);
+        router.cleanUpOldUsers();
     }
 
     /**

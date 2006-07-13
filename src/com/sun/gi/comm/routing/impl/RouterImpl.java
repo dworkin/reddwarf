@@ -69,6 +69,7 @@
 package com.sun.gi.comm.routing.impl;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -91,11 +92,26 @@ import com.sun.gi.framework.interconnect.TransportChannel;
 import com.sun.gi.framework.interconnect.TransportChannelListener;
 import com.sun.gi.framework.interconnect.TransportManager;
 import com.sun.gi.framework.logging.SGSERRORCODES;
+import com.sun.gi.logic.GLO;
+import com.sun.gi.objectstore.DeadlockException;
+import com.sun.gi.objectstore.NonExistantObjectIDException;
+import com.sun.gi.objectstore.ObjectStore;
+import com.sun.gi.objectstore.Transaction;
 import com.sun.gi.utils.SGSUUID;
 import com.sun.gi.utils.StatisticalUUID;
 import com.sun.gi.utils.types.BYTEARRAY;
 
+class CommPersistantData implements Serializable{
+    /**
+     * 
+     */
+    private static final long serialVersionUID = 1L;
+    List<UserID> connectedUsers = new ArrayList<UserID>();
+}
+
 public class RouterImpl implements Router {
+
+    private static final String PERSISTANTCOMMDATANAME = "_SYS_CommPersistantData";
 
     static Logger log = Logger.getLogger("com.sun.gi.comm.routing");
 
@@ -116,6 +132,11 @@ public class RouterImpl implements Router {
     protected int keySecondsToLive;
     
     private boolean shutdown = false;
+    private ObjectStore ostore;
+    private CommPersistantData persistantData=null;
+    private long persistantDataID = ObjectStore.INVALID_ID;
+    
+    
 
     private enum OPCODE {
         UserJoined,
@@ -125,9 +146,9 @@ public class RouterImpl implements Router {
         ReconnectKey
     }
 
-    public RouterImpl(TransportManager cmgr) throws IOException {
+    public RouterImpl(TransportManager cmgr, ObjectStore objectStore) throws IOException {
         transportManager = cmgr;
-        
+        ostore = objectStore;
         channelFilters = new ArrayList<ChannelFilterRec>();
         
         routerControlChannel = transportManager.openChannel("__SGS_ROUTER_CONTROL");
@@ -208,6 +229,35 @@ public class RouterImpl implements Router {
                 }
             }
         }).start();
+        
+    }
+    
+    public void cleanUpOldUsers(){
+        synchronized(ostore){
+            Transaction trans = ostore.newTransaction(this.getClass().getClassLoader());
+            trans.start();
+            persistantDataID = trans.lookup(PERSISTANTCOMMDATANAME);
+            if (persistantDataID == ObjectStore.INVALID_ID){
+                persistantData = new CommPersistantData();
+                persistantDataID = trans.create(persistantData,PERSISTANTCOMMDATANAME);
+            }
+            try {
+                persistantData = (CommPersistantData) trans.lock(persistantDataID);
+                for(UserID oldID : persistantData.connectedUsers){
+                    System.err.println("Foudn old ID: "+oldID);
+                    fireUserLeft(oldID);
+                }
+                persistantData.connectedUsers.clear();
+                trans.commit();
+            } catch (DeadlockException e) { 
+                trans.abort();
+                e.printStackTrace();
+            } catch (NonExistantObjectIDException e) {
+                trans.abort();
+                e.printStackTrace();
+            }
+                       
+        }
     }
     
     public void setChannelFilters(List<ChannelFilterRec> filters) {
@@ -337,6 +387,22 @@ public class RouterImpl implements Router {
     		return;
     	}
         userMap.put(user.getUserID(), user);
+        synchronized(ostore){
+            Transaction trans = ostore.newTransaction(this.getClass().getClassLoader());
+            trans.start();
+            try {
+                persistantData = (CommPersistantData) trans.lock(persistantDataID);
+                persistantData.connectedUsers.add(user.getUserID());
+                trans.commit();
+            } catch (DeadlockException e) {
+                trans.abort();
+                e.printStackTrace();
+            } catch (NonExistantObjectIDException e) {
+                trans.abort();
+                e.printStackTrace();
+            }
+            
+        }
         xmitUserJoined(user.getUserID());
         issueNewKey(user);
         reportUserJoined(user.getUserID().toByteArray());
@@ -404,9 +470,26 @@ public class RouterImpl implements Router {
     public void deregisterUser(SGSUser user) {
         UserID id = user.getUserID();
         userMap.remove(id);
+        synchronized(ostore){
+            Transaction trans = ostore.newTransaction(this.getClass().getClassLoader());
+            trans.start();
+            try {
+                persistantData = (CommPersistantData) trans.lock(persistantDataID);
+                persistantData.connectedUsers.remove(user.getUserID());
+                trans.commit();
+            } catch (DeadlockException e) {
+                trans.abort();
+                e.printStackTrace();
+            } catch (NonExistantObjectIDException e) {
+                trans.abort();
+                e.printStackTrace();
+            }
+            
+        }
         for (SGSChannel chan : channelMap.values()) {
             chan.leave(user);
         }
+        
         user.deregistered();
         xmitUserLeft(id);
         fireUserLeft(id);

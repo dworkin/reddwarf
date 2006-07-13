@@ -83,7 +83,7 @@ import javax.swing.JPanel;
 
 import com.sun.gi.comm.routing.Router;
 import com.sun.gi.comm.routing.impl.RouterImpl;
-import com.sun.gi.framework.interconnect.impl.LRMPTransportManager;
+import com.sun.gi.framework.interconnect.impl.NullTransportManager;
 
 public class RouterChat extends JFrame {
 
@@ -116,7 +116,7 @@ public class RouterChat extends JFrame {
         setVisible(true);
         // start router
         try {
-            router = new RouterImpl(new LRMPTransportManager());
+            router = new RouterImpl(new NullTransportManager(),null);
         } catch (IOException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
@@ -132,6 +132,7 @@ public class RouterChat extends JFrame {
 
     }
 
+    
     /**
      * @param args
      */

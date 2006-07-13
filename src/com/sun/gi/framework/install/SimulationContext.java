@@ -71,6 +71,7 @@ import java.util.Collection;
 
 import com.sun.gi.comm.users.server.UserManager;
 import com.sun.gi.framework.status.StatusReport;
+import com.sun.gi.objectstore.ObjectStore;
 
 /**
  * 

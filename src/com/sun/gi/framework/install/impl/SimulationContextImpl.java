@@ -137,8 +137,16 @@ public class SimulationContextImpl implements SimulationContext {
             }
             Router router = null;
             int gameID = deployment.getID();
+            ObjectStore ostore=null;
             try {
-                router = new RouterImpl(transportManager);
+                ostore = new TSOObjectStore(new PersistantInMemoryDataSpace(gameID));
+                //ostore = new TSOObjectStore(new InMemoryDataSpace(gameID));
+                String cleanProperty = System.getProperty("sgs.ostore.startclean");
+                if ((cleanProperty != null)
+                        && (cleanProperty.equalsIgnoreCase("true"))) {
+                    ostore.clear();
+                }
+                router = new RouterImpl(transportManager,ostore);
             } catch (Exception e) {
                 e.printStackTrace();
                 return;
@@ -165,13 +173,7 @@ public class SimulationContextImpl implements SimulationContext {
             // create simulation container for game
             if (deployment.getBootClass() != null) {
                 try {
-                    ObjectStore ostore = new TSOObjectStore(new PersistantInMemoryDataSpace(gameID));
-                    //ostore = new TSOObjectStore(new InMemoryDataSpace(gameID));
-                    String cleanProperty = System.getProperty("sgs.ostore.startclean");
-                    if ((cleanProperty != null)
-                    	&& (cleanProperty.equalsIgnoreCase("true"))) {
-                        ostore.clear();
-                    }
+                    
                     
             //			 set app info system properties
             	    String name = deployment.getName();

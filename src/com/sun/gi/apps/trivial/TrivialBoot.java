@@ -93,13 +93,14 @@ public class TrivialBoot implements SimBoot<TrivialBoot> {
     private static final long serialVersionUID = 1L;
     private static final boolean TEST_GLO_PARAM = false;
     private int count = 1;
+   
 
     public TrivialBoot() {}
 
     public void boot(GLOReference<? extends TrivialBoot> bootGLO,
             boolean firstBoot) {
         if (firstBoot) {
-            System.out.println("First boot of trivial test");
+            System.out.println("First boot of trivial test ");
         }
         SimTask task = SimTask.getCurrent();
         String appname = task.getAppName();

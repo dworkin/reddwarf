@@ -107,7 +107,7 @@ import com.sun.gi.framework.install.ChannelFilterRec;
  * @version 1.0
  */
 public interface Router {
-
+    public void cleanUpOldUsers();
     /**
      * This call is made in order to allocate a new unqiue UserID.
      * 
