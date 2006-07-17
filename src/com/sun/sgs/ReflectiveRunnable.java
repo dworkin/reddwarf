@@ -29,8 +29,9 @@ import java.lang.reflect.Method;
  */
 public class ReflectiveRunnable implements ManagedRunnable
 {
+	private static final long serialVersionUID = 1L;
 
-    // the referenced object that will be called
+	// the referenced object that will be called
     private ManagedReference reference;
 
     // the method to call
