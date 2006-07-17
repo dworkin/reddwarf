@@ -11,7 +11,7 @@
   <property name="classDir" location="${buildDir}/classes"/>
   <property name="docDir" location="${buildDir}/docs"/>
   <property name="libDir" location="${buildDir}/lib"/>
-  <property name="srcDir" location="${buildDir}/src"/>
+  <property name="srcDir" location="src"/>
 
   <!-- Values for the JavaDocs -->
   <property name="projName" value="Project Darkstar: Redstar"/>
