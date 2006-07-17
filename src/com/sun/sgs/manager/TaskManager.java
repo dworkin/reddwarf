@@ -11,6 +11,7 @@
 
 package com.sun.sgs.manager;
 
+import com.sun.sgs.ManagedReference;
 import com.sun.sgs.ManagedRunnable;
 
 
@@ -25,9 +26,9 @@ public abstract class TaskManager
 {
 
     /**
-     * Returns an instance of <code>TaskManaged</code>.
+     * Returns an instance of <code>TaskManager</code>.
      *
-     * @return an instance of <code>TaskManaged</code>
+     * @return an instance of <code>TaskManager</code>
      */
     public static TaskManager getInstance() {
         // FIXME: return the instance
@@ -37,8 +38,9 @@ public abstract class TaskManager
     /**
      * Queues a task to run.
      *
-     * @param task the task to run
+     * @param taskReference the task to run
      */
-    public abstract void queueTask(ManagedRunnable task);
+    public abstract void queueTask(ManagedReference<? extends ManagedRunnable>
+				   taskReference);
 
 }

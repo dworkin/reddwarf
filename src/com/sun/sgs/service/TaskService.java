@@ -10,6 +10,7 @@
 
 package com.sun.sgs.service;
 
+import com.sun.sgs.ManagedReference;
 import com.sun.sgs.ManagedRunnable;
 
 
@@ -29,6 +30,7 @@ public interface TaskService extends Service
      * @param txn the <code>Transaction</code> state
      * @param task the task to run
      */
-    public void queueTask(Transaction txn, ManagedRunnable task);
+    public void queueTask(Transaction txn,
+			  ManagedReference<? extends ManagedRunnable> task);
 
 }
