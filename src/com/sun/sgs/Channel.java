@@ -120,6 +120,6 @@ public interface Channel extends ManagedReference
     /**
      * Destroys this channel.
      */
-    public void destory();
+    public void destroy();
 
 }

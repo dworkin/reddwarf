@@ -56,9 +56,9 @@ public interface ChannelService extends Service
      * Destroys the given channel.
      *
      * @param txn the <code>Transaction</code> state
-     * @param channel the channel to destory
+     * @param channel the channel to destroy
      */
-    public void destoryChannel(Transaction txn, Channel channel);
+    public void destroyChannel(Transaction txn, Channel channel);
 
     /**
      * Adds a user to a channel.
