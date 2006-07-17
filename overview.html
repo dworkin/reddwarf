@@ -1,3 +1,224 @@
+<html>
 <body>
-  This is the overview file.
-</body>
+<pre>
+Braindump of Darkstar Core discussions
+
+The core redesign has the following goals:
+
+ * Support high-performance implementations of key services
+   * Persistence, networking, threading
+   
+ * Support flexible configurations of implementations
+   * Allow experimentation
+   * Allow different deployment scenarios
+
+ * Support an easy programming model for our users (game developers)
+   * Simplify the current model further
+   * Keep the "good stuff"
+
+== Programming Model ==
+
+The only developer-visible interface into Darkstar will be through
+the sgs.manager package.  In Darkstar EA1, this functionality is
+exposed as several dozen methods on SimTask.  We have refactored
+this into a set of functionally separate Managers.
+
+ * ChannelManager - client communications
+ * DataManager - persistence operations (create, find, destroy)
+ * TaskManager - queue new tasks for execution in a separate transaction
+ * TimerManager - low-level timer callbacks
+ * ExternalServiceManager - an integration/extension point for new functionality
+
+As in the original system, developer code runs in a transactional
+context, but that context is no longer visible to developers.  
+
+== ManagedObject and ManagedReference ==
+
+GLO has been generalized and renamed ManagedObject (and GLOReference
+to ManagedReference), to allow different Manager implementations to
+provide custom (possibly optimized) subclasses and behavior.
+
+For example, some DataManager might provide special support for ManagedObjects
+that are marked Stateless, and return a subclass of ManagedReference with
+singleton behavior instead of the more expensive get() semantics.
+
+To take this example further, let's look at a UserListener that gets
+called back when a packet arrives for a user.  In EA1, each packet
+arrival obtains a write-lock on the listener object, which is very
+expensive.  Instead, the developer may want to create a UserListener
+that is Stateless, which this DataManager can provide a specialized
+StatelessReference for.  Now when packets arrive, the call to get()
+on the StatelessReference is effectively a no-op, and much less
+overhead is incurred.
+
+== Internals ==
+
+In our current thinking, the Managers are supported by several layers
+within the core:
+
+ * Managers -- present simple API to developers, do input validation,
+       extract transactional context and provide it to Services.
+
+ * Services -- implement the transactional bookkeeping for the various
+       operations, and upon commit use Bricks to execute the real
+       functionality.  They also have a richer interface for other
+       Services to use.
+ 
+ * Bricks -- core functionality, not transaction-aware, used by Services
+       (and other Bricks) to perform work.
+ 
+ * Frameworks -- low-level event sources and control interfaces.
+       e.g., NetworkIOFramework.
+
+ * Event Queue -- entry point for all task execution, which takes a
+       Runnable and some Metadata and schedules the task for execution.
+
+It's possible that an implementation of some service (such as
+persistence) will provide related implementations of DataService to
+manage the transactional bookkeeping as well as one or more Bricks
+that actually marshal and unmarshal data, replicate it, and so on.
+
+Bricks are also intended as a place to wrap up functionality without
+being tied to specific implementation details.  For example, doing
+reliable ordered IO might be functionality offered by a Brick, and
+the implementation details (such as TCP vs. InfiniBand) would be
+hidden from a Service that just wanted to send data with those
+properties.
+
+The Manager interface layer provides flexibility in how the system
+interacts with developer code.  However, if this layer turns out
+to be trivially passing the current Task's context to its Service,
+we can just hard-code that functionality.
+
+== To Do ==
+
+Some important pieces that aren't in the current spec:
+
+ * ResourceController -- implements resource policies such as
+       threading model, connection throttling, and so on.
+
+We haven't specified the hooks at which core code needs to make
+these calls, yet.
+
+ * TransactionManager -- how transactions are created, and
+       how the commit protocol is implemented.
+
+ * Configuration -- how should Services and Managers discover
+       the right implementation type(s) to use?
+
+ * Callback Management -- when various callbacks are registered,
+       we might want to have some management mechanism that keeps
+       them as runnables (defining the right way to handle each
+       kind of event) mapped to endpoints that consume them
+
+ * Failure Recovery -- what are the mechanisms for bootstrapping
+       a node, detecting failure in other nodes, and recovering
+       from such failures?
+       
+One thought is to provide event sources that queue tasks for these
+events, and allow services to handle their own recovery.  There
+probably needs to be some dependency information, since services
+may use other services as part of their implementation.
+
+== Discussion ==
+
+There is room to talk about exactly what the responsibilities of
+the layers should be, and at what layer certain concepts should live.
+For example, Managed{Object,Reference} may be visible only at the
+Service level and above, or may be visible to the entire core.
+
+In the interfaces as written, the latter is true; EventQueue takes
+a (ManagedReference to a) ManagedRunnable, which is a Runnable that
+is also a ManagedObject.  This would allow any part of the system
+to queue a task such that the task will be guaranteed to run even
+if the stack fails.  However, it may cause implementation burdens,
+and low-level code will have to be sure to avoid circular
+dependencies.
+
+ * Currently, ManagedObject extends Serializable, so it's impossible
+ to queue an event that contains a ByteBuffer; this ends up costing
+ an extra copy even when the packets aren't themselves on a reliable
+ transport.
+
+ * If the DataService is implemented using the NetworkIOFramework for
+   its IO, then the NetworkIOFramework can't use the DataService to
+   persist packet data without some careful cooperation.
+
+An alternative in this case would be to allow Runnables onto the
+low-level EventQueue, and to require use of the TaskService to
+queue events in a reliable (recoverable) fashion.
+
+== Future Implementation ideas ==
+
+ * Deadlock avoidance
+   We may be able to improve on the current algorithm, e.g. by
+   following a chain of waiting-for pointers.
+
+ * DataStore technologies
+   * Memory "buddy" replication
+   * GigaSpaces
+
+ * Communication technologies
+   * Inifiniband
+   * Separate channel servers
+
+== Aspects ==
+
+Aspect-Oriented Programming has the potential to add a lot of
+flexibility and developer-friendliness to the system; see the
+writeup at:
+
+  http://labsvn.east.sun.com/trac/sgs/wiki/AspectsBrainstorm
+
+== Walkthrough Example ==
+
+Here's an illustration of how a particular set of component implementations
+might interact.
+
+Suppose that developer code has classes Game and Player.  Both implement
+ManagedObject, and the Player implements UserListener.  Suppose that a
+client has already connected to the system and their associated Player
+object has been registered as the UserListener for that user; we'll
+skip those details for now.
+
+Let's follow the system through the receipt of a packet for this user.
+
+ * Some NetworkIOFramework entity wakes up, reads the packet, and
+   finds the appropriate callback handler based on the sender (note
+   that we're still discussing the exact mechanism here).
+
+ * The callback handler is a runnable that can be run directly or
+   passed through the task queue, depending on the threading model.
+   It knows how to handle the event correctly, e.g. starting a
+   new transaction or passing off to system code.
+
+ * Our thread model will let the current thread return to a pool
+   after queuing the task, or let the thread follow the task to
+   the next part of execution. The decision about which path to
+   take is likely up to the ResourceManager.
+
+ * Assuming the packet is being handled by a UserListener, a new
+   Transaction is created by the TransactionManager and given to
+   the current Task, which in turn is set as the current Task for
+   the current thread.
+
+ * The Task's runnable calls get() on the UserListener Reference,
+   which uses its DataService to dereference the object. The runnable
+   then calls dataArrived() on the UserListener, which passes
+   control to the developer code.
+
+  * Developer code may do several operations involving various
+    Managers.
+
+  * Once the developer code returns, invoking runnable calls
+    commit() on the transaction.
+
+  * The TransactionManager does a two-phase commit involving
+    each Service that participated in this Transaction.
+    The Services registered using Transaction.join(this).
+
+  * This thread is returned to the ResourceManager do other work. 
+
+ </pre>
+ </body>
+ </html>
