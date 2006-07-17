@@ -1,0 +1,38 @@
+
+Probably Needed:
+--
+
+  public abstract void addUserListener(
+	    GLOReference<? extends SimUserListener> ref);
+
+  public abstract void addUserDataListener(UserID id,
+		    GLOReference<? extends SimUserDataListener> ref);
+
+  public abstract void access_check(ACCESS_TYPE accessType, GLO glo);
+
+
+Probably Not Needed:
+--
+
+  public abstract <T extends GLO> GLOReference<T> lookupReferenceFor(T glo);
+
+  public abstract void setEvesdroppingEnabled(UserID uid, ChannelID cid,
+	    boolean setting);
+
+  public static SimTask getCurrent();
+
+  public abstract void registerGLOID(long objID, GLO glo, ACCESS_TYPE access);
+
+  public abstract GLOReference<? extends GLO> makeReference(long id);
+
+  protected void setAsCurrent();
+
+
+Probably in Meta-Data:
+--
+
+  public abstract long getAppID();
+
+  public abstract String getAppName();
+
+  public abstract UserID getUserID();

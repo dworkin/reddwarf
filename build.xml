@@ -1,0 +1,64 @@
+
+<project name="redstar" default="build" basedir=".">
+
+  <description>
+    This is the Ant file that defines the build process for the Redstar
+    branch of Project Darkstar.
+  </description>
+
+  <!-- Some common locations -->
+  <property name="buildDir" location="build"/>
+  <property name="classDir" location="${buildDir}/classes"/>
+  <property name="docDir" location="${buildDir}/docs"/>
+  <property name="libDir" location="${buildDir}/lib"/>
+  <property name="srcDir" location="."/>
+
+  <!-- Values for the JavaDocs -->
+  <property name="projName" value="Project Darkstar: Redstar"/>
+  <property name="projVersion" value="0.1"/>
+
+  <!-- Builds the project into debug-enabled class files -->
+  <target name="build">
+    <mkdir dir="${classDir}"/>
+    <javac includeAntRuntime="no" debug="on" deprecation="on"
+           srcdir="${srcDir}" destdir="${classDir}" classpath="${classDir}">
+      <compilerarg value="-Xlint:unchecked"/>
+    </javac>
+  </target>
+
+  <!-- Removes all built files and all ~ files -->
+  <target name="clean">
+    <delete dir="${buildDir}"/>
+    <delete>
+      <fileset dir="." defaultexcludes="no" includes="**/*~"/>
+    </delete>
+  </target>
+
+  <!-- Build the JavaDocs from the source -->
+  <target name="doc" depends="build">
+    <javadoc sourcepath="${srcDir}" destdir="${docDir}"
+             classpath="${classDir}" packagenames="com.sun.*"
+             overview="${srcDir}/overview.html"
+             windowtitle="${projName}" doctitle="${projName}" author="no"
+             link="http://java.sun.com/j2se/1.5/docs/api">
+      <footer>
+        <![CDATA[<font size="-1">Project Darkstar: Redstar version
+        ${projVersion}</font>]]>
+      </footer>
+      <bottom>
+        <![CDATA[<font size="-1">Copyright 2006 Sun Microsystems,
+        Inc. All rights reserved. Use is subject to license
+        terms.<p>Sun, Sun Microsystems, the Sun Logo, and Java are
+        trademarks or registered trademarks of Sun Microsystems, Inc. in
+        the US and other countries.</font>]]>
+      </bottom>
+    </javadoc>
+  </target>
+
+  <!-- Builds the jar file for the project classes -->
+  <target name="jar" depends="build">
+    <mkdir dir="${libDir}"/>
+    <jar destfile="${libDir}/sgs.jar" basedir="${classDir}"/>
+  </target>
+
+</project>
