@@ -89,7 +89,6 @@ import com.sun.gi.framework.install.ValidatorRec;
 import com.sun.gi.framework.install.impl.DeployerImpl;
 import com.sun.gi.framework.install.impl.InstallationURL;
 import com.sun.gi.framework.interconnect.TransportManager;
-import com.sun.gi.framework.interconnect.impl.LRMPTransportManager;
 import com.sun.gi.framework.interconnect.impl.NullTransportManager;
 import com.sun.gi.framework.management.ManagerAgent;
 import com.sun.gi.framework.rawsocket.impl.RawSocketManagerImpl;

@@ -70,6 +70,7 @@ package com.sun.gi.framework.status;
 
 import java.io.IOException;
 
+
 public interface ReportManager {
 
     public StatusReport makeNewReport(String rootName);

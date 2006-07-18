@@ -11,13 +11,11 @@
     <property name="default.lint" value="all,-unchecked" />
 
     <property name="jrms.version" value="1.1" />
-    <property name="jrms.jarfile" value="jrms-${jrms.version}.jar" />
     <property name="derby.version" value="10.1.2.1" />
     <property name="derby.jarfile" value="derby-${derby.version}.jar" />
 
     <path id="project.classpath">
 	<pathelement location="bin" />
-	<pathelement location="resources/libs/jrms/${jrms.jarfile}" />
 	<pathelement location="resources/libs/derby/${derby.jarfile}" />
 	<pathelement location="resources/libs/servlet/javax.servlet.jar" />
 	<pathelement location="resources/libs/servlet/commons-logging.jar" />
@@ -25,12 +23,10 @@
     </path>
 
     <path id="build.j2se.server.classpath">
-	<pathelement location="resources/libs/jrms/${jrms.jarfile}" />
 	<pathelement location="resources/libs/derby/${derby.jarfile}" />
     </path>
 
     <path id="j2se.server.classpath">
-	<pathelement location="release/lib/${jrms.jarfile}" />
 	<pathelement location="release/lib/${derby.jarfile}" />
 	<pathelement location="release/SunGameServer.jar" />
     </path>
@@ -544,7 +540,7 @@
 	<jar destfile="release/SunGameServer.jar">
 	    <manifest>
 		<attribute name="Class-Path"
-			   value="lib/${jrms.jarfile} lib/${derby.jarfile}"/>
+			   value="lib/${derby.jarfile}"/>
 		<attribute name="Main-Class"
 			   value="com.sun.gi.SGS"/>
 	    </manifest>
@@ -555,11 +551,9 @@
 	    </fileset>
 	</jar>
 	<copy file="resources/startSGS.sh" todir="release" />
-	<copy file="resources/.startChatTest.sh" todir="release" />
-	<copy file="resources/startDiscovery.sh" todir="release" />
+	<copy file="resources/startChatClient.sh" todir="release" />
 	<chmod file="release/startSGS.sh" perm="755" />
-	<chmod file="release/startDiscovery.sh" perm="755" />
-	<copy file="resources/libs/jrms/${jrms.jarfile}" todir="release/lib" />
+	<chmod file="release/startChatClient.sh" perm="755" />
 	<copy file="resources/libs/derby/${derby.jarfile}" todir="release/lib" />
 	<copy file="resources/SGS-apps.conf" todir="release" />
 	<copy file="resources/passwd.txt" todir="release" />

@@ -19,7 +19,6 @@
 package com.sun.gi.framework.discovery;
 
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
@@ -30,10 +29,8 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import com.sun.gi.framework.interconnect.TransportManager;
-import com.sun.gi.framework.interconnect.impl.LRMPTransportManager;
 import com.sun.gi.framework.status.ReportManager;
 import com.sun.gi.framework.status.StatusReport;
-import com.sun.gi.framework.status.impl.ReportManagerImpl;
 
 /**
  * 
