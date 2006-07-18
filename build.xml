@@ -54,9 +54,6 @@
     	<mkdir dir="release/apps/glotest"/>
     	<mkdir dir="release/apps/jnwn"/>
     	<mkdir dir="release/client"/>
-    	<mkdir dir="release/derby"/>
-    	<mkdir dir="release/jrms"/>
-    	<mkdir dir="release/examples"/>
     	<mkdir dir="doc/doxygen" />
     </target>
 
@@ -558,6 +555,7 @@
 	    </fileset>
 	</jar>
 	<copy file="resources/startSGS.sh" todir="release" />
+	<copy file="resources/.startChatTest.sh" todir="release" />
 	<copy file="resources/startDiscovery.sh" todir="release" />
 	<chmod file="release/startSGS.sh" perm="755" />
 	<chmod file="release/startDiscovery.sh" perm="755" />
