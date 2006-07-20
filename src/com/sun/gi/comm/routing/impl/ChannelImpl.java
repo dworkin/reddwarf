@@ -102,11 +102,11 @@ public class ChannelImpl implements SGSChannel, TransportChannelListener {
     }
 
     // only instanceable by RouterImpl
-    ChannelImpl(RouterImpl r, TransportChannel chan, List<ChannelFilter> filters) 
+    ChannelImpl(RouterImpl r, TransportChannel chan, ChannelID channelID, List<ChannelFilter> filters) 
     														throws IOException {
         transportChannel = chan;
         transportChannel.addListener(this);
-        localID = new ChannelID();
+        localID = channelID;
         localIDbytes = localID.toByteArray();
         buffs[0] = hdr;
         router = r;

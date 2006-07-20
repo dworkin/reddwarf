@@ -44,6 +44,7 @@
     	<mkdir dir="release/apps/battleboard"/>
     	<mkdir dir="release/apps/hack"/>
     	<mkdir dir="release/apps/chat_test"/>
+    	<mkdir dir="release/apps/swordworld"/>
     	<mkdir dir="release/apps/matchmaker"/>
     	<mkdir dir="release/apps/timer_test"/>
     	<mkdir dir="release/apps/jeffboard"/>
@@ -286,6 +287,16 @@
 	    <compilerarg value="-Xlint:all"/>
 	    <classpath refid="build.j2se.client.classpath" />
 	    <include name="com/sun/gi/apps/chattest/ChatTestBoot.java" />
+	</javac>
+    </target>
+
+    <target name="build.swordworld" depends="init">
+	<javac srcdir="src" destdir="bin" source="5" target="5"
+		debug="${debug}" optimize="${optimize}"
+		deprecation="${deprecated}">
+	    <compilerarg value="-Xlint:all"/>
+	    <classpath refid="build.j2se.client.classpath" />
+	    <include name="com/sun/gi/apps/swordworld/SwordWorldBoot.java" />
 	</javac>
     </target>
 
@@ -583,7 +594,7 @@
 	</copy>
     </target>
 
-    <target name="release.clients" depends="release.client.battleboard, release.client.hack, release.client.chattest, release.client.matchmaker, release.client.other"/>
+    <target name="release.clients" depends="release.client.battleboard, release.client.hack, release.client.chattest, release.client.matchmaker, release.client.other, release.client.swordworld"/>
 
     <target name="release.client.other" depends="build.clients, release.j2seAPI"/>
 
@@ -615,6 +626,20 @@
 	    </manifest>
 	    <fileset dir="bin">
 		<include name="com/sun/gi/apps/chattest/client/**/*.class"/>
+	    </fileset>
+	</jar>
+    </target>
+    
+    <target name="release.client.swordworld" depends="build.clients, release.j2seAPI">
+	<jar destfile="release/client/SwordWorldClient.jar">
+	    <manifest>
+		<attribute name="Class-Path"
+			   value="SGSClient.jar"/>
+		<attribute name="Main-Class"
+			   value="com.sun.gi.apps.swordworld.client.SwordWorldClient"/>
+	    </manifest>
+	    <fileset dir="bin">
+		<include name="com/sun/gi/apps/swordworld/client/**/*.class"/>
 	    </fileset>
 	</jar>
     </target>
@@ -654,7 +679,7 @@
     </target>
 
     <target name="release.apps"
-	depends="release.trivialboot, release.timertest, release.chattest, release.jeffboard, release.battleboard, release.hack, release.glotest, release.matchmaker">
+	depends="release.trivialboot, release.timertest, release.chattest, release.jeffboard, release.battleboard, release.hack, release.glotest, release.matchmaker,release.swordworld">
     </target>
 
     <target name="release.trivialboot" depends="build.trivial">
@@ -669,6 +694,13 @@
 	    basedir="bin" includes="com/sun/gi/apps/chattest/ChatTestBoot.class" />
 	<copy file="resources/chat_test_deployment.xml"
 	    todir="release/apps/chat_test" />
+    </target>
+
+    <target name="release.swordworld" depends="build.swordworld">
+	<jar destfile="release/apps/swordworld/SwordWorld.jar"
+	    basedir="bin" includes="com/sun/gi/apps/swordworld/**" />
+	<copy file="resources/swordworld_deployment.xml"
+	    todir="release/apps/swordworld" />
     </target>
 
     <target name="release.battleboard" depends="build.battleboard">

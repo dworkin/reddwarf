@@ -72,6 +72,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -107,6 +108,8 @@ class CommPersistantData implements Serializable{
      */
     private static final long serialVersionUID = 1L;
     List<UserID> connectedUsers = new ArrayList<UserID>();
+    Map<String,ChannelID> allocatedChannelIDs = new HashMap<String,ChannelID>();
+    Map<ChannelID,String> allocatedChannelIDNames = new HashMap<ChannelID,String>();
 }
 
 public class RouterImpl implements Router {
@@ -135,7 +138,6 @@ public class RouterImpl implements Router {
     private ObjectStore ostore;
     private CommPersistantData persistantData=null;
     private long persistantDataID = ObjectStore.INVALID_ID;
-    
     
 
     private enum OPCODE {
@@ -272,8 +274,9 @@ public class RouterImpl implements Router {
     		}
     	}
     	
-    	// close any channels.  First copy the ChannelIDs to a temp
-    	// list since closing the channel removes it from the channelMap.
+    	// close any channels. First copy the ChannelIDs to a temp
+    	// list since closing the channel removes it from the
+        // channelMap.
     	List<ChannelID> channelIDList = null;
     	synchronized (channelMap) {
     		channelIDList = new ArrayList<ChannelID>(channelMap.keySet());
@@ -370,7 +373,8 @@ public class RouterImpl implements Router {
         }
     }
 
-    /* private void reportUserJoinedChannel(byte[] chanID, byte[]
+    /*
+     * private void reportUserJoinedChannel(byte[] chanID, byte[]
      * uidbytes) { UserID sentID = null; try { sentID = new
      * UserID(uidbytes); } catch (InstantiationException e1) {
      * e1.printStackTrace(); return; } for (SGSUser user :
@@ -521,40 +525,117 @@ public class RouterImpl implements Router {
     }
 
     public SGSChannel getChannel(ChannelID cid) {
-        return channelMap.get(cid);
+        synchronized(channelMap){
+            SGSChannel chan = channelMap.get(cid);
+            if (chan==null){ // check if known in persistant data
+                synchronized(ostore){
+                    Transaction trans = ostore.newTransaction(this.getClass().getClassLoader());
+                    trans.start();
+                    ChannelID id;
+                    try {
+                        persistantData = (CommPersistantData) trans.peek(persistantDataID);
+                        String chanName = persistantData.allocatedChannelIDNames.get(cid);
+                        if (chanName != null) { // already mapped
+                            TransportChannel tchan = transportManager.openChannel(chanName);
+                            chan = new ChannelImpl(this, tchan, cid, createFilters());
+                            channelMap.put(cid,chan);
+                            channelNameMap.put(chanName,chan);
+                        }   
+                        return chan;
+                    } catch (DeadlockException e) {
+                        e.printStackTrace();
+                    } catch (NonExistantObjectIDException e) {
+                        e.printStackTrace();
+                    } catch (IOException e) {                    
+                        e.printStackTrace();
+                    } finally {
+                        trans.abort();
+                    }              
+                }
+            }
+            return chan;
+        }
     }
 
     public SGSChannel openChannel(String channelName) {
-        SGSChannel sgschan = channelNameMap.get(channelName);
-        
-        // TODO: currently it is possible for an app to open another channel
-        // while the router is being shutdown.  We should close this 
-        // hole during the next pass.
-        if (sgschan == null) {
-            TransportChannel tchan;
-            try {
-                tchan = transportManager.openChannel(channelName);
-            } catch (IOException e) {
-                e.printStackTrace();
-                return null;
+        synchronized(channelNameMap){
+            SGSChannel sgschan = channelNameMap.get(channelName);
+            // TODO: currently it is possible for an app to open another
+            // channel
+            // while the router is being shutdown. We should close this
+            // hole during the next pass.
+            if (sgschan == null) {
+                TransportChannel tchan;
+                try {
+                    tchan = transportManager.openChannel(channelName);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    return null;
+                }
+                try {
+                    for (ChannelFilterRec curFilter : channelFilters) {
+                        curFilter.createChannelFilter();
+                    }
+                    ChannelID channelID = resolveChannelID(channelName);                
+                    sgschan = new ChannelImpl(this, tchan, channelID, createFilters());
+                    channelMap.put(sgschan.channelID(), sgschan);
+                    channelNameMap.put(channelName, sgschan);                
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
-            try {
-            	for (ChannelFilterRec curFilter : channelFilters) {
-            		curFilter.createChannelFilter();
-            	}
-                sgschan = new ChannelImpl(this, tchan, createFilters());
-                channelMap.put(sgschan.channelID(), sgschan);
-                channelNameMap.put(channelName, sgschan);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            return sgschan;
         }
-        return sgschan;
     }
     
     /**
-     * Creates a List of ChannelFilters based on the List of channel filter
-     * descriptors.
+     * @param channelName
+     * @param channelID
+     */
+    private ChannelID resolveChannelID(String channelName) {
+        synchronized(ostore){
+            Transaction trans = ostore.newTransaction(this.getClass().getClassLoader());
+            trans.start();
+            ChannelID id;
+            try {
+                persistantData = (CommPersistantData) trans.peek(persistantDataID);
+                id = persistantData.allocatedChannelIDs.get(channelName);
+                if (id != null){
+                    trans.abort();
+                    return id;
+                }
+                // now lock and check again
+                persistantData = (CommPersistantData) trans.lock(persistantDataID);
+                persistantData.allocatedChannelIDs.get(channelName);
+                id = persistantData.allocatedChannelIDs.get(channelName);
+                if (id != null){
+                    trans.abort();
+                    return id;
+                }
+                // need to create and register a new one
+                id = new ChannelID();
+                persistantData.allocatedChannelIDs.put(channelName, id);
+                persistantData.allocatedChannelIDNames.put(id,channelName);
+                trans.commit();
+                return id;
+            } catch (DeadlockException e) {
+                trans.abort();
+                e.printStackTrace();
+            } catch (NonExistantObjectIDException e) {
+                trans.abort();
+                e.printStackTrace();
+            }
+            return null;
+            
+        }
+        
+    }
+
+    
+
+    /**
+     * Creates a List of ChannelFilters based on the List of channel
+     * filter descriptors.
      * 
      * @return a List of ChannelFilters
      */
