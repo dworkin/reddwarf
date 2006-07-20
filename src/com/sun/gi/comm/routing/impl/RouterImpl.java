@@ -212,6 +212,18 @@ public class RouterImpl implements Router {
         if (ttlStr != null) {
             keySecondsToLive = Integer.parseInt(ttlStr);
         }
+        synchronized(ostore){
+            Transaction trans = ostore.newTransaction(this.getClass().getClassLoader());
+            trans.start();
+            persistantDataID = trans.lookup(PERSISTANTCOMMDATANAME);
+            if (persistantDataID == ObjectStore.INVALID_ID){
+                persistantData = new CommPersistantData();
+                persistantDataID = trans.create(persistantData,PERSISTANTCOMMDATANAME);
+                trans.commit();
+            } else {
+                trans.abort();
+            }
+        }
         // key issuance thread
         new Thread(new Runnable() {
             public void run() {
@@ -237,12 +249,7 @@ public class RouterImpl implements Router {
     public void cleanUpOldUsers(){
         synchronized(ostore){
             Transaction trans = ostore.newTransaction(this.getClass().getClassLoader());
-            trans.start();
-            persistantDataID = trans.lookup(PERSISTANTCOMMDATANAME);
-            if (persistantDataID == ObjectStore.INVALID_ID){
-                persistantData = new CommPersistantData();
-                persistantDataID = trans.create(persistantData,PERSISTANTCOMMDATANAME);
-            }
+            trans.start();           
             try {
                 persistantData = (CommPersistantData) trans.lock(persistantDataID);
                 for(UserID oldID : persistantData.connectedUsers){
