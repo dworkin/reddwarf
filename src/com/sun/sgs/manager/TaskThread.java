@@ -1,13 +1,4 @@
 
-/*
- * TaskThread.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Thu Jul  6, 2006	 5:27:12 PM
- * Desc: 
- *
- */
-
 package com.sun.sgs.manager;
 
 

@@ -1,13 +1,4 @@
 
-/*
- * ChannelService.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Thu Jul 13, 2006	 7:44:56 PM
- * Desc: 
- *
- */
-
 package com.sun.sgs.service;
 
 import com.sun.sgs.Channel;

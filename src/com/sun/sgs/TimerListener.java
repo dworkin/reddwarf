@@ -1,13 +1,4 @@
 
-/*
- * TimerListener.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Fri Jul 14, 2006	 1:54:01 PM
- * Desc: 
- *
- */
-
 package com.sun.sgs;
 
 import com.sun.sgs.ManagedObject;

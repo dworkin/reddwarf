@@ -1,13 +1,4 @@
 
-/*
- * Service.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Thu Jul  6, 2006	 4:58:28 PM
- * Desc: 
- *
- */
-
 package com.sun.sgs.service;
 
 

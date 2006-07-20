@@ -1,13 +1,4 @@
 
-/*
- * ExternalServiceManager.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Thu Jul 13, 2006	 7:32:10 PM
- * Desc: 
- *
- */
-
 package com.sun.sgs.manager;
 
 

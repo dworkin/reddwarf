@@ -1,13 +1,4 @@
 
-/*
- * TimerManager.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Mon Jul 10, 2006	12:24:29 PM
- * Desc: 
- *
- */
-
 package com.sun.sgs.manager;
 
 import com.sun.sgs.ManagedReference;

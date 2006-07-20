@@ -1,13 +1,4 @@
 
-/*
- * Transaction.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Thu Jul  6, 2006	 5:00:09 PM
- * Desc: 
- *
- */
-
 package com.sun.sgs.service;
 
 import com.sun.sgs.ManagedObject;

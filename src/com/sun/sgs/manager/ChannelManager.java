@@ -1,13 +1,4 @@
 
-/*
- * ChannelManager.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Mon Jul 10, 2006	12:36:08 PM
- * Desc: 
- *
- */
-
 package com.sun.sgs.manager;
 
 import com.sun.sgs.Channel;

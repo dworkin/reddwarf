@@ -1,13 +1,4 @@
 
-/*
- * TimerService.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Thu Jul 13, 2006	 7:48:05 PM
- * Desc: 
- *
- */
-
 package com.sun.sgs.service;
 
 import com.sun.sgs.ManagedReference;

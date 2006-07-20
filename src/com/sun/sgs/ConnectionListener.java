@@ -1,13 +1,4 @@
 
-/*
- * ConnectionListener.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Fri Jul 14, 2006	 7:51:27 PM
- * Desc: 
- *
- */
-
 
 package com.sun.sgs;
 

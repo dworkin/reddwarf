@@ -1,13 +1,4 @@
 
-/*
- * TaskManager.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Mon Jul 10, 2006	12:41:49 AM
- * Desc: 
- *
- */
-
 
 package com.sun.sgs.manager;
 

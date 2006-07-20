@@ -1,13 +1,4 @@
 
-/*
- * ReflectiveRunnable.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Mon Jul 10, 2006	12:16:10 AM
- * Desc: 
- *
- */
-
 package com.sun.sgs;
 
 import com.sun.sgs.ManagedReference;

@@ -1,13 +1,4 @@
 
-/*
- * User.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Thu Jul 13, 2006	 7:09:32 PM
- * Desc: 
- *
- */
-
 package com.sun.sgs;
 
 import java.nio.ByteBuffer;

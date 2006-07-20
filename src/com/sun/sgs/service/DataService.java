@@ -1,13 +1,4 @@
 
-/*
- * DataService.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Sun Jul  9, 2006	11:00:45 PM
- * Desc: 
- *
- */
-
 package com.sun.sgs.service;
 
 import com.sun.sgs.ManagedObject;

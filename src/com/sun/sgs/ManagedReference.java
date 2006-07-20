@@ -1,13 +1,4 @@
 
-/*
- * ManagedReference.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Thu Jul 13, 2006	 6:55:04 PM
- * Desc: 
- *
- */
-
 package com.sun.sgs;
 
 import com.sun.sgs.ManagedObject;

@@ -1,13 +1,4 @@
 
-/*
- * DataManager.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Mon Jul 10, 2006	12:25:46 AM
- * Desc: 
- *
- */
-
 package com.sun.sgs.manager;
 
 import com.sun.sgs.ManagedObject;

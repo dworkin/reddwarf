@@ -1,13 +1,4 @@
 
-/*
- * Task.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Thu Jul  6, 2006	 5:10:02 PM
- * Desc: 
- *
- */
-
 package com.sun.sgs.manager;
 
 import com.sun.sgs.ManagedRunnable;

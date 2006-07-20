@@ -1,13 +1,4 @@
 
-/*
- * EventManager.java
- *
- * Created by: seth proctor (sp76946)
- * Created on: Thu Jul 13, 2006	 7:59:14 PM
- * Desc: 
- *
- */
-
 package com.sun.sgs.manager;
 
 import com.sun.sgs.ManagedRunnable;
