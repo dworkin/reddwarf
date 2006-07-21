@@ -79,14 +79,4 @@ public abstract class DataManager
         return txn.getDataService().findManagedObject(txn, objectName);
     }
 
-    /**
-     * Destroys the referenced object.
-     *
-     * @param reference a reference to the object to destroy
-     */
-    public <T extends ManagedObject>
-            void destroyManagedObject(ManagedReference<T> reference) {
-        //return getService().destroyGLO(reference);
-    }
-
 }
