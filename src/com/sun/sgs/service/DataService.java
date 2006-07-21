@@ -59,7 +59,7 @@ public interface DataService extends Service
      *
      * @param reference the object's reference
      *
-     * @reurn the object
+     * @return the object
      */
     public <T extends ManagedObject> T get(ManagedReference<T> reference);
 
@@ -68,7 +68,7 @@ public interface DataService extends Service
      *
      * @param reference the object's reference
      *
-     * @reurn the object
+     * @return the object
      */
     public <T extends ManagedObject> T peek(ManagedReference<T> reference);
 
