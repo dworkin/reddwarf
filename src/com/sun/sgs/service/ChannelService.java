@@ -46,66 +46,59 @@ public interface ChannelService extends Service
     /**
      * Destroys the given channel.
      *
-     * @param txn the <code>Transaction</code> state
      * @param channel the channel to destroy
      */
-    public void destroyChannel(Transaction txn, Channel channel);
+    public void destroyChannel(Channel channel);
 
     /**
      * Adds a user to a channel.
      *
-     * @param txn the <code>Transaction</code> state
      * @param user the user joining the channel
      * @param channel the channel
      */
-    public void join(Transaction txn, User user, Channel channel);
+    public void join(User user, Channel channel);
 
     /**
      * Removes a user from a channel.
      *
-     * @param txn the <code>Transaction</code> state
      * @param user the user leaving the channel
      * @param channel the channel
      */
-    public void leave(Transaction txn, User user, Channel channel);
+    public void leave(User user, Channel channel);
 
     /**
      * Sends a message to a specific user. The user must be a member of
      * the channel.
      *
-     * @param txn the <code>Transaction</code> state
      * @param channel the channel to send on
      * @param to the user to receive the message
      * @param data the content of the message
      * @param quality the preferred quality of service paramaters
      */
-    public void send(Transaction txn, Channel channel, User to,
-                     ByteBuffer data, Quality quality);
+    public void send(Channel channel, User to, ByteBuffer data,
+                     Quality quality);
 
     /**
      * Sends a message to the specific sub-group of users. The users must
      * all be members of the channel.
      *
-     * @param txn the <code>Transaction</code> state
      * @param channel the channel to send on
      * @param to the users to receive the message
      * @param data the content of the message
      * @param quality the preferred quality of service paramaters
      */
-    public void multicast(Transaction txn, Channel channel, User [] to,
-                          ByteBuffer data, Quality quality);
+    public void multicast(Channel channel, User [] to, ByteBuffer data,
+                          Quality quality);
 
     /**
      * Sends a message to all users on this channel. This uses the default
      * quality of service for this channel to send the message.
      *
-     * @param txn the <code>Transaction</code> state
      * @param channel the channel to send on
      * @param data the content of the message
      * @param quality the preferred quality of service paramaters
      */
-    public void broadcast(Transaction txn, Channel channel,
-                          ByteBuffer data, Quality quality);
+    public void broadcast(Channel channel, ByteBuffer data, Quality quality);
 
     /**
      * Returns a <code>ByteBuffer</code> that can be used for future
