@@ -27,7 +27,8 @@ public interface Service
      *
      * @param txn the <code>Transaction</code> state
      *
-     * FIXME: what does this throw?
+     * FIXME: what does this throw? For cost reasons, should this actually
+     * be some kind of error code instead of an exception?
      */
     public void prepare(Transaction txn) throws Exception;
 
@@ -37,9 +38,10 @@ public interface Service
      *
      * @param txn the <code>Transaction</code> state
      *
-     * FIXME: what does this throw?
+     * @throws NotPreparedException if prepare wasn't previously called
+     *                              on this service for this transaction
      */
-    public void commit(Transaction txn) throws Exception;
+    public void commit(Transaction txn) throws NotPreparedException;
 
     /**
      * Tells the <code>Service</code> to both prepare and commit its
@@ -49,7 +51,7 @@ public interface Service
      *
      * @param txn the <code>Transaction</code> state
      *
-     * FIXME: what does this throw?
+     * FIXME: what does this throw? (also, see comments in prepare)
      */
     public void prepareAndCommit(Transaction txn) throws Exception;
 
