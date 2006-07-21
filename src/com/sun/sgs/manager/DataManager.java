@@ -28,14 +28,6 @@ public abstract class DataManager
     }
 
     /**
-     * Private helper that resolves the transaction from the thread.
-     */
-    private Transaction getTransaction() {
-        return ((TaskThread)(Thread.currentThread())).
-            getTask().getTransaction();
-    }
-
-    /**
      * Tells the manager to manage this object. The object has no name
      * associated with it.
      *
@@ -43,11 +35,8 @@ public abstract class DataManager
      *
      * @return a reference to the newly managed object
      */
-    public <T extends ManagedObject>
-            ManagedReference<T> manageObject(T object) {
-        Transaction txn = getTransaction();
-        return txn.getDataService().manageObject(txn, object);
-    }
+    public abstract <T extends ManagedObject>
+            ManagedReference<T> manageObject(T object);
 
     /**
      * Tells the manager to manage this object. The object is associated
@@ -58,11 +47,8 @@ public abstract class DataManager
      *
      * @return a reference to the newly managed object
      */
-    public <T extends ManagedObject>
-            ManagedReference<T> manageObject(T object, String objectName) {
-        Transaction txn = getTransaction();
-        return txn.getDataService().manageObject(txn, object);
-    }
+    public abstract <T extends ManagedObject>
+            ManagedReference<T> manageObject(T object, String objectName);
 
     /**
      * Tries to find an already managed object based on that object's
@@ -73,10 +59,7 @@ public abstract class DataManager
      *
      * @return a reference to the object, or null
      */
-    public ManagedReference<? extends ManagedObject>
-            findManagedObject(String objectName) {
-        Transaction txn = getTransaction();
-        return txn.getDataService().findManagedObject(txn, objectName);
-    }
+    public abstract ManagedReference<? extends ManagedObject>
+            findManagedObject(String objectName);
 
 }
