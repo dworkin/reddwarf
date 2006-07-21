@@ -55,12 +55,29 @@ public interface DataService extends Service
             findManagedObject(Transaction txn, String objectName);
 
     /**
+     * Locks the referenced object and returns the associated value.
+     *
+     * @param reference the object's reference
+     *
+     * @reurn the object
+     */
+    public <T extends ManagedObject> T get(ManagedReference<T> reference);
+
+    /**
+     * Returns the referenced object for read-only access without locking it.
+     *
+     * @param reference the object's reference
+     *
+     * @reurn the object
+     */
+    public <T extends ManagedObject> T peek(ManagedReference<T> reference);
+
+    /**
      * Destroys the referenced object.
      *
-     * @param txn the <code>Transaction</code> state
      * @param reference a reference to the object to destroy
      */
-    public void destroyManagedObject(Transaction txn,
+    public void destroyManagedObject(
             ManagedReference<? extends ManagedObject> reference);
 
 }
