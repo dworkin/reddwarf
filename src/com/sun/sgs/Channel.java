@@ -40,6 +40,11 @@ public interface Channel extends ManagedReference
     public void leave(User user);
 
     /**
+     * Destroys this channel.
+     */
+    public void destory();
+
+    /**
      * Sends a message to a specific user. The user must be a member of
      * this channel. This uses the default quality of service for this
      * channel to send the message.
@@ -107,10 +112,5 @@ public interface Channel extends ManagedReference
      * FIXME: what are the parameters?
      */
     public ByteBuffer getBuffer();
-
-    /**
-     * Destroys this channel.
-     */
-    public void destroy();
 
 }
