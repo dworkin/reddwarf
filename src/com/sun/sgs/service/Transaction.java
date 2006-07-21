@@ -74,8 +74,10 @@ public interface Transaction extends ManagedObject
 
     /**
      * Commits the transaction. If this fails, an exception is thrown.
-     *
-     * FIXME: what does this throw?
+     * <p>
+     * FIXME: what does this throw? There are probably 2 types of exceptions:
+     * one where we can re-try, and one where we can't (although it's not
+     * clear that the first case actually exists in this system).
      */
     public void commit() throws Exception;
 
