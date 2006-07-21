@@ -1,6 +1,8 @@
 
 package com.sun.sgs.service;
 
+import com.sun.sgs.kernel.TransactionProxy;
+
 
 /**
  * This is the core interface used for all services that participate in
@@ -20,6 +22,20 @@ public interface Service
      * @return the service's identifier
      */
     public String getIdentifier();
+
+    /**
+     * Provides this <code>Service</code> access to the current transaction
+     * state.
+     * <p>
+     * FIXME: should this be done like this, as a required parameter to
+     * the constructor, or through a more structured factory mechanism? The
+     * answer is probably the latter, but that won't be designed until some
+     * of the configuration code is designed.
+     *
+     * @param transactionProxy a non-null proxy that provides access to the
+     *                         current <code>Transaction</code>
+     */
+    public void setTransactionProxy(TransactionProxy transactionProxy);
 
     /**
      * Tells the <code>Service</code> to prepare for commiting its

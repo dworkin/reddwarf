@@ -18,10 +18,8 @@ public interface TaskService extends Service
     /**
      * Queues a task to run.
      *
-     * @param txn the <code>Transaction</code> state
      * @param task the task to run
      */
-    public void queueTask(Transaction txn,
-			  ManagedReference<? extends ManagedRunnable> task);
+    public void queueTask(ManagedReference<? extends ManagedRunnable> task);
 
 }

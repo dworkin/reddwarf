@@ -26,22 +26,19 @@ public interface ChannelService extends Service
      * name is already in use, or if there are other problems creating the
      * channel, then null is returned.
      *
-     * @param txn the <code>Transaction</code> state
      * @param channelName the name of this channel
      * @param quality the default quality of service properties
      *
      * @return a new channel, or null
      */
-    public Channel createChannel(Transaction txn, String channelName,
-                                 Quality quality);
+    public Channel createChannel(String channelName, Quality quality);
 
     /**
      * Find a channel based on its name.
      *
-     * @param txn the <code>Transaction</code> state
      * @param channelName the name of this channel
      */
-    public Channel findChannel(Transaction txn, String channelName);
+    public Channel findChannel(String channelName);
 
     /**
      * Destroys the given channel.
@@ -107,31 +104,27 @@ public interface ChannelService extends Service
      * <p>
      * FIXME: what are the parameters?
      *
-     * @param txn the <code>Transaction</code> state
-     *
      * @return a <code>ByteBuffer</code> to use when send messages
      */
-    public ByteBuffer getBuffer(Transaction txn);
+    public ByteBuffer getBuffer();
 
     /**
      * Registers the given listener to listen for messages associated
      * with the given user.
      *
-     * @param txn the <code>Transaction</code> state
      * @param user the <code>User</code> who's events we're listening for
      * @param listenerReference the listener
      */
-    public void registerUserListener(Transaction txn, User user,
+    public void registerUserListener(User user,
             ManagedReference<? extends UserListener> listenerReference);
 
     /**
      * Registers the given listen to listen for messages associated with
      * any connecting or disconnecting clients.
      *
-     * @param txn the <code>Transaction</code> state
      * @param listenerReference the listener
      */
-    public void registerConnectionListener(Transaction txn,
+    public void registerConnectionListener(
             ManagedReference<? extends ConnectionListener> listenerReference);
 
 }
