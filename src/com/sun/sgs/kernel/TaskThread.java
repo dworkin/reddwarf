@@ -3,16 +3,20 @@ package com.sun.sgs.kernel;
 
 
 /**
- * This package-private class is the specific implementation of
+ * This abstract class is the specific implementation of
  * <code>Thread</code> that runs all tasks in the system. It maintains
  * local state about the task, and implements the logic for running a
  * task in the server.
+ * <p>
+ * FIXME: This currently is a very naive implementation of task
+ * management...it's enough for initial tests, but needs to be re-built
+ * for the actual system.
  *
  * @since 1.0
  * @author James Megquier
  * @author Seth Proctor
  */
-class TaskThread extends Thread
+public abstract class TaskThread extends Thread
 {
 
     // the Task that this thread is currently executing
@@ -41,18 +45,41 @@ class TaskThread extends Thread
      */
     public void executeTask(Task task) {
         // first, check that we're not already running a task
+        // FIXME: we should decide if tasks get queued up here, or
+        // whether this is in fact an error
+        if (this.task != null) {
+            System.err.println("Tried to execute on already running task");
+            return;
+        }
 
         // next, remember the new task
+        this.task = task;
 
         // finally, start execution by waking up the run loop and
         // running the new task
+        synchronized(this) {
+            notify();
+        }
     }
 
     /**
      * Runs this thread.
      */
     public void run() {
-        // This needs to be over-ridden to provide common behavior
+        while (true) {
+            try {
+                synchronized(this) {
+                    wait();
+                }
+            } catch (InterruptedException ie) {
+                System.err.println("Task thread was interrupted");
+            }
+
+            if (task != null) {
+                task.run();
+                task = null;
+            }
+        }
     }
 
 }

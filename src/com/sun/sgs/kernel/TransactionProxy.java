@@ -15,7 +15,7 @@ import com.sun.sgs.service.Transaction;
  * @author James Megquier
  * @author Seth Proctor
  */
-public class TransactionProxy {
+public final class TransactionProxy {
 
     /**
      * This package-private constructor creates a new instance of
@@ -33,7 +33,7 @@ public class TransactionProxy {
      * @return the current <code>Transaction</code>
      */
     public Transaction getCurrentTransaction() {
-        return ((TaskThread)(Thread.currentThread())).getTask().
+        return ((TransactionalTaskThread)(Thread.currentThread())).
             getTransaction();
     }
 
