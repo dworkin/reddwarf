@@ -16,14 +16,31 @@ import com.sun.sgs.ManagedRunnable;
 public abstract class TaskManager
 {
 
+    // the singleton instance of TaskManager
+    private static TaskManager manager = null;
+
     /**
-     * Returns an instance of <code>TaskManager</code>.
+     * Creates an instance of <code>TaskManager</code>. This class enforces
+     * a singleton model, so only one instance of <code>TaskManager</code>
+     * may exist in the system.
      *
-     * @return an instance of <code>TaskManager</code>
+     * @throws IllegalStateException if an instance already exists
+     */
+    protected TaskManager() {
+        if (manager != null)
+            throw new IllegalStateException("TaskManager is already " +
+                                            "initialized");
+
+        manager = this;
+    }
+
+    /**
+     * Returns the instance of <code>TaskManager</code>.
+     *
+     * @return the instance of <code>TaskManager</code>
      */
     public static TaskManager getInstance() {
-        // FIXME: return the instance
-        return null;
+        return manager;
     }
 
     /**

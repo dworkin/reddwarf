@@ -4,8 +4,6 @@ package com.sun.sgs.manager;
 import com.sun.sgs.ManagedObject;
 import com.sun.sgs.ManagedReference;
 
-import com.sun.sgs.service.Transaction;
-
 
 /**
  * This manager provides access to the data-related routines.
@@ -17,14 +15,31 @@ import com.sun.sgs.service.Transaction;
 public abstract class DataManager
 {
 
+    // the singleton instance of DataManager
+    private static DataManager manager = null;
+
     /**
-     * Returns an instance of <code>DataManager</code>.
+     * Creates an instance of <code>DataManager</code>. This class enforces
+     * a singleton model, so only one instance of <code>DataManager</code>
+     * may exist in the system.
      *
-     * @return an instance of <code>DataManager</code>
+     * @throws IllegalStateException if an instance already exists
+     */
+    protected DataManager() {
+        if (manager != null)
+            throw new IllegalStateException("DataManager is already " +
+                                            "initialized");
+
+        manager = this;
+    }
+
+    /**
+     * Returns the instance of <code>DataManager</code>.
+     *
+     * @return the instance of <code>DataManager</code>
      */
     public static DataManager getInstance() {
-        // FIXME: return the instance
-        return null;
+        return manager;
     }
 
     /**

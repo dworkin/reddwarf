@@ -21,14 +21,31 @@ import java.nio.ByteBuffer;
 public abstract class ChannelManager
 {
 
+    // the singleton instance of ChannelManager
+    private static ChannelManager manager = null;
+
     /**
-     * Returns an instance of <code>ChannelManager</code>.
+     * Creates an instance of <code>ChannelManager</code>. This class enforces
+     * a singleton model, so only one instance of <code>ChannelManager</code>
+     * may exist in the system.
      *
-     * @return an instance of <code>ChannelManager</code>
+     * @throws IllegalStateException if an instance already exists
+     */
+    protected ChannelManager() {
+        if (manager != null)
+            throw new IllegalStateException("ChannelManager is already " +
+                                            "initialized");
+
+        manager = this;
+    }
+
+    /**
+     * Returns the instance of <code>ChannelManager</code>.
+     *
+     * @return the instance of <code>ChannelManager</code>
      */
     public static ChannelManager getInstance() {
-        // FIXME: return an instance
-        return null;
+        return manager;
     }
 
     /**

@@ -16,14 +16,31 @@ import com.sun.sgs.TimerListener;
 public abstract class TimerManager
 {
 
+    // the singleton instance of TimerManager
+    private static TimerManager manager = null;
+
     /**
-     * Returns an instance of <code>TimerManager</code>.
+     * Creates an instance of <code>TimerManager</code>. This class enforces
+     * a singleton model, so only one instance of <code>TimerManager</code>
+     * may exist in the system.
      *
-     * @return an instance of <code>TimerManager</code>
+     * @throws IllegalStateException if an instance already exists
+     */
+    protected TimerManager() {
+        if (manager != null)
+            throw new IllegalStateException("TimerManager is already " +
+                                            "initialized");
+
+        manager = this;
+    }
+
+    /**
+     * Returns the instance of <code>TimerManager</code>.
+     *
+     * @return the instance of <code>TimerManager</code>
      */
     public static TimerManager getInstance() {
-        // FIXME: return the instance
-        return null;
+        return manager;
     }
 
     /**
