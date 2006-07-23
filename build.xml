@@ -23,7 +23,7 @@
     <mkdir dir="${classDir}"/>
     <javac includeAntRuntime="no" debug="on" deprecation="on"
            srcdir="${srcDir}" destdir="${classDir}" classpath="${classDir}">
-      <compilerarg value="-Xlint:unchecked"/>
+      <!--<compilerarg value="-Xlint:unchecked"/>-->
     </javac>
   </target>
 
