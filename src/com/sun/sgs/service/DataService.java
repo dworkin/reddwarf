@@ -19,36 +19,40 @@ public interface DataService extends Service
      * Tells the service to manage this object. The object has no name
      * associated with it.
      *
+     * @param txn the transaction state
      * @param object the object to manage
      *
      * @return a reference to the newly managed object
      */
     public <T extends ManagedObject>
-            ManagedReference<T> manageObject(T object);
+            ManagedReference<T> manageObject(Transaction txn, T object);
 
     /**
      * Tells the service to manage this object. The object is associated
      * with the given name for future searching.
      *
+     * @param txn the transaction state
      * @param object the object to manage
      * @param objectName the name of the object
      *
      * @return a reference to the newly managed object
      */
     public <T extends ManagedObject>
-            ManagedReference<T> manageObject(T object, String objectName);
+            ManagedReference<T> manageObject(Transaction txn,
+                                             T object, String objectName);
 
     /**
      * Tries to find an already managed object based on that object's
      * name. If no object can be found with the given name then null
      * is returned.
      *
+     * @param txn the transaction state
      * @param objectName the name of the object
      *
      * @return a reference to the object, or null
      */
     public ManagedReference<? extends ManagedObject>
-            findManagedObject(String objectName);
+            findManagedObject(Transaction txn, String objectName);
 
     /**
      * Locks the referenced object and returns the associated value.
