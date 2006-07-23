@@ -23,7 +23,7 @@ public class ReflectiveRunnable implements ManagedRunnable
 	private static final long serialVersionUID = 1L;
 
 	// the referenced object that will be called
-    private ManagedReference reference;
+    private ManagedReference<? extends ManagedObject> reference;
 
     // the method to call
     private Method method;
@@ -33,10 +33,10 @@ public class ReflectiveRunnable implements ManagedRunnable
 
     /**
      * 
-     * FIXME: The accessType should be an Enum.
      */
-    public ReflectiveRunnable(int accessType, ManagedReference reference,
-                              Method method, Object [] parameters) {
+    public ReflectiveRunnable(
+            ManagedReference<? extends ManagedObject> reference,
+            Method method, Object [] parameters) {
         this.reference = reference;
         this.method = method;
 
@@ -49,7 +49,7 @@ public class ReflectiveRunnable implements ManagedRunnable
      * FIXME: not implemented
      */
     public void run() {
-        
+
     }
 
 }
