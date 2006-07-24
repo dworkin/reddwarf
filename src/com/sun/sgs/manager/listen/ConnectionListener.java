@@ -1,6 +1,9 @@
 
 
-package com.sun.sgs;
+package com.sun.sgs.manager.listen;
+
+import com.sun.sgs.ManagedObject;
+import com.sun.sgs.User;
 
 
 /**

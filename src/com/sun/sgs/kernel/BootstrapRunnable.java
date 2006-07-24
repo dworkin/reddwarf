@@ -1,10 +1,11 @@
 
 package com.sun.sgs.kernel;
 
-import com.sun.sgs.BootListener;
 import com.sun.sgs.ManagedReference;
 
 import com.sun.sgs.manager.DataManager;
+
+import com.sun.sgs.manager.listen.BootListener;
 
 
 /**

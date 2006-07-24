@@ -2,11 +2,12 @@
 package com.sun.sgs.service;
 
 import com.sun.sgs.Channel;
-import com.sun.sgs.ConnectionListener;
 import com.sun.sgs.ManagedReference;
 import com.sun.sgs.Quality;
 import com.sun.sgs.User;
-import com.sun.sgs.UserListener;
+
+import com.sun.sgs.manager.listen.ConnectionListener;
+import com.sun.sgs.manager.listen.UserListener;
 
 import java.nio.ByteBuffer;
 

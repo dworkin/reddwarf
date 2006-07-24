@@ -3,7 +3,8 @@ package com.sun.sgs.service;
 
 import com.sun.sgs.ManagedReference;
 import com.sun.sgs.TimerHandle;
-import com.sun.sgs.TimerListener;
+
+import com.sun.sgs.manager.listen.TimerListener;
 
 
 /**

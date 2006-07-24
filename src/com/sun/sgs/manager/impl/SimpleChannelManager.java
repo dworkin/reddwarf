@@ -2,15 +2,16 @@
 package com.sun.sgs.manager.impl;
 
 import com.sun.sgs.Channel;
-import com.sun.sgs.ConnectionListener;
 import com.sun.sgs.ManagedReference;
 import com.sun.sgs.Quality;
 import com.sun.sgs.User;
-import com.sun.sgs.UserListener;
 
 import com.sun.sgs.kernel.TransactionProxy;
 
 import com.sun.sgs.manager.ChannelManager;
+
+import com.sun.sgs.manager.listen.ConnectionListener;
+import com.sun.sgs.manager.listen.UserListener;
 
 import com.sun.sgs.service.Transaction;
 

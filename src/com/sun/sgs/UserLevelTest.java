@@ -4,6 +4,8 @@ package com.sun.sgs;
 import com.sun.sgs.manager.DataManager;
 import com.sun.sgs.manager.TaskManager;
 
+import com.sun.sgs.manager.listen.BootListener;
+
 
 /**
  * This is just a test driver for app-level code.

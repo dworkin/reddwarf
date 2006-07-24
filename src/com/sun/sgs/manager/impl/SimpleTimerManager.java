@@ -3,11 +3,12 @@ package com.sun.sgs.manager.impl;
 
 import com.sun.sgs.ManagedReference;
 import com.sun.sgs.TimerHandle;
-import com.sun.sgs.TimerListener;
 
 import com.sun.sgs.kernel.TransactionProxy;
 
 import com.sun.sgs.manager.TimerManager;
+
+import com.sun.sgs.manager.listen.TimerListener;
 
 import com.sun.sgs.service.Transaction;
 
