@@ -522,6 +522,10 @@ public class SimpleDataService implements DataService
         // get the transaction state and the object id
         TxnState txnState = getTxnState();
         long objId = ((SimpleManagedReference)reference).getObjectId();
+        
+        // FIXME: Check if it's already in deletedObjects -- someone
+        // might have obtained a different ManagedReference to it and
+        // called destroy on that reference. -jm
 
         // check if this is something we've created within this transaction,
         // and if so just clear it from the state
