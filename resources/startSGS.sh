@@ -1,2 +1,2 @@
 #!/bin/sh
-exec java -jar SunGameServer.jar
+exec java -Djava.util.logging.config.file=logging.properties -jar SunGameServer.jar
