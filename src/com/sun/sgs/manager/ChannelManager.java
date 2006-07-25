@@ -83,7 +83,7 @@ public abstract class ChannelManager
      * Registers the given listener to listen for messages associated
      * with the given user.
      *
-     * @param user the <code>User</code> who's events we're listening for
+     * @param user the <code>User</code> whose events we're listening for
      * @param listenerReference the listener
      */
     public abstract void registerUserListener(User user,

@@ -119,7 +119,7 @@ public interface ChannelService extends Service
      * with the given user.
      *
      * @param txn the transaction state
-     * @param user the <code>User</code> who's events we're listening for
+     * @param user the <code>User</code> whose events we're listening for
      * @param listenerReference the listener
      */
     public void registerUserListener(Transaction txn, User user,

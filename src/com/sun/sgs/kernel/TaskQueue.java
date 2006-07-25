@@ -8,51 +8,51 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 
 /**
- * This class is the entry point for all events in the system.
+ * This class is the entry point for all tasks in the system.
  *
  * @since 1.0
  * @author James Megquier
  * @author Seth Proctor
  */
-public class EventQueue
+public class TaskQueue
 {
 
     // the system's resource coordinator
     private ResourceCoordinator resourceCoordinator;
 
-    // the queue that lines up events
-    private ConcurrentLinkedQueue<Task> eventQueue;
+    // the queue that lines up tasks
+    private ConcurrentLinkedQueue<Task> taskQueue;
 
     /**
      * FIXME: figure out if the pool size is just for testing or actually
      * a useful parameter.
      */
-    public EventQueue(ResourceCoordinator resourceCoordinator,
+    public TaskQueue(ResourceCoordinator resourceCoordinator,
                       int initialPoolSize) {
         this.resourceCoordinator = resourceCoordinator;
 
         // create a simple queue, just for testing
-        eventQueue = new ConcurrentLinkedQueue<Task>();
+        taskQueue = new ConcurrentLinkedQueue<Task>();
 
         // now ask for some number of threads to consume the queue
         for (int i = 0; i < initialPoolSize; i++) {
-            Task queueTask = new Task(new EventQueueRunnable(), null);
+            Task queueTask = new Task(new TaskQueueRunnable(), null);
             resourceCoordinator.requestThread().executeTask(queueTask);
         }
     }
 
     /**
-     * Queue an event to run when the resources are available.
+     * Queue a task to run when the resources are available.
      *
      * @param task the <code>Task</code> to run
      */
-    public void queueEvent(Task task) {
+    public void queueTask(Task task) {
         // add the new task to the queue
-        eventQueue.add(task);
+        taskQueue.add(task);
 
         // make sure someone is awake to process this task
-        synchronized(eventQueue) {
-            eventQueue.notify();
+        synchronized(taskQueue) {
+            taskQueue.notify();
         }
     }
 
@@ -62,9 +62,9 @@ public class EventQueue
      * <p>
      * NOTE: This is internal right now for testing...although it may
      * make sense to keep it here, given that no one else need know how
-     * events are processed.
+     * tasks are processed.
      */
-    private class EventQueueRunnable implements Runnable {
+    private class TaskQueueRunnable implements Runnable {
         
         // flag noting whether this thread is still supposed to process tasks
         private boolean stillProcessing = true;
@@ -75,7 +75,7 @@ public class EventQueue
         public void run() {
             while (stillProcessing) {
                 // try to get a task off the queue
-                Task task = eventQueue.poll();
+                Task task = taskQueue.poll();
                 
                 if (task != null) {
                     // we got a task, so run it
@@ -84,12 +84,12 @@ public class EventQueue
                     // there was nothing available, so wait until there is
                     // something to process
                     try {
-                        synchronized(eventQueue) {
-                            eventQueue.wait();
+                        synchronized(taskQueue) {
+                            taskQueue.wait();
                         }
                     } catch (InterruptedException ie) {
                         // FIXME: we don't know yet what to do with this
-                        System.err.println("EventQueue thread interrupted");
+                        System.err.println("TaskQueue thread interrupted");
                     }
                 }
             }            

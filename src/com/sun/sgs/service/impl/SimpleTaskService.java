@@ -4,7 +4,7 @@ package com.sun.sgs.service.impl;
 import com.sun.sgs.ManagedReference;
 import com.sun.sgs.ManagedRunnable;
 
-import com.sun.sgs.kernel.EventQueue;
+import com.sun.sgs.kernel.TaskQueue;
 import com.sun.sgs.kernel.ReferenceRunnable;
 import com.sun.sgs.kernel.Task;
 import com.sun.sgs.kernel.TransactionProxy;
@@ -21,7 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * This is a simple implementation of <code>TaskService</code> that handles
- * any number of pending events, but makes no attempt to order or otherwise
+ * any number of pending tasks, but makes no attempt to order or otherwise
  * prioritize the tasks.
  *
  * @since 1.0
@@ -43,8 +43,8 @@ public class SimpleTaskService implements TaskService
     // the state map for each active transaction
     private ConcurrentHashMap<Long,TxnState> txnMap;
 
-    // the event queue used to actually queue up tasks
-    private EventQueue eventQueue = null;
+    // the task queue used to actually queue up tasks
+    private TaskQueue taskQueue = null;
 
     /**
      * Creates an instance of <code>SimpleTaskService</code>.
@@ -54,13 +54,13 @@ public class SimpleTaskService implements TaskService
     }
 
     /**
-     * Tells this service about the <code>EventQueue</code> where future
+     * Tells this service about the <code>TaskQueue</code> where future
      * tasks get queued.
      *
-     * @param eventQueue the system's event queue
+     * @param taskQueue the system's task queue
      */
-    public void setEventQueue(EventQueue eventQueue) {
-        this.eventQueue = eventQueue;
+    public void setTaskQueue(TaskQueue taskQueue) {
+        this.taskQueue = taskQueue;
     }
 
     /**
@@ -96,8 +96,8 @@ public class SimpleTaskService implements TaskService
 
         // This is a simple enough service implementation that it actually
         // doesn't need to do any preparation, since (in the current
-        // version of the system) you can't fail to add an event
-        // NOTE: If the event queue starts to become size-limited,
+        // version of the system) you can't fail to add a task
+        // NOTE: If the task queue starts to become size-limited,
         // then this prepare step will need to reserve space first
     }
 
@@ -126,9 +126,9 @@ public class SimpleTaskService implements TaskService
             Task task = new Task(new ReferenceRunnable(runnableRef), null);
 
             // now wrap the task in a transactional context and put this
-            // into the event queue
-            eventQueue.
-                queueEvent(new Task(new TransactionRunnable(task), null));
+            // into the task queue
+            taskQueue.
+                queueTask(new Task(new TransactionRunnable(task), null));
         }
 
         // finally, remove this transaction state from the map

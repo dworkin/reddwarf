@@ -4,7 +4,7 @@ package com.sun.sgs.service;
 import com.sun.sgs.ManagedReference;
 import com.sun.sgs.ManagedRunnable;
 
-import com.sun.sgs.kernel.EventQueue;
+import com.sun.sgs.kernel.TaskQueue;
 
 
 /**
@@ -19,12 +19,12 @@ public interface TaskService extends Service
 {
 
     /**
-     * Tells this service about the <code>EventQueue</code> where future
+     * Tells this service about the <code>TaskQueue</code> where future
      * tasks get queued.
      *
-     * @param eventQueue the system's event queue
+     * @param taskQueue the system's task queue
      */
-    public void setEventQueue(EventQueue eventQueue);
+    public void setTaskQueue(TaskQueue taskQueue);
 
     /**
      * Queues a task to run.

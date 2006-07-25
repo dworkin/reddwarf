@@ -26,8 +26,8 @@ import com.sun.sgs.service.impl.SimpleTaskService;
 public final class Boot
 {
 
-    // a reference to the event queue
-    private EventQueue eventQueue;
+    // a reference to the task queue
+    private TaskQueue taskQueue;
 
     // a reference to the resource manager
     private ResourceCoordinator resourceCoordinator;
@@ -68,12 +68,12 @@ public final class Boot
             resourceCoordinator.giveThread(taskThread);
         }
 
-        // create the event queue, at which point we're ready to start
+        // create the task queue, at which point we're ready to start
         // processing events
         // FIXME: for testing, we're giving all the threads right
-        // to the event queue, since no one else needs them yet
-        eventQueue = new EventQueue(resourceCoordinator, numThreads);
-        taskService.setEventQueue(eventQueue);
+        // to the task queue, since no one else needs them yet
+        taskQueue = new TaskQueue(resourceCoordinator, numThreads);
+        taskService.setTaskQueue(taskQueue);
     }
 
     /**
@@ -89,7 +89,7 @@ public final class Boot
         Task bootTask = new Task(tr, null);
 
         // finally, queue the task to run
-        eventQueue.queueEvent(bootTask);
+        taskQueue.queueTask(bootTask);
     }
 
     /**

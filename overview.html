@@ -134,7 +134,7 @@ and low-level code will have to be sure to avoid circular
 dependencies.
 
  * Currently, ManagedObject extends Serializable, so it's impossible
- to queue an event that contains a ByteBuffer; this ends up costing
+ to queue a task that contains a ByteBuffer; this ends up costing
  an extra copy even when the packets aren't themselves on a reliable
  transport.
 
@@ -144,7 +144,7 @@ dependencies.
 
 An alternative in this case would be to allow Runnables onto the
 low-level EventQueue, and to require use of the TaskService to
-queue events in a reliable (recoverable) fashion.
+queue tasks in a reliable (recoverable) fashion.
 
 == Future Implementation ideas ==
 

@@ -87,7 +87,7 @@ public class SimpleChannelManager extends ChannelManager
      * Registers the given listener to listen for messages associated
      * with the given user.
      *
-     * @param user the <code>User</code> who's events we're listening for
+     * @param user the <code>User</code> whose events we're listening for
      * @param listenerReference the listener
      */
     public void registerUserListener(User user,
@@ -98,7 +98,7 @@ public class SimpleChannelManager extends ChannelManager
     }
 
     /**
-     * Registers the given listen to listen for messages associated with
+     * Registers the given listener to listen for messages associated with
      * any connecting or disconnecting clients.
      *
      * @param listenerReference the listener

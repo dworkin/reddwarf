@@ -11,7 +11,7 @@ import com.sun.sgs.service.Transaction;
  * This class is used to define a single task to execute. It handles the
  * target to run and any associated meta-data or quality of service
  * parameters. This is typically stored in the state of a
- * <code>TaskThread</code> and then consumed from the event queue. Note
+ * <code>TaskThread</code> and then consumed from the task queue. Note
  * that <code>Task</code> is nothing more than a light-weight container
  * used to pair actions with meta-data. As such, it's not uncommon to
  * have tasks contain actions that in turn contains tasks.
