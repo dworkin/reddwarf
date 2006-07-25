@@ -570,8 +570,9 @@
 	<copy file="resources/libs/derby/${derby.jarfile}" todir="release/lib" />
 	<copy file="resources/SGS-apps.conf" todir="release" />
 	<copy file="resources/passwd.txt" todir="release" />
-	<copy file="resources/FakeDiscovery.xml" todir="release" />
+	<copy file="resources/README" todir="release" />
 	<copy file="resources/logging.properties" todir="release" />
+	<copy file="resources/DarkstarW32CPPAPI.zip" todir="release" />
     </target>
 
     <target name="release.j2seAPI" depends="build.j2seAPI">
