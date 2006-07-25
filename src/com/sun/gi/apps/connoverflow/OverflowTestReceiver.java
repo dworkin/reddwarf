@@ -62,7 +62,7 @@ public class OverflowTestReceiver extends JFrame
         setSize(100,100);
         setVisible(true);
         try {
-            connect("file:FakeDiscovery.xml");
+            connect("file:discovery.xml");
         } catch (MalformedURLException e) {
 
             e.printStackTrace();

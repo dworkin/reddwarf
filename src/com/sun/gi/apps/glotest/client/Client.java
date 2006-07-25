@@ -118,7 +118,7 @@ public class Client implements ClientConnectionManagerListener {
     public void run() {
         try {
             mgr = new ClientConnectionManagerImpl(appName, new URLDiscoverer(
-                    new File("FakeDiscovery.xml").toURI().toURL()));
+                    new File("discovery.xml").toURI().toURL()));
             mgr.setListener(this);
 
             String[] classNames = mgr.getUserManagerClassNames();

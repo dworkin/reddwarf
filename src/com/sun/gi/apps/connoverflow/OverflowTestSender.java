@@ -60,7 +60,7 @@ public class OverflowTestSender implements ClientConnectionManagerListener,
     
     public OverflowTestSender(){
        try {
-        connect("file:FakeDiscovery.xml");
+        connect("file:discovery.xml");
     } catch (MalformedURLException e) {
         
         e.printStackTrace();

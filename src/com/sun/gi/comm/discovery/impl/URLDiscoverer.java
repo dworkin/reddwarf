@@ -135,7 +135,7 @@ public class URLDiscoverer implements Discoverer {
         try {
             URLDiscoverer disco =
                 new URLDiscoverer(new File(
-                    "FakeDiscovery.xml").toURI().toURL());
+                    "discovery.xml").toURI().toURL());
             DiscoveredGame[] games = disco.games();
             System.err.println("Discovered " + games.length + " games.");
         } catch (MalformedURLException ex) {

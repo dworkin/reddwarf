@@ -232,7 +232,7 @@ public class SwordWorldClient extends JFrame
     public static void main(String[] args) {
 	if (args.length == 0){
 	    args = new String[1];
-	    args[0]="file:FakeDiscovery.xml";
+	    args[0]="file:discovery.xml";
 	}
 	try {
 	    new SwordWorldClient(args[0]);

@@ -333,12 +333,12 @@ public class ChatTestClient extends JFrame
         // central point of server communication for the client. The
         // ClientConnectionManager needs to know the application name to
         // attempt to connect to on the server and how to find it. In
-        // this case the app name is "ChatTest" and FakeDiscovery.xml
+        // this case the app name is "ChatTest" and discovery.xml
         // lists the valid UserManagers.
         try {
             mgr = new ClientConnectionManagerImpl("ChatTest",
                     new URLDiscoverer(
-                            new File("FakeDiscovery.xml").toURI().toURL()));
+                            new File("discovery.xml").toURI().toURL()));
             // mgr = new ClientConnectionManagerImpl("ChatTest",
             //     new URLDiscoverer(
             //         new URL("http://yourhost.example.com/discovery.xml")));

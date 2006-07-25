@@ -203,7 +203,7 @@ public class Client extends JFrame implements ClientConnectionManagerListener
         c.add(chatPanel, BorderLayout.SOUTH);
 
         // setup the connection details
-        URL url = new URL("file:FakeDiscovery.xml");
+        URL url = new URL("file:discovery.xml");
         connManager =
             new ClientConnectionManagerImpl("Hack",
                                             new URLDiscoverer(url));

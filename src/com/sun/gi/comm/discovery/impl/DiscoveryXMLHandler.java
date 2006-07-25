@@ -141,7 +141,7 @@ public class DiscoveryXMLHandler extends DefaultHandler {
         try {
             SAXParser parser = SAXParserFactory.newInstance().newSAXParser();
             DiscoveryXMLHandler hdlr = new DiscoveryXMLHandler();
-            parser.parse(new File("FakeDiscovery.xml"), hdlr);
+            parser.parse(new File("discovery.xml"), hdlr);
             for (DiscoveredGame game : hdlr.discoveredGames()) {
                 System.err.println("Game: " + game.getName() + " (" +
                         game.getId() + ")");

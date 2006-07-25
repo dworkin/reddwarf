@@ -374,7 +374,7 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
         try {
             mgr = new ClientConnectionManagerImpl("BattleBoard",
                     new URLDiscoverer(
-                            new File("FakeDiscovery.xml").toURI().toURL()));
+                            new File("discovery.xml").toURI().toURL()));
             mgr.setListener(this);
             String[] classNames = mgr.getUserManagerClassNames();
             mgr.connect(classNames[0]);
