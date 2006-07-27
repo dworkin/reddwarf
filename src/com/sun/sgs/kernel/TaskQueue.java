@@ -1,7 +1,5 @@
-
 package com.sun.sgs.kernel;
 
-import com.sun.sgs.ManagedRunnable;
 import com.sun.sgs.Quality;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
