@@ -534,11 +534,10 @@
 
     <!--<target name="release" depends="release.j2se, release.j2me">-->
     <target name="release" depends="release.j2se">
-	<zip destfile="SunGameServer.zip">
-	    <fileset dir="release">
-		<exclude name="persistant_store/**"/>
-	    </fileset>
-	</zip>
+	<zip destfile="SunGameServer.zip"
+	     basedir="." includes="release/**" 
+	     excludes="persistant_store"
+        />
     </target>
 
     <!-- J2SE release targets -->
@@ -567,6 +566,12 @@
 	<chmod file="release/startSGS.sh" perm="755" />
 	<chmod file="release/startChatClient.sh" perm="755" />
 	<chmod file="release/startSwordWorldClient.sh" perm="755" />
+	<copy file="resources/startSGS.bat" todir="release" />
+	<copy file="resources/startSwordWorldClient.bat" todir="release" />
+	<copy file="resources/startChatClient.bat" todir="release" />
+	<chmod file="release/startSGS.bat" perm="755" />
+	<chmod file="release/startChatClient.bat" perm="755" />
+	<chmod file="release/startSwordWorldClient.bat" perm="755" />
 	<copy file="resources/libs/derby/${derby.jarfile}" todir="release/lib" />
 	<copy file="resources/SGS-apps.conf" todir="release" />
 	<copy file="resources/passwd.txt" todir="release" />

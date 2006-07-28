@@ -89,6 +89,8 @@ import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimBoot;
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.SimUserListener;
+
+import java.nio.ByteBuffer;
 import java.security.Principal;
 import java.util.HashMap;
 import java.util.Map;
@@ -365,6 +367,10 @@ public class SwordWorldBoot
 	 * user we hav associated with that Player GLO.
 	 */
 	simTask.addUserDataListener(uid,playerRef);
+        String out = "Sworld welcomes "+playerName;
+        ByteBuffer outbuff = ByteBuffer.allocate(out.length());
+        outbuff.put(out.getBytes());
+        simTask.broadcastData(appChannel, outbuff, true);
     }
 
     /**

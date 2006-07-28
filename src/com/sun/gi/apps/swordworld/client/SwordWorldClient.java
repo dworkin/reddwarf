@@ -122,12 +122,14 @@ public class SwordWorldClient extends JFrame
 
 	    public void actionPerformed(ActionEvent e) {
 		sendCommand(inputField.getText());
+                inputField.setText("");
 	    }
 
 	});
 	c.add(inputField,BorderLayout.SOUTH);
 	outputArea.setEditable(false);
 	c.add(new JScrollPane(outputArea),BorderLayout.CENTER);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 	pack();
 	setSize(400,400);
 	setVisible(true);

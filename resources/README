@@ -1,5 +1,13 @@
 This is the EA2 release of the Project Darkstar Sun Game Server SDK.
 
+A key change is that there is no DiscoveryManager to run anymore.  The DiscoveryManager functionality of generating the discovery.xml has been integrated directly into the main SGS process.
+
+Accordingly FakeDiscovery.xml is no longer included in the destribution and all the sample apps have been modified to use "discovery.xml". 
+
+This version also elimiates the dependancy on LRMP as LRMp was judged too unstable and eliminating it removed a number of SGS bugs.
+
+DIRECTORIES:
+
 The apps directory contains the deployments of the sample server applications
 The SGS-apps.conf file controls which are started by the server on boot. (See
 that file's comments for more information.)
