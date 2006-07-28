@@ -20,13 +20,12 @@ public interface TimerService extends Service
     /**
      * Registers an event to be run at a given time.
      *
-     * @param txn the transaction state
      * @param delay the time in milliseconds to wait before starting
      * @param repeat whether to repeat the event each <code>delay</code>
      *               milliseconds
      * @param reference the listener to call to start the event
      */
-    public abstract TimerHandle registerTimerEvent(Transaction txn,
+    public abstract TimerHandle registerTimerEvent(
             long delay, boolean repeat,
             ManagedReference<? extends TimerListener> reference);
 

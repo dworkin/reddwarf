@@ -4,6 +4,8 @@ package com.sun.sgs.manager;
 import com.sun.sgs.ManagedObject;
 import com.sun.sgs.ManagedReference;
 
+import com.sun.sgs.kernel.TaskThread;
+
 
 /**
  * This manager provides access to the data-related routines.
@@ -15,31 +17,21 @@ import com.sun.sgs.ManagedReference;
 public abstract class DataManager
 {
 
-    // the singleton instance of DataManager
-    private static DataManager manager = null;
-
     /**
-     * Creates an instance of <code>DataManager</code>. This class enforces
-     * a singleton model, so only one instance of <code>DataManager</code>
-     * may exist in the system.
-     *
-     * @throws IllegalStateException if an instance already exists
+     * Creates an instance of <code>DataManager</code>.
      */
     protected DataManager() {
-        if (manager != null)
-            throw new IllegalStateException("DataManager is already " +
-                                            "initialized");
-
-        manager = this;
+        
     }
 
     /**
-     * Returns the instance of <code>DataManager</code>.
+     * Returns the application's instance of <code>DataManager</code>.
      *
-     * @return the instance of <code>DataManager</code>
+     * @return the application's instance of <code>DataManager</code>
      */
     public static DataManager getInstance() {
-        return manager;
+        return ((TaskThread)(Thread.currentThread())).getTask().
+            getAppContext().getDataManager();
     }
 
     /**

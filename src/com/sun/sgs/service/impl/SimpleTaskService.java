@@ -4,9 +4,11 @@ package com.sun.sgs.service.impl;
 import com.sun.sgs.ManagedReference;
 import com.sun.sgs.ManagedRunnable;
 
-import com.sun.sgs.kernel.TaskQueue;
+import com.sun.sgs.kernel.AppContext;
 import com.sun.sgs.kernel.ReferenceRunnable;
 import com.sun.sgs.kernel.Task;
+import com.sun.sgs.kernel.TaskQueue;
+import com.sun.sgs.kernel.TaskThread;
 import com.sun.sgs.kernel.TransactionProxy;
 import com.sun.sgs.kernel.TransactionRunnable;
 
@@ -39,6 +41,9 @@ public class SimpleTaskService implements TaskService
 
     // the proxy used to access transaction state
     private TransactionProxy transactionProxy = null;
+
+    // the context in which this instance runs
+    private AppContext appContext;
 
     // the state map for each active transaction
     private ConcurrentHashMap<Long,TxnState> txnMap;
@@ -84,6 +89,15 @@ public class SimpleTaskService implements TaskService
     }
 
     /**
+     * Sets the application context in which this service runs.
+     *
+     * @param appContext this <code>Service</code>'s <code>AppContext</code>
+     */
+    public void setAppContext(AppContext appContext) {
+        this.appContext = appContext;
+    }
+
+    /**
      * Tells the <code>Service</code> to prepare for commiting its
      * state assciated with the given transaction.
      *
@@ -123,12 +137,14 @@ public class SimpleTaskService implements TaskService
         for (ManagedReference<? extends ManagedRunnable> runnableRef :
                  txnState.tasks) {
             // create a task that handles the reference correctly
-            Task task = new Task(new ReferenceRunnable(runnableRef), null);
+            Task task = new Task(new ReferenceRunnable(runnableRef),
+                                 appContext, null);
 
             // now wrap the task in a transactional context and put this
             // into the task queue
             taskQueue.
-                queueTask(new Task(new TransactionRunnable(task), null));
+                queueTask(new Task(new TransactionRunnable(task),
+                                   appContext, null));
         }
 
         // finally, remove this transaction state from the map
@@ -167,7 +183,10 @@ public class SimpleTaskService implements TaskService
      * used by the methods that follow in this class (ie, not prepare and
      * commit).
      */
-    private TxnState getTxnState(Transaction txn) {
+    private TxnState getTxnState() {
+        // resolve the current transaction
+        Transaction txn = transactionProxy.getCurrentTransaction();
+
         // try to get the current state
         TxnState txnState = txnMap.get(txn.getId());
 
@@ -191,13 +210,11 @@ public class SimpleTaskService implements TaskService
     /**
      * Queues a task to run.
      *
-     * @param txn the transaction state
      * @param task the task to run
      */
-    public void queueTask(Transaction txn,
-                          ManagedReference<? extends ManagedRunnable> task) {
+    public void queueTask(ManagedReference<? extends ManagedRunnable> task) {
         // get the transaction state
-        TxnState txnState = getTxnState(txn);
+        TxnState txnState = getTxnState();
 
         // add the task to the collection
         txnState.tasks.add(task);

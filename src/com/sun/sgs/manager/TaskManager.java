@@ -5,6 +5,8 @@ package com.sun.sgs.manager;
 import com.sun.sgs.ManagedReference;
 import com.sun.sgs.ManagedRunnable;
 
+import com.sun.sgs.kernel.TaskThread;
+
 
 /**
  * This manager provides access to the task-related routines.
@@ -16,22 +18,11 @@ import com.sun.sgs.ManagedRunnable;
 public abstract class TaskManager
 {
 
-    // the singleton instance of TaskManager
-    private static TaskManager manager = null;
-
     /**
-     * Creates an instance of <code>TaskManager</code>. This class enforces
-     * a singleton model, so only one instance of <code>TaskManager</code>
-     * may exist in the system.
-     *
-     * @throws IllegalStateException if an instance already exists
+     * Creates an instance of <code>TaskManager</code>.
      */
     protected TaskManager() {
-        if (manager != null)
-            throw new IllegalStateException("TaskManager is already " +
-                                            "initialized");
 
-        manager = this;
     }
 
     /**
@@ -40,7 +31,8 @@ public abstract class TaskManager
      * @return the instance of <code>TaskManager</code>
      */
     public static TaskManager getInstance() {
-        return manager;
+        return ((TaskThread)(Thread.currentThread())).getTask().
+            getAppContext().getTaskManager();
     }
 
     /**

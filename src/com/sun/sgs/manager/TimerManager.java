@@ -4,6 +4,8 @@ package com.sun.sgs.manager;
 import com.sun.sgs.ManagedReference;
 import com.sun.sgs.TimerHandle;
 
+import com.sun.sgs.kernel.TaskThread;
+
 import com.sun.sgs.manager.listen.TimerListener;
 
 
@@ -17,22 +19,11 @@ import com.sun.sgs.manager.listen.TimerListener;
 public abstract class TimerManager
 {
 
-    // the singleton instance of TimerManager
-    private static TimerManager manager = null;
-
     /**
-     * Creates an instance of <code>TimerManager</code>. This class enforces
-     * a singleton model, so only one instance of <code>TimerManager</code>
-     * may exist in the system.
-     *
-     * @throws IllegalStateException if an instance already exists
+     * Creates an instance of <code>TimerManager</code>.
      */
     protected TimerManager() {
-        if (manager != null)
-            throw new IllegalStateException("TimerManager is already " +
-                                            "initialized");
 
-        manager = this;
     }
 
     /**
@@ -41,7 +32,8 @@ public abstract class TimerManager
      * @return the instance of <code>TimerManager</code>
      */
     public static TimerManager getInstance() {
-        return manager;
+        return ((TaskThread)(Thread.currentThread())).getTask().
+            getAppContext().getTimerManager();
     }
 
     /**

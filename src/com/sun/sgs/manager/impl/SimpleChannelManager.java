@@ -6,14 +6,12 @@ import com.sun.sgs.ManagedReference;
 import com.sun.sgs.Quality;
 import com.sun.sgs.User;
 
-import com.sun.sgs.kernel.TransactionProxy;
-
 import com.sun.sgs.manager.ChannelManager;
 
 import com.sun.sgs.manager.listen.ConnectionListener;
 import com.sun.sgs.manager.listen.UserListener;
 
-import com.sun.sgs.service.Transaction;
+import com.sun.sgs.service.ChannelService;
 
 import java.nio.ByteBuffer;
 
@@ -29,18 +27,18 @@ import java.nio.ByteBuffer;
 public class SimpleChannelManager extends ChannelManager
 {
 
-    // the proxy used to access transaction state
-    private TransactionProxy transactionProxy;
+    // the backing channel service
+    private ChannelService channelService;
 
     /**
      * Creates an instance of <code>SimpleChannelManager</code>.
      *
-     * @param transactionProxy the proxy used to access transaction state
+     * @param channelService the backing service
      */
-    public SimpleChannelManager(TransactionProxy transactionProxy) {
+    public SimpleChannelManager(ChannelService channelService) {
         super();
 
-        this.transactionProxy = transactionProxy;
+        this.channelService = channelService;
     }
 
     /**
@@ -54,9 +52,7 @@ public class SimpleChannelManager extends ChannelManager
      * @return a new channel, or null
      */
     public Channel createChannel(String channelName, Quality quality) {
-        Transaction txn = transactionProxy.getCurrentTransaction();
-        return txn.getChannelService().createChannel(txn, channelName,
-                                                     quality);
+        return channelService.createChannel(channelName, quality);
     }
 
     /**
@@ -65,8 +61,7 @@ public class SimpleChannelManager extends ChannelManager
      * @param channelName the name of this channel
      */
     public Channel findChannel(String channelName) {
-        Transaction txn = transactionProxy.getCurrentTransaction();
-        return txn.getChannelService().findChannel(txn, channelName);
+        return channelService.findChannel(channelName);
     }
 
     /**
@@ -79,8 +74,7 @@ public class SimpleChannelManager extends ChannelManager
      * @return a <code>ByteBuffer</code> to use when send messages
      */
     public ByteBuffer getBuffer() {
-        Transaction txn = transactionProxy.getCurrentTransaction();
-        return txn.getChannelService().getBuffer(txn);
+        return channelService.getBuffer();
     }
 
     /**
@@ -92,9 +86,7 @@ public class SimpleChannelManager extends ChannelManager
      */
     public void registerUserListener(User user,
             ManagedReference<? extends UserListener> listenerReference) {
-        Transaction txn = transactionProxy.getCurrentTransaction();
-        txn.getChannelService().
-            registerUserListener(txn, user, listenerReference);
+        channelService.registerUserListener(user, listenerReference);
     }
 
     /**
@@ -105,9 +97,7 @@ public class SimpleChannelManager extends ChannelManager
      */
     public void registerConnectionListener(
             ManagedReference<? extends ConnectionListener> listenerReference) {
-        Transaction txn = transactionProxy.getCurrentTransaction();
-        txn.getChannelService().
-            registerConnectionListener(txn, listenerReference);
+        channelService.registerConnectionListener(listenerReference);
     }
 
 }

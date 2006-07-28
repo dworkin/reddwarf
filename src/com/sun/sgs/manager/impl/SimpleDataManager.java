@@ -4,11 +4,9 @@ package com.sun.sgs.manager.impl;
 import com.sun.sgs.ManagedObject;
 import com.sun.sgs.ManagedReference;
 
-import com.sun.sgs.kernel.TransactionProxy;
-
 import com.sun.sgs.manager.DataManager;
 
-import com.sun.sgs.service.Transaction;
+import com.sun.sgs.service.DataService;
 
 
 /**
@@ -22,18 +20,18 @@ import com.sun.sgs.service.Transaction;
 public class SimpleDataManager extends DataManager
 {
 
-    // the proxy used to access transaction state
-    private TransactionProxy transactionProxy;
+    // the backing data service
+    private DataService dataService;
 
     /**
      * Creates an instance of <code>SimpleDataManager</code>.
      *
-     * @param transactionProxy the proxy used to access transaction state
+     * @param dataService the backing service
      */
-    public SimpleDataManager(TransactionProxy transactionProxy) {
+    public SimpleDataManager(DataService dataService) {
         super();
 
-        this.transactionProxy = transactionProxy;
+        this.dataService = dataService;
     }
 
     /**
@@ -46,8 +44,7 @@ public class SimpleDataManager extends DataManager
      */
     public <T extends ManagedObject>
             ManagedReference<T> manageObject(T object) {
-        Transaction txn = transactionProxy.getCurrentTransaction();
-        return txn.getDataService().manageObject(txn, object);
+        return dataService.manageObject(object);
     }
 
     /**
@@ -61,8 +58,7 @@ public class SimpleDataManager extends DataManager
      */
     public <T extends ManagedObject>
             ManagedReference<T> manageObject(T object, String objectName) {
-        Transaction txn = transactionProxy.getCurrentTransaction();
-        return txn.getDataService().manageObject(txn, object, objectName);
+        return dataService.manageObject(object, objectName);
     }
 
     /**
@@ -76,8 +72,7 @@ public class SimpleDataManager extends DataManager
      */
     public ManagedReference<? extends ManagedObject>
             findManagedObject(String objectName) {
-        Transaction txn = transactionProxy.getCurrentTransaction();
-        return txn.getDataService().findManagedObject(txn, objectName);
+        return dataService.findManagedObject(objectName);
     }
 
 }

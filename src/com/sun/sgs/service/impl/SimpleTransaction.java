@@ -1,12 +1,8 @@
 
 package com.sun.sgs.service.impl;
 
-import com.sun.sgs.service.ChannelService;
-import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.NotPreparedException;
 import com.sun.sgs.service.Service;
-import com.sun.sgs.service.TaskService;
-import com.sun.sgs.service.TimerService;
 import com.sun.sgs.service.Transaction;
 
 import java.util.HashSet;
@@ -29,12 +25,6 @@ public class SimpleTransaction implements Transaction {
     // our unique identifier
     private long id;
 
-    // our set of available services
-    private ChannelService channelService;
-    private DataService dataService;
-    private TaskService taskService;
-    private TimerService timerService;
-
     // the set of services that actually joined this transaction
     private HashSet<Service> joinedServices;
 
@@ -43,15 +33,8 @@ public class SimpleTransaction implements Transaction {
      *
      * @param id a unique identifier for this transaction
      */
-    public SimpleTransaction(long id, ChannelService channelService,
-                             DataService dataService, TaskService taskService,
-                             TimerService timerService) {
+    public SimpleTransaction(long id) {
         this.id = id;
-
-        this.channelService = channelService;
-        this.dataService = dataService;
-        this.taskService = taskService;
-        this.timerService = timerService;
 
         joinedServices = new HashSet<Service>();
     }
@@ -65,42 +48,6 @@ public class SimpleTransaction implements Transaction {
      */
     public long getId() {
         return id;
-    }
-
-    /**
-     * Returns the <code>ChannelService</code> used by this Transaction.
-     *
-     * @return the available <code>ChannelService</code>
-     */
-    public ChannelService getChannelService() {
-        return channelService;
-    }
-
-    /**
-     * Returns the <code>DataService</code> used by this Transaction.
-     *
-     * @return the available <code>DataService</code>.
-     */
-    public DataService getDataService() {
-        return dataService;
-    }
-
-    /**
-     * Returns the <code>TaskService</code> used by this Transaction.
-     *
-     * @return the available <code>TaskService</code>.
-     */
-    public TaskService getTaskService() {
-        return taskService;
-    }
-
-    /**
-     * Returns the <code>TimerService</code> used by this Transaction.
-     *
-     * @return the available <code>TimerService</code>.
-     */
-    public TimerService getTimerService() {
-        return timerService;
     }
 
     /**

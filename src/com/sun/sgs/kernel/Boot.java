@@ -1,6 +1,7 @@
 
 package com.sun.sgs.kernel;
 
+import com.sun.sgs.kernel.impl.SimpleAppContext;
 import com.sun.sgs.kernel.impl.SimpleResourceCoordinator;
 import com.sun.sgs.kernel.impl.SimpleTransactionCoordinator;
 
@@ -29,8 +30,56 @@ public final class Boot
     // a reference to the task queue
     private TaskQueue taskQueue;
 
-    // a reference to the resource manager
-    private ResourceCoordinator resourceCoordinator;
+    // TEST: the single app context we're using
+    private AppContext testApp;
+
+    /**
+     * Private helper that sets up a single application's context
+     * FIXME: this should only be called once until the task queue handling
+     * (i.e., setting the app context on each thread) is fixed
+     * TEST: The numThreds and rc parameters are just here temporarily
+     */
+    private AppContext setupApp(TransactionProxy transactionProxy,
+                                int numThreads, ResourceCoordinator rc) {
+        // FIXME: fetch the application config data, which will include
+        // the id, services, etc.
+
+        // create some test services
+        // FIXME: this actually gets created based on the config, but
+        // for now we'll just create them directly
+        SimpleDataService dataService = new SimpleDataService();
+        SimpleTaskService taskService = new SimpleTaskService();
+
+        // create the managers for this application
+        // FIXME: again, this is based on the config
+        SimpleChannelManager channelManager =
+            new SimpleChannelManager(null);
+        SimpleDataManager dataManager = new SimpleDataManager(dataService);
+        SimpleTaskManager taskManager = new SimpleTaskManager(taskService);
+        SimpleTimerManager timerManager =
+            new SimpleTimerManager(null);
+
+        // create a new context with the manager details
+        AppContext appContext =
+            new SimpleAppContext(channelManager, dataManager, taskManager,
+                                 timerManager);
+
+        // create the event queue
+        // TEST: This is only here for now because it needs to know about
+        // this context, and then be used to initialize a service
+        taskQueue = new TaskQueue(rc, numThreads, appContext);
+
+        // tell the services about the transaction proxy, the app context,
+        // and each other (as defined by the configuration)
+        dataService.setTransactionProxy(transactionProxy);
+        dataService.setAppContext(appContext);
+        taskService.setTransactionProxy(transactionProxy);
+        taskService.setTaskQueue(taskQueue);
+        taskService.setAppContext(appContext);
+
+        // finally, return the app context
+        return appContext;
+    }
 
     /**
      * Creates an instance of <code>Boot</code>.
@@ -38,28 +87,9 @@ public final class Boot
      * @param numThreads the number of threads to create and use
      */
     protected Boot(int numThreads) {
-        // create a proxy instance to share
-        TransactionProxy transactionProxy = new TransactionProxy();
-
-        // install the managers
-        new SimpleChannelManager(transactionProxy);
-        new SimpleDataManager(transactionProxy);
-        new SimpleTaskManager(transactionProxy);
-        new SimpleTimerManager(transactionProxy);
-
-        // create some test services
-        SimpleDataService dataService = new SimpleDataService();
-        dataService.setTransactionProxy(transactionProxy);
-        SimpleTaskService taskService = new SimpleTaskService();
-        taskService.setTransactionProxy(transactionProxy);
-
-        // create a test transaction coordinator with default services
-        SimpleTransactionCoordinator transactionCoordinator =
-            new SimpleTransactionCoordinator(dataService, taskService);
-        TransactionRunnable.setTransactionCoordinator(transactionCoordinator);
-
-        // create a test resource coordinator...
-        resourceCoordinator = new SimpleResourceCoordinator();
+        // to start create a test resource coordinator...
+        ResourceCoordinator resourceCoordinator =
+            new SimpleResourceCoordinator();
 
         // ...and give it the designated number of threads
         for (int i = 0; i < numThreads; i++) {
@@ -68,12 +98,16 @@ public final class Boot
             resourceCoordinator.giveThread(taskThread);
         }
 
-        // create the task queue, at which point we're ready to start
-        // processing events
-        // FIXME: for testing, we're giving all the threads right
-        // to the task queue, since no one else needs them yet
-        taskQueue = new TaskQueue(resourceCoordinator, numThreads);
-        taskService.setTaskQueue(taskQueue);
+        // create a proxy instance to share the transaction state
+        TransactionProxy transactionProxy = new TransactionProxy();
+
+        // setup a single test application
+        testApp = setupApp(transactionProxy, numThreads, resourceCoordinator);
+
+        // create a test transaction coordinator
+        SimpleTransactionCoordinator transactionCoordinator =
+            new SimpleTransactionCoordinator();
+        TransactionRunnable.setTransactionCoordinator(transactionCoordinator);
     }
 
     /**
@@ -85,8 +119,8 @@ public final class Boot
         Runnable br = new BootstrapRunnable(new com.sun.sgs.UserLevelTest());
 
         // now create the transaction task that will run the bootstap task
-        Runnable tr = new TransactionRunnable(new Task(br, null));
-        Task bootTask = new Task(tr, null);
+        Runnable tr = new TransactionRunnable(new Task(br, testApp, null));
+        Task bootTask = new Task(tr, testApp, null);
 
         // finally, queue the task to run
         taskQueue.queueTask(bootTask);

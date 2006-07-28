@@ -7,16 +7,7 @@ import com.sun.sgs.ManagedObject;
 /**
  * This interface represents the meta-data associated with any transaction
  * in the system. Typically, this is used by <code>Service</code>s to
- * maintain transaction state and to resolve other participating services.
- * <p>
- * NOTE: Currently, this interface provides access to <code>Service</code>s
- * that have been made available for use in this transaction. The goal is
- * to provide different sets of services for each transaction (for instance,
- * if different applications have different services). We may scale back
- * this ability, in which case there would be a single global set of
- * services available, and then these accessor methods would be removed.
- * It's also possible that these might be further generalized to be
- * retrieved by some identifier.
+ * maintain transaction state.
  *
  * @since 1.0
  * @author James Megquier
@@ -33,34 +24,6 @@ public interface Transaction extends ManagedObject
      * @return the transaction's identifier
      */
     public long getId();
-
-    /**
-     * Returns the <code>ChannelService</code> used by this Transaction.
-     *
-     * @return the available <code>ChannelService</code>
-     */
-    public ChannelService getChannelService();
-
-    /**
-     * Returns the <code>DataService</code> used by this Transaction.
-     *
-     * @return the available <code>DataService</code>.
-     */
-    public DataService getDataService();
-
-    /**
-     * Returns the <code>TaskService</code> used by this Transaction.
-     *
-     * @return the available <code>TaskService</code>.
-     */
-    public TaskService getTaskService();
-
-    /**
-     * Returns the <code>TimerService</code> used by this Transaction.
-     *
-     * @return the available <code>TimerService</code>.
-     */
-    public TimerService getTimerService();
 
     /**
      * Tells the <code>Transaction</code> that the given <code>Service</code>

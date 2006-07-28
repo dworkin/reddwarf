@@ -4,6 +4,7 @@ package com.sun.sgs.service.impl;
 import com.sun.sgs.ManagedObject;
 import com.sun.sgs.ManagedReference;
 
+import com.sun.sgs.kernel.AppContext;
 import com.sun.sgs.kernel.TransactionProxy;
 
 import com.sun.sgs.service.DataService;
@@ -64,6 +65,9 @@ public class SimpleDataService implements DataService
     // the proxy used to resolve transaction state as needed
     private TransactionProxy transactionProxy;
 
+    // the context in which this instance runs
+    private AppContext appContext;
+
     // the state map for each active transaction
     private ConcurrentHashMap<Long,TxnState> txnMap;
 
@@ -112,6 +116,15 @@ public class SimpleDataService implements DataService
      */
     public void setTransactionProxy(TransactionProxy transactionProxy) {
         this.transactionProxy = transactionProxy;
+    }
+
+    /**
+     * Sets the application context in which this service runs.
+     *
+     * @param appContext this <code>Service</code>'s <code>AppContext</code>
+     */
+    public void setAppContext(AppContext appContext) {
+        this.appContext = appContext;
     }
 
     /**
@@ -325,7 +338,10 @@ public class SimpleDataService implements DataService
      * used by the methods that follow in this class (ie, not prepare and
      * commit).
      */
-    private TxnState getTxnState(Transaction txn) {
+    private TxnState getTxnState() {
+        // resolve the current transaction
+        Transaction txn = transactionProxy.getCurrentTransaction();
+
         // try to get the current state
         TxnState txnState = txnMap.get(txn.getId());
 
@@ -347,33 +363,20 @@ public class SimpleDataService implements DataService
     }
 
     /**
-     * Private helper that fills in the transaction for the same method
-     * that takes a transaction (above).
-     */
-    private TxnState getTxnState() {
-        // resolve the transaction...
-        Transaction txn = transactionProxy.getCurrentTransaction();
-
-        // ...and use it to resolve the local state...
-        return getTxnState(txn);
-    }
-
-    /**
      * Tells the service to manage this object. The object has no name
      * associated with it.
      *
-     * @param txn the transaction state
      * @param object the object to manage
      *
      * @return a reference to the newly managed object
      */
     public <T extends ManagedObject>
-            ManagedReference<T> manageObject(Transaction txn, T object) {
+            ManagedReference<T> manageObject(T object) {
         // generate a new identifier
         long objId = objectIdGenerator.getAndIncrement();
 
         // add this to the created objects for this transaction
-        TxnState txnState = getTxnState(txn);
+        TxnState txnState = getTxnState();
         txnState.createdObjects.put(objId, object);
 
         // put this in the peek set for future access
@@ -389,25 +392,23 @@ public class SimpleDataService implements DataService
      * <p>
      * FIXME: this returns null if the name is taken, right?
      *
-     * @param txn the transaction state
      * @param object the object to manage
      * @param objectName the name of the object
      *
      * @return a reference to the newly managed object
      */
     public <T extends ManagedObject>
-            ManagedReference<T> manageObject(Transaction txn,
-                                             T object, String objectName) {
+            ManagedReference<T> manageObject(T object, String objectName) {
         // start by checking that the name is available
         if (nameSpace.containsKey(objectName))
             return null;
 
         // manage the object
         SimpleManagedReference<T> ref =
-            (SimpleManagedReference<T>)(manageObject(txn, object));
+            (SimpleManagedReference<T>)(manageObject(object));
 
         // now get the transaction state and track the name addition
-        TxnState txnState = getTxnState(txn);
+        TxnState txnState = getTxnState();
         txnState.createdNamespaceMap.put(objectName, ref.getObjectId());
 
         // return the new reference
@@ -419,15 +420,14 @@ public class SimpleDataService implements DataService
      * name. If no object can be found with the given name then null
      * is returned.
      *
-     * @param txn the transaction state
      * @param objectName the name of the object
      *
      * @return a reference to the object, or null
      */
     public ManagedReference<? extends ManagedObject>
-            findManagedObject(Transaction txn, String objectName) {
+            findManagedObject(String objectName) {
         // get the transaction state
-        TxnState txnState = getTxnState(txn);
+        TxnState txnState = getTxnState();
         
         if (txnState.createdNamespaceMap.containsKey(objectName)) {
             // the name was defined in this transaction

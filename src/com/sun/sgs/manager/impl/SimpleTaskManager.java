@@ -4,11 +4,9 @@ package com.sun.sgs.manager.impl;
 import com.sun.sgs.ManagedReference;
 import com.sun.sgs.ManagedRunnable;
 
-import com.sun.sgs.kernel.TransactionProxy;
-
 import com.sun.sgs.manager.TaskManager;
 
-import com.sun.sgs.service.Transaction;
+import com.sun.sgs.service.TaskService;
 
 
 /**
@@ -22,18 +20,18 @@ import com.sun.sgs.service.Transaction;
 public class SimpleTaskManager extends TaskManager
 {
 
-    // the proxy used to access transaction state
-    private TransactionProxy transactionProxy;
+    // the backing task service
+    private TaskService taskService;
 
     /**
      * Creates an instance of <code>SimpleTaskManager</code>.
      *
-     * @param transactionProxy the proxy used to access transaction state
+     * @param taskService the backing service
      */
-    public SimpleTaskManager(TransactionProxy transactionProxy) {
+    public SimpleTaskManager(TaskService taskService) {
         super();
 
-        this.transactionProxy = transactionProxy;
+        this.taskService = taskService;
     }
 
     /**
@@ -43,8 +41,7 @@ public class SimpleTaskManager extends TaskManager
      */
     public void queueTask(ManagedReference<? extends ManagedRunnable>
             taskReference) {
-        Transaction txn = transactionProxy.getCurrentTransaction();
-        txn.getTaskService().queueTask(txn, taskReference);
+        taskService.queueTask(taskReference);
     }
 
 }

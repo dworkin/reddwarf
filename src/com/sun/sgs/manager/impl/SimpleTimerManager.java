@@ -4,13 +4,11 @@ package com.sun.sgs.manager.impl;
 import com.sun.sgs.ManagedReference;
 import com.sun.sgs.TimerHandle;
 
-import com.sun.sgs.kernel.TransactionProxy;
-
 import com.sun.sgs.manager.TimerManager;
 
 import com.sun.sgs.manager.listen.TimerListener;
 
-import com.sun.sgs.service.Transaction;
+import com.sun.sgs.service.TimerService;
 
 
 /**
@@ -24,18 +22,18 @@ import com.sun.sgs.service.Transaction;
 public class SimpleTimerManager extends TimerManager
 {
 
-    // the proxy used to access transaction state
-    private TransactionProxy transactionProxy;
+    // the backing timer service
+    private TimerService timerService;
 
     /**
      * Creates an instance of <code>SimpleTimerManager</code>.
      *
-     * @param transactionProxy the proxy used to access transaction state
+     * @param timerService the backing service
      */
-    public SimpleTimerManager(TransactionProxy transactionProxy) {
+    public SimpleTimerManager(TimerService timerService) {
         super();
 
-        this.transactionProxy = transactionProxy;
+        this.timerService = timerService;
     }
 
     /**
@@ -48,9 +46,7 @@ public class SimpleTimerManager extends TimerManager
      */
     public TimerHandle registerTimerEvent(long delay, boolean repeat,
             ManagedReference<? extends TimerListener> reference) {
-        Transaction txn = transactionProxy.getCurrentTransaction();
-        return txn.getTimerService().
-            registerTimerEvent(txn, delay, repeat, reference);
+        return timerService.registerTimerEvent(delay, repeat, reference);
     }
 
 }

@@ -6,6 +6,8 @@ import com.sun.sgs.ManagedReference;
 import com.sun.sgs.Quality;
 import com.sun.sgs.User;
 
+import com.sun.sgs.kernel.TaskThread;
+
 import com.sun.sgs.manager.listen.ConnectionListener;
 import com.sun.sgs.manager.listen.UserListener;
 
@@ -22,31 +24,21 @@ import java.nio.ByteBuffer;
 public abstract class ChannelManager
 {
 
-    // the singleton instance of ChannelManager
-    private static ChannelManager manager = null;
-
     /**
-     * Creates an instance of <code>ChannelManager</code>. This class enforces
-     * a singleton model, so only one instance of <code>ChannelManager</code>
-     * may exist in the system.
-     *
-     * @throws IllegalStateException if an instance already exists
+     * Creates an instance of <code>ChannelManager</code>.
      */
     protected ChannelManager() {
-        if (manager != null)
-            throw new IllegalStateException("ChannelManager is already " +
-                                            "initialized");
 
-        manager = this;
     }
 
     /**
-     * Returns the instance of <code>ChannelManager</code>.
+     * Returns the application's instance of <code>ChannelManager</code>.
      *
-     * @return the instance of <code>ChannelManager</code>
+     * @return the application's instance of <code>ChannelManager</code>
      */
     public static ChannelManager getInstance() {
-        return manager;
+        return ((TaskThread)(Thread.currentThread())).getTask().
+            getAppContext().getChannelManager();
     }
 
     /**

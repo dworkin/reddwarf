@@ -27,7 +27,6 @@ public class TransactionRunnable implements Runnable
      * Creates an instance of <code>TransactionRunnable</code>.
      *
      * @param transactionalTask the task to run in a transactional context
-     * @param transactionCoordinator the coordinator to use
      */
     public TransactionRunnable(Task transactionalTask) {
         this.task = transactionalTask;
