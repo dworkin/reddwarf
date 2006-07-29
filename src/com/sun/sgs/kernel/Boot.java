@@ -10,6 +10,7 @@ import com.sun.sgs.manager.impl.SimpleDataManager;
 import com.sun.sgs.manager.impl.SimpleTaskManager;
 import com.sun.sgs.manager.impl.SimpleTimerManager;
 
+import com.sun.sgs.service.impl.SimpleContentionService;
 import com.sun.sgs.service.impl.SimpleDataService;
 import com.sun.sgs.service.impl.SimpleTaskService;
 
@@ -49,6 +50,8 @@ public final class Boot
         // for now we'll just create them directly
         SimpleDataService dataService = new SimpleDataService();
         SimpleTaskService taskService = new SimpleTaskService();
+        SimpleContentionService contentionService =
+            new SimpleContentionService();
 
         // create the managers for this application
         // FIXME: again, this is based on the config
@@ -71,11 +74,13 @@ public final class Boot
 
         // tell the services about the transaction proxy, the app context,
         // and each other (as defined by the configuration)
-        dataService.setTransactionProxy(transactionProxy);
-        dataService.setAppContext(appContext);
-        taskService.setTransactionProxy(transactionProxy);
+        dataService.configure(appContext, transactionProxy, contentionService);
+        taskService.configure(appContext, transactionProxy);
+        contentionService.configure(appContext, transactionProxy);
+
+        // FIXME: we haven't figured out how this is configured yet, but
+        // a more general solution is needed for frameworks, etc.
         taskService.setTaskQueue(taskQueue);
-        taskService.setAppContext(appContext);
 
         // finally, return the app context
         return appContext;

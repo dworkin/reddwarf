@@ -78,23 +78,16 @@ public class SimpleTaskService implements TaskService
     }
 
     /**
-     * Provides this <code>Service</code> access to the current transaction
-     * state.
+     * Configures this <code>Service</code>.
      *
+     * @param appContext this <code>Service</code>'s <code>AppContext</code>
      * @param transactionProxy a non-null proxy that provides access to the
      *                         current <code>Transaction</code>
      */
-    public void setTransactionProxy(TransactionProxy transactionProxy) {
-        this.transactionProxy = transactionProxy;
-    }
-
-    /**
-     * Sets the application context in which this service runs.
-     *
-     * @param appContext this <code>Service</code>'s <code>AppContext</code>
-     */
-    public void setAppContext(AppContext appContext) {
+    public void configure(AppContext appContext,
+                          TransactionProxy transactionProxy) {
         this.appContext = appContext;
+        this.transactionProxy = transactionProxy;
     }
 
     /**

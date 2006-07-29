@@ -17,13 +17,23 @@ public interface Transaction extends ManagedObject
 {
 
     /**
-     * Returns a unique identifier for this Transaction. This may be used
-     * by <code>Service</code>s or other parties to maintain state
-     * associated with this transaction.
+     * Returns a unique identifier for this <code>Transaction</code>. This
+     * may be used by <code>Service</code>s or other parties to maintain
+     * state associated with this transaction.
+     * <p>
+     * FIXME: we should decide if we actually want to expose this, or
+     * whether transactions are simply hashable
      *
      * @return the transaction's identifier
      */
     public long getId();
+
+    /**
+     * Returns the time at which this <code>Transaction</code> was created.
+     *
+     * @return the creation time-stamp
+     */
+    public long getTimeStamp();
 
     /**
      * Tells the <code>Transaction</code> that the given <code>Service</code>

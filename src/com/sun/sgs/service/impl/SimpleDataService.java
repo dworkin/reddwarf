@@ -7,6 +7,8 @@ import com.sun.sgs.ManagedReference;
 import com.sun.sgs.kernel.AppContext;
 import com.sun.sgs.kernel.TransactionProxy;
 
+import com.sun.sgs.service.ContentionHandler;
+import com.sun.sgs.service.ContentionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.NotPreparedException;
 import com.sun.sgs.service.Transaction;
@@ -24,17 +26,11 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * This is a simple implementation of <code>DataService</code> that makes
  * no attempt to persist data, and keeps all objects in memory. It is
- * intended for testing use only.
+ * intended for testing use only, and should not be consdered completely
+ * correct yet, as the semantics for it and its related components have
+ * not been fully defined.
  * <p>
- * NOTE: This includes no support for deadlock avoidance, and puts threads
- * directly to sleep if they request locked values. Obviously, this is
- * dangerous. This is done, for now, because all the semantics of
- * <code>DataService</code> haven't been clearly defined, and we need a
- * test platform. Given the unclear semantics, consider this implementation
- * fault-prone, since it may fail in unexpected ways until the rules are
- * clarified.
- * <p>
- * Another significant problem is that there is no clear way to define how
+ * NOTE: A significant problem is that there is no clear way to define how
  * objects are marked as immutable, or copied when written. This means
  * that all objects managed by this service are single instances that are
  * shared with all developer code and are always valid. Obviously this
@@ -68,6 +64,9 @@ public class SimpleDataService implements DataService
     // the context in which this instance runs
     private AppContext appContext;
 
+    // the contention service
+    private ContentionService contentionService;
+
     // the state map for each active transaction
     private ConcurrentHashMap<Long,TxnState> txnMap;
 
@@ -78,8 +77,8 @@ public class SimpleDataService implements DataService
     private ConcurrentHashMap<String,Long> nameSpace;
     private ConcurrentHashMap<Long,String> reverseNameSpace;
 
-    // the locks that are currently held
-    private ConcurrentHashMap<Long,AtomicBoolean> lockMap;
+    // the locks that are currently held, and who holds them
+    private ConcurrentHashMap<Long,LockState> lockMap;
 
     // the actual data space
     private ConcurrentHashMap<Long,ManagedObject> dataSpace;
@@ -92,7 +91,7 @@ public class SimpleDataService implements DataService
 
         nameSpace = new ConcurrentHashMap<String,Long>();
         reverseNameSpace = new ConcurrentHashMap<Long,String>();
-        lockMap = new ConcurrentHashMap<Long,AtomicBoolean>();
+        lockMap = new ConcurrentHashMap<Long,LockState>();
         dataSpace = new ConcurrentHashMap<Long,ManagedObject>();
 
         objectIdGenerator = new AtomicLong(1);
@@ -108,23 +107,20 @@ public class SimpleDataService implements DataService
     }
 
     /**
-     * Provides this <code>Service</code> access to the current transaction
-     * state.
-     *
-     * @param transactionProxy a non-null proxy that provides access to the
-     *                         current <code>Transaction</code>
-     */
-    public void setTransactionProxy(TransactionProxy transactionProxy) {
-        this.transactionProxy = transactionProxy;
-    }
-
-    /**
-     * Sets the application context in which this service runs.
+     * Configures this <code>Service</code>.
      *
      * @param appContext this <code>Service</code>'s <code>AppContext</code>
+     * @param transactionProxy a non-null proxy that provides access to the
+     *                         current <code>Transaction</code>
+     * @param contentionService the <code>Service</code> used to handle
+     *                          contention between transactions
      */
-    public void setAppContext(AppContext appContext) {
+    public void configure(AppContext appContext,
+                          TransactionProxy transactionProxy,
+                          ContentionService contentionService) {
         this.appContext = appContext;
+        this.transactionProxy = transactionProxy;
+        this.contentionService = contentionService;
     }
 
     /**
@@ -141,23 +137,52 @@ public class SimpleDataService implements DataService
      * the lock was taken. False is returned only if the object doesn't
      * exist (which could happen while we're trying to get the lock).
      */
-    private boolean acquireLock(long objectId) {
-        // get the lock flag for the object, if it exists
-        AtomicBoolean lockFlag = lockMap.get(objectId);
-        if (lockFlag == null)
+    private boolean acquireLock(long objectId, TxnState txnState) {
+        // get the lock state for the object, if it exists
+        LockState lockState = lockMap.get(objectId);
+        if (lockState == null)
             return false;
 
         // aquire the lock by atomically flipping the flag
-        while (! lockFlag.compareAndSet(false, true)) {
-            try {
-                synchronized(lockFlag) {
-                    lockFlag.wait();
+        while (! lockState.lock.compareAndSet(false, true)) {
+            // we failed to acquire the lock, so someone else already
+            // has it...call the contention handler for this transaction,
+            // first making sure that we have one
+            if (txnState.contentionHandler == null)
+                txnState.contentionHandler =
+                    contentionService.getContentionHandler(txnState.txn);
+
+            // NOTE: if this returns true, then we stole the lock from
+            // someone else, which means that we should just have the lock
+            // and proceed...the problem is that the current handler
+            // semantics aren't well defined, and so it's possible that
+            // we got the lock because the other party was just committing
+            // and has released the lock. While this happens, a third party
+            // could have come along and grabbed the lock. So, at this point
+            // we loop through, trying again to get the lock and calling
+            // the handler if there's a problem. This will be fixed after
+            // it's clear exactly what the handler provides.
+            if (! txnState.contentionHandler.
+                  resolveConflict(lockState.holder.txn)) {
+                try {
+                    txnState.contentionHandler.approveBlockingCall();
+                    synchronized(lockState.lock) {
+                        lockState.lock.wait();
+                    }
+                } catch (InterruptedException ie) {
+                    System.err.println("interrupted while waiting for lock " +
+                                       "on " + objectId + ": " +
+                                       ie.getMessage());
                 }
-            } catch (InterruptedException ie) {
-                System.err.println("interrupted while waiting for lock on " +
-                                   objectId + ": " + ie.getMessage());
             }
         }
+
+        // we got the lock, so track that in the map
+        // FIXME: if someone comes in right behind us, they could possibly
+        // try the above lookup for the holder before we get here, which
+        // means that we need to change the scheme to make both of those
+        // opertations (getting the lock and setting the holder name) atomic
+        lockState.holder = txnState;
 
         // double-check that the object wasn't deleted, since it could have
         // been removed after we fetched the boolean but while we were
@@ -165,8 +190,8 @@ public class SimpleDataService implements DataService
         // the lock and notify anyone else waiting for this lock, who will
         // in-turn fall into this same block
         if (! lockMap.containsKey(objectId)) {
-            lockFlag.set(false);
-            notifyNext(lockFlag);
+            lockState.lock.set(false);
+            notifyNext(lockState.lock);
             return false;
         }
 
@@ -180,9 +205,9 @@ public class SimpleDataService implements DataService
     private void releaseLock(long objectId) {
         // FIXME: check that the lock exists, and that we flipped the
         // flag correctly
-        AtomicBoolean lockFlag = lockMap.get(objectId);
-        lockFlag.compareAndSet(true, false);
-        notifyNext(lockFlag);
+        LockState lockState = lockMap.get(objectId);
+        lockState.lock.compareAndSet(true, false);
+        notifyNext(lockState.lock);
     }
 
     /**
@@ -262,7 +287,7 @@ public class SimpleDataService implements DataService
         // identifiers are unique, so there should never be contention here
         for (Map.Entry<Long,ManagedObject> entry :
                  txnState.createdObjects.entrySet()) {
-            lockMap.put(entry.getKey(), new AtomicBoolean());
+            lockMap.put(entry.getKey(), new LockState());
             dataSpace.put(entry.getKey(), entry.getValue());
         }
 
@@ -296,7 +321,7 @@ public class SimpleDataService implements DataService
         for (long objId : txnState.deletedObjects) {
             reverseNameSpace.remove(objId);
             dataSpace.remove(objId);
-            AtomicBoolean lockFlag = lockMap.remove(objId);
+            AtomicBoolean lockFlag = lockMap.remove(objId).lock;
             lockFlag.set(false);
             notifyNext(lockFlag);
         }
@@ -348,6 +373,7 @@ public class SimpleDataService implements DataService
         // if it didn't exist yet then create it and joing the transaction
         if (txnState == null) {
             txnState = new TxnState();
+            txnState.txn = txn;
             txnMap.put(txn.getId(), txnState);
             txn.join(this);
         } else {
@@ -473,7 +499,7 @@ public class SimpleDataService implements DataService
         // data space, and store it in the lock & peek sets before returning
 
         // if we don't get the lock, it's because the object was deleted
-        if (! acquireLock(objId))
+        if (! acquireLock(objId, txnState))
             return null;
 
         T obj = (T)(dataSpace.get(objId));
@@ -549,7 +575,7 @@ public class SimpleDataService implements DataService
 
         // lock the object...if this fails, it means that the object was
         // already destroyed, so we're done
-        if (! acquireLock(objId))
+        if (! acquireLock(objId, txnState))
             return;
 
         // put the identifier in the deleted set
@@ -562,6 +588,11 @@ public class SimpleDataService implements DataService
     class TxnState {
         // true if this state has been prepared, false otherwise
         public boolean prepared = false;
+
+        // the transaction and its contention handler, which are cached here
+        // just as an optimization
+        public Transaction txn = null;
+        public ContentionHandler contentionHandler = null;
 
         // the set of objects that have been created in a given transaction
         public HashMap<Long,ManagedObject> createdObjects =
@@ -584,6 +615,17 @@ public class SimpleDataService implements DataService
 
         // the object names deleted during a given transaction
         public HashSet<String> deletedNamespaceSet = new HashSet<String>();
+    }
+
+    /**
+     *
+     */
+    class LockState {
+        // the actual lock
+        public AtomicBoolean lock = new AtomicBoolean(false);
+
+        // the holder of the lock
+        public TxnState holder = null;
     }
 
 }

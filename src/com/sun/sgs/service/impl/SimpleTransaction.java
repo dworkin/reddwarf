@@ -5,6 +5,7 @@ import com.sun.sgs.service.NotPreparedException;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.Transaction;
 
+import java.util.Date;
 import java.util.HashSet;
 
 
@@ -25,6 +26,9 @@ public class SimpleTransaction implements Transaction {
     // our unique identifier
     private long id;
 
+    // the time at which this transaction was created
+    private long timeStamp;
+
     // the set of services that actually joined this transaction
     private HashSet<Service> joinedServices;
 
@@ -35,6 +39,8 @@ public class SimpleTransaction implements Transaction {
      */
     public SimpleTransaction(long id) {
         this.id = id;
+
+        timeStamp = (new Date()).getTime();
 
         joinedServices = new HashSet<Service>();
     }
@@ -48,6 +54,15 @@ public class SimpleTransaction implements Transaction {
      */
     public long getId() {
         return id;
+    }
+
+    /**
+     * Returns the time at which this <code>Transaction</code> was created.
+     *
+     * @return the creation time-stamp
+     */
+    public long getTimeStamp() {
+        return timeStamp;
     }
 
     /**

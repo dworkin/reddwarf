@@ -9,6 +9,28 @@ import com.sun.sgs.kernel.TransactionProxy;
  * This is the core interface used for all services that participate in
  * transactions. Most implementations of <code>Service</code> will
  * actually implement specific sub-interfaces like <code>DataService</code>.
+ * <p>
+ * Note that <code>Service</code> instances are created as part of an
+ * application context, which in turn is created from the system's
+ * configuration data. When this happens, each <code>Service</code> is
+ * configured with the application context, a proxy to resolve the
+ * current transaction state, and references to all the other
+ * <code>Service</code> instance that this <code>Service</code> needs.
+ * To accept this configuration, any implementations of <code>Service</code>
+ * must include a method named <code>configure</code>. The first parameter
+ * is <code>AppContext</code>, the second parameter is
+ * <code>TransactionProxy</code>, and then any following parameters are
+ * specific types of <code>Service</code>s that will be defined in the
+ * application's configuration. For example:
+ * <pre>
+ *    public void configure(AppContext appContext,
+ *                          TransactionProxy transactionProxy,
+ *                          DataService dataService,
+ *                          ContentionService contentionService);
+ * </pre>
+ * If an implementation of <code>Service</code> does not implement a
+ * <code>configure</code> method then the implementation is considered
+ * invalid and will not be loaded.
  *
  * @since 1.0
  * @author James Megquier
@@ -23,28 +45,6 @@ public interface Service
      * @return the service's identifier
      */
     public String getIdentifier();
-
-    /**
-     * Provides this <code>Service</code> access to the current transaction
-     * state.
-     * <p>
-     * FIXME: this will actually be done in the config method that sets
-     * all services and other facilities.
-     *
-     * @param transactionProxy a non-null proxy that provides access to the
-     *                         current <code>Transaction</code>
-     */
-    public void setTransactionProxy(TransactionProxy transactionProxy);
-
-    /**
-     * Sets the application context in which this service runs.
-     * <p>
-     * FIXME: this will actually be done in the config method that sets
-     * all services and other facilities.
-     *
-     * @param appContext this <code>Service</code>'s <code>AppContext</code>
-     */
-    public void setAppContext(AppContext appContext);
 
     /**
      * Tells the <code>Service</code> to prepare for commiting its
