@@ -73,7 +73,7 @@
 
     <!-- Documentation targets -->
 
-    <target name="docs" depends="javadocs" />
+    <target name="docs" depends="javadocs,docs.api" />
 
     <target name="docs.api" depends="javadocs.api, doxygen.api" />
 
