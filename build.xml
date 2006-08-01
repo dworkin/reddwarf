@@ -37,7 +37,6 @@
 
     <target name="init">
         <mkdir dir="bin"/>
-        <mkdir dir="doc"/>
         <mkdir dir="release"/>
     	<mkdir dir="release/apps"/>
     	<mkdir dir="release/apps/trivial_boot"/>
@@ -532,7 +531,7 @@
 
     <!-- Release Targets -->
 
-    <!--<target name="release" depends="release.j2se, release.j2me">-->
+    <!--<target name="release" depends="release.j2se, release.j2me, release.docs">-->
     <target name="release" depends="release.j2se">
 	<zip destfile="SunGameServer.zip"
 	     basedir="." includes="release/**" 
@@ -596,8 +595,13 @@
     </target>
 	
     <target name="release.docs" depends="docs">
-	<copy todir="release/docs" >
+	<copy todir="release/docs/doxxygen" >
 	    <fileset dir="doc/doxygen">
+		<exclude name="internal/**" />
+	    </fileset>
+	</copy>
+	<copy todir="release/docs/javadoc" >
+	    <fileset dir="doc/javadoc">
 		<exclude name="internal/**" />
 	    </fileset>
 	</copy>
