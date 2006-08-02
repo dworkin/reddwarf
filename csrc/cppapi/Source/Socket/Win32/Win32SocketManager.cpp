@@ -126,8 +126,10 @@ void Win32SocketManager::Update()
 	for (std::list<Win32Socket*>::iterator iter = mSockets.begin(); iter != mSockets.end(); /* erase loop */)
 	{
 		WSANETWORKEVENTS wsaEvents;
-		if (WSAEnumNetworkEvents(**iter, **iter, &wsaEvents) == SOCKET_ERROR)
+		if (WSAEnumNetworkEvents(**iter, **iter, &wsaEvents) == SOCKET_ERROR) {
+			++iter;
 			continue;	// MSED - error handling?
+		}
 
 		if (wsaEvents.lNetworkEvents & FD_CONNECT)
 		{
@@ -154,8 +156,8 @@ void Win32SocketManager::Update()
 			(*iter)->OnDisconnected();
 			delete *iter;
 			iter = mSockets.erase(iter);
-		}
-		else
+		} else {
 			++iter;
+		}
 	}
 }

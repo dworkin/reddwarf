@@ -108,17 +108,20 @@ private:
 	// IClientConnectionManagerListener
 	virtual void OnValidationRequest(const std::vector<ICallback*>& callbacks)
 	{
+		OutputDebugStringW(L"Validation Requested\n");
 		for (size_t i = 0; i < callbacks.size(); ++i)
 		{
 			NameCallback* pNCB = dynamic_cast<NameCallback*>(callbacks[i]);
 			if (pNCB)
 			{
+				OutputDebugStringW(L"Validation SetName\n");
 				pNCB->SetName(L"guest2");
 			}
 
 			PasswordCallback* pPCB = dynamic_cast<PasswordCallback*>(callbacks[i]);
 			if (pPCB)
 			{
+				OutputDebugStringW(L"Validation SetPassword\n");
 				pPCB->SetPassword(L"guest2");
 			}
 
@@ -128,6 +131,7 @@ private:
 			}
 		}
 
+		OutputDebugStringW(L"Validation sending response\n");
 		mpCCM->SendValidationResponse(callbacks);
 	}
 
@@ -218,17 +222,31 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	_CrtSetDbgFlag(_CRTDBG_LEAK_CHECK_DF | _CrtSetDbgFlag(_CRTDBG_REPORT_FLAG));
 #endif
 
-	IDiscoverer* pDiscoverer(new URLDiscoverer(L"C:\\Mind Control\\Sun\\FakeDiscovery.xml"));
+	OutputDebugStringW(L"ChatTest Client starting\n");
+
+	IDiscoverer* pDiscoverer(new URLDiscoverer(L"file:discovery.xml"));
 
 	IClientConnectionManager* pCCM = new ClientConnectionManager(L"ChatTest", pDiscoverer, new DefaultUserManagerPolicy());
 	IClientConnectionManagerListener* pCCMListener(new ConsoleListener(pCCM));
 	pCCM->SetListener(pCCMListener);
 	std::vector<std::wstring> classNames = pCCM->GetUserManagerClassNames();
+
+	if (classNames.empty()) {
+		OutputDebugStringW(L"No ChatTest games found\n");
+		return 1;
+	}
+
 	for (size_t i = 0; i < classNames.size(); ++i)
 	{
+		OutputDebugStringW((std::wstring(L"Trying ") + classNames[i] + L"\n").c_str());
 		if (pCCM->Connect(classNames[i]))
 		{
-			Sleep(10000000);
+			OutputDebugStringW(L"Connecting; sleeping for callbacks\n");
+			for (size_t j = 0; j < 1000; ++j) {
+				Sleep(100);
+				pCCM->Update();
+			}
+			OutputDebugStringW(L"Disconnecting\n");
 			pCCM->Disconnect();
 		}
 	}
