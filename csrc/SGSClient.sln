@@ -1,0 +1,39 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 9.00
+# Visual C++ Express 2005
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SGSClient", "cppapi\SGSClient.vcproj", "{DC28F79D-0C9F-4748-8277-C6C921CC0C6E}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TCPIPUserManagerClient", "usermanagers\tcpipusermanager\TCPIPUserManagerClient.vcproj", "{1599C5DF-3BAF-4AB3-8E6E-A8F6CC50D2DD}"
+	ProjectSection(ProjectDependencies) = postProject
+		{DC28F79D-0C9F-4748-8277-C6C921CC0C6E} = {DC28F79D-0C9F-4748-8277-C6C921CC0C6E}
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		PSP Debug|Win32 = PSP Debug|Win32
+		PSP Release|Win32 = PSP Release|Win32
+		Win32 Debug|Win32 = Win32 Debug|Win32
+		Win32 Release|Win32 = Win32 Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{DC28F79D-0C9F-4748-8277-C6C921CC0C6E}.PSP Debug|Win32.ActiveCfg = PSP Debug|Win32
+		{DC28F79D-0C9F-4748-8277-C6C921CC0C6E}.PSP Debug|Win32.Build.0 = PSP Debug|Win32
+		{DC28F79D-0C9F-4748-8277-C6C921CC0C6E}.PSP Release|Win32.ActiveCfg = PSP Release|Win32
+		{DC28F79D-0C9F-4748-8277-C6C921CC0C6E}.PSP Release|Win32.Build.0 = PSP Release|Win32
+		{DC28F79D-0C9F-4748-8277-C6C921CC0C6E}.Win32 Debug|Win32.ActiveCfg = Win32 Debug|Win32
+		{DC28F79D-0C9F-4748-8277-C6C921CC0C6E}.Win32 Debug|Win32.Build.0 = Win32 Debug|Win32
+		{DC28F79D-0C9F-4748-8277-C6C921CC0C6E}.Win32 Release|Win32.ActiveCfg = Win32 Release|Win32
+		{DC28F79D-0C9F-4748-8277-C6C921CC0C6E}.Win32 Release|Win32.Build.0 = Win32 Release|Win32
+		{1599C5DF-3BAF-4AB3-8E6E-A8F6CC50D2DD}.PSP Debug|Win32.ActiveCfg = PSP Debug|Win32
+		{1599C5DF-3BAF-4AB3-8E6E-A8F6CC50D2DD}.PSP Debug|Win32.Build.0 = PSP Debug|Win32
+		{1599C5DF-3BAF-4AB3-8E6E-A8F6CC50D2DD}.PSP Release|Win32.ActiveCfg = PSP Release|Win32
+		{1599C5DF-3BAF-4AB3-8E6E-A8F6CC50D2DD}.PSP Release|Win32.Build.0 = PSP Release|Win32
+		{1599C5DF-3BAF-4AB3-8E6E-A8F6CC50D2DD}.Win32 Debug|Win32.ActiveCfg = Win32 Debug|Win32
+		{1599C5DF-3BAF-4AB3-8E6E-A8F6CC50D2DD}.Win32 Debug|Win32.Build.0 = Win32 Debug|Win32
+		{1599C5DF-3BAF-4AB3-8E6E-A8F6CC50D2DD}.Win32 Release|Win32.ActiveCfg = Win32 Release|Win32
+		{1599C5DF-3BAF-4AB3-8E6E-A8F6CC50D2DD}.Win32 Release|Win32.Build.0 = Win32 Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

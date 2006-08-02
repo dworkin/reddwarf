@@ -72,8 +72,8 @@
 
 #include "Platform/IStream.h"
 
-#include "Expat-1.95.8/Source/lib/expat_config.h"
-#include "Expat-1.95.8/Source/lib/expat.h"
+#define XML_UNICODE_WCHAR_T 1
+#include <expat.h>
 
 namespace SGS
 {

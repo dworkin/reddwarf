@@ -1,204 +1,318 @@
 <?xml version="1.0" encoding="Windows-1252"?>
 <VisualStudioProject
 	ProjectType="Visual C++"
-	Version="7.10"
+	Version="8.00"
 	Name="TCPIPUserManagerClient"
 	ProjectGUID="{1599C5DF-3BAF-4AB3-8E6E-A8F6CC50D2DD}"
 	SccProjectName="SAK"
 	SccAuxPath="SAK"
 	SccLocalPath="SAK"
 	SccProvider="SAK"
-	Keyword="Win32Proj">
+	Keyword="Win32Proj"
+	>
 	<Platforms>
 		<Platform
-			Name="Win32"/>
+			Name="Win32"
+		/>
 	</Platforms>
+	<ToolFiles>
+	</ToolFiles>
 	<Configurations>
 		<Configuration
 			Name="Win32 Debug|Win32"
-			OutputDirectory="bin/$(ConfigurationName)"
-			IntermediateDirectory="bin/$(ConfigurationName)"
+			OutputDirectory="..\..\lib"
+			IntermediateDirectory="obj/$(ConfigurationName)"
 			ConfigurationType="2"
-			CharacterSet="1">
+			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
+			CharacterSet="1"
+			>
+			<Tool
+				Name="VCPreBuildEventTool"
+			/>
+			<Tool
+				Name="VCCustomBuildTool"
+			/>
+			<Tool
+				Name="VCXMLDataGeneratorTool"
+			/>
+			<Tool
+				Name="VCWebServiceProxyGeneratorTool"
+			/>
+			<Tool
+				Name="VCMIDLTool"
+			/>
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories=".\Source;..\Client\Source"
+				AdditionalIncludeDirectories=".\Source;..\..\cppapi\Source"
 				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL;TCPIPUSERMANAGERCLIENT_EXPORTS"
-				MinimalRebuild="TRUE"
+				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
-				BufferSecurityCheck="TRUE"
+				BufferSecurityCheck="true"
 				EnableEnhancedInstructionSet="0"
-				DisableLanguageExtensions="TRUE"
-				TreatWChar_tAsBuiltInType="TRUE"
-				ForceConformanceInForLoopScope="TRUE"
-				RuntimeTypeInfo="TRUE"
+				DisableLanguageExtensions="true"
+				TreatWChar_tAsBuiltInType="true"
+				ForceConformanceInForLoopScope="true"
+				RuntimeTypeInfo="true"
 				UsePrecompiledHeader="0"
 				WarningLevel="4"
-				WarnAsError="TRUE"
-				Detect64BitPortabilityProblems="TRUE"
-				DebugInformationFormat="4"/>
+				WarnAsError="true"
+				Detect64BitPortabilityProblems="true"
+				DebugInformationFormat="4"
+			/>
 			<Tool
-				Name="VCCustomBuildTool"/>
+				Name="VCManagedResourceCompilerTool"
+			/>
+			<Tool
+				Name="VCResourceCompilerTool"
+			/>
+			<Tool
+				Name="VCPreLinkEventTool"
+			/>
 			<Tool
 				Name="VCLinkerTool"
+				OutputFile="$(OutDir)\$(ProjectName)d.dll"
+				Version="0.2"
 				IgnoreDefaultLibraryNames="LIBCMT"
-				GenerateDebugInformation="TRUE"
+				GenerateDebugInformation="true"
 				OptimizeReferences="1"
-				EnableCOMDATFolding="1"/>
+				EnableCOMDATFolding="1"
+			/>
 			<Tool
-				Name="VCMIDLTool"/>
+				Name="VCALinkTool"
+			/>
 			<Tool
-				Name="VCPostBuildEventTool"/>
+				Name="VCManifestTool"
+			/>
 			<Tool
-				Name="VCPreBuildEventTool"/>
+				Name="VCXDCMakeTool"
+			/>
 			<Tool
-				Name="VCPreLinkEventTool"/>
+				Name="VCBscMakeTool"
+			/>
 			<Tool
-				Name="VCResourceCompilerTool"/>
+				Name="VCFxCopTool"
+			/>
 			<Tool
-				Name="VCWebServiceProxyGeneratorTool"/>
+				Name="VCAppVerifierTool"
+			/>
 			<Tool
-				Name="VCXMLDataGeneratorTool"/>
+				Name="VCWebDeploymentTool"
+			/>
 			<Tool
-				Name="VCWebDeploymentTool"/>
-			<Tool
-				Name="VCManagedWrapperGeneratorTool"/>
-			<Tool
-				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
+				Name="VCPostBuildEventTool"
+			/>
 		</Configuration>
 		<Configuration
 			Name="Win32 Release|Win32"
-			OutputDirectory="bin/$(ConfigurationName)"
-			IntermediateDirectory="bin/$(ConfigurationName)"
+			OutputDirectory="..\..\lib"
+			IntermediateDirectory="obj/$(ConfigurationName)"
 			ConfigurationType="2"
-			CharacterSet="1">
+			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
+			CharacterSet="1"
+			>
+			<Tool
+				Name="VCPreBuildEventTool"
+			/>
+			<Tool
+				Name="VCCustomBuildTool"
+			/>
+			<Tool
+				Name="VCXMLDataGeneratorTool"
+			/>
+			<Tool
+				Name="VCWebServiceProxyGeneratorTool"
+			/>
+			<Tool
+				Name="VCMIDLTool"
+			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				Optimization="1"
-				AdditionalIncludeDirectories=".\Source;..\Client\Source"
+				Optimization="3"
+				AdditionalIncludeDirectories=".\Source;..\..\cppapi\Source"
 				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;TCPIPUSERMANAGERCLIENT_EXPORTS"
-				StringPooling="TRUE"
+				StringPooling="true"
 				RuntimeLibrary="2"
 				EnableEnhancedInstructionSet="0"
-				DisableLanguageExtensions="TRUE"
-				TreatWChar_tAsBuiltInType="TRUE"
-				ForceConformanceInForLoopScope="TRUE"
-				RuntimeTypeInfo="TRUE"
+				DisableLanguageExtensions="true"
+				TreatWChar_tAsBuiltInType="true"
+				ForceConformanceInForLoopScope="true"
+				RuntimeTypeInfo="true"
 				UsePrecompiledHeader="0"
 				WarningLevel="4"
-				WarnAsError="TRUE"
-				Detect64BitPortabilityProblems="TRUE"
-				DebugInformationFormat="3"/>
+				WarnAsError="true"
+				Detect64BitPortabilityProblems="true"
+				DebugInformationFormat="0"
+			/>
 			<Tool
-				Name="VCCustomBuildTool"/>
+				Name="VCManagedResourceCompilerTool"
+			/>
 			<Tool
-				Name="VCLinkerTool"/>
+				Name="VCResourceCompilerTool"
+			/>
 			<Tool
-				Name="VCMIDLTool"/>
+				Name="VCPreLinkEventTool"
+			/>
 			<Tool
-				Name="VCPostBuildEventTool"/>
+				Name="VCLinkerTool"
+				Version="0.2"
+				LinkIncremental="1"
+			/>
 			<Tool
-				Name="VCPreBuildEventTool"/>
+				Name="VCALinkTool"
+			/>
 			<Tool
-				Name="VCPreLinkEventTool"/>
+				Name="VCManifestTool"
+			/>
 			<Tool
-				Name="VCResourceCompilerTool"/>
+				Name="VCXDCMakeTool"
+			/>
 			<Tool
-				Name="VCWebServiceProxyGeneratorTool"/>
+				Name="VCBscMakeTool"
+			/>
 			<Tool
-				Name="VCXMLDataGeneratorTool"/>
+				Name="VCFxCopTool"
+			/>
 			<Tool
-				Name="VCWebDeploymentTool"/>
+				Name="VCAppVerifierTool"
+			/>
 			<Tool
-				Name="VCManagedWrapperGeneratorTool"/>
+				Name="VCWebDeploymentTool"
+			/>
 			<Tool
-				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
+				Name="VCPostBuildEventTool"
+			/>
 		</Configuration>
 		<Configuration
 			Name="PSP Debug|Win32"
 			OutputDirectory="bin/$(ConfigurationName)"
 			IntermediateDirectory="bin/$(ConfigurationName)"
 			ConfigurationType="4"
-			DeleteExtensionsOnClean="*.obj;*.d;*.map;*.lst;*.pch;$(TargetPath)">
+			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
+			DeleteExtensionsOnClean="*.obj;*.d;*.map;*.lst;*.pch;$(TargetPath)"
+			>
+			<Tool
+				Name="VCPreBuildEventTool"
+			/>
+			<Tool
+				Name="VCCustomBuildTool"
+			/>
+			<Tool
+				Name="VCXMLDataGeneratorTool"
+			/>
+			<Tool
+				Name="VCWebServiceProxyGeneratorTool"
+			/>
+			<Tool
+				Name="VCMIDLTool"
+			/>
 			<Tool
 				Name="VCCLCompilerTool"
 				AdditionalOptions="-g -O0 -STLIO -Xc+=rtti -Xc+=exceptions"
 				AdditionalIncludeDirectories="..\..\..\..\ThirdParty\PSP\include;.\Source;..\Client\Source"
 				PreprocessorDefinitions="SN_TARGET_PSP_HW;_DEBUG;TCPIPUSERMANAGERCLIENT_EXPORTS"
-				DisableLanguageExtensions="TRUE"
-				TreatWChar_tAsBuiltInType="TRUE"
-				ForceConformanceInForLoopScope="TRUE"
-				RuntimeTypeInfo="TRUE"
+				DisableLanguageExtensions="true"
+				TreatWChar_tAsBuiltInType="true"
+				ForceConformanceInForLoopScope="true"
+				RuntimeTypeInfo="true"
 				ProgramDataBaseFileName=""
-				CompileAs="0"/>
+				CompileAs="0"
+			/>
 			<Tool
-				Name="VCCustomBuildTool"/>
+				Name="VCManagedResourceCompilerTool"
+			/>
+			<Tool
+				Name="VCResourceCompilerTool"
+			/>
+			<Tool
+				Name="VCPreLinkEventTool"
+			/>
 			<Tool
 				Name="VCLibrarianTool"
 				AdditionalOptions=""
-				OutputFile="$(OutDir)/$(ProjectName).lib"/>
+				OutputFile="$(OutDir)/$(ProjectName).lib"
+			/>
 			<Tool
-				Name="VCMIDLTool"/>
+				Name="VCALinkTool"
+			/>
 			<Tool
-				Name="VCPostBuildEventTool"/>
+				Name="VCXDCMakeTool"
+			/>
 			<Tool
-				Name="VCPreBuildEventTool"/>
+				Name="VCBscMakeTool"
+			/>
 			<Tool
-				Name="VCPreLinkEventTool"/>
+				Name="VCFxCopTool"
+			/>
 			<Tool
-				Name="VCResourceCompilerTool"/>
-			<Tool
-				Name="VCWebServiceProxyGeneratorTool"/>
-			<Tool
-				Name="VCXMLDataGeneratorTool"/>
-			<Tool
-				Name="VCManagedWrapperGeneratorTool"/>
-			<Tool
-				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
+				Name="VCPostBuildEventTool"
+			/>
 		</Configuration>
 		<Configuration
 			Name="PSP Release|Win32"
 			OutputDirectory="bin/$(ConfigurationName)"
 			IntermediateDirectory="bin/$(ConfigurationName)"
 			ConfigurationType="4"
-			DeleteExtensionsOnClean="*.obj;*.d;*.map;*.lst;*.pch;$(TargetPath)">
+			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
+			DeleteExtensionsOnClean="*.obj;*.d;*.map;*.lst;*.pch;$(TargetPath)"
+			>
+			<Tool
+				Name="VCPreBuildEventTool"
+			/>
+			<Tool
+				Name="VCCustomBuildTool"
+			/>
+			<Tool
+				Name="VCXMLDataGeneratorTool"
+			/>
+			<Tool
+				Name="VCWebServiceProxyGeneratorTool"
+			/>
+			<Tool
+				Name="VCMIDLTool"
+			/>
 			<Tool
 				Name="VCCLCompilerTool"
 				AdditionalOptions="-O3 -STLIO -Xc+=rtti -Xc+=exceptions"
 				AdditionalIncludeDirectories="..\..\..\..\ThirdParty\PSP\include;.\Source;..\Client\Source"
 				PreprocessorDefinitions="SN_TARGET_PSP_HW;NDEBUG;TCPIPUSERMANAGERCLIENT_EXPORTS"
-				DisableLanguageExtensions="TRUE"
-				TreatWChar_tAsBuiltInType="TRUE"
-				ForceConformanceInForLoopScope="TRUE"
-				RuntimeTypeInfo="TRUE"
+				DisableLanguageExtensions="true"
+				TreatWChar_tAsBuiltInType="true"
+				ForceConformanceInForLoopScope="true"
+				RuntimeTypeInfo="true"
 				ProgramDataBaseFileName=""
-				CompileAs="0"/>
+				CompileAs="0"
+			/>
 			<Tool
-				Name="VCCustomBuildTool"/>
+				Name="VCManagedResourceCompilerTool"
+			/>
+			<Tool
+				Name="VCResourceCompilerTool"
+			/>
+			<Tool
+				Name="VCPreLinkEventTool"
+			/>
 			<Tool
 				Name="VCLibrarianTool"
 				AdditionalOptions=""
-				OutputFile="$(OutDir)/$(ProjectName).lib"/>
+				OutputFile="$(OutDir)/$(ProjectName).lib"
+			/>
 			<Tool
-				Name="VCMIDLTool"/>
+				Name="VCALinkTool"
+			/>
 			<Tool
-				Name="VCPostBuildEventTool"/>
+				Name="VCXDCMakeTool"
+			/>
 			<Tool
-				Name="VCPreBuildEventTool"/>
+				Name="VCBscMakeTool"
+			/>
 			<Tool
-				Name="VCPreLinkEventTool"/>
+				Name="VCFxCopTool"
+			/>
 			<Tool
-				Name="VCResourceCompilerTool"/>
-			<Tool
-				Name="VCWebServiceProxyGeneratorTool"/>
-			<Tool
-				Name="VCXMLDataGeneratorTool"/>
-			<Tool
-				Name="VCManagedWrapperGeneratorTool"/>
-			<Tool
-				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
+				Name="VCPostBuildEventTool"
+			/>
 		</Configuration>
 	</Configurations>
 	<References>
@@ -206,57 +320,71 @@
 	<Files>
 		<Filter
 			Name="Client"
-			Filter="">
+			>
 			<File
-				RelativePath=".\Source\Client\TCPIPUserManagerClient.cpp">
+				RelativePath=".\Source\Client\TCPIPUserManagerClient.cpp"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Client\TCPIPUserManagerClient.h">
+				RelativePath=".\Source\Client\TCPIPUserManagerClient.h"
+				>
 			</File>
 		</Filter>
 		<Filter
 			Name="Protocol"
-			Filter="">
+			>
 			<File
-				RelativePath=".\Source\Protocol\BinaryPktProtocol.cpp">
+				RelativePath=".\Source\Protocol\BinaryPktProtocol.cpp"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Protocol\BinaryPktProtocol.h">
+				RelativePath=".\Source\Protocol\BinaryPktProtocol.h"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Protocol\ITransportProtocol.h">
+				RelativePath=".\Source\Protocol\ITransportProtocol.h"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Protocol\ITransportProtocolClient.h">
+				RelativePath=".\Source\Protocol\ITransportProtocolClient.h"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Protocol\ITransportProtocolTransmitter.h">
+				RelativePath=".\Source\Protocol\ITransportProtocolTransmitter.h"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Protocol\ValidationDataProtocol.cpp">
+				RelativePath=".\Source\Protocol\ValidationDataProtocol.cpp"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Protocol\ValidationDataProtocol.h">
+				RelativePath=".\Source\Protocol\ValidationDataProtocol.h"
+				>
 			</File>
 		</Filter>
 		<Filter
 			Name="Utilities"
-			Filter="">
+			>
 			<File
-				RelativePath=".\source\utilities\ByteBuffer.cpp">
+				RelativePath=".\source\utilities\ByteBuffer.cpp"
+				>
 			</File>
 			<File
-				RelativePath=".\source\utilities\ByteBuffer.h">
+				RelativePath=".\source\utilities\ByteBuffer.h"
+				>
 			</File>
 			<File
-				RelativePath=".\source\utilities\ByteBufferPool.cpp">
+				RelativePath=".\source\utilities\ByteBufferPool.cpp"
+				>
 			</File>
 			<File
-				RelativePath=".\source\utilities\ByteBufferPool.h">
+				RelativePath=".\source\utilities\ByteBufferPool.h"
+				>
 			</File>
 		</Filter>
 		<File
-			RelativePath=".\Source\stable.h">
+			RelativePath=".\Source\stable.h"
+			>
 		</File>
 	</Files>
 	<Globals>

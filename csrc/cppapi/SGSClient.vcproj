@@ -1,205 +1,323 @@
 <?xml version="1.0" encoding="Windows-1252"?>
 <VisualStudioProject
 	ProjectType="Visual C++"
-	Version="7.10"
+	Version="8.00"
 	Name="SGSClient"
 	ProjectGUID="{DC28F79D-0C9F-4748-8277-C6C921CC0C6E}"
+	RootNamespace="SGSClient"
 	SccProjectName="SAK"
 	SccAuxPath="SAK"
 	SccLocalPath="SAK"
 	SccProvider="SAK"
-	Keyword="Win32Proj">
+	Keyword="Win32Proj"
+	>
 	<Platforms>
 		<Platform
-			Name="Win32"/>
+			Name="Win32"
+		/>
 	</Platforms>
+	<ToolFiles>
+	</ToolFiles>
 	<Configurations>
 		<Configuration
 			Name="Win32 Debug|Win32"
-			OutputDirectory="bin/$(ConfigurationName)"
-			IntermediateDirectory="bin/$(ConfigurationName)"
+			OutputDirectory="..\lib"
+			IntermediateDirectory="obj/$(ConfigurationName)"
 			ConfigurationType="2"
-			CharacterSet="1">
+			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
+			CharacterSet="1"
+			>
+			<Tool
+				Name="VCPreBuildEventTool"
+			/>
+			<Tool
+				Name="VCCustomBuildTool"
+			/>
+			<Tool
+				Name="VCXMLDataGeneratorTool"
+			/>
+			<Tool
+				Name="VCWebServiceProxyGeneratorTool"
+			/>
+			<Tool
+				Name="VCMIDLTool"
+			/>
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories=".\Source;..\..\..\ThirdParty"
+				AdditionalIncludeDirectories=".\Source;..\ThirdParty\Expat-1.95.8\Source\lib"
 				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL;CLIENTAPI_EXPORTS"
-				MinimalRebuild="TRUE"
+				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="3"
-				BufferSecurityCheck="TRUE"
+				BufferSecurityCheck="true"
 				EnableEnhancedInstructionSet="0"
-				DisableLanguageExtensions="TRUE"
-				TreatWChar_tAsBuiltInType="TRUE"
-				ForceConformanceInForLoopScope="TRUE"
-				RuntimeTypeInfo="TRUE"
+				DisableLanguageExtensions="true"
+				TreatWChar_tAsBuiltInType="true"
+				ForceConformanceInForLoopScope="true"
+				RuntimeTypeInfo="true"
 				UsePrecompiledHeader="0"
 				WarningLevel="4"
-				WarnAsError="TRUE"
-				Detect64BitPortabilityProblems="TRUE"
-				DebugInformationFormat="4"/>
+				WarnAsError="true"
+				Detect64BitPortabilityProblems="true"
+				DebugInformationFormat="3"
+			/>
 			<Tool
-				Name="VCCustomBuildTool"/>
+				Name="VCManagedResourceCompilerTool"
+			/>
+			<Tool
+				Name="VCResourceCompilerTool"
+			/>
+			<Tool
+				Name="VCPreLinkEventTool"
+			/>
 			<Tool
 				Name="VCLinkerTool"
+				LinkLibraryDependencies="false"
+				AdditionalDependencies="&quot;..\ThirdParty\Expat-1.95.8\Libs\libexpatw.lib&quot;"
+				OutputFile="$(OutDir)\SGSClientd.dll"
+				Version="0.2"
+				LinkIncremental="1"
 				IgnoreDefaultLibraryNames="LIBCMT"
-				GenerateDebugInformation="TRUE"
+				GenerateDebugInformation="true"
 				OptimizeReferences="1"
-				EnableCOMDATFolding="1"/>
+				EnableCOMDATFolding="1"
+			/>
 			<Tool
-				Name="VCMIDLTool"/>
+				Name="VCALinkTool"
+			/>
 			<Tool
-				Name="VCPostBuildEventTool"/>
+				Name="VCManifestTool"
+			/>
 			<Tool
-				Name="VCPreBuildEventTool"/>
+				Name="VCXDCMakeTool"
+			/>
 			<Tool
-				Name="VCPreLinkEventTool"/>
+				Name="VCBscMakeTool"
+			/>
 			<Tool
-				Name="VCResourceCompilerTool"/>
+				Name="VCFxCopTool"
+			/>
 			<Tool
-				Name="VCWebServiceProxyGeneratorTool"/>
+				Name="VCAppVerifierTool"
+			/>
 			<Tool
-				Name="VCXMLDataGeneratorTool"/>
+				Name="VCWebDeploymentTool"
+			/>
 			<Tool
-				Name="VCWebDeploymentTool"/>
-			<Tool
-				Name="VCManagedWrapperGeneratorTool"/>
-			<Tool
-				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
+				Name="VCPostBuildEventTool"
+			/>
 		</Configuration>
 		<Configuration
 			Name="Win32 Release|Win32"
-			OutputDirectory="bin/$(ConfigurationName)"
-			IntermediateDirectory="bin/$(ConfigurationName)"
+			OutputDirectory="..\lib"
+			IntermediateDirectory="obj/$(ConfigurationName)"
 			ConfigurationType="2"
-			CharacterSet="1">
+			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
+			CharacterSet="1"
+			>
+			<Tool
+				Name="VCPreBuildEventTool"
+			/>
+			<Tool
+				Name="VCCustomBuildTool"
+			/>
+			<Tool
+				Name="VCXMLDataGeneratorTool"
+			/>
+			<Tool
+				Name="VCWebServiceProxyGeneratorTool"
+			/>
+			<Tool
+				Name="VCMIDLTool"
+			/>
 			<Tool
 				Name="VCCLCompilerTool"
-				Optimization="1"
-				AdditionalIncludeDirectories=".\Source;..\..\..\ThirdParty"
+				Optimization="3"
+				AdditionalIncludeDirectories=".\Source;..\ThirdParty\Expat-1.95.8\Source\lib"
 				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;CLIENTAPI_EXPORTS"
-				StringPooling="TRUE"
+				StringPooling="true"
 				RuntimeLibrary="2"
 				EnableEnhancedInstructionSet="0"
-				DisableLanguageExtensions="TRUE"
-				TreatWChar_tAsBuiltInType="TRUE"
-				ForceConformanceInForLoopScope="TRUE"
-				RuntimeTypeInfo="TRUE"
+				DisableLanguageExtensions="true"
+				TreatWChar_tAsBuiltInType="true"
+				ForceConformanceInForLoopScope="true"
+				RuntimeTypeInfo="true"
 				UsePrecompiledHeader="0"
 				WarningLevel="4"
-				WarnAsError="TRUE"
-				Detect64BitPortabilityProblems="TRUE"
-				DebugInformationFormat="3"/>
+				WarnAsError="true"
+				Detect64BitPortabilityProblems="true"
+				DebugInformationFormat="0"
+			/>
 			<Tool
-				Name="VCCustomBuildTool"/>
+				Name="VCManagedResourceCompilerTool"
+			/>
+			<Tool
+				Name="VCResourceCompilerTool"
+			/>
+			<Tool
+				Name="VCPreLinkEventTool"
+			/>
 			<Tool
 				Name="VCLinkerTool"
-				IgnoreDefaultLibraryNames="LIBCMT"/>
+				AdditionalDependencies="&quot;..\ThirdParty\Expat-1.95.8\Libs\libexpatw.lib&quot;"
+				Version="0.2"
+				IgnoreDefaultLibraryNames="LIBCMT"
+			/>
 			<Tool
-				Name="VCMIDLTool"/>
+				Name="VCALinkTool"
+			/>
 			<Tool
-				Name="VCPostBuildEventTool"/>
+				Name="VCManifestTool"
+			/>
 			<Tool
-				Name="VCPreBuildEventTool"/>
+				Name="VCXDCMakeTool"
+			/>
 			<Tool
-				Name="VCPreLinkEventTool"/>
+				Name="VCBscMakeTool"
+			/>
 			<Tool
-				Name="VCResourceCompilerTool"/>
+				Name="VCFxCopTool"
+			/>
 			<Tool
-				Name="VCWebServiceProxyGeneratorTool"/>
+				Name="VCAppVerifierTool"
+			/>
 			<Tool
-				Name="VCXMLDataGeneratorTool"/>
+				Name="VCWebDeploymentTool"
+			/>
 			<Tool
-				Name="VCWebDeploymentTool"/>
-			<Tool
-				Name="VCManagedWrapperGeneratorTool"/>
-			<Tool
-				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
+				Name="VCPostBuildEventTool"
+			/>
 		</Configuration>
 		<Configuration
 			Name="PSP Debug|Win32"
 			OutputDirectory="bin/$(ConfigurationName)"
 			IntermediateDirectory="bin/$(ConfigurationName)"
 			ConfigurationType="4"
-			DeleteExtensionsOnClean="*.obj;*.d;*.map;*.lst;*.pch;$(TargetPath)">
+			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
+			DeleteExtensionsOnClean="*.obj;*.d;*.map;*.lst;*.pch;$(TargetPath)"
+			>
+			<Tool
+				Name="VCPreBuildEventTool"
+			/>
+			<Tool
+				Name="VCCustomBuildTool"
+			/>
+			<Tool
+				Name="VCXMLDataGeneratorTool"
+			/>
+			<Tool
+				Name="VCWebServiceProxyGeneratorTool"
+			/>
+			<Tool
+				Name="VCMIDLTool"
+			/>
 			<Tool
 				Name="VCCLCompilerTool"
 				AdditionalOptions="-g -O0 -STLIO -Xc+=rtti -Xc+=exceptions"
 				AdditionalIncludeDirectories="..\..\..\ThirdParty\PSP\include;.\Source;..\..\..\ThirdParty"
 				PreprocessorDefinitions="SN_TARGET_PSP_HW;_DEBUG;CLIENTAPI_EXPORTS"
-				DisableLanguageExtensions="TRUE"
-				TreatWChar_tAsBuiltInType="TRUE"
-				ForceConformanceInForLoopScope="TRUE"
-				RuntimeTypeInfo="TRUE"
+				DisableLanguageExtensions="true"
+				TreatWChar_tAsBuiltInType="true"
+				ForceConformanceInForLoopScope="true"
+				RuntimeTypeInfo="true"
 				ProgramDataBaseFileName=""
-				CompileAs="0"/>
+				CompileAs="0"
+			/>
 			<Tool
-				Name="VCCustomBuildTool"/>
+				Name="VCManagedResourceCompilerTool"
+			/>
+			<Tool
+				Name="VCResourceCompilerTool"
+			/>
+			<Tool
+				Name="VCPreLinkEventTool"
+			/>
 			<Tool
 				Name="VCLibrarianTool"
 				AdditionalOptions=""
-				OutputFile="$(OutDir)/$(ProjectName).lib"/>
+				OutputFile="$(OutDir)/$(ProjectName).lib"
+			/>
 			<Tool
-				Name="VCMIDLTool"/>
+				Name="VCALinkTool"
+			/>
 			<Tool
-				Name="VCPostBuildEventTool"/>
+				Name="VCXDCMakeTool"
+			/>
 			<Tool
-				Name="VCPreBuildEventTool"/>
+				Name="VCBscMakeTool"
+			/>
 			<Tool
-				Name="VCPreLinkEventTool"/>
+				Name="VCFxCopTool"
+			/>
 			<Tool
-				Name="VCResourceCompilerTool"/>
-			<Tool
-				Name="VCWebServiceProxyGeneratorTool"/>
-			<Tool
-				Name="VCXMLDataGeneratorTool"/>
-			<Tool
-				Name="VCManagedWrapperGeneratorTool"/>
-			<Tool
-				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
+				Name="VCPostBuildEventTool"
+			/>
 		</Configuration>
 		<Configuration
 			Name="PSP Release|Win32"
 			OutputDirectory="bin/$(ConfigurationName)"
 			IntermediateDirectory="bin/$(ConfigurationName)"
 			ConfigurationType="4"
-			DeleteExtensionsOnClean="*.obj;*.d;*.map;*.lst;*.pch;$(TargetPath)">
+			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
+			DeleteExtensionsOnClean="*.obj;*.d;*.map;*.lst;*.pch;$(TargetPath)"
+			>
+			<Tool
+				Name="VCPreBuildEventTool"
+			/>
+			<Tool
+				Name="VCCustomBuildTool"
+			/>
+			<Tool
+				Name="VCXMLDataGeneratorTool"
+			/>
+			<Tool
+				Name="VCWebServiceProxyGeneratorTool"
+			/>
+			<Tool
+				Name="VCMIDLTool"
+			/>
 			<Tool
 				Name="VCCLCompilerTool"
 				AdditionalOptions="-O3 -STLIO -Xc+=rtti -Xc+=exceptions"
 				AdditionalIncludeDirectories="..\..\..\ThirdParty\PSP\include;.\Source;..\..\..\ThirdParty"
 				PreprocessorDefinitions="SN_TARGET_PSP_HW;NDEBUG;CLIENTAPI_EXPORTS"
-				DisableLanguageExtensions="TRUE"
-				TreatWChar_tAsBuiltInType="TRUE"
-				ForceConformanceInForLoopScope="TRUE"
-				RuntimeTypeInfo="TRUE"
+				DisableLanguageExtensions="true"
+				TreatWChar_tAsBuiltInType="true"
+				ForceConformanceInForLoopScope="true"
+				RuntimeTypeInfo="true"
 				ProgramDataBaseFileName=""
-				CompileAs="0"/>
+				CompileAs="0"
+			/>
 			<Tool
-				Name="VCCustomBuildTool"/>
+				Name="VCManagedResourceCompilerTool"
+			/>
+			<Tool
+				Name="VCResourceCompilerTool"
+			/>
+			<Tool
+				Name="VCPreLinkEventTool"
+			/>
 			<Tool
 				Name="VCLibrarianTool"
 				AdditionalOptions=""
-				OutputFile="$(OutDir)/$(ProjectName).lib"/>
+				OutputFile="$(OutDir)/$(ProjectName).lib"
+			/>
 			<Tool
-				Name="VCMIDLTool"/>
+				Name="VCALinkTool"
+			/>
 			<Tool
-				Name="VCPostBuildEventTool"/>
+				Name="VCXDCMakeTool"
+			/>
 			<Tool
-				Name="VCPreBuildEventTool"/>
+				Name="VCBscMakeTool"
+			/>
 			<Tool
-				Name="VCPreLinkEventTool"/>
+				Name="VCFxCopTool"
+			/>
 			<Tool
-				Name="VCResourceCompilerTool"/>
-			<Tool
-				Name="VCWebServiceProxyGeneratorTool"/>
-			<Tool
-				Name="VCXMLDataGeneratorTool"/>
-			<Tool
-				Name="VCManagedWrapperGeneratorTool"/>
-			<Tool
-				Name="VCAuxiliaryManagedWrapperGeneratorTool"/>
+				Name="VCPostBuildEventTool"
+			/>
 		</Configuration>
 	</Configurations>
 	<References>
@@ -207,408 +325,531 @@
 	<Files>
 		<Filter
 			Name="Client"
-			Filter="">
+			>
 			<File
-				RelativePath=".\Source\Client\ChannelID.h">
+				RelativePath=".\Source\Client\ChannelID.h"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Client\ClientAlreadyConnectedException.cpp">
+				RelativePath=".\Source\Client\ClientAlreadyConnectedException.cpp"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Client\ClientAlreadyConnectedException.h">
+				RelativePath=".\Source\Client\ClientAlreadyConnectedException.h"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Client\ClientChannel.cpp">
+				RelativePath=".\Source\Client\ClientChannel.cpp"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Client\ClientChannel.h">
+				RelativePath=".\Source\Client\ClientChannel.h"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Client\ClientConnectionManager.cpp">
+				RelativePath=".\Source\Client\ClientConnectionManager.cpp"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Client\ClientConnectionManager.h">
+				RelativePath=".\Source\Client\ClientConnectionManager.h"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Client\DefaultUserManagerPolicy.cpp">
+				RelativePath=".\Source\Client\DefaultUserManagerPolicy.cpp"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Client\DefaultUserManagerPolicy.h">
+				RelativePath=".\Source\Client\DefaultUserManagerPolicy.h"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Client\IClientChannel.h">
+				RelativePath=".\Source\Client\IClientChannel.h"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Client\IClientChannelListener.h">
+				RelativePath=".\Source\Client\IClientChannelListener.h"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Client\IClientConnectionManager.h">
+				RelativePath=".\Source\Client\IClientConnectionManager.h"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Client\IClientConnectionManagerListener.h">
+				RelativePath=".\Source\Client\IClientConnectionManagerListener.h"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Client\IUserManagerClient.h">
+				RelativePath=".\Source\Client\IUserManagerClient.h"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Client\IUserManagerClientListener.h">
+				RelativePath=".\Source\Client\IUserManagerClientListener.h"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Client\IUserManagerPolicy.h">
+				RelativePath=".\Source\Client\IUserManagerPolicy.h"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Client\ReconnectionKey.h">
+				RelativePath=".\Source\Client\ReconnectionKey.h"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Client\UserID.h">
+				RelativePath=".\Source\Client\UserID.h"
+				>
 			</File>
 		</Filter>
 		<Filter
 			Name="Discovery"
-			Filter="">
+			>
 			<File
-				RelativePath=".\Source\Discovery\DiscoveredGame.cpp">
+				RelativePath=".\Source\Discovery\DiscoveredGame.cpp"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Discovery\DiscoveredGame.h">
+				RelativePath=".\Source\Discovery\DiscoveredGame.h"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Discovery\DiscoveredUserManager.cpp">
+				RelativePath=".\Source\Discovery\DiscoveredUserManager.cpp"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Discovery\DiscoveredUserManager.h">
+				RelativePath=".\Source\Discovery\DiscoveredUserManager.h"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Discovery\IDiscoveredGame.h">
+				RelativePath=".\Source\Discovery\IDiscoveredGame.h"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Discovery\IDiscoveredUserManager.h">
+				RelativePath=".\Source\Discovery\IDiscoveredUserManager.h"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Discovery\IDiscoverer.h">
+				RelativePath=".\Source\Discovery\IDiscoverer.h"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Discovery\URLDiscoverer.cpp">
+				RelativePath=".\Source\Discovery\URLDiscoverer.cpp"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Discovery\URLDiscoverer.h">
+				RelativePath=".\Source\Discovery\URLDiscoverer.h"
+				>
 			</File>
 		</Filter>
 		<Filter
 			Name="Platform"
-			Filter="">
+			>
 			<File
-				RelativePath=".\Source\Platform\IStream.h">
+				RelativePath=".\Source\Platform\IStream.h"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Platform\Platform.h">
+				RelativePath=".\Source\Platform\Platform.h"
+				>
 			</File>
 			<Filter
 				Name="Win32"
-				Filter="">
+				>
 				<File
-					RelativePath=".\Source\Platform\Win32\Win32FileStream.cpp">
+					RelativePath=".\Source\Platform\Win32\Win32FileStream.cpp"
+					>
 					<FileConfiguration
-						Name="Win32 Debug|Win32">
+						Name="Win32 Debug|Win32"
+						>
 						<Tool
 							Name="VCCLCompilerTool"
-							DisableLanguageExtensions="FALSE"/>
+							DisableLanguageExtensions="false"
+						/>
 					</FileConfiguration>
 					<FileConfiguration
-						Name="Win32 Release|Win32">
+						Name="Win32 Release|Win32"
+						>
 						<Tool
 							Name="VCCLCompilerTool"
-							DisableLanguageExtensions="FALSE"/>
+							DisableLanguageExtensions="false"
+						/>
 					</FileConfiguration>
 					<FileConfiguration
 						Name="PSP Debug|Win32"
-						ExcludedFromBuild="TRUE">
+						ExcludedFromBuild="true"
+						>
 						<Tool
-							Name="VCCLCompilerTool"/>
+							Name="VCCLCompilerTool"
+						/>
 					</FileConfiguration>
 					<FileConfiguration
 						Name="PSP Release|Win32"
-						ExcludedFromBuild="TRUE">
+						ExcludedFromBuild="true"
+						>
 						<Tool
-							Name="VCCLCompilerTool"/>
+							Name="VCCLCompilerTool"
+						/>
 					</FileConfiguration>
 				</File>
 				<File
-					RelativePath=".\Source\Platform\Win32\Win32FileStream.h">
+					RelativePath=".\Source\Platform\Win32\Win32FileStream.h"
+					>
 					<FileConfiguration
 						Name="PSP Debug|Win32"
-						ExcludedFromBuild="TRUE">
+						ExcludedFromBuild="true"
+						>
 						<Tool
-							Name="VCCustomBuildTool"/>
+							Name="VCCustomBuildTool"
+						/>
 					</FileConfiguration>
 					<FileConfiguration
 						Name="PSP Release|Win32"
-						ExcludedFromBuild="TRUE">
+						ExcludedFromBuild="true"
+						>
 						<Tool
-							Name="VCCustomBuildTool"/>
+							Name="VCCustomBuildTool"
+						/>
 					</FileConfiguration>
 				</File>
 				<File
-					RelativePath=".\Source\Platform\Win32\Win32Platform.cpp">
+					RelativePath=".\Source\Platform\Win32\Win32Platform.cpp"
+					>
 					<FileConfiguration
-						Name="Win32 Debug|Win32">
+						Name="Win32 Debug|Win32"
+						>
 						<Tool
 							Name="VCCLCompilerTool"
-							DisableLanguageExtensions="FALSE"/>
+							DisableLanguageExtensions="false"
+						/>
 					</FileConfiguration>
 					<FileConfiguration
-						Name="Win32 Release|Win32">
+						Name="Win32 Release|Win32"
+						>
 						<Tool
 							Name="VCCLCompilerTool"
-							DisableLanguageExtensions="FALSE"/>
+							DisableLanguageExtensions="false"
+						/>
 					</FileConfiguration>
 					<FileConfiguration
 						Name="PSP Debug|Win32"
-						ExcludedFromBuild="TRUE">
+						ExcludedFromBuild="true"
+						>
 						<Tool
-							Name="VCCLCompilerTool"/>
+							Name="VCCLCompilerTool"
+						/>
 					</FileConfiguration>
 					<FileConfiguration
 						Name="PSP Release|Win32"
-						ExcludedFromBuild="TRUE">
+						ExcludedFromBuild="true"
+						>
 						<Tool
-							Name="VCCLCompilerTool"/>
+							Name="VCCLCompilerTool"
+						/>
 					</FileConfiguration>
 				</File>
 			</Filter>
 			<Filter
 				Name="PSP"
-				Filter="">
+				>
 				<File
-					RelativePath=".\Source\Platform\Psp\LibHTTPStream.cpp">
+					RelativePath=".\Source\Platform\Psp\LibHTTPStream.cpp"
+					>
 					<FileConfiguration
 						Name="Win32 Debug|Win32"
-						ExcludedFromBuild="TRUE">
+						ExcludedFromBuild="true"
+						>
 						<Tool
-							Name="VCCLCompilerTool"/>
+							Name="VCCLCompilerTool"
+						/>
 					</FileConfiguration>
 					<FileConfiguration
 						Name="Win32 Release|Win32"
-						ExcludedFromBuild="TRUE">
+						ExcludedFromBuild="true"
+						>
 						<Tool
-							Name="VCCLCompilerTool"/>
+							Name="VCCLCompilerTool"
+						/>
 					</FileConfiguration>
 				</File>
 				<File
-					RelativePath=".\Source\Platform\Psp\LibHTTPStream.h">
+					RelativePath=".\Source\Platform\Psp\LibHTTPStream.h"
+					>
 					<FileConfiguration
 						Name="Win32 Debug|Win32"
-						ExcludedFromBuild="TRUE">
+						ExcludedFromBuild="true"
+						>
 						<Tool
-							Name="VCCustomBuildTool"/>
+							Name="VCCustomBuildTool"
+						/>
 					</FileConfiguration>
 					<FileConfiguration
 						Name="Win32 Release|Win32"
-						ExcludedFromBuild="TRUE">
+						ExcludedFromBuild="true"
+						>
 						<Tool
-							Name="VCCustomBuildTool"/>
+							Name="VCCustomBuildTool"
+						/>
 					</FileConfiguration>
 				</File>
 				<File
-					RelativePath=".\Source\Platform\Psp\PSPPlatform.cpp">
+					RelativePath=".\Source\Platform\Psp\PSPPlatform.cpp"
+					>
 					<FileConfiguration
 						Name="Win32 Debug|Win32"
-						ExcludedFromBuild="TRUE">
+						ExcludedFromBuild="true"
+						>
 						<Tool
-							Name="VCCLCompilerTool"/>
+							Name="VCCLCompilerTool"
+						/>
 					</FileConfiguration>
 					<FileConfiguration
 						Name="Win32 Release|Win32"
-						ExcludedFromBuild="TRUE">
+						ExcludedFromBuild="true"
+						>
 						<Tool
-							Name="VCCLCompilerTool"/>
+							Name="VCCLCompilerTool"
+						/>
 					</FileConfiguration>
 				</File>
 			</Filter>
 		</Filter>
 		<Filter
 			Name="Socket"
-			Filter="">
+			>
 			<File
-				RelativePath=".\Source\Socket\ISocket.h">
+				RelativePath=".\Source\Socket\ISocket.h"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Socket\ISocketListener.h">
+				RelativePath=".\Source\Socket\ISocketListener.h"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Socket\ISocketManager.h">
+				RelativePath=".\Source\Socket\ISocketManager.h"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Socket\ISocketManagerListener.h">
+				RelativePath=".\Source\Socket\ISocketManagerListener.h"
+				>
 			</File>
 			<Filter
 				Name="Win32"
-				Filter="">
+				>
 				<File
-					RelativePath=".\Source\Socket\Win32\IP4Address.cpp">
+					RelativePath=".\Source\Socket\Win32\IP4Address.cpp"
+					>
 					<FileConfiguration
-						Name="Win32 Debug|Win32">
+						Name="Win32 Debug|Win32"
+						>
 						<Tool
 							Name="VCCLCompilerTool"
-							DisableLanguageExtensions="FALSE"/>
+							DisableLanguageExtensions="false"
+						/>
 					</FileConfiguration>
 					<FileConfiguration
-						Name="Win32 Release|Win32">
+						Name="Win32 Release|Win32"
+						>
 						<Tool
 							Name="VCCLCompilerTool"
-							DisableLanguageExtensions="FALSE"/>
+							DisableLanguageExtensions="false"
+						/>
 					</FileConfiguration>
 					<FileConfiguration
 						Name="PSP Debug|Win32"
-						ExcludedFromBuild="TRUE">
+						ExcludedFromBuild="true"
+						>
 						<Tool
-							Name="VCCLCompilerTool"/>
+							Name="VCCLCompilerTool"
+						/>
 					</FileConfiguration>
 					<FileConfiguration
 						Name="PSP Release|Win32"
-						ExcludedFromBuild="TRUE">
+						ExcludedFromBuild="true"
+						>
 						<Tool
-							Name="VCCLCompilerTool"/>
+							Name="VCCLCompilerTool"
+						/>
 					</FileConfiguration>
 				</File>
 				<File
-					RelativePath=".\Source\Socket\Win32\IP4Address.h">
+					RelativePath=".\Source\Socket\Win32\IP4Address.h"
+					>
 					<FileConfiguration
 						Name="PSP Debug|Win32"
-						ExcludedFromBuild="TRUE">
+						ExcludedFromBuild="true"
+						>
 						<Tool
-							Name="VCCustomBuildTool"/>
+							Name="VCCustomBuildTool"
+						/>
 					</FileConfiguration>
 					<FileConfiguration
 						Name="PSP Release|Win32"
-						ExcludedFromBuild="TRUE">
+						ExcludedFromBuild="true"
+						>
 						<Tool
-							Name="VCCustomBuildTool"/>
+							Name="VCCustomBuildTool"
+						/>
 					</FileConfiguration>
 				</File>
 				<File
-					RelativePath=".\Source\Socket\Win32\Win32Socket.cpp">
+					RelativePath=".\Source\Socket\Win32\Win32Socket.cpp"
+					>
 					<FileConfiguration
-						Name="Win32 Debug|Win32">
+						Name="Win32 Debug|Win32"
+						>
 						<Tool
 							Name="VCCLCompilerTool"
-							DisableLanguageExtensions="FALSE"/>
+							DisableLanguageExtensions="false"
+						/>
 					</FileConfiguration>
 					<FileConfiguration
-						Name="Win32 Release|Win32">
+						Name="Win32 Release|Win32"
+						>
 						<Tool
 							Name="VCCLCompilerTool"
-							DisableLanguageExtensions="FALSE"/>
+							DisableLanguageExtensions="false"
+						/>
 					</FileConfiguration>
 					<FileConfiguration
 						Name="PSP Debug|Win32"
-						ExcludedFromBuild="TRUE">
+						ExcludedFromBuild="true"
+						>
 						<Tool
-							Name="VCCLCompilerTool"/>
+							Name="VCCLCompilerTool"
+						/>
 					</FileConfiguration>
 					<FileConfiguration
 						Name="PSP Release|Win32"
-						ExcludedFromBuild="TRUE">
+						ExcludedFromBuild="true"
+						>
 						<Tool
-							Name="VCCLCompilerTool"/>
+							Name="VCCLCompilerTool"
+						/>
 					</FileConfiguration>
 				</File>
 				<File
-					RelativePath=".\Source\Socket\Win32\Win32Socket.h">
+					RelativePath=".\Source\Socket\Win32\Win32Socket.h"
+					>
 					<FileConfiguration
 						Name="PSP Debug|Win32"
-						ExcludedFromBuild="TRUE">
+						ExcludedFromBuild="true"
+						>
 						<Tool
-							Name="VCCustomBuildTool"/>
+							Name="VCCustomBuildTool"
+						/>
 					</FileConfiguration>
 					<FileConfiguration
 						Name="PSP Release|Win32"
-						ExcludedFromBuild="TRUE">
+						ExcludedFromBuild="true"
+						>
 						<Tool
-							Name="VCCustomBuildTool"/>
+							Name="VCCustomBuildTool"
+						/>
 					</FileConfiguration>
 				</File>
 				<File
-					RelativePath=".\Source\Socket\Win32\Win32SocketManager.cpp">
+					RelativePath=".\Source\Socket\Win32\Win32SocketManager.cpp"
+					>
 					<FileConfiguration
-						Name="Win32 Debug|Win32">
+						Name="Win32 Debug|Win32"
+						>
 						<Tool
 							Name="VCCLCompilerTool"
-							DisableLanguageExtensions="FALSE"/>
+							DisableLanguageExtensions="false"
+						/>
 					</FileConfiguration>
 					<FileConfiguration
-						Name="Win32 Release|Win32">
+						Name="Win32 Release|Win32"
+						>
 						<Tool
 							Name="VCCLCompilerTool"
-							DisableLanguageExtensions="FALSE"/>
+							DisableLanguageExtensions="false"
+						/>
 					</FileConfiguration>
 					<FileConfiguration
 						Name="PSP Debug|Win32"
-						ExcludedFromBuild="TRUE">
+						ExcludedFromBuild="true"
+						>
 						<Tool
-							Name="VCCLCompilerTool"/>
+							Name="VCCLCompilerTool"
+						/>
 					</FileConfiguration>
 					<FileConfiguration
 						Name="PSP Release|Win32"
-						ExcludedFromBuild="TRUE">
+						ExcludedFromBuild="true"
+						>
 						<Tool
-							Name="VCCLCompilerTool"/>
+							Name="VCCLCompilerTool"
+						/>
 					</FileConfiguration>
 				</File>
 				<File
-					RelativePath=".\Source\Socket\Win32\Win32SocketManager.h">
+					RelativePath=".\Source\Socket\Win32\Win32SocketManager.h"
+					>
 					<FileConfiguration
 						Name="PSP Debug|Win32"
-						ExcludedFromBuild="TRUE">
+						ExcludedFromBuild="true"
+						>
 						<Tool
-							Name="VCCustomBuildTool"/>
+							Name="VCCustomBuildTool"
+						/>
 					</FileConfiguration>
 					<FileConfiguration
 						Name="PSP Release|Win32"
-						ExcludedFromBuild="TRUE">
+						ExcludedFromBuild="true"
+						>
 						<Tool
-							Name="VCCustomBuildTool"/>
+							Name="VCCustomBuildTool"
+						/>
 					</FileConfiguration>
 				</File>
 			</Filter>
 		</Filter>
 		<Filter
 			Name="Utilities"
-			Filter="">
+			>
 			<File
-				RelativePath=".\Source\Utilities\Callback.cpp">
+				RelativePath=".\Source\Utilities\Callback.cpp"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Utilities\Callback.h">
+				RelativePath=".\Source\Utilities\Callback.h"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Utilities\GenericID.cpp">
+				RelativePath=".\Source\Utilities\GenericID.cpp"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\Utilities\GenericID.h">
+				RelativePath=".\Source\Utilities\GenericID.h"
+				>
 			</File>
 		</Filter>
 		<Filter
 			Name="XMLParser"
-			Filter="">
+			>
 			<File
-				RelativePath=".\Source\XMLParser\XMLElement.h">
+				RelativePath=".\Source\XMLParser\XMLElement.h"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\XMLParser\XMLReader.cpp">
+				RelativePath=".\Source\XMLParser\XMLReader.cpp"
+				>
 			</File>
 			<File
-				RelativePath=".\Source\XMLParser\XMLReader.h">
+				RelativePath=".\Source\XMLParser\XMLReader.h"
+				>
 			</File>
 		</Filter>
 		<File
-			RelativePath=".\Source\SGS.h">
+			RelativePath=".\Source\SGS.h"
+			>
 		</File>
 		<File
-			RelativePath=".\Source\stable.h">
+			RelativePath=".\Source\stable.h"
+			>
 		</File>
 		<File
-			RelativePath=".\Source\types.h">
+			RelativePath=".\Source\types.h"
+			>
 		</File>
 	</Files>
 	<Globals>

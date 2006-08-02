@@ -73,26 +73,24 @@
 #include <crtdbg.h>
 
 // Core
-#include "stable.h"
+#include <SGS_stable.h>
 
 // Interface
-#include "Utilities\Callback.h"
+#include <Utilities/Callback.h>
 
-#include "Discovery\IDiscoverer.h"
-#include "Discovery\IDiscoveredGame.h"
-#include "Discovery\IDiscoveredUserManager.h"
+#include <Discovery/IDiscoverer.h>
+#include <Discovery/IDiscoveredGame.h>
+#include <Discovery/IDiscoveredUserManager.h>
 
-#include "Client\IClientConnectionManager.h"
-#include "Client\IClientConnectionManagerListener.h"
-#include "Client\IClientChannel.h"
-#include "Client\IClientChannelListener.h"
+#include <Client/IClientConnectionManager.h>
+#include <Client/IClientConnectionManagerListener.h>
+#include <Client/IClientChannel.h>
+#include <Client/IClientChannelListener.h>
 
 // Implementation
-#include "Discovery\URLDiscoverer.h"
-
-#include "Client\ClientConnectionManager.h"
-
-#include "Client\DefaultUserManagerPolicy.h"
+#include <Discovery/URLDiscoverer.h>
+#include <Client/ClientConnectionManager.h>
+#include <Client/DefaultUserManagerPolicy.h>
 
 using namespace SGS;
 
@@ -178,27 +176,38 @@ private:
 	}
 
 	// IClientChannelListener
-	virtual void OnPlayerJoined(const UserID& playerID)
+	virtual void OnChannelLocked(const std::wstring& name, const UserID& user)
 	{
-		OutputDebugStringW((std::wstring(L"OnPlayerJoined ") + playerID.ToString() + L"\n").c_str());
+		OutputDebugStringW((std::wstring(L"OnChannelLocked user ") + user.ToString() +
+			L" on channel " + name + L"\n").c_str());
 	}
 
-	virtual void OnPlayerLeft(const UserID& playerID)
+	// IClientChannelListener
+	virtual void OnPlayerJoined(IClientChannel* clientChannel, const UserID& playerID)
 	{
-		OutputDebugStringW((std::wstring(L"OnPlayerLeft ") + playerID.ToString() + L"\n").c_str());
+		OutputDebugStringW((std::wstring(L"OnPlayerJoined ") + playerID.ToString() +
+			L" on channel " + clientChannel->GetName() + L"\n").c_str());
 	}
 
-	virtual void OnDataArrived(const UserID& fromID, const byte* data, size_t length, bool wasReliable)
+	virtual void OnPlayerLeft(IClientChannel* clientChannel, const UserID& playerID)
 	{
-		OutputDebugStringW((std::wstring(L"OnDataArrived ") + fromID.ToString() + L"\n").c_str());
+		OutputDebugStringW((std::wstring(L"OnPlayerLeft ") + playerID.ToString() +
+			L" on channel " + clientChannel->GetName() + L"\n").c_str());
+	}
+
+	virtual void OnDataArrived(IClientChannel* clientChannel, const UserID& fromID, const byte* data, size_t length, bool wasReliable)
+	{
+		OutputDebugStringW((std::wstring(L"OnDataArrived ") + fromID.ToString() +
+			L" on channel " + clientChannel->GetName() + L"\n").c_str());
 
 		mpChannel->SendUnicastData(fromID, data, length, wasReliable);
 		mpCCM->SendToServer(data, length, wasReliable);
 	}
 
-	virtual void OnChannelClosed()
+	virtual void OnChannelClosed(IClientChannel* clientChannel)
 	{
-		OutputDebugStringW((std::wstring(L"OnChannelClosed") + L"\n").c_str());
+		OutputDebugStringW((std::wstring(L"OnChannelClosed on channel") +
+			clientChannel->GetName() + L"\n").c_str());
 	}
 
 };
@@ -219,7 +228,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 	{
 		if (pCCM->Connect(classNames[i]))
 		{
-			Sleep(100000);
+			Sleep(10000000);
 			pCCM->Disconnect();
 		}
 	}
