@@ -259,9 +259,19 @@ namespace SGS
 				return NULL;
 
 			std::wstring shortName = className.substr(shortNameIndex);
-			HMODULE hModule = LoadLibrary(shortName.c_str());
-			if (hModule == NULL)
-				return NULL;
+			HMODULE hModule = NULL;
+#ifdef _DEBUG
+			std::wstring debugName = shortName + L"d";
+			hModule = LoadLibrary(debugName.c_str());
+			if (hModule == NULL) {
+#endif /* _DEBUG */
+				hModule = LoadLibrary(shortName.c_str());
+				if (hModule == NULL) {
+					return NULL;
+				}
+#ifdef _DEBUG
+			}
+#endif /* _DEBUG */
 
 			typedef const wchar_t* (*GetUserManagerClientClassNameFunction)();
 			GetUserManagerClientClassNameFunction pfnGetUserManagerClientClassName = reinterpret_cast<GetUserManagerClientClassNameFunction>(GetProcAddress(hModule, "GetUserManagerClientClassName"));
