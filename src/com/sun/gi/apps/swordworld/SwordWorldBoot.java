@@ -313,7 +313,7 @@ public class SwordWorldBoot
 	     * referenced via a GLOReference.
 	     */
 	    playerRef = simTask.createGLO(
-		    new Player(principal.getName(), appChannel));
+		    new Player(playerName, appChannel));
 	    if (playerRef == null) {
 
 		/*
