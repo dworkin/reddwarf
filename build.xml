@@ -13,6 +13,11 @@
     <property name="jrms.version" value="1.1" />
     <property name="derby.version" value="10.1.2.1" />
     <property name="derby.jarfile" value="derby-${derby.version}.jar" />
+    
+    <!-- Modify these two properties whenever there is a new release -->
+    
+    <property name="release.dir" value="sgs-ea2" />
+    <property name="release.zip" value="SunGameServerEA2.zip" />
 
     <path id="project.classpath">
 	<pathelement location="bin" />
@@ -37,27 +42,27 @@
 
     <target name="init">
         <mkdir dir="bin"/>
-        <mkdir dir="release"/>
-    	<mkdir dir="release/apps"/>
-    	<mkdir dir="release/apps/trivial_boot"/>
-    	<mkdir dir="release/apps/battleboard"/>
-    	<mkdir dir="release/apps/hack"/>
-    	<mkdir dir="release/apps/chat_test"/>
-    	<mkdir dir="release/apps/swordworld"/>
-    	<mkdir dir="release/apps/matchmaker"/>
-    	<mkdir dir="release/apps/timer_test"/>
-    	<mkdir dir="release/apps/jeffboard"/>
-    	<mkdir dir="release/apps/glotest"/>
-    	<mkdir dir="release/apps/jnwn"/>
-    	<mkdir dir="release/client"/>
+        <mkdir dir="${release.dir}"/>
+        <mkdir dir="${release.dir}/bin"/>
+    	<mkdir dir="${release.dir}/apps"/>
+    	<mkdir dir="${release.dir}/apps/trivial_boot"/>
+    	<mkdir dir="${release.dir}/apps/battleboard"/>
+    	<mkdir dir="${release.dir}/apps/hack"/>
+    	<mkdir dir="${release.dir}/apps/chat_test"/>
+    	<mkdir dir="${release.dir}/apps/swordworld"/>
+    	<mkdir dir="${release.dir}/apps/matchmaker"/>
+    	<mkdir dir="${release.dir}/apps/timer_test"/>
+    	<mkdir dir="${release.dir}/apps/jeffboard"/>
+    	<mkdir dir="${release.dir}/apps/glotest"/>
+    	<mkdir dir="${release.dir}/apps/jnwn"/>
+    	<mkdir dir="${release.dir}/client"/>
     	<mkdir dir="doc/doxygen" />
+    	
     </target>
 
     <target name="clean">
 	<delete dir="bin" />
-	<delete quiet="true">
-	    <fileset dir="release" includes="**/*.jar"/>
-	</delete>
+	<delete dir="${release.dir}" />
     </target>
 
     <target name="clean.j2meAPI">
@@ -67,13 +72,13 @@
     <target name="realclean" depends="clean, clean.j2meAPI">
 	<delete dir="doc/doxygen" />
 	<delete dir="doc/javadoc" />
-	<delete dir="release" />
+	<delete dir="${release.dir}" />
 	<delete file="SunGameServer.zip" />
     </target>
 
     <!-- Documentation targets -->
 
-    <target name="docs" depends="javadocs,docs.api" />
+    <target name="docs" depends="javadocs,docs.api" />  
 
     <target name="docs.api" depends="javadocs.api, doxygen.api" />
 
@@ -430,7 +435,7 @@
     <!-- Runnable Servers -->
 
     <target name="SGS-clean">
-	<java dir="release" jar="release/SunGameServer.jar" failonerror="true" fork="yes">
+	<java dir="${release.dir}" jar="${release.dir}/SunGameServer.jar" failonerror="true" fork="yes">
 	    <arg value="-C"/>
 	    <arg value="-V"/>
 	    <classpath refid="j2se.server.classpath"/>
@@ -440,7 +445,7 @@
     </target>
 
     <target name="SGS-jnwn-clean">
-	<java dir="release" jar="release/SunGameServer.jar" failonerror="true" fork="yes">
+	<java dir="${release.dir}" jar="${release.dir}/SunGameServer.jar" failonerror="true" fork="yes">
 	    <arg value="-C"/>
 	    <arg value="-V"/>
 	    <arg value="-I"/>
@@ -458,7 +463,7 @@
     </target>
 
     <target name="SGS">
-	<java dir="release" jar="release/SunGameServer.jar" failonerror="true" fork="yes">
+	<java dir="${release.dir}" jar="${release.dir}/SunGameServer.jar" failonerror="true" fork="yes">
 	    <arg value="-V" />
 	    <classpath refid="j2se.server.classpath" />
 	    <sysproperty key="java.util.logging.config.file"
@@ -467,7 +472,7 @@
     </target>
 
     <target name="SGS2">
-	<java dir="release" jar="release/SunGameServer.jar" failonerror="true" fork="yes">
+	<java dir="${release.dir}" jar="${release.dir}/SunGameServer.jar" failonerror="true" fork="yes">
 	    <arg value="-I"/>
 	    <arg value="file:SGS-apps-2.conf" />
 	    <classpath refid="j2se.server.classpath" />
@@ -498,14 +503,14 @@
 
     <target name="BattleBoard">
 	<echo message="WARNING:  Ant on Linux won't let us input on stdin; run manually"/>
-	<java jar="release/client/BattleBoardClient.jar" failonerror="true" fork="true">
+	<java jar="${release.dir}/client/BattleBoardClient.jar" failonerror="true" fork="true">
 	    <sysproperty key="java.util.logging.config.file"
 			 file="logging.properties" />
 	</java>
     </target>
 
     <target name="Hack">
-	<java jar="release/client/HackClient.jar" failonerror="true" fork="true">
+	<java jar="${release.dir}/client/HackClient.jar" failonerror="true" fork="true">
 	    <classpath refid="build.j2se.client.classpath" />
 	    <sysproperty key="java.util.logging.config.file"
 			 file="logging.properties" />
@@ -531,13 +536,20 @@
 
     <!-- Release Targets -->
 
-    <!--<target name="release" depends="release.j2se, release.j2me, release.docs">-->
-    <target name="release" depends="release.j2se">
-	<zip destfile="SunGameServer.zip"
-	     basedir="." includes="release/**" 
-	     excludes="persistant_store"
+    <target name="release" depends="release.j2se, release.j2me, release.cpp, release.docs">
+    <!--<target name="release" depends="release.j2se,release.cpp"> -->
+	<zip destfile="${release.zip}"
+	     basedir="." includes="${release.dir}/**"
+	  
         />
     </target>
+    
+    <target name="release.cpp">
+    	<copy todir="${release.dir}/Win32Cpp">
+    	    <fileset dir="csrc/Win32Cpp" />
+    	</copy>
+    
+    </target>     
 
     <!-- J2SE release targets -->
 
@@ -546,7 +558,7 @@
     <target name="release.j2se.bin" depends="release.server, release.j2seAPI, release.apps, release.clients"/>
 
     <target name="release.server" depends="build.server">
-	<jar destfile="release/SunGameServer.jar">
+	<jar destfile="${release.dir}/SunGameServer.jar">
 	    <manifest>
 		<attribute name="Class-Path"
 			   value="lib/${derby.jarfile}"/>
@@ -559,28 +571,45 @@
 		<exclude name="com/sun/gi/comm/users/client/**"/>
 	    </fileset>
 	</jar>
-	<copy file="resources/startSGS.sh" todir="release" />
-	<copy file="resources/startSwordWorldClient.sh" todir="release" />
-	<copy file="resources/startChatClient.sh" todir="release" />
-	<chmod file="release/startSGS.sh" perm="755" />
-	<chmod file="release/startChatClient.sh" perm="755" />
-	<chmod file="release/startSwordWorldClient.sh" perm="755" />
-	<copy file="resources/startSGS.bat" todir="release" />
-	<copy file="resources/startSwordWorldClient.bat" todir="release" />
-	<copy file="resources/startChatClient.bat" todir="release" />
-	<chmod file="release/startSGS.bat" perm="755" />
-	<chmod file="release/startChatClient.bat" perm="755" />
-	<chmod file="release/startSwordWorldClient.bat" perm="755" />
-	<copy file="resources/libs/derby/${derby.jarfile}" todir="release/lib" />
-	<copy file="resources/SGS-apps.conf" todir="release" />
-	<copy file="resources/passwd.txt" todir="release" />
-	<copy file="resources/README" todir="release" />
-	<copy file="resources/logging.properties" todir="release" />
-	<copy file="resources/DarkstarW32CPPAPI.zip" todir="release" />
+	<copy file="resources/startSGS.sh" todir="${release.dir}" />
+	<copy file="resources/startSGS.bat" todir="${release.dir}" />
+	<chmod file="${release.dir}/startSGS.sh" perm="755" />
+	<chmod file="${release.dir}/startSGS.bat" perm="755" />
+	
+	<copy file="resources/startSwordWorldClient.sh" todir="${release.dir}/bin" />
+	<copy file="resources/startSwordWorldClient.bat" todir="${release.dir}/bin" />
+	<chmod file="${release.dir}/startSwordWorldClient.sh" perm="755" />
+	<chmod file="${release.dir}/startSwordWorldClient.bat" perm="755" />
+	
+	<copy file="resources/startMatchMakerClient.sh" todir="${release.dir}/bin" />
+	<copy file="resources/startMatchMakerClient.bat" todir="${release.dir}/bin" />	
+	<chmod file="${release.dir}/startMatchMakerClient.bat" perm="755" />
+	<chmod file="${release.dir}/startMatchMakerClient.sh" perm="755" />
+	
+	<copy file="resources/startBattleboardClient1.sh" todir="${release.dir}/bin" />
+	<copy file="resources/startBattleboardClient1.bat" todir="${release.dir}/bin" />	
+	<chmod file="${release.dir}/startBattleboardClient1.bat" perm="755" />
+	<chmod file="${release.dir}/startBattleboardClient1.sh" perm="755" />	
+	
+	<copy file="resources/startBattleboardClient2.sh" todir="${release.dir}/bin" />
+	<copy file="resources/startBattleboardClient2.bat" todir="${release.dir}/bin" />	
+	<chmod file="${release.dir}/startBattleboardClient2.bat" perm="755" />
+	<chmod file="${release.dir}/startBattleboardClient2.sh" perm="755" />	
+	
+	<copy file="resources/startChatClient.sh" todir="${release.dir}/bin" />
+	<chmod file="${release.dir}/startChatClient.sh" perm="755" />
+	<copy file="resources/startChatClient.bat" todir="${release.dir}/bin" />
+	<chmod file="${release.dir}/startChatClient.bat" perm="755" />
+	
+	<copy file="resources/libs/derby/${derby.jarfile}" todir="${release.dir}/lib" />
+	<copy file="resources/SGS-apps.conf" todir="${release.dir}" />
+	<copy file="resources/passwd.txt" todir="${release.dir}" />
+	<copy file="resources/README" todir="${release.dir}" />
+	<copy file="resources/logging.properties" todir="${release.dir}" />
     </target>
 
     <target name="release.j2seAPI" depends="build.j2seAPI">
-	<jar destfile="release/SGSClient.jar">
+	<jar destfile="${release.dir}/SGSClient.jar">
 	    <fileset dir="bin">
 		<include name="com/sun/gi/comm/users/client/**"/>
 		<include name="com/sun/gi/comm/users/protocol/**"/>
@@ -594,17 +623,23 @@
 	</jar>
     </target>
 	
+	
     <target name="release.docs" depends="docs">
-	<copy todir="release/docs/doxxygen" >
+<!--    <target name="release.docs" > -->
+	<copy todir="${release.dir}/docs/doxygen" >
 	    <fileset dir="doc/doxygen">
 		<exclude name="internal/**" />
 	    </fileset>
 	</copy>
-	<copy todir="release/docs/javadoc" >
+	<copy todir="${release.dir}/docs/javadoc" >
 	    <fileset dir="doc/javadoc">
 		<exclude name="internal/**" />
 	    </fileset>
 	</copy>
+    	<copy todir="${release.dir}/docs/guides">
+    	    <fileset dir="guides/pdf" />
+    	</copy>	
+	
     </target>
 
     <target name="release.clients" depends="release.client.battleboard, release.client.hack, release.client.chattest, release.client.matchmaker, release.client.other, release.client.swordworld"/>
@@ -612,7 +647,7 @@
     <target name="release.client.other" depends="build.clients, release.j2seAPI"/>
 
     <target name="release.client.battleboard" depends="build.clients, release.j2seAPI">
-	<jar destfile="release/client/BattleBoardClient.jar">
+	<jar destfile="${release.dir}/client/BattleBoardClient.jar">
 	    <manifest>
 		<attribute name="Class-Path"
 			   value="SGSClient.jar"/>
@@ -627,7 +662,7 @@
 		<include name="com/sun/gi/apps/battleboard/client/swing/imgs/**"/>
 	    </fileset>
 	</jar>
-	<jar destfile="release/client/BattleBoardClientSrc.jar">
+	<jar destfile="${release.dir}/client/BattleBoardClientSrc.jar">
 	    <fileset dir="src">
 		<include name="com/sun/gi/apps/battleboard/*.java"/>
 		<include name="com/sun/gi/apps/battleboard/client/**"/>
@@ -636,7 +671,7 @@
     </target>
 
     <target name="release.client.chattest" depends="build.clients, release.j2seAPI">
-	<jar destfile="release/client/ChatTestClient.jar">
+	<jar destfile="${release.dir}/client/ChatTestClient.jar">
 	    <manifest>
 		<attribute name="Class-Path"
 			   value="SGSClient.jar"/>
@@ -647,7 +682,7 @@
 		<include name="com/sun/gi/apps/chattest/client/**/*.class"/>
 	    </fileset>
 	</jar>
-	<jar destfile="release/client/ChatTestClientSrc.jar">
+	<jar destfile="${release.dir}/client/ChatTestClientSrc.jar">
 	    <fileset dir="src">
 		<include name="com/sun/gi/apps/chattest/client/**/*.java"/>
 	    </fileset>
@@ -655,7 +690,7 @@
     </target>
     
     <target name="release.client.swordworld" depends="build.clients, release.j2seAPI">
-	<jar destfile="release/client/SwordWorldClient.jar">
+	<jar destfile="${release.dir}/client/SwordWorldClient.jar">
 	    <manifest>
 		<attribute name="Class-Path"
 			   value="SGSClient.jar"/>
@@ -666,7 +701,7 @@
 		<include name="com/sun/gi/apps/swordworld/client/**/*.class"/>
 	    </fileset>
 	</jar>
-	<jar destfile="release/client/SwordWorldClientSrc.jar">
+	<jar destfile="${release.dir}/client/SwordWorldClientSrc.jar">
 	    <fileset dir="src">
 		<include name="com/sun/gi/apps/swordworld/client/**/*.java"/>
 	    </fileset>
@@ -674,7 +709,7 @@
     </target>
 
     <target name="release.client.matchmaker" depends="build.client.matchmaker, release.j2seAPI">
-	<jar destfile="release/client/MatchmakerTestClient.jar">
+	<jar destfile="${release.dir}/client/MatchmakerTestClient.jar">
 	    <manifest>
 		<attribute name="Class-Path"
 			   value="SGSClient.jar"/>
@@ -686,7 +721,7 @@
 		<include name="com/sun/gi/apps/mcs/matchmaker/common/**/*.class"/>
 	    </fileset>
 	</jar>
-	<jar destfile="release/client/MatchmakerTestClientSrc.jar">
+	<jar destfile="${release.dir}/client/MatchmakerTestClientSrc.jar">
 	    <fileset dir="src">
 		<include name="com/sun/gi/apps/mcs/matchmaker/client/**/*.java"/>
 		<include name="com/sun/gi/apps/mcs/matchmaker/common/**/*.java"/>
@@ -695,7 +730,7 @@
     </target>
 
     <target name="release.client.hack" depends="build.client.hack, release.j2seAPI">
-	<jar destfile="release/client/HackClient.jar">
+	<jar destfile="${release.dir}/client/HackClient.jar">
 	    <manifest>
 		<attribute name="Class-Path"
 			   value="SGSClient.jar"/>
@@ -711,7 +746,7 @@
 		<include name="data/**"/>
 	    </fileset>
 	</jar>
-	<jar destfile="release/client/HackClientSrc.jar">
+	<jar destfile="${release.dir}/client/HackClientSrc.jar">
 	    <fileset dir="src">
 		<include name="com/sun/gi/apps/hack/client/**/*.java"/>
 		<include name="com/sun/gi/apps/hack/share/**/*.java"/>
@@ -728,139 +763,139 @@
     </target>
 
     <target name="release.trivialboot" depends="build.trivial">
-	<jar destfile="release/apps/trivial_boot/trivial_boot.jar"
+	<jar destfile="${release.dir}/apps/trivial_boot/trivial_boot.jar"
 	    basedir="bin" includes="com/sun/gi/apps/trivial/**" />
-	<jar destfile="release/apps/trivial_boot/trivial_boot_src.jar"
+	<jar destfile="${release.dir}/apps/trivial_boot/trivial_boot_src.jar"
 	    basedir="src" includes="com/sun/gi/apps/trivial/**/" />
 	<copy file="resources/trivial_boot_deployment.xml"
-	    todir="release/apps/trivial_boot" />
+	    todir="${release.dir}/apps/trivial_boot" />
     </target>
 
     <target name="release.chattest" depends="build.chat">
-	<jar destfile="release/apps/chat_test/ChatTest.jar"
+	<jar destfile="${release.dir}/apps/chat_test/ChatTest.jar"
 	    basedir="bin" includes="com/sun/gi/apps/chattest/ChatTestBoot.class" />
-	<jar destfile="release/apps/chat_test/ChatTestSrc.jar"
+	<jar destfile="${release.dir}/apps/chat_test/ChatTestSrc.jar"
 	    basedir="src" includes="com/sun/gi/apps/chattest/**" />
 	<copy file="resources/chat_test_deployment.xml"
-	    todir="release/apps/chat_test" />
+	    todir="${release.dir}/apps/chat_test" />
     </target>
 
     <target name="release.swordworld" depends="build.swordworld">
-	<jar destfile="release/apps/swordworld/SwordWorld.jar"
+	<jar destfile="${release.dir}/apps/swordworld/SwordWorld.jar"
 	    basedir="bin" includes="com/sun/gi/apps/swordworld/**" />
-	<jar destfile="release/apps/swordworld/SwordWorldSrc.jar"
+	<jar destfile="${release.dir}/apps/swordworld/SwordWorldSrc.jar"
 	    basedir="src" includes="com/sun/gi/apps/swordworld/**" />
 	<copy file="resources/swordworld_deployment.xml"
-	    todir="release/apps/swordworld" />
+	    todir="${release.dir}/apps/swordworld" />
     </target>
 
     <target name="release.battleboard" depends="build.battleboard">
-	<jar destfile="release/apps/battleboard/BattleBoard.jar">
+	<jar destfile="${release.dir}/apps/battleboard/BattleBoard.jar">
 	    <fileset dir="bin">
 		<include name="com/sun/gi/apps/battleboard/*.class"/>
 		<include name="com/sun/gi/apps/battleboard/server/**"/>
 	    </fileset>
 	</jar>
-	<jar destfile="release/apps/battleboard/BattleBoardSrc.jar">
+	<jar destfile="${release.dir}/apps/battleboard/BattleBoardSrc.jar">
 	    <fileset dir="src">
 		<include name="com/sun/gi/apps/battleboard/*.java"/>
 		<include name="com/sun/gi/apps/battleboard/server/**"/>
 	    </fileset>
 	</jar>
 	<copy file="resources/battleboard_deployment.xml"
-	    todir="release/apps/battleboard" />
+	    todir="${release.dir}/apps/battleboard" />
     </target>
 
     <target name="release.hack" depends="build.hack">
-	<jar destfile="release/apps/hack/Hack.jar">
+	<jar destfile="${release.dir}/apps/hack/Hack.jar">
 	    <fileset dir="bin">
 		<include name="com/sun/gi/apps/hack/server/**/*.class"/>
 		<include name="com/sun/gi/apps/hack/share/**/*.class"/>
 	    </fileset>
 	</jar>
-	<jar destfile="release/apps/hack/HackSrc.jar">
+	<jar destfile="${release.dir}/apps/hack/HackSrc.jar">
 	    <fileset dir="src">
 		<include name="com/sun/gi/apps/hack/server/**/*.java"/>
 		<include name="com/sun/gi/apps/hack/share/**/*.java"/>
 	    </fileset>
 	</jar>
 	<copy file="resources/hack/deploy.xml"
-	    todir="release/apps/hack" />
-	<copy todir="release/apps/hack">
+	    todir="${release.dir}/apps/hack" />
+	<copy todir="${release.dir}/apps/hack">
 	    <fileset dir="resources/hack" includes="data/**"/>
 	</copy>
     </target>
 
     <target name="release.glotest" depends="build.glotest">
-	<jar destfile="release/apps/glotest/GLOTest.jar"
+	<jar destfile="${release.dir}/apps/glotest/GLOTest.jar"
 	    basedir="bin" includes="com/sun/gi/apps/glotest/*.class" />
-	<jar destfile="release/apps/glotest/GLOTest.jar"
+	<jar destfile="${release.dir}/apps/glotest/GLOTest.jar"
 	    basedir="src" includes="com/sun/gi/apps/glotest/*.java" />
 	<copy file="resources/test_channel_race.xml"
-	    todir="release/apps/glotest" />
+	    todir="${release.dir}/apps/glotest" />
     </target>
 
     <target name="release.jeffboard" depends="build.jeffboard">
-	<jar destfile="release/apps/jeffboard/JeffBoard.jar"
+	<jar destfile="${release.dir}/apps/jeffboard/JeffBoard.jar"
 	    basedir="bin" includes="com/sun/gi/apps/jeffboard/**" />
-	<jar destfile="release/apps/jeffboard/JeffBoardSrc.jar"
+	<jar destfile="${release.dir}/apps/jeffboard/JeffBoardSrc.jar"
 	    basedir="src" includes="com/sun/gi/apps/jeffboard/**" />
 	<copy file="resources/jeffboard_deployment.xml"
-	    todir="release/apps/jeffboard" />
+	    todir="${release.dir}/apps/jeffboard" />
     </target>
 
     <target name="release.matchmaker" depends="build.matchmaker">
-	<jar destfile="release/apps/matchmaker/MatchMaker.jar">
+	<jar destfile="${release.dir}/apps/matchmaker/MatchMaker.jar">
 	    <fileset dir="bin">
 		<include name="com/sun/gi/apps/mcs/matchmaker/server/**/*.class"/>
 		<include name="com/sun/gi/apps/mcs/matchmaker/common/**/*.class"/>
 	    </fileset>
 	</jar>
-	<jar destfile="release/apps/matchmaker/MatchMakerSrc.jar">
+	<jar destfile="${release.dir}/apps/matchmaker/MatchMakerSrc.jar">
 	    <fileset dir="src">
 		<include name="com/sun/gi/apps/mcs/matchmaker/server/**/*.java"/>
 		<include name="com/sun/gi/apps/mcs/matchmaker/common/**/*.java"/>
 	    </fileset>
 	</jar>
 	<copy file="resources/matchmaker_deployment.xml"
-	    todir="release/apps/matchmaker" />
+	    todir="${release.dir}/apps/matchmaker" />
 	<copy file="resources/matchmaker_config.xml"
-	    todir="release/apps/matchmaker" />
+	    todir="${release.dir}/apps/matchmaker" />
     </target>
 	
     <target name="release.timertest" depends="build.timertest">
-	<jar destfile="release/apps/timer_test/TimerTest.jar"
+	<jar destfile="${release.dir}/apps/timer_test/TimerTest.jar"
 	    basedir="bin" includes="com/sun/gi/apps/timertest/**" />
-	<jar destfile="release/apps/timer_test/TimerTestSrc.jar"
+	<jar destfile="${release.dir}/apps/timer_test/TimerTestSrc.jar"
 	    basedir="src" includes="com/sun/gi/apps/timertest/**" />
 	<copy file="resources/timer_test_deployment.xml"
-	    todir="release/apps/timer_test" />
+	    todir="${release.dir}/apps/timer_test" />
     </target>
 
     <target name="release.jnwn" depends="build.jnwn">
-	<jar destfile="release/apps/jnwn/JNWN.jar"
+	<jar destfile="${release.dir}/apps/jnwn/JNWN.jar"
 	    basedir="bin" includes="com/sun/gi/apps/jnwn/**" />
 	<copy file="resources/jnwn/deploy.xml"
-	    todir="release/apps/jnwn" />
+	    todir="${release.dir}/apps/jnwn" />
     </target>
 
     <!-- J2SE zip targets -->
 
    <!-- Replaced by seperate Src jars for each example 
     <target name="release.examples" >
-	<zip destfile="release/Examples.zip" basedir="src"
+	<zip destfile="${release.dir}/Examples.zip" basedir="src"
 	    includes="com/sun/gi/apps/chattest/**"/>
     </target>
 
     <target name="zip.matchmaker" depends="release.matchmaker">
-	<zip destfile="release/apps/matchmaker/MatchMaker.zip" basedir="release" 
+	<zip destfile="${release.dir}/apps/matchmaker/MatchMaker.zip" basedir="${release.dir}" 
 		includes="apps/matchmaker/*" excludes="apps/*">
 	</zip>
     </target>
     -->
 	
     <target name="zip.matchmaker.client.source">
-	<zip destfile="release/J2SE_MM_client_src.zip" basedir="src"
+	<zip destfile="${release.dir}/J2SE_MM_client_src.zip" basedir="src"
 		includes="com/sun/gi/apps/mcs/matchmaker/client/**,
 			com/sun/gi/apps/mcs/matchmaker/common/*" />
     </target>
@@ -870,13 +905,13 @@
     <target name="release.j2me" depends="release.j2meAPI,release.j2meChatTest"/>
 
     <target name="release.j2meChatTest" depends="build.j2meAPI">
-	<copy todir="release/client" >
+	<copy todir="${release.dir}/client" >
 	    <fileset dir="J2MEAPI/ChatTest/dist" />
 	</copy>	
     </target>
 
     <target name="release.j2meAPI" depends="build.j2meAPI">
-	<copy todir="release" >
+	<copy todir="${release.dir}" >
 	    <fileset dir="J2MEAPI/J2MEClientAPI/dist" />
 	</copy>	
     </target>

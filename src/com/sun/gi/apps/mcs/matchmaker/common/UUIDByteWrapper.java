@@ -96,6 +96,8 @@ import java.nio.ByteBuffer;
  * @version 1.0
  */
 public class UUIDByteWrapper implements ByteWrapper {
+    
+    private static final long serialVersionUID = 1L;
 
 	private byte[] value;
 	

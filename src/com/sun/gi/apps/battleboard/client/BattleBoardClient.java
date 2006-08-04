@@ -137,6 +137,8 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
 	    System.getProperty("battleboard.playerName", null);
     private String displayMode =
 	    System.getProperty("battleboard.displayMode", "swing");
+    
+    private String discoveryFileName = "discovery.xml";
 
     private boolean batchMode = "batch".equals(displayMode);
     private boolean swingMode = "swing".equals(displayMode);
@@ -374,7 +376,7 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
         try {
             mgr = new ClientConnectionManagerImpl("BattleBoard",
                     new URLDiscoverer(
-                            new File("discovery.xml").toURI().toURL()));
+                            new File(discoveryFileName).toURI().toURL()));
             mgr.setListener(this);
             String[] classNames = mgr.getUserManagerClassNames();
             mgr.connect(classNames[0]);
@@ -406,7 +408,12 @@ public class BattleBoardClient implements ClientConnectionManagerListener {
 	    client.setParams(args[0], args[1], args[0]);
 	} else if (args.length == 3) {
 	    client.setParams(args[0], args[1], args[2]);
-	}
+	} else if (args.length == 4) {
+            client.setParams(args[0], args[1], args[2]);
+            client.discoveryFileName = args[3].substring(args[3].indexOf(":") + 1);
+        }
+        
+        
 
         client.run();
     }

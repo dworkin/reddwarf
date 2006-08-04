@@ -190,10 +190,17 @@ public class ChatTestClient extends JFrame
     private JButton dccButton;
     private JButton serverSendButton;
     private static String DCC_CHAN_NAME = "__DCC_Chan";
+    
+    private String discoveryFileName = "discovery.xml";
 
-    public ChatTestClient() {
+    public ChatTestClient(String[] args) {
         // build interface
         super();
+        
+        if (args.length > 0) {
+            discoveryFileName = args[0].substring(args[0].indexOf(":") + 1);
+        }
+        
         setTitle("Chat Test Client");
         Container c = getContentPane();
         c.setLayout(new BorderLayout());
@@ -338,7 +345,7 @@ public class ChatTestClient extends JFrame
         try {
             mgr = new ClientConnectionManagerImpl("ChatTest",
                     new URLDiscoverer(
-                            new File("discovery.xml").toURI().toURL()));
+                            new File(discoveryFileName).toURI().toURL()));
             // mgr = new ClientConnectionManagerImpl("ChatTest",
             //     new URLDiscoverer(
             //         new URL("http://yourhost.example.com/discovery.xml")));
@@ -543,7 +550,7 @@ public class ChatTestClient extends JFrame
      * @param args
      */
     public static void main(String[] args) {
-        new ChatTestClient();
+        new ChatTestClient(args);
 
     }
 

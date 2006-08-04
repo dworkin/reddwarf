@@ -228,7 +228,7 @@ public class SwordWorldClient extends JFrame
     public void channelLocked(String channelName, byte[] userID) {
     }
 
-    /**
+    /** 
      * @param args
      */
     public static void main(String[] args) {

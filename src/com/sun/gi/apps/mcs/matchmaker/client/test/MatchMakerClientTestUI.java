@@ -145,7 +145,8 @@ import static com.sun.gi.apps.mcs.matchmaker.common.CommandProtocol.*;
 public class MatchMakerClientTestUI extends JFrame implements
 		IMatchMakingClientListener {
 
-	private MatchMakingClient mmClient;
+	private String discoveryFileName = "discovery.xml";
+        private MatchMakingClient mmClient;
 	private ClientConnectionManager manager;
 	private DefaultMutableTreeNode root;
 	private JTree tree;
@@ -167,8 +168,12 @@ public class MatchMakerClientTestUI extends JFrame implements
 	private JMenuItem createGame;
 	private JMenuItem joinGame;
 
-	public MatchMakerClientTestUI() {
+	public MatchMakerClientTestUI(String[] args) {
 		super();
+                
+                if (args.length > 0) {
+                    discoveryFileName = args[0].substring(args[0].indexOf(":") + 1);
+                }
 
 		setStatus("Not Connected");
 
@@ -451,9 +456,15 @@ public class MatchMakerClientTestUI extends JFrame implements
 	public void connect() {
 		try {
 			manager = new ClientConnectionManagerImpl("MatchMaker",
-					new URLDiscoverer(new File("resources/discovery.xml")
+					new URLDiscoverer(new File(discoveryFileName)
 							.toURI().toURL()));
-			mmClient = new MatchMakingClient(manager);
+			// server probably hasn't written the discovery file yet. 
+                        if (manager == null) {
+			    JOptionPane.showMessageDialog(this, "No Discovery File Found", 
+                                        "Missing Discovery", JOptionPane.ERROR_MESSAGE);
+                            return;
+                        }
+                        mmClient = new MatchMakingClient(manager);
 			mmClient.setListener(this);
 			String[] classNames = manager.getUserManagerClassNames();
 			manager.connect(classNames[0]);
@@ -612,7 +623,7 @@ public class MatchMakerClientTestUI extends JFrame implements
 		for (Callback cb : callbacks) {
 			if (cb instanceof NameCallback) {
 				String value = JOptionPane.showInputDialog(this,
-						"Enter Username", "guest1");
+						"Enter Username", "Guest");
 				((NameCallback) cb).setName(value);
 			}
 		}
@@ -620,7 +631,7 @@ public class MatchMakerClientTestUI extends JFrame implements
 	}
 
 	public static void main(String[] args) {
-		new MatchMakerClientTestUI();
+		new MatchMakerClientTestUI(args);
 	}
 
 	private class FolderNode extends DefaultMutableTreeNode {

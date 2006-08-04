@@ -98,7 +98,7 @@ import java.nio.ByteBuffer;
  * @version 1.0
  */
 public interface ByteWrapper extends Serializable {
-	
+    
     public final static int TYPE_INTEGER = 0x1;
     public final static int TYPE_BOOLEAN = 0x2;
     public final static int TYPE_STRING = 0x3;
