@@ -237,7 +237,13 @@ public class JMEHttpTransporter implements Runnable {
             byte packetSize1 = data[position++];
             int packetSize = makeShort(packetSize0,packetSize1);
             packet = new byte[packetSize];
-            System.arraycopy(data,position,packet,0,packetSize);
+            if (data.length < (position + packetSize)) {
+                System.out.println("Error data buffer size less than " + (position + packetSize));
+                break;
+            }
+            else {
+                System.arraycopy(data,position,packet,0,packetSize);
+            }
             packets[i] = ByteBuffer.wrap(packet);
             position += packetSize;
         }
@@ -249,6 +255,7 @@ public class JMEHttpTransporter implements Runnable {
     
     public void run() {
         url = URL_START + host + COLON + port + SERVLET_NAME;
+        System.out.println("url " + url + " game name " + GAME_NAME);
         while (!stop) {
             try {
                 Thread.sleep(pollInterval);

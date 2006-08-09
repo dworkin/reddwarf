@@ -327,6 +327,9 @@ public class JMEBinaryPktProtocol {
      * @param inputBuffer ByteBuffer
      */
     public void packetReceived(ByteBuffer buff) {
+        if (buff == null) {
+            System.out.println("JMEBinaryPktProtocol Error: Packet contains no data");
+        }
         int op = buff.get();
         if (TRACEON){
             System.out.println("Recieved op: " + op);

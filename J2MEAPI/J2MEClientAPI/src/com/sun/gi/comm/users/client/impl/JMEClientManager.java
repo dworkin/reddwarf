@@ -70,7 +70,7 @@ package com.sun.gi.comm.users.client.impl;
 
 import com.sun.gi.comm.discovery.impl.JMEDiscoveredGameImpl;
 import com.sun.gi.comm.discovery.impl.JMEDiscoveredUserManagerImpl;
-import com.sun.gi.comm.discovery.impl.JMEDiscoverer;
+import com.sun.gi.comm.discovery.JMEDiscoverer;
 import com.sun.gi.comm.users.client.JMEClientListenerInterface;
 import com.sun.gi.comm.users.protocol.impl.JMEBinaryPktProtocol;
 import com.sun.gi.comm.users.protocol.impl.JMEHttpTransportProtocolTransmitter;
