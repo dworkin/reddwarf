@@ -68,7 +68,7 @@
 
 package com.sun.gi.apps.commtest.client;
 
-import com.sun.gi.comm.discovery.impl.JMEDiscoverer;
+import com.sun.gi.comm.discovery.impl.FakeJMEDiscovererImpl;
 import com.sun.gi.comm.users.client.JMEClientListenerInterface;
 import com.sun.gi.comm.users.client.impl.JMEClientManager;
 import com.sun.gi.utils.jme.ByteBuffer;
@@ -217,8 +217,8 @@ public class JMEChatClient extends MIDlet
     
     private void createLoginFormComponents() {
         exitCommand = new Command("Exit", Command.EXIT, 1);
-        userNameField = new TextField("Userid", "Ari", 16, TextField.ANY);
-        passwordField = new TextField("Password", "password", 16, TextField.PASSWORD);
+        userNameField = new TextField("Userid", "Guest", 16, TextField.ANY);
+        passwordField = new TextField("Password", "", 16, TextField.PASSWORD);
         loginCommand = new Command("Ok", Command.OK, 1);
     }
     
@@ -525,9 +525,15 @@ public class JMEChatClient extends MIDlet
      * callback discoveredGames() and can then proceed to log in
      */
     private void initializeClientManager() {
+        //clientMgr = new JMEClientManager("ChatTest",
+        //        new JMEDiscovererImpl(this.getAppProperty("XML-Discovery-URL")),
+        //        this.getAppProperty("UsrMgrClassName"));
+        
         clientMgr = new JMEClientManager("ChatTest",
-                new JMEDiscoverer(this.getAppProperty("XML-Discovery-URL")),
-                this.getAppProperty("UsrMgrClassName"));
+                new FakeJMEDiscovererImpl("ChatTest",
+                this.getAppProperty("UsrMgrClassName"), 
+                this.getAppProperty("UsrMgrPort")), 
+                this.getAppProperty("UsrMgrClassName"));        
         clientMgr.setListener(this);
         clientMgr.discoverGames();
     }
