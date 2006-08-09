@@ -78,7 +78,7 @@
 
     <!-- Documentation targets -->
 
-    <target name="docs" depends="javadocs,docs.api" />  
+    <target name="docs" depends="javadocs,docs.api" />
 
     <target name="docs.api" depends="javadocs.api, doxygen.api" />
 
@@ -250,7 +250,8 @@
 	<javac srcdir="src" destdir="bin" source="5" target="5"
 		debug="${debug}" optimize="${optimize}"
 		deprecation="${deprecated}">
-	    <classpath refid="build.j2se.server.classpath" />
+<!--	    <classpath refid="build.j2se.server.classpath" /> -->
+	    <classpath refid="project.classpath" />
 	    <compilerarg value="-Xlint:${default.lint}"/>
 	    <exclude name="com/sun/gi/apps/**" />
 	    <exclude name="com/sun/gi/client/**" />
@@ -258,8 +259,8 @@
 	    <exclude name="com/sun/gi/objectstore/hadbtest/**" />
 	    <exclude name="com/sun/gi/objectstore/tso/dataspace/monitor/**" />
 	    <exclude name="com/sun/gi/objectstore/tso/dataspace/HadbDataSpace.java" />
-	    <exclude name="com/sun/gi/utils/http/**" />
-	    <exclude name="com/sun/gi/**/JME*.java" />
+<!--	    <exclude name="com/sun/gi/utils/http/**" /> -->
+<!--	    <exclude name="com/sun/gi/**/JME*.java" />  -->
 	</javac>
     </target>
 
@@ -283,6 +284,10 @@
     <target name="build.j2meAPI" depends="init">
         <ant dir="J2MEAPI/J2MEClientAPI" target="jar"/>
     </target>
+	
+    <target name="build.j2meChatTest" >
+        <ant dir="J2MEAPI/ChatTest" target="jar"/>
+    </target>	
 
     <target name="build.chat" depends="init">
 	<javac srcdir="src" destdir="bin" source="5" target="5"
@@ -537,7 +542,6 @@
     <!-- Release Targets -->
 
     <target name="release" depends="release.j2se, release.j2me, release.cpp, release.docs">
-    <!--<target name="release" depends="release.j2se,release.cpp"> -->
 	<zip destfile="${release.zip}"
 	     basedir="." includes="${release.dir}/**"
 	  
@@ -572,9 +576,12 @@
 	    </fileset>
 	</jar>
 	<copy file="resources/startSGS.sh" todir="${release.dir}" />
+	<copy file="resources/startSGSWithJME.sh" todir="${release.dir}" />
 	<copy file="resources/startSGS.bat" todir="${release.dir}" />
+	<copy file="resources/startSGSWithJME.bat" todir="${release.dir}" />
 	<chmod file="${release.dir}/startSGS.sh" perm="755" />
-	<chmod file="${release.dir}/startSGS.bat" perm="755" />
+	<chmod file="${release.dir}/startSGSWithJME.sh" perm="755" />
+	<chmod file="${release.dir}/startSGSWithJME.bat" perm="755" />
 	
 	<copy file="resources/startSwordWorldClient.sh" todir="${release.dir}/bin" />
 	<copy file="resources/startSwordWorldClient.bat" todir="${release.dir}/bin" />
@@ -603,9 +610,16 @@
 	
 	<copy file="resources/libs/derby/${derby.jarfile}" todir="${release.dir}/lib" />
 	<copy file="resources/SGS-apps.conf" todir="${release.dir}" />
+	<copy file="resources/SGS-appsJME.conf" todir="${release.dir}" />
 	<copy file="resources/passwd.txt" todir="${release.dir}" />
 	<copy file="resources/README" todir="${release.dir}" />
 	<copy file="resources/logging.properties" todir="${release.dir}" />
+    	
+    	<!-- J2ME dependent jars -->
+    	<copy file="resources/libs/servlet/commons-logging.jar" todir="${release.dir}/lib" />
+    	<copy file="resources/libs/servlet/org.mortbay.jetty.jar" todir="${release.dir}/lib" />
+    	<copy file="resources/libs/servlet/javax.servlet.jar" todir="${release.dir}/lib" />
+    	
     </target>
 
     <target name="release.j2seAPI" depends="build.j2seAPI">
@@ -625,7 +639,6 @@
 	
 	
     <target name="release.docs" depends="docs">
-<!--    <target name="release.docs" > -->
 	<copy todir="${release.dir}/docs/doxygen" >
 	    <fileset dir="doc/doxygen">
 		<exclude name="internal/**" />
@@ -778,6 +791,8 @@
 	    basedir="src" includes="com/sun/gi/apps/chattest/**" />
 	<copy file="resources/chat_test_deployment.xml"
 	    todir="${release.dir}/apps/chat_test" />
+	<copy file="resources/chat_test_JME_deployment.xml"
+	    todir="${release.dir}/apps/chat_test" />    	
     </target>
 
     <target name="release.swordworld" depends="build.swordworld">
@@ -904,10 +919,16 @@
 
     <target name="release.j2me" depends="release.j2meAPI,release.j2meChatTest"/>
 
-    <target name="release.j2meChatTest" depends="build.j2meAPI">
+    <target name="release.j2meChatTest" depends="build.j2meChatTest">
 	<copy todir="${release.dir}/client" >
 	    <fileset dir="J2MEAPI/ChatTest/dist" />
 	</copy>	
+	<copy file="resources/startJMEChatTest.bat"
+	    todir="${release.dir}/bin" />
+	<copy file="resources/startJMEChatTest.sh"
+	    todir="${release.dir}/bin" />
+    	<chmod file="${release.dir}/startJMEChatTest.sh" perm="755" />
+    	<chmod file="${release.dir}/startJMEChatTest.sh" perm="755" />
     </target>
 
     <target name="release.j2meAPI" depends="build.j2meAPI">
