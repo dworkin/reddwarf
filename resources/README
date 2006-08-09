@@ -6,6 +6,8 @@ Accordingly FakeDiscovery.xml is no longer included in the destribution and all 
 
 This version also elimiates the dependancy on LRMP as LRMp was judged too unstable and eliminating it removed a number of SGS bugs.
 
+Also new in this release is a basic Management Console, useful for starting and stopping game applications without shutting down the entire server.  For details on how to enable and use it, please refer to docs/guides/ManagementConsole.pdf
+
 DIRECTORIES:
 
 The apps directory contains the deployments of the sample server applications
@@ -22,7 +24,7 @@ The server itself is in SunGameServer.jar.  The file startSGS.sh shows how to st
 
 SGSClient.jar is the J2SE client API. You may need to enable error logging in your applcication as well as the current API logs exceptions during callbacks and without logging these will be hidden.  You can enable logging by putting -Djava.util.logging.config.file=<logging.properties> on your java command line for your app.  <logging.properties> should be a copy of the destributed logging.properties file customized for your app.
 
-The SunGameServerJMEClient.jad and SunGameServerClient.jar files are the J2ME client API. 
+The SunGameServerJMEClient.jad and SunGameServerClient.jar files are the J2ME client API. startSGSWithJME.bat will start the game server with JME support enabled.  Refer to the JME Chat Test demo (bin/startJMEChatTest.bat) for a sample JME application.  In fact, running the JME demo along side the JSE Chat Test demo will demonstrate two hybrid clients talking to the same game application.
 
 The DarkstarW32CPPAPI.zip file contains the Win32 CPP API.
 
