@@ -1,4 +1,3 @@
-
 package com.sun.sgs;
 
 import java.nio.ByteBuffer;
