@@ -62,7 +62,7 @@ public class QueueingModel {
      *         <code>null</code> if no priority in this model is 
      *         comparable.
      *
-     * @see Priority#getRelativeDifference(Priority)
+     * @see Priority#getWeightedComparison(Priority)
      */
     public Priority getClosestPriority(Priority priority) {
 	double closestDist = 0;

@@ -2,7 +2,8 @@ package com.sun.sgs.kernel.scheduling;
 
 import com.sun.sgs.kernel.*;
 
-import org.junit.Assert.*;
+import org.junit.*;
+import static org.junit.Assert.*;
 
 import java.util.*;
 
@@ -19,7 +20,7 @@ public class PriorityTests {
     private final List<NumericPriority> numericPriorities;
 
     public PriorityTests() {
-	numericPriorities = new ArrayList();
+	numericPriorities = new LinkedList<NumericPriority>();
     }
 
     /**
@@ -27,14 +28,14 @@ public class PriorityTests {
      * {@link NumericPrioity} constants.
      */
     @Before public void resetNumericPriorities() {
-	numericPriorites.clear();
-	numericPriorites.add(NumericPriority.REAL_TIME);
-	numericPriorites.add(NumericPriority.HIGHEST);
-	numericPriorites.add(NumericPriority.HIGH);
-	numericPriorites.add(NumericPriority.NORMAL);
-	numericPriorites.add(NumericPriority.LOW);
-	numericPriorites.add(NumericPriority.LOWEST);
-	numericPriorites.add(NumericPriority.OPTIONAL);
+	numericPriorities.clear();
+	numericPriorities.add(NumericPriority.REAL_TIME);
+	numericPriorities.add(NumericPriority.HIGHEST);
+	numericPriorities.add(NumericPriority.HIGH);
+	numericPriorities.add(NumericPriority.NORMAL);
+	numericPriorities.add(NumericPriority.LOW);
+	numericPriorities.add(NumericPriority.LOWEST);
+	numericPriorities.add(NumericPriority.OPTIONAL);
     }
     
 
@@ -43,7 +44,7 @@ public class PriorityTests {
      * consistent after a series of shuffles and followed by a sort.
      */
     @Test public void testNumericPriorityOrdering() {
-	List<NumericPriority> sorted = new ArrayList<NumericPriority>(numericPriorities);
+	List<NumericPriority> sorted = new LinkedList<NumericPriority>(numericPriorities);
 	Collections.sort(sorted);
 	for (int i = 0; i < numericPriorities.size(); ++i) { // arbitrary times
 	    Collections.shuffle(numericPriorities);
@@ -57,7 +58,7 @@ public class PriorityTests {
      * priority implementations throw an error if {@link
      * Priority#getWeightedComparison(Priority)} is called using it.
      */
-    @Test(expected= Error.class) public void testIncomparablePriorities {
+    @Test(expected= Error.class) public void testIncomparablePriorities() {
 	// create an anonymous inner class
 	Priority p = new Priority() { 
 		public int compareTo(Object other) { return -1; }
@@ -80,5 +81,5 @@ public class PriorityTests {
 	    }
 	}
     }
-
+    
 }

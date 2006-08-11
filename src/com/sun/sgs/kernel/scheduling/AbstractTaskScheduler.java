@@ -20,11 +20,11 @@ import java.util.Queue;
  *
  * <p>
  *
- * [description of the task execution ordering]
- *
- * <p>
- *
- * [discussion of whether a task should have a priority or be unordered]
+ * The abstract base class uses the {@link ResourceCoordinator} to
+ * initialize threads that will repeatedly call {@link
+ * AbstractTaskScheduler#dequeueTask()}.  Subclasses should define the
+ * order in which {@link Task} requests are dequeued, but do not need
+ * to provide threads to execute the tasks.
  *
  * <p>
  *
@@ -34,7 +34,7 @@ import java.util.Queue;
  * @since  1.0
  * @author James Megquier
  * @author Seth Proctor
- * @authod David Jurgens
+ * @author David Jurgens
  */
 public abstract class AbstractTaskScheduler implements TaskScheduler {
 
@@ -46,14 +46,6 @@ public abstract class AbstractTaskScheduler implements TaskScheduler {
     protected final ResourceCoordinator resourceCoordinator;
 
     /**
-     * The internal FIFO queue of unordered <code>Task</code> requests
-     * waiting to be processed.  This pool of <code>Task</objets> is
-     * serviced by a separate pool of threads than those
-     * <code>Task</code> objects that are prioritizeable.
-     */
-    protected final Queue<Task> unorderedTasks;
-
-    /**
      * The default number of threads to have in the tool of {@link
      * TaskThread}s.
      */ 
@@ -61,17 +53,9 @@ public abstract class AbstractTaskScheduler implements TaskScheduler {
 
 
     /**
-     * FIXME: figure out if the pool size is just for testing or actually
-     * a useful parameter.
-     * TEST: for testing purposes we have all threads in the one app context
-     * that we're currently creating...once the task queue is correctly
-     * using the context of each task, then this parameter can be removed
-     *
-     * @param appContext
-     *
-     * @param priorityPolicy
+     * Sole constructor for invocation by subclasses only.
      */
-    public AbstractTaskScheduler(AppContext appContext) {
+    protected AbstractTaskScheduler() {
 
 	resourceCoordinator = Kernel.instance().getResourceCoordinator();
 
@@ -82,7 +66,10 @@ public abstract class AbstractTaskScheduler implements TaskScheduler {
 	    
         // now ask for some number of threads to consume the queue
         for (int i = 0; i < initialPoolSize; i++) {
-            Task queueTask = new TaskImpl(new TaskQueueRunnable(), appContext, null, NumericPriority.HIGH, Kernel.instance().getSystemUser());
+            Task queueTask = new TaskImpl(new TaskQueueRunnable(), 
+					  null,  // no AppContext
+					  null,  // no Quality
+					  Kernel.instance().getSystemPriority(), Kernel.instance().getSystemUser());
             resourceCoordinator.requestThread().executeTask(queueTask);
         }
     }
@@ -96,7 +83,8 @@ public abstract class AbstractTaskScheduler implements TaskScheduler {
 
 
     /**
-     * Returns the next task to be run by a {@link TaskThread}.  
+     * Returns the next task to be run by a {@link
+     * com.sun.sgs.kernel.TaskThread}.
      *
      * <p>
      *
@@ -249,10 +237,10 @@ public abstract class AbstractTaskScheduler implements TaskScheduler {
 	 * given user, tasks for that user are guaranteed to be
 	 * dequeued in FIFO order.
 	 *
-	 * @param task the task to be executed after all prior tasks
-	 *             for the user have been dequeued.
+	 * @param t the task to be executed after all prior tasks
+	 *          for the user have been dequeued.
 	 *
-	 * @see Task.getUser()
+	 * @see Task#getUser()
 	 */
 	// DEVELOPER NOTE: Queues are never removed for a user that
 	// disconnects.  For a long running system, this is a definite

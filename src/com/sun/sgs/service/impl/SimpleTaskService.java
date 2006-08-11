@@ -7,10 +7,12 @@ import com.sun.sgs.ManagedRunnable;
 import com.sun.sgs.kernel.AppContext;
 import com.sun.sgs.kernel.ReferenceRunnable;
 import com.sun.sgs.kernel.Task;
-import com.sun.sgs.kernel.TaskQueue;
+import com.sun.sgs.kernel.TaskImpl;
 import com.sun.sgs.kernel.TaskThread;
 import com.sun.sgs.kernel.TransactionProxy;
 import com.sun.sgs.kernel.TransactionRunnable;
+
+import com.sun.sgs.kernel.scheduling.TaskScheduler;
 
 import com.sun.sgs.service.NotPreparedException;
 import com.sun.sgs.service.TaskService;
@@ -49,7 +51,7 @@ public class SimpleTaskService implements TaskService
     private ConcurrentHashMap<Long,TxnState> txnMap;
 
     // the task queue used to actually queue up tasks
-    private TaskQueue taskQueue = null;
+    private TaskScheduler taskScheduler = null;
 
     /**
      * Creates an instance of <code>SimpleTaskService</code>.
@@ -59,13 +61,13 @@ public class SimpleTaskService implements TaskService
     }
 
     /**
-     * Tells this service about the <code>TaskQueue</code> where future
+     * Tells this service about the <code>TaskScheduler</code> where future
      * tasks get queued.
      *
-     * @param taskQueue the system's task queue
+     * @param taskScheduler the system's task queue
      */
-    public void setTaskQueue(TaskQueue taskQueue) {
-        this.taskQueue = taskQueue;
+    public void setTaskScheduler(TaskScheduler taskScheduler) {
+        this.taskScheduler = taskScheduler;
     }
 
     /**
@@ -130,14 +132,14 @@ public class SimpleTaskService implements TaskService
         for (ManagedReference<? extends ManagedRunnable> runnableRef :
                  txnState.tasks) {
             // create a task that handles the reference correctly
-            Task task = new Task(new ReferenceRunnable(runnableRef),
-                                 appContext, null);
+            Task task = new TaskImpl(new ReferenceRunnable(runnableRef),
+				     appContext, null, null, null);
 
             // now wrap the task in a transactional context and put this
             // into the task queue
-            taskQueue.
-                queueTask(new Task(new TransactionRunnable(task),
-                                   appContext, null));
+            taskScheduler.
+                queueTask(new TaskImpl(new TransactionRunnable(task),
+				       appContext, null, null, null));
         }
 
         // finally, remove this transaction state from the map

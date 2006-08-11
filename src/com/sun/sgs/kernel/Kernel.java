@@ -2,6 +2,8 @@ package com.sun.sgs.kernel;
 
 import com.sun.sgs.Quality;
 import com.sun.sgs.User;
+import com.sun.sgs.kernel.scheduling.Priority;
+import com.sun.sgs.kernel.scheduling.NumericPriority;
 
 import java.nio.ByteBuffer;
 import java.util.Properties;
@@ -54,6 +56,10 @@ public class Kernel {
 
     public ResourceCoordinator getResourceCoordinator() {
 	return resourceCoordinator;
+    }
+
+    public Priority getSystemPriority() {
+	return NumericPriority.HIGH;
     }
     
     /**

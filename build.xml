@@ -11,8 +11,10 @@
   <property name="buildDir" location="build"/>
   <property name="classDir" location="${buildDir}/classes"/>
   <property name="docDir" location="${buildDir}/docs"/>
+  <property name="jUnitJar" location="lib/junit-4.1.jar"/>
   <property name="libDir" location="${buildDir}/lib"/>
   <property name="srcDir" location="src"/>
+  <property name="testDir" location="test"/>
 
   <!-- Values for the JavaDocs -->
   <property name="projName" value="Project Darkstar: Redstar"/>
@@ -60,6 +62,17 @@
   <target name="jar" depends="build">
     <mkdir dir="${libDir}"/>
     <jar destfile="${libDir}/sgs.jar" basedir="${classDir}"/>
+  </target>
+
+  <!-- Builds the JUnit tests into class files -->
+  <target name="test" depends="build">
+    <javac includeAntRuntime="no" debug="on" deprecation="on"
+           srcdir="${testDir}" destdir="${classDir}" classpath="${classDir}:${jUnitJar}">
+      <compilerarg value="-Xlint:unchecked"/>
+    </javac>
+    <!-- now run the JUnit tests -->
+    <java classname="com.sun.sgs.RedStarTestSuite"
+          classpath="${classDir}:${jUnitJar}"/>
   </target>
 
 </project>

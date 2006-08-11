@@ -4,9 +4,10 @@ import com.sun.sgs.kernel.Task;
 
 /**
  * A <code>PriorityPolicy</code> implementation that utilizies the
- * provided {@link Priority} provided by {@link Task.getPriority()}
- * and does not weight this priority based on the {@link AppContext}
- * or {@link User} of a give {@link Task}.
+ * provided {@link com.sun.sgs.kernel.scheduling.Priority} provided by
+ * {@link com.sun.sgs.kernel.Task#getPriority()} and does not weight
+ * this priority based on the {@link com.sun.sgs.kernel.AppContext} or
+ * {@link com.sun.sgs.User} of a given {@link Task}.
  *
  * 
  * @since  1.0
@@ -28,7 +29,7 @@ public class FairPriorityPolicy implements PriorityPolicy {
      * Returns the priority assigned to <code>t</code> at its
      * constructions, or the closest <code>Priority</code> in the
      * provided <code>QueueingModel</code> if {@link
-     * Task.getPriority()} does not return a <code>Priority</code> in
+     * com.sun.sgs.kernel.Task#getPriority()} does not return a <code>Priority</code> in
      * the set of available priorities, or returns <code>null</code>
      * if <code>t</code> requests a priority that does not match any
      * available priority.
@@ -37,7 +38,7 @@ public class FairPriorityPolicy implements PriorityPolicy {
      *          this task will be enqueued based on the returned 
      *          priority for later execution.
      *
-     * @return the closest valid priority to {@link t.getPriorit()} or
+     * @return the closest valid priority to {@link com.sun.sgs.kernel.Task#getPriority()} or
      *         <code>null</code> if no such priority exists.
      */
     public Priority getPriority(Task t) {
@@ -51,7 +52,7 @@ public class FairPriorityPolicy implements PriorityPolicy {
      *
      * @param model the <code>QueueingModel</code> to use.
      *
-     * @see FairPriorityPolicy#getPriority(Task)
+     * @see com.sun.sgs.kernel.scheduling.FairPriorityPolicy#getPriority(com.sun.sgs.kernel.Task)
      */
     public void setQueueingModel(QueueingModel model) {
 	this.model = model;

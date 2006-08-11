@@ -4,7 +4,7 @@ package com.sun.sgs.kernel.scheduling;
  * A {@link Priority} implementation based on numeric values where a
  * higher numeric value represents a higher priority.
  *
- * Calling {@link Priority#getDistance(Priority)} with a
+ * Calling {@link Priority#getWeightedComparison(Priority)} with a
  * <code>NumericPriority</code> and a <code>Priority</code> of a
  * different type will throw an <code>Error</code>.  However, calling
  * {@link NumericPriority#compareTo(Object)} with an object not of
@@ -41,7 +41,7 @@ public class NumericPriority implements Priority {
     }
     
     // uses Priority interface javadoc comment
-    public int compareTo(Object other) {
+    public int compareTo(Priority other) {
 	if (other instanceof NumericPriority) {
 	    NumericPriority p = (NumericPriority)other;
 	    double distance = priority - p.priority;
@@ -54,6 +54,7 @@ public class NumericPriority implements Priority {
 	    return -1;
 	}
     }
+
 
     // uses Priority interface javadoc comment
     public double getWeightedComparison(Priority other) {

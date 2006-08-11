@@ -4,47 +4,50 @@ package com.sun.sgs.kernel.scheduling;
  * A <code>Priority</code> denotes the ordering category that a
  * prioritizeable object with which it should be enqueued.
  *
- * Priorities extend {@link Comparable} so that a unique ordering
- * exists among a set of <code>Priority</code> objects.  However, each
- * <code>Priority</code> must also provide a relative priority
- * distance between itself and another priority; an ordering is
- * necessary but not sufficient enough to reflect the semantic
+ * Priorities extend {@link Comparable} so that a unique
+ * ordering exists among a set of <code>Priority</code> objects.
+ * However, each <code>Priority</code> must also provide a relative
+ * priority distance between itself and another priority; an ordering
+ * is necessary but not sufficient enough to reflect the semantic
  * distance between neighboring priorities for any subset of the total
  * priority ordering.  For this reason a <code>Priority</code> must
- * define the {@link Priority#getWeightedComparison(Priority)}
+ * define the {@link
+ * com.sun.sgs.kernel.scheduling.Priority#getWeightedComparison(Priority)}
  * function.  This behavior can lead to non-linear priority models for
  * systems that require it.
  *
  * For the global set of priorities, each priority must know about all
- * other priorities for {@link Priority#getWeightedComparison(Priority)} to
- * properly evaluate.  This implies that no unknown priorities are
+ * other priorities for {@link
+ * com.sun.sgs.kernel.scheduling.Priority#getWeightedComparison(Priority)}
+ * to properly evaluate.  This implies that no unknown priorities are
  * injected into the system at runtime.  Should this happen, the
  * run-time behavior is left up to the developer.
  *
- * @see QueueingModel
- * @see PriorityPolicy
+ * @see com.sun.sgs.kernel.scheduling.QueueingModel
+ * @see com.sun.sgs.kernel.scheduling.PriorityPolicy
  * @since 1.0
  * @author David Jurgens
  */
-public interface Priority extends Comparable {
+public interface Priority extends Comparable<Priority> {
 
     /**
      * Compares this object with the specified object for order and if
      * <code>other</code> is of type {@link Priority} returns an
-     * ordering consistent with {@link getWeightedComparison(Priority}.
+     * ordering consistent with {@link
+     * com.sun.sgs.kernel.scheduling.Priority#getWeightedComparison(com.sun.sgs.kernel.scheduling.Priority)}.
      */
-    public int compareTo(Object other);
+    public int compareTo(Priority other);
 
     /**
      * Returns the relative distance between this priority and
      * <code>other</code>.  In keeping with the precedent set by
-     * {@link compareTo(Object)}, if this priority is of higher
+     * {@link Priority#compareTo(Object)}, if this priority is of higher
      * priority than <code>other</code> than a negative value,
      * <code>0</code> if the same priority, and a positive value if of
      * lower priority.  
      *
      * This function <i>must</i> return a total ordering that is the
-     * same as {@link compareTo(Object)}.  It should also be
+     * same as {@link Priority#compareTo(Object)}.  It should also be
      * transitive and idempotent for a global set of priorities.
      *
      * If <code>other</code> is not comparable to this priority, then

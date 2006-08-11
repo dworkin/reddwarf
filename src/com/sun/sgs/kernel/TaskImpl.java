@@ -15,7 +15,7 @@ import com.sun.sgs.service.Transaction;
  * that <code>Task</code> is nothing more than a light-weight container
  * used to pair actions with meta-data. As such, it's not uncommon to
  * have tasks contain actions that in turn contains tasks.
-(
+ *
  * <p>
  *
  * FIXME: This still needs to provide accessor methods to meta-data like
@@ -58,7 +58,9 @@ public class TaskImpl implements Task {
     
     /**
      * Creates an instance of <code>Task</code>
+     *
      * <p>
+     *
      * FIXME: this may still want more meta-data, like user
      *
      * @param runnable the actual task to run

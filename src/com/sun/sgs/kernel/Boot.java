@@ -1,9 +1,14 @@
 
 package com.sun.sgs.kernel;
 
+
 import com.sun.sgs.kernel.impl.SimpleAppContext;
 import com.sun.sgs.kernel.impl.SimpleResourceCoordinator;
 import com.sun.sgs.kernel.impl.SimpleTransactionCoordinator;
+
+import com.sun.sgs.kernel.scheduling.TaskScheduler;
+import com.sun.sgs.kernel.scheduling.FairPriorityTaskScheduler;
+import com.sun.sgs.kernel.scheduling.TaskScheduler;
 
 import com.sun.sgs.manager.impl.SimpleChannelManager;
 import com.sun.sgs.manager.impl.SimpleDataManager;
@@ -29,7 +34,7 @@ public final class Boot
 {
 
     // a reference to the task queue
-    private TaskQueue taskQueue;
+    private TaskScheduler taskScheduler;
 
     // TEST: the single app context we're using
     private AppContext testApp;
@@ -70,7 +75,7 @@ public final class Boot
         // create the event queue
         // TEST: This is only here for now because it needs to know about
         // this context, and then be used to initialize a service
-        taskQueue = new TaskQueue(rc, numThreads, appContext);
+        taskScheduler = new FairPriorityTaskScheduler(appContext);
 
         // tell the services about the transaction proxy, the app context,
         // and each other (as defined by the configuration)
@@ -80,7 +85,7 @@ public final class Boot
 
         // FIXME: we haven't figured out how this is configured yet, but
         // a more general solution is needed for frameworks, etc.
-        taskService.setTaskQueue(taskQueue);
+        taskService.setTaskScheduler(taskScheduler);
 
         // finally, return the app context
         return appContext;
@@ -124,11 +129,11 @@ public final class Boot
         Runnable br = new BootstrapRunnable(new com.sun.sgs.UserLevelTest());
 
         // now create the transaction task that will run the bootstap task
-        Runnable tr = new TransactionRunnable(new Task(br, testApp, null));
-        Task bootTask = new Task(tr, testApp, null);
+        Runnable tr = new TransactionRunnable(new TaskImpl(br, testApp, null, Kernel.instance().getSystemPriority(), Kernel.instance().getSystemUser()));
+        Task bootTask = new TaskImpl(tr, testApp, null, Kernel.instance().getSystemPriority(), Kernel.instance().getSystemUser());
 
         // finally, queue the task to run
-        taskQueue.queueTask(bootTask);
+        taskScheduler.queueTask(bootTask);
     }
 
     /**

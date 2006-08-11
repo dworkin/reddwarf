@@ -42,8 +42,7 @@ public class FairPriorityTaskScheduler extends AbstractTaskScheduler {
      */
     private int taskCounter;
 
-    public FairPriorityTaskScheduler(AppContext appContext) {
-	super(appContext);
+    public FairPriorityTaskScheduler() {
 
 	// DEVELOPER NOTE: these should probably be configurable
 	// somewhere but we also need to know them at design time to

@@ -1,4 +1,3 @@
-
 package com.sun.sgs.kernel;
 
 import com.sun.sgs.manager.ChannelManager;

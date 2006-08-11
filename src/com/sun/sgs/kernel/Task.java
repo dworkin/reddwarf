@@ -12,7 +12,7 @@ import com.sun.sgs.service.Transaction;
  * the target to run and any associated meta-data or quality of
  * service parameters. This is typically stored in the state of a
  * {@link TaskThread} and then consumed by the {@link
- * TaskScheduler}. 
+ * com.sun.sgs.kernel.scheduling.TaskScheduler}. 
  * 
  * <p>
  *
