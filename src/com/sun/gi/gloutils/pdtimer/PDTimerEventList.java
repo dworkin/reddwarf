@@ -183,7 +183,7 @@ public class PDTimerEventList implements GLO {
      * Called from a task.
      * Designed to be called with ACCESS.GET
      */
-    void cleanup(List<GLOReference<PDTimerEvent>> cleanupList) {
+    public void cleanup(List<GLOReference<PDTimerEvent>> cleanupList) {
         SimTask task = SimTask.getCurrent();
         task.access_check(ACCESS_TYPE.GET, this);
         log.finest("Doing cleanup");
