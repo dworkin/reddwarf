@@ -1,0 +1,11 @@
+XML-Discovery-URL: http://localhost:8080/FakeDiscovery.xml
+MIDlet-Vendor: Vendor
+MIDlet-Version: 1.0
+MIDlet-Name: JMEChatClient
+MicroEdition-Configuration: CLDC-1.1
+MicroEdition-Profile: MIDP-2.0
+UsrMgrClassName: com.sun.gi.comm.users.client.impl.JMEHttpUserManagerClient
+UsrMgrPort: 1152
+MIDlet-1: JMEChatClient, , com.sun.gi.apps.commtest.client.JMEChatClient
+MIDlet-Jar-Size: 52536
+MIDlet-Jar-URL: JMEChatClient.jar
