@@ -8,6 +8,6 @@
 			<PARAMETER tag="password_file_url" value="file:passwd.txt" />
 <!--			<PARAMETER tag="password_file_url" value="file:release/passwd.txt" /> -->
 		</VALIDATOR>	
-<!--		<CHANNELFILTER class="com.sun.gi.apps.mcs.matchmaker.server.MMChannelFilter" />	-->
+		<CHANNELFILTER class="com.sun.gi.apps.mcs.matchmaker.server.MMChannelFilter" />
 	</USERMANAGER>
 </GAMEAPP>

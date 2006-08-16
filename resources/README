@@ -8,6 +8,8 @@ This version also elimiates the dependancy on LRMP as LRMp was judged too unstab
 
 Also new in this release is a basic Management Console, useful for starting and stopping game applications without shutting down the entire server.  For details on how to enable and use it, please refer to docs/guides/ManagementConsole.pdf
 
+Finally, support has been added for pluggable server-side Channel Filters.  For details on usage, please refer to docs/guides/ChannelFiltering.pdf
+
 DIRECTORIES:
 
 The apps directory contains the deployments of the sample server applications
