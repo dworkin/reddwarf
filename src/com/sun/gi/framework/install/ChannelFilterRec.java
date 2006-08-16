@@ -83,14 +83,23 @@ import com.sun.gi.comm.users.filter.ChannelFilter;
  * @version 1.0
  */
 public interface ChannelFilterRec {
+    
+    /**
+     * Sets the ClassLoader that should be used to load the custom 
+     * ChannelFilter class.
+     * 
+     * @param loader            the ClassLoader to use for loading the 
+     *                          ChannelFilter
+     */
+    public void setClassLoader(ClassLoader loader);
 	
-	/**
-	 * Returns a new instance of the implementation of the ChannelFilter
-	 * specified by this descriptor.
-	 * 
-	 * @return		a new instance of the specific subclass of ChannelFilter
-	 * 				as specified by a deployment descriptor
-	 */
-	public ChannelFilter createChannelFilter();
+    /**
+     * Returns a new instance of the implementation of the ChannelFilter
+     * specified by this descriptor.
+     * 
+     * @return		a new instance of the specific subclass of ChannelFilter
+     * 				as specified by a deployment descriptor
+     */
+    public ChannelFilter createChannelFilter();
 
 }

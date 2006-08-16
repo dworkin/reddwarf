@@ -86,28 +86,33 @@ import com.sun.gi.framework.install.ChannelFilterRec;
  */
 public class ChannelFilterRecImpl implements ChannelFilterRec {
 	
-	private String className;
+    private String className;
+    private ClassLoader loader;
 
-	public ChannelFilterRecImpl(String className) {
-		this.className = className;
-	}
-	
-	public ChannelFilter createChannelFilter() {
-		ChannelFilter filter = null;
-		try {
-			Class<ChannelFilter> filterClass = (Class<ChannelFilter>) Class.forName(className);
-			filter = filterClass.newInstance();
-		}
-		catch (ClassNotFoundException cnf) {
-			cnf.printStackTrace();
-		}
-		catch (InstantiationException ie) {
-			ie.printStackTrace();
-		}
-		catch (IllegalAccessException iae) {
-			iae.printStackTrace();
-		}
-		return filter;
-	}
+    public ChannelFilterRecImpl(String className) {
+        this.className = className;
+    }
+    
+    public void setClassLoader(ClassLoader loader) {
+        this.loader = loader;
+    }
+
+    public ChannelFilter createChannelFilter() {
+        ChannelFilter filter = null;
+        try {
+            Class<ChannelFilter> filterClass = (Class<ChannelFilter>) Class.forName(className, true, loader);
+            filter = filterClass.newInstance();
+        }
+        catch (ClassNotFoundException cnf) {
+            cnf.printStackTrace();
+        }
+        catch (InstantiationException ie) {
+            ie.printStackTrace();
+        }
+        catch (IllegalAccessException iae) {
+            iae.printStackTrace();
+        }
+        return filter;
+    }
 
 }

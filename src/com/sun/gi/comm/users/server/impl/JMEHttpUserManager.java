@@ -132,6 +132,7 @@ public class JMEHttpUserManager
         if (p != null) {
             gameName = p;
         }
+        System.out.println("host " + host + " port " + port + " game " + gameName);
         p = (String) params.get("session_timeout");
         if (p != null) {
             sessionTimeout = Integer.parseInt(p);

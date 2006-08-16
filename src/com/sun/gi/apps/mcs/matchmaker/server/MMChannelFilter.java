@@ -102,32 +102,32 @@ import com.sun.gi.comm.users.filter.ChannelFilter;
  */
 public class MMChannelFilter implements ChannelFilter {
 
-	private CommandProtocol protocol;
-	
-	public MMChannelFilter() {
-		protocol = new CommandProtocol();
-	}
-	
-	public boolean filter(ByteBuffer message) {
-		if (!message.hasRemaining()) {
-			return true;
-		}
-		int command = protocol.readUnsignedByte(message);
-		if (command != CommandProtocol.SEND_TEXT && 
-			command != CommandProtocol.SEND_PRIVATE_TEXT) {
-			
-			return true;
-		}
-    	String strMessage = protocol.readString(message);
-		if (strMessage == null || strMessage.length() == 0) {
-    		return false;
-    	}
-    	for (int i = 0; i < strMessage.length(); i++) {
-    		if (!Character.isWhitespace(strMessage.charAt(i))) {
-    			return true;
-    		}
-    	}
-    	return false;
-	}
+    private CommandProtocol protocol;
+    
+    public MMChannelFilter() {
+    	protocol = new CommandProtocol();
+    }
+    
+    public boolean filter(ByteBuffer message) {
+        if (!message.hasRemaining()) {
+            return true;
+        }
+        int command = protocol.readUnsignedByte(message);
+        if (command != CommandProtocol.SEND_TEXT && 
+                command != CommandProtocol.SEND_PRIVATE_TEXT) {
+        	
+            return true;
+        }
+        String strMessage = protocol.readString(message);
+        if (strMessage == null || strMessage.length() == 0) {
+            return false;
+        }
+        for (int i = 0; i < strMessage.length(); i++) {
+            if (!Character.isWhitespace(strMessage.charAt(i))) {
+                return true;
+            }
+        }
+        return false;
+    }
 
 }

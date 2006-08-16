@@ -84,6 +84,8 @@ import javax.servlet.http.*;
  * @version
  */
 public class JMEListenerServlet extends HttpServlet {
+    
+    private static final long serialVersionUID = 1L;
 
     private static Map<String, ServletListener> servletListeners;
     private final static int PACKET_SIZE = 32000;

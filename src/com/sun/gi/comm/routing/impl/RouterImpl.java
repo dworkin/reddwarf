@@ -410,7 +410,7 @@ public class RouterImpl implements Router {
                 e.printStackTrace();
             } catch (NonExistantObjectIDException e) {
                 trans.abort();
-                e.printStackTrace();
+                e.printStackTrace(); 
             }
             
         }

@@ -98,17 +98,17 @@ import java.nio.ByteBuffer;
  */
 public interface ChannelFilter {
 	
-	/**
-	 * Filters the given message.  If true is returned, the message passes
-	 * the filter and will be delivered to the intended recipients on the 
-	 * channel (unless another filter blocks it).  If false is returned, 
-	 * the message will be discarded.
-	 * 
-	 * @param message			the message to filter
-	 * 
-	 * @return true if the message passes the rules of the filter, false 
-	 * 			otherwise. 
-	 */
-	public boolean filter(ByteBuffer message);
+    /**
+     * Filters the given message.  If true is returned, the message passes
+     * the filter and will be delivered to the intended recipients on the 
+     * channel (unless another filter blocks it).  If false is returned, 
+     * the message will be discarded.
+     * 
+     * @param message			the message to filter
+     * 
+     * @return true if the message passes the rules of the filter, false 
+     * 			otherwise. 
+     */
+    public boolean filter(ByteBuffer message);
 
 }

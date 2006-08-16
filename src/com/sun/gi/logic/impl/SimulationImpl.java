@@ -93,6 +93,7 @@ import com.sun.gi.comm.routing.RouterListener;
 import com.sun.gi.comm.routing.SGSChannel;
 import com.sun.gi.comm.routing.UserID;
 import com.sun.gi.utils.StatisticalUUID;
+import com.sun.gi.framework.install.ChannelFilterRec;
 import com.sun.gi.framework.install.DeploymentRec;
 import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
@@ -270,6 +271,11 @@ public class SimulationImpl implements Simulation {
             try {
                 loader = new URLClassLoader(new URL[] { new URL(
                         game.getClasspathURL()) });
+                
+                // set the custom ClassLoader for the custom ChannelFilters
+                for (ChannelFilterRec curFilterRec : game.getChannelFilters()) {
+                    curFilterRec.setClassLoader(loader);
+                }
 
                 Class bootclass = loader.loadClass(bootClassName);
 
