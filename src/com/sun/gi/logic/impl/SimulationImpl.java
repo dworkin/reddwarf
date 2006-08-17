@@ -165,13 +165,14 @@ public class SimulationImpl implements Simulation {
      * Constructor
      */
     public SimulationImpl(SimKernel kernel, ObjectStore ostore, Router router,
-            DeploymentRec game) throws InstantiationException {
+            DeploymentRec game, ClassLoader loader) throws InstantiationException {
 
         this.kernel = kernel;
         this.appName = game.getName();
         this.ostore = ostore;
         this.router = router;
         this.appID = game.getID();
+        this.loader = loader;
 
         router.addRouterListener(new RouterListener() {
             public void serverMessage(UserID from, ByteBuffer data,
@@ -269,8 +270,7 @@ public class SimulationImpl implements Simulation {
         final String bootClassName = game.getBootClass();
         if (bootClassName != null) { // has server side
             try {
-                loader = new URLClassLoader(new URL[] { new URL(
-                        game.getClasspathURL()) });
+                
                 
                 // set the custom ClassLoader for the custom ChannelFilters
                 for (ChannelFilterRec curFilterRec : game.getChannelFilters()) {
@@ -310,9 +310,6 @@ public class SimulationImpl implements Simulation {
                         new GLOReferenceImpl(bootObjectID), firstTime}, 
 				null));
 
-            } catch (MalformedURLException e) {
-                e.printStackTrace();
-                throw new InstantiationException(e.getMessage());
             } catch (ClassNotFoundException e) {
                 e.printStackTrace();
                 throw new InstantiationException(e.getMessage());

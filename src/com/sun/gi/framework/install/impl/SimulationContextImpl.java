@@ -67,7 +67,10 @@
  */
 package com.sun.gi.framework.install.impl;
 
+import java.io.IOException;
 import java.lang.reflect.Constructor;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
@@ -171,9 +174,11 @@ public class SimulationContextImpl implements SimulationContext {
         int umgrCount = 0;
         
         // create simulation container for game
+        ClassLoader loader = null;
         if (deployment.getBootClass() != null) {
             try {
-                
+                loader = new URLClassLoader(new URL[] { new URL(
+                        deployment.getClasspathURL()) });
                 
                 //			 set app info system properties
                 String name = deployment.getName();
@@ -181,13 +186,16 @@ public class SimulationContextImpl implements SimulationContext {
                 name = name.replaceAll(" ","_").toLowerCase();
                 String prefix = "sgs.game."+name+".";
                 String rootProp =prefix+"rootURL";
-    	    System.setProperty(rootProp, deployment.getRootURL());
-    		simulation = new SimulationImpl(kernel, ostore, router, deployment);
+    	           System.setProperty(rootProp, deployment.getRootURL());
+    		simulation = new SimulationImpl(kernel, ostore, router, deployment, loader);
             } catch (InstantiationException e) {
         
         		e.printStackTrace();
         		return;
+            } catch (IOException ioe) {
+                ioe.printStackTrace();
             }
+            
         
         }
         
@@ -199,7 +207,7 @@ public class SimulationContextImpl implements SimulationContext {
             installationReport.setParameter(statusBlockName + ".umgr", "count", 
                     Integer.toString(umgrCount));
             try {
-                Class serverClass = Class.forName(serverClassName);
+                Class serverClass = Class.forName(serverClassName, true, loader);
                 Constructor constructor = serverClass.getConstructor(new Class[] {
                 	Router.class, Map.class });
                 UserManager umgr = (UserManager) constructor.newInstance(new Object[] {
@@ -226,7 +234,7 @@ public class SimulationContextImpl implements SimulationContext {
                     UserValidatorFactory validatorFactory = new UserValidatorFactoryImpl();
                     for (ValidatorRec lmoduleRec : umgrRec.getValidatorModules()) {
                         String loginModuleClassname = lmoduleRec.getValidatorClassName();
-                        Class loginModuleClass = Class.forName(loginModuleClassname);
+                        Class loginModuleClass = Class.forName(loginModuleClassname, true, loader);
                         validatorFactory.addLoginModule(loginModuleClass,
                 			lmoduleRec.getParameterMap());
                     }
