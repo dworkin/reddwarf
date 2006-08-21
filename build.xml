@@ -587,6 +587,11 @@
 	<copy file="resources/startSwordWorldClient.bat" todir="${release.dir}/bin" />
 	<chmod file="${release.dir}/startSwordWorldClient.sh" perm="755" />
 	<chmod file="${release.dir}/startSwordWorldClient.bat" perm="755" />
+    	
+	<copy file="resources/startHackClient.bat" todir="${release.dir}/bin" />
+	<copy file="resources/startHackClient.sh" todir="${release.dir}/bin" />
+	<chmod file="${release.dir}/startHackClient.bat" perm="755" />
+	<chmod file="${release.dir}/startHackClient.sh" perm="755" />    	
 	
 	<copy file="resources/startMatchMakerClient.sh" todir="${release.dir}/bin" />
 	<copy file="resources/startMatchMakerClient.bat" todir="${release.dir}/bin" />	
