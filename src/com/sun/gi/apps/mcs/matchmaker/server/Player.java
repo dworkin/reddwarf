@@ -504,8 +504,8 @@ public class Player implements SimUserDataListener {
         Folder root = (Folder) folderRoot.peek(task);
         Folder targetFolder = folderID == null ? root : root.findFolder(task,
                 folderID);
-        System.out.println("folderID = " + folderID + " targetFolder "
-                + targetFolder.getName());
+        //System.out.println("folderID = " + folderID + " targetFolder "
+        //        + targetFolder.getName());
         CommandList list = new CommandList(LIST_FOLDER_RESPONSE);
         list.add(folderID == null ? root.getFolderID().toByteArray() : folderID.toByteArray());
         if (targetFolder != null) {

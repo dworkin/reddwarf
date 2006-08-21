@@ -216,7 +216,7 @@ public class MatchMakerBoot
         userMap.put(username, uid);
         Player p = new Player(uid, username, folderRoot);
 
-        System.out.println("Adding username " + username + " uid " + uid);
+        //System.out.println("Adding username " + username + " uid " + uid);
 
         // map the player reference to its UserID for later lookup by
         // other players.
@@ -248,7 +248,7 @@ public class MatchMakerBoot
         GLOMap<String, UserID> userMap = (GLOMap<String, UserID>) task.findGLO(
                 "UsernameMap").get(task);
         if (userMap.containsKey(player.getUserName())) {
-            System.out.println("removing " + player.getUserName() + " from map");
+            //System.out.println("removing " + player.getUserName() + " from map");
             userMap.remove(uid);
         }
     }

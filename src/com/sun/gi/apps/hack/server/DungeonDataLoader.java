@@ -168,7 +168,7 @@ public class DungeonDataLoader
         // load the sprite maps and dungeons
         while (stok.nextToken() != StreamTokenizer.TT_EOF) {
             if (stok.sval.equals("SpriteMap")) {
-                System.out.println("loading sprite map");
+                //System.out.println("loading sprite map");
                 stok.nextToken();
                 int mapId = (int)(stok.nval);
                 stok.nextToken();
@@ -179,7 +179,7 @@ public class DungeonDataLoader
                                SpriteMap.NAME_PREFIX + mapId);
                 impMap.put(mapId, getImpassableSet(smFile + ".imp"));
             } else if (stok.sval.equals("Dungeon")) {
-                System.out.println("loading dungeon");
+                //System.out.println("loading dungeon");
                 stok.nextToken();
                 String name = stok.sval;
                 stok.nextToken();
@@ -202,7 +202,7 @@ public class DungeonDataLoader
         // FIXME: do this in a getInstance on dungeon
         GameChangeManager gcm = gcmRef.get(task);
         for (Dungeon dungeon : dungeons) {
-            System.out.println("Registering dungeon: " + dungeon.getName());
+            //System.out.println("Registering dungeon: " + dungeon.getName());
             GLOReference<Dungeon> dungeonRef =
                 task.createGLO(dungeon, Game.NAME_PREFIX + dungeon.getName());
             gcm.notifyGameAdded(dungeon.getName());
@@ -225,7 +225,7 @@ public class DungeonDataLoader
         }
         */
 
-        System.out.println("finished loading files");
+        //System.out.println("finished loading files");
     }
 
     
@@ -241,7 +241,7 @@ public class DungeonDataLoader
     public static SpriteMap loadSpriteMap(String filename, int spriteSize)
         throws IOException
     {
-        System.out.println("Trying to read images from: " + filename);
+        //System.out.println("Trying to read images from: " + filename);
 
         // open the file into a single image
         BufferedImage image = ImageIO.read(new File(filename));
@@ -264,7 +264,7 @@ public class DungeonDataLoader
             }
         }
 
-        System.out.println("image bytes read: " + totalSize);
+        //System.out.println("image bytes read: " + totalSize);
 
         return new SpriteMap(spriteSize, spriteMap);
     }

@@ -178,10 +178,10 @@ public class ConfigParser {
                     && folderNode.getNodeName().equals("Folder")) {
                 Folder curSubFolder = createFolder(task, (Element) folderNode,
                         fullPath);
-                System.out.println("Creating Folder: " + curSubFolder.getName()
-                        + " " + curSubFolder.getDescription()
-                        + " as sub folder of " + folder.getName() + " "
-                        + folder.getDescription());
+                //System.out.println("Creating Folder: " + curSubFolder.getName()
+                //        + " " + curSubFolder.getDescription()
+                //        + " as sub folder of " + folder.getName() + " "
+                //        + folder.getDescription());
                 folder.addFolder(task.createGLO(curSubFolder));
             }
         }
@@ -207,7 +207,7 @@ public class ConfigParser {
         ChannelID cid = task.openChannel(channelName);
         task.lock(cid, true); // lobby access is controled by the
                                 // server
-        System.out.println("Creating Lobby: " + channelName);
+        //System.out.println("Creating Lobby: " + channelName);
         String password = (element.hasAttribute("password")
                 ? element.getAttribute("password") : null);
         Lobby lobby = new Lobby(lobbyName, element.getAttribute("description"),

@@ -379,10 +379,10 @@ public class DungeonFactory
         stok.nextToken(); data.level2X = (int)(stok.nval);
         stok.nextToken(); data.level2Y = (int)(stok.nval);
 
-        System.out.println("read connection: " + data.level1 + "@" +
-                           data.level1X + "," + data.level1Y);
-        System.out.println("it connects to: " + data.level2 + "@" +
-                           data.level2X + "," + data.level2Y);
+        //System.out.println("read connection: " + data.level1 + "@" +
+        //                   data.level1X + "," + data.level1Y);
+        //System.out.println("it connects to: " + data.level2 + "@" +
+        //                   data.level2X + "," + data.level2Y);
 
         return data;
     }
