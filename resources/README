@@ -13,8 +13,7 @@ Finally, support has been added for pluggable server-side Channel Filters.  For 
 DIRECTORIES:
 
 The apps directory contains the deployments of the sample server applications
-The SGS-apps.conf file controls which are started by the server on boot. (See
-that file's comments for more information.)
+The SGS-apps.conf file controls which are started by the server on boot.  Refer to docs/guides/Demo Guide.pdf for more information.
 
 The lib directory contains external librarys that the SGS depends on.
 
