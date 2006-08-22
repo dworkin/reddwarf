@@ -1,35 +1,84 @@
-This is the EA2 release of the Project Darkstar Sun Game Server SDK.
+Sun Game Server (SGS) Early Access 2
+August 22, 2006
 
-A key change is that there is no DiscoveryManager to run anymore.  The DiscoveryManager functionality of generating the discovery.xml has been integrated directly into the main SGS process.
+This archive contains Early Access 2 of the Sun Game Server (SGS) SDK.
+Here you'll find pre-built API libraries and jarfiles to link your code
+against, as well as documentation, tutorials, and several examples that
+illustrate how to integrate new game servers and clients with the SGS.
 
-Accordingly FakeDiscovery.xml is no longer included in the destribution and all the sample apps have been modified to use "discovery.xml". 
+This release also contains a standalone, single-server implementation of
+the SGS server API, so game programmers can develop their code against a
+small-scale implementation of the SGS system before deploying it to a
+fault-tolerant, multi-stack SGS cluster solution.
 
-This version also elimiates the dependancy on LRMP as LRMp was judged too unstable and eliminating it removed a number of SGS bugs.
+EA2 requires a Java 1.5 or later VM.
 
-Also new in this release is a basic Management Console, useful for starting and stopping game applications without shutting down the entire server.  For details on how to enable and use it, please refer to docs/guides/ManagementConsole.pdf
+INSTALLATION
 
-Finally, support has been added for pluggable server-side Channel Filters.  For details on usage, please refer to docs/guides/ChannelFiltering.pdf
+The SGS is packaged in ready-to-run form.  Several example game apps are
+included and set to load in the server configuration file.  Server apps
+are installed by editing the SGS-apps.conf file, which is read at SGS
+server startup to determine which server apps to instantiate and run.
 
-DIRECTORIES:
+CHANGES
 
-The apps directory contains the deployments of the sample server applications
-The SGS-apps.conf file controls which are started by the server on boot.  Refer to docs/guides/Demo Guide.pdf for more information.
+  * The DiscoveryManager has been integrated into the SGS server,
+    so it no longer needs to be run as a separate process.
 
-The lib directory contains external librarys that the SGS depends on.
+    With this change, FakeDiscovery.xml is no longer included in
+    the distribution, and all the sample apps have been modified
+    to use the automatically generated "discovery.xml" instead.
+    (Note change in filename).
 
-The client directory contains the clients sides of the sample apps.
+  * Since EA2 is a single-node server, LRMP has been removed from
+    the release.  EA2 can be run on servers without multicast.
 
-Next to each sample jar "Foo.jar" in the same directory is another jar "FooSrc.jar" that contains the Java source code for each example.
+  * A basic Management Console has been added, useful for starting
+    and stopping game applications without shutting down the
+    entire server.  See docs/guides/ManagementConsole.pdf
 
-The server itself is in SunGameServer.jar.  The file startSGS.sh shows how to start the server with logging enabled and controlled by the logging.properties file.  Look in logging.properties to see the settable logging options.
+  * Pluggable server-side Channel Filters have been added.
+    See docs/guides/ChannelFiltering.pdf
 
-SGSClient.jar is the J2SE client API. You may need to enable error logging in your applcication as well as the current API logs exceptions during callbacks and without logging these will be hidden.  You can enable logging by putting -Djava.util.logging.config.file=<logging.properties> on your java command line for your app.  <logging.properties> should be a copy of the destributed logging.properties file customized for your app.
+DIRECTORIES
 
-The SunGameServerJMEClient.jad and SunGameServerClient.jar files are the J2ME client API. startSGSWithJME.bat will start the game server with JME support enabled.  Refer to the JME Chat Test demo (bin/startJMEChatTest.bat) for a sample JME application.  In fact, running the JME demo along side the JSE Chat Test demo will demonstrate two hybrid clients talking to the same game application.
+The apps directory contains ready-to-run deployments of some sample
+server applications.  The SGS-apps.conf file controls which of
+these are loaded by the server on startup.  Refer to
+"docs/guides/Demo Guide.pdf" for more information.
 
-The DarkstarW32CPPAPI.zip file contains the Win32 CPP API.
+The lib directory contains external libraries used by the server.
 
-For the latest information please see the forums linked off the project darkstar home page at www.projectdarkstar.com
+The client directory contains clients for sample apps.  Scripts are
+provided in the bin directory to run several of them easily.
+
+For the sample apps and clients, a "Src" jar is provided alongside
+the main jarfile, which contains the source code for that example.
+
+The server itself is in SunGameServer.jar.  The script startSGS.sh
+(or startSGS.bat) starts the server with logging (as set in the
+logging.properties file).
+
+SGSClient.jar is the Java Standard Edition (JSE) client API.  You may
+want to enable logging for your client (via logging.properties, for
+example); the client API logs certain exceptions during callbacks and
+without logging these will be hidden.  Enable logging by including:
+    -Djava.util.logging.config.file=logging.properties
+on the Java command line for your client application.  You can replace
+"logging.properties" with any filename that contains log settings.
+
+SunGameServerJMEClient.jad and SunGameServerClient.jar files are the
+JME (Java Micro Edition) client API. startSGSWithJME.bat will start the
+game server with JME support enabled.  Refer to the JME Chat Test demo
+(bin/startJMEChatTest.bat) for a sample JME application.  In fact,
+running the JME demo along side the JSE Chat Test demo will demonstrate
+two hybrid clients talking to the same game application.
+
+Win32Cpp contains the Win32 C++ API and a sample debugging application.
+See the README in that folder for more info.
+
+For the latest information please see the forums linked off the Project
+Darkstar home page at www.projectdarkstar.com
 
 Jeff Kesselman
 Chief Darkstar Architect
