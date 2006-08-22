@@ -67,7 +67,7 @@ without logging these will be hidden.  Enable logging by including:
 on the Java command line for your client application.  You can replace
 "logging.properties" with any filename that contains log settings.
 
-SunGameServerJMEClient.jad and SunGameServerClient.jar files are the
+SunGameServerJMEClient.jad and SunGameServerJMEClient.jar files are the
 JME (Java Micro Edition) client API. startSGSWithJME.bat will start the
 game server with JME support enabled.  Refer to the JME Chat Test demo
 (bin/startJMEChatTest.bat) for a sample JME application.  In fact,
