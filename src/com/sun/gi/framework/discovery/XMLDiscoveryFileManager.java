@@ -32,24 +32,6 @@ import com.sun.gi.framework.interconnect.TransportManager;
 import com.sun.gi.framework.status.ReportManager;
 import com.sun.gi.framework.status.StatusReport;
 
-/**
- * 
- * <p>
- * Title: XMLDiscoveryFileManager.java
- * </p>
- * <p>
- * Description:
- * </p>
- * <p>
- * Copyright: Copyright (c) 2004 Sun Microsystems, Inc.
- * </p>
- * <p>
- * Company: Sun Microsystems, Inc
- * </p>
- * 
- * @author Jeff Kesselman
- * @version 1.0
- */
 public class XMLDiscoveryFileManager implements Runnable {
     class GameRecord {
         String name;
@@ -95,15 +77,16 @@ public class XMLDiscoveryFileManager implements Runnable {
     ReportManager reportManager;
     TransportManager transportManager;
 
-    static long fileUpdatePeriod = 50000; // regenreate once a second
+    static long fileUpdatePeriod = 50000; // default regeneration period, in ms
     final static String prefix = "_SGS_discover_";
 
     FileChannel chan;
     FileLock lock;
 
-    String discoveryFileName;
+    String discoveryFileName =  "discovery.xml";
     
     private boolean shouldShutDown = false;
+    private int lastGameCount = 0;
 
     static {
         String updatePeriodStr = System.getProperty("sgs.discovery.updateperiod");
@@ -123,36 +106,47 @@ public class XMLDiscoveryFileManager implements Runnable {
     public void run() {
         while (!shouldShutDown) {
             String[] reportNames = reportManager.listReports();
-            startDiscoveryFile("discovery.xml");
+            
+            long wakeupOffset = fileUpdatePeriod;
+            gameMap.clear();
+            
             for (int i = 0; i < reportNames.length; i++) {
                 if (reportNames[i].startsWith(prefix)) {
                     StatusReport report = reportManager.getReport(reportNames[i]);
                     if (report != null) {
                         report.dump(System.err);
-                        addReportToDiscoveryFile(report);
+                        processReport(report);
                     }
                 }
             }
-            endDiscoveryFile();
+
+            if ((lastGameCount == 0) && gameMap.isEmpty()) {
+            	// No games... poll more often
+            	wakeupOffset = 5000;
+            } else {
+	            writeDiscoveryFile();
+	            lastGameCount = gameMap.size();
+            }
+
             long time = System.currentTimeMillis();
-            long wakeUpTime = time + fileUpdatePeriod;
-            System.err.println("Wakeup Time:" + wakeUpTime);
-            while (wakeUpTime > time) {
+            long wakeupTime = time + wakeupOffset;
+            //System.err.println("Wakeup Time:" + wakeUpTime);
+            while (wakeupTime > time) {
                 try {
-                    Thread.sleep(wakeUpTime - time);
+                    Thread.sleep(wakeupTime - time);
                 } catch (InterruptedException ex1) {
                     ex1.printStackTrace();
                 }
                 time = System.currentTimeMillis();
             }
-            System.err.println("Woke up at: " + System.currentTimeMillis());
+            System.err.println("Discovery woke up at: " + System.currentTimeMillis());
         }
     }
     
     /**
      * endDiscoveryFile
      */
-    private void endDiscoveryFile() {
+    private void writeDiscoveryFile() {
 
         ByteBuffer buff = ByteBuffer.allocate(100 * 1024);
         buff.put("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n".getBytes());
@@ -206,7 +200,7 @@ public class XMLDiscoveryFileManager implements Runnable {
      * 
      * @param statusReport StatusReport
      */
-    private void addReportToDiscoveryFile(StatusReport statusReport) {
+    private void processReport(StatusReport statusReport) {
         int gameCount = Integer.parseInt(statusReport.getParameter("game",
                 "count"));
         for (int g = 0; g < gameCount; g++) {
@@ -261,11 +255,6 @@ public class XMLDiscoveryFileManager implements Runnable {
                 }
             }
         }
-    }
-
-    private void startDiscoveryFile(String string) {
-        gameMap.clear();
-        discoveryFileName = string;
     }
 
     public void shutDown() {
