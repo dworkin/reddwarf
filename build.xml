@@ -4,44 +4,68 @@
 
   <description>
     This is the Ant file that defines the build process for the Redstar
-    branch of Project Darkstar.
+    revision of Project Darkstar.
   </description>
 
-  <!-- Some common locations -->
-  <property name="buildDir" location="build"/>
-  <property name="classDir" location="${buildDir}/classes"/>
-  <property name="docDir" location="${buildDir}/docs"/>
-  <property name="jUnitJar" location="lib/junit-4.1.jar"/>
-  <property name="libDir" location="${buildDir}/lib"/>
+  <!-- VARIABLE DEFINITIONS -->
+
+  <!-- Common locations -->
+  <property name="docDir" location="doc"/>
+  <property name="libDir" location="lib"/>
   <property name="srcDir" location="src"/>
   <property name="testDir" location="test"/>
 
-  <!-- Values for the JavaDocs -->
-  <property name="projName" value="Project Darkstar: Redstar"/>
-  <property name="projVersion" value="0.1"/>
+  <!-- Common build locations -->
+  <property name="buildBaseDir" location="build"/>
+  <property name="buildClassDir" location="${buildBaseDir}/classes"/>
+  <property name="buildDocDir" location="${buildBaseDir}/doc"/>
+  <property name="buildLibDir" location="${buildBaseDir}/lib"/>
 
-  <!-- Builds the project into debug-enabled class files -->
-  <target name="build">
-    <mkdir dir="${classDir}"/>
+  <!-- Values for the server -->
+  <property name="serverClassDir" location="${buildClassDir}/server"/>
+  <property name="serverJarFile" location="${buildLibDir}/sgs.jar"/>
+  <property name="serverSrcDir" location="${srcDir}/server/j2se"/>
+
+  <!-- Values for the JavaDocs -->
+  <property name="baseJavadocDir" location="${buildDocDir}/javadoc"/>
+  <property name="serverJavadocDir" location="${baseJavadocDir}/server"/>
+  <property name="projName" value="Project Darkstar: Redstar"/>
+  <property name="projVersion" value="0.2"/>
+
+  <!-- TARGET DEFINITIONS -->
+
+  <!-- Builds a debug version of the complete project -->
+  <target name="build" depends="build-server"/>
+
+  <!-- Builds the server -->
+  <target name="build-server">
+    <mkdir dir="${serverClassDir}"/>
     <javac includeAntRuntime="no" debug="on" deprecation="on"
-           srcdir="${srcDir}" destdir="${classDir}" classpath="${classDir}">
+           srcdir="${serverSrcDir}" destdir="${serverClassDir}"
+           classpath="${serverClassDir}">
       <!--<compilerarg value="-Xlint:unchecked"/>-->
     </javac>
   </target>
 
   <!-- Removes all built files and all ~ files -->
   <target name="clean">
-    <delete dir="${buildDir}"/>
+    <delete dir="${buildBaseDir}"/>
     <delete>
       <fileset dir="." defaultexcludes="no" includes="**/*~"/>
     </delete>
   </target>
 
-  <!-- Build the JavaDocs from the source -->
-  <target name="doc" depends="build">
-    <javadoc sourcepath="${srcDir}" destdir="${docDir}"
-             classpath="${classDir}" packagenames="com.sun.*"
-             overview="${srcDir}/overview.html"
+  <!-- Builds the documentation -->
+  <target name="doc" depends="javadoc"/>
+
+  <!-- Build the JavaDoc from the source -->
+  <target name="javadoc" depends="javadoc-server"/>
+
+  <!-- Build the server JavaDoc -->
+  <target name="javadoc-server" depends="build-server">
+    <javadoc sourcepath="${serverSrcDir}" destdir="${serverJavadocDir}"
+             classpath="${serverClassDir}" packagenames="com.sun.*"
+             overview="${serverSrcDir}/overview.html"
              windowtitle="${projName}" doctitle="${projName}" author="no"
              link="http://java.sun.com/j2se/1.5/docs/api">
       <footer>
@@ -58,21 +82,13 @@
     </javadoc>
   </target>
 
-  <!-- Builds the jar file for the project classes -->
-  <target name="jar" depends="build">
-    <mkdir dir="${libDir}"/>
-    <jar destfile="${libDir}/sgs.jar" basedir="${classDir}"/>
-  </target>
+  <!-- Builds the jar files for the project classes -->
+  <target name="jar" depends="jar-server"/>
 
-  <!-- Builds the JUnit tests into class files -->
-  <target name="test" depends="build">
-    <javac includeAntRuntime="no" debug="on" deprecation="on"
-           srcdir="${testDir}" destdir="${classDir}" classpath="${classDir}:${jUnitJar}">
-      <compilerarg value="-Xlint:unchecked"/>
-    </javac>
-    <!-- now run the JUnit tests -->
-    <java classname="com.sun.sgs.TestSuite"
-          classpath="${classDir}:${jUnitJar}"/>
+  <!-- builds the server jar file -->
+  <target name="jar-server" depends="build-server">
+    <mkdir dir="${buildLibDir}"/>
+    <jar destfile="${serverJarFile}" basedir="${serverClassDir}"/>
   </target>
 
 </project>
