@@ -1,7 +1,5 @@
 
-package com.sun.sgs;
-
-import com.sun.sgs.ManagedObject;
+package com.sun.sgs.app;
 
 
 /**

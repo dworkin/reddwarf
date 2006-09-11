@@ -1,8 +1,8 @@
 
 package com.sun.sgs.impl.manager;
 
-import com.sun.sgs.ManagedReference;
-import com.sun.sgs.TimerHandle;
+import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.app.TimerHandle;
 
 import com.sun.sgs.app.TimerManager;
 

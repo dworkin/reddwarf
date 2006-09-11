@@ -1,18 +1,18 @@
 
 package com.sun.sgs.kernel;
 
-import com.sun.sgs.kernel.impl.SimpleAppContext;
-import com.sun.sgs.kernel.impl.SimpleResourceCoordinator;
-import com.sun.sgs.kernel.impl.SimpleTransactionCoordinator;
+import com.sun.sgs.impl.kernel.SimpleAppContext;
+import com.sun.sgs.impl.kernel.SimpleResourceCoordinator;
+import com.sun.sgs.impl.kernel.SimpleTransactionCoordinator;
 
 import com.sun.sgs.impl.manager.SimpleChannelManager;
 import com.sun.sgs.impl.manager.SimpleDataManager;
 import com.sun.sgs.impl.manager.SimpleTaskManager;
 import com.sun.sgs.impl.manager.SimpleTimerManager;
 
-import com.sun.sgs.service.impl.SimpleContentionService;
-import com.sun.sgs.service.impl.SimpleDataService;
-import com.sun.sgs.service.impl.SimpleTaskService;
+import com.sun.sgs.impl.service.SimpleContentionService;
+import com.sun.sgs.impl.service.SimpleDataService;
+import com.sun.sgs.impl.service.SimpleTaskService;
 
 
 /**

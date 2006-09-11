@@ -1,5 +1,5 @@
 
-package com.sun.sgs.service.impl;
+package com.sun.sgs.impl.service;
 
 import com.sun.sgs.service.NotPreparedException;
 import com.sun.sgs.service.Service;

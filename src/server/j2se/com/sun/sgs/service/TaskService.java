@@ -1,8 +1,8 @@
 
 package com.sun.sgs.service;
 
-import com.sun.sgs.ManagedReference;
-import com.sun.sgs.ManagedRunnable;
+import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.app.ManagedRunnable;
 
 import com.sun.sgs.kernel.TaskQueue;
 

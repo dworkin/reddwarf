@@ -1,9 +1,5 @@
 
-
 package com.sun.sgs.app;
-
-import com.sun.sgs.ManagedReference;
-import com.sun.sgs.ManagedRunnable;
 
 import com.sun.sgs.kernel.TaskThread;
 

@@ -1,10 +1,10 @@
 
 package com.sun.sgs.impl.manager;
 
-import com.sun.sgs.Channel;
-import com.sun.sgs.ManagedReference;
-import com.sun.sgs.Quality;
-import com.sun.sgs.User;
+import com.sun.sgs.app.Channel;
+import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.app.Quality;
+import com.sun.sgs.app.User;
 
 import com.sun.sgs.app.ChannelManager;
 

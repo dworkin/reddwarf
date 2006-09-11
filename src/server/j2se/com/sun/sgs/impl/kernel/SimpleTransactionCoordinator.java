@@ -1,13 +1,13 @@
 
-package com.sun.sgs.kernel.impl;
+package com.sun.sgs.impl.kernel;
 
-import com.sun.sgs.Quality;
+import com.sun.sgs.app.Quality;
 
 import com.sun.sgs.kernel.TransactionCoordinator;
 
 import com.sun.sgs.service.Transaction;
 
-import com.sun.sgs.service.impl.SimpleTransaction;
+import com.sun.sgs.impl.service.SimpleTransaction;
 
 import java.util.concurrent.atomic.AtomicLong;
 

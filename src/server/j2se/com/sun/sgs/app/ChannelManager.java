@@ -1,11 +1,6 @@
 
 package com.sun.sgs.app;
 
-import com.sun.sgs.Channel;
-import com.sun.sgs.ManagedReference;
-import com.sun.sgs.Quality;
-import com.sun.sgs.User;
-
 import com.sun.sgs.kernel.TaskThread;
 
 import com.sun.sgs.app.listen.ConnectionListener;

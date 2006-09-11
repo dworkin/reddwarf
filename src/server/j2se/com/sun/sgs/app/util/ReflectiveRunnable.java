@@ -1,9 +1,9 @@
 
 package com.sun.sgs.app.util;
 
-import com.sun.sgs.ManagedObject;
-import com.sun.sgs.ManagedReference;
-import com.sun.sgs.ManagedRunnable;
+import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.app.ManagedRunnable;
 
 import java.lang.reflect.Method;
 

@@ -1,6 +1,6 @@
 
 
-package com.sun.sgs;
+package com.sun.sgs.app;
 
 import java.io.Serializable;
 

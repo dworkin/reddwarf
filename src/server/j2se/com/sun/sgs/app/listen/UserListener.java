@@ -1,9 +1,9 @@
 
 package com.sun.sgs.app.listen;
 
-import com.sun.sgs.Channel;
-import com.sun.sgs.ManagedObject;
-import com.sun.sgs.User;
+import com.sun.sgs.app.Channel;
+import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.User;
 
 import java.nio.ByteBuffer;
 

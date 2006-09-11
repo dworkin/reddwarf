@@ -1,5 +1,5 @@
 
-package com.sun.sgs.kernel.impl;
+package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskThread;

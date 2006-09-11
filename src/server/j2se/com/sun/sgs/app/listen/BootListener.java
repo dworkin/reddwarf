@@ -1,7 +1,7 @@
 
 package com.sun.sgs.app.listen;
 
-import com.sun.sgs.ManagedObject;
+import com.sun.sgs.app.ManagedObject;
 
 
 /**

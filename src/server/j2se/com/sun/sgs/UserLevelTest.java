@@ -2,6 +2,8 @@
 package com.sun.sgs;
 
 import com.sun.sgs.app.DataManager;
+import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.app.ManagedRunnable;
 import com.sun.sgs.app.TaskManager;
 
 import com.sun.sgs.app.listen.BootListener;
@@ -9,6 +11,12 @@ import com.sun.sgs.app.listen.BootListener;
 
 /**
  * This is just a test driver for app-level code.
+ * <p>
+ * NOTE: This should be in the test hierarchy, but until we have a
+ * polished boot class we can't set that up to accept configuration
+ * and correctly load these boot listeners. In turn, that can't
+ * be done until the bootstrapping and manager access code is
+ * finished. So, for now, this class remains in the root package.
  *
  * @since 1.0
  * @author James Megquier

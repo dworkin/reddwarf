@@ -1,8 +1,8 @@
 
 package com.sun.sgs.kernel;
 
-import com.sun.sgs.ManagedRunnable;
-import com.sun.sgs.Quality;
+import com.sun.sgs.app.ManagedRunnable;
+import com.sun.sgs.app.Quality;
 
 import com.sun.sgs.service.Transaction;
 

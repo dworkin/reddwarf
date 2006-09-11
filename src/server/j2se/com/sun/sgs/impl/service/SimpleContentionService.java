@@ -1,5 +1,5 @@
 
-package com.sun.sgs.service.impl;
+package com.sun.sgs.impl.service;
 
 import com.sun.sgs.kernel.AppContext;
 import com.sun.sgs.kernel.TransactionProxy;
