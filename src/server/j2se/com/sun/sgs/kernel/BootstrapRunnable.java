@@ -3,9 +3,9 @@ package com.sun.sgs.kernel;
 
 import com.sun.sgs.ManagedReference;
 
-import com.sun.sgs.manager.DataManager;
+import com.sun.sgs.app.DataManager;
 
-import com.sun.sgs.manager.listen.BootListener;
+import com.sun.sgs.app.listen.BootListener;
 
 
 /**

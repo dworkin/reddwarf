@@ -1,12 +1,12 @@
 
-package com.sun.sgs.manager.impl;
+package com.sun.sgs.impl.manager;
 
 import com.sun.sgs.ManagedReference;
 import com.sun.sgs.TimerHandle;
 
-import com.sun.sgs.manager.TimerManager;
+import com.sun.sgs.app.TimerManager;
 
-import com.sun.sgs.manager.listen.TimerListener;
+import com.sun.sgs.app.listen.TimerListener;
 
 import com.sun.sgs.service.TimerService;
 

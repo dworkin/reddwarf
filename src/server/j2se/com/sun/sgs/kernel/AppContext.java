@@ -1,10 +1,10 @@
 
 package com.sun.sgs.kernel;
 
-import com.sun.sgs.manager.ChannelManager;
-import com.sun.sgs.manager.DataManager;
-import com.sun.sgs.manager.TaskManager;
-import com.sun.sgs.manager.TimerManager;
+import com.sun.sgs.app.ChannelManager;
+import com.sun.sgs.app.DataManager;
+import com.sun.sgs.app.TaskManager;
+import com.sun.sgs.app.TimerManager;
 
 
 /**

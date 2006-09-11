@@ -1,5 +1,5 @@
 
-package com.sun.sgs.manager.util;
+package com.sun.sgs.app.util;
 
 import com.sun.sgs.ManagedObject;
 import com.sun.sgs.ManagedReference;

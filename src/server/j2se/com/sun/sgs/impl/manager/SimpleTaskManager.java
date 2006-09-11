@@ -1,10 +1,10 @@
 
-package com.sun.sgs.manager.impl;
+package com.sun.sgs.impl.manager;
 
 import com.sun.sgs.ManagedReference;
 import com.sun.sgs.ManagedRunnable;
 
-import com.sun.sgs.manager.TaskManager;
+import com.sun.sgs.app.TaskManager;
 
 import com.sun.sgs.service.TaskService;
 

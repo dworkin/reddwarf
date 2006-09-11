@@ -1,5 +1,5 @@
 
-package com.sun.sgs.manager;
+package com.sun.sgs.app;
 
 import com.sun.sgs.Channel;
 import com.sun.sgs.ManagedReference;
@@ -8,8 +8,8 @@ import com.sun.sgs.User;
 
 import com.sun.sgs.kernel.TaskThread;
 
-import com.sun.sgs.manager.listen.ConnectionListener;
-import com.sun.sgs.manager.listen.UserListener;
+import com.sun.sgs.app.listen.ConnectionListener;
+import com.sun.sgs.app.listen.UserListener;
 
 import java.nio.ByteBuffer;
 

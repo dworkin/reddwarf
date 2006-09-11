@@ -1,10 +1,10 @@
 
 package com.sun.sgs;
 
-import com.sun.sgs.manager.DataManager;
-import com.sun.sgs.manager.TaskManager;
+import com.sun.sgs.app.DataManager;
+import com.sun.sgs.app.TaskManager;
 
-import com.sun.sgs.manager.listen.BootListener;
+import com.sun.sgs.app.listen.BootListener;
 
 
 /**

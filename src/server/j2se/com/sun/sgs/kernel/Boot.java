@@ -5,10 +5,10 @@ import com.sun.sgs.kernel.impl.SimpleAppContext;
 import com.sun.sgs.kernel.impl.SimpleResourceCoordinator;
 import com.sun.sgs.kernel.impl.SimpleTransactionCoordinator;
 
-import com.sun.sgs.manager.impl.SimpleChannelManager;
-import com.sun.sgs.manager.impl.SimpleDataManager;
-import com.sun.sgs.manager.impl.SimpleTaskManager;
-import com.sun.sgs.manager.impl.SimpleTimerManager;
+import com.sun.sgs.impl.manager.SimpleChannelManager;
+import com.sun.sgs.impl.manager.SimpleDataManager;
+import com.sun.sgs.impl.manager.SimpleTaskManager;
+import com.sun.sgs.impl.manager.SimpleTimerManager;
 
 import com.sun.sgs.service.impl.SimpleContentionService;
 import com.sun.sgs.service.impl.SimpleDataService;

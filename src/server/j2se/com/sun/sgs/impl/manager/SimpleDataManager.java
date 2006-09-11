@@ -1,10 +1,10 @@
 
-package com.sun.sgs.manager.impl;
+package com.sun.sgs.impl.manager;
 
 import com.sun.sgs.ManagedObject;
 import com.sun.sgs.ManagedReference;
 
-import com.sun.sgs.manager.DataManager;
+import com.sun.sgs.app.DataManager;
 
 import com.sun.sgs.service.DataService;
 

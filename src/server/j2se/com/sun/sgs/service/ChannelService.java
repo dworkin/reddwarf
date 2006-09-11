@@ -6,8 +6,8 @@ import com.sun.sgs.ManagedReference;
 import com.sun.sgs.Quality;
 import com.sun.sgs.User;
 
-import com.sun.sgs.manager.listen.ConnectionListener;
-import com.sun.sgs.manager.listen.UserListener;
+import com.sun.sgs.app.listen.ConnectionListener;
+import com.sun.sgs.app.listen.UserListener;
 
 import java.nio.ByteBuffer;
 

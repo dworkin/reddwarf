@@ -1,5 +1,5 @@
 
-package com.sun.sgs.manager;
+package com.sun.sgs.app;
 
 
 /**
