@@ -1,7 +1,7 @@
 
 package com.sun.sgs.impl.kernel;
 
-import com.sun.sgs.kernel.AppContext;
+import com.sun.sgs.app.AppContext;
 
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.DataManager;

@@ -1,7 +1,7 @@
 
 package com.sun.sgs.app;
 
-import com.sun.sgs.kernel.TaskThread;
+import com.sun.sgs.impl.kernel.TaskThread;
 
 import com.sun.sgs.app.listen.ConnectionListener;
 import com.sun.sgs.app.listen.UserListener;

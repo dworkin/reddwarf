@@ -1,9 +1,9 @@
 
 package com.sun.sgs.impl.kernel;
 
-import com.sun.sgs.kernel.ResourceCoordinator;
-import com.sun.sgs.kernel.TaskThread;
-import com.sun.sgs.kernel.TransactionCoordinator;
+import com.sun.sgs.impl.kernel.ResourceCoordinator;
+import com.sun.sgs.impl.kernel.TaskThread;
+import com.sun.sgs.service.TransactionCoordinator;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
 

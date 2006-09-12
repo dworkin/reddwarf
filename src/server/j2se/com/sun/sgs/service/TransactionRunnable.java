@@ -1,7 +1,10 @@
 
-package com.sun.sgs.kernel;
+package com.sun.sgs.service;
 
+import com.sun.sgs.impl.kernel.Task;
+import com.sun.sgs.impl.kernel.TransactionalTaskThread;
 import com.sun.sgs.service.Transaction;
+import com.sun.sgs.service.TransactionCoordinator;
 
 
 /**

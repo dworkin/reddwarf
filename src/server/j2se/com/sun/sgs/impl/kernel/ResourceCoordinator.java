@@ -1,5 +1,7 @@
 
-package com.sun.sgs.kernel;
+package com.sun.sgs.impl.kernel;
+
+import com.sun.sgs.impl.kernel.TaskThread;
 
 
 /**

@@ -1,9 +1,5 @@
 
-package com.sun.sgs.kernel;
-
-import com.sun.sgs.impl.kernel.SimpleAppContext;
-import com.sun.sgs.impl.kernel.SimpleResourceCoordinator;
-import com.sun.sgs.impl.kernel.SimpleTransactionCoordinator;
+package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.impl.manager.SimpleChannelManager;
 import com.sun.sgs.impl.manager.SimpleDataManager;
@@ -13,6 +9,12 @@ import com.sun.sgs.impl.manager.SimpleTimerManager;
 import com.sun.sgs.impl.service.SimpleContentionService;
 import com.sun.sgs.impl.service.SimpleDataService;
 import com.sun.sgs.impl.service.SimpleTaskService;
+import com.sun.sgs.service.TransactionRunnable;
+import com.sun.sgs.service.TransactionProxy;
+
+import com.sun.sgs.app.AppContext;
+import com.sun.sgs.impl.kernel.ResourceCoordinator;
+import com.sun.sgs.impl.kernel.TaskQueue;
 
 
 /**
@@ -104,7 +106,7 @@ public final class Boot
         }
 
         // create a proxy instance to share the transaction state
-        TransactionProxy transactionProxy = new TransactionProxy();
+        TransactionProxy transactionProxy = new SimpleTransactionProxy();
 
         // setup a single test application
         testApp = setupApp(transactionProxy, numThreads, resourceCoordinator);

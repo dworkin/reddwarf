@@ -1,5 +1,5 @@
 
-package com.sun.sgs.kernel;
+package com.sun.sgs.service;
 
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ManagedRunnable;

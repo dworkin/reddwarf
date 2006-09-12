@@ -1,6 +1,7 @@
 
-package com.sun.sgs.kernel;
+package com.sun.sgs.impl.kernel;
 
+import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.ManagedRunnable;
 import com.sun.sgs.app.Quality;
 

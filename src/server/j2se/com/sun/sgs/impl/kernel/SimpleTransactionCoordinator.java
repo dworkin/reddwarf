@@ -3,7 +3,7 @@ package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.app.Quality;
 
-import com.sun.sgs.kernel.TransactionCoordinator;
+import com.sun.sgs.service.TransactionCoordinator;
 
 import com.sun.sgs.service.Transaction;
 

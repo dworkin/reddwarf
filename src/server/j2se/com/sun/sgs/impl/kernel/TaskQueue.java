@@ -1,6 +1,9 @@
-package com.sun.sgs.kernel;
+package com.sun.sgs.impl.kernel;
 
+import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.Quality;
+import com.sun.sgs.impl.kernel.ResourceCoordinator;
+import com.sun.sgs.impl.kernel.Task;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
 

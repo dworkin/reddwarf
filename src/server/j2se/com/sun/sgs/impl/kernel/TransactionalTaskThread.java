@@ -1,5 +1,7 @@
 
-package com.sun.sgs.kernel;
+package com.sun.sgs.impl.kernel;
+
+import com.sun.sgs.impl.kernel.TaskThread;
 
 import com.sun.sgs.service.Transaction;
 
@@ -9,12 +11,18 @@ import com.sun.sgs.service.Transaction;
  * used by the system. It is a <code>TaskThread</code> that can optionally
  * store transaction state. This implementation is package-private so that
  * only select consumers can actually access the transaction state.
- *
+ * <p>
+ * FIXME: This has been exposed as a public class to make the initial
+ * re-factoring work correctly, however it will be hidden again once the
+ * new design is implemented. Basically, it cannot easily be hidden
+ * without making several related changes, and those are going to be
+ * done after the package layout is fixed.
+ * 
  * @since 1.0
  * @author James Megquier
- * @suthor Seth Proctor
+ * @author Seth Proctor
  */
-class TransactionalTaskThread extends TaskThread
+public class TransactionalTaskThread extends TaskThread
 {
 
     // the current transaction for this thread

@@ -4,8 +4,8 @@ package com.sun.sgs.impl.service;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 
-import com.sun.sgs.kernel.AppContext;
-import com.sun.sgs.kernel.TransactionProxy;
+import com.sun.sgs.app.AppContext;
+import com.sun.sgs.service.TransactionProxy;
 
 import com.sun.sgs.service.ContentionHandler;
 import com.sun.sgs.service.ContentionService;

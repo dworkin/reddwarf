@@ -1,9 +1,7 @@
 
-package com.sun.sgs.kernel;
+package com.sun.sgs.service;
 
 import com.sun.sgs.app.Quality;
-
-import com.sun.sgs.service.Transaction;
 
 
 /**

@@ -4,13 +4,13 @@ package com.sun.sgs.impl.service;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ManagedRunnable;
 
-import com.sun.sgs.kernel.AppContext;
-import com.sun.sgs.kernel.ReferenceRunnable;
-import com.sun.sgs.kernel.Task;
-import com.sun.sgs.kernel.TaskQueue;
-import com.sun.sgs.kernel.TaskThread;
-import com.sun.sgs.kernel.TransactionProxy;
-import com.sun.sgs.kernel.TransactionRunnable;
+import com.sun.sgs.app.AppContext;
+import com.sun.sgs.service.ReferenceRunnable;
+import com.sun.sgs.impl.kernel.Task;
+import com.sun.sgs.impl.kernel.TaskQueue;
+import com.sun.sgs.impl.kernel.TaskThread;
+import com.sun.sgs.service.TransactionProxy;
+import com.sun.sgs.service.TransactionRunnable;
 
 import com.sun.sgs.service.NotPreparedException;
 import com.sun.sgs.service.TaskService;

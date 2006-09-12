@@ -1,5 +1,5 @@
 
-package com.sun.sgs.kernel;
+package com.sun.sgs.app;
 
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.DataManager;
