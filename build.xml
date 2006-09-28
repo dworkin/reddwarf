@@ -21,6 +21,11 @@
   <property name="buildDocDir" location="${buildBaseDir}/doc"/>
   <property name="buildLibDir" location="${buildBaseDir}/lib"/>
 
+  <!-- Values for controlling compilation -->
+  <property name="javac.source" value="1.5" />
+  <property name="javac.compilerargs"
+	    value="-Xlint:unchecked,deprecation" />
+
   <!-- Values for the server -->
   <property name="serverClassDir" location="${buildClassDir}/server"/>
   <property name="serverJarFile" location="${buildLibDir}/sgs.jar"/>
@@ -29,8 +34,11 @@
   <!-- Values for the JavaDocs -->
   <property name="baseJavadocDir" location="${buildDocDir}/javadoc"/>
   <property name="serverJavadocDir" location="${baseJavadocDir}/server"/>
-  <property name="projName" value="Project Darkstar: Redstar"/>
+  <property name="projName" value="Sun Game Server"/>
   <property name="projVersion" value="0.2"/>
+  <property name="jdk.doc.api.url"
+	    value="http://java.sun.com/j2se/1.5/docs/api"/>
+  <property name="jdk.package.list" value="etc/jdk5.0_package_list"/>
 
   <!-- TARGET DEFINITIONS -->
 
@@ -40,10 +48,14 @@
   <!-- Builds the server -->
   <target name="build-server">
     <mkdir dir="${serverClassDir}"/>
+    <depend srcdir="j2se"
+	    destdir="${serverClassDir}"
+	    cache="${buildBaseDir}/depend"
+	    closure="true"/>
     <javac includeAntRuntime="no" debug="on" deprecation="on"
            srcdir="${serverSrcDir}" destdir="${serverClassDir}"
-           classpath="${serverClassDir}">
-      <!--<compilerarg value="-Xlint:unchecked"/>-->
+           classpath="${serverClassDir}" source="${javac.source}">
+      <compilerarg value="${javac.compilerargs}"/>
     </javac>
   </target>
 
@@ -66,8 +78,10 @@
     <javadoc sourcepath="${serverSrcDir}" destdir="${serverJavadocDir}"
              classpath="${serverClassDir}" packagenames="com.sun.*"
              overview="${serverSrcDir}/overview.html"
-             windowtitle="${projName}" doctitle="${projName}" author="no"
-             link="http://java.sun.com/j2se/1.5/docs/api">
+             windowtitle="${projName}" doctitle="${projName}" author="no">
+      <link href="${jdk.doc.api.url}"
+	    offline="true"
+	    packagelistLoc="${jdk.package.list}"/>
       <footer>
         <![CDATA[<font size="-1">Project Darkstar: Redstar version
         ${projVersion}</font>]]>

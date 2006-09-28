@@ -1,42 +1,115 @@
-
 package com.sun.sgs.app;
 
-import com.sun.sgs.impl.kernel.TaskThread;
-
+import java.io.Serializable;
 
 /**
- * This manager provides access to the task-related routines.
- *
- * @since 1.0
- * @author James Megquier
- * @author Seth Proctor
+ * Provides facilities for scheduling tasks.  Each task is a serializable
+ * object that can be scheduled to be run now, at some time in the future, or
+ * periodically.
  */
-public abstract class TaskManager
-{
+public interface TaskManager {
 
     /**
-     * Creates an instance of <code>TaskManager</code>.
-     */
-    protected TaskManager() {
-
-    }
-
-    /**
-     * Returns the instance of <code>TaskManager</code>.
+     * Schedules a task to run now.  The <code>TaskManager</code> will call the
+     * task's {@link Task#run run} method as soon as possible after the
+     * completion of the task in which this method is called, according to its
+     * scheduling algorithm.  <p>
      *
-     * @return the instance of <code>TaskManager</code>
+     * If the call to the <code>run</code> method throws an exception, that
+     * exception implements {@link ExceptionRetryStatus}, and its {@link
+     * ExceptionRetryStatus#shouldRetry shouldRetry} method returns
+     * <code>true</code>, then the <code>TaskManager</code> will make further
+     * attempts to run the task.  It will continue those attempts until either
+     * an attempt succeeds or it notices an exception is thrown that is not
+     * retryable.  The <code>TaskManager</code> is permitted to treat a
+     * non-retryable exception as a hint.  In particular, a task that throws a
+     * non-retryable exception may be retried if the node running the task
+     * crashes.
+     *
+     * @param	task the task to run
+     * @throws	IllegalArgumentException if <code>task</code> does not
+     *		implement {@link Serializable}
+     * @throws	TaskRejectedException if the <code>TaskManager</code> refuses
+     *		to accept the task because of resource limitations
+     * @throws	TransactionException if the operation failed because of a
+     *		problem with the current transaction
      */
-    public static TaskManager getInstance() {
-        return ((TaskThread)(Thread.currentThread())).getTask().
-            getAppContext().getTaskManager();
-    }
+    void scheduleTask(Task task);
 
     /**
-     * Queues a task to run.
+     * Schedules a task to run after a delay.  The <code>TaskManager</code>
+     * will wait for the specified number of milliseconds, and then call the
+     * task's {@link Task#run run} method as soon as possible after the
+     * completion of the task in which this method is called, according to its
+     * scheduling algorithm. <p>
      *
-     * @param taskReference the task to run
+     * If the call to the <code>run</code> method throws an exception, that
+     * exception implements {@link ExceptionRetryStatus}, and its {@link
+     * ExceptionRetryStatus#shouldRetry shouldRetry} method returns
+     * <code>true</code>, then the <code>TaskManager</code> will make further
+     * attempts to run the task.  It will continue those attempts until either
+     * an attempt succeeds or it notices an exception is thrown that is not
+     * retryable.  The <code>TaskManager</code> is permitted to treat a
+     * non-retryable exception as a hint.  In particular, a task that throws a
+     * non-retryable exception may be retried if the node running the task
+     * crashes.
+     *
+     * @param	task the task to run
+     * @param	delay the number of milliseconds to delay before running the
+     *		task
+     * @throws	IllegalArgumentException if <code>task</code> does not
+     *		implement {@link Serializable}, or if delay is less than
+     *		<code>0</code>
+     * @throws	TaskRejectedException if the <code>TaskManager</code> refuses
+     *		to accept the task because of resource limitations
+     * @throws	TransactionException if the operation failed because of a
+     *		problem with the current transaction
      */
-    public abstract void queueTask(ManagedReference<? extends ManagedRunnable>
-				   taskReference);
+    void scheduleTask(Task task, long delay);
 
+    /**
+     * Schedules a task to run periodically after a delay.  The
+     * <code>TaskManager</code> will wait for the specified number of
+     * milliseconds, and then call the task's {@link Task#run run} method as
+     * soon as possible after the completion of the task in which this method
+     * is called, according to its scheduling algorithm.  It will also arrange
+     * to run the task periodically at the specified interval following the
+     * delay until the {@link PeriodicTaskHandle#cancel
+     * PeriodicTaskHandle.cancel} method is called on the associated handle.
+     * Each time a task is successfully run, another task will be scheduled to
+     * run <code>period</code> milliseconds after the time that the task was
+     * scheduled to run in the previous period.  The <code>TaskManager</code>
+     * will wait until the current attempt to run the task has ended before
+     * making another attempt to run it, regardless of whether the attempts are
+     * for the same or different periods. <p>
+     *
+     * If the call to the <code>run</code> method throws an exception, that
+     * exception implements {@link ExceptionRetryStatus}, and its {@link
+     * ExceptionRetryStatus#shouldRetry shouldRetry} method returns
+     * <code>true</code>, then the <code>TaskManager</code> will make further
+     * attempts to run the task.  It will continue those attempts until either
+     * an attempt succeeds or it notices an exception is thrown that is not
+     * retryable.  Note that calls to <code>PeriodicTaskHandle.cancel</code>
+     * have no effect on attempts to retry a task after the first attempt.  The
+     * <code>TaskManager</code> is permitted to treat a non-retryable exception
+     * as a hint.  In particular, a task that throws a non-retryable exception
+     * may be retried if the node running the task crashes.
+     *
+     * @param	<T> the type of the task
+     * @param	task the task to run
+     * @param	delay the number of milliseconds to delay before running the
+     *		task
+     * @param	period the number of milliseconds that should elapse between
+     *		the starts of periodic attempts to run the task
+     * @return	a handle for managing the scheduling of the task
+     * @throws	IllegalArgumentException if <code>task</code> does not
+     *		implement {@link Serializable}, if delay is less than
+     *		<code>0</code>, or if period is less than <code>0</code>
+     * @throws	TaskRejectedException if the <code>TaskManager</code> refuses
+     *		to accept the task because of resource limitations
+     * @throws	TransactionException if the operation failed because of a
+     *		problem with the current transaction
+     */
+    <T extends Task> PeriodicTaskHandle<T> schedulePeriodicTask(
+        T task, long delay, long period);
 }
