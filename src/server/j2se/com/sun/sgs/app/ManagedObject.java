@@ -1,22 +1,17 @@
-
-
 package com.sun.sgs.app;
 
 import java.io.Serializable;
 
-
 /**
- * This is the core interface used to identify any classes that may be
- * managed by the system. Managed objects may be shared throughout the
- * system, and are accessed via <code>ManagedReference</code>s.
+ * A marker interface implemented by shared, persistent objects managed by
+ * {@link DataManager}.  Classes that implement <code>ManagedObject</code> must
+ * also implement {@link Serializable}, as should any non-managed objects they
+ * refer to.  Any instances of <code>ManagedObject</code> that a managed object
+ * refers to directly, or indirectly through non-managed objects, need to be
+ * referred to through instances of {@link ManagedReference}.
  *
- * @since 1.0
- * @author James Megquier
- * @author Seth Proctor
+ * @see		DataManager
+ * @see		ManagedReference
+ * @see		Serializable
  */
-public interface ManagedObject extends Serializable
-{
-
-
-
-}
+public interface ManagedObject { }

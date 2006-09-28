@@ -1,54 +1,58 @@
-
 package com.sun.sgs.app;
 
-import com.sun.sgs.app.ChannelManager;
-import com.sun.sgs.app.DataManager;
-import com.sun.sgs.app.TaskManager;
-import com.sun.sgs.app.TimerManager;
-
-
 /**
- * This interface provides access to the managers used within a specific
- * application context.
- * <p>
- * FIXME: we should figure out if this requires more detail (e.g., some
- * unique identitifer, the application's name, etc.) and whether access to
- * these managers should actually be protected. In the latter case, this
- * would presumably be done through a sub-interface, and the former detail
- * should still be exposed here.
- *
- * @since 1.0
- * @author James Megquier
- * @author Seth Proctor
+ * Provides access to facilities available in the current application context.
  */
-public interface AppContext {
+public abstract class AppContext {
+
+    /** Creates an instance of this class. */
+    protected AppContext() { }
 
     /**
-     * Returns the <code>ChannelManager</code> used by this Application.
+     * Returns the <code>ChannelManager</code> for use by the current
+     * application.  The object returned is not serializable, and should not be
+     * stored as part of a managed object.
      *
-     * @return the available <code>ChannelManager</code>
+     * @return	the <code>ChannelManager</code> for the current application
      */
-    public ChannelManager getChannelManager();
+    public static ChannelManager getChannelManager() {
+	throw new AssertionError("This method is not implemented");
+    }
 
     /**
-     * Returns the <code>DataManager</code> used by this Application.
+     * Returns the <code>DataManager</code> for use by the current application.
+     * The object returned is not serializable, and should not be stored as
+     * part of a managed object.
      *
-     * @return the available <code>DataManager</code>.
+     * @return	the <code>DataManager</code> for the current application
      */
-    public DataManager getDataManager();
+    public static DataManager getDataManager() {
+	throw new AssertionError("This method is not implemented");
+    }
 
     /**
-     * Returns the <code>TaskManager</code> used by this Application.
+     * Returns the <code>TaskManager</code> for use by the current application.
+     * The object returned is not serializable, and should not be stored as
+     * part of a managed object.
      *
-     * @return the available <code>TaskManager</code>.
+     * @return	the <code>TaskManager</code> for the current application
      */
-    public TaskManager getTaskManager();
+    public static TaskManager getTaskManager() {
+	throw new AssertionError("This method is not implemented");
+    }
 
     /**
-     * Returns the <code>TimerManager</code> used by this Application.
+     * Returns a manager of the specified type for use by the current
+     * application.  The object returned is not serializable, and should not be
+     * stored as part of a managed object.
      *
-     * @return the available <code>TimerManager</code>.
+     * @param	<T> the type of the manager
+     * @param	type a class representing the type of the manager
+     * @return	the manager of the specified type for the current application
+     * @throws	ManagerNotFoundException if no manager is found for the
+     *		specified type
      */
-    public TimerManager getTimerManager();
-
+    public static <T> T getManager(Class<T> type) {
+	throw new AssertionError("This method is not implemented");
+    }
 }
