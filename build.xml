@@ -42,18 +42,21 @@
 
   <!-- TARGET DEFINITIONS -->
 
+  <!-- Builds everything -->
+  <target name="all" depends="jar, javadoc, checkstyle"/>
+
   <!-- Builds a debug version of the complete project -->
   <target name="build" depends="build-server"/>
 
   <!-- Builds the server -->
   <target name="build-server">
-    <mkdir dir="${build.dir}/classes/server}"/>
+    <mkdir dir="${build.dir}/classes/server"/>
     <depend srcdir="j2se"
-	    destdir="${build.dir}/classes/server}"
+	    destdir="${build.dir}/classes/server"
 	    cache="${build.dir}/depend"
 	    closure="true"/>
     <javac includeAntRuntime="no" debug="on" deprecation="on"
-           srcdir="src/server/j2se" destdir="${build.dir}/classes/server}"
+           srcdir="src/server/j2se" destdir="${build.dir}/classes/server"
            classpath="${build.dir}/classes/server" source="${javac.source}">
       <compilerarg value="${javac.compilerargs}"/>
     </javac>
@@ -85,7 +88,7 @@
 	    packagelistLoc="${jdk.package.list}"/>
       <footer>
         <![CDATA[<font size="-1">Sun Game Server, Version
-        ${projVersion}</font>]]>
+        ${project.version}</font>]]>
       </footer>
       <bottom>
         <![CDATA[<font size="-1">Copyright 2006 Sun Microsystems,
@@ -127,7 +130,7 @@
 
   <!-- Convert from package names to filenames -->
   <target name="-checkstyle.includes">
-    <mkdir dir="${buildBaseDir}"/>
+    <mkdir dir="${build.dir}"/>
     <echo message="${checkstyle.packages}"
 	  file="${checkstyle.packages.file}"/>
     <loadfile srcFile="${checkstyle.packages.file}"
