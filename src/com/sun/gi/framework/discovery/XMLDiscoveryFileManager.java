@@ -235,23 +235,26 @@ public class XMLDiscoveryFileManager implements Runnable {
                 }
             }
             // now do user managers
-            int userManagerCount = Integer.parseInt(statusReport.getParameter(
-                    gamePrefix + ".umgr", "count"));
-            for (int u = 0; u < userManagerCount; u++) {
-                String umgrPrefix = gamePrefix + ".umgr." + u;
-                String clientClassName = statusReport.getParameter(umgrPrefix,
-                        "clientClassName");
-                UserManagerRecord urec = new UserManagerRecord(clientClassName);
-                grec.addUserManager(urec);
-                // do umgr params
-                int paramCount = Integer.parseInt(statusReport.getParameter(
-                        umgrPrefix + ".params", "count"));
-                for (int p = 0; p < paramCount; p++) {
-                    String key = statusReport.getParameter(umgrPrefix
-                            + ".params.keys", Integer.toString(p));
-                    String value = statusReport.getParameter(umgrPrefix
-                            + ".params.values", Integer.toString(p));
-                    urec.setParameter(key, value);
+            String umgrCountString =
+                    statusReport.getParameter(gamePrefix + ".umgr", "count");
+            if (umgrCountString != null) {
+                int userManagerCount = Integer.parseInt(umgrCountString);
+                for (int u = 0; u < userManagerCount; u++) {
+                    String umgrPrefix = gamePrefix + ".umgr." + u;
+                    String clientClassName = statusReport.getParameter(umgrPrefix,
+                            "clientClassName");
+                    UserManagerRecord urec = new UserManagerRecord(clientClassName);
+                    grec.addUserManager(urec);
+                    // do umgr params
+                    int paramCount = Integer.parseInt(statusReport.getParameter(
+                            umgrPrefix + ".params", "count"));
+                    for (int p = 0; p < paramCount; p++) {
+                        String key = statusReport.getParameter(umgrPrefix
+                                + ".params.keys", Integer.toString(p));
+                        String value = statusReport.getParameter(umgrPrefix
+                                + ".params.values", Integer.toString(p));
+                        urec.setParameter(key, value);
+                    }
                 }
             }
         }
