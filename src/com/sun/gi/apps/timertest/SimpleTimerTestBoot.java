@@ -82,7 +82,6 @@
 
 package com.sun.gi.apps.timertest;
 
-import com.sun.gi.gloutils.pdtimer.PDTimer;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimBoot;
 import com.sun.gi.logic.SimTask;
@@ -90,31 +89,24 @@ import com.sun.gi.logic.SimTimerListener;
 import com.sun.gi.logic.SimTask.ACCESS_TYPE;
 
 /**
- * @author Jeff Kesselman
+ * @author James Megquier
  * @version 1.0
  */
-public class TimerTestBoot implements SimBoot<TimerTestBoot>
+public class SimpleTimerTestBoot implements SimBoot<SimpleTimerTestBoot>, SimTimerListener
 {
     private static final long serialVersionUID = 1L;
 
-    private GLOReference<PDTimer> timerRef = null;
-
-    public void boot(GLOReference<? extends TimerTestBoot> gloRef,
+    public void boot(GLOReference<? extends SimpleTimerTestBoot> gloRef,
             boolean firstBoot)
     {
-        System.out.println("TimerTestBoot running");
-
+        System.out.println("SimpleTimerTestBoot running");
 	SimTask task = SimTask.getCurrent();
-	PDTimer timer;
-	if (firstBoot) { // not instantiated yet
-	    timer = new PDTimer(task);
-	    timerRef = task.createGLO(timer);
-	    GLOReference<TimerCount> tcRef = task.createGLO(new TimerCount());
-	    timer.addTimerEvent(task, ACCESS_TYPE.GET, 1, true, tcRef,
-		    "increment", new Object[] {});
-	} else {
-	    timer = timerRef.get(task);
-	}
-	timer.start(task, 1);
+ 
+        // Set the delay to 1ms to get the minimum tick size of the server */
+        task.registerTimerEvent(ACCESS_TYPE.GET, 1, true, gloRef);
+    }
+
+    public void timerEvent(long eventID) {
+        System.out.format("[%d] tick\n", System.currentTimeMillis());
     }
 }

@@ -9,6 +9,8 @@
     <property name="optimize" value="true" />
     <property name="deprecated" value="true" />
     <property name="default.lint" value="all,-unchecked" />
+    
+    <property name="sgs.framework.timer.heartbeat" value="100" />
 
     <property name="jrms.version" value="1.1" />
     <property name="derby.version" value="10.1.2.1" />
@@ -473,6 +475,24 @@
 	    <classpath refid="j2se.server.classpath" />
 	    <sysproperty key="java.util.logging.config.file"
 			 file="logging.properties" />
+	    <sysproperty key="sgs.framework.timer.heartbeat"
+                         value="${sgs.framework.timer.heartbeat}" />
+	</java>
+    </target>
+
+    <target name="nbprof.server">
+        <fail unless="netbeans.home">This target can only run inside the NetBeans IDE.</fail>
+        <nbprofiledirect>
+	    <classpath refid="j2se.server.classpath" />
+        </nbprofiledirect>
+	<java dir="${release.dir}" jar="${release.dir}/SunGameServer.jar" failonerror="true" fork="yes">
+            <jvmarg value="${profiler.info.jvmargs.agent}"/>
+	    <arg value="-V" />
+	    <classpath refid="j2se.server.classpath" />
+	    <sysproperty key="java.util.logging.config.file"
+			 file="logging.properties" />
+	    <sysproperty key="sgs.framework.timer.heartbeat"
+                         value="${sgs.framework.timer.heartbeat}" />
 	</java>
     </target>
 
@@ -483,6 +503,8 @@
 	    <classpath refid="j2se.server.classpath" />
 	    <sysproperty key="java.util.logging.config.file"
 			 file="logging.properties" />
+	    <sysproperty key="sgs.framework.timer.heartbeat"
+                         value="${sgs.framework.timer.heartbeat}" />
 	</java>
     </target>
 

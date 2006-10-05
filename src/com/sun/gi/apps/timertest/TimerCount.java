@@ -95,6 +95,8 @@ public class TimerCount implements GLO {
     long tickCount = 0;
 
     public void increment() {
-        System.out.println("Tick count = " + tickCount++);
+        ++tickCount;
+        System.out.format("[%d] tick count = %d\n",
+                System.currentTimeMillis(), tickCount);
     }
 }

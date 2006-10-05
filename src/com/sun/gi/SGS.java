@@ -128,23 +128,18 @@ public class SGS {
     SimKernel kernel;
    // ObjectStore ostore;
     private boolean verbose = false;
-    private String installFile = "file:SGS-apps.conf";
     //private static final long REPORTTTL = 1000;
     private Deployer deployer;
     private ManagerAgent agent;
     private XMLDiscoveryFileManager localDiscoveryXMLMgr;
 
     public SGS() {
-	String verboseString = System.getProperty("sgs.framework.verbose");
-	if (verboseString != null) {
-	    verbose = verboseString.equalsIgnoreCase("true");
-	}
+	String verboseProp = System.getProperty("sgs.framework.verbose", "false");
+	verbose = Boolean.parseBoolean(verboseProp);
 	try {
 	    kernel = new SimKernelImpl();
-	    String installProperty = System.getProperty("sgs.framework.installurl");
-	    if (installProperty != null) {
-		installFile = installProperty;
-	    }
+	    String installFile =
+                    System.getProperty("sgs.framework.installurl", "file:SGS-apps.conf");
 	    if (verbose) {
 		System.err.println("Loading configuration from: " + installFile);
 	    }
@@ -155,11 +150,8 @@ public class SGS {
 	    //transportManager = new LRMPTransportManager();
 	    transportManager = new NullTransportManager();
 	    //reportManager = new ReportManagerImpl(transportManager, REPORTTTL);
-	    long heartbeat = 1000; // 1 sec heartbeat default
-	    String hbprop = System.getProperty("sgs.framework.timer.heartbeat");
-	    if (hbprop != null) {
-		heartbeat = Long.parseLong(hbprop);
-	    }
+	    String hbprop = System.getProperty("sgs.framework.timer.heartbeat", "100");
+            long heartbeat = Math.max(Long.parseLong(hbprop), 1);
 	    timerManager = new TimerManagerImpl(heartbeat);
 	    kernel.setTimerManager(timerManager);
 
