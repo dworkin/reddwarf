@@ -33,6 +33,7 @@ public interface DataManager {
      * @param	<T> the type of the object
      * @param	name the name
      * @param	type a class representing the type of the object
+     * @return	the object bound to the name
      * @throws	ClassCastException if the object bound to the name is not of
      *		the specified type
      * @throws	NameNotBoundException if no object is bound to the name
