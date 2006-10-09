@@ -28,9 +28,11 @@ import java.util.Collection;
  *
  * <p>If a channel is created with a {@link ChannelListener}, then
  * when any client session sends a message on that channel, that
- * listener's {@link ChannelListener#sentMessage(Channel,Message)
- * sentMessage} method is invoked with that channel and the message.
- * If the server needs to receive notification of messages sent by an
+ * listener's {@link ChannelListener#receivedMessage(Channel,Session,byte[])
+ * receivedMessage} method is invoked with that channel, the client session,
+ * and the message.
+ *
+ * <p>If the server needs to receive notification of messages sent by an
  * individual client session on a channel, the server can register a
  * {@link ChannelListener} for that individual client session by
  * invoking the {@link Channel#setListener(ChannelListener,Session)}
@@ -199,11 +201,11 @@ public interface Channel {
      * <p>If the specified <code>listener</code> is
      * non-<code>null</code>, then when the specified client session
      * sends a message on this channel, the specified listener's
-     * {@link ChannelListener#sentMessage(Channel,Message)
-     * sentMessage} method is invoked with this channel and the
-     * message.  The specified listener is not invoked for messages
-     * that the server sends on this channel via one of the channel's
-     * <code>send</code> methods.
+     * {@link ChannelListener#receivedMessage(Channel,Session,byte[])
+     * receivedMessage} method is invoked with this channel, the
+     * session, and the message.  The specified listener is not
+     * invoked for messages that the server sends on this channel via
+     * one of the channel's <code>send</code> methods.
      *
      * <p>If the specified <code>listener</code> is <code>null</code>,
      * then, if a listener was specified for this channel by a

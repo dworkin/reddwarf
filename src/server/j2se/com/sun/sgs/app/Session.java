@@ -69,8 +69,8 @@ public interface Session {
     /**
      * Sets the listener for this session.  If the client associated
      * with this session sends a message to the server, the specified
-     * <code>listener</code>'s {@link SessionListener#sentMessage
-     * sentMessage} method is invoked with the contents of the
+     * <code>listener</code>'s {@link SessionListener#receivedMessage
+     * receivedMessage} method is invoked with the contents of the
      * message.  If the client associated with this session
      * disconnects, the specified <code>listener</code>'s {@link
      * SessionListener#disconnected disconnected} method is invoked

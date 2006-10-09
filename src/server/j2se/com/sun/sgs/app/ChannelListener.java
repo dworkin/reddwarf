@@ -35,12 +35,13 @@ import java.io.Serializable;
 public interface ChannelListener {
 
     /**
-     * Notifies this listener that the specified specified message was
-     * sent on the specified channel.
+     * Notifies this listener that the specified message, sent on the
+     * specified channel by the specified session, was received.
      *
      * @param channel a channel
-     * @param message a message
+     * @param session a session
+     * @param message byte array containing a message
      */
-    void sentMessage(Channel channel, Message message);
+    void receivedMessage(Channel channel, Session session, byte[] message);
     
 }

@@ -30,12 +30,12 @@ import java.io.Serializable;
 public interface SessionListener {
 
     /**
-     * Notifies this listener that the associated session's client sent
-     * the specified message.
+     * Notifies this listener that the specified message, sent by the
+     * associated session's client, was received.
      *
-     * @param message a message
+     * @param message byte array containing a message
      */
-    void sentMessage(Message message);
+    void receivedMessage(byte[] message);
 
     /**
      * Notifies this listener that the associated session's client has

@@ -22,11 +22,11 @@ public interface ChannelManager {
      * <p>If the specified <code>listener</code> is
      * non-<code>null</code>, then when any client session sends a
      * message on the returned channel, the specified listener's
-     * {@link ChannelListener#sentMessage(Channel,Message)
-     * sentMessage} method is invoked with this channel and the
-     * message.  The specified listener is not invoked for messages
-     * that the server sends on the channel via one of the channel's
-     * <code>send</code> methods.
+     * {@link ChannelListener#receivedMessage(Channel,Session,byte[])
+     * receivedMessage} method is invoked with this channel, the
+     * session, and the message.  The specified listener is not
+     * invoked for messages that the server sends on the channel via
+     * one of the channel's <code>send</code> methods.
      *
      * <p>Messages sent on the returned channel are delivered
      * according to the specified delivery requirement.
