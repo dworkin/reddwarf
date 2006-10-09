@@ -1,0 +1,238 @@
+package com.sun.sgs.app;
+
+import java.util.Collection;
+
+/**
+ * Interface representing a communication group, a
+ * <code>Channel</code>, consisting of multiple client sessions and
+ * the server.
+ *
+ * <p>A channel is created by invoking the {@link
+ * ChannelManager#getChannel(String) ChannelManager.createChannel}
+ * method with a name for the channel, a {@link ChannelListener}, and a
+ * {@link Delivery} requirement.  A client {@link Session} can be
+ * added or removed from a channel using that <code>Channel</code>'s
+ * {@link #join join} and {@link #leave leave} methods respectively.
+ * All client sessions can be removed from a channel by invoking
+ * {@link #leaveAll leaveAll} on the channel.
+ *
+ * <p>The server can send a message to any or all client sessions
+ * joined to a channel by using one of the channel's <code>send</code>
+ * methods.  Note that the methods of this interface are invoked
+ * within the context of an executing {@link Task}; as a result, a
+ * message sent to client sessions using one of the channel's
+ * <code>send</code> methods will not be sent until after its
+ * corresponding task completes.  Messages sent on a channel will be
+ * delivered according to that channel's {@link Delivery} requirement,
+ * specified at channel creation time.
+ *
+ * <p>If a channel is created with a {@link ChannelListener}, then
+ * when any client session sends a message on that channel, that
+ * listener's {@link ChannelListener#receivedMessage(Channel,Session,byte[])
+ * receivedMessage} method is invoked with that channel, the client session,
+ * and the message.
+ *
+ * <p>If the server needs to receive notification of messages sent by an
+ * individual client session on a channel, the server can register a
+ * {@link ChannelListener} for that individual client session by
+ * invoking the {@link Channel#setListener(ChannelListener,Session)}
+ * method with the channel listener and the session.  No registered
+ * listeners are notified of messages sent by the server on the
+ * channel; listeners are only notified (as described above) when
+ * client sessions send messages on the channel.
+ *
+ * <p>A client session joined to one or more channels may become
+ * disconnected due to the client logging out or due to other factors
+ * such as forced disconnection or network failure.  If a client
+ * session becomes disconnected, then for each channel the session is
+ * joined to:
+ * <ul>
+ * <li> that client session is removed from the channel
+ * <li> if an individual <code>ChannelListener</code> is registered
+ * for that session, then that listener is unregistered from the
+ * channel
+ * </ul>
+ *
+ * <p>When the server is finished using a channel, the server should
+ * invoke that channel's {@link #close close} method so that its
+ * resources can be reclaimed and its named binding removed.  Once a
+ * channel is closed, any of its side-effecting operations will throw
+ * {@link IllegalStateException} if invoked.
+ *
+ * @see ChannelManager#createChannel ChannelManager.createChannel
+ * @see ChannelManager#getChannel ChannelManager.getChannel
+ */
+public interface Channel {
+
+    /**
+     * Returns the name bound to this channel.
+     *
+     * @return the name bound to this channel
+     *
+     * @throws TransactionException if the operation failed because of
+     * a problem with the current transaction
+     */
+    String getName();
+
+
+    /**
+     * Returns the delivery requirement of this channel.
+     *
+     * @return the delivery requirement
+     *
+     * @throws TransactionException if the operation failed because of
+     * a problem with the current transaction
+     */
+    Delivery getDeliveryRequirement();
+
+    /**
+     * Adds a session to this channel.  If the specified session is
+     * already joined to this channel, then no action is taken.
+     *
+     * @param session a session
+     *
+     * @throws IllegalStateException if this channel is closed
+     * @throws TransactionException if the operation failed because of
+     * a problem with the current transaction
+     */
+    void join(Session session);
+
+    /**
+     * Removes a session from this channel.  If the specified session
+     * is not joined to this channel, then no action is taken.
+     *
+     * <p>If an individual {@link ChannelListener} is registered for
+     * the specified session, that listener is unregistered.
+     *
+     * @param session a session
+     *
+     * @throws IllegalStateException if this channel is closed
+     * @throws TransactionException if the operation failed because of
+     * a problem with the current transaction
+     */
+    void leave(Session session);
+
+    /**
+     * Removes all sessions from this channel.
+     *
+     * <p>Each {@link ChannelListener} registered for an individual
+     * session on this channel is unregistered.
+     *
+     * @throws IllegalStateException if this channel is closed
+     * @throws TransactionException if the operation failed because of
+     * a problem with the current transaction
+     */
+    void leaveAll();
+
+    /**
+     * Returns <code>true</code> if this channel has sessions joined
+     * to it, otherwise returns <code>false</code>.
+     *
+     * @return <code>true</code> if this channel has sessions joined
+     * to it, otherwise returns <code>false</code>.
+     *
+     * @throws IllegalStateException if this channel is closed
+     * @throws TransactionException if the operation failed because of
+     * a problem with the current transaction
+     */
+    boolean hasSessions();
+
+    /**
+     * Returns a collection containing the sessions joined to this channel.
+     *
+     * <p>Note: This operation may be expensive, so it should be used
+     * judiciously.
+     * 
+     * @return a collection containing the sessions joined to this channel
+     *
+     * @throws IllegalStateException if this channel is closed
+     * @throws TransactionException if the operation failed because of
+     * a problem with the current transaction
+     */
+    Collection<Session> getSessions();
+
+    /**
+     * Sends a message with the specified contents to all sessions
+     * joined to this channel.  If no sessions are joined to this
+     * channel, then no action is taken.
+     *
+     * @param contents message contents
+     *
+     * @throws IllegalStateException if this channel is closed
+     * @throws TransactionException if the operation failed because of
+     * a problem with the current transaction
+     */
+    void send(byte[] contents);
+
+    /**
+     * Sends a message with the specified contents to the specified
+     * recipient session.  If the specified recipient session is not
+     * joined to this channel, then no action is taken.
+     *
+     * @param recipient a recipient
+     * @param contents message contents
+     *
+     * @throws IllegalStateException if this channel is closed
+     * @throws TransactionException if the operation failed because of
+     * a problem with the current transaction
+     */
+    void send(Session recipient, byte[] contents);
+
+    /**
+     * Sends a message with the specified contents to the sessions in
+     * the specified collection.  Any specified recipient sessions that are
+     * not currently joined to the channel are ignored.
+     *
+     * @param recipients a collection of recipient sessions
+     * @param contents message contents
+     *
+     * @throws IllegalStateException if this channel is closed
+     * @throws TransactionException if the operation failed because of
+     * a problem with the current transaction
+     */
+    void send(Collection<Session> recipients, byte[] contents);
+
+    /**
+     * Sets the listener for messages sent by the specified client
+     * session on this channel, replacing the previous listener set
+     * for the specified session.  If the specified session is not
+     * joined to this channel, then this operation has no effect.
+     *
+     * <p>If the specified <code>listener</code> is
+     * non-<code>null</code>, then when the specified client session
+     * sends a message on this channel, the specified listener's
+     * {@link ChannelListener#receivedMessage(Channel,Session,byte[])
+     * receivedMessage} method is invoked with this channel, the
+     * session, and the message.  The specified listener is not
+     * invoked for messages that the server sends on this channel via
+     * one of the channel's <code>send</code> methods.
+     *
+     * <p>If the specified <code>listener</code> is <code>null</code>,
+     * then, if a listener was specified for this channel by a
+     * previous call to this method, that listener will no longer be
+     * notified when the specified client session sends message on
+     * this channel.
+     *
+     * <p>Note: This operation has no effect on notifications to the
+     * channel listener specified when this channel was created.
+     
+     * @param listener a channel listener, or <code>null</code>
+     * @param session a session
+     *
+     * @throws IllegalArgumentException if <code>listener</code> is
+     * not <code>Serializable</code>
+     * @throws IllegalStateException if this channel is closed
+     * @throws TransactionException if the operation failed because of
+     * a problem with the current transaction
+     */
+    void setListener(ChannelListener listener, Session session);
+
+    /**
+     * Closes this channel and removes its named binding.  If this
+     * channel is already closed, then no action is taken.
+     *
+     * @throws TransactionException if the operation failed because of
+     * a problem with the current transaction
+     */
+    void close();
+}
