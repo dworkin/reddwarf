@@ -53,11 +53,11 @@ import java.util.Collection;
  * channel
  * </ul>
  *
- * <p>When the server is finished using a channel, the server should
- * invoke that channel's {@link #close close} method so that its
- * resources can be reclaimed and its named binding removed.  Once a
- * channel is closed, any of its side-effecting operations will throw
- * {@link IllegalStateException} if invoked.
+ * <p>When the application is finished using a channel, the
+ * application should invoke that channel's {@link #close close}
+ * method so that its resources can be reclaimed and its named binding
+ * removed.  Once a channel is closed, any of its side-effecting
+ * operations will throw {@link IllegalStateException} if invoked.
  *
  * @see ChannelManager#createChannel ChannelManager.createChannel
  * @see ChannelManager#getChannel ChannelManager.getChannel

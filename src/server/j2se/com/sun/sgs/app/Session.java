@@ -1,5 +1,7 @@
 package com.sun.sgs.app;
 
+import java.nio.ByteBuffer;
+
 /**
  * Interface representing a single, connected login session between a
  * client and the server.
@@ -55,6 +57,14 @@ public interface Session {
     String getName();
 
     /**
+     * Returns a byte buffer containing the representation of the
+     * client address for this session.
+     *
+     * @return the representation of the client address for this session
+     */
+    ByteBuffer getClientAddress();
+
+    /**
      * Sends a message with the specified contents to this session's
      * client.
      *
@@ -90,6 +100,7 @@ public interface Session {
      *
      * @throws IllegalArgumentException if <code>listener</code> is
      * not <code>Serializable</code>
+     * @throws IllegalStateException if this session is disconnected
      * @throws TransactionException if the operation failed because of
      * a problem with the current transaction
      */

@@ -31,9 +31,15 @@
   <property name="serverJarFile" location="${buildLibDir}/sgs.jar"/>
   <property name="serverSrcDir" location="${srcDir}/server/j2se"/>
 
+  <!-- Values for the client -->
+  <property name="clientClassDir" location="${buildClassDir}/client"/>
+  <property name="clientJarFile" location="${buildLibDir}/client.jar"/>
+  <property name="clientSrcDir" location="${srcDir}/client/j2se"/>
+
   <!-- Values for the JavaDocs -->
   <property name="baseJavadocDir" location="${buildDocDir}/javadoc"/>
   <property name="serverJavadocDir" location="${baseJavadocDir}/server"/>
+  <property name="clientJavadocDir" location="${baseJavadocDir}/client"/>
   <property name="projName" value="Sun Game Server"/>
   <property name="projVersion" value="0.2"/>
   <property name="jdk.doc.api.url"
@@ -43,7 +49,7 @@
   <!-- TARGET DEFINITIONS -->
 
   <!-- Builds a debug version of the complete project -->
-  <target name="build" depends="build-server"/>
+  <target name="build" depends="build-server,build-client"/>
 
   <!-- Builds the server -->
   <target name="build-server">
@@ -55,6 +61,20 @@
     <javac includeAntRuntime="no" debug="on" deprecation="on"
            srcdir="${serverSrcDir}" destdir="${serverClassDir}"
            classpath="${serverClassDir}" source="${javac.source}">
+      <compilerarg value="${javac.compilerargs}"/>
+    </javac>
+  </target>
+
+  <!-- Builds the client -->
+  <target name="build-client">
+    <mkdir dir="${clientClassDir}"/>
+    <depend srcdir="j2se"
+	    destdir="${clientClassDir}"
+	    cache="${buildBaseDir}/depend"
+	    closure="true"/>
+    <javac includeAntRuntime="no" debug="on" deprecation="on"
+           srcdir="${clientSrcDir}" destdir="${clientClassDir}"
+           classpath="${clientClassDir}" source="${javac.source}">
       <compilerarg value="${javac.compilerargs}"/>
     </javac>
   </target>
@@ -71,13 +91,36 @@
   <target name="doc" depends="javadoc"/>
 
   <!-- Build the JavaDoc from the source -->
-  <target name="javadoc" depends="javadoc-server"/>
+  <target name="javadoc" depends="javadoc-server,javadoc-client"/>
 
   <!-- Build the server JavaDoc -->
   <target name="javadoc-server" depends="build-server">
     <javadoc sourcepath="${serverSrcDir}" destdir="${serverJavadocDir}"
              classpath="${serverClassDir}" packagenames="com.sun.*"
              overview="${serverSrcDir}/overview.html"
+             windowtitle="${projName}" doctitle="${projName}" author="no">
+      <link href="${jdk.doc.api.url}"
+	    offline="true"
+	    packagelistLoc="${jdk.package.list}"/>
+      <footer>
+        <![CDATA[<font size="-1">Project Darkstar: Redstar version
+        ${projVersion}</font>]]>
+      </footer>
+      <bottom>
+        <![CDATA[<font size="-1">Copyright 2006 Sun Microsystems,
+        Inc. All rights reserved. Use is subject to license
+        terms.<p>Sun, Sun Microsystems, the Sun Logo, and Java are
+        trademarks or registered trademarks of Sun Microsystems, Inc. in
+        the US and other countries.</font>]]>
+      </bottom>
+    </javadoc>
+  </target>
+
+  <!-- Build the client JavaDoc -->
+  <target name="javadoc-client" depends="build-client">
+    <javadoc sourcepath="${clientSrcDir}" destdir="${clientJavadocDir}"
+             classpath="${clientClassDir}" packagenames="com.sun.*"
+             overview="${clientSrcDir}/overview.html"
              windowtitle="${projName}" doctitle="${projName}" author="no">
       <link href="${jdk.doc.api.url}"
 	    offline="true"
