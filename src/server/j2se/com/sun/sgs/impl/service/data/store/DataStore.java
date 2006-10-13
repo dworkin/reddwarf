@@ -11,7 +11,11 @@ import com.sun.sgs.service.Transaction;
 public interface DataStore {
 
     /**
-     * Reserves an object ID for a new object.
+     * Reserves an object ID for a new object.  Note that calling other
+     * operations using this ID are not required to find the object until
+     * setObject is called.  Aborting a transaction is also not required to
+     * unassign the ID so long as other operations treat it as a non-existent
+     * object.
      *
      * @param	txn the transaction under which the operation should take place
      * @return	the new object ID

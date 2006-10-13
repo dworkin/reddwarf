@@ -6,6 +6,7 @@ import com.sleepycat.db.Database;
 import com.sleepycat.db.DatabaseConfig;
 import com.sleepycat.db.DatabaseEntry;
 import com.sleepycat.db.DatabaseException;
+import com.sleepycat.db.DatabaseType;
 import com.sleepycat.db.DeadlockException;
 import com.sleepycat.db.Environment;
 import com.sleepycat.db.EnvironmentConfig;
@@ -16,6 +17,7 @@ import com.sleepycat.db.TransactionConfig;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionConflictException;
+import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.service.data.Util;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
@@ -132,6 +134,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	    env = getEnvironment(properties);
 	    bdbTxn = env.beginTransaction(null, null);
 	    DatabaseConfig createConfig = new DatabaseConfig();
+	    createConfig.setType(DatabaseType.BTREE);
 	    createConfig.setAllowCreate(true);
 	    boolean create = false;
 	    String idsFileName = directory + File.separator + "ids";
@@ -144,7 +147,9 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 		    ids = env.openDatabase(
 			bdbTxn, idsFileName, null, createConfig);
 		} catch (FileNotFoundException e2) {
-		    throw new AssertionError();
+		    throw new DataStoreException(
+			"Problem creating database: " + e2.getMessage(),
+			e2);
 		}
 		DataStoreHeader.create(ids, bdbTxn);
 		create = true;
@@ -244,6 +249,9 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 
     public void setObject(Transaction txn, long id, byte[] data) {
 	checkId(id);
+	if (data == null) {
+	    throw new NullPointerException("The data must not be null");
+	}
 	try {
 	    TxnInfo txnInfo = checkTxn(txn);
 	    DatabaseEntry key = new DatabaseEntry();
@@ -363,8 +371,11 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	    txnInfo.prepared = true;
 	}
 	boolean done = false;
+	byte[] id = txn.getId();
+	byte[] gid = new byte[128];
+	System.arraycopy(id, 0, gid, 128 - id.length, id.length);
 	try {
-	    txnInfo.bdbTxn.prepare(txn.getId());
+	    txnInfo.bdbTxn.prepare(gid);
 	    done = true;
 	} catch (DeadlockException e) {
 	    handleDeadlockException(e, txn);
@@ -471,9 +482,18 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
      * prepare or commit.
      */
     private TxnInfo checkTxn(Transaction txn) throws DatabaseException {
+	if (txn == null) {
+	    throw new NullPointerException("Transaction must not be null");
+	}
 	synchronized (txnInfoMap) {
 	    TxnInfo txnInfo = txnInfoMap.get(txn);
 	    if (txnInfo == null) {
+		try {
+		    txn.join(this);
+		} catch (IllegalStateException e) {
+		    throw new TransactionNotActiveException(
+			"Transaction is not active");
+		}
 		txnInfo = new TxnInfo(txn, env);
 		txnInfoMap.put(txn, txnInfo);
 	    } else if (txnInfo.prepared) {

@@ -147,6 +147,7 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 
     public boolean prepare(Transaction txn) {
 	Context context = checkContext();
+	context.setInactive();
 	context.flushChanges();
 	return store.prepare(txn);
     }
@@ -159,13 +160,15 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 
     public void prepareAndCommit(Transaction txn) {
 	Context context = checkContext();
+	context.setInactive();
 	context.flushChanges();
 	currentContext.remove();
 	store.prepareAndCommit(txn);
     }
 
     public void abort(Transaction txn) {
-	checkContext();
+	Context context = checkContext();
+	context.setInactive();
 	currentContext.remove();
 	store.abort(txn);
     }

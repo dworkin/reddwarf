@@ -119,8 +119,8 @@ final class DataStoreHeader {
 	LongBinding.longToEntry(MAGIC, value);
 	putNoOverwrite(db, bdbTxn, key, value);
 
-	LongBinding.longToEntry(MINOR_ID, key);
-	ShortBinding.shortToEntry(MINOR_VERSION, value);
+	LongBinding.longToEntry(MAJOR_ID, key);
+	ShortBinding.shortToEntry(MAJOR_VERSION, value);
 	putNoOverwrite(db, bdbTxn, key, value);
 
 	LongBinding.longToEntry(MINOR_ID, key);

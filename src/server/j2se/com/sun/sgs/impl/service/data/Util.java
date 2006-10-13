@@ -16,14 +16,14 @@ public final class Util {
 	Properties properties, String name, int defaultValue)
     {
 	String value = properties.getProperty(name);
-	return name == null ? defaultValue : Integer.parseInt(value);
+	return value == null ? defaultValue : Integer.parseInt(value);
     }
 
     public static long getLongProperty(
 	Properties properties, String name, long defaultValue)
     {
 	String value = properties.getProperty(name);
-	return name == null ? defaultValue : Long.parseLong(value);
+	return value == null ? defaultValue : Long.parseLong(value);
     }
 
 }	

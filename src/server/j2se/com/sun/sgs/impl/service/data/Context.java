@@ -18,6 +18,8 @@ final class Context {
 
     private int count = 0;
 
+    private boolean inactive;
+
     /** Stores information about managed references. */
     final ReferenceTable refs = new ReferenceTable();
 
@@ -35,12 +37,17 @@ final class Context {
      * for transactions passed to the DataStore in order to mediate its
      * participation in the transaction.
      */
-    private static final class TxnTrampoline implements Transaction {
+    private final class TxnTrampoline implements Transaction {
 	private final Transaction txn;
 	TxnTrampoline(Transaction txn) { this.txn = txn; }
 	public byte[] getId() { return txn.getId(); }
 	public long getTimeStamp() { return txn.getTimeStamp(); }
-	public void join(Service service) { /* Ignore */ }
+	public void join(Service service) {
+	    if (inactive) {
+		throw new IllegalStateException(
+		    "Attempt to join a transaction that is not active");
+	    }
+	}
 	public void commit() { txn.commit(); }
 	public void abort() { txn.abort(); }
 	public boolean equals(Object object) {
@@ -105,5 +112,9 @@ final class Context {
 	    count = 0;
 	    refs.checkState();
 	}
+    }
+
+    void setInactive() {
+	inactive = true;
     }
 }
