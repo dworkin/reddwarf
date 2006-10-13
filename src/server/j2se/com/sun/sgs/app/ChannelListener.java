@@ -3,7 +3,7 @@ package com.sun.sgs.app;
 import java.io.Serializable;
 
 /**
- * Listener for messages sent on a channel.  A channel can be created
+ * Listener for messages received on a channel.  A channel can be created
  * with a <code>ChannelListener</code> which is notified when any
  * client session sends a message on that channel.  Additionally, a
  * server can register a per-session listener (to be notified when

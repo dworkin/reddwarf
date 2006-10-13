@@ -3,7 +3,7 @@ package com.sun.sgs.app;
 import java.io.Serializable;
 
 /**
- * Listener for messages sent from an associated session to the
+ * Listener for messages sent from an associated client session to the
  * server.
  *
  * <p>An implementation of a <code>SessionListener</code> should
