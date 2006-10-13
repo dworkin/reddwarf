@@ -1,4 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<GAMEAPP gamename="TrivialBoot"> 
-	<GLEAPP bootclass="com.sun.gi.apps.trivial.TrivialBoot" classpathURL="file:trivial_boot.jar" />    	
-</GAMEAPP>
