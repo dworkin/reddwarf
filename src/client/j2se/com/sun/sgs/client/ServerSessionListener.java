@@ -73,6 +73,14 @@ public interface ServerSessionListener {
     void reconnected();
     
     /**
+     * Notifies this listener that the session could not be
+     * authenticated successfully.
+     * 
+     * @param reason information about the failure to authenticate
+     */
+    void loginFailed(String reason);
+    
+    /**
      * Notifies this listener that the associated server session is
      * disconnected.
      *

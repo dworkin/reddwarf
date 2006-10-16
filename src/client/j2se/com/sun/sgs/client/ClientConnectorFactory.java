@@ -3,16 +3,15 @@ package com.sun.sgs.client;
 import java.util.Properties;
 
 public abstract class ClientConnectorFactory {
-    public static ClientConnector create(Properties props) {
-	// TBI
-	return null;
+    public static ClientConnector createConnector(Properties props) {
+	return theSingletonFactory.create(props);
     }
 
-    public static void setDefaultConnector(Class<? extends ClientConnector> clazz) {
-	// TBI
+    protected static void setConnectorFactory(ClientConnectorFactory factory) {
+	theSingletonFactory = factory;
     }
 
-    public static void setDefaultLogin(Class<? extends ClientLogin> clazz) {
-	// TBI
-    }
+    protected static ClientConnectorFactory theSingletonFactory;
+    
+    protected abstract ClientConnector create(Properties props);
 }
