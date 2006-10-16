@@ -14,7 +14,7 @@ import javax.swing.JPanel;
 import javax.swing.JPasswordField;
 import javax.swing.JTextField;
 
-import com.sun.sgs.client.ClientAuthenticator;
+import com.sun.sgs.client.ClientLogin;
 
 /**
  * This class provides a Swing GUI for server validation fulfillment.
@@ -26,7 +26,7 @@ public class ValidatorDialog extends JDialog {
     /**
      * Constructs a new ValidatorDialog.
      */
-    public ValidatorDialog(Frame parent, final ClientAuthenticator auth) {
+    public ValidatorDialog(Frame parent, final ClientLogin auth) {
         super(parent, "Login Dialog", true);
         Container c = getContentPane();
         JPanel validationPanel = new JPanel();
@@ -46,7 +46,8 @@ public class ValidatorDialog extends JDialog {
         validateButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
         	String password = new String(passwordField.getPassword());
-        	auth.passwordLogin(nameField.getText(), password.getBytes());
+        	byte[] message = createPasswordMessage(nameField.getText(), password.getBytes());
+        	auth.sendLoginMessage(message);
                 ValidatorDialog.this.setVisible(false);
                 ValidatorDialog.this.getParent().remove(ValidatorDialog.this);
             }
@@ -54,5 +55,10 @@ public class ValidatorDialog extends JDialog {
 
         pack();
         setVisible(true);
+    }
+    
+    byte[] createPasswordMessage(String user, byte[] pass) {
+	// TODO
+	return null;
     }
 }

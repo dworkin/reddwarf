@@ -1,5 +1,9 @@
 package com.sun.sgs.client;
 
+import java.util.concurrent.Future;
+
 public interface ClientConnector {
-    void connect(ClientAuthenticator auth, ServerSessionListener sessionListener);
+    Future<ServerSession> connect(
+	    ClientLoginListener loginListener,
+	    ServerSessionListener sessionListener);
 }

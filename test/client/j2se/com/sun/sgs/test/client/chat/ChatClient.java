@@ -26,11 +26,13 @@ import javax.swing.JScrollPane;
 import javax.swing.ListCellRenderer;
 import javax.swing.ListSelectionModel;
 
+import com.sun.sgs.client.ClientLoginListener;
 import com.sun.sgs.client.ClientChannel;
 import com.sun.sgs.client.ClientChannelListener;
-import com.sun.sgs.client.ClientAuthenticator;
+import com.sun.sgs.client.ClientLogin;
 import com.sun.sgs.client.ClientConnector;
 import com.sun.sgs.client.ClientAddress;
+import com.sun.sgs.client.ClientConnectorFactory;
 import com.sun.sgs.client.ServerSession;
 import com.sun.sgs.client.ServerSessionListener;
 
@@ -85,7 +87,7 @@ import com.sun.sgs.client.ServerSessionListener;
  * </p>
  */
 public class ChatClient extends JFrame
-        implements ServerSessionListener
+        implements ServerSessionListener, ClientLoginListener
 {
     private static final long serialVersionUID = 1L;
 
@@ -178,7 +180,8 @@ public class ChatClient extends JFrame
 //                            JOptionPane.INFORMATION_MESSAGE, null, classNames,
 //                            classNames[0]);
                     try {
-                        connector.connect(null, ChatClient.this);
+                	connector = ClientConnectorFactory.create(null);
+                        connector.connect(ChatClient.this, ChatClient.this);
                     } catch (Exception e) {
                         e.printStackTrace();
                         System.exit(1);
@@ -294,7 +297,7 @@ public class ChatClient extends JFrame
         dccChannel.send(target, message.getBytes());
     }
 
-    public void validationRequest(ClientAuthenticator auth) {
+    public void loginMessageReceived(ClientLogin auth, byte[] message) {
         statusMessage.setText("Status: Validating...");
         new ValidatorDialog(this, auth);
     }
@@ -454,4 +457,5 @@ public class ChatClient extends JFrame
         dccButton.setEnabled(true);
         serverSendButton.setEnabled(true);
     }
+
 }
