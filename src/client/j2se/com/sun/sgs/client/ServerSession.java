@@ -1,5 +1,7 @@
 package com.sun.sgs.client;
 
+import java.nio.ByteBuffer;
+
 /**
  * Represents a client's view of a login session with the server.
  * Each time a client logs in, it will be assigned a different server
@@ -44,7 +46,7 @@ public interface ServerSession {
      *
      * @throws IllegalStateException if this session is disconnected
      */
-    void send(byte[] message);
+    void send(ByteBuffer message);
 
     /**
      * Returns <code>true</code> if this session is connected,
@@ -57,19 +59,19 @@ public interface ServerSession {
 
     /**
      * Initiates logging out from the server.  If <code>force</code>
-     * is <code>true</code> then this session is forcibly terminated
-     * and the client can exit; otherwise, if <code>force</code> is
-     * <code>false</code>, then this session is gracefully
-     * disconnected and when the server has completed logging out this
-     * session, the {@link ServerSessionListener#disconnected
-     * disconnected} method is invoked on this session's associated
-     * {@link ServerSessionListener} passing a boolean indicating
-     * whether the disconnection was graceful.
+     * is <code>true</code> then this session is forcibly terminated,
+     * for example, by terminating the associated client's network
+     * connections. If <code>force</code> is <code>false</code>, then
+     * this session is gracefully disconnected, notifying the server
+     * that the client logged out.  When the session has been logged
+     * out, gracefully or otherwise, the {@link
+     * ServerSessionListener#disconnected disconnected} method is
+     * invoked on this session's associated {@link
+     * ServerSessionListener} passing a boolean indicating whether the
+     * disconnection was graceful.
      *
      * @param force if <code>true</code>, this session is forcibly
      * terminated; otherwise the session is gracefully disconnected
-     * and the {@link ServerSessionListener} is notified when the session is
-     * logged out
      *
      * @throws IllegalStateException if this session is disconnected
      */

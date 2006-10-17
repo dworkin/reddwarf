@@ -1,6 +1,7 @@
 package com.sun.sgs.client;
 
 import java.util.Collection;
+import java.nio.ByteBuffer;
 
 /**
  * Represents a client's view of a channel.  A channel is a
@@ -10,51 +11,40 @@ import java.util.Collection;
  * adding and removing clients from channels.  If desired, a client
  * can request that a channel be created by sending an
  * application-specific message to the server (using its {@link
- * ServerSession}).  When the server adds a client session to a
- * channel, the client's {@link ServerSessionListener} is subsequently
- * notified by having its {@link ServerSessionListener#joinedChannel
- * joinedChannel} method invoked with the client channel.
+ * ServerSession}).
  *
- * <p>When a client is joined to a <code>ClientChannel</code>, that
- * client should register a {@link ClientChannelListener} with that
- * channel (via the channel's {@link #setListener setListener}
- * method)) so that it can be notified when messages are received on
- * the channel ({@link ClientChannelListener#receivedMessage
- * receivedMessage}), or can be notified if the client has been
- * removed from the channel ({@link ClientChannelListener#leftChannel
- * leftChannel}).  Once a client has been removed from a channel, that
- * client can no longer send messages on that channel.
+ * <p>When the server adds a client session to a channel, the client's
+ * {@link ServerSessionListener}'s {@link
+ * ServerSessionListener#joinedChannel joinedChannel} method is
+ * invoked with that client channel, returning the client's
+ * <code>ClientChannelListener</code> for the channel.  A
+ * <code>ClientChannelListener</code> for a client channel is notified
+ * as follows: <ul>
  *
- * <p>TBD: getDeliveryRequirement method?
+ * <li>When a message is received on a client channel, the listener's
+ * {@link ClientChannelListener#receivedMessage receivedMessage}
+ * method is invoked with the channel, the sender's client address,
+ * and the message.  A <code>null</code> sender indicates that the
+ * message was sent by the server.  The listener is <i>not</i>
+ * notified of messages that its client sends on its associated
+ * channel.
+ *
+ * <li> When the associated client leaves a channel, the listener's
+ * {@link ClientChannelListener#leftChannel leftChannel} method is
+ * invoked with the channel.  Once a client has been removed
+ * from a channel, that client can no longer send messages on that
+ * channel.
+ * </ul>
  */
 public interface ClientChannel {
 
     /**
-     * Returns the name of this channel.
+     * Returns the name of this channel, which is the name that the
+     * server assigned to the channel.
      *
      * @return the name of this channel
      */
     String getName();
-    
-    /**
-     * Sets the listener for messages sent on this channel, replacing
-     * the previous listener set.
-     *
-     * <p>When a message is received on this channel, the specified
-     * listener's {@link ClientChannelListener#receivedMessage
-     * receivedMessage} method is invoked with this channel, the
-     * sender and the message.
-     *
-     * <p>DO WE WANT THIS?  The specified listener is not invoked for
-     * messages that a client sends on this channel via one of the
-     * channel's <code>send</code> methods.
-     *
-     * @param listener a channel listener
-     *
-     * @throws IllegalStateException if the associated client has been
-     * removed from this channel
-     */
-    void setListener(ClientChannelListener listener);
     
     /**
      * Sends the specified message to all clients joined to this
@@ -66,7 +56,7 @@ public interface ClientChannel {
      * @throws IllegalStateException if the associated client has been
      * removed from this channel
      */
-    void send(byte[] message);
+    void send(ByteBuffer message);
 
     /**
      * Sends the specified message to the specified recipient.  If the
@@ -79,7 +69,7 @@ public interface ClientChannel {
      * @throws IllegalStateException if the associated client has been
      * removed from this channel
      */
-    void send(ClientAddress recipient, byte[] message);
+    void send(ClientAddress recipient, ByteBuffer message);
 
     /**
      * Sends the specified message to the recipients contained in the
@@ -92,5 +82,5 @@ public interface ClientChannel {
      * @throws IllegalStateException if the associated client has been
      * removed from this channel
      */
-    void send(Collection<ClientAddress> recipients, byte[] message);
+    void send(Collection<ClientAddress> recipients, ByteBuffer message);
 }

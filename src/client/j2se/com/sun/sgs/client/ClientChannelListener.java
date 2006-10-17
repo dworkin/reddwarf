@@ -1,41 +1,53 @@
 package com.sun.sgs.client;
 
+import java.nio.ByteBuffer;
+
 /**
  * Listener for events relating to a {@link ClientChannel}.
  *
  * <p>When the server adds a client session to a channel, the client's
- * {@link ServerSessionListener} is subsequently notified by having
- * its {@link ServerSessionListener#joinedChannel joinedChannel}
- * method invoked with the client channel.
+ * {@link ServerSessionListener}'s {@link
+ * ServerSessionListener#joinedChannel joinedChannel} method is
+ * invoked with that client channel, returning the client's
+ * <code>ClientChannelListener</code> for the channel.  A
+ * <code>ClientChannelListener</code> for a client channel is notified
+ * as follows: <ul>
  *
- * <p>When a client is joined to a <code>ClientChannel</code>, the
- * client should register a <code>ClientChannelListener</code> with
- * that channel (via the channel's {@link ClientChannel#setListener
- * setListener} method)) so that it can be notified when messages are
- * received on the channel ({@link #receivedMessage receivedMessage}),
- * or can be notified if the client has been removed from the channel
- * ({@link #leftChannel leftChannel}).  Once a client has been removed
- * from a channel, that client can no longer send messages on that
+ * <li>When a message is received on a client channel, the listener's
+ * {@link ClientChannelListener#receivedMessage receivedMessage}
+ * method is invoked with the channel, the sender's client address,
+ * and the message.  A <code>null</code> sender indicates that the
+ * message was sent by the server.   The listener is <i>not</i>
+ * notified of messages that its client sends on its associated
  * channel.
  *
+ * <li> When the associated client leaves a channel, the listener's
+ * {@link ClientChannelListener#leftChannel leftChannel} method is
+ * invoked with the channel.  Once a client has been removed
+ * from a channel, that client can no longer send messages on that
+ * channel.
+ * </ul>
  */
 public interface ClientChannelListener {
 
     /**
      * Notifies this listener that the specified message, sent by the
-     * specified client, was received on the specified channel.
+     * specified sender, was received on the specified channel.  If
+     * the specified sender is <code>null</code>, then the specified
+     * message was sent by the server.
      *
-     * @param channel a client chanel
-     * @param client a client
-     * @param message a messagse
+     * @param channel a client channel
+     * @param sender sender's client address, or <code>null</code>
+     * @param message a byte buffer containing a message.
      */
     void receivedMessage(ClientChannel channel,
-			 ClientAddress client,
-			 byte[] message);
+			 ClientAddress sender,
+			 ByteBuffer message);
 
     /**
      * Notifies this listener that the associated client was removed
-     * from the specified channel.
+     * from the specified channel.  The associated client can no
+     * longer send messages on the specified channel.
      *
      * @param channel a client chanel
      */

@@ -1,5 +1,7 @@
 package com.sun.sgs.client;
 
+import java.nio.ByteBuffer;
+
 /**
  * A client's listener for handling messages sent from server to
  * client and for handling other connection-related events.
@@ -33,16 +35,27 @@ public interface ServerSessionListener {
     
     /**
      * Notifies this listener that its associated client has joined
-     * the specified channel.
+     * the specified channel, and returns a {@link
+     * ClientChannelListener} for that channel.
      *
-     * <p>A client should register a {@link ClientChannelListener}
-     * with the specified channel so that it can be notified when
-     * messages are received on the channel or can be notified if the
-     * client has been removed from the channel.
+     * <p>When a message is received on the specified channel, the
+     * returned listener's {@link
+     * ClientChannelListener#receivedMessage receivedMessage} method
+     * is invoked with the specified channel, the sender's client
+     * address, and the message.  A <code>null</code> sender indicates
+     * that the message was sent by the server.  The returned listener
+     * is <i>not</i> notified of messages that its client sends on the
+     * specified channel.
+     *
+     * <p>When the client associated with this server session leaves
+     * the specified channel, the returned listener's {@link
+     * ClientChannelListener#leftChannel leftChannel} method is
+     * invoked with the specified channel.
      *
      * @param channel a channel
+     * @return a listener for the specified channel
      */
-    void joinedChannel(ClientChannel channel);
+    ClientChannelListener joinedChannel(ClientChannel channel);
     
     /**
      * Notifies this listener that the specified message was sent by
@@ -50,7 +63,7 @@ public interface ServerSessionListener {
      *
      * @param message a message
      */
-    void receivedMessage(byte[] message);
+    void receivedMessage(ByteBuffer message);
     
     /**
      * Notifies this listener that its associated server session is in

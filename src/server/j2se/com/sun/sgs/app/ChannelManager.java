@@ -1,5 +1,6 @@
-
 package com.sun.sgs.app;
+
+import java.nio.ByteBuffer;
 
 /**
  * Manager for creating and obtaining channels.  A {@link Channel} is
@@ -17,12 +18,13 @@ public interface ChannelManager {
 
     /**
      * Creates a new channel with the specified listener and specified
-     * delivery requirement, binds it to the specified name, and returns it.
+     * delivery requirement, binds it to the specified name, and
+     * returns it.
      *
      * <p>If the specified <code>listener</code> is
      * non-<code>null</code>, then when any client session sends a
-     * message on the returned channel, the specified listener's
-     * {@link ChannelListener#receivedMessage(Channel,Session,byte[])
+     * message on the returned channel, the specified listener's {@link
+     * ChannelListener#receivedMessage(Channel,ClientSession,ByteBuffer)
      * receivedMessage} method is invoked with this channel, the
      * session, and the message.  The specified listener is not
      * invoked for messages that the server sends on the channel via
@@ -42,10 +44,9 @@ public interface ChannelManager {
      * @throws TransactionException if the operation failed because of
      * a problem with the current transaction
      */
-    Channel createChannel(
-	String name,
-	ChannelListener listener,
-	Delivery delivery);
+    Channel createChannel(String name,
+			  ChannelListener listener,
+			  Delivery delivery);
     
     /**
      * Returns an existing channel with the specified name

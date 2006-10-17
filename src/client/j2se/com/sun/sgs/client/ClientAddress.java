@@ -6,7 +6,7 @@ import java.nio.ByteBuffer;
  * Represents an address of a client session for identification and
  * communication purposes.
  */
-public abstract class ClientAddress implements Comparable {
+public abstract class ClientAddress {
 
     /**
      * Enables construction of a client address (for subclasses).
@@ -39,4 +39,14 @@ public abstract class ClientAddress implements Comparable {
      * of this client address.
      */
     public abstract ByteBuffer toBytes();
+
+    /**
+     * Returns <code>true</code> if the specified object represents
+     * the same client address as this one, and <code>false</code>
+     * otherwise.
+     *
+     * @return <code>true</code> if the specified object represents
+     * the the same client, and <code>false</code> otherwise
+     */
+    public abstract boolean equals(Object obj);
 }

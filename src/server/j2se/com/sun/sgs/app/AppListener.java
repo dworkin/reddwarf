@@ -1,6 +1,7 @@
 package com.sun.sgs.app;
 
 import java.io.Serializable;
+import java.util.Properties;
 
 /**
  * Listener for application-level events.  This listener is called
@@ -34,23 +35,25 @@ public interface AppListener extends ManagedObject {
      * Notifies this listener that the application is starting up.
      * This gives the application an opportunity to perform any
      * necessary initialization.
+     *
+     * @param props application-specific configuration properties
      */
-    void startingUp();
+    void startingUp(Properties props);
 
     /**
      * Notifies this listener that the specified session has logged
      * in.
      *
      * <p>When a client logs in, the application should register a
-     * {@link SessionListener} for that client's session (by invoking
-     * {@link Session#setListener setListener} on the
+     * {@link ClientSessionListener} for that client's session (by invoking
+     * {@link ClientSession#setListener setListener} on the
      * specified session), so that the application can be notified
      * when that session's client sends messages to the server or
      * disconnects.
      *
      * @param session a session
      */
-    void loggedIn(Session session);
+    void loggedIn(ClientSession session);
 
     /**
      * Notifies this listener that the associated application is

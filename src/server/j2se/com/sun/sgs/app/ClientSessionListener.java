@@ -1,12 +1,13 @@
 package com.sun.sgs.app;
 
 import java.io.Serializable;
+import java.nio.ByteBuffer;
 
 /**
  * Listener for messages sent from an associated client session to the
  * server.
  *
- * <p>An implementation of a <code>SessionListener</code> should
+ * <p>An implementation of a <code>ClientSessionListener</code> should
  * implement the {@link Serializable} interface, so that session
  * listeners can be stored persistently.  If a given listener has
  * mutable state, that listener should also implement the {@link
@@ -27,15 +28,15 @@ import java.io.Serializable;
  * <p>For a full description of task execution behavior, see the
  * documentation for {@link TaskManager#scheduleTask(Task)}.
  */
-public interface SessionListener {
+public interface ClientSessionListener {
 
     /**
      * Notifies this listener that the specified message, sent by the
      * associated session's client, was received.
      *
-     * @param message byte array containing a message
+     * @param message a message
      */
-    void receivedMessage(byte[] message);
+    void receivedMessage(ByteBuffer message);
 
     /**
      * Notifies this listener that the associated session's client has
