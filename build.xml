@@ -7,29 +7,23 @@
     revision of Project Darkstar.
   </description>
 
+  <!-- First load the user's properties -->
+  <property name="user.properties.file"
+	    location="${user.home}/.build.properties"/>
+  <property file="${user.properties.file}"/>
+
   <!-- VARIABLE DEFINITIONS -->
 
-  <!-- Common locations -->
-  <property name="docDir" location="doc"/>
-  <property name="libDir" location="lib"/>
-  <property name="srcDir" location="src"/>
-  <property name="testDir" location="test"/>
-
-  <!-- Common build locations -->
-  <property name="buildBaseDir" location="build"/>
-  <property name="buildClassDir" location="${buildBaseDir}/classes"/>
-  <property name="buildDocDir" location="${buildBaseDir}/doc"/>
-  <property name="buildLibDir" location="${buildBaseDir}/lib"/>
+  <!-- Build location -->
+  <property name="build.dir" location="build"/>
 
   <!-- Values for controlling compilation -->
-  <property name="javac.source" value="1.5" />
+  <property name="javac.source" value="1.5"/>
   <property name="javac.compilerargs"
-	    value="-Xlint:unchecked,deprecation" />
+	    value="-Xlint:unchecked,deprecation"/>
 
-  <!-- Values for the server -->
-  <property name="serverClassDir" location="${buildClassDir}/server"/>
-  <property name="serverJarFile" location="${buildLibDir}/sgs.jar"/>
-  <property name="serverSrcDir" location="${srcDir}/server/j2se"/>
+  <!-- Values for building the server -->
+  <property name="server.jar" location="${build.dir}/lib/sgs.jar"/>
 
   <!-- Values for the client -->
   <property name="clientClassDir" location="${buildClassDir}/client"/>
@@ -37,51 +31,59 @@
   <property name="clientSrcDir" location="${srcDir}/client/j2se"/>
 
   <!-- Values for the JavaDocs -->
-  <property name="baseJavadocDir" location="${buildDocDir}/javadoc"/>
-  <property name="serverJavadocDir" location="${baseJavadocDir}/server"/>
-  <property name="clientJavadocDir" location="${baseJavadocDir}/client"/>
-  <property name="projName" value="Sun Game Server"/>
-  <property name="projVersion" value="0.2"/>
+  <property name="project.name" value="Sun Game Server"/>
+  <property name="project.version" value="0.2"/>
   <property name="jdk.doc.api.url"
 	    value="http://java.sun.com/j2se/1.5/docs/api"/>
   <property name="jdk.package.list" value="etc/jdk5.0_package_list"/>
 
+  <!-- Values for programming style checks -->
+  <import file="${checkstyle.dir}/checkstyle_task.xml" optional="true"/>
+  <property name="checkstyle.packages"
+	    value="com.sun.sgs.app,
+		   com.sun.sgs.services"/>
+  <property name="checkstyle.packages.file"
+	    value="${build.dir}/checkstyle_packages"/>
+
   <!-- TARGET DEFINITIONS -->
+
+  <!-- Builds everything -->
+  <target name="all" depends="jar, javadoc, checkstyle"/>
 
   <!-- Builds a debug version of the complete project -->
   <target name="build" depends="build-server,build-client"/>
 
   <!-- Builds the server -->
   <target name="build-server">
-    <mkdir dir="${serverClassDir}"/>
+    <mkdir dir="${build.dir}/classes/server"/>
     <depend srcdir="j2se"
-	    destdir="${serverClassDir}"
-	    cache="${buildBaseDir}/depend"
+	    destdir="${build.dir}/classes/server"
+	    cache="${build.dir}/depend"
 	    closure="true"/>
     <javac includeAntRuntime="no" debug="on" deprecation="on"
-           srcdir="${serverSrcDir}" destdir="${serverClassDir}"
-           classpath="${serverClassDir}" source="${javac.source}">
+           srcdir="src/server/j2se" destdir="${build.dir}/classes/server"
+           classpath="${build.dir}/classes/server" source="${javac.source}">
       <compilerarg value="${javac.compilerargs}"/>
     </javac>
   </target>
 
   <!-- Builds the client -->
   <target name="build-client">
-    <mkdir dir="${clientClassDir}"/>
+    <mkdir dir="${build.dir}/classes/client"/>
     <depend srcdir="j2se"
-	    destdir="${clientClassDir}"
-	    cache="${buildBaseDir}/depend"
+	    destdir="${build.dir}/classes/client"
+	    cache="${build.dir}/depend"
 	    closure="true"/>
     <javac includeAntRuntime="no" debug="on" deprecation="on"
-           srcdir="${clientSrcDir}" destdir="${clientClassDir}"
-           classpath="${clientClassDir}" source="${javac.source}">
+           srcdir="src/client/j2se" destdir="${build.dir}/classes/client"
+           classpath="${build.dir}/classes/client" source="${javac.source}">
       <compilerarg value="${javac.compilerargs}"/>
     </javac>
   </target>
 
   <!-- Removes all built files and all ~ files -->
   <target name="clean">
-    <delete dir="${buildBaseDir}"/>
+    <delete dir="${build.dir}"/>
     <delete>
       <fileset dir="." defaultexcludes="no" includes="**/*~"/>
     </delete>
@@ -95,16 +97,17 @@
 
   <!-- Build the server JavaDoc -->
   <target name="javadoc-server" depends="build-server">
-    <javadoc sourcepath="${serverSrcDir}" destdir="${serverJavadocDir}"
-             classpath="${serverClassDir}" packagenames="com.sun.*"
-             overview="${serverSrcDir}/overview.html"
-             windowtitle="${projName}" doctitle="${projName}" author="no">
+    <javadoc sourcepath="src/server/j2se" destdir="${build.dir}/javadoc/server"
+             classpath="${build.dir}/classes/server" packagenames="com.sun.*"
+             overview="src/server/j2se/overview.html"
+             windowtitle="${project.name}" doctitle="${project.name}"
+	     author="no">
       <link href="${jdk.doc.api.url}"
 	    offline="true"
 	    packagelistLoc="${jdk.package.list}"/>
       <footer>
-        <![CDATA[<font size="-1">Project Darkstar: Redstar version
-        ${projVersion}</font>]]>
+        <![CDATA[<font size="-1">Sun Game Server, Version
+        ${project.version}</font>]]>
       </footer>
       <bottom>
         <![CDATA[<font size="-1">Copyright 2006 Sun Microsystems,
@@ -118,16 +121,17 @@
 
   <!-- Build the client JavaDoc -->
   <target name="javadoc-client" depends="build-client">
-    <javadoc sourcepath="${clientSrcDir}" destdir="${clientJavadocDir}"
-             classpath="${clientClassDir}" packagenames="com.sun.*"
-             overview="${clientSrcDir}/overview.html"
-             windowtitle="${projName}" doctitle="${projName}" author="no">
+    <javadoc sourcepath="src/client/j2se" destdir="${build.dir}/javadoc/client"
+             classpath="${build.dir}/classes/client" packagenames="com.sun.*"
+             overview="src/client/j2se/overview.html"
+             windowtitle="${project.name}" doctitle="${project.name}"
+	     author="no">
       <link href="${jdk.doc.api.url}"
 	    offline="true"
 	    packagelistLoc="${jdk.package.list}"/>
       <footer>
-        <![CDATA[<font size="-1">Project Darkstar: Redstar version
-        ${projVersion}</font>]]>
+        <![CDATA[<font size="-1">Project Darkstar: Version
+        ${project.version}</font>]]>
       </footer>
       <bottom>
         <![CDATA[<font size="-1">Copyright 2006 Sun Microsystems,
@@ -144,8 +148,48 @@
 
   <!-- builds the server jar file -->
   <target name="jar-server" depends="build-server">
-    <mkdir dir="${buildLibDir}"/>
-    <jar destfile="${serverJarFile}" basedir="${serverClassDir}"/>
+    <mkdir dir="${build.dir}/lib"/>
+    <jar destfile="${server.jar}" basedir="${build.dir}/classes/server"/>
+  </target>
+
+  <!-- Checks Java coding style -->
+  <target name="checkstyle"
+	  depends="build,-checkstyle.init,-checkstyle.includes"
+	  description="Checks Java coding style">
+      <checkstyle config="${neuromancer_checks.xml}"
+		  classpath="${build.dir}/classes/server">
+	  <fileset dir="src/server/j2se"
+		   includes="${checkstyle.includes}"/>
+      </checkstyle>
+  </target>
+
+  <!-- Verify checkstyle.dir is set, calculate checkstyle.includes, and
+       build the checkjars target in checkstyle.dir. -->
+  <target name="-checkstyle.init">
+      <fail unless="checkstyle.dir"
+	    message="The checkstyle.dir property must be set to a directory containing the checkstyle subproject"/>
+      <ant dir="${checkstyle.dir}" target="checkjars" inheritAll="false"/>
+  </target>
+
+  <!-- Convert from package names to filenames -->
+  <target name="-checkstyle.includes">
+    <mkdir dir="${build.dir}"/>
+    <echo message="${checkstyle.packages}"
+	  file="${checkstyle.packages.file}"/>
+    <loadfile srcFile="${checkstyle.packages.file}"
+	      property="checkstyle.includes">
+      <filterchain>
+	<tokenfilter>
+	  <!-- Get tokens delimited by commas and spaces -->
+	  <stringtokenizer delims=", "/>
+	  <!-- Replace all '.' with '/' in each token -->
+	  <replaceregex pattern="[.]" replace="/" flags="g"/>
+	  <!-- Append '/*.java' to each non-empty token -->
+	  <replaceregex pattern=".+" replace="\0/*.java"/>
+	</tokenfilter>
+      </filterchain>
+    </loadfile>
+    <delete file="${checkstyle.packages.file}"/>
   </target>
 
 </project>
