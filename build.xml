@@ -25,6 +25,11 @@
   <!-- Values for building the server -->
   <property name="server.jar" location="${build.dir}/lib/sgs.jar"/>
 
+  <!-- Values for the client -->
+  <property name="clientClassDir" location="${buildClassDir}/client"/>
+  <property name="clientJarFile" location="${buildLibDir}/client.jar"/>
+  <property name="clientSrcDir" location="${srcDir}/client/j2se"/>
+
   <!-- Values for the JavaDocs -->
   <property name="project.name" value="Sun Game Server"/>
   <property name="project.version" value="0.2"/>
@@ -46,7 +51,7 @@
   <target name="all" depends="jar, javadoc, checkstyle"/>
 
   <!-- Builds a debug version of the complete project -->
-  <target name="build" depends="build-server"/>
+  <target name="build" depends="build-server,build-client"/>
 
   <!-- Builds the server -->
   <target name="build-server">
@@ -58,6 +63,20 @@
     <javac includeAntRuntime="no" debug="on" deprecation="on"
            srcdir="src/server/j2se" destdir="${build.dir}/classes/server"
            classpath="${build.dir}/classes/server" source="${javac.source}">
+      <compilerarg value="${javac.compilerargs}"/>
+    </javac>
+  </target>
+
+  <!-- Builds the client -->
+  <target name="build-client">
+    <mkdir dir="${build.dir}/classes/client"/>
+    <depend srcdir="j2se"
+	    destdir="${build.dir}/classes/client"
+	    cache="${build.dir}/depend"
+	    closure="true"/>
+    <javac includeAntRuntime="no" debug="on" deprecation="on"
+           srcdir="src/client/j2se" destdir="${build.dir}/classes/client"
+           classpath="${build.dir}/classes/client" source="${javac.source}">
       <compilerarg value="${javac.compilerargs}"/>
     </javac>
   </target>
@@ -74,7 +93,7 @@
   <target name="doc" depends="javadoc"/>
 
   <!-- Build the JavaDoc from the source -->
-  <target name="javadoc" depends="javadoc-server"/>
+  <target name="javadoc" depends="javadoc-server,javadoc-client"/>
 
   <!-- Build the server JavaDoc -->
   <target name="javadoc-server" depends="build-server">
@@ -88,6 +107,30 @@
 	    packagelistLoc="${jdk.package.list}"/>
       <footer>
         <![CDATA[<font size="-1">Sun Game Server, Version
+        ${project.version}</font>]]>
+      </footer>
+      <bottom>
+        <![CDATA[<font size="-1">Copyright 2006 Sun Microsystems,
+        Inc. All rights reserved. Use is subject to license
+        terms.<p>Sun, Sun Microsystems, the Sun Logo, and Java are
+        trademarks or registered trademarks of Sun Microsystems, Inc. in
+        the US and other countries.</font>]]>
+      </bottom>
+    </javadoc>
+  </target>
+
+  <!-- Build the client JavaDoc -->
+  <target name="javadoc-client" depends="build-client">
+    <javadoc sourcepath="src/client/j2se" destdir="${build.dir}/javadoc/client"
+             classpath="${build.dir}/classes/client" packagenames="com.sun.*"
+             overview="src/client/j2se/overview.html"
+             windowtitle="${project.name}" doctitle="${project.name}"
+	     author="no">
+      <link href="${jdk.doc.api.url}"
+	    offline="true"
+	    packagelistLoc="${jdk.package.list}"/>
+      <footer>
+        <![CDATA[<font size="-1">Project Darkstar: Version
         ${project.version}</font>]]>
       </footer>
       <bottom>
