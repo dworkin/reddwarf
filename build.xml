@@ -25,11 +25,6 @@
   <!-- Values for building the server -->
   <property name="server.jar" location="${build.dir}/lib/sgs.jar"/>
 
-  <!-- Values for the client -->
-  <property name="clientClassDir" location="${buildClassDir}/client"/>
-  <property name="clientJarFile" location="${buildLibDir}/client.jar"/>
-  <property name="clientSrcDir" location="${srcDir}/client/j2se"/>
-
   <!-- Values for the JavaDocs -->
   <property name="project.name" value="Sun Game Server"/>
   <property name="project.version" value="0.2"/>
