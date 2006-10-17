@@ -26,10 +26,10 @@ import javax.swing.JScrollPane;
 import javax.swing.ListCellRenderer;
 import javax.swing.ListSelectionModel;
 
+import com.sun.sgs.client.ClientAuthenticator;
 import com.sun.sgs.client.ClientCredentials;
 import com.sun.sgs.client.ClientChannel;
 import com.sun.sgs.client.ClientChannelListener;
-import com.sun.sgs.client.ClientAuthenticator;
 import com.sun.sgs.client.ClientConnector;
 import com.sun.sgs.client.ClientAddress;
 import com.sun.sgs.client.ClientConnectorFactory;
@@ -87,7 +87,7 @@ import com.sun.sgs.client.ServerSessionListener;
  * </p>
  */
 public class ChatClient extends JFrame
-        implements ServerSessionListener, ClientCredentials
+        implements ServerSessionListener, ClientAuthenticator
 {
     private static final long serialVersionUID = 1L;
 
@@ -297,9 +297,13 @@ public class ChatClient extends JFrame
         dccChannel.send(target, message.getBytes());
     }
 
-    public void loginMessageReceived(ClientAuthenticator auth, byte[] message) {
+    public ClientCredentials getCredentials() {
         statusMessage.setText("Status: Validating...");
-        new ValidatorDialog(this, auth);
+        try {
+            return new ValidatorDialog(this).get();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /**

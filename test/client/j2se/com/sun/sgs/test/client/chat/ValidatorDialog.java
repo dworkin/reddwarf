@@ -6,6 +6,11 @@ import java.awt.Frame;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import javax.swing.JButton;
 import javax.swing.JDialog;
@@ -14,19 +19,25 @@ import javax.swing.JPanel;
 import javax.swing.JPasswordField;
 import javax.swing.JTextField;
 
-import com.sun.sgs.client.ClientAuthenticator;
+import com.sun.sgs.client.ClientCredentials;
+import com.sun.sgs.client.PasswordCredentials;
 
 /**
  * This class provides a Swing GUI for server validation fulfillment.
  */
-public class ValidatorDialog extends JDialog {
+public class ValidatorDialog extends JDialog
+	implements Future<ClientCredentials>
+{
 
     private static final long serialVersionUID = 1L;
+
+    private final Semaphore semaphore = new Semaphore(0);
+    private PasswordCredentials credentials;
 
     /**
      * Constructs a new ValidatorDialog.
      */
-    public ValidatorDialog(Frame parent, final ClientAuthenticator auth) {
+    public ValidatorDialog(Frame parent) {
         super(parent, "Login Dialog", true);
         Container c = getContentPane();
         JPanel validationPanel = new JPanel();
@@ -45,20 +56,39 @@ public class ValidatorDialog extends JDialog {
 
         validateButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
-        	String password = new String(passwordField.getPassword());
-        	byte[] message = createPasswordMessage(nameField.getText(), password.getBytes());
-        	auth.sendMessage(message);
+        	credentials = new PasswordCredentials(nameField.getText(),
+        		new String(passwordField.getPassword()).getBytes());
                 ValidatorDialog.this.setVisible(false);
                 ValidatorDialog.this.getParent().remove(ValidatorDialog.this);
+                semaphore.release();
             }
         });
 
         pack();
         setVisible(true);
     }
-    
-    byte[] createPasswordMessage(String user, byte[] pass) {
-	// TODO
+
+    public boolean cancel(boolean mayInterruptIfRunning) {
+	return false;
+    }
+
+    public ClientCredentials get() throws InterruptedException, ExecutionException {
+	semaphore.acquire();
+	return credentials;
+    }
+
+    public ClientCredentials get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
+	if (semaphore.tryAcquire(timeout, unit)) {
+	    return credentials;
+	}
 	return null;
+    }
+
+    public boolean isCancelled() {
+	return false;
+    }
+
+    public boolean isDone() {
+	return (credentials != null);
     }
 }
