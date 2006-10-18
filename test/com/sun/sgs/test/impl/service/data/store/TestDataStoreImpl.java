@@ -2,6 +2,7 @@ package com.sun.sgs.test.impl.service.data.store;
 
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.impl.service.data.store.DataStoreException;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.test.DummyTransaction;
@@ -9,6 +10,9 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Properties;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import junit.framework.TestCase;
 
 /** Test the DataStoreImpl class */
@@ -1031,6 +1035,94 @@ public class TestDataStoreImpl extends TestCase {
 	    System.err.println(e);
 	} finally {
 	    txn.abort();
+	}
+    }
+
+    /* -- Test deadlock -- */
+
+    public void testDeadlock() throws Exception {
+	final DataStoreImpl store = getDataStoreImpl();
+	DummyTransaction txn = new DummyTransaction();
+	final long id = store.createObject(txn);
+	store.setObject(txn, id, new byte[] { 0 });
+	final long id2 = store.createObject(txn);
+	store.setObject(txn, id2, new byte[] { 0 });
+	txn.commit();
+	txn = new DummyTransaction();
+	store.getObject(txn, id, false);
+	final DummyTransaction txn2 = new DummyTransaction();
+	store.getObject(txn2, id2, false);
+	class MyRunnable implements Runnable {
+	    Exception exception2;
+	    public void run() {
+		try {
+		    store.getObject(txn2, id, true);
+		    txn2.commit();
+		} catch (Exception e) {
+		    exception2 = e;
+		    txn2.abort();
+		}
+	    }
+	}
+	MyRunnable myRunnable = new MyRunnable();
+	Task task = new Task(myRunnable);
+	assertBlocked(task);
+	TransactionConflictException exception = null;
+	try {
+	    store.getObject(txn, id2, true);
+	} catch (TransactionConflictException e) {
+	    exception = e;
+	}
+	assertNotBlocked(task);
+	if (myRunnable.exception2 != null &&
+	    !(myRunnable.exception2 instanceof TransactionConflictException))
+	{
+	    throw myRunnable.exception2;
+	} else if (exception == null && myRunnable.exception2 == null) {
+	    fail("Expected TransactionConflictException");
+	} else if (exception != null && myRunnable.exception2 != null) {
+	    fail("Multiple TransactionConflictExceptions");
+	} else if (exception != null) {
+	    System.err.println(exception);
+	} else {
+	    System.err.println(myRunnable.exception2);
+	}
+    }
+
+    /* -- Other methods -- */
+
+    /** A future task that returns null. */
+    class Task extends FutureTask<Object> {
+	Task(Runnable runnable) {
+	    super(runnable, null);
+	}
+    }
+
+    /**
+     * Evaluate the future task in another thread, and make sure it is not
+     * blocked by checking that it evaluates "quickly".
+     */
+    static <T> T assertNotBlocked(FutureTask<T> task) throws Exception {
+	new Thread(task).start();
+	T result = null;
+	try {
+	    result = task.get(1, TimeUnit.SECONDS);
+	} catch (TimeoutException e) {
+	    fail("Timeout exceeded: " + e);
+	}
+	return result;
+    }
+
+    /**
+     * Evaluate a future task in another thread, and make sure it is blocked by
+     * checking that it does not evaluate "quickly".
+     */
+    static <T> void assertBlocked(FutureTask<T> task) throws Exception {
+	new Thread(task).start();
+	try {
+	    task.get(1, TimeUnit.SECONDS);
+	    fail("TimeoutException expected");
+	} catch (TimeoutException e) {
 	}
     }
 }
