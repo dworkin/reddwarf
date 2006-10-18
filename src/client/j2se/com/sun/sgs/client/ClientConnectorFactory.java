@@ -11,7 +11,7 @@ public abstract class ClientConnectorFactory {
 	theSingletonFactory = factory;
     }
 
-    protected static ClientConnectorFactory theSingletonFactory;
+    private static ClientConnectorFactory theSingletonFactory;
     
     protected abstract ClientConnector create(Properties props);
 }

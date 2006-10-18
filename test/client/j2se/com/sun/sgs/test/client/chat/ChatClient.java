@@ -1,30 +1,22 @@
 package com.sun.sgs.test.client.chat;
 
 import java.awt.BorderLayout;
-import java.awt.Component;
 import java.awt.Container;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 import java.awt.event.WindowEvent;
-import java.awt.event.WindowStateListener;
+import java.awt.event.WindowListener;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.Collection;
 
-import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JDesktopPane;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
-import javax.swing.JList;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.ListCellRenderer;
-import javax.swing.ListSelectionModel;
 
 import com.sun.sgs.client.ClientChannel;
 import com.sun.sgs.client.ClientChannelListener;
@@ -41,79 +33,43 @@ import com.sun.sgs.client.ServerSessionListener;
  * open arbitrary channels by name, or to use the Direct Client to
  * Client (DCC) channel.
  * </p>
- * 
- * <p>
- * Before connecting to any channels, the user must login to the server
- * via a UserManager. When the Login button is pressed, a list of
- * available UserManagers is displayed. (Right now the TCPIPUserManager
- * is the only implemented option). After selecting a UserManager, the
- * user is prompted for credentials (currently "Guest" with a blank
- * password will do a default login).
- * </p>
- * 
- * <p>
- * Once logged in, the user can open a new channel, or join an existing
- * channel by clicking the "Open Channel" button and typing in the
- * channel name. Once connected to a channel, a separate window opens
- * revealing the users connected to that channel as well as an area to
- * type messages. Each channel opened will appear in a new window.
- * </p>
- * 
- * <p>
- * A user can send a message directly to the server via the "Send to
- * Server" button. Messages are sent to the server via the
- * ClientConnectionManager.
- * </p>
- * 
- * <p>
- * A user can send a Direct Client to Client message via the "Send
- * Multi-DCC" button. This will send a multicast message on the
- * well-known DCC channel.
- * </p>
- * 
- * <p>
- * This class implements ClientConnectionManagerListener so that it can
- * receive and respond to connection events from the server.
- * </p>
- * 
- * <p>
- * The ChatClient is designed to work with the server application,
- * ChatTest. This application must be installed and running on the
- * server for the ChatClient to successfully login. Multiple
- * instances of this program can be run so that multiple users will be
- * shown in the client.
- * </p>
  */
 public class ChatClient extends JFrame
-        implements ServerSessionListener
+        implements ActionListener, WindowListener,
+        	ServerSessionListener, ClientChannelListener
 {
     private static final long serialVersionUID = 1L;
 
-    JButton loginButton;
-    JButton openChannelButton;
-    JLabel statusMessage;
-    JDesktopPane desktop;
+    private final JButton loginButton;
+    private final JButton openChannelButton;
+    private final JButton multiDccButton;
+    private final JButton serverSendButton;
+    private final JLabel statusMessage;
+    private final JDesktopPane desktop;
 
-    JList userList; // a list of sessions currently connected to the
-                    // ChatApp on the server.
+    private static final String DCC_CHANNEL_NAME = "__DCC_Chan";
 
-    ClientConnector connector; // used to create a session with the server. 
-    ServerSession session;  // used for communication with the server.
+    private final MemberList userList;	// a list of sessions currently connected to the
+    			// ChatApp on the server.
 
-    ClientChannel dccChannel; // the well-known channel for Direct
-                              // Client to Client communication.
+    private ClientConnector connector; // used to create a session with the server. 
+    private ServerSession session;     // used for communication with the server.
 
-    private JButton dccButton;
-    private JButton serverSendButton;
-    private static String DCC_CHAN_NAME = "__DCC_Chan";
+    private ClientChannel dccChannel;	// the well-known channel for Direct
+				// Client to Client communication.
 
+
+    private int quitAttempts = 0;
+
+    // === Constructor ==
+ 
     public ChatClient(String[] args) {
-        // build interface
         super();
         
         setTitle("Chat Test Client");
         Container c = getContentPane();
         c.setLayout(new BorderLayout());
+
         JPanel buttonPanel = new JPanel();
         JPanel southPanel = new JPanel();
         southPanel.setLayout(new GridLayout(0, 1));
@@ -121,348 +77,277 @@ public class ChatClient extends JFrame
         southPanel.add(buttonPanel);
         southPanel.add(statusMessage);
         c.add(southPanel, BorderLayout.SOUTH);
+
         desktop = new JDesktopPane();
         c.add(desktop, BorderLayout.CENTER);
+
         JPanel eastPanel = new JPanel();
         eastPanel.setLayout(new BorderLayout());
         eastPanel.add(new JLabel("Users"), BorderLayout.NORTH);
-        userList = new JList(new DefaultListModel());
-        userList.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
+        userList = new MemberList(this);
 
-        userList.addMouseListener(new MouseAdapter() {
-            public void mouseClicked(MouseEvent evt) {
-                if (evt.getClickCount() > 1) {
-                    ClientAddress member = (ClientAddress) userList.getSelectedValue();
-                    if (member != null) {
-                        String message = JOptionPane.showInputDialog(
-                                ChatClient.this, "Enter private message:");
-                        doDCCMessage(member, message);
-                    }
-                }
-
-            }
-        });
-
-        userList.setCellRenderer(new ListCellRenderer() {
-            JLabel text = new JLabel();
-
-            public Component getListCellRendererComponent(JList arg0,
-                    Object arg1, int arg2, boolean arg3, boolean arg4) {
-                text.setText(String.format("%.8s", arg1.toString()));
-                return text;
-            }
-        });
         eastPanel.add(new JScrollPane(userList), BorderLayout.CENTER);
         c.add(eastPanel, BorderLayout.EAST);
+
         buttonPanel.setLayout(new GridLayout(1, 0));
         loginButton = new JButton("Login");
+        loginButton.setActionCommand("login");
+        loginButton.addActionListener(this);
 
-        // The login button will attempt to login to the ChatTest
-        // application on the server.
-        // It must do this via an UserManager. The
-        // ClientConnectionManager is used to
-        // return an array of valid UserManager class names. Once
-        // selected, the ClientConnectionManager
-        // will attempt to connect via this UserManager.
-
-        loginButton.addActionListener(new ActionListener() {
-
-            public void actionPerformed(ActionEvent action) {
-                if (loginButton.getText().equals("Login")) {
-                    loginButton.setEnabled(false);
-                    // TODO - big time
-//                    String[] classNames = connector.getUserManagerClassNames();
-//                    String choice = (String) JOptionPane.showInputDialog(
-//                            ChatClient.this, "Choose a user manager",
-//                            "User Manager Selection",
-//                            JOptionPane.INFORMATION_MESSAGE, null, classNames,
-//                            classNames[0]);
-                    try {
-                	connector = ClientConnectorFactory.createConnector(null);
-                        connector.connect(ChatClient.this);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                        System.exit(1);
-                    }
-                } else {
-                    session.logout(false);
-                }
-            }
-        });
-
-        // Opens a channel by name on the server. If the channel doesn't
-	// exist,
-	// it will be opened. In either case, it will attempt to join
-	// the user
-	// to the specified channel.
         openChannelButton = new JButton("Open Channel");
-        openChannelButton.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                String channelName = JOptionPane.showInputDialog(
-                        ChatClient.this, "Enter channel name");
-                openChannel(channelName);
-            }
-        });
+        openChannelButton.setActionCommand("openChannel");
+        openChannelButton.addActionListener(this);
         openChannelButton.setEnabled(false);
 
-        // Sends a message directly to the server.
         serverSendButton = new JButton("Send to Server");
-        serverSendButton.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent arg0) {
-        	String message = JOptionPane.showInputDialog(
-        		ChatClient.this, "Enter server message:");
-        	doServerMessage(message);
-            }
-        });
+        serverSendButton.setActionCommand("directSend");
+        serverSendButton.addActionListener(this);
         serverSendButton.setEnabled(false);
 
-        // sends a mulicast message to the selected users on the DCC
-        // channel.
-        dccButton = new JButton("Send Multi-DCC ");
-        dccButton.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent arg0) {
-                ClientAddress[] targets = (ClientAddress[])userList.getSelectedValues();
-                if (targets != null) {
-                    String message = JOptionPane.showInputDialog(
-                            ChatClient.this, "Enter private message:");
-                    doMultiDCCMessage(Arrays.asList(targets), message);
-                }
-            }
-        });
-        dccButton.setEnabled(false);
+        multiDccButton = new JButton("Send Multi-DCC");
+        multiDccButton.addActionListener(this);
+        multiDccButton.setEnabled(false);
+
         buttonPanel.add(loginButton);
         buttonPanel.add(openChannelButton);
         buttonPanel.add(serverSendButton);
-        buttonPanel.add(dccButton);
+        buttonPanel.add(multiDccButton);
+
         pack();
         setSize(800, 600);
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-        // start connection process. The ClientConnectionManager is the
-        // central point of server communication for the client. The
-        // ClientConnectionManager needs to know the application name to
-        // attempt to connect to on the server and how to find it. In
-        // this case the app name is "ChatTest" and discovery.xml
-        // lists the valid UserManagers.
-        try {
-              // TODO - big time
-//            connector = new ClientConnectionManagerImpl("ChatTest",
-//                    new URLDiscoverer(
-//                            new File(discoveryFileName).toURI().toURL()));
-            connector = null; /* new TCPClientConnector(...) */
-        } catch (Exception e) {
-            e.printStackTrace();
-            System.exit(2);
-        }
-
-        // When the window closes, disconnect from the manager.
-        this.addWindowStateListener(new WindowStateListener() {
-            public void windowStateChanged(WindowEvent arg0) {
-                if (arg0.getNewState() == WindowEvent.WINDOW_CLOSED) {
-                    session.logout(false);
-                }
-            }
-        });
+        addWindowListener(this);
         setVisible(true);
     }
+    
+    // === GUI helper methods ===
+    
+    private void setButtonsEnabled(boolean enable) {
+        loginButton.setEnabled(enable);
+        setSessionButtonsEnabled(enable);
+    }
+    
+    private void setSessionButtonsEnabled(boolean enable) {
+        openChannelButton.setEnabled(enable);
+        multiDccButton.setEnabled(enable);
+        serverSendButton.setEnabled(enable);
+    }
 
-    /**
-     * Sends a message to the server via the ClientConnectionManager.
-     * 
-     * @param message the message to send.
-     */
-    protected void doServerMessage(String message) {
+    private String getUserInput(String prompt) {
+	setButtonsEnabled(false);
+	try {
+	    return JOptionPane.showInputDialog(this, prompt);
+	} finally {
+	    setButtonsEnabled(true);
+	}
+    }
+
+    // === Handle main window GUI actions ===
+    
+    private void doLogin() {
+	setButtonsEnabled(false);
+
+        try {
+            connector = ClientConnectorFactory.createConnector(null);
+            connector.connect(ChatClient.this);
+            // TODO: enable the loginButton as a "Cancel Login" action.
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.exit(1);
+        }
+    }
+
+    private void doLogout() {
+	setButtonsEnabled(false);
+        session.logout(false);
+    }
+
+    private void doQuit() {
+	++quitAttempts;
+	switch (quitAttempts) {
+	case 1:
+	    session.logout(false);
+	    break;
+	case 2:
+	    session.logout(true);
+	    break;
+	default:
+	    System.exit(1);
+	    break;
+	}
+    }
+
+    private void doOpenChannel() {
+	joinChannel(getUserInput("Enter channel name:"));
+    }
+
+    private void doServerMessage() {
+	String message = getUserInput("Enter server message:");
         session.send(ByteBuffer.wrap(message.getBytes()));
     }
 
-    /**
-     * Sends a multicast message on the DCC channel.
-     * 
-     * @param targetList the list of users to send to
-     * @param message the message to send
-     */
-    protected void doMultiDCCMessage(Collection<ClientAddress> targetList, String message) {
-        dccChannel.send(targetList, ByteBuffer.wrap(message.getBytes()));
+    private void doMultiDCCMessage() {
+	Collection<ClientAddress> targets = userList.getSelectedClients();
+    	if (targets == null || targets.isEmpty()) {
+    	    return;
+    	}
+
+        String message = getUserInput("Enter private message:");
+        dccChannel.send(targets, ByteBuffer.wrap(message.getBytes()));
     }
 
-    /**
-     * Sends a message to a single user on the DCC channel.
-     * 
-     * @param target the user to send to.
-     * @param message the message to send.
-     */
-    protected void doDCCMessage(ClientAddress target, String message) {
+    void doDCCMessage() {
+	ClientAddress target = userList.getSelectedClient();
+	if (target == null) {
+	    return;
+	}
+	String message = getUserInput("Enter private message:");
         dccChannel.send(target, ByteBuffer.wrap(message.getBytes()));
     }
-/*
-    public ClientCredentials getCredentials() {
-        statusMessage.setText("Status: Validating...");
-        try {
-            return new ValidatorDialog(this).get();
-        } catch (Exception e) {
-            return null;
-        }
+
+    void joinChannel(String channelName) {
+	String cmd = "JOIN" + channelName;
+	session.send(ByteBuffer.wrap(cmd.getBytes()));
     }
-*/
-    /**
-     * ClientConnectionManagerListener callback.
-     * 
-     * Called by the ClientConnectionManager when the login is
-     * successful.
-     * 
-     * @param myID the user's id. Used for future communication with the
-     * server.
-     */
+ 
+    void leaveChannel(ClientChannel chan) {
+	String cmd = "LEAV" + chan.getName();
+	session.send(ByteBuffer.wrap(cmd.getBytes()));
+    }
+
+    private void userLogin(ClientAddress member) {
+        userList.addClient(member);
+    }
+
+    private void userLogout(ClientAddress member) {
+        userList.removeClient(member);
+    }
+
+    public String getCredentials() {
+        statusMessage.setText("Status: Validating...");
+        // TODO
+        //return new ValidatorDialog(this);
+        return null;
+    }
+    
+    // === ServerSessionListener ===
+
     public void connected(ServerSession session) {
 	this.session = session;
         statusMessage.setText("Status: Connected");
         setTitle(String.format("Chat Test Client: %.8s", session.toString()));
         loginButton.setText("Logout");
-        loginButton.setEnabled(true);
-        openChannelButton.setEnabled(true);
-        dccButton.setEnabled(true);
-        serverSendButton.setEnabled(true);
-        openChannel(DCC_CHAN_NAME);
+        loginButton.setActionCommand("logout");
+        setButtonsEnabled(true);
     }
 
-    /**
-     * ClientConnectionManagerListener callback.
-     * 
-     * Called by the ClientConnectionManager if the login attempt
-     * failed.
-     * 
-     * @param reason the reason for failure.
-     */
     public void loginFailed(String reason) {
-        statusMessage.setText("Status: Connection refused. (" + reason + ")");
+        statusMessage.setText("Status: Login failed (" + reason + ")");
         loginButton.setText("Login");
+        loginButton.setActionCommand("login");
         loginButton.setEnabled(true);
     }
 
-    /**
-     * ClientConnectionManagerListener callback.
-     * 
-     * Called by ClientConnectionManager when the user is disconnected.
-     * 
-     */
     public void disconnected(boolean graceful) {
-        openChannelButton.setEnabled(false);
-        dccButton.setEnabled(false);
-        serverSendButton.setEnabled(false);
+        setButtonsEnabled(false);
         statusMessage.setText("Status: logged out");
-        loginButton.setText("Login");
-        loginButton.setEnabled(true);
-    }
-
-    /**
-     * ClientConnectionManagerListener callback.
-     * 
-     * Called by the ClientConnectionManager when a new user joins the
-     * application. The new user is added to the user list on the right
-     * side.
-     * 
-     * @param userID the new user
-     */
-    public void memberLogin(ClientAddress member) {
-        DefaultListModel mdl = (DefaultListModel) userList.getModel();
-        mdl.addElement(member);
-        userList.repaint();
-
-    }
-
-    /**
-     * ClientConnectionManagerListener callback.
-     * 
-     * Called by the ClientConnectionManager when a user leaves the
-     * application. The user is removed from the user list on the right
-     * side.
-     * 
-     * @param userID the user that left.
-     */
-    public void memberLogout(ClientAddress member) {
-        DefaultListModel mdl = (DefaultListModel) userList.getModel();
-        mdl.removeElement(member);
-        userList.repaint();
-    }
-
-    /**
-     * ClientConnectionManagerListener callback.
-     * 
-     * Called by the ClientConnectionManager as confirmation that the
-     * user joined the given channel. If the channel is the DCC channel,
-     * a ChannelListener will be attached to receive data from it.
-     * 
-     * @param channel the channel to which the user was joined.
-     */
-    public ClientChannelListener joinedChannel(ClientChannel channel) {
-        if (channel.getName().equals(DCC_CHAN_NAME)) {
-            dccChannel = channel;
-            return new ClientChannelListener() {
-
-		public void receivedMessage(ClientChannel channel, ClientAddress sender, ByteBuffer message)
-		{
-		    byte[] messageBytes = new byte[message.remaining()];
-		    message.get(messageBytes);
-                    JOptionPane.showMessageDialog(ChatClient.this,
-                            new String(messageBytes),
-                            String.format("Message from %.8s",
-                                    sender.toString()),
-                            JOptionPane.INFORMATION_MESSAGE);
-                }
-
-		public void leftChannel(ClientChannel channel) { }
-            };
+        if (quitAttempts > 0) {
+            this.dispose();
         } else {
-            ChatChannelFrame cframe = new ChatChannelFrame(channel);
+            loginButton.setText("Login");
+            loginButton.setActionCommand("login");
+            loginButton.setEnabled(true);
+        }
+    }
+
+    public void reconnecting() {
+        statusMessage.setText("Status: Reconnecting");
+        setSessionButtonsEnabled(false);
+    }
+
+    public void reconnected() {
+        statusMessage.setText("Status: Reconnected");
+        setSessionButtonsEnabled(true);
+    }
+    
+    public ClientChannelListener joinedChannel(ClientChannel channel) {
+        if (channel.getName().equals(DCC_CHANNEL_NAME)) {
+            dccChannel = channel;
+            return this;
+        } else {
+            ChatChannelFrame cframe = new ChatChannelFrame(this, channel);
             desktop.add(cframe);
             desktop.repaint();
             return cframe;
         }
     }
 
-    /**
-     * Starting point for the client app.
-     * 
-     * @param args
-     */
-    public static void main(String[] args) {
-        new ChatClient(args);
-    }
-
-    private void openChannel(String channelName) {
-	String cmd = "/join " + channelName;
-	session.send(ByteBuffer.wrap(cmd.getBytes()));
-    }
-
     public void receivedMessage(ByteBuffer message) {
-	byte[] messageBytes = new byte[message.remaining()];
+	byte[] messageBytes = new byte[4];
 	message.get(messageBytes);
 	String command = new String(messageBytes);
 	System.err.format("ChatClient: Command recv [%s]\n", command);
-	if (command.startsWith("/login ")) {
-	    String memberString = command.substring(7);
-	    memberLogin(ClientAddress.fromBytes(ByteBuffer.wrap(memberString.getBytes())));
-	} else if (command.startsWith("/logout ")) {
-	    String memberString = command.substring(8);
-	    memberLogout(ClientAddress.fromBytes(ByteBuffer.wrap(memberString.getBytes())));
+	if (command.equals("LOGI")) {
+	    userLogin(ClientAddress.fromBytes(message));
+	} else if (command.equals("LOGO")) {
+	    userLogout(ClientAddress.fromBytes(message));
 	} else {
 	    System.err.format("ChatClient: Error, unknown command [%s]\n",
 		    command);
 	}
     }
 
-    public void reconnecting() {
-        statusMessage.setText("Status: onnecting");
-        openChannelButton.setEnabled(false);
-        dccButton.setEnabled(false);
-        serverSendButton.setEnabled(false);
+    // === ClientChannelListener ===
+    
+    public void receivedMessage(ClientChannel channel, ClientAddress sender, ByteBuffer message) {
+	byte[] messageBytes = new byte[message.remaining()];
+	message.get(messageBytes);
+	JOptionPane.showMessageDialog(this,
+		new String(messageBytes),
+		String.format("Message from %.8s",
+			sender.toString()),
+			JOptionPane.INFORMATION_MESSAGE);
     }
 
-    public void reconnected() {
-        statusMessage.setText("Status: Reconnected");
-        openChannelButton.setEnabled(true);
-        dccButton.setEnabled(true);
-        serverSendButton.setEnabled(true);
+    public void leftChannel(ClientChannel channel) {
+	System.err.format("ChatClient: Error, kicked off channel [%s]\n", channel.getName());
     }
 
+    // === ActionListener ===
+
+    public void actionPerformed(ActionEvent action) {
+	final String command = action.getActionCommand();
+        if (command.equals("login")) {
+            doLogin();
+        } else if (command.equals("logout")) {
+            doLogout();
+        } else if (command.equals("openChannel")) {
+            doOpenChannel();
+        } else if (command.equals("directSend")) {
+            doServerMessage();
+        } else if (command.equals("multiDcc")) {
+            doMultiDCCMessage();
+        } else {
+            System.err.format("ChatClient: Error, unknown GUI command [%s]\n", command);
+        }
+    }
+
+    // === WindowListener ===
+
+    public void windowClosing(WindowEvent e) {
+	doQuit();
+    }
+
+    public void windowActivated(WindowEvent e) { }
+    public void windowClosed(WindowEvent e) { }
+    public void windowDeactivated(WindowEvent e) { }
+    public void windowDeiconified(WindowEvent e) { }
+    public void windowIconified(WindowEvent e) { }
+    public void windowOpened(WindowEvent e) { }
+
+    // === Main ===
+    
+    public static void main(String[] args) {
+        new ChatClient(args);
+    }
 }

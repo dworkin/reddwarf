@@ -15,45 +15,43 @@ import javax.swing.JPasswordField;
 import javax.swing.JTextField;
 
 /**
- * This class provides a Swing GUI for server validation fulfillment.
+ * Swing GUI for simple SGS login.
  */
 public class ValidatorDialog extends JDialog
+	implements ActionListener
 {
-
     private static final long serialVersionUID = 1L;
 
-    /**
-     * Constructs a new ValidatorDialog.
-     */
+    private final JTextField nameField;
+    private final JPasswordField passwordField;
+
     public ValidatorDialog(Frame parent) {
         super(parent, "Login Dialog", true);
         Container c = getContentPane();
         JPanel validationPanel = new JPanel();
         validationPanel.setLayout(new GridLayout(2, 0));
         c.add(validationPanel, BorderLayout.NORTH);
-        JButton validateButton = new JButton("CONTINUE");
+        JButton validateButton = new JButton("Login");
+        validateButton.addActionListener(this);
         c.add(validateButton, BorderLayout.SOUTH);
 
         validationPanel.add(new JLabel("Login"));
-        final JTextField nameField = new JTextField();
+        nameField = new JTextField();
         validationPanel.add(nameField);
 
         validationPanel.add(new JLabel("Password"));
-        final JPasswordField passwordField = new JPasswordField();
+        passwordField = new JPasswordField();
         validationPanel.add(passwordField);
-
-        validateButton.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-        	/*
-        	credentials = new PasswordCredentials(nameField.getText(),
-        		new String(passwordField.getPassword()).getBytes());
-        	*/
-                ValidatorDialog.this.setVisible(false);
-                ValidatorDialog.this.getParent().remove(ValidatorDialog.this);
-            }
-        });
 
         pack();
         setVisible(true);
+    }
+
+    public void actionPerformed(ActionEvent e) {
+	// nameField.getText()
+	// passwordField.getPassword()
+	passwordField.setText(null);
+        setVisible(false);
+        getParent().remove(ValidatorDialog.this);
     }
 }
