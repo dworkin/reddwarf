@@ -49,7 +49,7 @@ public interface ChannelManager {
 			  Delivery delivery);
     
     /**
-     * Returns an existing channel with the specified name
+     * Returns an existing channel with the specified name.
      *
      * @param name a channel name
      *
