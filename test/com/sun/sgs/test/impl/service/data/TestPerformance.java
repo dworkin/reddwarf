@@ -21,8 +21,6 @@ public class TestPerformance extends TestCase {
     private static int modifyItems = Integer.getInteger("test.modifyItems", 1);
     private static int count = Integer.getInteger("test.count", 100);
     private static int repeat = Integer.getInteger("test.repeat", 4);
-    private static String detectModifications =
-	System.getProperty("test.detectModifications", "false");
 
     /** Set when the test passes. */
     private boolean passed;
@@ -101,14 +99,20 @@ public class TestPerformance extends TestCase {
     /* -- Tests -- */
 
     public void testRead() throws Exception {
+	doTestRead(true);
+    }
+
+    public void testReadNoDetectMods() throws Exception {
+	doTestRead(false);
+    }
+
+    private void doTestRead(boolean detectMods) throws Exception {
 	Properties props = createProperties(
 	    "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
 	    createDirectory(),
 	    "com.sun.sgs.appName", "TestPerformance",
 	    "com.sun.sgs.impl.service.data.store.DataServiceImpl." +
-	    "debugCheckInterval", "10",
-	    "com.sun.sgs.impl.service.data.store.DataServiceImpl." +
-	    "detectModifications", detectModifications);
+	    "detectModifications", String.valueOf(detectMods));
 
 	DataServiceImpl service = new DataServiceImpl(props);
 	DummyTransactionProxy txnProxy = new DummyTransactionProxy();
@@ -139,12 +143,7 @@ public class TestPerformance extends TestCase {
 	Properties props = createProperties(
 	    "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
 	    createDirectory(),
-	    "com.sun.sgs.appName", "TestPerformance",
-	    "com.sun.sgs.impl.service.data.store.DataServiceImpl." +
-	    "debugCheckInterval", "10",
-	    "com.sun.sgs.impl.service.data.store.DataServiceImpl." +
-	    "detectModifications", detectModifications);
-
+	    "com.sun.sgs.appName", "TestPerformance");
 	DataServiceImpl service = new DataServiceImpl(props);
 	DummyTransactionProxy txnProxy = new DummyTransactionProxy();
 	service.configure(txnProxy);

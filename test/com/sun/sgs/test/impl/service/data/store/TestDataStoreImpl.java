@@ -17,6 +17,8 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.Semaphore;
 import junit.framework.TestCase;
 
+/* XXX: Test recovery */
+
 /** Test the DataStoreImpl class */
 public class TestDataStoreImpl extends TestCase {
 

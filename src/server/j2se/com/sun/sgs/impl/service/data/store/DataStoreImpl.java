@@ -13,10 +13,10 @@ import com.sleepycat.db.EnvironmentConfig;
 import com.sleepycat.db.LockDetectMode;
 import com.sleepycat.db.LockMode;
 import com.sleepycat.db.LockNotGrantedException;
+import com.sleepycat.db.ErrorHandler;
 import com.sleepycat.db.MessageHandler;
 import com.sleepycat.db.OperationStatus;
 import com.sleepycat.db.RunRecoveryException;
-import com.sleepycat.db.StatsConfig;
 import com.sleepycat.db.TransactionConfig;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
@@ -28,14 +28,12 @@ import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /*
- * XXX: Implement recovery, shutdown
+ * XXX: Implement recovery
  */
 public final class DataStoreImpl implements DataStore, TransactionParticipant {
 
@@ -73,8 +71,12 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
     /** An empty array returned when BDB returns null for a value. */
     private static final byte[] NO_BYTES = { };
 
-    /** The configuration properties. */
-    private final Properties properties;
+    /** A transaction configuration that supports uncommitted reads. */
+    private static final TransactionConfig uncommittedReadTxnConfig =
+	new TransactionConfig();
+    static {
+	uncommittedReadTxnConfig.setReadUncommitted(true);
+    }
 
     /** The directory in which to store database files. */
     private final String directory;
@@ -82,26 +84,18 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
     /** The number of object IDs to allocate at one time. */
     private final int allocationBlockSize;
 
-    private final Object dbLock = new Object();
-
     /** The Berkeley DB environment. */
-    private Environment env;
+    private final Environment env;
 
     /** The Berkeley DB database that maps object IDs to object bytes. */
-    private Database ids;
+    private final Database ids;
 
     /** The Berkeley DB database that maps name bindings to object IDs. */
-    private Database names;
+    private final Database names;
 
-    /**
-     * Maps a transaction to information about the transaction.  Callers should
-     * synchronize on the map when accessing it.
-     */
+    /** Provides information about the transaction for the current thread. */
     private final ThreadLocal<TxnInfo> threadTxnInfo =
 	new ThreadLocal<TxnInfo>();
-
-    private final Map<Transaction, TxnInfo> txnInfoMap =
-	new HashMap<Transaction, TxnInfo>();
 
     /**
      * Object to synchronize on when accessing nextObjectId and
@@ -149,6 +143,14 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	}
     }
 
+    /** A BDB error handler that uses logging. */
+    private static class LoggingErrorHandler implements ErrorHandler {
+	public void error(Environment env, String prefix, String message) {
+	    logger.log(Level.FINE, "Database error message: {0}{1}",
+		       prefix, message);
+	}
+    }
+
     /**
      * Creates an instance of this class configured with the specified
      * properties.
@@ -161,7 +163,6 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
      *		integer greater than zero
      */
     public DataStoreImpl(Properties properties) {
-	this.properties = properties;
 	directory = properties.getProperty(DIRECTORY_PROPERTY);
 	if (directory == null) {
 	    throw new IllegalArgumentException("Directory must be specified");
@@ -173,74 +174,57 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    throw new IllegalArgumentException(
 		"The allocation block size must be greater than zero");
 	}
-	initialize();
-    }
-
-    private void initialize() {
-	synchronized (dbLock) {
-	    if (env != null) {
-		return;
-	    }
-	    logger.log(Level.FINE, "Initializing database");
-	    com.sleepycat.db.Transaction bdbTxn = null;
-	    boolean committing = false;
-	    boolean done = false;
+	com.sleepycat.db.Transaction bdbTxn = null;
+	boolean done = false;
+	try {
+	    env = getEnvironment(properties);
+	    bdbTxn = env.beginTransaction(null, null);
+	    DatabaseConfig createConfig = new DatabaseConfig();
+	    createConfig.setType(DatabaseType.BTREE);
+	    createConfig.setAllowCreate(true);
+	    boolean create = false;
+	    String idsFileName = directory + File.separator + "ids";
+	    Database ids;
 	    try {
-		env = getEnvironment(properties);
-		bdbTxn = env.beginTransaction(null, null);
-		DatabaseConfig createConfig = new DatabaseConfig();
-		createConfig.setType(DatabaseType.BTREE);
-		createConfig.setAllowCreate(true);
-		boolean create = false;
-		String idsFileName = directory + File.separator + "ids";
-		Database ids;
+		ids = env.openDatabase(bdbTxn, idsFileName, null, null);
+		DataStoreHeader.verify(ids, bdbTxn);
+	    } catch (FileNotFoundException e) {
 		try {
-		    ids = env.openDatabase(bdbTxn, idsFileName, null, null);
-		    DataStoreHeader.verify(ids, bdbTxn);
-		} catch (FileNotFoundException e) {
-		    try {
-			ids = env.openDatabase(
-			    bdbTxn, idsFileName, null, createConfig);
-		    } catch (FileNotFoundException e2) {
-			throw new DataStoreException(
-			    "Problem creating database: " + e2.getMessage(),
-			    e2);
-		    }
-		    DataStoreHeader.create(ids, bdbTxn);
-		    create = true;
+		    ids = env.openDatabase(
+			bdbTxn, idsFileName, null, createConfig);
+		} catch (FileNotFoundException e2) {
+		    throw new DataStoreException(
+			"Problem creating database: " + e2.getMessage(),
+			e2);
 		}
-		this.ids = ids;
+		DataStoreHeader.create(ids, bdbTxn);
+		create = true;
+	    }
+	    this.ids = ids;
+	    try {
+		names = env.openDatabase(
+		    bdbTxn, directory + File.separator + "names", null,
+		    create ? createConfig : null);
+	    } catch (FileNotFoundException e) {
+		throw new DataStoreException("Names database not found");
+	    }
+	    done = true;
+	    bdbTxn.commit();
+	} catch (DatabaseException e) {
+	    throw new DataStoreException(
+		"Problem initializing DataStore: " + e.getMessage(), e);
+	} finally {
+	    if (bdbTxn != null && !done) {
 		try {
-		    names = env.openDatabase(
-			bdbTxn, directory + File.separator + "names", null,
-			create ? createConfig : null);
-		} catch (FileNotFoundException e) {
-		    throw new DataStoreException("Names database not found");
-		}
-		committing = true;
-		bdbTxn.commit();
-		done = true;
-	    } catch (DatabaseException e) {
-		throw new DataStoreException(
-		    "Problem initializing DataStore: " + e.getMessage(), e);
-	    } finally {
-		if (!done) {
-		    env = null;
-		    ids = null;
-		    names = null;
-		    if (bdbTxn != null) {
-			try {
-			    bdbTxn.abort();
-			} catch (DatabaseException e) {
-			    logger.logThrow(
-				Level.FINE, "Exception during abort", e);
-			}
-		    }
+		    bdbTxn.abort();
+		} catch (DatabaseException e) {
+		    logger.logThrow(Level.FINE, "Exception during abort", e);
 		}
 	    }
 	}
     }
 
+    /** Obtains a BDB environment suitable for the specified properties. */
     private Environment getEnvironment(Properties properties)
 	throws DatabaseException
     {
@@ -248,6 +232,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	long timeout = 1000L * Util.getLongProperty(
 	    properties, TXN_TIMEOUT_PROPERTY, DEFAULT_TXN_TIMEOUT);
         config.setAllowCreate(true);
+	config.setErrorHandler(new LoggingErrorHandler());
         config.setInitializeCache(true);
         config.setInitializeLocking(true);
         config.setInitializeLogging(true);
@@ -267,16 +252,39 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 
     /* -- Implement DataStore -- */
 
+    /** {@inheritDoc} */
     public long createObject(Transaction txn) {
 	try {
 	    checkTxn(txn);
-	    return createObjectInternal();
+	    synchronized (objectIdLock) {
+		if (nextObjectId >= lastObjectId) {
+		    long newNextObjectId;
+		    com.sleepycat.db.Transaction bdbTxn =
+			env.beginTransaction(
+			    null, uncommittedReadTxnConfig);
+		    boolean done = false;
+		    try {
+			newNextObjectId = DataStoreHeader.getNextId(
+			    ids, bdbTxn, allocationBlockSize);
+			done = true;
+			bdbTxn.commit();
+		    } finally {
+			if (!done) {
+			    bdbTxn.abort();
+			}
+		    }
+		    nextObjectId = newNextObjectId;
+		    lastObjectId = newNextObjectId + allocationBlockSize;
+		}
+		return nextObjectId++;
+	    }
 	} catch (DatabaseException e) {
 	    handleDatabaseException(e);
 	    throw new AssertionError();
 	}
     }
 
+    /** {@inheritDoc} */
     public void markForUpdate(Transaction txn, long id) {
 	/*
 	 * Berkeley DB doesn't seem to provide a way to obtain a write lock
@@ -286,6 +294,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	getObject(txn, id, true);
     }
 
+    /** {@inheritDoc} */
     public byte[] getObject(Transaction txn, long id, boolean forUpdate) {
 	if (logger.isLoggable(Level.FINER)) {
 	    logger.log(Level.FINER,
@@ -315,6 +324,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	}
     }
 
+    /** {@inheritDoc} */
     public void setObject(Transaction txn, long id, byte[] data) {
 	if (logger.isLoggable(Level.FINER)) {
 	    logger.log(Level.FINER, "setObject txn:{0}, id:{1,number,#}",
@@ -340,6 +350,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	}
     }
 
+    /** {@inheritDoc} */
     public void removeObject(Transaction txn, long id) {
 	checkId(id);
 	try {
@@ -359,6 +370,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	}
     }
 
+    /** {@inheritDoc} */
     public long getBinding(Transaction txn, String name) {
 	if (name == null) {
 	    throw new NullPointerException("Name must not be null");
@@ -383,6 +395,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	}
     }
 
+    /** {@inheritDoc} */
     public void setBinding(Transaction txn, String name, long id) {
 	if (name == null) {
 	    throw new NullPointerException("Name must not be null");
@@ -405,6 +418,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	}
     }
 
+    /** {@inheritDoc} */
     public void removeBinding(Transaction txn, String name) {
 	if (name == null) {
 	    throw new NullPointerException("Name must not be null");
@@ -428,16 +442,18 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 
     /* -- Implement TransactionParticipant -- */
 
+    /** {@inheritDoc} */
     public String getIdentifier() {
 	return toString();
     }
 
+    /** {@inheritDoc} */
     public boolean prepare(Transaction txn) {
 	logger.log(Level.FINE, "prepare txn:{0}", txn);
 	if (txn == null) {
 	    throw new NullPointerException("Transaction must not be null");
 	}
-	TxnInfo txnInfo = getTxnInfo();
+	TxnInfo txnInfo = threadTxnInfo.get();
 	if (txnInfo == null) {
 	    throw new IllegalStateException("Transaction is not active");
 	} else if (!txnInfo.txn.equals(txn)) {
@@ -472,12 +488,13 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	return result;
     }
 
+    /** {@inheritDoc} */
     public void commit(Transaction txn) {
 	logger.log(Level.FINE, "commit txn:{0}", txn);
 	if (txn == null) {
 	    throw new NullPointerException("Transaction must not be null");
 	}
-	TxnInfo txnInfo = getTxnInfo();
+	TxnInfo txnInfo = threadTxnInfo.get();
 	if (txnInfo == null) {
 	    throw new IllegalStateException("Transaction is not active");
 	} else if (!txnInfo.txn.equals(txn)) {
@@ -486,7 +503,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    throw new IllegalStateException(
 		"Transaction has not been prepared");
 	} else {
-	    removeTxnInfo(txnInfo);
+	    threadTxnInfo.set(null);
 	}
 	try {
 	    txnInfo.bdbTxn.commit();
@@ -497,12 +514,13 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	}
     }
 
+    /** {@inheritDoc} */
     public void prepareAndCommit(Transaction txn) {
 	logger.log(Level.FINE, "prepareAndCommit txn:{0}", txn);
 	if (txn == null) {
 	    throw new NullPointerException("Transaction must not be null");
 	}
-	TxnInfo txnInfo = getTxnInfo();
+	TxnInfo txnInfo = threadTxnInfo.get();
 	if (txnInfo == null) {
 	    throw new IllegalStateException("Transaction is not active");
 	} else if (!txnInfo.txn.equals(txn)) {
@@ -511,7 +529,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    throw new IllegalStateException(
 		"Transaction has already been prepared");
 	} else {
-	    removeTxnInfo(txnInfo);
+	    threadTxnInfo.set(null);
 	}
 	try {
 	    txnInfo.bdbTxn.commit();
@@ -522,16 +540,17 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	}
     }
 
+    /** {@inheritDoc} */
     public void abort(Transaction txn) {
 	logger.log(Level.FINE, "abort txn:{0}", txn);
 	if (txn == null) {
 	    throw new NullPointerException("Transaction must not be null");
 	}
-	TxnInfo txnInfo = getTxnInfo();
+	TxnInfo txnInfo = threadTxnInfo.get();
 	if (txnInfo == null) {
 	    throw new IllegalStateException("Transaction is not active");
 	}
-	removeTxnInfo(txnInfo);
+	threadTxnInfo.set(null);
 	if (!txnInfo.txn.equals(txn)) {
 	    throw new IllegalStateException("Wrong transaction");
 	}
@@ -565,14 +584,6 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	}
     }
 
-    private void printStats() throws DatabaseException {
-	StatsConfig config = new StatsConfig();
-	config.setClear(true);
-	System.err.println(env.getTransactionStats(config));
-	System.err.println(env.getLogStats(config));
-	System.err.println(env.getMutexStats(config));
-    }
-
     /**
      * Checks that the transaction is in progress for an operation other than
      * prepare or commit.
@@ -581,11 +592,11 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	if (txn == null) {
 	    throw new NullPointerException("Transaction must not be null");
 	}
-	TxnInfo txnInfo = getTxnInfo();
+	TxnInfo txnInfo = threadTxnInfo.get();
 	if (txnInfo == null) {
 	    txn.join(this);
 	    txnInfo = new TxnInfo(txn, env);
-	    setTxnInfo(txnInfo);
+	    threadTxnInfo.set(txnInfo);
 	} else if (!txnInfo.txn.equals(txn)) {
 	    throw new IllegalStateException("Wrong transaction");
 	} else if (txnInfo.prepared) {
@@ -595,111 +606,30 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	return txnInfo;
     }
 
-    private long createObjectInternal() throws DatabaseException {
-	// XXX: Need interlock for shutdown here!
-	synchronized (objectIdLock) {
-	    if (nextObjectId >= lastObjectId) {
-		long newNextObjectId;
-		TransactionConfig txnConfig = new TransactionConfig();
-		txnConfig.setReadUncommitted(true);
-		com.sleepycat.db.Transaction bdbTxn =
-		    env.beginTransaction(null, txnConfig);
-		boolean done = false;
-		try {
-		    newNextObjectId = DataStoreHeader.getNextId(
-			ids, bdbTxn, allocationBlockSize);
-		    done = true;
-		    bdbTxn.commit();
-		} finally {
-		    if (!done) {
-			bdbTxn.abort();
-		    }
-		}
-		nextObjectId = newNextObjectId;
-		lastObjectId = newNextObjectId + allocationBlockSize;
-	    }
-	    return nextObjectId++;
-	}
-    }   
-
-    private TxnInfo getTxnInfo() {
-	initialize();
-	return threadTxnInfo.get();
-    }
-
-    private void setTxnInfo(TxnInfo txnInfo) {
-	threadTxnInfo.set(txnInfo);
-	synchronized (txnInfoMap) {
-	    txnInfoMap.put(txnInfo.txn, txnInfo);
-	}
-    }
-
-    private void removeTxnInfo(TxnInfo txnInfo) {
-	threadTxnInfo.set(null);
-	TxnInfo result;
-	synchronized (txnInfoMap) {
-	    result = txnInfoMap.remove(txnInfo.txn);
-	}
-	assert txnInfo.equals(result);
-    }
-
-    public void shutdown() {
-	synchronized (dbLock) {
-	    synchronized (txnInfoMap) {
-		for (TxnInfo txnInfo : txnInfoMap.values()) {
-		    try {
-			txnInfo.bdbTxn.abort();
-		    } catch (DatabaseException e) {
-			logger.logThrow(
-			    Level.FINE, "Aborting transaction failed", e);
-		    }
-		}
-		txnInfoMap.clear();
-	    }
-	    env = null;
-	    try {
-		ids.close();
-	    } catch (DatabaseException e) {
-		logger.logThrow(
-		    Level.FINE, "Closing ids database failed", e);
-	    }
-	    ids = null;
-	    try {
-		names.close();
-	    } catch (DatabaseException e) {
-		logger.logThrow(
-		    Level.FINE, "Closing names database failed", e);
-	    }
-	    names = null;
-	}
-    }
-
+    /**
+     * Takes the correct action for a BDB DatabaseException thrown during an
+     * operation.  Converts to the correct SGS exceptions, and throws an Error
+     * if recovery is needed.
+     */
     private void handleDatabaseException(DatabaseException e) {
 	if (e instanceof LockNotGrantedException) {
 	    throw new TransactionTimeoutException(e.getMessage(), e);
 	} else if (e instanceof DeadlockException) {
 	    throw new TransactionConflictException(e.getMessage(), e);
 	} else if (e instanceof RunRecoveryException) {
-	    synchronized (dbLock) {
-		env = null;
-		ids = null;
-		names = null;
-	    }
-	    throw new DataStoreException(e.getMessage(), e);
+	    /*
+	     * It is tricky to clean up the data structures in this instance in
+	     * order to reopen the BDB databases, because it's hard to know
+	     * when they are no longer in use.  It's OK to catch this Error and
+	     * create a new DataStoreImpl instance, but this instance is dead.
+	     * -tjb@sun.com (10/19/2006)
+	     */
+	    throw new Error(
+		"Database requires recovery -- need to restart the server " +
+		"or create a new instance of DataStoreImpl",
+		e);
 	} else {
 	    throw new DataStoreException(e.getMessage(), e);
-	}
-    }
-
-    public void panic() {
-	synchronized (dbLock) {
-	    if (env != null) {
-		try {
-		    env.panic(true);
-		} catch (DatabaseException e) {
-		    throw new DataStoreException(e.getMessage(), e);
-		}
-	    }
 	}
     }
 }
