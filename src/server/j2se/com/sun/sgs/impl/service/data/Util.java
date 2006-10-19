@@ -12,6 +12,13 @@ public final class Util {
 	return BigInteger.valueOf(l).toString(16);
     }
 
+    public static boolean getBooleanProperty(
+	Properties properties, String name, boolean defaultValue)
+    {
+	String value = properties.getProperty(name);
+	return value == null ? defaultValue : Boolean.valueOf(value);
+    }
+
     public static int getIntProperty(
 	Properties properties, String name, int defaultValue)
     {
@@ -25,5 +32,4 @@ public final class Util {
 	String value = properties.getProperty(name);
 	return value == null ? defaultValue : Long.parseLong(value);
     }
-
 }	

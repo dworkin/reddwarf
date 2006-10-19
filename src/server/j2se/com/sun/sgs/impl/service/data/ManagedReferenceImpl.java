@@ -5,8 +5,11 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ObjectIOException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.impl.util.LoggerWrapper;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /*
  * States:
@@ -20,7 +23,13 @@ import java.io.Serializable;
 final class ManagedReferenceImpl<T extends ManagedObject>
     implements ManagedReference<T>, Serializable
 {
-    private enum State { NEW, EMPTY, READ, MODIFIED, FLUSHED, REMOVED };
+    private final static LoggerWrapper logger =
+	new LoggerWrapper(
+	    Logger.getLogger(ManagedReferenceImpl.class.getName()));
+
+    private enum State {
+	NEW, EMPTY, NOT_MODIFIED, MAYBE_MODIFIED, MODIFIED, FLUSHED, REMOVED
+    };
 
     private final Context context;
     final long id;
@@ -42,6 +51,10 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	     ref = new ManagedReferenceImpl<T>(context, object);
 	     context.refs.add(ref);
 	 }
+	 if (logger.isLoggable(Level.FINER)) {
+	     logger.log(Level.FINER, "getReference object:{0} returns {1}",
+			object, ref);
+	 }
 	 return ref;
      }
 
@@ -53,6 +66,10 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	 if (ref == null) {
 	     ref = new ManagedReferenceImpl<ManagedObject>(context, id);
 	     context.refs.add(ref);
+	 }
+	 if (logger.isLoggable(Level.FINER)) {
+	     logger.log(Level.FINER, "getReference id:{0} returns {1}",
+			id, ref);
 	 }
 	 return ref;
      }
@@ -103,20 +120,29 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	    }
 	    break;
 	case EMPTY:
-	case FLUSHED:
 	case REMOVED:
+	case FLUSHED:
 	    if (object != null) {
-		throw new IllegalStateException("EMPTY with object");
+		throw new IllegalStateException(state + " with object");
 	    } else if (fingerprint != null) {
-		throw new IllegalStateException("EMPTY with fingerprint");
+		throw new IllegalStateException(state + " with fingerprint");
 	    }
 	    break;
-	case READ:
+	case NOT_MODIFIED:
 	case MODIFIED:
 	    if (object == null) {
-		throw new IllegalStateException("READ with no object");
+		throw new IllegalStateException(state + " with no object");
+	    } else if (fingerprint != null) {
+		throw new IllegalStateException(state + " with fingerprint");
+	    }
+	    break;
+	case MAYBE_MODIFIED:
+	    if (object == null) {
+		throw new IllegalStateException(
+		    "MAYBE_MODIFIED with no object");
 	    } else if (fingerprint == null) {
-		throw new IllegalStateException("READ with no fingerprint");
+		throw new IllegalStateException(
+		    "MAYBE_MODIFIED with no fingerprint");
 	    }
 	    break;
 	}
@@ -125,12 +151,15 @@ final class ManagedReferenceImpl<T extends ManagedObject>
     void removeObject() {
 	switch (state) {
 	case EMPTY:
-	case READ:
+	case NOT_MODIFIED:
+	case MAYBE_MODIFIED:
 	case MODIFIED:
 	    context.store.removeObject(context.txn, id);
 	    /* Fall through */
 	case NEW:
 	    context.refs.remove(this);	    
+	    object = null;
+	    fingerprint = null;
 	    state = State.REMOVED;
 	    break;
 	case FLUSHED:
@@ -144,8 +173,10 @@ final class ManagedReferenceImpl<T extends ManagedObject>
     void markForUpdate() {
 	switch (state) {
 	case EMPTY:
-	case READ:
 	    context.store.markForUpdate(context.txn, id);
+	    break;
+	case MAYBE_MODIFIED:
+	    fingerprint = null;
 	    state = State.MODIFIED;
 	    break;
 	case MODIFIED:
@@ -160,27 +191,25 @@ final class ManagedReferenceImpl<T extends ManagedObject>
     }
 
     void flush() {
-	switch (state) {
-	case READ:
-	    if (!SerialUtil.matchingFingerprint(object, fingerprint)) {
-		context.store.setObject(
-		    context.txn, id, SerialUtil.serialize(object));
-	    }
-	    /* Fall through */
-	case MODIFIED:
-	    context.store.setObject(
-		context.txn, id, SerialUtil.serialize(object));
-	    /* Fall through */
-	case EMPTY:
-	    object = null;
-	    fingerprint = null;
-	    state = State.FLUSHED;
-	    break;
-	case FLUSHED:
-	case REMOVED:
-	    break;
+	if ((state == State.FLUSHED) || (state == State.REMOVED)) {
+	    return;
 	}
-    }   
+	boolean modified;
+	if (state == State.NEW || state == State.MODIFIED) {
+	    modified = true;
+	} else if (state == State.MAYBE_MODIFIED) {
+	    modified = !SerialUtil.matchingFingerprint(object, fingerprint);
+	} else {
+	    modified = false;
+	}
+	if (modified) {
+ 	    context.store.setObject(
+		context.txn, id, SerialUtil.serialize(object));
+	}
+	object = null;
+	fingerprint = null;
+	state = State.FLUSHED;
+    }
 
     boolean isNew() {
 	return state == State.NEW;
@@ -198,12 +227,17 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	case EMPTY:
 	    object = deserialize(
 		context.store.getObject(context.txn, id, false));
-	    fingerprint = SerialUtil.fingerprint(object);
 	    context.refs.registerObject(this);
-	    state = State.READ;
+	    if (context.detectModifications) {
+		fingerprint = SerialUtil.fingerprint(object);
+		state = State.MAYBE_MODIFIED;
+	    } else {
+		state = State.NOT_MODIFIED;
+	    }
 	    break;
 	case NEW:
-	case READ:
+	case NOT_MODIFIED:
+	case MAYBE_MODIFIED:
 	case MODIFIED:
 	    break;
 	case FLUSHED:
@@ -224,7 +258,8 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	    fingerprint = SerialUtil.fingerprint(object);
 	    state = State.MODIFIED;
 	    break;
-	case READ:
+	case NOT_MODIFIED:
+	case MAYBE_MODIFIED:
 	    context.store.markForUpdate(context.txn, id);
 	    state = State.MODIFIED;
 	    break;
@@ -253,9 +288,6 @@ final class ManagedReferenceImpl<T extends ManagedObject>
     }
 
     public String toString() {
-	return "ManagedReferenceImpl[id:" + id + "]";
+	return "ManagedReferenceImpl[id:" + id + ",state:" + state + "]";
     }
-
-    /* -- Other methods -- */
-
 }

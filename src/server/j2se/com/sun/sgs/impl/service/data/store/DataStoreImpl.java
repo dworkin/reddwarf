@@ -13,12 +13,14 @@ import com.sleepycat.db.EnvironmentConfig;
 import com.sleepycat.db.LockDetectMode;
 import com.sleepycat.db.LockMode;
 import com.sleepycat.db.OperationStatus;
+import com.sleepycat.db.StatsConfig;
 import com.sleepycat.db.TransactionConfig;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.service.data.Util;
+import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import java.io.File;
@@ -26,13 +28,13 @@ import java.io.FileNotFoundException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /*
  * XXX: Implement recovery
- * XXX: Join
  * XXX: Close
  */
-
 public class DataStoreImpl implements DataStore, TransactionParticipant {
 
     /** The property that specifies the transaction timeout in milliseconds. */
@@ -61,6 +63,13 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 
     /** The default for the number of object IDs to allocate at one time. */
     private static final int DEFAULT_ALLOCATION_BLOCK_SIZE = 100;
+
+    /** The logger for this class. */
+    private static final LoggerWrapper logger =
+	new LoggerWrapper(Logger.getLogger(CLASSNAME));
+
+    /** An empty array returned when BDB returns null for a value. */
+    private static final byte[] NO_BYTES = { };
 
     /** The directory in which to store database files. */
     private final String directory;
@@ -114,12 +123,26 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	/** Whether preparation of the transaction has started. */
 	boolean prepared;
 
+	/** Whether any changes have been made in this transaction. */
+	boolean modified;
+
 	TxnInfo(Transaction txn, Environment env) throws DatabaseException {
 	    this.txn = txn;
 	    bdbTxn = env.beginTransaction(null, null);
 	}
     }
 
+    /**
+     * Creates an instance of this class configured with the specified
+     * properties.
+     *
+     * @param	properties the properties for configuring this instance
+     * @throws	DataStoreException if there is a problem with the database
+     * @throws	IllegalArgumentException if the <code>DIRECTORY_PROPERTY</code>
+     *		property is not specified, or if the value of the
+     *		<code>ALLOCATION_BLOCK_SIZE_PROPERTY</code> is not a valid
+     *		integer greater than zero
+     */
     public DataStoreImpl(Properties properties) {
 	directory = properties.getProperty(DIRECTORY_PROPERTY);
 	if (directory == null) {
@@ -128,6 +151,10 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	allocationBlockSize = Util.getIntProperty(
 	    properties, ALLOCATION_BLOCK_SIZE_PROPERTY,
 	    DEFAULT_ALLOCATION_BLOCK_SIZE);
+	if (allocationBlockSize < 1) {
+	    throw new IllegalArgumentException(
+		"The allocation block size must be greater than zero");
+	}
 	com.sleepycat.db.Transaction bdbTxn = null;
 	boolean done = false;
 	try {
@@ -153,7 +180,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 		}
 		DataStoreHeader.create(ids, bdbTxn);
 		create = true;
-	    }	    
+	    }
 	    this.ids = ids;
 	    try {
 		names = env.openDatabase(
@@ -172,7 +199,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 		try {
 		    bdbTxn.abort();
 		} catch (DatabaseException e) {
-		    // XXX: Log
+		    logger.logThrow(Level.FINE, "Exception during abort", e);
 		}
 	    }
 	}
@@ -224,6 +251,11 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
     }
 
     public byte[] getObject(Transaction txn, long id, boolean forUpdate) {
+	if (logger.isLoggable(Level.FINER)) {
+	    logger.log(Level.FINER,
+		       "getObject txn:{0}, id:{1,number,#}, forUpdate:{2}",
+		       txn, id, forUpdate);
+	}
 	checkId(id);
 	try {
 	    TxnInfo txnInfo = checkTxn(txn);
@@ -238,7 +270,9 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 		throw new DataStoreException(
 		    "Getting object failed: " + status);
 	    }
-	    return value.getData();
+	    byte[] result = value.getData();
+	    /* BDB returns null if the data is empty. */
+	    return result != null ? result : NO_BYTES;
 	} catch (DeadlockException e) {
 	    handleDeadlockException(e, txn);
 	} catch (DatabaseException e) {
@@ -248,6 +282,10 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
     }
 
     public void setObject(Transaction txn, long id, byte[] data) {
+	if (logger.isLoggable(Level.FINER)) {
+	    logger.log(Level.FINER, "setObject txn:{0}, id:{1,number,#}",
+		       txn, id);
+	}
 	checkId(id);
 	if (data == null) {
 	    throw new NullPointerException("The data must not be null");
@@ -262,6 +300,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 		throw new DataStoreException(
 		    "Setting object failed: " + status);
 	    }
+	    txnInfo.modified = true;
 	} catch (DeadlockException e) {
 	    handleDeadlockException(e, txn);
 	} catch (DatabaseException e) {
@@ -282,6 +321,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 		throw new DataStoreException(
 		    "Removing object failed: " + status);
 	    }
+	    txnInfo.modified = true;
 	} catch (DeadlockException e) {
 	    handleDeadlockException(e, txn);
 	} catch (DatabaseException e) {
@@ -290,6 +330,9 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
     }
 
     public long getBinding(Transaction txn, String name) {
+	if (name == null) {
+	    throw new NullPointerException("Name must not be null");
+	}
 	try {
 	    TxnInfo txnInfo = checkTxn(txn);
 	    DatabaseEntry key = new DatabaseEntry();
@@ -313,6 +356,9 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
     }
 
     public void setBinding(Transaction txn, String name, long id) {
+	if (name == null) {
+	    throw new NullPointerException("Name must not be null");
+	}
 	checkId(id);
 	try {
 	    TxnInfo txnInfo = checkTxn(txn);
@@ -325,6 +371,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 		throw new DataStoreException(
 		    "Setting binding failed: " + status);
 	    }
+	    txnInfo.modified = true;
 	} catch (DeadlockException e) {
 	    handleDeadlockException(e, txn);
 	} catch (DatabaseException e) {
@@ -333,6 +380,9 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
     }
 
     public void removeBinding(Transaction txn, String name) {
+	if (name == null) {
+	    throw new NullPointerException("Name must not be null");
+	}
 	try {
 	    TxnInfo txnInfo = checkTxn(txn);
 	    DatabaseEntry key = new DatabaseEntry();
@@ -344,6 +394,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 		throw new DataStoreException(
 		    "Removing binding failed: " + status);
 	    }
+	    txnInfo.modified = true;
 	} catch (DeadlockException e) {
 	    handleDeadlockException(e, txn);
 	} catch (DatabaseException e) {
@@ -358,6 +409,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
     }
 
     public boolean prepare(Transaction txn) {
+	logger.log(Level.FINE, "prepare txn:{0}", txn);
 	TxnInfo txnInfo;
 	synchronized (txnInfoMap) {
 	    txnInfo = txnInfoMap.get(txn);
@@ -371,11 +423,13 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	    txnInfo.prepared = true;
 	}
 	boolean done = false;
-	byte[] id = txn.getId();
-	byte[] gid = new byte[128];
-	System.arraycopy(id, 0, gid, 128 - id.length, id.length);
 	try {
-	    txnInfo.bdbTxn.prepare(gid);
+	    if (txnInfo.modified) {
+		byte[] id = txn.getId();
+		byte[] gid = new byte[128];
+		System.arraycopy(id, 0, gid, 128 - id.length, id.length);
+		txnInfo.bdbTxn.prepare(gid);
+	    }
 	    done = true;
 	} catch (DeadlockException e) {
 	    handleDeadlockException(e, txn);
@@ -386,10 +440,15 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 		txnInfo.prepared = false;
 	    }
 	}
-	return false;
+	boolean result = !txnInfo.modified;
+	if (logger.isLoggable(Level.FINE)) {
+	    logger.log(Level.FINE, "prepare txn:{0} returns {1}", txn, result);
+	}
+	return result;
     }
 
     public void commit(Transaction txn) {
+	logger.log(Level.FINE, "commit txn:{0}", txn);
 	TxnInfo txnInfo;
 	synchronized (txnInfoMap) {
 	    txnInfo = txnInfoMap.get(txn);
@@ -414,6 +473,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
     }
 
     public void prepareAndCommit(Transaction txn) {
+	logger.log(Level.FINE, "prepareAndCommit txn:{0}", txn);
 	TxnInfo txnInfo;
 	synchronized (txnInfoMap) {
 	    txnInfo = txnInfoMap.get(txn);
@@ -438,6 +498,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
     }
 
     public void abort(Transaction txn) {
+	logger.log(Level.FINE, "abort txn:{0}", txn);
 	TxnInfo txnInfo;
 	synchronized (txnInfoMap) {
 	    txnInfo = txnInfoMap.remove(txn);
@@ -477,6 +538,14 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	}
     }
 
+    private void printStats() throws DatabaseException {
+	StatsConfig config = new StatsConfig();
+	config.setClear(true);
+	System.err.println(env.getTransactionStats(config));
+	System.err.println(env.getLogStats(config));
+	System.err.println(env.getMutexStats(config));
+    }
+
     /**
      * Checks that the transaction is in progress for an operation other than
      * prepare or commit.
@@ -488,12 +557,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	synchronized (txnInfoMap) {
 	    TxnInfo txnInfo = txnInfoMap.get(txn);
 	    if (txnInfo == null) {
-		try {
-		    txn.join(this);
-		} catch (IllegalStateException e) {
-		    throw new TransactionNotActiveException(
-			"Transaction is not active");
-		}
+		txn.join(this);
 		txnInfo = new TxnInfo(txn, env);
 		txnInfoMap.put(txn, txnInfo);
 	    } else if (txnInfo.prepared) {

@@ -4,6 +4,7 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.Transaction;
+import com.sun.sgs.service.TransactionParticipant;
 
 /** Stores information specific to a specific transaction. */
 final class Context {
@@ -11,24 +12,37 @@ final class Context {
     /** The data store. */
     final DataStore store;
 
-    /** The current transaction. */
-    final Transaction txn;
+    /** The original transaction. */
+    final Transaction originalTxn;
+
+    /** The wrapped transaction. */
+    final TxnTrampoline txn;
 
     private final int debugCheckInterval;
+
+    final boolean detectModifications;
 
     private int count = 0;
 
     private boolean inactive;
 
+    private TransactionParticipant storeParticipant;
+
     /** Stores information about managed references. */
     final ReferenceTable refs = new ReferenceTable();
 
     /** Creates an instance of this class. */
-    Context(DataStore store, Transaction txn, int debugCheckInterval) {
+    Context(DataStore store,
+	    Transaction txn,
+	    int debugCheckInterval,
+	    boolean detectModifications)
+    {
 	assert store != null && txn != null;
 	this.store = store;
+	this.originalTxn = txn;
 	this.txn = new TxnTrampoline(txn);
 	this.debugCheckInterval = debugCheckInterval;
+	this.detectModifications = detectModifications;
     }
 
     /**
@@ -37,24 +51,31 @@ final class Context {
      * for transactions passed to the DataStore in order to mediate its
      * participation in the transaction.
      */
-    private final class TxnTrampoline implements Transaction {
+    final class TxnTrampoline implements Transaction {
 	private final Transaction txn;
 	TxnTrampoline(Transaction txn) { this.txn = txn; }
 	public byte[] getId() { return txn.getId(); }
 	public long getTimeStamp() { return txn.getTimeStamp(); }
-	public void join(Service service) {
+	public void join(TransactionParticipant participant) {
 	    if (inactive) {
 		throw new IllegalStateException(
 		    "Attempt to join a transaction that is not active");
+	    } else if (storeParticipant == null) {
+		storeParticipant = participant;
+	    } else if (!storeParticipant.equals(participant)) {
+		throw new IllegalStateException(
+		    "Attempt to join with different participant");
 	    }
 	}
-	public void commit() { txn.commit(); }
 	public void abort() { txn.abort(); }
 	public boolean equals(Object object) {
 	    return object instanceof TxnTrampoline &&
 		txn.equals(((TxnTrampoline) object).txn);
 	}
 	public int hashCode() { return txn.hashCode(); }
+	public String toString() {
+	    return "TxnTrampoline[txn:" + txn + "]";
+	}
     }
 
     /* -- References -- */
@@ -83,7 +104,8 @@ final class Context {
     <T extends ManagedObject> T getBinding(
 	String internalName, Class<T> type)
     {
-	return type.cast(getReference(store.getBinding(txn, internalName)));
+	return type.cast(
+	    getReference(store.getBinding(txn, internalName)).get());
     }
 
     /** Sets the object associated with the specified internal name. */
@@ -94,6 +116,24 @@ final class Context {
     /** Removes the object associated with the specified internal name. */
     void removeBinding(String internalName) {
 	store.removeBinding(txn, internalName);
+    }
+
+    /* -- Methods on transaction participant -- */
+
+    boolean prepare() {
+	return storeParticipant.prepare(txn);
+    }
+
+    void commit() {
+	storeParticipant.commit(txn);
+    }
+
+    void prepareAndCommit() {
+	storeParticipant.prepareAndCommit(txn);
+    }
+
+    void abort() {
+	storeParticipant.commit(txn);
     }
 
     /* -- Other methods -- */

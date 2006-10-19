@@ -36,7 +36,10 @@ public class DummyTransaction implements Transaction {
 	participants.add(participant);
     }
     public void abort() {
-	if (state != State.ACTIVE && state != State.PREPARING) {
+	if (state != State.ACTIVE &&
+	    state != State.PREPARING &&
+	    state != State.PREPARED)
+	{
 	    throw new IllegalStateException(
 		"Transaction not active or preparing");
 	}
@@ -48,31 +51,29 @@ public class DummyTransaction implements Transaction {
 	    }
 	}
     }
-    public boolean prepare() {
+    public boolean prepare() throws Exception {
 	if (state != State.ACTIVE) {
 	    throw new IllegalStateException("Transaction not active");
 	}
 	state = State.PREPARING;
+	boolean result = true;
 	for (TransactionParticipant participant : participants) {
-	    try {
-		participant.prepare(this);
-	    } catch (Exception e) {
-		if (state != State.ABORTED) {
-		    throw new RuntimeException(
-			"Participant failed to abort when prepare failed: " +
-			participant + "\nException: " + e);
-		}
-		return false;
+	    if (!participant.prepare(this)) {
+		result = false;
 	    }
 	}
 	state = State.PREPARED;
-	return true;
+	return result;
     }
-    public void commit() {
-	if (state != State.ACTIVE) {
+    public void commit() throws Exception {
+	if (state == State.PREPARED) {
+	    for (TransactionParticipant participant : participants) {
+		participant.commit(this);
+	    }
+	} else if (state != State.ACTIVE) {
 	    throw new IllegalStateException("Transaction not active");
-	}
-	if (usePrepareAndCommit && participants.size() == 1) {
+	} else if (usePrepareAndCommit && participants.size() == 1) {
+	    state = State.PREPARING;
 	    participants.iterator().next().prepareAndCommit(this);
 	} else {
 	    prepare();
@@ -80,8 +81,12 @@ public class DummyTransaction implements Transaction {
 		participant.commit(this);
 	    }
 	}
+	state = State.COMMITTED;
     }
     public State getState() {
 	return state;
+    }
+    public String toString() {
+	return "DummyTransaction[id:" + id + "]";
     }
 }

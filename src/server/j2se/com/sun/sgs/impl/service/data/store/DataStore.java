@@ -19,7 +19,7 @@ public interface DataStore {
      *
      * @param	txn the transaction under which the operation should take place
      * @return	the new object ID
-     * @throws	TransactionException if the operation failed because of a
+     * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
     long createObject(Transaction txn);
@@ -32,7 +32,7 @@ public interface DataStore {
      * @param	id the object ID
      * @throws	IllegalArgumentException if <code>id</code> is negative
      * @throws	ObjectNotFoundException if the object is not found
-     * @throws	TransactionException if the operation failed because of a
+     * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
     void markForUpdate(Transaction txn, long id);
@@ -50,7 +50,7 @@ public interface DataStore {
      * @return	the data associated with the object ID
      * @throws	IllegalArgumentException if <code>id</code> is negative
      * @throws	ObjectNotFoundException if the object is not found
-     * @throws	TransactionException if the operation failed because of a
+     * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
     byte[] getObject(Transaction txn, long id, boolean forUpdate);
@@ -61,9 +61,9 @@ public interface DataStore {
      * @param	txn the transaction under which the operation should take place
      * @param	id the object ID
      * @param	data the data
-     * @throws	IllegalArgumentException if <code>id</code> is negative
-     * @throws	ObjectNotFoundException if the object is not found
-     * @throws	TransactionException if the operation failed because of a
+     * @throws	IllegalArgumentException if <code>id</code> is negative, or if
+     *		<code>data</code> is empty
+     * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
     void setObject(Transaction txn, long id, byte[] data);
@@ -78,7 +78,7 @@ public interface DataStore {
      * @param	id the object ID
      * @throws	IllegalArgumentException if <code>id</code> is negative
      * @throws	ObjectNotFoundException if the object is not found
-     * @throws	TransactionException if the operation failed because of a
+     * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
     void removeObject(Transaction txn, long id);
@@ -90,7 +90,7 @@ public interface DataStore {
      * @param	name the name
      * @return	the object ID
      * @throws	NameNotBoundException if no object ID is bound to the name
-     * @throws	TransactionException if the operation failed because of a
+     * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
     long getBinding(Transaction txn, String name);
@@ -102,7 +102,7 @@ public interface DataStore {
      * @param	name the name
      * @param	the object ID
      * @throws	IllegalArgumentException if <code>id</code> is negative
-     * @throws	TransactionException if the operation failed because of a
+     * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
     void setBinding(Transaction txn, String name, long id);
@@ -113,7 +113,7 @@ public interface DataStore {
      * @param	txn the transaction under which the operation should take place
      * @param	name the name
      * @throws	NameNotBoundException if the name is not bound
-     * @throws	TransactionException if the operation failed because of a
+     * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
     void removeBinding(Transaction txn, String name);

@@ -3,6 +3,7 @@ package com.sun.sgs.test.impl.service.data.store;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionConflictException;
+import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.service.data.store.DataStoreException;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.test.DummyTransaction;
@@ -14,6 +15,8 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import junit.framework.TestCase;
+
+/* XXX: Test timeout */
 
 /** Test the DataStoreImpl class */
 public class TestDataStoreImpl extends TestCase {
@@ -1070,8 +1073,10 @@ public class TestDataStoreImpl extends TestCase {
 	TransactionConflictException exception = null;
 	try {
 	    store.getObject(txn, id2, true);
+	    txn.commit();
 	} catch (TransactionConflictException e) {
 	    exception = e;
+	    txn.abort();
 	}
 	assertNotBlocked(task);
 	if (myRunnable.exception2 != null &&
@@ -1086,6 +1091,23 @@ public class TestDataStoreImpl extends TestCase {
 	    System.err.println(exception);
 	} else {
 	    System.err.println(myRunnable.exception2);
+	}
+    }
+
+    /* -- Test timeout -- */
+
+    public void testTimeout() throws Exception {
+	DataStoreImpl store = getDataStoreImpl();
+	DummyTransaction txn = new DummyTransaction();
+	long id = store.createObject(txn);
+	store.setBinding(txn, "foo", id);
+	Thread.sleep(2000);
+	try {
+	    store.setBinding(txn, "foo", id + 1);
+	    txn.commit();
+	    fail("Expected TransactionTimeoutException");
+	} catch (TransactionTimeoutException e) {
+	    System.err.println(e);
 	}
     }
 
