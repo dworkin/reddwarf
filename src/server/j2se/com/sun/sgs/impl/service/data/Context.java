@@ -55,7 +55,7 @@ final class Context {
 	private final Transaction txn;
 	TxnTrampoline(Transaction txn) { this.txn = txn; }
 	public byte[] getId() { return txn.getId(); }
-	public long getTimeStamp() { return txn.getTimeStamp(); }
+	public long getCreationTime() { return txn.getCreationTime(); }
 	public void join(TransactionParticipant participant) {
 	    if (inactive) {
 		throw new IllegalStateException(
@@ -120,7 +120,7 @@ final class Context {
 
     /* -- Methods on transaction participant -- */
 
-    boolean prepare() {
+    boolean prepare() throws Exception {
 	return storeParticipant.prepare(txn);
     }
 
@@ -128,7 +128,7 @@ final class Context {
 	storeParticipant.commit(txn);
     }
 
-    void prepareAndCommit() {
+    void prepareAndCommit() throws Exception {
 	storeParticipant.prepareAndCommit(txn);
     }
 

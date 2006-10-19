@@ -215,12 +215,12 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
     /* -- Implement TransactionParticipant -- */
 
     /** {@inheritDoc} */
-    public String getIdentifier() {
+    public String getName() {
 	return toString();
     }
 
     /** {@inheritDoc} */
-    public boolean prepare(Transaction txn) {
+    public boolean prepare(Transaction txn) throws Exception {
 	try {
 	    if (txn == null) {
 		throw new TransactionNotActiveException(
@@ -276,7 +276,7 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
     }
 
     /** {@inheritDoc} */
-    public void prepareAndCommit(Transaction txn) {
+    public void prepareAndCommit(Transaction txn) throws Exception {
 	try {
 	    if (txn == null) {
 		throw new IllegalStateException("No transaction");

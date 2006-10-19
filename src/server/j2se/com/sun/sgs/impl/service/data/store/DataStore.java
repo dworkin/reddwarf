@@ -1,5 +1,7 @@
 package com.sun.sgs.impl.service.data.store;
 
+import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.service.Transaction;
 
 /**
@@ -100,7 +102,7 @@ public interface DataStore {
      *
      * @param	txn the transaction under which the operation should take place
      * @param	name the name
-     * @param	the object ID
+     * @param	id the object ID
      * @throws	IllegalArgumentException if <code>id</code> is negative
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction

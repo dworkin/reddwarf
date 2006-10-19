@@ -12,27 +12,26 @@ import com.sleepycat.db.Environment;
 import com.sleepycat.db.EnvironmentConfig;
 import com.sleepycat.db.LockDetectMode;
 import com.sleepycat.db.LockMode;
+import com.sleepycat.db.LockNotGrantedException;
 import com.sleepycat.db.OperationStatus;
 import com.sleepycat.db.StatsConfig;
 import com.sleepycat.db.TransactionConfig;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionConflictException;
-import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.service.data.Util;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /*
- * XXX: Implement recovery
+ * XXX: Implement recovery, reopen
  * XXX: Close
  */
 public class DataStoreImpl implements DataStore, TransactionParticipant {
@@ -90,8 +89,8 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
      * Maps a transaction to information about the transaction.  Callers should
      * synchronize on the map when accessing it.
      */
-    private final Map<Transaction, TxnInfo> txnInfoMap =
-	new HashMap<Transaction, TxnInfo>();
+    private final ThreadLocal<TxnInfo> threadTxnInfo =
+	new ThreadLocal<TxnInfo>();
 
     /**
      * Object to synchronize on when accessing nextObjectId and
@@ -209,16 +208,17 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	throws DatabaseException
     {
         EnvironmentConfig config = new EnvironmentConfig();
-	config.setLockTimeout(
-	    Util.getLongProperty(
-		properties, TXN_TIMEOUT_PROPERTY, DEFAULT_TXN_TIMEOUT));
+	long timeout = 1000L * Util.getLongProperty(
+	    properties, TXN_TIMEOUT_PROPERTY, DEFAULT_TXN_TIMEOUT);
         config.setAllowCreate(true);
         config.setInitializeCache(true);
         config.setInitializeLocking(true);
         config.setInitializeLogging(true);
         config.setLockDetectMode(LockDetectMode.MINWRITE);
+	config.setLockTimeout(timeout);
         config.setRunRecovery(true);
         config.setTransactional(true);
+	config.setTxnTimeout(timeout);
 	try {
 	    return new Environment(new File(directory), config);
 	} catch (FileNotFoundException e) {
@@ -233,12 +233,13 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	try {
 	    checkTxn(txn);
 	    return createObjectInternal();
+	} catch (LockNotGrantedException e) {
+	    throw new TransactionTimeoutException(e.getMessage(), e);
 	} catch (DeadlockException e) {
-	    handleDeadlockException(e, txn);
+	    throw new TransactionConflictException(e.getMessage(), e);
 	} catch (DatabaseException e) {
-	    handleUnexpectedException(e, txn);
+	    throw new DataStoreException(e.getMessage(), e);
 	}
-	throw new AssertionError();
     }
 
     public void markForUpdate(Transaction txn, long id) {
@@ -273,12 +274,13 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	    byte[] result = value.getData();
 	    /* BDB returns null if the data is empty. */
 	    return result != null ? result : NO_BYTES;
+	} catch (LockNotGrantedException e) {
+	    throw new TransactionTimeoutException(e.getMessage(), e);
 	} catch (DeadlockException e) {
-	    handleDeadlockException(e, txn);
+	    throw new TransactionConflictException(e.getMessage(), e);
 	} catch (DatabaseException e) {
-	    handleUnexpectedException(e, txn);
+	    throw new DataStoreException(e.getMessage(), e);
 	}
-	throw new AssertionError();
     }
 
     public void setObject(Transaction txn, long id, byte[] data) {
@@ -301,10 +303,12 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 		    "Setting object failed: " + status);
 	    }
 	    txnInfo.modified = true;
+	} catch (LockNotGrantedException e) {
+	    throw new TransactionTimeoutException(e.getMessage(), e);
 	} catch (DeadlockException e) {
-	    handleDeadlockException(e, txn);
+	    throw new TransactionConflictException(e.getMessage(), e);
 	} catch (DatabaseException e) {
-	    handleUnexpectedException(e, txn);
+	    throw new DataStoreException(e.getMessage(), e);
 	}
     }
 
@@ -322,10 +326,12 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 		    "Removing object failed: " + status);
 	    }
 	    txnInfo.modified = true;
+	} catch (LockNotGrantedException e) {
+	    throw new TransactionTimeoutException(e.getMessage(), e);
 	} catch (DeadlockException e) {
-	    handleDeadlockException(e, txn);
+	    throw new TransactionConflictException(e.getMessage(), e);
 	} catch (DatabaseException e) {
-	    handleUnexpectedException(e, txn);
+	    throw new DataStoreException(e.getMessage(), e);
 	}
     }
 
@@ -347,12 +353,13 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 		    "Getting binding failed: " + status);
 	    }
 	    return LongBinding.entryToLong(value);
+	} catch (LockNotGrantedException e) {
+	    throw new TransactionTimeoutException(e.getMessage(), e);
 	} catch (DeadlockException e) {
-	    handleDeadlockException(e, txn);
+	    throw new TransactionConflictException(e.getMessage(), e);
 	} catch (DatabaseException e) {
-	    handleUnexpectedException(e, txn);
+	    throw new DataStoreException(e.getMessage(), e);
 	}
-	throw new AssertionError();
     }
 
     public void setBinding(Transaction txn, String name, long id) {
@@ -372,10 +379,12 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 		    "Setting binding failed: " + status);
 	    }
 	    txnInfo.modified = true;
+	} catch (LockNotGrantedException e) {
+	    throw new TransactionTimeoutException(e.getMessage(), e);
 	} catch (DeadlockException e) {
-	    handleDeadlockException(e, txn);
+	    throw new TransactionConflictException(e.getMessage(), e);
 	} catch (DatabaseException e) {
-	    handleUnexpectedException(e, txn);
+	    throw new DataStoreException(e.getMessage(), e);
 	}
     }
 
@@ -395,10 +404,12 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 		    "Removing binding failed: " + status);
 	    }
 	    txnInfo.modified = true;
+	} catch (LockNotGrantedException e) {
+	    throw new TransactionTimeoutException(e.getMessage(), e);
 	} catch (DeadlockException e) {
-	    handleDeadlockException(e, txn);
+	    throw new TransactionConflictException(e.getMessage(), e);
 	} catch (DatabaseException e) {
-	    handleUnexpectedException(e, txn);
+	    throw new DataStoreException(e.getMessage(), e);
 	}
     }
 
@@ -410,12 +421,14 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 
     public boolean prepare(Transaction txn) {
 	logger.log(Level.FINE, "prepare txn:{0}", txn);
-	TxnInfo txnInfo;
-	synchronized (txnInfoMap) {
-	    txnInfo = txnInfoMap.get(txn);
+	if (txn == null) {
+	    throw new NullPointerException("Transaction must not be null");
 	}
+	TxnInfo txnInfo = threadTxnInfo.get();
 	if (txnInfo == null) {
 	    throw new IllegalStateException("Transaction is not active");
+	} else if (!txnInfo.txn.equals(txn)) {
+	    throw new IllegalStateException("Wrong transaction");
 	} else if (txnInfo.prepared) {
 	    throw new IllegalStateException(
 		"Transaction has already been prepared");
@@ -431,10 +444,12 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 		txnInfo.bdbTxn.prepare(gid);
 	    }
 	    done = true;
+	} catch (LockNotGrantedException e) {
+	    throw new TransactionTimeoutException(e.getMessage(), e);
 	} catch (DeadlockException e) {
-	    handleDeadlockException(e, txn);
+	    throw new TransactionConflictException(e.getMessage(), e);
 	} catch (DatabaseException e) {
-	    handleUnexpectedException(e, txn);
+	    throw new DataStoreException(e.getMessage(), e);
 	} finally {
 	    if (!done) {
 		txnInfo.prepared = false;
@@ -449,20 +464,24 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 
     public void commit(Transaction txn) {
 	logger.log(Level.FINE, "commit txn:{0}", txn);
-	TxnInfo txnInfo;
-	synchronized (txnInfoMap) {
-	    txnInfo = txnInfoMap.get(txn);
-	    if (txnInfo == null) {
-		throw new IllegalStateException("Transaction is not active");
-	    } else if (!txnInfo.prepared) {
-		throw new IllegalStateException(
-		    "Transaction has not been prepared");
-	    } else {
-		txnInfoMap.remove(txn);
-	    }
+	if (txn == null) {
+	    throw new NullPointerException("Transaction must not be null");
+	}
+	TxnInfo txnInfo = threadTxnInfo.get();
+	if (txnInfo == null) {
+	    throw new IllegalStateException("Transaction is not active");
+	} else if (!txnInfo.txn.equals(txn)) {
+	    throw new IllegalStateException("Wrong transaction");
+	} else if (!txnInfo.prepared) {
+	    throw new IllegalStateException(
+		"Transaction has not been prepared");
+	} else {
+	    threadTxnInfo.set(null);
 	}
 	try {
 	    txnInfo.bdbTxn.commit();
+	} catch (LockNotGrantedException e) {
+	    throw new TransactionTimeoutException(e.getMessage(), e);
 	} catch (DeadlockException e) {
 	    throw new TransactionConflictException(e.getMessage(), e);
 	} catch (DatabaseException e) {
@@ -474,20 +493,24 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 
     public void prepareAndCommit(Transaction txn) {
 	logger.log(Level.FINE, "prepareAndCommit txn:{0}", txn);
-	TxnInfo txnInfo;
-	synchronized (txnInfoMap) {
-	    txnInfo = txnInfoMap.get(txn);
-	    if (txnInfo == null) {
-		throw new IllegalStateException("Transaction is not active");
-	    } else if (txnInfo.prepared) {
-		throw new IllegalStateException(
-		    "Transaction has already been prepared");
-	    } else {
-		txnInfoMap.remove(txn);
-	    }
+	if (txn == null) {
+	    throw new NullPointerException("Transaction must not be null");
+	}
+	TxnInfo txnInfo = threadTxnInfo.get();
+	if (txnInfo == null) {
+	    throw new IllegalStateException("Transaction is not active");
+	} else if (!txnInfo.txn.equals(txn)) {
+	    throw new IllegalStateException("Wrong transaction");
+	} else if (txnInfo.prepared) {
+	    throw new IllegalStateException(
+		"Transaction has already been prepared");
+	} else {
+	    threadTxnInfo.set(null);
 	}
 	try {
 	    txnInfo.bdbTxn.commit();
+	} catch (LockNotGrantedException e) {
+	    throw new TransactionTimeoutException(e.getMessage(), e);
 	} catch (DeadlockException e) {
 	    throw new TransactionConflictException(e.getMessage(), e);
 	} catch (DatabaseException e) {
@@ -499,15 +522,20 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 
     public void abort(Transaction txn) {
 	logger.log(Level.FINE, "abort txn:{0}", txn);
-	TxnInfo txnInfo;
-	synchronized (txnInfoMap) {
-	    txnInfo = txnInfoMap.remove(txn);
+	if (txn == null) {
+	    throw new NullPointerException("Transaction must not be null");
 	}
+	TxnInfo txnInfo = threadTxnInfo.get();
+	threadTxnInfo.set(null);
 	if (txnInfo == null) {
 	    throw new IllegalStateException("Transaction is not active");
+	} else if (!txnInfo.txn.equals(txn)) {
+	    throw new IllegalStateException("Wrong transaction");
 	}
 	try {
 	    txnInfo.bdbTxn.abort();
+	} catch (LockNotGrantedException e) {
+	    throw new TransactionTimeoutException(e.getMessage(), e);
 	} catch (DeadlockException e) {
 	    throw new TransactionConflictException(e.getMessage(), e);
 	} catch (DatabaseException e) {
@@ -554,18 +582,18 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	if (txn == null) {
 	    throw new NullPointerException("Transaction must not be null");
 	}
-	synchronized (txnInfoMap) {
-	    TxnInfo txnInfo = txnInfoMap.get(txn);
-	    if (txnInfo == null) {
-		txn.join(this);
-		txnInfo = new TxnInfo(txn, env);
-		txnInfoMap.put(txn, txnInfo);
-	    } else if (txnInfo.prepared) {
-		throw new IllegalStateException(
-		    "Transaction has been prepared");
-	    }
-	    return txnInfo;
+	TxnInfo txnInfo = threadTxnInfo.get();
+	if (txnInfo == null) {
+	    txn.join(this);
+	    txnInfo = new TxnInfo(txn, env);
+	    threadTxnInfo.set(txnInfo);
+	} else if (!txnInfo.txn.equals(txn)) {
+	    throw new IllegalStateException("Wrong transaction");
+	} else if (txnInfo.prepared) {
+	    throw new IllegalStateException(
+		"Transaction has been prepared");
 	}
+	return txnInfo;
     }
 
     private long createObjectInternal() throws DatabaseException {
@@ -593,18 +621,4 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	    return nextObjectId++;
 	}
     }   
-
-    /** Throws a TransactionConflictException. */
-    private void handleDeadlockException(
-	DeadlockException e, Transaction txn)
-    {
-	throw new TransactionConflictException(e.getMessage(), e);
-    }
-
-    /** Throws a DataStoreException. */
-    private void handleUnexpectedException(
-	DatabaseException e, Transaction txn)
-    {
-	throw new DataStoreException(e.getMessage(), e);
-    }
 }

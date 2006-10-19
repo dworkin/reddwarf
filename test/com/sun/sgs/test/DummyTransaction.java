@@ -11,7 +11,7 @@ public class DummyTransaction implements Transaction {
     private static boolean nextUsePrepareAndCommit;
     private final boolean usePrepareAndCommit;
     private final long id = nextId++;
-    private final long timestamp = System.currentTimeMillis();
+    private final long creationTime = System.currentTimeMillis();
     private State state = State.ACTIVE;
     public final Set<TransactionParticipant> participants =
 	new HashSet<TransactionParticipant>();
@@ -28,7 +28,7 @@ public class DummyTransaction implements Transaction {
 	    (byte) (id >>> 32), (byte) (id >>> 24), (byte) (id >>> 16),
 	    (byte) (id >>> 8), (byte) id };
     }
-    public long getTimeStamp() { return timestamp; }
+    public long getCreationTime() { return creationTime; }
     public void join(TransactionParticipant participant) {
 	if (state != State.ACTIVE) {
 	    throw new IllegalStateException("Transaction not active");

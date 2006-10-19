@@ -3,20 +3,19 @@ package com.sun.sgs.test.impl.service.data.store;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionConflictException;
+import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.service.data.store.DataStoreException;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
+import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.test.DummyTransaction;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Properties;
 import java.util.concurrent.FutureTask;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.Semaphore;
 import junit.framework.TestCase;
-
-/* XXX: Test timeout */
 
 /** Test the DataStoreImpl class */
 public class TestDataStoreImpl extends TestCase {
@@ -269,6 +268,22 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    public void testCreateObjectWrongTxn() throws Exception {
+	DataStoreImpl store = getDataStoreImpl();
+	DummyTransaction txn = new DummyTransaction();
+	store.createObject(txn);
+	DummyTransaction txn2 = new DummyTransaction();
+	try {
+	    store.createObject(txn2);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	} finally {
+	    txn.abort();
+	    txn2.abort();
+	}
+    }
+
     public void testCreateObjectSuccess() throws Exception {
 	DataStoreImpl store = getDataStoreImpl();
 	DummyTransaction txn = new DummyTransaction();
@@ -369,6 +384,26 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    public void testMarkForUpdateWrongTxn() throws Exception {
+	DataStoreImpl store = getDataStoreImpl();
+	DummyTransaction txn = new DummyTransaction();
+	long id = store.createObject(txn);
+	store.setObject(txn, id, new byte[] { 0 });
+	txn.commit();
+	txn = new DummyTransaction();
+	store.createObject(txn);
+	DummyTransaction txn2 = new DummyTransaction();
+	try {
+	    store.markForUpdate(txn2, id);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	} finally {
+	    txn.abort();
+	    txn2.abort();
+	}
+    }
+
     public void testMarkForUpdateSuccess() throws Exception {
 	DataStoreImpl store = getDataStoreImpl();
 	DummyTransaction txn = new DummyTransaction();
@@ -464,6 +499,26 @@ public class TestDataStoreImpl extends TestCase {
 	    fail("Expected IllegalStateException");
 	} catch (IllegalStateException e) {
 	    System.err.println(e);
+	}
+    }
+
+    public void testGetObjectWrongTxn() throws Exception {
+	DataStoreImpl store = getDataStoreImpl();
+	DummyTransaction txn = new DummyTransaction();
+	long id = store.createObject(txn);
+	store.setObject(txn, id, new byte[] { 0 });
+	txn.commit();
+	txn = new DummyTransaction();
+	store.getObject(txn, id, false);
+	DummyTransaction txn2 = new DummyTransaction();
+	try {
+	    store.getObject(txn2, id, false);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	} finally {
+	    txn.abort();
+	    txn2.abort();
 	}
     }
 
@@ -582,6 +637,24 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    public void testSetObjectWrongTxn() throws Exception {
+	DataStoreImpl store = getDataStoreImpl();
+	DummyTransaction txn = new DummyTransaction();
+	long id = store.createObject(txn);
+	DummyTransaction txn2 = new DummyTransaction();
+	long id2 = store.createObject(txn);
+	byte[] data = { 0 };
+	try {
+	    store.setObject(txn2, id, data);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	} finally {
+	    txn.abort();
+	    txn2.abort();
+	}
+    }
+
     public void testSetObjectSuccess() throws Exception {
 	DataStoreImpl store = getDataStoreImpl();
 	DummyTransaction txn = new DummyTransaction();
@@ -686,6 +759,26 @@ public class TestDataStoreImpl extends TestCase {
 	    fail("Expected IllegalStateException");
 	} catch (IllegalStateException e) {
 	    System.err.println(e);
+	}
+    }
+
+    public void testRemoveObjectWrongTxn() throws Exception {
+	DataStoreImpl store = getDataStoreImpl();
+	DummyTransaction txn = new DummyTransaction();
+	long id = store.createObject(txn);
+	store.setObject(txn, id, new byte[] { 0 });
+	txn.commit();
+	txn = new DummyTransaction();
+	store.createObject(txn);
+	DummyTransaction txn2 = new DummyTransaction();
+	try {
+	    store.removeObject(txn2, id);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	} finally {
+	    txn.abort();
+	    txn2.abort();
 	}
     }
 
@@ -827,6 +920,26 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    public void testGetBindingWrongTxn() throws Exception {
+	DataStoreImpl store = getDataStoreImpl();
+	DummyTransaction txn = new DummyTransaction();
+	long id = store.createObject(txn);
+	store.setBinding(txn, "foo", id);
+	txn.commit();
+	txn = new DummyTransaction();
+	store.createObject(txn);
+	DummyTransaction txn2 = new DummyTransaction();
+	try {
+	    store.getBinding(txn2, "foo");
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	} finally {
+	    txn.abort();
+	    txn2.abort();
+	}
+    }
+
     public void testGetBindingSuccess() throws Exception {
 	DataStoreImpl store = getDataStoreImpl();
 	DummyTransaction txn = new DummyTransaction();
@@ -905,6 +1018,25 @@ public class TestDataStoreImpl extends TestCase {
 	    fail("Expected IllegalStateException");
 	} catch (IllegalStateException e) {
 	    System.err.println(e);
+	}
+    }
+
+    public void testSetBindingWrongTxn() throws Exception {
+	DataStoreImpl store = getDataStoreImpl();
+	DummyTransaction txn = new DummyTransaction();
+	long id = store.createObject(txn);
+	txn.commit();
+	txn = new DummyTransaction();
+	store.createObject(txn);
+	DummyTransaction txn2 = new DummyTransaction();
+	try {
+	    store.setBinding(txn2, "foo", id);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	} finally {
+	    txn.abort();
+	    txn2.abort();
 	}
     }
 
@@ -1009,6 +1141,26 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    public void testRemoveBindingWrongTxn() throws Exception {
+	DataStoreImpl store = getDataStoreImpl();
+	DummyTransaction txn = new DummyTransaction();
+	long id = store.createObject(txn);
+	store.setBinding(txn, "foo", id);
+	txn.commit();
+	txn = new DummyTransaction();
+	store.createObject(txn);
+	DummyTransaction txn2 = new DummyTransaction();
+	try {
+	    store.removeBinding(txn2, "foo");
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	} finally {
+	    txn.abort();
+	    txn2.abort();
+	}
+    }
+
     public void testRemoveBindingSuccess() throws Exception {
 	DataStoreImpl store = getDataStoreImpl();
 	DummyTransaction txn = new DummyTransaction();
@@ -1041,110 +1193,390 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
-    /* -- Test deadlock -- */
+    /* -- Test abort -- */
 
-    public void testDeadlock() throws Exception {
-	final DataStoreImpl store = getDataStoreImpl();
+    public void testAbortNullTxn() throws Exception {
+	DataStoreImpl store = getDataStoreImpl();
 	DummyTransaction txn = new DummyTransaction();
-	final long id = store.createObject(txn);
-	store.setObject(txn, id, new byte[] { 0 });
-	final long id2 = store.createObject(txn);
-	store.setObject(txn, id2, new byte[] { 0 });
-	txn.commit();
-	txn = new DummyTransaction();
-	store.getObject(txn, id, false);
-	final DummyTransaction txn2 = new DummyTransaction();
-	store.getObject(txn2, id2, false);
-	class MyRunnable implements Runnable {
-	    Exception exception2;
-	    public void run() {
-		try {
-		    store.getObject(txn2, id, true);
-		    txn2.commit();
-		} catch (Exception e) {
-		    exception2 = e;
-		    txn2.abort();
-		}
-	    }
-	}
-	MyRunnable myRunnable = new MyRunnable();
-	Task task = new Task(myRunnable);
-	assertBlocked(task);
-	TransactionConflictException exception = null;
+	store.createObject(txn);
+	TransactionParticipant participant =
+	    txn.participants.iterator().next();
 	try {
-	    store.getObject(txn, id2, true);
-	    txn.commit();
-	} catch (TransactionConflictException e) {
-	    exception = e;
+	    participant.abort(null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	} finally {
 	    txn.abort();
-	}
-	assertNotBlocked(task);
-	if (myRunnable.exception2 != null &&
-	    !(myRunnable.exception2 instanceof TransactionConflictException))
-	{
-	    throw myRunnable.exception2;
-	} else if (exception == null && myRunnable.exception2 == null) {
-	    fail("Expected TransactionConflictException");
-	} else if (exception != null && myRunnable.exception2 != null) {
-	    fail("Multiple TransactionConflictExceptions");
-	} else if (exception != null) {
-	    System.err.println(exception);
-	} else {
-	    System.err.println(myRunnable.exception2);
 	}
     }
 
-    /* -- Test timeout -- */
-
-    public void testTimeout() throws Exception {
+    public void testAbortAborted() throws Exception {
 	DataStoreImpl store = getDataStoreImpl();
 	DummyTransaction txn = new DummyTransaction();
-	long id = store.createObject(txn);
-	store.setBinding(txn, "foo", id);
-	Thread.sleep(2000);
+	store.createObject(txn);
+	TransactionParticipant participant =
+	    txn.participants.iterator().next();
+	txn.abort();
 	try {
-	    store.setBinding(txn, "foo", id + 1);
-	    txn.commit();
-	    fail("Expected TransactionTimeoutException");
-	} catch (TransactionTimeoutException e) {
+	    participant.abort(txn);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
 	    System.err.println(e);
 	}
     }
 
-    /* -- Other methods -- */
+    public void testAbortPrepared() throws Exception {
+	DataStoreImpl store = getDataStoreImpl();
+	DummyTransaction txn = new DummyTransaction();
+	store.createObject(txn);
+	TransactionParticipant participant =
+	    txn.participants.iterator().next();
+	participant.prepare(txn);
+	participant.abort(txn);
+    }
 
-    /** A future task that returns null. */
-    class Task extends FutureTask<Object> {
-	Task(Runnable runnable) {
-	    super(runnable, null);
+    public void testAbortCommitted() throws Exception {
+	DataStoreImpl store = getDataStoreImpl();
+	DummyTransaction txn = new DummyTransaction();
+	store.createObject(txn);
+	TransactionParticipant participant =
+	    txn.participants.iterator().next();
+	txn.commit();
+	try {
+	    participant.abort(txn);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
 	}
     }
 
-    /**
-     * Evaluate the future task in another thread, and make sure it is not
-     * blocked by checking that it evaluates "quickly".
-     */
-    static <T> T assertNotBlocked(FutureTask<T> task) throws Exception {
-	new Thread(task).start();
-	T result = null;
+    public void testAbortWrongTxn() throws Exception {
+	DataStoreImpl store = getDataStoreImpl();
+	DummyTransaction txn = new DummyTransaction();
+	store.createObject(txn);
+	TransactionParticipant participant =
+	    txn.participants.iterator().next();
+	DummyTransaction txn2 = new DummyTransaction();
 	try {
-	    result = task.get(1, TimeUnit.SECONDS);
-	} catch (TimeoutException e) {
-	    fail("Timeout exceeded: " + e);
+	    participant.abort(txn2);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	} finally {
+	    txn.abort();
+	    txn2.abort();
 	}
-	return result;
     }
 
-    /**
-     * Evaluate a future task in another thread, and make sure it is blocked by
-     * checking that it does not evaluate "quickly".
-     */
-    static <T> void assertBlocked(FutureTask<T> task) throws Exception {
-	new Thread(task).start();
+    /* -- Test prepare -- */
+
+    public void testPrepareNullTxn() throws Exception {
+	DataStoreImpl store = getDataStoreImpl();
+	DummyTransaction txn = new DummyTransaction();
+	store.createObject(txn);
+	TransactionParticipant participant =
+	    txn.participants.iterator().next();
 	try {
-	    task.get(1, TimeUnit.SECONDS);
-	    fail("TimeoutException expected");
-	} catch (TimeoutException e) {
+	    participant.prepare(null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	} finally {
+	    txn.abort();
+	}
+    }
+
+    public void testPrepareAborted() throws Exception {
+	DataStoreImpl store = getDataStoreImpl();
+	DummyTransaction txn = new DummyTransaction();
+	store.createObject(txn);
+	TransactionParticipant participant =
+	    txn.participants.iterator().next();
+	txn.abort();
+	try {
+	    participant.prepare(txn);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testPreparePrepared() throws Exception {
+	DataStoreImpl store = getDataStoreImpl();
+	DummyTransaction txn = new DummyTransaction();
+	store.createObject(txn);
+	TransactionParticipant participant =
+	    txn.participants.iterator().next();
+	participant.prepare(txn);
+	try {
+	    participant.prepare(txn);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	} finally {
+	    txn.abort();
+	}
+    }
+
+    public void testPrepareCommitted() throws Exception {
+	DataStoreImpl store = getDataStoreImpl();
+	DummyTransaction txn = new DummyTransaction();
+	store.createObject(txn);
+	TransactionParticipant participant =
+	    txn.participants.iterator().next();
+	txn.commit();
+	try {
+	    participant.prepare(txn);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testPrepareWrongTxn() throws Exception {
+	DataStoreImpl store = getDataStoreImpl();
+	DummyTransaction txn = new DummyTransaction();
+	store.createObject(txn);
+	TransactionParticipant participant =
+	    txn.participants.iterator().next();
+	DummyTransaction txn2 = new DummyTransaction();
+	try {
+	    participant.prepare(txn2);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	} finally {
+	    txn.abort();
+	    txn2.abort();
+	}
+    }
+
+    /* -- Test prepareAndCommit -- */
+
+    public void testPrepareAndCommitNullTxn() throws Exception {
+	DataStoreImpl store = getDataStoreImpl();
+	DummyTransaction txn = new DummyTransaction();
+	store.createObject(txn);
+	TransactionParticipant participant =
+	    txn.participants.iterator().next();
+	try {
+	    participant.prepareAndCommit(null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	} finally {
+	    txn.abort();
+	}
+    }
+
+    public void testPrepareAndCommitAborted() throws Exception {
+	DataStoreImpl store = getDataStoreImpl();
+	DummyTransaction txn = new DummyTransaction();
+	store.createObject(txn);
+	TransactionParticipant participant =
+	    txn.participants.iterator().next();
+	txn.abort();
+	try {
+	    participant.prepareAndCommit(txn);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testPrepareAndCommitPrepared() throws Exception {
+	DataStoreImpl store = getDataStoreImpl();
+	DummyTransaction txn = new DummyTransaction();
+	store.createObject(txn);
+	TransactionParticipant participant =
+	    txn.participants.iterator().next();
+	participant.prepare(txn);
+	try {
+	    participant.prepareAndCommit(txn);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	} finally {
+	    txn.abort();
+	}
+    }
+
+    public void testPrepareAndCommitCommitted() throws Exception {
+	DataStoreImpl store = getDataStoreImpl();
+	DummyTransaction txn = new DummyTransaction();
+	store.createObject(txn);
+	TransactionParticipant participant =
+	    txn.participants.iterator().next();
+	txn.commit();
+	try {
+	    participant.prepareAndCommit(txn);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testPrepareAndCommitWrongTxn() throws Exception {
+	DataStoreImpl store = getDataStoreImpl();
+	DummyTransaction txn = new DummyTransaction();
+	store.createObject(txn);
+	TransactionParticipant participant =
+	    txn.participants.iterator().next();
+	DummyTransaction txn2 = new DummyTransaction();
+	try {
+	    participant.prepareAndCommit(txn2);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	} finally {
+	    txn.abort();
+	    txn2.abort();
+	}
+    }
+
+    /* -- Test commit -- */
+
+    public void testCommitNullTxn() throws Exception {
+	DataStoreImpl store = getDataStoreImpl();
+	DummyTransaction txn = new DummyTransaction();
+	store.createObject(txn);
+	TransactionParticipant participant =
+	    txn.participants.iterator().next();
+	try {
+	    participant.commit(null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	} finally {
+	    txn.abort();
+	}
+    }
+
+    public void testCommitAborted() throws Exception {
+	DataStoreImpl store = getDataStoreImpl();
+	DummyTransaction txn = new DummyTransaction();
+	store.createObject(txn);
+	TransactionParticipant participant =
+	    txn.participants.iterator().next();
+	txn.abort();
+	try {
+	    participant.commit(txn);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testCommitPrepared() throws Exception {
+	DataStoreImpl store = getDataStoreImpl();
+	DummyTransaction txn = new DummyTransaction();
+	store.createObject(txn);
+	TransactionParticipant participant =
+	    txn.participants.iterator().next();
+	participant.prepare(txn);
+	participant.commit(txn);
+    }
+
+    public void testCommitCommitted() throws Exception {
+	DataStoreImpl store = getDataStoreImpl();
+	DummyTransaction txn = new DummyTransaction();
+	store.createObject(txn);
+	TransactionParticipant participant =
+	    txn.participants.iterator().next();
+	txn.commit();
+	try {
+	    participant.commit(txn);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testCommitWrongTxn() throws Exception {
+	DataStoreImpl store = getDataStoreImpl();
+	DummyTransaction txn = new DummyTransaction();
+	store.createObject(txn);
+	TransactionParticipant participant =
+	    txn.participants.iterator().next();
+	DummyTransaction txn2 = new DummyTransaction();
+	try {
+	    participant.commit(txn2);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	} finally {
+	    txn.abort();
+	    txn2.abort();
+	}
+    }
+
+    /* -- Test deadlock -- */
+
+    public void testDeadlock() throws Exception {
+	for (int i = 0; i < 5; i++) {
+	    final int j = i;
+	    final DataStoreImpl store = getDataStoreImpl();
+	    DummyTransaction txn = new DummyTransaction();
+	    final long id = store.createObject(txn);
+	    store.setObject(txn, id, new byte[] { 0 });
+	    final long id2 = store.createObject(txn);
+	    store.setObject(txn, id2, new byte[] { 0 });
+	    txn.commit();
+	    txn = new DummyTransaction();
+	    store.getObject(txn, id, false);
+	    final Semaphore flag = new Semaphore(1);
+	    flag.acquire();
+	    class MyRunnable implements Runnable {
+		Exception exception2;
+		public void run() {
+		    DummyTransaction txn2 = null;
+		    try {
+			txn2 = new DummyTransaction();
+			store.getObject(txn2, id2, false);
+			flag.release();
+			store.getObject(txn2, id, true);
+			System.err.println(j + " txn2: commit");
+			txn2.commit();
+		    } catch (Exception e) {
+			System.err.println(j + " txn2: " + e);
+			exception2 = e;
+			if (txn2 != null) {
+			    txn2.abort();
+			}
+		    }
+		}
+	    }
+	    MyRunnable myRunnable = new MyRunnable();
+	    FutureTask task = new FutureTask<Object>(myRunnable, null);
+	    new Thread(task).start();
+	    Thread.sleep(i * 500);
+	    flag.acquire();
+	    TransactionException exception = null;
+	    try {
+		store.getObject(txn, id2, true);
+		System.err.println(i + " txn1: commit");
+		txn.commit();
+	    } catch (TransactionConflictException e) {
+		System.err.println(i + " txn1: " + e);
+		exception = e;
+		txn.abort();
+	    } catch (TransactionTimeoutException e) {
+		System.err.println(i + " txn1: " + e);
+		exception = e;
+		txn.abort();
+	    }
+	    task.get();
+	    if (myRunnable.exception2 != null &&
+		!(myRunnable.exception2
+		  instanceof TransactionConflictException ||
+		  myRunnable.exception2
+		  instanceof TransactionTimeoutException))
+	    {
+		throw myRunnable.exception2;
+	    } else if (exception == null && myRunnable.exception2 == null) {
+		fail("Expected TransactionConflictException");
+	    }
 	}
     }
 }
