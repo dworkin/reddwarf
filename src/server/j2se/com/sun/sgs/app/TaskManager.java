@@ -76,13 +76,16 @@ public interface TaskManager {
      * to run the task periodically at the specified interval following the
      * delay until the {@link PeriodicTaskHandle#cancel
      * PeriodicTaskHandle.cancel} method is called on the associated handle.
-     * Each time a task is successfully run, another task will be scheduled to
-     * run <code>period</code> milliseconds after the time that the task was
-     * scheduled to run in the previous period.  The <code>TaskManager</code>
-     * will wait until the current attempt to run the task has ended before
-     * making another attempt to run it, regardless of whether the attempts are
-     * for the same or different periods. <p>
-     *
+     * At the start of each period, which occurs <code>period</code>
+     * milliseconds after the scheduled start of the previous period, a new
+     * task will be scheduled to run. The <code>TaskManager</code> will make
+     * a best effort to run a new task in each period, but even if the task
+     * cannot be run in one period, a new task will always be scheduled for
+     * the following period. The <code>TaskManager</code> will wait until
+     * the current attempt to run the task has ended before making another
+     * attempt to run it, regardless of whether the attempts are for the same
+     * or different periods.
+     * <p>
      * If the call to the <code>run</code> method throws an exception, that
      * exception implements {@link ExceptionRetryStatus}, and its {@link
      * ExceptionRetryStatus#shouldRetry shouldRetry} method returns
