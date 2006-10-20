@@ -7,6 +7,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
+import java.net.PasswordAuthentication;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 
@@ -20,11 +21,9 @@ import javax.swing.JScrollPane;
 
 import com.sun.sgs.client.ClientChannel;
 import com.sun.sgs.client.ClientChannelListener;
-import com.sun.sgs.client.ClientConnector;
 import com.sun.sgs.client.ClientAddress;
-import com.sun.sgs.client.ClientConnectorFactory;
-import com.sun.sgs.client.ServerSession;
-import com.sun.sgs.client.ServerSessionListener;
+import com.sun.sgs.client.SimpleClientListener;
+import com.sun.sgs.client.SimpleClient;
 
 /**
  * <p>
@@ -36,7 +35,7 @@ import com.sun.sgs.client.ServerSessionListener;
  */
 public class ChatClient extends JFrame
         implements ActionListener, WindowListener,
-        	ServerSessionListener, ClientChannelListener
+        	SimpleClientListener, ClientChannelListener
 {
     private static final long serialVersionUID = 1L;
 
@@ -49,11 +48,10 @@ public class ChatClient extends JFrame
 
     private static final String DCC_CHANNEL_NAME = "__DCC_Chan";
 
-    private final MemberList userList;	// a list of sessions currently connected to the
+    private final MemberList userList;	// a list of clients currently connected to the
     			// ChatApp on the server.
 
-    private ClientConnector connector; // used to create a session with the server. 
-    private ServerSession session;     // used for communication with the server.
+    private SimpleClient client;     // used for communication with the server.
 
     private ClientChannel dccChannel;	// the well-known channel for Direct
 				// Client to Client communication.
@@ -148,8 +146,8 @@ public class ChatClient extends JFrame
 	setButtonsEnabled(false);
 
         try {
-            connector = ClientConnectorFactory.createConnector(null);
-            connector.connect(ChatClient.this);
+            client = new SimpleClient(this);
+            client.connect(null);
             // TODO: enable the loginButton as a "Cancel Login" action.
         } catch (Exception e) {
             e.printStackTrace();
@@ -159,17 +157,17 @@ public class ChatClient extends JFrame
 
     private void doLogout() {
 	setButtonsEnabled(false);
-        session.logout(false);
+        client.logout(false);
     }
 
     private void doQuit() {
 	++quitAttempts;
 	switch (quitAttempts) {
 	case 1:
-	    session.logout(false);
+	    client.logout(false);
 	    break;
 	case 2:
-	    session.logout(true);
+	    client.logout(true);
 	    break;
 	default:
 	    System.exit(1);
@@ -183,7 +181,7 @@ public class ChatClient extends JFrame
 
     private void doServerMessage() {
 	String message = getUserInput("Enter server message:");
-        session.send(ByteBuffer.wrap(message.getBytes()));
+        client.send(ByteBuffer.wrap(message.getBytes()));
     }
 
     private void doMultiDCCMessage() {
@@ -207,12 +205,12 @@ public class ChatClient extends JFrame
 
     void joinChannel(String channelName) {
 	String cmd = "JOIN" + channelName;
-	session.send(ByteBuffer.wrap(cmd.getBytes()));
+	client.send(ByteBuffer.wrap(cmd.getBytes()));
     }
  
     void leaveChannel(ClientChannel chan) {
 	String cmd = "LEAV" + chan.getName();
-	session.send(ByteBuffer.wrap(cmd.getBytes()));
+	client.send(ByteBuffer.wrap(cmd.getBytes()));
     }
 
     private void userLogin(ClientAddress member) {
@@ -223,24 +221,21 @@ public class ChatClient extends JFrame
         userList.removeClient(member);
     }
 
-    public String getCredentials() {
-        statusMessage.setText("Status: Validating...");
-        // TODO
-        //return new ValidatorDialog(this);
-        return null;
-    }
-    
-    // === ServerSessionListener ===
+    // === SimpleClientListener ===
 
-    public void connected(ServerSession session) {
-	this.session = session;
+    public void connected() {
         statusMessage.setText("Status: Connected");
-        setTitle(String.format("Chat Test Client: %.8s", session.toString()));
+        setTitle(String.format("Chat Test Client: %.8s", client.getClientAddress().toString()));
         loginButton.setText("Logout");
         loginButton.setActionCommand("logout");
         setButtonsEnabled(true);
     }
 
+    public PasswordAuthentication getPasswordAuthentication(String prompt) {
+        statusMessage.setText("Status: Validating...");
+        return new ValidatorDialog(this, prompt).getPasswordAuthentication();
+    }
+    
     public void loginFailed(String reason) {
         statusMessage.setText("Status: Login failed (" + reason + ")");
         loginButton.setText("Login");

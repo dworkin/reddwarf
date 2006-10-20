@@ -6,6 +6,8 @@ import java.awt.Frame;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.net.PasswordAuthentication;
+import java.util.concurrent.Semaphore;
 
 import javax.swing.JButton;
 import javax.swing.JDialog;
@@ -24,9 +26,16 @@ public class ValidatorDialog extends JDialog
 
     private final JTextField nameField;
     private final JPasswordField passwordField;
+    
+    private final Semaphore actionSemaphore;
 
-    public ValidatorDialog(Frame parent) {
+    private PasswordAuthentication passwordAuth;
+
+    public ValidatorDialog(Frame parent, String prompt) {
         super(parent, "Login Dialog", true);
+        
+        actionSemaphore = new Semaphore(0);
+        
         Container c = getContentPane();
         JPanel validationPanel = new JPanel();
         validationPanel.setLayout(new GridLayout(2, 0));
@@ -46,10 +55,20 @@ public class ValidatorDialog extends JDialog
         pack();
         setVisible(true);
     }
+    
+    public PasswordAuthentication getPasswordAuthentication() {
+	try {
+	    actionSemaphore.acquire();
+        } catch (InterruptedException e) {
+	    return null;
+        }
+	return passwordAuth;
+    }
 
     public void actionPerformed(ActionEvent e) {
-	// nameField.getText()
-	// passwordField.getPassword()
+	passwordAuth = new PasswordAuthentication(
+		nameField.getText(), passwordField.getPassword());
+	actionSemaphore.release();
 	passwordField.setText(null);
         setVisible(false);
         getParent().remove(ValidatorDialog.this);
