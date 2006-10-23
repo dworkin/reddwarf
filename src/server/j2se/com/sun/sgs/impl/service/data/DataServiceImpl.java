@@ -16,6 +16,7 @@ import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/* XXX: Add header? */
 public class DataServiceImpl implements DataService, TransactionParticipant {
 
     /** The property that specifies the application name. */
@@ -42,20 +43,33 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
 
+    /** Provides transaction and other information for the current thread. */
     private static final ThreadLocal<Context> currentContext =
 	new ThreadLocal<Context>();
 
+    /** The name of this application. */
     private final String appName;
 
-    private final int debugCheckInterval;
-
-    private final boolean detectModifications;
-
+    /** The underlying data store. */
     private final DataStore store;
 
-    private final Object txnProxyLock = new Object();
+    /**
+     * Synchronize on this object before accessing the txnProxy,
+     * debugCheckInterval, or detectModifications fields.
+     */
+    private final Object lock = new Object();
 
+    /** The transaction proxy, or null if configure has not been called. */
     private TransactionProxy txnProxy;
+
+    /**
+     * The number of operations between checking the consistency of the managed
+     * reference table.
+     */
+    private int debugCheckInterval;
+
+    /** Whether to detect object modification automatically. */
+    private boolean detectModifications;
 
     /**
      * Creates an instance of this class configured with the specified
@@ -63,9 +77,10 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
      *
      * @param	properties the properties for configuring this service
      * @throws	IllegalArgumentException if the <code>APP_NAME_PROPERTY</code>
-     *		is not specified or if the value of the
+     *		is not specified, if the value of the
      *		<code>DEBUG_CHECK_INTERVAL_PROPERTY</code> is not a valid
-     *		integer
+     *		integer, or if the data store constructor detects an illegal
+     *		property value
      */
     public DataServiceImpl(Properties properties) {
 	logger.log(Level.CONFIG, "Creating DataServiceImpl properties:{0}",
@@ -95,7 +110,10 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
      * @throws	IllegalStateException if this method has already been called
      */
     public void configure(TransactionProxy txnProxy) {
-	synchronized (txnProxyLock) {
+	if (txnProxy == null) {
+	    throw new NullPointerException("The argument must not be null");
+	}
+	synchronized (lock) {
 	    if (this.txnProxy != null) {
 		throw new IllegalStateException("Already configured");
 	    }
@@ -138,10 +156,10 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 		ref.removeObject();
 	    }
 	    logger.log(
-		Level.FINER, "removeObject object:{0} returns", object);
+		Level.FINEST, "removeObject object:{0} returns", object);
 	} catch (RuntimeException e) {
 	    logger.logThrow(
-		Level.FINER, "removeObject object:{0} throws", e, object);
+		Level.FINEST, "removeObject object:{0} throws", e, object);
 	    throw e;
 	}
     }
@@ -159,10 +177,10 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 		ref.markForUpdate();
 	    }
 	    logger.log(
-		Level.FINER, "markForUpdate object:{0} returns", object);
+		Level.FINEST, "markForUpdate object:{0} returns", object);
 	} catch (RuntimeException e) {
 	    logger.logThrow(
-		Level.FINER, "markForUpdate object:{0} throws", e, object);
+		Level.FINEST, "markForUpdate object:{0} throws", e, object);
 	    throw e;
 	}
     }
@@ -180,15 +198,15 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 	    }
 	    Context context = checkContext();
 	    ManagedReference<T> result = context.getReference(object);
-	    if (logger.isLoggable(Level.FINER)) {
+	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
-		    Level.FINER, "createReference object:{0} returns {1}",
+		    Level.FINEST, "createReference object:{0} returns {1}",
 		    object, result);
 	    }
 	    return result;
 	} catch (RuntimeException e) {
 	    logger.logThrow(
-		Level.FINER, "createReference object:{0} throws", e, object);
+		Level.FINEST, "createReference object:{0} throws", e, object);
 	    throw e;
 	}
     }
@@ -240,12 +258,12 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 	    context.flushChanges();
 	    boolean result = context.prepare();
 	    if (logger.isLoggable(Level.FINE)) {
-		logger.log(Level.FINE, "prepare txn:{0} returns {1}",
+		logger.log(Level.FINER, "prepare txn:{0} returns {1}",
 			   txn, result);
 	    }
 	    return result;
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINE, "prepare txn:{0} throws", e, txn);
+	    logger.logThrow(Level.FINER, "prepare txn:{0} throws", e, txn);
 	    throw e;
 	}
     }
@@ -268,9 +286,9 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 		    ", found " + txn);
 	    }
 	    context.commit();
-	    logger.log(Level.FINE, "commit txn:{0} returns", txn);
+	    logger.log(Level.FINER, "commit txn:{0} returns", txn);
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINE, "commit txn:{0} throws", e, txn);
+	    logger.logThrow(Level.FINER, "commit txn:{0} throws", e, txn);
 	    throw e;
 	}
     }
@@ -295,10 +313,10 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 	    context.flushChanges();
 	    currentContext.set(null);
 	    context.prepareAndCommit();
-	    logger.log(Level.FINE, "prepareAndCommit txn:{0} returns", txn);
+	    logger.log(Level.FINER, "prepareAndCommit txn:{0} returns", txn);
 	} catch (RuntimeException e) {
 	    logger.logThrow(
-		Level.FINE, "prepareAndCommit txn:{0} throws", e, txn);
+		Level.FINER, "prepareAndCommit txn:{0} throws", e, txn);
 	    throw e;
 	}
     }
@@ -321,15 +339,16 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 		    ", found " + txn);
 	    }
 	    context.abort();
-	    logger.log(Level.FINE, "abort txn:{0} returns", txn);
+	    logger.log(Level.FINER, "abort txn:{0} returns", txn);
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINE, "abort txn:{0} throws", e, txn);
+	    logger.logThrow(Level.FINER, "abort txn:{0} throws", e, txn);
 	    throw e;
 	}
     }
 
     /* -- Generic binding methods -- */
 
+    /** Implement getBinding and getServiceBinding. */
     private <T extends ManagedObject> T getBindingInternal(
 	 String name, Class<T> type, boolean serviceBinding)
     {
@@ -347,17 +366,17 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 		throw new NameNotBoundException(
 		    "Name '" + name + "' is not bound", e);
 	    }
-	    if (logger.isLoggable(Level.FINER)) {
+	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
-		    Level.FINER, "{0} name:{1}, type:{2} returns {3}",
+		    Level.FINEST, "{0} name:{1}, type:{2} returns {3}",
 		    serviceBinding ? "getServiceBinding" : "getBinding",
 		    name, type, result);
 	    }
 	    return result;
 	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.FINER)) {
+	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
-		    Level.FINER, "{0} name:{1}, type:{2} throws", e,
+		    Level.FINEST, "{0} name:{1}, type:{2} throws", e,
 		    serviceBinding ? "getServiceBinding" : "getBinding",
 		    name, type);
 	    }
@@ -365,6 +384,7 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 	}
     }
 
+    /** Implement setBinding and setServiceBinding. */
     private void setBindingInternal(
 	String name, ManagedObject object, boolean serviceBinding)
     {
@@ -379,15 +399,15 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 	    String internalName = serviceBinding ? "s" : "a" + name;
 	    Context context = checkContext();
 	    context.setBinding(internalName, object);
-	    if (logger.isLoggable(Level.FINER)) {
-		logger.log(Level.FINER, "{0} name:{1}, object:{2} returns",
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST, "{0} name:{1}, object:{2} returns",
 			   serviceBinding ? "setServiceBinding" : "setBinding",
 			   name, object);
 	    }
 	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.FINER)) {
+	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
-		    Level.FINER, "{0} name:{1}, object:{2} throws", e,
+		    Level.FINEST, "{0} name:{1}, object:{2} throws", e,
 		    serviceBinding ? "setServiceBinding" : "setBinding",
 		    name, object);
 	    }
@@ -395,6 +415,7 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 	}
     }
 
+    /** Implement removeBinding and removeServiceBinding. */
     private void removeBindingInternal(String name, boolean serviceBinding) {
 	try {
 	    if (name == null) {
@@ -409,16 +430,16 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 		throw new NameNotBoundException(
 		    "Name '" + name + "' is not bound", e);
 	    }
-	    if (logger.isLoggable(Level.FINER)) {
+	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
-		    Level.FINER, "{0} name:{1} returns",
+		    Level.FINEST, "{0} name:{1} returns",
 		    serviceBinding ? "removeServiceBinding" : "removeBinding",
 		    name);
 	    }
 	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.FINER)) {
+	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
-		    Level.FINER, "{0} name:{1} throws", e,
+		    Level.FINEST, "{0} name:{1} throws", e,
 		    serviceBinding ? "removeServiceBinding" : "removeBinding",
 		    name);
 	    }
@@ -426,11 +447,25 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 	}
     }
 
-    /* -- Other methods -- */
+    /* -- Other public methods -- */
 
     public String toString() {
 	return "DataServiceImpl[appName:" + appName + "]";
     }
+
+    public void setDebugCheckInterval(int debugCheckInterval) {
+	synchronized (lock) {
+	    this.debugCheckInterval = debugCheckInterval;
+	}
+    }
+
+    public void setDetectModifications(boolean detectModifications) {
+	synchronized (lock) {
+	    this.detectModifications = detectModifications;
+	}
+    }
+
+    /* -- Other methods -- */
 
     /**
      * Obtains information associated with the current transaction, throwing a
@@ -441,7 +476,7 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
      */
     private Context checkContext() {
 	Transaction txn;
-	synchronized (txnProxyLock) {
+	synchronized (lock) {
 	    if (txnProxy == null) {
 		throw new IllegalStateException("Not configured");
 	    }
@@ -453,7 +488,7 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 	}
 	Context context = currentContext.get();
 	if (context == null) {
-	    logger.log(Level.FINE, "join txn:{0}", txn);
+	    logger.log(Level.FINER, "join txn:{0}", txn);
 	    txn.join(this);
 	    context = new Context(
 		store, txn, debugCheckInterval, detectModifications);

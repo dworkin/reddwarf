@@ -145,6 +145,8 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 		    "MAYBE_MODIFIED with no fingerprint");
 	    }
 	    break;
+	default:
+	    throw new AssertionError();
 	}
     }
 
@@ -167,16 +169,24 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 		"No transaction is in progress");
 	case REMOVED:
 	    throw new ObjectNotFoundException("The object is not found");
+	default:
+	    throw new AssertionError();
 	}
     }
 
     void markForUpdate() {
 	switch (state) {
 	case EMPTY:
-	    context.store.markForUpdate(context.txn, id);
+	    object = deserialize(
+		context.store.getObject(context.txn, id, true));
+	    context.refs.registerObject(this);
+	    state = State.MODIFIED;
 	    break;
 	case MAYBE_MODIFIED:
 	    fingerprint = null;
+	    /* Fall through */
+	case NOT_MODIFIED:
+	    context.store.markForUpdate(context.txn, id);
 	    state = State.MODIFIED;
 	    break;
 	case MODIFIED:
@@ -187,28 +197,38 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 		"No transaction is in progress");
 	case REMOVED:
 	    throw new ObjectNotFoundException("The object is not found");
+	default:
+	    throw new AssertionError();
 	}
     }
 
     void flush() {
-	if ((state == State.FLUSHED) || (state == State.REMOVED)) {
-	    return;
-	}
-	boolean modified;
-	if (state == State.NEW || state == State.MODIFIED) {
-	    modified = true;
-	} else if (state == State.MAYBE_MODIFIED) {
-	    modified = !SerialUtil.matchingFingerprint(object, fingerprint);
-	} else {
-	    modified = false;
-	}
-	if (modified) {
+	switch (state) {
+	case FLUSHED:
+	case REMOVED:
+	    break;
+	case NEW:
+	case MODIFIED:
  	    context.store.setObject(
 		context.txn, id, SerialUtil.serialize(object));
+	    object = null;
+	    fingerprint = null;
+	    state = State.FLUSHED;
+	    break;
+	case MAYBE_MODIFIED:
+	    if (!SerialUtil.matchingFingerprint(object, fingerprint)) {
+		context.store.setObject(
+		    context.txn, id, SerialUtil.serialize(object));
+	    }
+	    /* Fall through */
+	case NOT_MODIFIED:
+	    object = null;
+	    fingerprint = null;
+	    state = State.FLUSHED;
+	    break;
+	default:
+	    throw new AssertionError();
 	}
-	object = null;
-	fingerprint = null;
-	state = State.FLUSHED;
     }
 
     boolean isNew() {
@@ -245,6 +265,8 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 		"No transaction is in progress");
 	case REMOVED:
 	    throw new ObjectNotFoundException("The object is not found");
+	default:
+	    throw new AssertionError();
 	}
 	return object;
     }
@@ -255,7 +277,7 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	case EMPTY:
 	    object = deserialize(
 		context.store.getObject(context.txn, id, true));
-	    fingerprint = SerialUtil.fingerprint(object);
+	    context.refs.registerObject(this);
 	    state = State.MODIFIED;
 	    break;
 	case NOT_MODIFIED:
@@ -265,8 +287,11 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	    break;
 	case FLUSHED:
 	    throw new IllegalStateException("Update flushed");
-	default:
+	case NEW:
+	case MODIFIED:
 	    break;
+	default:
+	    throw new AssertionError();
 	}
 	return object;
     }

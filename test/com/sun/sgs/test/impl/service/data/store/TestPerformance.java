@@ -1,16 +1,9 @@
-package com.sun.sgs.test.impl.service.data;
+package com.sun.sgs.test.impl.service.data.store;
 
-import com.sun.sgs.app.ManagedObject;
-import com.sun.sgs.app.ManagedReference;
-import com.sun.sgs.app.DataManager;
 import com.sun.sgs.test.DummyTransaction;
-import com.sun.sgs.test.DummyTransactionProxy;
-import com.sun.sgs.impl.service.data.DataServiceImpl;
+import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import java.io.File;
 import java.io.IOException;
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Properties;
 import junit.framework.TestCase;
 
@@ -18,15 +11,22 @@ import junit.framework.TestCase;
 public class TestPerformance extends TestCase {
 
     private static int items = Integer.getInteger("test.items", 10);
+    private static int itemSize = Integer.getInteger("test.itemSize", 100);
     private static int modifyItems = Integer.getInteger("test.modifyItems", 1);
     private static int count = Integer.getInteger("test.count", 100);
     private static int repeat = Integer.getInteger("test.repeat", 5);
+    private static int logStats = Integer.getInteger(
+	"test.logStats", Integer.MAX_VALUE);
 
     /** Set when the test passes. */
     private boolean passed;
 
     /** A per-test database directory, or null if not created. */
     private String directory;
+
+    public static void main(String[] args) throws Exception {
+	new TestPerformance("testReadIds").testReadIds();
+    }
 
     /** Creates the test. */
     public TestPerformance(String name) {
@@ -98,37 +98,28 @@ public class TestPerformance extends TestCase {
 
     /* -- Tests -- */
 
-    public void testRead() throws Exception {
-	doTestRead(true);
-    }
-
-    public void testReadNoDetectMods() throws Exception {
-	doTestRead(false);
-    }
-
-    private void doTestRead(boolean detectMods) throws Exception {
+    public void testReadIds() throws Exception {
 	Properties props = createProperties(
 	    "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
 	    createDirectory(),
-	    "com.sun.sgs.appName", "TestPerformance",
-	    "com.sun.sgs.impl.service.data.DataServiceImpl" +
-	    ".detectModifications", String.valueOf(detectMods));
-	DataServiceImpl service = new DataServiceImpl(props);
-	DummyTransactionProxy txnProxy = new DummyTransactionProxy();
-	service.configure(txnProxy);
+	    "com.sun.sgs.impl.service.data.store.DataStoreImpl.logStats",
+	    String.valueOf(logStats));
+	byte[] data = new byte[itemSize];
+	data[0] = 1;
+	DataStoreImpl store = new DataStoreImpl(props);
 	DummyTransaction txn = new DummyTransaction(true);
-	txnProxy.setCurrentTransaction(txn);
-	service.setBinding("counters", new Counters(service, items));
+	long[] ids = new long[items];
+	for (int i = 0; i < items; i++) {
+	    ids[i] = store.createObject(txn);
+	    store.setObject(txn, ids[i], data);
+	}
 	txn.commit();
 	for (int r = 0; r < repeat; r++) {
 	    long start = System.currentTimeMillis();
 	    for (int c = 0; c < count; c++) {
 		txn = new DummyTransaction(true);
-		txnProxy.setCurrentTransaction(txn);
-		Counters counters =
-		    service.getBinding("counters", Counters.class);
 		for (int i = 0; i < items; i++) {
-		    counters.get(i);
+		    store.getObject(txn, ids[i], false);
 		}
 		txn.commit();
 	    }
@@ -138,40 +129,32 @@ public class TestPerformance extends TestCase {
 	}
     }
 
-    public void testWrite() throws Exception {
-	doTestWrite(true);
-    }
-
-    public void testWriteNoDetectMods() throws Exception {
-	doTestWrite(false);
-    }
-
-    private void doTestWrite(boolean detectMods) throws Exception {
+    public void testWriteIds() throws Exception {
 	Properties props = createProperties(
 	    "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
 	    createDirectory(),
-	    "com.sun.sgs.appName", "TestPerformance",
-	    "com.sun.sgs.impl.service.data.DataServiceImpl" +
-	    ".detectModifications", String.valueOf(detectMods));
-	DataServiceImpl service = new DataServiceImpl(props);
-	DummyTransactionProxy txnProxy = new DummyTransactionProxy();
-	service.configure(txnProxy);
+	    "com.sun.sgs.impl.service.data.store.DataStoreImpl.logStats",
+	    String.valueOf(logStats));
+	byte[] data = new byte[itemSize];
+	data[0] = 1;
+	DataStoreImpl store = new DataStoreImpl(props);
 	DummyTransaction txn = new DummyTransaction(true);
-	txnProxy.setCurrentTransaction(txn);
-	service.setBinding("counters", new Counters(service, items));
+	long[] ids = new long[items];
+	for (int i = 0; i < items; i++) {
+	    ids[i] = store.createObject(txn);
+	    store.setObject(txn, ids[i], data);
+	}
 	txn.commit();
 	for (int r = 0; r < repeat; r++) {
 	    long start = System.currentTimeMillis();
 	    for (int c = 0; c < count; c++) {
 		txn = new DummyTransaction(true);
-		txnProxy.setCurrentTransaction(txn);
-		Counters counters =
-		    service.getBinding("counters", Counters.class);
 		for (int i = 0; i < items; i++) {
-		    Counter counter = counters.get(i);
-		    if (i < modifyItems) {
-			service.markForUpdate(counter);
-			counter.next();
+		    boolean update = i < modifyItems;
+		    byte[] result = store.getObject(txn, ids[i], update);
+		    if (update) {
+			result[0] ^= 1;
+			store.setObject(txn, ids[i], result);
 		    }
 		}
 		txn.commit();
@@ -182,26 +165,61 @@ public class TestPerformance extends TestCase {
 	}
     }
 
-    /* -- Other methods and classes -- */
-
-    static class Counters implements ManagedObject, Serializable {
-	private static final long serialVersionUID = 1;
-	private List<ManagedReference<Counter>> counters =
-	    new ArrayList<ManagedReference<Counter>>();
-	Counters(DataManager dataMgr, int count) {
-	    for (int i = 0; i < count; i++) {
-		counters.add(dataMgr.createReference(new Counter()));
-	    }
+    public void testReadNames() throws Exception {
+	Properties props = createProperties(
+	    "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
+	    createDirectory(),
+	    "com.sun.sgs.impl.service.data.store.DataStoreImpl.logStats",
+	    String.valueOf(logStats));
+	DataStoreImpl store = new DataStoreImpl(props);
+	DummyTransaction txn = new DummyTransaction(true);
+	for (int i = 0; i < items; i++) {
+	    store.setBinding(txn, "name" + i, i);
 	}
-	Counter get(int i) {
-	    return counters.get(i).get();
+	txn.commit();
+	for (int r = 0; r < repeat; r++) {
+	    long start = System.currentTimeMillis();
+	    for (int c = 0; c < count; c++) {
+		txn = new DummyTransaction(true);
+		for (int i = 0; i < items; i++) {
+		    store.getBinding(txn, "name" + i);
+		}
+		txn.commit();
+	    }
+	    long stop = System.currentTimeMillis();
+	    System.err.println(
+		"Time: " + (stop - start) / count + " ms per transaction");
 	}
     }
 
-    static class Counter implements ManagedObject, Serializable {
-	private static final long serialVersionUID = 1;
-	private int count;
-	Counter() { }
-	int next() { return ++count; }
+    public void testWriteNames() throws Exception {
+	Properties props = createProperties(
+	    "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
+	    createDirectory(),
+	    "com.sun.sgs.impl.service.data.store.DataStoreImpl.logStats",
+	    String.valueOf(logStats));
+	DataStoreImpl store = new DataStoreImpl(props);
+	DummyTransaction txn = new DummyTransaction(true);
+	for (int i = 0; i < items; i++) {
+	    store.setBinding(txn, "name" + i, i);
+	}
+	txn.commit();
+	for (int r = 0; r < repeat; r++) {
+	    long start = System.currentTimeMillis();
+	    for (int c = 0; c < count; c++) {
+		txn = new DummyTransaction(true);
+		for (int i = 0; i < items; i++) {
+		    boolean update = i < modifyItems;
+		    long result = store.getBinding(txn, "name" + i);
+		    if (update) {
+			store.setBinding(txn, "name" + i, result + 1);
+		    }
+		}
+		txn.commit();
+	    }
+	    long stop = System.currentTimeMillis();
+	    System.err.println(
+		"Time: " + (stop - start) / count + " ms per transaction");
+	}
     }
 }
