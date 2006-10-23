@@ -41,19 +41,31 @@ public interface AppListener extends ManagedObject {
     void startingUp(Properties props);
 
     /**
-     * Notifies this listener that the specified session has logged
-     * in.
+     * Notifies this listener that the specified client session has
+     * logged in, and returns a {@link ClientSessionListener} for that
+     * session.  The returned listener should implement {@link Serializable}
+     * so that it can be stored persistently.
      *
-     * <p>When a client logs in, the application should register a
-     * {@link ClientSessionListener} for that client's session (by invoking
-     * {@link ClientSession#setListener setListener} on the
-     * specified session), so that the application can be notified
-     * when that session's client sends messages to the server or
-     * disconnects.
+     * <p>The returned <code>ClientSessionListener</code> is notified as
+     * follows:<ul>
      *
-     * @param session a session
+     * <li>If a message is received from the specified client session,
+     * the returned listener's {@link
+     * ClientSessionListener#receivedMessage receivedMessage} method
+     * is invoked with the message.
+     *
+     * <li>If the specified client session logs out or becomes
+     * disconnected for other reasons, the returned listener's {@link
+     * ClientSessionListener#disconnected disconnected} method is
+     * invoked with a <code>boolean</code> that is <code>true</code>
+     * if the client logged out gracefully, and is <code>false</code>
+     * otherwise.
+     * </ul>
+     *
+     * @param session a client session
+     * @return a (serializable) listener for the client session
      */
-    void loggedIn(ClientSession session);
+    ClientSessionListener loggedIn(ClientSession session);
 
     /**
      * Notifies this listener that the associated application is

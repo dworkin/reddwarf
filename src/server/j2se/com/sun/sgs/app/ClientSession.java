@@ -78,37 +78,6 @@ public interface ClientSession {
     void send(ByteBuffer message);
 
     /**
-     * Sets the listener for this session.  If the client associated
-     * with this session sends a message to the server, the specified
-     * <code>listener</code>'s {@link ClientSessionListener#receivedMessage
-     * receivedMessage} method is invoked with the contents of the
-     * message.  If the client associated with this session
-     * disconnects, the specified <code>listener</code>'s {@link
-     * ClientSessionListener#disconnected disconnected} method is invoked
-     * with a <code>boolean</code> that is <code>true</code> if that
-     * the client logged out gracefully, and is <code>false</code>
-     * otherwise.
-     *
-     * <p>A <code>ClientSessionListener</code> for a session should be
-     * set upon client login.  When a client logs in, the
-     * application's {@link AppListener#loggedIn(ClientSession)
-     * AppListener.loggedIn} method is invoked with that client's
-     * newly-established session.  If a listener is not set for a
-     * session whose client sends a message to the server or whose
-     * client disconnects, the application will not be notified of
-     * these events.
-     *
-     * @param listener a listener for this client session
-     *
-     * @throws IllegalArgumentException if <code>listener</code> is
-     * not <code>Serializable</code>
-     * @throws IllegalStateException if this session is disconnected
-     * @throws TransactionException if the operation failed because of
-     * a problem with the current transaction
-     */
-    void setListener(ClientSessionListener listener);
-
-    /**
      * Forcibly disconnects this client session.  If this session is
      * already disconnected, then no action is taken.
      *
