@@ -38,6 +38,7 @@
 	    value="com.sun.sgs.app,
 		   com.sun.sgs.impl.service.data,
 		   com.sun.sgs.impl.service.data.store,
+		   com.sun.sgs.impl.service.transacction,
 		   com.sun.sgs.impl.util,
 		   com.sun.sgs.service"/>
   <property name="checkstyle.packages.file"
