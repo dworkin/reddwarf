@@ -143,14 +143,14 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
-    public void testConstructorNoAppName() {
+    public void testConstructorNoAppName() throws Exception {
 	Properties props = createProperties(
 	    DataStoreImplClassName + ".directory",
 	    createDirectory());
 	try {
 	    new DataServiceImpl(props);
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
 	}
     }

@@ -449,6 +449,11 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 
     /* -- Other public methods -- */
 
+    /**
+     * Returns a string representation of this instance.
+     *
+     * @return	a string representation of this instance
+     */
     public String toString() {
 	return "DataServiceImpl[appName:" + appName + "]";
     }

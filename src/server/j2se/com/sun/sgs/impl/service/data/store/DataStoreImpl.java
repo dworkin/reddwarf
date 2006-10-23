@@ -11,10 +11,10 @@ import com.sleepycat.db.DatabaseType;
 import com.sleepycat.db.DeadlockException;
 import com.sleepycat.db.Environment;
 import com.sleepycat.db.EnvironmentConfig;
+import com.sleepycat.db.ErrorHandler;
 import com.sleepycat.db.LockDetectMode;
 import com.sleepycat.db.LockMode;
 import com.sleepycat.db.LockNotGrantedException;
-import com.sleepycat.db.ErrorHandler;
 import com.sleepycat.db.MessageHandler;
 import com.sleepycat.db.OperationStatus;
 import com.sleepycat.db.RunRecoveryException;
@@ -484,11 +484,6 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
     }
 
     /* -- Implement TransactionParticipant -- */
-
-    /** {@inheritDoc} */
-    public String getIdentifier() {
-	return toString();
-    }
 
     /** {@inheritDoc} */
     public boolean prepare(Transaction txn) {
