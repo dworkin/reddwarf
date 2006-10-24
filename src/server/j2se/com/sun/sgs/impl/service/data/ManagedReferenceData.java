@@ -9,19 +9,19 @@ final class ManagedReferenceData implements Serializable {
     private static final long serialVersionUID = 1;
 
     /** @serial */
-    private final long id;
+    private final long oid;
 
-    ManagedReferenceData(long id) {
-	this.id = id;
+    ManagedReferenceData(long oid) {
+	this.oid = oid;
     }
 
     public String toString() {
-	return "ManagedReferenceData[id:" + id + "]";
+	return "ManagedReferenceData[oid:" + oid + "]";
     }
 
     private Object readResolve() throws ObjectStreamException {
 	try {
-	    return DataServiceImpl.getContext().getReference(id);
+	    return DataServiceImpl.getContext().getReference(oid);
 	} catch (RuntimeException e) {
 	    throw (InvalidObjectException) new InvalidObjectException(
 		e.getMessage()).initCause(e);

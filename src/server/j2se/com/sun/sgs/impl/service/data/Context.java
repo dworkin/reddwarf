@@ -94,8 +94,8 @@ final class Context {
     }
 
     /** Obtains the reference associated with the specified ID. */
-    ManagedReferenceImpl<? extends ManagedObject> getReference(long id) {
-	return ManagedReferenceImpl.getReference(this, id);
+    ManagedReferenceImpl<? extends ManagedObject> getReference(long oid) {
+	return ManagedReferenceImpl.getReference(this, oid);
     }
 
     /* -- Bindings -- */
@@ -110,7 +110,7 @@ final class Context {
 
     /** Sets the object associated with the specified internal name. */
     <T extends ManagedObject> void setBinding(String internalName, T object) {
-	store.setBinding(txn, internalName, getReference(object).id);
+	store.setBinding(txn, internalName, getReference(object).oid);
     }
 
     /** Removes the object associated with the specified internal name. */

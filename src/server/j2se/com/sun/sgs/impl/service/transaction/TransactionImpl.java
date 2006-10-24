@@ -1,14 +1,22 @@
 package com.sun.sgs.impl.service.transaction;
 
+import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /** Provides an implementation of Transaction. */
 final class TransactionImpl implements Transaction {
+
+    /** Logger for this class. */
+    private static final LoggerWrapper logger =
+	new LoggerWrapper(Logger.getLogger(TransactionImpl.class.getName()));
 
     /** The possible states of the transaction. */
     private static enum State {
@@ -23,7 +31,8 @@ final class TransactionImpl implements Transaction {
 	/** Begun committing */
 	COMMITTING,
 	/** Completed committing */
-	COMMITTED };
+	COMMITTED
+    };
 
     /** The transaction ID. */
     private final long tid;
@@ -34,7 +43,11 @@ final class TransactionImpl implements Transaction {
     /** The state of the transaction. */
     private State state;
 
-    /** The transaction participants. */
+    /**
+     * The transaction participants.  Individual participants are set to null
+     * if they return true (read-only) when prepared, to mark that they should
+     * not be committed or aborted.
+     */
     private final List<TransactionParticipant> participants =
 	new ArrayList<TransactionParticipant>();
 
@@ -46,6 +59,7 @@ final class TransactionImpl implements Transaction {
 	this.tid = tid;
 	creationTime = System.currentTimeMillis();
 	state = State.ACTIVE;
+	logger.log(Level.FINER, "created {0}", this);
     }
 
     /* -- Implement Transaction -- */
@@ -62,6 +76,10 @@ final class TransactionImpl implements Transaction {
 
     /** {@inheritDoc} */
     public void join(TransactionParticipant participant) {
+	if (logger.isLoggable(Level.FINER)) {
+	    logger.log(Level.FINER, "join {0} participant:{1}", this,
+		       participant);
+	}
 	if (participant == null) {
 	    throw new NullPointerException("Participant must not be null");
 	}
@@ -92,6 +110,7 @@ final class TransactionImpl implements Transaction {
 
     /** {@inheritDoc} */
     public void abort() {
+	logger.log(Level.FINER, "abort {0}", this);
 	switch (state) {
 	case ACTIVE:
 	case PREPARING:
@@ -107,9 +126,17 @@ final class TransactionImpl implements Transaction {
 	}
 	state = State.ABORTING;
 	for (TransactionParticipant participant : participants) {
-	    try {
-		participant.abort(this);
-	    } catch (Exception e) {
+	    if (participant != null) {
+		try {
+		    participant.abort(this);
+		} catch (Exception e) {
+		    if (logger.isLoggable(Level.SEVERE)) {
+			logger.logThrow(
+			    Level.SEVERE,
+			    "abort failed for txn:{0}, participant:{1}",
+			    e, this, participant);
+		    }
+		}
 	    }
 	}
 	state = State.ABORTED;
@@ -157,10 +184,11 @@ final class TransactionImpl implements Transaction {
      *		preparing the transaction
      */
     void commit() throws Exception {
+	logger.log(Level.FINER, "commit {0}", this);
 	switch (state) {
 	case ACTIVE:
-	case PREPARING:
 	    break;
+	case PREPARING:
 	case ABORTING:
 	case ABORTED:
 	case COMMITTING:
@@ -176,27 +204,59 @@ final class TransactionImpl implements Transaction {
 	    TransactionParticipant participant = participants.get(i);
 	    try {
 		if (i < last) {
-		    if (participant.prepare(this)) {
+		    boolean readOnly = participant.prepare(this);
+		    if (readOnly) {
 			participants.set(i, null);
+		    }
+		    if (logger.isLoggable(Level.FINEST)) {
+			logger.log(Level.FINEST,
+				   "prepare {0} participant:{1} returns {2}",
+				   this, participant, readOnly);
 		    }
 		} else {
 		    participant.prepareAndCommit(this);
+		    if (logger.isLoggable(Level.FINEST)) {
+			logger.log(
+			    Level.FINEST,
+			    "prepareAndCommit {0} participant:{1} returns",
+			    this, participant);
+		    }
 		}
 	    } catch (Exception e) {
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.logThrow(
+			Level.FINEST, "{0} {1} participant:{1} throws",
+			e, i < last ? "prepare" : "prepareAndCommit",
+			this, participant);
+		}
 		if (state != State.ABORTED) {
 		    abort();
 		}
 		throw e;
 	    }
 	    if (state == State.ABORTED) {
-		throw new Exception("Transaction was aborted");
+		throw new TransactionAbortedException(
+		    "Transaction was aborted");
 	    }
 	}
 	state = State.COMMITTING;
 	for (int i = 0; i < last; i++) {
 	    TransactionParticipant participant = participants.get(i);
 	    if (participant != null) {
-		participant.commit(this);
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(Level.FINEST, "commit {0} participant:{1}",
+			       this, participant);
+		}
+		try {
+		    participant.commit(this);
+		} catch (Exception e) {
+		    if (logger.isLoggable(Level.SEVERE)) {
+			logger.logThrow(
+			    Level.SEVERE,
+			    "commit failed for txn:{0}, participant:{1}",
+			    e, this, participant);
+		    }
+		}
 	    }
 	}
 	state = State.COMMITTED;

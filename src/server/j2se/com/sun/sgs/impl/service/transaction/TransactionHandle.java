@@ -17,6 +17,7 @@ public interface TransactionHandle {
      * Prepares and commits the transaction associated with this handle.
      *
      * @throws	TransactionNotActiveException if the transaction is not active
+     * @throws	TransactionAbortedException if the transaction was aborted
      * @throws	Exception if any participant throws an exception while
      *		preparing the transaction
      */

@@ -10,6 +10,7 @@ public class DummyTransactionParticipant implements TransactionParticipant {
 	Logger.getLogger("com.sun.sgs.test.DummyTransactionParticipant");
     public static enum State { ACTIVE, PREPARED, COMMITTED, ABORTED };
     private State state = State.ACTIVE;
+    private boolean prepareReturnedTrue;
     public DummyTransactionParticipant() { }
     public boolean prepare(Transaction txn) throws Exception {
 	logger.log(Level.FINE, "prepare");
@@ -17,12 +18,21 @@ public class DummyTransactionParticipant implements TransactionParticipant {
 	    throw new IllegalStateException("Not active");
 	}
 	state = State.PREPARED;
-	return false;
+	boolean result = prepareResult();
+	if (result) {
+	    prepareReturnedTrue = true;
+	}
+	return result;
     }
+    protected boolean prepareResult() { return false; };
+    public boolean prepareReturnedTrue() { return prepareReturnedTrue; }
     public void commit(Transaction txn) {
 	logger.log(Level.FINE, "commit");
 	if (state != State.PREPARED) {
 	    throw new IllegalStateException("Not prepared");
+	} else if (prepareReturnedTrue) {
+	    throw new RuntimeException(
+		"Committing read-only participant");
 	}
 	state = State.COMMITTED;
     }
@@ -37,6 +47,9 @@ public class DummyTransactionParticipant implements TransactionParticipant {
 	logger.log(Level.FINE, "abort");
 	if (state != State.ACTIVE && state != State.PREPARED) {
 	    throw new IllegalStateException("Not active or prepared");
+	} else if (prepareReturnedTrue) {
+	    throw new RuntimeException(
+		"Aborting read-only participant");
 	}
 	state = State.ABORTED;
     }

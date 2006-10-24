@@ -13,6 +13,7 @@ public class DummyTransaction implements Transaction {
     private final long id = nextId++;
     private final long creationTime = System.currentTimeMillis();
     private State state = State.ACTIVE;
+    DummyTransactionProxy proxy;
     public final Set<TransactionParticipant> participants =
 	new HashSet<TransactionParticipant>();
     public DummyTransaction() {
@@ -44,6 +45,9 @@ public class DummyTransaction implements Transaction {
 		"Transaction not active or preparing");
 	}
 	state = State.ABORTED;
+	if (proxy != null) {
+	    proxy.setCurrentTransaction(null);
+	}
 	for (TransactionParticipant participant : participants) {
 	    try {
 		participant.abort(this);
@@ -56,6 +60,9 @@ public class DummyTransaction implements Transaction {
 	    throw new IllegalStateException("Transaction not active");
 	}
 	state = State.PREPARING;
+	if (proxy != null) {
+	    proxy.setCurrentTransaction(null);
+	}
 	boolean result = true;
 	for (TransactionParticipant participant : participants) {
 	    if (!participant.prepare(this)) {
@@ -74,6 +81,9 @@ public class DummyTransaction implements Transaction {
 	    throw new IllegalStateException("Transaction not active");
 	} else if (usePrepareAndCommit && participants.size() == 1) {
 	    state = State.PREPARING;
+	    if (proxy != null) {
+		proxy.setCurrentTransaction(null);
+	    }
 	    participants.iterator().next().prepareAndCommit(this);
 	} else {
 	    prepare();

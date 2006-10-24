@@ -487,10 +487,6 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 	    }
 	    txn = txnProxy.getCurrentTransaction();
 	}
-	if (txn == null) {
-	    throw new TransactionNotActiveException(
-		"No transaction is active");
-	}
 	Context context = currentContext.get();
 	if (context == null) {
 	    logger.log(Level.FINER, "join txn:{0}", txn);

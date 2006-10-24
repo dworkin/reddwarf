@@ -72,6 +72,13 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
     private static final String LOG_STATS_PROPERTY =
 	CLASSNAME + ".logStats";
 
+    /**
+     * The property that specifies whether to flush changes to disk on
+     * transaction boundaries.
+     */
+    private static final String FLUSH_TO_DISK_PROPERTY =
+	CLASSNAME + ".flushToDisk";
+
     /** The logger for this class. */
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
@@ -99,7 +106,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
     private final Environment env;
 
     /** The Berkeley DB database that maps object IDs to object bytes. */
-    private final Database ids;
+    private final Database oids;
 
     /** The Berkeley DB database that maps name bindings to object IDs. */
     private final Database names;
@@ -196,24 +203,24 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    createConfig.setType(DatabaseType.BTREE);
 	    createConfig.setAllowCreate(true);
 	    boolean create = false;
-	    String idsFileName = directory + File.separator + "ids";
-	    Database ids;
+	    String oidsFileName = directory + File.separator + "oids";
+	    Database oids;
 	    try {
-		ids = env.openDatabase(bdbTxn, idsFileName, null, null);
-		DataStoreHeader.verify(ids, bdbTxn);
+		oids = env.openDatabase(bdbTxn, oidsFileName, null, null);
+		DataStoreHeader.verify(oids, bdbTxn);
 	    } catch (FileNotFoundException e) {
 		try {
-		    ids = env.openDatabase(
-			bdbTxn, idsFileName, null, createConfig);
+		    oids = env.openDatabase(
+			bdbTxn, oidsFileName, null, createConfig);
 		} catch (FileNotFoundException e2) {
 		    throw new DataStoreException(
 			"Problem creating database: " + e2.getMessage(),
 			e2);
 		}
-		DataStoreHeader.create(ids, bdbTxn);
+		DataStoreHeader.create(oids, bdbTxn);
 		create = true;
 	    }
-	    this.ids = ids;
+	    this.oids = oids;
 	    try {
 		names = env.openDatabase(
 		    bdbTxn, directory + File.separator + "names", null,
@@ -258,7 +265,9 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
         config.setRunRecovery(true);
         config.setTransactional(true);
 	config.setTxnTimeout(timeout);
-	config.setTxnWriteNoSync(true);
+	config.setTxnWriteNoSync(
+	    !Util.getBooleanProperty(
+		properties, FLUSH_TO_DISK_PROPERTY, false));
 	try {
 	    return new Environment(new File(directory), config);
 	} catch (FileNotFoundException e) {
@@ -283,7 +292,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 		    boolean done = false;
 		    try {
 			newNextObjectId = DataStoreHeader.getNextId(
-			    ids, bdbTxn, allocationBlockSize);
+			    oids, bdbTxn, allocationBlockSize);
 			done = true;
 			bdbTxn.commit();
 		    } finally {
@@ -303,40 +312,40 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
     }
 
     /** {@inheritDoc} */
-    public void markForUpdate(Transaction txn, long id) {
+    public void markForUpdate(Transaction txn, long oid) {
 	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST, "markForUpdate txn:{0}, id:{1,number,#}",
-		       txn, id);
+	    logger.log(Level.FINEST, "markForUpdate txn:{0}, oid:{1,number,#}",
+		       txn, oid);
 	}
 	/*
 	 * Berkeley DB doesn't seem to provide a way to obtain a write lock
 	 * without reading or writing, so get the object and ask for a write
 	 * lock.  -tjb@sun.com (10/06/2006)
 	 */
-	getObjectInternal(txn, id, true);
+	getObjectInternal(txn, oid, true);
     }
 
     /** {@inheritDoc} */
-    public byte[] getObject(Transaction txn, long id, boolean forUpdate) {
+    public byte[] getObject(Transaction txn, long oid, boolean forUpdate) {
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST,
-		       "getObject txn:{0}, id:{1,number,#}, forUpdate:{2}",
-		       txn, id, forUpdate);
+		       "getObject txn:{0}, oid:{1,number,#}, forUpdate:{2}",
+		       txn, oid, forUpdate);
 	}
-	return getObjectInternal(txn, id, forUpdate);
+	return getObjectInternal(txn, oid, forUpdate);
     }
 
     /** Implement getObject, without logging. */
     private byte[] getObjectInternal(
-	Transaction txn, long id, boolean forUpdate)
+	Transaction txn, long oid, boolean forUpdate)
     {
-	checkId(id);
+	checkId(oid);
 	try {
 	    TxnInfo txnInfo = checkTxn(txn);
 	    DatabaseEntry key = new DatabaseEntry();
-	    LongBinding.longToEntry(id, key);
+	    LongBinding.longToEntry(oid, key);
 	    DatabaseEntry value = new DatabaseEntry();
-	    OperationStatus status = ids.get(
+	    OperationStatus status = oids.get(
 		txnInfo.bdbTxn, key, value, forUpdate ? LockMode.RMW : null);
 	    if (status == OperationStatus.NOTFOUND) {
 		throw new ObjectNotFoundException("Object not found");
@@ -354,21 +363,21 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
     }
 
     /** {@inheritDoc} */
-    public void setObject(Transaction txn, long id, byte[] data) {
+    public void setObject(Transaction txn, long oid, byte[] data) {
 	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST, "setObject txn:{0}, id:{1,number,#}",
-		       txn, id);
+	    logger.log(Level.FINEST, "setObject txn:{0}, oid:{1,number,#}",
+		       txn, oid);
 	}
-	checkId(id);
+	checkId(oid);
 	if (data == null) {
 	    throw new NullPointerException("The data must not be null");
 	}
 	try {
 	    TxnInfo txnInfo = checkTxn(txn);
 	    DatabaseEntry key = new DatabaseEntry();
-	    LongBinding.longToEntry(id, key);
+	    LongBinding.longToEntry(oid, key);
 	    DatabaseEntry value = new DatabaseEntry(data);
-	    OperationStatus status = ids.put(txnInfo.bdbTxn, key, value);
+	    OperationStatus status = oids.put(txnInfo.bdbTxn, key, value);
 	    if (status != OperationStatus.SUCCESS) {
 		throw new DataStoreException(
 		    "Setting object failed: " + status);
@@ -380,19 +389,19 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
     }
 
     /** {@inheritDoc} */
-    public void removeObject(Transaction txn, long id) {
+    public void removeObject(Transaction txn, long oid) {
 	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST, "removeObject txn:{0}, id:{1,number,#}",
-		       txn, id);
+	    logger.log(Level.FINEST, "removeObject txn:{0}, oid:{1,number,#}",
+		       txn, oid);
 	}
-	checkId(id);
+	checkId(oid);
 	try {
 	    TxnInfo txnInfo = checkTxn(txn);
 	    DatabaseEntry key = new DatabaseEntry();
-	    LongBinding.longToEntry(id, key);
-	    OperationStatus status = ids.delete(txnInfo.bdbTxn, key);
+	    LongBinding.longToEntry(oid, key);
+	    OperationStatus status = oids.delete(txnInfo.bdbTxn, key);
 	    if (status == OperationStatus.NOTFOUND) {
-		throw new ObjectNotFoundException("Object not found: " + id);
+		throw new ObjectNotFoundException("Object not found: " + oid);
 	    } else if (status != OperationStatus.SUCCESS) {
 		throw new DataStoreException(
 		    "Removing object failed: " + status);
@@ -432,20 +441,20 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
     }
 
     /** {@inheritDoc} */
-    public void setBinding(Transaction txn, String name, long id) {
+    public void setBinding(Transaction txn, String name, long oid) {
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST, "setBinding txn:{0}, name:{1}", txn, name);
 	}
 	if (name == null) {
 	    throw new NullPointerException("Name must not be null");
 	}
-	checkId(id);
+	checkId(oid);
 	try {
 	    TxnInfo txnInfo = checkTxn(txn);
 	    DatabaseEntry key = new DatabaseEntry();
 	    StringBinding.stringToEntry(name, key);
 	    DatabaseEntry value = new DatabaseEntry();
-	    LongBinding.longToEntry(id, value);
+	    LongBinding.longToEntry(oid, value);
 	    OperationStatus status = names.put(txnInfo.bdbTxn, key, value);
 	    if (status != OperationStatus.SUCCESS) {
 		throw new DataStoreException(
@@ -505,9 +514,9 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	boolean done = false;
 	try {
 	    if (txnInfo.modified) {
-		byte[] id = txn.getId();
+		byte[] oid = txn.getId();
 		byte[] gid = new byte[128];
-		System.arraycopy(id, 0, gid, 128 - id.length, id.length);
+		System.arraycopy(oid, 0, gid, 128 - oid.length, oid.length);
 		txnInfo.bdbTxn.prepare(gid);
 	    }
 	    done = true;
@@ -611,8 +620,8 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
     /* -- Private methods -- */
 
     /** Checks that the object ID argument is not negative. */
-    private void checkId(long id) {
-	if (id < 0) {
+    private void checkId(long oid) {
+	if (oid < 0) {
 	    throw new IllegalArgumentException(
 		"Object ID must not be negative");
 	}
@@ -674,8 +683,8 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
     /** Log statistics using the specified transaction. */
     private void logStats(TxnInfo txnInfo) throws DatabaseException {
 	if (logger.isLoggable(Level.FINE)) {
-	    logger.log(Level.FINE, "Ids database: {0}",
-		       ids.getStats(txnInfo.bdbTxn, null));
+	    logger.log(Level.FINE, "Oids database: {0}",
+		       oids.getStats(txnInfo.bdbTxn, null));
 	    logger.log(Level.FINE, "Names database: {0}",
 		       names.getStats(txnInfo.bdbTxn, null));
 	    CacheFileStats[] stats = env.getCacheFileStats(null);

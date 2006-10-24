@@ -16,6 +16,10 @@ import junit.framework.TestCase;
 
 /** Performance tests for the DataServiceImpl class */
 public class TestPerformance extends TestCase {
+    private static final String DataStoreImplClass =
+	"com.sun.sgs.impl.service.data.store.DataStoreImpl";
+    private static final String DataServiceImplClass =
+	DataServiceImpl.class.getName();
 
     private static int items = Integer.getInteger("test.items", 10);
     private static int modifyItems = Integer.getInteger("test.modifyItems", 1);
@@ -108,11 +112,10 @@ public class TestPerformance extends TestCase {
 
     private void doTestRead(boolean detectMods) throws Exception {
 	Properties props = createProperties(
-	    "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
-	    createDirectory(),
+	    DataStoreImplClass + ".directory", createDirectory(),
 	    "com.sun.sgs.appName", "TestPerformance",
-	    "com.sun.sgs.impl.service.data.DataServiceImpl" +
-	    ".detectModifications", String.valueOf(detectMods));
+	    DataServiceImplClass + ".detectModifications",
+	    String.valueOf(detectMods));
 	DataServiceImpl service = new DataServiceImpl(props);
 	DummyTransactionProxy txnProxy = new DummyTransactionProxy();
 	service.configure(txnProxy);
@@ -139,20 +142,26 @@ public class TestPerformance extends TestCase {
     }
 
     public void testWrite() throws Exception {
-	doTestWrite(true);
+	doTestWrite(true, false);
     }
 
     public void testWriteNoDetectMods() throws Exception {
-	doTestWrite(false);
+	doTestWrite(false, false);
     }
 
-    private void doTestWrite(boolean detectMods) throws Exception {
+    public void testWriteFlush() throws Exception {
+	doTestWrite(false, true);
+    }
+
+    private void doTestWrite(boolean detectMods, boolean flush)
+	throws Exception
+    {
 	Properties props = createProperties(
-	    "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
-	    createDirectory(),
+	    DataStoreImplClass + ".directory", createDirectory(),
 	    "com.sun.sgs.appName", "TestPerformance",
-	    "com.sun.sgs.impl.service.data.DataServiceImpl" +
-	    ".detectModifications", String.valueOf(detectMods));
+	    DataServiceImplClass + ".detectModifications",
+	    String.valueOf(detectMods),
+	    DataStoreImplClass + ".flushToDisk", String.valueOf(flush));
 	DataServiceImpl service = new DataServiceImpl(props);
 	DummyTransactionProxy txnProxy = new DummyTransactionProxy();
 	service.configure(txnProxy);

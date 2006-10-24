@@ -13,7 +13,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Properties;
-import java.util.concurrent.FutureTask;
 import java.util.concurrent.Semaphore;
 import junit.framework.TestCase;
 
@@ -1553,8 +1552,8 @@ public class TestDataStoreImpl extends TestCase {
 		}
 	    }
 	    MyRunnable myRunnable = new MyRunnable();
-	    FutureTask task = new FutureTask<Object>(myRunnable, null);
-	    new Thread(task).start();
+	    Thread thread = new Thread(myRunnable);
+	    thread.start();
 	    Thread.sleep(i * 500);
 	    flag.acquire();
 	    TransactionException exception = null;
@@ -1571,7 +1570,7 @@ public class TestDataStoreImpl extends TestCase {
 		exception = e;
 		txn.abort();
 	    }
-	    task.get();
+	    thread.join();
 	    if (myRunnable.exception2 != null &&
 		!(myRunnable.exception2
 		  instanceof TransactionConflictException ||

@@ -31,13 +31,13 @@ public interface DataStore {
      * modified.
      *
      * @param	txn the transaction under which the operation should take place
-     * @param	id the object ID
-     * @throws	IllegalArgumentException if <code>id</code> is negative
+     * @param	oid the object ID
+     * @throws	IllegalArgumentException if <code>oid</code> is negative
      * @throws	ObjectNotFoundException if the object is not found
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
-    void markForUpdate(Transaction txn, long id);
+    void markForUpdate(Transaction txn, long oid);
 
     /**
      * Obtains the data associated with an object ID.  If the
@@ -47,28 +47,28 @@ public interface DataStore {
      * contention when the object is modified.
      *
      * @param	txn the transaction under which the operation should take place
-     * @param	id the object ID
+     * @param	oid the object ID
      * @param	forUpdate whether the caller intends to modify the object
      * @return	the data associated with the object ID
-     * @throws	IllegalArgumentException if <code>id</code> is negative
+     * @throws	IllegalArgumentException if <code>oid</code> is negative
      * @throws	ObjectNotFoundException if the object is not found
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
-    byte[] getObject(Transaction txn, long id, boolean forUpdate);
+    byte[] getObject(Transaction txn, long oid, boolean forUpdate);
 
     /**
      * Specifies data to associate with an object ID.
      *
      * @param	txn the transaction under which the operation should take place
-     * @param	id the object ID
+     * @param	oid the object ID
      * @param	data the data
-     * @throws	IllegalArgumentException if <code>id</code> is negative, or if
+     * @throws	IllegalArgumentException if <code>oid</code> is negative, or if
      *		<code>data</code> is empty
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
-    void setObject(Transaction txn, long id, byte[] data);
+    void setObject(Transaction txn, long oid, byte[] data);
 
     /**
      * Removes the object with the specified object ID.  The implementation
@@ -77,13 +77,13 @@ public interface DataStore {
      * not guaranteed.
      *
      * @param	txn the transaction under which the operation should take place
-     * @param	id the object ID
-     * @throws	IllegalArgumentException if <code>id</code> is negative
+     * @param	oid the object ID
+     * @throws	IllegalArgumentException if <code>oid</code> is negative
      * @throws	ObjectNotFoundException if the object is not found
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
-    void removeObject(Transaction txn, long id);
+    void removeObject(Transaction txn, long oid);
 
     /**
      * Obtains the object ID bound to a name.
@@ -102,12 +102,12 @@ public interface DataStore {
      *
      * @param	txn the transaction under which the operation should take place
      * @param	name the name
-     * @param	id the object ID
-     * @throws	IllegalArgumentException if <code>id</code> is negative
+     * @param	oid the object ID
+     * @throws	IllegalArgumentException if <code>oid</code> is negative
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
-    void setBinding(Transaction txn, String name, long id);
+    void setBinding(Transaction txn, String name, long oid);
 
     /**
      * Removes the binding for a name.

@@ -32,7 +32,7 @@ final class ManagedReferenceImpl<T extends ManagedObject>
     };
 
     private final Context context;
-    final long id;
+    final long oid;
     private T object;
     private byte[] fingerprint;
     private State state;
@@ -59,32 +59,32 @@ final class ManagedReferenceImpl<T extends ManagedObject>
      }
 
     static ManagedReferenceImpl<? extends ManagedObject> getReference(
-	Context context, long id)
+	Context context, long oid)
      {
 	 ManagedReferenceImpl<? extends ManagedObject> ref =
-	     context.refs.find(id);
+	     context.refs.find(oid);
 	 if (ref == null) {
-	     ref = new ManagedReferenceImpl<ManagedObject>(context, id);
+	     ref = new ManagedReferenceImpl<ManagedObject>(context, oid);
 	     context.refs.add(ref);
 	 }
 	 if (logger.isLoggable(Level.FINER)) {
-	     logger.log(Level.FINER, "getReference id:{0} returns {1}",
-			id, ref);
+	     logger.log(Level.FINER, "getReference oid:{0} returns {1}",
+			oid, ref);
 	 }
 	 return ref;
      }
 
     private ManagedReferenceImpl(Context context, T object) {
 	this.context = context;
-	id = context.store.createObject(context.txn);
+	oid = context.store.createObject(context.txn);
 	this.object = object;
 	state = State.NEW;
 	validate();
     }
 
-    private ManagedReferenceImpl(Context context, long id) {
+    private ManagedReferenceImpl(Context context, long oid) {
 	this.context = context;
-	this.id = id;
+	this.oid = oid;
 	state = State.EMPTY;
 	validate();
     }
@@ -105,8 +105,8 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	if (context == null) {
 	    throw new NullPointerException("The context must not be null");
 	}
-	if (id < 0) {
-	    throw new IllegalArgumentException("The id must not be negative");
+	if (oid < 0) {
+	    throw new IllegalArgumentException("The oid must not be negative");
 	}
     }
 
@@ -156,7 +156,7 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	case NOT_MODIFIED:
 	case MAYBE_MODIFIED:
 	case MODIFIED:
-	    context.store.removeObject(context.txn, id);
+	    context.store.removeObject(context.txn, oid);
 	    /* Fall through */
 	case NEW:
 	    context.refs.remove(this);	    
@@ -178,7 +178,7 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	switch (state) {
 	case EMPTY:
 	    object = deserialize(
-		context.store.getObject(context.txn, id, true));
+		context.store.getObject(context.txn, oid, true));
 	    context.refs.registerObject(this);
 	    state = State.MODIFIED;
 	    break;
@@ -186,7 +186,7 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	    fingerprint = null;
 	    /* Fall through */
 	case NOT_MODIFIED:
-	    context.store.markForUpdate(context.txn, id);
+	    context.store.markForUpdate(context.txn, oid);
 	    state = State.MODIFIED;
 	    break;
 	case MODIFIED:
@@ -210,7 +210,7 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	case NEW:
 	case MODIFIED:
  	    context.store.setObject(
-		context.txn, id, SerialUtil.serialize(object));
+		context.txn, oid, SerialUtil.serialize(object));
 	    object = null;
 	    fingerprint = null;
 	    state = State.FLUSHED;
@@ -218,7 +218,7 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	case MAYBE_MODIFIED:
 	    if (!SerialUtil.matchingFingerprint(object, fingerprint)) {
 		context.store.setObject(
-		    context.txn, id, SerialUtil.serialize(object));
+		    context.txn, oid, SerialUtil.serialize(object));
 	    }
 	    /* Fall through */
 	case NOT_MODIFIED:
@@ -246,7 +246,7 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	switch (state) {
 	case EMPTY:
 	    object = deserialize(
-		context.store.getObject(context.txn, id, false));
+		context.store.getObject(context.txn, oid, false));
 	    context.refs.registerObject(this);
 	    if (context.detectModifications) {
 		fingerprint = SerialUtil.fingerprint(object);
@@ -276,13 +276,13 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	switch (state) {
 	case EMPTY:
 	    object = deserialize(
-		context.store.getObject(context.txn, id, true));
+		context.store.getObject(context.txn, oid, true));
 	    context.refs.registerObject(this);
 	    state = State.MODIFIED;
 	    break;
 	case NOT_MODIFIED:
 	case MAYBE_MODIFIED:
-	    context.store.markForUpdate(context.txn, id);
+	    context.store.markForUpdate(context.txn, oid);
 	    state = State.MODIFIED;
 	    break;
 	case FLUSHED:
@@ -299,7 +299,7 @@ final class ManagedReferenceImpl<T extends ManagedObject>
     /* -- Implement Serializable -- */
 
     private Object writeReplace() throws ObjectStreamException {
-	return new ManagedReferenceData(id);
+	return new ManagedReferenceData(oid);
     }
 
     /* -- Object methods -- */
@@ -309,10 +309,10 @@ final class ManagedReferenceImpl<T extends ManagedObject>
     }
 
     public int hashCode() {
-	return (int) (id >>> 32) ^ (int) id;
+	return (int) (oid >>> 32) ^ (int) oid;
     }
 
     public String toString() {
-	return "ManagedReferenceImpl[id:" + id + ",state:" + state + "]";
+	return "ManagedReferenceImpl[oid:" + oid + ",state:" + state + "]";
     }
 }

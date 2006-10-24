@@ -12,7 +12,7 @@ final class ReferenceTable {
 
     /** Maps object IDs to managed references. */
     private final Map<Long,
-		      ManagedReferenceImpl<? extends ManagedObject>> ids =
+		      ManagedReferenceImpl<? extends ManagedObject>> oids =
 	new HashMap<Long, ManagedReferenceImpl<? extends ManagedObject>>();
 
     /** Maps managed objects to managed references. */
@@ -40,14 +40,14 @@ final class ReferenceTable {
      * Finds the managed reference associated with an object ID, returning null
      * if no reference is found.
      */
-    ManagedReferenceImpl<? extends ManagedObject> find(long id) {
-	assert id >= 0;
-	return ids.get(id);
+    ManagedReferenceImpl<? extends ManagedObject> find(long oid) {
+	assert oid >= 0;
+	return oids.get(oid);
     }
 
     /** Adds a new managed reference to this table. */
     void add(ManagedReferenceImpl<? extends ManagedObject> ref) {
-	Object existing = ids.put(ref.id, ref);
+	Object existing = oids.put(ref.oid, ref);
 	assert existing == null;
 	ManagedObject object = ref.getObject();
 	if (object != null) {
@@ -61,7 +61,7 @@ final class ReferenceTable {
      * an object.
      */
     void registerObject(ManagedReferenceImpl<? extends ManagedObject> ref) {
-	assert ids.get(ref.id) == ref;
+	assert oids.get(ref.oid) == ref;
 	assert ref.getObject() != null;
 	Object existing = objects.put(ref.getObject(), ref);
 	assert existing == null;
@@ -69,7 +69,7 @@ final class ReferenceTable {
 
     /** Removes a managed reference from this table. */
     void remove(ManagedReferenceImpl<? extends ManagedObject> ref) {
-	Object existing = ids.remove(ref.id);
+	Object existing = oids.remove(ref.oid);
 	assert existing == ref;
 	ManagedObject object = ref.getObject();
 	if (object != null) {
@@ -90,21 +90,22 @@ final class ReferenceTable {
     void checkState() {
 	int objectCount = 0;
 	for (Entry<Long, ManagedReferenceImpl<? extends ManagedObject>> entry :
-		 ids.entrySet())
+		 oids.entrySet())
 	{
-	    long id = entry.getKey();
+	    long oid = entry.getKey();
 	    ManagedReferenceImpl<? extends ManagedObject> ref =
 		entry.getValue();
 	    ref.checkState();
-	    if (id != ref.id) {
+	    if (oid != ref.oid) {
 		throw new IllegalStateException(
-		    "Wrong ids entry: id = " + id + ", ref.id = " + ref.id);
+		    "Wrong oids entry: oid = " + oid + ", ref.oid = " +
+		    ref.oid);
 	    }
 	    Object object = ref.getObject();
 	    if (object != null) {
 		if (!ref.equals(objects.get(object))) {
 		    throw new IllegalStateException(
-			"Missing entry in objects for id = " + ref.id +
+			"Missing entry in objects for oid = " + ref.oid +
 			", object = " + object);
 		}
 		objectCount++;

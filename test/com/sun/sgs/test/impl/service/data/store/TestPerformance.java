@@ -9,6 +9,8 @@ import junit.framework.TestCase;
 
 /** Performance tests for the DataServiceImpl class */
 public class TestPerformance extends TestCase {
+    private static final String DataStoreImplClass =
+	DataStoreImpl.class.getName();
 
     private static int items = Integer.getInteger("test.items", 10);
     private static int itemSize = Integer.getInteger("test.itemSize", 100);
@@ -100,10 +102,8 @@ public class TestPerformance extends TestCase {
 
     public void testReadIds() throws Exception {
 	Properties props = createProperties(
-	    "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
-	    createDirectory(),
-	    "com.sun.sgs.impl.service.data.store.DataStoreImpl.logStats",
-	    String.valueOf(logStats));
+	    DataStoreImplClass + ".directory", createDirectory(),
+	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
 	byte[] data = new byte[itemSize];
 	data[0] = 1;
 	DataStoreImpl store = new DataStoreImpl(props);
@@ -130,11 +130,18 @@ public class TestPerformance extends TestCase {
     }
 
     public void testWriteIds() throws Exception {
+	testWriteIdsInternal(false);
+    }	
+
+    public void testWriteIdsFlush() throws Exception {
+	testWriteIdsInternal(true);
+    }
+
+    private void testWriteIdsInternal(boolean flush) throws Exception {
 	Properties props = createProperties(
-	    "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
-	    createDirectory(),
-	    "com.sun.sgs.impl.service.data.store.DataStoreImpl.logStats",
-	    String.valueOf(logStats));
+	    DataStoreImplClass + ".directory", createDirectory(),
+	    DataStoreImplClass + ".logStats", String.valueOf(logStats),
+	    DataStoreImplClass + ".flushToDisk", String.valueOf(flush));
 	byte[] data = new byte[itemSize];
 	data[0] = 1;
 	DataStoreImpl store = new DataStoreImpl(props);
