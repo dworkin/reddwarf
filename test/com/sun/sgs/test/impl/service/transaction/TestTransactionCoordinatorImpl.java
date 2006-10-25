@@ -12,6 +12,7 @@ import com.sun.sgs.test.DummyTransactionParticipant;
 import com.sun.sgs.test.DummyTransactionParticipant.State;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Properties;
 import junit.framework.TestCase;
 
 /* XXX: Test abort & commit failures */
@@ -21,7 +22,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 
     /** The instance to test. */
     private final TransactionCoordinator coordinator =
-	new TransactionCoordinatorImpl();
+	new TransactionCoordinatorImpl(new Properties());
     
     /** The handle to test. */
     private TransactionHandle handle;
@@ -39,6 +40,17 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	System.err.println("Testcase: " + getName());
 	handle = coordinator.createTransaction();
 	txn = handle.getTransaction();
+    }
+
+    /* -- Test constructor -- */
+
+    public void testConstructorNullProperties() {
+	try {
+	    new TransactionCoordinatorImpl(null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
     }
 
     /* -- Test TransactionHandle.commit -- */
@@ -60,12 +72,12 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 		assertEquals(State.COMMITTED, participant.getState());
 	    }
 	}
-	assertFalse(handle.isActive());
+	assertHandleNotActive(handle);
     }
 
     public void testCommitActiveEmpty() throws Exception {
 	handle.commit();
-	assertFalse(handle.isActive());
+	assertHandleNotActive(handle);
     }
 
     public void testCommitAborting() throws Exception {
@@ -100,7 +112,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 			     participant.getState());
 	    }
 	}
-	assertFalse(handle.isActive());
+	assertHandleNotActive(handle);
     }
 
     public void testCommitAborted() throws Exception {
@@ -144,7 +156,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 		assertEquals(State.ABORTED, participant.getState());
 	    }
 	}
-	assertFalse(handle.isActive());
+	assertHandleNotActive(handle);
     }
 
     public void testCommitPrepareAndCommitting() throws Exception {
@@ -175,7 +187,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 		assertEquals(State.ABORTED, participant.getState());
 	    }
 	}
-	assertFalse(handle.isActive());
+	assertHandleNotActive(handle);
     }
 
     public void testCommitCommitting() throws Exception {
@@ -210,7 +222,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 			     participant.getState());
 	    }
 	}
-	assertFalse(handle.isActive());
+	assertHandleNotActive(handle);
     }
 
     public void testCommitCommitted() throws Exception {
@@ -254,7 +266,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 		assertEquals(State.ABORTED, participant.getState());
 	    }
 	}
-	assertFalse(handle.isActive());
+	assertHandleNotActive(handle);
     }
 
     public void testCommitFailsLast() throws Exception {
@@ -283,7 +295,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 		assertEquals(State.ABORTED, participant.getState());
 	    }
 	}
-	assertFalse(handle.isActive());
+	assertHandleNotActive(handle);
     }
 
     public void testCommitAbortsMiddle() throws Exception {
@@ -317,7 +329,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 		assertEquals(State.ABORTED, participant.getState());
 	    }
 	}
-	assertFalse(handle.isActive());
+	assertHandleNotActive(handle);
     }
 
     public void testCommitAbortsLast() throws Exception {
@@ -346,7 +358,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 		assertEquals(State.ABORTED, participant.getState());
 	    }
 	}
-	assertFalse(handle.isActive());
+	assertHandleNotActive(handle);
     }
 
     public void testCommitAbortsAndFailsMiddle() throws Exception {
@@ -380,7 +392,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 		assertEquals(State.ABORTED, participant.getState());
 	    }
 	}
-	assertFalse(handle.isActive());
+	assertHandleNotActive(handle);
     }
 
     public void testCommitAbortsAndFailsLast() throws Exception {
@@ -410,31 +422,31 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 		assertEquals(State.ABORTED, participant.getState());
 	    }
 	}
-	assertFalse(handle.isActive());
+	assertHandleNotActive(handle);
     }
 
-    /* -- Test TransactionHandle.isActive -- */
+    /* -- Test TransactionHandle.getTransaction -- */
 
-    public void testIsActiveActive() {
-	assertTrue(handle.isActive());
+    public void testGetTransactionActive() {
+	handle.getTransaction();
     }
 
-    public void testIsActivePreparing() {
+    public void testGetTransactionPreparing() {
 	TransactionParticipant participant =
 	    new DummyTransactionParticipant() {
 		public boolean prepare(Transaction txn) throws Exception {
-		    assertFalse(handle.isActive());
+		    assertHandleNotActive(handle);
 		    return super.prepare(txn);
 		}
 	    };
-	handle.getTransaction().join(participant);
+	txn.join(participant);
     }
 
-    public void testIsActiveAborting() {
+    public void testGetTransactionAborting() {
 	TransactionParticipant participant =
 	    new DummyTransactionParticipant() {
 		public void abort(Transaction txn) {
-		    assertFalse(handle.isActive());
+		    assertHandleNotActive(handle);
 		    super.abort(txn);
 		}
 	    };
@@ -442,17 +454,17 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	txn.abort();
     }
 
-    public void testIsActiveAborted() {
+    public void testGetTransactionAborted() {
 	txn.join(new DummyTransactionParticipant());
 	txn.abort();
-	assertFalse(handle.isActive());
+	assertHandleNotActive(handle);
     }
 
-    public void testIsActiveCommitting() throws Exception {
+    public void testGetTransactionCommitting() throws Exception {
 	TransactionParticipant participant =
 	    new DummyTransactionParticipant() {
 		public void commit(Transaction txn) {
-		    assertFalse(handle.isActive());
+		    assertHandleNotActive(handle);
 		    super.commit(txn);
 		}
 	    };
@@ -460,10 +472,10 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	handle.commit();
     }
 
-    public void testIsActiveCommitted() throws Exception {
+    public void testGetTransactionCommitted() throws Exception {
 	txn.join(new DummyTransactionParticipant());
 	handle.commit();
-	assertFalse(handle.isActive());
+	assertHandleNotActive(handle);
     }
 
     /* -- Test Transaction.getId -- */
@@ -534,7 +546,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 			     participant.getState());
 	    }
 	}
-	assertFalse(handle.isActive());
+	assertHandleNotActive(handle);
     }
 
     public void testJoinPreparing() throws Exception {
@@ -567,7 +579,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 		assertEquals(State.ABORTED, participant.getState());
 	    }
 	}
-	assertFalse(handle.isActive());
+	assertHandleNotActive(handle);
     }
 
     public void testJoinPrepareAndCommitting() throws Exception {
@@ -596,7 +608,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 		assertEquals(State.ABORTED, participant.getState());
 	    }
 	}
-	assertFalse(handle.isActive());
+	assertHandleNotActive(handle);
     }
 
     public void testJoinCommitting() throws Exception {
@@ -625,7 +637,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 			     participant.getState());
 	    }
 	}
-	assertFalse(handle.isActive());
+	assertHandleNotActive(handle);
     }
 
     /* -- Test Transaction.abort -- */
@@ -647,12 +659,12 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 		assertEquals(State.ABORTED, participant.getState());
 	    }
 	}
-	assertFalse(handle.isActive());
+	assertHandleNotActive(handle);
     }
 
     public void testAbortActiveEmpty() throws Exception {
 	txn.abort();
-	assertFalse(handle.isActive());
+	assertHandleNotActive(handle);
     }
 
     public void testAbortAborting() {
@@ -681,7 +693,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 			     participant.getState());
 	    }
 	}
-	assertFalse(handle.isActive());
+	assertHandleNotActive(handle);
     }
 
     public void testAbortAborted() throws Exception {
@@ -726,7 +738,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 		assertEquals(State.ABORTED, participant.getState());
 	    }
 	}
-	assertFalse(handle.isActive());
+	assertHandleNotActive(handle);
     }
 
     public void testAbortPreparingLast() throws Exception {
@@ -757,7 +769,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 		assertEquals(State.ABORTED, participant.getState());
 	    }
 	}
-	assertFalse(handle.isActive());
+	assertHandleNotActive(handle);
     }
 
     public void testAbortPreparingLastNonDurable() throws Exception {
@@ -800,7 +812,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 		assertEquals(State.ABORTED, participant.getState());
 	    }
 	}
-	assertFalse(handle.isActive());
+	assertHandleNotActive(handle);
     }
 
     public void testAbortPrepareAndCommitting() throws Exception {
@@ -831,7 +843,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 		assertEquals(State.ABORTED, participant.getState());
 	    }
 	}
-	assertFalse(handle.isActive());
+	assertHandleNotActive(handle);
     }
 
     public void testAbortCommitting() throws Exception {
@@ -860,7 +872,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 			     participant.getState());
 	    }
 	}
-	assertFalse(handle.isActive());
+	assertHandleNotActive(handle);
     }
 
     public void testAbortCommitted() throws Exception {
@@ -881,5 +893,15 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	assertFalse(txn.equals(null));
 	assertTrue(txn.equals(txn));
 	assertFalse(txn.equals(txn2));
+    }
+
+    /* -- Other methods -- */
+
+    static void assertHandleNotActive(TransactionHandle handle) {
+	try {
+	    handle.getTransaction();
+	    fail("Transaction was active");
+	} catch (TransactionNotActiveException e) {
+	}
     }
 }

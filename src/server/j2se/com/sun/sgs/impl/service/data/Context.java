@@ -2,11 +2,10 @@ package com.sun.sgs.impl.service.data;
 
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.impl.service.data.store.DataStore;
-import com.sun.sgs.service.Service;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 
-/** Stores information specific to a specific transaction. */
+/** Stores information for a specific transaction. */
 final class Context {
 
     /** The data store. */
@@ -15,7 +14,11 @@ final class Context {
     /** The original transaction. */
     final Transaction originalTxn;
 
-    /** The wrapped transaction. */
+    /**
+     * The wrapped transaction, to be passed to the data store.  The wrapping
+     * allows the data service to manage the data store's participation by
+     * itself, rather than revealing it to the transaction coordinator.
+     */
     final TxnTrampoline txn;
 
     private final int debugCheckInterval;
@@ -133,7 +136,7 @@ final class Context {
     }
 
     void abort() {
-	storeParticipant.commit(txn);
+	storeParticipant.abort(txn);
     }
 
     /* -- Other methods -- */

@@ -18,7 +18,7 @@ final class TransactionImpl implements Transaction {
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(TransactionImpl.class.getName()));
 
-    /** The possible states of the transaction. */
+    /** The possible states of a transaction. */
     private static enum State {
 	/** In progress */
 	ACTIVE,
@@ -44,9 +44,9 @@ final class TransactionImpl implements Transaction {
     private State state;
 
     /**
-     * The transaction participants.  Individual participants are set to null
-     * if they return true (read-only) when prepared, to mark that they should
-     * not be committed or aborted.
+     * The transaction participants.  If there is a durable participant, it
+     * will be listed last.  Participants whose prepare method returns true
+     * (read-only) are removed from this list.
      */
     private final List<TransactionParticipant> participants =
 	new ArrayList<TransactionParticipant>();
@@ -59,7 +59,7 @@ final class TransactionImpl implements Transaction {
 	this.tid = tid;
 	creationTime = System.currentTimeMillis();
 	state = State.ACTIVE;
-	logger.log(Level.FINER, "created {0}", this);
+	logger.log(Level.FINER, "create {0}", this);
     }
 
     /* -- Implement Transaction -- */
@@ -76,34 +76,28 @@ final class TransactionImpl implements Transaction {
 
     /** {@inheritDoc} */
     public void join(TransactionParticipant participant) {
-	if (logger.isLoggable(Level.FINER)) {
-	    logger.log(Level.FINER, "join {0} participant:{1}", this,
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(Level.FINEST, "join {0} participant:{1}", this,
 		       participant);
 	}
 	if (participant == null) {
 	    throw new NullPointerException("Participant must not be null");
-	}
-	switch (state) {
-	case ACTIVE:
-	    break;
-	case PREPARING:
-	case ABORTING:
-	case ABORTED:
-	case COMMITTING:
-	case COMMITTED:
+	} else if (state != State.ACTIVE) {
 	    throw new IllegalStateException("Transaction is not active");
-	default:
-	    throw new AssertionError();
 	}
 	if (!participants.contains(participant)) {
 	    if (participant instanceof NonDurableTransactionParticipant) {
-		participants.add(0, participant);
-	    } else if (hasDurableParticipant) {
-		throw new UnsupportedOperationException(
-		    "Attempt to add multiple durable participants");
-	    } else {
+		if (hasDurableParticipant) {
+		    participants.add(participants.size() - 1, participant);
+		} else {
+		    participants.add(participant);
+		}
+	    } else if (!hasDurableParticipant) {
 		hasDurableParticipant = true;
 		participants.add(participant);
+	    } else {
+		throw new UnsupportedOperationException(
+		    "Attempt to add multiple durable participants");
 	    }
 	}
     }
@@ -126,16 +120,17 @@ final class TransactionImpl implements Transaction {
 	}
 	state = State.ABORTING;
 	for (TransactionParticipant participant : participants) {
-	    if (participant != null) {
-		try {
-		    participant.abort(this);
-		} catch (Exception e) {
-		    if (logger.isLoggable(Level.SEVERE)) {
-			logger.logThrow(
-			    Level.SEVERE,
-			    "abort failed for txn:{0}, participant:{1}",
-			    e, this, participant);
-		    }
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST, "abort {0} participant:{1}",
+			   this, participant);
+	    }
+	    try {
+		participant.abort(this);
+	    } catch (Exception e) {
+		if (logger.isLoggable(Level.WARNING)) {
+		    logger.logThrow(
+			Level.WARNING, "abort {0} participant:{1} failed",
+			e, this, participant);
 		}
 	    }
 	}
@@ -180,33 +175,27 @@ final class TransactionImpl implements Transaction {
      * Commits this transaction
      *
      * @throws	TransactionNotActiveException if the transaction is not active
+     * @throws	TransactionAbortedException if the transaction was aborted
+     *		during preparation without an exception being thrown
      * @throws	Exception if any participant throws an exception while
      *		preparing the transaction
+     * @see	TransactionHandle#commit TransactionHandle.commit
      */
     void commit() throws Exception {
 	logger.log(Level.FINER, "commit {0}", this);
-	switch (state) {
-	case ACTIVE:
-	    break;
-	case PREPARING:
-	case ABORTING:
-	case ABORTED:
-	case COMMITTING:
-	case COMMITTED:
+	if (state != State.ACTIVE) {
 	    throw new TransactionNotActiveException(
 		"Transaction is not active");
-	default:
-	    throw new AssertionError();
 	}
 	state = State.PREPARING;
-	int last = participants.size() - 1;
-	for (int i = 0; i <= last; i++) {
+	for (int i = 0; i < participants.size(); i++) {
 	    TransactionParticipant participant = participants.get(i);
+	    boolean last = (i == participants.size() - 1);
 	    try {
-		if (i < last) {
+		if (!last) {
 		    boolean readOnly = participant.prepare(this);
 		    if (readOnly) {
-			participants.set(i, null);
+			participants.remove(i--);
 		    }
 		    if (logger.isLoggable(Level.FINEST)) {
 			logger.log(Level.FINEST,
@@ -226,7 +215,7 @@ final class TransactionImpl implements Transaction {
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.logThrow(
 			Level.FINEST, "{0} {1} participant:{1} throws",
-			e, i < last ? "prepare" : "prepareAndCommit",
+			e, !last ? "prepare" : "prepareAndCommit",
 			this, participant);
 		}
 		if (state != State.ABORTED) {
@@ -240,22 +229,18 @@ final class TransactionImpl implements Transaction {
 	    }
 	}
 	state = State.COMMITTING;
-	for (int i = 0; i < last; i++) {
-	    TransactionParticipant participant = participants.get(i);
-	    if (participant != null) {
-		if (logger.isLoggable(Level.FINEST)) {
-		    logger.log(Level.FINEST, "commit {0} participant:{1}",
-			       this, participant);
-		}
-		try {
-		    participant.commit(this);
-		} catch (Exception e) {
-		    if (logger.isLoggable(Level.SEVERE)) {
-			logger.logThrow(
-			    Level.SEVERE,
-			    "commit failed for txn:{0}, participant:{1}",
-			    e, this, participant);
-		    }
+	for (TransactionParticipant participant : participants) {
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST, "commit {0} participant:{1}",
+			   this, participant);
+	    }
+	    try {
+		participant.commit(this);
+	    } catch (Exception e) {
+		if (logger.isLoggable(Level.WARNING)) {
+		    logger.logThrow(
+			Level.WARNING, "commit {0} participant:{1} failed",
+			e, this, participant);
 		}
 	    }
 	}

@@ -164,8 +164,10 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
     /** A Berkeley DB error handler that uses logging. */
     private static class LoggingErrorHandler implements ErrorHandler {
 	public void error(Environment env, String prefix, String message) {
-	    logger.log(Level.FINE, "Database error message: {0}{1}",
-		       prefix != null ? prefix : "", message);
+	    if (logger.isLoggable(Level.WARNING)) {
+		logger.log(Level.WARNING, "Database error message: {0}{1}",
+			   prefix != null ? prefix : "", message);
+	    }
 	}
     }
 
@@ -231,6 +233,8 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    done = true;
 	    bdbTxn.commit();
 	} catch (DatabaseException e) {
+	    logger.logThrow(
+		Level.SEVERE, "DataStore initialization failed", e);
 	    throw new DataStoreException(
 		"Problem initializing DataStore: " + e.getMessage(), e);
 	} finally {
@@ -518,6 +522,9 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 		byte[] gid = new byte[128];
 		System.arraycopy(oid, 0, gid, 128 - oid.length, oid.length);
 		txnInfo.bdbTxn.prepare(gid);
+	    } else {
+		txnInfo.bdbTxn.commit();
+		threadTxnInfo.set(null);
 	    }
 	    done = true;
 	} catch (DatabaseException e) {
@@ -614,7 +621,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
      * @return	a string representation of this object
      */
     public String toString() {
-	return "DataStoreImpl[directory=" + directory + "]";
+	return "DataStoreImpl[directory=\"" + directory + "\"]";
     }
 
     /* -- Private methods -- */

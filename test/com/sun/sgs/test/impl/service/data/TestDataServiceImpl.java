@@ -6,6 +6,7 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
+import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.test.DummyManagedObject;
 import com.sun.sgs.test.DummyTransaction;
@@ -88,7 +89,10 @@ public class TestDataServiceImpl extends TestCase {
 	    deleteDirectory(directory);
 	}
 	if (txn != null) {
-	    txn.abort();
+	    try {
+		txn.abort();
+	    } catch (IllegalStateException e) {
+	    }
 	    txn = null;
 	}
     }
@@ -176,11 +180,18 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
-    /* -- Test DataManager.getBinding -- */
+    /* -- Test DataManager.getBinding and DataService.getServiceBinding -- */
 
     public void testGetBindingNullName() {
+	testGetBindingNullName(true);
+    }
+    public void testGetServiceBindingNullName() {
+	testGetBindingNullName(false);
+    }
+
+    private void testGetBindingNullName(boolean app) {
 	try {
-	    service.getBinding(null, ManagedObject.class);
+	    getBinding(app, service, null, ManagedObject.class);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
@@ -188,19 +199,34 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     public void testGetBindingEmptyName() throws Exception {
+	testGetBindingEmptyName(true);
+    }
+    public void testGetServiceBindingEmptyName() throws Exception {
+	testGetBindingEmptyName(false);
+    }
+
+    private void testGetBindingEmptyName(boolean app) throws Exception {
 	DummyManagedObject dummy = new DummyManagedObject(service, "dummy");
-	service.setBinding("", dummy);
+	setBinding(app, service, "", dummy);
 	txn.commit();
 	createTransaction();
 	DummyManagedObject result =
-	    service.getBinding("", DummyManagedObject.class);
+	    getBinding(app, service, "", DummyManagedObject.class);
 	assertEquals(dummy, result);
     }
 
     public void testGetBindingNullType() throws Exception {
-	service.setBinding("dummy", new DummyManagedObject(service, "dummy"));
+	testGetBindingNullType(true);
+    }
+    public void testGetServiceBindingNullType() throws Exception {
+	testGetBindingNullType(false);
+    }
+
+    private void testGetBindingNullType(boolean app) throws Exception {
+	setBinding(
+	    app, service, "dummy", new DummyManagedObject(service, "dummy"));
 	try {
-	    service.getBinding("dummy", null);
+	    getBinding(app, service, "dummy", null);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
@@ -208,9 +234,17 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     public void testGetBindingWrongType() throws Exception {
-	service.setBinding("dummy", new DummyManagedObject(service, "dummy"));
+	testGetBindingWrongType(true);
+    }
+    public void testGetServiceBindingWrongType() throws Exception {
+	testGetBindingWrongType(false);
+    }
+
+    private void testGetBindingWrongType(boolean app) throws Exception {
+	setBinding(
+	    app, service, "dummy", new DummyManagedObject(service, "dummy"));
 	try {
-	    service.getBinding("dummy", AnotherManagedObject.class);
+	    getBinding(app, service, "dummy", AnotherManagedObject.class);
 	    fail("Expected ClassCastException");
 	} catch (ClassCastException e) {
 	    System.err.println(e);
@@ -218,22 +252,37 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     public void testGetBindingNotFound() throws Exception {
+	testGetBindingNotFound(true);
+    }
+    public void testGetServiceBindingNotFound() throws Exception {
+	testGetBindingNotFound(false);
+    }
+
+    private void testGetBindingNotFound(boolean app) throws Exception {
 	try {
-	    service.getBinding("unknown", ManagedObject.class);
+	    getBinding(app, service, "unknown", ManagedObject.class);
 	    fail("Expected NameNotBoundException");
 	} catch (NameNotBoundException e) {
+	    System.err.println(e);
 	}
     }
 
     public void testGetBindingObjectNotFound() throws Exception {
+	testGetBindingObjectNotFound(true);
+    }
+    public void testGetServiceBindingObjectNotFound() throws Exception {
+	testGetBindingObjectNotFound(false);
+    }
+
+    private void testGetBindingObjectNotFound(boolean app) throws Exception {
 	DummyManagedObject dummy = new DummyManagedObject(service, "dummy");
-	service.setBinding("dummy", dummy);
+	setBinding(app, service, "dummy", dummy);
 	txn.commit();
 	createTransaction();
-	dummy = service.getBinding("dummy", DummyManagedObject.class);
+	dummy = getBinding(app, service, "dummy", DummyManagedObject.class);
 	service.removeObject(dummy);
 	try {
-	    service.getBinding("dummy", DummyManagedObject.class);
+	    getBinding(app, service, "dummy", DummyManagedObject.class);
 	    fail("Expected ObjectNotFoundException");
 	} catch (ObjectNotFoundException e) {
 	    System.err.println(e);
@@ -241,41 +290,90 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     public void testGetBindingNoTransaction() throws Exception {
-	service.setBinding("dummy", new DummyManagedObject(service, "dummy"));
+	testGetBindingNoTransaction(true);
+    }
+    public void testGetServiceBindingNoTransaction() throws Exception {
+	testGetBindingNoTransaction(false);
+    }
+
+    private void testGetBindingNoTransaction(boolean app) throws Exception {
+	setBinding(
+	    app, service, "dummy", new DummyManagedObject(service, "dummy"));
 	txn.commit();
 	txnProxy.setCurrentTransaction(null);
-	txn = null;
 	try {
-	    service.getBinding("dummy", DummyManagedObject.class);
+	    getBinding(app, service, "dummy", DummyManagedObject.class);
 	    fail("Expected TransactionNotActiveException");
 	} catch (TransactionNotActiveException e) {
 	    System.err.println(e);
 	}
     }
 
+    public void testGetBindingAborting() throws Exception {
+	testGetBindingAborting(true);
+    }
+    public void testGetServiceBindingAborting() throws Exception {
+	testGetBindingAborting(false);
+    }
+
+    private void testGetBindingAborting(final boolean app) throws Exception {
+	setBinding(
+	    app, service, "dummy", new DummyManagedObject(service, "dummy"));
+	class MyParticipant extends DummyTransactionParticipant {
+	    boolean ok;
+	    public void abort(Transaction txn) {
+		try {
+		    getBinding(app, service, "dummy", DummyManagedObject.class);
+		} catch (TransactionNotActiveException e) {
+		    ok = true;
+		    throw e;
+		}
+	    }
+	};
+	MyParticipant participant = new MyParticipant();
+	txn.join(participant);
+	txn.abort();
+	assertTrue(participant.ok);
+    }
+
     public void testGetBindingAborted() throws Exception {
-	service.setBinding("dummy", new DummyManagedObject(service, "dummy"));
+	testGetBindingAborted(true);
+    }
+    public void testGetServiceBindingAborted() throws Exception {
+	testGetBindingAborted(false);
+    }
+
+    private void testGetBindingAborted(boolean app) throws Exception {
+	setBinding(
+	    app, service, "dummy", new DummyManagedObject(service, "dummy"));
 	txn.commit();
 	txnProxy.setCurrentTransaction(null);
 	createTransaction();
 	txn.abort();
-	txn = null;
 	try {
-	    service.getBinding("dummy", DummyManagedObject.class);
+	    getBinding(app, service, "dummy", DummyManagedObject.class);
 	    fail("Expected TransactionNotActiveException");
 	} catch (TransactionNotActiveException e) {
 	    System.err.println(e);
 	}
     }
 
-    /* XXX: Need to be able to check if the transaction is prepared. */
     public void testGetBindingPreparing() throws Exception {
-	service.setBinding("dummy", new DummyManagedObject(service, "dummy"));
+	testGetBindingPreparing(true);
+    }
+
+    public void testGetServiceBindingPreparing() throws Exception {
+	testGetBindingPreparing(false);
+    }
+
+    private void testGetBindingPreparing(final boolean app) throws Exception {
+	setBinding(
+	    app, service, "dummy", new DummyManagedObject(service, "dummy"));
 	class MyParticipant extends DummyTransactionParticipant {
 	    boolean ok;
 	    public boolean prepare(Transaction txn) {
 		try {
-		    service.getBinding("dummy", DummyManagedObject.class);
+		    getBinding(app, service, "dummy", DummyManagedObject.class);
 		    return false;
 		} catch (TransactionNotActiveException e) {
 		    ok = true;
@@ -292,58 +390,133 @@ public class TestDataServiceImpl extends TestCase {
 	    System.err.println(e);
 	}
 	assertTrue(participant.ok);
-	txn = null;
     }
 
-//     public void testGetBindingCommitted() throws Exception {
-// 	DataServiceImpl service = getDataServiceImpl();
-// 	DummyTransaction txn = new DummyTransaction();
-// 	long id = store.createObject(txn);
-// 	store.setBinding(txn, "foo", id);
-// 	txn.commit();
-// 	try {
-// 	    store.getBinding(txn, "foo");
-// 	    fail("Expected IllegalStateException");
-// 	} catch (IllegalStateException e) {
-// 	    System.err.println(e);
-// 	}
-//     }
+    public void testGetBindingCommitting() throws Exception {
+	testGetBindingCommitting(true);
+    }
+    public void testGetServiceBindingCommitting() throws Exception {
+	testGetBindingCommitting(false);
+    }
 
-//     public void testGetBindingWrongTxn() throws Exception {
-// 	DataServiceImpl service = getDataServiceImpl();
-// 	DummyTransaction txn = new DummyTransaction();
-// 	long id = store.createObject(txn);
-// 	store.setBinding(txn, "foo", id);
-// 	txn.commit();
-// 	txn = new DummyTransaction();
-// 	store.createObject(txn);
-// 	DummyTransaction txn2 = new DummyTransaction();
-// 	try {
-// 	    store.getBinding(txn2, "foo");
-// 	    fail("Expected IllegalStateException");
-// 	} catch (IllegalStateException e) {
-// 	    System.err.println(e);
-// 	} finally {
-// 	    txn.abort();
-// 	    txn2.abort();
-// 	}
-//     }
+    private void testGetBindingCommitting(final boolean app) throws Exception {
+	setBinding(
+	    app, service, "dummy", new DummyManagedObject(service, "dummy"));
+	class MyParticipant extends DummyTransactionParticipant {
+	    boolean ok;
+	    public void commit(Transaction txn) {
+		try {
+		    getBinding(app, service, "dummy", DummyManagedObject.class);
+		} catch (TransactionNotActiveException e) {
+		    ok = true;
+		    throw e;
+		}
+	    }
+	};
+	MyParticipant participant = new MyParticipant();
+	txn.join(participant);
+	txn.commit();
+	assertTrue(participant.ok);
+    }
 
-//     public void testGetBindingSuccess() throws Exception {
-// 	DataServiceImpl service = getDataServiceImpl();
-// 	DummyTransaction txn = new DummyTransaction();
-// 	long id = store.createObject(txn);
-// 	store.setObject(txn, id, new byte[] { 0 });
-// 	store.setBinding(txn, "foo", id);
-// 	txn.commit();
-// 	txn = new DummyTransaction();
-// 	long result = store.getBinding(txn, "foo");
-// 	assertEquals(id, result);
-// 	assertTrue(txn.prepare());
-// 	txn.abort();
-//     }
+    public void testGetBindingCommitted() throws Exception {
+	testGetBindingCommitted(true);
+    }
+
+    public void testGetServiceBindingCommitted() throws Exception {
+	testGetBindingCommitted(false);
+    }
+
+    private void testGetBindingCommitted(boolean app) throws Exception {
+	setBinding(
+	    app, service, "dummy", new DummyManagedObject(service, "dummy"));
+	txn.commit();
+	createTransaction();
+	txn.commit();
+	try {
+	    getBinding(app, service, "dummy", DummyManagedObject.class);
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testGetBindingSuccess() throws Exception {
+	testGetBindingSuccess(true);
+    }
+
+    public void testGetServiceBindingSuccess() throws Exception {
+	testGetBindingSuccess(false);
+    }
+
+    private void testGetBindingSuccess(boolean app) throws Exception {
+	DummyManagedObject dummy = new DummyManagedObject(service, "dummy");
+	setBinding(app, service, "newDummy", dummy);
+	DummyManagedObject result =
+	    getBinding(app, service, "newDummy", DummyManagedObject.class);
+	assertEquals(dummy, result);
+	txn.abort();
+	createTransaction();
+	try {
+	    getBinding(app, service, "newDummy", DummyManagedObject.class);
+	    fail("Expected NameNotBoundException");
+	} catch (NameNotBoundException e) {
+	    System.err.println(e);
+	}
+	setBinding(app, service, "newDummy", dummy);
+	txn.commit();
+	createTransaction();
+	result = getBinding(
+	    app, service, "newDummy", DummyManagedObject.class);
+	assertEquals(dummy, result);
+    }
+
+    public void testGetBindingsDifferent() throws Exception {
+	DummyManagedObject appDummy =
+	    new DummyManagedObject(service, "appDummy");
+	DummyManagedObject serviceDummy =
+	    new DummyManagedObject(service, "serviceDummy");
+	service.setBinding("dummy", appDummy);
+	service.setServiceBinding("dummy", serviceDummy);
+	txn.commit();
+	createTransaction();
+	DummyManagedObject appResult =
+	    service.getBinding("dummy", DummyManagedObject.class);
+	assertEquals(appDummy, appResult);
+	DummyManagedObject serviceResult =
+	    service.getServiceBinding("dummy", DummyManagedObject.class);
+	assertEquals(serviceDummy, serviceResult);
+    }
+
+    /* -- App and service binding methods -- */
+
+    <T extends ManagedObject> T getBinding(
+	boolean app, DataService service, String name, Class<T> type)
+    {
+	return app ? service.getBinding(name, type)
+	    : service.getServiceBinding(name, type);
+    }
+
+    void setBinding(
+	boolean app, DataService service, String name, ManagedObject object)
+    {
+	if (app) {
+	    service.setBinding(name, object);
+	} else {
+	    service.setServiceBinding(name, object);
+	}
+    }
+
+    void removeBinding(boolean app, DataService service, String name) {
+	if (app) {
+	    service.removeBinding(name);
+	} else {
+	    service.removeServiceBinding(name);
+	}
+    }
 
     /* -- Other methods and classes -- */
 
     static class AnotherManagedObject implements ManagedObject, Serializable { }
+
 }

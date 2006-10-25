@@ -1230,13 +1230,29 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
-    public void testAbortPrepared() throws Exception {
+    public void testAbortPreparedReadOnly() throws Exception {
 	DataStoreImpl store = getDataStoreImpl();
 	DummyTransaction txn = new DummyTransaction();
 	store.createObject(txn);
 	TransactionParticipant participant =
 	    txn.participants.iterator().next();
-	participant.prepare(txn);
+	assertTrue(participant.prepare(txn));
+	try {
+	    participant.abort(txn);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testAbortPreparedModified() throws Exception {
+	DataStoreImpl store = getDataStoreImpl();
+	DummyTransaction txn = new DummyTransaction();
+	long id = store.createObject(txn);
+	store.setObject(txn, id, new byte[] { 0 });
+	TransactionParticipant participant =
+	    txn.participants.iterator().next();
+	assertFalse(participant.prepare(txn));
 	participant.abort(txn);
     }
 
@@ -1472,13 +1488,29 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
-    public void testCommitPrepared() throws Exception {
+    public void testCommitPreparedReadOnly() throws Exception {
 	DataStoreImpl store = getDataStoreImpl();
 	DummyTransaction txn = new DummyTransaction();
 	store.createObject(txn);
 	TransactionParticipant participant =
 	    txn.participants.iterator().next();
-	participant.prepare(txn);
+	assertTrue(participant.prepare(txn));
+	try {
+	    participant.commit(txn);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testCommitPreparedModified() throws Exception {
+	DataStoreImpl store = getDataStoreImpl();
+	DummyTransaction txn = new DummyTransaction();
+	long id = store.createObject(txn);
+	store.setObject(txn, id, new byte[] { 0 });
+	TransactionParticipant participant =
+	    txn.participants.iterator().next();
+	assertFalse(participant.prepare(txn));
 	participant.commit(txn);
     }
 

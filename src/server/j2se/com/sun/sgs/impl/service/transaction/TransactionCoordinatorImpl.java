@@ -1,22 +1,24 @@
 package com.sun.sgs.impl.service.transaction;
 
+import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
+import java.util.Properties;
 
 /**
  * Provides an implementation of <code>TransactionCoordinator</code>.  This
  * class is thread safe, but the {@link TransactionHandle} returned by the
  * {@link #createTransaction createTransaction} method, and the {@link
- * Transaction} associated with the handle are not thread safe.  Callers should
- * provide their own synchronization to insure that those objects are not
- * accessed concurrently from multiple threads. <p>
+ * Transaction} associated with the handle, are not thread safe.  Callers
+ * should provide their own synchronization to insure that those objects are
+ * not accessed concurrently from multiple threads. <p>
  *
  * Transactions created by this class can only support at most a single durable
- * participant &emdash; one that does not implement {@link
+ * participant &mdash; one that does not implement {@link
  * NonDurableTransactionParticipant}.  The {@link Transaction#join join} method
  * on transactions created using this class will throw {@link
  * UnsupportedOperationException} if more than one durable participant attempts
- * to join the transacction.
+ * to join the transaction.
  */
 public final class TransactionCoordinatorImpl
     implements TransactionCoordinator
@@ -28,8 +30,9 @@ public final class TransactionCoordinatorImpl
     private long nextTid = 1;
 
     /** An implementation of TransactionHandle. */
-    private final class TransactionHandleImpl implements TransactionHandle {
-
+    private static final class TransactionHandleImpl
+	implements TransactionHandle
+    {
 	/** The transaction. */
 	private final TransactionImpl txn;
 
@@ -45,20 +48,30 @@ public final class TransactionCoordinatorImpl
 	/* -- Implement TransactionHandle -- */
 
 	public Transaction getTransaction() {
-	    return txn;
+	    if (txn.isActive()) {
+		return txn;
+	    } else {
+		throw new TransactionNotActiveException(
+		    "No transaction is active");
+	    }
 	}
 
 	public void commit() throws Exception {
 	    txn.commit();
 	}
-
-	public boolean isActive() {
-	    return txn.isActive();
-	}
     }
 
-    /** Creates an instance of this class. */
-    public TransactionCoordinatorImpl() { }
+    /**
+     * Creates an instance of this class configured with the specified
+     * properties.  No properties are currently supported.
+     *
+     * @param	properties the properties for configuring this service
+     */
+    public TransactionCoordinatorImpl(Properties properties) {
+	if (properties == null) {
+	    throw new NullPointerException("Properties must not be null");
+	}
+    }
 
     /** {@inheritDoc} */
     public TransactionHandle createTransaction() {

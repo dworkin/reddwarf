@@ -1,5 +1,6 @@
 package com.sun.sgs.impl.service.transaction;
 
+import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.service.Transaction;
 
@@ -7,9 +8,11 @@ import com.sun.sgs.service.Transaction;
 public interface TransactionHandle {
 
     /**
-     * Returns the transaction associated with this handle.
+     * Returns the active transaction associated with this handle.
      *
      * @return	the transaction
+     * @throws	TransactionNotActive if the transaction associated with this
+     *		handle is not active
      */
     Transaction getTransaction();
 
@@ -18,17 +21,9 @@ public interface TransactionHandle {
      *
      * @throws	TransactionNotActiveException if the transaction is not active
      * @throws	TransactionAbortedException if the transaction was aborted
+     *		during preparation without an exception being thrown
      * @throws	Exception if any participant throws an exception while
      *		preparing the transaction
      */
     void commit() throws Exception;
-
-    /**
-     * Returns whether the transaction is currently active.  An active
-     * transaction is one that has not been prepared, committed, or aborted.
-     *
-     * @return	<code>true</code> if the transaction is active, otherwise
-     *		<code>false</code>
-     */
-    boolean isActive();
 }

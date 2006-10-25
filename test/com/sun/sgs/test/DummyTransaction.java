@@ -3,10 +3,17 @@ package com.sun.sgs.test;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class DummyTransaction implements Transaction {
-    public enum State { ACTIVE, PREPARING, PREPARED, COMMITTED, ABORTED };
+    private static final Logger logger =
+	Logger.getLogger(DummyTransaction.class.getName());
+    public enum State {
+	ACTIVE, PREPARING, PREPARED, COMMITTING, COMMITTED, ABORTING, ABORTED
+    };
     private static long nextId = 1;
     private static boolean nextUsePrepareAndCommit;
     private final boolean usePrepareAndCommit;
@@ -19,6 +26,7 @@ public class DummyTransaction implements Transaction {
     public DummyTransaction() {
 	usePrepareAndCommit = nextUsePrepareAndCommit;
 	nextUsePrepareAndCommit = !nextUsePrepareAndCommit;
+	logger.log(Level.FINER, "create {0}", this);
     }
     public DummyTransaction(boolean usePrepareAndCommit) {
 	this.usePrepareAndCommit = usePrepareAndCommit;
@@ -31,41 +39,70 @@ public class DummyTransaction implements Transaction {
     }
     public long getCreationTime() { return creationTime; }
     public void join(TransactionParticipant participant) {
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(
+		Level.FINER, "join {0} participant:{1}",
+		new Object[] { this, participant });
+	}
+	if (participant == null) {
+	    throw new NullPointerException("Participant must not be null");
+	}
 	if (state != State.ACTIVE) {
 	    throw new IllegalStateException("Transaction not active");
 	}
 	participants.add(participant);
     }
     public void abort() {
-	if (state != State.ACTIVE &&
-	    state != State.PREPARING &&
-	    state != State.PREPARED)
+	logger.log(Level.FINER, "abort {0}", this);
+	if (state == State.ABORTING) {
+	    return;
+	} else if (state != State.ACTIVE &&
+		   state != State.PREPARING &&
+		   state != State.PREPARED)
 	{
 	    throw new IllegalStateException(
 		"Transaction not active or preparing");
 	}
-	state = State.ABORTED;
+	state = State.ABORTING;
 	if (proxy != null) {
 	    proxy.setCurrentTransaction(null);
+	    proxy = null;
 	}
 	for (TransactionParticipant participant : participants) {
 	    try {
 		participant.abort(this);
-	    } catch (Exception e) {
+	    } catch (RuntimeException e) {
 	    }
 	}
+	state = State.ABORTED;
     }
     public boolean prepare() throws Exception {
+	logger.log(Level.FINER, "prepare {0}", this);
 	if (state != State.ACTIVE) {
 	    throw new IllegalStateException("Transaction not active");
 	}
 	state = State.PREPARING;
 	if (proxy != null) {
 	    proxy.setCurrentTransaction(null);
+	    proxy = null;
 	}
 	boolean result = true;
-	for (TransactionParticipant participant : participants) {
-	    if (!participant.prepare(this)) {
+	for (Iterator<TransactionParticipant> iter = participants.iterator();
+	    iter.hasNext(); )
+	{
+	    TransactionParticipant participant = iter.next();
+	    boolean readOnly;
+	    try {
+		readOnly = participant.prepare(this);
+	    } catch (Exception e) {
+		if (state != State.ABORTED) {
+		    abort();
+		}
+		throw e;
+	    }
+	    if (readOnly) {
+		iter.remove();
+	    } else {
 		result = false;
 	    }
 	}
@@ -73,9 +110,14 @@ public class DummyTransaction implements Transaction {
 	return result;
     }
     public void commit() throws Exception {
+	logger.log(Level.FINER, "commit {0}", this);
 	if (state == State.PREPARED) {
+	    state = State.COMMITTING;
 	    for (TransactionParticipant participant : participants) {
-		participant.commit(this);
+		try {
+		    participant.commit(this);
+		} catch (RuntimeException e) {
+		}
 	    }
 	} else if (state != State.ACTIVE) {
 	    throw new IllegalStateException("Transaction not active");
@@ -83,12 +125,26 @@ public class DummyTransaction implements Transaction {
 	    state = State.PREPARING;
 	    if (proxy != null) {
 		proxy.setCurrentTransaction(null);
+		proxy = null;
 	    }
-	    participants.iterator().next().prepareAndCommit(this);
+	    TransactionParticipant participant =
+		participants.iterator().next();
+	    try {
+		participant.prepareAndCommit(this);
+	    } catch (Exception e) {
+		if (state != State.ABORTED) {
+		    abort();
+		}
+		throw e;
+	    }
 	} else {
 	    prepare();
+	    state = State.COMMITTING;
 	    for (TransactionParticipant participant : participants) {
-		participant.commit(this);
+		try {
+		    participant.commit(this);
+		} catch (RuntimeException e) {
+		}
 	    }
 	}
 	state = State.COMMITTED;

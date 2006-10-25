@@ -357,11 +357,11 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 		throw new NullPointerException(
 		    "The arguments must not be null");
 	    }
-	    String internalName = serviceBinding ? "s" : "a" + name;
 	    Context context = checkContext();
 	    T result;
 	    try {
-		result = context.getBinding(internalName, type);
+		result = context.getBinding(
+		    getInternalName(name, serviceBinding), type);
 	    } catch (NameNotBoundException e) {
 		throw new NameNotBoundException(
 		    "Name '" + name + "' is not bound", e);
@@ -396,9 +396,8 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 		throw new IllegalArgumentException(
 		    "The object must be serializable");
 	    }
-	    String internalName = serviceBinding ? "s" : "a" + name;
 	    Context context = checkContext();
-	    context.setBinding(internalName, object);
+	    context.setBinding(getInternalName(name, serviceBinding), object);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST, "{0} name:{1}, object:{2} returns",
 			   serviceBinding ? "setServiceBinding" : "setBinding",
@@ -422,10 +421,9 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 		throw new NullPointerException(
 		    "The argument must not be null");
 	    }
-	    String internalName = serviceBinding ? "s" : "a" + name;
 	    Context context = checkContext();
 	    try {
-		context.removeBinding(internalName);
+		context.removeBinding(getInternalName(name, serviceBinding));
 	    } catch (NameNotBoundException e) {
 		throw new NameNotBoundException(
 		    "Name '" + name + "' is not bound", e);
@@ -455,7 +453,7 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
      * @return	a string representation of this instance
      */
     public String toString() {
-	return "DataServiceImpl[appName:" + appName + "]";
+	return "DataServiceImpl[appName:\"" + appName + "\"]";
     }
 
     public void setDebugCheckInterval(int debugCheckInterval) {
@@ -528,5 +526,11 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 	}
 	context.maybeCheckReferenceTable();
 	return context;
+    }
+
+    private static String getInternalName(
+	String name, boolean serviceBinding)
+    {
+	return (serviceBinding ? "s" : "a") + name;
     }
 }
