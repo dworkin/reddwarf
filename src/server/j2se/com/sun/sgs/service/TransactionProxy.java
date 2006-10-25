@@ -17,6 +17,11 @@ public interface TransactionProxy {
      * Returns the current transaction state.
      *
      * @return the current <code>Transaction</code>
+     *
+     * @throws TransactionNotActiveException if there is no current, active
+     *                                       transaction, or if the current
+     *                                       transaction has already started
+     *                                       preparing or aborting
      */
     public Transaction getCurrentTransaction();
 
