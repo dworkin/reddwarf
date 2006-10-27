@@ -36,6 +36,7 @@
   <import file="${checkstyle.dir}/checkstyle_task.xml" optional="true"/>
   <property name="checkstyle.packages"
 	    value="com.sun.sgs.app,
+		   com.sun.sgs.impl.service.transaction,
 		   com.sun.sgs.impl.util,
 		   com.sun.sgs.service"/>
   <property name="checkstyle.packages.file"
