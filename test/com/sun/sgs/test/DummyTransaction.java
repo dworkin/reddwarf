@@ -153,6 +153,6 @@ public class DummyTransaction implements Transaction {
 	return state;
     }
     public String toString() {
-	return "DummyTransaction[id:" + id + "]";
+	return "DummyTransaction[tid:" + id + "]";
     }
 }

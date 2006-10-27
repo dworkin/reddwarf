@@ -1,5 +1,6 @@
 package com.sun.sgs.impl.service.data;
 
+import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ObjectIOException;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -7,6 +8,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamClass;
+import java.io.OutputStream;
 import java.util.Arrays;
 
 /** Defines serialization utilities.  This class cannot be instantiated. */
@@ -48,17 +50,19 @@ final class SerialUtil {
     }
 
     /**
-     * Converts an object into serialized data.
+     * Converts an managed object into serialized data.
      *
      * @param	object the object
      * @return	the serialized data
      * @throws	ObjectIOException if a problem occurs serializing the object
+     *		and, in particular, if a <code>ManagedObject</code> is
+     *		referenced without an intervening <code>ManagedReference</code>
      */
-    static byte[] serialize(Object object) {
+    static byte[] serialize(ManagedObject object) {
 	ObjectOutputStream out = null;
 	try {
 	    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-	    out = new ObjectOutputStream(baos);
+	    out = new CheckReferencesObjectOutputStream(baos, object);
 	    out.writeObject(object);
 	    out.flush();
 	    return baos.toByteArray();
@@ -71,6 +75,44 @@ final class SerialUtil {
 		    out.close();
 		} catch (IOException e) {
 		}
+	    }
+	}
+    }
+
+    /**
+     * Define an ObjectOutputStream that checks for references to
+     * ManagedObjects not made through ManagedReferences.  Note that this
+     * stream will not be able to detect direct references to the top level
+     * object.
+     */
+    private static final class CheckReferencesObjectOutputStream
+	extends ObjectOutputStream
+    {
+	/** The top level managed object being serialized. */
+	private final ManagedObject topLevelObject;
+
+	/**
+	 * Creates an instance that writes to a stream for a managed object
+	 * being serialized.
+	 */
+	CheckReferencesObjectOutputStream(
+	    OutputStream out, ManagedObject topLevelObject)
+	    throws IOException
+	{
+	    super(out);
+	    this.topLevelObject = topLevelObject;
+	    enableReplaceObject(true);
+	}
+
+	/** Check for references to managed objects. */
+	protected Object replaceObject(Object object) throws IOException {
+	    if (object != topLevelObject && object instanceof ManagedObject) {
+		throw new ObjectIOException(
+		    "ManagedObject was not referenced through a " +
+		    "ManagedReference: " + object,
+		    false);
+	    } else {
+		return object;
 	    }
 	}
     }

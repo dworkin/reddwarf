@@ -7,6 +7,7 @@ import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.util.PropertiesUtil;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
@@ -17,6 +18,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /* XXX: Add header? */
+/** Provides an implementation of <code>DataService</code>. */
 public class DataServiceImpl implements DataService, TransactionParticipant {
 
     /** The property that specifies the application name. */
@@ -92,13 +94,13 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 		    "The " + APP_NAME_PROPERTY +
 		    " property must be specified");
 	    }
-	    debugCheckInterval = Util.getIntProperty(
+	    debugCheckInterval = PropertiesUtil.getIntProperty(
 		properties, DEBUG_CHECK_INTERVAL_PROPERTY, Integer.MAX_VALUE);
-	    detectModifications = Util.getBooleanProperty(
+	    detectModifications = PropertiesUtil.getBooleanProperty(
 		properties, DETECT_MODIFICATIONS_PROPERTY, Boolean.TRUE);
 	    store = new DataStoreImpl(properties);
 	} catch (RuntimeException e) {
-	    logger.log(Level.CONFIG, "Failed to create DataServiceImpl", e);
+	    logger.log(Level.SEVERE, "DataService initialization failed", e);
 	    throw e;
 	}
     }
@@ -159,7 +161,7 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 		Level.FINEST, "removeObject object:{0} returns", object);
 	} catch (RuntimeException e) {
 	    logger.logThrow(
-		Level.FINEST, "removeObject object:{0} throws", e, object);
+		Level.FINEST, "removeObject object:{0} fails", e, object);
 	    throw e;
 	}
     }
@@ -180,7 +182,7 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 		Level.FINEST, "markForUpdate object:{0} returns", object);
 	} catch (RuntimeException e) {
 	    logger.logThrow(
-		Level.FINEST, "markForUpdate object:{0} throws", e, object);
+		Level.FINEST, "markForUpdate object:{0} fails", e, object);
 	    throw e;
 	}
     }
@@ -206,7 +208,7 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 	    return result;
 	} catch (RuntimeException e) {
 	    logger.logThrow(
-		Level.FINEST, "createReference object:{0} throws", e, object);
+		Level.FINEST, "createReference object:{0} fails", e, object);
 	    throw e;
 	}
     }
@@ -248,14 +250,7 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 	    if (context == null) {
 		throw new IllegalStateException("No context");
 	    }
-	    if (!txn.equals(context.originalTxn)) {
-		currentContext.set(null);
-		throw new IllegalStateException(
-		    "Wrong transaction: Expected " + context.originalTxn +
-		    ", found " + txn);
-	    }
-	    context.setInactive();
-	    context.flushChanges();
+	    context.checkTxn(txn);
 	    boolean result = context.prepare();
 	    if (logger.isLoggable(Level.FINE)) {
 		logger.log(Level.FINER, "prepare txn:{0} returns {1}",
@@ -263,7 +258,7 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 	    }
 	    return result;
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINER, "prepare txn:{0} throws", e, txn);
+	    logger.logThrow(Level.FINER, "prepare txn:{0} fails", e, txn);
 	    throw e;
 	}
     }
@@ -278,17 +273,12 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 	    if (context == null) {
 		throw new IllegalStateException("Not joined");
 	    }
-	    context.setInactive();
+	    context.checkTxn(txn);
 	    currentContext.set(null);
-	    if (!txn.equals(context.originalTxn)) {
-		throw new IllegalStateException(
-		    "Wrong transaction: Expected " + context.originalTxn +
-		    ", found " + txn);
-	    }
 	    context.commit();
 	    logger.log(Level.FINER, "commit txn:{0} returns", txn);
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINER, "commit txn:{0} throws", e, txn);
+	    logger.logThrow(Level.FINER, "commit txn:{0} fails", e, txn);
 	    throw e;
 	}
     }
@@ -303,20 +293,13 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 	    if (context == null) {
 		throw new IllegalStateException("Not joined");
 	    }
-	    context.setInactive();
-	    if (!txn.equals(context.originalTxn)) {
-		currentContext.set(null);
-		throw new IllegalStateException(
-		    "Wrong transaction: Expected " + context.originalTxn +
-		    ", found " + txn);
-	    }
-	    context.flushChanges();
+	    context.checkTxn(txn);
 	    currentContext.set(null);
 	    context.prepareAndCommit();
 	    logger.log(Level.FINER, "prepareAndCommit txn:{0} returns", txn);
 	} catch (RuntimeException e) {
 	    logger.logThrow(
-		Level.FINER, "prepareAndCommit txn:{0} throws", e, txn);
+		Level.FINER, "prepareAndCommit txn:{0} fails", e, txn);
 	    throw e;
 	}
     }
@@ -331,17 +314,12 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 	    if (context == null) {
 		throw new IllegalStateException("Not joined");
 	    }
-	    context.setInactive();
+	    context.checkTxn(txn);
 	    currentContext.set(null);
-	    if (!txn.equals(context.originalTxn)) {
-		throw new IllegalStateException(
-		    "Wrong transaction: Expected " + context.originalTxn +
-		    ", found " + txn);
-	    }
 	    context.abort();
 	    logger.log(Level.FINER, "abort txn:{0} returns", txn);
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINER, "abort txn:{0} throws", e, txn);
+	    logger.logThrow(Level.FINER, "abort txn:{0} fails", e, txn);
 	    throw e;
 	}
     }
@@ -376,7 +354,7 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
-		    Level.FINEST, "{0} name:{1}, type:{2} throws", e,
+		    Level.FINEST, "{0} name:{1}, type:{2} fails", e,
 		    serviceBinding ? "getServiceBinding" : "getBinding",
 		    name, type);
 	    }
@@ -406,7 +384,7 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
-		    Level.FINEST, "{0} name:{1}, object:{2} throws", e,
+		    Level.FINEST, "{0} name:{1}, object:{2} fails", e,
 		    serviceBinding ? "setServiceBinding" : "setBinding",
 		    name, object);
 	    }
@@ -437,7 +415,7 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
-		    Level.FINEST, "{0} name:{1} throws", e,
+		    Level.FINEST, "{0} name:{1} fails", e,
 		    serviceBinding ? "removeServiceBinding" : "removeBinding",
 		    name);
 	    }
@@ -456,12 +434,24 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 	return "DataServiceImpl[appName:\"" + appName + "\"]";
     }
 
+    /**
+     * Specifies after how many operations to check the consistency of the
+     * managed references table.
+     *
+     * @param	debugCheckInterval the number of operations between consistency
+     *		checks
+     */
     public void setDebugCheckInterval(int debugCheckInterval) {
 	synchronized (lock) {
 	    this.debugCheckInterval = debugCheckInterval;
 	}
     }
 
+    /**
+     * Specifies whether to automatically detect modifications to objects.
+     *
+     * @param	detectModifications whether to detect modifications
+     */
     public void setDetectModifications(boolean detectModifications) {
 	synchronized (lock) {
 	    this.detectModifications = detectModifications;
@@ -492,11 +482,8 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 	    context = new Context(
 		store, txn, debugCheckInterval, detectModifications);
 	    currentContext.set(context);
-	} else if (!txn.equals(context.originalTxn)) {
-	    currentContext.set(null);
-	    throw new IllegalStateException(
-		"Wrong transaction: Expected " + context.originalTxn +
-		", found " + txn);
+	} else {
+	    context.checkTxn(txn);
 	}
 	context.maybeCheckReferenceTable();
 	return context;
@@ -528,6 +515,10 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 	return context;
     }
 
+    /**
+     * Returns the name that should be used for a service or application
+     * binding.
+     */
     private static String getInternalName(
 	String name, boolean serviceBinding)
     {

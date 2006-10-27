@@ -7,7 +7,7 @@ import com.sleepycat.db.DatabaseEntry;
 import com.sleepycat.db.DatabaseException;
 import com.sleepycat.db.LockMode;
 import com.sleepycat.db.OperationStatus;
-import com.sun.sgs.impl.service.data.Util;
+import java.math.BigInteger;
 
 /**
  * Encapsulates the layout of meta data stored at the start of the IDs
@@ -84,8 +84,7 @@ final class DataStoreHeader {
 	if (magic != MAGIC) {
 	    throw new DataStoreException(
 		"Bad magic number in header: expected " +
-		Util.toHexString(MAGIC) + ", found " +
-		Util.toHexString(magic));
+		toHexString(MAGIC) + ", found " + toHexString(magic));
 	}
 
 	LongBinding.longToEntry(MAJOR_ID, key);
@@ -206,5 +205,10 @@ final class DataStoreHeader {
 	if (status != OperationStatus.SUCCESS) {
 	    throw new DataStoreException("Problem writing item: " + status);
 	}
+    }
+
+    /** Converts a long to a string in hexadecimal. */
+    private static String toHexString(long l) {
+	return "0x" + BigInteger.valueOf(l).toString(16);
     }
 }

@@ -11,9 +11,6 @@ final class Context {
     /** The data store. */
     final DataStore store;
 
-    /** The original transaction. */
-    final Transaction originalTxn;
-
     /**
      * The wrapped transaction, to be passed to the data store.  The wrapping
      * allows the data service to manage the data store's participation by
@@ -21,15 +18,25 @@ final class Context {
      */
     final TxnTrampoline txn;
 
+    /**
+     * The number of operations between making checks on the reference table.
+     */
     private final int debugCheckInterval;
 
+    /** Whether to detect modifications. */
     final boolean detectModifications;
 
+    /**
+     * The number of operations performed -- used to determine when to make
+     * checks on the reference table.
+     */
     private int count = 0;
 
-    private boolean inactive;
-
-    private TransactionParticipant storeParticipant;
+    /**
+     * The participant object for the data store, or null if the data store has
+     * not yet joined the transaction.
+     */
+    TransactionParticipant storeParticipant;
 
     /** Stores information about managed references. */
     final ReferenceTable refs = new ReferenceTable();
@@ -40,9 +47,8 @@ final class Context {
 	    int debugCheckInterval,
 	    boolean detectModifications)
     {
-	assert store != null && txn != null;
+	assert store != null && txn != null : "Store or txn is null";
 	this.store = store;
-	this.originalTxn = txn;
 	this.txn = new TxnTrampoline(txn);
 	this.debugCheckInterval = debugCheckInterval;
 	this.detectModifications = detectModifications;
@@ -54,11 +60,29 @@ final class Context {
      * for transactions passed to the DataStore in order to mediate its
      * participation in the transaction.
      */
-    final class TxnTrampoline implements Transaction {
-	private final Transaction txn;
-	TxnTrampoline(Transaction txn) { this.txn = txn; }
-	public byte[] getId() { return txn.getId(); }
-	public long getCreationTime() { return txn.getCreationTime(); }
+    private final class TxnTrampoline implements Transaction {
+
+	/** The original transaction. */
+	private final Transaction originalTxn;
+
+	/** Whether this transaction is inactive. */
+	private boolean inactive;
+
+	/** Creates an instance. */
+	TxnTrampoline(Transaction originalTxn) {
+	    this.originalTxn = originalTxn;
+	}
+
+	/* -- Implement Transaction -- */
+
+	public byte[] getId() {
+	    return originalTxn.getId();
+	}
+
+	public long getCreationTime() {
+	    return originalTxn.getCreationTime();
+	}
+
 	public void join(TransactionParticipant participant) {
 	    if (inactive) {
 		throw new IllegalStateException(
@@ -70,18 +94,47 @@ final class Context {
 		    "Attempt to join with different participant");
 	    }
 	}
-	public void abort() { txn.abort(); }
+
+	public void abort() {
+	    originalTxn.abort();
+	}
+
+	/* -- Object methods -- */
+
 	public boolean equals(Object object) {
 	    return object instanceof TxnTrampoline &&
-		txn.equals(((TxnTrampoline) object).txn);
+		originalTxn.equals(((TxnTrampoline) object).originalTxn);
 	}
-	public int hashCode() { return txn.hashCode(); }
+
+	public int hashCode() {
+	    return originalTxn.hashCode();
+	}
+
 	public String toString() {
-	    return "TxnTrampoline[txn:" + txn + "]";
+	    return "TxnTrampoline[originalTxn:" + originalTxn + "]";
+	}
+
+	/* -- Other methods -- */
+
+	/**
+	 * Checks that the specified transaction equals the original one, and
+	 * throw IllegalStateException if not.
+	 */
+	void check(Transaction otherTxn) {
+	    if (!originalTxn.equals(otherTxn)) {
+		throw new IllegalStateException(
+		    "Wrong transaction: Expected " + originalTxn +
+		    ", found " + otherTxn);
+	    }
+	}
+
+	/** Notes that this transaction is inactive. */
+	void setInactive() {
+	    inactive = true;
 	}
     }
 
-    /* -- References -- */
+    /* -- Methods for obtaining references -- */
 
     /** Obtains the reference associated with the specified object. */
     <T extends ManagedObject> ManagedReferenceImpl<T> getReference(T object) {
@@ -97,11 +150,13 @@ final class Context {
     }
 
     /** Obtains the reference associated with the specified ID. */
-    ManagedReferenceImpl<? extends ManagedObject> getReference(long oid) {
+    private ManagedReferenceImpl<? extends ManagedObject> getReference(
+	long oid)
+    {
 	return ManagedReferenceImpl.getReference(this, oid);
     }
 
-    /* -- Bindings -- */
+    /* -- Methods for bindings -- */
 
     /** Obtains the object associated with the specified internal name. */
     <T extends ManagedObject> T getBinding(
@@ -121,35 +176,37 @@ final class Context {
 	store.removeBinding(txn, internalName);
     }
 
-    /* -- Methods on transaction participant -- */
+    /* -- Methods for TransactionParticipant -- */
 
     boolean prepare() throws Exception {
+	txn.setInactive();
+	flushChanges();
 	return storeParticipant.prepare(txn);
     }
 
     void commit() {
+	txn.setInactive();
 	storeParticipant.commit(txn);
     }
 
     void prepareAndCommit() throws Exception {
+	txn.setInactive();
+	flushChanges();
 	storeParticipant.prepareAndCommit(txn);
     }
 
     void abort() {
+	txn.setInactive();
 	storeParticipant.abort(txn);
     }
 
     /* -- Other methods -- */
 
-    /** Stores all object modifications in the data store. */
-    void flushChanges() {
-	for (ManagedReferenceImpl<? extends ManagedObject> ref :
-		 refs.getReferences())
-	{
-	    ref.flush();
-	}
-    }
-
+    /**
+     * Checks the consistency of the reference table if the operation count
+     * equals the check interval.  Throws an IllegalStateException if it
+     * encounters a problem.
+     */
     void maybeCheckReferenceTable() {
 	if (++count >= debugCheckInterval) {
 	    count = 0;
@@ -157,7 +214,18 @@ final class Context {
 	}
     }
 
-    void setInactive() {
-	inactive = true;
+    /**
+     * Check that the specified transaction equals the original one, and throw
+     * IllegalStateException if not.
+     */
+    void checkTxn(Transaction otherTxn) {
+	txn.check(otherTxn);
+    }
+
+    /** Stores all object modifications in the data store. */
+    private void flushChanges() {
+	for (ManagedReferenceImpl ref : refs.getReferences()) {
+	    ref.flush();
+	}
     }
 }

@@ -1,14 +1,21 @@
 package com.sun.sgs.impl.service.data;
 
 import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.impl.util.LoggerWrapper;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /** Stores information about managed references. */
 final class ReferenceTable {
+
+    /** The logger for this class. */
+    private static final LoggerWrapper logger =
+	new LoggerWrapper(Logger.getLogger(ReferenceTable.class.getName()));
 
     /** Maps object IDs to managed references. */
     private final Map<Long,
@@ -29,7 +36,7 @@ final class ReferenceTable {
      * null if no reference is found.
      */
     <T extends ManagedObject> ManagedReferenceImpl<T> find(T object) {
-	assert object != null;
+	assert object != null : "Object is null";
 	@SuppressWarnings("unchecked")
 	    ManagedReferenceImpl<T> result =
 	        (ManagedReferenceImpl<T>) objects.get(object);
@@ -41,18 +48,20 @@ final class ReferenceTable {
      * if no reference is found.
      */
     ManagedReferenceImpl<? extends ManagedObject> find(long oid) {
-	assert oid >= 0;
+	assert oid >= 0 : "Object ID is negative";
 	return oids.get(oid);
     }
 
     /** Adds a new managed reference to this table. */
     void add(ManagedReferenceImpl<? extends ManagedObject> ref) {
 	Object existing = oids.put(ref.oid, ref);
-	assert existing == null;
+	assert existing == null
+	    : "Found existing reference for oid:" + ref.oid;
 	ManagedObject object = ref.getObject();
 	if (object != null) {
 	    existing = objects.put(object, ref);
-	    assert existing == null;
+	    assert existing == null
+		: "Found existing reference for object with oid:" + ref.oid;
 	}
     }
 
@@ -61,20 +70,24 @@ final class ReferenceTable {
      * an object.
      */
     void registerObject(ManagedReferenceImpl<? extends ManagedObject> ref) {
-	assert oids.get(ref.oid) == ref;
-	assert ref.getObject() != null;
+	assert oids.get(ref.oid) == ref
+	    : "Found duplicate references for oid: " + ref.oid;
+	assert ref.getObject() != null : "Object is null for oid:" + ref.oid;
 	Object existing = objects.put(ref.getObject(), ref);
-	assert existing == null;
+	assert existing == null
+	    : "Found existing reference for object with oid: " + ref.oid;
     }
 
     /** Removes a managed reference from this table. */
     void remove(ManagedReferenceImpl<? extends ManagedObject> ref) {
 	Object existing = oids.remove(ref.oid);
-	assert existing == ref;
+	assert existing == ref
+	    : "Found duplicate reference for oid:" + ref.oid;
 	ManagedObject object = ref.getObject();
 	if (object != null) {
 	    existing = objects.remove(object);
-	    assert existing == ref;
+	    assert existing == ref
+		: "Found duplicate reference for oid:" + ref.oid;
 	}
     }
 
@@ -88,6 +101,7 @@ final class ReferenceTable {
      * is found.
      */
     void checkState() {
+	logger.log(Level.FINE, "Checking state");
 	int objectCount = 0;
 	for (Entry<Long, ManagedReferenceImpl<? extends ManagedObject>> entry :
 		 oids.entrySet())
@@ -96,6 +110,10 @@ final class ReferenceTable {
 	    ManagedReferenceImpl<? extends ManagedObject> ref =
 		entry.getValue();
 	    ref.checkState();
+	    if (ref.isRemoved()) {
+		throw new IllegalStateException(
+		    "Found removed reference: " + ref);
+	    }
 	    if (oid != ref.oid) {
 		throw new IllegalStateException(
 		    "Wrong oids entry: oid = " + oid + ", ref.oid = " +
