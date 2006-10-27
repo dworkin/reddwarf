@@ -171,6 +171,9 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 	try {
 	    if (object == null) {
 		throw new NullPointerException("The argument must not be null");
+	    } else if (!(object instanceof Serializable)) {
+		throw new IllegalArgumentException(
+		    "The object must be serializable");
 	    }
 	    Context context = checkContext();
 	    ManagedReferenceImpl<? extends ManagedObject> ref =

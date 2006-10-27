@@ -6,9 +6,11 @@ import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 
 public class DummyTransactionProxy implements TransactionProxy {
-    private DummyTransaction txn;
+    private ThreadLocal<DummyTransaction> threadTxn =
+	new ThreadLocal<DummyTransaction>();
     private final TaskOwner taskOwner = new DummyTaskOwner();
     public Transaction getCurrentTransaction() {
+	Transaction txn = threadTxn.get();
 	if (txn != null) {
 	    return txn;
 	} else {
@@ -20,7 +22,7 @@ public class DummyTransactionProxy implements TransactionProxy {
 	return taskOwner;
     }
     public void setCurrentTransaction(DummyTransaction txn) {
-	this.txn = txn;
+	threadTxn.set(txn);
 	if (txn != null) {
 	    txn.proxy = this;
 	}
