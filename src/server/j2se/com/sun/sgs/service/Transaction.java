@@ -48,9 +48,8 @@ public interface Transaction {
      * @param participant the <code>TransactionParticipant</code> joining
      *                    the transaction
      *
-     * @throws IllegalStateException if the transaction has committed, is
-     *                               already committing, or has been
-     *                               aborted
+     * @throws IllegalStateException if the transaction has begun preparation
+     *				     or aborting
      */
     public void join(TransactionParticipant participant);
 
@@ -65,9 +64,8 @@ public interface Transaction {
      * this transaction will continue to execute normally unless an
      * exception is raised.
      *
-     * @throws IllegalStateException if the transaction has committed, is
-     *                               already committing, or has already been
-     *                               aborted
+     * @throws IllegalStateException if the transaction has completed
+     *                               preparation or aborting
      */
     public void abort();
 
