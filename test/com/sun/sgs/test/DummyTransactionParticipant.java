@@ -5,13 +5,27 @@ import com.sun.sgs.service.TransactionParticipant;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/** Provides a testing implementation of a transaction participant. */
 public class DummyTransactionParticipant implements TransactionParticipant {
+
+    /** The logger for this class. */
     private static final Logger logger =
-	Logger.getLogger("com.sun.sgs.test.DummyTransactionParticipant");
+	Logger.getLogger(DummyTransactionParticipant.class.getName());
+
+    /** The possible states for a participant. */
     public static enum State { ACTIVE, PREPARED, COMMITTED, ABORTED };
+
+    /** The state of this participant. */
     private State state = State.ACTIVE;
+
+    /** Whether prepare was called and returned true. */
     private boolean prepareReturnedTrue;
+
+    /** Creates an instance of this class. */
     public DummyTransactionParticipant() { }
+
+    /* -- Implement TransactionParticipant -- */
+
     public boolean prepare(Transaction txn) throws Exception {
 	logger.log(Level.FINE, "prepare");
 	if (state != State.ACTIVE) {
@@ -24,8 +38,7 @@ public class DummyTransactionParticipant implements TransactionParticipant {
 	}
 	return result;
     }
-    protected boolean prepareResult() { return false; };
-    public boolean prepareReturnedTrue() { return prepareReturnedTrue; }
+
     public void commit(Transaction txn) {
 	logger.log(Level.FINE, "commit");
 	if (state != State.PREPARED) {
@@ -36,6 +49,7 @@ public class DummyTransactionParticipant implements TransactionParticipant {
 	}
 	state = State.COMMITTED;
     }
+
     public void prepareAndCommit(Transaction txn) throws Exception {
 	logger.log(Level.FINE, "prepareAndCommit");
 	if (state != State.ACTIVE) {
@@ -43,6 +57,7 @@ public class DummyTransactionParticipant implements TransactionParticipant {
 	}
 	state = State.COMMITTED;
     }
+
     public void abort(Transaction txn) {
 	logger.log(Level.FINE, "abort");
 	if (state != State.ACTIVE && state != State.PREPARED) {
@@ -53,5 +68,15 @@ public class DummyTransactionParticipant implements TransactionParticipant {
 	}
 	state = State.ABORTED;
     }
+
+    /* -- Other methods -- */
+
+    /** Returns the current state. */
     public State getState() { return state; }
+
+    /** Returns true if prepare was called and returned true. */
+    public boolean prepareReturnedTrue() { return prepareReturnedTrue; }
+
+    /** Returns the value to be returned by prepare. */
+    protected boolean prepareResult() { return false; };
 }
