@@ -22,7 +22,7 @@ import java.util.HashMap;
  * channels used in the context's associated transaction) channel name
  * to channel implementation.  To create, obtain, or remove a channel
  * within a transaction, the <code>createChannel</code>,
- * <code>getChannel</code>, or <code>removeChannel</code>
+ * <code>getChannel</code>, or <code>removeChannel</code> methods
  * (respectively) must be called on the context so that the proper
  * channel instances are used.
  */

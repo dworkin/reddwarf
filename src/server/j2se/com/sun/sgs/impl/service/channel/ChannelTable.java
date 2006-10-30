@@ -10,10 +10,11 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Table containing a map of all channel state, by name.
+ * Table containing a map of all channels, by name.
  */
 class ChannelTable implements ManagedObject, Serializable {
 
+    /** Name of channel table in the data store. */
     static final String NAME = "channel.table";
 
     /** Serialization version. */

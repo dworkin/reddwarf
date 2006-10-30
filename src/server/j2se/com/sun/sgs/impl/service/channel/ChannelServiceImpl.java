@@ -84,26 +84,35 @@ public class ChannelServiceImpl
 			  // TaskService taskService,
 			  DataService dataService)
     {
-	if (txnProxy == null || dataService == null) {
-	    throw new NullPointerException("null argument");
-	}
-	synchronized (lock) {
-	    if (this.txnProxy != null) {
-		throw new IllegalStateException("Already configured");
-	    }
-	    this.txnProxy = txnProxy;
-	    //this.taskService = taskService;
-	    this.dataService = dataService;
-	}
+	logger.log(Level.CONFIG, "Configuring ChannelServiceImpl");
 
-	/*
-	 * Create and store new channel table if one does not already
-	 * exist in the data store.
-	 */
 	try {
-	    dataService.getServiceBinding(ChannelTable.NAME, ChannelTable.class);
-	} catch (NameNotBoundException e) {
-	    dataService.setBinding(ChannelTable.NAME, new ChannelTable());
+	    if (txnProxy == null || dataService == null) {
+		throw new NullPointerException("null argument");
+	    }
+	    synchronized (lock) {
+		if (this.txnProxy != null) {
+		    throw new IllegalStateException("Already configured");
+		}
+		this.txnProxy = txnProxy;
+		//this.taskService = taskService;
+		this.dataService = dataService;
+	    }
+
+	    /*
+	     * Create and store new channel table if one does not already
+	     * exist in the data store.
+	     */
+	    try {
+		dataService.getServiceBinding(
+		    ChannelTable.NAME, ChannelTable.class);
+	    } catch (NameNotBoundException e) {
+		dataService.setBinding(ChannelTable.NAME, new ChannelTable());
+	    }
+	} catch (RuntimeException e) {
+	    logger.log(Level.CONFIG,
+		"Failed to configure ChannelServiceImpl", e);
+	    throw e;
 	}
     }
 
@@ -223,11 +232,11 @@ public class ChannelServiceImpl
      * Checks the specified transaction, throwing IllegalStateException
      * if the current context is null or if the specified transaction is
      * not equal to the transaction in the current context. If
-     * 'cancelContext' is 'true' or if the specified transaction does
+     * 'nullifyContext' is 'true' or if the specified transaction does
      * not match the current context's transaction, then sets the
      * current context to null.
      */
-    private void handleTransaction(Transaction txn, boolean cancelContext) {
+    private void handleTransaction(Transaction txn, boolean nullifyContext) {
 	if (txn == null) {
 	    throw new NullPointerException("null transaction");
 	}
@@ -240,7 +249,7 @@ public class ChannelServiceImpl
 	    throw new IllegalStateException(
 		"Wrong transaction: Expected " + context.txn + ", found " + txn);
 	}
-	if (cancelContext) {
+	if (nullifyContext) {
 	    currentContext.set(null);
 	}
     }

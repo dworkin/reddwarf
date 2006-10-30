@@ -4,10 +4,13 @@ import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
+import com.sun.sgs.impl.util.LoggerWrapper;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Channel implementation for use within a single transaction
@@ -15,8 +18,18 @@ import java.util.Collections;
  */
 final class ChannelImpl implements Channel {
 
+    /** The logger for this class. */
+    private final static LoggerWrapper logger =
+	new LoggerWrapper(
+	    Logger.getLogger(ChannelImpl.class.getName()));
+    
+    /** Transaction-related context information. */
     private final Context context;
+
+    /** Persistent channel state. */
     private final ChannelState state;
+
+    /** Flag that is 'true' if this channel is closed. */
     private boolean channelClosed = false;
 
     /**
@@ -27,6 +40,10 @@ final class ChannelImpl implements Channel {
      * @param state a channel state
      */
     ChannelImpl(Context context, ChannelState state) {
+	if (logger.isLoggable(Level.FINER)) {
+	    logger.log(Level.FINER, "Created ChannelImpl context:{0} state:{1}",
+		       context, state);
+	}
 	this.state =  state;
 	this.context = context;
     }
@@ -34,12 +51,19 @@ final class ChannelImpl implements Channel {
     /** {@inheritDoc} */
     public String getName() {
 	checkContext();
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(Level.FINEST, "getName returns {0}", state.name);
+	}
 	return state.name;
     }
 
     /** {@inheritDoc} */
     public Delivery getDeliveryRequirement() {
 	checkContext();
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(Level.FINEST,
+		       "getDeliveryRequirement returns {0}", state.delivery);
+	}
 	return state.delivery;
     }
 
@@ -56,6 +80,9 @@ final class ChannelImpl implements Channel {
 	    context.dataService.markForUpdate(state);
 	    state.sessions.put(session, listener);
 	}
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(Level.FINEST, "join session:{0} returns", session);
+	}
     }
 
     /** {@inheritDoc} */
@@ -68,6 +95,9 @@ final class ChannelImpl implements Channel {
 	    context.dataService.markForUpdate(state);
 	    state.sessions.remove(session);
 	}
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(Level.FINEST, "leave session:{0} returns", session);
+	}
     }
 
     /** {@inheritDoc} */
@@ -77,18 +107,30 @@ final class ChannelImpl implements Channel {
 	    context.dataService.markForUpdate(state);
 	    state.sessions.clear();
 	}
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(Level.FINEST, "leaveAll returns");
+	}
     }
 
     /** {@inheritDoc} */
     public boolean hasSessions() {
 	checkClosed();
-	return !state.sessions.isEmpty();
+	boolean hasSessions = !state.sessions.isEmpty();
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(Level.FINEST, "hasSessions returns {0}", hasSessions);
+	}
+	return hasSessions;
     }
 
     /** {@inheritDoc} */
     public Collection<ClientSession> getSessions() {
 	checkClosed();
-	return Collections.unmodifiableCollection(state.sessions.keySet());
+	Collection<ClientSession> sessions =
+	    Collections.unmodifiableCollection(state.sessions.keySet());	
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(Level.FINEST, "getSessions returns {0}", sessions);
+	}
+	return sessions;
     }
 
     /** {@inheritDoc} */
@@ -116,6 +158,9 @@ final class ChannelImpl implements Channel {
 	checkContext();
 	channelClosed = true;
 	context.removeChannel(state.name);
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(Level.FINEST, "close returns");
+	}
     }
 
     /* -- other methods -- */
