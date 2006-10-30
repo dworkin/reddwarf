@@ -104,8 +104,6 @@ import com.sun.gi.logic.impl.SimKernelImpl;
 import com.sun.gi.logic.impl.SimulationImpl;
 import com.sun.gi.objectstore.ObjectStore;
 import com.sun.gi.objectstore.tso.TSOObjectStore;
-//import com.sun.gi.objectstore.tso.dataspace.InMemoryDataSpace;
-import com.sun.gi.objectstore.tso.dataspace.PersistantInMemoryDataSpace;
 import com.sun.gi.utils.SGSUUID;
 import com.sun.gi.utils.StatisticalUUID;
 
@@ -120,15 +118,10 @@ import com.sun.gi.utils.StatisticalUUID;
  * </p>
  */
 public class SGS {
-    //ReportManager reportManager;
     TimerManager timerManager;
     TransportManager transportManager;
-    //ReportUpdater reportUpdater;
-    //SGSUUID sliceID = new StatisticalUUID();
     SimKernel kernel;
-   // ObjectStore ostore;
     private boolean verbose = false;
-    //private static final long REPORTTTL = 1000;
     private Deployer deployer;
     private ManagerAgent agent;
     private XMLDiscoveryFileManager localDiscoveryXMLMgr;
@@ -143,14 +136,12 @@ public class SGS {
 	    if (verbose) {
 		System.err.println("Loading configuration from: " + installFile);
 	    }
-	    //InstallationLoader installation = new InstallationURL(new URL(
-	//	    installFile));
 	    
 	    // start framework services
 	    //transportManager = new LRMPTransportManager();
 	    transportManager = new NullTransportManager();
-	    //reportManager = new ReportManagerImpl(transportManager, REPORTTTL);
-	    String hbprop = System.getProperty("sgs.framework.timer.heartbeat", "100");
+	    String hbprop =
+                    System.getProperty("sgs.framework.timer.heartbeat", "100");
             long heartbeat = Math.max(Long.parseLong(hbprop), 1);
 	    timerManager = new TimerManagerImpl(heartbeat);
 	    kernel.setTimerManager(timerManager);
@@ -158,26 +149,14 @@ public class SGS {
 	    kernel.setRawSocketManager(new RawSocketManagerImpl());
             
 	    // start game services
-	    //StatusReport installationReport =
-            //    reportManager.makeNewReport("_SGS_discover_" + sliceID);
 
 	    TransportManager routerTransportManager;
-	    /*
-                 * XXX: For single-stack case, use a non-multicast,
-                 * no-op transport at the router layer. This is both
-                 * faster and works around the lack of
-                 * message-fragmentation in LRMP (which limits message
-                 * sizes to UDP-max)
-                 * 
-                 * To use the LRMP routing, use: routerTransportManager =
-                 * transportManager; -jm
-                 */
 	    routerTransportManager = new NullTransportManager();
 	    deployer = new DeployerImpl(kernel, transportManager, 
 				new URL(installFile));
  	    
 	    int managerPort = Integer.parseInt(
-	    		System.getProperty("sgs.framework.management.port", "0"));
+                    System.getProperty("sgs.framework.management.port", "0"));
 	    if (managerPort > 0) {
 	    	startManagementAgent(managerPort);
 	    }
@@ -185,14 +164,6 @@ public class SGS {
 	    localDiscoveryXMLMgr = 
                 new XMLDiscoveryFileManager(((DeployerImpl)deployer).getReportManager());
 
-
-	    //installationReport.setParameter("game", "count", "0");
-	    /*for (DeploymentRec game : installation.listGames()) {
-		startupGame(routerTransportManager, game, installationReport);
-	    }*/
-	    //reportUpdater = new ReportUpdater(reportManager);
-	    //installationReport.dump(System.err);
-	    //reportUpdater.addReport(installationReport);
 	    
 	} catch (Exception ex) {
 	    ex.printStackTrace();
@@ -220,120 +191,6 @@ public class SGS {
     	System.exit(0);
     }
 
-    /**
-         * startupGame
-         * 
-         * @param game InstallRec
-         */
-   /* private Router startupGame(TransportManager transportMgr,
-	    DeploymentRec game, StatusReport installationReport) {
-	Router router = null;
-	int gameID = game.getID();
-	try {
-	    router = new RouterImpl(transportMgr);
-	} catch (Exception e) {
-	    e.printStackTrace();
-	    return null;
-	}
-	router.setChannelFilters(game.getChannelFilters());
-
-	int gameCount = Integer.parseInt(installationReport.getParameter(
-		"game", "count"));
-	String statusBlockName = "game." + gameCount;
-	installationReport.setParameter(statusBlockName, "id",
-		Integer.toString(gameID));
-	installationReport.setParameter(statusBlockName, "description",
-		game.getDescription());
-	installationReport.setParameter(statusBlockName, "name", game.getName());
-	int umgrCount = 0;
-
-	// create simulation container for game
-	if (game.getBootClass() != null) {
-	    Simulation sim = null;
-	    try {
-		ostore = new TSOObjectStore(new PersistantInMemoryDataSpace(gameID));
-		//ostore = new TSOObjectStore(new InMemoryDataSpace(gameID));
-		String cleanProperty = System.getProperty("sgs.ostore.startclean");
-		if ((cleanProperty != null)
-			&& (cleanProperty.equalsIgnoreCase("true"))) {
-		    if (verbose) {
-			System.err.println("Clearing Object Store");
-		    }
-		    ostore.clear();
-		}
-//		 set app info system properties
-	    String name = game.getName();
-	    // convert spaces to underbars
-	    name = name.replaceAll(" ","_").toLowerCase();
-	    String prefix = "sgs.game."+name+".";
-	    String rootProp =prefix+"rootURL";
-	    //System.out.println(rootProp+" to "+game.getRootURL());
-	    System.setProperty(rootProp,game.getRootURL());
-		sim = new SimulationImpl(kernel, ostore, router, game);
-	    } catch (InstantiationException e) {
-
-		e.printStackTrace();
-		return null;
-	    }
-	    
-	}
-
-	// create user managers
-	for (UserMgrRec umgrRec : game.getUserManagers()) {
-	    String serverClassName = umgrRec.getServerClassName();
-	    String umgrBlock = statusBlockName + ".umgr." + umgrCount;
-	    umgrCount++;
-	    installationReport.setParameter(statusBlockName + ".umgr", "count",
-		    Integer.toString(umgrCount));
-	    try {
-		Class serverClass = Class.forName(serverClassName);
-		Constructor constructor = serverClass.getConstructor(new Class[] {
-			Router.class, Map.class });
-		UserManager umgr = (UserManager) constructor.newInstance(new Object[] {
-			router, umgrRec.getParameterMap() });
-		installationReport.setParameter(umgrBlock, "clientClassName",
-			umgr.getClientClassname());
-		Set clientParams = umgr.getClientParams().entrySet();
-		installationReport.setParameter(umgrBlock + ".params", "count",
-			Integer.toString(clientParams.size()));
-		int c = 0;
-		for (Iterator i2 = clientParams.iterator(); i2.hasNext();) {
-		    Entry entry = (Entry) i2.next();
-		    installationReport.setParameter(umgrBlock + ".params.keys",
-			    Integer.toString(c), (String) entry.getKey());
-		    installationReport.setParameter(umgrBlock
-			    + ".params.values", Integer.toString(c),
-			    (String) entry.getValue());
-		    c++;
-		}
-		if (umgrRec.hasValidatorModules()) {
-		    UserValidatorFactory validatorFactory = new UserValidatorFactoryImpl();
-		    for (ValidatorRec lmoduleRec : umgrRec.getValidatorModules()) {
-			String loginModuleClassname = lmoduleRec.getValidatorClassName();
-			Class loginModuleClass = Class.forName(loginModuleClassname);
-			validatorFactory.addLoginModule(loginModuleClass,
-				lmoduleRec.getParameterMap());
-		    }
-		    umgr.setUserValidatorFactory(validatorFactory);
-		}
-		// start up container
-
-		// add client to list
-
-		// need to start boot method in container if it has one
-		// here.
-
-	    } catch (Exception ex) {
-		ex.printStackTrace();
-	    }
-	    gameCount++;
-	    installationReport.setParameter("game", "count",
-		    Integer.toString(gameCount));
-	}
-
-	return router;
-    }
-*/
     static public void main(String[] args) {
 	for (int i = 0; i < args.length; i++) {
 	    if (args[i].charAt(0) == '-') {

@@ -97,7 +97,7 @@ import com.sun.gi.logic.Simulation;
 import com.sun.gi.logic.impl.SimulationImpl;
 import com.sun.gi.objectstore.ObjectStore;
 import com.sun.gi.objectstore.tso.TSOObjectStore;
-import com.sun.gi.objectstore.tso.dataspace.PersistantInMemoryDataSpace;
+import com.sun.gi.objectstore.tso.dataspace.DataSpace;
 
 /**
  * 
@@ -123,8 +123,11 @@ public class SimulationContextImpl implements SimulationContext {
     private Simulation simulation;
     private int reportID = -1;           // this simulation's entry in the
                 // installation report.
-        private String statusBlockName;
-        private boolean firstStart = true;
+    private String statusBlockName;
+    private boolean firstStart = true;
+
+    private static final String DEFAULT_OSTORE_DATASPACE =
+            "com.sun.gi.objectstore.tso.dataspace.PersistantInMemoryDataSpace";
         
     public SimulationContextImpl(SimKernel kernel, TransportManager transportManager, 
     							DeploymentRec deployment) {
@@ -140,9 +143,16 @@ public class SimulationContextImpl implements SimulationContext {
         }
         Router router = null;
         int gameID = deployment.getID();
-        ObjectStore ostore=null;
+        ObjectStore ostore = null;
         try {
-            ostore = new TSOObjectStore(new PersistantInMemoryDataSpace(gameID));
+            String dataspaceName =
+                    System.getProperty("sgs.ostore.dataspace",
+                    DEFAULT_OSTORE_DATASPACE);
+            Class dataspaceClass = Class.forName(dataspaceName);
+            Constructor ctor =
+                    dataspaceClass.getConstructor(Long.TYPE);
+            DataSpace dataspace = (DataSpace) ctor.newInstance(gameID);
+            ostore = new TSOObjectStore(dataspace);
             //ostore = new TSOObjectStore(new InMemoryDataSpace(gameID));
             String cleanProperty = System.getProperty("sgs.ostore.startclean");
             if ((cleanProperty != null)
