@@ -20,14 +20,25 @@ import java.io.IOException;
 import java.util.Properties;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import junit.framework.Test;
 import junit.framework.TestCase;
+import junit.framework.TestSuite;
 
 /** Test the DataServiceImpl class */
 public class TestDataServiceImpl extends TestCase {
 
+    /** The test suite, to use for adding additional tests. */
+    private static final TestSuite suite =
+	new TestSuite(TestDataServiceImpl.class);
+
+    /** Provides the test suite to the test runner. */
+    public static Test suite() { return suite; }
+
+    /** The name of the DataServiceImpl class. */
     private static final String DataStoreImplClassName =
 	DataStoreImpl.class.getName();
 
+    /** The name of the DataServiceImpl class. */
     private static final String DataServiceImplClassName =
 	DataServiceImpl.class.getName();
 
@@ -56,13 +67,15 @@ public class TestDataServiceImpl extends TestCase {
     private boolean passed;
 
     /** A per-test database directory, or null if not created. */
-    private String directory;
+    String directory;
 
-    private DataServiceImpl service;
+    DataServiceImpl service;
 
-    private DummyTransactionProxy txnProxy;
+    DummyTransactionProxy txnProxy;
 
-    private DummyTransaction txn;
+    DummyTransaction txn;
+
+    DummyManagedObject dummy;
 
     /** Creates the test. */
     public TestDataServiceImpl(String name) {
@@ -77,6 +90,8 @@ public class TestDataServiceImpl extends TestCase {
 	service.configure(txnProxy);
 	txn = new DummyTransaction();
 	txnProxy.setCurrentTransaction(txn);
+	dummy = new DummyManagedObject(service, "dummy");
+	service.setBinding("dummy", dummy);
     }
 
     /** Sets passed if the test passes. */
@@ -103,7 +118,7 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     /** Creates a per-test directory. */
-    private String createDirectory() throws IOException {
+    String createDirectory() throws IOException {
 	File dir = File.createTempFile(getName(), "dbdir");
 	if (!dir.delete()) {
 	    throw new RuntimeException("Problem deleting file: " + dir);
@@ -117,7 +132,7 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     /** Deletes the specified directory, if it exists. */
-    private static void deleteDirectory(String directory) {
+    static void deleteDirectory(String directory) {
 	File dir = new File(directory);
 	if (dir.exists()) {
 	    for (File f : dir.listFiles()) {
@@ -133,7 +148,7 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     /** Creates a property list with the specified keys and values. */
-    private static Properties createProperties(String... args) {
+    static Properties createProperties(String... args) {
 	Properties props = new Properties();
 	if (args.length % 2 != 0) {
 	    throw new RuntimeException("Odd number of arguments");
@@ -145,7 +160,7 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     /** Returns a DataServiceImpl for the shared database. */
-    private DataServiceImpl getDataServiceImpl() {
+    DataServiceImpl getDataServiceImpl() {
 	File dir = new File(dbDirectory);
 	if (!dir.exists()) {
 	    if (!dir.mkdir()) {
@@ -156,7 +171,7 @@ public class TestDataServiceImpl extends TestCase {
 	return new DataServiceImpl(dbProps);
     }
 
-    private DummyTransaction createTransaction() {
+    DummyTransaction createTransaction() {
 	txn = new DummyTransaction();
 	txnProxy.setCurrentTransaction(txn);
 	return txn;
@@ -209,7 +224,6 @@ public class TestDataServiceImpl extends TestCase {
 	testGetBindingEmptyName(false);
     }
     private void testGetBindingEmptyName(boolean app) throws Exception {
-	DummyManagedObject dummy = new DummyManagedObject(service, "dummy");
 	setBinding(app, service, "", dummy);
 	txn.commit();
 	createTransaction();
@@ -225,8 +239,6 @@ public class TestDataServiceImpl extends TestCase {
 	testGetBindingNullType(false);
     }
     private void testGetBindingNullType(boolean app) throws Exception {
-	setBinding(
-	    app, service, "dummy", new DummyManagedObject(service, "dummy"));
 	try {
 	    getBinding(app, service, "dummy", null);
 	    fail("Expected NullPointerException");
@@ -242,8 +254,7 @@ public class TestDataServiceImpl extends TestCase {
 	testGetBindingWrongType(false);
     }
     private void testGetBindingWrongType(boolean app) throws Exception {
-	setBinding(
-	    app, service, "dummy", new DummyManagedObject(service, "dummy"));
+	setBinding(app, service, "dummy", dummy);
 	try {
 	    getBinding(app, service, "dummy", AnotherManagedObject.class);
 	    fail("Expected ClassCastException");
@@ -298,7 +309,6 @@ public class TestDataServiceImpl extends TestCase {
     }
     private void testGetBindingObjectNotFound(boolean app) throws Exception {
 	/* New object removed in this transaction */
-	DummyManagedObject dummy = new DummyManagedObject(service, "dummy");
 	setBinding(app, service, "testGetBindingRemoved", dummy);
 	service.removeObject(dummy);
 	try {
@@ -345,129 +355,21 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
-    public void testGetBindingAborting() throws Exception {
-	testGetBindingAborting(true);
-    }
-    public void testGetServiceBindingAborting() throws Exception {
-	testGetBindingAborting(false);
-    }
-    private void testGetBindingAborting(final boolean app) throws Exception {
-	setBinding(
-	    app, service, "dummy", new DummyManagedObject(service, "dummy"));
-	class MyParticipant extends DummyTransactionParticipant {
-	    boolean ok;
-	    public void abort(Transaction txn) {
-		try {
-		    getBinding(
-			app, service, "dummy", DummyManagedObject.class);
-		} catch (TransactionNotActiveException e) {
-		    ok = true;
-		    throw e;
-		}
-	    }
-	};
-	MyParticipant participant = new MyParticipant();
-	txn.join(participant);
-	txn.abort();
-	assertTrue(participant.ok);
-    }
-
-    public void testGetBindingAborted() throws Exception {
-	testGetBindingAborted(true);
-    }
-    public void testGetServiceBindingAborted() throws Exception {
-	testGetBindingAborted(false);
-    }
-    private void testGetBindingAborted(boolean app) throws Exception {
-	setBinding(
-	    app, service, "dummy", new DummyManagedObject(service, "dummy"));
-	txn.commit();
-	txnProxy.setCurrentTransaction(null);
-	createTransaction();
-	txn.abort();
-	try {
+    private static class TestGetBindingBadTxn extends BadTxnTest {
+	private final boolean app;
+	private TestGetBindingBadTxn(boolean app, BadTxnState state) {
+	    super(app ? "testGetBinding" : "testGetServiceBinding", state);
+	    this.app = app;
+	}
+	void action() {
 	    getBinding(app, service, "dummy", DummyManagedObject.class);
-	    fail("Expected TransactionNotActiveException");
-	} catch (TransactionNotActiveException e) {
-	    System.err.println(e);
 	}
     }
 
-    public void testGetBindingPreparing() throws Exception {
-	testGetBindingPreparing(true);
-    }
-    public void testGetServiceBindingPreparing() throws Exception {
-	testGetBindingPreparing(false);
-    }
-    private void testGetBindingPreparing(final boolean app) throws Exception {
-	setBinding(
-	    app, service, "dummy", new DummyManagedObject(service, "dummy"));
-	class MyParticipant extends DummyTransactionParticipant {
-	    boolean ok;
-	    public boolean prepare(Transaction txn) {
-		try {
-		    getBinding(
-			app, service, "dummy", DummyManagedObject.class);
-		    return false;
-		} catch (TransactionNotActiveException e) {
-		    ok = true;
-		    throw e;
-		}
-	    }
-	};
-	MyParticipant participant = new MyParticipant();
-	txn.join(participant);
-	try {
-	    txn.commit();
-	    fail("Expected TransactionNotActiveException");
-	} catch (TransactionNotActiveException e) {
-	    System.err.println(e);
-	}
-	assertTrue(participant.ok);
-    }
-
-    public void testGetBindingCommitting() throws Exception {
-	testGetBindingCommitting(true);
-    }
-    public void testGetServiceBindingCommitting() throws Exception {
-	testGetBindingCommitting(false);
-    }
-    private void testGetBindingCommitting(final boolean app) throws Exception {
-	setBinding(
-	    app, service, "dummy", new DummyManagedObject(service, "dummy"));
-	class MyParticipant extends DummyTransactionParticipant {
-	    boolean ok;
-	    public void commit(Transaction txn) {
-		try {
-		    getBinding(
-			app, service, "dummy", DummyManagedObject.class);
-		} catch (TransactionNotActiveException e) {
-		    ok = true;
-		    throw e;
-		}
-	    }
-	};
-	MyParticipant participant = new MyParticipant();
-	txn.join(participant);
-	txn.commit();
-	assertTrue(participant.ok);
-    }
-
-    public void testGetBindingCommitted() throws Exception {
-	testGetBindingCommitted(true);
-    }
-    public void testGetServiceBindingCommitted() throws Exception {
-	testGetBindingCommitted(false);
-    }
-    private void testGetBindingCommitted(boolean app) throws Exception {
-	setBinding(
-	    app, service, "dummy", new DummyManagedObject(service, "dummy"));
-	txn.commit();
-	try {
-	    getBinding(app, service, "dummy", DummyManagedObject.class);
-	    fail("Expected TransactionNotActiveException");
-	} catch (TransactionNotActiveException e) {
-	    System.err.println(e);
+    static {
+	for (BadTxnState state : BadTxnState.values()) {
+	    new TestGetBindingBadTxn(true, state);
+	    new TestGetBindingBadTxn(false, state);
 	}
     }
 
@@ -478,7 +380,6 @@ public class TestDataServiceImpl extends TestCase {
 	testGetBindingSuccess(false);
     }
     private void testGetBindingSuccess(boolean app) throws Exception {
-	DummyManagedObject dummy = new DummyManagedObject(service, "dummy");
 	setBinding(app, service, "newDummy", dummy);
 	DummyManagedObject result =
 	    getBinding(app, service, "newDummy", DummyManagedObject.class);
@@ -516,8 +417,6 @@ public class TestDataServiceImpl extends TestCase {
 	testSetBindingNullName(false);
     }
     private void testSetBindingNullName(boolean app) {
-	DummyManagedObject dummy =
-	    new DummyManagedObject(service, "dummy");
 	try {
 	    setBinding(app, service, null, dummy);
 	    fail("Expected NullPointerException");
@@ -574,128 +473,21 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
-    public void testSetBindingAborting() throws Exception {
-	testSetBindingAborting(true);
-    }
-    public void testSetServiceBindingAborting() throws Exception {
-	testSetBindingAborting(false);
-    }
-    private void testSetBindingAborting(final boolean app) throws Exception {
-	final DummyManagedObject dummy =
-	    new DummyManagedObject(service, "dummy");
-	class MyParticipant extends DummyTransactionParticipant {
-	    boolean ok;
-	    public void abort(Transaction txn) {
-		try {
-		    setBinding(app, service, "dummy", dummy);
-		} catch (TransactionNotActiveException e) {
-		    ok = true;
-		    throw e;
-		}
-	    }
-	};
-	MyParticipant participant = new MyParticipant();
-	txn.join(participant);
-	txn.abort();
-	assertTrue(participant.ok);
-    }
-
-    public void testSetBindingAborted() throws Exception {
-	testSetBindingAborted(true);
-    }
-    public void testSetServiceBindingAborted() throws Exception {
-	testSetBindingAborted(false);
-    }
-    private void testSetBindingAborted(boolean app) throws Exception {
-	DummyManagedObject dummy = new DummyManagedObject(service, "dummy");
-	txn.commit();
-	txnProxy.setCurrentTransaction(null);
-	createTransaction();
-	txn.abort();
-	try {
+    private static class TestSetBindingBadTxn extends BadTxnTest {
+	private final boolean app;
+	private TestSetBindingBadTxn(boolean app, BadTxnState state) {
+	    super(app ? "testSetBinding" : "testSetServiceBinding", state);
+	    this.app = app;
+	}
+	void action() {
 	    setBinding(app, service, "dummy", dummy);
-	    fail("Expected TransactionNotActiveException");
-	} catch (TransactionNotActiveException e) {
-	    System.err.println(e);
 	}
     }
 
-    public void testSetBindingPreparing() throws Exception {
-	testSetBindingPreparing(true);
-    }
-    public void testSetServiceBindingPreparing() throws Exception {
-	testSetBindingPreparing(false);
-    }
-    private void testSetBindingPreparing(final boolean app) throws Exception {
-	final DummyManagedObject dummy =
-	    new DummyManagedObject(service, "dummy");
-	setBinding(app, service, "dummy", dummy);
-	class MyParticipant extends DummyTransactionParticipant {
-	    boolean ok;
-	    public boolean prepare(Transaction txn) {
-		try {
-		    setBinding(app, service, "dummy", dummy);
-		    return false;
-		} catch (TransactionNotActiveException e) {
-		    ok = true;
-		    throw e;
-		}
-	    }
-	};
-	MyParticipant participant = new MyParticipant();
-	txn.join(participant);
-	try {
-	    txn.commit();
-	    fail("Expected TransactionNotActiveException");
-	} catch (TransactionNotActiveException e) {
-	    System.err.println(e);
-	}
-	assertTrue(participant.ok);
-    }
-
-    public void testSetBindingCommitting() throws Exception {
-	testSetBindingCommitting(true);
-    }
-    public void testSetServiceBindingCommitting() throws Exception {
-	testSetBindingCommitting(false);
-    }
-    private void testSetBindingCommitting(final boolean app) throws Exception {
-	final DummyManagedObject dummy =
-	    new DummyManagedObject(service, "dummy");
-	setBinding(app, service, "dummy", dummy);
-	class MyParticipant extends DummyTransactionParticipant {
-	    boolean ok;
-	    public void commit(Transaction txn) {
-		try {
-		    setBinding(app, service, "dummy", dummy);
-		} catch (TransactionNotActiveException e) {
-		    ok = true;
-		    throw e;
-		}
-	    }
-	};
-	MyParticipant participant = new MyParticipant();
-	txn.join(participant);
-	txn.commit();
-	assertTrue(participant.ok);
-    }
-
-    public void testSetBindingCommitted() throws Exception {
-	testSetBindingCommitted(true);
-    }
-    public void testSetServiceBindingCommitted() throws Exception {
-	testSetBindingCommitted(false);
-    }
-    private void testSetBindingCommitted(boolean app) throws Exception {
-	DummyManagedObject dummy = new DummyManagedObject(service, "dummy");
-	txn.commit();
-	createTransaction();
-	txn.commit();
-	try {
-	    setBinding(app, service, "dummy", dummy);
-	    fail("Expected TransactionNotActiveException");
-	} catch (TransactionNotActiveException e) {
-	    System.err.println(e);
+    static {
+	for (BadTxnState state : BadTxnState.values()) {
+	    new TestSetBindingBadTxn(true, state);
+	    new TestSetBindingBadTxn(false, state);
 	}
     }
 
@@ -733,132 +525,22 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
-    public void testRemoveBindingAborting() throws Exception {
-	testRemoveBindingAborting(true);
-    }
-    public void testRemoveServiceBindingAborting() throws Exception {
-	testRemoveBindingAborting(false);
-    }
-    private void testRemoveBindingAborting(final boolean app) throws Exception {
-	setBinding(app, service, "dummy",
-		   new DummyManagedObject(service, "dummy"));
-	class MyParticipant extends DummyTransactionParticipant {
-	    boolean ok;
-	    public void abort(Transaction txn) {
-		try {
-		    removeBinding(app, service, "dummy");
-		} catch (TransactionNotActiveException e) {
-		    ok = true;
-		    throw e;
-		}
-	    }
-	};
-	MyParticipant participant = new MyParticipant();
-	txn.join(participant);
-	txn.abort();
-	assertTrue(participant.ok);
-    }
-
-    public void testRemoveBindingAborted() throws Exception {
-	testRemoveBindingAborted(true);
-    }
-    public void testRemoveServiceBindingAborted() throws Exception {
-	testRemoveBindingAborted(false);
-    }
-    private void testRemoveBindingAborted(boolean app) throws Exception {
-	setBinding(app, service, "dummy",
-		   new DummyManagedObject(service, "dummy"));
-	txn.commit();
-	txnProxy.setCurrentTransaction(null);
-	createTransaction();
-	txn.abort();
-	try {
+    private static class TestRemoveBindingBadTxn extends BadTxnTest {
+	private final boolean app;
+	private TestRemoveBindingBadTxn(boolean app, BadTxnState state) {
+	    super(app ? "testRemoveBinding" : "testRemoveServiceBinding",
+		  state);
+	    this.app = app;
+	}
+	void action() {
 	    removeBinding(app, service, "dummy");
-	    fail("Expected TransactionNotActiveException");
-	} catch (TransactionNotActiveException e) {
-	    System.err.println(e);
 	}
     }
 
-    public void testRemoveBindingPreparing() throws Exception {
-	testRemoveBindingPreparing(true);
-    }
-    public void testRemoveServiceBindingPreparing() throws Exception {
-	testRemoveBindingPreparing(false);
-    }
-    private void testRemoveBindingPreparing(final boolean app)
-	throws Exception
-    {
-	setBinding(app, service, "dummy",
-		   new DummyManagedObject(service, "dummy"));
-	class MyParticipant extends DummyTransactionParticipant {
-	    boolean ok;
-	    public boolean prepare(Transaction txn) {
-		try {
-		    removeBinding(app, service, "dummy");
-		    return false;
-		} catch (TransactionNotActiveException e) {
-		    ok = true;
-		    throw e;
-		}
-	    }
-	};
-	MyParticipant participant = new MyParticipant();
-	txn.join(participant);
-	try {
-	    txn.commit();
-	    fail("Expected TransactionNotActiveException");
-	} catch (TransactionNotActiveException e) {
-	    System.err.println(e);
-	}
-	assertTrue(participant.ok);
-    }
-
-    public void testRemoveBindingCommitting() throws Exception {
-	testRemoveBindingCommitting(true);
-    }
-    public void testRemoveServiceBindingCommitting() throws Exception {
-	testRemoveBindingCommitting(false);
-    }
-    private void testRemoveBindingCommitting(final boolean app)
-	throws Exception
-    {
-	setBinding(app, service, "dummy",
-		   new DummyManagedObject(service, "dummy"));
-	class MyParticipant extends DummyTransactionParticipant {
-	    boolean ok;
-	    public void commit(Transaction txn) {
-		try {
-		    removeBinding(app, service, "dummy");
-		} catch (TransactionNotActiveException e) {
-		    ok = true;
-		    throw e;
-		}
-	    }
-	};
-	MyParticipant participant = new MyParticipant();
-	txn.join(participant);
-	txn.commit();
-	assertTrue(participant.ok);
-    }
-
-    public void testRemoveBindingCommitted() throws Exception {
-	testRemoveBindingCommitted(true);
-    }
-    public void testRemoveServiceBindingCommitted() throws Exception {
-	testRemoveBindingCommitted(false);
-    }
-    private void testRemoveBindingCommitted(boolean app) throws Exception {
-	setBinding(app, service, "dummy",
-		   new DummyManagedObject(service, "dummy"));
-	txn.commit();
-	createTransaction();
-	txn.commit();
-	try {
-	    removeBinding(app, service, "dummy");
-	    fail("Expected TransactionNotActiveException");
-	} catch (TransactionNotActiveException e) {
-	    System.err.println(e);
+    static {
+	for (BadTxnState state : BadTxnState.values()) {
+	    new TestRemoveBindingBadTxn(true, state);
+	    new TestRemoveBindingBadTxn(false, state);
 	}
     }
 
@@ -869,7 +551,6 @@ public class TestDataServiceImpl extends TestCase {
 	testRemoveBindingRemovedObject(false);
     }
     private void testRemoveBindingRemovedObject(boolean app) throws Exception {
-	DummyManagedObject dummy = new DummyManagedObject(service, "dummy");
 	setBinding(app, service, "dummy", dummy);
 	service.removeObject(dummy);
 	removeBinding(app, service, "dummy");
@@ -933,98 +614,22 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
-    public void testRemoveObjectAborting() {
-	final DummyManagedObject dummy =
-	    new DummyManagedObject(service, "dummy");	
-	class MyParticipant extends DummyTransactionParticipant {
-	    boolean ok;
-	    public void abort(Transaction txn) {
-		try {
-		    service.removeObject(dummy);
-		} catch (TransactionNotActiveException e) {
-		    ok = true;
-		    throw e;
-		}
-	    }
-	};
-	MyParticipant participant = new MyParticipant();
-	txn.join(participant);
-	txn.abort();
-	assertTrue(participant.ok);
-    }
-
-    public void testRemoveObjectAborted() {
-	DummyManagedObject dummy = new DummyManagedObject(service, "dummy");	
-	txn.abort();
-	try {
+    private static class TestRemoveObjectBadTxn extends BadTxnTest {
+	TestRemoveObjectBadTxn(BadTxnState state) {
+	    super("testRemoveObject", state);
+	}
+	void action() {
 	    service.removeObject(dummy);
-	    fail("Expected TransactionNotActiveException");
-	} catch (TransactionNotActiveException e) {
-	    System.err.println(e);
 	}
     }
 
-    public void testRemoveObjectPreparing() throws Exception {
-	final DummyManagedObject dummy =
-	    new DummyManagedObject(service, "dummy");	
-	service.setBinding("dummy", dummy);
-	class MyParticipant extends DummyTransactionParticipant {
-	    boolean ok;
-	    public boolean prepare(Transaction txn) throws Exception {
-		try {
-		    service.removeObject(dummy);
-		    return false;
-		} catch (TransactionNotActiveException e) {
-		    ok = true;
-		    throw e;
-		}
-	    }
-	};
-	MyParticipant participant = new MyParticipant();
-	txn.join(participant);
-	try {
-	    txn.commit();
-	    fail("Expected TransactionNotActiveException");
-	} catch (TransactionNotActiveException e) {
-	    System.err.println(e);
-	}
-	assertTrue(participant.ok);
-    }
-
-    public void testRemoveObjectCommitting() throws Exception {
-	final DummyManagedObject dummy =
-	    new DummyManagedObject(service, "dummy");	
-	class MyParticipant extends DummyTransactionParticipant {
-	    boolean ok;
-	    public void commit(Transaction txn) {
-		try {
-		    service.removeObject(dummy);
-		} catch (TransactionNotActiveException e) {
-		    ok = true;
-		    throw e;
-		}
-	    }
-	};
-	MyParticipant participant = new MyParticipant();
-	txn.join(participant);
-	txn.commit();
-	assertTrue(participant.ok);
-    }
-
-    public void testRemoveObjectCommitted() throws Exception {
-	DummyManagedObject dummy = new DummyManagedObject(service, "dummy");	
-	txn.commit();
-	try {
-	    service.removeObject(dummy);
-	    fail("Expected TransactionNotActiveException");
-	} catch (TransactionNotActiveException e) {
-	    System.err.println(e);
+    static {
+	for (BadTxnState state : BadTxnState.values()) {
+	    new TestRemoveObjectBadTxn(state);
 	}
     }
 
     public void testRemoveObjectSuccess() throws Exception {
-	DummyManagedObject dummy = new DummyManagedObject(service, "dummy");
-	service.setBinding("dummy", dummy);
 	service.removeObject(dummy);
 	try {
 	    service.getBinding("dummy", DummyManagedObject.class);
@@ -1043,7 +648,6 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     public void testRemoveObjectRemoved() throws Exception {
-	DummyManagedObject dummy = new DummyManagedObject(service, "dummy");
 	service.removeObject(dummy);
 	service.removeObject(dummy);
 	service.setBinding("dummy", dummy);
@@ -1055,8 +659,6 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     public void testRemoveObjectPreviousTxn() throws Exception {
-	DummyManagedObject dummy = new DummyManagedObject(service, "dummy");
-	service.setBinding("dummy", dummy);
 	txn.commit();
 	createTransaction();
 	service.removeObject(dummy);
@@ -1083,93 +685,18 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
-    public void testMarkForUpdateAborting() {
-	final DummyManagedObject dummy =
-	    new DummyManagedObject(service, "dummy");	
-	class MyParticipant extends DummyTransactionParticipant {
-	    boolean ok;
-	    public void abort(Transaction txn) {
-		try {
-		    service.markForUpdate(dummy);
-		} catch (TransactionNotActiveException e) {
-		    ok = true;
-		    throw e;
-		}
-	    }
-	};
-	MyParticipant participant = new MyParticipant();
-	txn.join(participant);
-	txn.abort();
-	assertTrue(participant.ok);
-    }
-
-    public void testMarkForUpdateAborted() {
-	DummyManagedObject dummy = new DummyManagedObject(service, "dummy");	
-	txn.abort();
-	try {
+    private static class TestMarkForUpdateBadTxn extends BadTxnTest {
+	TestMarkForUpdateBadTxn(BadTxnState state) {
+	    super("testMarkForUpdate", state);
+	}
+	void action() {
 	    service.markForUpdate(dummy);
-	    fail("Expected TransactionNotActiveException");
-	} catch (TransactionNotActiveException e) {
-	    System.err.println(e);
 	}
     }
 
-    public void testMarkForUpdatePreparing() throws Exception {
-	final DummyManagedObject dummy =
-	    new DummyManagedObject(service, "dummy");	
-	service.setBinding("dummy", dummy);
-	class MyParticipant extends DummyTransactionParticipant {
-	    boolean ok;
-	    public boolean prepare(Transaction txn) throws Exception {
-		try {
-		    service.markForUpdate(dummy);
-		    return false;
-		} catch (TransactionNotActiveException e) {
-		    ok = true;
-		    throw e;
-		}
-	    }
-	};
-	MyParticipant participant = new MyParticipant();
-	txn.join(participant);
-	try {
-	    txn.commit();
-	    fail("Expected TransactionNotActiveException");
-	} catch (TransactionNotActiveException e) {
-	    System.err.println(e);
-	}
-	assertTrue(participant.ok);
-    }
-
-    public void testMarkForUpdateCommitting() throws Exception {
-	final DummyManagedObject dummy =
-	    new DummyManagedObject(service, "dummy");	
-	service.setBinding("dummy", dummy);
-	class MyParticipant extends DummyTransactionParticipant {
-	    boolean ok;
-	    public void commit(Transaction txn) {
-		try {
-		    service.markForUpdate(dummy);
-		} catch (TransactionNotActiveException e) {
-		    ok = true;
-		    throw e;
-		}
-	    }
-	};
-	MyParticipant participant = new MyParticipant();
-	txn.join(participant);
-	txn.commit();
-	assertTrue(participant.ok);
-    }
-
-    public void testMarkForUpdateCommitted() throws Exception {
-	DummyManagedObject dummy = new DummyManagedObject(service, "dummy");	
-	txn.commit();
-	try {
-	    service.markForUpdate(dummy);
-	    fail("Expected TransactionNotActiveException");
-	} catch (TransactionNotActiveException e) {
-	    System.err.println(e);
+    static {
+	for (BadTxnState state : BadTxnState.values()) {
+	    new TestMarkForUpdateBadTxn(state);
 	}
     }
 
@@ -1245,104 +772,28 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
-    public void testCreateReferenceAborting() {
-	final DummyManagedObject dummy =
-	    new DummyManagedObject(service, "dummy");	
-	class MyParticipant extends DummyTransactionParticipant {
-	    boolean ok;
-	    public void abort(Transaction txn) {
-		try {
-		    service.createReference(dummy);
-		} catch (TransactionNotActiveException e) {
-		    ok = true;
-		    throw e;
-		}
-	    }
-	};
-	MyParticipant participant = new MyParticipant();
-	txn.join(participant);
-	txn.abort();
-	assertTrue(participant.ok);
-    }
+    private static class TestCreateReferenceBadTxn extends BadTxnTest {
+	TestCreateReferenceBadTxn(BadTxnState state) {
+	    super("testCreateReference", state);
+	}
 
-    public void testCreateReferenceAborted() {
-	DummyManagedObject dummy = new DummyManagedObject(service, "dummy");	
-	txn.abort();
-	try {
+	void action() {
 	    service.createReference(dummy);
-	    fail("Expected TransactionNotActiveException");
-	} catch (TransactionNotActiveException e) {
-	    System.err.println(e);
 	}
     }
 
-    public void testCreateReferencePreparing() throws Exception {
-	final DummyManagedObject dummy =
-	    new DummyManagedObject(service, "dummy");	
-	service.setBinding("dummy", dummy);
-	class MyParticipant extends DummyTransactionParticipant {
-	    boolean ok;
-	    public boolean prepare(Transaction txn) throws Exception {
-		try {
-		    service.createReference(dummy);
-		    return false;
-		} catch (TransactionNotActiveException e) {
-		    ok = true;
-		    throw e;
-		}
-	    }
-	};
-	MyParticipant participant = new MyParticipant();
-	txn.join(participant);
-	try {
-	    txn.commit();
-	    fail("Expected TransactionNotActiveException");
-	} catch (TransactionNotActiveException e) {
-	    System.err.println(e);
-	}
-	assertTrue(participant.ok);
-    }
-
-    public void testCreateReferenceCommitting() throws Exception {
-	final DummyManagedObject dummy =
-	    new DummyManagedObject(service, "dummy");	
-	service.setBinding("dummy", dummy);
-	class MyParticipant extends DummyTransactionParticipant {
-	    boolean ok;
-	    public void commit(Transaction txn) {
-		try {
-		    service.createReference(dummy);
-		} catch (TransactionNotActiveException e) {
-		    ok = true;
-		    throw e;
-		}
-	    }
-	};
-	MyParticipant participant = new MyParticipant();
-	txn.join(participant);
-	txn.commit();
-	assertTrue(participant.ok);
-    }
-
-    public void testCreateReferenceCommitted() throws Exception {
-	DummyManagedObject dummy = new DummyManagedObject(service, "dummy");	
-	txn.commit();
-	try {
-	    service.createReference(dummy);
-	    fail("Expected TransactionNotActiveException");
-	} catch (TransactionNotActiveException e) {
-	    System.err.println(e);
+    static {
+	for (BadTxnState state : BadTxnState.values()) {
+	    new TestCreateReferenceBadTxn(state);
 	}
     }
 
     public void testCreateReferenceNew() {
-	DummyManagedObject dummy = new DummyManagedObject(service, "dummy");
 	ManagedReference ref = service.createReference(dummy);
 	assertEquals(dummy, ref.get());
     }
 
     public void testCreateReferenceExisting() throws Exception {
-	service.setBinding("dummy", new DummyManagedObject(service, "dummy"));
 	txn.commit();
 	createTransaction();
 	DummyManagedObject dummy =
@@ -1352,15 +803,11 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     public void testCreateReferenceRemoved() throws Exception {
-	DummyManagedObject dummy = new DummyManagedObject(service, "dummy");
-	service.setBinding("dummy", dummy);
 	service.removeObject(dummy);
 	assertEquals(dummy, service.createReference(dummy).get());
     }
 
     public void testCreateReferencePreviousTxn() throws Exception {
-	DummyManagedObject dummy = new DummyManagedObject(service, "dummy");
-	service.setBinding("dummy", dummy);
 	txn.commit();
 	createTransaction();
 	assertEquals(dummy, service.createReference(dummy).get());
@@ -1375,7 +822,53 @@ public class TestDataServiceImpl extends TestCase {
 
     /* -- Test ManagedReference.get -- */
 
+    private static class TestGetReferenceBadTxn extends BadTxnTest {
+	private ManagedReference<DummyManagedObject> ref;
+
+	TestGetReferenceBadTxn(BadTxnState state) {
+	    super("testGetReference", state);
+	}
+
+	protected void setUp() {
+	    super.setUp();
+	    ref = service.createReference(dummy);
+	}
+
+	void action() {
+	    ref.get();
+	}
+    }
+
+    static {
+	for (BadTxnState state : BadTxnState.values()) {
+	    new TestGetReferenceBadTxn(state);
+	}
+    }
+
     /* -- Test ManagedReference.getForUpdate -- */
+
+    private static class TestGetReferenceUpdateBadTxn extends BadTxnTest {
+	private ManagedReference<DummyManagedObject> ref;
+
+	TestGetReferenceUpdateBadTxn(BadTxnState state) {
+	    super("testGetReferenceUpdate", state);
+	}
+
+	protected void setUp() {
+	    super.setUp();
+	    ref = service.createReference(dummy);
+	}
+
+	void action() {
+	    ref.getForUpdate();
+	}
+    }
+
+    static {
+	for (BadTxnState state : BadTxnState.values()) {
+	    new TestGetReferenceUpdateBadTxn(state);
+	}
+    }
 
     /* -- Test ManagedReference.equals -- */
 
@@ -1414,6 +907,143 @@ public class TestDataServiceImpl extends TestCase {
 	AnotherManagedObject(DataManager dataManager, Object object) {
 	    super(dataManager, "another");
 	    this.object = object;
+	}
+    }
+
+    /** The set of bad transaction states */
+    static enum BadTxnState {
+	Aborting, Aborted, Preparing, Committing, Committed
+    };
+
+    /** Defines a abstract class for testing bad transaction states. */
+    static abstract class BadTxnTest extends TestDataServiceImpl {
+
+	/** The bad state to test for this instance. */
+	private final BadTxnState state;
+
+	/**
+	 * Creates an instance with the specified generic name to test the
+	 * specified bad transaction state, and adds this test to the test
+	 * suite.
+	 */
+	BadTxnTest(String name, BadTxnState state) {
+	    super(name + state);
+	    this.state = state;
+	    suite.addTest(this);
+	}
+
+	/**
+	 * Subclasses should implement this method to define the action that
+	 * should be tested in a bad transaction state.
+	 */
+	abstract void action();
+
+	/** Runs the test for the bad transaction state. */
+	protected void runTest() throws Exception {
+	    switch (state) {
+	    case Aborting:
+		abortingTest();
+		break;
+	    case Aborted:
+		abortedTest();
+		break;
+	    case Preparing:
+		preparingTest();
+		break;
+	    case Committing:
+		committingTest();
+		break;
+	    case Committed:
+		committedTest();
+		break;
+	    default:
+		throw new AssertionError();
+	    }
+	}
+
+	/** Runs the test for the aborting case. */
+	void abortingTest() {
+	    class Participant extends DummyTransactionParticipant {
+		boolean ok;
+		public void abort(Transaction txn) {
+		    try {
+			action();
+		    } catch (TransactionNotActiveException e) {
+			ok = true;
+			throw e;
+		    }
+		}
+	    }
+	    Participant participant = new Participant();
+	    txn.join(participant);
+	    txn.abort();
+	    assertTrue("Action should throw", participant.ok);
+	}
+
+	/** Runs the test for the aborted case. */
+	private void abortedTest() {
+	    txn.abort();
+	    try {
+		action();
+		fail("Expected TransactionNotActiveException");
+	    } catch (TransactionNotActiveException e) {
+		System.err.println(e);
+	    }
+	}
+
+	/** Runs the test for the preparing case. */
+	private void preparingTest() throws Exception {
+	    class Participant extends DummyTransactionParticipant {
+		boolean ok;
+		public boolean prepare(Transaction txn) throws Exception {
+		    try {
+			action();
+			return false;
+		    } catch (TransactionNotActiveException e) {
+			ok = true;
+			throw e;
+		    }
+		}
+	    }
+	    Participant participant = new Participant();
+	    txn.join(participant);
+	    try {
+		txn.commit();
+		fail("Expected TransactionNotActiveException");
+	    } catch (TransactionNotActiveException e) {
+		System.err.println(e);
+	    }
+	    assertTrue("Action should throw", participant.ok);
+	}
+
+	/** Runs the test for the committing case. */
+	private void committingTest() throws Exception {
+	    class Participant extends DummyTransactionParticipant {
+		boolean ok;
+		public void commit(Transaction txn) {
+		    try {
+			action();
+		    } catch (TransactionNotActiveException e) {
+			ok = true;
+			throw e;
+		    }
+		}
+	    }
+	    Participant participant = new Participant();
+	    txn.join(participant);
+	    txn.commit();
+	    assertTrue("Action should throw", participant.ok);
+	}
+
+	/** Runs the test for the committed case. */
+	private void committedTest() throws Exception {
+	    txn.commit();
+	    try {
+		action();
+		fail("Expected TransactionNotActiveException");
+	    } catch (TransactionNotActiveException e) {
+		System.err.println(e);
+	    }
 	}
     }
 }

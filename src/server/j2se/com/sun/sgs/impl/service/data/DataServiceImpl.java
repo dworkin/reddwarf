@@ -483,7 +483,7 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 	    logger.log(Level.FINER, "join txn:{0}", txn);
 	    txn.join(this);
 	    context = new Context(
-		store, txn, debugCheckInterval, detectModifications);
+		store, txn, txnProxy, debugCheckInterval, detectModifications);
 	    currentContext.set(context);
 	} else {
 	    context.checkTxn(txn);
@@ -497,6 +497,7 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
      * TransactionNotActiveException if it isn't.
      */
     static void checkContext(Context context) {
+	context.txnProxy.getCurrentTransaction();
 	if (context != currentContext.get()) {
 	    throw new TransactionNotActiveException(
 		"No transaction is active");

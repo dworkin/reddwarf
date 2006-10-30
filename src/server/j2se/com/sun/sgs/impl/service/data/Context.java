@@ -4,6 +4,7 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
+import com.sun.sgs.service.TransactionProxy;
 
 /** Stores information for a specific transaction. */
 final class Context {
@@ -17,6 +18,9 @@ final class Context {
      * itself, rather than revealing it to the transaction coordinator.
      */
     final TxnTrampoline txn;
+
+    /** The transaction proxy, for obtaining the current active transaction. */
+    final TransactionProxy txnProxy;
 
     /**
      * The number of operations between making checks on the reference table.
@@ -44,12 +48,15 @@ final class Context {
     /** Creates an instance of this class. */
     Context(DataStore store,
 	    Transaction txn,
+	    TransactionProxy txnProxy,
 	    int debugCheckInterval,
 	    boolean detectModifications)
     {
-	assert store != null && txn != null : "Store or txn is null";
+	assert store != null && txn != null && txnProxy != null
+	    : "Store, txn, or txnProxy is null";
 	this.store = store;
 	this.txn = new TxnTrampoline(txn);
+	this.txnProxy = txnProxy;
 	this.debugCheckInterval = debugCheckInterval;
 	this.detectModifications = detectModifications;
     }
