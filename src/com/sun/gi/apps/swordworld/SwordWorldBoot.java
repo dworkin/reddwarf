@@ -217,7 +217,7 @@ public class SwordWorldBoot
 	     * called will have NO effect on the GLO itself.
 	     */
 
-	    Room roomGLO = (Room)roomRef.get(simTask);
+	    Room roomGLO = roomRef.get(simTask);
 
 	    /*
 	     * Now that we have a room GLO, let's make a sword GLO
