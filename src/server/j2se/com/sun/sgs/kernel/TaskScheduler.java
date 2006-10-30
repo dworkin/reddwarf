@@ -147,10 +147,14 @@ public interface TaskScheduler
      * and continuing running on a regular period starting from that
      * initial point. Unlike the other <code>scheduleTask</code> methods,
      * this method will never fail to accept to the task so there is no
-     * need for a reservation. At each execution point the scheduler will
-     * make a best effort to run the task, but based on available resources
-     * scheduling the task may fail. Regardless, the scheduler will always
-     * try again at the next execution time.
+     * need for a reservation. Note, however, that the task will not actually
+     * start executing until <code>start</code> is called on the returned
+     * <code>RecurringTaskHandle</code>.
+     * <p>
+     * At each execution point the scheduler will make a best effort to run
+     * the task, but based on available resources scheduling the task may
+     * fail. Regardless, the scheduler will always try again at the next
+     * execution time.
      *
      * @param task the <code>KernelRunnable</code> to execute
      * @param owner the entity on who's behalf this task is run

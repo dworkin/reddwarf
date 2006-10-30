@@ -5,7 +5,19 @@ import java.io.Serializable;
 /**
  * Provides facilities for scheduling tasks.  Each task is a serializable
  * object that can be scheduled to be run now, at some time in the future, or
- * periodically.
+ * periodically. For the methods that run at some delayed point in the
+ * future, the delay is taken from the moment when the scheduling method
+ * was called.
+ * <p>
+ * For all methods on <code>TaskManager</code>, if the instance of
+ * <code>Task</code> provided does not implement <code>ManagedObject</code>
+ * then the <code>TaskManager</code> will persist the <code>Task</code>
+ * until it finishes. This provides durability, and is particularly
+ * convenient for simple tasks that the developer doesn't wish to manage
+ * and remove manually. However, if the <code>Task</code> does implement
+ * <code>ManagedObject</code>, then it's assumed that the <code>Task</code>
+ * is already managed, and it is up to the developer to remove it from
+ * the <code>DataManager</code> when finished.
  */
 public interface TaskManager {
 
@@ -98,7 +110,6 @@ public interface TaskManager {
      * as a hint.  In particular, a task that throws a non-retryable exception
      * may be retried if the node running the task crashes.
      *
-     * @param	<T> the type of the task
      * @param	task the task to run
      * @param	delay the number of milliseconds to delay before running the
      *		task
@@ -113,6 +124,6 @@ public interface TaskManager {
      * @throws	TransactionException if the operation failed because of a
      *		problem with the current transaction
      */
-    <T extends Task> PeriodicTaskHandle<T> schedulePeriodicTask(
-        T task, long delay, long period);
+    PeriodicTaskHandle schedulePeriodicTask(Task task, long delay,
+                                            long period);
 }

@@ -7,11 +7,10 @@ import java.io.Serializable;
  * TaskManager} to run periodically.  Classes that implement
  * <code>PeriodicTaskHandle</code> must also implement {@link Serializable}.
  *
- * @param	<T> the type of the associated task
  * @see		TaskManager#schedulePeriodicTask 
  *		TaskManager.schedulePeriodicTask
  */
-public interface PeriodicTaskHandle<T extends Task> {
+public interface PeriodicTaskHandle {
 
     /**
      * Cancels attempts to run the associated task in future periods.  Calling
