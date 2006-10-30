@@ -169,7 +169,8 @@ public class GLOReferenceImpl<T extends GLO>
 	    log.throwing(getClass().getName(), "attempt", e);
 	}
 	if (obj != null) {
-	    task.registerGLOID(objID, obj, ACCESS_TYPE.ATTEMPT);
+            // Register as GET if the ATTEMPT is successful -JM
+	    task.registerGLOID(objID, obj, ACCESS_TYPE.GET);
 	}
         return obj;
     }

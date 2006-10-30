@@ -373,7 +373,56 @@ public class SimTaskImpl extends SimTask {
     }
 
     public void registerGLOID(long objID, GLO glo, ACCESS_TYPE access) {
-        gloIDMap.put(glo, new Long(objID));
+        Long currentID = gloIDMap.get(glo);
+        if (currentID == null) {
+            // First time we've seen this glo in this task.
+            gloIDMap.put(glo, new Long(objID));
+            // There shouldn't be an access entry for this glo either
+            if (gloAccessMap.put(glo, access) != null) {
+                throw new IllegalStateException("GLOID " +
+                        objID + " is new but already has access entry");
+            }
+            return;
+        }
+        
+        // Otherwise we've seen this GLO already.
+        // Check that the ID is the same.
+        if (currentID.longValue() != objID) {
+            throw new IllegalStateException("Trying to register GLOID " +
+                    objID + " but already have GLOID " + currentID +
+                    " for GLO [" + glo + "] ");
+        }
+        
+        // Convert ATTEMPT into GET for the map.
+        if (access == ACCESS_TYPE.ATTEMPT) {
+            // TODO: emit warning?
+            access = ACCESS_TYPE.GET;
+        }
+        
+        ACCESS_TYPE currentAccess = gloAccessMap.get(glo);
+        
+        if (currentAccess == null) {
+            throw new IllegalStateException("GLOID " +
+                objID + " has been seen but has no access entry");
+        }
+ 
+        switch (access) {
+            case PEEK:
+                // Any non-null access marking is sufficient.
+                // (null checked before the switch)
+                return;
+
+            case GET:
+            case ATTEMPT: // even though it's converted to GET earlier...
+                // If it's already marked as GET, do nothing.
+                if (currentAccess == ACCESS_TYPE.GET) return;
+                break;
+
+            default:
+                throw new IllegalArgumentException("Unknown access type " +
+                        access);
+        }
+        // Record the current access level
         gloAccessMap.put(glo, access);
     }
 
@@ -440,11 +489,27 @@ public class SimTaskImpl extends SimTask {
 
     public void access_check(ACCESS_TYPE theAccessType, GLO glo) {
 	checkTaskIsCurrent();
+
         ACCESS_TYPE gloAcc = gloAccessMap.get(glo);
-        if (gloAcc != theAccessType) {
-            throw new AccessTypeViolationException("Expected " + theAccessType
-                    + " check returned " + gloAcc);
+        switch (theAccessType) {
+            case PEEK:
+                // Any non-null access is OK
+                if (gloAcc != null) return;
+                break;
+
+            case GET:
+            case ATTEMPT:
+                // Current access must be GET
+                if (gloAcc == ACCESS_TYPE.GET) return;
+                break;
+
+            default:
+                throw new IllegalArgumentException("Unknown access type " +
+                        theAccessType);
         }
+        
+        throw new AccessTypeViolationException("Expected " + theAccessType
+                    + " check returned " + gloAcc);
     }
 
     public long openSocket(ACCESS_TYPE access, GLOReference ref, String host,
