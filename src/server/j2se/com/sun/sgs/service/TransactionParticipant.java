@@ -17,9 +17,17 @@ package com.sun.sgs.service;
  * defined here are called on a participant), a <code>Service</code> may
  * not interact with any other <code>Service</code> in the context of that
  * transaction. Doing so results in unspecified behavior.
+ * <p>
+ * This interface does not specify how transaction participants learn the
+ * outcome of prepared transactions following a crash.  Doing so requires a
+ * separate interaction between the participant and the transaction coordinator
+ * that is not specified by this interface.  Without that additional
+ * communication, this interface is sufficient to support transactions with at
+ * most one durable transaction participant.
  *
  * @since 1.0
  * @author Seth Proctor
+ * @see NonDurableTransactionParticipant
  */
 public interface TransactionParticipant {
 

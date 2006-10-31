@@ -1,10 +1,14 @@
 package com.sun.sgs.test.impl.service.data.store;
 
-import com.sun.sgs.test.DummyTransaction;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
+import com.sun.sgs.test.DummyTransaction;
 import java.io.File;
 import java.io.IOException;
+import java.util.Enumeration;
 import java.util.Properties;
+import java.util.logging.Level;
+import java.util.logging.LogManager;
+import java.util.logging.Logger;
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -17,15 +21,17 @@ import junit.framework.TestSuite;
  * Hardware: Power Mac G5, 2 2 GHz processors, 2.5 GB memory, HFS+ filesystem
  *	     with logging enabled
  * Operating System: Mac OS X 10.4.8
+ * Berkeley DB Version: 4.5.20
+ * Java Version: 1.5.0_06
  * Parameters: test.items=100, test.itemSize=100, test.modifyItems=50
  * Testcase: testReadIds
- * Time: 10 ms per transaction
+ * Time: 1 ms per transaction
  * Testcase: testWriteIds
- * Time: 17 ms per transaction
+ * Time: 1 ms per transaction
  * Testcase: testReadNames
- * Time: 10 ms per transaction
+ * Time: 1 ms per transaction
  * Testcase: testWriteNames
- * Time: 16 ms per transaction
+ * Time: 1 ms per transaction
  */
 public class TestPerformance extends TestCase {
 
@@ -48,6 +54,7 @@ public class TestPerformance extends TestCase {
     private static boolean testFlush = Boolean.getBoolean("test.flush");
     private static int logStats = Integer.getInteger(
 	"test.logStats", Integer.MAX_VALUE);
+    private static boolean doLogging = Boolean.getBoolean("test.doLogging");
 
     static {
 	System.err.println("Parameters: test.items=" + items +
@@ -73,12 +80,24 @@ public class TestPerformance extends TestCase {
     /** Prints the test case. */
     protected void setUp() {
 	System.err.println("Testcase: " + getName());
+	if (!doLogging) {
+	    LogManager logManager = LogManager.getLogManager();
+	    Enumeration<String> loggerNames = logManager.getLoggerNames();
+	    while (loggerNames.hasMoreElements()) {
+		String loggerName = loggerNames.nextElement();
+		Logger logger = Logger.getLogger(loggerName);
+		logger.setLevel(Level.WARNING);
+	    }
+	}
     }
 
     /** Sets passed if the test passes. */
     protected void runTest() throws Throwable {
 	super.runTest();
 	passed = true;
+	if (!doLogging) {
+	    LogManager.getLogManager().readConfiguration();
+	}
     }
 
     /**
@@ -216,10 +235,8 @@ public class TestPerformance extends TestCase {
 
     public void testReadNames() throws Exception {
 	Properties props = createProperties(
-	    "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
-	    createDirectory(),
-	    "com.sun.sgs.impl.service.data.store.DataStoreImpl.logStats",
-	    String.valueOf(logStats));
+	    DataStoreImplClass + ".directory", createDirectory(),
+	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
 	DataStoreImpl store = new DataStoreImpl(props);
 	DummyTransaction txn = new DummyTransaction(true);
 	for (int i = 0; i < items; i++) {
@@ -243,10 +260,8 @@ public class TestPerformance extends TestCase {
 
     public void testWriteNames() throws Exception {
 	Properties props = createProperties(
-	    "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory",
-	    createDirectory(),
-	    "com.sun.sgs.impl.service.data.store.DataStoreImpl.logStats",
-	    String.valueOf(logStats));
+	    DataStoreImplClass + ".directory", createDirectory(),
+	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
 	DataStoreImpl store = new DataStoreImpl(props);
 	DummyTransaction txn = new DummyTransaction(true);
 	for (int i = 0; i < items; i++) {

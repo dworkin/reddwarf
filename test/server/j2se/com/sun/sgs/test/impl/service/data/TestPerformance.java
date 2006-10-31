@@ -10,8 +10,12 @@ import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.List;
 import java.util.Properties;
+import java.util.logging.Level;
+import java.util.logging.LogManager;
+import java.util.logging.Logger;
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -24,15 +28,17 @@ import junit.framework.TestSuite;
  * Hardware: Power Mac G5, 2 2 GHz processors, 2.5 GB memory, HFS+ filesystem
  *	     with logging enabled
  * Operating System: Mac OS X 10.4.8
+ * Berkeley DB Version: 4.5.20
+ * Java Version: 1.5.0_06
  * Parameters: test.items=100, test.modifyItems=50
  * Testcase: testRead
- * Time: 25 ms per transaction
+ * Time: 10 ms per transaction
  * Testcase: testReadNoDetectMods
- * Time: 19 ms per transaction
+ * Time: 6 ms per transaction
  * Testcase: testWrite
- * Time: 44 ms per transaction
+ * Time: 11 ms per transaction
  * Testcase: testWriteNoDetectMods
- * Time: 39 ms per transaction
+ * Time: 8 ms per transaction
  */
 public class TestPerformance extends TestCase {
 
@@ -54,6 +60,7 @@ public class TestPerformance extends TestCase {
     private static int count = Integer.getInteger("test.count", 50);
     private static int repeat = Integer.getInteger("test.repeat", 5);
     private static boolean testFlush = Boolean.getBoolean("test.flush");
+    private static boolean doLogging = Boolean.getBoolean("test.doLogging");
 
     static {
 	System.err.println("Parameters: test.items=" + items +
@@ -74,6 +81,15 @@ public class TestPerformance extends TestCase {
     /** Prints the test case. */
     protected void setUp() {
 	System.err.println("Testcase: " + getName());
+	if (!doLogging) {
+	    LogManager logManager = LogManager.getLogManager();
+	    Enumeration<String> loggerNames = logManager.getLoggerNames();
+	    while (loggerNames.hasMoreElements()) {
+		String loggerName = loggerNames.nextElement();
+		Logger logger = Logger.getLogger(loggerName);
+		logger.setLevel(Level.WARNING);
+	    }
+	}
     }
 
     /** Sets passed if the test passes. */
@@ -89,6 +105,9 @@ public class TestPerformance extends TestCase {
     protected void tearDown() throws Exception {
 	if (passed && directory != null) {
 	    deleteDirectory(directory);
+	}
+	if (!doLogging) {
+	    LogManager.getLogManager().readConfiguration();
 	}
     }
 

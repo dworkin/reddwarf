@@ -2,7 +2,6 @@ package com.sun.sgs.impl.service.data.store;
 
 import com.sleepycat.bind.tuple.LongBinding;
 import com.sleepycat.bind.tuple.StringBinding;
-import com.sleepycat.db.CacheFileStats;
 import com.sleepycat.db.Database;
 import com.sleepycat.db.DatabaseConfig;
 import com.sleepycat.db.DatabaseEntry;
@@ -29,6 +28,7 @@ import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.util.Arrays;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -128,13 +128,13 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
      * The next object ID to use for allocating an object.  Valid if not
      * greater than lastObjectId.
      */
-    private long nextObjectId;
+    private long nextObjectId = 0;
 
     /**
      * The last object ID that is free for allocating an object before needing
      * to obtain more numbers from the database.
      */
-    private long lastObjectId;
+    private long lastObjectId = 0;
 
     /** Stores transaction information. */
     private static class TxnInfo {
@@ -293,6 +293,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    long result;
 	    synchronized (objectIdLock) {
 		if (nextObjectId >= lastObjectId) {
+		    logger.log(Level.FINE, "Obtaining more object IDs");
 		    long newNextObjectId;
 		    com.sleepycat.db.Transaction bdbTxn =
 			env.beginTransaction(
@@ -801,20 +802,25 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 
     /** Log statistics using the specified transaction. */
     private void logStats(TxnInfo txnInfo) throws DatabaseException {
-	if (logger.isLoggable(Level.FINE)) {
-	    logger.log(Level.FINE, "Oids database: {0}",
-		       oids.getStats(txnInfo.bdbTxn, null));
-	    logger.log(Level.FINE, "Names database: {0}",
-		       names.getStats(txnInfo.bdbTxn, null));
-	    CacheFileStats[] stats = env.getCacheFileStats(null);
-	    for (int i = 0; i < stats.length; i++) {
-		logger.log(Level.FINE, "{0}", stats[i]);
-	    }
-	    logger.log(Level.FINE, "{0}", env.getCacheStats(null));
-	    logger.log(Level.FINE, "{0}", env.getLockStats(null));
-	    logger.log(Level.FINE, "{0}", env.getLogStats(null));
-	    logger.log(Level.FINE, "{0}", env.getMutexStats(null));
-	    logger.log(Level.FINE, "{0}", env.getTransactionStats(null));
+	if (logger.isLoggable(Level.INFO)) {
+	    logger.log(Level.INFO,
+		       "Berkeley DB statistics:\n" +
+		       "Oids database: {0}\n" +
+		       "Names database: {1}\n" +
+		       "{2}\n" +
+		       "{3}\n" +
+		       "{4}\n" +
+		       "{5}\n" +
+		       "{6}\n" +
+		       "{7}",
+		       oids.getStats(txnInfo.bdbTxn, null),
+		       names.getStats(txnInfo.bdbTxn, null),
+		       Arrays.asList(env.getCacheFileStats(null)),
+		       env.getCacheStats(null),
+		       env.getLockStats(null),
+		       env.getLogStats(null),
+		       env.getMutexStats(null),
+		       env.getTransactionStats(null));
 	}
     }
 }
