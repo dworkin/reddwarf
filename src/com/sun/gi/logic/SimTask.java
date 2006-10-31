@@ -292,6 +292,14 @@ public abstract class SimTask {
 	    GLOReference<? extends SimTimerListener> ref);
 
     /**
+     * This function is used to deschedule a previously scheduled 
+     * timer Task.
+     *
+     * @param tid the ID for this timer event registration
+     */
+    public abstract void deregisterTimerEvent(long tid);
+
+    /**
      * This function is used to schedule a Task to be launched on a
      * stack-local heartbat timer.
      * 

@@ -216,6 +216,10 @@ public class SimKernelImpl implements SimKernel {
                 repeat);
     }
 
+    public void deregisterTimerEvent(long tid) {
+         timerManager.removeEvent(tid);
+    }
+
     // Hooks into the RawSocketManager, added 1/16/2006
 
     /**

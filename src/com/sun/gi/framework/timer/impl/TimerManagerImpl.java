@@ -142,9 +142,6 @@ public class TimerManagerImpl implements TimerManager {
     public long registerEvent(long id, Simulation sim, ACCESS_TYPE access,
             long startObjectID, long delay, boolean repeat)
     {
-        
-        if (timerTasksByID.containsKey(id)) {
-        }
         TimerRec rec = new TimerRec(id, sim, access, startObjectID);
         if (timerTasksByID.putIfAbsent(id, rec) != null) {
             rec.cancel();

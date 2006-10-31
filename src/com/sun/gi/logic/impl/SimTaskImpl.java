@@ -362,7 +362,8 @@ public class SimTaskImpl extends SimTask {
     }
 
     public long registerTimerEvent(ACCESS_TYPE access, long delay,
-            boolean repeat, GLOReference ref) {
+            boolean repeat, GLOReference ref)
+    {
 	checkTaskIsCurrent();
 
         long tid = simulation.getNextTimerID();
@@ -370,6 +371,18 @@ public class SimTaskImpl extends SimTask {
                 ((GLOReferenceImpl) ref).getObjID());
         deferredCommands.add(rec);
         return tid;
+    }
+
+    public long registerTimerEvent(long delay, boolean repeat,
+            GLOReference reference) {
+        return registerTimerEvent(ACCESS_TYPE.GET, delay, repeat, reference);
+    }
+
+    public void deregisterTimerEvent(long tid) {
+	checkTaskIsCurrent();
+
+        DeferredDeleteTimer rec = new DeferredDeleteTimer(tid);
+        deferredCommands.add(rec);
     }
 
     public void registerGLOID(long objID, GLO glo, ACCESS_TYPE access) {
@@ -424,12 +437,6 @@ public class SimTaskImpl extends SimTask {
         }
         // Record the current access level
         gloAccessMap.put(glo, access);
-    }
-
-    public long registerTimerEvent(long delay, boolean repeat,
-            GLOReference reference) {
-	checkTaskIsCurrent();
-        return registerTimerEvent(ACCESS_TYPE.GET, delay, repeat, reference);
     }
 
     public void queueTask(ACCESS_TYPE theAccessType,
@@ -770,6 +777,18 @@ class DeferredNewTimer implements DeferredSimCommand {
 
     public void execute(Simulation sim) {
         sim.registerTimerEvent(tid, access, objID, delay, repeat);
+    }
+}
+
+class DeferredDeleteTimer implements DeferredSimCommand {
+    private final long tid;
+
+    public DeferredDeleteTimer(long tid) {
+        this.tid = tid;
+    }
+
+    public void execute(Simulation sim) {
+        sim.deregisterTimerEvent(tid);
     }
 }
 

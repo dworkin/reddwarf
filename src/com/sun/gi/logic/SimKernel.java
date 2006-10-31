@@ -115,6 +115,13 @@ public interface SimKernel {
     long registerTimerEvent(long tid, ACCESS_TYPE access,
             Simulation sim, long objID, long delay, boolean repeat);
 
+    /**
+     * Cancel a timer event.
+     * 
+     * @param tid the TimerID to deregister
+     */
+    void deregisterTimerEvent(long tid);
+
     // Hooks into the RawSocketManager, added 1/16/2006
 
     /**

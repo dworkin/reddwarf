@@ -221,6 +221,8 @@ public interface Simulation {
     public long registerTimerEvent(long tid, ACCESS_TYPE access, long objID,
             long delay, boolean repeat);
 
+    public void deregisterTimerEvent(long tid);
+
     /**
      * @return ObjectStore the object store
      */

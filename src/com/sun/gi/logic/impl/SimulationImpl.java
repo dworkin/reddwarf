@@ -821,6 +821,10 @@ public class SimulationImpl implements Simulation {
                 repeat);
     }
 
+    public void deregisterTimerEvent(long tid) {
+        kernel.deregisterTimerEvent(tid);
+    }
+
     public SimTask newTask(GLOReference ref, Method methodToCall,
             Object[] params, UserID uid)
     {
