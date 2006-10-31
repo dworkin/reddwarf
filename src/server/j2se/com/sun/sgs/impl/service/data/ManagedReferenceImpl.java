@@ -15,6 +15,9 @@ import java.util.logging.Logger;
 final class ManagedReferenceImpl<T extends ManagedObject>
     implements ManagedReference<T>, Serializable
 {
+    /** The version of the serialized form. */
+    private static final long serialVersionUID = 1;
+
     /** The logger for this class. */
     private final static LoggerWrapper logger =
 	new LoggerWrapper(
@@ -268,6 +271,8 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	case NEW:
 	case MODIFIED:
 	    break;
+	case REMOVED:
+	    throw new ObjectNotFoundException("The object is not found");
 	default:
 	    throw new AssertionError();
 	}

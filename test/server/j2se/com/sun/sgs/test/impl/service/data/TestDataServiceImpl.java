@@ -822,6 +822,26 @@ public class TestDataServiceImpl extends TestCase {
 
     /* -- Test ManagedReference.get -- */
 
+    public void testGetReferenceNotFound() throws Exception {
+	dummy.setNext(new DummyManagedObject(service, "dummy2"));
+	service.removeObject(dummy.getNext());
+	try {
+	    dummy.getNext();
+	    fail("Expected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	    System.err.println(e);
+	}
+	txn.commit();
+	createTransaction();
+	dummy = service.getBinding("dummy", DummyManagedObject.class);
+	try {
+	    dummy.getNext();
+	    fail("Expected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	    System.err.println(e);
+	}
+    }
+
     private static class TestGetReferenceBadTxn extends BadTxnTest {
 	private ManagedReference<DummyManagedObject> ref;
 
@@ -846,6 +866,41 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     /* -- Test ManagedReference.getForUpdate -- */
+
+    public void testGetReferenceUpdateNotFound() throws Exception {
+	dummy.setNext(new DummyManagedObject(service, "dummy2"));
+	service.removeObject(dummy.getNext());
+	try {
+	    dummy.getNextForUpdate();
+	    fail("Expected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	    System.err.println(e);
+	}
+	txn.commit();
+	createTransaction();
+	dummy = service.getBinding("dummy", DummyManagedObject.class);
+	try {
+	    dummy.getNextForUpdate();
+	    fail("Expected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testGetReferenceUpdateSuccess() throws Exception {
+	dummy.setNext(new AnotherManagedObject(service, "A"));
+	txn.commit();
+	createTransaction();
+	dummy = service.getBinding("dummy", DummyManagedObject.class);
+	AnotherManagedObject amo =
+	    (AnotherManagedObject) dummy.getNextForUpdate();
+	amo.object = "B";
+	txn.commit();
+	createTransaction();
+	dummy = service.getBinding("dummy", DummyManagedObject.class);
+	amo = (AnotherManagedObject) dummy.getNext();
+	assertEquals("B", amo.object);
+    }
 
     private static class TestGetReferenceUpdateBadTxn extends BadTxnTest {
 	private ManagedReference<DummyManagedObject> ref;

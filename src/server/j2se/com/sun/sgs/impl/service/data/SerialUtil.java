@@ -164,8 +164,3 @@ final class SerialUtil {
 	return Arrays.equals(fingerprint(object), fingerprint);
     }
 }
- 
-	
-	
-
-

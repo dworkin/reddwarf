@@ -1,15 +1,15 @@
 package com.sun.sgs.test;
 
-import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import java.io.Serializable;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class DummyManagedObject implements ManagedObject, Serializable {
     private static Object lock = new Object();
     private static long serialVersionUID = 1;
-    private static int nextId = 1;
+    private static AtomicInteger nextId = new AtomicInteger(1);
     private final int id;
     private transient final DataManager dataManager;
     private final String name;
@@ -24,9 +24,7 @@ public class DummyManagedObject implements ManagedObject, Serializable {
 			      DummyManagedObject next)
     {
 	this.dataManager = dataManager;
-	synchronized (lock) {
-	    id = nextId++;
-	}
+	id = nextId.getAndIncrement();
 	this.name = name;
 	this.next = (next == null) ? null : dataManager.createReference(next);
     }
@@ -40,6 +38,14 @@ public class DummyManagedObject implements ManagedObject, Serializable {
 	    return null;
 	} else {
 	    return next.get();
+	}
+    }
+
+    public DummyManagedObject getNextForUpdate() {
+	if (next == null) {
+	    return null;
+	} else {
+	    return next.getForUpdate();
 	}
     }
 

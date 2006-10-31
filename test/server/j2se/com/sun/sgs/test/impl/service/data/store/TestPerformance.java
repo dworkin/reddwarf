@@ -5,20 +5,55 @@ import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
+import junit.framework.Test;
 import junit.framework.TestCase;
+import junit.framework.TestSuite;
 
-/** Performance tests for the DataServiceImpl class */
+/**
+ * Performance tests for the DataServiceImpl class.
+ *
+ * Results -- best times:
+ * Date: 10/31/2006
+ * Hardware: Power Mac G5, 2 2 GHz processors, 2.5 GB memory, HFS+ filesystem
+ *	     with logging enabled
+ * Operating System: Mac OS X 10.4.8
+ * Parameters: test.items=100, test.itemSize=100, test.modifyItems=50
+ * Testcase: testReadIds
+ * Time: 10 ms per transaction
+ * Testcase: testWriteIds
+ * Time: 17 ms per transaction
+ * Testcase: testReadNames
+ * Time: 10 ms per transaction
+ * Testcase: testWriteNames
+ * Time: 16 ms per transaction
+ */
 public class TestPerformance extends TestCase {
+
+    /** The test suite, to use for adding additional tests. */
+    private static final TestSuite suite =
+	new TestSuite(TestPerformance.class);
+
+    /** Provides the test suite to the test runner. */
+    public static Test suite() { return suite; }
+
     private static final String DataStoreImplClass =
 	DataStoreImpl.class.getName();
 
-    private static int items = Integer.getInteger("test.items", 10);
+    private static int items = Integer.getInteger("test.items", 100);
     private static int itemSize = Integer.getInteger("test.itemSize", 100);
-    private static int modifyItems = Integer.getInteger("test.modifyItems", 1);
-    private static int count = Integer.getInteger("test.count", 100);
+    private static int modifyItems =
+	Integer.getInteger("test.modifyItems", 50);
+    private static int count = Integer.getInteger("test.count", 50);
     private static int repeat = Integer.getInteger("test.repeat", 5);
+    private static boolean testFlush = Boolean.getBoolean("test.flush");
     private static int logStats = Integer.getInteger(
 	"test.logStats", Integer.MAX_VALUE);
+
+    static {
+	System.err.println("Parameters: test.items=" + items +
+			   ", test.itemSize=" + itemSize +
+			   ", test.modifyItems=" + modifyItems);
+    }
 
     /** Set when the test passes. */
     private boolean passed;
@@ -133,11 +168,18 @@ public class TestPerformance extends TestCase {
 	testWriteIdsInternal(false);
     }	
 
-    public void testWriteIdsFlush() throws Exception {
-	testWriteIdsInternal(true);
+    static {
+	if (testFlush) {
+	    suite.addTest(
+		new TestPerformance("testWriteIdsFlush") {
+		    protected void runTest() throws Exception {
+			testWriteIdsInternal(true);
+		    }
+		});
+	}
     }
 
-    private void testWriteIdsInternal(boolean flush) throws Exception {
+    void testWriteIdsInternal(boolean flush) throws Exception {
 	Properties props = createProperties(
 	    DataStoreImplClass + ".directory", createDirectory(),
 	    DataStoreImplClass + ".logStats", String.valueOf(logStats),

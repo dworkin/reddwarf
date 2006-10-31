@@ -12,19 +12,53 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import junit.framework.Test;
 import junit.framework.TestCase;
+import junit.framework.TestSuite;
 
-/** Performance tests for the DataServiceImpl class */
+/**
+ * Performance tests for the DataServiceImpl class.
+ *
+ * Results -- best times:
+ * Date: 10/31/2006
+ * Hardware: Power Mac G5, 2 2 GHz processors, 2.5 GB memory, HFS+ filesystem
+ *	     with logging enabled
+ * Operating System: Mac OS X 10.4.8
+ * Parameters: test.items=100, test.modifyItems=50
+ * Testcase: testRead
+ * Time: 25 ms per transaction
+ * Testcase: testReadNoDetectMods
+ * Time: 19 ms per transaction
+ * Testcase: testWrite
+ * Time: 44 ms per transaction
+ * Testcase: testWriteNoDetectMods
+ * Time: 39 ms per transaction
+ */
 public class TestPerformance extends TestCase {
+
+    /** The test suite, to use for adding additional tests. */
+    private static final TestSuite suite =
+	new TestSuite(TestPerformance.class);
+
+    /** Provides the test suite to the test runner. */
+    public static Test suite() { return suite; }
+
     private static final String DataStoreImplClass =
 	"com.sun.sgs.impl.service.data.store.DataStoreImpl";
     private static final String DataServiceImplClass =
 	DataServiceImpl.class.getName();
 
-    private static int items = Integer.getInteger("test.items", 10);
-    private static int modifyItems = Integer.getInteger("test.modifyItems", 1);
-    private static int count = Integer.getInteger("test.count", 100);
+    private static int items = Integer.getInteger("test.items", 100);
+    private static int modifyItems =
+	Integer.getInteger("test.modifyItems", 50);
+    private static int count = Integer.getInteger("test.count", 50);
     private static int repeat = Integer.getInteger("test.repeat", 5);
+    private static boolean testFlush = Boolean.getBoolean("test.flush");
+
+    static {
+	System.err.println("Parameters: test.items=" + items +
+			   ", test.modifyItems=" + modifyItems);
+    }
 
     /** Set when the test passes. */
     private boolean passed;
@@ -149,11 +183,18 @@ public class TestPerformance extends TestCase {
 	doTestWrite(false, false);
     }
 
-    public void testWriteFlush() throws Exception {
-	doTestWrite(false, true);
+    static {
+	if (testFlush) {
+	    suite.addTest(
+		new TestPerformance("testWriteFlush") {
+		    protected void runTest() throws Exception {
+			doTestWrite(false, true);
+		    }
+		});
+	}
     }
 
-    private void doTestWrite(boolean detectMods, boolean flush)
+    void doTestWrite(boolean detectMods, boolean flush)
 	throws Exception
     {
 	Properties props = createProperties(

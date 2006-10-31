@@ -7,6 +7,7 @@ import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -52,7 +53,7 @@ final class TransactionImpl implements Transaction {
 	new ArrayList<TransactionParticipant>();
 
     /** Whether this transaction has a durable participant. */
-    private boolean hasDurableParticipant;
+    private boolean hasDurableParticipant = false;
 
     /** Creates an instance with the specified transaction ID. */
     TransactionImpl(long tid) {
@@ -188,14 +189,16 @@ final class TransactionImpl implements Transaction {
 		"Transaction is not active");
 	}
 	state = State.PREPARING;
-	for (int i = 0; i < participants.size(); i++) {
-	    TransactionParticipant participant = participants.get(i);
-	    boolean last = (i == participants.size() - 1);
+	Iterator<TransactionParticipant> iter = participants.iterator();
+	boolean last = !iter.hasNext();
+	while (!last) {
+	    TransactionParticipant participant = iter.next();
+	    last = !iter.hasNext();
 	    try {
 		if (!last) {
 		    boolean readOnly = participant.prepare(this);
 		    if (readOnly) {
-			participants.remove(i--);
+			iter.remove();
 		    }
 		    if (logger.isLoggable(Level.FINEST)) {
 			logger.log(Level.FINEST,
@@ -204,6 +207,7 @@ final class TransactionImpl implements Transaction {
 		    }
 		} else {
 		    participant.prepareAndCommit(this);
+		    iter.remove();
 		    if (logger.isLoggable(Level.FINEST)) {
 			logger.log(
 			    Level.FINEST,

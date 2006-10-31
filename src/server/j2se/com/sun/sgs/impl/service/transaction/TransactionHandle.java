@@ -11,8 +11,8 @@ public interface TransactionHandle {
      * Returns the active transaction associated with this handle.
      *
      * @return	the transaction
-     * @throws	TransactionNotActive if the transaction associated with this
-     *		handle is not active
+     * @throws	TransactionNotActiveException if the transaction associated 
+     *		with this handle is not active
      */
     Transaction getTransaction();
 

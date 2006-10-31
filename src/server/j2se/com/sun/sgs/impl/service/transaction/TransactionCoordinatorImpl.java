@@ -4,6 +4,7 @@ import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Provides an implementation of <code>TransactionCoordinator</code>.  This
@@ -23,11 +24,8 @@ import java.util.Properties;
 public final class TransactionCoordinatorImpl
     implements TransactionCoordinator
 {
-    /** Synchronize on this lock when accessing the nextTid field. */
-    private final Object lock = new Object();
-
     /** The next transaction ID. */
-    private long nextTid = 1;
+    private AtomicLong nextTid = new AtomicLong(1);
 
     /** An implementation of TransactionHandle. */
     private static final class TransactionHandleImpl
@@ -75,10 +73,6 @@ public final class TransactionCoordinatorImpl
 
     /** {@inheritDoc} */
     public TransactionHandle createTransaction() {
-	long tid;
-	synchronized (lock) {
-	    tid = nextTid++;
-	}
-	return new TransactionHandleImpl(tid);
+	return new TransactionHandleImpl(nextTid.getAndIncrement());
     }
 }
