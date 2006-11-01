@@ -24,21 +24,21 @@ import junit.framework.TestSuite;
  * Performance tests for the DataServiceImpl class.
  *
  * Results -- best times:
- * Date: 10/31/2006
+ * Date: 11/1/2006
  * Hardware: Power Mac G5, 2 2 GHz processors, 2.5 GB memory, HFS+ filesystem
  *	     with logging enabled
  * Operating System: Mac OS X 10.4.8
  * Berkeley DB Version: 4.5.20
  * Java Version: 1.5.0_06
- * Parameters: test.items=100, test.modifyItems=50
+ * Parameters: test.items=400, test.modifyItems=200
  * Testcase: testRead
- * Time: 10 ms per transaction
+ * Time: 42 ms per transaction
  * Testcase: testReadNoDetectMods
- * Time: 6 ms per transaction
+ * Time: 27 ms per transaction
  * Testcase: testWrite
- * Time: 11 ms per transaction
+ * Time: 47 ms per transaction
  * Testcase: testWriteNoDetectMods
- * Time: 8 ms per transaction
+ * Time: 35 ms per transaction
  */
 public class TestPerformance extends TestCase {
 
@@ -54,12 +54,14 @@ public class TestPerformance extends TestCase {
     private static final String DataServiceImplClass =
 	DataServiceImpl.class.getName();
 
-    private static int items = Integer.getInteger("test.items", 100);
+    private static int items = Integer.getInteger("test.items", 400);
     private static int modifyItems =
-	Integer.getInteger("test.modifyItems", 50);
-    private static int count = Integer.getInteger("test.count", 50);
+	Integer.getInteger("test.modifyItems", 200);
+    private static int count = Integer.getInteger("test.count", 60);
     private static int repeat = Integer.getInteger("test.repeat", 5);
     private static boolean testFlush = Boolean.getBoolean("test.flush");
+    private static int logStats = Integer.getInteger(
+	"test.logStats", Integer.MAX_VALUE);
     private static boolean doLogging = Boolean.getBoolean("test.doLogging");
 
     static {
@@ -168,7 +170,8 @@ public class TestPerformance extends TestCase {
 	    DataStoreImplClass + ".directory", createDirectory(),
 	    "com.sun.sgs.appName", "TestPerformance",
 	    DataServiceImplClass + ".detectModifications",
-	    String.valueOf(detectMods));
+	    String.valueOf(detectMods),
+	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
 	DataServiceImpl service = new DataServiceImpl(props);
 	DummyTransactionProxy txnProxy = new DummyTransactionProxy();
 	service.configure(txnProxy);
@@ -221,7 +224,8 @@ public class TestPerformance extends TestCase {
 	    "com.sun.sgs.appName", "TestPerformance",
 	    DataServiceImplClass + ".detectModifications",
 	    String.valueOf(detectMods),
-	    DataStoreImplClass + ".flushToDisk", String.valueOf(flush));
+	    DataStoreImplClass + ".flushToDisk", String.valueOf(flush),
+	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
 	DataServiceImpl service = new DataServiceImpl(props);
 	DummyTransactionProxy txnProxy = new DummyTransactionProxy();
 	service.configure(txnProxy);

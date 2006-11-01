@@ -2,6 +2,7 @@ package com.sun.sgs.impl.service.data.store;
 
 import com.sleepycat.bind.tuple.LongBinding;
 import com.sleepycat.bind.tuple.StringBinding;
+import com.sleepycat.db.CacheFileStats;
 import com.sleepycat.db.Database;
 import com.sleepycat.db.DatabaseConfig;
 import com.sleepycat.db.DatabaseEntry;
@@ -17,7 +18,6 @@ import com.sleepycat.db.LockNotGrantedException;
 import com.sleepycat.db.MessageHandler;
 import com.sleepycat.db.OperationStatus;
 import com.sleepycat.db.RunRecoveryException;
-import com.sleepycat.db.TransactionConfig;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionConflictException;
@@ -28,7 +28,6 @@ import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.util.Arrays;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -89,13 +88,6 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
     /** An empty array returned when Berkeley DB returns null for a value. */
     private static final byte[] NO_BYTES = { };
 
-    /** A transaction configuration that supports uncommitted reads. */
-    private static final TransactionConfig uncommittedReadTxnConfig =
-	new TransactionConfig();
-    static {
-	uncommittedReadTxnConfig.setReadUncommitted(true);
-    }
-
     /** The directory in which to store database files. */
     private final String directory;
 
@@ -107,6 +99,9 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 
     /** The Berkeley DB environment. */
     private final Environment env;
+
+    /** The Berkeley DB database that holds additional information. */
+    private final Database info;
 
     /** The Berkeley DB database that maps object IDs to object bytes. */
     private final Database oids;
@@ -208,24 +203,31 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    createConfig.setType(DatabaseType.BTREE);
 	    createConfig.setAllowCreate(true);
 	    boolean create = false;
-	    String oidsFileName = directory + File.separator + "oids";
-	    Database oids;
+	    String infoFileName = directory + File.separator + "info";
+	    Database info;
 	    try {
-		oids = env.openDatabase(bdbTxn, oidsFileName, null, null);
-		DataStoreHeader.verify(oids, bdbTxn);
+		info = env.openDatabase(bdbTxn, infoFileName, null, null);
+		DataStoreHeader.verify(info, bdbTxn);
 	    } catch (FileNotFoundException e) {
 		try {
-		    oids = env.openDatabase(
-			bdbTxn, oidsFileName, null, createConfig);
+		    info = env.openDatabase(
+			bdbTxn, infoFileName, null, createConfig);
 		} catch (FileNotFoundException e2) {
 		    throw new DataStoreException(
 			"Problem creating database: " + e2.getMessage(),
 			e2);
 		}
-		DataStoreHeader.create(oids, bdbTxn);
+		DataStoreHeader.create(info, bdbTxn);
 		create = true;
 	    }
-	    this.oids = oids;
+	    this.info = info;
+	    try {
+		oids = env.openDatabase(
+		    bdbTxn, directory + File.separator + "oids", null,
+		    create ? createConfig : null);
+	    } catch (FileNotFoundException e) {
+		throw new DataStoreException("Oids database not found");
+	    }
 	    try {
 		names = env.openDatabase(
 		    bdbTxn, directory + File.separator + "names", null,
@@ -296,12 +298,11 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 		    logger.log(Level.FINE, "Obtaining more object IDs");
 		    long newNextObjectId;
 		    com.sleepycat.db.Transaction bdbTxn =
-			env.beginTransaction(
-			    null, uncommittedReadTxnConfig);
+			env.beginTransaction(null, null);
 		    boolean done = false;
 		    try {
 			newNextObjectId = DataStoreHeader.getNextId(
-			    oids, bdbTxn, allocationBlockSize);
+			    info, bdbTxn, allocationBlockSize);
 			done = true;
 			bdbTxn.commit();
 		    } finally {
@@ -803,19 +804,31 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
     /** Log statistics using the specified transaction. */
     private void logStats(TxnInfo txnInfo) throws DatabaseException {
 	if (logger.isLoggable(Level.INFO)) {
+	    StringBuilder allCacheFileStats = new StringBuilder();
+	    boolean first = true;
+	    for (CacheFileStats stats : env.getCacheFileStats(null)) {
+		if (first) {
+		    first = false;
+		} else {
+		    allCacheFileStats.append('\n');
+		}
+		allCacheFileStats.append(stats);
+	    }
 	    logger.log(Level.INFO,
 		       "Berkeley DB statistics:\n" +
-		       "Oids database: {0}\n" +
-		       "Names database: {1}\n" +
-		       "{2}\n" +
+		       "Info database: {0}\n" +
+		       "Oids database: {1}\n" +
+		       "Names database: {2}\n" +
 		       "{3}\n" +
 		       "{4}\n" +
 		       "{5}\n" +
 		       "{6}\n" +
-		       "{7}",
+		       "{7}\n" +
+		       "{8}",
+		       info.getStats(txnInfo.bdbTxn, null),
 		       oids.getStats(txnInfo.bdbTxn, null),
 		       names.getStats(txnInfo.bdbTxn, null),
-		       Arrays.asList(env.getCacheFileStats(null)),
+		       allCacheFileStats,
 		       env.getCacheStats(null),
 		       env.getLockStats(null),
 		       env.getLogStats(null),

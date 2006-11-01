@@ -17,21 +17,21 @@ import junit.framework.TestSuite;
  * Performance tests for the DataServiceImpl class.
  *
  * Results -- best times:
- * Date: 10/31/2006
+ * Date: 11/1/2006
  * Hardware: Power Mac G5, 2 2 GHz processors, 2.5 GB memory, HFS+ filesystem
  *	     with logging enabled
  * Operating System: Mac OS X 10.4.8
  * Berkeley DB Version: 4.5.20
  * Java Version: 1.5.0_06
- * Parameters: test.items=100, test.itemSize=100, test.modifyItems=50
+ * Parameters: test.items=400, test.itemSize=100, test.modifyItems=200
  * Testcase: testReadIds
- * Time: 1 ms per transaction
+ * Time: 4 ms per transaction
  * Testcase: testWriteIds
- * Time: 1 ms per transaction
+ * Time: 7 ms per transaction
  * Testcase: testReadNames
- * Time: 1 ms per transaction
+ * Time: 4 ms per transaction
  * Testcase: testWriteNames
- * Time: 1 ms per transaction
+ * Time: 7 ms per transaction
  */
 public class TestPerformance extends TestCase {
 
@@ -45,11 +45,11 @@ public class TestPerformance extends TestCase {
     private static final String DataStoreImplClass =
 	DataStoreImpl.class.getName();
 
-    private static int items = Integer.getInteger("test.items", 100);
+    private static int items = Integer.getInteger("test.items", 400);
     private static int itemSize = Integer.getInteger("test.itemSize", 100);
     private static int modifyItems =
-	Integer.getInteger("test.modifyItems", 50);
-    private static int count = Integer.getInteger("test.count", 50);
+	Integer.getInteger("test.modifyItems", 200);
+    private static int count = Integer.getInteger("test.count", 100);
     private static int repeat = Integer.getInteger("test.repeat", 5);
     private static boolean testFlush = Boolean.getBoolean("test.flush");
     private static int logStats = Integer.getInteger(

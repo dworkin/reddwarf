@@ -305,6 +305,17 @@ public class TestDataStoreImpl extends TestCase {
 	txn.abort();
     }
 
+    public void testCreateObjectMany() throws Exception {
+	DataStoreImpl store = getDataStoreImpl();
+	for (int i = 0; i < 10; i++) {
+	    DummyTransaction txn = new DummyTransaction();
+	    for (int j = 0; j < 200; j++) {
+		store.createObject(txn);
+	    }
+	    txn.commit();
+	}
+    }
+
     /* -- Test markForUpdate -- */
 
     public void testMarkForUpdateNullTxn() {

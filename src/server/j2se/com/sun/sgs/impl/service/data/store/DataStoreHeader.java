@@ -10,13 +10,8 @@ import com.sleepycat.db.OperationStatus;
 import java.math.BigInteger;
 
 /**
- * Encapsulates the layout of meta data stored at the start of the IDs
+ * Encapsulates the layout of meta data stored at the start of the info
  * database.  This class cannot be instantiated. <p>
- *
- * The IDs database stores a mapping from object IDs to object values.  The
- * first block of IDs is reserved for storing data used by {@link
- * DataStoreImpl}.  The first ID allocated after this block is specified by
- * {@link NEXT_ID_ID}. <p>
  *
  * ID <code>0</code> contains a magic number common to all
  * <code>DataStoreImpl</code> databases. <p>
@@ -54,7 +49,7 @@ final class DataStoreHeader {
     static final short MINOR_VERSION = 0;
 
     /** The first free ID. */
-    static final long INITIAL_NEXT_ID = 1024;
+    static final long INITIAL_NEXT_ID = 1;
 
     /** This class cannot be instantiated. */
     private DataStoreHeader() {
