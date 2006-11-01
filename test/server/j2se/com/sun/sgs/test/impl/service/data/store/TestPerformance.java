@@ -1,7 +1,7 @@
 package com.sun.sgs.test.impl.service.data.store;
 
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
-import com.sun.sgs.test.DummyTransaction;
+import com.sun.sgs.test.util.DummyTransaction;
 import java.io.File;
 import java.io.IOException;
 import java.util.Enumeration;

@@ -1,4 +1,4 @@
-package com.sun.sgs.test;
+package com.sun.sgs.test.util;
 
 import com.sun.sgs.kernel.KernelAppContext;
 import com.sun.sgs.kernel.TaskOwner;

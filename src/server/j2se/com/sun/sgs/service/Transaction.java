@@ -7,6 +7,11 @@ package com.sun.sgs.service;
  * participants to join a transaction and manage state associated with
  * a transaction.
  * <p>
+ * Note that some transaction implementations may only support transactions
+ * with at most one durable transaction participant, because of the need to
+ * communicate the outcome of prepared transactions to transaction participants
+ * following a crash when there are multiple durable participants.
+ * <p>
  * All implementations of <code>Transaction</code> must implement
  * <code>equals</code> and <code>hashCode</code>. Two
  * <code>Transaction</code>s are equal if and only if they represent
@@ -49,7 +54,9 @@ public interface Transaction {
      *                    the transaction
      *
      * @throws IllegalStateException if the transaction has begun preparation
-     *				     or aborting
+     *	       or aborting, or if <code>participant</code> does not implement
+     *	       {@link NonDurableTransactionParticipant} and the implementation
+     *	       cannot support an additional durable transaction participant
      */
     public void join(TransactionParticipant participant);
 

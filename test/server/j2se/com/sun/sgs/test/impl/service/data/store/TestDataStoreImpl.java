@@ -8,7 +8,7 @@ import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.service.data.store.DataStoreException;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.service.TransactionParticipant;
-import com.sun.sgs.test.DummyTransaction;
+import com.sun.sgs.test.util.DummyTransaction;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
