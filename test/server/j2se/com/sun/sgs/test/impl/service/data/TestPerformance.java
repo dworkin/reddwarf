@@ -3,6 +3,7 @@ package com.sun.sgs.test.impl.service.data;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.DataManager;
+import com.sun.sgs.test.DummyComponentRegistry;
 import com.sun.sgs.test.DummyTransaction;
 import com.sun.sgs.test.DummyTransactionProxy;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
@@ -174,7 +175,7 @@ public class TestPerformance extends TestCase {
 	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
 	DataServiceImpl service = new DataServiceImpl(props);
 	DummyTransactionProxy txnProxy = new DummyTransactionProxy();
-	service.configure(txnProxy);
+	service.configure(new DummyComponentRegistry(), txnProxy);
 	DummyTransaction txn = new DummyTransaction(true);
 	txnProxy.setCurrentTransaction(txn);
 	service.setBinding("counters", new Counters(service, items));
@@ -228,7 +229,7 @@ public class TestPerformance extends TestCase {
 	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
 	DataServiceImpl service = new DataServiceImpl(props);
 	DummyTransactionProxy txnProxy = new DummyTransactionProxy();
-	service.configure(txnProxy);
+	service.configure(new DummyComponentRegistry(), txnProxy);
 	DummyTransaction txn = new DummyTransaction(true);
 	txnProxy.setCurrentTransaction(txn);
 	service.setBinding("counters", new Counters(service, items));

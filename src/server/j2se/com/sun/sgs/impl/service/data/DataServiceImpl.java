@@ -8,6 +8,7 @@ import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.PropertiesUtil;
+import com.sun.sgs.service.ComponentRegistry;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
@@ -106,14 +107,15 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
     }
 
     /**
-     * Configures this service with the specified transaction proxy.
+     * {@inheritDoc}
      *
-     * @param	txnProxy the transaction proxy
-     * @throws	IllegalStateException if this method has already been called
+     * @throws	IllegalStateException {@inheritDoc}
      */
-    public void configure(TransactionProxy txnProxy) {
-	if (txnProxy == null) {
-	    throw new NullPointerException("The argument must not be null");
+    public void configure(ComponentRegistry registry,
+			  TransactionProxy txnProxy)
+    {
+	if (registry == null || txnProxy == null) {
+	    throw new NullPointerException("The arguments must not be null");
 	}
 	synchronized (lock) {
 	    if (this.txnProxy != null) {

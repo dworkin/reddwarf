@@ -9,8 +9,10 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
+import com.sun.sgs.service.ComponentRegistry;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Transaction;
+import com.sun.sgs.test.DummyComponentRegistry;
 import com.sun.sgs.test.DummyManagedObject;
 import com.sun.sgs.test.DummyTransaction;
 import com.sun.sgs.test.DummyTransactionParticipant;
@@ -87,7 +89,7 @@ public class TestDataServiceImpl extends TestCase {
 	System.err.println("Testcase: " + getName());
 	service = getDataServiceImpl();
 	txnProxy = new DummyTransactionProxy();
-	service.configure(txnProxy);
+	service.configure(new DummyComponentRegistry(), txnProxy);
 	txn = new DummyTransaction();
 	txnProxy.setCurrentTransaction(txn);
 	dummy = new DummyManagedObject(service, "dummy");
@@ -196,6 +198,43 @@ public class TestDataServiceImpl extends TestCase {
 	    new DataServiceImpl(props);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
+    /* -- Test configure -- */
+
+    public void testConfigureNullArgs() throws Exception {
+	Properties props = createProperties(
+	    DataStoreImplClassName + ".directory", createDirectory(),
+	    "com.sun.sgs.appName", "Foo");
+	DataService service = new DataServiceImpl(props);
+	ComponentRegistry components = new DummyComponentRegistry();
+	try {
+	    service.configure(null, txnProxy);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+	try {
+	    service.configure(components, null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testConfigureAgain() throws Exception {
+	Properties props = createProperties(
+	    DataStoreImplClassName + ".directory", createDirectory(),
+	    "com.sun.sgs.appName", "Foo");
+	DataService service = new DataServiceImpl(props);
+	ComponentRegistry components = new DummyComponentRegistry();
+	service.configure(components, txnProxy);
+	try {
+	    service.configure(components, txnProxy);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
 	    System.err.println(e);
 	}
     }
