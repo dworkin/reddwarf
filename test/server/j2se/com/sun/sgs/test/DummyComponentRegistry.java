@@ -1,6 +1,6 @@
 package com.sun.sgs.test;
 
-import com.sun.sgs.service.ComponentRegistry;
+import com.sun.sgs.kernel.ComponentRegistry;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.MissingResourceException;

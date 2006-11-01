@@ -1,5 +1,5 @@
 
-package com.sun.sgs.service;
+package com.sun.sgs.kernel;
 
 
 /**

@@ -1,6 +1,8 @@
 
 package com.sun.sgs.service;
 
+import com.sun.sgs.kernel.ComponentRegistry;
+
 import java.util.Properties;
 
 
