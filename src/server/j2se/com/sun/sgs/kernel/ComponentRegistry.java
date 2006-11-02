@@ -1,6 +1,8 @@
 
 package com.sun.sgs.kernel;
 
+import java.util.MissingResourceException;
+
 
 /**
  * This is a general registry interface used to provide access to a collection
