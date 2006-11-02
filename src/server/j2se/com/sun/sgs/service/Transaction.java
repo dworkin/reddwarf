@@ -54,9 +54,12 @@ public interface Transaction {
      *                    the transaction
      *
      * @throws IllegalStateException if the transaction has begun preparation
-     *	       or aborting, or if <code>participant</code> does not implement
-     *	       {@link NonDurableTransactionParticipant} and the implementation
-     *	       cannot support an additional durable transaction participant
+     *                               or aborting
+     *
+     * @throws UnsupportedOperationException if <code>participant</code> does
+     *         not implement {@link NonDurableTransactionParticipant} and the
+     *         implementation cannot support an additional durable transaction
+     *         participant
      */
     public void join(TransactionParticipant participant);
 
