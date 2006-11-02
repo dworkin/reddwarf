@@ -1,4 +1,4 @@
-package com.sun.sgs.test;
+package com.sun.sgs.test.util;
 
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
