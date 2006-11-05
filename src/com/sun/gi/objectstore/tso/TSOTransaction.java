@@ -284,16 +284,12 @@ public class TSOTransaction implements Transaction {
 	// named objectID which is the 'real' objectID of its contents.
 	// Users of TSOTransaction refer to objects by their headerIDs.
 
-	if (objectID == DataSpace.INVALID_ID) {
-	    throw new NonExistantObjectIDException();
-	}
-
-        TSODataHeader hdr = (TSODataHeader) trans.read(objectID);
-        if ((hdr.createNotCommitted) && (!hdr.owner.equals(txnID))) {
-	    // It's only paritally created, so we don't see it.
-            return;
+        // Obtain the GET lock for this object.
+        TSODataHeader hdr = acquire_lock(objectID, true);
+	if (hdr != null) {
+            // Mark it as deleted
+            deletedIDs.add(objectID);
         }
-	deletedIDs.add(objectID);
     }
 
     public Serializable peek(long objectID)
@@ -343,6 +339,7 @@ public class TSOTransaction implements Transaction {
 
 	obj = trans.read(hdr.objectID);
         peekedObjectsMap.put(objectID, obj);
+        trans.abort();
 
         return obj;
     }
@@ -370,8 +367,24 @@ public class TSOTransaction implements Transaction {
 	    // We've already locked it -- return the cached copy.
             return obj;
         }
-
-	// Note that 'objectID' is actually the id of the object's
+        
+        TSODataHeader hdr = acquire_lock(objectID, shouldBlock);
+        if (hdr != null) {
+            // We've got the lock; read the object.
+            obj = trans.read(hdr.objectID);
+            lockedObjectsMap.put(objectID, obj);
+        }
+        
+        return obj;
+    }
+    
+    private TSODataHeader acquire_lock(long objectID, boolean shouldBlock)
+            throws DeadlockException, NonExistantObjectIDException
+    {
+        // Note: the caller must check for an invalid objectID
+        // and check the lockedObjectsMap and deletedIDs as appropriate.
+        
+	// Note: 'objectID' is actually the id of the object's
 	// *TSODataHeader* in the database.  The header has a field
 	// named objectID which is the 'real' objectID of its contents.
 	// Users of TSOTransaction refer to objects by their headerIDs.
@@ -650,13 +663,6 @@ public class TSOTransaction implements Transaction {
         trans.write(objectID, hdr);
         trans.commit();
 
-        // Release the header-lock before reading the object bytes, so
-        // threads blocked on reading the header can make progress.
-        // Since we now own the GET lock, no one else can modify
-        // the object bytes.
-        obj = trans.read(hdr.objectID);
-        lockedObjectsMap.put(objectID, obj);
-
 	if (DEBUG) {
             log.log(Level.FINEST, "GET-lock acquired, wrote {0}", hdr);
 	}
@@ -667,7 +673,7 @@ public class TSOTransaction implements Transaction {
             log.log(Level.FINEST, "GET superseded PEEK for {0}", objectID);
 	}
 
-        return obj;
+        return hdr;
     }
 
     /**

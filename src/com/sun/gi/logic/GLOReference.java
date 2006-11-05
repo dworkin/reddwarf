@@ -121,7 +121,8 @@ public interface GLOReference<T extends GLO> {
 
     /**
      * Removes the associated GLO from the objectstore, destroying all
-     * persistence data for it.
+     * persistence data for it.  Locks the object first, blocking if
+     * necessary.
      * 
      * @param task The SimTask context
      */
