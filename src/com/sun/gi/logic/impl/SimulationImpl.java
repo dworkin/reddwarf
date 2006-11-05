@@ -105,6 +105,9 @@ import com.sun.gi.logic.SimTask.ACCESS_TYPE;
 import com.sun.gi.objectstore.ObjectStore;
 import com.sun.gi.objectstore.Transaction;
 
+import com.sun.gi.transition.AppContext;
+import com.sun.gi.transition.impl.TaskManagerImpl;
+
 public class SimulationImpl implements Simulation {
 
     private static Logger log = Logger.getLogger("com.sun.gi.logic");
@@ -306,6 +309,12 @@ public class SimulationImpl implements Simulation {
 		log.fine("BootObj for app " + appID +
 			" is objectID " + bootObjectID);
 
+                // Restart any crashed timers
+                TaskManagerImpl taskMgr =
+                        (TaskManagerImpl) AppContext.getTaskManager();
+                taskMgr.restartTasks(this, ostore);
+        
+                // Run the boot method
                 queueTask(newTask(bootObjectID, startMethod, new Object[] {
                         new GLOReferenceImpl(bootObjectID), firstTime}, 
 				null));

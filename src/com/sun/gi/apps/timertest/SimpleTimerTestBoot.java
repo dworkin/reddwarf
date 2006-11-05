@@ -92,10 +92,12 @@ import com.sun.gi.logic.SimTask.ACCESS_TYPE;
  * @author James Megquier
  * @version 1.0
  */
-public class SimpleTimerTestBoot implements SimBoot<SimpleTimerTestBoot>, SimTimerListener
+public class SimpleTimerTestBoot
+       implements SimBoot<SimpleTimerTestBoot>, SimTimerListener
 {
     private static final long serialVersionUID = 1L;
-
+    
+    long tickCount=0;
     public void boot(GLOReference<? extends SimpleTimerTestBoot> gloRef,
             boolean firstBoot)
     {
@@ -107,6 +109,12 @@ public class SimpleTimerTestBoot implements SimBoot<SimpleTimerTestBoot>, SimTim
     }
 
     public void timerEvent(long eventID) {
-        System.out.format("[%d] tick\n", System.currentTimeMillis());
+        System.out.format("%d: [%d] tick\n", tickCount++,
+                          System.currentTimeMillis());
+
+        if (tickCount == 100){
+        	SimTask task = SimTask.getCurrent();
+        	task.deregisterTimerEvent(eventID);
+        }
     }
 }

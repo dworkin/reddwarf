@@ -912,6 +912,8 @@
 	    basedir="src" includes="com/sun/gi/apps/timertest/**" />
 	<copy file="resources/timer_test_deployment.xml"
 	    todir="${release.dir}/apps/timer_test" />
+    <copy file="resources/transition_timer_deploy.xml"
+        todir="${release.dir}/apps/timer_test" />
     </target>
 
     <target name="release.jnwn" depends="build.jnwn">
