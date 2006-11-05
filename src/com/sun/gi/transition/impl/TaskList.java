@@ -71,11 +71,16 @@ package com.sun.gi.transition.impl;
 import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask;
+import com.sun.gi.transition.AppContext;
+
 import java.util.HashSet;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class TaskList implements GLO {
-    private static final long serialVersionUUID = 1L;
+    private static final long serialVersionUID = 1L;
+    private static Logger log = Logger.getLogger("com.sun.gi.transition");
     
     private Set<GLOReference> tasks;
     
@@ -84,27 +89,42 @@ public class TaskList implements GLO {
     }
     
     public void add(GLOReference ref) {
-        //tasks.add(ref);
-        //System.err.println("Added " + ref + " -> " + this);
+        tasks.add(ref);
+        log.log(Level.FINEST, "Added {0} -> {1}", 
+                new Object[] { ref, this });
     }
     
     public void remove(GLOReference ref) {
-        //tasks.remove(ref);
-        //System.err.println("Removed " + ref + " -> " + this);
+        tasks.remove(ref);
+        log.log(Level.FINEST, "Removed {0} -> {1}", 
+                new Object[] { ref, this });
     }
     
     public void restartTasks() {
-        //System.err.println("restartTasks on " + this);
+        log.log(Level.FINE, "Restart tasks on {0}", this);
         SimTask simTask = SimTask.getCurrent();
+        TaskManagerImpl taskMgr =
+            ((TaskManagerImpl)AppContext.getTaskManager());
+        taskMgr.setTaskListRef(simTask.lookupReferenceFor(this));
+        
         for (GLOReference ref : tasks) {
             try {
                 Restartable task = (Restartable) ref.get(simTask);
-                task.restart();
+                if (task == null) {
+                    log.log(Level.WARNING,
+                            "Skipping restart of null timer {0}",
+                            ref);
+                } else {
+                    task.restart();
+                }
             } catch (Exception e) {
                 // skip it
+                log.log(Level.WARNING,
+                        "Restart of timer {0} threw {1}",
+                        new Object[] { ref, e.getMessage() });
+                e.printStackTrace();
             }
         }
-        tasks.clear();
     }
     
     public String toString() {

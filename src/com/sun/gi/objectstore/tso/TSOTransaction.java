@@ -525,8 +525,6 @@ public class TSOTransaction implements Transaction {
 	    // this lock.  If there's someone senior to us, give it to
 	    // him.  -DJE
 
-	    Set<TSOTransaction> xactions = new HashSet<TSOTransaction>();
-
 	    // assertion:  we don't need to make a copy of the
 	    // listeners list.  They won't change out from
 	    // under us, at least not in the single-stack

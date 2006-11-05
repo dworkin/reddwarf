@@ -86,21 +86,27 @@ public class TransitionTimerTestBoot
 {
     private static final long serialVersionUID = 1L;
     
+    boolean running = false;
     long tickCount = 0;
     PeriodicTaskHandle periodicTaskHandle = null;
     
     public void boot(GLOReference<? extends TransitionTimerTestBoot> gloRef,
             boolean firstBoot) {
-        //reset counter
-        tickCount=0;
         System.out.println("TransitionTimerTestBoot running");
+
+        if (tickCount >= 10) {
+            System.out.format("Resetting count (was %d)\n", tickCount);
+            tickCount = 0;
+        }
         
-        System.out.println("Doing immediate task");
-        AppContext.getTaskManager().scheduleTask(this);
+        if (tickCount == 0) {
+            System.out.println("Doing immediate task");
+            AppContext.getTaskManager().scheduleTask(this);
         
-        System.out.format("Scheduling 1000ms callback at %d\n",
+            System.out.format("Scheduling 1000ms callback at %d\n",
                 System.currentTimeMillis());
-        AppContext.getTaskManager().scheduleTask(this, 1000);
+            AppContext.getTaskManager().scheduleTask(this, 1000);
+        }
     }
     
     public void run() throws Exception {

@@ -68,6 +68,10 @@
 
 package com.sun.gi.transition.impl;
 
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.SimTask.ACCESS_TYPE;
@@ -80,7 +84,12 @@ public class PeriodicTaskWrapper
         implements SimTimerListener, Restartable
 {
     private static final long serialVersionUID = 1L;
+    private static Logger log = Logger.getLogger("com.sun.gi.transition");
 
+    private static final AtomicLong nextID = new AtomicLong();
+    
+    private GLOReference<PeriodicTaskWrapper> thisRef;
+    private final long id;
     private final GLOReference<TaskWrapper> taskWrapperRef;
     private final long period;
 
@@ -88,32 +97,51 @@ public class PeriodicTaskWrapper
             create(Task task, long period)
     {
         SimTask simTask = SimTask.getCurrent();
-        return simTask.createGLO(new PeriodicTaskWrapper(task, period));
+        GLOReference<PeriodicTaskWrapper> wrapperRef =
+            simTask.createGLO(new PeriodicTaskWrapper(task, period));
+        wrapperRef.get(simTask).thisRef = wrapperRef;
+        return wrapperRef;
     }
 
-    public PeriodicTaskWrapper(Task task, long period) {
+    protected PeriodicTaskWrapper(Task task, long period) {
         assert period > 0;
-        this.taskWrapperRef = TaskWrapper.wrapTask(task, false);
+        this.id = nextID.incrementAndGet();
+        this.taskWrapperRef =
+            TaskWrapper.wrapTask(task, 0, false);
         this.period = period;
     }
 
     public void cancel() {
+        log.log(Level.FINEST, 
+                "PeriodicTaskWrapper {0} cancel (ref {1})",
+                new Object[] { this, thisRef });
+        
         TaskManagerImpl taskMgr =
                 ((TaskManagerImpl)AppContext.getTaskManager());
         taskMgr.removePeriodicTask(this);
 
         // Delete our TaskWrapper helper GLO.
         SimTask simTask = SimTask.getCurrent();
-        taskWrapperRef.get(simTask);
         taskWrapperRef.delete(simTask);
-
-        // PeriodicTaskHandleImpl will ensure that
-        // this PeriodicTaskWrapper GLO gets destroyed
-        // after the cancel().
+        
+        // Delete ourselves
+        thisRef.delete(simTask);
     }
 
     public void restart() {
-        System.err.println("  -> restart() on " + this);
+        SimTask simTask = SimTask.getCurrent();
+
+        log.log(Level.FINE, "PeriodicTaskWrapper {0} restart", this);
+        
+        long newTimerID = 
+            simTask.registerTimerEvent(ACCESS_TYPE.PEEK,
+                                       period,
+                                       true,
+                                       taskWrapperRef);
+        
+        TaskManagerImpl taskMgr =
+            ((TaskManagerImpl)AppContext.getTaskManager());
+        taskMgr.setPeriodicTaskTimerID(this, newTimerID);
     }
 
     // We only get a timer event for the first period of a periodic
@@ -121,9 +149,15 @@ public class PeriodicTaskWrapper
     // directly and update the TaskManager's idea of what timer ID it's on.    
     public void timerEvent(long eventID) {
         SimTask simTask = SimTask.getCurrent();
+        // taskWrapperRef is safe to PEEK (only need GET to delete it)
+        TaskWrapper taskWrapper = taskWrapperRef.peek(simTask);
+        if (taskWrapper == null) {
+            log.warning("Timer task was null, deleting " + this);
+            cancel();
+            return;
+        }
         try {
-            // taskWrapperRef is safe to PEEK (only need GET to delete it)
-            taskWrapperRef.peek(simTask).run();
+            taskWrapper.run();
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
@@ -143,7 +177,7 @@ public class PeriodicTaskWrapper
     }
 
     public int hashCode() {
-        return (taskWrapperRef.hashCode() ^ ((int) period));
+        return Long.valueOf(id).hashCode();
     }
     
     public boolean equals(Object obj) {
@@ -152,7 +186,6 @@ public class PeriodicTaskWrapper
         }
 
         PeriodicTaskWrapper other = (PeriodicTaskWrapper) obj;
-        return (taskWrapperRef.equals(other.taskWrapperRef)
-                && (period == other.period));
+        return id == other.id;
     }
 }

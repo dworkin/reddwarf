@@ -93,7 +93,7 @@ import com.sun.gi.logic.SimTask.ACCESS_TYPE;
 import com.sun.gi.logic.SimTimerListener;
 
 public class TaskManagerImpl implements TaskManager {
-    private static final String TASKLISTNAME = "_SGS_TaskManagerData";
+    public static final String TASKLISTNAME = "_SGS_TaskManagerData";
     private static Logger log = Logger.getLogger("com.sun.gi.transition");
     
     // Not persisted, so doesn't need to use GLORefs
@@ -116,41 +116,8 @@ public class TaskManagerImpl implements TaskManager {
         }
     }
     
-    public void restartTasks(SimulationImpl sim, ObjectStore ostore) {
-        // Read the persistent task list and reschedule timers for
-        // all the tasks we find there (since they were running when we
-        // crashed).
-        synchronized(ostore){
-            Transaction trans =
-                    ostore.newTransaction(this.getClass().getClassLoader());
-            trans.start();
-            try {
-                long taskListID = trans.lookup(TASKLISTNAME);
-                if (taskListID == ObjectStore.INVALID_ID) {
-                    taskListID = trans.create(new TaskList(), TASKLISTNAME);
-                }
-                taskListRef = new GLOReferenceImpl<TaskList>(taskListID);
-                TaskList taskList = (TaskList) trans.peek(taskListID);
-                //System.err.println("TaskList = " + taskList);
-                trans.commit();
-                
-                Method restartTasksMethod =
-                    TaskList.class.getMethod("restartTasks", new Class[] {});
-                sim.queueTask(
-                    sim.newTask(taskListID,
-                        restartTasksMethod,
-                        new Object[] {},
-                        null));
-            } catch (DeadlockException e) {
-                e.printStackTrace();
-                trans.abort();
-            } catch (NonExistantObjectIDException e) {
-                e.printStackTrace();
-                trans.abort();
-            } catch (NoSuchMethodException e) {
-                e.printStackTrace();
-            }
-        }
+    public void setTaskListRef(GLOReference<TaskList> ref) {
+        taskListRef = ref;
     }
     
     public void persistTask(GLOReference ref) {
@@ -167,9 +134,13 @@ public class TaskManagerImpl implements TaskManager {
 
     public void scheduleTask(Task task) {
         SimTask simTask = SimTask.getCurrent();
+
+        long deadline = System.currentTimeMillis();
         
         GLOReference<TaskWrapper> taskWrapperRef =
-                TaskWrapper.wrapTask(task, true);
+                TaskWrapper.wrapTask(task,
+                        deadline, 
+                        true);
         
         persistTask(taskWrapperRef);
         
@@ -184,8 +155,12 @@ public class TaskManagerImpl implements TaskManager {
     public void scheduleTask(Task task, long delay) {
         SimTask simTask = SimTask.getCurrent();
         
+        long deadline = System.currentTimeMillis() + delay;
+        
         GLOReference<TaskWrapper> taskWrapperRef =
-                TaskWrapper.wrapTask(task, true);
+                TaskWrapper.wrapTask(task,
+                        deadline,
+                        true);
 
         persistTask(taskWrapperRef);
 
@@ -205,8 +180,6 @@ public class TaskManagerImpl implements TaskManager {
         GLOReference<PeriodicTaskWrapper> wrapperRef = 
                 PeriodicTaskWrapper.create(task, period);
         PeriodicTaskWrapper wrapper = wrapperRef.get(simTask);
-
-        persistTask(wrapperRef);
         
         // We can register with access PEEK here, since the
         // PeriodicTaskWrapper won't need to be modified.
@@ -216,6 +189,8 @@ public class TaskManagerImpl implements TaskManager {
                     false,
                     wrapperRef);
 
+        persistTask(wrapperRef);
+        
         log.log(Level.FINER, 
                 "Register timer for {0} ID {1}",
                 new Object[] { wrapper, timerID });

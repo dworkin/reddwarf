@@ -97,6 +97,7 @@ import com.sun.gi.framework.install.ChannelFilterRec;
 import com.sun.gi.framework.install.DeploymentRec;
 import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
+import com.sun.gi.logic.SimBoot;
 import com.sun.gi.logic.SimKernel;
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.SimUserDataListener;
@@ -168,7 +169,8 @@ public class SimulationImpl implements Simulation {
      * Constructor
      */
     public SimulationImpl(SimKernel kernel, ObjectStore ostore, Router router,
-            DeploymentRec game, ClassLoader loader) throws InstantiationException {
+            DeploymentRec game, ClassLoader loader)
+            throws InstantiationException {
 
         this.kernel = kernel;
         this.appName = game.getName();
@@ -184,88 +186,86 @@ public class SimulationImpl implements Simulation {
             }
 
             public void userJoined(UserID uid, Subject subject) {
-		log.fine("user " + uid + " joining");
+                log.fine("user " + uid + " joining");
 
-		// DJE create local state for the user.
-		synchronized (userStateMutex) {
-		    if (!knownUsers.contains(uid)) {
-			knownUsers.add(uid);
+                // DJE create local state for the user.
+                synchronized (userStateMutex) {
+                    if (!knownUsers.contains(uid)) {
+                        knownUsers.add(uid);
 
-			// If we didn't even know about this user,
-			// then we must not be running anything for
-			// them (so they're ready) and we must not
-			// have a taskQueue for them.
+                        // If we didn't even know about this user,
+                        // then we must not be running anything for
+                        // them (so they're ready) and we must not
+                        // have a taskQueue for them.
 
-			readyUsers.add(uid);
-			if (!taskQueues.containsKey(uid)) {
-			    taskQueues.put(uid,
-				    Collections.synchronizedList(
-					    new LinkedList<SimTask>()));
-			}
-		    } else {
-			log.warning("user " + uid + " was already joined.");
-		    }
-		}
+                        readyUsers.add(uid);
+                        if (!taskQueues.containsKey(uid)) {
+                            taskQueues.put(
+                                    uid,
+                                    Collections.synchronizedList(new LinkedList<SimTask>()));
+                        }
+                    } else {
+                        log.warning("user " + uid + " was already joined.");
+                    }
+                }
                 fireUserJoined(uid, subject);
             }
 
             public void userLeft(UserID uid) {
-		log.fine("user " + uid + " leaving");
+                log.fine("user " + uid + " leaving");
 
-		fireUserLeft(uid);
+                fireUserLeft(uid);
 
-		// DJE note the assymetry wrt userJoin:  we need to
-		// queue up the "leave" message BEFORE we can declare
-		// the user a lame duck.
+                // DJE note the assymetry wrt userJoin: we need to
+                // queue up the "leave" message BEFORE we can declare
+                // the user a lame duck.
 
-		synchronized (userStateMutex) {
+                synchronized (userStateMutex) {
 
-		    // DJE mark this user as a lame duck.  We can
-		    // remove their queues and other bookkeeping if
-		    // their queue drains while we still think they're
-		    // dead wood.
+                    // DJE mark this user as a lame duck. We can
+                    // remove their queues and other bookkeeping if
+                    // their queue drains while we still think they're
+                    // dead wood.
 
-		    if (knownUsers.contains(uid)) {
-			log.fine("user left: " + uid);
-			lameDuckUsers.add(uid);
-		    } else {
-			log.info("user " + uid +
-				" leaving but was not joined.");
-		    }
-		}
-	    }
+                    if (knownUsers.contains(uid)) {
+                        log.fine("user left: " + uid);
+                        lameDuckUsers.add(uid);
+                    } else {
+                        log.info("user " + uid + " leaving but was not joined.");
+                    }
+                }
+            }
 
             public void userJoinedChannel(UserID uid, ChannelID cid) {
-		log.fine("user " + uid + " joined channel " + cid);
-		synchronized (userStateMutex) {
-		    if (lameDuckUsers.contains(uid)) {
-			log.info("joinedChannel user " + uid +
-				" is a lame duck");
-		    }
-		}
+                log.fine("user " + uid + " joined channel " + cid);
+                synchronized (userStateMutex) {
+                    if (lameDuckUsers.contains(uid)) {
+                        log.info("joinedChannel user " + uid
+                                + " is a lame duck");
+                    }
+                }
                 fireUserJoinedChannel(uid, cid);
             }
 
             public void userLeftChannel(UserID uid, ChannelID cid) {
-		log.fine("user " + uid + " left channel " + cid);
-		synchronized (userStateMutex) {
-		    if (lameDuckUsers.contains(uid)) {
-			log.info("leftChannel user " + uid +
-				" is a lame duck");
-		    }
-		}
+                log.fine("user " + uid + " left channel " + cid);
+                synchronized (userStateMutex) {
+                    if (lameDuckUsers.contains(uid)) {
+                        log.info("leftChannel user " + uid + " is a lame duck");
+                    }
+                }
                 fireUserLeftChannel(uid, cid);
             }
 
             public void channelDataPacket(ChannelID cid, UserID from,
                     ByteBuffer buff) {
-		log.fine("user " + from + " sent data to channel " + cid);
-		synchronized (userStateMutex) {
-		    if (lameDuckUsers.contains(from)) {
-			log.info("channelDataPacket user " + from +
-				" is a lame duck");
-		    }
-		}
+                log.fine("user " + from + " sent data to channel " + cid);
+                synchronized (userStateMutex) {
+                    if (lameDuckUsers.contains(from)) {
+                        log.info("channelDataPacket user " + from
+                                + " is a lame duck");
+                    }
+                }
                 fireChannelDataPacket(cid, from, buff);
             }
         });
@@ -273,51 +273,49 @@ public class SimulationImpl implements Simulation {
         final String bootClassName = game.getBootClass();
         if (bootClassName != null) { // has server side
             try {
-                
-                
-                // set the custom ClassLoader for the custom ChannelFilters
+                // Set the custom ClassLoader for the custom
+                // ChannelFilters
                 for (ChannelFilterRec curFilterRec : game.getChannelFilters()) {
                     curFilterRec.setClassLoader(loader);
                 }
 
-                Class bootclass = loader.loadClass(bootClassName);
-
-                Method startMethod = bootclass.getMethod("boot",
-			new Class[] { GLOReference.class, boolean.class });
+                Class<?> bootclass = loader.loadClass(bootClassName);
+                
+                // Ensure that the bootclass has a "boot" method
+                bootclass.getMethod("boot",
+                        new Class[] { GLOReference.class, Boolean.TYPE });
 
                 // Check for existing boot object in objectstore...
 
-                Transaction trans =
-			ostore.newTransaction(bootclass.getClassLoader());
+                Transaction trans = ostore.newTransaction(bootclass.getClassLoader());
 
                 trans.start();
                 boolean firstTime = false;
                 long bootObjectID = trans.lookup("BOOT");
+                long internalBootstrapID = trans.lookup("_SGS_BOOTSTRAP");
                 if (bootObjectID == ObjectStore.INVALID_ID) {
                     // boot object doesn't exist; create it
                     bootObjectID =
-			trans.create((GLO) bootclass.newInstance(), "BOOT");
+                        trans.create((GLO) bootclass.newInstance(), "BOOT");
                     if (bootObjectID == ObjectStore.INVALID_ID) {
-                        // we lost a create race
-                        bootObjectID = trans.lookup("BOOT");
-                    } else {
-                        firstTime = true;
+                        throw new InstantiationException(
+                                "Someone else is booting " + bootClassName);
                     }
+                    internalBootstrapID =
+                        trans.create((GLO) new BootstrapImpl(), "_SGS_BOOTSTRAP");
+                    firstTime = true;
                 }
                 trans.commit();
 
-		log.fine("BootObj for app " + appID +
-			" is objectID " + bootObjectID);
+                log.fine("BootObj for app " + appID + " is objectID "
+                        + bootObjectID);
 
-                // Restart any crashed timers
-                TaskManagerImpl taskMgr =
-                        (TaskManagerImpl) AppContext.getTaskManager();
-                taskMgr.restartTasks(this, ostore);
-        
+                Method bootMethod = SimBoot.class.getMethod("boot",
+                        new Class[] { GLOReference.class, Boolean.TYPE });
+
                 // Run the boot method
-                queueTask(newTask(bootObjectID, startMethod, new Object[] {
-                        new GLOReferenceImpl(bootObjectID), firstTime}, 
-				null));
+                queueTask(newTask(internalBootstrapID, bootMethod, new Object[] {
+                        new GLOReferenceImpl(internalBootstrapID), firstTime }, null));
 
             } catch (ClassNotFoundException e) {
                 e.printStackTrace();

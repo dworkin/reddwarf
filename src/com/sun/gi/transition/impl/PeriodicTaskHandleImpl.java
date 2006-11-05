@@ -87,8 +87,11 @@ public class PeriodicTaskHandleImpl
 
     public void cancel() {
         SimTask simTask = SimTask.getCurrent();
-        ref.get(simTask).cancel();
-        ref.delete(simTask);
+        PeriodicTaskWrapper wrapper = ref.get(simTask);
+        if (wrapper != null) {
+            wrapper.cancel();
+            ref.delete(simTask);
+        }
     }
 
     public int hashCode() {
