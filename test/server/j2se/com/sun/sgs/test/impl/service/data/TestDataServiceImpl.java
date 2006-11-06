@@ -19,6 +19,8 @@ import com.sun.sgs.test.util.DummyTransactionParticipant;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 import java.io.File;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.Properties;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -85,14 +87,15 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     /** Prints the test case. */
-    protected void setUp() {
+    protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
-	service = getDataServiceImpl();
 	txnProxy = new DummyTransactionProxy();
+	createTransaction();
+	service = getDataServiceImpl();
 	service.configure(new DummyComponentRegistry(), txnProxy);
-	txn = new DummyTransaction();
-	txnProxy.setCurrentTransaction(txn);
-	dummy = new DummyManagedObject(service, "dummy");
+	txn.commit();
+	createTransaction();
+	dummy = new DummyManagedObject(service);
 	service.setBinding("dummy", dummy);
     }
 
@@ -224,6 +227,18 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    public void testConfigureNoTxn() throws Exception {
+	txn.commit();
+	DataServiceImpl service = getDataServiceImpl();
+	ComponentRegistry registry = new DummyComponentRegistry();
+	try {
+	    service.configure(registry, txnProxy);
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	}
+    }
+
     public void testConfigureAgain() throws Exception {
 	Properties props = createProperties(
 	    DataStoreImplClassName + ".directory", createDirectory(),
@@ -319,7 +334,7 @@ public class TestDataServiceImpl extends TestCase {
 	}
 	/* Binding removed in this transaction */
 	setBinding(app, service, "testGetBindingNotFound",
-		   new DummyManagedObject(service, "dummy"));
+		   new DummyManagedObject(service));
 	removeBinding(app, service, "testGetBindingNotFound");
 	try {
 	    getBinding(app, service, "testGetBindingNotFound",
@@ -368,7 +383,7 @@ public class TestDataServiceImpl extends TestCase {
 	    System.err.println(e);
 	}
 	setBinding(app, service, "testGetBindingRemoved",
-		   new DummyManagedObject(service, "dummy"));
+		   new DummyManagedObject(service));
 	txn.commit();
 	/* Existing object removed in this transaction */
 	createTransaction();
@@ -412,6 +427,26 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    public void testGetBindingDeserializationFails() throws Exception {
+	testGetBindingDeserializationFails(true);
+    }
+    public void testGetServiceBindingDeserializationFails() throws Exception {
+	testGetBindingDeserializationFails(false);
+    }
+    private void testGetBindingDeserializationFails(boolean app)
+	throws Exception
+    {
+	setBinding(app, service, "dummy", new DeserializationFails(service));
+	txn.commit();
+	createTransaction();
+	try {
+	    getBinding(app, service, "dummy", DeserializationFails.class);
+	    fail("Expected ObjectIOException");
+	} catch (ObjectIOException e) {
+	    System.err.println(e);
+	}
+    }
+
     public void testGetBindingSuccess() throws Exception {
 	testGetBindingSuccess(true);
     }
@@ -431,10 +466,8 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     public void testGetBindingsDifferent() throws Exception {
-	DummyManagedObject appDummy =
-	    new DummyManagedObject(service, "appDummy");
-	DummyManagedObject serviceDummy =
-	    new DummyManagedObject(service, "serviceDummy");
+	DummyManagedObject appDummy = new DummyManagedObject(service);
+	DummyManagedObject serviceDummy = new DummyManagedObject(service);
 	service.setBinding("dummy", appDummy);
 	service.setServiceBinding("dummy", serviceDummy);
 	txn.commit();
@@ -494,6 +527,24 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    public void testSetBindingSerializationFails() throws Exception {
+	testSetBindingSerializationFails(true);
+    }
+    public void testSetServiceBindingSerializationFails() throws Exception {
+	testSetBindingSerializationFails(false);
+    }
+    private void testSetBindingSerializationFails(boolean app)
+	throws Exception
+    {
+	setBinding(app, service, "dummy", new SerializationFails(service));
+	try {
+	    txn.commit();
+	    fail("Expected ObjectIOException");
+	} catch (ObjectIOException e) {
+	    System.err.println(e);
+	}
+    }
+
     public void testSetBindingNoReference() throws Exception {
 	testSetBindingNoReference(true);
     }
@@ -501,8 +552,7 @@ public class TestDataServiceImpl extends TestCase {
 	testSetBindingNoReference(false);
     }
     private void testSetBindingNoReference(boolean app) throws Exception {
-	DummyManagedObject dummy = new AnotherManagedObject(
-	    service, new DummyManagedObject(service, "dummy"));
+	dummy.setValue(new DummyManagedObject(service));
 	setBinding(app, service, "dummy", dummy);
 	try {
 	    txn.commit();
@@ -554,7 +604,7 @@ public class TestDataServiceImpl extends TestCase {
 	testRemoveBindingNullName(false);
     }
     private void testRemoveBindingEmptyName(boolean app) {
-	setBinding(app, service, "", new DummyManagedObject(service, "dummy"));
+	setBinding(app, service, "", new DummyManagedObject(service));
 	removeBinding(app, service, "");
 	try {
 	    removeBinding(app, service, "");
@@ -611,11 +661,32 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    public void testRemoveBindingDeserializationFails() throws Exception {
+	testRemoveBindingDeserializationFails(true);
+    }
+    public void testRemoveServiceBindingDeserializationFails()
+	throws Exception
+    {
+	testRemoveBindingDeserializationFails(false);
+    }
+    private void testRemoveBindingDeserializationFails(boolean app)
+	throws Exception
+    {
+	setBinding(app, service, "dummy", new DeserializationFails(service));
+	txn.commit();
+	createTransaction();
+	removeBinding(app, service, "dummy");
+	try {
+	    getBinding(app, service, "dummy", DeserializationFails.class);
+	    fail("Expected NameNotBoundException");
+	} catch (NameNotBoundException e) {
+	    System.err.println(e);
+	}
+    }
+
     public void testRemoveBindingsDifferent() throws Exception {
-	DummyManagedObject appDummy =
-	    new DummyManagedObject(service, "appDummy");
-	DummyManagedObject serviceDummy =
-	    new DummyManagedObject(service, "serviceDummy");
+	DummyManagedObject appDummy = new DummyManagedObject(service);
+	DummyManagedObject serviceDummy = new DummyManagedObject(service);
 	service.setBinding("dummy", appDummy);
 	service.setServiceBinding("dummy", serviceDummy);
 	txn.commit();
@@ -740,29 +811,25 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     public void testMarkForUpdateSuccess() throws Exception {
-	service.setBinding(
-	    "dummy", new AnotherManagedObject(service, "a"));
+	dummy.setValue("a");
 	txn.commit();
 	service.setDetectModifications(false);
 	createTransaction();
-	AnotherManagedObject dummy =
-	    service.getBinding("dummy", AnotherManagedObject.class);
+	dummy = service.getBinding("dummy", DummyManagedObject.class);
 	service.markForUpdate(dummy);
-	dummy.object = "b";
+	dummy.value = "b";
 	txn.commit();
 	createTransaction();
-	dummy = service.getBinding("dummy", AnotherManagedObject.class);
-	assertEquals("b", dummy.object);
+	dummy = service.getBinding("dummy", DummyManagedObject.class);
+	assertEquals("b", dummy.value);
     }
 
     public void testMarkForUpdateLocking() throws Exception {
-	service.setBinding(
-	    "dummy", new AnotherManagedObject(service, "a"));
+	dummy.setValue("a");
 	txn.commit();
 	createTransaction();
-	AnotherManagedObject dummy =
-	    service.getBinding("dummy", AnotherManagedObject.class);
-	assertEquals("a", dummy.object);
+	dummy = service.getBinding("dummy", DummyManagedObject.class);
+	assertEquals("a", dummy.value);
 	final Semaphore mainFlag = new Semaphore(0);
 	final Semaphore threadFlag = new Semaphore(0);
 	Thread thread = new Thread() {
@@ -770,9 +837,9 @@ public class TestDataServiceImpl extends TestCase {
 		try {
 		    DummyTransaction txn2 = new DummyTransaction();
 		    txnProxy.setCurrentTransaction(txn2);
-		    AnotherManagedObject dummy2 = service.getBinding(
-			"dummy", AnotherManagedObject.class);
-		    assertEquals("a", dummy2.object);		
+		    DummyManagedObject dummy2 = service.getBinding(
+			"dummy", DummyManagedObject.class);
+		    assertEquals("a", dummy2.value);
 		    threadFlag.release();
 		    assertTrue(mainFlag.tryAcquire(1, TimeUnit.SECONDS));
 		    service.markForUpdate(dummy2);
@@ -841,6 +908,16 @@ public class TestDataServiceImpl extends TestCase {
 	assertEquals(dummy, ref.get());
     }
 
+    public void testCreateReferenceSerializationFails() throws Exception {
+	dummy.setNext(new SerializationFails(service));
+	try {
+	    txn.commit();
+	    fail("Expected ObjectIOException");
+	} catch (ObjectIOException e) {
+	    System.err.println(e);
+	}
+    }
+
     public void testCreateReferenceRemoved() throws Exception {
 	service.removeObject(dummy);
 	assertEquals(dummy, service.createReference(dummy).get());
@@ -853,8 +930,8 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     public void testCreateReferenceTwoObjects() throws Exception {
-	DummyManagedObject x = new DummyManagedObject(service, "x");
-	DummyManagedObject y = new DummyManagedObject(service, "y");
+	DummyManagedObject x = new DummyManagedObject(service);
+	DummyManagedObject y = new DummyManagedObject(service);
 	assertFalse(
 	    service.createReference(x).equals(service.createReference(y)));
     }
@@ -862,7 +939,7 @@ public class TestDataServiceImpl extends TestCase {
     /* -- Test ManagedReference.get -- */
 
     public void testGetReferenceNotFound() throws Exception {
-	dummy.setNext(new DummyManagedObject(service, "dummy2"));
+	dummy.setNext(new DummyManagedObject(service));
 	service.removeObject(dummy.getNext());
 	try {
 	    dummy.getNext();
@@ -888,7 +965,7 @@ public class TestDataServiceImpl extends TestCase {
 	    super("testGetReference", state);
 	}
 
-	protected void setUp() {
+	protected void setUp() throws Exception {
 	    super.setUp();
 	    ref = service.createReference(dummy);
 	}
@@ -900,14 +977,30 @@ public class TestDataServiceImpl extends TestCase {
 
     static {
 	for (BadTxnState state : BadTxnState.values()) {
-	    new TestGetReferenceBadTxn(state);
+	    /* Can't get a reference when the service is not initialized */
+	    if (state != BadTxnState.Uninitialized) {
+		new TestGetReferenceBadTxn(state);
+	    }
+	}
+    }
+
+    public void testGetReferenceDeserializationFails() throws Exception {
+	dummy.setNext(new DeserializationFails(service));
+	txn.commit();
+	createTransaction();
+	dummy = service.getBinding("dummy", DummyManagedObject.class);
+	try {
+	    dummy.getNext();
+	    fail("Expected ObjectIOException");
+	} catch (ObjectIOException e) {
+	    System.err.println(e);
 	}
     }
 
     /* -- Test ManagedReference.getForUpdate -- */
 
     public void testGetReferenceUpdateNotFound() throws Exception {
-	dummy.setNext(new DummyManagedObject(service, "dummy2"));
+	dummy.setNext(new DummyManagedObject(service));
 	service.removeObject(dummy.getNext());
 	try {
 	    dummy.getNextForUpdate();
@@ -927,18 +1020,19 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     public void testGetReferenceUpdateSuccess() throws Exception {
-	dummy.setNext(new AnotherManagedObject(service, "A"));
+	DummyManagedObject dummy2 = new DummyManagedObject(service);
+	dummy2.setValue("A");
+	dummy.setNext(dummy2);
 	txn.commit();
 	createTransaction();
 	dummy = service.getBinding("dummy", DummyManagedObject.class);
-	AnotherManagedObject amo =
-	    (AnotherManagedObject) dummy.getNextForUpdate();
-	amo.object = "B";
+	dummy2 = dummy.getNextForUpdate();
+	dummy2.value = "B";
 	txn.commit();
 	createTransaction();
 	dummy = service.getBinding("dummy", DummyManagedObject.class);
-	amo = (AnotherManagedObject) dummy.getNext();
-	assertEquals("B", amo.object);
+	dummy2 = dummy.getNext();
+	assertEquals("B", dummy2.value);
     }
 
     private static class TestGetReferenceUpdateBadTxn extends BadTxnTest {
@@ -948,7 +1042,7 @@ public class TestDataServiceImpl extends TestCase {
 	    super("testGetReferenceUpdate", state);
 	}
 
-	protected void setUp() {
+	protected void setUp() throws Exception {
 	    super.setUp();
 	    ref = service.createReference(dummy);
 	}
@@ -960,11 +1054,86 @@ public class TestDataServiceImpl extends TestCase {
 
     static {
 	for (BadTxnState state : BadTxnState.values()) {
-	    new TestGetReferenceUpdateBadTxn(state);
+	    /* Can't get a reference when the service is not initialized */
+	    if (state != BadTxnState.Uninitialized) {
+		new TestGetReferenceUpdateBadTxn(state);
+	    }
+	}
+    }
+
+    public void testGetReferenceUpdateDeserializationFails() throws Exception {
+	dummy.setNext(new DeserializationFails(service));
+	txn.commit();
+	createTransaction();
+	dummy = service.getBinding("dummy", DummyManagedObject.class);
+	try {
+	    dummy.getNextForUpdate();
+	    fail("Expected ObjectIOException");
+	} catch (ObjectIOException e) {
+	    System.err.println(e);
 	}
     }
 
     /* -- Test ManagedReference.equals -- */
+
+    public void testReferenceEquals() throws Exception {
+	ManagedReference<DummyManagedObject> ref =
+	    service.createReference(dummy);
+	assertFalse(ref.equals(null));
+	assertTrue(ref.equals(ref));
+	DummyManagedObject dummy2 = new DummyManagedObject(service);
+	ManagedReference<DummyManagedObject> ref2 =
+	    service.createReference(dummy2);
+	assertFalse(ref.equals(ref2));
+	ManagedReference ref3 = new ManagedReference<DummyManagedObject>() {
+	    public DummyManagedObject get() { return null; }
+	    public DummyManagedObject getForUpdate() { return null; }
+	};
+	assertFalse(ref.equals(ref3));
+    }
+
+    /* -- Other tests -- */
+
+    public void testCommitNoStoreParticipant() throws Exception {
+	txn.commit();
+	txn = new DummyTransaction(false);
+	txnProxy.setCurrentTransaction(txn);
+	service.removeObject(dummy);
+	txn.commit();
+    }
+
+    public void testPrepareAndCommitNoStoreParticipant() throws Exception {
+	txn.commit();
+	txn = new DummyTransaction(true);
+	txnProxy.setCurrentTransaction(txn);
+	service.removeObject(dummy);
+	txn.commit();
+    }
+
+    public void testAbortNoStoreParticipant() throws Exception {
+	txn.commit();
+	createTransaction();
+	service.removeObject(dummy);
+	txn.abort();
+    }
+
+    public void testCommitReadOnly() throws Exception {
+	txn.commit();
+	createTransaction();
+	service.getBinding("dummy", DummyManagedObject.class);
+	txn.commit();
+	createTransaction();
+	service.getBinding("dummy", DummyManagedObject.class);
+    }
+
+    public void testAbortReadOnly() throws Exception {
+	txn.commit();
+	createTransaction();
+	service.getBinding("dummy", DummyManagedObject.class);
+	txn.abort();
+	createTransaction();
+	service.getBinding("dummy", DummyManagedObject.class);
+    }
 
     /* -- App and service binding methods -- */
 
@@ -997,16 +1166,36 @@ public class TestDataServiceImpl extends TestCase {
 
     static class AnotherManagedObject extends DummyManagedObject {
 	private static final long serialVersionUID = 1;
-	Object object;
-	AnotherManagedObject(DataManager dataManager, Object object) {
-	    super(dataManager, "another");
-	    this.object = object;
+	AnotherManagedObject(DataManager dataManager) {
+	    super(dataManager);
+	}
+    }
+
+    static class SerializationFails extends DummyManagedObject {
+	SerializationFails(DataManager dataManager) {
+	    super(dataManager);
+	}
+	private void writeObject(ObjectOutputStream out)
+	    throws IOException
+	{
+	    throw new IOException("Serialization fails");
+	}
+    }
+
+    static class DeserializationFails extends DummyManagedObject {
+	DeserializationFails(DataManager dataManager) {
+	    super(dataManager);
+	}
+	private void readObject(ObjectInputStream in)
+	    throws IOException
+	{
+	    throw new IOException("Deserialization fails");
 	}
     }
 
     /** The set of bad transaction states */
     static enum BadTxnState {
-	Aborting, Aborted, Preparing, Committing, Committed
+	Uninitialized, Aborting, Aborted, Preparing, Committing, Committed
     };
 
     /** Defines a abstract class for testing bad transaction states. */
@@ -1035,6 +1224,9 @@ public class TestDataServiceImpl extends TestCase {
 	/** Runs the test for the bad transaction state. */
 	protected void runTest() throws Exception {
 	    switch (state) {
+	    case Uninitialized:
+		uninitializedTest();
+		break;
 	    case Aborting:
 		abortingTest();
 		break;
@@ -1052,6 +1244,19 @@ public class TestDataServiceImpl extends TestCase {
 		break;
 	    default:
 		throw new AssertionError();
+	    }
+	}
+
+	/** Runs the test for the uninitialized case. */
+	void uninitializedTest() throws Exception {
+	    txn.commit();
+	    createTransaction();
+	    service = getDataServiceImpl();
+	    try {
+		action();
+		fail("Expected IllegalStateException");
+	    } catch (IllegalStateException e) {
+		System.err.println(e);
 	    }
 	}
 

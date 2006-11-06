@@ -1,5 +1,6 @@
 package com.sun.sgs.test.util;
 
+import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import java.util.HashSet;
@@ -9,8 +10,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class DummyTransaction implements Transaction {
-    private static final Logger logger =
-	Logger.getLogger(DummyTransaction.class.getName());
+    private static final LoggerWrapper logger =
+	new LoggerWrapper(Logger.getLogger(DummyTransaction.class.getName()));
     public enum State {
 	ACTIVE, PREPARING, PREPARED, COMMITTING, COMMITTED, ABORTING, ABORTED
     };
@@ -41,8 +42,7 @@ public class DummyTransaction implements Transaction {
     public void join(TransactionParticipant participant) {
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(
-		Level.FINER, "join {0} participant:{1}",
-		new Object[] { this, participant });
+		Level.FINER, "join {0} participant:{1}", this, participant);
 	}
 	if (participant == null) {
 	    throw new NullPointerException("Participant must not be null");
@@ -72,6 +72,7 @@ public class DummyTransaction implements Transaction {
 	    try {
 		participant.abort(this);
 	    } catch (RuntimeException e) {
+		logger.logThrow(Level.WARNING, "Abort failed", e);
 	    }
 	}
 	state = State.ABORTED;
@@ -117,6 +118,7 @@ public class DummyTransaction implements Transaction {
 		try {
 		    participant.commit(this);
 		} catch (RuntimeException e) {
+		    logger.logThrow(Level.WARNING, "Commit failed", e);
 		}
 	    }
 	} else if (state != State.ACTIVE) {
@@ -144,6 +146,7 @@ public class DummyTransaction implements Transaction {
 		try {
 		    participant.commit(this);
 		} catch (RuntimeException e) {
+		    logger.logThrow(Level.WARNING, "Commit failed", e);
 		}
 	    }
 	}

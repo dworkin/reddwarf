@@ -11,19 +11,22 @@ import java.math.BigInteger;
 
 /**
  * Encapsulates the layout of meta data stored at the start of the info
- * database.  This class cannot be instantiated. <p>
+ * database.  This class cannot be instantiated.
  *
- * ID <code>0</code> contains a magic number common to all
- * <code>DataStoreImpl</code> databases. <p>
+ * ID 0 contains a magic number common to all DataStoreImpl databases.
  *
- * ID <code>1</code> contains the major version number, which match the value
- * in the current version of the implementation. <p>
+ * ID 1 contains the major version number, which must match the value in the
+ * current version of the implementation.
  *
- * ID <code>2</code> contains the minor version number, which can vary between
- * the database and the implementation. <p>
+ * ID 2 contains the minor version number, which can vary between the database
+ * and the implementation.
  *
- * ID <code>3</code> contains the ID of the next free ID number to use for
- * allocating new objects.
+ * ID 3 contains the ID of the next free ID number to use for allocating new
+ * objects.
+ *
+ * Version history:
+ *
+ * Version 1.0: Initial version, 11/3/2006
  */
 final class DataStoreHeader {
 
@@ -39,8 +42,8 @@ final class DataStoreHeader {
     /** The ID for the value of the next free ID. */
     static final long NEXT_ID_ID = 3;
 
-    /** The magic number. */
-    static final long MAGIC = 0xb2bfd03aafd9acc5l;
+    /** The magic number: DaRkStAr. */
+    static final long MAGIC = 0x4461526b53744172L;
 
     /** The major version number. */
     static final short MAJOR_VERSION = 1;
@@ -84,7 +87,7 @@ final class DataStoreHeader {
 
 	LongBinding.longToEntry(MAJOR_ID, key);
 	get(db, bdbTxn, key, value, null);
-	long majorVersion = ShortBinding.entryToShort(value);
+	int majorVersion = ShortBinding.entryToShort(value);
 	if (majorVersion != MAJOR_VERSION) {
 	    throw new DataStoreException(
 		"Wrong major version number: expected " + MAJOR_VERSION +
@@ -151,6 +154,20 @@ final class DataStoreHeader {
 	return result;
     }
 
+    /** Returns a string that describes the standard header. */
+    static String headerString() {
+	return headerString(MINOR_VERSION);
+    }
+
+    /**
+     * Returns a string that describes the header with the specified minor
+     * version number.
+     */
+    static String headerString(int minorVersion) {
+	return "DataStoreHeader[magic:" + toHexString(MAGIC) +
+	    ", version:" + MAJOR_VERSION + "." + minorVersion + "]";
+    }
+
     /**
      * Reads a value from the database, throwing an exception if the key is not
      * present.
@@ -204,6 +221,11 @@ final class DataStoreHeader {
 
     /** Converts a long to a string in hexadecimal. */
     private static String toHexString(long l) {
-	return "0x" + BigInteger.valueOf(l).toString(16);
+	/* Avoid sign extension if bit 63 is set */
+	BigInteger bi = BigInteger.valueOf(l & (-1L >>> 1));
+	if ((l & (1L << 63)) != 0) {
+	    bi = bi.setBit(63);
+	}
+	return "0x" + bi.toString(16);
     }
 }

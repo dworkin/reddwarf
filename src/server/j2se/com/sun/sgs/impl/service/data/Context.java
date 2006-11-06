@@ -94,6 +94,8 @@ final class Context {
 	    if (inactive) {
 		throw new IllegalStateException(
 		    "Attempt to join a transaction that is not active");
+	    } else if (participant == null) {
+		throw new NullPointerException("Participant must not be null");
 	    } else if (storeParticipant == null) {
 		storeParticipant = participant;
 	    } else if (!storeParticipant.equals(participant)) {
@@ -188,23 +190,33 @@ final class Context {
     boolean prepare() throws Exception {
 	txn.setInactive();
 	flushChanges();
-	return storeParticipant.prepare(txn);
+	if (storeParticipant == null) {
+	    return true;
+	} else {
+	    return storeParticipant.prepare(txn);
+	}
     }
 
     void commit() {
 	txn.setInactive();
-	storeParticipant.commit(txn);
+	if (storeParticipant != null) {
+	    storeParticipant.commit(txn);
+	}
     }
 
     void prepareAndCommit() throws Exception {
 	txn.setInactive();
 	flushChanges();
-	storeParticipant.prepareAndCommit(txn);
+	if (storeParticipant != null) {
+	    storeParticipant.prepareAndCommit(txn);
+	}
     }
 
     void abort() {
 	txn.setInactive();
-	storeParticipant.abort(txn);
+	if (storeParticipant != null) {
+	    storeParticipant.abort(txn);
+	}
     }
 
     /* -- Other methods -- */

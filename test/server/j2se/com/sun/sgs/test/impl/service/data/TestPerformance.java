@@ -76,6 +76,10 @@ public class TestPerformance extends TestCase {
     /** A per-test database directory, or null if not created. */
     private String directory;
 
+    private DummyTransactionProxy txnProxy;
+
+    private DummyTransaction txn;
+
     /** Creates the test. */
     public TestPerformance(String name) {
 	super(name);
@@ -84,6 +88,8 @@ public class TestPerformance extends TestCase {
     /** Prints the test case. */
     protected void setUp() {
 	System.err.println("Testcase: " + getName());
+	txnProxy = new DummyTransactionProxy();
+	createTransaction();
 	if (!doLogging) {
 	    LogManager logManager = LogManager.getLogManager();
 	    Enumeration<String> loggerNames = logManager.getLoggerNames();
@@ -156,6 +162,12 @@ public class TestPerformance extends TestCase {
 	return props;
     }
 
+    private DummyTransaction createTransaction() {
+	txn = new DummyTransaction(true);
+	txnProxy.setCurrentTransaction(txn);
+	return txn;
+    }
+
     /* -- Tests -- */
 
     public void testRead() throws Exception {
@@ -174,17 +186,15 @@ public class TestPerformance extends TestCase {
 	    String.valueOf(detectMods),
 	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
 	DataServiceImpl service = new DataServiceImpl(props);
-	DummyTransactionProxy txnProxy = new DummyTransactionProxy();
 	service.configure(new DummyComponentRegistry(), txnProxy);
-	DummyTransaction txn = new DummyTransaction(true);
-	txnProxy.setCurrentTransaction(txn);
+	txn.commit();
+	createTransaction();
 	service.setBinding("counters", new Counters(service, items));
 	txn.commit();
 	for (int r = 0; r < repeat; r++) {
 	    long start = System.currentTimeMillis();
 	    for (int c = 0; c < count; c++) {
-		txn = new DummyTransaction(true);
-		txnProxy.setCurrentTransaction(txn);
+		createTransaction();
 		Counters counters =
 		    service.getBinding("counters", Counters.class);
 		for (int i = 0; i < items; i++) {
@@ -228,17 +238,15 @@ public class TestPerformance extends TestCase {
 	    DataStoreImplClass + ".flushToDisk", String.valueOf(flush),
 	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
 	DataServiceImpl service = new DataServiceImpl(props);
-	DummyTransactionProxy txnProxy = new DummyTransactionProxy();
 	service.configure(new DummyComponentRegistry(), txnProxy);
-	DummyTransaction txn = new DummyTransaction(true);
-	txnProxy.setCurrentTransaction(txn);
+	txn.commit();
+	createTransaction();
 	service.setBinding("counters", new Counters(service, items));
 	txn.commit();
 	for (int r = 0; r < repeat; r++) {
 	    long start = System.currentTimeMillis();
 	    for (int c = 0; c < count; c++) {
-		txn = new DummyTransaction(true);
-		txnProxy.setCurrentTransaction(txn);
+		createTransaction();
 		Counters counters =
 		    service.getBinding("counters", Counters.class);
 		for (int i = 0; i < items; i++) {

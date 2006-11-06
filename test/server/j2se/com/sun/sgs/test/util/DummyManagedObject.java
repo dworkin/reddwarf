@@ -7,30 +7,20 @@ import java.io.Serializable;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class DummyManagedObject implements ManagedObject, Serializable {
-    private static Object lock = new Object();
     private static long serialVersionUID = 1;
     private static AtomicInteger nextId = new AtomicInteger(1);
-    private final int id;
+    private final int id = nextId.getAndIncrement();
     private transient final DataManager dataManager;
-    private final String name;
-    private ManagedReference<DummyManagedObject> next;
+    public Object value = null;
+    private ManagedReference<DummyManagedObject> next = null;
 
-    public DummyManagedObject(DataManager dataManager, String name) {
-	this(dataManager, name, null);
-    }
-
-    public DummyManagedObject(DataManager dataManager,
-			      String name,
-			      DummyManagedObject next)
-    {
+    public DummyManagedObject(DataManager dataManager) {
 	this.dataManager = dataManager;
-	id = nextId.getAndIncrement();
-	this.name = name;
-	this.next = (next == null) ? null : dataManager.createReference(next);
     }
 
-    public String getName() {
-	return name;
+    public void setValue(Object value) {
+	dataManager.markForUpdate(this);
+	this.value = value;
     }
 
     public DummyManagedObject getNext() {
@@ -65,7 +55,8 @@ public class DummyManagedObject implements ManagedObject, Serializable {
     }
 
     public String toString() {
-	return "DummyManagedObject[id:" + id + ", name:" + name +
+	return "DummyManagedObject[id:" + id +
+	    (value != null ? ", value:" + value : "") +
 	    ", next:" + next + "]";
     }
 }

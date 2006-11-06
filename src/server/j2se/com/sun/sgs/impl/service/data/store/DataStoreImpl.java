@@ -207,7 +207,11 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    Database info;
 	    try {
 		info = env.openDatabase(bdbTxn, infoFileName, null, null);
-		DataStoreHeader.verify(info, bdbTxn);
+		int minorVersion = DataStoreHeader.verify(info, bdbTxn);
+		if (logger.isLoggable(Level.CONFIG)) {
+		    logger.log(Level.CONFIG, "Found existing header {0}",
+			       DataStoreHeader.headerString(minorVersion));
+		}
 	    } catch (FileNotFoundException e) {
 		try {
 		    info = env.openDatabase(
@@ -218,6 +222,10 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 			e2);
 		}
 		DataStoreHeader.create(info, bdbTxn);
+		if (logger.isLoggable(Level.CONFIG)) {
+		    logger.log(Level.CONFIG, "Created new header {0}",
+			       DataStoreHeader.headerString());
+		}
 		create = true;
 	    }
 	    this.info = info;

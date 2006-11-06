@@ -18,7 +18,6 @@ import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/* XXX: Add header? */
 /** Provides an implementation of <code>DataService</code>. */
 public class DataServiceImpl implements DataService, TransactionParticipant {
 
@@ -122,6 +121,16 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 		throw new IllegalStateException("Already configured");
 	    }
 	    this.txnProxy = txnProxy;
+	    DataServiceHeader header;
+	    try {
+		header = getServiceBinding(
+		    CLASSNAME + ".header", DataServiceHeader.class);
+		logger.log(Level.CONFIG, "Found existing header {0}", header);
+	    } catch (NameNotBoundException e) {
+		header = new DataServiceHeader(appName);
+		setServiceBinding(CLASSNAME + ".header", header);
+		logger.log(Level.CONFIG, "Created new header {0}", header);
+	    }
 	}
     }
 
@@ -257,6 +266,9 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 	    }
 	    context.checkTxn(txn);
 	    boolean result = context.prepare();
+	    if (result) {
+		currentContext.set(null);
+	    }
 	    if (logger.isLoggable(Level.FINE)) {
 		logger.log(Level.FINER, "prepare txn:{0} returns {1}",
 			   txn, result);
@@ -347,7 +359,7 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 		    getInternalName(name, serviceBinding), type);
 	    } catch (NameNotBoundException e) {
 		throw new NameNotBoundException(
-		    "Name '" + name + "' is not bound", e);
+		    "Name '" + name + "' is not bound");
 	    }
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
@@ -409,7 +421,7 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 		context.removeBinding(getInternalName(name, serviceBinding));
 	    } catch (NameNotBoundException e) {
 		throw new NameNotBoundException(
-		    "Name '" + name + "' is not bound", e);
+		    "Name '" + name + "' is not bound");
 	    }
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
