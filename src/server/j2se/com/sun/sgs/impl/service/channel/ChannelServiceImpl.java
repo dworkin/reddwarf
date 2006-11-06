@@ -7,9 +7,11 @@ import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Service;
+//import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import java.util.LinkedList;
@@ -62,6 +64,9 @@ public class ChannelServiceImpl
 
     /** The data service. */
     private DataService dataService;
+
+    /** The task service. */
+    //    private TaskService taskService;
     
     /**
      * Constructs an instance of this class with the specified properties.
@@ -82,24 +87,22 @@ public class ChannelServiceImpl
 	    throw e;
 	}
     }
+ 
+    /* -- Implement Service -- */
 
-    /**
-     * Configures this service with the specified transaction proxy,
-     * task service, and data service.
-     *
-     * @param	txnProxy the transaction proxy
-     * @param	taskService the task service
-     * @param	dataService the data service
-     * @throws	IllegalStateException if this method has already been called
-     */
-    public void configure(TransactionProxy txnProxy,
-			  // TaskService taskService,
-			  DataService dataService)
-    {
+    /** {@inheritDoc} */
+    public String getName() {
+	return toString();
+    }
+
+
+    /** {@inheritDoc} */
+    public void configure(ComponentRegistry registry, TransactionProxy proxy) {
+	
 	logger.log(Level.CONFIG, "Configuring ChannelServiceImpl");
 
 	try {
-	    if (txnProxy == null || dataService == null) {
+	    if (registry == null || txnProxy == null) {
 		throw new NullPointerException("null argument");
 	    }
 	    synchronized (lock) {
@@ -107,8 +110,8 @@ public class ChannelServiceImpl
 		    throw new IllegalStateException("Already configured");
 		}
 		this.txnProxy = txnProxy;
-		//this.taskService = taskService;
-		this.dataService = dataService;
+		dataService = registry.getComponent(DataService.class);
+		//taskService = registry.getComponent(TaskService.class);
 	    }
 
 	    /*
@@ -176,14 +179,6 @@ public class ChannelServiceImpl
 	    throw e;
 	}
     }
-
-    /* -- Implement Service -- */
-
-    /** {@inheritDoc} */
-    public String getName() {
-	return toString();
-    }
-
 
     /* -- Implement NonDurableTransactionParticipant -- */
        
