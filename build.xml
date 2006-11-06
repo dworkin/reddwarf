@@ -34,12 +34,6 @@
 
   <!-- Values for programming style checks -->
   <import file="${checkstyle.dir}/checkstyle_task.xml" optional="true"/>
-  <property name="checkstyle.packages"
-	    value="com.sun.sgs.app,
-		   com.sun.sgs.impl.util,
-		   com.sun.sgs.service"/>
-  <property name="checkstyle.packages.file"
-	    value="${build.dir}/checkstyle_packages"/>
 
   <!-- Values for testing -->
   <property name="test.logging" location="test/test.logging"/>
@@ -158,12 +152,11 @@
 
   <!-- Checks Java coding style -->
   <target name="checkstyle"
-	  depends="build,-checkstyle.init,-checkstyle.includes"
+	  depends="build,-checkstyle.init"
 	  description="Checks Java coding style">
       <checkstyle config="${neuromancer_checks.xml}"
 		  classpath="${build.dir}/classes/server">
-	  <fileset dir="src/server/j2se"
-		   includes="${checkstyle.includes}"/>
+	  <fileset dir="src/server/j2se"/>
       </checkstyle>
   </target>
 
@@ -175,30 +168,13 @@
       <ant dir="${checkstyle.dir}" target="checkjars" inheritAll="false"/>
   </target>
 
-  <!-- Convert from package names to filenames -->
-  <target name="-checkstyle.includes">
-    <mkdir dir="${build.dir}"/>
-    <echo message="${checkstyle.packages}"
-	  file="${checkstyle.packages.file}"/>
-    <loadfile srcFile="${checkstyle.packages.file}"
-	      property="checkstyle.includes">
-      <filterchain>
-	<tokenfilter>
-	  <!-- Get tokens delimited by commas and spaces -->
-	  <stringtokenizer delims=", "/>
-	  <!-- Replace all '.' with '/' in each token -->
-	  <replaceregex pattern="[.]" replace="/" flags="g"/>
-	  <!-- Append '/*.java' to each non-empty token -->
-	  <replaceregex pattern=".+" replace="\0/*.java"/>
-	</tokenfilter>
-      </filterchain>
-    </loadfile>
-    <delete file="${checkstyle.packages.file}"/>
-  </target>
-
   <!-- Compile and run tests -->
-  <target name="test" depends="-test.classes"
-	  description="Compiles and runs tests">
+  <target name="test" depends="test-server"
+	  description="Compiles and runs tests"/>
+
+  <!-- Compile and run server tests -->
+  <target name="test-server" depends="-test-server.classes"
+	  description="Compiles and runs server tests">
     <mkdir dir="${build.dir}/test"/>
     <delete dir="${build.dir}/test/output"/>
     <mkdir dir="${build.dir}/test/output"/>
@@ -213,7 +189,7 @@
       <jvmarg line="${test.jvm.args}"/>
       <jvmarg value="-Djava.library.path=${bdb.lib.dir}"/>
       <jvmarg value="-Djava.io.tmpdir=${build.dir}/test/output"/>
-      <classpath path="${build.dir}/test/classes;
+      <classpath path="${build.dir}/test/classes/server;
 		       ${build.dir}/classes/server;
 		       ${bdb.lib.dir}/db.jar"/>
       <syspropertyset>
@@ -227,7 +203,7 @@
       <jvmarg value="-enableassertions"/>
       <formatter type="${test.formatter.type}"/>
       <batchtest todir="${build.dir}/test/output">
-	<fileset dir="test">
+	<fileset dir="test/server/j2se">
 	  <include name="${test.include}"/>
 	</fileset>
       </batchtest>
@@ -236,14 +212,14 @@
   </target>
 
   <!-- Compiles tests -->
-  <target name="-test.classes" depends="build">
-    <mkdir dir="${build.dir}/test/classes"/>
-    <depend srcdir="test"
-	    destdir="${build.dir}/test/classes"
+  <target name="-test-server.classes" depends="build">
+    <mkdir dir="${build.dir}/test/classes/server"/>
+    <depend srcdir="test/server/j2se"
+	    destdir="${build.dir}/test/classes/server"
 	    cache="${build.dir}/test/depend"
 	    closure="true"/>
-    <javac srcdir="test"
-	   destdir="${build.dir}/test/classes"
+    <javac srcdir="test/server/j2se"
+	   destdir="${build.dir}/test/classes/server"
 	   includeAntRuntime="yes"
 	   debug="on"
 	   source="${javac.source}"
