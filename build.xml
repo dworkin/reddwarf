@@ -43,8 +43,14 @@
   <property name="test.showoutput" value="false"/>
   <property name="test.include" value="**/Test*.java"/>
 
-  <!-- Berkeley DB -->
-  <property name="bdb.lib.dir" location="/usr/local/BerkeleyDB.4.4/lib"/>
+  <!-- Directory containing Berkeley DB libraries -->
+  <fail unless="bdb.lib.dir" message="The bdb.lib.dir property must be set"/>
+  
+  <!-- Server class path -->
+  <path id="server.classpath">
+    <pathelement path="${build.dir}/classes/server"/>
+    <pathelement path="${bdb.lib.dir}/db.jar"/>
+  </path>
 
   <!-- TARGET DEFINITIONS -->
 
@@ -63,8 +69,7 @@
 	    closure="true"/>
     <javac includeAntRuntime="no" debug="on" deprecation="on"
            srcdir="src/server/j2se" destdir="${build.dir}/classes/server"
-           classpath="${build.dir}/classes/server;${bdb.lib.dir}/db.jar"
-	   source="${javac.source}">
+           classpathref="server.classpath" source="${javac.source}">
       <compilerarg value="${javac.compilerargs}"/>
     </javac>
   </target>
@@ -100,8 +105,7 @@
   <!-- Build the server JavaDoc -->
   <target name="javadoc-server" depends="build-server">
     <javadoc sourcepath="src/server/j2se" destdir="${build.dir}/javadoc/server"
-             classpath="${build.dir}/classes/server;${bdb.lib.dir}/db.jar"
-	     packagenames="com.sun.*"
+             classpathref="server.classpath" packagenames="com.sun.*"
              overview="src/server/j2se/overview.html"
              windowtitle="${project.name}" doctitle="${project.name}"
 	     author="no">
@@ -157,12 +161,28 @@
 
   <!-- Checks Java coding style -->
   <target name="checkstyle"
-	  depends="build,-checkstyle.init"
+	  depends="checkstyle-client, checkstyle-server"
 	  description="Checks Java coding style">
-      <checkstyle config="${neuromancer_checks.xml}"
-		  classpath="${build.dir}/classes/server">
-	  <fileset dir="src/server/j2se"/>
-      </checkstyle>
+  </target>
+
+  <!-- Checks client Java coding style -->
+  <target name="checkstyle-client"
+	  depends="build-client,-checkstyle.init"
+	  description="Checks client Java coding style">
+    <checkstyle config="${neuromancer_checks.xml}"
+		classpath="${build.dir}/classes/client">
+      <fileset dir="src/client/j2se"/>
+    </checkstyle>
+  </target>
+
+  <!-- Checks server Java coding style -->
+  <target name="checkstyle-server"
+	  depends="build-server,-checkstyle.init"
+	  description="Checks server Java coding style">
+    <checkstyle config="${neuromancer_checks.xml}"
+		classpathref="server.classpath">
+      <fileset dir="src/server/j2se"/>
+    </checkstyle>
   </target>
 
   <!-- Verify checkstyle.dir is set, calculate checkstyle.includes, and

@@ -70,6 +70,8 @@ public class TestDataServiceImpl extends TestCase {
     /** Set when the test passes. */
     private boolean passed;
 
+    DummyComponentRegistry componentRegistry = new DummyComponentRegistry();
+
     /** A per-test database directory, or null if not created. */
     String directory;
 
@@ -92,7 +94,7 @@ public class TestDataServiceImpl extends TestCase {
 	txnProxy = new DummyTransactionProxy();
 	createTransaction();
 	service = getDataServiceImpl();
-	service.configure(new DummyComponentRegistry(), txnProxy);
+	service.configure(componentRegistry, txnProxy);
 	txn.commit();
 	createTransaction();
 	dummy = new DummyManagedObject(service);
@@ -173,7 +175,7 @@ public class TestDataServiceImpl extends TestCase {
 		    "Problem creating directory: " + dir);
 	    }
 	}
-	return new DataServiceImpl(dbProps);
+	return new DataServiceImpl(dbProps, componentRegistry);
     }
 
     DummyTransaction createTransaction() {
@@ -184,9 +186,15 @@ public class TestDataServiceImpl extends TestCase {
 
     /* -- Test constructor -- */
 
-    public void testConstructorNullArg() {
+    public void testConstructorNullArgs() {
 	try {
-	    new DataServiceImpl(null);
+	    new DataServiceImpl(null, componentRegistry);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+	try {
+	    new DataServiceImpl(dbProps, null);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
@@ -198,7 +206,7 @@ public class TestDataServiceImpl extends TestCase {
 	    DataStoreImplClassName + ".directory",
 	    createDirectory());
 	try {
-	    new DataServiceImpl(props);
+	    new DataServiceImpl(props, componentRegistry);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -211,8 +219,7 @@ public class TestDataServiceImpl extends TestCase {
 	Properties props = createProperties(
 	    DataStoreImplClassName + ".directory", createDirectory(),
 	    "com.sun.sgs.appName", "Foo");
-	DataService service = new DataServiceImpl(props);
-	ComponentRegistry components = new DummyComponentRegistry();
+	DataService service = new DataServiceImpl(props, componentRegistry);
 	try {
 	    service.configure(null, txnProxy);
 	    fail("Expected NullPointerException");
@@ -220,7 +227,7 @@ public class TestDataServiceImpl extends TestCase {
 	    System.err.println(e);
 	}
 	try {
-	    service.configure(components, null);
+	    service.configure(componentRegistry, null);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
@@ -230,9 +237,8 @@ public class TestDataServiceImpl extends TestCase {
     public void testConfigureNoTxn() throws Exception {
 	txn.commit();
 	DataServiceImpl service = getDataServiceImpl();
-	ComponentRegistry registry = new DummyComponentRegistry();
 	try {
-	    service.configure(registry, txnProxy);
+	    service.configure(componentRegistry, txnProxy);
 	    fail("Expected TransactionNotActiveException");
 	} catch (TransactionNotActiveException e) {
 	    System.err.println(e);
@@ -243,11 +249,10 @@ public class TestDataServiceImpl extends TestCase {
 	Properties props = createProperties(
 	    DataStoreImplClassName + ".directory", createDirectory(),
 	    "com.sun.sgs.appName", "Foo");
-	DataService service = new DataServiceImpl(props);
-	ComponentRegistry components = new DummyComponentRegistry();
-	service.configure(components, txnProxy);
+	DataService service = new DataServiceImpl(props, componentRegistry);
+	service.configure(componentRegistry, txnProxy);
 	try {
-	    service.configure(components, txnProxy);
+	    service.configure(componentRegistry, txnProxy);
 	    fail("Expected IllegalStateException");
 	} catch (IllegalStateException e) {
 	    System.err.println(e);

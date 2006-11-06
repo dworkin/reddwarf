@@ -70,6 +70,9 @@ public class TestPerformance extends TestCase {
 			   ", test.modifyItems=" + modifyItems);
     }
 
+    private DummyComponentRegistry componentRegistry =
+	new DummyComponentRegistry();
+
     /** Set when the test passes. */
     private boolean passed;
 
@@ -185,8 +188,9 @@ public class TestPerformance extends TestCase {
 	    DataServiceImplClass + ".detectModifications",
 	    String.valueOf(detectMods),
 	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
-	DataServiceImpl service = new DataServiceImpl(props);
-	service.configure(new DummyComponentRegistry(), txnProxy);
+	DataServiceImpl service =
+	    new DataServiceImpl(props, componentRegistry);
+	service.configure(componentRegistry, txnProxy);
 	txn.commit();
 	createTransaction();
 	service.setBinding("counters", new Counters(service, items));
@@ -237,8 +241,9 @@ public class TestPerformance extends TestCase {
 	    String.valueOf(detectMods),
 	    DataStoreImplClass + ".flushToDisk", String.valueOf(flush),
 	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
-	DataServiceImpl service = new DataServiceImpl(props);
-	service.configure(new DummyComponentRegistry(), txnProxy);
+	DataServiceImpl service =
+	    new DataServiceImpl(props, componentRegistry);
+	service.configure(componentRegistry, txnProxy);
 	txn.commit();
 	createTransaction();
 	service.setBinding("counters", new Counters(service, items));

@@ -10,6 +10,7 @@ import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.PropertiesUtil;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.Service;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.service.TransactionProxy;
@@ -78,21 +79,33 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
      * properties.
      *
      * @param	properties the properties for configuring this service
+     * @param	componentRegistry the registry of configured {@link Service}
+     *		instances
      * @throws	IllegalArgumentException if the <code>APP_NAME_PROPERTY</code>
      *		is not specified, if the value of the
      *		<code>DEBUG_CHECK_INTERVAL_PROPERTY</code> is not a valid
      *		integer, or if the data store constructor detects an illegal
      *		property value
      */
-    public DataServiceImpl(Properties properties) {
-	logger.log(Level.CONFIG, "Creating DataServiceImpl properties:{0}",
-		   properties);
+    public DataServiceImpl(
+	Properties properties, ComponentRegistry componentRegistry)
+    {
+	if (logger.isLoggable(Level.CONFIG)) {
+	    logger.log(Level.CONFIG,
+		       "Creating DataServiceImpl properties:{0}, " +
+		       "componentRegistry:{1}",
+		       properties, componentRegistry);
+	}
 	try {
 	    appName = properties.getProperty(APP_NAME_PROPERTY);
 	    if (appName == null) {
 		throw new IllegalArgumentException(
 		    "The " + APP_NAME_PROPERTY +
 		    " property must be specified");
+	    }
+	    if (componentRegistry == null) {
+		throw new NullPointerException(
+		    "The componentRegistry argument must not be null");
 	    }
 	    debugCheckInterval = PropertiesUtil.getIntProperty(
 		properties, DEBUG_CHECK_INTERVAL_PROPERTY, Integer.MAX_VALUE);
