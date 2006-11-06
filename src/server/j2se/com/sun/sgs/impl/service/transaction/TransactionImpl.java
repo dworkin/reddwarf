@@ -41,6 +41,9 @@ final class TransactionImpl implements Transaction {
     /** The time the transaction was created. */
     private final long creationTime;
 
+    /** The thread associated with this transaction. */
+    private final Thread owner;
+
     /** The state of the transaction. */
     private State state;
 
@@ -59,6 +62,7 @@ final class TransactionImpl implements Transaction {
     TransactionImpl(long tid) {
 	this.tid = tid;
 	creationTime = System.currentTimeMillis();
+	owner = Thread.currentThread();
 	state = State.ACTIVE;
 	logger.log(Level.FINER, "create {0}", this);
     }
@@ -77,6 +81,7 @@ final class TransactionImpl implements Transaction {
 
     /** {@inheritDoc} */
     public void join(TransactionParticipant participant) {
+	assert Thread.currentThread() == owner : "Wrong thread";
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST, "join {0} participant:{1}", this,
 		       participant);
@@ -105,6 +110,7 @@ final class TransactionImpl implements Transaction {
 
     /** {@inheritDoc} */
     public void abort() {
+	assert Thread.currentThread() == owner : "Wrong thread";
 	logger.log(Level.FINER, "abort {0}", this);
 	switch (state) {
 	case ACTIVE:
@@ -183,6 +189,7 @@ final class TransactionImpl implements Transaction {
      * @see	TransactionHandle#commit TransactionHandle.commit
      */
     void commit() throws Exception {
+	assert Thread.currentThread() == owner : "Wrong thread";
 	logger.log(Level.FINER, "commit {0}", this);
 	if (state != State.ACTIVE) {
 	    throw new TransactionNotActiveException(
@@ -252,6 +259,7 @@ final class TransactionImpl implements Transaction {
 
     /** Returns whether this transaction is currently active. */
     boolean isActive() {
+	assert Thread.currentThread() == owner : "Wrong thread";
 	return state == State.ACTIVE;
     }
 
