@@ -5,10 +5,10 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 
+import com.sun.sgs.impl.io.SocketConnector;
 import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
 import com.sun.sgs.io.IOConnector;
-import com.sun.sgs.io.mina.SocketConnector;
 
 import java.nio.ByteBuffer;
 

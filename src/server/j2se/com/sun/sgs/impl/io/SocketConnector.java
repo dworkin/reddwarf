@@ -1,4 +1,4 @@
-package com.sun.sgs.io.mina;
+package com.sun.sgs.impl.io;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;

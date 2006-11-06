@@ -1,4 +1,4 @@
-package com.sun.sgs.io.mina;
+package com.sun.sgs.impl.io;
 
 import org.apache.mina.common.IdleStatus;
 import org.apache.mina.common.IoHandler;

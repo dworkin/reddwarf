@@ -4,10 +4,10 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 
+import com.sun.sgs.impl.io.SocketAcceptor;
 import com.sun.sgs.io.AcceptedHandleListener;
 import com.sun.sgs.io.IOAcceptor;
 import com.sun.sgs.io.IOHandle;
-import com.sun.sgs.io.mina.SocketAcceptor;
 
 /**
  * A test harness for the server {@code Acceptor} code.
