@@ -19,7 +19,13 @@ import java.util.concurrent.atomic.AtomicLong;
  * NonDurableTransactionParticipant}.  The {@link Transaction#join join} method
  * on transactions created using this class will throw {@link
  * UnsupportedOperationException} if more than one durable participant attempts
- * to join the transaction.
+ * to join the transaction. <p>
+ *
+ * The <code>Transaction</code> and <code>TransactionHandle</code> instances
+ * returned by this class are not synchronized.  If multiple threads access
+ * these instances concurrently, then synchronization must be performed by the
+ * caller.  Note that calls to the {@link #createTransaction createTransaction}
+ * method itself are synchronized.
  */
 public final class TransactionCoordinatorImpl
     implements TransactionCoordinator
