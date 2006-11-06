@@ -189,13 +189,12 @@ final class TransactionImpl implements Transaction {
 		"Transaction is not active");
 	}
 	state = State.PREPARING;
-	Iterator<TransactionParticipant> iter = participants.iterator();
-	boolean last = !iter.hasNext();
-	while (!last) {
+	for (Iterator<TransactionParticipant> iter = participants.iterator();
+	     iter.hasNext(); )
+	{
 	    TransactionParticipant participant = iter.next();
-	    last = !iter.hasNext();
 	    try {
-		if (!last) {
+		if (iter.hasNext()) {
 		    boolean readOnly = participant.prepare(this);
 		    if (readOnly) {
 			iter.remove();
@@ -219,7 +218,7 @@ final class TransactionImpl implements Transaction {
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.logThrow(
 			Level.FINEST, "{0} {1} participant:{1} throws",
-			e, !last ? "prepare" : "prepareAndCommit",
+			e, iter.hasNext() ? "prepare" : "prepareAndCommit",
 			this, participant);
 		}
 		if (state != State.ABORTED) {
