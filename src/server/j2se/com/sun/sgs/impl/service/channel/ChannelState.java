@@ -8,8 +8,11 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Persistent state of a channel.
@@ -44,6 +47,14 @@ final class ChannelState implements ManagedObject, Serializable {
 	this.name = name;
 	this.listener = listener;
 	this.delivery = delivery;
+    }
+
+    Collection<ClientSession> getSessions() {
+	Collection<ClientSession> collection = new ArrayList<ClientSession>();
+	for (ClientSession session : sessions.keySet()) {
+	    collection.add(session);
+	}
+	return collection;
     }
 
     /** {@inheritDoc} */

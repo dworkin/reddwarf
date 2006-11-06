@@ -31,6 +31,9 @@ final class Context {
     /** The data service. */
     final DataService dataService;
 
+    /** The channel service. */
+    final ChannelServiceImpl channelService;
+
     /** The transaction. */
     final Transaction txn;
 
@@ -48,9 +51,13 @@ final class Context {
      * Creates an instance of this class with the specified data
      * service and transaction.
      */
-    Context(DataService dataService, Transaction txn) {
-	assert dataService != null && txn != null;
+    Context(DataService dataService,
+	    ChannelServiceImpl channelService,
+	    Transaction txn)
+    {
+	assert dataService != null && channelService != null && txn != null;
 	this.dataService = dataService;
+	this.channelService = channelService;
 	this.txn = txn;
 	this.table = dataService.getServiceBinding(
 	    ChannelTable.NAME, ChannelTable.class);
@@ -66,6 +73,7 @@ final class Context {
 			  ChannelListener listener,
 			  Delivery delivery)
     {
+	assert name != null;
 	if (table.get(name) != null) {
 	    throw new NameExistsException(name);
 	}
@@ -84,6 +92,7 @@ final class Context {
      * Returns a channel with the specified name.
      */
     Channel getChannel(String name) {
+	assert name != null;
 	Channel channel = internalTable.get(name);
 	if (channel == null) {
 	    ManagedReference<ChannelState> ref = table.get(name);
@@ -102,6 +111,7 @@ final class Context {
      * called when the 'close' method is invoked on a 'ChannelImpl'.
      */
     void removeChannel(String name) {
+	assert name != null;
 	if (table.get(name) != null) {
 	    dataService.markForUpdate(table);
 	    table.remove(name);

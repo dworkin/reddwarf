@@ -12,6 +12,8 @@ import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -45,6 +47,16 @@ public class ChannelServiceImpl
     
     /** The transaction proxy, or null if configure has not been called. */    
     private TransactionProxy txnProxy;
+
+    /** List of tasks (e.g. for sending channel messages). */
+    private List<Runnable> tasks =
+	new LinkedList<Runnable>();
+
+    /** Lock for task list. */
+    private final Object tasksLock = new Object();
+
+    /** Thread for handling send tasks. */
+    private HandleTasksThread handleTasksThread;
 
     //private TaskService taskService;
 
@@ -277,7 +289,7 @@ public class ChannelServiceImpl
 	if (context == null) {
 	    logger.log(Level.FINER, "join txn:{0}", txn);
 	    txn.join(this);
-	    context = new Context(dataService, txn);
+	    context = new Context(dataService, this, txn);
 	    currentContext.set(context);
 	} else if (!txn.equals(context.txn)) {
 	    currentContext.set(null);
@@ -297,5 +309,67 @@ public class ChannelServiceImpl
 	    throw new TransactionNotActiveException(
 		"No transaction is active");
 	}
+    }
+
+    /**
+     * Adds a task to this instance's task queue.
+     */
+    void addTask(Runnable runnable) {
+	synchronized (tasksLock) {
+	    tasks.add(runnable);
+	    tasksLock.notify();
+	}
+    }
+
+    /**
+     * Thread for executing this channel service's tasks.
+     */
+    private final class HandleTasksThread extends Thread {
+
+	private boolean interrupted = false;
+	
+	HandleTasksThread() {
+	    super("HandleTasksThread");
+	    setDaemon(true);
+	}
+
+	public void interrupt() {
+	    interrupted = true;
+	}
+	
+	public void run() {
+	    while (!interrupted) {
+		try {
+		    Runnable task;
+		    synchronized (tasksLock) {
+			if (tasks.isEmpty()) {
+			    try {
+				tasksLock.wait();
+				continue;
+			    } catch (InterruptedException e) {
+				return;
+			    }
+			} else {
+			    task = tasks.remove(0);
+			}
+		    }
+		    try {
+			logger.log(Level.FINEST, "Processing {0}", task);
+		    } catch (Throwable t) {
+		    }
+
+		    task.run();
+
+		} catch (Throwable t) {
+		    try {
+			logger.log(
+			    Level.FINEST,
+			    "Problem during processing -- continuing",
+			    t);
+		    } catch (Throwable t2) {
+		    }
+		}
+	    }
+	};
     }
 }

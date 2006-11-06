@@ -7,6 +7,7 @@ import com.sun.sgs.app.Delivery;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.logging.Level;
@@ -22,7 +23,7 @@ final class ChannelImpl implements Channel {
     private final static LoggerWrapper logger =
 	new LoggerWrapper(
 	    Logger.getLogger(ChannelImpl.class.getName()));
-    
+
     /** Transaction-related context information. */
     private final Context context;
 
@@ -136,13 +137,24 @@ final class ChannelImpl implements Channel {
     /** {@inheritDoc} */
     public void send(ByteBuffer message) {
 	checkClosed();
-	// TBI
+	if (message == null) {
+	    throw new NullPointerException("null message");
+	}
+	scheduleSend(state.getSessions(), message);
     }
 
     /** {@inheritDoc} */
     public void send(ClientSession recipient, ByteBuffer message) { 
 	checkClosed();
-	// TBI
+	if (recipient == null) {
+	    throw new NullPointerException("null recipient");
+	} else if (message == null) {
+	    throw new NullPointerException("null message");
+	}
+	
+	Collection<ClientSession> sessions = new ArrayList<ClientSession>();
+	sessions.add(recipient);
+	scheduleSend(sessions, message);
     }
 
     /** {@inheritDoc} */
@@ -150,7 +162,16 @@ final class ChannelImpl implements Channel {
 		     ByteBuffer message)
     {
 	checkClosed();
-	// TBI
+	if (recipients == null) {
+	    throw new NullPointerException("null recipients");
+	} else if (message == null) {
+	    throw new NullPointerException("null message");
+	}
+
+	if (recipients.isEmpty()) {
+	    return;
+	}
+	scheduleSend(recipients, message);
     }
 
     /** {@inheritDoc} */
@@ -163,7 +184,7 @@ final class ChannelImpl implements Channel {
 	}
     }
 
-    /* -- other methods -- */
+    /* -- other methods and classes -- */
 
     /**
      * Checks that this channel's context is currently active,
@@ -183,5 +204,58 @@ final class ChannelImpl implements Channel {
 	if (channelClosed) {
 	    throw new IllegalStateException("channel is closed");
 	}
+    }
+
+    private void scheduleSend(
+	final Collection<ClientSession> sessions, final ByteBuffer message)
+    {
+	/*
+	 * Schedule a non-durable task that runs outside a transaction
+	 * that will enqueue work (sending the specified message to
+	 * the specified sessions) for the channel manager.
+	 */
+	Runnable task = new Runnable() {
+		public void run() {
+		    context.channelService.addTask(
+			new SendTask(sessions, message));
+		}
+	    };
+
+	// TBI:
+	// context.taskService.scheduleNonDurableTask(task);
+	// for now, do this...
+	task.run();
+    }
+
+    /**
+     * Task for sending a message to a set of clients.
+     */
+    final class SendTask implements Runnable {
+
+	private final Collection<byte[]> clients = new ArrayList<byte[]>();
+	private final byte[] message;
+
+	SendTask(Collection<ClientSession> sessions, ByteBuffer message) {
+	    for (ClientSession session : sessions) {
+		this.clients.add(toArray(session.getClientAddress()));
+	    }
+	    this.message = toArray(message);
+	}
+
+	public void run() {
+	    for (byte[] addr : clients) {
+		// TBI: send message to client specified by addr...
+	    }
+	}
+    }
+
+    /**
+     * Returns a new byte array initialized with the contents of the
+     * specified byte buffer.
+     */
+    private static byte[] toArray(ByteBuffer buf) {
+	byte[] bytes = new byte[buf.limit()];
+	buf.get(bytes);
+	return bytes;
     }
 }
