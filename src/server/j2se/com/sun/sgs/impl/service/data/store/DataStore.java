@@ -1,6 +1,8 @@
 package com.sun.sgs.impl.service.data.store;
 
+import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.service.Transaction;
 
@@ -8,19 +10,22 @@ import com.sun.sgs.service.Transaction;
  * Defines the interface to the underlying persistence mechanism that {@link
  * DataServiceImpl} uses to store byte data. <p>
  *
- * Objects are identified by object IDs, which are positive <code>long</code>s.
+ * Objects are identified by object IDs, which are positive
+ * <code>long</code>s.  Names are mapped to object IDs.
  */
 public interface DataStore {
 
     /**
      * Reserves an object ID for a new object.  Note that calling other
      * operations using this ID are not required to find the object until
-     * setObject is called.  Aborting a transaction is also not required to
-     * unassign the ID so long as other operations treat it as a non-existent
-     * object.
+     * {@link #setObject setObject} is called.  Aborting a transaction is also
+     * not required to unassign the ID so long as other operations treat it as
+     * a non-existent object.
      *
      * @param	txn the transaction under which the operation should take place
      * @return	the new object ID
+     * @throws	TransactionAbortedException if the transaction was aborted due
+     *		to a lock conflict or timeout
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
@@ -34,6 +39,8 @@ public interface DataStore {
      * @param	oid the object ID
      * @throws	IllegalArgumentException if <code>oid</code> is negative
      * @throws	ObjectNotFoundException if the object is not found
+     * @throws	TransactionAbortedException if the transaction was aborted due
+     *		to a lock conflict or timeout
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
@@ -43,8 +50,8 @@ public interface DataStore {
      * Obtains the data associated with an object ID.  If the
      * <code>forUpdate</code> parameter is <code>true</code>, the caller is
      * stating its intention to modify the object.  The implementation can use
-     * the information to obtain an exclusive lock on the object in order avoid
-     * contention when the object is modified.
+     * that information to obtain an exclusive lock on the object in order
+     * avoid contention when the object is modified.
      *
      * @param	txn the transaction under which the operation should take place
      * @param	oid the object ID
@@ -52,6 +59,8 @@ public interface DataStore {
      * @return	the data associated with the object ID
      * @throws	IllegalArgumentException if <code>oid</code> is negative
      * @throws	ObjectNotFoundException if the object is not found
+     * @throws	TransactionAbortedException if the transaction was aborted due
+     *		to a lock conflict or timeout
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
@@ -65,6 +74,8 @@ public interface DataStore {
      * @param	data the data
      * @throws	IllegalArgumentException if <code>oid</code> is negative, or if
      *		<code>data</code> is empty
+     * @throws	TransactionAbortedException if the transaction was aborted due
+     *		to a lock conflict or timeout
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
@@ -80,6 +91,8 @@ public interface DataStore {
      * @param	oid the object ID
      * @throws	IllegalArgumentException if <code>oid</code> is negative
      * @throws	ObjectNotFoundException if the object is not found
+     * @throws	TransactionAbortedException if the transaction was aborted due
+     *		to a lock conflict or timeout
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
@@ -92,6 +105,8 @@ public interface DataStore {
      * @param	name the name
      * @return	the object ID
      * @throws	NameNotBoundException if no object ID is bound to the name
+     * @throws	TransactionAbortedException if the transaction was aborted due
+     *		to a lock conflict or timeout
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
@@ -104,6 +119,8 @@ public interface DataStore {
      * @param	name the name
      * @param	oid the object ID
      * @throws	IllegalArgumentException if <code>oid</code> is negative
+     * @throws	TransactionAbortedException if the transaction was aborted due
+     *		to a lock conflict or timeout
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
@@ -115,6 +132,8 @@ public interface DataStore {
      * @param	txn the transaction under which the operation should take place
      * @param	name the name
      * @throws	NameNotBoundException if the name is not bound
+     * @throws	TransactionAbortedException if the transaction was aborted due
+     *		to a lock conflict or timeout
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */

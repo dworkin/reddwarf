@@ -42,7 +42,16 @@ public final class PropertiesUtil {
 	Properties properties, String name, int defaultValue)
     {
 	String value = properties.getProperty(name);
-	return value == null ? defaultValue : Integer.parseInt(value);
+	if (value == null) {
+	    return defaultValue;
+	}
+	try {
+	    return Integer.parseInt(value);
+	} catch (NumberFormatException e) {
+	    throw (NumberFormatException) new NumberFormatException(
+		"The value of the " + name + " property must be a valid " +
+		"int: \"" + value + "\"").initCause(e);
+	}
     }
 
     /**
@@ -59,6 +68,15 @@ public final class PropertiesUtil {
 	Properties properties, String name, long defaultValue)
     {
 	String value = properties.getProperty(name);
-	return value == null ? defaultValue : Long.parseLong(value);
+	if (value == null) {
+	    return defaultValue;
+	}
+	try {
+	    return Long.parseLong(value);
+	} catch (NumberFormatException e) {
+	    throw (NumberFormatException) new NumberFormatException(
+		"The value of the " + name + " property must be a valid " +
+		"long: \"" + value + "\"").initCause(e);
+	}
     }
 }	

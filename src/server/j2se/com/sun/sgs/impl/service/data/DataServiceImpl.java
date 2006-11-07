@@ -1,5 +1,6 @@
 package com.sun.sgs.impl.service.data;
 
+import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
@@ -19,9 +20,58 @@ import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/** Provides an implementation of <code>DataService</code>. */
-public class DataServiceImpl implements DataService, TransactionParticipant {
-
+/**
+ * Provides an implementation of <code>DataService</code> using {@link
+ * DataStoreImpl}. <p>
+ *
+ * The {@link #DataServiceImpl constructor} supports the following properties:
+ * <p>
+ *
+ * <ul>
+ *
+ * <li> <i>Key:</i> <code>com.sun.sgs.appName</code> <br>
+ *	<i>Required</i> <br>
+ *	Specifies the name of the application using this
+ *	<code>DataService</code>. <p>
+ *
+ * <li> <i>Key:</i> <code>com.sun.sgs.impl.service.data.debugCheckInterval
+ *	</code> <br>
+ *	<i>Default:</i> <code>Integer.MAX_VALUE</code> <br>
+ *	Specifies the number of <code>DataService</code> operations between
+ *	checks of the consistency of the managed references table.  Note that
+ *	the number of operations is measured separately for each
+ *	transaction. <p>
+ *
+ * <li> <i>Key:</i> <code>com.sun.sgs.impl.service.data.detectModifications
+ *	</code> <br>
+ *	<i>Default:</i> <code>true</code> <br>
+ *	Specifies whether to automatically detect modifications to managed
+ *	objects.  If set to <code>false</code>, then applications need to call
+ *	{@link DataManager#markForUpdate DataManager.markForUpdate} or {@link
+ *	ManagedReference#getForUpdate ManagedReference.getForUpdate} for any
+ *	modified objects to make sure that the modifications are recorded by
+ *	the <code>DataService</code>. <p>
+ *
+ * </ul> <p>
+ *
+ * The constructor also passes the properties to the {@link DataStoreImpl}
+ * constructor, which supports additional properties. <p>
+ *
+ * This class uses the {@link Logger} named
+ * <code>com.sun.sgs.impl.service.DataServiceImpl</code> to log information at
+ * the following logging levels: <p>
+ *
+ * <ul>
+ * <li> {@link Level#SEVERE SEVERE} - Initialization failures
+ * <li> {@link Level#CONFIG CONFIG} - Constructor properties, data service
+ *	headers
+ * <li> {@link Level#FINER FINER} - Transaction operations
+ * <li> {@link Level#FINEST FINEST} - Name and object operations
+ * </ul>
+ */
+public final class DataServiceImpl
+    implements DataService, TransactionParticipant
+{
     /** The property that specifies the application name. */
     public static final String APP_NAME_PROPERTY = "com.sun.sgs.appName";
 
@@ -76,16 +126,17 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 
     /**
      * Creates an instance of this class configured with the specified
-     * properties.
+     * properties.  See the {@link DataServiceImpl class documentation} for the
+     * list of supported properties.
      *
      * @param	properties the properties for configuring this service
      * @param	componentRegistry the registry of configured {@link Service}
      *		instances
-     * @throws	IllegalArgumentException if the <code>APP_NAME_PROPERTY</code>
-     *		is not specified, if the value of the
-     *		<code>DEBUG_CHECK_INTERVAL_PROPERTY</code> is not a valid
-     *		integer, or if the data store constructor detects an illegal
-     *		property value
+     * @throws	IllegalArgumentException if the <code>com.sun.sgs.appName
+     *		</code> property is not specified, if the value of the
+     *		<code>com.sun.sgs.impl.service.data.debugCheckInterval</code>
+     *		property is not a valid integer, or if the data store
+     *		constructor detects an illegal property value
      */
     public DataServiceImpl(
 	Properties properties, ComponentRegistry componentRegistry)
@@ -282,7 +333,7 @@ public class DataServiceImpl implements DataService, TransactionParticipant {
 	    if (result) {
 		currentContext.set(null);
 	    }
-	    if (logger.isLoggable(Level.FINE)) {
+	    if (logger.isLoggable(Level.FINER)) {
 		logger.log(Level.FINER, "prepare txn:{0} returns {1}",
 			   txn, result);
 	    }

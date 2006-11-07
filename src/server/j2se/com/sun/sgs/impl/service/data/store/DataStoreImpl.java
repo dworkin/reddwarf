@@ -33,44 +33,133 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /*
- * XXX: Implement recovery for prepared transactions
+ * XXX: Implement recovery for prepared transactions after a crash.
+ * -tjb@sun.com (11/07/2006)
  */
-/** Provides an implementation of <code>DataStore</code>. */
+
+/**
+ * Provides an implementation of <code>DataStore</code> based on <a href=
+ * "http://www.oracle.com/database/berkeley-db.html">Berkeley DB</a>. <p>
+ *
+ * Operations on this class will throw an {@link Error} if the underlying
+ * Berkeley DB database requires recovery.  In that case, callers need to
+ * restart the server or create a new instance of this class. <p>
+ *
+ * Note that, although this class provides support for the {@link
+ * TransactionParticipant#prepare TransactionParticipant.prepare} method, it
+ * does not provide facilities for resolving prepared transactions after a
+ * crash.  Callers can work around this limitation by insuring that the
+ * transaction implementation calls {@link
+ * TransactionParticipant#prepareAndCommit
+ * TransactionParticipant.prepareAndCommit} to commit transactions on this
+ * class.  The current transaction implementation calls
+ * <code>prepareAndCommit</code> on durable participants, such as this class,
+ * so the inability to resolve prepared transactions should have no effect at
+ * present. <p>
+ *
+ * The {@link #DataStoreImpl constructor} supports the following properties:
+ * <p>
+ *
+ * <ul>
+ *
+ * <li> <i>Key:</i> <code>com.sun.sgs.txnTimeout</code> <br>
+ *	<i>Default:</i> <code>1000</code> <br>
+ *	The maximum amount of time in milliseconds that a transaction will be
+ *	permitted to run before it is a candidate for being aborted. <p>
+ *
+ * <li> <i>Key:</i> <code>com.sun.sgs.impl.service.data.store.directory</code>
+ *	<br>
+ *	<i>Required</i> <br>
+ *	The directory in which to store database files.  Each instance of
+ *	<code>DataStoreImpl</code> requires its own, unique directory. <p>
+ *
+ * <li> <i>Key:</i> <code>
+ *	com.sun.sgs.impl.service.data.store.allocationBlockSize</code> <br>
+ *	<i>Default:</i> <code>100</code> <br>
+ *	The number of object IDs to allocate at a time.  Object IDs are
+ *	allocated in an independent transaction, and are discarded if a
+ *	transaction aborts, if a managed object is made reachable within the
+ *	data store but is removed from the store before the transaction
+ *	commits, or if the program exits before it uses the object IDs it has
+ *	allocated.  This number limits the maximum number of object IDs that
+ *	would be discarded when the program exits. <p>
+ *
+ * <li> <i>Key:</i> <code>com.sun.sgs.impl.service.data.store.cacheSize</code>
+ *	<br>
+ *	<i>Default:</i> <code>1000000</code> <br>
+ *	The size in bytes of the Berkeley DB cache.  This value must not be
+ *	less than 20000. <p>
+ *
+ * <li> <i>Key:</i> <code>com.sun.sgs.impl.service.data.store.flushToDisk
+ *	</code> <br>
+ *	<i>Default:</i> <code>false</code>
+ *	Whether to flush changes to disk when a transaction commits.  If
+ *	<code>false</code>, the modifications made in some of the most recent
+ *	transactions may be lost if the host crashes, although data integrity
+ *	will be maintained.  Flushing changes to disk avoids data loss but
+ *	introduces a significant reduction in performance. <p>
+ *
+ * <li> <i>Key:</i> <code>com.sun.sgs.impl.service.data.store.logStats</code>
+ *	<br>
+ *	<i>Default:</i> <code>Integer.MAX_VALUE</code> <br>
+ *	The number of transactions between logging database statistics. <p>
+ *
+ * </ul> <p>
+ *
+ * This class uses the {@link Logger} named
+ * <code>com.sun.sgs.impl.service.data.DataStoreImpl</code> to log information
+ * at the following logging levels: <p>
+ *
+ * <ul>
+ * <li> {@link Level#SEVERE SEVERE} - Initialization failures
+ * <li> {@link Level#WARNING WARNING} - Berkeley DB errors
+ * <li> {@link Level#INFO INFO} - Berkeley DB statistics
+ * <li> {@link Level#CONFIG CONFIG} - Constructor properties, data store
+ *	headers
+ * <li> {@link Level#FINE FINE} - Berkeley DB messages, allocating blocks of
+ *	object IDs
+ * <li> {@link Level#FINER FINER} - Transaction operations
+ * <li> {@link Level#FINEST FINEST} - Name and object operations
+ * </ul>
+ */
 public final class DataStoreImpl implements DataStore, TransactionParticipant {
 
     /** The property that specifies the transaction timeout in milliseconds. */
-    private static final String TXN_TIMEOUT_PROPERTY =
+    public static final String TXN_TIMEOUT_PROPERTY =
 	"com.sun.sgs.txnTimeout";
 
     /** The default transaction timeout in milliseconds. */
     private static final long DEFAULT_TXN_TIMEOUT = 1000;
 
-    /** This class name. */
+    /** The name of this class. */
     private static final String CLASSNAME = DataStoreImpl.class.getName();
 
     /**
      * The property that specifies the directory in which to store database
      * files.
      */
-    private static final String DIRECTORY_PROPERTY =
-	CLASSNAME + ".directory";
+    public static final String DIRECTORY_PROPERTY = CLASSNAME + ".directory";
 
     /**
      * The property that specifies the number of object IDs to allocate at one
      * time.
      */
-    private static final String ALLOCATION_BLOCK_SIZE_PROPERTY =
+    public static final String ALLOCATION_BLOCK_SIZE_PROPERTY =
 	CLASSNAME + ".allocationBlockSize";
 
     /** The default for the number of object IDs to allocate at one time. */
     private static final int DEFAULT_ALLOCATION_BLOCK_SIZE = 100;
 
     /**
-     * The property that specifies the number of transactions between logging
-     * database statistics.
+     * The property that specifies the size in bytes of the Berkeley DB cache.
      */
-    private static final String LOG_STATS_PROPERTY =
-	CLASSNAME + ".logStats";
+    public static final String CACHE_SIZE_PROPERTY = CLASSNAME + ".cacheSize";
+
+    /** The minimum cache size, as specified by Berkeley DB */
+    private static final long MIN_CACHE_SIZE = 20000;
+
+    /** The default cache size. */
+    private static final long DEFAULT_CACHE_SIZE = 1000000L;
 
     /**
      * The property that specifies whether to flush changes to disk on
@@ -78,8 +167,14 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
      * false, some recent transactions may be lost in the event of a crash,
      * although integrity will be maintained.
      */
-    private static final String FLUSH_TO_DISK_PROPERTY =
+    public static final String FLUSH_TO_DISK_PROPERTY =
 	CLASSNAME + ".flushToDisk";
+
+    /**
+     * The property that specifies the number of transactions between logging
+     * database statistics.
+     */
+    public static final String LOG_STATS_PROPERTY = CLASSNAME + ".logStats";
 
     /** The logger for this class. */
     static final LoggerWrapper logger =
@@ -94,13 +189,17 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
     /** The number of object IDs to allocate at one time. */
     private final int allocationBlockSize;
 
+    /** The number of transactions between logging database statistics. */
     private final int logStats;
-    private int logStatsCount;
 
     /** The Berkeley DB environment. */
     private final Environment env;
 
-    /** The Berkeley DB database that holds additional information. */
+    /**
+     * The Berkeley DB database that holds version and next object ID
+     * information.  This information is stored in a separate database to avoid
+     * concurrency conflicts between the object ID and other data.
+     */
     private final Database info;
 
     /** The Berkeley DB database that maps object IDs to object bytes. */
@@ -120,16 +219,21 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
     private final Object objectIdLock = new Object();
 
     /**
-     * The next object ID to use for allocating an object.  Valid if not
-     * greater than lastObjectId.
+     * The next object ID to use for creating an object.  Valid if not greater
+     * than lastObjectId.
      */
     private long nextObjectId = 0;
 
     /**
      * The last object ID that is free for allocating an object before needing
-     * to obtain more numbers from the database.
+     * to obtain more IDs from the database.
      */
-    private long lastObjectId = 0;
+    private long lastObjectId = -1;
+
+    /**
+     * The number of transactions since the database statistics were logged.
+     */
+    private int logStatsCount = 0;
 
     /** Stores transaction information. */
     private static class TxnInfo {
@@ -171,16 +275,20 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 
     /**
      * Creates an instance of this class configured with the specified
-     * properties.
+     * properties.  See the {@link DataStoreImpl class documentation} for a
+     * list of supported properties.
      *
      * @param	properties the properties for configuring this instance
      * @throws	DataStoreException if there is a problem with the database
-     * @throws	IllegalArgumentException if the <code>DIRECTORY_PROPERTY</code>
-     *		property is not specified, or if the value of the
-     *		<code>ALLOCATION_BLOCK_SIZE_PROPERTY</code> is not a valid
-     *		integer greater than zero
+     * @throws	IllegalArgumentException if the <code>
+     *		com.sun.sgs.impl.service.data.store.directory</code> property
+     *		is not specified, or if the value of the <code>
+     *		com.sun.sgs.impl.service.data.store.allocationBlockSize</code>
+     *		property is not a valid integer greater than zero
      */
     public DataStoreImpl(Properties properties) {
+	logger.log(
+	    Level.CONFIG, "Creating DataStoreImpl properties:{0}", properties);
 	directory = properties.getProperty(DIRECTORY_PROPERTY);
 	if (directory == null) {
 	    throw new IllegalArgumentException("Directory must be specified");
@@ -272,8 +380,15 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    properties, TXN_TIMEOUT_PROPERTY, DEFAULT_TXN_TIMEOUT);
 	boolean flushToDisk = PropertiesUtil.getBooleanProperty(
 	    properties, FLUSH_TO_DISK_PROPERTY, false);
+	long cacheSize = PropertiesUtil.getLongProperty(
+	    properties, CACHE_SIZE_PROPERTY, DEFAULT_CACHE_SIZE);
+	if (cacheSize < MIN_CACHE_SIZE) {
+	    throw new IllegalArgumentException(
+		"The cache size must not be less than " + MIN_CACHE_SIZE);
+	}
         EnvironmentConfig config = new EnvironmentConfig();
         config.setAllowCreate(true);
+	config.setCacheSize(cacheSize);
 	config.setErrorHandler(new LoggingErrorHandler());
         config.setInitializeCache(true);
         config.setInitializeLocking(true);
@@ -297,13 +412,14 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 
     /** {@inheritDoc} */
     public long createObject(Transaction txn) {
+	logger.log(Level.FINEST, "createObject txn:{0}", txn);
 	RuntimeException exception;
 	try {
 	    checkTxn(txn);
 	    long result;
 	    synchronized (objectIdLock) {
-		if (nextObjectId >= lastObjectId) {
-		    logger.log(Level.FINE, "Obtaining more object IDs");
+		if (nextObjectId > lastObjectId) {
+		    logger.log(Level.FINE, "Allocate more object IDs");
 		    long newNextObjectId;
 		    com.sleepycat.db.Transaction bdbTxn =
 			env.beginTransaction(null, null);
@@ -319,7 +435,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 			}
 		    }
 		    nextObjectId = newNextObjectId;
-		    lastObjectId = newNextObjectId + allocationBlockSize;
+		    lastObjectId = newNextObjectId + allocationBlockSize - 1;
 		}
 		result = nextObjectId++;
 	    }
@@ -335,12 +451,16 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    exception = e;
 	}
 	logger.logThrow(
-	    Level.FINEST, "createObject txn:{0} fails", exception, txn);
+	    Level.FINEST, "createObject txn:{0} throws", exception, txn);
 	throw exception;
     }
 
     /** {@inheritDoc} */
     public void markForUpdate(Transaction txn, long oid) {
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(Level.FINEST, "markForUpdate txn:{0}, oid:{1,number,#}",
+		       txn, oid);
+	}
 	/*
 	 * Berkeley DB doesn't seem to provide a way to obtain a write lock
 	 * without reading or writing, so get the object and ask for a write
@@ -357,7 +477,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
 		    Level.FINEST,
-		    "markForUpdate txn:{0}, oid:{1,number,#} fails",
+		    "markForUpdate txn:{0}, oid:{1,number,#} throws",
 		    e, txn, oid);
 	    }
 	    throw e;
@@ -366,6 +486,11 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 
     /** {@inheritDoc} */
     public byte[] getObject(Transaction txn, long oid, boolean forUpdate) {
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(Level.FINEST,
+		       "getObject txn:{0}, oid:{1,number,#}, forUpdate:{2}",
+		       txn, oid, forUpdate);
+	}
 	try {
 	    byte[] result = getObjectInternal(txn, oid, forUpdate);
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -378,10 +503,10 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    return result;
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
-		logger.logThrow(
-		    Level.FINEST,
-		    "getObject txn:{0}, oid:{1,number,#}, forUpdate:{2} fails",
-		    e, txn, oid, forUpdate);
+		logger.logThrow(Level.FINEST,
+				"getObject txn:{0}, oid:{1,number,#}, " +
+				"forUpdate:{2} throws",
+				e, txn, oid, forUpdate);
 	    }
 	    throw e;
 	}
@@ -415,6 +540,10 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 
     /** {@inheritDoc} */
     public void setObject(Transaction txn, long oid, byte[] data) {
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(Level.FINEST, "setObject txn:{0}, oid:{1,number,#}",
+		       txn, oid);
+	}
 	RuntimeException exception;
 	try {
 	    checkId(oid);
@@ -444,7 +573,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	}
 	if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
-		    Level.FINEST, "setObject txn:{0}, oid:{1,number,#} fails",
+		    Level.FINEST, "setObject txn:{0}, oid:{1,number,#} throws",
 		    exception, txn, oid);
 	}
 	throw exception;
@@ -452,6 +581,10 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 
     /** {@inheritDoc} */
     public void removeObject(Transaction txn, long oid) {
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(Level.FINEST, "removeObject txn:{0}, oid:{1,number,#}",
+		       txn, oid);
+	}
 	RuntimeException exception;
 	try {
 	    checkId(oid);
@@ -479,7 +612,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	}
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.logThrow(Level.FINEST,
-			    "removeObject txn:{0}, oid:{1,number,#} fails",
+			    "removeObject txn:{0}, oid:{1,number,#} throws",
 			    exception, txn, oid);
 	}
 	throw exception;
@@ -487,6 +620,10 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 
     /** {@inheritDoc} */
     public long getBinding(Transaction txn, String name) {
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(
+		Level.FINEST, "getBinding txn:{0}, name:{1}", txn, name);
+	}
 	RuntimeException exception;
 	try {
 	    if (name == null) {
@@ -518,7 +655,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    exception = e;
 	}
 	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST, "getBinding txn:{0}, name:{1} fails",
+	    logger.log(Level.FINEST, "getBinding txn:{0}, name:{1} throws",
 		       exception, txn, name);
 	}
 	throw exception;
@@ -526,6 +663,11 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 
     /** {@inheritDoc} */
     public void setBinding(Transaction txn, String name, long oid) {
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(
+		Level.FINEST, "setBinding txn:{0}, name:{1}, oid:{2,number,#}",
+		txn, name, oid);
+	}
 	RuntimeException exception;
 	try {
 	    if (name == null) {
@@ -545,8 +687,9 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    txnInfo.modified = true;
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
-		    Level.FINEST, "setBinding txn:{0}, name:{1} returns",
-		    txn, name);
+		    Level.FINEST,
+		    "setBinding txn:{0}, name:{1}, oid:{2,number,#} returns",
+		    txn, name, oid);
 	    }
 	    return;
 	} catch (DatabaseException e) {
@@ -556,14 +699,19 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	}
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.logThrow(
-		Level.FINEST, "setBinding txn:{0}, name:{1} fails",
-		exception, txn, name);
+		Level.FINEST,
+		"setBinding txn:{0}, name:{1}, oid:{2,number,#} throws",
+		exception, txn, name, oid);
 	}
 	throw exception;
     }
 
     /** {@inheritDoc} */
     public void removeBinding(Transaction txn, String name) {
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(
+		Level.FINEST, "removeBinding txn:{0}, name:{1}", txn, name);
+	}
 	RuntimeException exception;
 	try {
 	    if (name == null) {
@@ -593,7 +741,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	}
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.logThrow(
-		Level.FINEST, "removeBinding txn:{0}, name:{1} fails",
+		Level.FINEST, "removeBinding txn:{0}, name:{1} throws",
 		exception, txn, name);
 	}
 	throw exception;
@@ -603,6 +751,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 
     /** {@inheritDoc} */
     public boolean prepare(Transaction txn) {
+	logger.log(Level.FINER, "prepare txn:{0}", txn);
 	RuntimeException exception;
 	try {
 	    if (txn == null) {
@@ -617,24 +766,24 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 		throw new IllegalStateException(
 		    "Transaction has already been prepared");
 	    }
-	    txnInfo.prepared = true;
-	    boolean done = false;
-	    try {
-		if (txnInfo.modified) {
-		    byte[] oid = txn.getId();
-		    byte[] gid = new byte[128];
-		    System.arraycopy(
-			oid, 0, gid, 128 - oid.length, oid.length);
-		    txnInfo.bdbTxn.prepare(gid);
-		} else {
-		    txnInfo.bdbTxn.commit();
-		    threadTxnInfo.set(null);
-		}
-		done = true;
-	    } finally {
-		if (!done) {
-		    txnInfo.prepared = false;
-		}
+	    if (txnInfo.modified) {
+		byte[] oid = txn.getId();
+		/*
+		 * Berkeley DB requires transaction IDs to be at least 128
+		 * bytes long.  -tjb@sun.com (11/07/2006)
+		 */
+		byte[] gid = new byte[128];
+		System.arraycopy(oid, 0, gid, 128 - oid.length, oid.length);
+		txnInfo.bdbTxn.prepare(gid);
+		txnInfo.prepared = true;
+	    } else {
+		/*
+		 * Clear the transaction information first, since Berkeley DB
+		 * doesn't permit operating on its transaction object after
+		 * commit is called.
+		 */
+		threadTxnInfo.set(null);
+		txnInfo.bdbTxn.commit();
 	    }
 	    boolean result = !txnInfo.modified;
 	    if (logger.isLoggable(Level.FINER)) {
@@ -647,12 +796,13 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	logger.logThrow(Level.FINER, "prepare txn:{0} fails", exception, txn);
+	logger.logThrow(Level.FINER, "prepare txn:{0} throws", exception, txn);
 	throw exception;
     }
 
     /** {@inheritDoc} */
     public void commit(Transaction txn) {
+	logger.log(Level.FINER, "commit txn:{0}", txn);
 	RuntimeException exception;
 	try {
 	    if (txn == null) {
@@ -667,6 +817,11 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 		throw new IllegalStateException(
 		    "Transaction has not been prepared");
 	    }
+	    /*
+	     * Clear the transaction information first, since Berkeley DB
+	     * doesn't permit operating on its transaction object after commit
+	     * is called.
+	     */
 	    threadTxnInfo.set(null);
 	    txnInfo.bdbTxn.commit();
 	    logger.log(Level.FINER, "commit txn:{0} returns", txn);
@@ -676,12 +831,13 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	logger.log(Level.FINER, "commit txn:{0} fails", exception, txn);
+	logger.log(Level.FINER, "commit txn:{0} throws", exception, txn);
 	throw exception;
     }
 
     /** {@inheritDoc} */
     public void prepareAndCommit(Transaction txn) {
+	logger.log(Level.FINER, "prepareAndCommit txn:{0}", txn);
 	RuntimeException exception;
 	try {
 	    if (txn == null) {
@@ -696,6 +852,11 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 		throw new IllegalStateException(
 		    "Transaction has already been prepared");
 	    }
+	    /*
+	     * Clear the transaction information first, since Berkeley DB
+	     * doesn't permit operating on its transaction object after commit
+	     * is called.
+	     */
 	    threadTxnInfo.set(null);
 	    txnInfo.bdbTxn.commit();
 	    logger.log(Level.FINER, "prepareAndCommit txn:{0} returns", txn);
@@ -706,12 +867,13 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    exception = e;
 	}
 	logger.logThrow(
-	    Level.FINER, "prepareAndCommit txn:{0} fails", exception, txn);
+	    Level.FINER, "prepareAndCommit txn:{0} throws", exception, txn);
 	throw exception;
     }
 
     /** {@inheritDoc} */
     public void abort(Transaction txn) {
+	logger.log(Level.FINER, "abort txn:{0}", txn);
 	RuntimeException exception;
 	try {
 	    if (txn == null) {
@@ -723,6 +885,11 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    } else if (!txnInfo.txn.equals(txn)) {
 		throw new IllegalStateException("Wrong transaction");
 	    }
+	    /*
+	     * Clear the transaction information first, since Berkeley DB
+	     * doesn't permit operating on its transaction object after abort
+	     * is called.
+	     */
 	    threadTxnInfo.set(null);
 	    txnInfo.bdbTxn.abort();
 	    logger.log(Level.FINER, "abort txn:{0} returns", txn);
@@ -732,7 +899,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	logger.logThrow(Level.FINER, "abort txn:{0} fails", exception, txn);
+	logger.logThrow(Level.FINER, "abort txn:{0} throws", exception, txn);
 	throw exception;
     }
 
@@ -758,8 +925,8 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
     }
 
     /**
-     * Checks that the transaction is in progress for an operation other than
-     * prepare or commit.
+     * Checks that the correct transaction is in progress, and join if none is
+     * in progress.
      */
     private TxnInfo checkTxn(Transaction txn) throws DatabaseException {
 	if (txn == null) {
@@ -809,7 +976,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	}
     }
 
-    /** Log statistics using the specified transaction. */
+    /** Log statistics for the specified transaction. */
     private void logStats(TxnInfo txnInfo) throws DatabaseException {
 	if (logger.isLoggable(Level.INFO)) {
 	    StringBuilder allCacheFileStats = new StringBuilder();
