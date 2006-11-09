@@ -7,6 +7,8 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 import org.apache.mina.common.IoAcceptor;
 
@@ -26,8 +28,42 @@ public class SocketAcceptor implements IOAcceptor {
     private IoAcceptor acceptor;
     private List<SocketAddress> boundAddresses;
     
+    /**
+     * Constructs a {@code SocketAcceptor} with one separate thread for
+     * processing IO.
+     *
+     */
     public SocketAcceptor() {
-        acceptor = new org.apache.mina.transport.socket.nio.SocketAcceptor();
+        this(1, Executors.newSingleThreadExecutor());
+    }
+    
+    /**
+     * Constructs a {@code SocketAcceptor} using the given {@link Executor}
+     * for thread management.
+     * 
+     * @param executor          An {@code Executor} for controlling thread usage.
+     */
+    public SocketAcceptor(Executor executor) {
+        this(1, executor);
+    }
+    
+    /**
+     * Constructs a {@code SocketAcceptor} using the given {@link Executor}
+     * for thread management.  The {@code numProcessors} parameter refers to
+     * the number of {@code SocketIOProcessors} to initially create.  
+     * A {@code SocketIOProcessor} is a Mina internal implementation detail
+     * that controls the internal processing of the IO.  It is exposed here
+     * to allow clients the option to configure this value.  
+     * 
+     * @param numProcessors             the number of processors for the 
+     *                                  underlying Mina acceptor to create
+     * 
+     * @param executor                  An {@code Executor} for controlling
+     *                                  thread usage.                          
+     */
+    public SocketAcceptor(int numProcessors, Executor executor) {
+        acceptor = new org.apache.mina.transport.socket.nio.SocketAcceptor(
+                                numProcessors, new ExecutorAdapter(executor));
         boundAddresses = new LinkedList<SocketAddress>();
     }
 

@@ -41,7 +41,6 @@ public class AcceptedHandleAdapter implements IoHandler {
      * notify the associated {@code AcceptedHandleListener}.
      */
     public void sessionCreated(IoSession session) throws Exception {
-        System.out.println("AcceptedHandleAdapter sessionCreated");
         SocketHandle handle = new SocketHandle();
         handle.setSession(session);
         listener.newHandle(handle);
@@ -68,11 +67,16 @@ public class AcceptedHandleAdapter implements IoHandler {
     }
 
     public void messageReceived(IoSession session, Object message) throws Exception {
-        org.apache.mina.common.ByteBuffer buffer = 
+        org.apache.mina.common.ByteBuffer minaBuffer = 
                                 (org.apache.mina.common.ByteBuffer) message;
 
         SocketHandle handle = (SocketHandle) session.getAttachment();
-        handle.getIOHandler().messageReceived(buffer.buf(), handle);
+        java.nio.ByteBuffer nioBuffer = 
+                        java.nio.ByteBuffer.allocate(minaBuffer.remaining());
+        nioBuffer.put(minaBuffer.buf());
+        nioBuffer.flip();
+        
+        handle.getIOHandler().messageReceived(nioBuffer, handle);
         
     }
 

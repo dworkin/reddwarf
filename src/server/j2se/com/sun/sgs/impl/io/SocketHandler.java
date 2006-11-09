@@ -34,7 +34,7 @@ public class SocketHandler implements IoHandler {
     }
 
     public void sessionCreated(IoSession session) throws Exception {
-        System.out.println("SocketHandler sessionCreated ");
+        //System.out.println("SocketHandler sessionCreated ");
         
     }
 
@@ -58,9 +58,15 @@ public class SocketHandler implements IoHandler {
     }
 
     public void messageReceived(IoSession session, Object message) throws Exception {
-        org.apache.mina.common.ByteBuffer buffer = 
+        org.apache.mina.common.ByteBuffer minaBuffer = 
                 (org.apache.mina.common.ByteBuffer) message;
-        handler.messageReceived(buffer.buf(), getHandle(session));
+        
+        
+        java.nio.ByteBuffer nioBuffer = 
+                        java.nio.ByteBuffer.allocate(minaBuffer.remaining());
+        nioBuffer.put(minaBuffer.buf());
+        nioBuffer.flip();
+        handler.messageReceived(nioBuffer, getHandle(session));
         
     }
 

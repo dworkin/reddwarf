@@ -3,6 +3,7 @@ package com.sun.sgs.io;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.util.concurrent.Executors;
 
 import com.sun.sgs.impl.io.SocketAcceptor;
 import com.sun.sgs.io.AcceptedHandleListener;
@@ -20,7 +21,7 @@ public class ServerTest implements AcceptedHandleListener, IOHandler {
     IOAcceptor acceptor;
 
     public ServerTest() {
-        acceptor = new SocketAcceptor();
+        acceptor = new SocketAcceptor(Executors.newCachedThreadPool());
     }
 
     public void start() {
@@ -51,7 +52,7 @@ public class ServerTest implements AcceptedHandleListener, IOHandler {
 
     public void disconnected(IOHandle handle) {
         System.out.println("ServerTest: disconnected");
-        acceptor.shutdown();
+        //acceptor.shutdown();
     }
 
     public void exceptionThrown(Throwable exception, IOHandle handle) {
@@ -60,7 +61,7 @@ public class ServerTest implements AcceptedHandleListener, IOHandler {
     }
 
     public void messageReceived(ByteBuffer buffer, IOHandle handle) {
-        System.out.println("ServerTest messageReceived " + buffer.get());
+        System.out.println("ServerTest messageReceived " + buffer.remaining());
         try {
             handle.sendMessage(buffer);
         }

@@ -30,10 +30,10 @@ public class SocketHandle implements IOHandle, IoFutureListener {
     /**
      * {@inheritDoc}
      * 
-     * The incoming buffer should be at "position = limit", that is not flipped.
+     * The incoming buffer should have its position set at the begining of the 
+     * chunk of bytes to be written (that is, the buffer should be "flipped").
      */
     public void sendMessage(ByteBuffer message) throws IOException {
-        message.flip();
         org.apache.mina.common.ByteBuffer minaBuffer = 
             org.apache.mina.common.ByteBuffer.wrap(message);
         session.write(minaBuffer);
