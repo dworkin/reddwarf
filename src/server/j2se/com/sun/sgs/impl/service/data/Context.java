@@ -14,8 +14,9 @@ final class Context {
 
     /**
      * The wrapped transaction, to be passed to the data store.  The wrapping
-     * allows the data service to manage the data store's participation by
-     * itself, rather than revealing it to the transaction coordinator.
+     * allows the data service to manage the data store's transaction
+     * participation by itself, rather than revealing it to the transaction
+     * coordinator.
      */
     final TxnTrampoline txn;
 
@@ -23,7 +24,8 @@ final class Context {
     final TransactionProxy txnProxy;
 
     /**
-     * The number of operations between making checks on the reference table.
+     * The number of operations to skip between checks of the consistency of
+     * the reference table.
      */
     private final int debugCheckInterval;
 
@@ -42,7 +44,10 @@ final class Context {
      */
     TransactionParticipant storeParticipant;
 
-    /** Stores information about managed references. */
+    /**
+     * Stores information about managed references.  This field is logically
+     * part of the ManagedReferenceImpl class.
+     */
     final ReferenceTable refs = new ReferenceTable();
 
     /** Creates an instance of this class. */
@@ -63,8 +68,8 @@ final class Context {
 
     /**
      * Defines a transaction that forwards all operations to another
-     * transaction, except for join, which it ignores.  Use this implementation
-     * for transactions passed to the DataStore in order to mediate its
+     * transaction, except for join, which records the participant.  Pass
+     * instances of this class to the DataStore in order to mediate its
      * participation in the transaction.
      */
     private final class TxnTrampoline implements Transaction {
@@ -127,7 +132,7 @@ final class Context {
 
 	/**
 	 * Checks that the specified transaction equals the original one, and
-	 * throw IllegalStateException if not.
+	 * throws IllegalStateException if not.
 	 */
 	void check(Transaction otherTxn) {
 	    if (!originalTxn.equals(otherTxn)) {
@@ -159,9 +164,7 @@ final class Context {
     }
 
     /** Obtains the reference associated with the specified ID. */
-    private ManagedReferenceImpl<? extends ManagedObject> getReference(
-	long oid)
-    {
+    private ManagedReferenceImpl<?> getReference(long oid) {
 	return ManagedReferenceImpl.getReference(this, oid);
     }
 
@@ -176,7 +179,7 @@ final class Context {
     }
 
     /** Sets the object associated with the specified internal name. */
-    <T extends ManagedObject> void setBinding(String internalName, T object) {
+    void setBinding(String internalName, ManagedObject object) {
 	store.setBinding(txn, internalName, getReference(object).oid);
     }
 
@@ -189,7 +192,7 @@ final class Context {
 
     boolean prepare() throws Exception {
 	txn.setInactive();
-	flushChanges();
+	ManagedReferenceImpl.flushAll(this);
 	if (storeParticipant == null) {
 	    return true;
 	} else {
@@ -206,7 +209,7 @@ final class Context {
 
     void prepareAndCommit() throws Exception {
 	txn.setInactive();
-	flushChanges();
+	ManagedReferenceImpl.flushAll(this);
 	if (storeParticipant != null) {
 	    storeParticipant.prepareAndCommit(txn);
 	}
@@ -227,9 +230,9 @@ final class Context {
      * encounters a problem.
      */
     void maybeCheckReferenceTable() {
-	if (++count >= debugCheckInterval) {
+	if (++count > debugCheckInterval) {
 	    count = 0;
-	    refs.checkState();
+	    ManagedReferenceImpl.checkAllState(this);
 	}
     }
 
@@ -239,12 +242,5 @@ final class Context {
      */
     void checkTxn(Transaction otherTxn) {
 	txn.check(otherTxn);
-    }
-
-    /** Stores all object modifications in the data store. */
-    private void flushChanges() {
-	for (ManagedReferenceImpl ref : refs.getReferences()) {
-	    ref.flush();
-	}
     }
 }

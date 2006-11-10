@@ -21,7 +21,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Provides an implementation of <code>DataService</code> using {@link
+ * Provides an implementation of <code>DataService</code> based on {@link
  * DataStoreImpl}. <p>
  *
  * The {@link #DataServiceImpl constructor} supports the following properties:
@@ -30,27 +30,28 @@ import java.util.logging.Logger;
  * <ul>
  *
  * <li> <i>Key:</i> <code>com.sun.sgs.appName</code> <br>
- *	<i>Required</i> <br>
+ *	<i>No default &mdash; required</i> <br>
  *	Specifies the name of the application using this
  *	<code>DataService</code>. <p>
  *
  * <li> <i>Key:</i> <code>com.sun.sgs.impl.service.data.debugCheckInterval
  *	</code> <br>
  *	<i>Default:</i> <code>Integer.MAX_VALUE</code> <br>
- *	Specifies the number of <code>DataService</code> operations between
- *	checks of the consistency of the managed references table.  Note that
- *	the number of operations is measured separately for each
+ *	Specifies the number of <code>DataService</code> operations to skip
+ *	between checks of the consistency of the managed references table.
+ *	Note that the number of operations is measured separately for each
  *	transaction. <p>
  *
  * <li> <i>Key:</i> <code>com.sun.sgs.impl.service.data.detectModifications
  *	</code> <br>
  *	<i>Default:</i> <code>true</code> <br>
  *	Specifies whether to automatically detect modifications to managed
- *	objects.  If set to <code>false</code>, then applications need to call
- *	{@link DataManager#markForUpdate DataManager.markForUpdate} or {@link
- *	ManagedReference#getForUpdate ManagedReference.getForUpdate} for any
- *	modified objects to make sure that the modifications are recorded by
- *	the <code>DataService</code>. <p>
+ *	objects.  If set to something other than <code>true</code>, then
+ *	applications need to call {@link DataManager#markForUpdate
+ *	DataManager.markForUpdate} or {@link ManagedReference#getForUpdate
+ *	ManagedReference.getForUpdate} for any modified objects to make sure
+ *	that the modifications are recorded by the
+ *	<code>DataService</code>. <p>
  *
  * </ul> <p>
  *
@@ -58,8 +59,8 @@ import java.util.logging.Logger;
  * constructor, which supports additional properties. <p>
  *
  * This class uses the {@link Logger} named
- * <code>com.sun.sgs.impl.service.DataServiceImpl</code> to log information at
- * the following logging levels: <p>
+ * <code>com.sun.sgs.impl.service.data.DataServiceImpl</code> to log
+ * information at the following logging levels: <p>
  *
  * <ul>
  * <li> {@link Level#SEVERE SEVERE} - Initialization failures
@@ -67,6 +68,16 @@ import java.util.logging.Logger;
  *	headers
  * <li> {@link Level#FINER FINER} - Transaction operations
  * <li> {@link Level#FINEST FINEST} - Name and object operations
+ * </ul> <p>
+ *
+ * Instances of {@link ManagedReference} returned by the {@link
+ * #createReference createReference} method use the <code>Logger</code> named
+ * <code>com.sun.sgs.impl.service.data.ManagedReferenceImpl</code> to log
+ * information at the following logging levels: <p>
+ *
+ * <ul>
+ * <li> {@link Level#FINE FINE} - Managed reference table checks
+ * <li> <code>FINEST</code> - Reference operations
  * </ul>
  */
 public final class DataServiceImpl
@@ -79,8 +90,8 @@ public final class DataServiceImpl
     private static final String CLASSNAME = DataServiceImpl.class.getName();
 
     /**
-     * The property that specifies after how many operations to check the
-     * consistency of the managed references table.
+     * The property that specifies the number of operations to skip between
+     * checks of the consistency of the managed references table.
      */
     public static final String DEBUG_CHECK_INTERVAL_PROPERTY =
 	CLASSNAME + ".debugCheckInterval";
@@ -116,18 +127,18 @@ public final class DataServiceImpl
     private TransactionProxy txnProxy;
 
     /**
-     * The number of operations between checking the consistency of the managed
-     * reference table.
+     * The number of operations to skip between checks of the consistency of
+     * the managed reference table.
      */
     private int debugCheckInterval;
 
-    /** Whether to detect object modification automatically. */
+    /** Whether to detect object modifications automatically. */
     private boolean detectModifications;
 
     /**
      * Creates an instance of this class configured with the specified
-     * properties.  See the {@link DataServiceImpl class documentation} for the
-     * list of supported properties.
+     * properties and services.  See the {@link DataServiceImpl class
+     * documentation} for the list of supported properties.
      *
      * @param	properties the properties for configuring this service
      * @param	componentRegistry the registry of configured {@link Service}
@@ -164,16 +175,20 @@ public final class DataServiceImpl
 		properties, DETECT_MODIFICATIONS_PROPERTY, Boolean.TRUE);
 	    store = new DataStoreImpl(properties);
 	} catch (RuntimeException e) {
-	    logger.log(Level.SEVERE, "DataService initialization failed", e);
+	    logger.logThrow(
+		Level.SEVERE, "DataService initialization failed", e);
 	    throw e;
 	}
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * @throws	IllegalStateException {@inheritDoc}
-     */
+    /* -- Implement Service -- */
+
+     /** {@inheritDoc} */
+    public String getName() {
+	return toString();
+    }
+
+    /** {@inheritDoc} */
     public void configure(ComponentRegistry registry,
 			  TransactionProxy txnProxy)
     {
@@ -221,14 +236,13 @@ public final class DataServiceImpl
     public void removeObject(ManagedObject object) {
 	try {
 	    if (object == null) {
-		throw new NullPointerException("The argument must not be null");
+		throw new NullPointerException("The object must not be null");
 	    } else if (!(object instanceof Serializable)) {
 		throw new IllegalArgumentException(
 		    "The object must be serializable");
 	    }
 	    Context context = checkContext();
-	    ManagedReferenceImpl<? extends ManagedObject> ref =
-		context.findReference(object);
+	    ManagedReferenceImpl<?> ref = context.findReference(object);
 	    if (ref != null) {
 		ref.removeObject();
 	    }
@@ -236,7 +250,7 @@ public final class DataServiceImpl
 		Level.FINEST, "removeObject object:{0} returns", object);
 	} catch (RuntimeException e) {
 	    logger.logThrow(
-		Level.FINEST, "removeObject object:{0} fails", e, object);
+		Level.FINEST, "removeObject object:{0} throws", e, object);
 	    throw e;
 	}
     }
@@ -245,14 +259,13 @@ public final class DataServiceImpl
     public void markForUpdate(ManagedObject object) {
 	try {
 	    if (object == null) {
-		throw new NullPointerException("The argument must not be null");
+		throw new NullPointerException("The object must not be null");
 	    } else if (!(object instanceof Serializable)) {
 		throw new IllegalArgumentException(
 		    "The object must be serializable");
 	    }
 	    Context context = checkContext();
-	    ManagedReferenceImpl<? extends ManagedObject> ref =
-		context.findReference(object);
+	    ManagedReferenceImpl<?> ref = context.findReference(object);
 	    if (ref != null) {
 		ref.markForUpdate();
 	    }
@@ -260,7 +273,7 @@ public final class DataServiceImpl
 		Level.FINEST, "markForUpdate object:{0} returns", object);
 	} catch (RuntimeException e) {
 	    logger.logThrow(
-		Level.FINEST, "markForUpdate object:{0} fails", e, object);
+		Level.FINEST, "markForUpdate object:{0} throws", e, object);
 	    throw e;
 	}
     }
@@ -271,7 +284,7 @@ public final class DataServiceImpl
     {
 	try {
 	    if (object == null) {
-		throw new NullPointerException("The argument must not be null");
+		throw new NullPointerException("The object must not be null");
 	    } else if (!(object instanceof Serializable)) {
 		throw new IllegalArgumentException(
 		    "The object must be serializable");
@@ -286,7 +299,7 @@ public final class DataServiceImpl
 	    return result;
 	} catch (RuntimeException e) {
 	    logger.logThrow(
-		Level.FINEST, "createReference object:{0} fails", e, object);
+		Level.FINEST, "createReference object:{0} throws", e, object);
 	    throw e;
 	}
     }
@@ -313,22 +326,9 @@ public final class DataServiceImpl
     /* -- Implement TransactionParticipant -- */
 
     /** {@inheritDoc} */
-    public String getName() {
-	return toString();
-    }
-
-    /** {@inheritDoc} */
     public boolean prepare(Transaction txn) throws Exception {
 	try {
-	    if (txn == null) {
-		throw new TransactionNotActiveException(
-		    "No transaction is active");
-	    }
-	    Context context = currentContext.get();
-	    if (context == null) {
-		throw new IllegalStateException("No context");
-	    }
-	    context.checkTxn(txn);
+	    Context context = checkContext(txn);
 	    boolean result = context.prepare();
 	    if (result) {
 		currentContext.set(null);
@@ -339,7 +339,7 @@ public final class DataServiceImpl
 	    }
 	    return result;
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINER, "prepare txn:{0} fails", e, txn);
+	    logger.logThrow(Level.FINER, "prepare txn:{0} throws", e, txn);
 	    throw e;
 	}
     }
@@ -347,19 +347,12 @@ public final class DataServiceImpl
     /** {@inheritDoc} */
     public void commit(Transaction txn) {
 	try {
-	    if (txn == null) {
-		throw new IllegalStateException("No transaction");
-	    }
-	    Context context = currentContext.get();
-	    if (context == null) {
-		throw new IllegalStateException("Not joined");
-	    }
-	    context.checkTxn(txn);
+	    Context context = checkContext(txn);
 	    currentContext.set(null);
 	    context.commit();
 	    logger.log(Level.FINER, "commit txn:{0} returns", txn);
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINER, "commit txn:{0} fails", e, txn);
+	    logger.logThrow(Level.FINER, "commit txn:{0} throws", e, txn);
 	    throw e;
 	}
     }
@@ -367,20 +360,13 @@ public final class DataServiceImpl
     /** {@inheritDoc} */
     public void prepareAndCommit(Transaction txn) throws Exception {
 	try {
-	    if (txn == null) {
-		throw new IllegalStateException("No transaction");
-	    }
-	    Context context = currentContext.get();
-	    if (context == null) {
-		throw new IllegalStateException("Not joined");
-	    }
-	    context.checkTxn(txn);
+	    Context context = checkContext(txn);
 	    currentContext.set(null);
 	    context.prepareAndCommit();
 	    logger.log(Level.FINER, "prepareAndCommit txn:{0} returns", txn);
 	} catch (RuntimeException e) {
 	    logger.logThrow(
-		Level.FINER, "prepareAndCommit txn:{0} fails", e, txn);
+		Level.FINER, "prepareAndCommit txn:{0} throws", e, txn);
 	    throw e;
 	}
     }
@@ -388,19 +374,12 @@ public final class DataServiceImpl
     /** {@inheritDoc} */
     public void abort(Transaction txn) {
 	try {
-	    if (txn == null) {
-		throw new IllegalStateException("No transaction");
-	    }
-	    Context context = currentContext.get();
-	    if (context == null) {
-		throw new IllegalStateException("Not joined");
-	    }
-	    context.checkTxn(txn);
+	    Context context = checkContext(txn);
 	    currentContext.set(null);
 	    context.abort();
 	    logger.log(Level.FINER, "abort txn:{0} returns", txn);
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINER, "abort txn:{0} fails", e, txn);
+	    logger.logThrow(Level.FINER, "abort txn:{0} throws", e, txn);
 	    throw e;
 	}
     }
@@ -435,7 +414,7 @@ public final class DataServiceImpl
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
-		    Level.FINEST, "{0} name:{1}, type:{2} fails", e,
+		    Level.FINEST, "{0} name:{1}, type:{2} throws", e,
 		    serviceBinding ? "getServiceBinding" : "getBinding",
 		    name, type);
 	    }
@@ -465,7 +444,7 @@ public final class DataServiceImpl
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
-		    Level.FINEST, "{0} name:{1}, object:{2} fails", e,
+		    Level.FINEST, "{0} name:{1}, object:{2} throws", e,
 		    serviceBinding ? "setServiceBinding" : "setBinding",
 		    name, object);
 	    }
@@ -477,8 +456,7 @@ public final class DataServiceImpl
     private void removeBindingInternal(String name, boolean serviceBinding) {
 	try {
 	    if (name == null) {
-		throw new NullPointerException(
-		    "The argument must not be null");
+		throw new NullPointerException("The name must not be null");
 	    }
 	    Context context = checkContext();
 	    try {
@@ -496,7 +474,7 @@ public final class DataServiceImpl
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
-		    Level.FINEST, "{0} name:{1} fails", e,
+		    Level.FINEST, "{0} name:{1} throws", e,
 		    serviceBinding ? "removeServiceBinding" : "removeBinding",
 		    name);
 	    }
@@ -516,11 +494,11 @@ public final class DataServiceImpl
     }
 
     /**
-     * Specifies after how many operations to check the consistency of the
-     * managed references table.
+     * Specifies the number of operations to skip between checks of the
+     * consistency of the managed references table.
      *
-     * @param	debugCheckInterval the number of operations between consistency
-     *		checks
+     * @param	debugCheckInterval the number of operations to skip between
+     *		checks of the consistency of the managed references table
      */
     public void setDebugCheckInterval(int debugCheckInterval) {
 	synchronized (lock) {
@@ -566,6 +544,25 @@ public final class DataServiceImpl
 	} else {
 	    context.checkTxn(txn);
 	}
+	context.maybeCheckReferenceTable();
+	return context;
+    }
+
+    /**
+     * Checks that the specified transaction matches the current context, and
+     * returns the current context.  Throws NullPointerException if the
+     * transaction is null, and IllegalStateException if another or no
+     * transaction has been joined.
+     */
+    private Context checkContext(Transaction txn) {
+	if (txn == null) {
+	    throw new NullPointerException("The transaction must not be null");
+	}
+	Context context = currentContext.get();
+	if (context == null) {
+	    throw new IllegalStateException("Not joined");
+	}
+	context.checkTxn(txn);
 	context.maybeCheckReferenceTable();
 	return context;
     }

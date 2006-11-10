@@ -50,28 +50,44 @@ public class TestPerformance extends TestCase {
     /** Provides the test suite to the test runner. */
     public static Test suite() { return suite; }
 
+    /** The name of the DataStoreImpl class. */
     private static final String DataStoreImplClass =
 	"com.sun.sgs.impl.service.data.store.DataStoreImpl";
+
+    /** The name of the DataServiceImpl class. */
     private static final String DataServiceImplClass =
 	DataServiceImpl.class.getName();
 
+    /** The number of objects to read in a transaction. */
     private static int items = Integer.getInteger("test.items", 400);
+
+    /**
+     * The number of objects to modify in a transaction, if doing modification.
+     */
     private static int modifyItems =
 	Integer.getInteger("test.modifyItems", 200);
+
+    /** The number of times to run the test while timing. */
     private static int count = Integer.getInteger("test.count", 60);
+
+    /** The number of times to repeat the timing. */
     private static int repeat = Integer.getInteger("test.repeat", 5);
+
+    /** Whether to flush to disk on transaction commits. */
     private static boolean testFlush = Boolean.getBoolean("test.flush");
+
+    /** The number of transactions between logging database statistics. */
     private static int logStats = Integer.getInteger(
 	"test.logStats", Integer.MAX_VALUE);
+
+    /** Whether to do logging, which is otherwise disabled. */
     private static boolean doLogging = Boolean.getBoolean("test.doLogging");
 
+    /** Print test parameters. */
     static {
 	System.err.println("Parameters: test.items=" + items +
 			   ", test.modifyItems=" + modifyItems);
     }
-
-    private DummyComponentRegistry componentRegistry =
-	new DummyComponentRegistry();
 
     /** Set when the test passes. */
     private boolean passed;
@@ -79,8 +95,14 @@ public class TestPerformance extends TestCase {
     /** A per-test database directory, or null if not created. */
     private String directory;
 
-    private DummyTransactionProxy txnProxy;
+    /** A transaction proxy. */
+    private DummyTransactionProxy txnProxy = new DummyTransactionProxy();
 
+    /** A component registry. */
+    private DummyComponentRegistry componentRegistry =
+	new DummyComponentRegistry();
+
+    /** An initial, open transaction. */
     private DummyTransaction txn;
 
     /** Creates the test. */
@@ -88,18 +110,21 @@ public class TestPerformance extends TestCase {
 	super(name);
     }
 
-    /** Prints the test case. */
+    /**
+     * Prints the test case, initializes the transaction, and disables logging
+     * if necessary.
+     */
     protected void setUp() {
 	System.err.println("Testcase: " + getName());
-	txnProxy = new DummyTransactionProxy();
 	createTransaction();
 	if (!doLogging) {
-	    LogManager logManager = LogManager.getLogManager();
-	    Enumeration<String> loggerNames = logManager.getLoggerNames();
-	    while (loggerNames.hasMoreElements()) {
+	    /* Disable logging */
+	    for (Enumeration<String> loggerNames =
+		     LogManager.getLogManager().getLoggerNames();
+		 loggerNames.hasMoreElements(); )
+	    {
 		String loggerName = loggerNames.nextElement();
-		Logger logger = Logger.getLogger(loggerName);
-		logger.setLevel(Level.WARNING);
+		Logger.getLogger(loggerName).setLevel(Level.WARNING);
 	    }
 	}
     }
@@ -112,7 +137,7 @@ public class TestPerformance extends TestCase {
 
     /**
      * Deletes the directory if the test passes and the directory was
-     * created.
+     * created, and reinitializes logging.
      */
     protected void tearDown() throws Exception {
 	if (passed && directory != null) {
@@ -121,54 +146,6 @@ public class TestPerformance extends TestCase {
 	if (!doLogging) {
 	    LogManager.getLogManager().readConfiguration();
 	}
-    }
-
-    /** Creates a per-test directory. */
-    private String createDirectory() throws IOException {
-	File dir = File.createTempFile(getName(), "dbdir");
-	if (!dir.delete()) {
-	    throw new RuntimeException("Problem deleting file: " + dir);
-	}
-	if (!dir.mkdir()) {
-	    throw new RuntimeException(
-		"Failed to create directory: " + dir);
-	}
-	directory = dir.getPath();
-	return directory;
-    }
-
-    /** Deletes the specified directory, if it exists. */
-    private static void deleteDirectory(String directory) {
-	File dir = new File(directory);
-	if (dir.exists()) {
-	    for (File f : dir.listFiles()) {
-		if (!f.delete()) {
-		    throw new RuntimeException("Failed to delete file: " + f);
-		}
-	    }
-	    if (!dir.delete()) {
-		throw new RuntimeException(
-		    "Failed to delete directory: " + dir);
-	    }
-	}
-    }
-
-    /** Creates a property list with the specified keys and values. */
-    private static Properties createProperties(String... args) {
-	Properties props = new Properties();
-	if (args.length % 2 != 0) {
-	    throw new RuntimeException("Odd number of arguments");
-	}
-	for (int i = 0; i < args.length; i += 2) {
-	    props.setProperty(args[i], args[i + 1]);
-	}
-	return props;
-    }
-
-    private DummyTransaction createTransaction() {
-	txn = new DummyTransaction(true);
-	txnProxy.setCurrentTransaction(txn);
-	return txn;
     }
 
     /* -- Tests -- */
@@ -231,9 +208,7 @@ public class TestPerformance extends TestCase {
 	}
     }
 
-    void doTestWrite(boolean detectMods, boolean flush)
-	throws Exception
-    {
+    void doTestWrite(boolean detectMods, boolean flush) throws Exception {
 	Properties props = createProperties(
 	    DataStoreImplClass + ".directory", createDirectory(),
 	    "com.sun.sgs.appName", "TestPerformance",
@@ -271,6 +246,57 @@ public class TestPerformance extends TestCase {
 
     /* -- Other methods and classes -- */
 
+    /** Creates a per-test directory. */
+    private String createDirectory() throws IOException {
+	File dir = File.createTempFile(getName(), "dbdir");
+	if (!dir.delete()) {
+	    throw new RuntimeException("Problem deleting file: " + dir);
+	}
+	if (!dir.mkdir()) {
+	    throw new RuntimeException(
+		"Failed to create directory: " + dir);
+	}
+	directory = dir.getPath();
+	return directory;
+    }
+
+    /** Deletes the specified directory, if it exists. */
+    private static void deleteDirectory(String directory) {
+	File dir = new File(directory);
+	if (dir.exists()) {
+	    for (File f : dir.listFiles()) {
+		if (!f.delete()) {
+		    throw new RuntimeException("Failed to delete file: " + f);
+		}
+	    }
+	    if (!dir.delete()) {
+		throw new RuntimeException(
+		    "Failed to delete directory: " + dir);
+	    }
+	}
+    }
+
+    /** Creates a property list with the specified keys and values. */
+    private static Properties createProperties(String... args) {
+	Properties props = new Properties();
+	if (args.length % 2 != 0) {
+	    throw new RuntimeException("Odd number of arguments");
+	}
+	for (int i = 0; i < args.length; i += 2) {
+	    props.setProperty(args[i], args[i + 1]);
+	}
+	return props;
+    }
+
+    /** Creates a new transaction. */
+    private DummyTransaction createTransaction() {
+	/* Make sure to use prepareAndCommit */
+	txn = new DummyTransaction(true);
+	txnProxy.setCurrentTransaction(txn);
+	return txn;
+    }
+
+    /** A managed object that maintains a list of Counter instances. */
     static class Counters implements ManagedObject, Serializable {
 	private static final long serialVersionUID = 1;
 	private List<ManagedReference<Counter>> counters =
@@ -285,6 +311,7 @@ public class TestPerformance extends TestCase {
 	}
     }
 
+    /** A simple managed object that maintains a count. */
     static class Counter implements ManagedObject, Serializable {
 	private static final long serialVersionUID = 1;
 	private int count;

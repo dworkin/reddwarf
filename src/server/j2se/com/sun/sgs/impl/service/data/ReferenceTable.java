@@ -1,32 +1,23 @@
 package com.sun.sgs.impl.service.data;
 
 import com.sun.sgs.app.ManagedObject;
-import com.sun.sgs.impl.util.LoggerWrapper;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
-/** Stores information about managed references. */
+/**
+ * Stores information about managed references within a particular transaction.
+ * This class is logically part of the ManagedReferenceImpl class.
+ */
 final class ReferenceTable {
 
-    /** The logger for this class. */
-    private static final LoggerWrapper logger =
-	new LoggerWrapper(Logger.getLogger(ReferenceTable.class.getName()));
-
     /** Maps object IDs to managed references. */
-    private final Map<Long,
-		      ManagedReferenceImpl<? extends ManagedObject>> oids =
-	new HashMap<Long, ManagedReferenceImpl<? extends ManagedObject>>();
+    private final Map<Long, ManagedReferenceImpl<?>> oids =
+	new HashMap<Long, ManagedReferenceImpl<?>>();
 
     /** Maps managed objects to managed references. */
-    private final Map<ManagedObject,
-		      ManagedReferenceImpl<? extends ManagedObject>> objects =
-	new HashMap<ManagedObject,
-		    ManagedReferenceImpl<? extends ManagedObject>>();
+    private final Map<ManagedObject, ManagedReferenceImpl<?>> objects =
+	new HashMap<ManagedObject, ManagedReferenceImpl<?>>();
 
     /** Creates an instance of this class. */
     ReferenceTable() { }
@@ -37,6 +28,11 @@ final class ReferenceTable {
      */
     <T extends ManagedObject> ManagedReferenceImpl<T> find(T object) {
 	assert object != null : "Object is null";
+	/*
+	 * Managed references always have the same type as the managed objects
+	 * they refer to, so this cast is actually safe to perform, since we
+	 * have the object in hand.  -tjb@sun.com (11/08/2006)
+	 */
 	@SuppressWarnings("unchecked")
 	    ManagedReferenceImpl<T> result =
 	        (ManagedReferenceImpl<T>) objects.get(object);
@@ -47,21 +43,21 @@ final class ReferenceTable {
      * Finds the managed reference associated with an object ID, returning null
      * if no reference is found.
      */
-    ManagedReferenceImpl<? extends ManagedObject> find(long oid) {
+    ManagedReferenceImpl<?> find(long oid) {
 	assert oid >= 0 : "Object ID is negative";
 	return oids.get(oid);
     }
 
     /** Adds a new managed reference to this table. */
-    void add(ManagedReferenceImpl<? extends ManagedObject> ref) {
-	Object existing = oids.put(ref.oid, ref);
-	assert existing == null
+    void add(ManagedReferenceImpl<?> ref) {
+	assert !oids.containsKey(ref.oid)
 	    : "Found existing reference for oid:" + ref.oid;
+	oids.put(ref.oid, ref);
 	ManagedObject object = ref.getObject();
 	if (object != null) {
-	    existing = objects.put(object, ref);
-	    assert existing == null
+	    assert !objects.containsKey(object)
 		: "Found existing reference for object with oid:" + ref.oid;
+	    objects.put(object, ref);
 	}
     }
 
@@ -69,17 +65,26 @@ final class ReferenceTable {
      * Updates this table for a reference that has been newly associated with
      * an object.
      */
-    void registerObject(ManagedReferenceImpl<? extends ManagedObject> ref) {
+    void registerObject(ManagedReferenceImpl<?> ref) {
 	assert oids.get(ref.oid) == ref
 	    : "Found duplicate references for oid: " + ref.oid;
 	assert ref.getObject() != null : "Object is null for oid:" + ref.oid;
-	Object existing = objects.put(ref.getObject(), ref);
-	assert existing == null
+	assert !objects.containsKey(ref.getObject())
 	    : "Found existing reference for object with oid: " + ref.oid;
+	objects.put(ref.getObject(), ref);
+    }
+
+    /**
+     * Updates this table for a reference that is no longer associated with an
+     * object.
+     */
+    void unregisterObject(ManagedObject object) {
+	assert objects.containsKey(object) : "Object was not found";
+	objects.remove(object);
     }
 
     /** Removes a managed reference from this table. */
-    void remove(ManagedReferenceImpl<? extends ManagedObject> ref) {
+    void remove(ManagedReferenceImpl<?> ref) {
 	Object existing = oids.remove(ref.oid);
 	assert existing == ref
 	    : "Found duplicate reference for oid:" + ref.oid;
@@ -91,24 +96,22 @@ final class ReferenceTable {
 	}
     }
 
-    /** Obtains the managed references in this table. */
-    Collection<ManagedReferenceImpl<? extends ManagedObject>> getReferences() {
-	return Collections.unmodifiableCollection(objects.values());
+    /** Saves all object modifications to the data store. */
+    void flushChanges() {
+	for (ManagedReferenceImpl<?> ref : oids.values()) {
+	    ref.flush();
+	}
     }
 
     /**
      * Checks the consistency of this table, throwing an exception if a problem
      * is found.
      */
-    void checkState() {
-	logger.log(Level.FINE, "Checking state");
+    void checkAllState() {
 	int objectCount = 0;
-	for (Entry<Long, ManagedReferenceImpl<? extends ManagedObject>> entry :
-		 oids.entrySet())
-	{
+	for (Entry<Long, ManagedReferenceImpl<?>> entry : oids.entrySet()) {
 	    long oid = entry.getKey();
-	    ManagedReferenceImpl<? extends ManagedObject> ref =
-		entry.getValue();
+	    ManagedReferenceImpl<?> ref = entry.getValue();
 	    ref.checkState();
 	    if (ref.isRemoved()) {
 		throw new IllegalStateException(
@@ -121,10 +124,13 @@ final class ReferenceTable {
 	    }
 	    Object object = ref.getObject();
 	    if (object != null) {
-		if (!ref.equals(objects.get(object))) {
+		ManagedReferenceImpl<?> objectsRef = objects.get(object);
+		if (objectsRef == null) {
 		    throw new IllegalStateException(
-			"Missing entry in objects for oid = " + ref.oid +
-			", object = " + object);
+			"Missing objects entry for oid = " + ref.oid);
+		} else if (!ref.equals(objectsRef)) {
+		    throw new IllegalStateException(
+			"Wrong objects entry for oid = " + ref.oid);
 		}
 		objectCount++;
 	    }

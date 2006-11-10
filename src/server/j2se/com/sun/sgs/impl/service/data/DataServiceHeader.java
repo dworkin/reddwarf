@@ -36,7 +36,7 @@ final class DataServiceHeader implements ManagedObject, Serializable {
      *
      * @serial
      */
-    private final String appName;
+    final String appName;
 
     /**
      * Creates an instance of this class with the specified application

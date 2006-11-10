@@ -42,20 +42,39 @@ public class TestPerformance extends TestCase {
     /** Provides the test suite to the test runner. */
     public static Test suite() { return suite; }
 
+    /** The name of the DataStoreImpl class. */
     private static final String DataStoreImplClass =
 	DataStoreImpl.class.getName();
 
+    /** The number of objects to read in a transaction. */
     private static int items = Integer.getInteger("test.items", 400);
+
+    /** The size in bytes of each object. */
     private static int itemSize = Integer.getInteger("test.itemSize", 100);
+
+    /**
+     * The number of objects to modify in a transaction, if doing modification.
+     */
     private static int modifyItems =
 	Integer.getInteger("test.modifyItems", 200);
+
+    /** The number of times to run the test while timing. */
     private static int count = Integer.getInteger("test.count", 100);
+
+    /** The number of times to repeat the timing. */
     private static int repeat = Integer.getInteger("test.repeat", 5);
+
+    /** Whether to flush to disk on transaction commits. */
     private static boolean testFlush = Boolean.getBoolean("test.flush");
+
+    /** The number of transactions between logging database statistics. */
     private static int logStats = Integer.getInteger(
 	"test.logStats", Integer.MAX_VALUE);
+
+    /** Whether to do logging, which is otherwise disabled. */
     private static boolean doLogging = Boolean.getBoolean("test.doLogging");
 
+    /** Print test parameters. */
     static {
 	System.err.println("Parameters: test.items=" + items +
 			   ", test.itemSize=" + itemSize +
@@ -68,25 +87,22 @@ public class TestPerformance extends TestCase {
     /** A per-test database directory, or null if not created. */
     private String directory;
 
-    public static void main(String[] args) throws Exception {
-	new TestPerformance("testReadIds").testReadIds();
-    }
-
     /** Creates the test. */
     public TestPerformance(String name) {
 	super(name);
     }
 
-    /** Prints the test case. */
+    /** Prints the test case and disables logging if necessary. */
     protected void setUp() {
 	System.err.println("Testcase: " + getName());
 	if (!doLogging) {
-	    LogManager logManager = LogManager.getLogManager();
-	    Enumeration<String> loggerNames = logManager.getLoggerNames();
-	    while (loggerNames.hasMoreElements()) {
+	    /* Disable logging */
+	    for (Enumeration<String> loggerNames =
+		     LogManager.getLogManager().getLoggerNames();
+		 loggerNames.hasMoreElements(); )
+	    {
 		String loggerName = loggerNames.nextElement();
-		Logger logger = Logger.getLogger(loggerName);
-		logger.setLevel(Level.WARNING);
+		Logger.getLogger(loggerName).setLevel(Level.WARNING);
 	    }
 	}
     }
@@ -95,61 +111,19 @@ public class TestPerformance extends TestCase {
     protected void runTest() throws Throwable {
 	super.runTest();
 	passed = true;
-	if (!doLogging) {
-	    LogManager.getLogManager().readConfiguration();
-	}
     }
 
     /**
      * Deletes the directory if the test passes and the directory was
-     * created.
+     * created, and reinitializes logging.
      */
     protected void tearDown() throws Exception {
 	if (passed && directory != null) {
 	    deleteDirectory(directory);
 	}
-    }
-
-    /** Creates a per-test directory. */
-    private String createDirectory() throws IOException {
-	File dir = File.createTempFile(getName(), "dbdir");
-	if (!dir.delete()) {
-	    throw new RuntimeException("Problem deleting file: " + dir);
+	if (!doLogging) {
+	    LogManager.getLogManager().readConfiguration();
 	}
-	if (!dir.mkdir()) {
-	    throw new RuntimeException(
-		"Failed to create directory: " + dir);
-	}
-	directory = dir.getPath();
-	return directory;
-    }
-
-    /** Deletes the specified directory, if it exists. */
-    private static void deleteDirectory(String directory) {
-	File dir = new File(directory);
-	if (dir.exists()) {
-	    for (File f : dir.listFiles()) {
-		if (!f.delete()) {
-		    throw new RuntimeException("Failed to delete file: " + f);
-		}
-	    }
-	    if (!dir.delete()) {
-		throw new RuntimeException(
-		    "Failed to delete directory: " + dir);
-	    }
-	}
-    }
-
-    /** Creates a property list with the specified keys and values. */
-    private static Properties createProperties(String... args) {
-	Properties props = new Properties();
-	if (args.length % 2 != 0) {
-	    throw new RuntimeException("Odd number of arguments");
-	}
-	for (int i = 0; i < args.length; i += 2) {
-	    props.setProperty(args[i], args[i + 1]);
-	}
-	return props;
     }
 
     /* -- Tests -- */
@@ -285,5 +259,49 @@ public class TestPerformance extends TestCase {
 	    System.err.println(
 		"Time: " + (stop - start) / count + " ms per transaction");
 	}
+    }
+
+    /* -- Other methods -- */
+
+    /** Creates a per-test directory. */
+    private String createDirectory() throws IOException {
+	File dir = File.createTempFile(getName(), "dbdir");
+	if (!dir.delete()) {
+	    throw new RuntimeException("Problem deleting file: " + dir);
+	}
+	if (!dir.mkdir()) {
+	    throw new RuntimeException(
+		"Failed to create directory: " + dir);
+	}
+	directory = dir.getPath();
+	return directory;
+    }
+
+    /** Deletes the specified directory, if it exists. */
+    private static void deleteDirectory(String directory) {
+	File dir = new File(directory);
+	if (dir.exists()) {
+	    for (File f : dir.listFiles()) {
+		if (!f.delete()) {
+		    throw new RuntimeException("Failed to delete file: " + f);
+		}
+	    }
+	    if (!dir.delete()) {
+		throw new RuntimeException(
+		    "Failed to delete directory: " + dir);
+	    }
+	}
+    }
+
+    /** Creates a property list with the specified keys and values. */
+    private static Properties createProperties(String... args) {
+	Properties props = new Properties();
+	if (args.length % 2 != 0) {
+	    throw new RuntimeException("Odd number of arguments");
+	}
+	for (int i = 0; i < args.length; i += 2) {
+	    props.setProperty(args[i], args[i + 1]);
+	}
+	return props;
     }
 }

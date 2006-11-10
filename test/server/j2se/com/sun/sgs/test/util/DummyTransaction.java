@@ -6,40 +6,76 @@ import com.sun.sgs.service.TransactionParticipant;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/** Provides a simple implementation of Transaction, for testing. */
 public class DummyTransaction implements Transaction {
+
+    /** The logger for this class. */
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(DummyTransaction.class.getName()));
+
+    /** The possible transaction states. */
     public enum State {
 	ACTIVE, PREPARING, PREPARED, COMMITTING, COMMITTED, ABORTING, ABORTED
     };
-    private static long nextId = 1;
-    private static boolean nextUsePrepareAndCommit;
+
+    /** The ID for the next transaction. */
+    private static AtomicLong nextId = new AtomicLong(1);
+
+    /**
+     * Whether commit on this transaction should use prepareAndCommit instead
+     * of prepare followed by commit.
+     */
     private final boolean usePrepareAndCommit;
-    private final long id = nextId++;
+
+    /** The ID for this transaction. */
+    private final long id = nextId.getAndIncrement();
+
+    /** The creation time of this transaction. */
     private final long creationTime = System.currentTimeMillis();
+
+    /** The state of this transaction. */
     private State state = State.ACTIVE;
+
+    /** The transaction proxy associated with this transaction, if any. */
     DummyTransactionProxy proxy;
+
+    /** The transaction participants for this transaction. */
     public final Set<TransactionParticipant> participants =
 	new HashSet<TransactionParticipant>();
+
+    /**
+     * Creates an instance of this class which decides arbitrarily whether or
+     * not to call prepareAndCommit.
+     */
     public DummyTransaction() {
-	usePrepareAndCommit = nextUsePrepareAndCommit;
-	nextUsePrepareAndCommit = !nextUsePrepareAndCommit;
+	usePrepareAndCommit = (id % 2 == 0);
 	logger.log(Level.FINER, "create {0}", this);
     }
+
+    /**
+     * Creates an instance of this class which uses prepareAndCommit based on
+     * the argument.
+     */
     public DummyTransaction(boolean usePrepareAndCommit) {
 	this.usePrepareAndCommit = usePrepareAndCommit;
     }
+
+    /* -- Implement Transaction -- */
+    
     public byte[] getId() {
 	return new byte[] {
 	    (byte) (id >>> 56), (byte) (id >>> 48), (byte) (id >>> 40),
 	    (byte) (id >>> 32), (byte) (id >>> 24), (byte) (id >>> 16),
 	    (byte) (id >>> 8), (byte) id };
     }
+
     public long getCreationTime() { return creationTime; }
-    public void join(TransactionParticipant participant) {
+
+    public synchronized void join(TransactionParticipant participant) {
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(
 		Level.FINER, "join {0} participant:{1}", this, participant);
@@ -52,7 +88,8 @@ public class DummyTransaction implements Transaction {
 	}
 	participants.add(participant);
     }
-    public void abort() {
+
+    public synchronized void abort() {
 	logger.log(Level.FINER, "abort {0}", this);
 	if (state == State.ABORTING) {
 	    return;
@@ -77,7 +114,8 @@ public class DummyTransaction implements Transaction {
 	}
 	state = State.ABORTED;
     }
-    public boolean prepare() throws Exception {
+
+    public synchronized boolean prepare() throws Exception {
 	logger.log(Level.FINER, "prepare {0}", this);
 	if (state != State.ACTIVE) {
 	    throw new IllegalStateException("Transaction not active");
@@ -110,7 +148,8 @@ public class DummyTransaction implements Transaction {
 	state = State.PREPARED;
 	return result;
     }
-    public void commit() throws Exception {
+
+    public synchronized void commit() throws Exception {
 	logger.log(Level.FINER, "commit {0}", this);
 	if (state == State.PREPARED) {
 	    state = State.COMMITTING;
@@ -152,9 +191,14 @@ public class DummyTransaction implements Transaction {
 	}
 	state = State.COMMITTED;
     }
-    public State getState() {
+
+    /* -- Other public methods -- */
+
+    /** Returns the current state. */
+    public synchronized State getState() {
 	return state;
     }
+
     public String toString() {
 	return "DummyTransaction[tid:" + id + "]";
     }

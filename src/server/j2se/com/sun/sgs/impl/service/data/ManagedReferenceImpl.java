@@ -11,7 +11,12 @@ import java.io.Serializable;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/** Provides an implementation of ManagedReference. */
+/**
+ * Provides an implementation of ManagedReference.  Instances of this class are
+ * associated with a single transaction.  Within a transaction, instances are
+ * canonicalized: only a single instance appears for a given object ID or
+ * object.
+ */
 final class ManagedReferenceImpl<T extends ManagedObject>
     implements ManagedReference<T>, Serializable
 {
@@ -19,7 +24,7 @@ final class ManagedReferenceImpl<T extends ManagedObject>
     private static final long serialVersionUID = 1;
 
     /** The logger for this class. */
-    private final static LoggerWrapper logger =
+    private static final LoggerWrapper logger =
 	new LoggerWrapper(
 	    Logger.getLogger(ManagedReferenceImpl.class.getName()));
 
@@ -77,8 +82,8 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 
     /**
      * Information related to the transaction in which this reference was
-     * created.  This field is not final only so that it can be set during
-     * deserialization.
+     * created.  This field is logically final, but is not declared final so
+     * that it can be set during deserialization.
      */
     private transient Context context;
 
@@ -122,8 +127,8 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	     ref = new ManagedReferenceImpl<T>(context, object);
 	     context.refs.add(ref);
 	 }
-	 if (logger.isLoggable(Level.FINER)) {
-	     logger.log(Level.FINER, "getReference object:{0} returns {1}",
+	 if (logger.isLoggable(Level.FINEST)) {
+	     logger.log(Level.FINEST, "getReference object:{0} returns {1}",
 			object, ref);
 	 }
 	 return ref;
@@ -133,17 +138,14 @@ final class ManagedReferenceImpl<T extends ManagedObject>
      * Returns the reference associated with a context and object ID, creating
      * an EMPTY reference if none is found.
      */
-    static ManagedReferenceImpl<? extends ManagedObject> getReference(
-	Context context, long oid)
-     {
-	 ManagedReferenceImpl<? extends ManagedObject> ref =
-	     context.refs.find(oid);
+    static ManagedReferenceImpl<?> getReference(Context context, long oid) {
+	 ManagedReferenceImpl<?> ref = context.refs.find(oid);
 	 if (ref == null) {
-	     ref = new ManagedReferenceImpl<ManagedObject>(context, oid);
+	     ref = new ManagedReferenceImpl(context, oid);
 	     context.refs.add(ref);
 	 }
-	 if (logger.isLoggable(Level.FINER)) {
-	     logger.log(Level.FINER, "getReference oid:{0} returns {1}",
+	 if (logger.isLoggable(Level.FINEST)) {
+	     logger.log(Level.FINEST, "getReference oid:{0} returns {1}",
 			oid, ref);
 	 }
 	 return ref;
@@ -195,6 +197,10 @@ final class ManagedReferenceImpl<T extends ManagedObject>
     void markForUpdate() {
 	switch (state) {
 	case EMPTY:
+	    /*
+	     * Presumably this object is being marked for update because it
+	     * will be modified, so fetch the object now.
+	     */
 	    object = deserialize(
 		context.store.getObject(context.txn, oid, true));
 	    context.refs.registerObject(this);
@@ -220,63 +226,83 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	}
     }
 
-    /* -- Implement ManagedReference<T> -- */
+    /* -- Implement ManagedReference -- */
 
     public T get() {
-	DataServiceImpl.checkContext(context);
-	switch (state) {
-	case EMPTY:
-	    object = deserialize(
-		context.store.getObject(context.txn, oid, false));
-	    context.refs.registerObject(this);
-	    if (context.detectModifications) {
-		fingerprint = SerialUtil.fingerprint(object);
-		state = State.MAYBE_MODIFIED;
-	    } else {
-		state = State.NOT_MODIFIED;
+	try {
+	    DataServiceImpl.checkContext(context);
+	    switch (state) {
+	    case EMPTY:
+		object = deserialize(
+		    context.store.getObject(context.txn, oid, false));
+		context.refs.registerObject(this);
+		if (context.detectModifications) {
+		    fingerprint = SerialUtil.fingerprint(object);
+		    state = State.MAYBE_MODIFIED;
+		} else {
+		    state = State.NOT_MODIFIED;
+		}
+		break;
+	    case NEW:
+	    case NOT_MODIFIED:
+	    case MAYBE_MODIFIED:
+	    case MODIFIED:
+		break;
+	    case FLUSHED:
+		throw new TransactionNotActiveException(
+		    "No transaction is in progress");
+	    case REMOVED:
+		throw new ObjectNotFoundException("The object is not found");
+	    default:
+		throw new AssertionError();
 	    }
-	    break;
-	case NEW:
-	case NOT_MODIFIED:
-	case MAYBE_MODIFIED:
-	case MODIFIED:
-	    break;
-	case FLUSHED:
-	    throw new TransactionNotActiveException(
-		"No transaction is in progress");
-	case REMOVED:
-	    throw new ObjectNotFoundException("The object is not found");
-	default:
-	    throw new AssertionError();
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST, "get {0} returns {1}", this, object);
+	    }
+	    return object;
+	} catch (RuntimeException e) {
+	    logger.logThrow(Level.FINEST, "get {0} throws", e, this);
+	    throw e;
 	}
-	return object;
     }
 
     public T getForUpdate() {
-	DataServiceImpl.checkContext(context);
-	switch (state) {
-	case EMPTY:
-	    object = deserialize(
-		context.store.getObject(context.txn, oid, true));
-	    context.refs.registerObject(this);
-	    state = State.MODIFIED;
-	    break;
-	case NOT_MODIFIED:
-	case MAYBE_MODIFIED:
-	    context.store.markForUpdate(context.txn, oid);
-	    state = State.MODIFIED;
-	    break;
-	case FLUSHED:
-	    throw new IllegalStateException("Update flushed");
-	case NEW:
-	case MODIFIED:
-	    break;
-	case REMOVED:
-	    throw new ObjectNotFoundException("The object is not found");
-	default:
-	    throw new AssertionError();
+	try {
+	    DataServiceImpl.checkContext(context);
+	    switch (state) {
+	    case EMPTY:
+		object = deserialize(
+		    context.store.getObject(context.txn, oid, true));
+		context.refs.registerObject(this);
+		state = State.MODIFIED;
+		break;
+	    case MAYBE_MODIFIED:
+		fingerprint = null;
+		/* Fall through */
+	    case NOT_MODIFIED:
+		context.store.markForUpdate(context.txn, oid);
+		state = State.MODIFIED;
+		break;
+	    case FLUSHED:
+		throw new TransactionNotActiveException(
+		    "No transaction is in progress");
+	    case NEW:
+	    case MODIFIED:
+		break;
+	    case REMOVED:
+		throw new ObjectNotFoundException("The object is not found");
+	    default:
+		throw new AssertionError();
+	    }
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST, "getForUpdate {0} returns {1}",
+			   this, object);
+	    }
+	    return object;
+	} catch (RuntimeException e) {
+	    logger.logThrow(Level.FINEST, "getForUpdate {0} throws", e, this);
+	    throw e;
 	}
-	return object;
     }
 
     /* -- Implement Serializable -- */
@@ -287,7 +313,7 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	    context = DataServiceImpl.getContext();
 	    state = State.EMPTY;
 	    validate();
-	    ManagedReferenceImpl ref = context.refs.find(oid);
+	    ManagedReferenceImpl<?> ref = context.refs.find(oid);
 	    if (ref == null) {
 		context.refs.add(this);
 		return this;
@@ -316,6 +342,15 @@ final class ManagedReferenceImpl<T extends ManagedObject>
     }
 
     /* -- Other methods -- */
+
+    /**
+     * Checks the consistency of the managed references table, throwing an
+     * exception if a problem is found.
+     */
+    static void checkAllState(Context context) {
+	logger.log(Level.FINE, "Checking state");
+	context.refs.checkAllState();
+    }
 
     /**
      * Checks the fields of this object to make sure they have valid values,
@@ -361,19 +396,24 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	}
     }
 
+    /** Saves all object modifications to the data store. */
+    static void flushAll(Context context) {
+	context.refs.flushChanges();
+    }
+
     /**
      * Stores any modifications to the data store, and changes the state to
      * FLUSHED.
      */
     void flush() {
 	switch (state) {
-	case FLUSHED:
-	case REMOVED:
+	case EMPTY:
 	    break;
 	case NEW:
 	case MODIFIED:
  	    context.store.setObject(
 		context.txn, oid, SerialUtil.serialize(object));
+	    context.refs.unregisterObject(object);
 	    object = null;
 	    fingerprint = null;
 	    state = State.FLUSHED;
@@ -385,10 +425,15 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	    }
 	    /* Fall through */
 	case NOT_MODIFIED:
+	    context.refs.unregisterObject(object);
 	    object = null;
 	    fingerprint = null;
 	    state = State.FLUSHED;
 	    break;
+	case FLUSHED:
+	    throw new IllegalStateException("Object already flushed");
+	case REMOVED:
+	    throw new IllegalStateException("Object was removed");
 	default:
 	    throw new AssertionError();
 	}
@@ -422,6 +467,10 @@ final class ManagedReferenceImpl<T extends ManagedObject>
      * the type of the object is wrong!
      */
     private T deserialize(byte[] data) {
+	/**
+	 * The serialized form doesn't know the type, so the real type check
+	 * will need to occur in the caller.
+	 */
 	@SuppressWarnings("unchecked")
 	    T deserialized = (T) SerialUtil.deserialize(data);
 	return deserialized;

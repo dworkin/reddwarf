@@ -9,7 +9,6 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
-import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.test.util.DummyComponentRegistry;
@@ -38,7 +37,7 @@ public class TestDataServiceImpl extends TestCase {
     /** Provides the test suite to the test runner. */
     public static Test suite() { return suite; }
 
-    /** The name of the DataServiceImpl class. */
+    /** The name of the DataStoreImpl class. */
     private static final String DataStoreImplClassName =
 	DataStoreImpl.class.getName();
 
@@ -56,31 +55,34 @@ public class TestDataServiceImpl extends TestCase {
      * each test.
      */
     static {
-	System.err.println("Deleting database directory");
 	deleteDirectory(dbDirectory);
     }
 
     /** Properties for creating the shared database. */
     private static Properties dbProps = createProperties(
-	DataStoreImplClassName + ".directory",
-	dbDirectory,
+	DataStoreImplClassName + ".directory", dbDirectory,
 	"com.sun.sgs.appName", "TestDataServiceImpl",
-	DataServiceImplClassName + ".debugCheckInterval", "1");
+	DataServiceImplClassName + ".debugCheckInterval", "0");
 
     /** Set when the test passes. */
     private boolean passed;
 
-    DummyComponentRegistry componentRegistry = new DummyComponentRegistry();
-
     /** A per-test database directory, or null if not created. */
     String directory;
 
-    DataServiceImpl service;
+    /** A transaction proxy. */
+    DummyTransactionProxy txnProxy = new DummyTransactionProxy();
 
-    DummyTransactionProxy txnProxy;
+    /** A component registry. */
+    DummyComponentRegistry componentRegistry = new DummyComponentRegistry();
 
+    /** An initial, open transaction. */
     DummyTransaction txn;
 
+    /** An instance of the data service, to test. */
+    DataServiceImpl service;
+
+    /** A managed object. */
     DummyManagedObject dummy;
 
     /** Creates the test. */
@@ -88,10 +90,12 @@ public class TestDataServiceImpl extends TestCase {
 	super(name);
     }
 
-    /** Prints the test case. */
+    /**
+     * Prints the test case, initializes the data service, and creates and
+     * binds a managed object.
+     */
     protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
-	txnProxy = new DummyTransactionProxy();
 	createTransaction();
 	service = getDataServiceImpl();
 	service.configure(componentRegistry, txnProxy);
@@ -109,79 +113,16 @@ public class TestDataServiceImpl extends TestCase {
 
     /**
      * Deletes the directory if the test passes and the directory was
-     * created.
+     * created, and aborts the current transaction.
      */
     protected void tearDown() throws Exception {
 	if (passed && directory != null) {
 	    deleteDirectory(directory);
 	}
 	if (txn != null) {
-	    try {
-		txn.abort();
-	    } catch (IllegalStateException e) {
-	    }
+	    txn.abort();
 	    txn = null;
 	}
-    }
-
-    /** Creates a per-test directory. */
-    String createDirectory() throws IOException {
-	File dir = File.createTempFile(getName(), "dbdir");
-	if (!dir.delete()) {
-	    throw new RuntimeException("Problem deleting file: " + dir);
-	}
-	if (!dir.mkdir()) {
-	    throw new RuntimeException(
-		"Failed to create directory: " + dir);
-	}
-	directory = dir.getPath();
-	return directory;
-    }
-
-    /** Deletes the specified directory, if it exists. */
-    static void deleteDirectory(String directory) {
-	File dir = new File(directory);
-	if (dir.exists()) {
-	    for (File f : dir.listFiles()) {
-		if (!f.delete()) {
-		    throw new RuntimeException("Failed to delete file: " + f);
-		}
-	    }
-	    if (!dir.delete()) {
-		throw new RuntimeException(
-		    "Failed to delete directory: " + dir);
-	    }
-	}
-    }
-
-    /** Creates a property list with the specified keys and values. */
-    static Properties createProperties(String... args) {
-	Properties props = new Properties();
-	if (args.length % 2 != 0) {
-	    throw new RuntimeException("Odd number of arguments");
-	}
-	for (int i = 0; i < args.length; i += 2) {
-	    props.setProperty(args[i], args[i + 1]);
-	}
-	return props;
-    }
-
-    /** Returns a DataServiceImpl for the shared database. */
-    DataServiceImpl getDataServiceImpl() {
-	File dir = new File(dbDirectory);
-	if (!dir.exists()) {
-	    if (!dir.mkdir()) {
-		throw new RuntimeException(
-		    "Problem creating directory: " + dir);
-	    }
-	}
-	return new DataServiceImpl(dbProps, componentRegistry);
-    }
-
-    DummyTransaction createTransaction() {
-	txn = new DummyTransaction();
-	txnProxy.setCurrentTransaction(txn);
-	return txn;
     }
 
     /* -- Test constructor -- */
@@ -203,8 +144,7 @@ public class TestDataServiceImpl extends TestCase {
 
     public void testConstructorNoAppName() throws Exception {
 	Properties props = createProperties(
-	    DataStoreImplClassName + ".directory",
-	    createDirectory());
+	    DataStoreImplClassName + ".directory", createDirectory());
 	try {
 	    new DataServiceImpl(props, componentRegistry);
 	    fail("Expected IllegalArgumentException");
@@ -213,13 +153,42 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    public void testConstructorBadDebugCheckInterval() throws Exception {
+	Properties props = createProperties(
+	    DataStoreImplClassName + ".directory", createDirectory(),
+	    "com.sun.sgs.appName", "Foo",
+	    DataServiceImplClassName + ".debugCheckInterval", "gorp");
+	try {
+	    new DataServiceImpl(props, componentRegistry);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testConstructorNoDirectory() throws Exception {
+	Properties props = createProperties("com.sun.sgs.appName", "Foo");
+	try {
+	    new DataServiceImpl(props, componentRegistry);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
+    /* -- Test getName -- */
+
+    public void testGetName() {
+	assertNotNull(service.getName());
+    }
+
     /* -- Test configure -- */
 
     public void testConfigureNullArgs() throws Exception {
 	Properties props = createProperties(
 	    DataStoreImplClassName + ".directory", createDirectory(),
 	    "com.sun.sgs.appName", "Foo");
-	DataService service = new DataServiceImpl(props, componentRegistry);
+	service = new DataServiceImpl(props, componentRegistry);
 	try {
 	    service.configure(null, txnProxy);
 	    fail("Expected NullPointerException");
@@ -236,7 +205,8 @@ public class TestDataServiceImpl extends TestCase {
 
     public void testConfigureNoTxn() throws Exception {
 	txn.commit();
-	DataServiceImpl service = getDataServiceImpl();
+	txn = null;
+	service = getDataServiceImpl();
 	try {
 	    service.configure(componentRegistry, txnProxy);
 	    fail("Expected TransactionNotActiveException");
@@ -246,11 +216,6 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     public void testConfigureAgain() throws Exception {
-	Properties props = createProperties(
-	    DataStoreImplClassName + ".directory", createDirectory(),
-	    "com.sun.sgs.appName", "Foo");
-	DataService service = new DataServiceImpl(props, componentRegistry);
-	service.configure(componentRegistry, txnProxy);
 	try {
 	    service.configure(componentRegistry, txnProxy);
 	    fail("Expected IllegalStateException");
@@ -261,15 +226,21 @@ public class TestDataServiceImpl extends TestCase {
 
     /* -- Test getBinding and getServiceBinding -- */
 
-    public void testGetBindingNullName() {
-	testGetBindingNullName(true);
+    public void testGetBindingNullArgs() {
+	testGetBindingNullArgs(true);
     }
-    public void testGetServiceBindingNullName() {
-	testGetBindingNullName(false);
+    public void testGetServiceBindingNullArgs() {
+	testGetBindingNullArgs(false);
     }
-    private void testGetBindingNullName(boolean app) {
+    private void testGetBindingNullArgs(boolean app) {
 	try {
 	    getBinding(app, service, null, ManagedObject.class);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+	try {
+	    getBinding(app, service, "dummy", null);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
@@ -289,21 +260,6 @@ public class TestDataServiceImpl extends TestCase {
 	DummyManagedObject result =
 	    getBinding(app, service, "", DummyManagedObject.class);
 	assertEquals(dummy, result);
-    }
-
-    public void testGetBindingNullType() throws Exception {
-	testGetBindingNullType(true);
-    }
-    public void testGetServiceBindingNullType() throws Exception {
-	testGetBindingNullType(false);
-    }
-    private void testGetBindingNullType(boolean app) throws Exception {
-	try {
-	    getBinding(app, service, "dummy", null);
-	    fail("Expected NullPointerException");
-	} catch (NullPointerException e) {
-	    System.err.println(e);
-	}
     }
 
     public void testGetBindingWrongType() throws Exception {
@@ -337,7 +293,7 @@ public class TestDataServiceImpl extends TestCase {
 	} catch (NameNotBoundException e) {
 	    System.err.println(e);
 	}
-	/* Binding removed in this transaction */
+	/* New binding removed in this transaction */
 	setBinding(app, service, "testGetBindingNotFound",
 		   new DummyManagedObject(service));
 	removeBinding(app, service, "testGetBindingNotFound");
@@ -348,7 +304,30 @@ public class TestDataServiceImpl extends TestCase {
 	} catch (NameNotBoundException e) {
 	    System.err.println(e);
 	}
-	/* Binding removed in last transaction */
+	/* New binding removed in last transaction */
+	txn.commit();
+	createTransaction();
+	try {
+	    getBinding(app, service, "testGetBindingNotFound",
+		       ManagedObject.class);
+	    fail("Expected NameNotBoundException");
+	} catch (NameNotBoundException e) {
+	    System.err.println(e);
+	}
+	/* Existing binding removed in this transaction */
+	setBinding(app, service, "testGetBindingNotFound",
+		   new DummyManagedObject(service));
+	txn.commit();
+	createTransaction();
+	removeBinding(app, service, "testGetBindingNotFound");
+	try {
+	    getBinding(app, service, "testGetBindingNotFound",
+		       ManagedObject.class);
+	    fail("Expected NameNotBoundException");
+	} catch (NameNotBoundException e) {
+	    System.err.println(e);
+	}
+	/* Existing binding removed in last transaction. */
 	txn.commit();
 	createTransaction();
 	try {
@@ -459,56 +438,44 @@ public class TestDataServiceImpl extends TestCase {
 	testGetBindingSuccess(false);
     }
     private void testGetBindingSuccess(boolean app) throws Exception {
-	setBinding(app, service, "newDummy", dummy);
+	setBinding(app, service, "dummy", dummy);
 	DummyManagedObject result =
-	    getBinding(app, service, "newDummy", DummyManagedObject.class);
+	    getBinding(app, service, "dummy", DummyManagedObject.class);
 	assertEquals(dummy, result);
 	txn.commit();
 	createTransaction();
-	result = getBinding(
-	    app, service, "newDummy", DummyManagedObject.class);
+	result = getBinding(app, service, "dummy", DummyManagedObject.class);
 	assertEquals(dummy, result);
     }
 
     public void testGetBindingsDifferent() throws Exception {
-	DummyManagedObject appDummy = new DummyManagedObject(service);
 	DummyManagedObject serviceDummy = new DummyManagedObject(service);
-	service.setBinding("dummy", appDummy);
 	service.setServiceBinding("dummy", serviceDummy);
 	txn.commit();
 	createTransaction();
-	DummyManagedObject appResult =
+	DummyManagedObject result =
 	    service.getBinding("dummy", DummyManagedObject.class);
-	assertEquals(appDummy, appResult);
-	DummyManagedObject serviceResult =
+	assertEquals(dummy, result);
+	result =
 	    service.getServiceBinding("dummy", DummyManagedObject.class);
-	assertEquals(serviceDummy, serviceResult);
+	assertEquals(serviceDummy, result);
     }
 
     /* -- Test setBinding and setServiceBinding -- */
 
-    public void testSetBindingNullName() {
-	testSetBindingNullName(true);
+    public void testSetBindingNullArgs() {
+	testSetBindingNullArgs(true);
     }
-    public void testSetServiceBindingNullName() {
-	testSetBindingNullName(false);
+    public void testSetServiceBindingNullArgs() {
+	testSetBindingNullArgs(false);
     }
-    private void testSetBindingNullName(boolean app) {
+    private void testSetBindingNullArgs(boolean app) {
 	try {
 	    setBinding(app, service, null, dummy);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
 	}
-    }
-
-    public void testSetBindingNullObject() throws Exception {
-	testSetBindingNullObject(true);
-    }
-    public void testSetServiceBindingNullObject() throws Exception {
-	testSetBindingNullObject(false);
-    }
-    private void testSetBindingNullObject(boolean app) throws Exception {
 	try {
 	    setBinding(app, service, "dummy", null);
 	    fail("Expected NullPointerException");
@@ -524,45 +491,11 @@ public class TestDataServiceImpl extends TestCase {
 	testSetBindingNotSerializable(false);
     }
     private void testSetBindingNotSerializable(boolean app) throws Exception {
+	ManagedObject mo = new ManagedObject() { };
 	try {
-	    setBinding(app, service, "dummy", new ManagedObject() { });
+	    setBinding(app, service, "dummy", mo);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
-	    System.err.println(e);
-	}
-    }
-
-    public void testSetBindingSerializationFails() throws Exception {
-	testSetBindingSerializationFails(true);
-    }
-    public void testSetServiceBindingSerializationFails() throws Exception {
-	testSetBindingSerializationFails(false);
-    }
-    private void testSetBindingSerializationFails(boolean app)
-	throws Exception
-    {
-	setBinding(app, service, "dummy", new SerializationFails(service));
-	try {
-	    txn.commit();
-	    fail("Expected ObjectIOException");
-	} catch (ObjectIOException e) {
-	    System.err.println(e);
-	}
-    }
-
-    public void testSetBindingNoReference() throws Exception {
-	testSetBindingNoReference(true);
-    }
-    public void testSetServiceBindingNoReference() throws Exception {
-	testSetBindingNoReference(false);
-    }
-    private void testSetBindingNoReference(boolean app) throws Exception {
-	dummy.setValue(new DummyManagedObject(service));
-	setBinding(app, service, "dummy", dummy);
-	try {
-	    txn.commit();
-	    fail("Expected ObjectIOException");
-	} catch (ObjectIOException e) {
 	    System.err.println(e);
 	}
     }
@@ -583,6 +516,77 @@ public class TestDataServiceImpl extends TestCase {
 	    new TestSetBindingBadTxn(true, state);
 	    new TestSetBindingBadTxn(false, state);
 	}
+    }
+
+    public void testSetBindingSerializationFails() throws Exception {
+	testSetBindingSerializationFails(true);
+    }
+    public void testSetServiceBindingSerializationFails() throws Exception {
+	testSetBindingSerializationFails(false);
+    }
+    private void testSetBindingSerializationFails(boolean app)
+	throws Exception
+    {
+	setBinding(app, service, "dummy", new SerializationFails(service));
+	try {
+	    txn.commit();
+	    fail("Expected ObjectIOException");
+	} catch (ObjectIOException e) {
+	    System.err.println(e);
+	} finally {
+	    txn = null;
+	}
+    }
+
+    public void testSetBindingManagedObjectNoReference() throws Exception {
+	testSetBindingManagedObjectNoReference(true);
+    }
+    public void testSetServiceBindingManagedObjectNoReference()
+	throws Exception
+    {
+	testSetBindingManagedObjectNoReference(false);
+    }
+    private void testSetBindingManagedObjectNoReference(boolean app)
+	throws Exception
+    {
+	dummy.setValue(new DummyManagedObject(service));
+	setBinding(app, service, "dummy", dummy);
+	try {
+	    txn.commit();
+	    fail("Expected ObjectIOException");
+	} catch (ObjectIOException e) {
+	    System.err.println(e);
+	} finally {
+	    txn = null;
+	}
+    }
+
+    public void testSetBindingSuccess() throws Exception {
+	testSetBindingSuccess(true);
+    }
+    public void testSetServiceBindingSuccess() throws Exception {
+	testSetBindingSuccess(false);
+    }
+    public void testSetBindingSuccess(boolean app) throws Exception {
+	setBinding(app, service, "dummy", dummy);
+	txn.commit();
+	createTransaction();
+	assertEquals(
+	    dummy,
+	    getBinding(app, service, "dummy", DummyManagedObject.class));
+	DummyManagedObject dummy2 = new DummyManagedObject(service);
+	setBinding(app, service, "dummy", dummy2);
+	txn.abort();
+	createTransaction();
+	assertEquals(
+	    dummy,
+	    getBinding(app, service, "dummy", DummyManagedObject.class));
+	setBinding(app, service, "dummy", dummy2);
+	txn.commit();
+	createTransaction();
+	assertEquals(
+	    dummy2,
+	    getBinding(app, service, "dummy", DummyManagedObject.class));
     }
 
     /* -- Test removeBinding and removeServiceBinding -- */
@@ -609,7 +613,7 @@ public class TestDataServiceImpl extends TestCase {
 	testRemoveBindingNullName(false);
     }
     private void testRemoveBindingEmptyName(boolean app) {
-	setBinding(app, service, "", new DummyManagedObject(service));
+	setBinding(app, service, "", dummy);
 	removeBinding(app, service, "");
 	try {
 	    removeBinding(app, service, "");
@@ -689,10 +693,28 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    public void testRemoveBindingSuccess() {
+	testRemoveBindingSuccess(true);
+    }
+    public void testRemoveServiceBindingSuccess() {
+	testRemoveBindingSuccess(false);
+    }
+    private void testRemoveBindingSuccess(boolean app) {
+	setBinding(app, service, "dummy", dummy);
+	removeBinding(app, service, "dummy");
+	txn.abort();
+	createTransaction();
+	removeBinding(app, service, "dummy");	
+	try {
+	    removeBinding(app, service, "dummy");
+	    fail("Expected NameNotBoundException");
+	} catch (NameNotBoundException e) {
+	    System.err.println(e);
+	}
+    }
+
     public void testRemoveBindingsDifferent() throws Exception {
-	DummyManagedObject appDummy = new DummyManagedObject(service);
 	DummyManagedObject serviceDummy = new DummyManagedObject(service);
-	service.setBinding("dummy", appDummy);
 	service.setServiceBinding("dummy", serviceDummy);
 	txn.commit();
 	createTransaction();
@@ -703,9 +725,9 @@ public class TestDataServiceImpl extends TestCase {
 	txn.abort();
 	createTransaction();
 	service.removeServiceBinding("dummy");
-	DummyManagedObject appResult =
+	DummyManagedObject result =
 	    service.getBinding("dummy", DummyManagedObject.class);
-	assertEquals(appDummy, appResult);
+	assertEquals(dummy, result);
     }
 
     /* -- Test removeObject -- */
@@ -729,18 +751,13 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
-    private static class TestRemoveObjectBadTxn extends BadTxnTest {
-	TestRemoveObjectBadTxn(BadTxnState state) {
-	    super("testRemoveObject", state);
-	}
-	void action() {
-	    service.removeObject(dummy);
-	}
-    }
-
     static {
 	for (BadTxnState state : BadTxnState.values()) {
-	    new TestRemoveObjectBadTxn(state);
+	    new BadTxnTest("testRemoveObject", state) {
+		void action() {
+		    service.removeObject(dummy);
+		}
+	    };
 	}
     }
 
@@ -800,22 +817,21 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
-    private static class TestMarkForUpdateBadTxn extends BadTxnTest {
-	TestMarkForUpdateBadTxn(BadTxnState state) {
-	    super("testMarkForUpdate", state);
-	}
-	void action() {
-	    service.markForUpdate(dummy);
-	}
-    }
-
     static {
 	for (BadTxnState state : BadTxnState.values()) {
-	    new TestMarkForUpdateBadTxn(state);
+	    new BadTxnTest("testMarkForUpdate", state) {
+		void action() {
+		    service.markForUpdate(dummy);
+		}
+	    };
 	}
     }
 
     public void testMarkForUpdateSuccess() throws Exception {
+	service.markForUpdate(dummy);
+	service.removeObject(dummy);
+	service.markForUpdate(dummy);	    
+	service.setBinding("dummy", dummy);
 	dummy.setValue("a");
 	txn.commit();
 	service.setDetectModifications(false);
@@ -839,8 +855,8 @@ public class TestDataServiceImpl extends TestCase {
 	final Semaphore threadFlag = new Semaphore(0);
 	Thread thread = new Thread() {
 	    public void run() {
+		DummyTransaction txn2 = new DummyTransaction();
 		try {
-		    DummyTransaction txn2 = new DummyTransaction();
 		    txnProxy.setCurrentTransaction(txn2);
 		    DummyManagedObject dummy2 = service.getBinding(
 			"dummy", DummyManagedObject.class);
@@ -851,6 +867,8 @@ public class TestDataServiceImpl extends TestCase {
 		    threadFlag.release();
 		} catch (Exception e) {
 		    fail("Unexpected exception: " + e);
+		} finally {
+		    txn2.abort();
 		}
 	    }
 	};
@@ -859,6 +877,7 @@ public class TestDataServiceImpl extends TestCase {
 	mainFlag.release();
 	assertFalse(threadFlag.tryAcquire(1, TimeUnit.SECONDS));	
 	txn.commit();
+	txn = null;
 	assertTrue(threadFlag.tryAcquire(1, TimeUnit.SECONDS));
     }
 
@@ -883,19 +902,13 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
-    private static class TestCreateReferenceBadTxn extends BadTxnTest {
-	TestCreateReferenceBadTxn(BadTxnState state) {
-	    super("testCreateReference", state);
-	}
-
-	void action() {
-	    service.createReference(dummy);
-	}
-    }
-
     static {
 	for (BadTxnState state : BadTxnState.values()) {
-	    new TestCreateReferenceBadTxn(state);
+	    new BadTxnTest("testCreateReference", state) {
+		void action() {
+		    service.createReference(dummy);
+		}
+	    };
 	}
     }
 
@@ -920,12 +933,17 @@ public class TestDataServiceImpl extends TestCase {
 	    fail("Expected ObjectIOException");
 	} catch (ObjectIOException e) {
 	    System.err.println(e);
+	} finally {
+	    txn = null;
 	}
     }
 
     public void testCreateReferenceRemoved() throws Exception {
+	ManagedReference<?> ref = service.createReference(dummy);
 	service.removeObject(dummy);
-	assertEquals(dummy, service.createReference(dummy).get());
+	ManagedReference<?> ref2 = service.createReference(dummy);
+	assertEquals(dummy, ref2.get());
+	assertFalse(ref.equals(ref2));
     }
 
     public void testCreateReferencePreviousTxn() throws Exception {
@@ -963,28 +981,20 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
-    private static class TestGetReferenceBadTxn extends BadTxnTest {
-	private ManagedReference<DummyManagedObject> ref;
-
-	TestGetReferenceBadTxn(BadTxnState state) {
-	    super("testGetReference", state);
-	}
-
-	protected void setUp() throws Exception {
-	    super.setUp();
-	    ref = service.createReference(dummy);
-	}
-
-	void action() {
-	    ref.get();
-	}
-    }
-
     static {
 	for (BadTxnState state : BadTxnState.values()) {
 	    /* Can't get a reference when the service is not initialized */
 	    if (state != BadTxnState.Uninitialized) {
-		new TestGetReferenceBadTxn(state);
+		new BadTxnTest("testGetReference", state) {
+		    private ManagedReference<DummyManagedObject> ref;
+		    protected void setUp() throws Exception {
+			super.setUp();
+			ref = service.createReference(dummy);
+		    }
+		    void action() {
+			ref.get();
+		    }
+		};
 	    }
 	}
     }
@@ -1024,6 +1034,18 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    public void testGetReferenceForUpdateMaybeModified() throws Exception {
+	txn.commit();
+	createTransaction();
+	dummy = service.getBinding("dummy", DummyManagedObject.class);
+	service.createReference(dummy).getForUpdate();
+	dummy.value = "B";
+	txn.commit();
+	createTransaction();
+	dummy = service.getBinding("dummy", DummyManagedObject.class);
+	assertEquals("B", dummy.value);
+    }
+
     public void testGetReferenceUpdateSuccess() throws Exception {
 	DummyManagedObject dummy2 = new DummyManagedObject(service);
 	dummy2.setValue("A");
@@ -1040,28 +1062,20 @@ public class TestDataServiceImpl extends TestCase {
 	assertEquals("B", dummy2.value);
     }
 
-    private static class TestGetReferenceUpdateBadTxn extends BadTxnTest {
-	private ManagedReference<DummyManagedObject> ref;
-
-	TestGetReferenceUpdateBadTxn(BadTxnState state) {
-	    super("testGetReferenceUpdate", state);
-	}
-
-	protected void setUp() throws Exception {
-	    super.setUp();
-	    ref = service.createReference(dummy);
-	}
-
-	void action() {
-	    ref.getForUpdate();
-	}
-    }
-
     static {
 	for (BadTxnState state : BadTxnState.values()) {
 	    /* Can't get a reference when the service is not initialized */
 	    if (state != BadTxnState.Uninitialized) {
-		new TestGetReferenceUpdateBadTxn(state);
+		new BadTxnTest("testGetReferenceUpdate", state) {
+		    private ManagedReference<DummyManagedObject> ref;
+		    protected void setUp() throws Exception {
+			super.setUp();
+			ref = service.createReference(dummy);
+		    }
+		    void action() {
+			ref.getForUpdate();
+		    }
+		};
 	    }
 	}
     }
@@ -1077,6 +1091,41 @@ public class TestDataServiceImpl extends TestCase {
 	} catch (ObjectIOException e) {
 	    System.err.println(e);
 	}
+    }
+
+    public void testGetReferenceUpdateLocking() throws Exception {
+	dummy.setNext(new DummyManagedObject(service));
+	txn.commit();
+	createTransaction();
+	dummy = service.getBinding("dummy", DummyManagedObject.class);
+	dummy.getNext();
+	final Semaphore mainFlag = new Semaphore(0);
+	final Semaphore threadFlag = new Semaphore(0);
+	Thread thread = new Thread() {
+	    public void run() {
+		DummyTransaction txn2 = new DummyTransaction();
+		try {
+		    txnProxy.setCurrentTransaction(txn2);
+		    DummyManagedObject dummy2 = service.getBinding(
+			"dummy", DummyManagedObject.class);
+		    threadFlag.release();
+		    assertTrue(mainFlag.tryAcquire(1, TimeUnit.SECONDS));
+		    dummy2.getNextForUpdate();
+		    threadFlag.release();
+		} catch (Exception e) {
+		    fail("Unexpected exception: " + e);
+		} finally {
+		    txn2.abort();
+		}
+	    }
+	};
+	thread.start();
+	assertTrue(threadFlag.tryAcquire(1, TimeUnit.SECONDS));
+	mainFlag.release();
+	assertFalse(threadFlag.tryAcquire(1, TimeUnit.SECONDS));	
+	txn.commit();
+	txn = null;
+	assertTrue(threadFlag.tryAcquire(1, TimeUnit.SECONDS));
     }
 
     /* -- Test ManagedReference.equals -- */
@@ -1105,26 +1154,34 @@ public class TestDataServiceImpl extends TestCase {
 	txnProxy.setCurrentTransaction(txn);
 	service.removeObject(dummy);
 	txn.commit();
-    }
-
-    public void testPrepareAndCommitNoStoreParticipant() throws Exception {
-	txn.commit();
 	txn = new DummyTransaction(true);
 	txnProxy.setCurrentTransaction(txn);
 	service.removeObject(dummy);
 	txn.commit();
+	txn = null;
     }
 
     public void testAbortNoStoreParticipant() throws Exception {
 	txn.commit();
-	createTransaction();
+	txn = new DummyTransaction(false);
+	txnProxy.setCurrentTransaction(txn);
 	service.removeObject(dummy);
 	txn.abort();
+	txn = new DummyTransaction(true);
+	txnProxy.setCurrentTransaction(txn);
+	service.removeObject(dummy);
+	txn.abort();
+	txn = null;
     }
 
     public void testCommitReadOnly() throws Exception {
 	txn.commit();
-	createTransaction();
+	txn = new DummyTransaction(false);
+	txnProxy.setCurrentTransaction(txn);
+	service.getBinding("dummy", DummyManagedObject.class);
+	txn.commit();
+	txn = new DummyTransaction(true);
+	txnProxy.setCurrentTransaction(txn);
 	service.getBinding("dummy", DummyManagedObject.class);
 	txn.commit();
 	createTransaction();
@@ -1133,7 +1190,12 @@ public class TestDataServiceImpl extends TestCase {
 
     public void testAbortReadOnly() throws Exception {
 	txn.commit();
-	createTransaction();
+	txn = new DummyTransaction(false);
+	txnProxy.setCurrentTransaction(txn);
+	service.getBinding("dummy", DummyManagedObject.class);
+	txn.abort();
+	txn = new DummyTransaction(true);
+	txnProxy.setCurrentTransaction(txn);
 	service.getBinding("dummy", DummyManagedObject.class);
 	txn.abort();
 	createTransaction();
@@ -1169,6 +1231,68 @@ public class TestDataServiceImpl extends TestCase {
 
     /* -- Other methods and classes -- */
 
+    /** Creates a per-test directory. */
+    String createDirectory() throws IOException {
+	File dir = File.createTempFile(getName(), "dbdir");
+	if (!dir.delete()) {
+	    throw new RuntimeException("Problem deleting file: " + dir);
+	}
+	if (!dir.mkdir()) {
+	    throw new RuntimeException(
+		"Failed to create directory: " + dir);
+	}
+	directory = dir.getPath();
+	return directory;
+    }
+
+    /** Deletes the specified directory, if it exists. */
+    static void deleteDirectory(String directory) {
+	File dir = new File(directory);
+	if (dir.exists()) {
+	    for (File f : dir.listFiles()) {
+		if (!f.delete()) {
+		    throw new RuntimeException("Failed to delete file: " + f);
+		}
+	    }
+	    if (!dir.delete()) {
+		throw new RuntimeException(
+		    "Failed to delete directory: " + dir);
+	    }
+	}
+    }
+
+    /** Creates a property list with the specified keys and values. */
+    static Properties createProperties(String... args) {
+	Properties props = new Properties();
+	if (args.length % 2 != 0) {
+	    throw new RuntimeException("Odd number of arguments");
+	}
+	for (int i = 0; i < args.length; i += 2) {
+	    props.setProperty(args[i], args[i + 1]);
+	}
+	return props;
+    }
+
+    /** Returns a DataServiceImpl for the shared database. */
+    DataServiceImpl getDataServiceImpl() {
+	File dir = new File(dbDirectory);
+	if (!dir.exists()) {
+	    if (!dir.mkdir()) {
+		throw new RuntimeException(
+		    "Problem creating directory: " + dir);
+	    }
+	}
+	return new DataServiceImpl(dbProps, componentRegistry);
+    }
+
+    /** Creates a new transaction. */
+    DummyTransaction createTransaction() {
+	txn = new DummyTransaction();
+	txnProxy.setCurrentTransaction(txn);
+	return txn;
+    }
+
+    /** Another managed object type. */
     static class AnotherManagedObject extends DummyManagedObject {
 	private static final long serialVersionUID = 1;
 	AnotherManagedObject(DataManager dataManager) {
@@ -1176,6 +1300,7 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    /** A managed object that fails during serialization. */
     static class SerializationFails extends DummyManagedObject {
 	SerializationFails(DataManager dataManager) {
 	    super(dataManager);
@@ -1187,6 +1312,7 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    /** A Managed object that fails during deserialization. */
     static class DeserializationFails extends DummyManagedObject {
 	DeserializationFails(DataManager dataManager) {
 	    super(dataManager);
@@ -1206,7 +1332,7 @@ public class TestDataServiceImpl extends TestCase {
     /** Defines a abstract class for testing bad transaction states. */
     static abstract class BadTxnTest extends TestDataServiceImpl {
 
-	/** The bad state to test for this instance. */
+	/** The bad state to test. */
 	private final BadTxnState state;
 
 	/**
@@ -1281,6 +1407,7 @@ public class TestDataServiceImpl extends TestCase {
 	    Participant participant = new Participant();
 	    txn.join(participant);
 	    txn.abort();
+	    txn = null;
 	    assertTrue("Action should throw", participant.ok);
 	}
 
@@ -1292,6 +1419,8 @@ public class TestDataServiceImpl extends TestCase {
 		fail("Expected TransactionNotActiveException");
 	    } catch (TransactionNotActiveException e) {
 		System.err.println(e);
+	    } finally {
+		txn = null;
 	    }
 	}
 
@@ -1316,6 +1445,8 @@ public class TestDataServiceImpl extends TestCase {
 		fail("Expected TransactionNotActiveException");
 	    } catch (TransactionNotActiveException e) {
 		System.err.println(e);
+	    } finally {
+		txn = null;
 	    }
 	    assertTrue("Action should throw", participant.ok);
 	}
@@ -1336,6 +1467,7 @@ public class TestDataServiceImpl extends TestCase {
 	    Participant participant = new Participant();
 	    txn.join(participant);
 	    txn.commit();
+	    txn = null;
 	    assertTrue("Action should throw", participant.ok);
 	}
 
@@ -1347,6 +1479,8 @@ public class TestDataServiceImpl extends TestCase {
 		fail("Expected TransactionNotActiveException");
 	    } catch (TransactionNotActiveException e) {
 		System.err.println(e);
+	    } finally {
+		txn = null;
 	    }
 	}
     }
