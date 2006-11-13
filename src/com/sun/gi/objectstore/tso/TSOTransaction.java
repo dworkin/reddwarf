@@ -129,6 +129,7 @@ public class TSOTransaction implements Transaction {
     private DataSpaceTransaction trans;
 
     private volatile boolean timestampInterrupted;
+    private Error errorInProgress;
 
     private static final boolean DEBUG = false;
 
@@ -155,7 +156,7 @@ public class TSOTransaction implements Transaction {
     public SGSUUID getUUID() {
         return txnID;
     }
-
+    
     /**
      * Acquires database resources needed to begin the transaction.
      * If this transaction aborted due to DeadlockException and has
@@ -172,14 +173,23 @@ public class TSOTransaction implements Transaction {
         trans = new DataSpaceTransactionImpl(loader, dataSpace);
 	currentTransactionDeadline = System.currentTimeMillis() + TIMEOUT;
         timestampInterrupted = false;
+        errorInProgress = null;
         ostore.registerActiveTransaction(this);
+    }
+    
+    public void checkIsValid() {
+        if (errorInProgress != null) {
+            throw errorInProgress;
+        }
     }
 
     public long lookup(String name) {
+        checkIsValid();
         return trans.lookupName(name);
     }
 
     public long create(Serializable object, String name) {
+        checkIsValid();
 
         TSODataHeader hdr = new TSODataHeader(this);
 
@@ -279,6 +289,8 @@ public class TSOTransaction implements Transaction {
     public void destroy(long objectID)
 	    throws DeadlockException, NonExistantObjectIDException
     {
+        checkIsValid();
+        
 	// Note that 'objectID' is actually the id of the object's
 	// *TSODataHeader* in the database.  The header has a field
 	// named objectID which is the 'real' objectID of its contents.
@@ -295,6 +307,8 @@ public class TSOTransaction implements Transaction {
     public Serializable peek(long objectID)
 	    throws NonExistantObjectIDException
     {
+        checkIsValid();
+        
 	// Note that 'objectID' is actually the id of the object's
 	// *TSODataHeader* in the database.  The header has a field
 	// named objectID which is the 'real' objectID of its contents.
@@ -353,6 +367,8 @@ public class TSOTransaction implements Transaction {
     public Serializable lock(long objectID, boolean shouldBlock)
             throws DeadlockException, NonExistantObjectIDException
     {
+        checkIsValid();
+        
 	if (objectID == DataSpace.INVALID_ID) {
 	    throw new NonExistantObjectIDException();
 	}
@@ -381,6 +397,8 @@ public class TSOTransaction implements Transaction {
     private TSODataHeader acquire_lock(long objectID, boolean shouldBlock)
             throws DeadlockException, NonExistantObjectIDException
     {
+        checkIsValid();
+        
         // Note: the caller must check for an invalid objectID
         // and check the lockedObjectsMap and deletedIDs as appropriate.
         
@@ -428,7 +446,8 @@ public class TSOTransaction implements Transaction {
                     }
                     
 		    abort();
-		    throw new DeadlockException();
+		    errorInProgress = new DeadlockException();
+                    throw errorInProgress;
 		}
 
 		if (now > hdr.currentTransactionDeadline) {
@@ -477,7 +496,8 @@ public class TSOTransaction implements Transaction {
                     }
                     
 		    abort();
-		    throw new DeadlockException();
+		    errorInProgress = new DeadlockException();
+                    throw errorInProgress;
 		}
 
 		if (hdr.youngerThan(initialAttemptTime, tiebreaker)) {
@@ -648,7 +668,8 @@ public class TSOTransaction implements Transaction {
 	    }
 
 	    abort();
-	    throw new DeadlockException();
+            errorInProgress = new DeadlockException();
+            throw errorInProgress;
 	}
 
         // At long last, we can take ownership of this header.

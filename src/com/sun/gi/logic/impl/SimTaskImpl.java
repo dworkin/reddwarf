@@ -72,10 +72,9 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
-import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Queue;
@@ -132,8 +131,8 @@ public class SimTaskImpl extends SimTask {
 	this.executionCount = 0;
 	this.trans = simulation.getObjectStore().newTransaction(loader);
 
-        this.gloIDMap = new HashMap<GLO, Long>();
-        this.gloAccessMap = new HashMap<GLO, ACCESS_TYPE>();
+        this.gloIDMap = new IdentityHashMap<GLO, Long>();
+        this.gloAccessMap = new IdentityHashMap<GLO, ACCESS_TYPE>();
 
         this.deferredCommands = new LinkedList<DeferredSimCommand>();
     }
@@ -142,6 +141,10 @@ public class SimTaskImpl extends SimTask {
 	if (DEBUG && (this != SimTask.getCurrent())) {
 	    throw new ExecutionOutsideOfTaskException();
 	}
+        
+        // Is the transaction avoiding deadlock?  If so,
+        // disallow any API calls and re-throw the exception!
+        trans.checkIsValid();
     }
 
     public void execute() {
@@ -189,49 +192,45 @@ public class SimTaskImpl extends SimTask {
 
 	    // DJE If we reach this, then the task is finished.
 
-        } catch (DeadlockException de) {
-	    log.throwing(getClass().getName(), "run", de);
-	    requeueAfterDeadlock();
+        } catch (Throwable ex) {
+            // Fetch out the root cause
+            while (ex.getCause() != null) {
+                if (ex.getCause().equals(ex)) {
+                    log.severe("Exception is its own cause: " +
+                            ex.getMessage());
+                    break;
+                }
+                
+                if (ex instanceof DeadlockException) {
+                    log.warning(
+                            "DeadlockException not the root cause: " +  ex);
+                }
+                
+                ex = ex.getCause();
+            }
+            
+            if (ex instanceof DeadlockException) {
+                requeueAfterDeadlock();
+                
+                // DJE: NOT finished or dead
+                
+            } else {
+                if (log.isLoggable(Level.WARNING)) {
+                    log.log(Level.WARNING,
+                        "Exception on task execution:\n  target: " +
+                        (runobj == null ? "<null> "
+                                        : runobj.getClass().getName()) +
+                        (startMethod == null
+                            ? "<null method>"
+                            : ("\n  method: " + startMethod.getName() +
+                               "\n  declared on: " +
+                               startMethod.getDeclaringClass().getName())) +
+                        "\n  " + ex.getMessage(), ex);
+                }
+                trans.abort();
 
-	    // DJE: NOT finished or dead
-
-        } catch (InvocationTargetException ex) {
-	    Throwable realException = ex.getCause();
-	    log.throwing(getClass().getName(), "run", realException);
-
-	    if (realException instanceof DeadlockException) {
-		requeueAfterDeadlock();
-
-		// DJE: NOT finished or dead
-
-	    } else {
-		realException.printStackTrace();
-		trans.abort();
-
-		// DJE: If we reach this, then the task is DEAD.
-	    }
-        } catch (IllegalAccessException ex) {
-            ex.printStackTrace();
-	    log.throwing(getClass().getName(), "run", ex);
-            trans.abort();
-
-	    // DJE: If we reach this, then the task is DEAD.
-        } catch (RuntimeException ex) {
-	    if (log.isLoggable(Level.WARNING)) {
-		log.warning("Exception on task execution:" +
-		    "\n  target: " + (runobj == null
-			? "<null> "
-			: runobj.getClass().getName()) +
-		    (startMethod == null ? "<null method>"
-			: ("\n  method: " + startMethod.getName() +
-			   "\n  declared on: " +
-			   startMethod.getDeclaringClass().getName())));
-	    }
-            ex.printStackTrace();
-	    log.throwing(getClass().getName(), "run", ex);
-            trans.abort();
-
-	    // DJE: If we reach this, then the task is DEAD.
+                // DJE: If we reach this, then the task is DEAD.
+            }
         }
 
 	simulation.taskDone(this);
@@ -276,6 +275,11 @@ public class SimTaskImpl extends SimTask {
     }
 
     public Transaction getTransaction() {
+	checkTaskIsCurrent();
+        // We do the above check in case the trasaction is trying
+        // to throw deadlock exception; this method is a chance
+        // to catch accesses via GLOReferenceImpl.
+
         return trans;
     }
 
@@ -386,6 +390,8 @@ public class SimTaskImpl extends SimTask {
     }
 
     public void registerGLOID(long objID, GLO glo, ACCESS_TYPE access) {
+	checkTaskIsCurrent();
+        
         Long currentID = gloIDMap.get(glo);
         if (currentID == null) {
             // First time we've seen this glo in this task.
@@ -548,24 +554,24 @@ public class SimTaskImpl extends SimTask {
      * Joins the specified user to the Channel referenced by the given
      * ChannelID.
      * 
-     * @param uid the user
+     * @param joiningUID the user
      * @param cid the ChannelID
      */
-    public void join(UserID uid, ChannelID cid) {
+    public void join(UserID joiningUID, ChannelID cid) {
 	checkTaskIsCurrent();
-        deferredCommands.add(new DeferredChannelJoin(uid, cid));
+        deferredCommands.add(new DeferredChannelJoin(joiningUID, cid));
     }
 
     /**
      * Removes the specified user from the Channel referenced by the
      * given ChannelID.
      * 
-     * @param uid the user
+     * @param leavingUID the user
      * @param cid the ChannelID
      */
-    public void leave(UserID uid, ChannelID cid) {
+    public void leave(UserID leavingUID, ChannelID cid) {
 	checkTaskIsCurrent();
-        deferredCommands.add(new DeferredChannelLeave(uid, cid));
+        deferredCommands.add(new DeferredChannelLeave(leavingUID, cid));
     }
 
     /**

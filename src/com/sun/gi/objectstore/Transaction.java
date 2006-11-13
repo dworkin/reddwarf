@@ -192,5 +192,9 @@ public interface Transaction {
     public long getCurrentAppID();
 
     public void clear();
+    
+    // Check that the transaction is valid, throw an error if not.
+    // E.g., if avoiding deadlock, throw DeadlockException (again).
+    public void checkIsValid();
 
 }
