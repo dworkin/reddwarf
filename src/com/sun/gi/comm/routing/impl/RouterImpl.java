@@ -93,7 +93,6 @@ import com.sun.gi.framework.interconnect.TransportChannel;
 import com.sun.gi.framework.interconnect.TransportChannelListener;
 import com.sun.gi.framework.interconnect.TransportManager;
 import com.sun.gi.framework.logging.SGSERRORCODES;
-import com.sun.gi.logic.GLO;
 import com.sun.gi.objectstore.DeadlockException;
 import com.sun.gi.objectstore.NonExistantObjectIDException;
 import com.sun.gi.objectstore.ObjectStore;
@@ -538,7 +537,6 @@ public class RouterImpl implements Router {
                 synchronized(ostore){
                     Transaction trans = ostore.newTransaction(this.getClass().getClassLoader());
                     trans.start();
-                    ChannelID id;
                     try {
                         persistantData = (CommPersistantData) trans.peek(persistantDataID);
                         String chanName = persistantData.allocatedChannelIDNames.get(cid);

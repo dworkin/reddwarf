@@ -68,44 +68,19 @@
 
 package com.sun.gi;
 
-import java.lang.reflect.Constructor;
 import java.net.URL;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Set;
-import java.util.Map.Entry;
 
-import com.sun.gi.comm.routing.Router;
-import com.sun.gi.comm.routing.impl.RouterImpl;
-import com.sun.gi.comm.users.server.UserManager;
-import com.sun.gi.comm.users.validation.UserValidatorFactory;
-import com.sun.gi.comm.users.validation.impl.UserValidatorFactoryImpl;
 import com.sun.gi.framework.discovery.XMLDiscoveryFileManager;
 import com.sun.gi.framework.install.Deployer;
-import com.sun.gi.framework.install.DeploymentRec;
-import com.sun.gi.framework.install.InstallationLoader;
-import com.sun.gi.framework.install.UserMgrRec;
-import com.sun.gi.framework.install.ValidatorRec;
 import com.sun.gi.framework.install.impl.DeployerImpl;
-import com.sun.gi.framework.install.impl.InstallationURL;
 import com.sun.gi.framework.interconnect.TransportManager;
 import com.sun.gi.framework.interconnect.impl.NullTransportManager;
 import com.sun.gi.framework.management.ManagerAgent;
 import com.sun.gi.framework.rawsocket.impl.RawSocketManagerImpl;
-import com.sun.gi.framework.status.ReportManager;
-import com.sun.gi.framework.status.ReportUpdater;
-import com.sun.gi.framework.status.StatusReport;
-import com.sun.gi.framework.status.impl.ReportManagerImpl;
 import com.sun.gi.framework.timer.TimerManager;
 import com.sun.gi.framework.timer.impl.TimerManagerImpl;
 import com.sun.gi.logic.SimKernel;
-import com.sun.gi.logic.Simulation;
 import com.sun.gi.logic.impl.SimKernelImpl;
-import com.sun.gi.logic.impl.SimulationImpl;
-import com.sun.gi.objectstore.ObjectStore;
-import com.sun.gi.objectstore.tso.TSOObjectStore;
-import com.sun.gi.utils.SGSUUID;
-import com.sun.gi.utils.StatisticalUUID;
 
 /**
  * <p>
@@ -150,8 +125,6 @@ public class SGS {
             
 	    // start game services
 
-	    TransportManager routerTransportManager;
-	    routerTransportManager = new NullTransportManager();
 	    deployer = new DeployerImpl(kernel, transportManager, 
 				new URL(installFile));
  	    

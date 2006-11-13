@@ -284,7 +284,7 @@ public class BattleBoardGame implements GLO {
         }
         String outstr = "move-ended " + screenNames.get(thisPlayer) + " bomb "
                 + screenNames.get(target) + " " + x + " " + y + " " + result;
-        ;
+
         for (UserID id : screenNames.keySet()) {
             sendData(task, gameChannel, id, outstr);
         }

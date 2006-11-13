@@ -85,7 +85,6 @@ import com.sun.gi.framework.status.ReportUpdater;
 import com.sun.gi.framework.status.StatusReport;
 import com.sun.gi.framework.status.impl.ReportManagerImpl;
 import com.sun.gi.logic.SimKernel;
-import com.sun.gi.objectstore.ObjectStore;
 import com.sun.gi.utils.SGSUUID;
 import com.sun.gi.utils.StatisticalUUID;
 
@@ -107,7 +106,6 @@ public class DeployerImpl implements Deployer {
 	
     private static final long REPORTTTL = 1000;
     
-    private SimKernel kernel;
     private TransportManager transportManager;
     private Map<Integer, SimulationContext> contextMap;
     private SGSUUID sliceID = new StatisticalUUID();
@@ -116,7 +114,7 @@ public class DeployerImpl implements Deployer {
     public DeployerImpl(SimKernel kernel, TransportManager transportManager, 
     					URL url) throws InstantiationException {
     	
-    	this.kernel = kernel;
+    	//this.kernel = kernel;
     	this.transportManager = transportManager;
     	contextMap = new HashMap<Integer, SimulationContext>();
     	

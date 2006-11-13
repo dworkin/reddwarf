@@ -70,9 +70,6 @@ package com.sun.gi.apps.timertest;
 
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimBoot;
-import com.sun.gi.logic.SimTask;
-import com.sun.gi.logic.SimTimerListener;
-import com.sun.gi.logic.SimTask.ACCESS_TYPE;
 import com.sun.gi.transition.AppContext;
 import com.sun.gi.transition.PeriodicTaskHandle;
 import com.sun.gi.transition.Task;
@@ -86,7 +83,6 @@ public class TransitionTimerTestBoot
 {
     private static final long serialVersionUID = 1L;
     
-    boolean running = false;
     long tickCount = 0;
     PeriodicTaskHandle periodicTaskHandle = null;
     

@@ -122,7 +122,7 @@ public class OSChat extends JFrame {
       public void run(){
         Transaction trans = os.newTransaction(null);
         long id = trans.lookup("OSChatData");
-        if (id == os.INVALID_ID) {
+        if (id == ObjectStore.INVALID_ID) {
           TextHolder data = new TextHolder();
           data.text = "";
           data.updatecount = 0;

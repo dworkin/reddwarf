@@ -89,7 +89,6 @@ import com.sun.gi.framework.install.DeploymentRec;
 import com.sun.gi.framework.install.SimulationContext;
 import com.sun.gi.framework.install.UserMgrRec;
 import com.sun.gi.framework.install.ValidatorRec;
-import com.sun.gi.framework.install.SimulationContext.StatusType;
 import com.sun.gi.framework.interconnect.TransportManager;
 import com.sun.gi.framework.status.StatusReport;
 import com.sun.gi.logic.SimKernel;
@@ -121,10 +120,10 @@ public class SimulationContextImpl implements SimulationContext {
     private TransportManager transportManager;
     private List<UserManager> userManagerList;
     private Simulation simulation;
-    private int reportID = -1;           // this simulation's entry in the
+    //private int reportID = -1;           // this simulation's entry in the
                 // installation report.
     private String statusBlockName;
-    private boolean firstStart = true;
+    //private boolean firstStart = true;
 
     private static final String DEFAULT_OSTORE_DATASPACE =
             "com.sun.gi.objectstore.tso.dataspace.PersistantInMemoryDataSpace";
@@ -148,8 +147,8 @@ public class SimulationContextImpl implements SimulationContext {
             String dataspaceName =
                     System.getProperty("sgs.ostore.dataspace",
                     DEFAULT_OSTORE_DATASPACE);
-            Class dataspaceClass = Class.forName(dataspaceName);
-            Constructor ctor =
+            Class<?> dataspaceClass = Class.forName(dataspaceName);
+            Constructor<?> ctor =
                     dataspaceClass.getConstructor(Long.TYPE);
             DataSpace dataspace = (DataSpace) ctor.newInstance(gameID);
             ostore = new TSOObjectStore(dataspace);
@@ -217,8 +216,8 @@ public class SimulationContextImpl implements SimulationContext {
             installationReport.setParameter(statusBlockName + ".umgr", "count", 
                     Integer.toString(umgrCount));
             try {
-                Class serverClass = Class.forName(serverClassName, true, loader);
-                Constructor constructor = serverClass.getConstructor(new Class[] {
+                Class<?> serverClass = Class.forName(serverClassName, true, loader);
+                Constructor<?> constructor = serverClass.getConstructor(new Class[] {
                 	Router.class, Map.class });
                 UserManager umgr = (UserManager) constructor.newInstance(new Object[] {
                 	router, umgrRec.getParameterMap() });

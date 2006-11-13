@@ -134,7 +134,7 @@ class ClientTest5 implements Runnable {
 	this.os = TestUtil.connect(appID, false,
 		params.dataSpaceType, traceFileName);
 
-	this.objSize = params.objSize;;
+	this.objSize = params.objSize;
 	this.numPeeks = params.transactionNumPeeks;
 	this.numLocks = params.transactionNumLocks;
 	this.numPromotedPeeks = params.transactionNumPromotedPeeks;

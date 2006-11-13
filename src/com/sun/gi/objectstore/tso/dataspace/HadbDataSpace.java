@@ -77,7 +77,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -143,8 +142,6 @@ public class HadbDataSpace implements DataSpace {
     private PreparedStatement deleteObjStmnt;
     private PreparedStatement deleteObjLockStmnt;
     private PreparedStatement deleteNameStmnt;
-    private PreparedStatement clearObjTableStmnt; // XXX: unused?
-    private PreparedStatement clearNameTableStmnt; // XXX: unused?
 
     private volatile boolean closed = false;
 
@@ -541,11 +538,6 @@ public class HadbDataSpace implements DataSpace {
 
         // XXX: HADB does not implement table locking.
         // So, we NEED another way to do this.
-
-        clearObjTableStmnt = updateSingleConn.prepareStatement("DELETE FROM "
-                + OBJTBLNAME);
-        clearNameTableStmnt = updateSingleConn.prepareStatement("DELETE FROM "
-                + NAMETBLNAME);
 
         updateInfoStmnt = idConn.prepareStatement("UPDATE " + INFOTBLNAME
                 + " SET NEXTIDBLOCKBASE=? "

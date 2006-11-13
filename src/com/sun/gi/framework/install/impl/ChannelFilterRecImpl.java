@@ -100,8 +100,8 @@ public class ChannelFilterRecImpl implements ChannelFilterRec {
     public ChannelFilter createChannelFilter() {
         ChannelFilter filter = null;
         try {
-            Class<ChannelFilter> filterClass = (Class<ChannelFilter>) Class.forName(className, true, loader);
-            filter = filterClass.newInstance();
+            Class<?> filterClass = Class.forName(className, true, loader);
+            filter = (ChannelFilter) filterClass.newInstance();
         }
         catch (ClassNotFoundException cnf) {
             cnf.printStackTrace();

@@ -1,12 +1,9 @@
 package com.sun.gi.logic.impl;
 
-import java.lang.reflect.Method;
-
 import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimBoot;
 import com.sun.gi.logic.SimTask;
-import com.sun.gi.transition.AppContext;
 import com.sun.gi.transition.impl.TaskList;
 import com.sun.gi.transition.impl.TaskManagerImpl;
 

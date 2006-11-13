@@ -70,7 +70,6 @@ package com.sun.gi.logic.impl;
 
 import java.io.IOException;
 import java.io.ObjectInputStream;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.sun.gi.logic.GLO;

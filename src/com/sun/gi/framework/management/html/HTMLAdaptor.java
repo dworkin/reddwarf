@@ -203,14 +203,15 @@ public class HTMLAdaptor implements Runnable {
     	StringBuffer buffer = new StringBuffer(writeBanner());
     	try {
     	
-    	    Collection<SimulationContext> contextList = 
-    	        (Collection<SimulationContext>) server.invoke(new ObjectName(server.getDefaultDomain() + 
+    	    Collection<?> contextList = 
+    	        (Collection<?>) server.invoke(new ObjectName(server.getDefaultDomain() + 
     	        ":name=Deployer"), "listContexts", null, null);
             buffer.append("<p><p><table width=100% border=1>");
             buffer.append("<tr><th align=left valign=top>ID</th><th align=left>Name</th>" +
             			"<th align=left>UserManagers</th>" +
             			"<th align=left>Status</th><th align=left>Operation</th></tr>");
-            for (SimulationContext curContext : contextList) {
+            for (Object curObj : contextList) {
+                SimulationContext curContext = (SimulationContext) curObj;
             	buffer.append("<tr><td>" + curContext.getID() + "</td><td>" + curContext.getName() + 
     			"</td>");
     	

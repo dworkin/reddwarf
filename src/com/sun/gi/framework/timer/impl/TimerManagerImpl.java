@@ -71,8 +71,6 @@ package com.sun.gi.framework.timer.impl;
 import java.lang.reflect.Method;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.Iterator;
-import java.util.PriorityQueue;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;

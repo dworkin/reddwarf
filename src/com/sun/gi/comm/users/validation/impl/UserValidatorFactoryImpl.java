@@ -84,8 +84,8 @@ import com.sun.gi.comm.users.validation.UserValidatorFactory;
  */
 public class UserValidatorFactoryImpl implements UserValidatorFactory {
 
-    List<Constructor> userValidatorConstructors =
-        new ArrayList<Constructor>();
+    List<Constructor<?>> userValidatorConstructors =
+        new ArrayList<Constructor<?>>();
     List<Map<String, String>> userValidatorParams =
         new ArrayList<Map<String, String>>();
 
@@ -118,7 +118,8 @@ public class UserValidatorFactoryImpl implements UserValidatorFactory {
             Map<String, String> params)
     {
         try {
-            Constructor c = loginModuleClass.getConstructor(Map.class);
+            Constructor<?> c =
+                ((Class<?>)loginModuleClass).getConstructor(Map.class);
             userValidatorConstructors.add(c);
             userValidatorParams.add(params);
         } catch (SecurityException e) {

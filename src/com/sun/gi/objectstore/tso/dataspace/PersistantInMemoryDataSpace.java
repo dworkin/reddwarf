@@ -945,26 +945,6 @@ public class PersistantInMemoryDataSpace implements DataSpace {
         return createId;
     }
 
-    /**
-     * Destroys the object associated with objectID and removes the
-     * name associated with that ID (if any).  <p>
-     * 
-     * @param objectID The objectID of the object to destroy
-     */
-    private void olddestroy(long objectID) {
-	/*
-	try {
-	    deleteObjStmnt.setLong(1, objectID);
-	    deleteObjStmnt.execute();
-	    deleteNameByOIDStmnt.setLong(1, objectID);
-	    deleteNameByOIDStmnt.execute();
-	    deleteInsertConn.commit();
-	} catch (SQLException e) {
-	    e.printStackTrace();
-	}
-	*/
-    }
-
     private long getNextID() {
         synchronized (idMutex) {
             return id++;
