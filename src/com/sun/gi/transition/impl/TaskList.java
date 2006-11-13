@@ -109,13 +109,13 @@ public class TaskList implements GLO {
         
         for (GLOReference ref : tasks) {
             try {
-                Restartable task = (Restartable) ref.get(simTask);
-                if (task == null) {
+                TaskWrapper wrapper = (TaskWrapper) ref.get(simTask);
+                if (wrapper == null) {
                     log.log(Level.WARNING,
                             "Skipping restart of null timer {0}",
                             ref);
                 } else {
-                    task.restart();
+                    wrapper.restart();
                 }
             } catch (Exception e) {
                 // skip it

@@ -90,7 +90,6 @@ public class PeriodicTaskHandleImpl
         PeriodicTaskWrapper wrapper = ref.get(simTask);
         if (wrapper != null) {
             wrapper.cancel();
-            ref.delete(simTask);
         }
     }
 

@@ -68,38 +68,35 @@
 
 package com.sun.gi.transition.impl;
 
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask;
-import com.sun.gi.logic.SimTask.ACCESS_TYPE;
 import com.sun.gi.logic.SimTimerListener;
 import com.sun.gi.transition.AppContext;
 import com.sun.gi.transition.Task;
+import java.util.UUID;
 
-public class TaskWrapper implements SimTimerListener, Task, Restartable
+public class TaskWrapper implements SimTimerListener, Task
 {
     private static final long serialVersionUID = 1L;
     private static Logger log = Logger.getLogger("com.sun.gi.transition");
+
+    protected final UUID id;
+    protected final GLOReference<? extends GLO> taskRef;
+    protected long deadline;
+    protected boolean cleanup;
     
-    private static final AtomicLong nextID = new AtomicLong();
+    protected GLOReference<? extends TaskWrapper> thisRef;
 
-    private GLOReference<TaskWrapper> thisRef;
-    private final long id;
-    private final GLOReference<? extends GLO> taskRef;
-    private final long deadline;
-    private boolean cleanup;
-
-    public static GLOReference<TaskWrapper> wrapTask(Task task,
-            long deadline,
-            boolean cleanup)
+    public static GLOReference<TaskWrapper>
+            wrapTask(Task task, long deadline)
     {
         SimTask simTask = SimTask.getCurrent();
         GLOReference<TaskWrapper> wrapperRef =
-            simTask.createGLO(new TaskWrapper(task, deadline, cleanup));
+            simTask.createGLO(new TaskWrapper(task, deadline, true));
         wrapperRef.get(simTask).thisRef = wrapperRef;
         return wrapperRef;
     }
@@ -108,8 +105,8 @@ public class TaskWrapper implements SimTimerListener, Task, Restartable
      * @param task the Task to run, which must implement GLO
      * @param cleanup whether to destroy this wrapper on its first timerEvent
      */
-    public TaskWrapper(Task task, long deadline, boolean cleanup) {
-        this.id = nextID.incrementAndGet();
+    protected TaskWrapper(Task task, long deadline, boolean cleanup) {
+        this.id = UUID.randomUUID();
         this.taskRef = SimTask.getCurrent().lookupReferenceFor((GLO)task);
         this.deadline = deadline;
         this.cleanup = cleanup;
@@ -117,58 +114,69 @@ public class TaskWrapper implements SimTimerListener, Task, Restartable
     
     public void run() throws Exception {
         Task task = (Task) taskRef.get(SimTask.getCurrent());
-        if (task == null) {
-            cleanup = true;
-            log.warning("Timer task was null for " + this);
-            return;
-        }
         task.run();
     }
 
     public void restart() {
+        internalRestart();
+    }
+    
+    protected long internalRestart() {
         SimTask simTask = SimTask.getCurrent();
         
         long delay = (deadline - System.currentTimeMillis());
         delay = Math.max(0, delay);
         
         log.log(Level.FINE,
-                "TaskWrapper {0} restart, new delay = {1}",
+                "Restart {0}, new delay = {1}",
                 new Object[] { this, Long.toString(delay) });
         
-        simTask.registerTimerEvent(SimTask.ACCESS_TYPE.GET,
-                delay,
-                false,
-                thisRef);
+        return simTask.registerTimerEvent(SimTask.ACCESS_TYPE.GET,
+                    delay,
+                    false,
+                    thisRef);
     }
 
     public void timerEvent(long eventID) {
+        timerEvent(eventID, true);
+    }
+    
+    public void timerEvent(long eventID, boolean cleanupOnTransient) {
         try {
             run();
-        } catch (RuntimeException e) {
-            throw e;
+        } catch (NullPointerException e) {
+            log.warning("Task was null for " + this);
+            cleanup = true;
         } catch (Exception e) {
-            throw new RuntimeException(e);
-        } finally {
-            if (cleanup) {
-                SimTask simTask = SimTask.getCurrent();
-
-                log.log(Level.FINEST, 
-                        "TaskWrapper {0} cleanup (ref {1})",
-                        new Object[] { this, thisRef });
-                
-                // Tell our TimerManagerImpl to depersist
-                // this task now that it's been completed.
-                TaskManagerImpl taskMgr =
-                        ((TaskManagerImpl)AppContext.getTaskManager());
-                taskMgr.depersistTask(thisRef);
-
-                thisRef.delete(simTask);
-            }
+            log.log(Level.WARNING,
+                    "Exception while running timer task: " + e.getMessage(),
+                    e);
+            cleanup = cleanupOnTransient;
         }
+
+        if (cleanup) {
+            log.log(Level.FINEST, 
+                    "{0} cleanup (ref {1})",
+                    new Object[] { this, thisRef });
+            
+            cleanup();
+        }
+    }
+    
+    protected void cleanup() {
+        SimTask simTask = SimTask.getCurrent();
+
+        // Tell our TimerManagerImpl to depersist
+        // this task now that it's been completed.
+        TaskManagerImpl taskMgr =
+                ((TaskManagerImpl)AppContext.getTaskManager());
+        taskMgr.depersistTask(this);
+
+        thisRef.delete(simTask);
     }
 
     public int hashCode() {
-        return Long.valueOf(id).hashCode();
+        return id.hashCode();
     }
     
     public boolean equals(Object obj) {
@@ -177,6 +185,11 @@ public class TaskWrapper implements SimTimerListener, Task, Restartable
         }
 
         TaskWrapper other = (TaskWrapper) obj;
-        return id == other.id;
+        return id.equals(other.id);
+    }
+    
+    public String toString() {
+        return "TaskWrapper(deadline=" + deadline + ")@" +
+                Integer.toHexString(hashCode());
     }
 }

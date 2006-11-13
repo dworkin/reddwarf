@@ -68,124 +68,93 @@
 
 package com.sun.gi.transition.impl;
 
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import com.sun.gi.logic.GLOReference;
 import com.sun.gi.logic.SimTask;
 import com.sun.gi.logic.SimTask.ACCESS_TYPE;
-import com.sun.gi.logic.SimTimerListener;
 import com.sun.gi.transition.AppContext;
 import com.sun.gi.transition.Task;
-import com.sun.gi.transition.PeriodicTaskHandle;
 
-public class PeriodicTaskWrapper
-        implements SimTimerListener, Restartable
+public class PeriodicTaskWrapper extends TaskWrapper
 {
     private static final long serialVersionUID = 1L;
     private static Logger log = Logger.getLogger("com.sun.gi.transition");
-
-    private static final AtomicLong nextID = new AtomicLong();
     
-    private GLOReference<PeriodicTaskWrapper> thisRef;
-    private final long id;
-    private final GLOReference<TaskWrapper> taskWrapperRef;
     private final long period;
+    private boolean firstTime;
 
     public static GLOReference<PeriodicTaskWrapper>
-            create(Task task, long period)
+            create(Task task, long deadline, long period)
     {
         SimTask simTask = SimTask.getCurrent();
         GLOReference<PeriodicTaskWrapper> wrapperRef =
-            simTask.createGLO(new PeriodicTaskWrapper(task, period));
+            simTask.createGLO(new PeriodicTaskWrapper(task, deadline, period));
         wrapperRef.get(simTask).thisRef = wrapperRef;
         return wrapperRef;
     }
 
-    protected PeriodicTaskWrapper(Task task, long period) {
+    protected PeriodicTaskWrapper(Task task, long deadline, long period) {
+        super(task, deadline, false);
         assert period > 0;
-        this.id = nextID.incrementAndGet();
-        this.taskWrapperRef =
-            TaskWrapper.wrapTask(task, 0, false);
         this.period = period;
+        this.firstTime = true;
     }
 
     public void cancel() {
         log.log(Level.FINEST, 
-                "PeriodicTaskWrapper {0} cancel (ref {1})",
+                "{0} cancel (ref {1})",
                 new Object[] { this, thisRef });
         
-        TaskManagerImpl taskMgr =
-                ((TaskManagerImpl)AppContext.getTaskManager());
-        taskMgr.removePeriodicTask(this);
-
-        // Delete our TaskWrapper helper GLO.
-        SimTask simTask = SimTask.getCurrent();
-        taskWrapperRef.delete(simTask);
-        
-        // Delete ourselves
-        thisRef.delete(simTask);
+        firstTime = false;
+        cleanup();
     }
-
+    
     public void restart() {
-        SimTask simTask = SimTask.getCurrent();
-
-        log.log(Level.FINE, "PeriodicTaskWrapper {0} restart", this);
-        
-        long newTimerID = 
-            simTask.registerTimerEvent(ACCESS_TYPE.PEEK,
-                                       period,
-                                       true,
-                                       taskWrapperRef);
+        // Treat the interrupted period as a new "delay" starting period,
+        // and re-register the normal period after the first time through.
+        firstTime = true;
+        long newTimerID = internalRestart();
         
         TaskManagerImpl taskMgr =
             ((TaskManagerImpl)AppContext.getTaskManager());
-        taskMgr.setPeriodicTaskTimerID(this, newTimerID);
+        taskMgr.setTaskTimerID(thisRef, newTimerID);
     }
 
     // We only get a timer event for the first period of a periodic
     // task (the "delay" part); then we schedule that task to repeat
     // directly and update the TaskManager's idea of what timer ID it's on.    
     public void timerEvent(long eventID) {
-        SimTask simTask = SimTask.getCurrent();
-        // taskWrapperRef is safe to PEEK (only need GET to delete it)
-        TaskWrapper taskWrapper = taskWrapperRef.peek(simTask);
-        if (taskWrapper == null) {
-            log.warning("Timer task was null, deleting " + this);
-            cancel();
+        super.timerEvent(eventID, false);
+        
+        if (cleanup) {
+            // Don't do the new timer scheduling below.
+            // (Rest of cleanup handled in superclass).
             return;
         }
-        try {
-            taskWrapper.run();
-        } catch (RuntimeException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        } finally {
-            // taskWrapperRef is safe to PEEK (only need GET to delete it)
+
+        if (firstTime) {
+            firstTime = false;
+            
+            SimTask simTask = SimTask.getCurrent();
             long newTimerID = 
-                simTask.registerTimerEvent(ACCESS_TYPE.PEEK,
+                simTask.registerTimerEvent(ACCESS_TYPE.GET,
                                            period,
                                            true,
-                                           taskWrapperRef);
+                                           thisRef);
 
             TaskManagerImpl taskMgr =
                     ((TaskManagerImpl)AppContext.getTaskManager());
-            taskMgr.setPeriodicTaskTimerID(this, newTimerID);
+            taskMgr.setTaskTimerID(thisRef, newTimerID);
         }
-    }
-
-    public int hashCode() {
-        return Long.valueOf(id).hashCode();
+        
+        deadline += period;
     }
     
-    public boolean equals(Object obj) {
-        if (! (obj instanceof PeriodicTaskWrapper)) {
-            return false;
-        }
-
-        PeriodicTaskWrapper other = (PeriodicTaskWrapper) obj;
-        return id == other.id;
+    public String toString() {
+        return "PeriodicTaskWrapper(period=" + period +
+                ",deadline=" + deadline + ")@" +
+                Integer.toHexString(hashCode());
     }
 }

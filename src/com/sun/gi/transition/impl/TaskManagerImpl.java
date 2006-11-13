@@ -68,43 +68,31 @@
 
 package com.sun.gi.transition.impl;
 
-import java.io.Serializable;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import com.sun.gi.objectstore.DeadlockException;
-import com.sun.gi.objectstore.NonExistantObjectIDException;
-import com.sun.gi.objectstore.ObjectStore;
-import com.sun.gi.objectstore.Transaction;
 import com.sun.gi.transition.PeriodicTaskHandle;
 import com.sun.gi.transition.Task;
 import com.sun.gi.transition.TaskManager;
-import com.sun.gi.logic.GLO;
 import com.sun.gi.logic.GLOReference;
-import com.sun.gi.logic.impl.GLOReferenceImpl;
-import com.sun.gi.logic.impl.SimulationImpl;
 import com.sun.gi.logic.SimTask;
-import com.sun.gi.logic.SimTask.ACCESS_TYPE;
 import com.sun.gi.logic.SimTimerListener;
 
 public class TaskManagerImpl implements TaskManager {
     public static final String TASKLISTNAME = "_SGS_TaskManagerData";
     private static Logger log = Logger.getLogger("com.sun.gi.transition");
     
-    // Not persisted, so doesn't need to use GLORefs
-    private final Map<PeriodicTaskWrapper, Long> periodicTimerMap;
+    private final Map<GLOReference<? extends TaskWrapper>, Long> timerMap;
 
     private final Method callbackMethod;
     
     private GLOReference<TaskList> taskListRef;
     
     public TaskManagerImpl() {
-        periodicTimerMap = new HashMap<PeriodicTaskWrapper, Long>();
+        timerMap = new HashMap<GLOReference<? extends TaskWrapper>, Long>();
         try {
             callbackMethod =
                     SimTimerListener.class.getMethod("timerEvent",
@@ -120,16 +108,32 @@ public class TaskManagerImpl implements TaskManager {
         taskListRef = ref;
     }
     
-    public void persistTask(GLOReference ref) {
+    public void persistTask(GLOReference<? extends TaskWrapper> ref) {
         SimTask simTask = SimTask.getCurrent();
         TaskList taskList = taskListRef.get(simTask);
         taskList.add(ref);
     }
 
-    public void depersistTask(GLOReference ref) {
+    public void depersistTask(TaskWrapper wrapper) {
         SimTask simTask = SimTask.getCurrent();
         TaskList taskList = taskListRef.get(simTask);
+        GLOReference<? extends TaskWrapper> ref =
+                simTask.lookupReferenceFor(wrapper);
         taskList.remove(ref);
+        
+        if (wrapper instanceof PeriodicTaskWrapper) {
+            Long timerID = timerMap.get(ref);
+            if (timerID != null) {
+                // @@ NOTE @@
+                // We cannot remove this wrapper's entry from the map, because
+                // this transaction might fail and we may be asked for its
+                // timerID in a future (successful) transaction.
+                // TODO: clean up stale entries from time to time.
+                simTask.deregisterTimerEvent(timerID);
+                log.log(Level.FINER, "Cancel timer for {0} id {1}",
+                        new Object[] { wrapper, timerID });
+            }
+        }
     }
 
     public void scheduleTask(Task task) {
@@ -138,9 +142,7 @@ public class TaskManagerImpl implements TaskManager {
         long deadline = System.currentTimeMillis();
         
         GLOReference<TaskWrapper> taskWrapperRef =
-                TaskWrapper.wrapTask(task,
-                        deadline, 
-                        true);
+                TaskWrapper.wrapTask(task, deadline);
         
         persistTask(taskWrapperRef);
         
@@ -158,9 +160,7 @@ public class TaskManagerImpl implements TaskManager {
         long deadline = System.currentTimeMillis() + delay;
         
         GLOReference<TaskWrapper> taskWrapperRef =
-                TaskWrapper.wrapTask(task,
-                        deadline,
-                        true);
+                TaskWrapper.wrapTask(task, deadline);
 
         persistTask(taskWrapperRef);
 
@@ -177,58 +177,35 @@ public class TaskManagerImpl implements TaskManager {
             long period)
     {
         SimTask simTask = SimTask.getCurrent();
+        
+        long deadline = System.currentTimeMillis() + delay;
+        
         GLOReference<PeriodicTaskWrapper> wrapperRef = 
-                PeriodicTaskWrapper.create(task, period);
-        PeriodicTaskWrapper wrapper = wrapperRef.get(simTask);
+                PeriodicTaskWrapper.create(task, deadline, period);
         
         // We can register with access PEEK here, since the
         // PeriodicTaskWrapper won't need to be modified.
         Long timerID =
-                simTask.registerTimerEvent(SimTask.ACCESS_TYPE.PEEK,
+                simTask.registerTimerEvent(SimTask.ACCESS_TYPE.GET,
                     delay,
                     false,
                     wrapperRef);
 
         persistTask(wrapperRef);
+        setTaskTimerID(wrapperRef, timerID);
         
-        log.log(Level.FINER, 
-                "Register timer for {0} ID {1}",
-                new Object[] { wrapper, timerID });
-
-        periodicTimerMap.put(wrapper, timerID);
         return new PeriodicTaskHandleImpl(wrapperRef);
     }
     
-    public void setPeriodicTaskTimerID(PeriodicTaskWrapper wrapper,
+    public void setTaskTimerID(GLOReference<? extends TaskWrapper> ref,
             long newTimerID)
     {
-        log.log(Level.FINEST, 
-                "Update timer for {0} ID {1}",
-                new Object[] { wrapper, newTimerID });
-
-        periodicTimerMap.put(wrapper, newTimerID);
-    }
-
-    public void removePeriodicTask(PeriodicTaskWrapper wrapper) {
         SimTask simTask = SimTask.getCurrent();
         
-        log.log(Level.FINER, "Cancel timer {0}", wrapper);
-        
-        // Remove this PeriodicTaskWrapper from the persistent
-        // task list.
-        depersistTask(simTask.lookupReferenceFor(wrapper));
+        log.log(Level.FINEST, 
+                "Update timer for {0} ID {1}",
+                new Object[] { ref.peek(simTask), newTimerID });
 
-        // @@ NOTE @@
-        // We cannot remove this wrapper's entry from the periodicTimerMap,
-        // because this transaction might fail and we may be asked for its
-        // timerID in a future (successful) transaction.
-        // TODO: this leaks map entries, but we can garbage collect them if
-        // we add appropriate calls to the DeferredDeleteTimer command.
-        Long timerID = periodicTimerMap.get(wrapper);
-        if (timerID != null) {
-            simTask.deregisterTimerEvent(timerID);
-        } else {
-            log.log(Level.WARNING, "No such periodic task {0}", wrapper);
-        }
+        timerMap.put(ref, newTimerID);
     }
 }
