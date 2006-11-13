@@ -100,7 +100,8 @@ public interface Channel {
      * receivedMessage} method is invoked with this channel, the
      * session, and the message.  The specified listener is not
      * invoked for messages that the server sends on this channel via
-     * one of the channel's <code>send</code> methods.
+     * one of the channel's <code>send</code> methods.  If the specified
+     * listener is non-<code>null</code> then it must also be serializable.
      *
      * <p>Note: This operation has no effect on notifications to the
      * channel listener specified when this channel was created.
@@ -109,7 +110,7 @@ public interface Channel {
      * @param listener a channel listener, or <code>null</code>
      *
      * @throws IllegalArgumentException if <code>listener</code> is
-     * not <code>Serializable</code>
+     * non-<code>null</code> and is not <code>Serializable</code>
      * @throws IllegalStateException if this channel is closed
      * @throws TransactionException if the operation failed because of
      * a problem with the current transaction

@@ -28,7 +28,9 @@ public interface ChannelManager {
      * receivedMessage} method is invoked with this channel, the
      * session, and the message.  The specified listener is not
      * invoked for messages that the server sends on the channel via
-     * one of the channel's <code>send</code> methods.
+     * one of the channel's <code>send</code> methods.  If the specified
+     * <code>listener</code> is non-<code>null</code>, then it must also
+     * be {@link Serializable}.
      *
      * <p>Messages sent on the returned channel are delivered
      * according to the specified delivery requirement.
@@ -39,6 +41,8 @@ public interface ChannelManager {
      *
      * @return a new channel bound to the specified name
      *
+     * @throws IllegalArgumentException if the specified listener is
+     * non-<code>null</code> and is not serializable
      * @throws NameExistsException if a channel is already bound to
      * the specified name
      * @throws TransactionException if the operation failed because of
