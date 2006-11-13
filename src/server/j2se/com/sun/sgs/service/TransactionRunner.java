@@ -1,6 +1,8 @@
 
 package com.sun.sgs.service;
 
+import com.sun.sgs.impl.kernel.TaskHandler;
+
 import com.sun.sgs.kernel.KernelRunnable;
 
 
@@ -36,7 +38,7 @@ public class TransactionRunner implements KernelRunnable {
      *                   <code>KernelRunnable</code> or with the transaction
      */
     public void run() throws Exception {
-        // FIXME: implement this method
+        TaskHandler.runTransactionalTask(transactionalTask);
     }
 
 }
