@@ -25,7 +25,7 @@ final class ChannelState implements ManagedObject, Serializable {
     /** The name of this channel. */
     final String name;
 
-    /** The global listener for this channel. */
+    /** The listener for this channel. */
     final ChannelListener listener;
 
     /** The delivery requirement for messages sent on this channel. */
@@ -49,6 +49,10 @@ final class ChannelState implements ManagedObject, Serializable {
 	this.delivery = delivery;
     }
 
+    /**
+     * Returns a collection containing the client sessions joined to
+     * the channel represented by this state.
+     */
     Collection<ClientSession> getSessions() {
 	Collection<ClientSession> collection = new ArrayList<ClientSession>();
 	for (ClientSession session : sessions.keySet()) {
@@ -57,9 +61,30 @@ final class ChannelState implements ManagedObject, Serializable {
 	return collection;
     }
 
+    /* -- Implement Object -- */
+
+    /** {@inheritDoc} */
+    public boolean equals(Object obj) {
+	if (this == obj) {
+	    return true;
+	} else if (obj.getClass() == this.getClass()) {
+	    ChannelState state = (ChannelState) obj;
+	    return
+		name.equals(state.name) &&
+		delivery.equals(state.delivery) &&
+		listener.equals(state.listener);
+	}
+	return false;
+    }
+
+    /** {@inheritDoc} */
+    public int hashCode() {
+	return name.hashCode();
+    }
+
     /** {@inheritDoc} */
     public String toString() {
-	return name;
+	return getClass().getName() + "[" + name + "]";
     }
 
     /* -- Serialization methods -- */

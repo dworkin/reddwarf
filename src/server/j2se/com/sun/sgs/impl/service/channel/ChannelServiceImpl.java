@@ -14,6 +14,7 @@ import com.sun.sgs.service.Service;
 //import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
+import java.io.Serializable;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
@@ -102,14 +103,16 @@ public class ChannelServiceImpl
 	logger.log(Level.CONFIG, "Configuring ChannelServiceImpl");
 
 	try {
-	    if (registry == null || txnProxy == null) {
-		throw new NullPointerException("null argument");
+	    if (registry == null) {
+		throw new NullPointerException("null registry");
+	    } else if (proxy == null) {
+		throw new NullPointerException("null transaction proxy");
 	    }
 	    synchronized (lock) {
 		if (this.txnProxy != null) {
 		    throw new IllegalStateException("Already configured");
 		}
-		this.txnProxy = txnProxy;
+		this.txnProxy = proxy;
 		dataService = registry.getComponent(DataService.class);
 		//taskService = registry.getComponent(TaskService.class);
 	    }
@@ -122,8 +125,10 @@ public class ChannelServiceImpl
 		dataService.getServiceBinding(
 		    ChannelTable.NAME, ChannelTable.class);
 	    } catch (NameNotBoundException e) {
-		dataService.setBinding(ChannelTable.NAME, new ChannelTable());
+		dataService.setServiceBinding(
+		    ChannelTable.NAME, new ChannelTable());
 	    }
+	    
 	} catch (RuntimeException e) {
 	    logger.log(Level.CONFIG,
 		"Failed to configure ChannelServiceImpl", e);
@@ -141,6 +146,9 @@ public class ChannelServiceImpl
 	try {
 	    if (name == null) {
 		throw new NullPointerException("null name");
+	    }
+	    if (listener != null && !(listener instanceof Serializable)) {
+		throw new IllegalArgumentException("listener is not serializable");
 	    }
 	    Context context = checkContext();
 	    Channel channel = context.createChannel(name, listener, delivery);
@@ -185,11 +193,13 @@ public class ChannelServiceImpl
     /** {@inheritDoc} */
     public boolean prepare(Transaction txn) throws Exception {
 	try {
-	    handleTransaction(txn, false);
+	    boolean prepared = true; // nothing to do on commit (yet).
+	    handleTransaction(txn, prepared);
 	    if (logger.isLoggable(Level.FINE)) {
 		logger.log(Level.FINER, "prepare txn:{0} returns {1}",
 			   txn, true);
 	    }
+	    
 	    return true;
 	} catch (RuntimeException e) {
 	    logger.logThrow(Level.FINER, "prepare txn:{0} throws", e, txn);

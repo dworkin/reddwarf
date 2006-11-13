@@ -66,7 +66,7 @@ final class Context {
     /* -- ChannelManager methods -- */
 
     /**
-     * Creates a channel with the sepcified name, listener, and
+     * Creates a channel with the specified name, listener, and
      * delivery requirement.
      */
     Channel createChannel(String name,

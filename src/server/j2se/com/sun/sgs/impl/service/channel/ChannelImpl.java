@@ -1,10 +1,17 @@
 package com.sun.sgs.impl.service.channel;
 
+import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelListener;
+import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.impl.util.LoggerWrapper;
+import java.io.IOException;
+import java.io.InvalidObjectException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -17,7 +24,7 @@ import java.util.logging.Logger;
  * Channel implementation for use within a single transaction
  * specified by the context passed during construction.
  */
-final class ChannelImpl implements Channel {
+final class ChannelImpl implements Channel, Serializable {
 
     /** The logger for this class. */
     private final static LoggerWrapper logger =
@@ -49,6 +56,8 @@ final class ChannelImpl implements Channel {
 	this.context = context;
     }
 
+    /* -- Implement Channel -- */
+    
     /** {@inheritDoc} */
     public String getName() {
 	checkContext();
@@ -71,11 +80,11 @@ final class ChannelImpl implements Channel {
     /** {@inheritDoc} */
     public void join(ClientSession session, ChannelListener listener) {
 	checkClosed();
-	if (session == null || listener == null) {
-	    throw new NullPointerException("null argument");
+	if (session == null) {
+	    throw new NullPointerException("null session");
 	}
-	if (!(listener instanceof Serializable)) {
-	    throw new IllegalStateException("listener not serializable");
+	if (listener != null && !(listener instanceof Serializable)) {
+	    throw new IllegalArgumentException("listener not serializable");
 	}
 	if (state.sessions.get(session) == null) {
 	    context.dataService.markForUpdate(state);
@@ -181,6 +190,67 @@ final class ChannelImpl implements Channel {
 	context.removeChannel(state.name);
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST, "close returns");
+	}
+    }
+
+    /* -- Implement Object -- */
+
+    /** {@inheritDoc} */
+    public boolean equals(Object obj) {
+	return
+	    (this == obj) ||
+	    (obj.getClass() == this.getClass() &&
+	     state.equals(((ChannelImpl) obj).state));
+    }
+
+    /** {@inheritDoc} */
+    public int hashCode() {
+	return state.name.hashCode();
+    }
+
+    /** {@inheritDoc} */
+    public String toString() {
+	return getClass().getName() + "[" + state.name + "]";
+    }
+
+    /* -- Serialization methods -- */
+
+    private Object writeReplace() {
+	return new External(state.name);
+    }
+
+    /**
+     * Represents the persistent represntation for a channel (just its name).
+     */
+    private final static class External implements Serializable {
+
+	private final static long serialVersionUID = 1L;
+
+	private final String name;
+
+	External(String name) {
+	    this.name = name;
+	}
+
+	private void writeObject(ObjectOutputStream out) throws IOException {
+	    out.defaultWriteObject();
+	}
+
+	private void readObject(ObjectInputStream in)
+	    throws IOException, ClassNotFoundException
+	{
+	    in.defaultReadObject();
+	}
+
+	private Object readResolve() throws ObjectStreamException {
+	    try {
+		ChannelManager cm = AppContext.getChannelManager();
+		Channel channel = cm.getChannel(name);
+		return channel;
+	    } catch (RuntimeException e) {
+		throw (InvalidObjectException)
+		    new InvalidObjectException(e.getMessage()).initCause(e);
+	    }
 	}
     }
 
