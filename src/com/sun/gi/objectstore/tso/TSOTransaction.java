@@ -81,6 +81,7 @@ import java.util.Set;
 import java.util.logging.Logger;
 import java.util.logging.Level;
 
+import com.sun.gi.logic.SGSError;
 import com.sun.gi.objectstore.DeadlockException;
 import com.sun.gi.objectstore.NonExistantObjectIDException;
 import com.sun.gi.objectstore.ObjectStore;
@@ -256,7 +257,9 @@ public class TSOTransaction implements Transaction {
 	} catch (NonExistantObjectIDException e) {
 	    log.severe("Create failed -- can't trans.lock " + headerID);
 	    abort();
-	    throw new IllegalStateException("TSOTransaction.create failed");
+            errorInProgress = new SGSError("TSOTransaction.create failed");
+            errorInProgress.initCause(e);
+            throw errorInProgress;
 	}
 
 	hdr.hdrID = headerID; // (LOG) set if using hdrID in TSODataHeader
@@ -853,6 +856,7 @@ public class TSOTransaction implements Transaction {
     }
 
     public void commit() {
+        checkIsValid();
 
 	if (DEBUG) {
 	    if (log.isLoggable(Level.FINEST)) {
