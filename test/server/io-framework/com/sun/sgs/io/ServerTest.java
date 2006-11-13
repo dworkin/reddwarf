@@ -5,7 +5,8 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Executors;
 
-import com.sun.sgs.impl.io.SocketAcceptor;
+import com.sun.sgs.impl.io.AcceptorFactory;
+import com.sun.sgs.impl.io.IOConstants.TransportType;
 import com.sun.sgs.io.AcceptedHandleListener;
 import com.sun.sgs.io.IOAcceptor;
 import com.sun.sgs.io.IOHandle;
@@ -19,9 +20,11 @@ import com.sun.sgs.io.IOHandle;
 public class ServerTest implements AcceptedHandleListener, IOHandler {
 
     IOAcceptor acceptor;
+    private int numConnections;
 
     public ServerTest() {
-        acceptor = new SocketAcceptor(Executors.newCachedThreadPool());
+        acceptor = AcceptorFactory.createAcceptor(TransportType.UNRELIABLE, 
+                                            Executors.newCachedThreadPool());
     }
 
     public void start() {
@@ -40,8 +43,9 @@ public class ServerTest implements AcceptedHandleListener, IOHandler {
     }
 
     public void newHandle(IOHandle handle) {
-        System.out.println("ServerTest: New Connection");
-        
+        synchronized (this) {
+            numConnections++;
+        }
         handle.setIOHandler(this);
 
     }
@@ -51,8 +55,13 @@ public class ServerTest implements AcceptedHandleListener, IOHandler {
     }
 
     public void disconnected(IOHandle handle) {
-        System.out.println("ServerTest: disconnected");
-        //acceptor.shutdown();
+        synchronized (this) {
+            numConnections--;
+        }
+        if (numConnections <= 0) {
+            acceptor.shutdown();
+            System.exit(0);
+        }
     }
 
     public void exceptionThrown(Throwable exception, IOHandle handle) {
@@ -61,7 +70,7 @@ public class ServerTest implements AcceptedHandleListener, IOHandler {
     }
 
     public void messageReceived(ByteBuffer buffer, IOHandle handle) {
-        System.out.println("ServerTest messageReceived " + buffer.remaining());
+        //System.out.println("ServerTest messageReceived " + buffer.remaining());
         try {
             handle.sendMessage(buffer);
         }

@@ -5,6 +5,7 @@ import java.net.InetSocketAddress;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
+import org.apache.mina.common.IoConnector;
 import org.apache.mina.common.IoFuture;
 import org.apache.mina.util.NewThreadExecutor;
 
@@ -16,52 +17,31 @@ import com.sun.sgs.io.IOConnector;
 /**
  * This is a socket-based implementation of an {@code IOConnector} using
  * the Apache Mina framework for the underlying transport.  It uses an
- * {@link org.apache.mina.transport.socket.nio.SocketConnector} to initiate
- * connections on remote hosts.  This implementation is thread-safe.
+ * {@link org.apache.mina.common.IoConnector} to initiate connections on 
+ * remote hosts.  
+ * <p>
+ * Its constructor is "package-private", so use one of the 
+ * {@code ConnectorFactory.createConnector} methods and specify a 
+ * {@code TransportType} to create a new instance. This implementation is 
+ * thread-safe.
  * 
  * @author Sten Anderson
  * @since 1.0
  */
 public class SocketConnector implements IOConnector {
     
-    private org.apache.mina.transport.socket.nio.SocketConnector connector;
+    private IoConnector connector;
 
-    /**
-     * Constructs a {@code SocketConnector} with one separate thread for
-     * processing IO.
-     *
-     */
-    public SocketConnector() {
-        this(1, Executors.newSingleThreadExecutor());
-    }
     
     /**
-     * Constructs a {@code SocketConnector} using the given {@link Executor}
-     * for thread management.
+     * Constructs a {@code SocketConnector} using the given {@code IoConnector}
+     * for the underlying transport.  This constructor is only visible to the
+     * package, so use one of the {@code ConnectorFactory.createConnector} 
+     * methods to create a new instance.
      * 
-     * @param executor          An {@code Executor} for controlling thread usage.
      */
-    public SocketConnector(Executor executor) {
-        this(1, executor);
-    }
-    
-    /**
-     * Constructs a {@code SocketConnector} using the given {@link Executor}
-     * for thread management.  The {@code numProcessors} parameter refers to
-     * the number of {@code SocketIOProcessors} to initially create.  
-     * A {@code SocketIOProcessor} is a Mina internal implementation detail
-     * that controls the internal processing of the IO.  It is exposed here
-     * to allow clients the option to configure this value.  
-     * 
-     * @param numProcessors             the number of processors for the 
-     *                                  underlying Mina connector to create
-     * 
-     * @param executor                  An {@code Executor} for controlling
-     *                                  thread usage.                          
-     */
-    public SocketConnector(int numProcessors, Executor executor) {
-        connector = new org.apache.mina.transport.socket.nio.SocketConnector(
-                                  numProcessors, new ExecutorAdapter(executor));
+    SocketConnector(IoConnector connector) {
+        this.connector = connector;
     }
     
     /**

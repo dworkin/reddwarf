@@ -27,46 +27,18 @@ public class SocketAcceptor implements IOAcceptor {
     
     private IoAcceptor acceptor;
     private List<SocketAddress> boundAddresses;
-    
+
     /**
-     * Constructs a {@code SocketAcceptor} with one separate thread for
-     * processing IO.
-     *
-     */
-    public SocketAcceptor() {
-        this(1, Executors.newSingleThreadExecutor());
-    }
-    
-    /**
-     * Constructs a {@code SocketAcceptor} using the given {@link Executor}
-     * for thread management.
+     * Constructs a {@code SocketAcceptor} with the given {@code IoAcceptor}.
      * 
-     * @param executor          An {@code Executor} for controlling thread usage.
+     * @param acceptor          the mina {@code IoAcceptor} to use for the
+     *                          underlying IO processing.
      */
-    public SocketAcceptor(Executor executor) {
-        this(1, executor);
-    }
-    
-    /**
-     * Constructs a {@code SocketAcceptor} using the given {@link Executor}
-     * for thread management.  The {@code numProcessors} parameter refers to
-     * the number of {@code SocketIOProcessors} to initially create.  
-     * A {@code SocketIOProcessor} is a Mina internal implementation detail
-     * that controls the internal processing of the IO.  It is exposed here
-     * to allow clients the option to configure this value.  
-     * 
-     * @param numProcessors             the number of processors for the 
-     *                                  underlying Mina acceptor to create
-     * 
-     * @param executor                  An {@code Executor} for controlling
-     *                                  thread usage.                          
-     */
-    public SocketAcceptor(int numProcessors, Executor executor) {
-        acceptor = new org.apache.mina.transport.socket.nio.SocketAcceptor(
-                                numProcessors, new ExecutorAdapter(executor));
+    SocketAcceptor(IoAcceptor acceptor) {
+        this.acceptor = acceptor;
         boundAddresses = new LinkedList<SocketAddress>();
     }
-
+    
     /**
      * {@inheritDoc}
      */

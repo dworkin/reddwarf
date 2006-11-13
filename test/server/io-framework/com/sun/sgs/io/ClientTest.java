@@ -10,7 +10,9 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 
+import com.sun.sgs.impl.io.ConnectorFactory;
 import com.sun.sgs.impl.io.SocketConnector;
+import com.sun.sgs.impl.io.IOConstants.TransportType;
 import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
 import com.sun.sgs.io.IOConnector;
@@ -18,6 +20,7 @@ import com.sun.sgs.io.IOConnector;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.Executors;
 
 import javax.swing.JButton;
@@ -41,9 +44,13 @@ public class ClientTest extends JFrame {
     private SocketTableModel model;
     private int numSockets = 10;
     private int numDisconnects = 0;
+    private boolean done = false;
+    private Random random;
     
     public ClientTest() {
         super("Client Test");
+        
+        random = new Random();
         
         JTable table = new JTable(model = new SocketTableModel());
         JScrollPane pane = new JScrollPane(table);
@@ -75,6 +82,7 @@ public class ClientTest extends JFrame {
     }
     
     private void shutdown() {
+        done = true;
         model.shutdown();
     }
     
@@ -84,7 +92,9 @@ public class ClientTest extends JFrame {
     
 
     public void start() {
-        IOConnector connector = new SocketConnector(Executors.newCachedThreadPool());
+        IOConnector connector = ConnectorFactory.createConnector(
+                                                TransportType.UNRELIABLE,
+                                                Executors.newCachedThreadPool());
         model.connect(connector);
     }
 
@@ -101,6 +111,7 @@ public class ClientTest extends JFrame {
             columnHeaders = new ArrayList<String>();
             columnHeaders.add("ID");
             columnHeaders.add("Status");
+            columnHeaders.add("Messages In");
             columnHeaders.add("Bytes In");
             columnHeaders.add("Bytes Out");
             
@@ -143,6 +154,9 @@ public class ClientTest extends JFrame {
             else if (curCol.equals("Status")) {
                 return info.getStatus();
             }
+            else if (curCol.equals("Messages In")) {
+                return info.getMessagesIn();
+            }
             else if (curCol.equals("Bytes In")) {
                 return info.getBytesIn();
             }
@@ -158,6 +172,7 @@ public class ClientTest extends JFrame {
         
         private IOHandle handle;
         private String status;
+        private int messagesIn;
         private long bytesIn;
         private long bytesOut;
         private int id;
@@ -169,6 +184,10 @@ public class ClientTest extends JFrame {
         
         public int getID() {
             return id;
+        }
+        
+        public int getMessagesIn() {
+            return messagesIn;
         }
         
         public long getBytesIn() {
@@ -208,6 +227,7 @@ public class ClientTest extends JFrame {
         }
         
         public void messageReceived(ByteBuffer message, IOHandle handle) {
+            messagesIn++;
             bytesIn += message.remaining();
             dataChanged();
         }
@@ -228,8 +248,21 @@ public class ClientTest extends JFrame {
         public void connected(IOHandle handle) {
             status = "Connected";
             dataChanged();
-            
-            writeBytes(10000);
+            Thread t = new Thread () {
+                public void run() {
+                    while (!done) {
+                        writeBytes(random.nextInt(2000) + 1);
+                        try {
+                            Thread.sleep(random.nextInt(500) + 50);
+                        }
+                        catch (InterruptedException ie) {
+                            ie.printStackTrace();
+                        }
+                    }
+                }
+                
+            };
+            t.start();
         }
         
         private void writeBytes(int num) {

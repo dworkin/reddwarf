@@ -3,7 +3,10 @@ package com.sun.sgs.impl.io;
 /**
  * This class adapts a {@code java.util.concurrent.Executor} to an 
  * {@code edu.emory.mathcs.backport.java.util.concurrent.Executor} which is
- * used by Mina.
+ * used by Mina.  
+ * <p>
+ * Note that newer versions of Mina will have Java 1.5 support, so this 
+ * dependancy will no longer be necessary.
  * 
  * @author      Sten Anderson
  * @version     1.0
