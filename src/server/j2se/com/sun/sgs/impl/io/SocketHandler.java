@@ -33,25 +33,24 @@ public class SocketHandler implements IoHandler {
         this.handler = handler;
     }
 
-    public void sessionCreated(IoSession session) throws Exception {
-        //System.out.println("SocketHandler sessionCreated ");
-        
-    }
-
-    public void sessionOpened(IoSession arg0) throws Exception {
-
-    }
-
+    /**
+     * Called by the Mina framework when the given session is closed.  Forward
+     * this onto the associated handler as "disconnected".
+     */
     public void sessionClosed(IoSession session) throws Exception {
         handler.disconnected(getHandle(session));
     }
 
-    public void sessionIdle(IoSession arg0, IdleStatus arg1) throws Exception {
-
-    }
-
+    /**
+     * This call-back is fired when there is an exception somewhere in Mina's
+     * framework.  The exception is forwarded onto the associated 
+     * {@code IOHandler}. 
+     * 
+     * @param session           the session where the exception occurred
+     * @param throwable         the exception
+     */
     public void exceptionCaught(IoSession session, Throwable exception)
-            throws Exception {
+                                                            throws Exception {
         
         handler.exceptionThrown(exception, getHandle(session));
         
@@ -70,12 +69,18 @@ public class SocketHandler implements IoHandler {
         
     }
 
-    public void messageSent(IoSession arg0, Object arg1) throws Exception {
-
-    }
-    
     private IOHandle getHandle(IoSession session) {
         return (IOHandle) session.getAttachment();
     }
+    
+    
+    // these call-backs aren't used.
+    public void sessionCreated(IoSession session) throws Exception {}
+
+    public void sessionOpened(IoSession arg0) throws Exception {}
+    
+    public void sessionIdle(IoSession arg0, IdleStatus arg1) throws Exception {}
+    
+    public void messageSent(IoSession arg0, Object arg1) throws Exception {}
 
 }

@@ -3,13 +3,14 @@
  * Clients should use these interfaces, regardless of the implementation that
  * backs them.
  * <p>
- * To use this framework, typically a client would obtain a
- * <code>ConnectionManager</code> implementation.
+ * To use this framework, typically a client would obtain an
+ * <code>IOConnector</code> implementation through a 
+ * <code>ConnectorFactory</code>, or an <code>IOAcceptor</code> implementation 
+ * through an <code>AcceptorFactory</code>.
  * <p>
- * The specific implementation of a <code>Connector</code> is dictated
- * by the type of I/O and the desired features of the underlying framework
- * implementation (for example thread pools, etc.).
- *
+ * Note that <code>java.nio.ByteBuffer</code>s are used throughout.  At some 
+ * point they may want to be replaced by a custom ByteBuffer implementation, 
+ * and/or a pooled buffer solution.
  *
  */
 package com.sun.sgs.io;

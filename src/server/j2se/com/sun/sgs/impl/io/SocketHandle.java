@@ -24,18 +24,24 @@ public class SocketHandle implements IOHandle, IoFutureListener {
     private IOHandler handler;
     private IoSession session;
     
-    public SocketHandle() {
-    }
-    
     /**
      * {@inheritDoc}
      * 
      * The incoming buffer should have its position set at the begining of the 
      * chunk of bytes to be written (that is, the buffer should be "flipped").
+     * <p>
+     * Note that a new ByteBuffer is created with each call to sendMessage so
+     * that the client can continue to use the "message" buffer without fear of
+     * tampering.  This is an inefficiency though, and perhaps should be 
+     * replaced with a pool at some point.
      */
     public void sendMessage(ByteBuffer message) throws IOException {
+        ByteBuffer nioBuffer = ByteBuffer.allocate(message.remaining());
+        nioBuffer.put(message);
+        nioBuffer.flip();
+        
         org.apache.mina.common.ByteBuffer minaBuffer = 
-            org.apache.mina.common.ByteBuffer.wrap(message);
+            org.apache.mina.common.ByteBuffer.wrap(nioBuffer);
         session.write(minaBuffer);
     }
 
@@ -53,8 +59,10 @@ public class SocketHandle implements IOHandle, IoFutureListener {
         this.handler = handler;
     }
 
-    // IoFutureListener method
-    
+    /**
+     * IoFutureListener call-back.  Once this is called, the handle is 
+     * considered "connected".  
+     */
     public void operationComplete(IoFuture future) {
         setSession(future.getSession());
         handler.connected(this);

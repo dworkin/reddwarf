@@ -11,6 +11,9 @@ public class IOConstants {
     // cannot instantiate
     private IOConstants() {}
     
+    /**
+     * The type of IO transport: TCP, or UDP
+     */
     public enum TransportType {RELIABLE, UNRELIABLE}
 
 }

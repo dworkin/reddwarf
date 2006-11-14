@@ -42,7 +42,7 @@ public class ClientTest extends JFrame {
     private IOHandle connection = null;
     
     private SocketTableModel model;
-    private int numSockets = 10;
+    private int numSockets = 20;
     private int numDisconnects = 0;
     private boolean done = false;
     private Random random;
