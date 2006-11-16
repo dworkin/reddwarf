@@ -42,6 +42,7 @@ public interface TransactionProxy {
      * the type is unknown, or if there is more than one <code>Service</code>
      * of the given type, <code>MissingResourceException</code> is thrown.
      *
+     * @param <T> the type of the <code>Service</code>
      * @param type the <code>Class</code> of the requested <code>Service</code>
      *
      * @return the requested <code>Service</code>

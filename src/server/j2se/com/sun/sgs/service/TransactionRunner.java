@@ -18,7 +18,7 @@ import com.sun.sgs.kernel.KernelRunnable;
 public class TransactionRunner implements KernelRunnable {
 
     // the kernel runnable
-    private KernelRunnable transactionalTask;
+    private final KernelRunnable transactionalTask;
 
     /**
      * Creates an instance of <code>TransactionRunner</code> that accepts
@@ -27,6 +27,8 @@ public class TransactionRunner implements KernelRunnable {
      * @param transactionalTask the <code>KernelRunnable</code> to run
      */
     public TransactionRunner(KernelRunnable transactionalTask) {
+        if (transactionalTask == null)
+            throw new NullPointerException("null task not allowed");
         this.transactionalTask = transactionalTask;
     }
 

@@ -35,7 +35,7 @@ import java.util.logging.Logger;
 public final class TaskHandler {
 
     // logger for this class
-    private static LoggerWrapper logger =
+    private static final LoggerWrapper logger =
         new LoggerWrapper(Logger.getLogger(TaskHandler.class.getName()));
 
     // the single instance used for creating transactions
@@ -57,8 +57,7 @@ public final class TaskHandler {
         if (transactionCoordinator == null)
             throw new NullPointerException("null coordinator not allowed");
 
-        if (logger.isLoggable(Level.CONFIG))
-            logger.log(Level.CONFIG, "Creating the Task Handler");
+        logger.log(Level.CONFIG, "Creating the Task Handler");
 
         this.transactionCoordinator = transactionCoordinator;
     }
@@ -88,14 +87,10 @@ public final class TaskHandler {
         thread.setCurrentOwner(owner);
         try {
             task.run();
-        } catch (Exception e) {
-            // restore the previous owner before re-throwing the exception
+        } finally {
+            // always restore the previous owner
             thread.setCurrentOwner(parent);
-            throw e;
         }
-
-        // restore the owner
-        thread.setCurrentOwner(parent);
     }
 
     /**

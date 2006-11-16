@@ -70,14 +70,14 @@ public class TaskServiceImpl
     public static final String NAME = TaskServiceImpl.class.getName();
 
     // logger for this class
-    private static LoggerWrapper logger =
+    private static final LoggerWrapper logger =
         new LoggerWrapper(Logger.getLogger(NAME));
 
     /**
      * The name prefix used to bind all service-level objects associated
      * with this service.
      */
-    public static final String DS_PREFIX = "TaskService:";
+    public static final String DS_PREFIX = NAME + ".";
 
     // the name of the single map for the pending tasks
     private static final String DS_PENDING_TASKS = DS_PREFIX + "PendingTasks";
@@ -87,6 +87,11 @@ public class TaskServiceImpl
 
     // the internal value used to represent a task that does not repeat
     private static final long PERIOD_NONE = -1;
+
+    // flags indicating that configuration has been done successfully,
+    // and that we're still in the process of configuring
+    private boolean isConfigured = false;
+    private boolean isConfiguring = false;
 
     // the system's task scheduler, where tasks actually run
     private TaskScheduler taskScheduler = null;
@@ -115,10 +120,10 @@ public class TaskServiceImpl
 
     /**
      * Creates an instance of <code>TaskServiceImpl</code>. Note that this
-     * service does not currently use any propoerties.
+     * service does not currently use any properties.
      *
      * @param properties startup propoerties
-     * @param systemRegistry the registery of systsem components
+     * @param systemRegistry the registry of system components
      */
     public TaskServiceImpl(Properties properties,
                            ComponentRegistry systemRegistry) {
@@ -142,25 +147,29 @@ public class TaskServiceImpl
      */
     public void configure(ComponentRegistry serviceRegistry,
                           TransactionProxy transactionProxy) {
-        if (logger.isLoggable(Level.CONFIG))
-            logger.log(Level.CONFIG, "starting TaskService configuration");
+        if (isConfigured)
+            throw new IllegalStateException("Task Service already configured");
+        isConfiguring = true;
+
+        logger.log(Level.CONFIG, "starting TaskService configuration");
+
+        if (transactionProxy == null)
+            throw new NullPointerException("null proxy not allowed");
 
         // keep track of the proxy and the data service
-        this.transactionProxy = transactionProxy;
+        TaskServiceImpl.transactionProxy = transactionProxy;
         dataService = serviceRegistry.getComponent(DataService.class);
 
         // fetch the map of pending tasks, or create it if it doesn't
-        // already exist (which only happens if this service has never beeen
+        // already exist (which only happens if this service has never been
         // used before)
         PendingMap pmap = null;
         try {
             pmap = dataService.
                 getServiceBinding(DS_PENDING_TASKS, PendingMap.class);
-            if (logger.isLoggable(Level.CONFIG))
-                logger.log(Level.CONFIG, "found existing pending map");
+            logger.log(Level.CONFIG, "found existing pending map");
         } catch (NameNotBoundException nnbe) {
-            if (logger.isLoggable(Level.CONFIG))
-                logger.log(Level.CONFIG, "creating new pending map");
+            logger.log(Level.CONFIG, "creating new pending map");
             pmap = new PendingMap();
             try {
                 dataService.setServiceBinding(DS_PENDING_TASKS, pmap);
@@ -171,9 +180,13 @@ public class TaskServiceImpl
             }
         }
 
-        // if there are no pending tasks then we're finished configuring
-        if (pmap.isEmpty())
+        // if there are no pending tasks then we're finished configuring,
+        // so join the transaction only so we can set our isConfigured flag
+        // on commit
+        if (pmap.isEmpty()) {
+            transactionProxy.getCurrentTransaction().join(this);
             return;
+        }
 
         if (logger.isLoggable(Level.CONFIG))
             logger.log(Level.INFO, "re-scheduling {0} pending tasks",
@@ -198,9 +211,12 @@ public class TaskServiceImpl
                 long period = task.period;
                 // if the start time has already passed, figure out the next
                 // period interval from now, and use that as the start time
-                if (startTime < now)
+                // NOTE: this behavior may be generalized in the scheduler,
+                // in which case it can be removed from here
+                if (startTime < now) {
                     startTime += (((int)((now - startTime) / period)) + 1) *
                         period;
+                }
                 RecurringTaskHandle handle =
                     taskScheduler.scheduleRecurringTask(runner, null,
                                                         startTime, period);
@@ -259,6 +275,12 @@ public class TaskServiceImpl
     public void commit(Transaction txn) {
         if (logger.isLoggable(Level.FINER))
             logger.log(Level.FINER, "committing txn:{0}", txn);
+
+        // see if we we're committing the configuration transaction
+        if (isConfiguring) {
+            isConfigured = true;
+            isConfiguring = false;
+        }
 
         // resolve the current transaction and the local state, removing the
         // state so we can't accidentally use it further in the future
@@ -451,7 +473,7 @@ public class TaskServiceImpl
     /**
      * Private helper that creates a <code>KernelRunnable</code> for the
      * associated task, also generating a unique name for this task, taking
-     * care of persiting the task if that hasn't already been done, and
+     * care of persisting the task if that hasn't already been done, and
      * tracking the task in the map of pending tasks.
      */
     private TaskRunner getRunner(Task task, long startTime, long period) {
@@ -523,7 +545,7 @@ public class TaskServiceImpl
             throw tre;
         }
 
-        // kep track of the reservation in our local transaction state
+        // keep track of the reservation in our local transaction state
         txnState.reservationSet.add(reservation);
     }
 
@@ -561,19 +583,31 @@ public class TaskServiceImpl
      * task be re-tried. In this case, the transaction gets aborted, so
      * the pending task stays in the map. This method is called to start
      * a new task with the sole purpose of creating a new transactional
-     * task where the pending task can be removed. Note that this method
-     * is not called within an active transaction.
+     * task where the pending task can be removed, if that task is not
+     * periodic. Note that this method is not called within an active
+     * transaction.
      */
     private void notifyNonRetry(final String objName) {
         if (logger.isLoggable(Level.INFO))
             logger.log(Level.INFO, "trying to remove non-retried task {0}",
                        objName);
+
+        // check if the task is in the recurring map, in which case we don't
+        // do anything else, because we don't remove recurring tasks except
+        // when they're cancelled...note that this may yield a false negative,
+        // because in another transaction the task may have been cancelled and
+        // therefore already removed from this map, but this is an extremely
+        // rare case, and at wost it simply causes a task to be scheduled
+        // that will have no effect once run (because fetchPendingTask will
+        // look at the pending task data, see that it's recurring, and
+        // leave it in the map)
+        if (recurringMap.containsKey(objName))
+            return;
         
-        final TaskServiceImpl taskService = this;
         TransactionRunner transactionRunner =
             new TransactionRunner(new KernelRunnable() {
                 public void run() throws Exception {
-                    taskService.fetchPendingTask(objName);
+                    fetchPendingTask(objName);
                 }
             });
 
@@ -637,18 +671,24 @@ public class TaskServiceImpl
      * Nested class used to manage the pending tasks in a managed object.
      */
     private static class PendingMap extends HashMap<String,PendingTask>
-        implements ManagedObject, Serializable {}
+        implements ManagedObject, Serializable {
+        private static final long serialVersionUID = 1;
+    }
 
     /**
      * Nested class that represents a single pending task in the managed map.
      */
     private static class PendingTask implements Serializable {
+        private static final long serialVersionUID = 1;
         public Task task = null;
         public ManagedReference taskRef = null;
         public long startTime = START_NOW;
         public long period = PERIOD_NONE;
         // FIXME: this will need to include details about the owner as well,
         // which aren't ready until the login/auth component is defined
+        Task getTask() {
+            return (task != null) ? task : ((Task)(taskRef.get()));
+        }
     }
 
     /**
@@ -656,8 +696,8 @@ public class TaskServiceImpl
      * run the <code>Task</code>s scheduled by the application.
      */
     private class TaskRunner implements KernelRunnable {
-        private TaskServiceImpl taskService;
-        private String objName;
+        private final TaskServiceImpl taskService;
+        private final String objName;
         public TaskRunner(TaskServiceImpl taskService, String objName) {
             this.taskService = taskService;
             this.objName = objName;
@@ -676,11 +716,7 @@ public class TaskServiceImpl
                                 logger.log(Level.FINEST, "running task {0} " +
                                            "scheduled to run at {1}",
                                            ptask.startTime, objName);
-                            // get the task, taking into account that it
-                            // might be a managed object
-                            Task task = (ptask != null) ? ptask.task :
-                                (Task)(ptask.taskRef.get());
-                            task.run();
+                            ptask.getTask().run();
                         }
                     })).run();
             } catch (Exception e) {
@@ -705,9 +741,9 @@ public class TaskServiceImpl
     private static class PeriodicTaskHandleImpl
         implements PeriodicTaskHandle, Serializable
     {
-        private String objName;
+        private final String objName;
         private boolean cancelled = false;
-        public PeriodicTaskHandleImpl(String objName) {
+        PeriodicTaskHandleImpl(String objName) {
             this.objName = objName;
         }
         public void cancel() {

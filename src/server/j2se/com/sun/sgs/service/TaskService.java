@@ -41,6 +41,8 @@ public interface TaskService extends TaskManager, Service {
      * Schedules a single task to run, after the given delay, once the
      * current task has finished. The task will not be persisted by the
      * <code>TaskService</code>, and therefore is not guaranteed to run.
+     * As described in <code>TaskManager</code>, the delay is from the
+     * time of this call, not from the time that the transaction commits.
      *
      * @param task the <code>KernelTask</code> to run
      * @param delay the number of milliseconds to delay before running the task

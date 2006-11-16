@@ -1,8 +1,6 @@
 
 package com.sun.sgs.impl.kernel;
 
-import com.sun.sgs.app.TransactionNotActiveException;
-
 import com.sun.sgs.kernel.TaskOwner;
 
 import com.sun.sgs.service.Service;
