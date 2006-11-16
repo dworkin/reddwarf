@@ -6,26 +6,35 @@ import java.net.PasswordAuthentication;
  * A client's listener for handling messages sent from server to
  * client and for handling other connection-related events.
  *
- * <p>A <code>ServerSessionListener</code> for a client (specified as
+ * <p>A <code>SimpleClientListener</code> for a client (specified as
  * part of the login procedure...) is notified in the following cases:
- * when a {@link ServerSession} is established with the server ({@link
- * #connected connected}), a connection with the server is being
+ * when a connection is established with the server ({@link
+ * #loggedIn loggedIn}), a connection with the server is being
  * re-established ({@link #reconnecting reconnecting}), a connection
  * has been re-established ({@link #reconnected reconnected}), or
- * finally when the associated server session becomes disconnected,
+ * finally when client becomes disconnected,
  * gracefully or otherwise ({@link #disconnected disconnected}).
- *
- * <p>If a server session becomes disconnected, it can no longer be
- * used to send messages to the server.  In this case, a client must
- * log in again to obtain a new server session to communicate with the
- * server.
  */
 public interface SimpleClientListener extends ServerSessionListener {
 
-    void connected();
+    /**
+     * Notifies this listener that a connection was established with
+     * the server.
+     */
+    void loggedIn();
     
+    /**
+     * Requests login credentials from this listener.
+     * 
+     * @param prompt the login prompt
+     * @return the PasswordAuthentication credentials
+     */
     PasswordAuthentication getPasswordAuthentication(String prompt);
-
+    
+    /**
+     * Notifies this listener that its associated server 
+     * connection could not be established due to login failure.
+     */
     void loginFailed(String reason);
 
     /**

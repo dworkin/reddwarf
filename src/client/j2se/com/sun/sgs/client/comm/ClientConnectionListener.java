@@ -1,6 +1,8 @@
-package com.sun.sgs.client;
+package com.sun.sgs.client.comm;
 
 import java.nio.ByteBuffer;
+
+import com.sun.sgs.client.ServerSessionListener;
 
 public interface ClientConnectionListener {
 

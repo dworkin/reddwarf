@@ -1,4 +1,4 @@
-package com.sun.sgs.client;
+package com.sun.sgs.client.comm;
 
 import java.io.IOException;
 import java.util.Properties;

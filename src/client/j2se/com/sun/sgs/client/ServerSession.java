@@ -8,18 +8,12 @@ import java.nio.ByteBuffer;
  * session.
  *
  * <p>A client, as part of its login procedure (...), specifies a {@link
- * ServerSessionListener} to be notified when a login session is
- * established with the server, as well as to be notified of other
- * events.  Once a session is established with the server, a client is
- * notified by having its {@link ServerSessionListener#connected
- * ServerSessionListener.connected} method invoked with the
- * newly-established <code>ServerSession</code>.  A client can use its
+ * ServerSessionListener} to be notified of session communication
+ * events.  A client can use its
  * <code>ServerSession</code> to send messages to the server, to check
  * if it is connected, or to log out.
  *
- * <p>When a server session becomes disconnected, its listener's
- * {@link ServerSessionListener#disconnected disconnected} method is
- * invoked.  Once a server session is disconnected, it can no longer
+ * <p>Once a server session is disconnected, it can no longer
  * be used to send messages to the server.  In this case, a client
  * must log in again to obtain a new server session to communicate
  * with the server.
@@ -63,12 +57,7 @@ public interface ServerSession {
      * for example, by terminating the associated client's network
      * connections. If <code>force</code> is <code>false</code>, then
      * this session is gracefully disconnected, notifying the server
-     * that the client logged out.  When the session has been logged
-     * out, gracefully or otherwise, the {@link
-     * ServerSessionListener#disconnected disconnected} method is
-     * invoked on this session's associated {@link
-     * ServerSessionListener} passing a boolean indicating whether the
-     * disconnection was graceful.
+     * that the client logged out.
      *
      * @param force if <code>true</code>, this session is forcibly
      * terminated; otherwise the session is gracefully disconnected
