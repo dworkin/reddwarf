@@ -223,7 +223,7 @@ public class ChatClient extends JFrame
 
     // === SimpleClientListener ===
 
-    public void connected() {
+    public void loggedIn() {
         statusMessage.setText("Status: Connected");
         setTitle(String.format("Chat Test Client: %.8s", client.getClientAddress().toString()));
         loginButton.setText("Logout");
