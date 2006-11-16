@@ -56,6 +56,9 @@ public final class ContextResolver {
     /**
      * Returns the manager in this context that matches the given type.
      *
+     * @param <T> the type of the manager
+     * @param type the <code>Class</code> of the requested manager
+     *
      * @return the matching manager
      *
      * @throws ManagerNotFoundException if no manager is found that matches

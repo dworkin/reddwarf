@@ -1,17 +1,12 @@
 
 package com.sun.sgs.impl.kernel.schedule;
 
-import com.sun.sgs.app.TaskRejectedException;
-
 import com.sun.sgs.impl.util.LoggerWrapper;
 
-import com.sun.sgs.kernel.KernelAppContext;
-import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskReservation;
 
 import java.util.Date;
-import java.util.HashSet;
 import java.util.Timer;
 import java.util.TimerTask;
 

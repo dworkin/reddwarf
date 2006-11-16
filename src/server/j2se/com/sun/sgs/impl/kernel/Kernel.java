@@ -12,7 +12,6 @@ import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 import com.sun.sgs.impl.util.LoggerWrapper;
 
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.TaskScheduler;
 
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TransactionRunner;
@@ -57,8 +56,7 @@ class Kernel {
 
     // TEST: the name and source for the default application
     private static final String APP_NAME = "TestApplication";
-    private static final String APP_CLASS =
-        "com.sun.sgs.impl.app.TestApplication";
+    private static final String APP_CLASS = "TestApplication";
 
     // the default services that are used for channels, data, and tasks
     private static final String DEFAULT_CHANNEL_SERVICE =
