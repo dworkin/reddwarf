@@ -22,9 +22,9 @@ import com.sun.sgs.kernel.TaskScheduler;
 
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.NonDurableTransactionParticipant;
-import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
+import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.TransactionRunner;
 
 import java.io.Serializable;
@@ -122,7 +122,7 @@ public class TaskServiceImpl
      * Creates an instance of <code>TaskServiceImpl</code>. Note that this
      * service does not currently use any properties.
      *
-     * @param properties startup propoerties
+     * @param properties startup properties
      * @param systemRegistry the registry of system components
      */
     public TaskServiceImpl(Properties properties,
@@ -579,7 +579,7 @@ public class TaskServiceImpl
     /**
      * Private helper that notifies the service about a task that failed
      * and is not being re-tried. This happens whenever a task is run by
-     * the scheduler, and throws an exception that doesn't requst the
+     * the scheduler, and throws an exception that doesn't request the
      * task be re-tried. In this case, the transaction gets aborted, so
      * the pending task stays in the map. This method is called to start
      * a new task with the sole purpose of creating a new transactional
@@ -597,7 +597,7 @@ public class TaskServiceImpl
         // when they're cancelled...note that this may yield a false negative,
         // because in another transaction the task may have been cancelled and
         // therefore already removed from this map, but this is an extremely
-        // rare case, and at wost it simply causes a task to be scheduled
+        // rare case, and at worst it simply causes a task to be scheduled
         // that will have no effect once run (because fetchPendingTask will
         // look at the pending task data, see that it's recurring, and
         // leave it in the map)
@@ -741,6 +741,7 @@ public class TaskServiceImpl
     private static class PeriodicTaskHandleImpl
         implements PeriodicTaskHandle, Serializable
     {
+        private static final long serialVersionUID = 1;
         private final String objName;
         private boolean cancelled = false;
         PeriodicTaskHandleImpl(String objName) {
