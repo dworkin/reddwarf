@@ -25,7 +25,7 @@ public class DummyManagedObject implements ManagedObject, Serializable {
     public Object value = null;
 
     /** A reference to another DummyManagedObject, or null. */
-    private ManagedReference<DummyManagedObject> next = null;
+    private ManagedReference next = null;
 
     /** Creates an instance of this class using the specified data manager. */
     public DummyManagedObject(DataManager dataManager) {
@@ -49,7 +49,7 @@ public class DummyManagedObject implements ManagedObject, Serializable {
 	if (next == null) {
 	    return null;
 	} else {
-	    return next.get();
+	    return next.get(DummyManagedObject.class);
 	}
     }
 
@@ -62,7 +62,7 @@ public class DummyManagedObject implements ManagedObject, Serializable {
 	if (next == null) {
 	    return null;
 	} else {
-	    return next.getForUpdate();
+	    return next.getForUpdate(DummyManagedObject.class);
 	}
     }
 

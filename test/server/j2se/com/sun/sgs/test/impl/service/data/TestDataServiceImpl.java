@@ -480,6 +480,7 @@ public class TestDataServiceImpl extends TestCase {
 	createTransaction();
 	result = getBinding(app, service, "dummy", DummyManagedObject.class);
 	assertEquals(dummy, result);
+	getBinding(app, service, "dummy", Object.class);
     }
 
     public void testGetBindingsDifferent() throws Exception {
@@ -578,6 +579,22 @@ public class TestDataServiceImpl extends TestCase {
 	    System.err.println(e);
 	} finally {
 	    txn = null;
+	}
+    }
+
+    public void testSetBindingRemoved() throws Exception {
+	testSetBindingRemoved(true);
+    }
+    public void testSetServiceBindingRemoved() throws Exception {
+	testSetBindingRemoved(false);
+    }
+    private void testSetBindingRemoved(boolean app) throws Exception {
+	service.removeObject(dummy);
+	try {
+	    setBinding(app, service, "dummy", dummy);
+	    fail("Expected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	    System.err.println(e);
 	}
     }
 
@@ -701,7 +718,9 @@ public class TestDataServiceImpl extends TestCase {
 	} catch (NameNotBoundException e) {
 	    System.err.println(e);
 	}
+	dummy = new DummyManagedObject(service);
 	setBinding(app, service, "dummy", dummy);
+	service.removeObject(dummy);
 	txn.commit();
 	createTransaction();
 	removeBinding(app, service, "dummy");
@@ -824,13 +843,12 @@ public class TestDataServiceImpl extends TestCase {
 
     public void testRemoveObjectRemoved() throws Exception {
 	service.removeObject(dummy);
-	service.removeObject(dummy);
-	service.setBinding("dummy", dummy);
-	txn.commit();
-	createTransaction();
-	dummy = service.getBinding("dummy", DummyManagedObject.class);
-	service.removeObject(dummy);
-	service.removeObject(dummy);
+	try {
+	    service.removeObject(dummy);
+	    fail("Expected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	    System.err.println(e);
+	}
     }
 
     public void testRemoveObjectPreviousTxn() throws Exception {
@@ -860,6 +878,16 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    public void testMarkForUpdateRemoved() {
+	service.removeObject(dummy);
+	try {
+	    service.markForUpdate(dummy);
+	    fail("Expected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	    System.err.println(e);
+	}
+    }
+
     static {
 	for (BadTxnState state : BadTxnState.values()) {
 	    new BadTxnTest("testMarkForUpdate", state) {
@@ -871,8 +899,6 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     public void testMarkForUpdateSuccess() throws Exception {
-	service.markForUpdate(dummy);
-	service.removeObject(dummy);
 	service.markForUpdate(dummy);	    
 	service.setBinding("dummy", dummy);
 	dummy.setValue("a");
@@ -957,7 +983,7 @@ public class TestDataServiceImpl extends TestCase {
 
     public void testCreateReferenceNew() {
 	ManagedReference ref = service.createReference(dummy);
-	assertEquals(dummy, ref.get());
+	assertEquals(dummy, ref.get(DummyManagedObject.class));
     }
 
     public void testCreateReferenceExisting() throws Exception {
@@ -966,7 +992,7 @@ public class TestDataServiceImpl extends TestCase {
 	DummyManagedObject dummy =
 	    service.getBinding("dummy", DummyManagedObject.class);
 	ManagedReference ref = service.createReference(dummy);
-	assertEquals(dummy, ref.get());
+	assertEquals(dummy, ref.get(DummyManagedObject.class));
     }
 
     public void testCreateReferenceSerializationFails() throws Exception {
@@ -982,17 +1008,22 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     public void testCreateReferenceRemoved() throws Exception {
-	ManagedReference<?> ref = service.createReference(dummy);
+	ManagedReference ref = service.createReference(dummy);
 	service.removeObject(dummy);
-	ManagedReference<?> ref2 = service.createReference(dummy);
-	assertEquals(dummy, ref2.get());
-	assertFalse(ref.equals(ref2));
+	try {
+	    service.createReference(dummy);
+	    fail("Expected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	    System.err.println(e);
+	}
     }
 
     public void testCreateReferencePreviousTxn() throws Exception {
 	txn.commit();
 	createTransaction();
-	assertEquals(dummy, service.createReference(dummy).get());
+	assertEquals(
+	    dummy,
+	    service.createReference(dummy).get(DummyManagedObject.class));
     }
 
     public void testCreateReferenceTwoObjects() throws Exception {
@@ -1003,6 +1034,15 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     /* -- Test ManagedReference.get -- */
+
+    public void testGetReferenceNullType() throws Exception {
+	ManagedReference ref = service.createReference(dummy);
+	try {
+	    ref.get(null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	}
+    }
 
     public void testGetReferenceNotFound() throws Exception {
 	dummy.setNext(new DummyManagedObject(service));
@@ -1029,13 +1069,13 @@ public class TestDataServiceImpl extends TestCase {
 	    /* Can't get a reference when the service is not initialized */
 	    if (state != BadTxnState.Uninitialized) {
 		new BadTxnTest("testGetReference", state) {
-		    private ManagedReference<DummyManagedObject> ref;
+		    private ManagedReference ref;
 		    protected void setUp() throws Exception {
 			super.setUp();
 			ref = service.createReference(dummy);
 		    }
 		    void action() {
-			ref.get();
+			ref.get(DummyManagedObject.class);
 		    }
 		};
 	    }
@@ -1070,6 +1110,15 @@ public class TestDataServiceImpl extends TestCase {
 
     /* -- Test ManagedReference.getForUpdate -- */
 
+    public void testGetReferenceUpdateNullType() throws Exception {
+	ManagedReference ref = service.createReference(dummy);
+	try {
+	    ref.getForUpdate(null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	}
+    }
+
     public void testGetReferenceUpdateNotFound() throws Exception {
 	dummy.setNext(new DummyManagedObject(service));
 	service.removeObject(dummy.getNext());
@@ -1094,7 +1143,7 @@ public class TestDataServiceImpl extends TestCase {
 	txn.commit();
 	createTransaction();
 	dummy = service.getBinding("dummy", DummyManagedObject.class);
-	service.createReference(dummy).getForUpdate();
+	service.createReference(dummy).getForUpdate(DummyManagedObject.class);
 	dummy.value = "B";
 	txn.commit();
 	createTransaction();
@@ -1123,13 +1172,13 @@ public class TestDataServiceImpl extends TestCase {
 	    /* Can't get a reference when the service is not initialized */
 	    if (state != BadTxnState.Uninitialized) {
 		new BadTxnTest("testGetReferenceUpdate", state) {
-		    private ManagedReference<DummyManagedObject> ref;
+		    private ManagedReference ref;
 		    protected void setUp() throws Exception {
 			super.setUp();
 			ref = service.createReference(dummy);
 		    }
 		    void action() {
-			ref.getForUpdate();
+			ref.getForUpdate(DummyManagedObject.class);
 		    }
 		};
 	    }
@@ -1200,17 +1249,15 @@ public class TestDataServiceImpl extends TestCase {
     /* -- Test ManagedReference.equals -- */
 
     public void testReferenceEquals() throws Exception {
-	ManagedReference<DummyManagedObject> ref =
-	    service.createReference(dummy);
+	ManagedReference ref = service.createReference(dummy);
 	assertFalse(ref.equals(null));
 	assertTrue(ref.equals(ref));
 	DummyManagedObject dummy2 = new DummyManagedObject(service);
-	ManagedReference<DummyManagedObject> ref2 =
-	    service.createReference(dummy2);
+	ManagedReference ref2 = service.createReference(dummy2);
 	assertFalse(ref.equals(ref2));
-	ManagedReference ref3 = new ManagedReference<DummyManagedObject>() {
-	    public DummyManagedObject get() { return null; }
-	    public DummyManagedObject getForUpdate() { return null; }
+	ManagedReference ref3 = new ManagedReference() {
+	    public <T> T get(Class<T> type) { return null; }
+	    public <T> T getForUpdate(Class<T> type) { return null; }
 	};
 	assertFalse(ref.equals(ref3));
     }
@@ -1282,7 +1329,7 @@ public class TestDataServiceImpl extends TestCase {
 
     /* -- App and service binding methods -- */
 
-    <T extends ManagedObject> T getBinding(
+    <T> T getBinding(
 	boolean app, DataService service, String name, Class<T> type)
     {
 	return app ? service.getBinding(name, type)

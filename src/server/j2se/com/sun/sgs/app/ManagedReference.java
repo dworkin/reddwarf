@@ -17,10 +17,9 @@ import java.io.Serializable;
  * through these external references will continue to be managed by the
  * <code>DataManager</code>.
  *
- * @param	<T> the type of the referenced object
  * @see		DataManager#createReference DataManager.createReference
  */
-public interface ManagedReference<T extends ManagedObject> {
+public interface ManagedReference {
 
     /**
      * Obtains the object associated with this reference.  Applications need to
@@ -29,7 +28,11 @@ public interface ManagedReference<T extends ManagedObject> {
      * getForUpdate} or {@link DataManager#markForUpdate
      * DataManager.markForUpdate} before making the modifications.
      *
+     * @param	<T> the type of the referenced object
+     * @param	type a class representing the type of the referenced object
      * @return	the associated object
+     * @throws	ClassCastException if the object associated with this reference
+     *		is not of the specified type
      * @throws	ObjectNotFoundException if the object associated with this
      *		reference is not found
      * @throws	TransactionException if the operation failed because of a
@@ -37,20 +40,24 @@ public interface ManagedReference<T extends ManagedObject> {
      * @see	#getForUpdate getForUpdate
      * @see	DataManager#markForUpdate DataManager.markForUpdate
      */
-    T get();
+    <T> T get(Class<T> type);
 
     /**
      * Obtains the managed object associated with this reference, and notifies
      * the system that the object is going to be modified.
      *
+     * @param	<T> the type of the referenced object
+     * @param	type a class representing the type of the referenced object
      * @return	the associated object
+     * @throws	ClassCastException if the object associated with this reference
+     *		is not of the specified type
      * @throws	ObjectNotFoundException if the object associated with this
      *		reference is not found
      * @throws	TransactionException if the operation failed because of a
      *		problem with the current transaction
      * @see	DataManager#markForUpdate DataManager.markForUpdate
      */
-    T getForUpdate();
+    <T> T getForUpdate(Class<T> type);
 
     /**
      * Compares the specified object with this reference.  Returns

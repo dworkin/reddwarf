@@ -18,9 +18,8 @@ import java.util.logging.Logger;
  * canonicalized: only a single instance appears for a given object ID or
  * object.
  */
-final class ManagedReferenceImpl<T extends ManagedObject>
-    implements ManagedReference<T>, Serializable
-{
+final class ManagedReferenceImpl implements ManagedReference, Serializable {
+
     /** The version of the serialized form. */
     private static final long serialVersionUID = 1;
 
@@ -33,17 +32,17 @@ final class ManagedReferenceImpl<T extends ManagedObject>
      * The possible states of a reference.
      *
      * Here's a table relating state values to the values of the object and
-     * fingerprint fields, as well as whether the reference should be present
-     * in the ReferenceTable:
+     * fingerprint fields:
      *
-     *   State		 object    fingerprint  ReferenceTable
-     *   NEW		 non-null  null		present
-     *   EMPTY		 null      null		present
-     *   NOT_MODIFIED	 non-null  null		present
-     *   MAYBE_MODIFIED  non-null  non-null	present
-     *   MODIFIED	 non-null  null		present
-     *	 FLUSHED	 null      null		present
-     *	 REMOVED	 null      null		not present
+     *   State		  object    fingerprint
+     *   NEW		  non-null  null
+     *   EMPTY		  null      null
+     *   NOT_MODIFIED	  non-null  null
+     *   MAYBE_MODIFIED   non-null  non-null
+     *   MODIFIED	  non-null  null
+     *	 FLUSHED	  null      null
+     *	 REMOVED_EMPTY	  null      null
+     *	 REMOVED_FETCHED  non-null  null
      */
     private static enum State {
 
@@ -77,8 +76,11 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	 */
 	FLUSHED,
 
-	/** An object that has been removed. */
-	REMOVED
+	/** An object that has been removed without being dereferenced */
+	REMOVED_EMPTY,
+
+	/** An object that has been removed after being dereferenced. */
+	REMOVED_FETCHED
     };
 
     /**
@@ -100,7 +102,7 @@ final class ManagedReferenceImpl<T extends ManagedObject>
      * refer to null, so this field will only be null if the object has not
      * been fetched yet.
      */
-    private transient T object;
+    private transient ManagedObject object;
 
     /** The fingerprint of the object before it was modified, or null. */
     private transient byte[] fingerprint;
@@ -112,54 +114,63 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 
     /**
      * Returns the reference associated with a context and object, or null if
-     * the reference is not found.
+     * the reference is not found.  Throws ObjectNotFoundException if the
+     * object has been removed.
      */
-    static <T extends ManagedObject> ManagedReferenceImpl<T> findReference(
-	Context context, T object)
-     {
-	 assert object != null : "Object is null";
-	 return context.refs.find(object);
+    static ManagedReferenceImpl findReference(
+	Context context, ManagedObject object)
+    {
+	assert object != null : "Object is null";
+	ManagedReferenceImpl ref = context.refs.find(object);
+	if (ref != null && ref.isRemoved()) {
+	    throw new ObjectNotFoundException("Object has been removed");
+	}
+	return ref;
      }
 
     /**
      * Returns the reference associated with a context and object, creating a
      * NEW reference if none is found.
      */
-    static <T extends ManagedObject> ManagedReferenceImpl<T> getReference(
-	Context context, T object)
-     {
-	 assert object != null : "Object is null";
-	 ManagedReferenceImpl<T> ref = context.refs.find(object);
-	 if (ref == null) {
-	     ref = new ManagedReferenceImpl<T>(context, object);
-	     context.refs.add(ref);
-	 }
-	 if (logger.isLoggable(Level.FINEST)) {
-	     logger.log(Level.FINEST, "getReference object:{0} returns {1}",
-			object, ref);
-	 }
-	 return ref;
-     }
+    static ManagedReferenceImpl getReference(
+	Context context, ManagedObject object)
+    {
+	assert object != null : "Object is null";
+	ManagedReferenceImpl ref = context.refs.find(object);
+	if (ref == null) {
+	    ref = new ManagedReferenceImpl(context, object);
+	    context.refs.add(ref);
+	} else if (ref.isRemoved()) {
+	    throw new ObjectNotFoundException("Object has been removed");
+	}
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(Level.FINEST, "getReference object:{0} returns {1}",
+		       object, ref);
+	}
+	return ref;
+    }
 
     /**
      * Returns the reference associated with a context and object ID, creating
      * an EMPTY reference if none is found.
      */
-    static ManagedReferenceImpl<?> getReference(Context context, long oid) {
-	 ManagedReferenceImpl<?> ref = context.refs.find(oid);
-	 if (ref == null) {
-	     ref = new ManagedReferenceImpl(context, oid);
-	     context.refs.add(ref);
-	 }
-	 if (logger.isLoggable(Level.FINEST)) {
-	     logger.log(Level.FINEST, "getReference oid:{0} returns {1}",
-			oid, ref);
-	 }
-	 return ref;
-     }
+    static ManagedReferenceImpl getReference(Context context, long oid) {
+	ManagedReferenceImpl ref = context.refs.find(oid);
+	if (ref == null) {
+	    ref = new ManagedReferenceImpl(context, oid);
+	    context.refs.add(ref);
+	} else if (ref.isRemoved()) {
+	    throw new ObjectNotFoundException("Object has been removed");
+	}
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(Level.FINEST, "getReference oid:{0} returns {1}",
+		       oid, ref);
+	}
+	return ref;
+    }
 
     /** Creates a NEW reference to an object. */
-    private ManagedReferenceImpl(Context context, T object) {
+    private ManagedReferenceImpl(Context context, ManagedObject object) {
 	this.context = context;
 	oid = context.store.createObject(context.txn);
 	this.object = object;
@@ -180,21 +191,24 @@ final class ManagedReferenceImpl<T extends ManagedObject>
     void removeObject() {
 	switch (state) {
 	case EMPTY:
-	case NOT_MODIFIED:
+	    context.store.removeObject(context.txn, oid);
+	    state = State.REMOVED_EMPTY;
+	    break;
 	case MAYBE_MODIFIED:
+	    fingerprint = null;
+	    /* Fall through */
+	case NOT_MODIFIED:
 	case MODIFIED:
 	    context.store.removeObject(context.txn, oid);
 	    /* Fall through */
 	case NEW:
-	    context.refs.remove(this);	    
-	    object = null;
-	    fingerprint = null;
-	    state = State.REMOVED;
+	    state = State.REMOVED_FETCHED;
 	    break;
 	case FLUSHED:
 	    throw new TransactionNotActiveException(
 		"No transaction is in progress");
-	case REMOVED:
+	case REMOVED_EMPTY:
+	case REMOVED_FETCHED:
 	    throw new ObjectNotFoundException("The object is not found");
 	default:
 	    throw new AssertionError();
@@ -226,7 +240,8 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	case FLUSHED:
 	    throw new TransactionNotActiveException(
 		"No transaction is in progress");
-	case REMOVED:
+	case REMOVED_EMPTY:
+	case REMOVED_FETCHED:
 	    throw new ObjectNotFoundException("The object is not found");
 	default:
 	    throw new AssertionError();
@@ -235,7 +250,11 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 
     /* -- Implement ManagedReference -- */
 
-    public T get() {
+    public <T> T get(Class<T> type) {
+	if (type == null) {
+	    throw new NullPointerException(
+		"The type argument must not be null");
+	}
 	try {
 	    DataServiceImpl.checkContext(context);
 	    switch (state) {
@@ -258,7 +277,8 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	    case FLUSHED:
 		throw new TransactionNotActiveException(
 		    "No transaction is in progress");
-	    case REMOVED:
+	    case REMOVED_EMPTY:
+	    case REMOVED_FETCHED:
 		throw new ObjectNotFoundException("The object is not found");
 	    default:
 		throw new AssertionError();
@@ -266,14 +286,18 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST, "get {0} returns {1}", this, object);
 	    }
-	    return object;
+	    return type.cast(object);
 	} catch (RuntimeException e) {
 	    logger.logThrow(Level.FINEST, "get {0} throws", e, this);
 	    throw e;
 	}
     }
 
-    public T getForUpdate() {
+    public <T> T getForUpdate(Class<T> type) {
+	if (type == null) {
+	    throw new NullPointerException(
+		"The type argument must not be null");
+	}
 	try {
 	    DataServiceImpl.checkContext(context);
 	    switch (state) {
@@ -296,7 +320,8 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	    case NEW:
 	    case MODIFIED:
 		break;
-	    case REMOVED:
+	    case REMOVED_EMPTY:
+	    case REMOVED_FETCHED:
 		throw new ObjectNotFoundException("The object is not found");
 	    default:
 		throw new AssertionError();
@@ -305,7 +330,7 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 		logger.log(Level.FINEST, "getForUpdate {0} returns {1}",
 			   this, object);
 	    }
-	    return object;
+	    return type.cast(object);
 	} catch (RuntimeException e) {
 	    logger.logThrow(Level.FINEST, "getForUpdate {0} throws", e, this);
 	    throw e;
@@ -320,7 +345,7 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	    context = DataServiceImpl.getContextNoJoin();
 	    state = State.EMPTY;
 	    validate();
-	    ManagedReferenceImpl<?> ref = context.refs.find(oid);
+	    ManagedReferenceImpl ref = context.refs.find(oid);
 	    if (ref == null) {
 		context.refs.add(this);
 		return this;
@@ -347,7 +372,12 @@ final class ManagedReferenceImpl<T extends ManagedObject>
      */
     static void checkAllState(Context context) {
 	logger.log(Level.FINE, "Checking state");
-	context.refs.checkAllState();
+	try {
+	    context.refs.checkAllState();
+	} catch (AssertionError e) {
+	    logger.logThrow(Level.SEVERE, "State check failed", e);
+	    throw e;
+	}
     }
 
     /**
@@ -364,8 +394,8 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	    }
 	    break;
 	case EMPTY:
-	case REMOVED:
 	case FLUSHED:
+	case REMOVED_EMPTY:
 	    if (object != null) {
 		throw new AssertionError(state + " with object");
 	    } else if (fingerprint != null) {
@@ -374,6 +404,7 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	    break;
 	case NOT_MODIFIED:
 	case MODIFIED:
+	case REMOVED_FETCHED:
 	    if (object == null) {
 		throw new AssertionError(state + " with no object");
 	    } else if (fingerprint != null) {
@@ -406,6 +437,7 @@ final class ManagedReferenceImpl<T extends ManagedObject>
     void flush() {
 	switch (state) {
 	case EMPTY:
+	case REMOVED_EMPTY:
 	    break;
 	case NEW:
 	case MODIFIED:
@@ -420,12 +452,11 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	    }
 	    /* Fall through */
 	case NOT_MODIFIED:
+	case REMOVED_FETCHED:
 	    context.refs.unregisterObject(object);
 	    break;
 	case FLUSHED:
 	    throw new IllegalStateException("Object already flushed");
-	case REMOVED:
-	    throw new IllegalStateException("Object was removed");
 	default:
 	    throw new AssertionError();
 	}
@@ -439,11 +470,11 @@ final class ManagedReferenceImpl<T extends ManagedObject>
      * false if the object was not removed in this transaction.
      */
     boolean isRemoved() {
-	return state == State.REMOVED;
+	return state == State.REMOVED_EMPTY || state == State.REMOVED_FETCHED;
     }
 
     /** Returns the object currently associated with this reference or null. */
-    T getObject() {
+    ManagedObject getObject() {
 	return object;
     }
 
@@ -458,20 +489,18 @@ final class ManagedReferenceImpl<T extends ManagedObject>
     }
 
     /**
-     * Returns the object associated with serialized data.  Will not notice if
-     * the type of the object is wrong!
+     * Returns the managed object associated with serialized data.  Checks that
+     * the return value is not null.
      */
-    private T deserialize(byte[] data) {
-	/**
-	 * The serialized form doesn't know the type, so the real type check
-	 * will need to occur in the caller.
-	 */
-	@SuppressWarnings("unchecked")
-	    T deserialized = (T) SerialUtil.deserialize(data);
-	if (deserialized == null) {
+    private ManagedObject deserialize(byte[] data) {
+	Object object =  SerialUtil.deserialize(data);
+	if (object == null) {
 	    throw new ObjectIOException(
 		"Managed object must not deserialize to null", false);
+	} else if (!(object instanceof ManagedObject)) {
+	    throw new ObjectIOException(
+		"Deserialized object must implement ManagedObject", false);
 	}
-	return deserialized;
+	return (ManagedObject) object;
     }
 }

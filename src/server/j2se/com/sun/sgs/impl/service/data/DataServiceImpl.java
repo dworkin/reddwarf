@@ -42,7 +42,7 @@ import java.util.logging.Logger;
  *	Specifies the number of <code>DataService</code> operations to skip
  *	between checks of the consistency of the managed references table.
  *	Note that the number of operations is measured separately for each
- *	transaction. <p>
+ *	transaction.  This property is intended for use in debugging. <p>
  *
  * <li> <i>Key:</i> <code>com.sun.sgs.impl.service.data.detectModifications
  *	</code> <br>
@@ -231,9 +231,7 @@ public final class DataServiceImpl
     /* -- Implement DataManager -- */
 
     /** {@inheritDoc} */
-    public <T extends ManagedObject> T getBinding(
-	 String name, Class<T> type)
-    {
+    public <T> T getBinding(String name, Class<T> type) {
 	return getBindingInternal(name, type, false);
     }
 
@@ -257,7 +255,7 @@ public final class DataServiceImpl
 		    "The object must be serializable");
 	    }
 	    Context context = getContext();
-	    ManagedReferenceImpl<?> ref = context.findReference(object);
+	    ManagedReferenceImpl ref = context.findReference(object);
 	    if (ref != null) {
 		ref.removeObject();
 	    }
@@ -280,7 +278,7 @@ public final class DataServiceImpl
 		    "The object must be serializable");
 	    }
 	    Context context = getContext();
-	    ManagedReferenceImpl<?> ref = context.findReference(object);
+	    ManagedReferenceImpl ref = context.findReference(object);
 	    if (ref != null) {
 		ref.markForUpdate();
 	    }
@@ -294,9 +292,7 @@ public final class DataServiceImpl
     }
 
     /** {@inheritDoc} */
-    public <T extends ManagedObject> ManagedReference<T> createReference(
-	T object)
-    {
+    public ManagedReference createReference(ManagedObject object) {
 	try {
 	    if (object == null) {
 		throw new NullPointerException("The object must not be null");
@@ -305,7 +301,7 @@ public final class DataServiceImpl
 		    "The object must be serializable");
 	    }
 	    Context context = getContext();
-	    ManagedReference<T> result = context.getReference(object);
+	    ManagedReference result = context.getReference(object);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST, "createReference object:{0} returns {1}",
@@ -322,9 +318,7 @@ public final class DataServiceImpl
     /* -- Implement DataService -- */
 
     /** {@inheritDoc} */
-    public <T extends ManagedObject> T getServiceBinding(
-	String name, Class<T> type)
-    {
+    public <T> T getServiceBinding(String name, Class<T> type) {
 	return getBindingInternal(name, type, true);
     }
 
@@ -411,7 +405,7 @@ public final class DataServiceImpl
     /* -- Generic binding methods -- */
 
     /** Implement getBinding and getServiceBinding. */
-    private <T extends ManagedObject> T getBindingInternal(
+    private <T> T getBindingInternal(
 	 String name, Class<T> type, boolean serviceBinding)
     {
 	try {
