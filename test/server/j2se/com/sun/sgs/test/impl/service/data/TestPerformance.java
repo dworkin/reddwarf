@@ -299,15 +299,15 @@ public class TestPerformance extends TestCase {
     /** A managed object that maintains a list of Counter instances. */
     static class Counters implements ManagedObject, Serializable {
 	private static final long serialVersionUID = 1;
-	private List<ManagedReference<Counter>> counters =
-	    new ArrayList<ManagedReference<Counter>>();
+	private List<ManagedReference> counters =
+	    new ArrayList<ManagedReference>();
 	Counters(DataManager dataMgr, int count) {
 	    for (int i = 0; i < count; i++) {
 		counters.add(dataMgr.createReference(new Counter()));
 	    }
 	}
 	Counter get(int i) {
-	    return counters.get(i).get();
+	    return counters.get(i).get(Counter.class);
 	}
     }
 

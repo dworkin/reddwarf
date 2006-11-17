@@ -8,7 +8,7 @@ import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.util.LoggerWrapper;
-import com.sun.sgs.impl.util.PropertiesUtil;
+import com.sun.sgs.impl.util.PropertiesWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Service;
@@ -16,6 +16,8 @@ import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.service.TransactionProxy;
 import java.io.Serializable;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -40,7 +42,7 @@ import java.util.logging.Logger;
  *	Specifies the number of <code>DataService</code> operations to skip
  *	between checks of the consistency of the managed references table.
  *	Note that the number of operations is measured separately for each
- *	transaction. <p>
+ *	transaction.  This property is intended for use in debugging. <p>
  *
  * <li> <i>Key:</i> <code>com.sun.sgs.impl.service.data.detectModifications
  *	</code> <br>
@@ -84,7 +86,7 @@ public final class DataServiceImpl
     implements DataService, TransactionParticipant
 {
     /** The property that specifies the application name. */
-    public static final String APP_NAME_PROPERTY = "com.sun.sgs.appName";
+    private static final String APP_NAME_PROPERTY = "com.sun.sgs.appName";
 
     /** The name of this class. */
     private static final String CLASSNAME = DataServiceImpl.class.getName();
@@ -93,14 +95,14 @@ public final class DataServiceImpl
      * The property that specifies the number of operations to skip between
      * checks of the consistency of the managed references table.
      */
-    public static final String DEBUG_CHECK_INTERVAL_PROPERTY =
+    private static final String DEBUG_CHECK_INTERVAL_PROPERTY =
 	CLASSNAME + ".debugCheckInterval";
 
     /**
      * The property that specifies whether to automatically detect
      * modifications to objects.
      */
-    public static final String DETECT_MODIFICATIONS_PROPERTY =
+    private static final String DETECT_MODIFICATIONS_PROPERTY =
 	CLASSNAME + ".detectModifications";
 
     /** The logger for this class. */
@@ -124,7 +126,13 @@ public final class DataServiceImpl
     private final Object lock = new Object();
 
     /** The transaction proxy, or null if configure has not been called. */
-    private TransactionProxy txnProxy;
+    TransactionProxy txnProxy;
+
+    /**
+     * A list of operations to run on abort, and clear on commit, or null if
+     * there are no abort actions.
+     */
+    private List<Runnable> abortActions = null;
 
     /**
      * The number of operations to skip between checks of the consistency of
@@ -159,7 +167,8 @@ public final class DataServiceImpl
 		       properties, componentRegistry);
 	}
 	try {
-	    appName = properties.getProperty(APP_NAME_PROPERTY);
+	    PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
+	    appName = wrappedProps.getProperty(APP_NAME_PROPERTY);
 	    if (appName == null) {
 		throw new IllegalArgumentException(
 		    "The " + APP_NAME_PROPERTY +
@@ -169,10 +178,10 @@ public final class DataServiceImpl
 		throw new NullPointerException(
 		    "The componentRegistry argument must not be null");
 	    }
-	    debugCheckInterval = PropertiesUtil.getIntProperty(
-		properties, DEBUG_CHECK_INTERVAL_PROPERTY, Integer.MAX_VALUE);
-	    detectModifications = PropertiesUtil.getBooleanProperty(
-		properties, DETECT_MODIFICATIONS_PROPERTY, Boolean.TRUE);
+	    debugCheckInterval = wrappedProps.getIntProperty(
+		DEBUG_CHECK_INTERVAL_PROPERTY, Integer.MAX_VALUE);
+	    detectModifications = wrappedProps.getBooleanProperty(
+		DETECT_MODIFICATIONS_PROPERTY, Boolean.TRUE);
 	    store = new DataStoreImpl(properties);
 	} catch (RuntimeException e) {
 	    logger.logThrow(
@@ -200,6 +209,12 @@ public final class DataServiceImpl
 		throw new IllegalStateException("Already configured");
 	    }
 	    this.txnProxy = txnProxy;
+	    addAbortAction(
+		new Runnable() {
+		    public void run() {
+			DataServiceImpl.this.txnProxy = null;
+		    }
+		});
 	    DataServiceHeader header;
 	    try {
 		header = getServiceBinding(
@@ -216,9 +231,7 @@ public final class DataServiceImpl
     /* -- Implement DataManager -- */
 
     /** {@inheritDoc} */
-    public <T extends ManagedObject> T getBinding(
-	 String name, Class<T> type)
-    {
+    public <T> T getBinding(String name, Class<T> type) {
 	return getBindingInternal(name, type, false);
     }
 
@@ -241,8 +254,8 @@ public final class DataServiceImpl
 		throw new IllegalArgumentException(
 		    "The object must be serializable");
 	    }
-	    Context context = checkContext();
-	    ManagedReferenceImpl<?> ref = context.findReference(object);
+	    Context context = getContext();
+	    ManagedReferenceImpl ref = context.findReference(object);
 	    if (ref != null) {
 		ref.removeObject();
 	    }
@@ -264,8 +277,8 @@ public final class DataServiceImpl
 		throw new IllegalArgumentException(
 		    "The object must be serializable");
 	    }
-	    Context context = checkContext();
-	    ManagedReferenceImpl<?> ref = context.findReference(object);
+	    Context context = getContext();
+	    ManagedReferenceImpl ref = context.findReference(object);
 	    if (ref != null) {
 		ref.markForUpdate();
 	    }
@@ -279,9 +292,7 @@ public final class DataServiceImpl
     }
 
     /** {@inheritDoc} */
-    public <T extends ManagedObject> ManagedReference<T> createReference(
-	T object)
-    {
+    public ManagedReference createReference(ManagedObject object) {
 	try {
 	    if (object == null) {
 		throw new NullPointerException("The object must not be null");
@@ -289,8 +300,8 @@ public final class DataServiceImpl
 		throw new IllegalArgumentException(
 		    "The object must be serializable");
 	    }
-	    Context context = checkContext();
-	    ManagedReference<T> result = context.getReference(object);
+	    Context context = getContext();
+	    ManagedReference result = context.getReference(object);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST, "createReference object:{0} returns {1}",
@@ -307,9 +318,7 @@ public final class DataServiceImpl
     /* -- Implement DataService -- */
 
     /** {@inheritDoc} */
-    public <T extends ManagedObject> T getServiceBinding(
-	String name, Class<T> type)
-    {
+    public <T> T getServiceBinding(String name, Class<T> type) {
 	return getBindingInternal(name, type, true);
     }
 
@@ -328,10 +337,11 @@ public final class DataServiceImpl
     /** {@inheritDoc} */
     public boolean prepare(Transaction txn) throws Exception {
 	try {
-	    Context context = checkContext(txn);
+	    Context context = getContext(txn);
 	    boolean result = context.prepare();
 	    if (result) {
 		currentContext.set(null);
+		abortActions = null;
 	    }
 	    if (logger.isLoggable(Level.FINER)) {
 		logger.log(Level.FINER, "prepare txn:{0} returns {1}",
@@ -347,12 +357,13 @@ public final class DataServiceImpl
     /** {@inheritDoc} */
     public void commit(Transaction txn) {
 	try {
-	    Context context = checkContext(txn);
+	    Context context = getContext(txn);
 	    currentContext.set(null);
+	    abortActions = null;
 	    context.commit();
 	    logger.log(Level.FINER, "commit txn:{0} returns", txn);
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINER, "commit txn:{0} throws", e, txn);
+	    logger.logThrow(Level.WARNING, "commit txn:{0} throws", e, txn);
 	    throw e;
 	}
     }
@@ -360,9 +371,10 @@ public final class DataServiceImpl
     /** {@inheritDoc} */
     public void prepareAndCommit(Transaction txn) throws Exception {
 	try {
-	    Context context = checkContext(txn);
-	    currentContext.set(null);
+	    Context context = getContext(txn);
 	    context.prepareAndCommit();
+	    abortActions = null;
+	    currentContext.set(null);
 	    logger.log(Level.FINER, "prepareAndCommit txn:{0} returns", txn);
 	} catch (RuntimeException e) {
 	    logger.logThrow(
@@ -374,12 +386,18 @@ public final class DataServiceImpl
     /** {@inheritDoc} */
     public void abort(Transaction txn) {
 	try {
-	    Context context = checkContext(txn);
+	    Context context = getContext(txn);
 	    currentContext.set(null);
+	    if (abortActions != null) {
+		for (Runnable action : abortActions) {
+		    action.run();
+		}
+		abortActions = null;
+	    }
 	    context.abort();
 	    logger.log(Level.FINER, "abort txn:{0} returns", txn);
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINER, "abort txn:{0} throws", e, txn);
+	    logger.logThrow(Level.WARNING, "abort txn:{0} throws", e, txn);
 	    throw e;
 	}
     }
@@ -387,7 +405,7 @@ public final class DataServiceImpl
     /* -- Generic binding methods -- */
 
     /** Implement getBinding and getServiceBinding. */
-    private <T extends ManagedObject> T getBindingInternal(
+    private <T> T getBindingInternal(
 	 String name, Class<T> type, boolean serviceBinding)
     {
 	try {
@@ -395,7 +413,7 @@ public final class DataServiceImpl
 		throw new NullPointerException(
 		    "The arguments must not be null");
 	    }
-	    Context context = checkContext();
+	    Context context = getContext();
 	    T result;
 	    try {
 		result = context.getBinding(
@@ -434,7 +452,7 @@ public final class DataServiceImpl
 		throw new IllegalArgumentException(
 		    "The object must be serializable");
 	    }
-	    Context context = checkContext();
+	    Context context = getContext();
 	    context.setBinding(getInternalName(name, serviceBinding), object);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST, "{0} name:{1}, object:{2} returns",
@@ -458,7 +476,7 @@ public final class DataServiceImpl
 	    if (name == null) {
 		throw new NullPointerException("The name must not be null");
 	    }
-	    Context context = checkContext();
+	    Context context = getContext();
 	    try {
 		context.removeBinding(getInternalName(name, serviceBinding));
 	    } catch (NameNotBoundException e) {
@@ -490,7 +508,8 @@ public final class DataServiceImpl
      * @return	a string representation of this instance
      */
     public String toString() {
-	return "DataServiceImpl[appName:\"" + appName + "\"]";
+	return "DataServiceImpl[appName:\"" + appName +
+	    ", store:" + store + "\"]";
     }
 
     /**
@@ -524,9 +543,10 @@ public final class DataServiceImpl
      * TransactionNotActiveException exception if there is no current
      * transaction, and throwing IllegalStateException if there is a problem
      * with the state of the transaction or if this service has not been
-     * configured with a transaction proxy.
+     * configured with a transaction proxy.  Joins the transaction if that has
+     * not been done already.
      */
-    private Context checkContext() {
+    private Context getContext() {
 	Transaction txn;
 	synchronized (lock) {
 	    if (txnProxy == null) {
@@ -554,7 +574,7 @@ public final class DataServiceImpl
      * transaction is null, and IllegalStateException if another or no
      * transaction has been joined.
      */
-    private Context checkContext(Transaction txn) {
+    private Context getContext(Transaction txn) {
 	if (txn == null) {
 	    throw new NullPointerException("The transaction must not be null");
 	}
@@ -582,9 +602,10 @@ public final class DataServiceImpl
 
     /**
      * Obtains the currently active context, throwing
-     * TransactionNotActiveException if none is active.
+     * TransactionNotActiveException if none is active.  Does not join the
+     * transaction.
      */
-    static Context getContext() {
+    static Context getContextNoJoin() {
 	Context context = currentContext.get();
 	if (context == null) {
 	    throw new TransactionNotActiveException(
@@ -601,6 +622,17 @@ public final class DataServiceImpl
     private static String getInternalName(
 	String name, boolean serviceBinding)
     {
-	return (serviceBinding ? "s" : "a") + name;
+	return (serviceBinding ? "s." : "a.") + name;
+    }
+
+    /**
+     * Adds an action to be performed on abort, to roll back transient state
+     * changes.
+     */
+    private void addAbortAction(Runnable action) {
+	if (abortActions == null) {
+	    abortActions = new LinkedList<Runnable>();
+	}
+	abortActions.add(action);
     }
 }

@@ -2,6 +2,7 @@ package com.sun.sgs.impl.service.data;
 
 import com.sun.sgs.app.ManagedObject;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -12,12 +13,15 @@ import java.util.Map.Entry;
 final class ReferenceTable {
 
     /** Maps object IDs to managed references. */
-    private final Map<Long, ManagedReferenceImpl<?>> oids =
-	new HashMap<Long, ManagedReferenceImpl<?>>();
+    private final Map<Long, ManagedReferenceImpl> oids =
+	new HashMap<Long, ManagedReferenceImpl>();
 
-    /** Maps managed objects to managed references. */
-    private final Map<ManagedObject, ManagedReferenceImpl<?>> objects =
-	new HashMap<ManagedObject, ManagedReferenceImpl<?>>();
+    /**
+     * Maps managed objects to managed references.  The objects are compared by
+     * identity, not the equals method.
+     */
+    private final Map<ManagedObject, ManagedReferenceImpl> objects =
+	new IdentityHashMap<ManagedObject, ManagedReferenceImpl>();
 
     /** Creates an instance of this class. */
     ReferenceTable() { }
@@ -26,30 +30,22 @@ final class ReferenceTable {
      * Finds the managed reference associated with a managed object, returning
      * null if no reference is found.
      */
-    <T extends ManagedObject> ManagedReferenceImpl<T> find(T object) {
+    ManagedReferenceImpl find(ManagedObject object) {
 	assert object != null : "Object is null";
-	/*
-	 * Managed references always have the same type as the managed objects
-	 * they refer to, so this cast is actually safe to perform, since we
-	 * have the object in hand.  -tjb@sun.com (11/08/2006)
-	 */
-	@SuppressWarnings("unchecked")
-	    ManagedReferenceImpl<T> result =
-	        (ManagedReferenceImpl<T>) objects.get(object);
-	return result;
+	return objects.get(object);
     }
 
     /**
      * Finds the managed reference associated with an object ID, returning null
      * if no reference is found.
      */
-    ManagedReferenceImpl<?> find(long oid) {
+    ManagedReferenceImpl find(long oid) {
 	assert oid >= 0 : "Object ID is negative";
 	return oids.get(oid);
     }
 
     /** Adds a new managed reference to this table. */
-    void add(ManagedReferenceImpl<?> ref) {
+    void add(ManagedReferenceImpl ref) {
 	assert !oids.containsKey(ref.oid)
 	    : "Found existing reference for oid:" + ref.oid;
 	oids.put(ref.oid, ref);
@@ -65,7 +61,7 @@ final class ReferenceTable {
      * Updates this table for a reference that has been newly associated with
      * an object.
      */
-    void registerObject(ManagedReferenceImpl<?> ref) {
+    void registerObject(ManagedReferenceImpl ref) {
 	assert oids.get(ref.oid) == ref
 	    : "Found duplicate references for oid: " + ref.oid;
 	assert ref.getObject() != null : "Object is null for oid:" + ref.oid;
@@ -84,7 +80,7 @@ final class ReferenceTable {
     }
 
     /** Removes a managed reference from this table. */
-    void remove(ManagedReferenceImpl<?> ref) {
+    void remove(ManagedReferenceImpl ref) {
 	Object existing = oids.remove(ref.oid);
 	assert existing == ref
 	    : "Found duplicate reference for oid:" + ref.oid;
@@ -98,45 +94,41 @@ final class ReferenceTable {
 
     /** Saves all object modifications to the data store. */
     void flushChanges() {
-	for (ManagedReferenceImpl<?> ref : oids.values()) {
+	for (ManagedReferenceImpl ref : oids.values()) {
 	    ref.flush();
 	}
     }
 
     /**
-     * Checks the consistency of this table, throwing an exception if a problem
-     * is found.
+     * Checks the consistency of this table, throwing an assertion error if a
+     * problem is found.
      */
     void checkAllState() {
 	int objectCount = 0;
-	for (Entry<Long, ManagedReferenceImpl<?>> entry : oids.entrySet()) {
+	for (Entry<Long, ManagedReferenceImpl> entry : oids.entrySet()) {
 	    long oid = entry.getKey();
-	    ManagedReferenceImpl<?> ref = entry.getValue();
+	    ManagedReferenceImpl ref = entry.getValue();
 	    ref.checkState();
-	    if (ref.isRemoved()) {
-		throw new IllegalStateException(
-		    "Found removed reference: " + ref);
-	    }
 	    if (oid != ref.oid) {
-		throw new IllegalStateException(
+		throw new AssertionError(
 		    "Wrong oids entry: oid = " + oid + ", ref.oid = " +
 		    ref.oid);
 	    }
 	    Object object = ref.getObject();
 	    if (object != null) {
-		ManagedReferenceImpl<?> objectsRef = objects.get(object);
+		ManagedReferenceImpl objectsRef = objects.get(object);
 		if (objectsRef == null) {
-		    throw new IllegalStateException(
+		    throw new AssertionError(
 			"Missing objects entry for oid = " + ref.oid);
 		} else if (!ref.equals(objectsRef)) {
-		    throw new IllegalStateException(
+		    throw new AssertionError(
 			"Wrong objects entry for oid = " + ref.oid);
 		}
 		objectCount++;
 	    }
 	}
 	if (objectCount != objects.size()) {
-	    throw new IllegalStateException(
+	    throw new AssertionError(
 		"Objects table has wrong size: was " + objects.size() +
 		", expected " + objectCount);
 	}

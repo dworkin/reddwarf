@@ -13,15 +13,16 @@ import java.math.BigInteger;
  * Encapsulates the layout of meta data stored at the start of the info
  * database.  This class cannot be instantiated.
  *
- * ID 0 contains a magic number common to all DataStoreImpl databases.
+ * The value for key 0 stores a magic number common to all DataStoreImpl
+ * databases.
  *
- * ID 1 contains the major version number, which must match the value in the
+ * Key 1 stores the major version number, which must match the value in the
  * current version of the implementation.
  *
- * ID 2 contains the minor version number, which can vary between the database
+ * Key 2 stores the minor version number, which can vary between the database
  * and the implementation.
  *
- * ID 3 contains the ID of the next free ID number to use for allocating new
+ * Key 3 stores the ID of the next free ID number to use for allocating new
  * objects.
  *
  * Version history:
@@ -30,17 +31,17 @@ import java.math.BigInteger;
  */
 final class DataStoreHeader {
 
-    /** The ID for the magic number. */
-    static final long MAGIC_ID = 0;
+    /** The key for the magic number. */
+    static final long MAGIC_KEY = 0;
 
-    /** The ID for the major version number. */
-    static final long MAJOR_ID = 1;
+    /** The key for the major version number. */
+    static final long MAJOR_KEY = 1;
 
-    /** The ID for the minor version number. */
-    static final long MINOR_ID = 2;
+    /** The key for the minor version number. */
+    static final long MINOR_KEY = 2;
 
-    /** The ID for the value of the next free ID. */
-    static final long NEXT_ID_ID = 3;
+    /** The key for the value of the next free ID. */
+    static final long NEXT_ID_KEY = 3;
 
     /** The magic number: DaRkStAr. */
     static final long MAGIC = 0x4461526b53744172L;
@@ -76,7 +77,7 @@ final class DataStoreHeader {
 	DatabaseEntry key = new DatabaseEntry();
 	DatabaseEntry value = new DatabaseEntry();
 
-	LongBinding.longToEntry(MAGIC_ID, key);
+	LongBinding.longToEntry(MAGIC_KEY, key);
 	get(db, bdbTxn, key, value, null);
 	long magic = LongBinding.entryToLong(value);
 	if (magic != MAGIC) {
@@ -85,7 +86,7 @@ final class DataStoreHeader {
 		toHexString(MAGIC) + ", found " + toHexString(magic));
 	}
 
-	LongBinding.longToEntry(MAJOR_ID, key);
+	LongBinding.longToEntry(MAJOR_KEY, key);
 	get(db, bdbTxn, key, value, null);
 	int majorVersion = ShortBinding.entryToShort(value);
 	if (majorVersion != MAJOR_VERSION) {
@@ -94,7 +95,7 @@ final class DataStoreHeader {
 		", found " + majorVersion);
 	}
 
-	LongBinding.longToEntry(MINOR_ID, key);
+	LongBinding.longToEntry(MINOR_KEY, key);
 	get(db, bdbTxn, key, value, null);
 	return ShortBinding.entryToShort(value);
     }
@@ -112,19 +113,19 @@ final class DataStoreHeader {
 	DatabaseEntry key = new DatabaseEntry();
 	DatabaseEntry value = new DatabaseEntry();
 
-	LongBinding.longToEntry(MAGIC_ID, key);
+	LongBinding.longToEntry(MAGIC_KEY, key);
 	LongBinding.longToEntry(MAGIC, value);
 	putNoOverwrite(db, bdbTxn, key, value);
 
-	LongBinding.longToEntry(MAJOR_ID, key);
+	LongBinding.longToEntry(MAJOR_KEY, key);
 	ShortBinding.shortToEntry(MAJOR_VERSION, value);
 	putNoOverwrite(db, bdbTxn, key, value);
 
-	LongBinding.longToEntry(MINOR_ID, key);
+	LongBinding.longToEntry(MINOR_KEY, key);
 	ShortBinding.shortToEntry(MINOR_VERSION, value);
 	putNoOverwrite(db, bdbTxn, key, value);
 
-	LongBinding.longToEntry(NEXT_ID_ID, key);
+	LongBinding.longToEntry(NEXT_ID_KEY, key);
 	LongBinding.longToEntry(INITIAL_NEXT_ID, value);
 	putNoOverwrite(db, bdbTxn, key, value);
     }
@@ -145,7 +146,7 @@ final class DataStoreHeader {
 	throws DatabaseException
     {
 	DatabaseEntry key = new DatabaseEntry();
-	LongBinding.longToEntry(NEXT_ID_ID, key);
+	LongBinding.longToEntry(NEXT_ID_KEY, key);
 	DatabaseEntry value = new DatabaseEntry();
 	get(db, bdbTxn, key, value, LockMode.RMW);
 	long result = LongBinding.entryToLong(value);

@@ -49,6 +49,10 @@ final class DataServiceHeader implements ManagedObject, Serializable {
 
     /** Validates the fields of this instance. */
     private void validate() {
+	if (minorVersion < 0) {
+	    throw new IllegalArgumentException(
+		"The minorVersion field must not be negative");
+	}
 	if (appName == null) {
 	    throw new NullPointerException(
 		"The appName field must not be null");

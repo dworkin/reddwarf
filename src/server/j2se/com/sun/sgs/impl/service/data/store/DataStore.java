@@ -33,7 +33,9 @@ public interface DataStore {
 
     /**
      * Notifies the <code>DataStore</code> that an object is going to be
-     * modified.
+     * modified.  The implementation can use this information to obtain an
+     * exclusive lock on the object in order avoid contention when the object
+     * is modified.
      *
      * @param	txn the transaction under which the operation should take place
      * @param	oid the object ID
