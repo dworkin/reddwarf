@@ -1,7 +1,7 @@
-Sun Game Server (SGS) Early Access 2
-August 22, 2006
+Sun Game Server (SGS) Early Access 2a
+November 17, 2006
 
-This archive contains Early Access 2 of the Sun Game Server (SGS) SDK.
+This archive contains Early Access 2a of the Sun Game Server (SGS) SDK.
 Here you'll find pre-built API libraries and jarfiles to link your code
 against, as well as documentation, tutorials, and several examples that
 illustrate how to integrate new game servers and clients with the SGS.
@@ -11,7 +11,7 @@ the SGS server API, so game programmers can develop their code against a
 small-scale implementation of the SGS system before deploying it to a
 fault-tolerant, multi-stack SGS cluster solution.
 
-EA2 requires a Java 1.5 or later VM.
+EA2a requires a Java 1.5 or later VM.
 
 INSTALLATION
 
@@ -20,7 +20,13 @@ included and set to load in the server configuration file.  Server apps
 are installed by editing the SGS-apps.conf file, which is read at SGS
 server startup to determine which server apps to instantiate and run.
 
-CHANGES
+CHANGES in EA2a
+
+  * Better timer performance.
+
+  * Several fixes which improve locking behavior under load.
+
+CHANGES in EA2
 
   * The DiscoveryManager has been integrated into the SGS server,
     so it no longer needs to be run as a separate process.

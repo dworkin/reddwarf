@@ -18,8 +18,8 @@
     
     <!-- Modify these two properties whenever there is a new release -->
     
-    <property name="release.dir" value="sgs-ea2" />
-    <property name="release.zip" value="SunGameServerEA2.zip" />
+    <property name="release.dir" value="sgs-ea2a" />
+    <property name="release.zip" value="SunGameServerEA2a.zip" />
 
     <path id="project.classpath">
 	<pathelement location="bin" />
@@ -87,7 +87,7 @@
     <target name="doxygen" depends="doxygen.internal, doxygen.api" />
 
     <target name="doxygen.api" depends="init">
-	<exec executable="doxygen" failonerror="true">
+<!--	<exec executable="doxygen" failonerror="true">
 	    <arg value="java-client-api.doxygen" />
 	</exec>
 	<exec executable="doxygen" failonerror="true">
@@ -96,6 +96,7 @@
 	<exec executable="doxygen" failonerror="true">
 	    <arg value="java-stackext-api.doxygen" />
 	</exec>
+-->
     </target>
 
     <target name="doxygen.internal" depends="init">
@@ -666,11 +667,11 @@
 	
 	
     <target name="release.docs" depends="docs">
-	<copy todir="${release.dir}/docs/doxygen" >
+<!--	<copy todir="${release.dir}/docs/doxygen" >
 	    <fileset dir="doc/doxygen">
 		<exclude name="internal/**" />
 	    </fileset>
-	</copy>
+	</copy> -->
 	<copy todir="${release.dir}/docs/javadoc" >
 	    <fileset dir="doc/javadoc">
 		<exclude name="internal/**" />
