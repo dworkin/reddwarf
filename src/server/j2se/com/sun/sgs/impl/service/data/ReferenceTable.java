@@ -2,6 +2,7 @@ package com.sun.sgs.impl.service.data;
 
 import com.sun.sgs.app.ManagedObject;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -15,9 +16,12 @@ final class ReferenceTable {
     private final Map<Long, ManagedReferenceImpl<?>> oids =
 	new HashMap<Long, ManagedReferenceImpl<?>>();
 
-    /** Maps managed objects to managed references. */
+    /**
+     * Maps managed objects to managed references.  The objects are compared by
+     * identity, not the equals method.
+     */
     private final Map<ManagedObject, ManagedReferenceImpl<?>> objects =
-	new HashMap<ManagedObject, ManagedReferenceImpl<?>>();
+	new IdentityHashMap<ManagedObject, ManagedReferenceImpl<?>>();
 
     /** Creates an instance of this class. */
     ReferenceTable() { }
@@ -104,8 +108,8 @@ final class ReferenceTable {
     }
 
     /**
-     * Checks the consistency of this table, throwing an exception if a problem
-     * is found.
+     * Checks the consistency of this table, throwing an assertion error if a
+     * problem is found.
      */
     void checkAllState() {
 	int objectCount = 0;
@@ -114,11 +118,11 @@ final class ReferenceTable {
 	    ManagedReferenceImpl<?> ref = entry.getValue();
 	    ref.checkState();
 	    if (ref.isRemoved()) {
-		throw new IllegalStateException(
+		throw new AssertionError(
 		    "Found removed reference: " + ref);
 	    }
 	    if (oid != ref.oid) {
-		throw new IllegalStateException(
+		throw new AssertionError(
 		    "Wrong oids entry: oid = " + oid + ", ref.oid = " +
 		    ref.oid);
 	    }
@@ -126,17 +130,17 @@ final class ReferenceTable {
 	    if (object != null) {
 		ManagedReferenceImpl<?> objectsRef = objects.get(object);
 		if (objectsRef == null) {
-		    throw new IllegalStateException(
+		    throw new AssertionError(
 			"Missing objects entry for oid = " + ref.oid);
 		} else if (!ref.equals(objectsRef)) {
-		    throw new IllegalStateException(
+		    throw new AssertionError(
 			"Wrong objects entry for oid = " + ref.oid);
 		}
 		objectCount++;
 	    }
 	}
 	if (objectCount != objects.size()) {
-	    throw new IllegalStateException(
+	    throw new AssertionError(
 		"Objects table has wrong size: was " + objects.size() +
 		", expected " + objectCount);
 	}

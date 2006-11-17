@@ -2,6 +2,7 @@ package com.sun.sgs.impl.service.data;
 
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.app.ObjectIOException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.util.LoggerWrapper;
@@ -65,7 +66,7 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	 * An object that has been read and will be checked for modification at
 	 * commit.
 	 */
-	 MAYBE_MODIFIED,
+	MAYBE_MODIFIED,
 
 	/** An object that has been explicitly marked modified. */
 	MODIFIED,
@@ -94,7 +95,11 @@ final class ManagedReferenceImpl<T extends ManagedObject>
      */
     final long oid;
 
-    /** The associated object or null. */
+    /**
+     * The associated object or null.  Note that managed references cannot
+     * refer to null, so this field will only be null if the object has not
+     * been fetched yet.
+     */
     private transient T object;
 
     /** The fingerprint of the object before it was modified, or null. */
@@ -112,6 +117,7 @@ final class ManagedReferenceImpl<T extends ManagedObject>
     static <T extends ManagedObject> ManagedReferenceImpl<T> findReference(
 	Context context, T object)
      {
+	 assert object != null : "Object is null";
 	 return context.refs.find(object);
      }
 
@@ -122,6 +128,7 @@ final class ManagedReferenceImpl<T extends ManagedObject>
     static <T extends ManagedObject> ManagedReferenceImpl<T> getReference(
 	Context context, T object)
      {
+	 assert object != null : "Object is null";
 	 ManagedReferenceImpl<T> ref = context.refs.find(object);
 	 if (ref == null) {
 	     ref = new ManagedReferenceImpl<T>(context, object);
@@ -310,7 +317,7 @@ final class ManagedReferenceImpl<T extends ManagedObject>
     /** Replaces this instance with a canonical instance. */
     private Object readResolve() throws ObjectStreamException {
 	try {
-	    context = DataServiceImpl.getContext();
+	    context = DataServiceImpl.getContextNoJoin();
 	    state = State.EMPTY;
 	    validate();
 	    ManagedReferenceImpl<?> ref = context.refs.find(oid);
@@ -327,15 +334,6 @@ final class ManagedReferenceImpl<T extends ManagedObject>
     }
 
     /* -- Object methods -- */
-
-    public boolean equals(Object object) {
-	/* Compare identity, since instances are canonicalized. */
-	return this == object;
-    }
-
-    public int hashCode() {
-	return (int) (oid >>> 32) ^ (int) oid;
-    }
 
     public String toString() {
 	return "ManagedReferenceImpl[oid:" + oid + ", state:" + state + "]";
@@ -354,40 +352,40 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 
     /**
      * Checks the fields of this object to make sure they have valid values,
-     * throwing IllegalStateException if a problem is found.
+     * throwing an assertion error if a problem is found.
      */
     void checkState() {
 	switch (state) {
 	case NEW:
 	    if (object == null) {
-		throw new IllegalStateException("NEW with no object");
+		throw new AssertionError("NEW with no object");
 	    } else if (fingerprint != null) {
-		throw new IllegalStateException("NEW with fingerprint");
+		throw new AssertionError("NEW with fingerprint");
 	    }
 	    break;
 	case EMPTY:
 	case REMOVED:
 	case FLUSHED:
 	    if (object != null) {
-		throw new IllegalStateException(state + " with object");
+		throw new AssertionError(state + " with object");
 	    } else if (fingerprint != null) {
-		throw new IllegalStateException(state + " with fingerprint");
+		throw new AssertionError(state + " with fingerprint");
 	    }
 	    break;
 	case NOT_MODIFIED:
 	case MODIFIED:
 	    if (object == null) {
-		throw new IllegalStateException(state + " with no object");
+		throw new AssertionError(state + " with no object");
 	    } else if (fingerprint != null) {
-		throw new IllegalStateException(state + " with fingerprint");
+		throw new AssertionError(state + " with fingerprint");
 	    }
 	    break;
 	case MAYBE_MODIFIED:
 	    if (object == null) {
-		throw new IllegalStateException(
+		throw new AssertionError(
 		    "MAYBE_MODIFIED with no object");
 	    } else if (fingerprint == null) {
-		throw new IllegalStateException(
+		throw new AssertionError(
 		    "MAYBE_MODIFIED with no fingerprint");
 	    }
 	    break;
@@ -414,9 +412,6 @@ final class ManagedReferenceImpl<T extends ManagedObject>
  	    context.store.setObject(
 		context.txn, oid, SerialUtil.serialize(object));
 	    context.refs.unregisterObject(object);
-	    object = null;
-	    fingerprint = null;
-	    state = State.FLUSHED;
 	    break;
 	case MAYBE_MODIFIED:
 	    if (!SerialUtil.matchingFingerprint(object, fingerprint)) {
@@ -426,9 +421,6 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	    /* Fall through */
 	case NOT_MODIFIED:
 	    context.refs.unregisterObject(object);
-	    object = null;
-	    fingerprint = null;
-	    state = State.FLUSHED;
 	    break;
 	case FLUSHED:
 	    throw new IllegalStateException("Object already flushed");
@@ -437,6 +429,9 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	default:
 	    throw new AssertionError();
 	}
+	object = null;
+	fingerprint = null;
+	state = State.FLUSHED;
     }
 
     /**
@@ -473,6 +468,10 @@ final class ManagedReferenceImpl<T extends ManagedObject>
 	 */
 	@SuppressWarnings("unchecked")
 	    T deserialized = (T) SerialUtil.deserialize(data);
+	if (deserialized == null) {
+	    throw new ObjectIOException(
+		"Managed object must not deserialize to null", false);
+	}
 	return deserialized;
     }
 }

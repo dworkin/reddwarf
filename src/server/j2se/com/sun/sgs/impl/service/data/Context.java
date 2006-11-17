@@ -174,8 +174,9 @@ final class Context {
     <T extends ManagedObject> T getBinding(
 	String internalName, Class<T> type)
     {
-	return type.cast(
-	    getReference(store.getBinding(txn, internalName)).get());
+	long id = store.getBinding(txn, internalName);
+	assert id >= 0 : "Object ID must not be negative";
+	return type.cast(getReference(id).get());
     }
 
     /** Sets the object associated with the specified internal name. */

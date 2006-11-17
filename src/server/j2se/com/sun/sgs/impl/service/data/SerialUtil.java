@@ -9,6 +9,8 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamClass;
 import java.io.OutputStream;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
 import java.util.Arrays;
 
 /** Defines serialization utilities.  This class cannot be instantiated. */
@@ -101,7 +103,13 @@ final class SerialUtil {
 	{
 	    super(out);
 	    this.topLevelObject = topLevelObject;
-	    enableReplaceObject(true);
+	    AccessController.doPrivileged(
+		new PrivilegedAction<Void>() {
+		    public Void run() {
+			enableReplaceObject(true);
+			return null;
+		    }
+		});
 	}
 
 	/** Check for references to managed objects. */
@@ -126,6 +134,10 @@ final class SerialUtil {
      * @throws	ObjectIOException if a problem occurs serializing the object
      */
     static byte[] fingerprint(Object object) {
+	/*
+	 * TBD: Maybe use a message digest if the fingerprint gets long.
+	 * -tjb@sun.com (11/16/2006)
+	 */
 	ObjectOutputStream out = null;
 	try {
 	    ByteArrayOutputStream baos = new ByteArrayOutputStream();

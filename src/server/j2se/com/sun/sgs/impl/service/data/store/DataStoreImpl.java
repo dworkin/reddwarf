@@ -23,7 +23,7 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.util.LoggerWrapper;
-import com.sun.sgs.impl.util.PropertiesUtil;
+import com.sun.sgs.impl.util.PropertiesWrapper;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import java.io.File;
@@ -125,7 +125,7 @@ import java.util.logging.Logger;
 public final class DataStoreImpl implements DataStore, TransactionParticipant {
 
     /** The property that specifies the transaction timeout in milliseconds. */
-    public static final String TXN_TIMEOUT_PROPERTY =
+    private static final String TXN_TIMEOUT_PROPERTY =
 	"com.sun.sgs.txnTimeout";
 
     /** The default transaction timeout in milliseconds. */
@@ -138,13 +138,13 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
      * The property that specifies the directory in which to store database
      * files.
      */
-    public static final String DIRECTORY_PROPERTY = CLASSNAME + ".directory";
+    private static final String DIRECTORY_PROPERTY = CLASSNAME + ".directory";
 
     /**
      * The property that specifies the number of object IDs to allocate at one
      * time.
      */
-    public static final String ALLOCATION_BLOCK_SIZE_PROPERTY =
+    private static final String ALLOCATION_BLOCK_SIZE_PROPERTY =
 	CLASSNAME + ".allocationBlockSize";
 
     /** The default for the number of object IDs to allocate at one time. */
@@ -153,7 +153,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
     /**
      * The property that specifies the size in bytes of the Berkeley DB cache.
      */
-    public static final String CACHE_SIZE_PROPERTY = CLASSNAME + ".cacheSize";
+    private static final String CACHE_SIZE_PROPERTY = CLASSNAME + ".cacheSize";
 
     /** The minimum cache size, as specified by Berkeley DB */
     private static final long MIN_CACHE_SIZE = 20000;
@@ -167,14 +167,14 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
      * false, some recent transactions may be lost in the event of a crash,
      * although integrity will be maintained.
      */
-    public static final String FLUSH_TO_DISK_PROPERTY =
+    private static final String FLUSH_TO_DISK_PROPERTY =
 	CLASSNAME + ".flushToDisk";
 
     /**
      * The property that specifies the number of transactions between logging
      * database statistics.
      */
-    public static final String LOG_STATS_PROPERTY = CLASSNAME + ".logStats";
+    private static final String LOG_STATS_PROPERTY = CLASSNAME + ".logStats";
 
     /** The logger for this class. */
     static final LoggerWrapper logger =
@@ -289,19 +289,19 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
     public DataStoreImpl(Properties properties) {
 	logger.log(
 	    Level.CONFIG, "Creating DataStoreImpl properties:{0}", properties);
-	directory = properties.getProperty(DIRECTORY_PROPERTY);
+	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
+	directory = wrappedProps.getProperty(DIRECTORY_PROPERTY);
 	if (directory == null) {
 	    throw new IllegalArgumentException("Directory must be specified");
 	}
-	allocationBlockSize = PropertiesUtil.getIntProperty(
-	    properties, ALLOCATION_BLOCK_SIZE_PROPERTY,
-	    DEFAULT_ALLOCATION_BLOCK_SIZE);
+	allocationBlockSize = wrappedProps.getIntProperty(
+	    ALLOCATION_BLOCK_SIZE_PROPERTY, DEFAULT_ALLOCATION_BLOCK_SIZE);
 	if (allocationBlockSize < 1) {
 	    throw new IllegalArgumentException(
 		"The allocation block size must be greater than zero");
 	}
-	logStats = PropertiesUtil.getIntProperty(
-	    properties, LOG_STATS_PROPERTY, Integer.MAX_VALUE);
+	logStats = wrappedProps.getIntProperty(
+	    LOG_STATS_PROPERTY, Integer.MAX_VALUE);
 	com.sleepycat.db.Transaction bdbTxn = null;
 	boolean done = false;
 	try {
@@ -376,12 +376,13 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
     private Environment getEnvironment(Properties properties)
 	throws DatabaseException
     {
-	long timeout = 1000L * PropertiesUtil.getLongProperty(
-	    properties, TXN_TIMEOUT_PROPERTY, DEFAULT_TXN_TIMEOUT);
-	boolean flushToDisk = PropertiesUtil.getBooleanProperty(
-	    properties, FLUSH_TO_DISK_PROPERTY, false);
-	long cacheSize = PropertiesUtil.getLongProperty(
-	    properties, CACHE_SIZE_PROPERTY, DEFAULT_CACHE_SIZE);
+	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
+	long timeout = 1000L * wrappedProps.getLongProperty(
+	    TXN_TIMEOUT_PROPERTY, DEFAULT_TXN_TIMEOUT);
+	boolean flushToDisk = wrappedProps.getBooleanProperty(
+	    FLUSH_TO_DISK_PROPERTY, false);
+	long cacheSize = wrappedProps.getLongProperty(
+	    CACHE_SIZE_PROPERTY, DEFAULT_CACHE_SIZE);
 	if (cacheSize < MIN_CACHE_SIZE) {
 	    throw new IllegalArgumentException(
 		"The cache size must not be less than " + MIN_CACHE_SIZE);
@@ -778,9 +779,10 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 		txnInfo.prepared = true;
 	    } else {
 		/*
-		 * Clear the transaction information first, since Berkeley DB
-		 * doesn't permit operating on its transaction object after
-		 * commit is called.
+		 * Make sure to clear the transaction information, regardless
+		 * of whether the Berkeley DB commit operation succeeds, since
+		 * Berkeley DB doesn't permit operating on its transaction
+		 * object after commit is called.
 		 */
 		threadTxnInfo.set(null);
 		txnInfo.bdbTxn.commit();
@@ -818,9 +820,10 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 		    "Transaction has not been prepared");
 	    }
 	    /*
-	     * Clear the transaction information first, since Berkeley DB
-	     * doesn't permit operating on its transaction object after commit
-	     * is called.
+	     * Make sure to clear the transaction information, regardless of
+	     * whether the Berkeley DB commit operation succeeds, since
+	     * Berkeley DB doesn't permit operating on its transaction object
+	     * after commit is called.
 	     */
 	    threadTxnInfo.set(null);
 	    txnInfo.bdbTxn.commit();
@@ -853,9 +856,10 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 		    "Transaction has already been prepared");
 	    }
 	    /*
-	     * Clear the transaction information first, since Berkeley DB
-	     * doesn't permit operating on its transaction object after commit
-	     * is called.
+	     * Make sure to clear the transaction information, regardless of
+	     * whether the Berkeley DB commit operation succeeds, since
+	     * Berkeley DB doesn't permit operating on its transaction object
+	     * after commit is called.
 	     */
 	    threadTxnInfo.set(null);
 	    txnInfo.bdbTxn.commit();
@@ -886,9 +890,10 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 		throw new IllegalStateException("Wrong transaction");
 	    }
 	    /*
-	     * Clear the transaction information first, since Berkeley DB
-	     * doesn't permit operating on its transaction object after abort
-	     * is called.
+	     * Make sure to clear the transaction information, regardless of
+	     * whether the Berkeley DB commit operation succeeds, since
+	     * Berkeley DB doesn't permit operating on its transaction object
+	     * after commit is called.
 	     */
 	    threadTxnInfo.set(null);
 	    txnInfo.bdbTxn.abort();

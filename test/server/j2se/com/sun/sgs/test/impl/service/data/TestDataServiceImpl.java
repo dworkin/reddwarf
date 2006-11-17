@@ -20,6 +20,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.io.ObjectStreamException;
+import java.io.Serializable;
 import java.util.Properties;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -222,6 +224,18 @@ public class TestDataServiceImpl extends TestCase {
 	} catch (IllegalStateException e) {
 	    System.err.println(e);
 	}
+    }
+
+    public void testConfigureAborted() throws Exception {
+	txn.commit();
+	service = getDataServiceImpl();
+	createTransaction();
+	service.configure(componentRegistry, txnProxy);
+	txn.abort();
+	createTransaction();
+	service.configure(componentRegistry, txnProxy);
+	txn.commit();
+	txn = null;
     }
 
     /* -- Test getBinding and getServiceBinding -- */
@@ -431,6 +445,26 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    public void testGetBindingDeserializeAsNull() throws Exception {
+	testGetBindingDeserializeAsNull(true);
+    }
+    public void testGetServiceBindingDeserializeAsNull() throws Exception {
+	testGetBindingDeserializeAsNull(false);
+    }
+    private void testGetBindingDeserializeAsNull(boolean app)
+	throws Exception
+    {
+	setBinding(app, service, "dummy", new DeserializeAsNull(service));
+	txn.commit();
+	createTransaction();
+	try {
+	    getBinding(app, service, "dummy", DeserializeAsNull.class);
+	    fail("Expected ObjectIOException");
+	} catch (ObjectIOException e) {
+	    System.err.println(e);
+	}
+    }
+
     public void testGetBindingSuccess() throws Exception {
 	testGetBindingSuccess(true);
     }
@@ -527,6 +561,15 @@ public class TestDataServiceImpl extends TestCase {
     private void testSetBindingSerializationFails(boolean app)
 	throws Exception
     {
+	setBinding(app, service, "dummy", new SerializationFails(service));
+	try {
+	    txn.commit();
+	    fail("Expected ObjectIOException");
+	} catch (ObjectIOException e) {
+	    System.err.println(e);
+	}
+	/* Try again with opposite transaction type. */
+	createTransaction();
 	setBinding(app, service, "dummy", new SerializationFails(service));
 	try {
 	    txn.commit();
@@ -1012,6 +1055,19 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    public void testGetReferenceDeserializeAsNull() throws Exception {
+	dummy.setNext(new DeserializeAsNull(service));
+	txn.commit();
+	createTransaction();
+	dummy = service.getBinding("dummy", DummyManagedObject.class);
+	try {
+	    dummy.getNext();
+	    fail("Expected ObjectIOException");
+	} catch (ObjectIOException e) {
+	    System.err.println(e);
+	}
+    }
+
     /* -- Test ManagedReference.getForUpdate -- */
 
     public void testGetReferenceUpdateNotFound() throws Exception {
@@ -1082,6 +1138,19 @@ public class TestDataServiceImpl extends TestCase {
 
     public void testGetReferenceUpdateDeserializationFails() throws Exception {
 	dummy.setNext(new DeserializationFails(service));
+	txn.commit();
+	createTransaction();
+	dummy = service.getBinding("dummy", DummyManagedObject.class);
+	try {
+	    dummy.getNextForUpdate();
+	    fail("Expected ObjectIOException");
+	} catch (ObjectIOException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testGetReferenceUpdateDeserializeAsNull() throws Exception {
+	dummy.setNext(new DeserializeAsNull(service));
 	txn.commit();
 	createTransaction();
 	dummy = service.getBinding("dummy", DummyManagedObject.class);
@@ -1202,6 +1271,15 @@ public class TestDataServiceImpl extends TestCase {
 	service.getBinding("dummy", DummyManagedObject.class);
     }
 
+    public void testContentEquals() throws Exception {
+	service.setBinding("a", new ContentEquals(3));
+	service.setBinding("b", new ContentEquals(3));
+	txn.commit();
+	createTransaction();
+	assertNotSame(service.getBinding("a", ContentEquals.class),
+		      service.getBinding("b", ContentEquals.class));
+    }
+
     /* -- App and service binding methods -- */
 
     <T extends ManagedObject> T getBinding(
@@ -1312,7 +1390,7 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
-    /** A Managed object that fails during deserialization. */
+    /** A managed object that fails during deserialization. */
     static class DeserializationFails extends DummyManagedObject {
 	DeserializationFails(DataManager dataManager) {
 	    super(dataManager);
@@ -1321,6 +1399,28 @@ public class TestDataServiceImpl extends TestCase {
 	    throws IOException
 	{
 	    throw new IOException("Deserialization fails");
+	}
+    }
+
+    /** A managed object that deserializes as null. */
+    static class DeserializeAsNull extends DummyManagedObject {
+	DeserializeAsNull(DataManager dataManager) {
+	    super(dataManager);
+	}
+	private Object readResolve() throws ObjectStreamException {
+	    return null;
+	}
+    }
+
+    /** A managed object that uses content equality. */
+    static class ContentEquals implements ManagedObject, Serializable {
+	private static final long serialVersionUID = 1;
+	private final int i;
+	ContentEquals(int i) { this.i = i; }
+	public String toString() { return "ContentEquals[" + i + "]"; }
+	public int hashCode() { return i; }
+	public boolean equals(Object o) {
+	    return o instanceof ContentEquals && i == ((ContentEquals) o).i;
 	}
     }
 
