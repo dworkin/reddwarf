@@ -24,20 +24,20 @@ import java.util.MissingResourceException;
 class KernelAppContextImpl implements KernelAppContext {
 
     // the application's name and cached hash code
-    private String applicationName;
-    private int applicationCode;
+    private final String applicationName;
+    private final int applicationCode;
 
     // the managers available in this context
-    private ComponentRegistry managerComponents;
+    private final ComponentRegistry managerComponents;
 
     // the services used in this context
     private ComponentRegistry serviceComponents = null;
 
     // the three standard managers, which are cached since they are used
     // extremely frequently
-    private ChannelManager channelManager;
-    private DataManager dataManager;
-    private TaskManager taskManager;
+    private final ChannelManager channelManager;
+    private final DataManager dataManager;
+    private final TaskManager taskManager;
 
     /**
      * Creates an instance of <code>KernelAppContextImpl</code>.
@@ -64,6 +64,7 @@ class KernelAppContextImpl implements KernelAppContext {
         // FIXME: add this back in when we have support for channels
         /*channelManager = managerComponents.
           getComponent(ChannelManager.class);*/
+        channelManager = null;
         dataManager = managerComponents.getComponent(DataManager.class);
         taskManager = managerComponents.getComponent(TaskManager.class);
     }

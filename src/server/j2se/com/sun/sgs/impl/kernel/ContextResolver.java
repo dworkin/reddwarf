@@ -30,6 +30,10 @@ public final class ContextResolver {
      * Returns the <code>ChannelManager</code> used in this context.
      *
      * @return the context's <code>ChannelManager</code>.
+     *
+     * @throws IllegalStateException if there is no available
+     *                               <code>ChannelManager</code> in this
+     *                               context
      */
     public static ChannelManager getChannelManager() {
         return context.get().getChannelManager();
@@ -39,6 +43,10 @@ public final class ContextResolver {
      * Returns the <code>DataManager</code> used in this context.
      *
      * @return the context's <code>DataManager</code>.
+     *
+     * @throws IllegalStateException if there is no available
+     *                               <code>DataManager</code> in this
+     *                               context
      */
     public static DataManager getDataManager() {
         return context.get().getDataManager();
@@ -48,6 +56,10 @@ public final class ContextResolver {
      * Returns the <code>TaskManager</code> used in this context.
      *
      * @return the context's <code>TaskManager</code>.
+     *
+     * @throws IllegalStateException if there is no available
+     *                               <code>TaskManager</code> in this
+     *                               context
      */
     public static TaskManager getTaskManager() {
         return context.get().getTaskManager();
@@ -63,6 +75,8 @@ public final class ContextResolver {
      *
      * @throws ManagerNotFoundException if no manager is found that matches
      *                                  the given type
+     * @throws IllegalStateException if there are no available managers
+     *                               in this context
      */
     public static <T> T getManager(Class<T> type) {
         return context.get().getManager(type);

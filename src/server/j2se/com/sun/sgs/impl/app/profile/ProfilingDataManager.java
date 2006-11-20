@@ -22,7 +22,7 @@ import com.sun.sgs.app.ManagedReference;
 public class ProfilingDataManager implements DataManager, ProfilingManager {
 
     // the data manager that this manager calls through to
-    private DataManager backingManager;
+    private final DataManager backingManager;
 
     // the reporting interface
     private ProfileReporter reporter = null;
@@ -45,9 +45,15 @@ public class ProfilingDataManager implements DataManager, ProfilingManager {
      * is called. The backing manager is provided the same instance of
      * <code>ProfileReporter</code> so reports from the two managers are
      * considered to come from the same source.
+     *
+     * @throws IllegalStateException if a <code>ProfileReporter</code>
+     *                               has already been set
      */
     public void setProfileReporter(ProfileReporter profileReporter) {
-        this.reporter = reporter;
+        if (reporter != null)
+            throw new IllegalStateException("reporter is already set");
+
+        reporter = profileReporter;
         if (backingManager instanceof ProfilingManager)
             ((ProfilingManager)backingManager).
                 setProfileReporter(profileReporter);
