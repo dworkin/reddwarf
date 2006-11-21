@@ -44,7 +44,7 @@ public interface DataManager {
      * @see	#markForUpdate markForUpdate
      * @see	ManagedReference#getForUpdate ManagedReference.getForUpdate
      */
-    <T extends ManagedObject> T getBinding(String name, Class<T> type);
+    <T> T getBinding(String name, Class<T> type);
 
     /**
      * Binds an object to a name, replacing any previous binding.  The object,
@@ -61,6 +61,7 @@ public interface DataManager {
      * @param	object the object
      * @throws	IllegalArgumentException if <code>object</code> does not
      *		implement {@link Serializable}
+     * @throws	ObjectNotFoundException if the object has been removed
      * @throws	TransactionException if the operation failed because of a
      *		problem with the current transaction
      */
@@ -90,6 +91,7 @@ public interface DataManager {
      * @param	object the object
      * @throws	IllegalArgumentException if <code>object</code> does not
      *		implement {@link Serializable}
+     * @throws	ObjectNotFoundException if the object has already been removed
      * @throws	TransactionException if the operation failed because of a
      *		problem with the current transaction
      */
@@ -103,6 +105,7 @@ public interface DataManager {
      * @param	object the object
      * @throws	IllegalArgumentException if <code>object</code> does not
      *		implement {@link Serializable}
+     * @throws	ObjectNotFoundException if the object has been removed
      * @throws	TransactionException if the operation failed because of a
      *		problem with the current transaction
      * @see	ManagedReference#getForUpdate ManagedReference.getForUpdate 
@@ -114,13 +117,13 @@ public interface DataManager {
      * managed references when a managed object refers to another managed
      * object, either directly or indirectly through non-managed objects.
      *
-     * @param	<T> the type of the object
      * @param	object the object
      * @return	the managed reference
      * @throws	IllegalArgumentException if <code>object</code> does not
      *		implement {@link Serializable}
+     * @throws	ObjectNotFoundException if the object has been removed
      * @throws	TransactionException if the operation failed because of a
      *		problem with the current transaction
      */
-    <T extends ManagedObject> ManagedReference<T> createReference(T object);
+    ManagedReference createReference(ManagedObject object);
 }

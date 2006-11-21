@@ -37,7 +37,7 @@ public interface TransactionParticipant {
      * flag stating whether the prepared state is read-only, meaning that no
      * external state is modified by this participant. If this method
      * returns true, then neither <code>commit</code> nor <code>abort</code>
-     * will not be called.
+     * will be called.
      * <p>
      * If this method throws an exception, then the preparation failed, and
      * the transaction will be aborted. If this method completes successfully,
