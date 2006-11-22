@@ -13,7 +13,6 @@
 /* SGS: Update package and imports */
 package com.sun.sgs.impl.util;
 
-import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
@@ -532,13 +531,13 @@ public class ManagedHashMap<K,V>
      *	       <tt>null</tt> with the specified key.
      */
     public V put(K key, V value) {
-	if (!(key instanceof Serializable)) {
+	if (key != null && !(key instanceof Serializable)) {
 	    throw new IllegalArgumentException(
 		"The key must implement Serializable");
 	} else if (key instanceof ManagedObject) {
 	    throw new IllegalArgumentException(
 		"The key must not implement ManagedObject");
-	} else if (!(value instanceof Serializable)) {
+	} else if (value != null && !(value instanceof Serializable)) {
 	    throw new IllegalArgumentException(
 		"The value must implement Serializable");
 	}
@@ -804,26 +803,14 @@ public class ManagedHashMap<K,V>
      *         specified value.
      */
     public boolean containsValue(Object value) {
-	if (value == null) 
-            return containsNullValue();
-
 	ManagedReference[] tab = table;
-        for (int i = 0; i < tab.length ; i++)
-            for (Entry e = getTableEntry(tab, i) ; e != null ; e = e.next)
-                if (value.equals(e.value))
+        for (int i = 0; i < tab.length ; i++) {
+            for (Entry e = getTableEntry(tab, i); e != null; e = e.next) {
+                if (e.equalsValue(value)) {
                     return true;
-	return false;
-    }
-
-    /**
-     * Special-case code for containsValue with null argument
-     **/
-    private boolean containsNullValue() {
-	ManagedReference[] tab = table;
-        for (int i = 0; i < tab.length ; i++)
-            for (Entry e = getTableEntry(tab, i) ; e != null ; e = e.next)
-                if (e.value == null)
-                    return true;
+		}
+	    }
+	}
 	return false;
     }
 
@@ -891,7 +878,7 @@ public class ManagedHashMap<K,V>
 
 	void write(ObjectOutputStream s) throws IOException {
 	    s.writeByte(isReference() ? REFERENCE : NONREFERENCE);
-	    s.writeObject(key);
+	    s.writeObject(unmaskNull(key));
 	    if (isReference()) {
 		s.writeObject(ref);
 		s.writeInt(refHash);
@@ -958,51 +945,52 @@ public class ManagedHashMap<K,V>
 		return true;
 	    } else if (o instanceof Entry) {
 		Entry e = (Entry) o;
-		Object k1 = key;
-		Object k2 = e.key;
-		if (k1 == k2 || (k1 != null && k1.equals(k2))) {
+		if (eq(key, e.key)) {
 		    if (isReference()) {
 			if (ref.equals(e.ref)) {
 			    return true;
-			}
-		    } else {
-			Object v1 = value;
-			Object v2 = e.value;
-			if (v1 == v2 || (v1 != null && v1.equals(v2))) {
+			} else if (refHash == e.refHash &&
+				   ref.get(ManagedObject.class).equals(
+				       e.ref.get(ManagedObject.class)))
+			{
 			    return true;
 			}
+		    } else if (e.isReference() && safeEquals(value, e.value)) {
+			return true;
 		    }
 		}
 	    } else if (o instanceof Map.Entry) {
 		Map.Entry e = (Map.Entry)o;
-		Object k1 = getKey();
-		Object k2 = e.getKey();
-		if (k1 == k2 || (k1 != null && k1.equals(k2))) {
-		    if (isReference()) {
-			Object v2 = e.getValue();
-			if (v2 instanceof ManagedObject) {
-			    ManagedReference ref2 =
-				getDataManager().createReference(
-				    (ManagedObject) v2);
-			    if (ref.equals(ref2)) {
-				return true;
-			    }
-			}
-		    } else {
-			Object v1 = value;
-			Object v2 = e.getValue();
-			if (eq(v1, v2)) {
-			    return true;
-			}
+		if (safeEquals(getKey(), e.getKey())) {
+		    if (equalsValue(e.getValue())) {
+			return true;
 		    }
 		}
             }
             return false;
         }
     
+	boolean equalsValue(Object value) {
+	    if (isReference()) {
+		if (value != null &&
+		    value.hashCode() == refHash &&
+		    value.equals(ref.get(ManagedObject.class)))
+		{
+		    return true;
+		}
+	    } else if (safeEquals(value, this.value)) {
+		return true;
+	    }
+	    return false;
+	}
+
+	private static boolean safeEquals(Object x, Object y) {
+	    return x == y || x != null && x.equals(y);
+	}
+
         public int hashCode() {
             return (key==NULL_KEY ? 0 : key.hashCode()) ^
-		   (ref != null ? refHash : value.hashCode());
+		(ref != null ? refHash : value == null ? 0 : value.hashCode());
         }
     
         public String toString() {
