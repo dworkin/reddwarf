@@ -3,6 +3,9 @@ package com.sun.sgs.impl.util;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.AbstractMap;
 import java.util.AbstractSet;
@@ -83,24 +86,24 @@ public class SimpleManagedHashMap<K, V>
 
     /** {@inheritDoc} */
     public V put(K key, V value) {
-	if (!(key instanceof Serializable)) {
+	if (key != null && !(key instanceof Serializable)) {
 	    throw new IllegalArgumentException(
 		"The key must implement Serializable");
 	} else if (key instanceof ManagedObject) {
 	    throw new IllegalArgumentException(
 		"The key must not implement ManagedObject");
-	} else if (!(value instanceof Serializable)) {
+	} else if (value != null && !(value instanceof Serializable)) {
 	    throw new IllegalArgumentException(
 		"The value must implement Serializable");
 	}
-	modified();
-	return (V) dereference(map.put(key, new Value<V>(value)));
+	markForUpdate();
+	return dereference(map.put(key, new Value<V>(value)));
     }
 
     /** {@inheritDoc} */
     public V remove(Object key) {
-	modified();
-	return (V) dereference(map.remove(key));
+	markForUpdate();
+	return dereference(map.remove(key));
     }
 
     /* -- Bulk operations -- */
@@ -109,7 +112,7 @@ public class SimpleManagedHashMap<K, V>
 
     /** {@inheritDoc} */
     public void clear() {
-	modified();
+	markForUpdate();
 	map.clear();
     }
 
@@ -141,10 +144,11 @@ public class SimpleManagedHashMap<K, V>
         }
 
         public boolean remove(Object object) {
-	    if ((object instanceof Entry)) {
+	    if (object instanceof Entry) {
 		Entry entry = (Entry) object;
-		if (containsKey(entry.getKey())) {
-		    remove(entry.getKey());
+		Object key = entry.getKey();
+		if (containsKey(key)) {
+		    SimpleManagedHashMap.this.remove(key);
 		    return true;
 		}
 	    }
@@ -175,7 +179,7 @@ public class SimpleManagedHashMap<K, V>
 	}
 
 	public void remove() {
-	    modified();
+	    markForUpdate();
 	    iterator.remove();
 	}
     }
@@ -230,18 +234,18 @@ public class SimpleManagedHashMap<K, V>
 	return value == null ? null : value.get();
     }
 
-    /** Stores a value that is a managed object or just serializable. */
-    private static class Value<V> {
-	private final V value;
-	private final ManagedReference ref;
+    /** Stores a value that is a managed object or is just serializable. */
+    private static class Value<V> implements Serializable {
+	private transient V value;
+	private transient ManagedReference ref;
+	private transient int refHash;
 
 	Value(V value) {
 	    if (value instanceof ManagedObject) {
-		this.value = null;
 		ref = getDataManager().createReference((ManagedObject) value);
+		refHash = value.hashCode();
 	    } else {
 		this.value = value;
-		ref = null;
 	    }
 	}
 
@@ -255,15 +259,72 @@ public class SimpleManagedHashMap<K, V>
 		return value;
 	    }
 	}
+
+	public boolean equals(Object o) {
+	    if (o == this) {
+		return true;
+	    } else if (o instanceof Value) {
+		Value v = (Value) o;
+		if (ref != null) {
+		    if (ref.equals(v.ref)) {
+			return true;
+		    } else if (refHash == v.refHash &&
+			       ref.get(ManagedObject.class).equals(
+				   v.ref.get(ManagedObject.class)))
+		    {
+			return true;
+		    }
+		} else if (safeEquals(value, v.value)) {
+		    return true;
+		}
+	    } else if (safeEquals(value, o)) {
+		return true;
+	    }
+	    return false;
+	}
+
+	public int hashCode() {
+	    return (ref != null) ? refHash :
+		(value != null) ? value.hashCode() : 0;
+	}
+
+	private void writeObject(ObjectOutputStream s) throws IOException {
+	    if (ref != null) {
+		s.writeBoolean(true);
+		s.writeObject(ref);
+		s.writeInt(refHash);
+	    } else {
+		s.writeBoolean(false);
+		s.writeObject(value);
+	    }
+	}
+
+	private void readObject(ObjectInputStream s)
+	    throws IOException, ClassNotFoundException
+	{
+	    boolean isRef = s.readBoolean();
+	    if (isRef) {
+		ref = (ManagedReference) s.readObject();
+		refHash = s.readInt();
+	    } else {
+		@SuppressWarnings("unchecked")
+		    V v = (V) s.readObject();
+		value = v;
+	    }
+	}
     }
 
-    /** Notes that this object has been modified. */
-    void modified() {
+    /** Notes that this object is going to be modified. */
+    void markForUpdate() {
 	getDataManager().markForUpdate(this);
     }
 
     /** Returns the current data data manager. */
     static DataManager getDataManager() {
 	return dataManager;
+    }
+
+    static boolean safeEquals(Object x, Object y) {
+	return x == y || x != null && x.equals(y);
     }
 }
