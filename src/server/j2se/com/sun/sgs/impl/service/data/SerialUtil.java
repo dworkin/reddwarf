@@ -1,5 +1,6 @@
 package com.sun.sgs.impl.service.data;
 
+import com.sun.sgs.app.DetectChanges;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ObjectIOException;
 import java.io.ByteArrayInputStream;
@@ -141,13 +142,7 @@ final class SerialUtil {
 	ObjectOutputStream out = null;
 	try {
 	    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-	    out = new ObjectOutputStream(baos) {
-		protected void writeClassDescriptor(ObjectStreamClass desc)
-		    throws IOException
-		{
-		    writeUTF(desc.getName());
-		}
-	    };
+	    out = new FingerprintOutputStream(baos);
 	    out.writeObject(object);
 	    out.flush();
 	    return baos.toByteArray();
@@ -160,6 +155,48 @@ final class SerialUtil {
 		    out.close();
 		} catch (IOException e) {
 		}
+	    }
+	}
+    }
+
+    /**
+     * Define an ObjectOutputStream that is intended for computing modification
+     * fingerprints.  It writes the class name as an object instead of writing
+     * the full class descriptor, and writes the result of calling
+     * getChangesState on objects that implement DetectChanges.
+     */
+    private static final class FingerprintOutputStream
+	extends ObjectOutputStream
+    {
+	FingerprintOutputStream(OutputStream out) throws IOException {
+	    super(out);
+	    AccessController.doPrivileged(
+		new PrivilegedAction<Void>() {
+		    public Void run() {
+			enableReplaceObject(true);
+			return null;
+		    }
+		});
+	}
+
+	/**
+	 * Write the name of the descriptor as an object.  The name is
+	 * sufficient, since the class of an object can't change, and writing
+	 * it as an object produces smaller output when there is more than one
+	 * instance of the class.
+	 */
+	protected void writeClassDescriptor(ObjectStreamClass desc)
+	    throws IOException
+	{
+	    writeObject(desc.getName());
+	}
+
+	/** Check for objects that implement DetectChanges. */
+	protected Object replaceObject(Object object) throws IOException {
+	    if (object instanceof DetectChanges) {
+		return ((DetectChanges) object).getChangesState();
+	    } else {
+		return object;
 	    }
 	}
     }

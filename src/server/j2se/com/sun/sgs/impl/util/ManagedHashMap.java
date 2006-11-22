@@ -14,6 +14,7 @@
 package com.sun.sgs.impl.util;
 
 import com.sun.sgs.app.DataManager;
+import com.sun.sgs.app.DetectChanges;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import java.io.*;
@@ -116,7 +117,7 @@ import java.util.*;
 @SuppressWarnings("unchecked")
 public class ManagedHashMap<K,V>
     extends AbstractMap<K,V>
-    implements Map<K,V>, Cloneable, ManagedObject, Serializable
+    implements Map<K,V>, Cloneable, DetectChanges, ManagedObject, Serializable
 {
 
     /**
@@ -361,6 +362,10 @@ public class ManagedHashMap<K,V>
                 return e.getValue();
             e = e.next;
         }
+    }
+
+    public Object getChangesState() {
+	return null;
     }
 
     /*
