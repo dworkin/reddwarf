@@ -102,8 +102,8 @@ public class MasterTaskScheduler implements TaskScheduler {
                        systemSchedulerName);
 
         // get the system scheduler instance
-        Class systemSchedulerClass = Class.forName(systemSchedulerName);
-        Constructor systemSchedulerConstructor =
+        Class<?> systemSchedulerClass = Class.forName(systemSchedulerName);
+        Constructor<?> systemSchedulerConstructor =
             systemSchedulerClass.getConstructor(Properties.class);
         systemScheduler =
             (SystemScheduler)(systemSchedulerConstructor.

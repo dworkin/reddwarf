@@ -229,18 +229,18 @@ class Kernel {
         throws Exception
     {
         // make sure we can resolve the two classes
-        Class serviceClass = Class.forName(serviceName);
-        Class managerClass = Class.forName(managerName);
+        Class<?> serviceClass = Class.forName(serviceName);
+        Class<?> managerClass = Class.forName(managerName);
 
         // find the appropriate constructors for both service and manager,
         // which is easy for the service...
-        Constructor serviceConstructor =
+        Constructor<?> serviceConstructor =
             serviceClass.getConstructor(Properties.class,
                                         ComponentRegistry.class);
         // ...but requires more work for the manager, because its constructor
         // is probably taking a super-type of the service
-        Constructor [] constructors = managerClass.getConstructors();
-        Constructor managerConstructor = null;
+        Constructor<?> [] constructors = managerClass.getConstructors();
+        Constructor<?> managerConstructor = null;
         for (int i = 0; i < constructors.length; i++) {
             Class<?> [] types = constructors[i].getParameterTypes();
             if (types.length == 1) {

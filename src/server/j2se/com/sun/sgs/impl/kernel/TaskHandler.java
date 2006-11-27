@@ -52,14 +52,14 @@ public final class TaskHandler {
      *                               of <code>TaskHandler</code>
      */
     TaskHandler(TransactionCoordinator transactionCoordinator) {
-        if (this.transactionCoordinator != null)
+        if (TaskHandler.transactionCoordinator != null)
             throw new IllegalStateException("an instance already exists");
         if (transactionCoordinator == null)
             throw new NullPointerException("null coordinator not allowed");
 
         logger.log(Level.CONFIG, "Creating the Task Handler");
 
-        this.transactionCoordinator = transactionCoordinator;
+        TaskHandler.transactionCoordinator = transactionCoordinator;
     }
 
     /**

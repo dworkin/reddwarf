@@ -120,7 +120,7 @@ class FIFOApplicationScheduler
      * the scheduler is unbounded, and therefore doesn't actually track
      * these reservations or use them to actually reserve any space.
      */
-    private class FIFOTaskReservation implements TaskReservation {
+    private static class FIFOTaskReservation implements TaskReservation {
         private boolean finished = false;
         private FIFOApplicationScheduler scheduler;
         private ScheduledTask task;
@@ -150,7 +150,7 @@ class FIFOApplicationScheduler
      * a little work, since cancelling a handle also involves cancelling
      * its current <code>TimerTask</code>, if it has one.
      */
-    private class FIFORecurringHandle implements RecurringTaskHandle {
+    private static class FIFORecurringHandle implements RecurringTaskHandle {
         private ApplicationScheduler scheduler;
         private ScheduledTask task;
         private TimerTask timerTask = null;
@@ -188,7 +188,7 @@ class FIFOApplicationScheduler
      * The handles keep a reference to their current task, so they can
      * cancel it when they are cancelled.
      */
-    private class FIFOTimerTask extends TimerTask {
+    private static class FIFOTimerTask extends TimerTask {
         private FIFOApplicationScheduler scheduler;
         private ScheduledTask task;
         private boolean cancelled = false;
