@@ -91,9 +91,9 @@ public class TestChannelServiceImpl extends TestCase {
 	txnProxy = new DummyTransactionProxy();
 	createTransaction();
 	registry = new DummyComponentRegistry();
-	dataService = createDataService();
+	dataService = createDataService(registry);
 	dataService.configure(registry, txnProxy);
-	registry.add(DataService.class, dataService);
+	registry.setComponent(DataService.class, dataService);
 	txn.commit();
 	createTransaction();
 	channelService = createChannelService();
@@ -913,7 +913,9 @@ public class TestChannelServiceImpl extends TestCase {
      * Creates a new data service.  If the database directory does
      * not exist, one is created.
      */
-    private DataServiceImpl createDataService() {
+    private DataServiceImpl createDataService(
+	DummyComponentRegistry registry)
+    {
 	File dir = new File(dbDirectory);
 	if (!dir.exists()) {
 	    if (!dir.mkdir()) {
@@ -921,7 +923,7 @@ public class TestChannelServiceImpl extends TestCase {
 		    "Problem creating directory: " + dir);
 	    }
 	}
-	return new DataServiceImpl(dbProps);
+	return new DataServiceImpl(dbProps, registry);
     }
 
    /** Creates a new channel service. */

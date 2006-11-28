@@ -79,7 +79,7 @@ final class Context {
 	}
 
 	ChannelState channelState = new ChannelState(name, listener, delivery);
-	ManagedReference<ChannelState> ref =
+	ManagedReference ref =
 	    dataService.createReference(channelState);
 	dataService.markForUpdate(table);
 	table.put(name, ref);
@@ -95,11 +95,11 @@ final class Context {
 	assert name != null;
 	Channel channel = internalTable.get(name);
 	if (channel == null) {
-	    ManagedReference<ChannelState> ref = table.get(name);
+	    ManagedReference ref = table.get(name);
 	    if (ref == null) {
 		throw new NameNotBoundException(name);
 	    }
-	    ChannelState channelState = ref.get();
+	    ChannelState channelState = ref.get(ChannelState.class);
 	    channel = new ChannelImpl(this, channelState);
 	    internalTable.put(name, channel);
 	}
