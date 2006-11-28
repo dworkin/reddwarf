@@ -64,6 +64,13 @@ public class ClientTest extends JFrame {
             }
         });
         
+        JButton stopButton = new JButton("Stop");
+        stopButton.addActionListener(new ActionListener() {
+           public void actionPerformed(ActionEvent e) {
+               stop();
+           }
+        });
+        
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
         
         addWindowListener(new WindowAdapter() {
@@ -74,6 +81,7 @@ public class ClientTest extends JFrame {
         
         JPanel bottomPanel = new JPanel();
         bottomPanel.add(goButton);
+        bottomPanel.add(stopButton);
         
         add(bottomPanel, BorderLayout.SOUTH);
         
@@ -96,6 +104,10 @@ public class ClientTest extends JFrame {
                                                 TransportType.RELIABLE,
                                                 Executors.newCachedThreadPool());
         model.connect(connector);
+    }
+    
+    public void stop() {
+        model.disconnect();
     }
 
     public static void main(String[] args) {
@@ -124,6 +136,12 @@ public class ClientTest extends JFrame {
         public void connect(IOConnector connector) {
             for (SocketInfo info : list) {
                 info.connect(connector);
+            }
+        }
+        
+        public void disconnect() {
+            for (SocketInfo info : list) {
+                info.close();
             }
         }
         
@@ -176,6 +194,7 @@ public class ClientTest extends JFrame {
         private long bytesIn;
         private long bytesOut;
         private int id;
+        private boolean connected = false;
         
         SocketInfo(int id) {
             this.id = id;
@@ -229,23 +248,33 @@ public class ClientTest extends JFrame {
         public void messageReceived(byte[] message, IOHandle handle) {
             messagesIn++;
             bytesIn += message.length;
+            for (byte b : message) {
+                if (b != 1) {
+                    status = "Error: " + b;
+                }
+            }
             dataChanged();
         }
 
         public void disconnected(IOHandle handle) {
+            connected = false;
             numDisconnects++;
             if (numDisconnects >= numSockets) {
                 System.exit(0);
             }
+            status = "Disconnected";
             dataChanged();
         }
 
         public void exceptionThrown(Throwable exception, IOHandle handle) {
             System.out.println("ClientTest exceptionThrown");
+            status = "Exception!";
+            dataChanged();
             exception.printStackTrace();
         }
 
         public void connected(IOHandle handle) {
+            connected = true;
             status = "Connected";
             dataChanged();
             Thread t = new Thread () {
@@ -266,7 +295,9 @@ public class ClientTest extends JFrame {
         }
         
         private void writeBytes(int num) {
-            
+            if (!connected) {
+                return;
+            }
             byte[] buffer = new byte[num];
             for (int i = 0; i < num; i++) {
                 buffer[i] = (byte) 1;
