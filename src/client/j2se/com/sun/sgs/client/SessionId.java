@@ -42,6 +42,8 @@ public abstract class SessionId {
      * the same session identifier as this one, and <code>false</code>
      * otherwise.
      *
+     * @param obj an object to compare to
+     *
      * @return <code>true</code> if the specified object represents
      * the the same session identifier, and <code>false</code> otherwise
      */
