@@ -13,7 +13,6 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -144,7 +143,7 @@ final class ChannelImpl implements Channel, Serializable {
     }
 
     /** {@inheritDoc} */
-    public void send(ByteBuffer message) {
+    public void send(byte[] message) {
 	checkClosed();
 	if (message == null) {
 	    throw new NullPointerException("null message");
@@ -153,7 +152,7 @@ final class ChannelImpl implements Channel, Serializable {
     }
 
     /** {@inheritDoc} */
-    public void send(ClientSession recipient, ByteBuffer message) { 
+    public void send(ClientSession recipient, byte[] message) { 
 	checkClosed();
 	if (recipient == null) {
 	    throw new NullPointerException("null recipient");
@@ -168,7 +167,7 @@ final class ChannelImpl implements Channel, Serializable {
 
     /** {@inheritDoc} */
     public void send(Collection<ClientSession> recipients,
-		     ByteBuffer message)
+		     byte[] message)
     {
 	checkClosed();
 	if (recipients == null) {
@@ -277,7 +276,7 @@ final class ChannelImpl implements Channel, Serializable {
     }
 
     private void scheduleSend(
-	final Collection<ClientSession> sessions, final ByteBuffer message)
+	final Collection<ClientSession> sessions, final byte[] message)
     {
 	/*
 	 * Schedule a non-durable task that runs outside a transaction
@@ -305,27 +304,17 @@ final class ChannelImpl implements Channel, Serializable {
 	private final Collection<byte[]> clients = new ArrayList<byte[]>();
 	private final byte[] message;
 
-	SendTask(Collection<ClientSession> sessions, ByteBuffer message) {
+	SendTask(Collection<ClientSession> sessions, byte[] message) {
 	    for (ClientSession session : sessions) {
-		this.clients.add(toArray(session.getClientAddress()));
+		this.clients.add(session.getSessionId());
 	    }
-	    this.message = toArray(message);
+	    this.message = message;
 	}
 
 	public void run() {
-	    for (byte[] addr : clients) {
-		// TBI: send message to client specified by addr...
+	    for (byte[] id : clients) {
+		// TBI: send message to client specified by identifier...
 	    }
 	}
-    }
-
-    /**
-     * Returns a new byte array initialized with the contents of the
-     * specified byte buffer.
-     */
-    private static byte[] toArray(ByteBuffer buf) {
-	byte[] bytes = new byte[buf.limit()];
-	buf.get(bytes);
-	return bytes;
     }
 }

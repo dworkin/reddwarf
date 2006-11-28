@@ -21,8 +21,8 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Properties;
 import junit.framework.Test;
@@ -742,7 +742,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     /* -- Test Channel.send (to all) -- */
 
-    private static ByteBuffer testMessage = ByteBuffer.allocate(2).putChar('x');
+    private static byte[] testMessage = new byte[] {'x'};
 
     public void testChannelSendAllNoTxn() throws Exception {
 	Channel channel = channelService.getChannel("testy");
@@ -937,7 +937,7 @@ public class TestChannelServiceImpl extends TestCase {
 	NonSerializableChannelListener() {}
 	
 	public void receivedMessage(
-	    Channel channel, ClientSession session, ByteBuffer message)
+	    Channel channel, ClientSession session, byte[] message)
 	{
 	}
     }
@@ -956,11 +956,11 @@ public class TestChannelServiceImpl extends TestCase {
 	private static byte b = 0x00;
 
 	private final String name;
-	private transient ByteBuffer addr = ByteBuffer.allocate(1);
+	private transient byte[] id = new byte[1];
 	
 	DummyClientSession(String name) {
 	    this.name = name;
-	    this.addr.put(b);
+	    this.id[0] = b;
 	    b += 0x01;
 	}
 
@@ -970,11 +970,11 @@ public class TestChannelServiceImpl extends TestCase {
 	    return name;
 	}
 
-	public ByteBuffer getClientAddress() {
-	    return addr;
+	public byte[] getSessionId() {
+	    return id;
 	}
 
-	public void send(ByteBuffer message) {
+	public void send(byte[] message) {
 	}
 
 	public void disconnect() {
@@ -987,7 +987,7 @@ public class TestChannelServiceImpl extends TestCase {
 	/* -- Implement Object -- */
 	
 	public int hashCode() {
-	    return (int) addr.get(0);
+	    return (int) id[0];
 	}
 
 	public boolean equals(Object obj) {
@@ -995,7 +995,8 @@ public class TestChannelServiceImpl extends TestCase {
 		return true;
 	    } else if (obj instanceof DummyClientSession) {
 		DummyClientSession session = (DummyClientSession) obj;
-		return name.equals(session.name) && addr.equals(session.addr);
+		return
+		    name.equals(session.name) && Arrays.equals(id, session.id);
 	    }
 	    return false;
 	}
@@ -1008,8 +1009,8 @@ public class TestChannelServiceImpl extends TestCase {
 
 	private void writeObject(ObjectOutputStream out) throws IOException {
 	    out.defaultWriteObject();
-	    out.writeInt(addr.capacity());
-	    for (byte b : addr.array()) {
+	    out.writeInt(id.length);
+	    for (byte b : id) {
 		out.writeByte(b);
 	    }
 	}
@@ -1019,9 +1020,9 @@ public class TestChannelServiceImpl extends TestCase {
 	{
 	    in.defaultReadObject();
 	    int size = in.readInt();
-	    this.addr = ByteBuffer.allocate(size);
+	    this.id = new byte[size];
 	    for (int i = 0; i < size; i++) {
-		addr.put(in.readByte());
+		id[i] = in.readByte();
 	    }
 	}
     }

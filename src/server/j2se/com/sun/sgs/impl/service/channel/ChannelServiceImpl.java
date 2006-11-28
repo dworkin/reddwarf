@@ -305,6 +305,10 @@ public class ChannelServiceImpl
 	return context;
     }
 
+    static Context getContext() {
+	return currentContext.get();
+    }
+
     /**
      * Checks that the specified context is currently active, throwing
      * TransactionNotActiveException if it isn't.
