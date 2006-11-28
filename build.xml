@@ -24,6 +24,9 @@
 
   <!-- Values for building the server -->
   <property name="server.jar" location="${build.dir}/lib/sgs.jar"/>
+  <property name="mina.jar" location="lib/mina-core-1.0.0.jar"/>
+  <property name="slf4j.jar" location="lib/slf4j-simple.jar"/>
+  <property name="backport-concurrent.jar" location="lib/backport-util-concurrent.jar"/>
 
   <!-- Values for the JavaDocs -->
   <property name="project.name" value="Sun Game Server"/>
@@ -66,7 +69,7 @@
 	    closure="true"/>
     <javac includeAntRuntime="no" debug="on" deprecation="on"
            srcdir="src/server/j2se" destdir="${build.dir}/classes/server"
-           classpath="${build.dir}/classes/server" source="${javac.source}">
+           classpath="${build.dir}/classes/server;${mina.jar};${slf4j.jar};${backport-concurrent.jar}" source="${javac.source}">
       <compilerarg value="${javac.compilerargs}"/>
     </javac>
   </target>
@@ -81,6 +84,16 @@
     <javac includeAntRuntime="no" debug="on" deprecation="on"
            srcdir="src/client/j2se" destdir="${build.dir}/classes/client"
            classpath="${build.dir}/classes/client" source="${javac.source}">
+      <compilerarg value="${javac.compilerargs}"/>
+    </javac>
+  </target>
+  
+  <!-- build the IO framework test harness -->
+  <target name="build-io-test">
+    <mkdir dir="${build.dir}/classes/test/io-framework"/>
+    <javac includeAntRuntime="no" debug="on" deprecation="on"
+           srcdir="test/server/io-framework" destdir="${build.dir}/classes/test/io-framework"
+           classpath="${build.dir}/classes/server" source="${javac.source}">
       <compilerarg value="${javac.compilerargs}"/>
     </javac>
   </target>
