@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<project name="redstar" default="build" basedir=".">
+<project name="sgs" default="build" basedir=".">
 
   <description>
-    This is the Ant file that defines the build process for the Redstar
-    revision of Project Darkstar.
+    Builds the Sun Game Server project
   </description>
 
   <!-- First load the user's properties -->
@@ -44,7 +43,7 @@
   <property name="test.include" value="**/Test*.java"/>
 
   <!-- Directory containing Berkeley DB libraries -->
-  <fail unless="bdb.lib.dir" message="The bdb.lib.dir property must be set"/>
+  <!-- The caller should make sure to set the bdb.lib.dir property -->
   
   <!-- Server class path -->
   <path id="server.classpath">
@@ -55,13 +54,17 @@
   <!-- TARGET DEFINITIONS -->
 
   <!-- Builds everything -->
-  <target name="all" depends="jar, javadoc, checkstyle, test"/>
+  <target name="all" depends="jar, javadoc, checkstyle, test"
+	  description="Builds everything"/>
 
   <!-- Builds a debug version of the complete project -->
-  <target name="build" depends="build-server,build-client"/>
+  <target name="build" depends="build-server,build-client"
+	  description="Builds code"/>
 
   <!-- Builds the server -->
-  <target name="build-server">
+  <target name="build-server" description="Builds server code">
+    <fail unless="bdb.lib.dir"
+	  message="The bdb.lib.dir property must be set"/>
     <mkdir dir="${build.dir}/classes/server"/>
     <depend srcdir="j2se"
 	    destdir="${build.dir}/classes/server"
@@ -75,7 +78,7 @@
   </target>
 
   <!-- Builds the client -->
-  <target name="build-client">
+  <target name="build-client" description="Builds client code">
     <mkdir dir="${build.dir}/classes/client"/>
     <depend srcdir="j2se"
 	    destdir="${build.dir}/classes/client"
@@ -89,7 +92,7 @@
   </target>
 
   <!-- Removes all built files and all ~ files -->
-  <target name="clean">
+  <target name="clean" description="Removes all built files and all ~ files">
     <delete dir="${build.dir}"/>
     <delete>
       <fileset dir="." defaultexcludes="no" includes="**/*~"/>
@@ -97,13 +100,15 @@
   </target>
 
   <!-- Builds the documentation -->
-  <target name="doc" depends="javadoc"/>
+  <target name="doc" depends="javadoc" description="Builds documentation"/>
 
   <!-- Build the JavaDoc from the source -->
-  <target name="javadoc" depends="javadoc-server,javadoc-client"/>
+  <target name="javadoc" depends="javadoc-server,javadoc-client"
+	  description="Builds javadoc"/>
 
   <!-- Build the server JavaDoc -->
-  <target name="javadoc-server" depends="build-server">
+  <target name="javadoc-server" depends="build-server"
+	  description="Builds server javadoc">
     <javadoc sourcepath="src/server/j2se" destdir="${build.dir}/javadoc/server"
              classpathref="server.classpath" packagenames="com.sun.*"
              overview="src/server/j2se/overview.html"
@@ -127,7 +132,8 @@
   </target>
 
   <!-- Build the client JavaDoc -->
-  <target name="javadoc-client" depends="build-client">
+  <target name="javadoc-client" depends="build-client"
+	  description="Builds client javadoc">
     <javadoc sourcepath="src/client/j2se" destdir="${build.dir}/javadoc/client"
              classpath="${build.dir}/classes/client" packagenames="com.sun.*"
              overview="src/client/j2se/overview.html"
@@ -151,10 +157,12 @@
   </target>
 
   <!-- Builds the jar files for the project classes -->
-  <target name="jar" depends="jar-server"/>
+  <target name="jar" depends="jar-server"
+	  description="Builds JAR files"/>
 
   <!-- builds the server jar file -->
-  <target name="jar-server" depends="build-server">
+  <target name="jar-server" depends="build-server"
+	  description="Builds server JAR files">
     <mkdir dir="${build.dir}/lib"/>
     <jar destfile="${server.jar}" basedir="${build.dir}/classes/server"/>
   </target>
