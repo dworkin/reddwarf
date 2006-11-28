@@ -1,6 +1,5 @@
 package com.sun.sgs.io;
 
-import java.nio.ByteBuffer;
 
 /**
  * Attaches to an <code>IOHandle</code> in order to receive connection
@@ -20,7 +19,7 @@ public interface IOHandler {
      * @param buffer            the buffer containing the data
      * @param handle            the IOHandle on which the data arrived
      */
-    public void messageReceived(ByteBuffer buffer, IOHandle handle);
+    public void messageReceived(byte[] buffer, IOHandle handle);
     
     /**
      * Called when the given <code>IOHandle</code> is disconnected.

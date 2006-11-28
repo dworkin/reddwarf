@@ -23,7 +23,7 @@ public class ServerTest implements AcceptedHandleListener, IOHandler {
     private int numConnections;
 
     public ServerTest() {
-        acceptor = AcceptorFactory.createAcceptor(TransportType.UNRELIABLE, 
+        acceptor = AcceptorFactory.createAcceptor(TransportType.RELIABLE, 
                                             Executors.newCachedThreadPool());
     }
 
@@ -69,8 +69,9 @@ public class ServerTest implements AcceptedHandleListener, IOHandler {
         exception.printStackTrace();
     }
 
-    public void messageReceived(ByteBuffer buffer, IOHandle handle) {
-        //System.out.println("ServerTest messageReceived " + buffer.remaining());
+    public void messageReceived(byte[] message, IOHandle handle) {
+        byte[] buffer = new byte[message.length]; 
+        System.arraycopy(message, 0, buffer, 0, message.length); 
         try {
             handle.sendMessage(buffer);
         }

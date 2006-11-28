@@ -42,7 +42,7 @@ public class ClientTest extends JFrame {
     private IOHandle connection = null;
     
     private SocketTableModel model;
-    private int numSockets = 20;
+    private int numSockets = 20; 
     private int numDisconnects = 0;
     private boolean done = false;
     private Random random;
@@ -93,7 +93,7 @@ public class ClientTest extends JFrame {
 
     public void start() {
         IOConnector connector = ConnectorFactory.createConnector(
-                                                TransportType.UNRELIABLE,
+                                                TransportType.RELIABLE,
                                                 Executors.newCachedThreadPool());
         model.connect(connector);
     }
@@ -226,9 +226,9 @@ public class ClientTest extends JFrame {
             return status;
         }
         
-        public void messageReceived(ByteBuffer message, IOHandle handle) {
+        public void messageReceived(byte[] message, IOHandle handle) {
             messagesIn++;
-            bytesIn += message.remaining();
+            bytesIn += message.length;
             dataChanged();
         }
 
@@ -267,11 +267,10 @@ public class ClientTest extends JFrame {
         
         private void writeBytes(int num) {
             
-            ByteBuffer buffer = ByteBuffer.allocate(num);
+            byte[] buffer = new byte[num];
             for (int i = 0; i < num; i++) {
-                buffer.put((byte) 1);
+                buffer[i] = (byte) 1;
             }
-            buffer.flip();
             try {
                 handle.sendMessage(buffer);
             }

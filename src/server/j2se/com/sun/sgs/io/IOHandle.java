@@ -1,7 +1,6 @@
 package com.sun.sgs.io;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 
 /**
  * Represents a handle for sending and receiving byte data.
@@ -15,13 +14,15 @@ import java.nio.ByteBuffer;
 public interface IOHandle {
     
     /**
-     * Sends a byte message on this handle.
+     * Sends a byte message on this handle.  The caller should relinquish 
+     * ownship of the given byte array, and should not attempt to manipulate
+     * its contents after calling this method.
      * 
      * @param message           the message to send
      * 
      * @throws IOException if there was a problem sending the message
      */
-    public void sendMessage(ByteBuffer message) throws IOException;
+    public void sendMessage(byte[] message) throws IOException;
     
     /**
      * Attempts to close the underlying <code>Connection</code>.  Note that

@@ -1,7 +1,6 @@
 package com.sun.sgs.impl.io;
 
-import java.nio.ByteBuffer;
-
+import org.apache.mina.common.ByteBuffer;
 import org.apache.mina.common.IdleStatus;
 import org.apache.mina.common.IoHandler;
 import org.apache.mina.common.IoSession;
@@ -56,16 +55,20 @@ public class SocketHandler implements IoHandler {
         
     }
 
+    /**
+     * Called by the Mina framework when some amount of data comes in on the 
+     * given session.  The data is packed into a byte array and forwarded to
+     * the associated handler.
+     * 
+     * @param session           the session on which the data has arrived
+     * @param message           the data, which in practice is a mina ByteBuffer
+     */
     public void messageReceived(IoSession session, Object message) throws Exception {
-        org.apache.mina.common.ByteBuffer minaBuffer = 
-                (org.apache.mina.common.ByteBuffer) message;
+        ByteBuffer minaBuffer = (ByteBuffer) message;
         
-        
-        java.nio.ByteBuffer nioBuffer = 
-                        java.nio.ByteBuffer.allocate(minaBuffer.remaining());
-        nioBuffer.put(minaBuffer.buf());
-        nioBuffer.flip();
-        handler.messageReceived(nioBuffer, getHandle(session));
+        byte[] array = new byte[minaBuffer.remaining()];
+        minaBuffer.get(array);
+        handler.messageReceived(array, getHandle(session));
         
     }
 
@@ -74,7 +77,7 @@ public class SocketHandler implements IoHandler {
     }
     
     
-    // these call-backs aren't used.
+    // these Mina call-backs aren't used.
     public void sessionCreated(IoSession session) throws Exception {}
 
     public void sessionOpened(IoSession arg0) throws Exception {}

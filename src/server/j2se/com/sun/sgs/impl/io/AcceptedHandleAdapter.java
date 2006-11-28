@@ -73,20 +73,18 @@ public class AcceptedHandleAdapter implements IoHandler {
 
     /**
      * Fired by Mina when a new message is received on a session.  The message
-     * is translated into a {@code java.nio.ByteBuffer} and sent along on the
-     * associated {@code IOHandler.messageReceived} callback.
+     * is transferred into a byte array and forwarded to the associated 
+     * {@code IOHandler.messageReceived} callback.
      */
     public void messageReceived(IoSession session, Object message) throws Exception {
         org.apache.mina.common.ByteBuffer minaBuffer = 
                                 (org.apache.mina.common.ByteBuffer) message;
 
         SocketHandle handle = (SocketHandle) session.getAttachment();
-        java.nio.ByteBuffer nioBuffer = 
-                        java.nio.ByteBuffer.allocate(minaBuffer.remaining());
-        nioBuffer.put(minaBuffer.buf());
-        nioBuffer.flip();
         
-        handle.getIOHandler().messageReceived(nioBuffer, handle);
+        byte[] array = new byte[minaBuffer.remaining()];
+        minaBuffer.get(array);
+        handle.getIOHandler().messageReceived(array, handle);
         
     }
 

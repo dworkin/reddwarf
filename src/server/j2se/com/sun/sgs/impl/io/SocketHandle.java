@@ -2,8 +2,8 @@ package com.sun.sgs.impl.io;
 
 import java.io.IOException;
 import java.lang.annotation.Inherited;
-import java.nio.ByteBuffer;
 
+import org.apache.mina.common.ByteBuffer;
 import org.apache.mina.common.IoFuture;
 import org.apache.mina.common.IoFutureListener;
 import org.apache.mina.common.IoSession;
@@ -27,21 +27,15 @@ public class SocketHandle implements IOHandle, IoFutureListener {
     /**
      * {@inheritDoc}
      * 
-     * The incoming buffer should have its position set at the begining of the 
-     * chunk of bytes to be written (that is, the buffer should be "flipped").
-     * <p>
-     * Note that a new ByteBuffer is created with each call to sendMessage so
-     * that the client can continue to use the "message" buffer without fear of
-     * tampering.  This is an inefficiency though, and perhaps should be 
-     * replaced with a pool at some point.
      */
-    public void sendMessage(ByteBuffer message) throws IOException {
-        ByteBuffer nioBuffer = ByteBuffer.allocate(message.remaining());
-        nioBuffer.put(message);
-        nioBuffer.flip();
+    public void sendMessage(byte[] message) throws IOException {
+        if (!session.isConnected()) {
+            throw new IOException("SocketHandle.sendMessage: session not connected");
+        }
         
-        org.apache.mina.common.ByteBuffer minaBuffer = 
-            org.apache.mina.common.ByteBuffer.wrap(nioBuffer);
+        ByteBuffer minaBuffer = ByteBuffer.allocate(message.length);
+        minaBuffer.put(message);
+        minaBuffer.flip();
         session.write(minaBuffer);
     }
 
@@ -49,6 +43,9 @@ public class SocketHandle implements IOHandle, IoFutureListener {
      * {@inheritDoc}
      */
     public void close() throws IOException {
+        if (!session.isConnected()) {
+            throw new IOException("SocketHandle.close: session not connected");
+        }
         session.close();
     }
     
