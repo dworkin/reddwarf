@@ -29,18 +29,13 @@ import java.util.logging.Logger;
 class SimpleSystemScheduler implements SystemScheduler, ProfilingConsumer {
 
     // logger for this class
-    private static LoggerWrapper logger =
+    private static final LoggerWrapper logger =
         new LoggerWrapper(Logger.getLogger(SimpleSystemScheduler.
                                            class.getName()));
 
     // the application schedulers
     private ConcurrentHashMap<KernelAppContext,ApplicationScheduler>
         appSchedulers;
-
-    // TEST: this is the app scheduler for system tasks...we don't have the
-    // system identity yet, so we can't put this in the map, but when the
-    // identity piece is ready, this will just be another element of the map
-    private ApplicationScheduler systemAppScheduler;
 
     // the ready queue of tasks
     private LinkedBlockingQueue<ScheduledTask> queue;
@@ -55,9 +50,6 @@ class SimpleSystemScheduler implements SystemScheduler, ProfilingConsumer {
         appSchedulers =
             new ConcurrentHashMap<KernelAppContext,ApplicationScheduler>();
         queue = new LinkedBlockingQueue<ScheduledTask>();
-
-        // TEST: see comment above about why this will be removed
-        systemAppScheduler = new FIFOApplicationScheduler(this);
     } 
 
     /**
@@ -94,44 +86,33 @@ class SimpleSystemScheduler implements SystemScheduler, ProfilingConsumer {
     }
 
     /**
-     * TEST: This is a private helper used to look up the appropriate
-     * scheduler for the given identity. When we have the system identity,
-     * then everything will be in the map and a simple map lookup can
-     * replace this method
-     */
-    private ApplicationScheduler getScheduler(ScheduledTask task) {
-        TaskOwner owner = task.getOwner();
-        if (owner == null)
-            return systemAppScheduler;
-        return appSchedulers.get(owner.getContext());
-    }
-
-    /**
      * {@inheritDoc}
      */
     public TaskReservation reserveTask(ScheduledTask task) {
-        return getScheduler(task).reserveTask(task);
+        return appSchedulers.get(task.getOwner().getContext()).
+            reserveTask(task);
     }
 
     /**
      * {@inheritDoc}
      */
     public void addReadyTask(ScheduledTask task) {
-        getScheduler(task).addTask(task);
+        appSchedulers.get(task.getOwner().getContext()).addTask(task);
     }
 
     /**
      * {@inheritDoc}
      */
     public void addFutureTask(ScheduledTask task) {
-        getScheduler(task).addTask(task);
+        appSchedulers.get(task.getOwner().getContext()).addTask(task);
     }
 
     /**
      * {@inheritDoc}
      */
     public RecurringTaskHandle addRecurringTask(ScheduledTask task) {
-        return getScheduler(task).addRecurringTask(task);
+        return appSchedulers.get(task.getOwner().getContext()).
+            addRecurringTask(task);
     }
 
 }

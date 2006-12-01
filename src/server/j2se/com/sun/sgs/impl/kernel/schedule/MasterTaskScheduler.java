@@ -41,18 +41,18 @@ import java.util.logging.Logger;
 public class MasterTaskScheduler implements TaskScheduler {
 
     // logger for this class
-    private static LoggerWrapper logger =
+    private static final LoggerWrapper logger =
         new LoggerWrapper(Logger.getLogger(MasterTaskScheduler.
                                            class.getName()));
 
     // the scheduler used for this system
-    private SystemScheduler systemScheduler;
+    private final SystemScheduler systemScheduler;
 
     // the system's resource coordinator
-    private ResourceCoordinator resourceCoordinator;
+    private final ResourceCoordinator resourceCoordinator;
 
     // the task handler used to run tasks
-    private TaskHandler taskHandler;
+    private final TaskHandler taskHandler;
 
     /**
      * The property used to define the system scheduler.

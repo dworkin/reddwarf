@@ -10,6 +10,10 @@ import com.sun.sgs.app.PeriodicTaskHandle;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TaskRejectedException;
 
+import com.sun.sgs.auth.Identity;
+
+import com.sun.sgs.impl.kernel.TaskOwnerImpl;
+
 import com.sun.sgs.impl.util.LoggerWrapper;
 
 import com.sun.sgs.kernel.ComponentRegistry;
@@ -180,6 +184,9 @@ public class TaskServiceImpl
             }
         }
 
+        // re-set the name generator
+        nameGenerator = new AtomicLong(pmap.nextId);
+
         // if there are no pending tasks then we're finished configuring,
         // so join the transaction only so we can set our isConfigured flag
         // on commit
@@ -193,17 +200,15 @@ public class TaskServiceImpl
                        pmap.size());
 
         // re-start all of the pending tasks
-        // FIXME: The one missing element right now is how to reconstruct
-        // the task owner correctly...this will be fixed when the identity
-        // and login component is added. Until then, the code below correctly
-        // re-schedules all tasks, but those tasks can't run because they
-        // have no valid context
         for (Entry<String,PendingTask> entry : pmap.entrySet()) {
             PendingTask task = entry.getValue();
             TaskRunner runner = new TaskRunner(this, entry.getKey());
+            TaskOwner owner =
+                new TaskOwnerImpl(task.identity, transactionProxy.
+                                  getCurrentOwner().getContext());
             if (task.period == PERIOD_NONE) {
                 // this is a non-periodic task
-                scheduleTask(runner, null, task.startTime, defaultPriority);
+                scheduleTask(runner, owner, task.startTime, defaultPriority);
             } else {
                 // this is a periodic task
                 long startTime = task.startTime;
@@ -218,7 +223,7 @@ public class TaskServiceImpl
                         period;
                 }
                 RecurringTaskHandle handle =
-                    taskScheduler.scheduleRecurringTask(runner, null,
+                    taskScheduler.scheduleRecurringTask(runner, owner,
                                                         startTime, period);
 
                 // keep track of the handle
@@ -477,7 +482,9 @@ public class TaskServiceImpl
      * tracking the task in the map of pending tasks.
      */
     private TaskRunner getRunner(Task task, long startTime, long period) {
-        String objName = generateTaskName();
+        // get the next id, which we turn into a name
+        long nextId = nameGenerator.getAndIncrement();
+        String objName = String.valueOf(nextId);
 
         if (logger.isLoggable(Level.FINEST))
             logger.log(Level.FINEST, "creating pending task {0}", objName);
@@ -485,6 +492,7 @@ public class TaskServiceImpl
         PendingTask ptask = new PendingTask();
         ptask.startTime = startTime;
         ptask.period = period;
+        ptask.identity = transactionProxy.getCurrentOwner().getIdentity();
 
         // if the Task is also a ManagedObject then the assumption is that
         // object was already managed by the application so we just keep a
@@ -495,22 +503,15 @@ public class TaskServiceImpl
         else
             ptask.task = task;
 
-        // remember the task in our pending map
+        // remember the task in our pending map, and also store the next
+        // name (number) so we can start there when the system comes back up
         PendingMap pmap =
             dataService.getServiceBinding(DS_PENDING_TASKS, PendingMap.class);
         dataService.markForUpdate(pmap);
         pmap.put(objName, ptask);
+        pmap.nextId = nextId + 1;
 
         return new TaskRunner(this, objName);
-    }
-
-    /**
-     * Private helper that generates a unique name for a task. Note that this
-     * is a separate method so that it's easier to change the implementation
-     * when we support a multi-stack naming scheme.
-     */
-    private String generateTaskName() {
-        return String.valueOf(nameGenerator.getAndIncrement());
     }
 
     /**
@@ -563,7 +564,7 @@ public class TaskServiceImpl
 
         if (ptask == null) {
             if (logger.isLoggable(Level.WARNING))
-                logger.log(Level.WARNING, "couldn't fetch task {0}", objName);
+                logger.log(Level.WARNING, "could not fetch task {0}", objName);
             throw new ObjectNotFoundException("Unknown task: " + objName);
         }
 
@@ -612,8 +613,8 @@ public class TaskServiceImpl
             });
 
         try {
-            // FIXME: decide if this is the system's task or the user's
-            taskScheduler.scheduleTask(transactionRunner, null);
+            taskScheduler.scheduleTask(transactionRunner,
+                                       transactionProxy.getCurrentOwner());
         } catch (TaskRejectedException tre) {
             if (logger.isLoggable(Level.WARNING))
                 logger.log(Level.WARNING, "couldn't schedule task to remove " +
@@ -650,10 +651,10 @@ public class TaskServiceImpl
             if (txnState.cancelledSet == null)
                 txnState.cancelledSet = new HashSet<String>();
             txnState.cancelledSet.add(objName);
-        }
 
-        dataService.markForUpdate(pmap);
-        pmap.remove(objName);
+            dataService.markForUpdate(pmap);
+            pmap.remove(objName);
+        }
     }
 
     /**
@@ -669,10 +670,13 @@ public class TaskServiceImpl
 
     /**
      * Nested class used to manage the pending tasks in a managed object.
+     * The <code>nextId</code> field is used to start the object name
+     * atomic long when the stack starts up again.
      */
     private static class PendingMap extends HashMap<String,PendingTask>
         implements ManagedObject, Serializable {
         private static final long serialVersionUID = 1;
+        public long nextId = 0;
     }
 
     /**
@@ -684,10 +688,9 @@ public class TaskServiceImpl
         public ManagedReference taskRef = null;
         public long startTime = START_NOW;
         public long period = PERIOD_NONE;
-        // FIXME: this will need to include details about the owner as well,
-        // which aren't ready until the login/auth component is defined
+        public Identity identity = null;
         Task getTask() {
-            return (task != null) ? task : ((Task)(taskRef.get()));
+            return (task != null) ? task : taskRef.get(Task.class);
         }
     }
 

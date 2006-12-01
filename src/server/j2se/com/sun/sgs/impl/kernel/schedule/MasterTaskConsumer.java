@@ -25,15 +25,15 @@ import java.util.logging.Logger;
 class MasterTaskConsumer implements Runnable {
 
     // logger for this class
-    private static LoggerWrapper logger =
+    private static final LoggerWrapper logger =
         new LoggerWrapper(Logger.getLogger(MasterTaskConsumer.
                                            class.getName()));
 
     // the system scheduler that provides tasks
-    private SystemScheduler scheduler;
+    private final SystemScheduler scheduler;
 
     // the task handler used to run each task
-    private TaskHandler taskHandler;
+    private final TaskHandler taskHandler;
 
     /**
      * Creates an instance of <code>MasterTaskConsumer</code>.
@@ -80,7 +80,8 @@ class MasterTaskConsumer implements Runnable {
                     } else {
                         if (logger.isLoggable(Level.FINE))
                             logger.log(Level.FINE, "dropping a failed task " +
-                                       "that didn't ask to be re-tried");
+                                       "that didn't ask to be re-tried: {0}",
+                                       task);
                         taskFinished = true;
                     }
                 }

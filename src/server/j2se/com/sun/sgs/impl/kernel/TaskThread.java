@@ -16,14 +16,11 @@ import com.sun.sgs.kernel.TaskOwner;
  * <p>
  * This interface provides two major facilities. First, it allows assigning
  * new tasks (only if a task isn't currently running), or shutting down the
- * thead (once no task is running). These are used so that existing threads
+ * thread (once no task is running). These are used so that existing threads
  * can be re-cycled. Second, it keeps track of the current owner of this
  * thread, which starts as the owner of the initial task, but will be
  * re-set with each task run out of the scheduler. See
  * <code>TaskHandler</code> for details on this process.
- * <p>
- * FIXME: when the identity scheme is finalized, there should be a special
- * owner instance for the kernel, rather than using <code>null</code>.
  *
  * @since 1.0
  * @author Seth Proctor
@@ -31,7 +28,7 @@ import com.sun.sgs.kernel.TaskOwner;
 abstract class TaskThread extends Thread {
 
     // the resource coordinator that manages this thread
-    private ResourceCoordinatorImpl resourceCoordinator;
+    private final ResourceCoordinatorImpl resourceCoordinator;
 
     // flag that tracks whether this thread is running, and whether it's
     // waiting for a task to execute
@@ -53,7 +50,7 @@ abstract class TaskThread extends Thread {
         this.resourceCoordinator = resourceCoordinator;
         running = false;
         waiting = false;
-        currentOwner = null;
+        currentOwner = Kernel.TASK_OWNER;
         nextTask = null;
     }
 
@@ -79,21 +76,14 @@ abstract class TaskThread extends Thread {
      * Because the latter only allows setting the owner for a task in the
      * current thread of execution, only kernel components have the ability
      * to set the ownership of one thread from within a different thread
-     * of control, or perform similar operations that should only be allowed
-     * by trusted parties.
+     * of control, which should never be done.
      *
      * @param owner the new owner, or <code>null</code> for the kernel
      */
     void setCurrentOwner(TaskOwner owner) {
         currentOwner = owner;
-        // FIXME: when we have the identity component then we also get the
-        // kernel owner/context, but until then this might be null, so we
-        // want to check for this
-        if ((owner == null) || (owner.getContext() == null))
-            ContextResolver.setContext(null);
-        else
-            ContextResolver.setContext((KernelAppContextImpl)(owner.
-                                                              getContext()));
+        ContextResolver.
+            setContext((AbstractKernelAppContext)(owner.getContext()));
     }
 
     /**

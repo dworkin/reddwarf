@@ -5,6 +5,7 @@ import com.sun.sgs.kernel.ComponentRegistry;
 
 import java.util.HashSet;
 import java.util.MissingResourceException;
+import java.util.Set;
 
 
 /**
@@ -26,6 +27,16 @@ class ComponentRegistryImpl implements ComponentRegistry {
      */
     ComponentRegistryImpl() {
         componentSet = new HashSet<Object>();
+    }
+
+    /**
+     * Creates an instance of <code>ComponentRegistryImpl</code> with the
+     * given components.
+     *
+     * @param components an initial <code>Set</code> of components
+     */
+    ComponentRegistryImpl(Set<Object> components) {
+        componentSet = new HashSet<Object>(components);
     }
 
     /**

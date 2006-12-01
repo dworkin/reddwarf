@@ -28,17 +28,17 @@ import java.util.logging.Logger;
 class AppStartupRunner implements KernelRunnable {
 
     // logger for this class
-    private static LoggerWrapper logger =
+    private static final LoggerWrapper logger =
         new LoggerWrapper(Logger.getLogger(AppStartupRunner.class.getName()));
 
     // the context in which this will run
-    private KernelAppContextImpl appContext;
+    private final AppKernelAppContext appContext;
 
     // the properties for the application
-    private Properties properties;
+    private final Properties properties;
 
     // the kernel that is responsible for the starting application
-    private Kernel kernel;
+    private final Kernel kernel;
 
     /**
      * Creates an instance of <code>AppStartupRunner</code>.
@@ -48,7 +48,7 @@ class AppStartupRunner implements KernelRunnable {
      *                   application on startup
      * @param kernel the <code>Kernel</code> that manages the application
      */
-    AppStartupRunner(KernelAppContextImpl appContext, Properties properties,
+    AppStartupRunner(AppKernelAppContext appContext, Properties properties,
                      Kernel kernel) {
         this.appContext = appContext;
         this.properties = properties;
@@ -62,7 +62,7 @@ class AppStartupRunner implements KernelRunnable {
      */
     public void run() throws Exception {
         if (logger.isLoggable(Level.CONFIG))
-            logger.log(Level.INFO, "{0}: starting application", appContext);
+            logger.log(Level.CONFIG, "{0}: starting application", appContext);
         // NOTE: for the multi-stack case, this needs to check that the
         // app's boot method hasn't already been called...this can be done
         // simply by having a flag in the data store that we set when we
@@ -76,7 +76,8 @@ class AppStartupRunner implements KernelRunnable {
                                                        AppListener.class);
         } catch (Exception e) {
             if (logger.isLoggable(Level.SEVERE))
-                logger.log(Level.INFO, "{0}: has no listener", e, appContext);
+                logger.log(Level.SEVERE, "{0}: has no listener", e,
+                           appContext);
             throw e;
         }
 

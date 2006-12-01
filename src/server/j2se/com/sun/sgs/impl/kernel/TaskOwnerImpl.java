@@ -1,6 +1,8 @@
 
 package com.sun.sgs.impl.kernel;
 
+import com.sun.sgs.auth.Identity;
+
 import com.sun.sgs.kernel.KernelAppContext;
 import com.sun.sgs.kernel.TaskOwner;
 
@@ -12,29 +14,29 @@ import com.sun.sgs.kernel.TaskOwner;
  * @since 1.0
  * @author Seth Proctor
  */
-class TaskOwnerImpl implements TaskOwner {
+public class TaskOwnerImpl implements TaskOwner {
 
-    // the name of the owner
-    private String identity;
+    // the identity of the owner
+    private final Identity identity;
 
     // the context of the owner
-    private KernelAppContext context;
+    private final KernelAppContext context;
 
     // a cache for the hash code
-    private int hash;
+    private final int hash;
 
     /**
      * Creates an instance of <code>SimpleTaskOwner</code>.
      *
-     * @param identity the name of the owner
+     * @param identity the <code>Identity</code> of the owner
      * @param context the context in which this owner runs tasks
      */
-    TaskOwnerImpl(String identity, KernelAppContext context) {
+    public TaskOwnerImpl(Identity identity, KernelAppContext context) {
         this.identity = identity;
         this.context = context;
 
         // cache the hash code as the hash of the identity and the context
-        hash = (identity + context.toString()).hashCode();
+        hash = (identity.toString() + context.toString()).hashCode();
     }
 
     /**
@@ -47,7 +49,7 @@ class TaskOwnerImpl implements TaskOwner {
     /**
      * {@inheritDoc}
      */
-    public String getIdentity() {
+    public Identity getIdentity() {
         return identity;
     }
 

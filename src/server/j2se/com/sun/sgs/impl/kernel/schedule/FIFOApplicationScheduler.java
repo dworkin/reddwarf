@@ -26,12 +26,12 @@ class FIFOApplicationScheduler
     implements ApplicationScheduler, ProfilingConsumer {
 
     // logger for this class
-    private static LoggerWrapper logger =
+    private static final LoggerWrapper logger =
         new LoggerWrapper(Logger.getLogger(FIFOApplicationScheduler.
                                            class.getName()));
 
     // our parent scheduler
-    private SystemScheduler systemScheduler;
+    private final SystemScheduler systemScheduler;
 
     // the milliseconds in the future that a task must be to be stuck
     // in the timer instead of executed directly
@@ -122,8 +122,8 @@ class FIFOApplicationScheduler
      */
     private static class FIFOTaskReservation implements TaskReservation {
         private boolean finished = false;
-        private FIFOApplicationScheduler scheduler;
-        private ScheduledTask task;
+        private final FIFOApplicationScheduler scheduler;
+        private final ScheduledTask task;
         public FIFOTaskReservation(FIFOApplicationScheduler scheduler,
                                    ScheduledTask task) {
             this.scheduler = scheduler;
@@ -151,8 +151,8 @@ class FIFOApplicationScheduler
      * its current <code>TimerTask</code>, if it has one.
      */
     private static class FIFORecurringHandle implements RecurringTaskHandle {
-        private ApplicationScheduler scheduler;
-        private ScheduledTask task;
+        private final ApplicationScheduler scheduler;
+        private final ScheduledTask task;
         private TimerTask timerTask = null;
         private boolean cancelled = false;
         private boolean started = false;

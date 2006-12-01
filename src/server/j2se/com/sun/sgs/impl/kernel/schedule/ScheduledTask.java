@@ -18,11 +18,11 @@ import com.sun.sgs.kernel.TaskOwner;
 class ScheduledTask {
 
     // the common aspects of a task
-    private KernelRunnable task;
-    private TaskOwner owner;
-    private Priority priority;
-    private long startTime;
-    private long period;
+    private final KernelRunnable task;
+    private final TaskOwner owner;
+    private final Priority priority;
+    private final long startTime;
+    private final long period;
     private RecurringTaskHandle recurringTaskHandle = null;
 
     // identifier that represents a non-recurring task.

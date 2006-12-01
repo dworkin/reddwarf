@@ -17,12 +17,10 @@ public final class ContextResolver {
 
     // the thread local that caches the context, so we don't need to cast
     // the task thread with each query to find the context
-    private static ThreadLocal<KernelAppContextImpl> context =
-        new ThreadLocal<KernelAppContextImpl>() {
-            protected KernelAppContextImpl initialValue() {
-                // FIXME: this should use the kernel context, when that's
-                // been clearly defined
-                return null;
+    private static ThreadLocal<AbstractKernelAppContext> context =
+        new ThreadLocal<AbstractKernelAppContext>() {
+            protected AbstractKernelAppContext initialValue() {
+                return SystemKernelAppContext.CONTEXT;
             }
         };
 
@@ -88,7 +86,7 @@ public final class ContextResolver {
      *
      * @param appContext the current context
      */
-    static void setContext(KernelAppContextImpl appContext) {
+    static void setContext(AbstractKernelAppContext appContext) {
         context.set(appContext);
     }
 

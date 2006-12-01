@@ -3,7 +3,13 @@ package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.app.AppListener;
 
+import com.sun.sgs.auth.IdentityAuthenticator;
+
 import com.sun.sgs.impl.app.profile.ProfilingManager;
+
+import com.sun.sgs.impl.auth.IdentityImpl;
+import com.sun.sgs.impl.auth.IdentityManagerImpl;
+import com.sun.sgs.impl.auth.NamePasswordAuthenticator;
 
 import com.sun.sgs.impl.kernel.schedule.MasterTaskScheduler;
 
@@ -42,17 +48,24 @@ import java.util.logging.Logger;
 class Kernel {
 
     // logger for this class
-    private static LoggerWrapper logger =
+    private static final LoggerWrapper logger =
         new LoggerWrapper(Logger.getLogger(Kernel.class.getName()));
 
+    /**
+     * A utility owner for all system tasks.
+     */
+    static final TaskOwnerImpl TASK_OWNER =
+        new TaskOwnerImpl(SystemIdentity.IDENTITY,
+                          SystemKernelAppContext.CONTEXT);
+
     // the collection of core system components
-    private ComponentRegistryImpl systemComponents;
+    private final HashSet<Object> systemComponents;
 
     // the proxy used by all transactional components
-    private TransactionProxyImpl transactionProxy;
+    private final TransactionProxyImpl transactionProxy;
 
     // the set of applications that are running in this kernel
-    private HashSet<KernelAppContextImpl> applications;
+    private HashSet<AppKernelAppContext> applications;
 
     // TEST: the name and source for the default application
     private static final String APP_NAME = "TestApplication";
@@ -92,8 +105,8 @@ class Kernel {
             logger.log(Level.CONFIG, "Booting the Kernel");
 
         // initialize our data structures
-        systemComponents = new ComponentRegistryImpl();
-        applications = new HashSet<KernelAppContextImpl>();
+        systemComponents = new HashSet<Object>();
+        applications = new HashSet<AppKernelAppContext>();
 
         // TEST: provide some hard-coded properties to all components
         Properties systemProperties = new Properties();
@@ -106,12 +119,13 @@ class Kernel {
                 new TransactionCoordinatorImpl(systemProperties);
             ResourceCoordinatorImpl resourceCoordinator =
                 new ResourceCoordinatorImpl(systemProperties);
-            systemComponents.addComponent(resourceCoordinator);
+            systemComponents.add(resourceCoordinator);
             TaskHandler taskHandler = new TaskHandler(transactionCoordinator);
             MasterTaskScheduler scheduler =
                 new MasterTaskScheduler(systemProperties, resourceCoordinator,
                                         taskHandler);
-            systemComponents.addComponent(scheduler);
+            scheduler.registerApplication(SystemKernelAppContext.CONTEXT);
+            systemComponents.add(scheduler);
         } catch (Exception e) {
             if (logger.isLoggable(Level.SEVERE))
                 logger.log(Level.SEVERE, "Failed on Kernel boot", e);
@@ -123,6 +137,10 @@ class Kernel {
     }
 
     /**
+     * FIXME: Now that we have real identity and context, most of this
+     * method should be run as a scheduled task, or at least directly in
+     * some task thread, so that we can set the context correctly.
+     * <p>
      * TEST: This is using a fixed configuration. Eventually, it should be
      * loading its configuration, but for now, we have only fixed services
      * with known properties...when configuration details are decided, that
@@ -131,11 +149,6 @@ class Kernel {
     void startupApplication() throws Exception {
         if (logger.isLoggable(Level.CONFIG))
             logger.log(Level.CONFIG, "{0}: configuring application", APP_NAME);
-
-        // collections for the managers and services
-        ArrayList<Service> serviceList = new ArrayList<Service>();
-        HashSet<Object> managerSet = new HashSet<Object>();
-        ComponentRegistryImpl managerComponents = new ComponentRegistryImpl();
 
         // TEST: the following variables should be learned from the
         // application's configuration, but because we don't have a full
@@ -155,33 +168,58 @@ class Kernel {
         properties.setProperty("com.sun.sgs.appName", appName);
         properties.setProperty("com.sun.sgs.impl.service.data.store." +
                                "DataStoreImpl.directory",
-                               "/tmp/dsdb/" + appName);
+                               "/tmp/" + appName + "/dsdb");
+        properties.setProperty("com.sun.sgs.impl.auth." +
+                               "NamePasswordAuthenticator.PasswordFile",
+                               "/tmp/" + appName + "/passwords");
+
+        // create the authentication manager used for this application
+        HashSet<IdentityAuthenticator> authenticators =
+            new HashSet<IdentityAuthenticator>();
+        // TEST: this should get loaded from our configuration
+        authenticators.add(new NamePasswordAuthenticator(properties));
+        IdentityManagerImpl appIdentityManager =
+            new IdentityManagerImpl(authenticators);
+
+        // now that we have the app's authenticators, create a system
+        // registry to use in setting up the services
+        HashSet<Object> appSystemComponents =
+            new HashSet<Object>(systemComponents);
+        appSystemComponents.add(appIdentityManager);
+        ComponentRegistryImpl systemRegistry =
+            new ComponentRegistryImpl(appSystemComponents);
 
         // create the services and their associated managers...call out
         // the three standard services, because we need to get the
         // ordering right
         // TEST: again, the services and their associated managers should
         // come from configuration, but for now they're hard-coded
+        ArrayList<Service> serviceList = new ArrayList<Service>();
+        HashSet<Object> managerSet = new HashSet<Object>();
+        ComponentRegistryImpl managerComponents = new ComponentRegistryImpl();
         try {
             setupService(DEFAULT_DATA_SERVICE, serviceList,
-                         DEFAULT_DATA_MANAGER, managerSet, properties);
+                         DEFAULT_DATA_MANAGER, managerSet, properties,
+                         systemRegistry);
             setupService(DEFAULT_TASK_SERVICE, serviceList,
-                         DEFAULT_TASK_MANAGER, managerSet, properties);
+                         DEFAULT_TASK_MANAGER, managerSet, properties,
+                         systemRegistry);
+            // FIXME: add the channel service support when it's ready
+            /*setupService(DEFAULT_CHANNEL_SERVICE, serviceList,
+              DEFAULT_CHANNEL_MANAGER, managerSet, properties,
+              systemRegistry);*/
         } catch (Exception e) {
             if (logger.isLoggable(Level.SEVERE))
                 logger.log(Level.SEVERE, "Couldn't setup service", e);
             throw e;
         }
-        // FIXME: add the channel service support when it's ready
-        /*setupService(DEFAULT_CHANNEL_SERVICE, serviceList,
-          DEFAULT_CHANNEL_MANAGER, managerSet, properties);*/
 
         // NOTE: when we support external services, this is where they
         // get created
 
         // resolve the scheduler
         MasterTaskScheduler scheduler =
-            systemComponents.getComponent(MasterTaskScheduler.class);
+            systemRegistry.getComponent(MasterTaskScheduler.class);
 
         // register any profiling managers and fill in the manager registry
         for (Object manager : managerSet) {
@@ -194,8 +232,8 @@ class Kernel {
         // and kick off a task to do the transactional configuration step,
         // where the services are configured...this in turn will actually
         // start the application running
-        KernelAppContextImpl appContext =
-            new KernelAppContextImpl(appName, managerComponents);
+        AppKernelAppContext appContext =
+            new AppKernelAppContext(appName, managerComponents);
         try {
             scheduler.registerApplication(appContext);
         } catch (Exception e) {
@@ -208,7 +246,8 @@ class Kernel {
                                     appListener, appName, properties);
         TransactionRunner transactionRunner =
             new TransactionRunner(configRunner);
-        TaskOwnerImpl owner = new TaskOwnerImpl(appName, appContext);
+        IdentityImpl appIdentity = new IdentityImpl("app:" + appName);
+        TaskOwnerImpl owner = new TaskOwnerImpl(appIdentity, appContext);
         try {
             scheduler.scheduleTask(transactionRunner, owner);
         } catch (Exception e) {
@@ -225,7 +264,8 @@ class Kernel {
     private void setupService(String serviceName,
                               ArrayList<Service> serviceList,
                               String managerName, HashSet<Object> managerSet,
-                              Properties serviceProperties)
+                              Properties serviceProperties,
+                              ComponentRegistryImpl systemRegistry)
         throws Exception
     {
         // make sure we can resolve the two classes
@@ -259,7 +299,7 @@ class Kernel {
         // create both instances, putting them into their collections
         Service service =
             (Service)(serviceConstructor.newInstance(serviceProperties,
-                                                     systemComponents));
+                                                     systemRegistry));
         managerSet.add(managerConstructor.newInstance(service));
         serviceList.add(service);
     }
@@ -271,7 +311,7 @@ class Kernel {
      *
      * @param context the application's kernel context
      */
-    void applicationReady(KernelAppContextImpl context) {
+    void applicationReady(AppKernelAppContext context) {
         applications.add(context);
         if (logger.isLoggable(Level.CONFIG))
                 logger.log(Level.CONFIG, "{0}: application is ready", context);

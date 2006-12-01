@@ -36,27 +36,27 @@ import java.util.logging.Logger;
 class ServiceConfigRunner implements KernelRunnable {
 
     // logger for this class
-    private static LoggerWrapper logger =
+    private final static LoggerWrapper logger =
         new LoggerWrapper(Logger.getLogger(ServiceConfigRunner.
                                            class.getName()));
 
     // the reference back to the kernel
-    private Kernel kernel;
+    private final Kernel kernel;
 
     // the services that this runnable will configure
-    private List<Service> services;
+    private final List<Service> services;
 
     // the proxy that provides transaction state
-    private TransactionProxy proxy;
+    private final TransactionProxy proxy;
 
     // the listener used to boot an application
-    private AppListener app;
+    private final AppListener app;
 
     // the name of the application
-    private String appName;
+    private final String appName;
 
     // the properties that are passed to the app on startup
-    private Properties appProperties;
+    private final Properties appProperties;
 
     /**
      * Creates an instance of <code>ServiceConfigRunner</code>.
@@ -90,7 +90,7 @@ class ServiceConfigRunner implements KernelRunnable {
      */
     public void run() throws Exception {
         if (logger.isLoggable(Level.CONFIG))
-            logger.log(Level.INFO, "{0}: starting service config", appName);
+            logger.log(Level.CONFIG, "{0}: starting service config", appName);
 
         // initialize the services in the correct order, adding them to the
         // registry as we go
@@ -126,8 +126,8 @@ class ServiceConfigRunner implements KernelRunnable {
 
         // get the context so we can provide it to the next runnable, which
         // runs in a new transaction, and is responsible for booting the app
-        KernelAppContextImpl appContext =
-            (KernelAppContextImpl)(proxy.getCurrentOwner().getContext());
+        AppKernelAppContext appContext =
+            (AppKernelAppContext)(proxy.getCurrentOwner().getContext());
         AppStartupRunner startupRunner =
             new AppStartupRunner(appContext, appProperties, kernel);
         TransactionRunner transactionRunner =
@@ -143,7 +143,7 @@ class ServiceConfigRunner implements KernelRunnable {
         }
 
         if (logger.isLoggable(Level.CONFIG))
-            logger.log(Level.INFO, "{0}: finished service config runner",
+            logger.log(Level.CONFIG, "{0}: finished service config runner",
                        appName);
     }
 

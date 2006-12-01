@@ -49,7 +49,7 @@ final class TransactionProxyImpl implements TransactionProxy {
      * {@inheritDoc}
      */
     public <T extends Service> T getService(Class<T> type) {
-        return ((KernelAppContextImpl)(getCurrentOwner().getContext())).
+        return ((AbstractKernelAppContext)(getCurrentOwner().getContext())).
             getService(type);
     }
 

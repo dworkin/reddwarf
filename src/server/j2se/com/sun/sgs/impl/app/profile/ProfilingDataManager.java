@@ -62,7 +62,7 @@ public class ProfilingDataManager implements DataManager, ProfilingManager {
     /**
      * {@inheritDoc}
      */
-    public <T extends ManagedObject> T getBinding(String name, Class<T> type) {
+    public <T> T getBinding(String name, Class<T> type) {
         return backingManager.getBinding(name, type);
     }
 
@@ -97,8 +97,7 @@ public class ProfilingDataManager implements DataManager, ProfilingManager {
     /**
      * {@inheritDoc}
      */
-    public <T extends ManagedObject> ManagedReference<T>
-            createReference(T object) {
+    public ManagedReference createReference(ManagedObject object) {
         return backingManager.createReference(object);
     }
 

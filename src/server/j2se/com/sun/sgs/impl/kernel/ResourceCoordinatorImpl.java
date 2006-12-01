@@ -36,7 +36,7 @@ class ResourceCoordinatorImpl implements ResourceCoordinator
 {
 
     // logger for this class
-    private static LoggerWrapper logger =
+    private static final LoggerWrapper logger =
         new LoggerWrapper(Logger.getLogger(ResourceCoordinatorImpl.
                                            class.getName()));
 
@@ -44,7 +44,7 @@ class ResourceCoordinatorImpl implements ResourceCoordinator
     private Stack<TaskThread> threadPool;
 
     // the maximum pool size allowed
-    private int maxPoolSize;
+    private final int maxPoolSize;
 
     // the default starting pool size
     private static final String DEFAULT_POOL_SIZE_START = "8";
