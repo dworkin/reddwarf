@@ -1,7 +1,6 @@
 package com.sun.sgs.client;
 
 import java.util.Collection;
-import java.nio.ByteBuffer;
 
 /**
  * Represents a client's view of a channel.  A channel is a
@@ -23,7 +22,7 @@ import java.nio.ByteBuffer;
  *
  * <li>When a message is received on a client channel, the listener's
  * {@link ClientChannelListener#receivedMessage receivedMessage}
- * method is invoked with the channel, the sender's client address,
+ * method is invoked with the channel, the sender's session identifier,
  * and the message.  A <code>null</code> sender indicates that the
  * message was sent by the server.  The listener is <i>not</i>
  * notified of messages that its client sends on its associated
@@ -47,34 +46,47 @@ public interface ClientChannel {
     String getName();
     
     /**
-     * Sends the specified message to all clients joined to this
-     * channel.  If no clients are joined to this channel, then no
-     * action is taken.
+     * Sends the message contained in the specified byte array to all
+     * clients joined to this channel.  If no clients are joined to
+     * this channel, then no action is taken.
+     *
+     * <p>The specified byte array must not be modified after invoking
+     * this method; if the byte array is modified, then this method
+     * may have unpredictable results.
      *
      * @param message a message
      *
      * @throws IllegalStateException if the associated client has been
      * removed from this channel
      */
-    void send(ByteBuffer message);
+    void send(byte[] message);
 
     /**
-     * Sends the specified message to the specified recipient.  If the
-     * specified recipient is not joined to this channel, then no
-     * action is taken.
+     * Sends the message contained in the specified byte array to the
+     * specified recipient.  If the specified recipient is not joined
+     * to this channel, then no action is taken.
      *
-     * @param recipient a recipient
+     * <p>The specified byte array must not be modified after invoking
+     * this method; if the byte array is modified, then this method
+     * may have unpredictable results.
+     *
+     * @param recipient the session identifier of a recipient
      * @param message a message
      *
      * @throws IllegalStateException if the associated client has been
      * removed from this channel
      */
-    void send(ClientAddress recipient, ByteBuffer message);
+    void send(SessionId recipient, byte[] message);
 
     /**
-     * Sends the specified message to the recipients contained in the
-     * specified collection.  Any specified clients that are not
-     * currently joined to the channel are ignored.
+     * Sends the message contained in the specified byte array to the
+     * recipients contained in the specified collection.  Any
+     * specified clients that are not currently joined to the channel
+     * are ignored.
+     *
+     * <p>The specified byte array must not be modified after invoking
+     * this method; if the byte array is modified, then this method
+     * may have unpredictable results.
      *
      * @param recipients a collection of client recipients
      * @param message a message
@@ -82,5 +94,5 @@ public interface ClientChannel {
      * @throws IllegalStateException if the associated client has been
      * removed from this channel
      */
-    void send(Collection<ClientAddress> recipients, ByteBuffer message);
+    void send(Collection<SessionId> recipients, byte[] message);
 }

@@ -40,7 +40,7 @@ public interface DataService extends DataManager, Service {
      * @throws	TransactionException if the operation failed because of a
      *		problem with the current transaction
      */
-    <T extends ManagedObject> T getServiceBinding(String name, Class<T> type);
+    <T> T getServiceBinding(String name, Class<T> type);
 
     /**
      * Specifies an object for the service binding of a name, replacing any
@@ -58,6 +58,7 @@ public interface DataService extends DataManager, Service {
      *		name
      * @throws	IllegalArgumentException if <code>object</code> does not
      *		implement {@link Serializable}
+     * @throws	ObjectNotFoundException if the object has been removed
      * @throws	TransactionException if the operation failed because of a
      *		problem with the current transaction
      */

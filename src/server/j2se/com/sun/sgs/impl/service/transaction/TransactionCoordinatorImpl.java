@@ -21,11 +21,9 @@ import java.util.concurrent.atomic.AtomicLong;
  * UnsupportedOperationException} if more than one durable participant attempts
  * to join the transaction. <p>
  *
- * The <code>Transaction</code> and <code>TransactionHandle</code> instances
- * returned by this class are not synchronized.  If multiple threads access
- * these instances concurrently, then synchronization must be performed by the
- * caller.  Note that calls to the {@link #createTransaction createTransaction}
- * method itself are synchronized.
+ * The <code>Transaction</code> instances created by this class are not
+ * synchronized; methods on those instances should only be called from a single
+ * thread.
  */
 public final class TransactionCoordinatorImpl
     implements TransactionCoordinator
