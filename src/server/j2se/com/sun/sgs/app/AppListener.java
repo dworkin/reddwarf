@@ -61,9 +61,16 @@ public interface AppListener extends ManagedObject {
      * if the client logged out gracefully, and is <code>false</code>
      * otherwise.
      * </ul>
+     * 
+     * <p>A return value of <code>null</code> has special meaning,
+     * indicating that the specified client session should not
+     * complete the login process and should be disconnected
+     * immediately.
      *
      * @param session a client session
-     * @return a (serializable) listener for the client session
+     * @return a (serializable) listener for the client session,
+     * or <code>null</code> to indicate that the session should
+     * be terminated without completing the login process.
      */
     ClientSessionListener loggedIn(ClientSession session);
 

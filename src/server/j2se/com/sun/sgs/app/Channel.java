@@ -1,11 +1,13 @@
 package com.sun.sgs.app;
 
+import java.io.Serializable;
 import java.util.Collection;
 
 /**
  * Interface representing a communication group, a
  * <code>Channel</code>, consisting of multiple client sessions and
- * the server.
+ * the server.  Classes that implement <code>Channel</code> must
+ * also implement {@link Serializable}.
  *
  * <p>A channel is created by invoking the {@link
  * ChannelManager#getChannel(String) ChannelManager.createChannel}
