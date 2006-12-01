@@ -9,6 +9,11 @@ import com.sun.sgs.kernel.ResourceCoordinator;
 import java.util.Properties;
 import java.util.Stack;
 
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -41,13 +46,10 @@ class ResourceCoordinatorImpl implements ResourceCoordinator
                                            class.getName()));
 
     // the pool of threads
-    private Stack<TaskThread> threadPool;
-
-    // the maximum pool size allowed
-    private final int maxPoolSize;
+    private ThreadPoolExecutor threadPool;
 
     // the default starting pool size
-    private static final String DEFAULT_POOL_SIZE_START = "8";
+    private static final String DEFAULT_POOL_SIZE_CORE = "8";
 
     // the default maximum pool size
     private static final String DEFAULT_POOL_SIZE_MAX = "16";
@@ -55,8 +57,8 @@ class ResourceCoordinatorImpl implements ResourceCoordinator
     /**
      * The property used to specify the starting thread pool size.
      */
-    public static final String POOL_SIZE_START_PROPERTY =
-        "com.sun.sgs.kernel.StartingPoolSize";
+    public static final String POOL_SIZE_CORE_PROPERTY =
+        "com.sun.sgs.kernel.CorePoolSize";
 
     /**
      * The property used to specify the maximum thread pool size.
@@ -70,71 +72,46 @@ class ResourceCoordinatorImpl implements ResourceCoordinator
      * @param properties configuration properties
      */
     ResourceCoordinatorImpl(Properties properties) {
-        int startingSize =
-            Integer.parseInt(properties.getProperty(POOL_SIZE_START_PROPERTY,
-                                                    DEFAULT_POOL_SIZE_START));
-        maxPoolSize =
+        int coreSize =
+            Integer.parseInt(properties.getProperty(POOL_SIZE_CORE_PROPERTY,
+                                                    DEFAULT_POOL_SIZE_CORE));
+        int maxSize =
             Integer.parseInt(properties.getProperty(POOL_SIZE_MAX_PROPERTY,
                                                     DEFAULT_POOL_SIZE_MAX));
 
         if (logger.isLoggable(Level.CONFIG))
             logger.log(Level.CONFIG, "Starting Resource Coordinator with " +
-                       "{0} initial threads and a max pool of {1}",
-                       startingSize, maxPoolSize);
+                       "{0} core threads and a max pool of {1}",
+                       coreSize, maxSize);
 
-        threadPool = new Stack<TaskThread>();
+        SynchronousQueue<Runnable> backingQueue =
+            new SynchronousQueue<Runnable>();
+        ThreadFactory threadFactory =
+            new ThreadFactory() {
+                public Thread newThread(Runnable r) {
+                    return new TransactionalTaskThread(r);
+                }
+            };
 
-        for (int i = 0; i < startingSize; i++) {
-            TaskThread thread = new TransactionalTaskThread(this);
-            thread.start();
-            threadPool.push(thread);
-        }
+        threadPool =
+            new ThreadPoolExecutor(coreSize, maxSize, 120L,
+                                   TimeUnit.SECONDS, backingQueue,
+                                   threadFactory);
     }
 
     /**
+     *
+     *  NOTE: make sure to set the owner on the new task
+     *
+     *
      * {@inheritDoc}
      */
     public synchronized void startTask(Runnable task, Manageable component) {
         // FIXME: the Manageable interface should have some kind of owner
-        // or context accessor, so we can assign specific ownership
-
-        // if there are available threads, then use one of those
-        if (! threadPool.empty()) {
-            if (logger.isLoggable(Level.FINE))
-                logger.log(Level.FINE, "starting long-lived task with " +
-                           "existing task thread");
-            // FIXME: when we have a manageable interface, we should use it
-            // to identify the component so all tasks don't start as the system
-            threadPool.pop().runTask(task, Kernel.TASK_OWNER);
-            return;
-        }
-
-        if (logger.isLoggable(Level.FINE))
-            logger.log(Level.FINE, "creating new task thread for a new " +
-                       "long-lived task");
-
-        // the pool is empty, so create a thread for the task
-        TaskThread thread = new TransactionalTaskThread(this);
-        thread.start();
-        // FIXME: when we have a manageable interface, we should use it
-        // to identify the component so all tasks don't start as the system
-        thread.runTask(task, Kernel.TASK_OWNER);
-    }
-
-    /**
-     * Notifies the coordinator that a thread has finished its task and
-     * is ready to be given more work.
-     *
-     * @param thread the <code>TaskThread</code> that has finished its task
-     */
-    synchronized void notifyThreadWaiting(TaskThread thread) {
-        if (logger.isLoggable(Level.FINE))
-            logger.log(Level.FINE, "a thread is now ready and waiting");
-
-        if (threadPool.size() < maxPoolSize)
-            threadPool.push(thread);
-        else
-            thread.shutdown();
+        // or context accessor, so we can assign specific ownership through
+        // beforeExecute method of the pool using a wrapping runnable, but
+        // for now all threads start being owned by the kernel
+        threadPool.execute(task);
     }
 
 }

@@ -25,11 +25,10 @@ final class TransactionalTaskThread extends TaskThread {
     /**
      * Creates an instance of <code>TransactionalTaskThread</code>.
      *
-     * @param resourceCoordinator the <code>ResourceCoordinatorImpl</code>
-     *                            that manages this thread
+     * @param r the root <code>Runnable</code> for this <code>Thread</code>
      */
-    TransactionalTaskThread(ResourceCoordinatorImpl resourceCoordinator) {
-        super(resourceCoordinator);
+    TransactionalTaskThread(Runnable r) {
+        super(r);
         currentTransaction = null;
     }
 
