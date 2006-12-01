@@ -36,6 +36,7 @@ public class SocketHandle implements IOHandle, IoFutureListener {
         ByteBuffer minaBuffer = ByteBuffer.allocate(message.length);
         minaBuffer.put(message);
         minaBuffer.flip();
+        
         session.write(minaBuffer);
     }
 

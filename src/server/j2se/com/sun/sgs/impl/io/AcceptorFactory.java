@@ -22,15 +22,22 @@ public class AcceptorFactory {
     
     /**
      * Constructs an {@code IOAcceptor} with the given TransportType.  This is
-     * the simplest way to construct an IOAcceptor.  The returned acceptor
-     * uses a separate, single thread for processing. 
+     * the simplest way to construct an  IOAcceptor.  The returned acceptor
+     * will launch new threads as needed for processing. 
      * 
      * @param transportType             the type of transport
      * 
      * @return an IOAcceptor with the appropriate transport type.
      */
     public static IOAcceptor createAcceptor(TransportType transportType) {
-        return createAcceptor(transportType, Executors.newSingleThreadExecutor());
+        IoAcceptor minaAcceptor = null;  
+        if (transportType.equals(TransportType.RELIABLE)) {
+            minaAcceptor = new org.apache.mina.transport.socket.nio.SocketAcceptor();
+        }
+        else {
+            minaAcceptor = new DatagramAcceptor();
+        }
+        return new SocketAcceptor(minaAcceptor);
     }
     
     /**

@@ -23,14 +23,21 @@ public class ConnectorFactory {
     /**
      * Constructs an {@code IOConnector} with the given TransportType.  This is
      * the simplest way to construct an IOConnector.  The returned connector 
-     * uses a separate, single thread for processing. 
+     * creates new threads as necessary for processing. 
      * 
      * @param transportType             the type of transport
      * 
      * @return an IOConnector with the appropriate transport type.
      */
     public static IOConnector createConnector(TransportType transportType) {
-        return createConnector(transportType, Executors.newSingleThreadExecutor());
+        IoConnector minaConnector = null;  
+        if (transportType.equals(TransportType.RELIABLE)) {
+            minaConnector = new org.apache.mina.transport.socket.nio.SocketConnector();
+        }
+        else {
+            minaConnector = new DatagramConnector();
+        }
+        return new SocketConnector(minaConnector);        
     }
     
     /**
