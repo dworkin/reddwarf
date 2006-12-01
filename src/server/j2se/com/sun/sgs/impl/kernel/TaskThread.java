@@ -60,10 +60,9 @@ abstract class TaskThread extends Thread {
      * be the owner of the last <code>Runnable</code> provided to
      * <code>runTask</code>, the owner of a specific
      * <code>KernelRunnable</code> running in this thread (typically
-     * consumed from the <code>TaskScheduler</code>), or <code>null</code>
-     * meaning that it's running work on behalf of the kernel.
+     * consumed from the <code>TaskScheduler</code>).
      *
-     * @return the current owner, or <code>null</code> if owned by the kernel
+     * @return the current owner
      */
     TaskOwner getCurrentOwner() {
         return currentOwner;
@@ -78,7 +77,7 @@ abstract class TaskThread extends Thread {
      * to set the ownership of one thread from within a different thread
      * of control, which should never be done.
      *
-     * @param owner the new owner, or <code>null</code> for the kernel
+     * @param owner the new owner
      */
     void setCurrentOwner(TaskOwner owner) {
         currentOwner = owner;
@@ -97,9 +96,7 @@ abstract class TaskThread extends Thread {
      * currently executing another task.
      *
      * @param task a <code>Runnable</code> to run in this thread
-     * @param initialOwner the initial <code>TaskOwner</code for this
-     *                     task, which is <code>null</code> if the owner
-     *                     is the kernel
+     * @param initialOwner the initial <code>TaskOwner</code> for this task
      *
      * @throws IllegalStateException if this thread isn't currently running,
      *                               has been requested to shut down, or

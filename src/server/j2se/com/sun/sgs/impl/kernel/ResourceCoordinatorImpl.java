@@ -103,7 +103,9 @@ class ResourceCoordinatorImpl implements ResourceCoordinator
             if (logger.isLoggable(Level.FINE))
                 logger.log(Level.FINE, "starting long-lived task with " +
                            "existing task thread");
-            threadPool.pop().runTask(task, null);
+            // FIXME: when we have a manageable interface, we should use it
+            // to identify the component so all tasks don't start as the system
+            threadPool.pop().runTask(task, Kernel.TASK_OWNER);
             return;
         }
 
@@ -114,7 +116,9 @@ class ResourceCoordinatorImpl implements ResourceCoordinator
         // the pool is empty, so create a thread for the task
         TaskThread thread = new TransactionalTaskThread(this);
         thread.start();
-        thread.runTask(task, null);
+        // FIXME: when we have a manageable interface, we should use it
+        // to identify the component so all tasks don't start as the system
+        thread.runTask(task, Kernel.TASK_OWNER);
     }
 
     /**
