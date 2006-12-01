@@ -24,11 +24,8 @@ public interface IOConnector {
      * @param port              the remote port
      * @param listener          the <code>IOHandler</code> that will
      *                          receive the associated connection events.
-     *                          
-     * @throws IOException if there is a problem connecting.
      */
-    public IOHandle connect(InetAddress address, int port, IOHandler listener)
-                                                            throws IOException;
+    public IOHandle connect(InetAddress address, int port, IOHandler listener);
     
     
     /**
