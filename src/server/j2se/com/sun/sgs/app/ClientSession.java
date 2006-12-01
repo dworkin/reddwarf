@@ -1,8 +1,11 @@
 package com.sun.sgs.app;
 
+import java.io.Serializable;
+
 /**
  * Interface representing a single, connected login session between a
- * client and the server.
+ * client and the server.  Classes that implement
+ * <code>ClientSession</code> must also implement {@link Serializable}.
  *
  * <p>When a client logs in, the application's {@link
  * AppListener#loggedIn(ClientSession) AppListener.loggedIn} method is
