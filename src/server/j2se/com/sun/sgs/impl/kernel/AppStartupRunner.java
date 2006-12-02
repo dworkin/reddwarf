@@ -2,10 +2,13 @@
 package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.app.AppListener;
+import com.sun.sgs.app.NameNotBoundException;
 
 import com.sun.sgs.impl.util.LoggerWrapper;
 
 import com.sun.sgs.kernel.KernelRunnable;
+
+import com.sun.sgs.service.DataService;
 
 import java.util.Properties;
 
@@ -41,6 +44,11 @@ class AppStartupRunner implements KernelRunnable {
     private final Kernel kernel;
 
     /**
+     * FIXME: I'd like to promote this to the AppListener interface
+     */
+    public static final String LISTENER_BINDING = "appListener";
+
+    /**
      * Creates an instance of <code>AppStartupRunner</code>.
      *
      * @param appContext the context in which the application will run
@@ -63,25 +71,31 @@ class AppStartupRunner implements KernelRunnable {
     public void run() throws Exception {
         if (logger.isLoggable(Level.CONFIG))
             logger.log(Level.CONFIG, "{0}: starting application", appContext);
-        // NOTE: for the multi-stack case, this needs to check that the
-        // app's boot method hasn't already been called...this can be done
-        // simply by having a flag in the data store that we set when we
-        // call the boot method
 
-        // get the listener, and call it
-        AppListener listener = null;
+        // FIXME
+        DataService dataService = appContext.getService(DataService.class);
         try {
-            listener =
-                appContext.getDataManager().getBinding(Kernel.LISTENER_BINDING,
-                                                       AppListener.class);
-        } catch (Exception e) {
-            if (logger.isLoggable(Level.SEVERE))
-                logger.log(Level.SEVERE, "{0}: has no listener", e,
-                           appContext);
-            throw e;
-        }
+            // test to see if this name if the listener is already bound...
+            dataService.getBinding(LISTENER_BINDING, AppListener.class);
+        } catch (NameNotBoundException nnbe) {
+            // ...if it's not, create and then bind the listener
+            try {
+                String appClass =
+                    properties.getProperty("com.sun.sgs.appListenerClass");
+                AppListener listener =
+                    (AppListener)(Class.forName(appClass).newInstance());
+                dataService.setBinding(LISTENER_BINDING, listener);
 
-        listener.startingUp(properties);
+                // since we created the listener, we're the first one to
+                // start the app, so we also need to start it up
+                listener.startingUp(properties);
+            } catch (Exception e) {
+                if (logger.isLoggable(Level.SEVERE))
+                    logger.log(Level.SEVERE, "{0}: couldn't start application",
+                               e, appContext);
+                throw e;
+            }
+        }
 
         // tell the kernel that this application has now started up
         kernel.applicationReady(appContext);

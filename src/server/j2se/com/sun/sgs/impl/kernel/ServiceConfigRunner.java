@@ -49,9 +49,6 @@ class ServiceConfigRunner implements KernelRunnable {
     // the proxy that provides transaction state
     private final TransactionProxy proxy;
 
-    // the listener used to boot an application
-    private final AppListener app;
-
     // the name of the application
     private final String appName;
 
@@ -65,18 +62,16 @@ class ServiceConfigRunner implements KernelRunnable {
      * @param services the <code>Service</code>s to configure, in order
      *                 of how they will be configured
      * @param proxy the proxy used to access the current transaction
-     * @param app the <code>AppListener</code> used to start the application
      * @param appName the name of the application being started
      * @param appProperties the <code>Properties</code> provided to the
      *                      application on startup
      */
     ServiceConfigRunner(Kernel kernel, List<Service> services,
-                        TransactionProxy proxy, AppListener app,
-                        String appName, Properties appProperties) {
+                        TransactionProxy proxy, String appName,
+                        Properties appProperties) {
         this.kernel = kernel;
         this.services = services;
         this.proxy = proxy;
-        this.app = app;
         this.appName = appName;
         this.appProperties = appProperties;
     }
@@ -108,24 +103,9 @@ class ServiceConfigRunner implements KernelRunnable {
         }
 
         // At this point the services are now configured, so the final step
-        // is to boot the application, making sure to manage the app listener
-        // if this has never happened before. This uses the data and task
-        // services, which are always first and second (respectively) in
-        // the service list
-        Iterator<Service> serviceIterator = services.iterator();
-        DataService dataService = (DataService)(serviceIterator.next());
-        TaskService taskService = (TaskService)(serviceIterator.next());
-
-        try {
-            // test to see if this name is already used...
-            dataService.getBinding(Kernel.LISTENER_BINDING, AppListener.class);
-        } catch (NameNotBoundException nnbe) {
-            // ...and if it's not, bind the listener
-            dataService.setBinding(Kernel.LISTENER_BINDING, app);
-        }
-
-        // get the context so we can provide it to the next runnable, which
-        // runs in a new transaction, and is responsible for booting the app
+        // is to try booting the application after setting the services
+        // available in our context. Boot the app is done by running a
+        // special KernelRunnable in a new transaction
         AppKernelAppContext appContext =
             (AppKernelAppContext)(proxy.getCurrentOwner().getContext());
         AppStartupRunner startupRunner =
@@ -134,7 +114,8 @@ class ServiceConfigRunner implements KernelRunnable {
             new TransactionRunner(startupRunner);
         try {
             appContext.setServices(serviceComponents);
-            taskService.scheduleNonDurableTask(transactionRunner);
+            appContext.getService(TaskService.class).
+                scheduleNonDurableTask(transactionRunner);
         } catch (Exception e) {
             if (logger.isLoggable(Level.CONFIG))
                 logger.log(Level.CONFIG, "{0}: failed to schedule app " +

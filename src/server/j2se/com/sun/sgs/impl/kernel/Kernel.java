@@ -67,10 +67,6 @@ class Kernel {
     // the set of applications that are running in this kernel
     private HashSet<AppKernelAppContext> applications;
 
-    // TEST: the name and source for the default application
-    private static final String APP_NAME = "TestApplication";
-    private static final String APP_CLASS = "TestApplication";
-
     // the default services that are used for channels, data, and tasks
     private static final String DEFAULT_CHANNEL_SERVICE =
         "com.sun.sgs.impl.service.channel.ChannelServiceImpl";
@@ -79,7 +75,7 @@ class Kernel {
     private static final String DEFAULT_TASK_SERVICE =
         "com.sun.sgs.impl.service.task.TaskServiceImpl";
 
-    //the default managers that are used for channels, data, and tasks
+    // the default managers that are used for channels, data, and tasks
     private static final String DEFAULT_CHANNEL_MANAGER =
         "com.sun.sgs.impl.app.profile.ProfilingChannelManager";
     private static final String DEFAULT_DATA_MANAGER =
@@ -88,19 +84,17 @@ class Kernel {
         "com.sun.sgs.impl.app.profile.ProfilingTaskManager";
 
     /**
-     * FIXME: I'd like to promote this to the AppListener interface
-     */
-    public static final String LISTENER_BINDING = "appListener";
-
-    /**
      * Creates an instance of <code>Kernel</code>. Once this is created
      * the code components of the system are running and ready. Creating
      * a <code>Kernel</code> will also result in initializing and starting
      * all associated applications and their associated services.
      *
+     * @param systemProperties system <code>Properties</code> for all
+     *                         system-level components
+     *
      * @throws Exception if for any reason the kernel cannot be started
      */
-    protected Kernel() throws Exception {
+    protected Kernel(Properties systemProperties) throws Exception {
         if (logger.isLoggable(Level.CONFIG))
             logger.log(Level.CONFIG, "Booting the Kernel");
 
@@ -108,23 +102,30 @@ class Kernel {
         systemComponents = new HashSet<Object>();
         applications = new HashSet<AppKernelAppContext>();
 
-        // TEST: provide some hard-coded properties to all components
-        Properties systemProperties = new Properties();
-
         // setup the system components
-        // FIXME: decide which components we want to share
         try {
+            // create the transaction proxy and coordinator
             transactionProxy = new TransactionProxyImpl();
             TransactionCoordinatorImpl transactionCoordinator =
                 new TransactionCoordinatorImpl(systemProperties);
+
+            // create the resource coordinator
             ResourceCoordinatorImpl resourceCoordinator =
                 new ResourceCoordinatorImpl(systemProperties);
-            systemComponents.add(resourceCoordinator);
+
+            // create the task handler and scheduler
             TaskHandler taskHandler = new TaskHandler(transactionCoordinator);
             MasterTaskScheduler scheduler =
                 new MasterTaskScheduler(systemProperties, resourceCoordinator,
                                         taskHandler);
+
+            // make sure to register the system as a user of the scheduler,
+            // so that all of our events get grouped together
             scheduler.registerApplication(SystemKernelAppContext.CONTEXT);
+
+            // finally, collect some of the system components to be shared
+            // with services as they are created
+            systemComponents.add(resourceCoordinator);
             systemComponents.add(scheduler);
         } catch (Exception e) {
             if (logger.isLoggable(Level.SEVERE))
@@ -137,41 +138,16 @@ class Kernel {
     }
 
     /**
-     * FIXME: Now that we have real identity and context, most of this
-     * method should be run as a scheduled task, or at least directly in
-     * some task thread, so that we can set the context correctly.
-     * <p>
      * TEST: This is using a fixed configuration. Eventually, it should be
      * loading its configuration, but for now, we have only fixed services
      * with known properties...when configuration details are decided, that
      * detail will be passed as parameters to this method.
      */
-    void startupApplication() throws Exception {
+    void startupApplication(Properties properties) throws Exception {
+        String appName = properties.getProperty("com.sun.sgs.appName");
+
         if (logger.isLoggable(Level.CONFIG))
-            logger.log(Level.CONFIG, "{0}: configuring application", APP_NAME);
-
-        // TEST: the following variables should be learned from the
-        // application's configuration, but because we don't have a full
-        // configuration system yet, they're hard-coded for now
-        Properties properties = new Properties();
-        AppListener appListener = null;
-        try {
-            appListener =
-                (AppListener)(Class.forName(APP_CLASS).newInstance());
-        } catch (Exception e) {
-            if (logger.isLoggable(Level.SEVERE))
-                logger.log(Level.SEVERE, "Couldn't resolve AppListener", e);
-            throw e;
-        }
-        String appName = APP_NAME;
-
-        properties.setProperty("com.sun.sgs.appName", appName);
-        properties.setProperty("com.sun.sgs.impl.service.data.store." +
-                               "DataStoreImpl.directory",
-                               "/tmp/" + appName + "/dsdb");
-        properties.setProperty("com.sun.sgs.impl.auth." +
-                               "NamePasswordAuthenticator.PasswordFile",
-                               "/tmp/" + appName + "/passwords");
+            logger.log(Level.CONFIG, "{0}: configuring application", appName);
 
         // create the authentication manager used for this application
         HashSet<IdentityAuthenticator> authenticators =
@@ -192,16 +168,21 @@ class Kernel {
         // create the services and their associated managers...call out
         // the three standard services, because we need to get the
         // ordering right
-        // TEST: again, the services and their associated managers should
-        // come from configuration, but for now they're hard-coded
         ArrayList<Service> serviceList = new ArrayList<Service>();
         HashSet<Object> managerSet = new HashSet<Object>();
         ComponentRegistryImpl managerComponents = new ComponentRegistryImpl();
         try {
-            setupService(DEFAULT_DATA_SERVICE, serviceList,
+            String dataServiceClass =
+                properties.getProperty("com.sun.sgs.dataService",
+                                       DEFAULT_DATA_SERVICE);
+            String taskServiceClass =
+                properties.getProperty("com.sun.sgs.taskService",
+                                       DEFAULT_DATA_SERVICE);
+
+            setupService(dataServiceClass, serviceList,
                          DEFAULT_DATA_MANAGER, managerSet, properties,
                          systemRegistry);
-            setupService(DEFAULT_TASK_SERVICE, serviceList,
+            setupService(taskServiceClass, serviceList,
                          DEFAULT_TASK_MANAGER, managerSet, properties,
                          systemRegistry);
             // FIXME: add the channel service support when it's ready
@@ -243,7 +224,7 @@ class Kernel {
         }
         ServiceConfigRunner configRunner =
             new ServiceConfigRunner(this, serviceList, transactionProxy,
-                                    appListener, appName, properties);
+                                    appName, properties);
         TransactionRunner transactionRunner =
             new TransactionRunner(configRunner);
         IdentityImpl appIdentity = new IdentityImpl("app:" + appName);
@@ -318,12 +299,60 @@ class Kernel {
     }
 
     /**
-     * Main-line method that starts the <code>Kernel</code>.
+     * Main-line method that starts the <code>Kernel</code>. Note that right
+     * now there is no management for the stack, so we accept on the
+     * command-line the set of applications to run. Once we have management
+     * and configration facilities, this command-line list will be removed.
+     * <p>
+     * com.sun.sgs.{AppName}.appListenerClass
+     * com.sun.sgs.{AppName}.rootDir
+     *
+     * com.sun.sgs.channelService
+     * com.sun.sgs.dataService
+     * com.sun.sgs.taskService 
+     *
+     * @param args the applications to run
      */
     public static void main(String [] args) throws Exception {
-        // TEST: for now, we just boot the kernel and setup the default app
-        Kernel kernel = new Kernel();
-        kernel.startupApplication();
+        // for now, we'll just use the system properties for everything
+        Properties systemProperties = System.getProperties();
+
+        // boot the kernel
+        Kernel kernel = new Kernel(systemProperties);
+
+        // setup and run each application
+        for (int i = 0; i < args.length; i++) {
+            Properties appProperties = new Properties(systemProperties);
+            appProperties.setProperty("com.sun.sgs.appName", args[i]);
+
+            // get the listener class
+            String app =
+                appProperties.getProperty("com.sun.sgs." + args[i] +
+                                          ".appListenerClass");
+            appProperties.setProperty("com.sun.sgs.appListenerClass", app);
+
+            // get the database location
+            String rootDir =
+                appProperties.getProperty("com.sun.sgs." + args[i] +
+                                          ".rootDir");
+            appProperties.setProperty("com.sun.sgs.impl.service.data.store." +
+                                      "DataStoreImpl.directory",
+                                      rootDir + "/dsdb");
+
+            // get the (optional) services
+            if (! appProperties.containsKey("com.sun.sgs.channelService"))
+                appProperties.setProperty("com.sun.sgs.channelService",
+                                          DEFAULT_CHANNEL_SERVICE);
+            if (! appProperties.containsKey("com.sun.sgs.dataService"))
+                appProperties.setProperty("com.sun.sgs.dataService",
+                                          DEFAULT_DATA_SERVICE);
+            if (! appProperties.containsKey("com.sun.sgs.taskService"))
+                appProperties.setProperty("com.sun.sgs.taskService",
+                                          DEFAULT_TASK_SERVICE);
+            
+            // start the application
+            kernel.startupApplication(appProperties);
+        }
     }
 
 }
