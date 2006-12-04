@@ -92,12 +92,13 @@ public class TestDataStoreImpl extends TestCase {
      * created.
      */
     protected void tearDown() throws Exception {
-	if (passed && directory != null) {
-	    deleteDirectory(directory);
-	}
 	if (txn != null) {
 	    txn.abort();
 	    txn = null;
+	}
+	if (passed && directory != null) {
+	    store.shutdown();
+	    deleteDirectory(directory);
 	}
     }
 
@@ -175,7 +176,8 @@ public class TestDataStoreImpl extends TestCase {
 	Properties props = createProperties(
 	    DataStoreImplClassName + ".directory",
 	    createDirectory());
-	new File(directory).setReadOnly();
+	File f = new File(directory);
+	assertTrue("set readonly " + f, f.setReadOnly());
 	try {
 	    new DataStoreImpl(props);
 	    fail("Expected DataStoreException");

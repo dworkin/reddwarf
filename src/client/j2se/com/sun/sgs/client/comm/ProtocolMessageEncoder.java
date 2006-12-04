@@ -11,10 +11,10 @@ import java.util.List;
  */
 public class ProtocolMessageEncoder {
     
-    private List list;
+    private List<Object> list;
     
     public ProtocolMessageEncoder() {
-        list = new ArrayList();
+        list = new ArrayList<Object>();
     }
     
     public void reset() {
@@ -36,7 +36,7 @@ public class ProtocolMessageEncoder {
      * @return  a byte array packed with the contents of the message
      */
     public byte[] getMessage() {
-        List byteList = new ArrayList();
+        List<Object> byteList = new ArrayList<Object>();
         // protocol version and command are first and second position respectively.
         byteList.add(getUnsignedByte((Integer) list.get(0)));
         byteList.add(getUnsignedByte((Integer) list.get(1)));

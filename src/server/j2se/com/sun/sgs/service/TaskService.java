@@ -33,7 +33,7 @@ public interface TaskService extends TaskManager, Service {
      * The task will not be persisted by the <code>TaskService</code>, and
      * therefore is not guaranteed to run.
      *
-     * @param task the <code>KernelTask</code> to run
+     * @param task the <code>KernelRunnable</code> to run
      *
      * @throws TaskRejectedException if the <code>TaskScheduler</code> refuses
      *                               to accept the task
@@ -49,7 +49,7 @@ public interface TaskService extends TaskManager, Service {
      * As described in <code>TaskManager</code>, the delay is from the
      * time of this call, not from the time that the transaction commits.
      *
-     * @param task the <code>KernelTask</code> to run
+     * @param task the <code>KernelRunnable</code> to run
      * @param delay the number of milliseconds to delay before running the task
      *
      * @throws TaskRejectedException if the <code>TaskScheduler</code> refuses
@@ -64,7 +64,7 @@ public interface TaskService extends TaskManager, Service {
      * current task has finished. The task will not be persisted  by the
      * <code>TaskService</code>, and therefore is not guaranteed to run.
      *
-     * @param task the <code>KernelTask</code> to run
+     * @param task the <code>KernelRunnable</code> to run
      * @param priority the requested <code>Priority</code> for the task
      *
      * @throws TaskRejectedException if the <code>TaskScheduler</code> refuses

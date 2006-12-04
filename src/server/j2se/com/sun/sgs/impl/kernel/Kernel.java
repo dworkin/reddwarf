@@ -177,6 +177,9 @@ class Kernel {
             String taskServiceClass =
                 properties.getProperty("com.sun.sgs.taskService",
                                        DEFAULT_DATA_SERVICE);
+            String channelServiceClass =
+                properties.getProperty("com.sun.sgs.channelService",
+                		       DEFAULT_CHANNEL_SERVICE);
 
             setupService(dataServiceClass, serviceList,
                          DEFAULT_DATA_MANAGER, managerSet, properties,
@@ -184,10 +187,9 @@ class Kernel {
             setupService(taskServiceClass, serviceList,
                          DEFAULT_TASK_MANAGER, managerSet, properties,
                          systemRegistry);
-            // FIXME: add the channel service support when it's ready
-            /*setupService(DEFAULT_CHANNEL_SERVICE, serviceList,
-              DEFAULT_CHANNEL_MANAGER, managerSet, properties,
-              systemRegistry);*/
+            setupService(channelServiceClass, serviceList,
+        	         DEFAULT_CHANNEL_MANAGER, managerSet, properties,
+        	         systemRegistry);
         } catch (Exception e) {
             if (logger.isLoggable(Level.SEVERE))
                 logger.log(Level.SEVERE, "Couldn't setup service", e);

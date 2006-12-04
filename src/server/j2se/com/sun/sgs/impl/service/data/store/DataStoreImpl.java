@@ -412,15 +412,15 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
     /* -- Implement DataStore -- */
 
     /** {@inheritDoc} */
-    public void shutdown() {
+    public void shutdown() {	
 	try {
 	    names.close();
 	    oids.close();
 	    info.close();
 	    env.close();
         } catch (DatabaseException e) {
-	    // TODO Auto-generated catch block
-	    e.printStackTrace();
+	    logger.logThrow(Level.FINE,
+		    "exception during shutdown: ", e);
         }
     }
 
