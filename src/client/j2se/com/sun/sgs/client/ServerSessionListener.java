@@ -1,15 +1,11 @@
 package com.sun.sgs.client;
 
-import java.nio.ByteBuffer;
-
 /**
  * A client's listener for handling messages sent from server to
  * client and for handling other connection-related events.
  *
- * <p>A <code>ServerSessionListener</code> for a client (specified as
- * part of the login procedure...) is notified in the following cases:
- * when a {@link ServerSession} is established with the server ({@link
- * #connected connected}), the associated client is joined to a
+ * <p>A <code>ServerSessionListener</code> for a client is notified in
+ * the following cases: when the associated client is joined to a
  * channel ({@link #joinedChannel joinedChannel}), a message is
  * received from the server ({@link #receivedMessage
  * receivedMessage}), a connection with the server is being
@@ -26,14 +22,6 @@ import java.nio.ByteBuffer;
 public interface ServerSessionListener {
 
     /**
-     * Notifies this listener that the specified session has been
-     * established with the server as a result of a successful login.
-     *
-     * @param session a session
-     */
-    void connected(ServerSession session);
-    
-    /**
      * Notifies this listener that its associated client has joined
      * the specified channel, and returns a {@link
      * ClientChannelListener} for that channel.
@@ -41,8 +29,8 @@ public interface ServerSessionListener {
      * <p>When a message is received on the specified channel, the
      * returned listener's {@link
      * ClientChannelListener#receivedMessage receivedMessage} method
-     * is invoked with the specified channel, the sender's client
-     * address, and the message.  A <code>null</code> sender indicates
+     * is invoked with the specified channel, the sender's session
+     * identifier, and the message.  A <code>null</code> sender indicates
      * that the message was sent by the server.  The returned listener
      * is <i>not</i> notified of messages that its client sends on the
      * specified channel.
@@ -63,7 +51,7 @@ public interface ServerSessionListener {
      *
      * @param message a message
      */
-    void receivedMessage(ByteBuffer message);
+    void receivedMessage(byte[] message);
     
     /**
      * Notifies this listener that its associated server session is in

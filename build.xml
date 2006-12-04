@@ -31,6 +31,11 @@
 	    value="http://java.sun.com/j2se/1.5/docs/api"/>
   <property name="jdk.package.list" value="etc/jdk5.0_package_list"/>
 
+  <property name="apidoc.app.zip"
+            location="${build.dir}/sgs-apidoc-app.zip"/>
+  <property name="apidoc.client.zip"
+            location="${build.dir}/sgs-apidoc-client.zip"/>
+
   <!-- Values for programming style checks -->
   <import file="${checkstyle.dir}/checkstyle_task.xml" optional="true"/>
 
@@ -103,12 +108,18 @@
   <target name="doc" depends="javadoc" description="Builds documentation"/>
 
   <!-- Build the JavaDoc from the source -->
-  <target name="javadoc" depends="javadoc-server,javadoc-client"
+  <target name="javadoc" depends="javadoc-api,javadoc-internal"
 	  description="Builds javadoc"/>
 
-  <!-- Build the server JavaDoc -->
+  <target name="javadoc-internal" depends="javadoc-server,javadoc-client"
+	  description="Builds internal (full) javadoc"/>
+
+  <target name="javadoc-api" depends="javadoc-api-app,javadoc-api-client"
+	  description="Builds public API javadoc"/>
+
+  <!-- Build the internal server JavaDoc -->
   <target name="javadoc-server" depends="build-server"
-	  description="Builds server javadoc">
+	  description="Builds internal (full) server javadoc">
     <javadoc sourcepath="src/server/j2se" destdir="${build.dir}/javadoc/server"
              classpathref="server.classpath" packagenames="com.sun.*"
              overview="src/server/j2se/overview.html"
@@ -131,9 +142,9 @@
     </javadoc>
   </target>
 
-  <!-- Build the client JavaDoc -->
+  <!-- Build the internal client JavaDoc -->
   <target name="javadoc-client" depends="build-client"
-	  description="Builds client javadoc">
+	  description="Builds internal (full) client javadoc">
     <javadoc sourcepath="src/client/j2se" destdir="${build.dir}/javadoc/client"
              classpath="${build.dir}/classes/client" packagenames="com.sun.*"
              overview="src/client/j2se/overview.html"
@@ -156,11 +167,85 @@
     </javadoc>
   </target>
 
+  <!-- Build the public Application API JavaDoc -->
+  <target name="javadoc-api-app" depends="build-server"
+	  description="Builds public server application API javadoc">
+    <javadoc sourcepath="src/server/j2se"
+             destdir="${build.dir}/javadoc/apidoc/app"
+             classpathref="server.classpath"
+             packagenames="com.sun.sgs.app.*"
+             overview="src/server/j2se/overview.html"
+             windowtitle="${project.name}" doctitle="${project.name}"
+             public="true" author="no">
+      <link href="${jdk.doc.api.url}"
+	    offline="true"
+	    packagelistLoc="${jdk.package.list}"/>
+      <footer>
+        <![CDATA[<font size="-1">Sun Game Server, Version
+        ${project.version}</font>]]>
+      </footer>
+      <bottom>
+        <![CDATA[<font size="-1">Copyright 2006 Sun Microsystems,
+        Inc. All rights reserved. Use is subject to license
+        terms.<p>Sun, Sun Microsystems, the Sun Logo, and Java are
+        trademarks or registered trademarks of Sun Microsystems, Inc. in
+        the US and other countries.</font>]]>
+      </bottom>
+    </javadoc>
+  </target>
+
+  <!-- Build the public Client API JavaDoc -->
+  <target name="javadoc-api-client" depends="build-client"
+	  description="Builds public client API javadoc">
+    <javadoc sourcepath="src/client/j2se"
+             destdir="${build.dir}/javadoc/apidoc/client"
+             classpath="${build.dir}/classes/client"
+             packagenames="com.sun.sgs.client.*"
+             overview="src/client/j2se/overview.html"
+             windowtitle="${project.name}" doctitle="${project.name}"
+             public="true" author="no">
+      <link href="${jdk.doc.api.url}"
+	    offline="true"
+	    packagelistLoc="${jdk.package.list}"/>
+      <footer>
+        <![CDATA[<font size="-1">Project Darkstar: Version
+        ${project.version}</font>]]>
+      </footer>
+      <bottom>
+        <![CDATA[<font size="-1">Copyright 2006 Sun Microsystems,
+        Inc. All rights reserved. Use is subject to license
+        terms.<p>Sun, Sun Microsystems, the Sun Logo, and Java are
+        trademarks or registered trademarks of Sun Microsystems, Inc. in
+        the US and other countries.</font>]]>
+      </bottom>
+    </javadoc>
+  </target>
+
+  <!-- Builds the API javadoc zip files -->
+  <target name="apidoc" depends="zip-apidoc-app,zip-apidoc-client"
+	  description="Builds API javadoc zip files"/>
+
+  <!-- Builds the app API javadoc zip file -->
+  <target name="zip-apidoc-app" depends="javadoc-api-app"
+	  description="Builds app API javadoc zip file">
+    <zip destfile="${apidoc.app.zip}"
+          basedir="${build.dir}/javadoc"
+          includes="apidoc/app/**"/>
+  </target>
+
+  <!-- Builds the client API javadoc zip file -->
+  <target name="zip-apidoc-client" depends="javadoc-api-client"
+	  description="Builds client API javadoc zip file">
+    <zip destfile="${apidoc.client.zip}"
+          basedir="${build.dir}/javadoc"
+          includes="apidoc/client/**"/>
+  </target>
+
   <!-- Builds the jar files for the project classes -->
   <target name="jar" depends="jar-server"
 	  description="Builds JAR files"/>
 
-  <!-- builds the server jar file -->
+  <!-- Builds the server jar file -->
   <target name="jar-server" depends="build-server"
 	  description="Builds server JAR files">
     <mkdir dir="${build.dir}/lib"/>

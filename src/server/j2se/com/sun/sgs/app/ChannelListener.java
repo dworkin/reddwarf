@@ -1,7 +1,6 @@
 package com.sun.sgs.app;
 
 import java.io.Serializable;
-import java.nio.ByteBuffer;
 
 /**
  * Listener for messages received on a channel.  A channel can be
@@ -44,6 +43,6 @@ public interface ChannelListener {
      */
     void receivedMessage(Channel channel,
 			 ClientSession session,
-			 ByteBuffer message);
+			 byte[] message);
     
 }

@@ -1,7 +1,5 @@
 package com.sun.sgs.client;
 
-import java.nio.ByteBuffer;
-
 /**
  * Listener for events relating to a {@link ClientChannel}.
  *
@@ -15,7 +13,7 @@ import java.nio.ByteBuffer;
  *
  * <li>When a message is received on a client channel, the listener's
  * {@link ClientChannelListener#receivedMessage receivedMessage}
- * method is invoked with the channel, the sender's client address,
+ * method is invoked with the channel, the sender's session identifier,
  * and the message.  A <code>null</code> sender indicates that the
  * message was sent by the server.   The listener is <i>not</i>
  * notified of messages that its client sends on its associated
@@ -37,12 +35,12 @@ public interface ClientChannelListener {
      * message was sent by the server.
      *
      * @param channel a client channel
-     * @param sender sender's client address, or <code>null</code>
-     * @param message a byte buffer containing a message.
+     * @param sender sender's session identifier, or <code>null</code>
+     * @param message a byte array containing a message.
      */
     void receivedMessage(ClientChannel channel,
-			 ClientAddress sender,
-			 ByteBuffer message);
+			 SessionId sender,
+			 byte[] message);
 
     /**
      * Notifies this listener that the associated client was removed
