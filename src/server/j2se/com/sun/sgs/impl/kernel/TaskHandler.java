@@ -129,7 +129,7 @@ public final class TaskHandler {
                 // this isn't a problem, since it just means that some
                 // participant aborted the transaction before throwing the
                 // original exception
-                logger.log(Log.FINEST, "Transaction was already aborted");
+                logger.log(Level.FINEST, "Transaction was already aborted");
             }
             throw e;
         } finally {
