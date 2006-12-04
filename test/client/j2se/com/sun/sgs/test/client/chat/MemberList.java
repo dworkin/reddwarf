@@ -12,7 +12,7 @@ import javax.swing.JList;
 import javax.swing.ListCellRenderer;
 import javax.swing.ListSelectionModel;
 
-import com.sun.sgs.client.ClientAddress;
+import com.sun.sgs.client.SessionId;
 
 //=== Represent channel members and user lists in the GUI ===
 
@@ -33,22 +33,22 @@ public class MemberList extends JList
 	addMouseListener(this);
     }
 
-    public void addClient(ClientAddress member) {
+    public void addClient(SessionId member) {
 	((DefaultListModel) getModel()).addElement(member);
 	repaint();
     }
 
-    public void removeClient(ClientAddress member) {
+    public void removeClient(SessionId member) {
 	((DefaultListModel) getModel()).removeElement(member);
 	repaint();
     }
 
-    public ClientAddress getSelectedClient() {
-	return (ClientAddress) getSelectedValue();
+    public SessionId getSelectedClient() {
+	return (SessionId) getSelectedValue();
     }
 
-    public Collection<ClientAddress> getSelectedClients() {
-	ClientAddress[] targets = (ClientAddress[]) getSelectedValues();
+    public Collection<SessionId> getSelectedClients() {
+	SessionId[] targets = (SessionId[]) getSelectedValues();
 	if (targets == null) {
 	    return null;
 	}
@@ -70,8 +70,8 @@ public class MemberList extends JList
 	}
     }
 
-    public void mouseEntered(MouseEvent e) { }
-    public void mouseExited(MouseEvent e) { }
-    public void mousePressed(MouseEvent e) { }
-    public void mouseReleased(MouseEvent e) { }
+    public void mouseEntered(MouseEvent e)  { /* unused */ }
+    public void mouseExited(MouseEvent e)   { /* unused */ }
+    public void mousePressed(MouseEvent e)  { /* unused */ }
+    public void mouseReleased(MouseEvent e) { /* unused */ }
 }

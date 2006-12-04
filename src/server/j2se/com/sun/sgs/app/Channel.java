@@ -1,17 +1,18 @@
 package com.sun.sgs.app;
 
+import java.io.Serializable;
 import java.util.Collection;
-import java.nio.ByteBuffer;
 
 /**
  * Interface representing a communication group, a
  * <code>Channel</code>, consisting of multiple client sessions and
- * the server.
+ * the server.  Classes that implement <code>Channel</code> must
+ * also implement {@link Serializable}.
  *
  * <p>A channel is created by invoking the {@link
  * ChannelManager#getChannel(String) ChannelManager.createChannel}
  * method with a name for the channel, a {@link ChannelListener}, and
- * a {@link Delivery} requirement.  A client {@link ClientSession} can
+ * a {@link Delivery} requirement.  A {@link ClientSession} can
  * be added or removed from a channel using that
  * <code>Channel</code>'s {@link #join join} and {@link #leave leave}
  * methods respectively.  All client sessions can be removed from a
@@ -30,19 +31,19 @@ import java.nio.ByteBuffer;
  * <p>If a channel is created with a {@link ChannelListener}, then
  * when any client session sends a message on that channel, that
  * listener's {@link
- * ChannelListener#receivedMessage(Channel,ClientSession,ByteBuffer)
+ * ChannelListener#receivedMessage(Channel,ClientSession,byte[])
  * receivedMessage} method is invoked with that channel, the client
  * session, and the message.
  *
  * <p>If the server needs to receive notification of messages sent by
- * an individual client session on a channel, the server can register
- * a {@link ChannelListener} for that individual client session by
- * invoking the {@link
- * Channel#setListener(ChannelListener,ClientSession)} method with the
- * channel listener and the session.  No registered listeners are
- * notified of messages sent by the server on the channel; listeners
- * are only notified (as described above) when client sessions send
- * messages on the channel.
+ * an individual client session on a channel, the application can
+ * specify a non-<code>null</code> {@link ChannelListener} when
+ * invoking the {@link #join join} method to add a client session to a
+ * channel.
+ *
+ * <p> Note that no registered listeners are notified of messages sent
+ * by the server on the channel; listeners are only notified (as
+ * described above) when client sessions send messages on the channel.
  *
  * <p>A client session joined to one or more channels may become
  * disconnected due to the client logging out or due to other factors
@@ -93,13 +94,29 @@ public interface Channel {
      * session is already joined to this channel, then no action is
      * taken.
      *
-     * @param session a session
+     * <p>If the specified <code>listener</code> is
+     * non-<code>null</code>, then when the specified client session
+     * sends a message on this channel, the specified listener's {@link
+     * ChannelListener#receivedMessage(Channel,ClientSession,byte[])
+     * receivedMessage} method is invoked with this channel, the
+     * session, and the message.  The specified listener is not
+     * invoked for messages that the server sends on this channel via
+     * one of the channel's <code>send</code> methods.  If the specified
+     * listener is non-<code>null</code> then it must also be serializable.
      *
+     * <p>Note: This operation has no effect on notifications to the
+     * channel listener specified when this channel was created.
+     *
+     * @param session a session
+     * @param listener a channel listener, or <code>null</code>
+     *
+     * @throws IllegalArgumentException if <code>listener</code> is
+     * non-<code>null</code> and is not <code>Serializable</code>
      * @throws IllegalStateException if this channel is closed
      * @throws TransactionException if the operation failed because of
      * a problem with the current transaction
      */
-    void join(ClientSession session);
+    void join(ClientSession session, ChannelListener listener);
 
     /**
      * Removes a client session from this channel.  If the specified
@@ -157,9 +174,13 @@ public interface Channel {
     Collection<ClientSession> getSessions();
 
     /**
-     * Sends a message with the specified message to all client
-     * sessions joined to this channel.  If no sessions are joined to
-     * this channel, then no action is taken.
+     * Sends the message contained in the specified byte array to all
+     * client sessions joined to this channel.  If no sessions are
+     * joined to this channel, then no action is taken.
+     *
+     * <p>The specified byte array must not be modified after invoking
+     * this method; if the byte array is modified, then this method
+     * may have unpredictable results.
      *
      * @param message a message
      *
@@ -167,12 +188,16 @@ public interface Channel {
      * @throws TransactionException if the operation failed because of
      * a problem with the current transaction
      */
-    void send(ByteBuffer message);
+    void send(byte[] message);
 
     /**
-     * Sends a message with the specified message to the specified
-     * recipient session.  If the specified client session is not
-     * joined to this channel, then no action is taken.
+     * Sends the message contained in the specified byte array to the
+     * specified recipient session.  If the specified client session
+     * is not joined to this channel, then no action is taken.
+     *
+     * <p>The specified byte array must not be modified after invoking
+     * this method; if the byte array is modified, then this method
+     * may have unpredictable results.
      *
      * @param recipient a recipient
      * @param message a message
@@ -181,13 +206,17 @@ public interface Channel {
      * @throws TransactionException if the operation failed because of
      * a problem with the current transaction
      */
-    void send(ClientSession recipient, ByteBuffer message);
+    void send(ClientSession recipient, byte[] message);
 
     /**
-     * Sends a message with the specified message to the client
-     * sessions in the specified collection.  Any specified recipient
-     * sessions that are not currently joined to the channel are
-     * ignored.
+     * Sends a message contained in the specified byte array to the
+     * client sessions in the specified collection.  Any specified
+     * recipient sessions that are not currently joined to the channel
+     * are ignored.
+     *
+     * <p>The specified byte array must not be modified after invoking
+     * this method; if the byte array is modified, then this method
+     * may have unpredictable results.
      *
      * @param recipients a collection of recipient sessions
      * @param message a message
@@ -196,42 +225,7 @@ public interface Channel {
      * @throws TransactionException if the operation failed because of
      * a problem with the current transaction
      */
-    void send(Collection<ClientSession> recipients, ByteBuffer message);
-
-    /**
-     * Sets the listener for messages sent by the specified client
-     * session on this channel, replacing the previous listener set
-     * for the specified session.  If the specified session is not
-     * joined to this channel, then this operation has no effect.
-     *
-     * <p>If the specified <code>listener</code> is
-     * non-<code>null</code>, then when the specified client session
-     * sends a message on this channel, the specified listener's {@link
-     * ChannelListener#receivedMessage(Channel,ClientSession,ByteBuffer)
-     * receivedMessage} method is invoked with this channel, the
-     * session, and the message.  The specified listener is not
-     * invoked for messages that the server sends on this channel via
-     * one of the channel's <code>send</code> methods.
-     *
-     * <p>If the specified <code>listener</code> is <code>null</code>,
-     * then, if a listener was specified for this channel by a
-     * previous call to this method, that listener will no longer be
-     * notified when the specified client session sends message on
-     * this channel.
-     *
-     * <p>Note: This operation has no effect on notifications to the
-     * channel listener specified when this channel was created.
-     
-     * @param listener a channel listener, or <code>null</code>
-     * @param session a session
-     *
-     * @throws IllegalArgumentException if <code>listener</code> is
-     * not <code>Serializable</code>
-     * @throws IllegalStateException if this channel is closed
-     * @throws TransactionException if the operation failed because of
-     * a problem with the current transaction
-     */
-    void setListener(ChannelListener listener, ClientSession session);
+    void send(Collection<ClientSession> recipients, byte[] message);
 
     /**
      * Closes this channel and removes its named binding.  If this

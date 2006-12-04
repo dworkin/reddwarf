@@ -8,7 +8,6 @@ import java.awt.event.ActionListener;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
 import java.net.PasswordAuthentication;
-import java.nio.ByteBuffer;
 import java.util.Collection;
 
 import javax.swing.JButton;
@@ -21,9 +20,9 @@ import javax.swing.JScrollPane;
 
 import com.sun.sgs.client.ClientChannel;
 import com.sun.sgs.client.ClientChannelListener;
-import com.sun.sgs.client.ClientAddress;
-import com.sun.sgs.client.SimpleClientListener;
-import com.sun.sgs.client.SimpleClient;
+import com.sun.sgs.client.SessionId;
+import com.sun.sgs.client.simple.SimpleClientListener;
+import com.sun.sgs.client.simple.SimpleClient;
 
 /**
  * <p>
@@ -147,7 +146,7 @@ public class ChatClient extends JFrame
 
         try {
             client = new SimpleClient(this);
-            client.connect(null);
+            client.login(null);
             // TODO: enable the loginButton as a "Cancel Login" action.
         } catch (Exception e) {
             e.printStackTrace();
@@ -181,43 +180,43 @@ public class ChatClient extends JFrame
 
     private void doServerMessage() {
 	String message = getUserInput("Enter server message:");
-        client.send(ByteBuffer.wrap(message.getBytes()));
+        client.send(message.getBytes());
     }
 
     private void doMultiDCCMessage() {
-	Collection<ClientAddress> targets = userList.getSelectedClients();
+	Collection<SessionId> targets = userList.getSelectedClients();
     	if (targets == null || targets.isEmpty()) {
     	    return;
     	}
 
         String message = getUserInput("Enter private message:");
-        dccChannel.send(targets, ByteBuffer.wrap(message.getBytes()));
+        dccChannel.send(targets, message.getBytes());
     }
 
     void doDCCMessage() {
-	ClientAddress target = userList.getSelectedClient();
+	SessionId target = userList.getSelectedClient();
 	if (target == null) {
 	    return;
 	}
 	String message = getUserInput("Enter private message:");
-        dccChannel.send(target, ByteBuffer.wrap(message.getBytes()));
+        dccChannel.send(target, message.getBytes());
     }
 
     void joinChannel(String channelName) {
 	String cmd = "JOIN" + channelName;
-	client.send(ByteBuffer.wrap(cmd.getBytes()));
+	client.send(cmd.getBytes());
     }
  
     void leaveChannel(ClientChannel chan) {
 	String cmd = "LEAV" + chan.getName();
-	client.send(ByteBuffer.wrap(cmd.getBytes()));
+	client.send(cmd.getBytes());
     }
 
-    private void userLogin(ClientAddress member) {
+    private void userLogin(SessionId member) {
         userList.addClient(member);
     }
 
-    private void userLogout(ClientAddress member) {
+    private void userLogout(SessionId member) {
         userList.removeClient(member);
     }
 
@@ -225,7 +224,7 @@ public class ChatClient extends JFrame
 
     public void loggedIn() {
         statusMessage.setText("Status: Connected");
-        setTitle(String.format("Chat Test Client: %.8s", client.getClientAddress().toString()));
+        setTitle(String.format("Chat Test Client: %.8s", client.getSessionId().toString()));
         loginButton.setText("Logout");
         loginButton.setActionCommand("logout");
         setButtonsEnabled(true);
@@ -277,15 +276,22 @@ public class ChatClient extends JFrame
         }
     }
 
-    public void receivedMessage(ByteBuffer message) {
-	byte[] messageBytes = new byte[4];
-	message.get(messageBytes);
-	String command = new String(messageBytes);
+    private static SessionId getSessionIdAfter(byte[] message, int bytesRead) {
+	int sessionIdLen = message.length - bytesRead;
+	byte[] sessionIdBytes = new byte[sessionIdLen];
+	System.arraycopy(message, 0, sessionIdBytes, 0, sessionIdLen);
+	return SessionId.fromBytes(sessionIdBytes);
+    }
+
+    public void receivedMessage(byte[] message) {
+	byte[] cmdBytes = new byte[4];
+	System.arraycopy(message, 0, cmdBytes, 0, 4);
+	String command = new String(cmdBytes);
 	System.err.format("ChatClient: Command recv [%s]\n", command);
 	if (command.equals("LOGI")) {
-	    userLogin(ClientAddress.fromBytes(message));
+	    userLogin(getSessionIdAfter(message, 4));
 	} else if (command.equals("LOGO")) {
-	    userLogout(ClientAddress.fromBytes(message));
+	    userLogout(getSessionIdAfter(message, 4));
 	} else {
 	    System.err.format("ChatClient: Error, unknown command [%s]\n",
 		    command);
@@ -294,11 +300,9 @@ public class ChatClient extends JFrame
 
     // === ClientChannelListener ===
     
-    public void receivedMessage(ClientChannel channel, ClientAddress sender, ByteBuffer message) {
-	byte[] messageBytes = new byte[message.remaining()];
-	message.get(messageBytes);
+    public void receivedMessage(ClientChannel channel, SessionId sender, byte[] message) {
 	JOptionPane.showMessageDialog(this,
-		new String(messageBytes),
+		new String(message),
 		String.format("Message from %.8s",
 			sender.toString()),
 			JOptionPane.INFORMATION_MESSAGE);
@@ -333,12 +337,12 @@ public class ChatClient extends JFrame
 	doQuit();
     }
 
-    public void windowActivated(WindowEvent e) { }
-    public void windowClosed(WindowEvent e) { }
-    public void windowDeactivated(WindowEvent e) { }
-    public void windowDeiconified(WindowEvent e) { }
-    public void windowIconified(WindowEvent e) { }
-    public void windowOpened(WindowEvent e) { }
+    public void windowActivated(WindowEvent e)   { /*unused */ }
+    public void windowClosed(WindowEvent e)      { /*unused */ }
+    public void windowDeactivated(WindowEvent e) { /*unused */ }
+    public void windowDeiconified(WindowEvent e) { /*unused */ }
+    public void windowIconified(WindowEvent e)   { /*unused */ }
+    public void windowOpened(WindowEvent e)      { /*unused */ }
 
     // === Main ===
     

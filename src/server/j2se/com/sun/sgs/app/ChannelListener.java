@@ -1,16 +1,14 @@
 package com.sun.sgs.app;
 
 import java.io.Serializable;
-import java.nio.ByteBuffer;
 
 /**
  * Listener for messages received on a channel.  A channel can be
  * created with a <code>ChannelListener</code> which is notified when
  * any client session sends a message on that channel.  Additionally,
- * a server can register a per-session listener (to be notified when
- * messages are sent by an individual client sessions on a channel) by
- * invoking the channel's {@link Channel#setListener setListener}
- * method with the channel listener and the session.
+ * a server can specify a per-session listener (to be notified when
+ * messages are sent by an individual client session on a channel)
+ * when joining a client session to a channel.
  *
  * <p>An implementation of a <code>ChannelListener</code> should implement
  * the {@link Serializable} interface, so that channel listeners
@@ -45,6 +43,6 @@ public interface ChannelListener {
      */
     void receivedMessage(Channel channel,
 			 ClientSession session,
-			 ByteBuffer message);
+			 byte[] message);
     
 }

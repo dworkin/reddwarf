@@ -1,12 +1,13 @@
+
 package com.sun.sgs.app;
+
+import com.sun.sgs.impl.kernel.ContextResolver;
+
 
 /**
  * Provides access to facilities available in the current application context.
  */
-public abstract class AppContext {
-
-    /** Creates an instance of this class. */
-    protected AppContext() { }
+public final class AppContext {
 
     /**
      * Returns the <code>ChannelManager</code> for use by the current
@@ -16,7 +17,7 @@ public abstract class AppContext {
      * @return	the <code>ChannelManager</code> for the current application
      */
     public static ChannelManager getChannelManager() {
-	throw new AssertionError("This method is not implemented");
+        return ContextResolver.getChannelManager();
     }
 
     /**
@@ -27,7 +28,7 @@ public abstract class AppContext {
      * @return	the <code>DataManager</code> for the current application
      */
     public static DataManager getDataManager() {
-	throw new AssertionError("This method is not implemented");
+        return ContextResolver.getDataManager();
     }
 
     /**
@@ -38,7 +39,7 @@ public abstract class AppContext {
      * @return	the <code>TaskManager</code> for the current application
      */
     public static TaskManager getTaskManager() {
-	throw new AssertionError("This method is not implemented");
+        return ContextResolver.getTaskManager();
     }
 
     /**
@@ -53,6 +54,7 @@ public abstract class AppContext {
      *		specified type
      */
     public static <T> T getManager(Class<T> type) {
-	throw new AssertionError("This method is not implemented");
+        return ContextResolver.getManager(type);    
     }
+
 }

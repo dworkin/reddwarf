@@ -1,0 +1,115 @@
+package com.sun.sgs.impl.kernel;
+
+import com.sun.sgs.impl.util.LoggerWrapper;
+
+import com.sun.sgs.kernel.Manageable;
+import com.sun.sgs.kernel.ResourceCoordinator;
+
+import java.util.Properties;
+
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+
+/**
+ * This implementation of <code>ResourceCoordinator</code> is used by the
+ * kernel to create and manage threads of control. No component creates
+ * a thread directly. Instead, they request to run some long-lived task
+ * through the <code>startTask</code> method. All threads created and
+ * managed by this class are instances of
+ * <code>TransactionalTaskThread</code>.
+ * <p>
+ * NOTE: This currently provides access to an unbounded number of threads.
+ * A pool of threads is kept, but if the pool is empty and a new thread
+ * is needed, it is always created. Also, there is no policy governing how
+ * many threads may be allocated to any given component. This is fine for
+ * an initial testing system, but will need to be profiled and understood
+ * better in the final production system. For the present, this is meant
+ * be a simple coordinator that provides correct behavior.
+ *
+ * @since 1.0
+ * @author Seth Proctor
+ */
+class ResourceCoordinatorImpl implements ResourceCoordinator
+{
+
+    // logger for this class
+    private static final LoggerWrapper logger =
+        new LoggerWrapper(Logger.getLogger(ResourceCoordinatorImpl.
+                                           class.getName()));
+
+    // the pool of threads
+    private ThreadPoolExecutor threadPool;
+
+    // the default starting pool size
+    private static final String DEFAULT_POOL_SIZE_CORE = "8";
+
+    // the default maximum pool size
+    private static final String DEFAULT_POOL_SIZE_MAX = "16";
+
+    /**
+     * The property used to specify the starting thread pool size.
+     */
+    public static final String POOL_SIZE_CORE_PROPERTY =
+        "com.sun.sgs.kernel.CorePoolSize";
+
+    /**
+     * The property used to specify the maximum thread pool size.
+     */
+    public static final String POOL_SIZE_MAX_PROPERTY =
+        "com.sun.sgs.kernel.MaximumPoolSize";
+
+    /**
+     * Creates a new instance of <code>ResourceCoordinatorImpl</code>.
+     *
+     * @param properties configuration properties
+     */
+    ResourceCoordinatorImpl(Properties properties) {
+        int coreSize =
+            Integer.parseInt(properties.getProperty(POOL_SIZE_CORE_PROPERTY,
+                                                    DEFAULT_POOL_SIZE_CORE));
+        int maxSize =
+            Integer.parseInt(properties.getProperty(POOL_SIZE_MAX_PROPERTY,
+                                                    DEFAULT_POOL_SIZE_MAX));
+
+        if (logger.isLoggable(Level.CONFIG))
+            logger.log(Level.CONFIG, "Starting Resource Coordinator with " +
+                       "{0} core threads and a max pool of {1}",
+                       coreSize, maxSize);
+
+        SynchronousQueue<Runnable> backingQueue =
+            new SynchronousQueue<Runnable>();
+        ThreadFactory threadFactory =
+            new ThreadFactory() {
+                public Thread newThread(Runnable r) {
+                    return new TransactionalTaskThread(r);
+                }
+            };
+
+        threadPool =
+            new ThreadPoolExecutor(coreSize, maxSize, 120L,
+                                   TimeUnit.SECONDS, backingQueue,
+                                   threadFactory);
+    }
+
+    /**
+     *
+     *  NOTE: make sure to set the owner on the new task
+     *
+     *
+     * {@inheritDoc}
+     */
+    public synchronized void startTask(Runnable task, Manageable component) {
+        // FIXME: the Manageable interface should have some kind of owner
+        // or context accessor, so we can assign specific ownership through
+        // beforeExecute method of the pool using a wrapping runnable, but
+        // for now all threads start being owned by the kernel
+        threadPool.execute(task);
+    }
+
+}

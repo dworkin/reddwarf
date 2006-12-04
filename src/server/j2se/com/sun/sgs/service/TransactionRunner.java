@@ -1,6 +1,8 @@
 
 package com.sun.sgs.service;
 
+import com.sun.sgs.impl.kernel.TaskHandler;
+
 import com.sun.sgs.kernel.KernelRunnable;
 
 
@@ -16,7 +18,7 @@ import com.sun.sgs.kernel.KernelRunnable;
 public class TransactionRunner implements KernelRunnable {
 
     // the kernel runnable
-    private KernelRunnable transactionalTask;
+    private final KernelRunnable transactionalTask;
 
     /**
      * Creates an instance of <code>TransactionRunner</code> that accepts
@@ -25,6 +27,8 @@ public class TransactionRunner implements KernelRunnable {
      * @param transactionalTask the <code>KernelRunnable</code> to run
      */
     public TransactionRunner(KernelRunnable transactionalTask) {
+        if (transactionalTask == null)
+            throw new NullPointerException("null task not allowed");
         this.transactionalTask = transactionalTask;
     }
 
@@ -36,7 +40,7 @@ public class TransactionRunner implements KernelRunnable {
      *                   <code>KernelRunnable</code> or with the transaction
      */
     public void run() throws Exception {
-        // FIXME: implement this method
+        TaskHandler.runTransactionalTask(transactionalTask);
     }
 
 }

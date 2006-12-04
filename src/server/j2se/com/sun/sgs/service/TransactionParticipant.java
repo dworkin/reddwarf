@@ -17,9 +17,17 @@ package com.sun.sgs.service;
  * defined here are called on a participant), a <code>Service</code> may
  * not interact with any other <code>Service</code> in the context of that
  * transaction. Doing so results in unspecified behavior.
+ * <p>
+ * This interface does not specify how transaction participants learn the
+ * outcome of prepared transactions following a crash.  Doing so requires a
+ * separate interaction between the participant and the transaction coordinator
+ * that is not specified by this interface.  Without that additional
+ * communication, this interface is sufficient to support transactions with at
+ * most one durable transaction participant.
  *
  * @since 1.0
  * @author Seth Proctor
+ * @see NonDurableTransactionParticipant
  */
 public interface TransactionParticipant {
 
@@ -29,7 +37,7 @@ public interface TransactionParticipant {
      * flag stating whether the prepared state is read-only, meaning that no
      * external state is modified by this participant. If this method
      * returns true, then neither <code>commit</code> nor <code>abort</code>
-     * will not be called.
+     * will be called.
      * <p>
      * If this method throws an exception, then the preparation failed, and
      * the transaction will be aborted. If this method completes successfully,

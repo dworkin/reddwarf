@@ -5,7 +5,6 @@ import java.awt.Container;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.nio.ByteBuffer;
 
 import javax.swing.JInternalFrame;
 import javax.swing.JLabel;
@@ -19,7 +18,7 @@ import javax.swing.event.InternalFrameListener;
 
 import com.sun.sgs.client.ClientChannel;
 import com.sun.sgs.client.ClientChannelListener;
-import com.sun.sgs.client.ClientAddress;
+import com.sun.sgs.client.SessionId;
 
 /**
  * <p>
@@ -37,7 +36,6 @@ public class ChatChannelFrame extends JInternalFrame
 
     private final ChatClient myChatClient;
     private final ClientChannel chan;
-    private final ByteBuffer outbuff;
 
     private final MemberList memberList;
     private final JTextField inputField;
@@ -53,7 +51,6 @@ public class ChatChannelFrame extends JInternalFrame
         super("Channel: " + channel.getName());
         myChatClient = client;
         chan = channel;
-        outbuff = ByteBuffer.allocate(1024);
         Container c = getContentPane();
         c.setLayout(new BorderLayout());
         JPanel eastPanel = new JPanel();
@@ -77,20 +74,25 @@ public class ChatChannelFrame extends JInternalFrame
         setResizable(true);
         setVisible(true);
     }
+    
+    private static SessionId getSessionIdAfter(byte[] message, int bytesRead) {
+	int sessionIdLen = message.length - bytesRead;
+	byte[] sessionIdBytes = new byte[sessionIdLen];
+	System.arraycopy(message, 0, sessionIdBytes, 0, sessionIdLen);
+	return SessionId.fromBytes(sessionIdBytes);
+    }
 
-    public void receivedMessage(ClientChannel channel, ClientAddress sender, ByteBuffer message) {
-	byte[] messageBytes = new byte[4];
-	message.get(messageBytes);
-	String command = new String(messageBytes);
+    public void receivedMessage(ClientChannel channel, SessionId sender, byte[] message) {
+	byte[] cmdBytes = new byte[4];
+	System.arraycopy(message, 0, cmdBytes, 0, 4);
+	String command = new String(cmdBytes);
 	if (command.equals("CHNJ")) {
-	    memberList.addClient(ClientAddress.fromBytes(message));
+	    memberList.addClient(getSessionIdAfter(message, 4));
 	} else if (command.equals("CHNL")) {
-	    memberList.removeClient(ClientAddress.fromBytes(message));
+	    memberList.removeClient(getSessionIdAfter(message, 4));
 	} else {
-	    message.rewind();
-	    messageBytes = new byte[message.remaining()];
 	    outputArea.append(String.format("%.8s: %s\n",
-		    sender.toString(), new String(messageBytes)));
+		    sender.toString(), new String(message)));
 	}
     }
 
@@ -101,18 +103,16 @@ public class ChatChannelFrame extends JInternalFrame
     }
     
     public void actionPerformed(ActionEvent action) {
-	outbuff.clear();
-	outbuff.put(inputField.getText().getBytes()).flip();
-        chan.send(outbuff);
+        chan.send(inputField.getText().getBytes());
         inputField.setText("");
     }
     
-    public void internalFrameOpened(InternalFrameEvent event) { }
-    public void internalFrameClosed(InternalFrameEvent event) { }
-    public void internalFrameIconified(InternalFrameEvent event) { }
-    public void internalFrameDeiconified(InternalFrameEvent event) { }
-    public void internalFrameActivated(InternalFrameEvent event) { }
-    public void internalFrameDeactivated(InternalFrameEvent event) { }
+    public void internalFrameOpened(InternalFrameEvent event)      { /* unused */ }
+    public void internalFrameClosed(InternalFrameEvent event)      { /* unused */ }
+    public void internalFrameIconified(InternalFrameEvent event)   { /* unused */ }
+    public void internalFrameDeiconified(InternalFrameEvent event) { /* unused */ }
+    public void internalFrameActivated(InternalFrameEvent event)   { /* unused */ }
+    public void internalFrameDeactivated(InternalFrameEvent event) { /* unused */ }
 
     public void internalFrameClosing(InternalFrameEvent event) {
         myChatClient.leaveChannel(chan);

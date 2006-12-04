@@ -1,7 +1,6 @@
 package com.sun.sgs.app;
 
 import java.io.Serializable;
-import java.nio.ByteBuffer;
 
 /**
  * Listener for messages sent from an associated client session to the
@@ -36,7 +35,7 @@ public interface ClientSessionListener {
      *
      * @param message a message
      */
-    void receivedMessage(ByteBuffer message);
+    void receivedMessage(byte[] message);
 
     /**
      * Notifies this listener that the associated session's client has

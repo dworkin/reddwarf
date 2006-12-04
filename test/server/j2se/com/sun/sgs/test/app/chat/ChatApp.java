@@ -1,7 +1,6 @@
 package com.sun.sgs.test.app.chat;
 
 import java.io.Serializable;
-import java.nio.ByteBuffer;
 import java.util.Properties;
 
 import com.sun.sgs.app.AppContext;
@@ -21,6 +20,7 @@ public class ChatApp
 {
     private static final long serialVersionUID = 1L;
 
+    /** {@inheritDoc} */
     public void startingUp(Properties props) {
         System.err.format("ChatApp: Starting up\n");
 
@@ -28,21 +28,22 @@ public class ChatApp
         	"echo", this, Delivery.ORDERED_UNRELIABLE);
     }
 
-    public void loggedIn(final ClientSession session) {
+    /** {@inheritDoc} */
+    public ClientSessionListener loggedIn(ClientSession session) {
         System.err.format("ChatApp: ClientSession [%s] joined, named \"%s\"\n",
         	session.toString(), session.getName());
-        session.setListener(new ChatClientSessionListener(this, session));
+        return new ChatClientSessionListener(this, session);
     }
 
-    public void receivedMessage(Channel channel, ClientSession sender, ByteBuffer message) {
-	byte[] messageBytes = new byte[message.remaining()];
-	message.get(messageBytes);
-	String messageString = new String(messageBytes);
+    /** {@inheritDoc} */
+    public void receivedMessage(Channel channel, ClientSession sender, byte[] message) {
+	String messageString = new String(message);
 	System.err.format("ChatApp: Echoing to \"%s\": [%s]\n",
 		sender.getName(), messageString);
         channel.send(sender, message);
     }
 
+    /** {@inheritDoc} */
     public void shuttingDown(ShutdownListener listener, boolean force) {
 	System.err.format("ChatApp: Shutting down, force = %b\n", force);
 	listener.shutdownComplete();
@@ -59,16 +60,16 @@ public class ChatApp
 	    this.app = app;
 	    this.session = session;
 	}
-
+	
+	/** {@inheritDoc} */
 	public void disconnected(boolean graceful) {
 	    System.err.format("ChatApp: ClientSession [%s] disconnected, " +
 		    "graceful = %b\n", session.toString(), graceful);
 	}
 
-	public void receivedMessage(ByteBuffer message) {
-	    byte[] messageBytes = new byte[message.remaining()];
-	    message.get(messageBytes);
-	    String command = new String(messageBytes);
+	/** {@inheritDoc} */
+	public void receivedMessage(byte[] message) {
+	    String command = new String(message);
 	    System.err.format("ChatApp: Command from \"%s\": [%s]\n",
 		    session.getName(), command);
 
@@ -83,7 +84,7 @@ public class ChatApp
 		}
 		System.err.format("ChatApp: Joining \"%s\" to channel %s\n",
 			session.getName(), channel.getName());
-		channel.join(session);
+		channel.join(session, null);
 	    } else if (command.startsWith("/leave ")) {
 		String channelName = command.substring(7);
 		Channel channel = channelMgr.getChannel(channelName);
