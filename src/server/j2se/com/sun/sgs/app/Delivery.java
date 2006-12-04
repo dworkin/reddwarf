@@ -6,8 +6,7 @@ package com.sun.sgs.app;
  * ChannelManager#createChannel ChannelManager.createChannel} method
  * for details.
  *
- * <p>Unless otherwise specified by a delivery requirement, messages
- * will be delivered <i>at most once</i>.
+ * <p>Messages are guaranteed to be delivered <i>at most once</i>.
  */
 public enum Delivery {
 
@@ -25,16 +24,9 @@ public enum Delivery {
     ORDERED_UNRELIABLE,
 	
     /**
-     * Mostly reliable delivery: Message delivery is guaranteed unless
+     * Reliable delivery: Message delivery is guaranteed unless
      * there is a node or network failure.  Messages that are
      * delivered preserve the sender's order.
-     */
-    MOSTLY_RELIABLE,
-	
-    /**
-     * Reliable delivery: Message delivery is guaranteed.  Messages
-     * are delivered preserving the sender's order.  A given message
-     * will be delivered <i>exactly once</i>.
      */
     RELIABLE;
 }
