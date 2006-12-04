@@ -38,8 +38,6 @@ public class ProtocolMessageDecoder {
      * Reads the next int off the buffer and returns true if it equals
      * 1, otherwise false.
      * 
-     * @param data the data buffer
-     * 
      * @return true if the int read equals one.
      */
     public boolean readBoolean() {
@@ -58,8 +56,6 @@ public class ProtocolMessageDecoder {
      * size, and reads that many more bytes from the buffer, returning
      * the resulting byte array.
      * 
-     * @param data the buffer to read from
-     * 
      * @return a byte array matching the length of the first int read
      * from the buffer
      */
@@ -77,8 +73,6 @@ public class ProtocolMessageDecoder {
      * Reads a regular old Java signed byte off the buffer and converts
      * it to an unsigned one (0-255).
      * 
-     * @param data the buffer from which to read
-     * 
      * @return the unsigned representation of the next byte off the
      * buffer (as an int).
      */
@@ -93,8 +87,6 @@ public class ProtocolMessageDecoder {
     /**
      * Convenience method for reading the first byte as the version number.
      * 
-     * @param data      the data to read from
-     * 
      * @return the first byte as the version number of the protocol.
      */
     public int readVersionNumber() {
@@ -103,8 +95,6 @@ public class ProtocolMessageDecoder {
     
     /**
      * Convenience method for reading the second byte as an unsigned byte.
-     * 
-     * @param data      the data to read from
      * 
      * @return the first byte as the command code of a message.
      */

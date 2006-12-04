@@ -46,7 +46,7 @@ public class SocketHandler implements IoHandler {
      * {@code IOHandler}. 
      * 
      * @param session           the session where the exception occurred
-     * @param throwable         the exception
+     * @param exception         the exception
      */
     public void exceptionCaught(IoSession session, Throwable exception)
                                                             throws Exception {

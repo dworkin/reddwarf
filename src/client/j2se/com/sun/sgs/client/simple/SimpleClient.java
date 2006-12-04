@@ -95,7 +95,7 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
      * <p>If this client is disconnected for any reason (including
      * login failure), this method may be used again to log in.
      *
-     * @param properties a properties list specifying properties to
+     * @param props a properties list specifying properties to
      * use for this client's session (e.g., connection properties)
      */
     public void login(Properties props) throws IOException {
