@@ -140,11 +140,11 @@ public class LoggerWrapper {
      * errors thrown by the underlying <code>log</code> call are swallowed.
      *
      * @param	level the level at which to log
-     * @param	message the log message, which can be <code>null</code>
      * @param	thrown the <code>Throwable</code> associated with the log
      * 		message
+     * @param	message the log message, which can be <code>null</code>
      */
-    public void logThrow(Level level, String message, Throwable thrown) {
+    public void logThrow(Level level, Throwable thrown, String message) {
 	if (logger.isLoggable(level)) {
 	    LogRecord lr = new LogRecord(level, message);
 	    lr.setThrown(thrown);
@@ -170,15 +170,15 @@ public class LoggerWrapper {
      * are swallowed.
      *
      * @param	level the level at which to log
-     * @param	message the log message, which can be <code>null</code>
      * @param	thrown the <code>Throwable</code> associated with the log
      * 		message
+     * @param	message the log message, which can be <code>null</code>
      * @param	param the parameter value for the log message, which can be
      * 		<code>null</code>
      */
     public void logThrow(Level level,
-			 String message,
 			 Throwable thrown,
+			 String message,
 			 Object param)
     {
 	if (logger.isLoggable(level)) {
@@ -207,15 +207,15 @@ public class LoggerWrapper {
      * are swallowed.
      *
      * @param	level the level at which to log
-     * @param	message the log message, which can be <code>null</code>
      * @param	thrown the <code>Throwable</code> associated with the log
      * 		message
+     * @param	message the log message, which can be <code>null</code>
      * @param	params the parameter values for the log message, which can be
      * 		<code>null</code>
      */
     public void logThrow(Level level,
-			 String message,
 			 Throwable thrown,
+			 String message,
 			 Object... params) 
     {
 	if (logger.isLoggable(level)) {
@@ -224,6 +224,76 @@ public class LoggerWrapper {
 	    lr.setParameters(params);
 	    log(lr);
 	}
+    }
+
+    /**
+     * If calling {@link Logger#isLoggable isLoggable} with the given
+     * <code>level</code> value on the wrapped <code>Logger</code> returns
+     * <code>true</code>, invokes the {@link Logger#log(LogRecord) log} method
+     * of the wrapped <code>Logger</code>, passing a {@link LogRecord}
+     * constructed with the given <code>level</code> and <code>message</code>
+     * values.  The given <code>param</code> value is set as the sole
+     * {@linkplain LogRecord#setParameters parameter} of the
+     * <code>LogRecord</code>.  The {@linkplain LogRecord#getSourceClassName
+     * source class name} and {@linkplain LogRecord#getSourceMethodName source
+     * method name} of the <code>LogRecord</code> are set to the class and
+     * method names of the caller of this method, if they can be determined.
+     * Any exceptions or errors thrown by the underlying <code>log</code> call
+     * are swallowed. <p>
+     *
+     * This method is deprecated to flag any possible confusion of this method
+     * with the {@link #logThrow(Level, Throwable, String) logThrow} method.
+     * If the caller intends to include a <code>Throwable</code> as a parameter
+     * value in the log method, rather than including its stack trace by
+     * calling <code>logThrow</code>, it can cast the parameter to type
+     * <code>Object</code> to avoid the deprecation warning.
+     *
+     * @param	level the level at which to log
+     * @param	message the log message, which can be <code>null</code>
+     * @param	param the parameter value for the log message, which can be
+     * 		<code>null</code>
+     */
+    @Deprecated
+    public void log(Level level, String message, Throwable param) {
+	log(level, message, (Object) param);
+    }
+
+    /**
+     * If calling {@link Logger#isLoggable isLoggable} with the given
+     * <code>level</code> value on the wrapped <code>Logger</code> returns
+     * <code>true</code>, invokes the {@link Logger#log(LogRecord) log} method
+     * of the wrapped <code>Logger</code>, passing a {@link LogRecord}
+     * constructed with the given <code>level</code> and <code>message</code>
+     * values.  The given <code>param</code> and <code>otherParams</code>
+     * values are set as the {@linkplain LogRecord#setParameters parameters} of
+     * the <code>LogRecord</code>.  The {@linkplain
+     * LogRecord#getSourceClassName source class name} and {@linkplain
+     * LogRecord#getSourceMethodName source method name} of the
+     * <code>LogRecord</code> are set to the class and method names of the
+     * caller of this method, if they can be determined.  Any exceptions or
+     * errors thrown by the underlying <code>log</code> call are swallowed. <p>
+     *
+     * This method is deprecated to flag any possible confusion of this method
+     * with the {@link #logThrow(Level, Throwable, String, Object) logThrow}
+     * method.  If the caller intends to include a <code>Throwable</code> as a
+     * parameter value in the log method, rather than including its stack trace
+     * by calling <code>logThrow</code>, it can cast the first parameter to
+     * type <code>Object</code> to avoid the deprecation warning.
+     *
+     * @param	level the level at which to log
+     * @param	message the log message, which can be <code>null</code>
+     * @param	param the parameter value for the log message, which can be
+     * 		<code>null</code>
+     * @param	otherParams additional parameter values for the log message,
+     *		which can be <code>null</code>
+     */
+    @Deprecated
+    public void log(Level level,
+		    String message,
+		    Throwable param,
+		    Object... otherParams)
+    {
+	log(level, message, (Object) param, otherParams);
     }
 
     /**

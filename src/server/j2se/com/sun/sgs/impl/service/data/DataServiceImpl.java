@@ -185,7 +185,7 @@ public final class DataServiceImpl
 	    store = new DataStoreImpl(properties);
 	} catch (RuntimeException e) {
 	    logger.logThrow(
-		Level.SEVERE, "DataService initialization failed", e);
+		Level.SEVERE, e, "DataService initialization failed");
 	    throw e;
 	}
     }
@@ -263,7 +263,7 @@ public final class DataServiceImpl
 		Level.FINEST, "removeObject object:{0} returns", object);
 	} catch (RuntimeException e) {
 	    logger.logThrow(
-		Level.FINEST, "removeObject object:{0} throws", e, object);
+		Level.FINEST, e, "removeObject object:{0} throws", object);
 	    throw e;
 	}
     }
@@ -286,7 +286,7 @@ public final class DataServiceImpl
 		Level.FINEST, "markForUpdate object:{0} returns", object);
 	} catch (RuntimeException e) {
 	    logger.logThrow(
-		Level.FINEST, "markForUpdate object:{0} throws", e, object);
+		Level.FINEST, e, "markForUpdate object:{0} throws", object);
 	    throw e;
 	}
     }
@@ -310,7 +310,7 @@ public final class DataServiceImpl
 	    return result;
 	} catch (RuntimeException e) {
 	    logger.logThrow(
-		Level.FINEST, "createReference object:{0} throws", e, object);
+		Level.FINEST, e, "createReference object:{0} throws", object);
 	    throw e;
 	}
     }
@@ -349,7 +349,7 @@ public final class DataServiceImpl
 	    }
 	    return result;
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINER, "prepare txn:{0} throws", e, txn);
+	    logger.logThrow(Level.FINER, e, "prepare txn:{0} throws", txn);
 	    throw e;
 	}
     }
@@ -363,7 +363,7 @@ public final class DataServiceImpl
 	    context.commit();
 	    logger.log(Level.FINER, "commit txn:{0} returns", txn);
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.WARNING, "commit txn:{0} throws", e, txn);
+	    logger.logThrow(Level.WARNING, e, "commit txn:{0} throws", txn);
 	    throw e;
 	}
     }
@@ -378,7 +378,7 @@ public final class DataServiceImpl
 	    logger.log(Level.FINER, "prepareAndCommit txn:{0} returns", txn);
 	} catch (RuntimeException e) {
 	    logger.logThrow(
-		Level.FINER, "prepareAndCommit txn:{0} throws", e, txn);
+		Level.FINER, e, "prepareAndCommit txn:{0} throws", txn);
 	    throw e;
 	}
     }
@@ -397,7 +397,7 @@ public final class DataServiceImpl
 	    context.abort();
 	    logger.log(Level.FINER, "abort txn:{0} returns", txn);
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.WARNING, "abort txn:{0} throws", e, txn);
+	    logger.logThrow(Level.WARNING, e, "abort txn:{0} throws", txn);
 	    throw e;
 	}
     }
@@ -432,7 +432,7 @@ public final class DataServiceImpl
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
-		    Level.FINEST, "{0} name:{1}, type:{2} throws", e,
+		    Level.FINEST, e, "{0} name:{1}, type:{2} throws",
 		    serviceBinding ? "getServiceBinding" : "getBinding",
 		    name, type);
 	    }
@@ -462,7 +462,7 @@ public final class DataServiceImpl
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
-		    Level.FINEST, "{0} name:{1}, object:{2} throws", e,
+		    Level.FINEST, e, "{0} name:{1}, object:{2} throws",
 		    serviceBinding ? "setServiceBinding" : "setBinding",
 		    name, object);
 	    }
@@ -492,7 +492,7 @@ public final class DataServiceImpl
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
-		    Level.FINEST, "{0} name:{1} throws", e,
+		    Level.FINEST, e, "{0} name:{1} throws",
 		    serviceBinding ? "removeServiceBinding" : "removeBinding",
 		    name);
 	    }

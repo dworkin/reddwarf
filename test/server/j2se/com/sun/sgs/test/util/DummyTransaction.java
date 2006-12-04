@@ -109,7 +109,7 @@ public class DummyTransaction implements Transaction {
 	    try {
 		participant.abort(this);
 	    } catch (RuntimeException e) {
-		logger.logThrow(Level.WARNING, "Abort failed", e);
+		logger.logThrow(Level.WARNING, e, "Abort failed");
 	    }
 	}
 	state = State.ABORTED;
@@ -157,7 +157,7 @@ public class DummyTransaction implements Transaction {
 		try {
 		    participant.commit(this);
 		} catch (RuntimeException e) {
-		    logger.logThrow(Level.WARNING, "Commit failed", e);
+		    logger.logThrow(Level.WARNING, e, "Commit failed");
 		}
 	    }
 	} else if (state != State.ACTIVE) {
@@ -185,7 +185,7 @@ public class DummyTransaction implements Transaction {
 		try {
 		    participant.commit(this);
 		} catch (RuntimeException e) {
-		    logger.logThrow(Level.WARNING, "Commit failed", e);
+		    logger.logThrow(Level.WARNING, e, "Commit failed");
 		}
 	    }
 	}

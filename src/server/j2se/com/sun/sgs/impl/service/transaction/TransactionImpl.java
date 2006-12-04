@@ -136,8 +136,8 @@ final class TransactionImpl implements Transaction {
 	    } catch (Exception e) {
 		if (logger.isLoggable(Level.WARNING)) {
 		    logger.logThrow(
-			Level.WARNING, "abort {0} participant:{1} failed",
-			e, this, participant);
+			Level.WARNING, e, "abort {0} participant:{1} failed",
+			this, participant);
 		}
 	    }
 	}
@@ -224,8 +224,8 @@ final class TransactionImpl implements Transaction {
 	    } catch (Exception e) {
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.logThrow(
-			Level.FINEST, "{0} {1} participant:{1} throws",
-			e, iter.hasNext() ? "prepare" : "prepareAndCommit",
+			Level.FINEST, e, "{0} {1} participant:{1} throws",
+			iter.hasNext() ? "prepare" : "prepareAndCommit",
 			this, participant);
 		}
 		if (state != State.ABORTED) {
@@ -249,8 +249,8 @@ final class TransactionImpl implements Transaction {
 	    } catch (Exception e) {
 		if (logger.isLoggable(Level.WARNING)) {
 		    logger.logThrow(
-			Level.WARNING, "commit {0} participant:{1} failed",
-			e, this, participant);
+			Level.WARNING, e, "commit {0} participant:{1} failed",
+			this, participant);
 		}
 	    }
 	}
