@@ -27,14 +27,15 @@
   <!-- Values for the JavaDocs -->
   <property name="project.name" value="Sun Game Server"/>
   <property name="project.version" value="0.2"/>
+  <property name="project.build" value="December 2006"/>
   <property name="jdk.doc.api.url"
 	    value="http://java.sun.com/j2se/1.5/docs/api"/>
   <property name="jdk.package.list" value="etc/jdk5.0_package_list"/>
 
-  <property name="apidoc.app.zip"
-            location="${build.dir}/sgs-apidoc-app.zip"/>
+  <property name="apidoc.server.zip"
+            location="${build.dir}/sgs-server-apidoc.zip"/>
   <property name="apidoc.client.zip"
-            location="${build.dir}/sgs-apidoc-client.zip"/>
+            location="${build.dir}/sgs-client-apidoc.zip"/>
 
   <!-- Values for programming style checks -->
   <import file="${checkstyle.dir}/checkstyle_task.xml" optional="true"/>
@@ -114,7 +115,7 @@
   <target name="javadoc-internal" depends="javadoc-server,javadoc-client"
 	  description="Builds internal (full) javadoc"/>
 
-  <target name="javadoc-api" depends="javadoc-api-app,javadoc-api-client"
+  <target name="javadoc-api" depends="javadoc-api-server,javadoc-api-client"
 	  description="Builds public API javadoc"/>
 
   <!-- Build the internal server JavaDoc -->
@@ -168,28 +169,29 @@
   </target>
 
   <!-- Build the public Application API JavaDoc -->
-  <target name="javadoc-api-app" depends="build-server"
+  <target name="javadoc-api-server" depends="build-server"
 	  description="Builds public server application API javadoc">
     <javadoc sourcepath="src/server/j2se"
-             destdir="${build.dir}/javadoc/apidoc/app"
+             destdir="${build.dir}/javadoc/apidoc/sgs-server-apidoc"
              classpathref="server.classpath"
              packagenames="com.sun.sgs.app.*"
              overview="src/server/j2se/overview.html"
-             windowtitle="${project.name}" doctitle="${project.name}"
+             windowtitle="${project.name} Server API"
+             doctitle="${project.name} Server API"
              public="true" author="no">
       <link href="${jdk.doc.api.url}"
 	    offline="true"
 	    packagelistLoc="${jdk.package.list}"/>
       <footer>
-        <![CDATA[<font size="-1">Sun Game Server, Version
-        ${project.version}</font>]]>
+        <![CDATA[<font size="-1">Sun Game Server version ${project.version}<br/>${project.build}</font>]]>
       </footer>
       <bottom>
         <![CDATA[<font size="-1">Copyright 2006 Sun Microsystems,
-        Inc. All rights reserved. Use is subject to license
-        terms.<p>Sun, Sun Microsystems, the Sun Logo, and Java are
+        Inc. All rights reserved.
+        <p>Sun, Sun Microsystems, the Sun Logo, and Java are
         trademarks or registered trademarks of Sun Microsystems, Inc. in
-        the US and other countries.</font>]]>
+        the US and other countries.
+        <p>THIS PRODUCT CONTAINS CONFIDENTIAL INFORMATION AND TRADE SECRETS OF SUN MICROSYSTEMS, INC. USE, DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT THE PRIOR EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC.</font>]]>
       </bottom>
     </javadoc>
   </target>
@@ -198,47 +200,48 @@
   <target name="javadoc-api-client" depends="build-client"
 	  description="Builds public client API javadoc">
     <javadoc sourcepath="src/client/j2se"
-             destdir="${build.dir}/javadoc/apidoc/client"
+             destdir="${build.dir}/javadoc/apidoc/sgs-client-apidoc"
              classpath="${build.dir}/classes/client"
-             packagenames="com.sun.sgs.client.*"
+             packagenames="com.sun.sgs.client,com.sun.sgs.client.simple"
              overview="src/client/j2se/overview.html"
-             windowtitle="${project.name}" doctitle="${project.name}"
+             windowtitle="${project.name} Client API"
+             doctitle="${project.name} Client API"
              public="true" author="no">
       <link href="${jdk.doc.api.url}"
 	    offline="true"
 	    packagelistLoc="${jdk.package.list}"/>
       <footer>
-        <![CDATA[<font size="-1">Project Darkstar: Version
-        ${project.version}</font>]]>
+        <![CDATA[<font size="-1">Sun Game Server version ${project.version}<br/>${project.build}</font>]]>
       </footer>
       <bottom>
         <![CDATA[<font size="-1">Copyright 2006 Sun Microsystems,
-        Inc. All rights reserved. Use is subject to license
-        terms.<p>Sun, Sun Microsystems, the Sun Logo, and Java are
+        Inc. All rights reserved.
+        <p>Sun, Sun Microsystems, the Sun Logo, and Java are
         trademarks or registered trademarks of Sun Microsystems, Inc. in
-        the US and other countries.</font>]]>
+        the US and other countries.
+        <p>THIS PRODUCT CONTAINS CONFIDENTIAL INFORMATION AND TRADE SECRETS OF SUN MICROSYSTEMS, INC. USE, DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT THE PRIOR EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC.</font>]]>
       </bottom>
     </javadoc>
   </target>
 
   <!-- Builds the API javadoc zip files -->
-  <target name="apidoc" depends="zip-apidoc-app,zip-apidoc-client"
+  <target name="apidoc" depends="zip-apidoc-server,zip-apidoc-client"
 	  description="Builds API javadoc zip files"/>
 
   <!-- Builds the app API javadoc zip file -->
-  <target name="zip-apidoc-app" depends="javadoc-api-app"
+  <target name="zip-apidoc-server" depends="javadoc-api-server"
 	  description="Builds app API javadoc zip file">
-    <zip destfile="${apidoc.app.zip}"
-          basedir="${build.dir}/javadoc"
-          includes="apidoc/app/**"/>
+    <zip destfile="${apidoc.server.zip}"
+          basedir="${build.dir}/javadoc/apidoc"
+          includes="sgs-server-apidoc/**"/>
   </target>
 
   <!-- Builds the client API javadoc zip file -->
   <target name="zip-apidoc-client" depends="javadoc-api-client"
 	  description="Builds client API javadoc zip file">
     <zip destfile="${apidoc.client.zip}"
-          basedir="${build.dir}/javadoc"
-          includes="apidoc/client/**"/>
+          basedir="${build.dir}/javadoc/apidoc"
+          includes="sgs-client-apidoc/**"/>
   </target>
 
   <!-- Builds the jar files for the project classes -->
