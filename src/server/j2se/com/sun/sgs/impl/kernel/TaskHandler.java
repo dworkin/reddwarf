@@ -1,6 +1,8 @@
 
 package com.sun.sgs.impl.kernel;
 
+import com.sun.sgs.app.TransactionNotActiveException;
+
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionHandle;
 
@@ -115,10 +117,25 @@ public final class TaskHandler {
             (TransactionalTaskThread)(Thread.currentThread());
         thread.setCurrentTransaction(transaction);
 
-        // run the task, and clear the active state as soon as we're done
-        // so no one else sees it as active
-        task.run();
-        thread.clearCurrentTransaction(transaction);
+        // run the task, watching for any exceptions
+        try {
+            task.run();
+        } catch (Exception e) {
+            // make sure that the transaction is aborted, then re-throw the
+            // original exception
+            try {
+                handle.abort();
+            } catch (TransactionNotActiveException tnae) {
+                // this isn't a problem, since it just means that some
+                // participant aborted the transaction before throwing the
+                // original exception
+                logger.log(Log.FINEST, "Transaction was already aborted");
+            }
+            throw e;
+        } finally {
+            // regardless of the outcome, always clear the current state
+            thread.clearCurrentTransaction(transaction);
+        }
 
         // finally, actually commit the transaction, allowing any exceptions
         // to be thrown, since they will indicate whether this task is
