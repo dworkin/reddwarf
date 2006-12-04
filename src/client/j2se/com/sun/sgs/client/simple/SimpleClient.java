@@ -1,9 +1,22 @@
 package com.sun.sgs.client.simple;
 
-import com.sun.sgs.client.ServerSession;
-import com.sun.sgs.client.SessionId;
+import java.io.IOException;
 import java.net.PasswordAuthentication;
+import java.nio.ByteBuffer;
 import java.util.Properties;
+
+import org.apache.mina.filter.codec.ProtocolEncoder;
+
+import com.sun.sgs.client.ServerSession;
+import com.sun.sgs.client.ServerSessionListener;
+import com.sun.sgs.client.SessionId;
+import com.sun.sgs.client.comm.ClientConnection;
+import com.sun.sgs.client.comm.ClientConnectionListener;
+import com.sun.sgs.client.comm.ClientConnector;
+import com.sun.sgs.client.comm.ProtocolMessage;
+import com.sun.sgs.client.comm.ProtocolMessageDecoder;
+import com.sun.sgs.client.comm.ProtocolMessageEncoder;
+import com.sun.sgs.impl.client.comm.SimpleConnectorFactory;
 
 /**
  * An implementation of {@link ServerSession} that clients can use to
@@ -30,11 +43,16 @@ import java.util.Properties;
  * again, the {@link #getSessionId getSessionId} method will
  * return a new <code>SessionId</code>.
  */
-public class SimpleClient implements ServerSession {
-
+public class SimpleClient implements ServerSession, ClientConnectionListener {
+    
     /** The listener for this simple client. */
-    private final SimpleClientListener listener;
-
+    private SimpleClientListener listener;
+    private boolean connected = false;
+    private ClientConnection connection;
+    private SessionId sessionId;
+    private ProtocolMessageDecoder messageDecoder;
+    private ProtocolMessageEncoder messageEncoder;
+    
     /**
      * Creates an instance of this class with the specified listener.
      * Once this client is logged in (by using the {@link #login
@@ -48,8 +66,11 @@ public class SimpleClient implements ServerSession {
      * client
      */
     public SimpleClient(SimpleClientListener listener) {
-	this.listener = listener;
+        this.listener = listener;
+        messageDecoder = new ProtocolMessageDecoder();
+        messageEncoder = new ProtocolMessageEncoder();
     }
+
 
     /**
      * Initiates a login session with the server.  A session is
@@ -77,36 +98,114 @@ public class SimpleClient implements ServerSession {
      * @param properties a properties list specifying properties to
      * use for this client's session (e.g., connection properties)
      */
-    public void login(Properties properties) {
-	throw new AssertionError("this method is not implemented");
+    public void login(Properties props) throws IOException {
+        ClientConnector connector = new SimpleConnectorFactory().createConnector(props);
+        connector.connect(this);
     }
-
-    /* -- Implement ServerSession methods -- */
 
     /** {@inheritDoc}
      * @throws IllegalStateException if this session is disconnected
      */
     public SessionId getSessionId() {
-	throw new AssertionError("this method is not implemented");
+        throw new AssertionError("this method is not implemented");
     }
 
-    /** {@inheritDoc}
-     */
+    /** {@inheritDoc} */
     public boolean isConnected() {
-	throw new AssertionError("this method is not implemented");
+	return connected;
     }
 
     /** {@inheritDoc}
      * @throws IllegalStateException if this session is disconnected
      */
     public void logout(boolean force) {
-	throw new AssertionError("this method is not implemented");
+	// TODO
     }
 
     /** {@inheritDoc}
      * @throws IllegalStateException if this session is disconnected
      */
     public void send(byte[] message) {
-	throw new AssertionError("this method is not implemented");
+	connection.sendMessage(message);
+    }
+    
+    
+    private void sendMessage() {
+        send(messageEncoder.getMessage());
+        messageEncoder.reset();
+    }
+
+    /**
+     * Called in the midst of the connection process.  At this point the connection
+     * has been established, but there is as yet no session.  
+     *
+     * @param connection        the live connection to the server
+     */
+    public void connected(ClientConnection connection) {
+        System.out.println("SimpleClient: connected");
+        connected = true;
+        this.connection = connection;
+        
+    }
+
+    public void disconnected(boolean graceful, byte[] message) {
+        connected = false;
+        listener.disconnected(graceful);
+    }
+
+    // refactor to receivedMessage(ByteBuffer)
+    // all API level messages will come in on this call-back.  From here they
+    // are interpreted and dispatched to a channel, or the ServerSessionListener.
+    public void receivedMessage(byte[] message) {
+        messageDecoder.setMessage(message);
+        int versionNumber = messageDecoder.readVersionNumber();
+        int command = messageDecoder.readCommand();
+        System.out.println("SimpleClient messageReceived: " + message.length + 
+                            " command " + command);
+        if (command == ProtocolMessage.AUTHENTICATION_REQUEST) {
+            PasswordAuthentication authentication = 
+                listener.getPasswordAuthentication("Enter Username/Password");
+            
+            messageEncoder.startMessage(ProtocolMessage.AUTHENTICATION_REQUEST);
+            messageEncoder.add(authentication.getUserName());
+            // TODO wrapping the char[] in a String is probably not the way to go
+            messageEncoder.add(new String(authentication.getPassword()));
+            sendMessage();
+        }
+        else if (command == ProtocolMessage.LOGIN) {
+            System.out.println("logging in");
+            boolean success = messageDecoder.readBoolean();
+            if (success) {
+                sessionStarted(message);
+            }
+            else {
+                listener.loginFailed(messageDecoder.readString());
+            }
+        }
+    }
+
+    public void reconnected(byte[] message) {
+        // TODO Auto-generated method stub
+        listener.reconnected();
+        
+    }
+
+    public void reconnecting(byte[] message) {
+        // TODO Auto-generated method stub
+        listener.reconnecting();
+    }
+
+    public ServerSessionListener sessionStarted(byte[] message) {
+        extractSessionId(message);
+        
+        listener.loggedIn();
+        
+        return listener;
+    }
+    
+    private void extractSessionId(byte[] message) {
+        byte[] bytes = messageDecoder.readBytes();
+        // TODO uncomment this when it becomes implemented
+        //sessionId = SessionId.fromBytes(bytes);
     }
 }

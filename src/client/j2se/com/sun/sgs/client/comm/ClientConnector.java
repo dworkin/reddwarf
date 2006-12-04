@@ -23,9 +23,7 @@ public abstract class ClientConnector {
      * Initiates a non-blocking connect to this ClientConnector's target remote address.
      * TODO: more doc
      *
-     * @param connectorListener The listener that will receive completion events for this Connector
-     *
-     * @return a ConnectionHandle that can be used to cancel this connection attempt.
+     * @param connectionListener the listener that will receive completion events for this Connector
      * 
      * @throws AlreadyConnectedException if this connector is already connected
      * @throws ConnectionPendingException if a non-blocking connection operation is already in progress on this connector

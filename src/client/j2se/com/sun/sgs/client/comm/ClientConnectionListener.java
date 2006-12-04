@@ -20,13 +20,13 @@ public interface ClientConnectionListener {
      * the associated session is disconnected from the server and the
      * client must log in again.
      */
-    void reconnecting(ByteBuffer message);
+    void reconnecting(byte[] message);
 
     /**
      * Notifies this listener whether the associated server connection is
      * successfully reconnected. 
      */
-    void reconnected(ByteBuffer message);
+    void reconnected(byte[] message);
     
     /**
      * Notifies this listener that the associated server connection is
@@ -41,9 +41,9 @@ public interface ClientConnectionListener {
      * the associated client gracefully logging out, and
      * <code>false</code> otherwise
      */
-    void disconnected(boolean graceful, ByteBuffer message);
+    void disconnected(boolean graceful, byte[] message);
 
-    void receivedAuthMessage(ByteBuffer message);
+    void receivedMessage(byte[] message);
 
-    ServerSessionListener sessionStarted(ByteBuffer message);
+    ServerSessionListener sessionStarted(byte[] message);
 }
