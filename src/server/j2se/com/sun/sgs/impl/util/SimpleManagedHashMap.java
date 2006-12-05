@@ -9,6 +9,7 @@ import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.AbstractMap;
 import java.util.AbstractSet;
+import java.util.ConcurrentModificationException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -18,7 +19,17 @@ import java.util.Set;
 /**
  * Defines a simple managed object {@link Map} that maps serializable keys to
  * serializable values that may also be managed objects.  The keys must not be
- * managed objects.
+ * managed objects.  Both keys and values can be <code>null</code>. <p>
+ *
+ * Calls to the {@link #put put} and {@link #putAll putAll} methods will throw
+ * an {@link IllegalArgumentException} if the keys or values are not
+ * <code>null</code> and do not implement {@link Serializable}, or if the keys
+ * implement {@link ManagedObject}. <p>
+ *
+ * This implementation is not synchronized.
+ *
+ * @param	<K> the type of the keys stored in the map
+ * @param	<V> the type of the values stored in the map
  */
 public class SimpleManagedHashMap<K, V>
     extends AbstractMap<K, V>
@@ -27,7 +38,13 @@ public class SimpleManagedHashMap<K, V>
     /** The version of the serialized form. */
     private static final long serialVersionUID = 1;
 
-    /** FIXME: The data manager. */
+    /** An empty array, for calling Collection.toArray. */
+    private static final Serializable[] EMPTY_SERIALIZABLE_ARRAY = { };
+
+    /**
+     * The data manager.  FIXME: Remove this when AppContext.getDataManager is
+     * implemented.  -tjb@sun.com (12/04/2006)
+     */
     public static DataManager dataManager;
 
     /**
@@ -40,13 +57,17 @@ public class SimpleManagedHashMap<K, V>
     /** The entry set, or null if not yet created. */
     private transient Set<Entry<K, V>> entrySet = null;
 
-    /** Creates an instance of this class. */
+    /** Creates an instance of this class with no entries. */
     public SimpleManagedHashMap() { }
 
     /**
      * Creates an instance with the specified mappings.
      *
      * @param	map the mappings to place in this map
+     * @throws	IllegalArgumentException if <code>map</code> contains keys or
+     *		values that are not <code>null</code> and do not implement
+     *		{@link Serializable}, or keys that implement {@link
+     *		ManagedObject}
      */
     public SimpleManagedHashMap(Map<? extends K, ? extends V> map) {
 	putAll(map);
@@ -84,7 +105,14 @@ public class SimpleManagedHashMap<K, V>
 
     /* -- Modification operations -- */
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc} <p>
+     *
+     * @throws	IllegalArgumentException if <code>key</code> or
+     *		<code>value</code> are not <code>null</code> and do not
+     *		implement {@link Serializable}, or if <code>key</code>
+     *		implements {@link ManagedObject}
+     */
     public V put(K key, V value) {
 	if (key != null && !(key instanceof Serializable)) {
 	    throw new IllegalArgumentException(
@@ -96,29 +124,74 @@ public class SimpleManagedHashMap<K, V>
 	    throw new IllegalArgumentException(
 		"The value must implement Serializable");
 	}
-	markForUpdate();
+	getDataManager().markForUpdate(this);
 	return dereference(map.put(key, new Value<V>(value)));
     }
 
     /** {@inheritDoc} */
     public V remove(Object key) {
-	markForUpdate();
+	getDataManager().markForUpdate(this);
 	return dereference(map.remove(key));
     }
 
     /* -- Bulk operations -- */
 
-    /* Inherit AbstractMap.putAll */
+    /**
+     * {@inheritDoc} <p>
+     *
+     * @throws	IllegalArgumentException if <code>map</code> contains keys or
+     *		values that are not <code>null</code> and do not implement
+     *		{@link Serializable}, or keys that implement {@link
+     *		ManagedObject}
+     */
+    public void putAll(Map<? extends K, ? extends V> map) {
+	if (map == null) {
+	    throw new NullPointerException("The argument must not be null");
+	}
+	Serializable[] keys = null;
+	try {
+	    keys = map.keySet().toArray(EMPTY_SERIALIZABLE_ARRAY);
+	} catch (ArrayStoreException e) {
+	    throw new IllegalArgumentException(
+		"The keys in the map must implement Serializable", e);
+	}
+	for (Serializable key : keys) {
+	    if (key instanceof ManagedObject) {
+		throw new IllegalArgumentException(
+		    "The keys in the map must not implement ManagedObject");
+	    }
+	}
+	Serializable[] values = null;
+	try {
+	    values = map.values().toArray(EMPTY_SERIALIZABLE_ARRAY);
+	} catch (ArrayStoreException e) {
+	    throw new IllegalArgumentException(
+		"The values in the map must implement Serializable", e);
+	}
+	if (keys.length != values.length) {
+	    throw new ConcurrentModificationException();
+	}
+	getDataManager().markForUpdate(this);
+	for (int i = 0; i < keys.length; i++) {
+	    /* The types of the keys and values are otherwise unchecked */
+	    @SuppressWarnings("unchecked")
+		K key = (K) keys[i];
+	    @SuppressWarnings("unchecked")
+		V value = (V) values[i];
+	    this.map.put(key, new Value<V>(value));
+	}
+    }
 
     /** {@inheritDoc} */
     public void clear() {
-	markForUpdate();
+	getDataManager().markForUpdate(this);
 	map.clear();
     }
 
     /* -- Views -- */
 
     /* Inherit AbstractMap.keySet */
+
     /* Inherit AbstractMap.values */
 
     /** {@inheritDoc} */
@@ -179,7 +252,7 @@ public class SimpleManagedHashMap<K, V>
 	}
 
 	public void remove() {
-	    markForUpdate();
+	    getDataManager().markForUpdate(SimpleManagedHashMap.this);
 	    iterator.remove();
 	}
     }
@@ -222,20 +295,14 @@ public class SimpleManagedHashMap<K, V>
     /* -- Comparison and hashing -- */
 
     /* Inherit AbstractMap.equals */
+
     /* Inherit AbstractMap.hashCode */
 
-    /* -- Methods and classes for managed objects and references -- */
-
-    /**
-     * Returns the object referred to by the reference, or null if the
-     * reference is null.
-     */
-    static <V> V dereference(Value<V> value) {
-	return value == null ? null : value.get();
-    }
+    /* -- Other classes and methods -- */
 
     /** Stores a value that is a managed object or is just serializable. */
     private static class Value<V> implements Serializable {
+	private static final long serialVersionUID = 1;
 	private transient V value;
 	private transient ManagedReference ref;
 	private transient int refHash;
@@ -314,9 +381,12 @@ public class SimpleManagedHashMap<K, V>
 	}
     }
 
-    /** Notes that this object is going to be modified. */
-    void markForUpdate() {
-	getDataManager().markForUpdate(this);
+    /**
+     * Returns the object referred to by the Value, or null if the reference is
+     * null.
+     */
+    static <V> V dereference(Value<V> value) {
+	return value == null ? null : value.get();
     }
 
     /** Returns the current data data manager. */
@@ -324,6 +394,7 @@ public class SimpleManagedHashMap<K, V>
 	return dataManager;
     }
 
+    /* Checks for equality, allowing for null. */
     static boolean safeEquals(Object x, Object y) {
 	return x == y || x != null && x.equals(y);
     }
