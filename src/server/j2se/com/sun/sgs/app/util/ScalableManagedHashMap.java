@@ -1,4 +1,4 @@
-package com.sun.sgs.impl.util;
+package com.sun.sgs.app.util;
 
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.DetectChanges;
@@ -28,7 +28,7 @@ import java.util.Set;
  * @param	<K> the type of the keys stored in the map
  * @param	<V> the type of the values stored in the map
  */
-public class ManagedHashMap<K, V>
+public class ScalableManagedHashMap<K, V>
     extends AbstractMap<K, V>
     implements DetectChanges, ManagedObject, Serializable
 {
@@ -119,15 +119,15 @@ public class ManagedHashMap<K, V>
     /* -- Constructors -- */
 
     /**
-     * Constructs an empty <code>ManagedHashMap</code> with the specified
-     * initial capacity and load factor.
+     * Constructs an empty <code>ScalableManagedHashMap</code> with the
+     * specified initial capacity and load factor.
      *
      * @param	initialCapacity the initial capacity
      * @param	loadFactor the load factor
      * @throws	IllegalArgumentException if the initial capacity is negative
      *		or the load factor is nonpositive
      */
-    public ManagedHashMap(int initialCapacity, float loadFactor) {
+    public ScalableManagedHashMap(int initialCapacity, float loadFactor) {
         if (initialCapacity < 0) {
             throw new IllegalArgumentException(
 		"Illegal initial capacity: " + initialCapacity);
@@ -150,33 +150,34 @@ public class ManagedHashMap<K, V>
     }
   
     /**
-     * Constructs an empty <code>ManagedHashMap</code> with the specified
-     * initial capacity and the default load factor (<code>0.75</code>).
+     * Constructs an empty <code>ScalableManagedHashMap</code> with the
+     * specified initial capacity and the default load factor
+     * (<code>0.75</code>).
      *
      * @param	initialCapacity the initial capacity
      * @throws	IllegalArgumentException if the initial capacity is negative
      */
-    public ManagedHashMap(int initialCapacity) {
+    public ScalableManagedHashMap(int initialCapacity) {
         this(initialCapacity, DEFAULT_LOAD_FACTOR);
     }
 
     /**
-     * Constructs an empty <code>ManagedHashMap</code> with the default initial
-     * capacity (<code>16</code>) and the default load factor
+     * Constructs an empty <code>ScalableManagedHashMap</code> with the default
+     * initial capacity (<code>16</code>) and the default load factor
      * (<code>0.75</code>).
      */
-    public ManagedHashMap() {
+    public ScalableManagedHashMap() {
         loadFactor = DEFAULT_LOAD_FACTOR;
         threshold = (int) (DEFAULT_INITIAL_CAPACITY * DEFAULT_LOAD_FACTOR);
         table = new ManagedReference[DEFAULT_INITIAL_CAPACITY];
     }
 
     /**
-     * Constructs a new <code>ManagedHashMap</code> with the same mappings as
-     * the specified <code>Map</code>.  The <code>ManagedHashMap</code> is
-     * created with default load factor (<code>0.75</code>) and an initial
-     * capacity sufficient to hold the mappings in the specified
-     * <code>Map</code>.
+     * Constructs a new <code>ScalableManagedHashMap</code> with the same
+     * mappings as the specified <code>Map</code>.  The
+     * <code>ScalableManagedHashMap</code> is created with default load factor
+     * (<code>0.75</code>) and an initial capacity sufficient to hold the
+     * mappings in the specified <code>Map</code>.
      *
      * @param	map the map whose mappings are to be placed in this map
      * @throws  IllegalArgumentException if the map contains keys that are not
@@ -185,7 +186,7 @@ public class ManagedHashMap<K, V>
      *		that are not <code>null</code> and do not implement
      *		<code>Serializable</code>
      */
-    public ManagedHashMap(Map<? extends K, ? extends V> map) {
+    public ScalableManagedHashMap(Map<? extends K, ? extends V> map) {
         this(Math.max((int) (map.size() / DEFAULT_LOAD_FACTOR) + 1,
                       DEFAULT_INITIAL_CAPACITY), DEFAULT_LOAD_FACTOR);
 	int h = 0;
@@ -712,7 +713,7 @@ public class ManagedHashMap<K, V>
 	    }
             Object k = current.key;
             current = null;
-            ManagedHashMap.this.removeEntryForKey(k);
+            ScalableManagedHashMap.this.removeEntryForKey(k);
             expectedModCount = modCount;
         }
     }
@@ -754,10 +755,10 @@ public class ManagedHashMap<K, V>
             return containsKey(o);
         }
         public boolean remove(Object o) {
-            return ManagedHashMap.this.removeEntryForKey(o) != null;
+            return ScalableManagedHashMap.this.removeEntryForKey(o) != null;
         }
         public void clear() {
-            ManagedHashMap.this.clear();
+            ScalableManagedHashMap.this.clear();
         }
     }
 
@@ -774,7 +775,7 @@ public class ManagedHashMap<K, V>
             return containsValue(o);
         }
         public void clear() {
-            ManagedHashMap.this.clear();
+            ScalableManagedHashMap.this.clear();
         }
     }
 
@@ -799,7 +800,7 @@ public class ManagedHashMap<K, V>
             return size;
         }
         public void clear() {
-            ManagedHashMap.this.clear();
+            ScalableManagedHashMap.this.clear();
         }
     }
 

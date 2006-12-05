@@ -1,4 +1,4 @@
-package com.sun.sgs.impl.util;
+package com.sun.sgs.app.util;
 
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
