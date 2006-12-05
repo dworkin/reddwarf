@@ -1,5 +1,6 @@
 package com.sun.sgs.impl.service.channel;
 
+import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ChannelManager;
@@ -28,7 +29,7 @@ final class ChannelImpl implements Channel, Serializable {
     private static final long serialVersionUID = 1L;
 
     /** The logger for this class. */
-    private final static LoggerWrapper logger =
+    final static LoggerWrapper logger =
 	new LoggerWrapper(
 	    Logger.getLogger(ChannelImpl.class.getName()));
 
@@ -245,8 +246,7 @@ final class ChannelImpl implements Channel, Serializable {
 
 	private Object readResolve() throws ObjectStreamException {
 	    try {
-		ChannelManager cm =
-		    ChannelServiceImpl.getContext().channelService;
+		ChannelManager cm = AppContext.getChannelManager();
 		Channel channel = cm.getChannel(name);
 		return channel;
 	    } catch (RuntimeException e) {

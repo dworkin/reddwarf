@@ -399,8 +399,7 @@ public class TaskServiceImpl
 
         // make sure that we were already called to prepare
         if (! txnState.prepared) {
-            if (logger.isLoggable(Level.WARNING))
-                logger.log(Level.WARNING, "weren't prepared for txn:{0}", txn);
+            logger.log(Level.WARNING, "weren''t prepared for txn: {0}", txn);
             throw new IllegalStateException("TaskService " + NAME + " has " +
                                             "not been prepared");
         }
@@ -666,8 +665,7 @@ public class TaskServiceImpl
                 reservation =
                     taskScheduler.reserveTask(task, owner, startTime);
         } catch (TaskRejectedException tre) {
-            if (logger.isLoggable(Level.FINE))
-                logger.logThrow(Level.FINE, tre, "couldn't get a reservation");
+            logger.logThrow(Level.FINE, tre, "couldn''t get a reservation");
             throw tre;
         }
 
@@ -696,16 +694,10 @@ public class TaskServiceImpl
 	    return ptask;
 	    
 	} catch (NameNotBoundException e) {
-            if (logger.isLoggable(Level.WARNING))
-                logger.logThrow(Level.WARNING, e,
-                	"could not fetch task {0}", objName);
-            throw e;
 	} catch (ObjectNotFoundException e) {
-            if (logger.isLoggable(Level.WARNING))
-                logger.logThrow(Level.WARNING, e,
-                	"could not fetch task {0}", objName);
-            throw e;
         }
+	// It's been deleted; let this runner end.
+	return null;
     }
 
     void removePendingTask(String objName) {
@@ -764,10 +756,9 @@ public class TaskServiceImpl
             taskScheduler.scheduleTask(taskRemover,
                                        transactionProxy.getCurrentOwner());
         } catch (TaskRejectedException tre) {
-            if (logger.isLoggable(Level.WARNING))
-                logger.logThrow(Level.WARNING, tre,
-                	"couldn't schedule task to remove " +
-                        "non-retried task {0}: giving up", objName);
+        	logger.logThrow(Level.WARNING, tre,
+        			"couldn''t schedule task to remove " +
+        			"non-retried task {0}: giving up", objName);
             throw tre;
         }
     }
@@ -869,7 +860,13 @@ public class TaskServiceImpl
 	    super(startTime, period, identity);
 	    this.taskRef = taskRef;
 	}
-        Task getTask() { return taskRef.get(Task.class); }
+        Task getTask() {
+            try {
+        	return taskRef.get(Task.class);
+            } catch (ObjectNotFoundException e) {
+        	return null;
+            }
+        }
     }
 
     /**
@@ -886,13 +883,22 @@ public class TaskServiceImpl
             this.taskRunner = (new TransactionRunner(new KernelRunnable() {
                 public void run() throws Exception {
                     PendingTask pendingTask = taskService.fetchPendingTask(objName);
+                    if (pendingTask == null) {
+                	return;
+                    }
                     if (logger.isLoggable(Level.FINEST))
                         logger.log(Level.FINEST, "running task {0} " +
                                    "scheduled to run " +
                                    (pendingTask.getStartTime() == START_NOW ? "immediate" :
                         	   "at {1,date,yyyy-MM-dd'T'HH:mm:ss.SSSSSSZ}"),
                         	   objName, pendingTask.getStartTime());
-                    pendingTask.getTask().run();
+                    Task task = pendingTask.getTask();
+                    if (task == null) {
+                	// cancel this PendingTask
+                	taskService.removePendingTask(pendingTask);
+                	return;
+                    }
+                    task.run();
                 }
             }));
         }

@@ -79,7 +79,7 @@ class MasterTaskConsumer implements Runnable {
                     } else {
                 	logger.logThrow(Level.FINE, e,
                 		"dropping a failed task that " +
-                		"didn't ask to be re-tried: {0}", task);
+                		"didn''t ask to be re-tried: {0}", task);
                         taskFinished = true;
                     }
                 }
