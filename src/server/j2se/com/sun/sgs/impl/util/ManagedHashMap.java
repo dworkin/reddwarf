@@ -1,175 +1,102 @@
-/*
- * @(#)HashMap.java	1.63 04/02/19
- *
- * Copyright 2004 Sun Microsystems, Inc. All rights reserved.
- * SUN PROPRIETARY/CONFIDENTIAL. Use is subject to license terms.
- */
-
-/*
- * This is a modified version of the HashMap source file from Java 1.5.06.
- * -tjb@sun.com (11/10/2006)
- */
-
-/* SGS: Update package and imports */
 package com.sun.sgs.impl.util;
 
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.DetectChanges;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
-import java.io.*;
-import java.util.*;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
+import java.util.AbstractCollection;
+import java.util.AbstractMap;
+import java.util.AbstractSet;
+import java.util.Collection;
+import java.util.ConcurrentModificationException;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.NoSuchElementException;
+import java.util.Set;
 
 /**
- * Hash table based implementation of the <tt>Map</tt> interface.  This
- * implementation provides all of the optional map operations, and permits
- * <tt>null</tt> values and the <tt>null</tt> key.  (The <tt>HashMap</tt>
- * class is roughly equivalent to <tt>Hashtable</tt>, except that it is
- * unsynchronized and permits nulls.)  This class makes no guarantees as to
- * the order of the map; in particular, it does not guarantee that the order
- * will remain constant over time.
+ * A hash table implementation of {@link Map} that can store managed objects
+ * and uses a separate managed object for each hash bucket.  This class is
+ * derived from revision 1.63 of the {@link HashMap} class from Java 1.5.06.
  *
- * <p>This implementation provides constant-time performance for the basic
- * operations (<tt>get</tt> and <tt>put</tt>), assuming the hash function
- * disperses the elements properly among the buckets.  Iteration over
- * collection views requires time proportional to the "capacity" of the
- * <tt>HashMap</tt> instance (the number of buckets) plus its size (the number
- * of key-value mappings).  Thus, it's very important not to set the initial
- * capacity too high (or the load factor too low) if iteration performance is
- * important.
- *
- * <p>An instance of <tt>HashMap</tt> has two parameters that affect its
- * performance: <i>initial capacity</i> and <i>load factor</i>.  The
- * <i>capacity</i> is the number of buckets in the hash table, and the initial
- * capacity is simply the capacity at the time the hash table is created.  The
- * <i>load factor</i> is a measure of how full the hash table is allowed to
- * get before its capacity is automatically increased.  When the number of
- * entries in the hash table exceeds the product of the load factor and the
- * current capacity, the capacity is roughly doubled by calling the
- * <tt>rehash</tt> method.
- *
- * <p>As a general rule, the default load factor (.75) offers a good tradeoff
- * between time and space costs.  Higher values decrease the space overhead
- * but increase the lookup cost (reflected in most of the operations of the
- * <tt>HashMap</tt> class, including <tt>get</tt> and <tt>put</tt>).  The
- * expected number of entries in the map and its load factor should be taken
- * into account when setting its initial capacity, so as to minimize the
- * number of <tt>rehash</tt> operations.  If the initial capacity is greater
- * than the maximum number of entries divided by the load factor, no
- * <tt>rehash</tt> operations will ever occur.
- *
- * <p>If many mappings are to be stored in a <tt>HashMap</tt> instance,
- * creating it with a sufficiently large capacity will allow the mappings to
- * be stored more efficiently than letting it perform automatic rehashing as
- * needed to grow the table.
- *
- * <p><b>Note that this implementation is not synchronized.</b> If multiple
- * threads access this map concurrently, and at least one of the threads
- * modifies the map structurally, it <i>must</i> be synchronized externally.
- * (A structural modification is any operation that adds or deletes one or
- * more mappings; merely changing the value associated with a key that an
- * instance already contains is not a structural modification.)  This is
- * typically accomplished by synchronizing on some object that naturally
- * encapsulates the map.  If no such object exists, the map should be
- * "wrapped" using the <tt>Collections.synchronizedMap</tt> method.  This is
- * best done at creation time, to prevent accidental unsynchronized access to
- * the map: <pre> Map m = Collections.synchronizedMap(new HashMap(...));
- * </pre>
- *
- * <p>The iterators returned by all of this class's "collection view methods"
- * are <i>fail-fast</i>: if the map is structurally modified at any time after
- * the iterator is created, in any way except through the iterator's own
- * <tt>remove</tt> or <tt>add</tt> methods, the iterator will throw a
- * <tt>ConcurrentModificationException</tt>.  Thus, in the face of concurrent
- * modification, the iterator fails quickly and cleanly, rather than risking
- * arbitrary, non-deterministic behavior at an undetermined time in the
- * future.
- *
- * <p>Note that the fail-fast behavior of an iterator cannot be guaranteed
- * as it is, generally speaking, impossible to make any hard guarantees in the
- * presence of unsynchronized concurrent modification.  Fail-fast iterators
- * throw <tt>ConcurrentModificationException</tt> on a best-effort basis. 
- * Therefore, it would be wrong to write a program that depended on this
- * exception for its correctness: <i>the fail-fast behavior of iterators
- * should be used only to detect bugs.</i>
- *
- * <p>This class is a member of the 
- * <a href="{@docRoot}/../guide/collections/index.html">
- * Java Collections Framework</a>.
- *
- * @author  Doug Lea
- * @author  Josh Bloch
- * @author  Arthur van Hoff
- * @author  Neal Gafter
- * @version 1.63, 02/19/04
- * @see     Object#hashCode()
- * @see     Collection
- * @see	    Map
- * @see	    TreeMap
- * @see	    Hashtable
- * @since   1.2
+ * @param	<K> the type of the keys stored in the map
+ * @param	<V> the type of the values stored in the map
  */
-
-/*
- * SGS: Update class name, restrict V to managed object, and implement
- * ManagedObject.
- */
-@SuppressWarnings("unchecked")
-public class ManagedHashMap<K,V>
-    extends AbstractMap<K,V>
-    implements Map<K,V>, Cloneable, DetectChanges, ManagedObject, Serializable
+public class ManagedHashMap<K, V>
+    extends AbstractMap<K, V>
+    implements DetectChanges, ManagedObject, Serializable
 {
+    /* -- Fields -- */
+
+    /** The version of the serialized form. */
+    private static final long serialVersionUID = 1;
 
     /**
      * The default initial capacity - MUST be a power of two.
      */
-    static final int DEFAULT_INITIAL_CAPACITY = 16;
+    private static final int DEFAULT_INITIAL_CAPACITY = 16;
 
     /**
      * The maximum capacity, used if a higher value is implicitly specified
      * by either of the constructors with arguments.
      * MUST be a power of two <= 1<<30.
      */
-    static final int MAXIMUM_CAPACITY = 1 << 30;
+    private static final int MAXIMUM_CAPACITY = 1 << 30;
 
     /**
      * The load factor used when none specified in constructor.
      **/
-    static final float DEFAULT_LOAD_FACTOR = 0.75f;
+    private static final float DEFAULT_LOAD_FACTOR = 0.75f;
+
+    /** An empty array, for calling Collection.toArray. */
+    private static final Serializable[] EMPTY_SERIALIZABLE_ARRAY = { };
+
+    /**
+     * FIXME: Store the data manager until the AppContext version works.
+     * -tjb@sun.com (11/22/2006)
+     */
+    public static DataManager dataManager;
 
     /**
      * The table, resized as necessary. Length MUST Always be a power of two.
-     */
-    /*
-     * SGS: Use managed reference to bucket for each list, and make
-     * non-transient, since we just want to read in the bucket objects.
+     *
+     * @serial
      */
     ManagedReference[] table;
 
     /**
-     * The number of key-value mappings contained in this identity hash map.
-     */
-    /*
-     * SGS: make non-transient, since we will not read in all of the mappings
-     * at deserialization time.
+     * The number of key-value mappings contained in this hash map.
+     *
+     * @serial
      */
     int size;
   
     /**
      * The next size value at which to resize (capacity * load factor).
+     *
      * @serial
      */
-    int threshold;
+    private int threshold;
   
     /**
      * The load factor for the hash table.
      *
      * @serial
      */
-    final float loadFactor;
+    private final float loadFactor;
 
-    /** @serial */
-    int hashCode = 0;
+    /** 
+     * The hash code for this instance.
+     *
+     * @serial
+     */
+    private int hashCode = 0;
 
     /**
      * The number of times this HashMap has been structurally modified
@@ -178,199 +105,320 @@ public class ManagedHashMap<K,V>
      * rehash).  This field is used to make iterators on Collection-views of
      * the HashMap fail-fast.  (See ConcurrentModificationException).
      */
-    transient volatile int modCount;
+    transient int modCount;
 
-    /*
-     * SGS: Add these fields since we don't have package access to the ones in
-     * AbstractMap.
-     */
-    transient volatile Set<K>        keySet = null;
-    transient volatile Collection<V> values = null;
+    /** The value returned by entrySet or null. */
+    private transient Set<Entry<K, V>> entrySet = null;
+
+    /** The value returned by keySet or null. */
+    private transient Set<K> keySet = null;
+
+    /** The value returned by values or null. */
+    private transient Collection<V> values = null;
+
+    /* -- Constructors -- */
 
     /**
-     * Constructs an empty <tt>HashMap</tt> with the specified initial
-     * capacity and load factor.
+     * Constructs an empty <code>ManagedHashMap</code> with the specified
+     * initial capacity and load factor.
      *
-     * @param  initialCapacity The initial capacity.
-     * @param  loadFactor      The load factor.
-     * @throws IllegalArgumentException if the initial capacity is negative
-     *         or the load factor is nonpositive.
+     * @param	initialCapacity the initial capacity
+     * @param	loadFactor the load factor
+     * @throws	IllegalArgumentException if the initial capacity is negative
+     *		or the load factor is nonpositive
      */
     public ManagedHashMap(int initialCapacity, float loadFactor) {
-        if (initialCapacity < 0)
-            throw new IllegalArgumentException("Illegal initial capacity: " +
-                                               initialCapacity);
-        if (initialCapacity > MAXIMUM_CAPACITY)
+        if (initialCapacity < 0) {
+            throw new IllegalArgumentException(
+		"Illegal initial capacity: " + initialCapacity);
+	}
+        if (initialCapacity > MAXIMUM_CAPACITY) {
             initialCapacity = MAXIMUM_CAPACITY;
-        if (loadFactor <= 0 || Float.isNaN(loadFactor))
-            throw new IllegalArgumentException("Illegal load factor: " +
-                                               loadFactor);
-
-        // Find a power of 2 >= initialCapacity
+	}
+        if (loadFactor <= 0 || Float.isNaN(loadFactor)) {
+            throw new IllegalArgumentException(
+		"Illegal load factor: " + loadFactor);
+	}
+        /* Find a power of 2 >= initialCapacity */
         int capacity = 1;
-        while (capacity < initialCapacity) 
+        while (capacity < initialCapacity) {
             capacity <<= 1;
-    
-        this.loadFactor = loadFactor;
-        threshold = (int)(capacity * loadFactor);
+	}
+	this.loadFactor = loadFactor;
+        threshold = (int) (capacity * loadFactor);
         table = new ManagedReference[capacity];
-        init();
     }
   
     /**
-     * Constructs an empty <tt>HashMap</tt> with the specified initial
-     * capacity and the default load factor (0.75).
+     * Constructs an empty <code>ManagedHashMap</code> with the specified
+     * initial capacity and the default load factor (<code>0.75</code>).
      *
-     * @param  initialCapacity the initial capacity.
-     * @throws IllegalArgumentException if the initial capacity is negative.
+     * @param	initialCapacity the initial capacity
+     * @throws	IllegalArgumentException if the initial capacity is negative
      */
     public ManagedHashMap(int initialCapacity) {
         this(initialCapacity, DEFAULT_LOAD_FACTOR);
     }
 
     /**
-     * Constructs an empty <tt>HashMap</tt> with the default initial capacity
-     * (16) and the default load factor (0.75).
+     * Constructs an empty <code>ManagedHashMap</code> with the default initial
+     * capacity (<code>16</code>) and the default load factor
+     * (<code>0.75</code>).
      */
     public ManagedHashMap() {
-        this.loadFactor = DEFAULT_LOAD_FACTOR;
-        threshold = (int)(DEFAULT_INITIAL_CAPACITY * DEFAULT_LOAD_FACTOR);
+        loadFactor = DEFAULT_LOAD_FACTOR;
+        threshold = (int) (DEFAULT_INITIAL_CAPACITY * DEFAULT_LOAD_FACTOR);
         table = new ManagedReference[DEFAULT_INITIAL_CAPACITY];
-        init();
     }
 
     /**
-     * Constructs a new <tt>HashMap</tt> with the same mappings as the
-     * specified <tt>Map</tt>.  The <tt>HashMap</tt> is created with
-     * default load factor (0.75) and an initial capacity sufficient to
-     * hold the mappings in the specified <tt>Map</tt>.
+     * Constructs a new <code>ManagedHashMap</code> with the same mappings as
+     * the specified <code>Map</code>.  The <code>ManagedHashMap</code> is
+     * created with default load factor (<code>0.75</code>) and an initial
+     * capacity sufficient to hold the mappings in the specified
+     * <code>Map</code>.
      *
-     * @param   m the map whose mappings are to be placed in this map.
-     * @throws  NullPointerException if the specified map is null.
+     * @param	map the map whose mappings are to be placed in this map
+     * @throws  IllegalArgumentException if the map contains keys that are not
+     *		<code>null</code> and either do not implement {@link
+     *		Serializable} or implement {@link ManagedObject}, or values
+     *		that are not <code>null</code> and do not implement
+     *		<code>Serializable</code>
      */
-    public ManagedHashMap(Map<? extends K, ? extends V> m) {
-        this(Math.max((int) (m.size() / DEFAULT_LOAD_FACTOR) + 1,
+    public ManagedHashMap(Map<? extends K, ? extends V> map) {
+        this(Math.max((int) (map.size() / DEFAULT_LOAD_FACTOR) + 1,
                       DEFAULT_INITIAL_CAPACITY), DEFAULT_LOAD_FACTOR);
-        putAllForCreate(m, true);
-    }
-
-    // internal utilities
-
-    /**
-     * Initialization hook for subclasses. This method is called
-     * in all constructors and pseudo-constructors (clone, readObject)
-     * after HashMap has been initialized but before any entries have
-     * been inserted.  (In the absence of this method, readObject would
-     * require explicit knowledge of subclasses.)
-     */
-    void init() {
-    }
-
-    /**
-     * Value representing null keys inside tables.
-     */
-    static final Object NULL_KEY = new Object();
-
-    /**
-     * Returns internal representation for key. Use NULL_KEY if key is null.
-     */
-    static <T> T maskNull(T key) {
-        return key == null ? (T)NULL_KEY : key;
-    }
-
-    /**
-     * Returns key represented by specified internal representation.
-     */
-    static <T> T unmaskNull(T key) {
-        return (key == NULL_KEY ? null : key);
-    }
-
-    /**
-     * Returns a hash value for the specified object.  In addition to 
-     * the object's own hashCode, this method applies a "supplemental
-     * hash function," which defends against poor quality hash functions.
-     * This is critical because HashMap uses power-of two length 
-     * hash tables.<p>
-     *
-     * The shift distances in this function were chosen as the result
-     * of an automated search over the entire four-dimensional search space.
-     */
-    static int hash(Object x) {
-        int h = x.hashCode();
-
-        h += ~(h << 9);
-        h ^=  (h >>> 14);
-        h +=  (h << 4);
-        h ^=  (h >>> 10);
-        return h;
-    }
-
-    /** 
-     * Check for equality of non-null reference x and possibly-null y. 
-     */
-    static boolean eq(Object x, Object y) {
-        return x == y || x.equals(y);
-    }
-
-    /**
-     * Returns index for hash code h. 
-     */
-    static int indexFor(int h, int length) {
-        return h & (length-1);
-    }
- 
-    /**
-     * Returns the number of key-value mappings in this map.
-     *
-     * @return the number of key-value mappings in this map.
-     */
-    public int size() {
-        return size;
-    }
-  
-    /**
-     * Returns <tt>true</tt> if this map contains no key-value mappings.
-     *
-     * @return <tt>true</tt> if this map contains no key-value mappings.
-     */
-    public boolean isEmpty() {
-        return size == 0;
-    }
-
-    /**
-     * Returns the value to which the specified key is mapped in this identity
-     * hash map, or <tt>null</tt> if the map contains no mapping for this key.
-     * A return value of <tt>null</tt> does not <i>necessarily</i> indicate
-     * that the map contains no mapping for the key; it is also possible that
-     * the map explicitly maps the key to <tt>null</tt>. The
-     * <tt>containsKey</tt> method may be used to distinguish these two cases.
-     *
-     * @param   key the key whose associated value is to be returned.
-     * @return  the value to which this map maps the specified key, or
-     *          <tt>null</tt> if the map contains no mapping for this key.
-     * @see #put(Object, Object)
-     */
-    public V get(Object key) {
-        Object k = maskNull(key);
-        int hash = hash(k);
-        int i = indexFor(hash, table.length);
-        Entry<K,V> e = getTableEntry(i); 
-        while (true) {
-            if (e == null)
-                return null;
-            if (e.hash == hash && eq(k, e.key)) 
-                return e.getValue();
-            e = e.next;
+	int h = 0;
+        for (Entry<? extends K, ? extends V> entry : map.entrySet()) {
+            putForCreate(entry.getKey(), entry.getValue(), true);
+	    h += entry.hashCode();
         }
+	hashCode = h;
     }
 
+    /* -- Implement DetectChanges -- */
+
+    /**
+     * {@inheritDoc} <p>
+     *
+     * This implementation always returns null, since this object manages its
+     * own modified state directly.
+     */
     public Object getChangesState() {
 	return null;
     }
 
+    /* -- Implement Map -- */
+
+    /** {@inheritDoc} */
+    public int size() {
+        return size;
+    }
+  
+    /* Inherit AbstractMap.isEmpty */
+
+    /** {@inheritDoc} */
+    public V get(Object key) {
+        int hash = hash(key);
+        int i = indexFor(hash, table.length);
+        for (HashEntry<K, V> e = getTableEntry(i); e != null; e = e.next) {
+	    if (e.hash == hash && safeEquals(key, e.key)) {
+                return e.getValue();
+	    }
+        }
+	return null;
+    }
+
+    /** {@inheritDoc} */
+    public boolean containsKey(Object key) {
+        int hash = hash(key);
+        int i = indexFor(hash, table.length);
+        for (HashEntry e = getTableEntry(i); e != null; e = e.next) {
+            if (e.hash == hash && safeEquals(key, e.key)) {
+                return true;
+	    }
+        }
+        return false;
+    }
+
+    /**
+     * {@inheritDoc} <p>
+     *
+     * @throws	IllegalArgumentException if <code>key</code> is not
+     *		<code>null</code> and either does not implement {@link
+     *		Serializable} or implements {@link ManagedObject}, or if
+     *		<code>value</code> is not <code>null</code> and does not
+     *		implement <code>Serializable</code>
+     */
+    public V put(K key, V value) {
+	if (key != null && !(key instanceof Serializable)) {
+	    throw new IllegalArgumentException(
+		"The key must implement Serializable");
+	} else if (key instanceof ManagedObject) {
+	    throw new IllegalArgumentException(
+		"The key must not implement ManagedObject");
+	} else if (value != null && !(value instanceof Serializable)) {
+	    throw new IllegalArgumentException(
+		"The value must implement Serializable");
+	}
+	return putInternal(key, value);
+    }
+
+    /* Same as put, but without illegal argument checks. */
+    private V putInternal(K key, V value) {
+	getDataManager().markForUpdate(this);
+        int hash = hash(key);
+        int i = indexFor(hash, table.length);
+        for (HashEntry<K, V> e = getTableEntryForUpdate(i);
+	     e != null;
+	     e = e.next)
+	{
+            if (e.hash == hash && safeEquals(key, e.key)) {
+                V oldValue = e.getValue();
+		hashCode -= e.hashCode();
+                e.setValue(value);
+		hashCode += e.hashCode();
+                return oldValue;
+            }
+        }
+        modCount++;
+	HashEntry<K, V> e = getTableEntry(i);
+	HashEntry<K, V> newEntry = new HashEntry<K, V>(hash, key, value, e);
+        setTableEntry(i, newEntry);
+	hashCode += newEntry.hashCode();
+        if (size++ >= threshold) {
+            resize(2 * table.length);
+	}
+        return null;
+    }
+
+    /** {@inheritDoc} */
+    public void putAll(Map<? extends K, ? extends V> m) {
+        int numKeysToBeAdded = m.size();
+        if (numKeysToBeAdded == 0) {
+            return;
+	}
+        /*
+         * Expand the map if the map if the number of mappings to be added is
+         * greater than or equal to threshold.  This is conservative; the
+         * obvious condition is (m.size() + size) >= threshold, but this
+         * condition could result in a map with twice the appropriate capacity,
+         * if the keys to be added overlap with the keys already in this map.
+         * By using the conservative calculation, we subject ourself to at most
+         * one extra resize.
+         */
+        if (numKeysToBeAdded > threshold) {
+            int targetCapacity = (int) (numKeysToBeAdded / loadFactor + 1);
+            if (targetCapacity > MAXIMUM_CAPACITY) {
+                targetCapacity = MAXIMUM_CAPACITY;
+	    }
+            int newCapacity = table.length;
+            while (newCapacity < targetCapacity) {
+                newCapacity <<= 1;
+	    }
+            if (newCapacity > table.length) {
+                resize(newCapacity);
+	    }
+        }
+	Serializable[] keys = null;
+	try {
+	    keys = m.keySet().toArray(EMPTY_SERIALIZABLE_ARRAY);
+	} catch (ArrayStoreException e) {
+	    throw new IllegalArgumentException(
+		"The keys in the map must implement Serializable", e);
+	}
+	for (Serializable key : keys) {
+	    if (key instanceof ManagedObject) {
+		throw new IllegalArgumentException(
+		    "The keys in the map must not implement ManagedObject");
+	    }
+	}
+	Serializable[] values = null;
+	try {
+	    values = m.values().toArray(EMPTY_SERIALIZABLE_ARRAY);
+	} catch (ArrayStoreException e) {
+	    throw new IllegalArgumentException(
+		"The values in the map must implement Serializable", e);
+	}
+	if (keys.length != values.length) {
+	    throw new ConcurrentModificationException();
+	}
+	getDataManager().markForUpdate(this);
+	for (int i = 0; i < keys.length; i++) {
+	    /* The types of the keys and values are otherwise unchecked */
+	    @SuppressWarnings("unchecked")
+		K key = (K) keys[i];
+	    @SuppressWarnings("unchecked")
+		V value = (V) values[i];
+	    putInternal(key, value);
+	}
+    }
+  
+    /** {@inheritDoc} */
+    public V remove(Object key) {
+        HashEntry<K, V> e = removeEntryForKey(key);
+        return e == null ? null : e.getValue();
+    }
+
+    /** {@inheritDoc} */
+    public void clear() {
+        modCount++;
+	clearTable();
+        size = 0;
+	hashCode = 0;
+    }
+
+    /** {@inheritDoc} */
+    public boolean containsValue(Object value) {
+	ManagedReference[] tab = table;
+        for (int i = 0; i < tab.length ; i++) {
+            for (HashEntry e = getTableEntry(tab, i); e != null; e = e.next) {
+                if (e.equalsValue(value)) {
+                    return true;
+		}
+	    }
+	}
+	return false;
+    }
+
+    /* Map views */
+
+    /** {@inheritDoc} */
+    public Set<K> keySet() {
+	if (keySet == null) {
+	    keySet = new KeySet();
+	}
+	return keySet;
+    }
+
+    /** {@inheritDoc} */
+    public Collection<V> values() {
+	if (values == null) {
+	    values = new Values();
+	}
+        return values;
+    }
+
+    /** {@inheritDoc} */
+    public Set<Entry<K, V>> entrySet() {
+	if (entrySet == null) {
+	    entrySet = new EntrySet();
+	}
+	return entrySet;
+    }
+
+    /* Inherit AbstractMap.equals */
+
+    /** {@inheritDoc} */
+    public int hashCode() {
+	return hashCode;
+    }
+
+    /* -- Private classes -- */
+
     /*
-     * SGS: Define a class that serves as a separate managed object for each
-     * bucket chain.
+     * Define a class that serves as a separate managed object for each bucket
+     * chain.
      */
     private static class Bucket<K, V> implements ManagedObject, Serializable {
 
@@ -378,10 +426,10 @@ public class ManagedHashMap<K,V>
 	private static final long serialVersionUID = 1;
 
 	/** The first entry in the chain. */
-	private transient Entry<K,V> entry;
+	transient HashEntry<K, V> entry;
 
 	/** Creates an instance with the specified first entry. */
-	Bucket(Entry<K,V> entry) {
+	Bucket(HashEntry<K, V> entry) {
 	    this.entry = entry;
 	}
 
@@ -390,10 +438,10 @@ public class ManagedHashMap<K,V>
 	 * end.
 	 */
 	private void writeObject(ObjectOutputStream s) throws IOException {
-	    for (Entry<K,V> e = entry; e != null; e = e.next) {
+	    for (HashEntry<K, V> e = entry; e != null; e = e.next) {
 		e.write(s);
 	    }
-	    Entry.writeDone(s);
+	    HashEntry.writeDone(s);
 	}
 
 	/** Reads the entries for this bucket. */
@@ -401,9 +449,9 @@ public class ManagedHashMap<K,V>
 	    throws IOException, ClassNotFoundException
 	{
 	    s.defaultReadObject();
-	    Entry<K,V> previous = null;
+	    HashEntry<K, V> previous = null;
 	    while (true) {
-		Entry<K,V> e = Entry.read(s);
+		HashEntry<K, V> e = HashEntry.read(s);
 		if (e == null) {
 		    break;
 		}
@@ -417,95 +465,480 @@ public class ManagedHashMap<K,V>
 	}
     }
 
-    /* SGS: Methods for manipulating tables */
+    /** The implementation of Entry for this class. */
+    static final class HashEntry<K, V> implements Entry<K, V> {
+	private static final byte REFERENCE = 1;
+	private static final byte NONREFERENCE = 2;
+	private static final byte DONE = 3;
+        final int hash;
+        final K key;
+        private ManagedReference ref;
+	private int refHash;
+	private V value;
+        HashEntry<K, V> next;
 
-    private Entry<K,V> getTableEntry(int i) {
+        /** Create new entry. */
+        HashEntry(int hash, K key, V value, HashEntry<K, V> next) {
+            this.hash = hash;
+            this.key = key;
+	    if (value != null && value instanceof ManagedObject) {
+		ref = reference((ManagedObject) value);
+		refHash = value.hashCode();
+	    } else {
+		this.value = value;
+	    }
+            this.next = next;
+        }
+
+	/** Creates a new entry for a managed reference. */
+        HashEntry(int hash, K key, ManagedReference ref, int refHash) { 
+            this.hash = hash;
+	    this.key = key;
+	    this.ref = ref;
+	    this.refHash = refHash;
+        }
+
+	/**
+	 * Creates a new entry for an object that is not a managed
+	 * reference.
+	 */
+        HashEntry(int hash, K key, V value) { 
+            this.hash = hash;
+	    this.key = key;
+	    this.value = value;
+        }
+
+	/** Serializes this entry to a stream. */
+	void write(ObjectOutputStream s) throws IOException {
+	    s.writeByte(isReference() ? REFERENCE : NONREFERENCE);
+	    s.writeObject(key);
+	    if (isReference()) {
+		s.writeObject(ref);
+		s.writeInt(refHash);
+	    } else {
+		s.writeObject(value);
+	    }
+	}
+
+	/** Marks in the stream that the last entry has been written. */
+	static void writeDone(ObjectOutputStream s) throws IOException {
+	    s.writeByte(DONE);
+	}
+
+	/**
+	 * Reads an entry from a stream, returning null if there are no more
+	 * entries.
+	 */
+	static <K, V> HashEntry<K, V> read(ObjectInputStream s)
+	    throws IOException, ClassNotFoundException
+	{
+	    byte status = s.readByte();
+	    if (status == DONE) {
+		return null;
+	    }
+	    /* Deserialization is inherently not typesafe. */
+	    @SuppressWarnings("unchecked")
+		K k = (K) s.readObject();
+	    int h = hash(k);
+	    if (status == REFERENCE) {
+		/* Deserialization is inherently not typesafe. */
+		@SuppressWarnings("unchecked")
+		    ManagedReference ref = (ManagedReference) s.readObject();
+		int refHash = s.readInt();
+		return new HashEntry<K, V>(h, k, ref, refHash);
+	    } else {
+		/* Deserialization is inherently not typesafe. */
+		@SuppressWarnings("unchecked")
+		    V v = (V) s.readObject();
+		return new HashEntry<K, V>(h, k, v);
+	    }
+	}
+
+	/**
+	 * Returns true if this entry uses a managed reference to refer to a
+	 * managed object
+	 */
+	private boolean isReference() {
+	    return ref != null;
+	}
+
+	/**
+	 * Returns the hash code of the managed object referred to by this
+	 * object.
+	 */
+	int getRefHash() {
+	    return refHash;
+	}
+
+	/** {@inheritDoc} */
+        public K getKey() {
+            return key;
+        }
+
+	/** {@inheritDoc} */
+        public V getValue() {
+	    if (isReference()) {
+		/* This is inherently non-typesafe. */
+		@SuppressWarnings("unchecked")
+		    V v = (V) dereference(ref, ManagedObject.class);
+		return v;
+	    } else {
+		return value;
+	    }
+        }
+    
+	/** {@inheritDoc} */
+        public V setValue(V newValue) {
+	    V oldValue = getValue();
+	    if (newValue != null && newValue instanceof ManagedObject) {
+		value = null;
+		ref = reference((ManagedObject) newValue);
+		refHash = newValue.hashCode();
+	    } else {
+		value = newValue;
+		ref = null;
+	    }
+            return oldValue;
+        }
+
+	/** {@inheritDoc} */
+        public boolean equals(Object o) {
+	    if (o == this) {
+		return true;
+	    } else if (o instanceof HashEntry) {
+		HashEntry e = (HashEntry) o;
+		if (safeEquals(key, e.key)) {
+		    if (isReference()) {
+			if (ref.equals(e.ref)) {
+			    return true;
+			} else if (refHash == e.refHash &&
+				   ref.get(ManagedObject.class).equals(
+				       e.ref.get(ManagedObject.class)))
+			{
+			    return true;
+			}
+		    } else if (e.isReference() && safeEquals(value, e.value)) {
+			return true;
+		    }
+		}
+	    } else if (o instanceof Entry) {
+		Entry e = (Entry) o;
+		if (safeEquals(getKey(), e.getKey())) {
+		    if (equalsValue(e.getValue())) {
+			return true;
+		    }
+		}
+            }
+            return false;
+        }
+    
+	/** Checks if the argument is the value of this entry. */
+	boolean equalsValue(Object value) {
+	    if (isReference()) {
+		if (value != null &&
+		    value.hashCode() == refHash &&
+		    value.equals(ref.get(ManagedObject.class)))
+		{
+		    return true;
+		}
+	    } else if (safeEquals(value, this.value)) {
+		return true;
+	    }
+	    return false;
+	}
+
+	/** {@inheritDoc} */
+        public int hashCode() {
+            return (key == null ? 0 : key.hashCode()) ^
+		(ref != null ? refHash : value == null ? 0 : value.hashCode());
+        }
+    
+	/** {@inheritDoc} */
+        public String toString() {
+            return getKey() + "=" + getValue();
+        }
+    }
+
+    /** A base class for iterators over items in the map. */
+    private abstract class HashIterator<E> implements Iterator<E> {
+        private HashEntry<K, V> next;	// next entry to return
+        private int expectedModCount;	// For fast-fail
+        private int index;		// current slot
+        private HashEntry<K, V> current;	// current entry
+
+        HashIterator() {
+            expectedModCount = modCount;
+            ManagedReference[] t = table;
+            int i = t.length;
+            HashEntry<K, V> n = null;
+            if (size != 0) { // advance to first entry
+                while (i > 0 && (n = getTableEntry(t, --i)) == null) {
+                    continue;
+		}
+            }
+            next = n;
+            index = i;
+        }
+
+        public boolean hasNext() {
+            return next != null;
+        }
+
+        HashEntry<K, V> nextEntry() { 
+            if (modCount != expectedModCount) {
+                throw new ConcurrentModificationException();
+	    }
+            HashEntry<K, V> e = next;
+            if (e == null)  {
+                throw new NoSuchElementException();
+	    }
+            HashEntry<K, V> n = e.next;
+            ManagedReference[] t = table;
+            int i = index;
+            while (n == null && i > 0) {
+                n = getTableEntry(t, --i);
+	    }
+            index = i;
+            next = n;
+            return current = e;
+        }
+
+        public void remove() {
+            if (current == null) {
+                throw new IllegalStateException();
+            }
+	    if (modCount != expectedModCount) {
+                throw new ConcurrentModificationException();
+	    }
+            Object k = current.key;
+            current = null;
+            ManagedHashMap.this.removeEntryForKey(k);
+            expectedModCount = modCount;
+        }
+    }
+
+    /** Iterates over the values in the map. */
+    private class ValueIterator extends HashIterator<V> {
+	ValueIterator() { }
+        public V next() {
+            return nextEntry().getValue();
+        }
+    }
+
+    /** Iterates over the keys in the map. */
+    private class KeyIterator extends HashIterator<K> {
+	KeyIterator() { }
+        public K next() {
+            return nextEntry().getKey();
+        }
+    }
+
+    /** Iterates over the entries in the map. */
+    private class EntryIterator extends HashIterator<Entry<K, V>> {
+	EntryIterator() { }
+        public Entry<K, V> next() {
+            return nextEntry();
+        }
+    }
+
+    /** The key view of the map. */
+    private class KeySet extends AbstractSet<K> {
+	KeySet() { }
+        public Iterator<K> iterator() {
+            return new KeyIterator();
+        }
+        public int size() {
+            return size;
+        }
+        public boolean contains(Object o) {
+            return containsKey(o);
+        }
+        public boolean remove(Object o) {
+            return ManagedHashMap.this.removeEntryForKey(o) != null;
+        }
+        public void clear() {
+            ManagedHashMap.this.clear();
+        }
+    }
+
+    /** The value view of the map. */
+    private class Values extends AbstractCollection<V> {
+	Values() { }
+        public Iterator<V> iterator() {
+            return new ValueIterator();
+        }
+        public int size() {
+            return size;
+        }
+        public boolean contains(Object o) {
+            return containsValue(o);
+        }
+        public void clear() {
+            ManagedHashMap.this.clear();
+        }
+    }
+
+    /** The entry view of the map. */
+    private class EntrySet extends AbstractSet<Entry<K, V>> {
+	EntrySet() { }
+        public Iterator<Entry<K, V>> iterator() {
+            return new EntryIterator();
+        }
+        public boolean contains(Object o) {
+            if (!(o instanceof Entry)) {
+                return false;
+	    }
+            Entry e = (Entry) o;
+            Entry<K, V> candidate = getEntry(e.getKey());
+            return candidate != null && candidate.equals(e);
+        }
+        public boolean remove(Object o) {
+            return removeEntry(o) != null;
+        }
+        public int size() {
+            return size;
+        }
+        public void clear() {
+            ManagedHashMap.this.clear();
+        }
+    }
+
+    /* -- Private methods -- */
+
+    /**
+     * Returns a hash value for the specified object.  In addition to 
+     * the object's own hashCode, this method applies a "supplemental
+     * hash function," which defends against poor quality hash functions.
+     * This is critical because HashMap uses power-of two length 
+     * hash tables.<p>
+     *
+     * The shift distances in this function were chosen as the result
+     * of an automated search over the entire four-dimensional search space.
+     */
+    static int hash(Object x) {
+        int h = (x == null) ? 0 : x.hashCode();
+        h += ~(h << 9);
+        h ^=  (h >>> 14);
+        h +=  (h << 4);
+        h ^=  (h >>> 10);
+        return h;
+    }
+
+    /** Checks for equality, including null. */
+    static boolean safeEquals(Object x, Object y) {
+	return x == y || x != null && x.equals(y);
+    }
+
+    /**
+     * Returns index for hash code h. 
+     */
+    private static int indexFor(int h, int length) {
+        return h & (length-1);
+    }
+
+    /** Gets the first entry from a bucket in the current table. */
+    private HashEntry<K, V> getTableEntry(int i) {
 	return getTableEntry(table, i);
     }
 
-    private static <K,V> Entry<K,V> getTableEntry(
+    /** Gets the first entry from a bucket in a table. */
+    static <K, V> HashEntry<K, V> getTableEntry(
 	ManagedReference[] table, int i)
     {
 	ManagedReference ref = table[i];
-	return (ref == null) ? null : ref.get(Bucket.class).entry;
+	if (ref == null) {
+	    return null;
+	} else {
+	    /* Can't check parameterized types here. */
+	    @SuppressWarnings("unchecked")
+		Bucket<K, V> bucket = ref.get(Bucket.class);
+	    return bucket.entry;
+	}
     }
 
-    private Entry<K,V> getTableEntryForUpdate(int i) {
+    /**
+     * Gets the first entry from a bucket in the current table and marks the
+     * bucket for update.
+     */
+    private HashEntry<K, V> getTableEntryForUpdate(int i) {
 	return getTableEntryForUpdate(table, i);
     }
 
-    private static <K, V> Entry<K,V> getTableEntryForUpdate(
+    /**
+     * Gets the first entry from a bucket in a table and marks the bucket for
+     * update.
+     */
+    private static <K, V> HashEntry<K, V> getTableEntryForUpdate(
 	ManagedReference[] table, int i)
     {
 	ManagedReference ref = table[i];
-	return (ref == null) ? null : ref.getForUpdate(Bucket.class).entry;
+	if (ref == null) {
+	    return null;
+	} else {
+	    /* Can't check parameterized types here. */
+	    @SuppressWarnings("unchecked")
+		Bucket<K, V> bucket = ref.getForUpdate(Bucket.class);
+	    return bucket.entry;
+	}
     }
 
-    private void setTableEntry(int i, Entry<K,V> entry) {
+    /** Stores an entry into a bucket in the current table. */
+    private void setTableEntry(int i, HashEntry<K, V> entry) {
 	setTableEntry(table, i, entry);
     }
 
+    /** Stores an entry into a bucket in a table. */
     private void setTableEntry(
-	ManagedReference[] table, int i, Entry<K,V> entry)
+	ManagedReference[] table, int i, HashEntry<K, V> entry)
     {
 	ManagedReference ref = table[i];
 	if (ref == null) {
 	    DataManager dm = getDataManager();
 	    dm.markForUpdate(this);
-	    table[i] = dm.createReference(new Bucket<K,V>(entry));
+	    table[i] = dm.createReference(new Bucket<K, V>(entry));
 	} else {
-	    ref.getForUpdate(Bucket.class).entry = entry;
+	    /*
+	     * Can't check parameterized types here.  -tjb@sun.com
+	     * (11/28/2006)
+	     */
+	    @SuppressWarnings("unchecked")
+		Bucket<K, V> bucket = ref.getForUpdate(Bucket.class);
+	    bucket.entry = entry;
 	}
     }
 
+    /** Clears all entries from the table, removing the Bucket instances. */
     private void clearTable() {
 	DataManager dm = getDataManager();
 	dm.markForUpdate(this);
-        for (int i = 0; i < table.length; i++) {
-	    if (table[i] != null) {
-		dm.removeObject(table[i].get(Bucket.class));
-		table[i] = null;
+	ManagedReference[] tab = table;
+        for (int i = 0; i < tab.length; i++) {
+	    if (tab[i] != null) {
+		dm.removeObject(tab[i].get(Bucket.class));
+		tab[i] = null;
 	    }
 	}
     }
 
-    private static DataManager dataManager;
-
+    /**
+     * Returns the data manager.  FIXME: Remove when AppManager.getDataManager
+     * is in place.  -tjb@sun.com (11/28/2006)
+     */
     static DataManager getDataManager() {
 	return dataManager;
     }
 
-    static public void setDataManager(DataManager dataManager) {
-	ManagedHashMap.dataManager = dataManager;
-    }
-
+    /** Returns a reference to a managed object, or null. */
     static ManagedReference reference(ManagedObject value) {
 	return value == null ? null : getDataManager().createReference(value);
     }
 
+    /**
+     * Returns the value associated with a managed reference, which may be
+     * null.
+     */
     static <V> V dereference(ManagedReference value, Class<V> type) {
 	return value == null ? null : value.get(type);
-    }
-
-    /**
-     * Returns <tt>true</tt> if this map contains a mapping for the
-     * specified key.
-     *
-     * @param   key   The key whose presence in this map is to be tested
-     * @return <tt>true</tt> if this map contains a mapping for the specified
-     * key.
-     */
-    public boolean containsKey(Object key) {
-        Object k = maskNull(key);
-        int hash = hash(k);
-        int i = indexFor(hash, table.length);
-        Entry e = getTableEntry(i);
-        while (e != null) {
-            if (e.hash == hash && eq(k, e.key)) 
-                return true;
-            e = e.next;
-        }
-        return false;
     }
 
     /**
@@ -513,56 +946,14 @@ public class ManagedHashMap<K,V>
      * HashMap.  Returns null if the HashMap contains no mapping
      * for this key.
      */
-    Entry<K,V> getEntry(Object key) {
-        Object k = maskNull(key);
-        int hash = hash(k);
+    HashEntry<K, V> getEntry(Object key) {
+        int hash = hash(key);
         int i = indexFor(hash, table.length);
-        Entry<K,V> e = getTableEntry(i); 
-        while (e != null && !(e.hash == hash && eq(k, e.key)))
-            e = e.next;
-        return e;
-    }
-  
-    /**
-     * Associates the specified value with the specified key in this map.
-     * If the map previously contained a mapping for this key, the old
-     * value is replaced.
-     *
-     * @param key key with which the specified value is to be associated.
-     * @param value value to be associated with the specified key.
-     * @return previous value associated with specified key, or <tt>null</tt>
-     *	       if there was no mapping for key.  A <tt>null</tt> return can
-     *	       also indicate that the HashMap previously associated
-     *	       <tt>null</tt> with the specified key.
-     */
-    public V put(K key, V value) {
-	if (key != null && !(key instanceof Serializable)) {
-	    throw new IllegalArgumentException(
-		"The key must implement Serializable");
-	} else if (key instanceof ManagedObject) {
-	    throw new IllegalArgumentException(
-		"The key must not implement ManagedObject");
-	} else if (value != null && !(value instanceof Serializable)) {
-	    throw new IllegalArgumentException(
-		"The value must implement Serializable");
+        for (HashEntry<K, V> e = getTableEntry(i); e != null; e = e.next) {
+	    if (e.hash == hash && safeEquals(key, e.key)) {
+		return e;
+	    }
 	}
-	K k = maskNull(key);
-        int hash = hash(k);
-        int i = indexFor(hash, table.length);
-
-        for (Entry<K,V> e = getTableEntryForUpdate(i); e != null; e = e.next) {
-            if (e.hash == hash && eq(k, e.key)) {
-                V oldValue = e.getValue();
-		hashCode -= e.hashCode();
-                e.setValue(value);
-		hashCode += e.hashCode();
-                e.recordAccess(this);
-                return oldValue;
-            }
-        }
-
-        modCount++;
-        addEntry(hash, k, value, i);
         return null;
     }
 
@@ -585,33 +976,22 @@ public class ManagedHashMap<K,V>
 		    "The value must implement Serializable");
 	    }
 	}
-        K k = maskNull(key);
-        int hash = hash(k);
+        int hash = hash(key);
         int i = indexFor(hash, table.length);
-
         /**
          * Look for preexisting entry for key.  This will never happen for
          * clone or deserialize.  It will only happen for construction if the
          * input Map is a sorted map whose ordering is inconsistent w/ equals.
          */
-        for (Entry<K,V> e = getTableEntry(i); e != null; e = e.next) {
-            if (e.hash == hash && eq(k, e.key)) {
+        for (HashEntry<K, V> e = getTableEntry(i); e != null; e = e.next) {
+            if (e.hash == hash && safeEquals(key, e.key)) {
                 e.setValue(value);
                 return;
             }
         }
-
-        createEntry(hash, k, value, i);
-    }
-
-    void putAllForCreate(Map<? extends K, ? extends V> m, boolean check) {
-	int h = 0;
-        for (Iterator<? extends Map.Entry<? extends K, ? extends V>> i = m.entrySet().iterator(); i.hasNext(); ) {
-            Map.Entry<? extends K, ? extends V> e = i.next();
-            putForCreate(e.getKey(), e.getValue(), check);
-	    h += e.hashCode();
-        }
-	hashCode = h;
+        setTableEntry(
+	    i, new HashEntry<K, V>(hash, key, value, getTableEntry(i)));
+        size++;
     }
 
     /**
@@ -628,33 +1008,33 @@ public class ManagedHashMap<K,V>
      *        capacity is MAXIMUM_CAPACITY (in which case value
      *        is irrelevant).
      */
-    void resize(int newCapacity) {
+    private void resize(int newCapacity) {
         ManagedReference[] oldTable = table;
         int oldCapacity = oldTable.length;
         if (oldCapacity == MAXIMUM_CAPACITY) {
             threshold = Integer.MAX_VALUE;
             return;
         }
-
         ManagedReference[] newTable = new ManagedReference[newCapacity];
         transfer(newTable);
 	clearTable();
         table = newTable;
-        threshold = (int)(newCapacity * loadFactor);
+        threshold = (int) (newCapacity * loadFactor);
     }
 
-    /** 
-     * Transfer all entries from current table to newTable.
+    /**
+     * Transfers all entries from current table to newTable.  Creates fresh
+     * Bucket instances.
      */
-    void transfer(ManagedReference[] newTable) {
+    private void transfer(ManagedReference[] newTable) {
         ManagedReference[] src = table;
         int newCapacity = newTable.length;
         for (int j = 0; j < src.length; j++) {
-            Entry<K,V> e = getTableEntry(src, j);
+            HashEntry<K, V> e = getTableEntry(src, j);
             if (e != null) {
                 src[j] = null;
                 do {
-                    Entry<K,V> next = e.next;
+                    HashEntry<K, V> next = e.next;
                     int i = indexFor(e.hash, newCapacity);  
                     e.next = getTableEntry(newTable, i);
                     setTableEntry(newTable, i, e);
@@ -665,73 +1045,18 @@ public class ManagedHashMap<K,V>
     }
 
     /**
-     * Copies all of the mappings from the specified map to this map
-     * These mappings will replace any mappings that
-     * this map had for any of the keys currently in the specified map.
-     *
-     * @param m mappings to be stored in this map.
-     * @throws NullPointerException if the specified map is null.
-     */
-    public void putAll(Map<? extends K, ? extends V> m) {
-        int numKeysToBeAdded = m.size();
-        if (numKeysToBeAdded == 0)
-            return;
-
-        /*
-         * Expand the map if the map if the number of mappings to be added
-         * is greater than or equal to threshold.  This is conservative; the
-         * obvious condition is (m.size() + size) >= threshold, but this
-         * condition could result in a map with twice the appropriate capacity,
-         * if the keys to be added overlap with the keys already in this map.
-         * By using the conservative calculation, we subject ourself
-         * to at most one extra resize.
-         */
-        if (numKeysToBeAdded > threshold) {
-            int targetCapacity = (int)(numKeysToBeAdded / loadFactor + 1);
-            if (targetCapacity > MAXIMUM_CAPACITY)
-                targetCapacity = MAXIMUM_CAPACITY;
-            int newCapacity = table.length;
-            while (newCapacity < targetCapacity)
-                newCapacity <<= 1;
-            if (newCapacity > table.length)
-                resize(newCapacity);
-        }
-
-        for (Iterator<? extends Map.Entry<? extends K, ? extends V>> i = m.entrySet().iterator(); i.hasNext(); ) {
-            Map.Entry<? extends K, ? extends V> e = i.next();
-            put(e.getKey(), e.getValue());
-        }
-    }
-  
-    /**
-     * Removes the mapping for this key from this map if present.
-     *
-     * @param  key key whose mapping is to be removed from the map.
-     * @return previous value associated with specified key, or <tt>null</tt>
-     *	       if there was no mapping for key.  A <tt>null</tt> return can
-     *	       also indicate that the map previously associated <tt>null</tt>
-     *	       with the specified key.
-     */
-    public V remove(Object key) {
-        Entry<K,V> e = removeEntryForKey(key);
-        return (e == null ? null : e.getValue());
-    }
-
-    /**
      * Removes and returns the entry associated with the specified key
      * in the HashMap.  Returns null if the HashMap contains no mapping
      * for this key.
      */
-    Entry<K,V> removeEntryForKey(Object key) {
-        Object k = maskNull(key);
-        int hash = hash(k);
+    HashEntry<K, V> removeEntryForKey(Object key) {
+        int hash = hash(key);
         int i = indexFor(hash, table.length);
-        Entry<K,V> prev = getTableEntry(i);
-        Entry<K,V> e = prev;
-
+        HashEntry<K, V> prev = getTableEntry(i);
+        HashEntry<K, V> e = prev;
         while (e != null) {
-            Entry<K,V> next = e.next;
-            if (e.hash == hash && eq(k, e.key)) {
+            HashEntry<K, V> next = e.next;
+            if (e.hash == hash && safeEquals(key, e.key)) {
                 modCount++;
                 if (prev == e) {
                     setTableEntry(i, next);
@@ -742,32 +1067,26 @@ public class ManagedHashMap<K,V>
 		}
                 size--;
 		hashCode -= e.hashCode();
-                e.recordRemoval(this);
 		break;
             }
             prev = e;
             e = next;
         }
-
         return e;
     }
 
-    /**
-     * Special version of remove for EntrySet.
-     */
-    Entry<K,V> removeMapping(Object o) {
-        if (!(o instanceof Map.Entry))
+    /** Removes the specified entry */
+    HashEntry<K, V> removeEntry(Object o) {
+        if (!(o instanceof Entry)) {
             return null;
-
-        Map.Entry<K,V> entry = (Map.Entry<K,V>) o;
-        Object k = maskNull(entry.getKey());
-        int hash = hash(k);
+	}
+        Entry entry = (Entry) o;
+        int hash = hash(entry.getKey());
         int i = indexFor(hash, table.length);
-        Entry<K,V> prev = getTableEntry(i);
-        Entry<K,V> e = prev;
-
+        HashEntry<K, V> prev = getTableEntry(i);
+        HashEntry<K, V> e = prev;
         while (e != null) {
-            Entry<K,V> next = e.next;
+            HashEntry<K, V> next = e.next;
             if (e.hash == hash && e.equals(entry)) {
                 modCount++;
                 if (prev == e) {
@@ -779,506 +1098,11 @@ public class ManagedHashMap<K,V>
 		}
                 size--;
 		hashCode -= e.hashCode();
-                e.recordRemoval(this);
 		break;
             }
             prev = e;
             e = next;
         }
-   
         return e;
-    }
-
-    /**
-     * Removes all mappings from this map.
-     */
-    public void clear() {
-        modCount++;
-	clearTable();
-        size = 0;
-	hashCode = 0;
-    }
-
-    /**
-     * Returns <tt>true</tt> if this map maps one or more keys to the
-     * specified value.
-     *
-     * @param value value whose presence in this map is to be tested.
-     * @return <tt>true</tt> if this map maps one or more keys to the
-     *         specified value.
-     */
-    public boolean containsValue(Object value) {
-	ManagedReference[] tab = table;
-        for (int i = 0; i < tab.length ; i++) {
-            for (Entry e = getTableEntry(tab, i); e != null; e = e.next) {
-                if (e.equalsValue(value)) {
-                    return true;
-		}
-	    }
-	}
-	return false;
-    }
-
-    /**
-     * Returns a shallow copy of this <tt>HashMap</tt> instance: the keys and
-     * values themselves are not cloned.
-     *
-     * @return a shallow copy of this map.
-     */
-    public Object clone() {
-        ManagedHashMap<K,V> result = null;
-	try { 
-	    result = (ManagedHashMap<K,V>)super.clone();
-	} catch (CloneNotSupportedException e) { 
-	    // assert false;
-	}
-        result.table = new ManagedReference[table.length];
-        result.entrySet = null;
-        result.modCount = 0;
-        result.size = 0;
-        result.init();
-        result.putAllForCreate(this, false);
-
-        return result;
-    }
-
-    static class Entry<K,V> implements Map.Entry<K,V> {
-	private static final byte REFERENCE = 1;
-	private static final byte NONREFERENCE = 2;
-	private static final byte DONE = 3;
-        final K key;
-        private ManagedReference ref;
-	private int refHash;
-	private V value;
-        final int hash;
-        Entry<K,V> next;
-
-        /**
-         * Create new entry.
-         */
-        Entry(int h, K k, V v, Entry<K,V> n) {
-	    if (v != null && v instanceof ManagedObject) {
-		ref = reference((ManagedObject) v);
-		refHash = v.hashCode();
-	    } else {
-		value = v;
-	    }
-            next = n;
-            key = k;
-            hash = h;
-        }
-
-        Entry(int h, K k, ManagedReference ref, int refHash) { 
-	    key = k;
-	    this.ref = ref;
-	    this.refHash = refHash;
-            hash = h;
-        }
-
-        Entry(int h, K k, V value) { 
-	    key = k;
-	    this.value = value;
-            hash = h;
-        }
-
-	void write(ObjectOutputStream s) throws IOException {
-	    s.writeByte(isReference() ? REFERENCE : NONREFERENCE);
-	    s.writeObject(unmaskNull(key));
-	    if (isReference()) {
-		s.writeObject(ref);
-		s.writeInt(refHash);
-	    } else {
-		s.writeObject(value);
-	    }
-	}
-
-	static void writeDone(ObjectOutputStream s) throws IOException {
-	    s.writeByte(DONE);
-	}
-
-	static <K,V> Entry<K,V> read(ObjectInputStream s)
-	    throws IOException, ClassNotFoundException
-	{
-	    byte status = s.readByte();
-	    if (status == DONE) {
-		return null;
-	    }
-	    K k = (K) maskNull(s.readObject());
-	    int h = hash(k);
-	    if (status == REFERENCE) {
-		ManagedReference ref = (ManagedReference) s.readObject();
-		int refHash = s.readInt();
-		return new Entry<K,V>(h, k, ref, refHash);
-	    } else {
-		V v = (V) s.readObject();
-		return new Entry<K,V>(h, k, v);
-	    }
-	}
-
-	private boolean isReference() {
-	    return ref != null;
-	}
-
-	int getRefHash() {
-	    return refHash;
-	}
-
-        public K getKey() {
-            return ManagedHashMap.<K>unmaskNull(key);
-        }
-
-        public V getValue() {
-	    return isReference() ?
-		(V) dereference(ref, ManagedObject.class) : value;
-        }
-    
-        public V setValue(V newValue) {
-	    V oldValue = getValue();
-	    if (newValue != null && newValue instanceof ManagedObject) {
-		value = null;
-		ref = reference((ManagedObject) newValue);
-		refHash = newValue.hashCode();
-	    } else {
-		value = newValue;
-		ref = null;
-	    }
-            return oldValue;
-        }
-
-        public boolean equals(Object o) {
-	    if (o == this) {
-		return true;
-	    } else if (o instanceof Entry) {
-		Entry e = (Entry) o;
-		if (eq(key, e.key)) {
-		    if (isReference()) {
-			if (ref.equals(e.ref)) {
-			    return true;
-			} else if (refHash == e.refHash &&
-				   ref.get(ManagedObject.class).equals(
-				       e.ref.get(ManagedObject.class)))
-			{
-			    return true;
-			}
-		    } else if (e.isReference() && safeEquals(value, e.value)) {
-			return true;
-		    }
-		}
-	    } else if (o instanceof Map.Entry) {
-		Map.Entry e = (Map.Entry)o;
-		if (safeEquals(getKey(), e.getKey())) {
-		    if (equalsValue(e.getValue())) {
-			return true;
-		    }
-		}
-            }
-            return false;
-        }
-    
-	boolean equalsValue(Object value) {
-	    if (isReference()) {
-		if (value != null &&
-		    value.hashCode() == refHash &&
-		    value.equals(ref.get(ManagedObject.class)))
-		{
-		    return true;
-		}
-	    } else if (safeEquals(value, this.value)) {
-		return true;
-	    }
-	    return false;
-	}
-
-	private static boolean safeEquals(Object x, Object y) {
-	    return x == y || x != null && x.equals(y);
-	}
-
-        public int hashCode() {
-            return (key==NULL_KEY ? 0 : key.hashCode()) ^
-		(ref != null ? refHash : value == null ? 0 : value.hashCode());
-        }
-    
-        public String toString() {
-            return getKey() + "=" + getValue();
-        }
-
-        /**
-         * This method is invoked whenever the value in an entry is
-         * overwritten by an invocation of put(k,v) for a key k that's already
-         * in the HashMap.
-         */
-        void recordAccess(ManagedHashMap<K,V> m) {
-        }
-
-        /**
-         * This method is invoked whenever the entry is
-         * removed from the table.
-         */
-        void recordRemoval(ManagedHashMap<K,V> m) {
-        }
-    }
-
-    /**
-     * Add a new entry with the specified key, value and hash code to
-     * the specified bucket.  It is the responsibility of this 
-     * method to resize the table if appropriate.
-     *
-     * Subclass overrides this to alter the behavior of put method.
-     */
-    void addEntry(int hash, K key, V value, int bucketIndex) {
-	Entry<K,V> e = getTableEntry(bucketIndex);
-	Entry<K,V> newEntry = new Entry<K,V>(hash, key, value, e);
-        setTableEntry(bucketIndex, newEntry);
-	hashCode += newEntry.hashCode();
-        if (size++ >= threshold)
-            resize(2 * table.length);
-    }
-
-    /**
-     * Like addEntry except that this version is used when creating entries
-     * as part of Map construction or "pseudo-construction" (cloning,
-     * deserialization).  This version needn't worry about resizing the table.
-     *
-     * Subclass overrides this to alter the behavior of HashMap(Map),
-     * clone, and readObject.
-     */
-    void createEntry(int hash, K key, V value, int bucketIndex) {
-	Entry<K,V> e = getTableEntry(bucketIndex);
-        setTableEntry(bucketIndex, new Entry<K,V>(hash, key, value, e));
-        size++;
-    }
-
-    private abstract class HashIterator<E> implements Iterator<E> {
-        Entry<K,V> next;	// next entry to return
-        int expectedModCount;	// For fast-fail 
-        int index;		// current slot 
-        Entry<K,V> current;	// current entry
-
-        HashIterator() {
-            expectedModCount = modCount;
-            ManagedReference[] t = table;
-            int i = t.length;
-            Entry<K,V> n = null;
-            if (size != 0) { // advance to first entry
-                while (i > 0 && (n = getTableEntry(t, --i)) == null)
-                    ;
-            }
-            next = n;
-            index = i;
-        }
-
-        public boolean hasNext() {
-            return next != null;
-        }
-
-        Entry<K,V> nextEntry() { 
-            if (modCount != expectedModCount)
-                throw new ConcurrentModificationException();
-            Entry<K,V> e = next;
-            if (e == null) 
-                throw new NoSuchElementException();
-                
-            Entry<K,V> n = e.next;
-            ManagedReference[] t = table;
-            int i = index;
-            while (n == null && i > 0)
-                n = getTableEntry(t, --i);
-            index = i;
-            next = n;
-            return current = e;
-        }
-
-        public void remove() {
-            if (current == null)
-                throw new IllegalStateException();
-            if (modCount != expectedModCount)
-                throw new ConcurrentModificationException();
-            Object k = current.key;
-            current = null;
-            ManagedHashMap.this.removeEntryForKey(k);
-            expectedModCount = modCount;
-        }
-
-    }
-
-    private class ValueIterator extends HashIterator<V> {
-        public V next() {
-            return nextEntry().getValue();
-        }
-    }
-
-    private class KeyIterator extends HashIterator<K> {
-        public K next() {
-            return nextEntry().getKey();
-        }
-    }
-
-    private class EntryIterator extends HashIterator<Map.Entry<K,V>> {
-        public Map.Entry<K,V> next() {
-            return nextEntry();
-        }
-    }
-
-    // Subclass overrides these to alter behavior of views' iterator() method
-    Iterator<K> newKeyIterator()   {
-        return new KeyIterator();
-    }
-    Iterator<V> newValueIterator()   {
-        return new ValueIterator();
-    }
-    Iterator<Map.Entry<K,V>> newEntryIterator()   {
-        return new EntryIterator();
-    }
-
-
-    // Views
-
-    private transient Set<Map.Entry<K,V>> entrySet = null;
-
-    /**
-     * Returns a set view of the keys contained in this map.  The set is
-     * backed by the map, so changes to the map are reflected in the set, and
-     * vice-versa.  The set supports element removal, which removes the
-     * corresponding mapping from this map, via the <tt>Iterator.remove</tt>,
-     * <tt>Set.remove</tt>, <tt>removeAll</tt>, <tt>retainAll</tt>, and
-     * <tt>clear</tt> operations.  It does not support the <tt>add</tt> or
-     * <tt>addAll</tt> operations.
-     *
-     * @return a set view of the keys contained in this map.
-     */
-    public Set<K> keySet() {
-        Set<K> ks = keySet;
-        return (ks != null ? ks : (keySet = new KeySet()));
-    }
-
-    private class KeySet extends AbstractSet<K> {
-        public Iterator<K> iterator() {
-            return newKeyIterator();
-        }
-        public int size() {
-            return size;
-        }
-        public boolean contains(Object o) {
-            return containsKey(o);
-        }
-        public boolean remove(Object o) {
-            return ManagedHashMap.this.removeEntryForKey(o) != null;
-        }
-        public void clear() {
-            ManagedHashMap.this.clear();
-        }
-    }
-
-    /**
-     * Returns a collection view of the values contained in this map.  The
-     * collection is backed by the map, so changes to the map are reflected in
-     * the collection, and vice-versa.  The collection supports element
-     * removal, which removes the corresponding mapping from this map, via the
-     * <tt>Iterator.remove</tt>, <tt>Collection.remove</tt>,
-     * <tt>removeAll</tt>, <tt>retainAll</tt>, and <tt>clear</tt> operations.
-     * It does not support the <tt>add</tt> or <tt>addAll</tt> operations.
-     *
-     * @return a collection view of the values contained in this map.
-     */
-    public Collection<V> values() {
-        Collection<V> vs = values;
-        return (vs != null ? vs : (values = new Values()));
-    }
-
-    private class Values extends AbstractCollection<V> {
-        public Iterator<V> iterator() {
-            return newValueIterator();
-        }
-        public int size() {
-            return size;
-        }
-        public boolean contains(Object o) {
-            return containsValue(o);
-        }
-        public void clear() {
-            ManagedHashMap.this.clear();
-        }
-    }
-
-    /**
-     * Returns a collection view of the mappings contained in this map.  Each
-     * element in the returned collection is a <tt>Map.Entry</tt>.  The
-     * collection is backed by the map, so changes to the map are reflected in
-     * the collection, and vice-versa.  The collection supports element
-     * removal, which removes the corresponding mapping from the map, via the
-     * <tt>Iterator.remove</tt>, <tt>Collection.remove</tt>,
-     * <tt>removeAll</tt>, <tt>retainAll</tt>, and <tt>clear</tt> operations.
-     * It does not support the <tt>add</tt> or <tt>addAll</tt> operations.
-     *
-     * @return a collection view of the mappings contained in this map.
-     * @see Map.Entry
-     */
-    public Set<Map.Entry<K,V>> entrySet() {
-        Set<Map.Entry<K,V>> es = entrySet;
-        return (es != null ? es : (entrySet = (Set<Map.Entry<K,V>>) (Set) new EntrySet()));
-    }
-
-    private class EntrySet extends AbstractSet/*<Map.Entry<K,V>>*/ {
-        public Iterator/*<Map.Entry<K,V>>*/ iterator() {
-            return newEntryIterator();
-        }
-        public boolean contains(Object o) {
-            if (!(o instanceof Map.Entry))
-                return false;
-            Map.Entry<K,V> e = (Map.Entry<K,V>) o;
-            Entry<K,V> candidate = getEntry(e.getKey());
-            return candidate != null && candidate.equals(e);
-        }
-        public boolean remove(Object o) {
-            return removeMapping(o) != null;
-        }
-        public int size() {
-            return size;
-        }
-        public void clear() {
-            ManagedHashMap.this.clear();
-        }
-    }
-
-    /**
-     * Save the state of the <tt>HashMap</tt> instance to a stream (i.e.,
-     * serialize it).
-     *
-     * @serialData The <i>capacity</i> of the HashMap (the length of the
-     *		   bucket array) is emitted (int), followed  by the
-     *		   <i>size</i> of the HashMap (the number of key-value
-     *		   mappings), followed by the key (Object) and value (Object)
-     *		   for each key-value mapping represented by the HashMap
-     *             The key-value mappings are emitted in the order that they
-     *             are returned by <tt>entrySet().iterator()</tt>.
-     * 
-     */
-    private void writeObject(java.io.ObjectOutputStream s)
-        throws IOException
-    {
-	// Write out the threshold, loadfactor, and any hidden stuff
-	s.defaultWriteObject();
-    }
-
-    private static final long serialVersionUID = 362498820763181265L;
-
-    /**
-     * Reconstitute the <tt>HashMap</tt> instance from a stream (i.e.,
-     * deserialize it).
-     */
-    private void readObject(java.io.ObjectInputStream s)
-         throws IOException, ClassNotFoundException
-    {
-	// Read in the threshold, loadfactor, and any hidden stuff
-	s.defaultReadObject();
-        init();  // Give subclass a chance to do its thing.
-    }
-
-    // These methods are used when serializing HashSets
-    int   capacity()     { return table.length; }
-    float loadFactor()   { return loadFactor;   }
-
-    public int hashCode() {
-	return hashCode;
     }
 }
