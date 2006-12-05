@@ -1,40 +1,44 @@
 package com.sun.sgs.app;
 
 /**
- * Provides an interface that {@link ManagedObject} subclasses can implement in
- * order to control the way changes to the state of their instances is
- * detected. <p>
+ * Provides an interface that {@link ManagedObject} classes can implement to
+ * control how changes to the state of their instances are detected.  For
+ * classes that implement this interface, the {@link #getChangesState
+ * getChangesState} method will be called when the object is first obtained
+ * from the {@link DataManager}, and again at the end of a transaction.  The
+ * results of serializing the two objects will be compared, and the associated
+ * managed object will only be saved to the <code>DataManager</code> if the
+ * serialized forms differ.  For managed objects that do not implement this
+ * interface, the serialized form of the object itself will be used to
+ * determine if the object has changed.  Note that no comparison is performed
+ * if the object is marked modified explicitly by calls to {@link
+ * DataManager#markForUpdate DataManager.markForUpdate} or {@link
+ * ManagedReference#getForUpdate ManagedReference.getForUpdate}. <p>
  *
- * Managed objects that do not implement this interface will be serialized when
- * first accessed and again at commit time to determine if their contents have
- * changed. <p>
- *
- * Classes that always make sure to call {@link DataManager#markForUpdate
- * DataManager.markForUpdate} and {@link ManagedReference#getForUpdate
- * ManagedReference.getForUpdate} whenever their state, or the state of any
- * non-managed objects they refer to, changes can choose to implement this
- * interface by returning a constant value with a small serialized form &mdash;
+ * Classes that call <code>DataManager.markForUpdate</code> or
+ * <code>ManagedReference.getForUpdate</code> whenever their state, or the
+ * state of any non-managed objects they refer to, changes can implement this
+ * interface to return a constant value with a small serialized form &mdash;
  * <code>null</code> works well for this purpose.  The fact that the serialized
- * form of this value does not change will tell the {@link DataManager} that
- * the object does not need to be saved. <p>
+ * form of this value does not change is an efficient way to tell the
+ * <code>DataManager</code> that the object does not need to be saved. <p>
  *
- * Another possibility is that a class still needs to perform some work to
- * determine if it has been changed in the current transaction, but it is a
- * smaller amount of work than serializing the entire instance and the objects
- * it refers to.  In that case, the class can implement {@link #getChangesState
- * getChangesState} to return an object that represents the current
- * modification of the object.
+ * Another use case for this interface is for classes that need to perform some
+ * work to determine if it has been changed in the current transaction, but a
+ * smaller amount of work than would be needed to serialize the entire instance
+ * and the objects it refers to.  In that case, the class can implement
+ * <code>getChangesState</code> to return an object that represents the current
+ * modification state of the object.
  */
 public interface DetectChanges {
 
     /**
-     * Returns an object whose serialized state represents any state of this
-     * instance, or any non-managed objects this instance refers to, that may
-     * have been modified.
+     * Returns an object whose serialized state represents modifications to any
+     * state of this instance and any non-managed objects to which this
+     * instance refers.
      *
-     * @param	an object whose serialized state represents the state of this
-     *		instance
+     * @return	an object whose serialized state represents modifications to
+     *		the state of this instance
      */
     Object getChangesState();
 }
-	
