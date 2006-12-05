@@ -203,9 +203,8 @@ public class TaskServiceImpl
                     dataService.setServiceBinding(getPmapKey(i), pmap);
                 } catch (RuntimeException re) {
                     if (logger.isLoggable(Level.SEVERE))
-                        logger.logThrow(Level.SEVERE,
-                    	    "failed to bind pending map {0}",
-                    	    re, i);
+                        logger.logThrow(Level.SEVERE, re, 
+                    	    "failed to bind pending map {0}", i);
                     throw re;
                 }
             }
@@ -668,7 +667,7 @@ public class TaskServiceImpl
                     taskScheduler.reserveTask(task, owner, startTime);
         } catch (TaskRejectedException tre) {
             if (logger.isLoggable(Level.FINE))
-                logger.log(Level.FINE, "couldn't get a reservation", tre);
+                logger.logThrow(Level.FINE, tre, "couldn't get a reservation");
             throw tre;
         }
 
@@ -698,13 +697,13 @@ public class TaskServiceImpl
 	    
 	} catch (NameNotBoundException e) {
             if (logger.isLoggable(Level.WARNING))
-                logger.logThrow(Level.WARNING, "could not fetch task {0}",
-                	e, objName);
+                logger.logThrow(Level.WARNING, e,
+                	"could not fetch task {0}", objName);
             throw e;
 	} catch (ObjectNotFoundException e) {
             if (logger.isLoggable(Level.WARNING))
-                logger.logThrow(Level.WARNING, "could not fetch task {0}",
-                	e, objName);
+                logger.logThrow(Level.WARNING, e,
+                	"could not fetch task {0}", objName);
             throw e;
         }
     }
@@ -766,9 +765,9 @@ public class TaskServiceImpl
                                        transactionProxy.getCurrentOwner());
         } catch (TaskRejectedException tre) {
             if (logger.isLoggable(Level.WARNING))
-                logger.logThrow(Level.WARNING,
+                logger.logThrow(Level.WARNING, tre,
                 	"couldn't schedule task to remove " +
-                        "non-retried task {0}: giving up", tre, objName);
+                        "non-retried task {0}: giving up", objName);
             throw tre;
         }
     }

@@ -155,6 +155,7 @@ public class TestPerformance extends TestCase {
 	    System.err.println(
 		"Time: " + (stop - start) / count + " ms per transaction");
 	}
+	store.shutdown();
     }
 
     public void testWriteIds() throws Exception {
@@ -205,6 +206,7 @@ public class TestPerformance extends TestCase {
 	    System.err.println(
 		"Time: " + (stop - start) / count + " ms per transaction");
 	}
+	store.shutdown();
     }
 
     public void testReadNames() throws Exception {
@@ -230,6 +232,7 @@ public class TestPerformance extends TestCase {
 	    System.err.println(
 		"Time: " + (stop - start) / count + " ms per transaction");
 	}
+	store.shutdown();
     }
 
     public void testWriteNames() throws Exception {
@@ -259,6 +262,7 @@ public class TestPerformance extends TestCase {
 	    System.err.println(
 		"Time: " + (stop - start) / count + " ms per transaction");
 	}
+	store.shutdown();
     }
 
     /* -- Other methods -- */

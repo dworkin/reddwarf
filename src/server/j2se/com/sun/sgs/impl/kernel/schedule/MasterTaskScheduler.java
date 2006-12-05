@@ -91,15 +91,14 @@ public class MasterTaskScheduler implements TaskScheduler {
                                TaskHandler taskHandler)
         throws Exception
     {
-        if (logger.isLoggable(Level.CONFIG))
-            logger.log(Level.CONFIG, "Creating the Master Task Scheduler");
+	logger.log(Level.CONFIG, "Creating the Master Task Scheduler");
 
         String systemSchedulerName =
             properties.getProperty(SYSTEM_SCHEDULER_PROPERTY,
                                    DEFAULT_SYSTEM_SCHEDULER);
-        if (logger.isLoggable(Level.CONFIG))
-            logger.log(Level.CONFIG, "Using {0} as the System Scheduler",
-                       systemSchedulerName);
+
+        logger.log(Level.CONFIG, "Using {0} as the System Scheduler",
+        	systemSchedulerName);
 
         // get the system scheduler instance
         Class<?> systemSchedulerClass = Class.forName(systemSchedulerName);
@@ -116,9 +115,9 @@ public class MasterTaskScheduler implements TaskScheduler {
             Integer.parseInt(properties.
                     getProperty(INITIAL_CONSUMER_THREADS_PROPERTY,
                                 DEFAULT_INITIAL_CONSUMER_THREADS));
-        if (logger.isLoggable(Level.CONFIG))
-            logger.log(Level.CONFIG, "Using {0} initial consumer threads",
-                       startingThreads);
+
+        logger.log(Level.CONFIG, "Using {0} initial consumer threads",
+        	startingThreads);
 
         // create the initial consuming threads
         for (int i = 0; i < startingThreads; i++) {

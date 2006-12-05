@@ -98,9 +98,9 @@ class AppStartupRunner implements KernelRunnable {
                 dataService.setBinding(LISTENER_BINDING, listener);
             } catch (Exception e) {
                 if (logger.isLoggable(Level.SEVERE))
-                    logger.logThrow(Level.SEVERE,
-                	       "{0}: couldn't instantiate application",
-                               e, appContext);
+                    logger.logThrow(Level.SEVERE, e,
+                	       "Couldn't instantiate application {0}: ",
+                               appContext);
                 throw e;
             }
         }
@@ -120,9 +120,9 @@ class AppStartupRunner implements KernelRunnable {
 		listener.startingUp(properties);
             } catch (Exception e) {
                 if (logger.isLoggable(Level.SEVERE))
-                    logger.logThrow(Level.SEVERE,
-                	       "{0}: couldn't instantiate application",
-                               e, appContext);
+                    logger.logThrow(Level.SEVERE, e,
+             	       	       "Couldn't startup application {0}: ",
+                               appContext);
                 throw e;
             }
 	}

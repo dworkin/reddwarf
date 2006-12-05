@@ -5,7 +5,6 @@ import org.apache.mina.common.IoHandler;
 import org.apache.mina.common.IoSession;
 
 import com.sun.sgs.io.AcceptedHandleListener;
-import com.sun.sgs.io.IOHandle;
 
 /**
  * This class functions as an adapter between the Mina {@link IoHandler}

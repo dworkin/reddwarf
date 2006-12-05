@@ -78,8 +78,7 @@ class ServiceConfigRunner implements KernelRunnable {
      * @throws Exception if any failure occurs during service configuration
      */
     public void run() throws Exception {
-        if (logger.isLoggable(Level.FINER))
-            logger.log(Level.FINER, "{0}: starting service config", appName);
+	logger.log(Level.FINER, "{0}: starting service config", appName);
 
         // initialize the services in the correct order, adding them to the
         // registry as we go
@@ -88,9 +87,9 @@ class ServiceConfigRunner implements KernelRunnable {
             try {
                 service.configure(serviceComponents, proxy);
             } catch (Exception e) {
-                if (logger.isLoggable(Level.SEVERE))
-                    logger.logThrow(Level.SEVERE, "{0}: failed to configure " +
-                               " service {1}", e, appName, service.getName());
+        	logger.logThrow(Level.SEVERE, e,
+        		"{0}: failed to configure service {1}",
+        		appName, service.getName());
                 throw e;
             }
             serviceComponents.addComponent(service);
@@ -111,15 +110,12 @@ class ServiceConfigRunner implements KernelRunnable {
             appContext.getService(TaskService.class).
                 scheduleNonDurableTask(transactionRunner);
         } catch (Exception e) {
-            if (logger.isLoggable(Level.SEVERE))
-                logger.logThrow(Level.SEVERE, "{0}: failed to schedule app " +
-                           "startup task", e, appName);
+            logger.logThrow(Level.SEVERE, e,
+        	    "{0}: failed to schedule app startup task", appName);
             throw e;
         }
 
-        if (logger.isLoggable(Level.FINER))
-            logger.log(Level.FINER, "{0}: finished service config runner",
-                       appName);
+        logger.log(Level.FINER, "{0}: finished service config runner", appName);
     }
 
 }

@@ -1,7 +1,6 @@
 package com.sun.sgs.client.comm;
 
 import java.io.UnsupportedEncodingException;
-import java.nio.ByteBuffer;
 
 /**
  * Translates protocol messages from bytes into their component parts.

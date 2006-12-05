@@ -94,8 +94,7 @@ class Kernel {
      * @throws Exception if for any reason the kernel cannot be started
      */
     protected Kernel(Properties systemProperties) throws Exception {
-        if (logger.isLoggable(Level.FINE))
-            logger.log(Level.FINE, "Booting the Kernel");
+        logger.log(Level.FINE, "Booting the Kernel");
 
         // initialize our data structures
         systemComponents = new HashSet<Object>();
@@ -127,13 +126,11 @@ class Kernel {
             systemComponents.add(resourceCoordinator);
             systemComponents.add(scheduler);
         } catch (Exception e) {
-            if (logger.isLoggable(Level.SEVERE))
-                logger.log(Level.SEVERE, "Failed on Kernel boot", e);
+            logger.logThrow(Level.SEVERE, e, "Failed on Kernel boot");
             throw e;
         }
 
-        if (logger.isLoggable(Level.FINE))
-            logger.log(Level.FINE, "The Kernel is ready");
+        logger.log(Level.FINE, "The Kernel is ready");
     }
 
     /**
@@ -145,8 +142,7 @@ class Kernel {
     void startupApplication(Properties properties) throws Exception {
         String appName = properties.getProperty("com.sun.sgs.appName");
 
-        if (logger.isLoggable(Level.FINE))
-            logger.log(Level.FINE, "{0}: configuring application", appName);
+        logger.log(Level.FINE, "{0}: configuring application", appName);
 
         // create the authentication manager used for this application
         HashSet<IdentityAuthenticator> authenticators =
@@ -191,8 +187,7 @@ class Kernel {
         	         DEFAULT_CHANNEL_MANAGER, managerSet, properties,
         	         systemRegistry);
         } catch (Exception e) {
-            if (logger.isLoggable(Level.SEVERE))
-                logger.log(Level.SEVERE, "Couldn't setup service", e);
+            logger.logThrow(Level.SEVERE, e, "Couldn't setup service");
             throw e;
         }
 
@@ -219,8 +214,7 @@ class Kernel {
         try {
             scheduler.registerApplication(appContext);
         } catch (Exception e) {
-            if (logger.isLoggable(Level.SEVERE))
-                logger.log(Level.SEVERE, "Couldn't setup app scheduler", e);
+            logger.logThrow(Level.SEVERE, e, "Couldn't setup app scheduler");
             throw e;
         }
         ServiceConfigRunner configRunner =
@@ -233,8 +227,7 @@ class Kernel {
         try {
             scheduler.scheduleTask(transactionRunner, owner);
         } catch (Exception e) {
-            if (logger.isLoggable(Level.SEVERE))
-                logger.log(Level.SEVERE, "Couldn't start configuration", e);
+            logger.logThrow(Level.SEVERE, e, "Couldn't start configuration");
             throw e;
         }
     }
@@ -295,8 +288,7 @@ class Kernel {
      */
     void applicationReady(AppKernelAppContext context) {
         applications.add(context);
-        if (logger.isLoggable(Level.INFO))
-                logger.log(Level.INFO, "{0}: application is ready", context);
+        logger.log(Level.INFO, "{0}: application is ready", context);
     }
 
     /**
@@ -307,8 +299,7 @@ class Kernel {
      * @param context the application's kernel context
      */
     void applicationFinished(AppKernelAppContext context) {
-        if (logger.isLoggable(Level.INFO))
-                logger.log(Level.INFO, "{0}: application stopped", context);
+        logger.log(Level.INFO, "{0}: application stopped", context);
         applications.remove(context);
     }
     
@@ -349,9 +340,9 @@ class Kernel {
         	}
             }
         } catch (IOException e) {
-            logger.logThrow(Level.WARNING,
+            logger.logThrow(Level.WARNING, e,
         	    "Unable to load properties file {0}: ",
-        	    e, propertiesFile);
+        	    propertiesFile);
             throw e;
         }
         

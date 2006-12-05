@@ -1,5 +1,6 @@
-
 package com.sun.sgs.impl.kernel;
+
+import com.sun.sgs.app.TransactionNotActiveException;
 
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionHandle;
@@ -76,8 +77,7 @@ public final class TaskHandler {
     public void runTaskAsOwner(KernelRunnable task, TaskOwner owner)
         throws Exception
     {
-        if (logger.isLoggable(Level.FINEST))
-            logger.log(Level.FINEST, "running a task as {0}", owner);
+	logger.log(Level.FINEST, "running a task as {0}", owner);
 
         // get the thread and the calling owner
         TaskThread thread = (TaskThread)(Thread.currentThread());
@@ -105,8 +105,7 @@ public final class TaskHandler {
     public static void runTransactionalTask(KernelRunnable task)
         throws Exception
     {
-        if (logger.isLoggable(Level.FINEST))
-            logger.log(Level.FINEST, "starting a new transactional context");
+	logger.log(Level.FINEST, "starting a new transactional context");
 
         // create a new transaction and set it as currently active
         TransactionHandle handle = transactionCoordinator.createTransaction();
@@ -115,18 +114,25 @@ public final class TaskHandler {
             (TransactionalTaskThread)(Thread.currentThread());
         thread.setCurrentTransaction(transaction);
 
-        // run the task, and clear the active state as soon as we're done
-        // so no one else sees it as active
+        // run the task, watching for any exceptions
         try {
             task.run();
         } catch (Exception e) {
-            logger.logThrow(Level.FINE, "exception in txn {0}, aborting:",
-        	    e, transaction);
+            // make sure that the transaction is aborted, then re-throw the
+            // original exception
             try {
-        	transaction.abort();
-            } catch (IllegalStateException ise) { /* FIXME: ignore? */ }
+                logger.logThrow(Level.FINE, e,
+            	    "exception in txn {0}, aborting: ", transaction);
+                handle.abort();
+            } catch (TransactionNotActiveException tnae) {
+                // this isn't a problem, since it just means that some
+                // participant aborted the transaction before throwing the
+                // original exception
+                logger.log(Level.FINEST, "Transaction was already aborted");
+            }
             throw e;
         } finally {
+            // regardless of the outcome, always clear the current state
             thread.clearCurrentTransaction(transaction);
         }
 

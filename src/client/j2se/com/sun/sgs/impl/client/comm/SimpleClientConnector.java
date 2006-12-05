@@ -3,15 +3,12 @@ package com.sun.sgs.impl.client.comm;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.util.Properties;
-import java.util.concurrent.Executors;
 
-import com.sun.sgs.client.comm.ClientConnection;
 import com.sun.sgs.client.comm.ClientConnectionListener;
 import com.sun.sgs.client.comm.ClientConnector;
 import com.sun.sgs.impl.io.ConnectorFactory;
 import com.sun.sgs.impl.io.IOConstants.TransportType;
 import com.sun.sgs.io.IOConnector;
-import com.sun.sgs.io.IOHandle;
 
 public class SimpleClientConnector extends ClientConnector {
     

@@ -13,4 +13,6 @@ public interface ProtocolMessage {
     
     public final int AUTHENTICATION_REQUEST = 0x10;
     public final int LOGIN = 0x11;
+
+    public final byte DIRECT_SEND = 0x20;
 }

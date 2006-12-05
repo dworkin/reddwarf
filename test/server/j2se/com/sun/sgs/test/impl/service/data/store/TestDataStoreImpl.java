@@ -106,7 +106,7 @@ public class TestDataStoreImpl extends TestCase {
 
     public void testConstructorNullArg() {
 	try {
-	    new DataStoreImpl(null);
+	    new DataStoreImpl(null).shutdown();
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
@@ -116,7 +116,7 @@ public class TestDataStoreImpl extends TestCase {
     public void testConstructorNoDirectory() {
 	Properties props = new Properties();
 	try {
-	    new DataStoreImpl(props);
+	    new DataStoreImpl(props).shutdown();
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -128,7 +128,7 @@ public class TestDataStoreImpl extends TestCase {
 	    DataStoreImplClassName + ".directory", "foo",
 	    DataStoreImplClassName + ".allocationBlockSize", "gorp");
 	try {
-	    new DataStoreImpl(props);
+	    new DataStoreImpl(props).shutdown();
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -140,7 +140,7 @@ public class TestDataStoreImpl extends TestCase {
 	    DataStoreImplClassName + ".directory", "foo",
 	    DataStoreImplClassName + ".allocationBlockSize", "-3");
 	try {
-	    new DataStoreImpl(props);
+	    new DataStoreImpl(props).shutdown();
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -152,7 +152,7 @@ public class TestDataStoreImpl extends TestCase {
 	    DataStoreImplClassName + ".directory",
 	    "/this-is-a-non-existent-directory/yup");
 	try {
-	    new DataStoreImpl(props);
+	    new DataStoreImpl(props).shutdown();
 	    fail("Expected DataStoreException");
 	} catch (DataStoreException e) {
 	    System.err.println(e);	    
@@ -165,7 +165,7 @@ public class TestDataStoreImpl extends TestCase {
 	    DataStoreImplClassName + ".directory",
 	    file);
 	try {
-	    new DataStoreImpl(props);
+	    new DataStoreImpl(props).shutdown();
 	    fail("Expected DataStoreException");
 	} catch (DataStoreException e) {
 	    System.err.println(e);
@@ -173,13 +173,18 @@ public class TestDataStoreImpl extends TestCase {
     }
 
     public void testConstructorDirectoryNotWritable() throws Exception {
+	String osName = System.getProperty("os.name", "unknown");
+	if (osName.startsWith("Windows")) {
+	    System.err.println("Skipping DirectoryNotWritable on " + osName);
+	    return;
+	}
 	Properties props = createProperties(
 	    DataStoreImplClassName + ".directory",
 	    createDirectory());
 	File f = new File(directory);
 	assertTrue("set readonly " + f, f.setReadOnly());
 	try {
-	    new DataStoreImpl(props);
+	    new DataStoreImpl(props).shutdown();
 	    fail("Expected DataStoreException");
 	} catch (DataStoreException e) {
 	    System.err.println(e);
@@ -190,7 +195,7 @@ public class TestDataStoreImpl extends TestCase {
 	Properties props = createProperties(
 	    DataStoreImplClassName + ".directory",
 	    createDirectory());
-	new DataStoreImpl(props);
+	new DataStoreImpl(props).shutdown();
     }
 
     /* -- Test createObject -- */

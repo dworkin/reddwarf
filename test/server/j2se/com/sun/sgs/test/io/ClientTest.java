@@ -45,8 +45,8 @@ public class ClientTest extends JFrame {
     private SocketTableModel model;
     private int numSockets = 20; 
     private int numDisconnects = 0;
-    private boolean done = false;
-    private Random random;
+    boolean done = false;
+    Random random;
     
     public ClientTest() {
         super("Client Test");
@@ -90,7 +90,7 @@ public class ClientTest extends JFrame {
         setVisible(true);
     }
     
-    private void shutdown() {
+    void shutdown() {
         done = true;
         model.shutdown();
     }
@@ -296,7 +296,7 @@ public class ClientTest extends JFrame {
             t.start();
         }
         
-        private void writeBytes(int num) {
+        void writeBytes(int num) {
             if (!connected) {
                 return;
             }

@@ -10,8 +10,11 @@ import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
+import com.sun.sgs.impl.service.task.TaskServiceImpl;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.TaskService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
+import com.sun.sgs.test.util.DummyTaskService;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 import java.io.ByteArrayInputStream;
@@ -25,7 +28,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Properties;
-import junit.framework.Test;
 import junit.framework.TestCase;
 
 public class TestChannelServiceImpl extends TestCase {
@@ -45,7 +47,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     /** Properties for the channel service. */
     private static Properties serviceProps = createProperties(
-	"com.sun.sgs.app.name", "TestChannelServiceImpl");
+	"com.sun.sgs.appName", "TestChannelServiceImpl");
 
     /** Properties for creating the shared database. */
     private static Properties dbProps = createProperties(
@@ -72,7 +74,9 @@ public class TestChannelServiceImpl extends TestCase {
 
     private DummyTransaction txn;
 
-    private DataServiceImpl dataService;
+    private DataService dataService;
+
+    private TaskService taskService;
     
     private ChannelServiceImpl channelService;
 
@@ -95,8 +99,11 @@ public class TestChannelServiceImpl extends TestCase {
 	dataService.configure(registry, txnProxy);
 	registry.setComponent(DataService.class, dataService);
 	txn.commit();
+	taskService = new DummyTaskService();
+	taskService.configure(registry, txnProxy);
+	registry.setComponent(TaskService.class, taskService);
 	createTransaction();
-	channelService = createChannelService();
+	channelService = createChannelService(registry);
 	channelService.configure(registry, txnProxy);
 	txn.commit();
 	createTransaction();
@@ -121,9 +128,18 @@ public class TestChannelServiceImpl extends TestCase {
 
     /* -- Test constructor -- */
 
-    public void testConstructorNullArg() {
+    public void testConstructorNullProperties() {
 	try {
-	    new ChannelServiceImpl(null);
+	    new ChannelServiceImpl(null, null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+    
+    public void testConstructorNullRegistry() {
+	try {
+	    new ChannelServiceImpl(serviceProps, null);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
@@ -132,7 +148,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testConstructorNoAppName() throws Exception {
 	try {
-	    new ChannelServiceImpl(new Properties());
+	    new ChannelServiceImpl(new Properties(), registry);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -142,7 +158,7 @@ public class TestChannelServiceImpl extends TestCase {
     /* -- Test configure -- */
 
     public void testConfigureNullRegistry() {
-	ChannelServiceImpl service = new ChannelServiceImpl(serviceProps);
+	new ChannelServiceImpl(serviceProps, new DummyComponentRegistry());
 	try {
 	    channelService.configure(null, new DummyTransactionProxy());
 	    fail("Expected NullPointerException");
@@ -152,10 +168,10 @@ public class TestChannelServiceImpl extends TestCase {
     }
     
     public void testConfigureNullTransactionProxy() {
-	ChannelServiceImpl channelService =
-	    new ChannelServiceImpl(serviceProps);
+	ChannelServiceImpl aChannelService =
+	    new ChannelServiceImpl(serviceProps, new DummyComponentRegistry());
 	try {
-	    channelService.configure(new DummyComponentRegistry(), null);
+	    aChannelService.configure(new DummyComponentRegistry(), null);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
@@ -913,7 +929,7 @@ public class TestChannelServiceImpl extends TestCase {
      * Creates a new data service.  If the database directory does
      * not exist, one is created.
      */
-    private DataServiceImpl createDataService(
+    private static DataServiceImpl createDataService(
 	DummyComponentRegistry registry)
     {
 	File dir = new File(dbDirectory);
@@ -927,13 +943,15 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
    /** Creates a new channel service. */
-    private static ChannelServiceImpl createChannelService() {
-	return new ChannelServiceImpl(serviceProps);
+    private static ChannelServiceImpl createChannelService(
+	DummyComponentRegistry registry)
+    {
+	return new ChannelServiceImpl(serviceProps, registry);
     }
     
     /* -- other classes -- */
 
-    private static class NonSerializableChannelListener
+    static class NonSerializableChannelListener
 	implements ChannelListener
     {
 	NonSerializableChannelListener() {}
@@ -944,14 +962,14 @@ public class TestChannelServiceImpl extends TestCase {
 	}
     }
 
-    private static class DummyChannelListener
+    static class DummyChannelListener
 	extends NonSerializableChannelListener
 	implements Serializable
     {
 	private final static long serialVersionUID = 1L;
     }
 
-    private static class DummyClientSession
+    static class DummyClientSession
 	implements ClientSession, Serializable
     {
 	private final static long serialVersionUID = 1L;
@@ -989,7 +1007,7 @@ public class TestChannelServiceImpl extends TestCase {
 	/* -- Implement Object -- */
 	
 	public int hashCode() {
-	    return (int) id[0];
+	    return id[0];
 	}
 
 	public boolean equals(Object obj) {
@@ -1012,8 +1030,8 @@ public class TestChannelServiceImpl extends TestCase {
 	private void writeObject(ObjectOutputStream out) throws IOException {
 	    out.defaultWriteObject();
 	    out.writeInt(id.length);
-	    for (byte b : id) {
-		out.writeByte(b);
+	    for (byte x : id) {
+		out.writeByte(x);
 	    }
 	}
 

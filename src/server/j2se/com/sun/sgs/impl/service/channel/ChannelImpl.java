@@ -5,7 +5,6 @@ import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
-import com.sun.sgs.impl.service.task.TaskServiceImpl;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.kernel.KernelRunnable;
 

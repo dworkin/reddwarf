@@ -1,4 +1,5 @@
-<?xml version="1.0" encoding="ISO-8859-15"?>
+<?xml version="1.0" encoding="UTF-8"?>
+
 <project name="sgs" default="build" basedir=".">
 
   <description>
@@ -6,7 +7,8 @@
   </description>
 
   <!-- First load the user's properties -->
-  <property name="user.properties.file" location="${user.home}/.build.properties"/>
+  <property name="user.properties.file"
+	    location="${user.home}/.build.properties"/>
   <property file="${user.properties.file}"/>
 
   <!-- VARIABLE DEFINITIONS -->
@@ -16,7 +18,8 @@
 
   <!-- Values for controlling compilation -->
   <property name="javac.source" value="1.5"/>
-  <property name="javac.compilerargs" value="-Xlint:unchecked,deprecation"/>
+  <property name="javac.compilerargs"
+	    value="-Xlint:unchecked,deprecation"/>
 
   <!-- Values for building the server -->
   <property name="server.jar" location="${build.dir}/lib/sgs.jar"/>
@@ -24,18 +27,23 @@
   <!-- Values for the JavaDocs -->
   <property name="project.name" value="Sun Game Server"/>
   <property name="project.version" value="0.2"/>
-  <property name="jdk.doc.api.url" value="http://java.sun.com/j2se/1.5/docs/api"/>
+  <property name="project.build" value="December 2006"/>
+  <property name="jdk.doc.api.url"
+	    value="http://java.sun.com/j2se/1.5/docs/api"/>
   <property name="jdk.package.list" value="etc/jdk5.0_package_list"/>
 
-  <property name="apidoc.app.zip" location="${build.dir}/sgs-apidoc-app.zip"/>
-  <property name="apidoc.client.zip" location="${build.dir}/sgs-apidoc-client.zip"/>
+  <property name="apidoc.server.zip"
+            location="${build.dir}/sgs-server-apidoc.zip"/>
+  <property name="apidoc.client.zip"
+            location="${build.dir}/sgs-client-apidoc.zip"/>
 
   <!-- Values for programming style checks -->
   <import file="${checkstyle.dir}/checkstyle_task.xml" optional="true"/>
 
   <!-- Values for testing -->
   <property name="test.logging" location="test/test.logging"/>
-  <property name="test.jvm.args" value="-Djava.util.logging.config.file=${test.logging}"/>
+  <property name="test.jvm.args"
+	    value="-Djava.util.logging.config.file=${test.logging}"/>
   <property name="test.formatter.type" value="plain"/>
   <property name="test.showoutput" value="false"/>
   <property name="test.include" value="**/Test*.java"/>
@@ -52,17 +60,25 @@
   <!-- TARGET DEFINITIONS -->
 
   <!-- Builds everything -->
-  <target name="all" depends="jar, javadoc, checkstyle, test" description="Builds everything"/>
+  <target name="all" depends="jar, javadoc, checkstyle, test"
+	  description="Builds everything"/>
 
   <!-- Builds a debug version of the complete project -->
-  <target name="build" depends="build-server,build-client" description="Builds code"/>
+  <target name="build" depends="build-server,build-client"
+	  description="Builds code"/>
 
   <!-- Builds the server -->
   <target name="build-server" description="Builds server code">
-    <fail unless="bdb.lib.dir" message="The bdb.lib.dir property must be set"/>
+    <fail unless="bdb.lib.dir"
+	  message="The bdb.lib.dir property must be set"/>
     <mkdir dir="${build.dir}/classes/server"/>
-    <depend srcdir="j2se" destdir="${build.dir}/classes/server" cache="${build.dir}/depend" closure="true"/>
-    <javac includeAntRuntime="no" debug="on" deprecation="on" srcdir="src/server/j2se" destdir="${build.dir}/classes/server" classpathref="server.classpath" source="${javac.source}">
+    <depend srcdir="j2se"
+	    destdir="${build.dir}/classes/server"
+	    cache="${build.dir}/depend"
+	    closure="true"/>
+    <javac includeAntRuntime="no" debug="on" deprecation="on"
+           srcdir="src/server/j2se" destdir="${build.dir}/classes/server"
+           classpathref="server.classpath" source="${javac.source}">
       <compilerarg value="${javac.compilerargs}"/>
     </javac>
   </target>
@@ -70,8 +86,13 @@
   <!-- Builds the client -->
   <target name="build-client" description="Builds client code">
     <mkdir dir="${build.dir}/classes/client"/>
-    <depend srcdir="j2se" destdir="${build.dir}/classes/client" cache="${build.dir}/depend" closure="true"/>
-    <javac includeAntRuntime="no" debug="on" deprecation="on" srcdir="src/client/j2se" destdir="${build.dir}/classes/client" classpath="${build.dir}/classes/client" source="${javac.source}">
+    <depend srcdir="j2se"
+	    destdir="${build.dir}/classes/client"
+	    cache="${build.dir}/depend"
+	    closure="true"/>
+    <javac includeAntRuntime="no" debug="on" deprecation="on"
+           srcdir="src/client/j2se" destdir="${build.dir}/classes/client"
+           classpath="${build.dir}/classes/client" source="${javac.source}">
       <compilerarg value="${javac.compilerargs}"/>
     </javac>
   </target>
@@ -88,16 +109,26 @@
   <target name="doc" depends="javadoc" description="Builds documentation"/>
 
   <!-- Build the JavaDoc from the source -->
-  <target name="javadoc" depends="javadoc-api,javadoc-internal" description="Builds javadoc"/>
+  <target name="javadoc" depends="javadoc-api,javadoc-internal"
+	  description="Builds javadoc"/>
 
-  <target name="javadoc-internal" depends="javadoc-server,javadoc-client" description="Builds internal (full) javadoc"/>
+  <target name="javadoc-internal" depends="javadoc-server,javadoc-client"
+	  description="Builds internal (full) javadoc"/>
 
-  <target name="javadoc-api" depends="javadoc-api-app,javadoc-api-client" description="Builds public API javadoc"/>
+  <target name="javadoc-api" depends="javadoc-api-server,javadoc-api-client"
+	  description="Builds public API javadoc"/>
 
   <!-- Build the internal server JavaDoc -->
-  <target name="javadoc-server" depends="build-server" description="Builds internal (full) server javadoc">
-    <javadoc sourcepath="src/server/j2se" destdir="${build.dir}/javadoc/server" classpathref="server.classpath" packagenames="com.sun.*" overview="src/server/j2se/overview.html" windowtitle="${project.name}" doctitle="${project.name}" author="no">
-      <link href="${jdk.doc.api.url}" offline="true" packagelistLoc="${jdk.package.list}"/>
+  <target name="javadoc-server" depends="build-server"
+	  description="Builds internal (full) server javadoc">
+    <javadoc sourcepath="src/server/j2se" destdir="${build.dir}/javadoc/server"
+             classpathref="server.classpath" packagenames="com.sun.*"
+             overview="src/server/j2se/overview.html"
+             windowtitle="${project.name}" doctitle="${project.name}"
+	     author="no">
+      <link href="${jdk.doc.api.url}"
+	    offline="true"
+	    packagelistLoc="${jdk.package.list}"/>
       <footer>
         <![CDATA[<font size="-1">Sun Game Server, Version
         ${project.version}</font>]]>
@@ -113,9 +144,16 @@
   </target>
 
   <!-- Build the internal client JavaDoc -->
-  <target name="javadoc-client" depends="build-client" description="Builds internal (full) client javadoc">
-    <javadoc sourcepath="src/client/j2se" destdir="${build.dir}/javadoc/client" classpath="${build.dir}/classes/client" packagenames="com.sun.*" overview="src/client/j2se/overview.html" windowtitle="${project.name}" doctitle="${project.name}" author="no">
-      <link href="${jdk.doc.api.url}" offline="true" packagelistLoc="${jdk.package.list}"/>
+  <target name="javadoc-client" depends="build-client"
+	  description="Builds internal (full) client javadoc">
+    <javadoc sourcepath="src/client/j2se" destdir="${build.dir}/javadoc/client"
+             classpath="${build.dir}/classes/client" packagenames="com.sun.*"
+             overview="src/client/j2se/overview.html"
+             windowtitle="${project.name}" doctitle="${project.name}"
+	     author="no">
+      <link href="${jdk.doc.api.url}"
+	    offline="true"
+	    packagelistLoc="${jdk.package.list}"/>
       <footer>
         <![CDATA[<font size="-1">Project Darkstar: Version
         ${project.version}</font>]]>
@@ -131,31 +169,49 @@
   </target>
 
   <!-- Build the public Application API JavaDoc -->
-  <target name="javadoc-api-app" depends="build-server" description="Builds public server application API javadoc">
-    <javadoc sourcepath="src/server/j2se" destdir="${build.dir}/javadoc/apidoc/app" classpathref="server.classpath" packagenames="com.sun.sgs.app.*" overview="src/server/j2se/overview.html" windowtitle="${project.name}" doctitle="${project.name}" public="true" author="no">
-      <link href="${jdk.doc.api.url}" offline="true" packagelistLoc="${jdk.package.list}"/>
+  <target name="javadoc-api-server" depends="build-server"
+	  description="Builds public server application API javadoc">
+    <javadoc sourcepath="src/server/j2se"
+             destdir="${build.dir}/javadoc/apidoc/sgs-server-apidoc"
+             classpathref="server.classpath"
+             packagenames="com.sun.sgs.app.*"
+             overview="src/server/j2se/overview.html"
+             windowtitle="${project.name} Server API"
+             doctitle="${project.name} Server API"
+             public="true" author="no">
+      <link href="${jdk.doc.api.url}"
+	    offline="true"
+	    packagelistLoc="${jdk.package.list}"/>
       <footer>
-        <![CDATA[<font size="-1">Sun Game Server, Version
-        ${project.version}</font>]]>
+        <![CDATA[<font size="-1">Sun Game Server version ${project.version}<br/>${project.build}</font>]]>
       </footer>
-        <bottom>
-          <![CDATA[<font size="-1">Copyright 2006 Sun Microsystems,
-          Inc. All rights reserved.
-          <p>Sun, Sun Microsystems, the Sun Logo, and Java are
-          trademarks or registered trademarks of Sun Microsystems, Inc. in
-          the US and other countries.
-          <p>THIS PRODUCT CONTAINS CONFIDENTIAL INFORMATION AND TRADE SECRETS OF SUN MICROSYSTEMS, INC. USE, DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT THE PRIOR EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC.</font>]]>
-        </bottom>
+      <bottom>
+        <![CDATA[<font size="-1">Copyright 2006 Sun Microsystems,
+        Inc. All rights reserved.
+        <p>Sun, Sun Microsystems, the Sun Logo, and Java are
+        trademarks or registered trademarks of Sun Microsystems, Inc. in
+        the US and other countries.
+        <p>THIS PRODUCT CONTAINS CONFIDENTIAL INFORMATION AND TRADE SECRETS OF SUN MICROSYSTEMS, INC. USE, DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT THE PRIOR EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC.</font>]]>
+      </bottom>
     </javadoc>
   </target>
 
   <!-- Build the public Client API JavaDoc -->
-  <target name="javadoc-api-client" depends="build-client" description="Builds public client API javadoc">
-    <javadoc sourcepath="src/client/j2se" destdir="${build.dir}/javadoc/apidoc/client" classpath="${build.dir}/classes/client" packagenames="com.sun.sgs.client.*" overview="src/client/j2se/overview.html" windowtitle="${project.name}" doctitle="${project.name}" public="true" author="no">
-      <link href="${jdk.doc.api.url}" offline="true" packagelistLoc="${jdk.package.list}"/>
+  <target name="javadoc-api-client" depends="build-client"
+	  description="Builds public client API javadoc">
+    <javadoc sourcepath="src/client/j2se"
+             destdir="${build.dir}/javadoc/apidoc/sgs-client-apidoc"
+             classpath="${build.dir}/classes/client"
+             packagenames="com.sun.sgs.client,com.sun.sgs.client.simple"
+             overview="src/client/j2se/overview.html"
+             windowtitle="${project.name} Client API"
+             doctitle="${project.name} Client API"
+             public="true" author="no">
+      <link href="${jdk.doc.api.url}"
+	    offline="true"
+	    packagelistLoc="${jdk.package.list}"/>
       <footer>
-        <![CDATA[<font size="-1">Project Darkstar: Version
-        ${project.version}</font>]]>
+        <![CDATA[<font size="-1">Sun Game Server version ${project.version}<br/>${project.build}</font>]]>
       </footer>
       <bottom>
         <![CDATA[<font size="-1">Copyright 2006 Sun Microsystems,
@@ -169,41 +225,58 @@
   </target>
 
   <!-- Builds the API javadoc zip files -->
-  <target name="apidoc" depends="zip-apidoc-app,zip-apidoc-client" description="Builds API javadoc zip files"/>
+  <target name="apidoc" depends="zip-apidoc-server,zip-apidoc-client"
+	  description="Builds API javadoc zip files"/>
 
   <!-- Builds the app API javadoc zip file -->
-  <target name="zip-apidoc-app" depends="javadoc-api-app" description="Builds app API javadoc zip file">
-    <zip destfile="${apidoc.app.zip}" basedir="${build.dir}/javadoc" includes="apidoc/app/**"/>
+  <target name="zip-apidoc-server" depends="javadoc-api-server"
+	  description="Builds app API javadoc zip file">
+    <zip destfile="${apidoc.server.zip}"
+          basedir="${build.dir}/javadoc/apidoc"
+          includes="sgs-server-apidoc/**"/>
   </target>
 
   <!-- Builds the client API javadoc zip file -->
-  <target name="zip-apidoc-client" depends="javadoc-api-client" description="Builds client API javadoc zip file">
-    <zip destfile="${apidoc.client.zip}" basedir="${build.dir}/javadoc" includes="apidoc/client/**"/>
+  <target name="zip-apidoc-client" depends="javadoc-api-client"
+	  description="Builds client API javadoc zip file">
+    <zip destfile="${apidoc.client.zip}"
+          basedir="${build.dir}/javadoc/apidoc"
+          includes="sgs-client-apidoc/**"/>
   </target>
 
   <!-- Builds the jar files for the project classes -->
-  <target name="jar" depends="jar-server" description="Builds JAR files"/>
+  <target name="jar" depends="jar-server"
+	  description="Builds JAR files"/>
 
   <!-- Builds the server jar file -->
-  <target name="jar-server" depends="build-server" description="Builds server JAR files">
+  <target name="jar-server" depends="build-server"
+	  description="Builds server JAR files">
     <mkdir dir="${build.dir}/lib"/>
     <jar destfile="${server.jar}" basedir="${build.dir}/classes/server"/>
   </target>
 
   <!-- Checks Java coding style -->
-  <target name="checkstyle" depends="checkstyle-client, checkstyle-server" description="Checks Java coding style">
+  <target name="checkstyle"
+	  depends="checkstyle-client, checkstyle-server"
+	  description="Checks Java coding style">
   </target>
 
   <!-- Checks client Java coding style -->
-  <target name="checkstyle-client" depends="build-client,-checkstyle.init" description="Checks client Java coding style">
-    <checkstyle config="${neuromancer_checks.xml}" classpath="${build.dir}/classes/client">
+  <target name="checkstyle-client"
+	  depends="build-client,-checkstyle.init"
+	  description="Checks client Java coding style">
+    <checkstyle config="${neuromancer_checks.xml}"
+		classpath="${build.dir}/classes/client">
       <fileset dir="src/client/j2se"/>
     </checkstyle>
   </target>
 
   <!-- Checks server Java coding style -->
-  <target name="checkstyle-server" depends="build-server,-checkstyle.init" description="Checks server Java coding style">
-    <checkstyle config="${neuromancer_checks.xml}" classpathref="server.classpath">
+  <target name="checkstyle-server"
+	  depends="build-server,-checkstyle.init"
+	  description="Checks server Java coding style">
+    <checkstyle config="${neuromancer_checks.xml}"
+		classpathref="server.classpath">
       <fileset dir="src/server/j2se"/>
     </checkstyle>
   </target>
@@ -211,26 +284,37 @@
   <!-- Verify checkstyle.dir is set, calculate checkstyle.includes, and
        build the checkjars target in checkstyle.dir. -->
   <target name="-checkstyle.init">
-      <fail unless="checkstyle.dir" message="The checkstyle.dir property must be set to a directory containing the checkstyle subproject"/>
+      <fail unless="checkstyle.dir"
+	    message="The checkstyle.dir property must be set to a directory containing the checkstyle subproject"/>
       <ant dir="${checkstyle.dir}" target="checkjars" inheritAll="false"/>
   </target>
 
   <!-- Compile and run tests -->
-  <target name="test" depends="test-server" description="Compiles and runs tests"/>
+  <target name="test" depends="test-server"
+	  description="Compiles and runs tests"/>
 
   <!-- Compile and run server tests -->
-  <target name="test-server" depends="-test-server.classes" description="Compiles and runs server tests">
+  <target name="test-server" depends="-test-server.classes"
+	  description="Compiles and runs server tests">
     <mkdir dir="${build.dir}/test"/>
     <delete dir="${build.dir}/test/output"/>
     <mkdir dir="${build.dir}/test/output"/>
     <!-- XXX: We'd like to use forkmode="once" here, but that doesn't
 	 seem to work in Ant 1.6.1 -tjb@sun.com (01/13/2006)
       -->
-    <junit fork="true" printsummary="on" showoutput="${test.showoutput}" tempdir="${build.dir}/test/output" failureproperty="tests.failed">
+    <junit fork="true"
+	   printsummary="on"
+	   showoutput="${test.showoutput}"
+	   tempdir="${build.dir}/test/output"
+	   failureproperty="tests.failed">
       <jvmarg line="${test.jvm.args}"/>
       <jvmarg value="-Djava.library.path=${bdb.lib.dir}"/>
       <jvmarg value="-Djava.io.tmpdir=${build.dir}/test/output"/>
-      <classpath path="${build.dir}/test/classes/server;          ${build.dir}/classes/server;          ${bdb.lib.dir}/db.jar"/>
+      <classpath>
+          <pathelement path="${build.dir}/test/classes/server"/>
+          <pathelement path="${build.dir}/classes/server"/>
+          <pathelement path="${bdb.lib.dir}/db.jar"/>
+      </classpath>
       <syspropertyset>
 	<propertyref prefix="test."/>
       </syspropertyset>
@@ -253,8 +337,17 @@
   <!-- Compiles tests -->
   <target name="-test-server.classes" depends="build">
     <mkdir dir="${build.dir}/test/classes/server"/>
-    <depend srcdir="test/server/j2se" destdir="${build.dir}/test/classes/server" cache="${build.dir}/test/depend" closure="true"/>
-    <javac srcdir="test/server/j2se" destdir="${build.dir}/test/classes/server" includeAntRuntime="yes" debug="on" source="${javac.source}" classpath="${build.dir}/classes/server" includes="**/*.java">
+    <depend srcdir="test/server/j2se"
+	    destdir="${build.dir}/test/classes/server"
+	    cache="${build.dir}/test/depend"
+	    closure="true"/>
+    <javac srcdir="test/server/j2se"
+	   destdir="${build.dir}/test/classes/server"
+	   includeAntRuntime="yes"
+	   debug="on"
+	   source="${javac.source}"
+	   classpath="${build.dir}/classes/server"
+	   includes="**/*.java">
       <compilerarg line="${javac.compilerargs}"/>
     </javac>
   </target>

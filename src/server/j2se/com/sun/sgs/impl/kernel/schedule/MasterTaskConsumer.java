@@ -26,8 +26,8 @@ class MasterTaskConsumer implements Runnable {
 
     // logger for this class
     private static final LoggerWrapper logger =
-        new LoggerWrapper(Logger.getLogger(MasterTaskConsumer.
-                                           class.getName()));
+        new LoggerWrapper(
+        	Logger.getLogger(MasterTaskConsumer.class.getName()));
 
     // the system scheduler that provides tasks
     private final SystemScheduler scheduler;
@@ -42,8 +42,7 @@ class MasterTaskConsumer implements Runnable {
      * @param taskHandler the system's <code>TaskHandler</code>
      */
     MasterTaskConsumer(SystemScheduler scheduler, TaskHandler taskHandler) {
-        if (logger.isLoggable(Level.CONFIG))
-            logger.log(Level.CONFIG, "Creating a new Master Task Consumer");
+	logger.log(Level.CONFIG, "Creating a new Master Task Consumer");
 
         this.scheduler = scheduler;
         this.taskHandler = taskHandler;
@@ -55,8 +54,8 @@ class MasterTaskConsumer implements Runnable {
      * appropriate.
      */
     public void run() {
-        if (logger.isLoggable(Level.FINE))
-            logger.log(Level.FINE, "Starting a Master Task Consumer");
+	logger.log(Level.FINE, "Starting a Master Task Consumer");
+	
         while (true) {
             // wait for the next task
             ScheduledTask task = scheduler.getNextTask();
@@ -78,11 +77,9 @@ class MasterTaskConsumer implements Runnable {
                         // of the first issues that will be investigated
                         // for optimization
                     } else {
-                        if (logger.isLoggable(Level.FINE))
-                            logger.logThrow(Level.FINE,
-                                            "dropping a failed task that " +
-                                            "didn't ask to be re-tried: {0}",
-                                            e, task);
+                	logger.logThrow(Level.FINE, e,
+                		"dropping a failed task that " +
+                		"didn't ask to be re-tried: {0}", task);
                         taskFinished = true;
                     }
                 }

@@ -1,6 +1,5 @@
 package com.sun.sgs.impl.service.channel;
 
-import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelListener;
@@ -8,10 +7,8 @@ import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.NameExistsException;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.service.DataService;
-import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
-import com.sun.sgs.service.TransactionParticipant;
 import java.util.Map;
 import java.util.HashMap;
 

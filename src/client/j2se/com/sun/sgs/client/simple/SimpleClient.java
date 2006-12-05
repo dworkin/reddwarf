@@ -2,10 +2,7 @@ package com.sun.sgs.client.simple;
 
 import java.io.IOException;
 import java.net.PasswordAuthentication;
-import java.nio.ByteBuffer;
 import java.util.Properties;
-
-import org.apache.mina.filter.codec.ProtocolEncoder;
 
 import com.sun.sgs.client.ServerSession;
 import com.sun.sgs.client.ServerSessionListener;
@@ -43,15 +40,17 @@ import com.sun.sgs.impl.client.comm.SimpleConnectorFactory;
  * again, the {@link #getSessionId getSessionId} method will
  * return a new <code>SessionId</code>.
  */
-public class SimpleClient implements ServerSession, ClientConnectionListener {
+public class SimpleClient implements ServerSession {
     
     /** The listener for this simple client. */
-    private SimpleClientListener listener;
-    private boolean connected = false;
-    private ClientConnection connection;
-    private SessionId sessionId;
-    private ProtocolMessageDecoder messageDecoder;
-    private ProtocolMessageEncoder messageEncoder;
+    final SimpleClientListener listener;
+    final SimpleClientConnListener clientConnListener;
+    final ProtocolMessageDecoder messageDecoder;
+    final ProtocolMessageEncoder messageEncoder;
+    
+    boolean connected = false;
+    ClientConnection connection;
+    SessionId sessionId;
     
     /**
      * Creates an instance of this class with the specified listener.
@@ -67,8 +66,9 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
      */
     public SimpleClient(SimpleClientListener listener) {
         this.listener = listener;
-        messageDecoder = new ProtocolMessageDecoder();
-        messageEncoder = new ProtocolMessageEncoder();
+        this.clientConnListener = new SimpleClientConnListener();
+        this.messageDecoder = new ProtocolMessageDecoder();
+        this.messageEncoder = new ProtocolMessageEncoder();
     }
 
 
@@ -100,7 +100,7 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
      */
     public void login(Properties props) throws IOException {
         ClientConnector connector = new SimpleConnectorFactory().createConnector(props);
-        connector.connect(this);
+        connector.connect(clientConnListener);
     }
 
     /** {@inheritDoc}
@@ -129,83 +129,92 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
 	connection.sendMessage(message);
     }
     
+    // Utility methods
     
-    private void sendMessage() {
+    void sendMessage() {
         send(messageEncoder.getMessage());
         messageEncoder.reset();
     }
 
-    /**
-     * Called in the midst of the connection process.  At this point the connection
-     * has been established, but there is as yet no session.  
-     *
-     * @param connection        the live connection to the server
-     */
-    public void connected(ClientConnection connection) {
-        System.out.println("SimpleClient: connected");
-        connected = true;
-        this.connection = connection;
-        
-    }
-
-    public void disconnected(boolean graceful, byte[] message) {
-        connected = false;
-        listener.disconnected(graceful);
-    }
-
-    // refactor to receivedMessage(ByteBuffer)
-    // all API level messages will come in on this call-back.  From here they
-    // are interpreted and dispatched to a channel, or the ServerSessionListener.
-    public void receivedMessage(byte[] message) {
-        messageDecoder.setMessage(message);
-        int versionNumber = messageDecoder.readVersionNumber();
-        int command = messageDecoder.readCommand();
-        System.out.println("SimpleClient messageReceived: " + message.length + 
-                            " command " + command);
-        if (command == ProtocolMessage.AUTHENTICATION_REQUEST) {
-            PasswordAuthentication authentication = 
-                listener.getPasswordAuthentication("Enter Username/Password");
-            
-            messageEncoder.startMessage(ProtocolMessage.AUTHENTICATION_REQUEST);
-            messageEncoder.add(authentication.getUserName());
-            // TODO wrapping the char[] in a String is probably not the way to go
-            messageEncoder.add(new String(authentication.getPassword()));
-            sendMessage();
-        }
-        else if (command == ProtocolMessage.LOGIN) {
-            System.out.println("logging in");
-            boolean success = messageDecoder.readBoolean();
-            if (success) {
-                sessionStarted(message);
-            }
-            else {
-                listener.loginFailed(messageDecoder.readString());
-            }
-        }
-    }
-
-    public void reconnected(byte[] message) {
-        // TODO Auto-generated method stub
-        listener.reconnected();
-        
-    }
-
-    public void reconnecting(byte[] message) {
-        // TODO Auto-generated method stub
-        listener.reconnecting();
-    }
-
-    public ServerSessionListener sessionStarted(byte[] message) {
-        extractSessionId(message);
-        
-        listener.loggedIn();
-        
-        return listener;
-    }
-    
-    private void extractSessionId(byte[] message) {
+    void extractSessionId(byte[] message) {
         byte[] bytes = messageDecoder.readBytes();
         // TODO uncomment this when it becomes implemented
         //sessionId = SessionId.fromBytes(bytes);
+    }
+    
+    // Inner ClientConnectionListener implementation
+    
+    class SimpleClientConnListener implements ClientConnectionListener {
+
+	SimpleClientConnListener() {
+	    //
+	}
+	/**
+	 * Called in the midst of the connection process.  At this point the connection
+	 * has been established, but there is as yet no session.  
+	 *
+	 * @param conn        the live connection to the server
+	 */
+	public void connected(ClientConnection conn) {
+	    System.out.println("SimpleClient: connected");
+	    connected = true;
+	    connection = conn;
+
+	}
+
+	public void disconnected(boolean graceful, byte[] message) {
+	    connected = false;
+	    listener.disconnected(graceful);
+	}
+
+	// refactor to receivedMessage(ByteBuffer)
+	// all API level messages will come in on this call-back.  From here they
+	// are interpreted and dispatched to a channel, or the ServerSessionListener.
+	public void receivedMessage(byte[] message) {
+	    messageDecoder.setMessage(message);
+	    int versionNumber = messageDecoder.readVersionNumber();
+	    int command = messageDecoder.readCommand();
+	    System.out.println("SimpleClient messageReceived: " + message.length + 
+		    " command " + command);
+	    if (command == ProtocolMessage.AUTHENTICATION_REQUEST) {
+		PasswordAuthentication authentication = 
+		    listener.getPasswordAuthentication("Enter Username/Password");
+
+		messageEncoder.startMessage(ProtocolMessage.AUTHENTICATION_REQUEST);
+		messageEncoder.add(authentication.getUserName());
+		// TODO wrapping the char[] in a String is probably not the way to go
+		messageEncoder.add(new String(authentication.getPassword()));
+		sendMessage();
+	    }
+	    else if (command == ProtocolMessage.LOGIN) {
+		System.out.println("logging in");
+		boolean success = messageDecoder.readBoolean();
+		if (success) {
+		    sessionStarted(message);
+		}
+		else {
+		    listener.loginFailed(messageDecoder.readString());
+		}
+	    }
+	}
+
+	public void reconnected(byte[] message) {
+	    // TODO Auto-generated method stub
+	    listener.reconnected();
+
+	}
+
+	public void reconnecting(byte[] message) {
+	    // TODO Auto-generated method stub
+	    listener.reconnecting();
+	}
+
+	public ServerSessionListener sessionStarted(byte[] message) {
+	    extractSessionId(message);
+
+	    listener.loggedIn();
+
+	    return listener;
+	}
     }
 }

@@ -1,7 +1,6 @@
 package com.sun.sgs.impl.io;
 
 import java.io.IOException;
-import java.lang.annotation.Inherited;
 
 import org.apache.mina.common.ByteBuffer;
 import org.apache.mina.common.IoFuture;

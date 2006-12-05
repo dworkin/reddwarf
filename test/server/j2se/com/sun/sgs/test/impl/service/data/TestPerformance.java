@@ -187,6 +187,7 @@ public class TestPerformance extends TestCase {
 	    System.err.println(
 		"Time: " + (stop - start) / count + " ms per transaction");
 	}
+	service.shutdown();
     }
 
     public void testWrite() throws Exception {
@@ -242,6 +243,7 @@ public class TestPerformance extends TestCase {
 	    System.err.println(
 		"Time: " + (stop - start) / count + " ms per transaction");
 	}
+	service.shutdown();
     }
 
     /* -- Other methods and classes -- */

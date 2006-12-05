@@ -1,4 +1,3 @@
-
 package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.app.ChannelManager;
@@ -11,7 +10,6 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.Service;
 
 import java.util.MissingResourceException;
-
 
 /**
  * This is the implementation of <code>KernelAppContext</code> used by
@@ -55,10 +53,7 @@ class AppKernelAppContext extends AbstractKernelAppContext {
         this.managerComponents = managerComponents;
 
         // pre-fetch the three standard managers
-        // FIXME: add this back in when we have support for channels
-        /*channelManager = managerComponents.
-          getComponent(ChannelManager.class);*/
-        channelManager = null;
+        channelManager = managerComponents.getComponent(ChannelManager.class);
         dataManager = managerComponents.getComponent(DataManager.class);
         taskManager = managerComponents.getComponent(TaskManager.class);
     }

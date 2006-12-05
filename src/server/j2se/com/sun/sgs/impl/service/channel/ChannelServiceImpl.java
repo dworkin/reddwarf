@@ -27,7 +27,7 @@ public class ChannelServiceImpl
 {
 
     /** The property that specifies the application name. */
-    public static final String APP_NAME_PROPERTY = "com.sun.sgs.app.name";
+    public static final String APP_NAME_PROPERTY = "com.sun.sgs.appName";
 
     /** The name of this class. */
     private static final String CLASSNAME = ChannelServiceImpl.class.getName();
@@ -49,8 +49,6 @@ public class ChannelServiceImpl
     /** The transaction proxy, or null if configure has not been called. */    
     private TransactionProxy txnProxy;
 
-    //private TaskService taskService;
-
     /** The data service. */
     private DataService dataService;
 
@@ -60,10 +58,18 @@ public class ChannelServiceImpl
     /**
      * Constructs an instance of this class with the specified properties.
      */
-    public ChannelServiceImpl(Properties properties) {
+    public ChannelServiceImpl(Properties properties,
+	ComponentRegistry registry)
+    {
 	logger.log(Level.CONFIG, "Creating ChannelServiceImpl properties:{0}",
 		   properties);
 	try {
+	    if (properties == null) {
+		throw new NullPointerException("null properties");
+	    } else if  (registry == null) {
+		throw new NullPointerException("null registry");
+	    }
+		
 	    appName = properties.getProperty(APP_NAME_PROPERTY);
 	    if (appName == null) {
 		throw new IllegalArgumentException(
@@ -72,7 +78,8 @@ public class ChannelServiceImpl
 	    }
 
 	} catch (RuntimeException e) {
-	    logger.log(Level.CONFIG, "Failed to create ChannelServiceImpl", e);
+	    logger.logThrow(Level.CONFIG, e,
+		    "Failed to create ChannelServiceImpl");
 	    throw e;
 	}
     }
@@ -102,7 +109,7 @@ public class ChannelServiceImpl
 		}
 		this.txnProxy = proxy;
 		dataService = registry.getComponent(DataService.class);
-		//taskService = registry.getComponent(TaskService.class);
+		taskService = registry.getComponent(TaskService.class);
 	    }
 
 	    /*
@@ -118,8 +125,8 @@ public class ChannelServiceImpl
 	    }
 	    
 	} catch (RuntimeException e) {
-	    logger.log(Level.CONFIG,
-		"Failed to configure ChannelServiceImpl", e);
+	    logger.logThrow(Level.CONFIG, e,
+		"Failed to configure ChannelServiceImpl");
 	    throw e;
 	}
     }
@@ -149,7 +156,7 @@ public class ChannelServiceImpl
 	    
 	} catch (RuntimeException e) {
 	    logger.logThrow(
-		Level.FINEST, "createChannel name:{0} throws", e, name);
+		Level.FINEST, e, "createChannel name:{0} throws", name);
 	    throw e;
 	}
     }
@@ -171,7 +178,7 @@ public class ChannelServiceImpl
 	    
 	} catch (RuntimeException e) {
 	    logger.logThrow(
-		Level.FINEST, "getChannel name:{0} throws", e, name);
+		Level.FINEST, e, "getChannel name:{0} throws", name);
 	    throw e;
 	}
     }
@@ -190,7 +197,7 @@ public class ChannelServiceImpl
 	    
 	    return true;
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINER, "prepare txn:{0} throws", e, txn);
+	    logger.logThrow(Level.FINER, e, "prepare txn:{0} throws", txn);
 	    throw e;
 	}
     }
@@ -202,7 +209,7 @@ public class ChannelServiceImpl
 	    currentContext.set(null);
 	    logger.log(Level.FINER, "commit txn:{0} returns", txn);
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINER, "commit txn:{0} throws", e, txn);
+	    logger.logThrow(Level.FINER, e, "commit txn:{0} throws", txn);
 	    throw e;
 	}
     }
@@ -215,7 +222,7 @@ public class ChannelServiceImpl
 	    logger.log(Level.FINER, "prepareAndCommit txn:{0} returns", txn);
 	} catch (RuntimeException e) {
 	    logger.logThrow(
-		Level.FINER, "prepareAndCommit txn:{0} throws", e, txn);
+		Level.FINER, e, "prepareAndCommit txn:{0} throws", txn);
 	    throw e;
 	}
     }
@@ -226,7 +233,7 @@ public class ChannelServiceImpl
 	    handleTransaction(txn, true);
 	    logger.log(Level.FINER, "abort txn:{0} returns", txn);
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINER, "abort txn:{0} throws", e, txn);
+	    logger.logThrow(Level.FINER, e, "abort txn:{0} throws", txn);
 	    throw e;
 	}
     }

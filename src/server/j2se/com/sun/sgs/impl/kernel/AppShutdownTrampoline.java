@@ -47,8 +47,8 @@ class AppShutdownTrampoline implements Task, Serializable
         DataService dataService = appContext.getService(DataService.class);
         TaskService taskService = appContext.getService(TaskService.class);
         
-        // if the app has shut down cleanly, or was never run, we
-        // need to send it the startingUp callback
+        // if the app was marked as running, we need to remove the
+        // running flag from the datastore
         try {
             // Is the app already shutdown?
             ManagedObject appRunningIndicator =
@@ -64,14 +64,14 @@ class AppShutdownTrampoline implements Task, Serializable
             
 	} catch (NameNotBoundException nnbe) {
             if (logger.isLoggable(Level.WARNING))
-                logger.logThrow(Level.WARNING,
-            	       "{0}: application was already shut down",
-                           nnbe, appContext);
+                logger.logThrow(Level.WARNING, nnbe,
+            	       "{0}: application was already shut down: ",
+            	       appContext);
         } catch (Exception e) {
             if (logger.isLoggable(Level.SEVERE))
-                logger.logThrow(Level.SEVERE,
-            	       "{0}: couldn't instantiate application:",
-                           e, appContext);
+                logger.logThrow(Level.SEVERE, e,
+            	       "{0}: problem shutting down: ",
+            	       appContext);
             throw e;
 	}
         

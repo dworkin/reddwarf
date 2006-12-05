@@ -2,14 +2,10 @@ package com.sun.sgs.impl.io;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
 
 import org.apache.mina.common.IoConnector;
 import org.apache.mina.common.IoFuture;
-import org.apache.mina.util.NewThreadExecutor;
 
-import com.sun.sgs.io.AcceptedHandleListener;
 import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
 import com.sun.sgs.io.IOConnector;

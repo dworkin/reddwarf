@@ -355,7 +355,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    bdbTxn.commit();
 	} catch (DatabaseException e) {
 	    logger.logThrow(
-		Level.SEVERE, "DataStore initialization failed", e);
+		Level.SEVERE, e, "DataStore initialization failed");
 	    throw new DataStoreException(
 		"Problem initializing DataStore: " + e.getMessage(), e);
 	} finally {
@@ -363,7 +363,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 		try {
 		    bdbTxn.abort();
 		} catch (DatabaseException e) {
-		    logger.logThrow(Level.FINE, "Exception during abort", e);
+		    logger.logThrow(Level.FINE, e, "Exception during abort");
 		}
 	    }
 	}
@@ -419,8 +419,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    info.close();
 	    env.close();
         } catch (DatabaseException e) {
-	    logger.logThrow(Level.FINE,
-		    "exception during shutdown: ", e);
+	    logger.logThrow(Level.FINE, e, "exception during shutdown: ");
         }
     }
 
@@ -465,7 +464,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    exception = e;
 	}
 	logger.logThrow(
-	    Level.FINEST, "createObject txn:{0} throws", exception, txn);
+	    Level.FINEST, exception, "createObject txn:{0} throws", txn);
 	throw exception;
     }
 
@@ -491,8 +490,8 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
 		    Level.FINEST,
-		    "markForUpdate txn:{0}, oid:{1,number,#} throws",
-		    e, txn, oid);
+		    e, "markForUpdate txn:{0}, oid:{1,number,#} throws",
+		    txn, oid);
 	    }
 	    throw e;
 	}
@@ -517,10 +516,10 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    return result;
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
-		logger.logThrow(Level.FINEST,
+		logger.logThrow(Level.FINEST, e,
 				"getObject txn:{0}, oid:{1,number,#}, " +
 				"forUpdate:{2} throws",
-				e, txn, oid, forUpdate);
+				txn, oid, forUpdate);
 	    }
 	    throw e;
 	}
@@ -587,8 +586,8 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	}
 	if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
-		    Level.FINEST, "setObject txn:{0}, oid:{1,number,#} throws",
-		    exception, txn, oid);
+		    Level.FINEST, exception,
+		    "setObject txn:{0}, oid:{1,number,#} throws", txn, oid);
 	}
 	throw exception;
     }
@@ -625,9 +624,9 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    exception = e;
 	}
 	if (logger.isLoggable(Level.FINEST)) {
-	    logger.logThrow(Level.FINEST,
+	    logger.logThrow(Level.FINEST, exception,
 			    "removeObject txn:{0}, oid:{1,number,#} throws",
-			    exception, txn, oid);
+			    txn, oid);
 	}
 	throw exception;
     }
@@ -669,8 +668,8 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    exception = e;
 	}
 	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST, "getBinding txn:{0}, name:{1} throws",
-		       exception, txn, name);
+	    logger.logThrow(Level.FINEST, exception,
+			    "getBinding txn:{0}, name:{1} throws", txn, name);
 	}
 	throw exception;
     }
@@ -713,9 +712,9 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	}
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.logThrow(
-		Level.FINEST,
+		Level.FINEST, exception,
 		"setBinding txn:{0}, name:{1}, oid:{2,number,#} throws",
-		exception, txn, name, oid);
+		txn, name, oid);
 	}
 	throw exception;
     }
@@ -754,9 +753,9 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    exception = e;
 	}
 	if (logger.isLoggable(Level.FINEST)) {
-	    logger.logThrow(
-		Level.FINEST, "removeBinding txn:{0}, name:{1} throws",
-		exception, txn, name);
+	    logger.logThrow(Level.FINEST, exception,
+			    "removeBinding txn:{0}, name:{1} throws",
+			    txn, name);
 	}
 	throw exception;
     }
@@ -811,7 +810,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	logger.logThrow(Level.FINER, "prepare txn:{0} throws", exception, txn);
+	logger.logThrow(Level.FINER, exception, "prepare txn:{0} throws", txn);
 	throw exception;
     }
 
@@ -847,7 +846,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	logger.log(Level.FINER, "commit txn:{0} throws", exception, txn);
+	logger.logThrow(Level.FINER, exception, "commit txn:{0} throws", txn);
 	throw exception;
     }
 
@@ -884,7 +883,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    exception = e;
 	}
 	logger.logThrow(
-	    Level.FINER, "prepareAndCommit txn:{0} throws", exception, txn);
+	    Level.FINER, exception, "prepareAndCommit txn:{0} throws", txn);
 	throw exception;
     }
 
@@ -917,7 +916,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	logger.logThrow(Level.FINER, "abort txn:{0} throws", exception, txn);
+	logger.logThrow(Level.FINER, exception, "abort txn:{0} throws", txn);
 	throw exception;
     }
 

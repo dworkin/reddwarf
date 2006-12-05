@@ -203,6 +203,7 @@ public class TestDataServiceImpl extends TestCase {
 	} catch (NullPointerException e) {
 	    System.err.println(e);
 	}
+	service.shutdown();
     }
 
     public void testConfigureNoTxn() throws Exception {
@@ -407,9 +408,9 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
-    private static class TestGetBindingBadTxn extends BadTxnTest {
+    static class TestGetBindingBadTxn extends BadTxnTest {
 	private final boolean app;
-	private TestGetBindingBadTxn(boolean app, BadTxnState state) {
+	TestGetBindingBadTxn(boolean app, BadTxnState state) {
 	    super(app ? "testGetBinding" : "testGetServiceBinding", state);
 	    this.app = app;
 	}
@@ -535,9 +536,9 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
-    private static class TestSetBindingBadTxn extends BadTxnTest {
+    static class TestSetBindingBadTxn extends BadTxnTest {
 	private final boolean app;
-	private TestSetBindingBadTxn(boolean app, BadTxnState state) {
+	TestSetBindingBadTxn(boolean app, BadTxnState state) {
 	    super(app ? "testSetBinding" : "testSetServiceBinding", state);
 	    this.app = app;
 	}
@@ -683,9 +684,9 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
-    private static class TestRemoveBindingBadTxn extends BadTxnTest {
+    static class TestRemoveBindingBadTxn extends BadTxnTest {
 	private final boolean app;
-	private TestRemoveBindingBadTxn(boolean app, BadTxnState state) {
+	TestRemoveBindingBadTxn(boolean app, BadTxnState state) {
 	    super(app ? "testRemoveBinding" : "testRemoveServiceBinding",
 		  state);
 	    this.app = app;

@@ -942,6 +942,81 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	assertHandleNotActive(handle);
     }
 
+    /* -- Test TransactionHandle.abort -- */
+
+    public void testHandleAbortActive() {
+	DummyTransactionParticipant[] participants = {
+	    new DummyNonDurableTransactionParticipant(),
+	    new DummyNonDurableTransactionParticipant() {
+		protected boolean prepareResult() { return true; }
+	    },
+	    new DummyTransactionParticipant()
+	};
+	for (TransactionParticipant participant : participants) {
+	    txn.join(participant);
+	}
+	handle.abort();
+	for (DummyTransactionParticipant participant : participants) {
+	    if (!participant.prepareReturnedTrue()) {
+		assertEquals(State.ABORTED, participant.getState());
+	    }
+	}
+	assertHandleNotActive(handle);
+    }
+
+    public void testHandleAbortActiveEmpty() throws Exception {
+	handle.abort();
+	assertHandleNotActive(handle);
+    }
+
+    public void testHandleAbortAborted() throws Exception {
+	txn.join(new DummyTransactionParticipant());
+	txn.abort();
+	try {
+	    handle.abort();
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testHandleAbortCommitted() throws Exception {
+	txn.join(new DummyTransactionParticipant());
+	handle.commit();
+	try {
+	    handle.abort();
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testHandleAbortFails() throws Exception {
+	DummyTransactionParticipant[] participants = {
+	    new DummyNonDurableTransactionParticipant(),
+	    new DummyNonDurableTransactionParticipant() {
+		public void abort(Transaction txn) {
+		    throw new RuntimeException("Commit failed");
+		}
+	    },
+	    new DummyTransactionParticipant() {
+	    }
+	};
+	for (TransactionParticipant participant : participants) {
+	    txn.join(participant);
+	}
+	handle.abort();
+	for (DummyTransactionParticipant participant : participants) {
+	    if (!participant.prepareReturnedTrue()) {
+		assertEquals(
+		    (participant == participants[1]
+		     ? State.ACTIVE : State.ABORTED),
+		    participant.getState());
+	    }
+	}
+	assertHandleNotActive(handle);
+    }
+
     /* -- Test equals -- */
 
     public void testEquals() throws Exception {

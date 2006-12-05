@@ -1,7 +1,6 @@
 package com.sun.sgs.impl.io;
 
 import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
 
 import org.apache.mina.common.IoAcceptor;
 import org.apache.mina.transport.socket.nio.DatagramAcceptor;
