@@ -26,4 +26,11 @@ public interface TransactionHandle {
      *		preparing the transaction
      */
     void commit() throws Exception;
+
+    /**
+     * Aborts the transaction associated with this handle.
+     *
+     * @throws	TransactionNotActiveException if the transaction is not active
+     */
+    void abort();
 }

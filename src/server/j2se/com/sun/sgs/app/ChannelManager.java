@@ -1,6 +1,6 @@
 package com.sun.sgs.app;
 
-import java.nio.ByteBuffer;
+import java.io.Serializable;
 
 /**
  * Manager for creating and obtaining channels.  A {@link Channel} is
@@ -24,11 +24,13 @@ public interface ChannelManager {
      * <p>If the specified <code>listener</code> is
      * non-<code>null</code>, then when any client session sends a
      * message on the returned channel, the specified listener's {@link
-     * ChannelListener#receivedMessage(Channel,ClientSession,ByteBuffer)
+     * ChannelListener#receivedMessage(Channel,ClientSession,byte[])
      * receivedMessage} method is invoked with this channel, the
      * session, and the message.  The specified listener is not
      * invoked for messages that the server sends on the channel via
-     * one of the channel's <code>send</code> methods.
+     * one of the channel's <code>send</code> methods.  If the specified
+     * <code>listener</code> is non-<code>null</code>, then it must also
+     * be {@link Serializable}.
      *
      * <p>Messages sent on the returned channel are delivered
      * according to the specified delivery requirement.
@@ -39,6 +41,8 @@ public interface ChannelManager {
      *
      * @return a new channel bound to the specified name
      *
+     * @throws IllegalArgumentException if the specified listener is
+     * non-<code>null</code> and is not serializable
      * @throws NameExistsException if a channel is already bound to
      * the specified name
      * @throws TransactionException if the operation failed because of

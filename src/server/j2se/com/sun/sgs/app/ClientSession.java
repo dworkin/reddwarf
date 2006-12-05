@@ -1,10 +1,11 @@
 package com.sun.sgs.app;
 
-import java.nio.ByteBuffer;
+import java.io.Serializable;
 
 /**
  * Interface representing a single, connected login session between a
- * client and the server.
+ * client and the server.  Classes that implement
+ * <code>ClientSession</code> must also implement {@link Serializable}.
  *
  * <p>When a client logs in, the application's {@link
  * AppListener#loggedIn(ClientSession) AppListener.loggedIn} method is
@@ -58,24 +59,29 @@ public interface ClientSession {
     String getName();
 
     /**
-     * Returns a byte buffer containing the representation of the
-     * client address for this session.
+     * Returns a byte array containing the representation of session
+     * identifier for this session.
      *
-     * @return the representation of the client address for this session
+     * @return the representation of the session identifier for this
+     * session
      */
-    ByteBuffer getClientAddress();
+    byte[] getSessionId();
 
     /**
-     * Sends a message with the specified contents to this session's
-     * client.
+     * Sends a message contained in the specified byte array to this
+     * session's client.
      *
+     * <p>The specified byte array must not be modified after invoking
+     * this method; if the byte array is modified, then this method
+     * may have unpredictable results.
+     
      * @param message a message
      *
      * @throws IllegalStateException if this session is disconnected
      * @throws TransactionException if the operation failed because of
      * a problem with the current transaction
      */
-    void send(ByteBuffer message);
+    void send(byte[] message);
 
     /**
      * Forcibly disconnects this client session.  If this session is
