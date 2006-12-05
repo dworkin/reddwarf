@@ -22,6 +22,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.math.BigInteger;
 import java.util.Properties;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -1246,6 +1247,23 @@ public class TestDataServiceImpl extends TestCase {
 	assertTrue(threadFlag.tryAcquire(1, TimeUnit.SECONDS));
     }
 
+    /* -- Test ManagedReference.getId -- */
+
+    public void testReferenceGetId() throws Exception {
+	BigInteger id = service.createReference(dummy).getId();
+	DummyManagedObject dummy2 = new DummyManagedObject(service);
+	service.setBinding("dummy2", dummy2);
+	BigInteger id2 = service.createReference(dummy2).getId();
+	assertFalse(id.equals(id2));
+	txn.commit();
+	createTransaction();
+	dummy = service.getBinding("dummy", DummyManagedObject.class);
+	ManagedReference ref = service.createReference(dummy);
+	assertEquals(id, ref.getId());
+	dummy2 = service.getBinding("dummy2", DummyManagedObject.class);
+	assertEquals(id2, service.createReference(dummy2).getId());
+    }
+
     /* -- Test ManagedReference.equals -- */
 
     public void testReferenceEquals() throws Exception {
@@ -1258,6 +1276,7 @@ public class TestDataServiceImpl extends TestCase {
 	ManagedReference ref3 = new ManagedReference() {
 	    public <T> T get(Class<T> type) { return null; }
 	    public <T> T getForUpdate(Class<T> type) { return null; }
+	    public BigInteger getId() { return null; }
 	};
 	assertFalse(ref.equals(ref3));
     }

@@ -17,14 +17,18 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 /**
- * Defines a simple managed object {@link Map} that maps serializable keys to
- * serializable values that may also be managed objects.  The keys must not be
- * managed objects.  Both keys and values can be <code>null</code>. <p>
+ * A simple hash table implementation of {@link Map} that implements {@link
+ * ManagedObject} and can store managed object values.  The implementation
+ * stores the entire hash table structure using a single managed object, so it
+ * is best suited to storing small numbers of objects. <p>
  *
- * Calls to the {@link #put put} and {@link #putAll putAll} methods will throw
- * an {@link IllegalArgumentException} if the keys or values are not
- * <code>null</code> and do not implement {@link Serializable}, or if the keys
- * implement {@link ManagedObject}. <p>
+ * This class supports all of the optional operations of the <code>Map</code>
+ * interface, as well as <code>null</code> keys and values. <p>
+ *
+ * Non-<code>null</code> keys and values must implement {@link Serializable}.
+ * Values may also implement {@link ManagedObject}, but keys are not permitted
+ * to do so.  The {@link #put put} and {@link #putAll putAll} methods enforce
+ * these restrictions. <p>
  *
  * This implementation is not synchronized.
  *
@@ -57,11 +61,11 @@ public class SimpleManagedHashMap<K, V>
     /** The entry set, or null if not yet created. */
     private transient Set<Entry<K, V>> entrySet = null;
 
-    /** Creates an instance of this class with no entries. */
+    /** Creates a map with no entries. */
     public SimpleManagedHashMap() { }
 
     /**
-     * Creates an instance with the specified mappings.
+     * Creates a map with the specified mappings.
      *
      * @param	map the mappings to place in this map
      * @throws	IllegalArgumentException if <code>map</code> contains keys or
@@ -108,8 +112,8 @@ public class SimpleManagedHashMap<K, V>
     /**
      * {@inheritDoc} <p>
      *
-     * @throws	IllegalArgumentException if <code>key</code> or
-     *		<code>value</code> are not <code>null</code> and do not
+     * @throws	IllegalArgumentException if either <code>key</code> or
+     *		<code>value</code> is not <code>null</code> and does not
      *		implement {@link Serializable}, or if <code>key</code>
      *		implements {@link ManagedObject}
      */

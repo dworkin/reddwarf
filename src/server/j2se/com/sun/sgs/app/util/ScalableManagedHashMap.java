@@ -21,9 +21,37 @@ import java.util.NoSuchElementException;
 import java.util.Set;
 
 /**
- * A hash table implementation of {@link Map} that can store managed objects
- * and uses a separate managed object for each hash bucket.  This class is
- * derived from revision 1.63 of the {@link HashMap} class from Java 1.5.06.
+ * A scalable hash table implementation of {@link Map} that implements {@link
+ * ManagedObject} and can store managed object values.  The implementation uses
+ * a separate managed object for each hash bucket chain, so it permits objects
+ * to be obtained from the map without needing to fetch the entire map from the
+ * {@link DataManager}.  Because the size of the map is stored in a single
+ * managed object, this implementation does not support concurrent
+ * modifications. <p>
+ *
+ * This class supports all of the optional operations of the <code>Map</code>
+ * interface, as well as <code>null</code> keys and values. <p>
+ *
+ * Non-<code>null</code> keys and values must implement {@link Serializable}.
+ * Values may also implement {@link ManagedObject}, but keys are not permitted
+ * to do so.  The {@link #put put} and {@link #putAll putAll} methods enforce
+ * these restrictions. <p>
+ *
+ * This implementation is not synchronized. <p>
+ *
+ * Two parameters control the performance of this implementation: the capacity,
+ * which is the number of buckets in the hash table, and the load factor, which
+ * measures how full the table can become before its capacity is increased.
+ * When the number of entries in the hash table exceeds the product of the load
+ * factor and the current capacity, the capacity is roughly doubled. <p>
+ *
+ * The default load factor (<code>.75</code>) typically offers a good trade-off
+ * between time and space costs.  Higher values decrease the space overhead but
+ * increase the lookup cost.  The expected number of entries in the map and its
+ * load factor should be considered when setting its initial capacity, so as to
+ * minimize the number of times its capacity must be increased.  If the initial
+ * capacity is greater than the maximum number of entries divided by the load
+ * factor, no capacity changes will ever occur.
  *
  * @param	<K> the type of the keys stored in the map
  * @param	<V> the type of the values stored in the map
@@ -32,6 +60,11 @@ public class ScalableManagedHashMap<K, V>
     extends AbstractMap<K, V>
     implements DetectChanges, ManagedObject, Serializable
 {
+    /*
+     * The implementation of this class is derived from revision 1.63 of the
+     * java.util.HashMap class from Java 1.5.06.  -tjb@sun.com (12/05/2006)
+     */
+
     /* -- Fields -- */
 
     /** The version of the serialized form. */
@@ -119,8 +152,29 @@ public class ScalableManagedHashMap<K, V>
     /* -- Constructors -- */
 
     /**
-     * Constructs an empty <code>ScalableManagedHashMap</code> with the
-     * specified initial capacity and load factor.
+     * Constructs an empty map with the default initial capacity
+     * (<code>16</code>) and the default load factor (<code>0.75</code>).
+     */
+    public ScalableManagedHashMap() {
+        loadFactor = DEFAULT_LOAD_FACTOR;
+        threshold = (int) (DEFAULT_INITIAL_CAPACITY * DEFAULT_LOAD_FACTOR);
+        table = new ManagedReference[DEFAULT_INITIAL_CAPACITY];
+    }
+
+    /**
+     * Constructs an empty map with the specified initial capacity and the
+     * default load factor (<code>0.75</code>).
+     *
+     * @param	initialCapacity the initial capacity
+     * @throws	IllegalArgumentException if the initial capacity is negative
+     */
+    public ScalableManagedHashMap(int initialCapacity) {
+        this(initialCapacity, DEFAULT_LOAD_FACTOR);
+    }
+
+    /**
+     * Constructs an empty map with the specified initial capacity and load
+     * factor.
      *
      * @param	initialCapacity the initial capacity
      * @param	loadFactor the load factor
@@ -150,41 +204,15 @@ public class ScalableManagedHashMap<K, V>
     }
   
     /**
-     * Constructs an empty <code>ScalableManagedHashMap</code> with the
-     * specified initial capacity and the default load factor
-     * (<code>0.75</code>).
+     * Constructs a new map containing the specified mappings, and using the
+     * default load factor (<code>0.75</code>) and an initial capacity
+     * sufficient to hold the specified mappings.
      *
-     * @param	initialCapacity the initial capacity
-     * @throws	IllegalArgumentException if the initial capacity is negative
-     */
-    public ScalableManagedHashMap(int initialCapacity) {
-        this(initialCapacity, DEFAULT_LOAD_FACTOR);
-    }
-
-    /**
-     * Constructs an empty <code>ScalableManagedHashMap</code> with the default
-     * initial capacity (<code>16</code>) and the default load factor
-     * (<code>0.75</code>).
-     */
-    public ScalableManagedHashMap() {
-        loadFactor = DEFAULT_LOAD_FACTOR;
-        threshold = (int) (DEFAULT_INITIAL_CAPACITY * DEFAULT_LOAD_FACTOR);
-        table = new ManagedReference[DEFAULT_INITIAL_CAPACITY];
-    }
-
-    /**
-     * Constructs a new <code>ScalableManagedHashMap</code> with the same
-     * mappings as the specified <code>Map</code>.  The
-     * <code>ScalableManagedHashMap</code> is created with default load factor
-     * (<code>0.75</code>) and an initial capacity sufficient to hold the
-     * mappings in the specified <code>Map</code>.
-     *
-     * @param	map the map whose mappings are to be placed in this map
-     * @throws  IllegalArgumentException if the map contains keys that are not
-     *		<code>null</code> and either do not implement {@link
-     *		Serializable} or implement {@link ManagedObject}, or values
-     *		that are not <code>null</code> and do not implement
-     *		<code>Serializable</code>
+     * @param	map the mappings to place in this map
+     * @throws  IllegalArgumentException if <code>map</code> contains keys or
+     *		values that are not <code>null</code> and do not implement
+     *		{@link Serializable}, or keys that implement {@link
+     *		ManagedObject}
      */
     public ScalableManagedHashMap(Map<? extends K, ? extends V> map) {
         this(Math.max((int) (map.size() / DEFAULT_LOAD_FACTOR) + 1,
@@ -202,8 +230,8 @@ public class ScalableManagedHashMap<K, V>
     /**
      * {@inheritDoc} <p>
      *
-     * This implementation always returns null, since this object manages its
-     * own modified state directly.
+     * This implementation always returns <code>null</code>, since this object
+     * manages its own modified state directly.
      */
     public Object getChangesState() {
 	return null;
@@ -245,11 +273,10 @@ public class ScalableManagedHashMap<K, V>
     /**
      * {@inheritDoc} <p>
      *
-     * @throws	IllegalArgumentException if <code>key</code> is not
-     *		<code>null</code> and either does not implement {@link
-     *		Serializable} or implements {@link ManagedObject}, or if
+     * @throws	IllegalArgumentException if either <code>key</code> or
      *		<code>value</code> is not <code>null</code> and does not
-     *		implement <code>Serializable</code>
+     *		implement {@link Serializable}, or if <code>key</code>
+     *		implements {@link ManagedObject}
      */
     public V put(K key, V value) {
 	if (key != null && !(key instanceof Serializable)) {
@@ -293,7 +320,14 @@ public class ScalableManagedHashMap<K, V>
         return null;
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc} <p>
+     *
+     * @throws	IllegalArgumentException if <code>map</code> contains keys or
+     *		values that are not <code>null</code> and do not implement
+     *		{@link Serializable}, or keys that implement {@link
+     *		ManagedObject}
+     */
     public void putAll(Map<? extends K, ? extends V> m) {
         int numKeysToBeAdded = m.size();
         if (numKeysToBeAdded == 0) {
@@ -662,17 +696,18 @@ public class ScalableManagedHashMap<K, V>
 
     /** A base class for iterators over items in the map. */
     private abstract class HashIterator<E> implements Iterator<E> {
-        private HashEntry<K, V> next;	// next entry to return
-        private int expectedModCount;	// For fast-fail
-        private int index;		// current slot
-        private HashEntry<K, V> current;	// current entry
+        private HashEntry<K, V> next;		/* next entry to return */
+        private int expectedModCount;		/* for fast-fail */
+        private int index;			/* current slot */
+        private HashEntry<K, V> current;	/* current entry */
 
         HashIterator() {
             expectedModCount = modCount;
             ManagedReference[] t = table;
             int i = t.length;
             HashEntry<K, V> n = null;
-            if (size != 0) { // advance to first entry
+            if (size != 0) {
+		/* Advance to first entry */
                 while (i > 0 && (n = getTableEntry(t, --i)) == null) {
                     continue;
 		}
