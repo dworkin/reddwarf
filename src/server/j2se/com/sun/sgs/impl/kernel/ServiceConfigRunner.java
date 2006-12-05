@@ -8,7 +8,6 @@ import com.sun.sgs.impl.util.LoggerWrapper;
 
 import com.sun.sgs.kernel.KernelRunnable;
 
-import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.TransactionProxy;

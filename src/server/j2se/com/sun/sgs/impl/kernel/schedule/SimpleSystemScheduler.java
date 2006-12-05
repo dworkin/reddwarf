@@ -64,25 +64,15 @@ class SimpleSystemScheduler implements SystemScheduler, ProfilingConsumer {
     /**
      * {@inheritDoc}
      */
-    public ScheduledTask getNextTask() {
-        while (true) {
-            try {
-                return queue.take();
-            } catch (InterruptedException ie) {}
-        }
+    public ScheduledTask getNextTask() throws InterruptedException {
+        return queue.take();
     }
 
     /**
      * {@inheritDoc}
      */
-    public void giveReadyTask(ScheduledTask task) {
-        boolean given = false;
-        while (! given) {
-            try {
-                queue.put(task);
-                given = true;
-            } catch (InterruptedException ie) {}
-        }
+    public void giveReadyTask(ScheduledTask task) throws InterruptedException {
+        queue.put(task);
     }
 
     /**

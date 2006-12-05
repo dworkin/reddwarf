@@ -34,8 +34,11 @@ interface SystemScheduler {
      * available to run.
      *
      * @return the next <code>ScheduledTask</code>
+     *
+     * @throws InterruptedException if the thread is interrupted while
+     *                              waiting for a task
      */
-    public ScheduledTask getNextTask();
+    public ScheduledTask getNextTask() throws InterruptedException;
 
     /**
      * Used by <code>ApplicationScheduler</code>s to give ready tasks to
@@ -44,8 +47,11 @@ interface SystemScheduler {
      * this interface.
      *
      * @param task the ready <code>ScheduledTask</code>
+     *
+     * @throws InterruptedException if the thread is interrupted while
+     *                              waiting to give this task
      */
-    public void giveReadyTask(ScheduledTask task);
+    public void giveReadyTask(ScheduledTask task) throws InterruptedException;
 
     /**
      * Reserves a space for a task.

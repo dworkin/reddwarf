@@ -1,6 +1,8 @@
 
 package com.sun.sgs.impl.kernel.schedule;
 
+import com.sun.sgs.app.TaskRejectedException;
+
 import com.sun.sgs.impl.util.LoggerWrapper;
 
 import com.sun.sgs.kernel.RecurringTaskHandle;
@@ -85,10 +87,15 @@ class FIFOApplicationScheduler
         }
 
         // finally, hand off the task to the appropriate place
-        if (tt == null)
-            systemScheduler.giveReadyTask(task);
-        else
+        if (tt == null) {
+            try {
+                systemScheduler.giveReadyTask(task);
+            } catch (InterruptedException ie) {
+                throw new TaskRejectedException("Request was interrupted", ie);
+            }
+        } else {
             timer.schedule(tt, new Date(task.getStartTime()));
+        }
     }
 
     /**
@@ -96,7 +103,21 @@ class FIFOApplicationScheduler
      * the scheduler that a delayed task has now hit its time to run.
      */
     private void addTimedTask(ScheduledTask task) {
-        systemScheduler.giveReadyTask(task);
+        while (true) {
+            // NOTE: This method is not allowed to fail, because when we
+            // accepted the task for future execution, we guaranteed that
+            // it would run. As a result, any interruptions here are
+            // ignored, and we keep trying to give the task. The alternative
+            // would be to add this back into the Timer and hope that it
+            // executes next time, but that could lead to falling well
+            // behind without visibility into this problem. When management
+            // is added to the stack, that may help define why an interruption
+            // occurred and how we should actually react.
+            try {
+                systemScheduler.giveReadyTask(task);
+                break;
+            } catch (InterruptedException ie) {}
+        }
     }
 
     /**
@@ -167,17 +188,21 @@ class FIFOApplicationScheduler
         boolean isCancelled() {
             return cancelled;
         }
-        public synchronized void cancel() {
-            if (cancelled)
-                throw new IllegalStateException("cannot cancel task");
-            cancelled = true;
+        public void cancel() {
+            synchronized (this) {
+                if (cancelled)
+                    throw new IllegalStateException("cannot cancel task");
+                cancelled = true;
+            }
             if (timerTask != null)
                 timerTask.cancel();
         }
-        public synchronized void start() {
-            if ((cancelled) || (started))
-                throw new IllegalStateException("cannot start task");
-            started = true;
+        public void start() {
+            synchronized (this) {
+                if ((cancelled) || (started))
+                    throw new IllegalStateException("cannot start task");
+                started = true;
+            }
             scheduler.addTask(task);
         }
     }

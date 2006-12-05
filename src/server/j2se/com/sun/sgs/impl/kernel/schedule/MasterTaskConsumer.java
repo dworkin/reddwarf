@@ -58,9 +58,18 @@ class MasterTaskConsumer implements Runnable {
         if (logger.isLoggable(Level.FINE))
             logger.log(Level.FINE, "Starting a Master Task Consumer");
         while (true) {
-            // wait for the next task
-            ScheduledTask task = scheduler.getNextTask();
+            // wait for the next task...if we get interrupted while waiting,
+            // then we'll loop back and try again
+            // NOTE: when we actually add shutdown and other management
+            // facilities, we will probably want to interpret interruption
+            // different, perhaps even returning from this thread
+            ScheduledTask task = null;
             boolean taskFinished = false;
+            try {
+                task = scheduler.getNextTask();
+            } catch (InterruptedException ie) {
+                taskFinished = true;
+            }
 
             // run the task to completion
             while (! taskFinished) {
@@ -89,7 +98,7 @@ class MasterTaskConsumer implements Runnable {
             }
 
             // if this is a recurring task, we can now schedule the next run
-            if (task.isRecurring()) {
+            if ((task != null) && (task.isRecurring())) {
                 long newStartTime = task.getStartTime() + task.getPeriod();
                 scheduler.addFutureTask(new ScheduledTask(task, newStartTime));
             }
