@@ -132,7 +132,7 @@ public class TSOTransaction implements Transaction {
     private volatile boolean timestampInterrupted;
     private Error errorInProgress;
 
-    private static final boolean DEBUG = false;
+    private static final boolean DEBUG = true;
 
     private static long TIMEOUT =
         Integer.parseInt(System.getProperty("sgs.objectstore.timeout",
@@ -196,16 +196,20 @@ public class TSOTransaction implements Transaction {
 
         long headerID = trans.create(hdr, name);
 
-	if (DEBUG) {
+	if (log.isLoggable(Level.FINEST)) {
             if (headerID != DataSpace.INVALID_ID) {
-                log.log(Level.FINE, 
-                        "txn {0} won create of {1} with hdrID {2}",
-                        new Object[] { txnID, name, headerID });
+                log.log(Level.FINEST, 
+                	"txn {0} won create of {1,number,#}: {2}",
+                        new Object[] { txnID, headerID, name });
             } else {
-                log.log(Level.FINE, 
+                log.log(Level.FINEST, 
                         "txn {0} lost create of {1}",
                         new Object[] { txnID, name });
             }
+	} else if (log.isLoggable(Level.FINE) && name != null) {
+	    log.log(Level.FINE, 
+                    "txn {0} create {1,number,#}: {2}",
+                    new Object[] { txnID, headerID, name });
 	}
 
         while (headerID == DataSpace.INVALID_ID) {
