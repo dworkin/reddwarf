@@ -19,7 +19,7 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TransactionRunner;
 
-import java.io.FileReader;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 
@@ -327,7 +327,8 @@ class Kernel {
             System.getProperty("com.sun.sgs.config.file");
         try {
             if (propertiesFile != null) {
-        	FileReader fileReader = new FileReader(propertiesFile);
+        	FileInputStream fileReader =
+        	    new FileInputStream(propertiesFile);
         	try {
         	    Properties fileProperties = new Properties();
         	    fileProperties.load(fileReader);
