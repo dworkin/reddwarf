@@ -140,4 +140,22 @@ public interface DataStore {
      *		problem with the current transaction
      */
     void removeBinding(Transaction txn, String name);
+
+    /**
+     * Returns the next name after the specified name that has a binding, or
+     * <code>null</code> if there are no more bound names.  If
+     * <code>name</code> is <code>null</code>, then the search starts at the
+     * beginning.
+     *
+     * @param	txn the transaction under which the operation should take place
+     * @param	name the name to search after, or <code>null</code> to start
+     *		from the beginning
+     * @return	the next name with a binding following <code>name</code>, or
+     *		<code>null</code> if there are no more bound names
+     * @throws	TransactionAbortedException if the transaction was aborted due
+     *		to a lock conflict or timeout
+     * @throws	IllegalStateException if the operation failed because of a
+     *		problem with the current transaction
+     */
+    String nextBoundName(Transaction txn, String name);
 }

@@ -793,6 +793,159 @@ public class TestDataServiceImpl extends TestCase {
 	assertEquals(dummy, result);
     }
 
+    /* -- Test nextBoundName and nextServiceBoundName -- */
+
+    public void testNextBoundNameNotFound() throws Exception {
+	for (String name = null;
+	     (name = service.nextBoundName(name)) != null; )
+	{
+	    service.removeBinding(name);
+	}
+	assertNull(service.nextBoundName(null));
+	assertNull(service.nextBoundName(""));
+	assertNull(service.nextBoundName("whatever"));
+    }
+
+    public void testNextBoundNameEmpty() throws Exception {
+	testNextBoundNameEmpty(true);
+    }
+    public void testNextServiceBoundNameEmpty() throws Exception {
+	testNextBoundNameEmpty(false);
+    }
+    private void testNextBoundNameEmpty(boolean app) throws Exception {
+	try {
+	    removeBinding(app, service, "");
+	} catch (NameNotBoundException e) {
+	}
+	String forNull = nextBoundName(app, service, null);
+	assertEquals(forNull, nextBoundName(app, service, ""));
+	setBinding(app, service, "", dummy);
+	assertEquals("", nextBoundName(app, service, null));
+	assertEquals(forNull, nextBoundName(app, service, ""));
+    }
+
+    private static class TestNextBoundNameBadTxn extends BadTxnTest {
+	private final boolean app;
+	private TestNextBoundNameBadTxn(boolean app, BadTxnState state) {
+	    super(app ? "testNextBoundName" : "testNextServiceBoundName",
+		  state);
+	    this.app = app;
+	}
+	void action() {
+	    nextBoundName(app, service, null);
+	}
+    }
+
+    static {
+	for (BadTxnState state : BadTxnState.values()) {
+	    new TestNextBoundNameBadTxn(true, state);
+	    new TestNextBoundNameBadTxn(false, state);
+	}
+    }
+
+    public void testNextBoundNameSuccess() throws Exception {
+	testNextBoundNameSuccess(true);
+    }
+    public void testNextServiceBoundNameSuccess() throws Exception {
+	testNextBoundNameSuccess(false);
+    }
+    private void testNextBoundNameSuccess(boolean app) throws Exception {
+	assertNull(nextBoundName(app, service, "zzz-"));
+	setBinding(app, service, "zzz-1", dummy);
+	assertEquals("zzz-1", nextBoundName(app, service, "zzz-"));
+	assertEquals("zzz-1", nextBoundName(app, service, "zzz-"));
+	assertNull(nextBoundName(app, service, "zzz-1"));
+	assertNull(nextBoundName(app, service, "zzz-1"));
+	setBinding(app, service, "zzz-2", dummy);	
+	assertEquals("zzz-1", nextBoundName(app, service, "zzz-"));
+	assertEquals("zzz-1", nextBoundName(app, service, "zzz-"));
+	assertEquals("zzz-2", nextBoundName(app, service, "zzz-1"));
+	assertEquals("zzz-2", nextBoundName(app, service, "zzz-1"));
+	assertNull(nextBoundName(app, service, "zzz-2"));
+	assertNull(nextBoundName(app, service, "zzz-2"));
+	txn.commit();
+	createTransaction();
+	removeBinding(app, service, "zzz-1");
+	assertEquals("zzz-2", nextBoundName(app, service, "zzz-"));
+	assertEquals("zzz-2", nextBoundName(app, service, "zzz-"));
+	assertEquals("zzz-2", nextBoundName(app, service, "zzz-1"));
+	assertEquals("zzz-2", nextBoundName(app, service, "zzz-1"));
+	assertNull(nextBoundName(app, service, "zzz-2"));
+	assertNull(nextBoundName(app, service, "zzz-2"));
+	txn.abort();
+	createTransaction();
+	removeBinding(app, service, "zzz-2");
+	assertEquals("zzz-1", nextBoundName(app, service, "zzz-"));
+	assertEquals("zzz-1", nextBoundName(app, service, "zzz-"));
+	assertNull(nextBoundName(app, service, "zzz-1"));
+	assertNull(nextBoundName(app, service, "zzz-1"));
+	assertNull(nextBoundName(app, service, "zzz-2"));
+	assertNull(nextBoundName(app, service, "zzz-2"));
+	removeBinding(app, service, "zzz-1");
+	assertNull(nextBoundName(app, service, "zzz-"));
+	assertNull(nextBoundName(app, service, "zzz-"));
+	assertNull(nextBoundName(app, service, "zzz-1"));
+	assertNull(nextBoundName(app, service, "zzz-1"));
+	assertNull(nextBoundName(app, service, "zzz-2"));
+	assertNull(nextBoundName(app, service, "zzz-2"));
+    }
+
+    public void testNextBoundNameModify() throws Exception {
+	testNextBoundNameModify(true);
+    }
+    public void testNextServiceBoundNameModify() throws Exception {
+	testNextBoundNameModify(false);
+    }
+    private void testNextBoundNameModify(boolean app) throws Exception {
+	for (String name = "zzz-1";
+	     (name = service.nextBoundName(name)) != null; )
+	{
+	    service.removeBinding(name);
+	}
+	setBinding(app, service, "zzz-1", dummy);
+	assertEquals("zzz-1", nextBoundName(app, service, "zzz-"));
+	setBinding(app, service, "zzz-2", dummy);
+	assertEquals("zzz-2", nextBoundName(app, service, "zzz-1"));
+	removeBinding(app, service, "zzz-2");
+	setBinding(app, service, "zzz-3", dummy);
+	setBinding(app, service, "zzz-4", dummy);
+	assertEquals("zzz-3", nextBoundName(app, service, "zzz-2"));
+	removeBinding(app, service, "zzz-4");
+	assertNull(nextBoundName(app, service, "zzz-3"));
+    }
+
+    public void testNextBoundNameDifferent() throws Exception {
+	for (String name = null;
+	     (name = service.nextBoundName(name)) != null; )
+	{
+	    service.removeBinding(name);
+	}
+	for (String name = null;
+	     (name = service.nextServiceBoundName(name)) != null; )
+	{
+	    if (!name.startsWith("com.sun.sgs")) {
+		service.removeServiceBinding(name);
+	    }
+	}
+	String nextService = service.nextServiceBoundName(null);
+	String lastService = nextService;
+	String name;
+	while ((name = service.nextServiceBoundName(lastService)) != null) {
+	    lastService = name;
+	}
+	service.setBinding("a-app", dummy);
+	service.setServiceBinding("a-service", dummy);
+	assertEquals("a-app", service.nextBoundName(null));
+	assertEquals("a-app", service.nextBoundName(""));
+	assertEquals("a-app", service.nextBoundName("a-"));
+	assertEquals(null, service.nextBoundName("a-app"));
+	assertEquals("a-service", service.nextServiceBoundName(null));
+	assertEquals("a-service", service.nextServiceBoundName(""));
+	assertEquals("a-service", service.nextServiceBoundName("a-"));
+	assertEquals(nextService, service.nextServiceBoundName("a-service"));
+	assertEquals(null, service.nextServiceBoundName(lastService));
+    }
+
     /* -- Test removeObject -- */
 
     public void testRemoveObjectNull() {
@@ -1370,6 +1523,14 @@ public class TestDataServiceImpl extends TestCase {
 	    service.removeBinding(name);
 	} else {
 	    service.removeServiceBinding(name);
+	}
+    }
+
+    String nextBoundName(boolean app, DataService service, String name) {
+	if (app) {
+	    return service.nextBoundName(name);
+	} else {
+	    return service.nextServiceBoundName(name);
 	}
     }
 

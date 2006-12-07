@@ -669,6 +669,85 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    /* -- Test nextBoundName -- */
+
+    public void testNextBoundNameNullTxn() {
+	try {
+	    store.nextBoundName(null, "foo");
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testNextBoundNameEmpty() {
+	assertNull(store.nextBoundName(txn, ""));
+	store.setBinding(txn, "", id);
+	assertEquals("", store.nextBoundName(txn, null));
+	assertEquals(null, store.nextBoundName(txn, ""));
+    }
+
+    static {
+	for (BadTxnState state : BadTxnState.values()) {
+	    new BadTxnTest("testNextBoundName", state) {
+		void action() {
+		    store.nextBoundName(txn, null);
+		}
+	    };
+	}
+    }
+
+    public void testNextBoundNameSuccess() throws Exception {
+	for (String name = null;
+	     (name = store.nextBoundName(txn, name)) != null; )
+	{
+	    store.removeBinding(txn, name);
+	}
+	assertNull(store.nextBoundName(txn, null));
+	assertNull(store.nextBoundName(txn, "name-1"));
+	assertNull(store.nextBoundName(txn, ""));
+	store.setBinding(txn, "name-1", id);
+	assertEquals("name-1", store.nextBoundName(txn, null));
+	assertEquals(null, store.nextBoundName(txn, "name-1"));
+	assertEquals(null, store.nextBoundName(txn, "name-2"));
+	assertEquals(null, store.nextBoundName(txn, "name-1"));
+	assertEquals("name-1", store.nextBoundName(txn, "name-0"));
+	assertEquals("name-1", store.nextBoundName(txn, null));
+	assertEquals("name-1", store.nextBoundName(txn, "name-0"));
+	store.setBinding(txn, "name-2", id);
+	txn.commit();
+	txn = new DummyTransaction();
+	assertEquals("name-1", store.nextBoundName(txn, null));
+	assertEquals("name-2", store.nextBoundName(txn, "name-1"));
+	assertNull(store.nextBoundName(txn, "name-2"));
+	assertNull(store.nextBoundName(txn, "name-3"));
+	assertEquals("name-1", store.nextBoundName(txn, "name-0"));
+	assertEquals("name-2", store.nextBoundName(txn, "name-1"));
+	assertEquals("name-1", store.nextBoundName(txn, null));
+	store.removeBinding(txn, "name-1");
+	assertEquals("name-2", store.nextBoundName(txn, null));
+	assertEquals("name-2", store.nextBoundName(txn, "name-1"));
+	assertEquals(null, store.nextBoundName(txn, "name-2"));
+	assertEquals(null, store.nextBoundName(txn, "name-3"));
+	assertEquals("name-2", store.nextBoundName(txn, "name-0"));
+	store.removeBinding(txn, "name-2");
+	assertNull(store.nextBoundName(txn, "name-2"));
+	assertNull(store.nextBoundName(txn, null));
+	store.setBinding(txn, "name-1", id);
+	store.setBinding(txn, "name-2", id);
+	txn.commit();
+	txn = new DummyTransaction();
+	assertEquals("name-1", store.nextBoundName(txn, null));
+	assertEquals("name-1", store.nextBoundName(txn, null));
+	store.removeBinding(txn, "name-1");
+	assertEquals("name-2", store.nextBoundName(txn, null));
+	store.removeBinding(txn, "name-2");
+	assertNull(store.nextBoundName(txn, null));
+	txn.abort();
+	txn = new DummyTransaction();
+	assertEquals("name-1", store.nextBoundName(txn, null));
+    }
+
     /* -- Test abort -- */
 
     public void testAbortNullTxn() throws Exception {
