@@ -85,14 +85,19 @@ public class TaskManagerImpl implements TaskManager {
     public static final String TASKLISTNAME = "_SGS_TaskManagerData";
     private static Logger log = Logger.getLogger("com.sun.gi.transition");
     
-    private final Map<GLOReference<? extends TaskWrapper>, Long> timerMap;
+    private final Map<TaskWrapper, Long> timerMap;
 
     private final Method callbackMethod;
     
     private GLOReference<TaskList> taskListRef;
     
+    private final boolean ENABLE_TASK_PERSISTENCE =
+	Boolean.parseBoolean(
+		System.getProperty("com.sun.gi.transition.task.persistent",
+			"true"));
+    
     public TaskManagerImpl() {
-        timerMap = new HashMap<GLOReference<? extends TaskWrapper>, Long>();
+        timerMap = new HashMap<TaskWrapper, Long>();
         try {
             callbackMethod =
                     SimTimerListener.class.getMethod("timerEvent",
@@ -109,20 +114,24 @@ public class TaskManagerImpl implements TaskManager {
     }
     
     public void persistTask(GLOReference<? extends TaskWrapper> ref) {
-        SimTask simTask = SimTask.getCurrent();
-        TaskList taskList = taskListRef.get(simTask);
-        taskList.add(ref);
+        if (ENABLE_TASK_PERSISTENCE) {
+            SimTask simTask = SimTask.getCurrent();
+            TaskList taskList = taskListRef.get(simTask);
+            taskList.add(ref);
+        }
     }
 
     public void depersistTask(TaskWrapper wrapper) {
         SimTask simTask = SimTask.getCurrent();
-        TaskList taskList = taskListRef.get(simTask);
-        GLOReference<? extends TaskWrapper> ref =
-                simTask.lookupReferenceFor(wrapper);
-        taskList.remove(ref);
+        if (ENABLE_TASK_PERSISTENCE) {
+            TaskList taskList = taskListRef.get(simTask);
+            GLOReference<? extends TaskWrapper> ref =
+        	simTask.lookupReferenceFor(wrapper);
+            taskList.remove(ref);
+        }
         
         if (wrapper instanceof PeriodicTaskWrapper) {
-            Long timerID = timerMap.get(ref);
+            Long timerID = timerMap.get(wrapper);
             if (timerID != null) {
                 // @@ NOTE @@
                 // We cannot remove this wrapper's entry from the map, because
@@ -206,6 +215,6 @@ public class TaskManagerImpl implements TaskManager {
                 "Update timer for {0} ID {1}",
                 new Object[] { ref.peek(simTask), newTimerID });
 
-        timerMap.put(ref, newTimerID);
+        timerMap.put(ref.peek(simTask), newTimerID);
     }
 }
