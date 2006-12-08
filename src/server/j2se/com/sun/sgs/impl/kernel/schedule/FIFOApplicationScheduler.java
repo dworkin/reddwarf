@@ -142,7 +142,7 @@ class FIFOApplicationScheduler
      * these reservations or use them to actually reserve any space.
      */
     private static class FIFOTaskReservation implements TaskReservation {
-        private boolean finished = false;
+        private volatile boolean finished = false;
         private final FIFOApplicationScheduler scheduler;
         private final ScheduledTask task;
         public FIFOTaskReservation(FIFOApplicationScheduler scheduler,
@@ -182,10 +182,10 @@ class FIFOApplicationScheduler
             this.scheduler = scheduler;
             this.task = task;
         }
-        void setTimerTask(TimerTask timerTask) {
+        synchronized void setTimerTask(TimerTask timerTask) {
             this.timerTask = timerTask;
         }
-        boolean isCancelled() {
+        synchronized boolean isCancelled() {
             return cancelled;
         }
         public void cancel() {
@@ -214,9 +214,9 @@ class FIFOApplicationScheduler
      * cancel it when they are cancelled.
      */
     private static class FIFOTimerTask extends TimerTask {
-        private FIFOApplicationScheduler scheduler;
-        private ScheduledTask task;
-        private boolean cancelled = false;
+        private final FIFOApplicationScheduler scheduler;
+        private final ScheduledTask task;
+        private volatile boolean cancelled = false;
         public FIFOTimerTask(FIFOApplicationScheduler scheduler,
                              ScheduledTask task) {
             this.scheduler = scheduler;

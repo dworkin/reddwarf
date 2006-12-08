@@ -14,7 +14,7 @@ import com.sun.sgs.kernel.TaskOwner;
  * be called infrequently, so <code>TaskThread</code>s will not be given
  * new tasks frequently.
  * <p>
- * This interface is used only to manager the current owner of this
+ * This interface is used only to manage the current owner of this
  * thread, which starts as the owner of the initial task, but will be
  * re-set with each task run out of the scheduler. See
  * <code>TaskHandler</code> for details on this process.
@@ -46,8 +46,17 @@ abstract class TaskThread extends Thread {
      * consumed from the <code>TaskScheduler</code>).
      *
      * @return the current owner
+     *
+     * @throws IllegalStateException if <code>getCurrentOwner</code> is not
+     *                               called on the current thread
      */
     TaskOwner getCurrentOwner() {
+        // make sure that we're looking at the our own thread
+        if (Thread.currentThread() != this)
+            throw new IllegalStateException("Cannot ask for the owner of a " +
+                                            "thread other than the current " +
+                                            "thread");
+
         return currentOwner;
     }
 
@@ -55,14 +64,19 @@ abstract class TaskThread extends Thread {
      * Sets the current owner of the work being done by this thread. The only
      * components who have access to this ability are those in the kernel and
      * the <code>TaskScheduler</code> (via the <code>TaskHandler</code>).
-     * Because the latter only allows setting the owner for a task in the
-     * current thread of execution, only kernel components have the ability
-     * to set the ownership of one thread from within a different thread
-     * of control, which should never be done.
      *
      * @param owner the new owner
+     *
+     * @throws IllegalStateException if <code>setCurrentOwner</code> is not
+     *                               called on the current thread
      */
     void setCurrentOwner(TaskOwner owner) {
+        // make sure that we're setting the owner for our thread
+        if (Thread.currentThread() != this)
+            throw new IllegalStateException("Cannot set the owner of a " +
+                                            "thread other than the current " +
+                                            "thread");
+
         currentOwner = owner;
         ContextResolver.
             setContext((AbstractKernelAppContext)(owner.getContext()));

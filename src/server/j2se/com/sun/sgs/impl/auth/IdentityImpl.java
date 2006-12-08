@@ -23,9 +23,12 @@ public class IdentityImpl implements Identity, Serializable
      * Creates an instance of <code>Identity</code> associated with the
      * given name.
      *
-     * @param name the name of this identity
+     * @param name the non-null name of this identity
      */
     public IdentityImpl(String name) {
+        if (name == null)
+            throw new NullPointerException("Null names are not allowed");
+
         this.name = name;
     }
 

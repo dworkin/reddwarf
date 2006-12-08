@@ -8,7 +8,6 @@ import com.sun.sgs.auth.IdentityAuthenticator;
 import com.sun.sgs.impl.app.profile.ProfilingManager;
 
 import com.sun.sgs.impl.auth.IdentityImpl;
-import com.sun.sgs.impl.auth.IdentityManagerImpl;
 import com.sun.sgs.impl.auth.NamePasswordAuthenticator;
 
 import com.sun.sgs.impl.kernel.schedule.MasterTaskScheduler;
@@ -150,8 +149,8 @@ class Kernel {
             logger.log(Level.CONFIG, "{0}: configuring application", appName);
 
         // create the authentication manager used for this application
-        HashSet<IdentityAuthenticator> authenticators =
-            new HashSet<IdentityAuthenticator>();
+        ArrayList<IdentityAuthenticator> authenticators =
+            new ArrayList<IdentityAuthenticator>();
         // TEST: this should get loaded from our configuration
         authenticators.add(new NamePasswordAuthenticator(properties));
         IdentityManagerImpl appIdentityManager =
@@ -185,7 +184,8 @@ class Kernel {
             setupService(taskServiceClass, serviceList,
                          DEFAULT_TASK_MANAGER, managerSet, properties,
                          systemRegistry);
-            // FIXME: add the channel service support when it's ready
+            // FIXME: add the channel service support when it's ready,
+            // and probably also the session service
             /*setupService(DEFAULT_CHANNEL_SERVICE, serviceList,
               DEFAULT_CHANNEL_MANAGER, managerSet, properties,
               systemRegistry);*/
@@ -239,6 +239,24 @@ class Kernel {
     }
 
     /**
+     * Creates a service with no manager based on fully qualified class names.
+     */
+    private Service createService(Class<?> serviceClass,
+                                  Properties serviceProperties,
+                                  ComponentRegistryImpl systemRegistry)
+        throws Exception
+    {
+        // find the class and constructor
+        Constructor<?> serviceConstructor =
+            serviceClass.getConstructor(Properties.class,
+                                        ComponentRegistry.class);
+
+        // return a new instance
+        return (Service)(serviceConstructor.newInstance(serviceProperties,
+                                                        systemRegistry));
+    }
+
+    /**
      * Creates a service and its associated manager based on fully qualified
      * class names.
      */
@@ -249,17 +267,14 @@ class Kernel {
                               ComponentRegistryImpl systemRegistry)
         throws Exception
     {
-        // make sure we can resolve the two classes
+        // get the service class and instance
         Class<?> serviceClass = Class.forName(serviceName);
-        Class<?> managerClass = Class.forName(managerName);
+        Service service =
+            createService(serviceClass, serviceProperties, systemRegistry);
 
-        // find the appropriate constructors for both service and manager,
-        // which is easy for the service...
-        Constructor<?> serviceConstructor =
-            serviceClass.getConstructor(Properties.class,
-                                        ComponentRegistry.class);
-        // ...but requires more work for the manager, because its constructor
-        // is probably taking a super-type of the service
+        // resolve the class and the constructor, checking for constructors
+        // by type since they likely take a super-type of Service
+        Class<?> managerClass = Class.forName(managerName);
         Constructor<?> [] constructors = managerClass.getConstructors();
         Constructor<?> managerConstructor = null;
         for (int i = 0; i < constructors.length; i++) {
@@ -277,10 +292,8 @@ class Kernel {
             throw new NoSuchMethodException("Could not find a constructor " +
                                             "that accepted the Service");
 
-        // create both instances, putting them into their collections
-        Service service =
-            (Service)(serviceConstructor.newInstance(serviceProperties,
-                                                     systemRegistry));
+        // create the manager, and put both service and manager in their
+        // respective collections
         managerSet.add(managerConstructor.newInstance(service));
         serviceList.add(service);
     }
@@ -304,14 +317,26 @@ class Kernel {
      * command-line the set of applications to run. Once we have management
      * and configration facilities, this command-line list will be removed.
      * <p>
-     * com.sun.sgs.{AppName}.appListenerClass
-     * com.sun.sgs.{AppName}.rootDir
-     *
-     * com.sun.sgs.channelService
-     * com.sun.sgs.dataService
-     * com.sun.sgs.taskService 
+     * Each arguent on the command-line is considered to be the name of an
+     * application to run. For each application, the values of two properties
+     * need to be supplied: <code>com.sun.sgs.{AppName}.appListenerClass</code>
+     * and <code>com.sun.sgs.{AppName}.rootDir</code>. These will be provided
+     * to all components and <code>Service</code>s as the properties
+     * <code>com.sun.sgs.appListenerClass</code> and
+     * <code>com.sun.sgs.rootDir</code> respectively. The name of the
+     * application will also be provided as <code>com.sun.sgs.appName</code>.
+     * <p>
+     * Optionally, the properties <code>com.sun.sgs.channelService</code>,
+     * <code>com.sun.sgs.dataService</code>, and
+     * <code>com.sun.sgs.taskService</code> may be specified to use the
+     * given service implementation for all applications. If any of these
+     * properties is not specified, then the respective default service
+     * is used.
      *
      * @param args the applications to run
+     *
+     * @throws Exception if there is any problem starting the system or
+     *                   any of the applications
      */
     public static void main(String [] args) throws Exception {
         // for now, we'll just use the system properties for everything
@@ -325,16 +350,19 @@ class Kernel {
             Properties appProperties = new Properties(systemProperties);
             appProperties.setProperty("com.sun.sgs.appName", args[i]);
 
+            // set the root property
+            String rootDir =
+                appProperties.getProperty("com.sun.sgs." + args[i] +
+                                          ".rootDir");
+            appProperties.setProperty("com.sun.sgs.rootDir", rootDir);
+
             // get the listener class
             String app =
                 appProperties.getProperty("com.sun.sgs." + args[i] +
                                           ".appListenerClass");
             appProperties.setProperty("com.sun.sgs.appListenerClass", app);
 
-            // get the database location
-            String rootDir =
-                appProperties.getProperty("com.sun.sgs." + args[i] +
-                                          ".rootDir");
+            // set the database location
             appProperties.setProperty("com.sun.sgs.impl.service.data.store." +
                                       "DataStoreImpl.directory",
                                       rootDir + "/dsdb");

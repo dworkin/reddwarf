@@ -11,7 +11,7 @@ import com.sun.sgs.kernel.TaskReservation;
  * This interface is used to define a scheduler that is tied to a single
  * application. It is used by a <code>SystemScheduler</code> to handle
  * the tasks it recieves that are associated with a given application.
- * Implementations of this interface are essentialy just reponsible for
+ * Implementations of this interface are essentially just responsible for
  * ordering the tasks associated with a given application.
  *
  * @since 1.0

@@ -71,6 +71,8 @@ public interface Service {
      *              transaction
      *
      * @throws IllegalStateException if this method has already been called
+     * @throws RuntimeException if there is any trouble configuring this
+     *                          <code>Service</code>
      */
     public void configure(ComponentRegistry registry, TransactionProxy proxy);
 

@@ -14,45 +14,31 @@ import com.sun.sgs.auth.IdentityCredentials;
 public class NamePasswordCredentials implements IdentityCredentials
 {
 
+    /**
+     * The identifier for this type of credentials.
+     */
+    public static final String TYPE_IDENTIFIER = "NameAndPasswordCredentials";
+
     // the name and password
     private final String name;
     private final char [] password;
 
-    // identifier for the authenticating mechanism
-    private final String authenticatorId;
-
     /**
-     * Creates an instance of <code>NamePasswordCredentials</code> for use
-     * with its default authentication mechanism.
+     * Creates an instance of <code>NamePasswordCredentials</code>.
      *
      * @param name the name
      * @param password the password
      */
     public NamePasswordCredentials(String name, char [] password) {
-        this(name, password, NamePasswordAuthenticator.IDENTIFIER);
-    }
-
-    /**
-     * Creates an instance of <code>NamePasswordCredentials</code> for use
-     * with a specific authentication mechanism. This is typically used when
-     * more than mechanism is implemented that knows how to do authentication
-     * based on using a name and password.
-     *
-     * @param name the name
-     * @param password the password
-     */
-    public NamePasswordCredentials(String name, char [] password,
-                                   String authenticatorId) {
         this.name = name;
         this.password = password;
-        this.authenticatorId = authenticatorId;
     }
 
     /**
      * {@inheritDoc}
      */
-    public String getAuthenticatorId() {
-        return authenticatorId;
+    public String getCredentialsType() {
+        return TYPE_IDENTIFIER;
     }
 
     /**

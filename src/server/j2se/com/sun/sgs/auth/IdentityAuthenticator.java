@@ -1,6 +1,8 @@
 
 package com.sun.sgs.auth;
 
+import com.sun.sgs.kernel.KernelAppContext;
+
 import javax.security.auth.login.LoginException;
 
 
@@ -26,13 +28,26 @@ public interface IdentityAuthenticator
 {
 
     /**
-     * Returns this <code>IdentityAuthenticator</code>s identifier. This
-     * is the same identifier used by <code>IdentityCredentials</code>s to
-     * identify their authentication mechanism.
+     * Returns the identifiers for this <code>IdentityAuthenticator</code>'s
+     * supported credential types. This may contain any number of
+     * identifiers, which are matched against the identifier of
+     * <code>IdentityCredential</code>s to determine if this
+     * <code>IdentityAuthenticator</code> can consume those credentials.
      *
-     * @return this authenticator's identifier
+     * @return the identifiers for the supported credential types
      */
-    public String getIdentifier();
+    public String [] getSupportedCredentialTypes();
+
+    /**
+     * Tells this <code>IdentityAuthenticator</code> the context in which
+     * it is running. This should only be called once for the lifetime of
+     * this authenticator.
+     *
+     * @param context the context in which identities are authenticated
+     *
+     * @throws IllegalStateException if the context has already been assigned
+     */
+    public void assignContext(KernelAppContext context);
 
     /**
      * Authenticates the given credentials. The returned <code>Identity</code>
