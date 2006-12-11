@@ -5,6 +5,7 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
+import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyManagedObject;
@@ -14,10 +15,16 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
 import java.util.Random;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import junit.framework.TestCase;
 
 /** Test concurrent operation. */
 public class TestConcurrent extends TestCase {
+
+    /** Logger for this test. */
+    private static final LoggerWrapper logger =
+	new LoggerWrapper(Logger.getLogger(TestConcurrent.class.getName()));
 
     /** The name of the DataStoreImpl class. */
     private static final String DataStoreImplClass =
@@ -91,7 +98,7 @@ public class TestConcurrent extends TestCase {
 	    new DummyComponentRegistry();
 	DataServiceImpl service =
 	    new DataServiceImpl(props, componentRegistry);
-	DummyTransaction txn = new DummyTransaction();
+	DummyTransaction txn = new DummyTransaction(true);
 	txnProxy.setCurrentTransaction(txn);
 	service.configure(componentRegistry, txnProxy);
 	txn.commit();
@@ -184,7 +191,7 @@ public class TestConcurrent extends TestCase {
 		    t.commit();
 		    createTxn();
 		}
-		String name = "obj-" + (1 + random.nextInt(objects));
+		String name = "obj-" + (1 + random.nextInt(objects * threads));
 		switch (random.nextInt(6)) {
 		case 0:
 		    try {
@@ -230,7 +237,9 @@ public class TestConcurrent extends TestCase {
 		    throw new AssertionError();
 		}
 	    } catch (TransactionAbortedException e) {
-		System.err.println(this + ": " + e);
+		if (logger.isLoggable(Level.FINE)) {
+		    logger.log(Level.FINE, "{0}: {1}", this, e);
+		}
 		aborts++;
 		if (txn != null) {
 		    txn.abort();
@@ -240,7 +249,7 @@ public class TestConcurrent extends TestCase {
 	}
 
 	private void createTxn() {
-	    txn = new DummyTransaction();
+	    txn = new DummyTransaction(true);
 	    txnProxy.setCurrentTransaction(txn);
 	}
     }
