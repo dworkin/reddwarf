@@ -30,6 +30,10 @@ import java.util.Set;
  * to do so.  The {@link #put put} and {@link #putAll putAll} methods enforce
  * these restrictions. <p>
  *
+ * The values returned by the <code>entrySet</code>, <code>keySet</code>, and
+ * <code>values</code> methods, and their associated iterators, are not
+ * serializable. <p>
+ *
  * This implementation is not synchronized.
  *
  * @param	<K> the type of the keys stored in the map
@@ -65,7 +69,8 @@ public class SimpleManagedHashMap<K, V>
     public SimpleManagedHashMap() { }
 
     /**
-     * Creates a map with the specified mappings.
+     * Creates a map with the specified mappings.  The keys and values in the
+     * map can be <code>null</code>.
      *
      * @param	map the mappings to place in this map
      * @throws	IllegalArgumentException if <code>map</code> contains keys or
@@ -79,19 +84,37 @@ public class SimpleManagedHashMap<K, V>
 
     /* -- Query operations -- */
 
-    /** {@inheritDoc} */
+    /**
+     * Returns the number of mappings in this map.
+     *
+     * @return	the number of mappings in this map
+     */
     public int size() {
 	return map.size();
     }
 
     /* Inherit AbstractMap.isEmpty */
 
-    /** {@inheritDoc} */
+    /**
+     * Returns <code>true</code> if this map contains a mapping for the
+     * specified key, which can be <code>null</code>.
+     *
+     * @param   key the key whose presence in this map is to be tested
+     * @return	<code>true</code> if this map contains a mapping for the
+     *		specified key, else <code>false</code>
+     */
     public boolean containsKey(Object key) {
 	return map.containsKey(key);
     }
 
-    /** {@inheritDoc} */
+    /**
+     * Returns <code>true</code> if this map maps one or more keys to the
+     * specified value, which can be <code>null</code>.
+     *
+     * @param	value the value whose presence in this map is to be tested
+     * @return	<code>true</code> if this map maps one or more keys to the
+     *		specified value, else <code>false</code>
+     */
     public boolean containsValue(Object value) {
 	/*
 	 * It's OK to do this cast because the result will just be false if the
@@ -102,7 +125,20 @@ public class SimpleManagedHashMap<K, V>
 	return map.containsValue(new Value<V>(v));
     }
 
-    /** {@inheritDoc} */
+    /**
+     * Returns the value to which the specified key is mapped in this map, or
+     * <code>null</code> if the map contains no mapping for this key.  The key
+     * can be <code>null</code>.  A return value of <code>null</code> does not
+     * <i>necessarily</i> indicate that the map contains no mapping for the
+     * key; it is also possible that the map explicitly maps the key to
+     * <code>null</code>. The <code>containsKey</code> method may be used to
+     * distinguish these two cases.
+     *
+     * @param   key the key whose associated value is to be returned
+     * @return  the value to which this map maps the specified key, or
+     *          <code>null</code> if the map contains no mapping for this key
+     * @see	#put(Object, Object) put
+     */
     public V get(Object key) {
 	return dereference(map.get(key));
     }
@@ -110,8 +146,16 @@ public class SimpleManagedHashMap<K, V>
     /* -- Modification operations -- */
 
     /**
-     * {@inheritDoc} <p>
+     * Associates the specified value with the specified key in this map.  If
+     * the map previously contained a mapping for this key, the old value is
+     * replaced.  The key and the value can be <code>null</code>.
      *
+     * @param	key the key with which the specified value is to be associated
+     * @param	value the value to be associated with the specified key
+     * @return	the previous value associated with specified key, or
+     *		<code>null</code> if there was no mapping for key.  A
+     *		<code>null</code> return can also indicate that this map
+     *		previously associated <code>null</code> with the specified key.
      * @throws	IllegalArgumentException if either <code>key</code> or
      *		<code>value</code> is not <code>null</code> and does not
      *		implement {@link Serializable}, or if <code>key</code>
@@ -132,7 +176,16 @@ public class SimpleManagedHashMap<K, V>
 	return dereference(map.put(key, new Value<V>(value)));
     }
 
-    /** {@inheritDoc} */
+    /**
+     * Removes the mapping for this key from this map if present.  The key can
+     * be <code>null</code>.
+     *
+     * @param	key the key whose mapping is to be removed from the map
+     * @return	the previous value associated with specified key, or
+     *		<code>null</code> if there was no mapping for key.  A
+     *		<code>null</code> return can also indicate that the map
+     *		previously associated <code>null</code> with the specified key.
+     */
     public V remove(Object key) {
 	getDataManager().markForUpdate(this);
 	return dereference(map.remove(key));
@@ -141,8 +194,12 @@ public class SimpleManagedHashMap<K, V>
     /* -- Bulk operations -- */
 
     /**
-     * {@inheritDoc} <p>
+     * Copies all of the mappings from the specified map to this map.  These
+     * mappings will replace any mappings that this map had for any of the keys
+     * currently in the specified map.  The keys and values in the map can be
+     * <code>null</code>.
      *
+     * @param	map mappings to be stored in this map
      * @throws	IllegalArgumentException if <code>map</code> contains keys or
      *		values that are not <code>null</code> and do not implement
      *		{@link Serializable}, or keys that implement {@link
@@ -186,7 +243,7 @@ public class SimpleManagedHashMap<K, V>
 	}
     }
 
-    /** {@inheritDoc} */
+    /** Removes all mappings from this map. */
     public void clear() {
 	getDataManager().markForUpdate(this);
 	map.clear();
@@ -198,7 +255,20 @@ public class SimpleManagedHashMap<K, V>
 
     /* Inherit AbstractMap.values */
 
-    /** {@inheritDoc} */
+    /**
+     * Returns a collection view of the mappings contained in this map.  Each
+     * element in the returned collection is an {@link Entry}.  The collection
+     * is backed by the map, so changes to the map are reflected in the
+     * collection, and vice-versa.  The collection supports element removal,
+     * which removes the corresponding mapping from the map, via the
+     * <code>Iterator.remove</code>, <code>Collection.remove</code>,
+     * <code>removeAll</code>, <code>retainAll</code>, and <code>clear</code>
+     * operations.  It does not support the <code>add</code> or
+     * <code>addAll</code> operations.
+     *
+     * @return	a collection view of the mappings contained in this map.
+     * @see	Entry
+     */
     public Set<Entry<K, V>> entrySet() {
 	if (entrySet == null) {
 	    entrySet = new EntrySet();
@@ -304,6 +374,15 @@ public class SimpleManagedHashMap<K, V>
 
     /* -- Other classes and methods -- */
 
+    /**
+     * This method always throws <code>CloneNotSupportedException</code>.
+     *
+     * @throws	CloneNotSupportedException whenever this method is called
+     */
+    protected Object clone() throws CloneNotSupportedException {
+	throw new CloneNotSupportedException();
+    }
+
     /** Stores a value that is a managed object or is just serializable. */
     private static class Value<V> implements Serializable {
 	private static final long serialVersionUID = 1;
@@ -360,6 +439,7 @@ public class SimpleManagedHashMap<K, V>
 	}
 
 	private void writeObject(ObjectOutputStream s) throws IOException {
+	    s.defaultWriteObject();
 	    if (ref != null) {
 		s.writeBoolean(true);
 		s.writeObject(ref);
@@ -373,6 +453,7 @@ public class SimpleManagedHashMap<K, V>
 	private void readObject(ObjectInputStream s)
 	    throws IOException, ClassNotFoundException
 	{
+	    s.defaultReadObject();
 	    boolean isRef = s.readBoolean();
 	    if (isRef) {
 		ref = (ManagedReference) s.readObject();
