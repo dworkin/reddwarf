@@ -21,6 +21,8 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TransactionRunner;
 
+import java.io.File;
+
 import java.lang.reflect.Constructor;
 
 import java.util.ArrayList;
@@ -94,8 +96,7 @@ class Kernel {
      * @throws Exception if for any reason the kernel cannot be started
      */
     protected Kernel(Properties systemProperties) throws Exception {
-        if (logger.isLoggable(Level.CONFIG))
-            logger.log(Level.CONFIG, "Booting the Kernel");
+        logger.log(Level.CONFIG, "Booting the Kernel");
 
         // initialize our data structures
         systemComponents = new HashSet<Object>();
@@ -128,12 +129,11 @@ class Kernel {
             systemComponents.add(scheduler);
         } catch (Exception e) {
             if (logger.isLoggable(Level.SEVERE))
-                logger.log(Level.SEVERE, "Failed on Kernel boot", e);
+                logger.logThrow(Level.SEVERE, e, "Failed on Kernel boot");
             throw e;
         }
 
-        if (logger.isLoggable(Level.CONFIG))
-            logger.log(Level.CONFIG, "The Kernel is ready");
+        logger.log(Level.CONFIG, "The Kernel is ready");
     }
 
     /**
@@ -191,7 +191,7 @@ class Kernel {
               systemRegistry);*/
         } catch (Exception e) {
             if (logger.isLoggable(Level.SEVERE))
-                logger.log(Level.SEVERE, "Couldn't setup service", e);
+                logger.logThrow(Level.SEVERE, e, "Could not setup service");
             throw e;
         }
 
@@ -219,7 +219,8 @@ class Kernel {
             scheduler.registerApplication(appContext);
         } catch (Exception e) {
             if (logger.isLoggable(Level.SEVERE))
-                logger.log(Level.SEVERE, "Couldn't setup app scheduler", e);
+                logger.logThrow(Level.SEVERE, e,
+                                "Couldn't setup app scheduler");
             throw e;
         }
         ServiceConfigRunner configRunner =
@@ -233,7 +234,8 @@ class Kernel {
             scheduler.scheduleTask(transactionRunner, owner);
         } catch (Exception e) {
             if (logger.isLoggable(Level.SEVERE))
-                logger.log(Level.SEVERE, "Couldn't start configuration", e);
+                logger.logThrow(Level.SEVERE, e,
+                                "Could not start configuration");
             throw e;
         }
     }
@@ -365,7 +367,7 @@ class Kernel {
             // set the database location
             appProperties.setProperty("com.sun.sgs.impl.service.data.store." +
                                       "DataStoreImpl.directory",
-                                      rootDir + "/dsdb");
+                                      rootDir + File.separator + "dsdb");
 
             // get the (optional) services
             if (! appProperties.containsKey("com.sun.sgs.channelService"))

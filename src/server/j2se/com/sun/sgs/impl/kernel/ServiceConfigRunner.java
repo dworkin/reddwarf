@@ -94,8 +94,9 @@ class ServiceConfigRunner implements KernelRunnable {
                 service.configure(serviceComponents, proxy);
             } catch (Exception e) {
                 if (logger.isLoggable(Level.CONFIG))
-                    logger.log(Level.CONFIG, "{1}: failed to configure " +
-                               " service {2}", e, appName, service.getName());
+                    logger.logThrow(Level.CONFIG, e, "{1}: failed to " +
+                                    "configure service {2}",
+                                    appName, service.getName());
                 throw e;
             }
             serviceComponents.addComponent(service);
@@ -117,8 +118,8 @@ class ServiceConfigRunner implements KernelRunnable {
                 scheduleNonDurableTask(transactionRunner);
         } catch (Exception e) {
             if (logger.isLoggable(Level.CONFIG))
-                logger.log(Level.CONFIG, "{0}: failed to schedule app " +
-                           "startup task", e, appName);
+                logger.logThrow(Level.CONFIG, e, "{0}: failed to schedule " +
+                                "app startup task", appName);
             throw e;
         }
 

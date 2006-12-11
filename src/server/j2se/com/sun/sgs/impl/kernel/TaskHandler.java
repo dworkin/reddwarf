@@ -107,8 +107,7 @@ public final class TaskHandler {
     public static void runTransactionalTask(KernelRunnable task)
         throws Exception
     {
-        if (logger.isLoggable(Level.FINEST))
-            logger.log(Level.FINEST, "starting a new transactional context");
+        logger.log(Level.FINEST, "starting a new transactional context");
 
         // create a new transaction and set it as currently active
         TransactionHandle handle = transactionCoordinator.createTransaction();

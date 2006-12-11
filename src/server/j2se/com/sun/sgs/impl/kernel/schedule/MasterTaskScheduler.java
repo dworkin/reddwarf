@@ -91,8 +91,7 @@ public class MasterTaskScheduler implements TaskScheduler {
                                TaskHandler taskHandler)
         throws Exception
     {
-        if (logger.isLoggable(Level.CONFIG))
-            logger.log(Level.CONFIG, "Creating the Master Task Scheduler");
+        logger.log(Level.CONFIG, "Creating the Master Task Scheduler");
 
         String systemSchedulerName =
             properties.getProperty(SYSTEM_SCHEDULER_PROPERTY,
@@ -148,8 +147,7 @@ public class MasterTaskScheduler implements TaskScheduler {
     public void registerProfilingManager(ProfilingManager manager) {
         // FIXME: lookup or create the reporter and provide to the manager
         // once we start the profiling work and define these interfaces
-        if (logger.isLoggable(Level.CONFIG))
-            logger.log(Level.CONFIG, "Registering profiling manager");
+        logger.log(Level.CONFIG, "Registering profiling manager");
     }
 
     /**

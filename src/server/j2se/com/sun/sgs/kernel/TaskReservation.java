@@ -13,14 +13,6 @@ package com.sun.sgs.kernel;
  * If this reservation includes tasks scheduled to be run at a specified time,
  * and that time has already passed when <code>use</code> is called, then
  * the tasks are run immediately.
- * <p>
- * Implementations of this interface are not assumed to be thread-safe. That
- * is, if users of <code>TaskReservation</code>s pass reservations between
- * threads that might call cancel or start, then access must be synchronized
- * by the user. This requirement is made because most cases only involve
- * a single thread interacting with a transaction for a very short period of
- * time, so usually there is no need for the overhead involed in syncronizing
- * access.
  *
  * @since 1.0
  * @author Seth Proctor

@@ -7,6 +7,7 @@ import com.sun.sgs.auth.Identity;
 
 import com.sun.sgs.kernel.KernelAppContext;
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -16,6 +17,7 @@ import java.io.StreamTokenizer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Properties;
 
@@ -63,7 +65,7 @@ public class NamePasswordAuthenticator implements IdentityAuthenticator
     /**
      * Creates an instance of <code>NamePasswordAuthenticator</code>.
      *
-     * @param properties the application's non-null configuration properties
+     * @param properties the application's configuration properties
      *
      * @throws FileNotFoundException if the password file cannot be found
      * @throws IOException if any error occurs reading the password file
@@ -79,21 +81,21 @@ public class NamePasswordAuthenticator implements IdentityAuthenticator
         String passFile = properties.getProperty(PASSWORD_FILE_PROPERTY);
         if (passFile == null) {
             String root = properties.getProperty("com.sun.sgs.rootDir");
-            passFile = root + "/" + DEFAULT_FILE_NAME;
+            passFile = root + File.separator + DEFAULT_FILE_NAME;
         }
 
         // load the passwords
         FileInputStream in = new FileInputStream(passFile);
         StreamTokenizer stok = new StreamTokenizer(new InputStreamReader(in));
         stok.eolIsSignificant(false);
-        stok.wordChars('0', '0' + 16);
+        //stok.wordChars('0', '0' + 16);
         passwordMap = new HashMap<String,byte[]>();
         while (stok.nextToken() != StreamTokenizer.TT_EOF) {
             String name = stok.sval;
             if (stok.nextToken() == StreamTokenizer.TT_EOF)
                 throw new IOException("Unexpected EOL at line " +
                                       stok.lineno());
-            byte [] password = decodeBytes(stok.sval.getBytes());
+            byte [] password = decodeBytes(stok.sval.getBytes("UTF-8"));
             passwordMap.put(name, password);
         }
 
@@ -116,8 +118,8 @@ public class NamePasswordAuthenticator implements IdentityAuthenticator
         byte [] decoded = new byte[bytes.length / 2];
         for (int i = 0; i < decoded.length; i++) {
             int encodedIndex = i * 2;
-            decoded[i] = (byte)(((bytes[encodedIndex] - '0') << 4) +
-                                (bytes[encodedIndex + 1] - '0'));
+            decoded[i] = (byte)(((bytes[encodedIndex] - 'a') << 4) +
+                                (bytes[encodedIndex + 1] - 'a'));
         }
         return decoded;
     }
@@ -137,8 +139,8 @@ public class NamePasswordAuthenticator implements IdentityAuthenticator
         byte [] encoded = new byte[bytes.length * 2];
         for (int i = 0; i < bytes.length; i++) {
             int encodedIndex = i * 2;
-            encoded[encodedIndex] = (byte)(((bytes[i] & 0xF0) >> 4) + '0');
-            encoded[encodedIndex + 1] = (byte)((bytes[i] & 0x0F) + '0');
+            encoded[encodedIndex] = (byte)(((bytes[i] & 0xF0) >> 4) + 'a');
+            encoded[encodedIndex + 1] = (byte)((bytes[i] & 0x0F) + 'a');
         }
         return encoded;
     }
@@ -188,15 +190,18 @@ public class NamePasswordAuthenticator implements IdentityAuthenticator
         byte [] pass = null;
         synchronized (digest) {
             digest.reset();
-            pass = digest.digest((new String(npc.getPassword())).getBytes());
+            try {
+                pass = digest.digest((new String(npc.getPassword())).
+                                     getBytes("UTF-8"));
+            } catch (IOException ioe) {
+                throw new CredentialException("Could not get password: " +
+                                              ioe.getMessage());
+            }
         }
         
         // verify that the hashes match
-        if (validPass.length != pass.length)
+        if (! Arrays.equals(validPass, pass))
             throw new CredentialException("Invalid credentials");
-        for (int i = 0; i < validPass.length; i++)
-            if (validPass[i] != pass[i])
-                throw new CredentialException("Invalid credentials");
 
         return new IdentityImpl(name);
     }

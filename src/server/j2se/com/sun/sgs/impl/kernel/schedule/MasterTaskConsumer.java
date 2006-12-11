@@ -42,8 +42,7 @@ class MasterTaskConsumer implements Runnable {
      * @param taskHandler the system's <code>TaskHandler</code>
      */
     MasterTaskConsumer(SystemScheduler scheduler, TaskHandler taskHandler) {
-        if (logger.isLoggable(Level.CONFIG))
-            logger.log(Level.CONFIG, "Creating a new Master Task Consumer");
+        logger.log(Level.CONFIG, "Creating a new Master Task Consumer");
 
         this.scheduler = scheduler;
         this.taskHandler = taskHandler;
@@ -55,8 +54,8 @@ class MasterTaskConsumer implements Runnable {
      * appropriate.
      */
     public void run() {
-        if (logger.isLoggable(Level.FINE))
-            logger.log(Level.FINE, "Starting a Master Task Consumer");
+        logger.log(Level.FINE, "Starting a Master Task Consumer");
+
         while (true) {
             // wait for the next task...if we get interrupted while waiting,
             // then we'll loop back and try again
@@ -88,10 +87,10 @@ class MasterTaskConsumer implements Runnable {
                         // for optimization
                     } else {
                         if (logger.isLoggable(Level.FINE))
-                            logger.logThrow(Level.FINE,
+                            logger.logThrow(Level.FINE, e,
                                             "dropping a failed task that " +
-                                            "didn't ask to be re-tried: {0}",
-                                            e, task);
+                                            "did not ask to be re-tried: {0}",
+                                            task);
                         taskFinished = true;
                     }
                 }

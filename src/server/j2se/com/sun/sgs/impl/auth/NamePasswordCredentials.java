@@ -31,7 +31,7 @@ public class NamePasswordCredentials implements IdentityCredentials
      */
     public NamePasswordCredentials(String name, char [] password) {
         this.name = name;
-        this.password = password;
+        this.password = password.clone();
     }
 
     /**
@@ -56,7 +56,7 @@ public class NamePasswordCredentials implements IdentityCredentials
      * @return the password
      */
     public char [] getPassword() {
-        return password;
+        return password.clone();
     }
 
 }

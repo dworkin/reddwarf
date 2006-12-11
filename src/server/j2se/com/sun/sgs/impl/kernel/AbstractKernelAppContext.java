@@ -133,8 +133,7 @@ abstract class AbstractKernelAppContext implements KernelAppContext {
 
         AbstractKernelAppContext other = (AbstractKernelAppContext)o;
 
-        return ((other.applicationCode == applicationCode) &&
-                (other.applicationName.equals(applicationName)));
+        return other.applicationName.equals(applicationName);
     }
 
     /**

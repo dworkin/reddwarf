@@ -65,12 +65,12 @@ class IdentityManagerImpl implements IdentityManager
         for (IdentityAuthenticator authenticator : authenticators) {
             String [] identifiers =
                 authenticator.getSupportedCredentialTypes();
-            for (int i = 0; i < identifiers.length; i++) {
+            for (String identifier : identifiers) {
                 List<IdentityAuthenticator> list =
-                    authenticatorMap.get(identifiers[i]);
+                    authenticatorMap.get(identifier);
                 if (list == null) {
                     list = new ArrayList<IdentityAuthenticator>();
-                    authenticatorMap.put(identifiers[i], list);
+                    authenticatorMap.put(identifier, list);
                 }
                 list.add(authenticator);
             }
@@ -119,9 +119,10 @@ class IdentityManagerImpl implements IdentityManager
                 // authenticators since some of them might be expected
                 // behavior. So, for now, these errors are being ignored
                 if (logger.isLoggable(Level.FINEST))
-                    logger.log(Level.FINEST, "Could not authenticate " +
-                               "credentials with authenticator {0}",
-                               authenticator.getClass().getName(), le);
+                    logger.logThrow(Level.FINEST, le, "Could not " +
+                                    "authenticate credentials with " +
+                                    "authenticator {0}",
+                                    authenticator.getClass().getName());
             }
         }
 

@@ -126,9 +126,8 @@ class FIFOApplicationScheduler
     public RecurringTaskHandle addRecurringTask(ScheduledTask task) {
         FIFORecurringHandle handle = new FIFORecurringHandle(this, task);
         if (! task.setRecurringTaskHandle(handle)) {
-            if (logger.isLoggable(Level.SEVERE))
-                logger.log(Level.SEVERE, "a scheduled task was given a " +
-                           "new RecurringTaskHandle");
+            logger.log(Level.SEVERE, "a scheduled task was given a new " +
+                       "RecurringTaskHandle");
             throw new IllegalArgumentException("cannot re-assign handle");
         }
         return handle;
@@ -157,10 +156,12 @@ class FIFOApplicationScheduler
             finished = true;
         }
         public void use() {
-            if (finished)
-                throw new IllegalStateException("cannot use reservation");
+            synchronized (this) {
+                if (finished)
+                    throw new IllegalStateException("cannot use reservation");
+                finished = true;
+            }
             scheduler.addTask(task);
-            finished = true;
         }
     }
 
@@ -233,9 +234,11 @@ class FIFOApplicationScheduler
             return task.getStartTime();
         }
         public void run() {
-            if (! cancelled)
-                scheduler.addTimedTask(task);
-            cancelled = true;
+            synchronized (this) {
+                if (! cancelled)
+                    scheduler.addTimedTask(task);
+                cancelled = true;
+            }
         }
     }
 

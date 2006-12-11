@@ -179,7 +179,8 @@ public class TaskServiceImpl
                 dataService.setServiceBinding(DS_PENDING_TASKS, pmap);
             } catch (RuntimeException re) {
                 if (logger.isLoggable(Level.SEVERE))
-                    logger.log(Level.SEVERE, "failed to bind pending map", re);
+                    logger.logThrow(Level.SEVERE, re,
+                                    "failed to bind pending map");
                 throw re;
             }
         }
@@ -303,7 +304,8 @@ public class TaskServiceImpl
         // make sure that we were already called to prepare
         if (! txnState.prepared) {
             if (logger.isLoggable(Level.WARNING))
-                logger.log(Level.WARNING, "weren't prepared for txn:{0}", txn);
+                logger.log(Level.WARNING, "were not prepared for txn:{0}",
+                           txn);
             throw new IllegalStateException("TaskService " + NAME + " has " +
                                             "not been prepared");
         }
@@ -542,7 +544,8 @@ public class TaskServiceImpl
                     taskScheduler.reserveTask(task, owner, startTime);
         } catch (TaskRejectedException tre) {
             if (logger.isLoggable(Level.FINE))
-                logger.log(Level.FINE, "couldn't get a reservation", tre);
+                logger.logThrow(Level.FINE, tre,
+                                "could not get a reservation");
             throw tre;
         }
 
@@ -617,8 +620,9 @@ public class TaskServiceImpl
                                        transactionProxy.getCurrentOwner());
         } catch (TaskRejectedException tre) {
             if (logger.isLoggable(Level.WARNING))
-                logger.log(Level.WARNING, "couldn't schedule task to remove " +
-                           "non-retried task {0}: giving up", tre, objName);
+                logger.logThrow(Level.WARNING, tre, "could not schedule " +
+                                "task to remove non-retried task {0}: " +
+                                "giving up", objName);
             throw tre;
         }
     }

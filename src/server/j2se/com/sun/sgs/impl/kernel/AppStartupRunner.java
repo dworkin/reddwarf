@@ -90,8 +90,9 @@ class AppStartupRunner implements KernelRunnable {
                 listener.startingUp(properties);
             } catch (Exception e) {
                 if (logger.isLoggable(Level.SEVERE))
-                    logger.log(Level.SEVERE, "{0}: couldn't start application",
-                               e, appContext);
+                    logger.logThrow(Level.SEVERE, e,
+                                    "{0}: could not start application",
+                                    appContext);
                 throw e;
             }
         }

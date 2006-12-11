@@ -62,18 +62,4 @@ class SystemIdentity implements Identity
         logger.log(Level.SEVERE, "System identity notified of logout");
     }
 
-    /**
-     * {@inheritDoc}
-     */
-    public boolean equals(Object o) {
-        return ((o == null) || (! (o instanceof SystemIdentity)));
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public int hashCode() {
-        return "System".hashCode();
-    }
-
 }

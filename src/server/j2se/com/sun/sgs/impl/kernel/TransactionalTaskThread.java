@@ -62,6 +62,11 @@ final class TransactionalTaskThread extends TaskThread {
         if (currentTransaction != null)
             throw new IllegalStateException("an active transaction is " +
                                             "currently running");
+        if (Thread.currentThread() != this)
+            throw new IllegalStateException("Cannot set the transaction of " +
+                                            "a thread other than the " +
+                                            "current thread");
+
         currentTransaction = transaction;
     }
 

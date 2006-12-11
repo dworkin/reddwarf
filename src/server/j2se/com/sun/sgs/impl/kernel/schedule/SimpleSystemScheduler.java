@@ -44,8 +44,7 @@ class SimpleSystemScheduler implements SystemScheduler, ProfilingConsumer {
      * Creates a new instance of <code>SimpleSystemScheduler</code>.
      */
     public SimpleSystemScheduler(Properties properties) {
-        if (logger.isLoggable(Level.CONFIG))
-            logger.log(Level.CONFIG, "Creating a Simple System Scheduler");
+        logger.log(Level.CONFIG, "Creating a Simple System Scheduler");
 
         appSchedulers =
             new ConcurrentHashMap<KernelAppContext,ApplicationScheduler>();
