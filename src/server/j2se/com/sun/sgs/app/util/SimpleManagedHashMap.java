@@ -60,7 +60,8 @@ public class SimpleManagedHashMap<K, V>
      *
      * @serial
      */
-    private final Map<K, Value<V>> map = new HashMap<K, Value<V>>();
+    private final Map<K, PersistentReference<V>> map =
+	new HashMap<K, PersistentReference<V>>();
 
     /** The entry set, or null if not yet created. */
     private transient Set<Entry<K, V>> entrySet = null;
@@ -116,13 +117,7 @@ public class SimpleManagedHashMap<K, V>
      *		specified value, else <code>false</code>
      */
     public boolean containsValue(Object value) {
-	/*
-	 * It's OK to do this cast because the result will just be false if the
-	 * cast is wrong.
-	 */
-	@SuppressWarnings("unchecked")
-	    V v = (V) value;
-	return map.containsValue(Value.create(v));
+	return map.containsValue(PersistentReference.create(value));
     }
 
     /**
@@ -140,7 +135,7 @@ public class SimpleManagedHashMap<K, V>
      * @see	#put(Object, Object) put
      */
     public V get(Object key) {
-	return Value.get(map.get(key));
+	return PersistentReference.get(map.get(key));
     }
 
     /* -- Modification operations -- */
@@ -173,7 +168,8 @@ public class SimpleManagedHashMap<K, V>
 		"The value must implement Serializable");
 	}
 	getDataManager().markForUpdate(this);
-	return Value.get(map.put(key, Value.create(value)));
+	return PersistentReference.get(
+	    map.put(key, PersistentReference.create(value)));
     }
 
     /**
@@ -188,7 +184,7 @@ public class SimpleManagedHashMap<K, V>
      */
     public V remove(Object key) {
 	getDataManager().markForUpdate(this);
-	return Value.get(map.remove(key));
+	return PersistentReference.get(map.remove(key));
     }
 
     /* -- Bulk operations -- */
@@ -239,7 +235,7 @@ public class SimpleManagedHashMap<K, V>
 		K key = (K) keys[i];
 	    @SuppressWarnings("unchecked")
 		V value = (V) values[i];
-	    this.map.put(key, Value.create(value));
+	    this.map.put(key, PersistentReference.create(value));
 	}
     }
 
@@ -314,7 +310,7 @@ public class SimpleManagedHashMap<K, V>
     /** Defines an iterator over the entries in this map. */
     private final class EntryIterator implements Iterator<Entry<K, V>> {
 
-	private final Iterator<Entry<K, Value<V>>> iterator =
+	private final Iterator<Entry<K, PersistentReference<V>>> iterator =
 	    map.entrySet().iterator();
 
 	public boolean hasNext() {
@@ -334,9 +330,9 @@ public class SimpleManagedHashMap<K, V>
     /** Defines an entry in an instance of this class. */
     private static class SimpleEntry<K, V> implements Entry<K, V> {
 
-	private final Entry<K, Value<V>> entry;
+	private final Entry<K, PersistentReference<V>> entry;
 
-	SimpleEntry(Entry<K, Value<V>> entry) {
+	SimpleEntry(Entry<K, PersistentReference<V>> entry) {
 	    this.entry = entry;
 	}
 
@@ -345,11 +341,12 @@ public class SimpleManagedHashMap<K, V>
 	}
 
 	public V getValue() {
-	    return Value.get(entry.getValue());
+	    return entry.getValue().get();
 	}
 	    
 	public V setValue(V newValue) {
-	    return Value.get(entry.setValue(Value.create(newValue)));
+	    return PersistentReference.get(
+		entry.setValue(PersistentReference.create(newValue)));
 	}
 
 	public boolean equals(Object object) {
@@ -362,7 +359,7 @@ public class SimpleManagedHashMap<K, V>
 	}
 
 	public String toString() {
-	    return entry.toString();
+	    return entry.getKey() + "=" + entry.getValue().valueToString();
 	}
     }
 

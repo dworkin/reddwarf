@@ -465,7 +465,7 @@ public class ScalableManagedHashMap<K, V>
 	ManagedReference[] tab = table;
         for (int i = 0; i < tab.length ; i++) {
             for (HashEntry e = getTableEntry(tab, i); e != null; e = e.next) {
-                if (e.value.sameValue(value)) {
+                if (e.ref.valueEquals(value)) {
                     return true;
 		}
 	    }
@@ -618,22 +618,22 @@ public class ScalableManagedHashMap<K, V>
     static final class HashEntry<K, V> implements Entry<K, V> {
         final int hash;
         final K key;
-	Value<V> value;
+	PersistentReference<V> ref;
         HashEntry<K, V> next;
 
         /** Create new entry. */
         HashEntry(int hash, K key, V value, HashEntry<K, V> next) {
             this.hash = hash;
             this.key = key;
-	    this.value = Value.create(value);
+	    ref = PersistentReference.create(value);
             this.next = next;
         }
     
 	/** Create a new entry when deserializing. */
-	HashEntry(K key, Value<V> value) {
+	HashEntry(K key, PersistentReference<V> ref) {
 	    hash = hash(key);
 	    this.key = key;
-	    this.value = value;
+	    this.ref = ref;
 	}
 
         public K getKey() {
@@ -641,12 +641,12 @@ public class ScalableManagedHashMap<K, V>
         }
 
 	public V getValue() {
-	    return value.get();
+	    return ref.get();
 	}
 
 	public V setValue(V newValue) {
-	    V oldValue = value.get();
-	    value = Value.create(newValue);
+	    V oldValue = ref.get();
+	    ref = PersistentReference.create(newValue);
 	    return oldValue;
 	}
 
@@ -656,31 +656,31 @@ public class ScalableManagedHashMap<K, V>
 	    } else if (o instanceof HashEntry) {
 		HashEntry entry = (HashEntry) o;
 		return safeEquals(key, entry.getKey()) &&
-		    value.equals(entry.value);
+		    ref.equals(entry.ref);
 	    } else if (o instanceof Entry) {
 		Entry entry = (Entry) o;
 		return safeEquals(key, entry.getKey()) &&
-		    value.sameValue(entry.getValue());
+		    ref.valueEquals(entry.getValue());
 	    } else {
 		return false;
 	    }
 	}
 
 	public int hashCode() {
-	    return (key == null ? 0 : key.hashCode()) ^ value.hashCode();
+	    return (key == null ? 0 : key.hashCode()) ^ ref.hashCode();
 	}
 
         public String toString() {
-            return getKey() + "=" + getValue();
+            return getKey() + "=" + ref.valueToString();
         }
 
 	/** Serializes this entry to a stream. */
 	void write(ObjectOutputStream s) throws IOException {
 	    /*
-	     * Write the value first, which is never null, so that we can use
+	     * Write the ref first, which is never null, so that we can use
 	     * null as the end marker.
 	     */
-	    s.writeObject(value);
+	    s.writeObject(ref);
 	    s.writeObject(key);
 	}
 
@@ -698,17 +698,18 @@ public class ScalableManagedHashMap<K, V>
 	{
 	    /* Deserialization is inherently not typesafe. */
 	    @SuppressWarnings("unchecked")
-		Value<V> value = (Value<V>) s.readObject();
+		PersistentReference<V> ref =
+		(PersistentReference<V>) s.readObject();
 	    /*
-	     * The value should never be null, so, if it is, there are no more
+	     * The ref should never be null, so, if it is, there are no more
 	     * entries.
 	     */
-	    if (value == null) {
+	    if (ref == null) {
 		return null;
 	    }
 	    @SuppressWarnings("unchecked")
 		K key = (K) s.readObject();
-	    return new HashEntry<K, V>(key, value);
+	    return new HashEntry<K, V>(key, ref);
 	}
     }
 
