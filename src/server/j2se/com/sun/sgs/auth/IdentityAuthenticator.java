@@ -53,6 +53,8 @@ public interface IdentityAuthenticator
      * Authenticates the given credentials. The returned <code>Identity</code>
      * is valid, but has not yet been notified as logged in.
      *
+     * @param credentials the <code>IdentityCredentials</code> to authenticate
+     *
      * @return an authenticated <code>Identity</code>
      *
      * @throws LoginException if authentication fails

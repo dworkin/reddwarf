@@ -22,11 +22,11 @@ import java.util.logging.Logger;
  * @since 1.0
  * @author Seth Proctor
  */
-class SystemIdentity implements Identity
+final class SystemIdentity implements Identity
 {
 
     // logger for this class
-    private static LoggerWrapper logger =
+    private static final LoggerWrapper logger =
         new LoggerWrapper(Logger.getLogger(SystemIdentity.class.getName()));
 
     /**

@@ -1,9 +1,9 @@
 
 package com.sun.sgs.impl.auth;
 
+import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityAuthenticator;
 import com.sun.sgs.auth.IdentityCredentials;
-import com.sun.sgs.auth.Identity;
 
 import com.sun.sgs.kernel.KernelAppContext;
 
@@ -167,7 +167,7 @@ public class NamePasswordAuthenticator implements IdentityAuthenticator
      * {@inheritDoc}
      * <p>
      * The provided <code>IdentityCredentials</code> must be an instance
-     * of <code>NamePasswordCredentials</code>
+     * of <code>NamePasswordCredentials</code>.
      *
      * @throws AccountNotFoundException if the identity is unknown
      * @throws CredentialException if the credentials are invalid

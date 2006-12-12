@@ -5,7 +5,6 @@ import com.sun.sgs.impl.util.LoggerWrapper;
 
 import com.sun.sgs.kernel.KernelAppContext;
 import com.sun.sgs.kernel.RecurringTaskHandle;
-import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskReservation;
 
 import java.util.Properties;

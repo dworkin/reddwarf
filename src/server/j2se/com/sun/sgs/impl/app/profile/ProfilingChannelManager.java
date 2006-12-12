@@ -5,10 +5,6 @@ import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.Delivery;
-import com.sun.sgs.app.ManagedObject;
-import com.sun.sgs.app.ManagedReference;
-
-import java.nio.ByteBuffer;
 
 
 /**

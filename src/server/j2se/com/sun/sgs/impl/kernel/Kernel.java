@@ -1,8 +1,6 @@
 
 package com.sun.sgs.impl.kernel;
 
-import com.sun.sgs.app.AppListener;
-
 import com.sun.sgs.auth.IdentityAuthenticator;
 
 import com.sun.sgs.impl.app.profile.ProfilingManager;

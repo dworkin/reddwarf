@@ -30,6 +30,8 @@ public interface IdentityManager
     /**
      * Authenticates the given credentials.
      *
+     * @param credentials the <code>IdentityCredentials</code> to authenticate
+     *
      * @return an authenticated <code>Identity</code> that has not been
      *         notified of login
      *

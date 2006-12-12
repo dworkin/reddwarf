@@ -22,11 +22,11 @@ import java.util.logging.Logger;
  * @since 1.0
  * @author Seth Proctor
  */
-class SystemKernelAppContext extends AbstractKernelAppContext
+final class SystemKernelAppContext extends AbstractKernelAppContext
 {
 
     // logger for this class
-    private static LoggerWrapper logger =
+    private static final LoggerWrapper logger =
         new LoggerWrapper(Logger.getLogger(SystemKernelAppContext.
                                            class.getName()));
 

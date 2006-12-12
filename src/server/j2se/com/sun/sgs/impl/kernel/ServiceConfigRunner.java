@@ -1,9 +1,6 @@
 
 package com.sun.sgs.impl.kernel;
 
-import com.sun.sgs.app.AppListener;
-import com.sun.sgs.app.NameNotBoundException;
-
 import com.sun.sgs.impl.util.LoggerWrapper;
 
 import com.sun.sgs.kernel.KernelRunnable;
@@ -13,7 +10,6 @@ import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.TransactionRunner;
 
-import java.util.Iterator;
 import java.util.List;
 import java.util.Properties;
 

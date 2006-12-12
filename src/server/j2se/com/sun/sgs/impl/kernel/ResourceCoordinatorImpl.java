@@ -7,7 +7,6 @@ import com.sun.sgs.kernel.Manageable;
 import com.sun.sgs.kernel.ResourceCoordinator;
 
 import java.util.Properties;
-import java.util.Stack;
 
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadFactory;

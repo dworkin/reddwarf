@@ -12,7 +12,7 @@ import java.security.MessageDigest;
  * This is a simple utility program used to create the password files that
  * are consumed by <code>NamePasswordAuthenticator</code>. The password
  * files consist of one entry per line, where each entry has a name, some
- * whitespace, a SHA-256 hashed password encoded vi a call to
+ * whitespace, a SHA-256 hashed password encoded via a call to
  * <code>NamePasswordAuthenticator.encodeBytes</code>, and finally a newline.
  *
  * @since 1.0
@@ -22,7 +22,14 @@ public class PasswordFileEditor
 {
 
     /**
-     * Main-line for this utility.
+     * Main-line for this utility. This utility takes three arguments on
+     * the command line. The first argument is the file to update, the second
+     * argument is the user name, and the third argument is that user's
+     * password.
+     *
+     * @param args the arguments for this utility
+     *
+     * @throws Exception if anything fails
      */
     public static void main(String [] args) throws Exception {
         if (args.length != 3) {
