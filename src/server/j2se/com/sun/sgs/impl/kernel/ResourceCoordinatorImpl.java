@@ -97,6 +97,7 @@ class ResourceCoordinatorImpl implements ResourceCoordinator
             new ThreadPoolExecutor(coreSize, maxSize, 120L,
                                    TimeUnit.SECONDS, backingQueue,
                                    threadFactory);
+        threadPool.prestartAllCoreThreads();
     }
 
     /**
