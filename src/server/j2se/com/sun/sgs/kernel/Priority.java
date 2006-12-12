@@ -73,6 +73,15 @@ public enum Priority {
     }
 
     /**
+     * Returns the default <code>Priority</code> used by the system.
+     *
+     * @return the default <code>Priority</code>
+     */
+    public static Priority getDefaultPriority() {
+        return MEDIUM;
+    }
+
+    /**
      * Returns the priority that is higher than this priority,
      * or this priority if this priority is the highest priority
      * defined.
