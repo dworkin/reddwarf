@@ -184,8 +184,9 @@ class Kernel {
             setupService(taskServiceClass, serviceList,
                          DEFAULT_TASK_MANAGER, managerSet, properties,
                          systemRegistry);
-            // FIXME: add the channel service support when it's ready,
-            // and probably also the session service
+            // FIXME: add the channel and app services when they're ready
+            /*serviceList.add(setupService(Class.forName("app service name"),
+              properties, systemRegistry));*/
             /*setupService(DEFAULT_CHANNEL_SERVICE, serviceList,
               DEFAULT_CHANNEL_MANAGER, managerSet, properties,
               systemRegistry);*/
@@ -324,7 +325,8 @@ class Kernel {
      * need to be supplied: <code>com.sun.sgs.{AppName}.appListenerClass</code>
      * and <code>com.sun.sgs.{AppName}.rootDir</code>. These will be provided
      * to all components and <code>Service</code>s as the properties
-     * <code>com.sun.sgs.appListenerClass</code> and
+     * <code>com.sun.sgs.appListenerClass</code> (the fully-qualified name of
+     * the <code>AppListener</code> implementation used by the app) and
      * <code>com.sun.sgs.rootDir</code> respectively. The name of the
      * application will also be provided as <code>com.sun.sgs.appName</code>.
      * <p>
@@ -335,10 +337,9 @@ class Kernel {
      * properties is not specified, then the respective default service
      * is used.
      *
-     * @param args the applications to run
+     * @param args the names of the applications to run
      *
-     * @throws Exception if there is any problem starting the system or
-     *                   any of the applications
+     * @throws Exception if there is any problem starting the system
      */
     public static void main(String [] args) throws Exception {
         // for now, we'll just use the system properties for everything
