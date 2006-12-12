@@ -1,10 +1,18 @@
 package com.sun.sgs.test.util;
 
+import com.sun.sgs.auth.Identity;
 import com.sun.sgs.kernel.KernelAppContext;
 import com.sun.sgs.kernel.TaskOwner;
 
 /** Provides a simple implementation of TaskOwner, for testing. */
 public class DummyTaskOwner implements TaskOwner {
+
+    /** The identity. */
+    private final Identity identity = new Identity() {
+	public String getName() { return "Me!"; }
+	public void notifyLoggedIn() { }
+	public void notifyLoggedOut() { }
+    };
 
     /** The kernel application context. */
     private final KernelAppContext kernelAppContext =
@@ -19,7 +27,7 @@ public class DummyTaskOwner implements TaskOwner {
 	return kernelAppContext;
     }
 
-    public String getIdentity() {
-	return "Me!";
+    public Identity getIdentity() {
+	return identity;
     }
 }
