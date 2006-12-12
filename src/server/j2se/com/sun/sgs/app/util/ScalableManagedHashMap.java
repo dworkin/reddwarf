@@ -37,6 +37,10 @@ import java.util.Set;
  * to do so.  The {@link #put put} and {@link #putAll putAll} methods enforce
  * these restrictions. <p>
  *
+ * The values returned by the <code>entrySet</code>, <code>keySet</code>, and
+ * <code>values</code> methods, and their associated iterators, are not
+ * serializable. <p>
+ *
  * This implementation is not synchronized. <p>
  *
  * Two parameters control the performance of this implementation: the capacity,
@@ -206,7 +210,8 @@ public class ScalableManagedHashMap<K, V>
     /**
      * Constructs a new map containing the specified mappings, and using the
      * default load factor (<code>0.75</code>) and an initial capacity
-     * sufficient to hold the specified mappings.
+     * sufficient to hold the specified mappings.  The keys and values in the
+     * map can be <code>null</code>.
      *
      * @param	map the mappings to place in this map
      * @throws  IllegalArgumentException if <code>map</code> contains keys or
@@ -239,14 +244,31 @@ public class ScalableManagedHashMap<K, V>
 
     /* -- Implement Map -- */
 
-    /** {@inheritDoc} */
+    /**
+     * Returns the number of mappings in this map.
+     *
+     * @return	the number of mappings in this map
+     */
     public int size() {
         return size;
     }
   
     /* Inherit AbstractMap.isEmpty */
 
-    /** {@inheritDoc} */
+    /**
+     * Returns the value to which the specified key is mapped in this map, or
+     * <code>null</code> if the map contains no mapping for this key.  The key
+     * can be <code>null</code>.  A return value of <code>null</code> does not
+     * <i>necessarily</i> indicate that the map contains no mapping for the
+     * key; it is also possible that the map explicitly maps the key to
+     * <code>null</code>. The <code>containsKey</code> method may be used to
+     * distinguish these two cases.
+     *
+     * @param   key the key whose associated value is to be returned
+     * @return  the value to which this map maps the specified key, or
+     *          <code>null</code> if the map contains no mapping for this key
+     * @see	#put(Object, Object) put
+     */
     public V get(Object key) {
         int hash = hash(key);
         int i = indexFor(hash, table.length);
@@ -258,7 +280,14 @@ public class ScalableManagedHashMap<K, V>
 	return null;
     }
 
-    /** {@inheritDoc} */
+    /**
+     * Returns <code>true</code> if this map contains a mapping for the
+     * specified key, which can be <code>null</code>.
+     *
+     * @param   key the key whose presence in this map is to be tested
+     * @return	<code>true</code> if this map contains a mapping for the
+     *		specified key, else <code>false</code>
+     */
     public boolean containsKey(Object key) {
         int hash = hash(key);
         int i = indexFor(hash, table.length);
@@ -271,8 +300,16 @@ public class ScalableManagedHashMap<K, V>
     }
 
     /**
-     * {@inheritDoc} <p>
+     * Associates the specified value with the specified key in this map.  If
+     * the map previously contained a mapping for this key, the old value is
+     * replaced.  The key and the value can be <code>null</code>.
      *
+     * @param	key the key with which the specified value is to be associated
+     * @param	value the value to be associated with the specified key
+     * @return	the previous value associated with specified key, or
+     *		<code>null</code> if there was no mapping for key.  A
+     *		<code>null</code> return can also indicate that this map
+     *		previously associated <code>null</code> with the specified key.
      * @throws	IllegalArgumentException if either <code>key</code> or
      *		<code>value</code> is not <code>null</code> and does not
      *		implement {@link Serializable}, or if <code>key</code>
@@ -321,8 +358,12 @@ public class ScalableManagedHashMap<K, V>
     }
 
     /**
-     * {@inheritDoc} <p>
+     * Copies all of the mappings from the specified map to this map.  These
+     * mappings will replace any mappings that this map had for any of the keys
+     * currently in the specified map.  The keys and values in the map can be
+     * <code>null</code>.
      *
+     * @param	m mappings to be stored in this map
      * @throws	IllegalArgumentException if <code>map</code> contains keys or
      *		values that are not <code>null</code> and do not implement
      *		{@link Serializable}, or keys that implement {@link
@@ -389,13 +430,22 @@ public class ScalableManagedHashMap<K, V>
 	}
     }
   
-    /** {@inheritDoc} */
+    /**
+     * Removes the mapping for this key from this map if present.  The key can
+     * be <code>null</code>.
+     *
+     * @param	key the key whose mapping is to be removed from the map
+     * @return	the previous value associated with specified key, or
+     *		<code>null</code> if there was no mapping for key.  A
+     *		<code>null</code> return can also indicate that the map
+     *		previously associated <code>null</code> with the specified key.
+     */
     public V remove(Object key) {
         HashEntry<K, V> e = removeEntryForKey(key);
         return e == null ? null : e.getValue();
     }
 
-    /** {@inheritDoc} */
+    /** Removes all mappings from this map. */
     public void clear() {
         modCount++;
 	clearTable();
@@ -403,12 +453,19 @@ public class ScalableManagedHashMap<K, V>
 	hashCode = 0;
     }
 
-    /** {@inheritDoc} */
+    /**
+     * Returns <code>true</code> if this map maps one or more keys to the
+     * specified value, which can be <code>null</code>.
+     *
+     * @param	value the value whose presence in this map is to be tested
+     * @return	<code>true</code> if this map maps one or more keys to the
+     *		specified value, else <code>false</code>
+     */
     public boolean containsValue(Object value) {
 	ManagedReference[] tab = table;
         for (int i = 0; i < tab.length ; i++) {
             for (HashEntry e = getTableEntry(tab, i); e != null; e = e.next) {
-                if (e.equalsValue(value)) {
+                if (e.value.sameValue(value)) {
                     return true;
 		}
 	    }
@@ -418,7 +475,18 @@ public class ScalableManagedHashMap<K, V>
 
     /* Map views */
 
-    /** {@inheritDoc} */
+    /**
+     * Returns a set view of the keys contained in this map.  The set is backed
+     * by the map, so changes to the map are reflected in the set, and
+     * vice-versa.  The set supports element removal, which removes the
+     * corresponding mapping from this map, via the
+     * <code>Iterator.remove</code>, <code>Set.remove</code>,
+     * <code>removeAll</code>, <code>retainAll</code>, and <code>clear</code>
+     * operations.  It does not support the <code>add</code> or
+     * <code>addAll</code> operations.
+     *
+     * @return	a set view of the keys contained in this map
+     */
     public Set<K> keySet() {
 	if (keySet == null) {
 	    keySet = new KeySet();
@@ -426,7 +494,18 @@ public class ScalableManagedHashMap<K, V>
 	return keySet;
     }
 
-    /** {@inheritDoc} */
+    /**
+     * Returns a collection view of the values contained in this map.  The
+     * collection is backed by the map, so changes to the map are reflected in
+     * the collection, and vice-versa.  The collection supports element
+     * removal, which removes the corresponding mapping from this map, via the
+     * <code>Iterator.remove</code>, <code>Collection.remove</code>,
+     * <code>removeAll</code>, <code>retainAll</code>, and <code>clear</code>
+     * operations.  It does not support the <code>add</code> or
+     * <code>addAll</code> operations.
+     *
+     * @return	a collection view of the values contained in this map
+     */
     public Collection<V> values() {
 	if (values == null) {
 	    values = new Values();
@@ -434,7 +513,20 @@ public class ScalableManagedHashMap<K, V>
         return values;
     }
 
-    /** {@inheritDoc} */
+    /**
+     * Returns a collection view of the mappings contained in this map.  Each
+     * element in the returned collection is a {@link Entry}.  The collection
+     * is backed by the map, so changes to the map are reflected in the
+     * collection, and vice-versa.  The collection supports element removal,
+     * which removes the corresponding mapping from the map, via the
+     * <code>Iterator.remove</code>, <code>Collection.remove</code>,
+     * <code>removeAll</code>, <code>retainAll</code>, and <code>clear</code>
+     * operations.  It does not support the <code>add</code> or
+     * <code>addAll</code> operations.
+     *
+     * @return	a collection view of the mappings contained in this map.
+     * @see	Entry
+     */
     public Set<Entry<K, V>> entrySet() {
 	if (entrySet == null) {
 	    entrySet = new EntrySet();
@@ -444,9 +536,31 @@ public class ScalableManagedHashMap<K, V>
 
     /* Inherit AbstractMap.equals */
 
-    /** {@inheritDoc} */
+    /**
+     * Returns the hash code value for this map.  The hash code of a map is
+     * defined to be the sum of the hash codes of each entry in the map's
+     * <code>entrySet()</code> view.  This ensures that
+     * <code>t1.equals(t2)</code> implies that
+     * <code>t1.hashCode()==t2.hashCode()</code> for any two maps
+     * <code>t1</code> and <code>t2</code>, as required by the general contract
+     * of <code>Object.hashCode</code>.<p>
+     *
+     * @return	the hash code value for this map
+     */
     public int hashCode() {
 	return hashCode;
+    }
+
+    /* -- Disable cloning -- */
+
+    /**
+     * This method always throws <code>CloneNotSupportedException</code>.
+     *
+     * @return	does not return
+     * @throws	CloneNotSupportedException whenever this method is called
+     */
+    protected Object clone() throws CloneNotSupportedException {
+	throw new CloneNotSupportedException();
     }
 
     /* -- Private classes -- */
@@ -502,62 +616,77 @@ public class ScalableManagedHashMap<K, V>
 
     /** The implementation of Entry for this class. */
     static final class HashEntry<K, V> implements Entry<K, V> {
-	private static final byte REFERENCE = 1;
-	private static final byte NONREFERENCE = 2;
-	private static final byte DONE = 3;
         final int hash;
         final K key;
-        private ManagedReference ref;
-	private int refHash;
-	private V value;
+	Value<V> value;
         HashEntry<K, V> next;
 
         /** Create new entry. */
         HashEntry(int hash, K key, V value, HashEntry<K, V> next) {
             this.hash = hash;
             this.key = key;
-	    if (value != null && value instanceof ManagedObject) {
-		ref = reference((ManagedObject) value);
-		refHash = value.hashCode();
-	    } else {
-		this.value = value;
-	    }
+	    this.value = Value.create(value);
             this.next = next;
         }
-
-	/** Creates a new entry for a managed reference. */
-        HashEntry(int hash, K key, ManagedReference ref, int refHash) { 
-            this.hash = hash;
-	    this.key = key;
-	    this.ref = ref;
-	    this.refHash = refHash;
-        }
-
-	/**
-	 * Creates a new entry for an object that is not a managed
-	 * reference.
-	 */
-        HashEntry(int hash, K key, V value) { 
-            this.hash = hash;
+    
+	/** Create a new entry when deserializing. */
+	HashEntry(K key, Value<V> value) {
+	    hash = hash(key);
 	    this.key = key;
 	    this.value = value;
+	}
+
+        public K getKey() {
+            return key;
+        }
+
+	public V getValue() {
+	    return value.get();
+	}
+
+	public V setValue(V newValue) {
+	    V oldValue = value.get();
+	    value = Value.create(newValue);
+	    return oldValue;
+	}
+
+	public boolean equals(Object o) {
+	    if (o == this) {
+		return true;
+	    } else if (o instanceof HashEntry) {
+		HashEntry entry = (HashEntry) o;
+		return safeEquals(key, entry.getKey()) &&
+		    value.equals(entry.value);
+	    } else if (o instanceof Entry) {
+		Entry entry = (Entry) o;
+		return safeEquals(key, entry.getKey()) &&
+		    value.sameValue(entry.getValue());
+	    } else {
+		return false;
+	    }
+	}
+
+	public int hashCode() {
+	    return (key == null ? 0 : key.hashCode()) ^ value.hashCode();
+	}
+
+        public String toString() {
+            return getKey() + "=" + getValue();
         }
 
 	/** Serializes this entry to a stream. */
 	void write(ObjectOutputStream s) throws IOException {
-	    s.writeByte(isReference() ? REFERENCE : NONREFERENCE);
+	    /*
+	     * Write the value first, which is never null, so that we can use
+	     * null as the end marker.
+	     */
+	    s.writeObject(value);
 	    s.writeObject(key);
-	    if (isReference()) {
-		s.writeObject(ref);
-		s.writeInt(refHash);
-	    } else {
-		s.writeObject(value);
-	    }
 	}
 
 	/** Marks in the stream that the last entry has been written. */
 	static void writeDone(ObjectOutputStream s) throws IOException {
-	    s.writeByte(DONE);
+	    s.writeObject(null);
 	}
 
 	/**
@@ -567,131 +696,20 @@ public class ScalableManagedHashMap<K, V>
 	static <K, V> HashEntry<K, V> read(ObjectInputStream s)
 	    throws IOException, ClassNotFoundException
 	{
-	    byte status = s.readByte();
-	    if (status == DONE) {
-		return null;
-	    }
 	    /* Deserialization is inherently not typesafe. */
 	    @SuppressWarnings("unchecked")
-		K k = (K) s.readObject();
-	    int h = hash(k);
-	    if (status == REFERENCE) {
-		/* Deserialization is inherently not typesafe. */
-		@SuppressWarnings("unchecked")
-		    ManagedReference ref = (ManagedReference) s.readObject();
-		int refHash = s.readInt();
-		return new HashEntry<K, V>(h, k, ref, refHash);
-	    } else {
-		/* Deserialization is inherently not typesafe. */
-		@SuppressWarnings("unchecked")
-		    V v = (V) s.readObject();
-		return new HashEntry<K, V>(h, k, v);
+		Value<V> value = (Value<V>) s.readObject();
+	    /*
+	     * The value should never be null, so, if it is, there are no more
+	     * entries.
+	     */
+	    if (value == null) {
+		return null;
 	    }
+	    @SuppressWarnings("unchecked")
+		K key = (K) s.readObject();
+	    return new HashEntry<K, V>(key, value);
 	}
-
-	/**
-	 * Returns true if this entry uses a managed reference to refer to a
-	 * managed object
-	 */
-	private boolean isReference() {
-	    return ref != null;
-	}
-
-	/**
-	 * Returns the hash code of the managed object referred to by this
-	 * object.
-	 */
-	int getRefHash() {
-	    return refHash;
-	}
-
-	/** {@inheritDoc} */
-        public K getKey() {
-            return key;
-        }
-
-	/** {@inheritDoc} */
-        public V getValue() {
-	    if (isReference()) {
-		/* This is inherently non-typesafe. */
-		@SuppressWarnings("unchecked")
-		    V v = (V) dereference(ref, ManagedObject.class);
-		return v;
-	    } else {
-		return value;
-	    }
-        }
-    
-	/** {@inheritDoc} */
-        public V setValue(V newValue) {
-	    V oldValue = getValue();
-	    if (newValue != null && newValue instanceof ManagedObject) {
-		value = null;
-		ref = reference((ManagedObject) newValue);
-		refHash = newValue.hashCode();
-	    } else {
-		value = newValue;
-		ref = null;
-	    }
-            return oldValue;
-        }
-
-	/** {@inheritDoc} */
-        public boolean equals(Object o) {
-	    if (o == this) {
-		return true;
-	    } else if (o instanceof HashEntry) {
-		HashEntry e = (HashEntry) o;
-		if (safeEquals(key, e.key)) {
-		    if (isReference()) {
-			if (ref.equals(e.ref)) {
-			    return true;
-			} else if (refHash == e.refHash &&
-				   ref.get(ManagedObject.class).equals(
-				       e.ref.get(ManagedObject.class)))
-			{
-			    return true;
-			}
-		    } else if (e.isReference() && safeEquals(value, e.value)) {
-			return true;
-		    }
-		}
-	    } else if (o instanceof Entry) {
-		Entry e = (Entry) o;
-		if (safeEquals(getKey(), e.getKey())) {
-		    if (equalsValue(e.getValue())) {
-			return true;
-		    }
-		}
-            }
-            return false;
-        }
-    
-	/** Checks if the argument is the value of this entry. */
-	boolean equalsValue(Object value) {
-	    if (isReference()) {
-		if (value != null &&
-		    value.hashCode() == refHash &&
-		    value.equals(ref.get(ManagedObject.class)))
-		{
-		    return true;
-		}
-	    } else if (safeEquals(value, this.value)) {
-		return true;
-	    }
-	    return false;
-	}
-
-	/** {@inheritDoc} */
-        public int hashCode() {
-            return (key == null ? 0 : key.hashCode()) ^
-		(ref != null ? refHash : value == null ? 0 : value.hashCode());
-        }
-    
-	/** {@inheritDoc} */
-        public String toString() {
-            return getKey() + "=" + getValue();
-        }
     }
 
     /** A base class for iterators over items in the map. */
@@ -862,7 +880,7 @@ public class ScalableManagedHashMap<K, V>
 
     /** Checks for equality, including null. */
     static boolean safeEquals(Object x, Object y) {
-	return x == y || x != null && x.equals(y);
+	return x == y || (x != null && x.equals(y));
     }
 
     /**

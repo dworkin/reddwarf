@@ -2,10 +2,10 @@ package com.sun.sgs.app.util;
 
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
-import com.sun.sgs.app.ManagedReference;
 import java.io.IOException;
+import java.io.InvalidObjectException;
 import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
+import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.util.AbstractMap;
 import java.util.AbstractSet;
@@ -122,7 +122,7 @@ public class SimpleManagedHashMap<K, V>
 	 */
 	@SuppressWarnings("unchecked")
 	    V v = (V) value;
-	return map.containsValue(new Value<V>(v));
+	return map.containsValue(Value.create(v));
     }
 
     /**
@@ -140,7 +140,7 @@ public class SimpleManagedHashMap<K, V>
      * @see	#put(Object, Object) put
      */
     public V get(Object key) {
-	return dereference(map.get(key));
+	return Value.get(map.get(key));
     }
 
     /* -- Modification operations -- */
@@ -173,7 +173,7 @@ public class SimpleManagedHashMap<K, V>
 		"The value must implement Serializable");
 	}
 	getDataManager().markForUpdate(this);
-	return dereference(map.put(key, new Value<V>(value)));
+	return Value.get(map.put(key, Value.create(value)));
     }
 
     /**
@@ -188,7 +188,7 @@ public class SimpleManagedHashMap<K, V>
      */
     public V remove(Object key) {
 	getDataManager().markForUpdate(this);
-	return dereference(map.remove(key));
+	return Value.get(map.remove(key));
     }
 
     /* -- Bulk operations -- */
@@ -239,7 +239,7 @@ public class SimpleManagedHashMap<K, V>
 		K key = (K) keys[i];
 	    @SuppressWarnings("unchecked")
 		V value = (V) values[i];
-	    this.map.put(key, new Value<V>(value));
+	    this.map.put(key, Value.create(value));
 	}
     }
 
@@ -257,7 +257,7 @@ public class SimpleManagedHashMap<K, V>
 
     /**
      * Returns a collection view of the mappings contained in this map.  Each
-     * element in the returned collection is an {@link Entry}.  The collection
+     * element in the returned collection is a {@link Entry}.  The collection
      * is backed by the map, so changes to the map are reflected in the
      * collection, and vice-versa.  The collection supports element removal,
      * which removes the corresponding mapping from the map, via the
@@ -345,11 +345,11 @@ public class SimpleManagedHashMap<K, V>
 	}
 
 	public V getValue() {
-	    return dereference(entry.getValue());
+	    return Value.get(entry.getValue());
 	}
 	    
 	public V setValue(V newValue) {
-	    return dereference(entry.setValue(new Value<V>(newValue)));
+	    return Value.get(entry.setValue(Value.create(newValue)));
 	}
 
 	public boolean equals(Object object) {
@@ -372,106 +372,36 @@ public class SimpleManagedHashMap<K, V>
 
     /* Inherit AbstractMap.hashCode */
 
+    /* -- Serialization methods -- */
+
+    /**
+     * Throws <code>InvalidObjectException</code> to signal that no field data
+     * was supplied.
+     */
+    private void readObjectNoData() throws ObjectStreamException {
+	throw new InvalidObjectException("No field data was supplied");
+    }        
+
+    /** Checks the consistency of serialized fields. */
+    private void readObject(ObjectInputStream s)
+	throws ClassNotFoundException, IOException
+    {
+	s.defaultReadObject();
+	if (map == null) {
+	    throw new InvalidObjectException("The map field must be non-null");
+	}
+    }
+
     /* -- Other classes and methods -- */
 
     /**
      * This method always throws <code>CloneNotSupportedException</code>.
      *
+     * @return	does not return
      * @throws	CloneNotSupportedException whenever this method is called
      */
     protected Object clone() throws CloneNotSupportedException {
 	throw new CloneNotSupportedException();
-    }
-
-    /** Stores a value that is a managed object or is just serializable. */
-    private static class Value<V> implements Serializable {
-	private static final long serialVersionUID = 1;
-	private transient V value;
-	private transient ManagedReference ref;
-	private transient int refHash;
-
-	Value(V value) {
-	    if (value instanceof ManagedObject) {
-		ref = getDataManager().createReference((ManagedObject) value);
-		refHash = value.hashCode();
-	    } else {
-		this.value = value;
-	    }
-	}
-
-	V get() {
-	    if (ref != null) {
-		/* Parameterized maps are inherently non-typesafe. */
-		@SuppressWarnings("unchecked")
-		    V result = (V) ref.get(ManagedObject.class);
-		return result;
-	    } else {
-		return value;
-	    }
-	}
-
-	public boolean equals(Object o) {
-	    if (o == this) {
-		return true;
-	    } else if (o instanceof Value) {
-		Value v = (Value) o;
-		if (ref != null) {
-		    if (ref.equals(v.ref)) {
-			return true;
-		    } else if (refHash == v.refHash &&
-			       ref.get(ManagedObject.class).equals(
-				   v.ref.get(ManagedObject.class)))
-		    {
-			return true;
-		    }
-		} else if (safeEquals(value, v.value)) {
-		    return true;
-		}
-	    } else if (safeEquals(value, o)) {
-		return true;
-	    }
-	    return false;
-	}
-
-	public int hashCode() {
-	    return (ref != null) ? refHash :
-		(value != null) ? value.hashCode() : 0;
-	}
-
-	private void writeObject(ObjectOutputStream s) throws IOException {
-	    s.defaultWriteObject();
-	    if (ref != null) {
-		s.writeBoolean(true);
-		s.writeObject(ref);
-		s.writeInt(refHash);
-	    } else {
-		s.writeBoolean(false);
-		s.writeObject(value);
-	    }
-	}
-
-	private void readObject(ObjectInputStream s)
-	    throws IOException, ClassNotFoundException
-	{
-	    s.defaultReadObject();
-	    boolean isRef = s.readBoolean();
-	    if (isRef) {
-		ref = (ManagedReference) s.readObject();
-		refHash = s.readInt();
-	    } else {
-		@SuppressWarnings("unchecked")
-		    V v = (V) s.readObject();
-		value = v;
-	    }
-	}
-    }
-
-    /**
-     * Returns the object referred to by the Value, or null if the reference is
-     * null.
-     */
-    static <V> V dereference(Value<V> value) {
-	return value == null ? null : value.get();
     }
 
     /** Returns the current data data manager. */
