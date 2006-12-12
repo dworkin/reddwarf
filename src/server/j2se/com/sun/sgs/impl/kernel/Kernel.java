@@ -38,10 +38,6 @@ import java.util.logging.Logger;
  * created, and represents the kernel of the runtime. It is responsible
  * for creating and initializing all components of the system and the
  * applications configured to run in this system.
- * <p>
- * NOTE: there are many TEST comments in the implementation of this class.
- * This is because there is a static set of configuration parameters
- * hard-coded here until we develop an external source of configuration.
  *
  * @since 1.0
  * @author Seth Proctor
@@ -137,10 +133,15 @@ class Kernel {
     }
 
     /**
-     * TEST: This is using a fixed configuration. Eventually, it should be
-     * loading its configuration, but for now, we have only fixed services
-     * with known properties...when configuration details are decided, that
-     * detail will be passed as parameters to this method.
+     * Package-private helper that starts an application. This method will
+     * ensure that all the components are availabe, create them, and then
+     * start a separate task that will run in a transactional context to
+     * actually configure the <code>Service</code>s associated with the
+     * application.
+     *
+     * @param properties the <code>Properties</code> for the application
+     *
+     * @throws Exception if there is any error in startup
      */
     void startupApplication(Properties properties) throws Exception {
         String appName = properties.getProperty("com.sun.sgs.appName");
@@ -151,7 +152,8 @@ class Kernel {
         // create the authentication manager used for this application
         ArrayList<IdentityAuthenticator> authenticators =
             new ArrayList<IdentityAuthenticator>();
-        // TEST: this should get loaded from our configuration
+        // FIXME: this should get loaded from our configuration, but for now
+        // it's all we have, so it's created directly here
         authenticators.add(new NamePasswordAuthenticator(properties));
         IdentityManagerImpl appIdentityManager =
             new IdentityManagerImpl(authenticators);
