@@ -1,5 +1,6 @@
 package com.sun.sgs.impl.service.channel;
 
+import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ChannelManager;
@@ -61,14 +62,12 @@ public class ChannelServiceImpl
     /** Thread for handling send tasks. */
     private HandleTasksThread handleTasksThread;
 
-    //private TaskService taskService;
-
     /** The data service. */
     private DataService dataService;
 
     /** The task service. */
-    //    private TaskService taskService;
-    
+    //private TaskService taskService;
+
     /**
      * Constructs an instance of this class with the specified properties.
      */
