@@ -348,6 +348,17 @@ public abstract class BasicDataHashMapTest extends TestCase {
 	}
     }
 
+    public void testToString() {
+	map.put(null, "for-null-key");
+	map.put("has-null-value", null);
+	map.put("string-value", "string");
+	map.put("dummy-value", dummy);
+	System.err.println("map: " + map);
+	System.err.println("entries: " + map.entrySet());
+	System.err.println("keys: " + map.keySet());
+	System.err.println("values: " + map.values());
+    }
+
     /* -- Other methods -- */
 
     /** Creates a per-test directory. */

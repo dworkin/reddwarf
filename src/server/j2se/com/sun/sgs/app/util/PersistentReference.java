@@ -127,7 +127,7 @@ public abstract class PersistentReference<V> implements Serializable {
 
 	public String toString() {
 	    return "PersistentReference.Managed[ref:" + ref +
-		"hash:" + hash + "]";
+		", hash:" + hash + "]";
 	}
     }
 
