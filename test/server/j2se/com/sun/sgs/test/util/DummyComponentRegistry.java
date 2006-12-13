@@ -1,5 +1,6 @@
 package com.sun.sgs.test.util;
 
+import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
 import com.sun.sgs.kernel.ComponentRegistry;
 import java.util.HashMap;
 import java.util.Map;
@@ -39,5 +40,13 @@ public class DummyComponentRegistry implements ComponentRegistry {
 	    throw new NullPointerException("Arguments must not be null");
 	}
 	components.put(type, component);
+    }
+
+    /**
+     * Registers this component registry as the source of components supplied
+     * by the AppContext for the current thread.
+     */
+    public void registerAppContext() {
+	new DummyAbstractKernelAppContext(this);
     }
 }
