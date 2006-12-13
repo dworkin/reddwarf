@@ -1,5 +1,6 @@
 package com.sun.sgs.test.impl.service.data;
 
+import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
@@ -98,9 +99,11 @@ public class TestConcurrent extends TestCase {
 	    new DummyComponentRegistry();
 	DataServiceImpl service =
 	    new DataServiceImpl(props, componentRegistry);
-	DummyTransaction txn = new DummyTransaction(true);
+	DummyTransaction txn = new DummyTransaction();
 	txnProxy.setCurrentTransaction(txn);
 	service.configure(componentRegistry, txnProxy);
+	componentRegistry.setComponent(DataManager.class, service);
+	componentRegistry.registerAppContext();
 	txn.commit();
 	long start = System.currentTimeMillis();
 	for (int i = 0; i < threads; i++) {
@@ -201,7 +204,7 @@ public class TestConcurrent extends TestCase {
 		    }
 		    break;
 		case 1:
-		    service.setBinding(name, new DummyManagedObject(service));
+		    service.setBinding(name, new DummyManagedObject());
 		    break;
 		case 2:
 		    try {
@@ -249,7 +252,7 @@ public class TestConcurrent extends TestCase {
 	}
 
 	private void createTxn() {
-	    txn = new DummyTransaction(true);
+	    txn = new DummyTransaction();
 	    txnProxy.setCurrentTransaction(txn);
 	}
     }
