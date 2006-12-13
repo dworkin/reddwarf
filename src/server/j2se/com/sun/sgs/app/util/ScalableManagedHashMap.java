@@ -1,5 +1,6 @@
 package com.sun.sgs.app.util;
 
+import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.DetectChanges;
 import com.sun.sgs.app.ManagedObject;
@@ -93,12 +94,6 @@ public class ScalableManagedHashMap<K, V>
 
     /** An empty array, for calling Collection.toArray. */
     private static final Serializable[] EMPTY_SERIALIZABLE_ARRAY = { };
-
-    /**
-     * FIXME: Store the data manager until the AppContext version works.
-     * -tjb@sun.com (11/22/2006)
-     */
-    public static DataManager dataManager;
 
     /**
      * The table, resized as necessary. Length MUST Always be a power of two.
@@ -975,12 +970,9 @@ public class ScalableManagedHashMap<K, V>
 	}
     }
 
-    /**
-     * Returns the data manager.  FIXME: Remove when AppManager.getDataManager
-     * is in place.  -tjb@sun.com (11/28/2006)
-     */
+    /** Returns the data manager. */
     static DataManager getDataManager() {
-	return dataManager;
+	return AppContext.getDataManager();
     }
 
     /** Returns a reference to a managed object, or null. */

@@ -1,5 +1,6 @@
 package com.sun.sgs.app.util;
 
+import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import java.io.Serializable;
@@ -86,8 +87,7 @@ public abstract class PersistentReference<V> implements Serializable {
 
 	/** Creates an instance for the specified managed object. */
 	Managed(V value) {
-	    /* FIXME: Use AppContext.getDataManager */
-	    ref = SimpleManagedHashMap.dataManager.createReference(
+	    ref = AppContext.getDataManager().createReference(
 		(ManagedObject) value);
 	    hash = value.hashCode();
 	}

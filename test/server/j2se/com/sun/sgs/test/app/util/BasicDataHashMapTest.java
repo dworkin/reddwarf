@@ -93,12 +93,12 @@ public abstract class BasicDataHashMapTest extends TestCase {
 	createTransaction();
 	DataServiceImpl service = getDataServiceImpl();
 	service.configure(componentRegistry, txnProxy);
+	componentRegistry.setComponent(DataManager.class, service);
+	componentRegistry.registerAppContext();
 	txn.commit();
 	dataManager = service;
-	ScalableManagedHashMap.dataManager = dataManager;
-	SimpleManagedHashMap.dataManager = dataManager;
 	createTransaction();
-	dummy = new DummyManagedObject(service);
+	dummy = new DummyManagedObject();
 	dataManager.setBinding("dummy", dummy);
 	dataManager.setBinding("map", (ManagedObject) map);
     }

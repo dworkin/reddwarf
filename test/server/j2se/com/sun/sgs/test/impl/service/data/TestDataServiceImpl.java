@@ -1409,7 +1409,7 @@ public class TestDataServiceImpl extends TestCase {
 
     public void testReferenceGetId() throws Exception {
 	BigInteger id = service.createReference(dummy).getId();
-	DummyManagedObject dummy2 = new DummyManagedObject(service);
+	DummyManagedObject dummy2 = new DummyManagedObject();
 	service.setBinding("dummy2", dummy2);
 	BigInteger id2 = service.createReference(dummy2).getId();
 	assertFalse(id.equals(id2));

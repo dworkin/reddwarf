@@ -1,5 +1,6 @@
 package com.sun.sgs.app.util;
 
+import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import java.io.IOException;
@@ -48,12 +49,6 @@ public class SimpleManagedHashMap<K, V>
 
     /** An empty array, for calling Collection.toArray. */
     private static final Serializable[] EMPTY_SERIALIZABLE_ARRAY = { };
-
-    /**
-     * The data manager.  FIXME: Remove this when AppContext.getDataManager is
-     * implemented.  -tjb@sun.com (12/04/2006)
-     */
-    public static DataManager dataManager;
 
     /**
      * The underlying map of keys to values or references.
@@ -403,7 +398,7 @@ public class SimpleManagedHashMap<K, V>
 
     /** Returns the current data data manager. */
     static DataManager getDataManager() {
-	return dataManager;
+	return AppContext.getDataManager();
     }
 
     /* Checks for equality, allowing for null. */

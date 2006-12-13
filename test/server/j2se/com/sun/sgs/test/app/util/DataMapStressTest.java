@@ -94,15 +94,15 @@ public class DataMapStressTest extends BasicMapStressTest {
 		Logger.getLogger(loggerName).setLevel(Level.WARNING);
 	    }
 	}
-	createTransaction(true);
+	createTransaction();
 	DataServiceImpl service = getDataServiceImpl();
 	service.configure(componentRegistry, txnProxy);
+	componentRegistry.setComponent(DataManager.class, service);
+	componentRegistry.registerAppContext();
 	txn.commit();
 	dataManager = service;
-	ScalableManagedHashMap.dataManager = dataManager;
-	SimpleManagedHashMap.dataManager = dataManager;
 	createTransaction();
-	dummy = new DummyManagedObject(service);
+	dummy = new DummyManagedObject();
 	dataManager.setBinding("dummy", dummy);
 	dataManager.setBinding("map", (ManagedObject) map);
     }
@@ -142,7 +142,7 @@ public class DataMapStressTest extends BasicMapStressTest {
 	    } catch (Exception e) {
 		fail("Unexpected exception: " + e);
 	    }
-	    createTransaction(true);
+	    createTransaction();
 	    @SuppressWarnings("unchecked")
 		Map<String, Object> m =
 		dataManager.getBinding("map", Map.class);
@@ -152,7 +152,7 @@ public class DataMapStressTest extends BasicMapStressTest {
 
     Object createValue(int n) {
 	if ((n % 7) > 4) {
-	    return new DummyManagedObject(dataManager, n);
+	    return new DummyManagedObject(n);
 	} else {
 	    return super.createValue(n);
 	}
@@ -217,13 +217,6 @@ public class DataMapStressTest extends BasicMapStressTest {
     /** Creates a new transaction. */
     DummyTransaction createTransaction() {
 	txn = new DummyTransaction();
-	txnProxy.setCurrentTransaction(txn);
-	return txn;
-    }
-
-    /** Creates a new transaction. */
-    DummyTransaction createTransaction(boolean usePrepareAndCommit) {
-	txn = new DummyTransaction(usePrepareAndCommit);
 	txnProxy.setCurrentTransaction(txn);
 	return txn;
     }
