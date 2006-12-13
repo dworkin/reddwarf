@@ -20,6 +20,9 @@ public interface ComponentRegistry
      * type. If there are no matches, or there is more than one possible
      * match, then an exception is thrown.
      *
+     * @param <T> the type of the component
+     * @param type the <code>Class</code> of the requested component
+     *
      * @return the requested component
      *
      * @throws MissingResourceException if the requested component is not

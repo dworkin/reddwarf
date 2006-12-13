@@ -1,10 +1,12 @@
 
 package com.sun.sgs.kernel;
 
+import com.sun.sgs.app.TaskRejectedException;
+
 
 /**
- * This interface is used to start long-running tasks (for example, a timer
- * wheel or a select loop) that need their own thread of control. Unlike
+ * This interface is used to start long-running tasks (for example, a consumer
+ * thread or a select loop) that need their own thread of control. Unlike
  * tasks submitted to <code>TaskScheduler</code>, no attempt is made to
  * re-try long-running tasks.
  *

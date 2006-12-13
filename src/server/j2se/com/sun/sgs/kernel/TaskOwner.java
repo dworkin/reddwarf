@@ -1,6 +1,8 @@
 
 package com.sun.sgs.kernel;
 
+import com.sun.sgs.auth.Identity;
+
 
 /**
  * This interface provides details about the owner of a task. All tasks run
@@ -25,16 +27,10 @@ public interface TaskOwner
     public KernelAppContext getContext();
 
     /**
-     * Returns an identifier for the <code>TaskOwner</code>, used primarily
-     * for logging and reporting.
-     * <p>
-     * FIXME: when we have desiged the login/identity facility, then we can
-     * figure out if something more detailed should be provided here, and
-     * what the specific rules are about the identity's format.
+     * Returns the <code>Identity</code> for this <code>TaskOwner</code>.
      *
-     * @return a <code>String</code> representing the identity of the
-     *         <code>Owner</code>
+     * @return this task's owner's <code>Identity</code>
      */
-    public String getIdentity();
+    public Identity getIdentity();
 
 }
