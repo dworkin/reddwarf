@@ -1,5 +1,6 @@
 package com.sun.sgs.test.impl.service.data;
 
+import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.DataManager;
@@ -168,9 +169,11 @@ public class TestPerformance extends TestCase {
 	DataServiceImpl service =
 	    new DataServiceImpl(props, componentRegistry);
 	service.configure(componentRegistry, txnProxy);
+	componentRegistry.setComponent(DataManager.class, service);
+	componentRegistry.registerAppContext();
 	txn.commit();
 	createTransaction();
-	service.setBinding("counters", new Counters(service, items));
+	service.setBinding("counters", new Counters(items));
 	txn.commit();
 	for (int r = 0; r < repeat; r++) {
 	    long start = System.currentTimeMillis();
@@ -219,9 +222,11 @@ public class TestPerformance extends TestCase {
 	DataServiceImpl service =
 	    new DataServiceImpl(props, componentRegistry);
 	service.configure(componentRegistry, txnProxy);
+	componentRegistry.setComponent(DataManager.class, service);
+	componentRegistry.registerAppContext();
 	txn.commit();
 	createTransaction();
-	service.setBinding("counters", new Counters(service, items));
+	service.setBinding("counters", new Counters(items));
 	txn.commit();
 	for (int r = 0; r < repeat; r++) {
 	    long start = System.currentTimeMillis();
@@ -290,8 +295,7 @@ public class TestPerformance extends TestCase {
 
     /** Creates a new transaction. */
     private DummyTransaction createTransaction() {
-	/* Make sure to use prepareAndCommit */
-	txn = new DummyTransaction(true);
+	txn = new DummyTransaction();
 	txnProxy.setCurrentTransaction(txn);
 	return txn;
     }
@@ -301,9 +305,11 @@ public class TestPerformance extends TestCase {
 	private static final long serialVersionUID = 1;
 	private List<ManagedReference> counters =
 	    new ArrayList<ManagedReference>();
-	Counters(DataManager dataMgr, int count) {
+	Counters(int count) {
 	    for (int i = 0; i < count; i++) {
-		counters.add(dataMgr.createReference(new Counter()));
+		counters.add(
+		    AppContext.getDataManager().createReference(
+			new Counter()));
 	    }
 	}
 	Counter get(int i) {

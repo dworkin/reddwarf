@@ -14,8 +14,7 @@ package com.sun.sgs.kernel;
  * application doesn't have any ability to see other applications. It
  * runs in a single context, and needs only know how to resolve its
  * managers. That said, <code>Service</code>s do need to be able to
- * identify their own context (e.g., for scheduling tasks), so they are
- * provided with an instance of <code>KernelAppContext</code> at startup.
+ * identify their own context (e.g., for scheduling tasks).
  * <p>
  * All implementations of <code>KernelAppContext</code> must implement
  * <code>hashCode</code> and <code>equals</code>.

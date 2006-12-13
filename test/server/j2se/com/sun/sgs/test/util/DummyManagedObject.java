@@ -1,5 +1,6 @@
 package com.sun.sgs.test.util;
 
+import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
@@ -18,27 +19,19 @@ public class DummyManagedObject implements ManagedObject, Serializable {
     /** A unique identifier for this object -- used for equality checks. */
     private final int id;
 
-    /** The data manager for dirtying and obtaining references. */
-    private transient final DataManager dataManager;
-
     /** An arbitrary object. */
     public Object value = null;
 
     /** A reference to another DummyManagedObject, or null. */
     private ManagedReference next = null;
 
-    /** Creates an instance of this class using the specified data manager. */
-    public DummyManagedObject(DataManager dataManager) {
-	this.dataManager = dataManager;
+    /** Creates an instance of this class. */
+    public DummyManagedObject() {
 	id = nextId.getAndIncrement();
     }
 
-    /**
-     * Creates an instance of this class using the specified data manager and
-     * specific ID.
-     */
-    public DummyManagedObject(DataManager dataManager, int id) {
-	this.dataManager = dataManager;
+    /** Creates an instance of this class using a specific ID. */
+    public DummyManagedObject(int id) {
 	this.id = id;
     }
 
@@ -47,7 +40,7 @@ public class DummyManagedObject implements ManagedObject, Serializable {
      * modification.
      */
     public void setValue(Object value) {
-	dataManager.markForUpdate(this);
+	AppContext.getDataManager().markForUpdate(this);
 	this.value = value;
     }
 
@@ -81,6 +74,7 @@ public class DummyManagedObject implements ManagedObject, Serializable {
      * the modification.
      */
     public void setNext(DummyManagedObject next) {
+	DataManager dataManager = AppContext.getDataManager();
 	dataManager.markForUpdate(this);
 	this.next = dataManager.createReference(next);
     }
