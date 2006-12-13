@@ -135,7 +135,7 @@ public class TestPerformance extends TestCase {
 	byte[] data = new byte[itemSize];
 	data[0] = 1;
 	DataStoreImpl store = new DataStoreImpl(props);
-	DummyTransaction txn = new DummyTransaction(true);
+	DummyTransaction txn = new DummyTransaction();
 	long[] ids = new long[items];
 	for (int i = 0; i < items; i++) {
 	    ids[i] = store.createObject(txn);
@@ -145,7 +145,7 @@ public class TestPerformance extends TestCase {
 	for (int r = 0; r < repeat; r++) {
 	    long start = System.currentTimeMillis();
 	    for (int c = 0; c < count; c++) {
-		txn = new DummyTransaction(true);
+		txn = new DummyTransaction();
 		for (int i = 0; i < items; i++) {
 		    store.getObject(txn, ids[i], false);
 		}
@@ -180,7 +180,7 @@ public class TestPerformance extends TestCase {
 	byte[] data = new byte[itemSize];
 	data[0] = 1;
 	DataStoreImpl store = new DataStoreImpl(props);
-	DummyTransaction txn = new DummyTransaction(true);
+	DummyTransaction txn = new DummyTransaction();
 	long[] ids = new long[items];
 	for (int i = 0; i < items; i++) {
 	    ids[i] = store.createObject(txn);
@@ -190,7 +190,7 @@ public class TestPerformance extends TestCase {
 	for (int r = 0; r < repeat; r++) {
 	    long start = System.currentTimeMillis();
 	    for (int c = 0; c < count; c++) {
-		txn = new DummyTransaction(true);
+		txn = new DummyTransaction();
 		for (int i = 0; i < items; i++) {
 		    boolean update = i < modifyItems;
 		    byte[] result = store.getObject(txn, ids[i], update);
@@ -212,7 +212,7 @@ public class TestPerformance extends TestCase {
 	    DataStoreImplClass + ".directory", createDirectory(),
 	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
 	DataStoreImpl store = new DataStoreImpl(props);
-	DummyTransaction txn = new DummyTransaction(true);
+	DummyTransaction txn = new DummyTransaction();
 	for (int i = 0; i < items; i++) {
 	    store.setBinding(txn, "name" + i, i);
 	}
@@ -220,7 +220,7 @@ public class TestPerformance extends TestCase {
 	for (int r = 0; r < repeat; r++) {
 	    long start = System.currentTimeMillis();
 	    for (int c = 0; c < count; c++) {
-		txn = new DummyTransaction(true);
+		txn = new DummyTransaction();
 		for (int i = 0; i < items; i++) {
 		    store.getBinding(txn, "name" + i);
 		}
@@ -237,7 +237,7 @@ public class TestPerformance extends TestCase {
 	    DataStoreImplClass + ".directory", createDirectory(),
 	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
 	DataStoreImpl store = new DataStoreImpl(props);
-	DummyTransaction txn = new DummyTransaction(true);
+	DummyTransaction txn = new DummyTransaction();
 	for (int i = 0; i < items; i++) {
 	    store.setBinding(txn, "name" + i, i);
 	}
@@ -245,7 +245,7 @@ public class TestPerformance extends TestCase {
 	for (int r = 0; r < repeat; r++) {
 	    long start = System.currentTimeMillis();
 	    for (int c = 0; c < count; c++) {
-		txn = new DummyTransaction(true);
+		txn = new DummyTransaction();
 		for (int i = 0; i < items; i++) {
 		    boolean update = i < modifyItems;
 		    long result = store.getBinding(txn, "name" + i);
