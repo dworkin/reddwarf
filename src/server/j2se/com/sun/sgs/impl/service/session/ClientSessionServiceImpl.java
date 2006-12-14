@@ -11,12 +11,14 @@ import com.sun.sgs.io.IOHandler;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.KernelAppContext;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
-import com.sun.sgs.service.Service;
+import com.sun.sgs.service.ServiceListener;
 import com.sun.sgs.service.TransactionProxy;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;   
 import java.util.Properties;
@@ -32,7 +34,7 @@ import java.util.logging.Logger;
  * <li><code>com.sun.sgs.app.port</code>
  * </ul>
  */
-public class ClientSessionServiceImpl implements Service {
+public class ClientSessionServiceImpl implements ClientSessionService {
 
     /** The property that specifies the application name. */
     public static final String APP_NAME_PROPERTY = "com.sun.sgs.app.name";
@@ -54,9 +56,13 @@ public class ClientSessionServiceImpl implements Service {
     /** The listener for accpeted connections. */
     private final AcceptedHandleListener listener = new Listener();
 
+    /** The registered service listeners. */
+    private final Map<Byte, ServiceListener> serviceListeners =
+	Collections.synchronizedMap(new HashMap<Byte, ServiceListener>());
+
     /** A map of current sessions, from session ID to ClientSessionImpl. */
     private final Map<byte[], ClientSessionImpl> sessions =
-	new HashMap<byte[], ClientSessionImpl>();
+	Collections.synchronizedMap(new HashMap<byte[], ClientSessionImpl>());
 
     /** The IOAcceptor for listening for new connections. */
     private IOAcceptor acceptor;
@@ -164,6 +170,15 @@ public class ClientSessionServiceImpl implements Service {
 	acceptor.shutdown();
     }
 
+    /* -- Implement ClientSessionService -- */
+
+    /** {@inheritDoc} */
+    public void registerServiceListener(
+	byte serviceId, ServiceListener listener)
+    {
+	serviceListeners.put(serviceId, listener);
+    }
+
     /* -- Implement AcceptedHandleListener -- */
 
     class Listener implements AcceptedHandleListener {
@@ -178,20 +193,23 @@ public class ClientSessionServiceImpl implements Service {
 	    ClientSessionImpl session =
 		new ClientSessionImpl(ClientSessionServiceImpl.this, handle);
 	    handle.setIOHandler(session.getHandler());
-	    synchronized (lock) {
-		sessions.put(session.getSessionId(), session);
-	    }
+	    sessions.put(session.getSessionId(), session);
 	}
     }
     
     /* -- Other methods -- */
 
     /**
+     * Returns the service listener for the specified service id.
+     */
+    ServiceListener getServiceListener(byte serviceId) {
+	return serviceListeners.get(serviceId);
+    }
+
+    /**
      * Removes the specified session from the internal session map.
      */
     void disconnected(ClientSessionImpl session) {
-	synchronized (lock) {
-	    sessions.remove(session.getSessionId());
-	}
+	sessions.remove(session.getSessionId());
     }
 }

@@ -3,13 +3,17 @@ package com.sun.sgs.impl.service.session;
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
+import com.sun.sgs.app.Delivery;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
 import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.service.ServiceListener;
+import com.sun.sgs.service.SgsClientSession;
 import java.io.IOException;
 import java.security.SecureRandom;
 import java.util.Random;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -17,7 +21,7 @@ import java.util.logging.Logger;
 /**
  * Implements a client session.
  */
-class ClientSessionImpl implements ClientSession {
+class ClientSessionImpl implements SgsClientSession {
 
     /** Connection state. */
     private static enum State {
@@ -51,7 +55,7 @@ class ClientSessionImpl implements ClientSession {
     /** The authenticated name for this session. */
     private String name;
 
-    /** The lock for accessing the connection state. */
+    /** The lock for accessing the connection state and sending messages. */
     private final Object lock = new Object();
     
     /** The connection state. */
@@ -61,6 +65,8 @@ class ClientSessionImpl implements ClientSession {
     private ClientSessionListener listener;
 
     private boolean disconnectHandled = false;
+
+    private AtomicLong sequenceNumber = new AtomicLong(0);
 
     /**
      * Constructs an instance of this class with the specified handle.
@@ -173,8 +179,21 @@ class ClientSessionImpl implements ClientSession {
 	}
     }
 
+    /* -- Implement SgsClientSession -- */
+
+    /** {@inheritDoc} */
+    public long nextSequenceNumber() {
+	return sequenceNumber.getAndIncrement();
+    }
+    
+    public void sendMessage(byte[] message, Delivery delivery) {
+    }
+    
     /* -- other methods -- */
 
+    /**
+     * Returns the current state.
+     */
     private State getCurrentState() {
 	State currentState;
 	synchronized (lock) {
@@ -183,15 +202,15 @@ class ClientSessionImpl implements ClientSession {
 	return currentState;
     }
 
-    private void checkConnected() {
-	if (getCurrentState() != State.CONNECTED) {
-	    throw new IllegalArgumentException("client session not connected");
-	}
-    }
-
+    /**
+     * Sends the protocol message in the specified buffer to this
+     * session's client, logging any exception that occurs.
+     */
     private void sendProtocolMessage(MessageBuffer buf) {
 	try {
-	    sessionHandle.sendMessage(buf.getBuffer());
+	    synchronized (lock) {
+		sessionHandle.sendMessage(buf.getBuffer());
+	    }
 	} catch (IOException e) {
 	    if (logger.isLoggable(Level.WARNING)) {
 		logger.logThrow(
@@ -202,7 +221,20 @@ class ClientSessionImpl implements ClientSession {
     }
 
     /**
-     * Handles a disconnect request.
+     * Handles a disconnect request (if not already handlede) by doing
+     * the following:
+     *
+     * a) sending a disconnect acknowledgement (either LOGOUT_SUCCESS
+     * if 'graceful' is true, or SESSION_DISCONNECT if 'graceful' is
+     * false)
+     *
+     * b) closing this session's connection
+     *
+     * c) submitting a transactional task to call the 'disconnected'
+     * callback on the listener for this session.
+     *
+     * @param graceful if the disconnection was graceful (i.e., due to
+     * a logout request).
      */
     private void handleDisconnect(final boolean graceful) {
 	synchronized (lock) {
@@ -264,9 +296,14 @@ class ClientSessionImpl implements ClientSession {
     }
 
     /* -- IOHandler implementation -- */
-    
+
+    /**
+     * Handler for connection-related events for this session's
+     * IOHandle.
+     */
     class Handler implements IOHandler {
 
+	/** {@inheritDoc} */
 	public void connected(IOHandle handle) {
 	    if (logger.isLoggable(Level.FINER)) {
 		logger.log(
@@ -291,6 +328,7 @@ class ClientSessionImpl implements ClientSession {
 	    }
 	}
 
+	/** {@inheritDoc} */
 	public void disconnected(IOHandle handle) {
 	    if (logger.isLoggable(Level.FINER)) {
 		logger.log(
@@ -313,6 +351,7 @@ class ClientSessionImpl implements ClientSession {
 	    }
 	}
 
+	/** {@inheritDoc} */
 	public void exceptionThrown(Throwable exception, IOHandle handle) {
 
 	    if (logger.isLoggable(Level.WARNING)) {
@@ -322,22 +361,27 @@ class ClientSessionImpl implements ClientSession {
 	    }
 	}
 
+	/** {@inheritDoc} */
 	public void messageReceived(byte[] buffer, IOHandle handle) {
 	    synchronized (lock) {
 		if (handle != sessionHandle) {
 		    return;
 		}
 	    }
-	    logger.log(
-		Level.FINEST, "Handler.messageReceived handle:{0}, buffer:{1}",
-		handle, buffer);
-
-
-	    if (buffer.length < 2) {
+	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
-		    Level.SEVERE,
-		    "Handler.messageReceived malformed protocol message:{0}" +
-		    buffer);
+		    Level.FINEST,
+		    "Handler.messageReceived handle:{0}, buffer:{1}",
+		    handle, buffer);
+	    }
+
+	    if (buffer.length < 3) {
+		if (logger.isLoggable(Level.SEVERE)) {
+		    logger.log(
+		        Level.SEVERE,
+			"Handler.messageReceived malformed protocol message:{0}",
+			buffer);
+		}
 		// TBD: should the connection be disconnected?
 		return;
 	    }
@@ -349,12 +393,36 @@ class ClientSessionImpl implements ClientSession {
 	     */
 	    byte version = msg.getByte();
 	    if (version != SgsProtocol.VERSION) {
-		logger.log(
-		    Level.SEVERE,
-		    "Handler.messageReceived protocol version:{0}, " +
-		    "expected {1}", version, SgsProtocol.VERSION);
-		// TBD: should the connection be disconnected?
+		if (logger.isLoggable(Level.SEVERE)) {
+		    logger.log(
+			Level.SEVERE,
+			"Handler.messageReceived protocol version:{0}, " +
+			"expected {1}", version, SgsProtocol.VERSION);
+		}
+		    // TBD: should the connection be disconnected?
 		return;
+	    }
+
+	    /*
+	     * Handle service id.
+	     */
+	    byte serviceId = msg.getByte();
+
+	    if (serviceId != SgsProtocol.APPLICATION_SERVICE) {
+		ServiceListener serviceListener =
+		    sessionService.getServiceListener(serviceId);
+		if (serviceListener != null) {
+		    serviceListener.receivedMessage(
+			ClientSessionImpl.this, buffer);
+		} else {
+		    if (logger.isLoggable(Level.SEVERE)) {
+		    	logger.log(
+			    Level.SEVERE,
+			    "Handler.messageReceived unknown service ID:{0}",
+			    serviceId);
+		    }
+		    return;
+		}
 	    }
 
 	    /*
@@ -401,11 +469,12 @@ class ClientSessionImpl implements ClientSession {
 		break;
 		
 	    default:
-		logger.log(
-		    Level.SEVERE,
-		    "Handler.messageReceived unknown operation code:{0}",
-		    opcode);
-		    
+		if (logger.isLoggable(Level.SEVERE)) {
+		    logger.log(
+			Level.SEVERE,
+			"Handler.messageReceived unknown operation code:{0}",
+			opcode);
+		}
 		// TBD: should the connection be disconnected, or
 		// should this send an "unknown opcode" message to the
 		// client?

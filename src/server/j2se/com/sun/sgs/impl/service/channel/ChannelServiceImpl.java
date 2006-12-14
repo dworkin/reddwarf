@@ -12,6 +12,8 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Service;
+import com.sun.sgs.service.ServiceListener;
+import com.sun.sgs.service.SgsClientSession;
 //import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
@@ -23,10 +25,10 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Simple ChannelManager implementation.
+ * Simple ChannelService implementation.
  */
 public class ChannelServiceImpl
-    implements ChannelManager, Service, NonDurableTransactionParticipant
+    implements ChannelManager, NonDurableTransactionParticipant
 {
 
     /** The property that specifies the application name. */
@@ -185,6 +187,12 @@ public class ChannelServiceImpl
 		Level.FINEST, "getChannel name:{0} throws", e, name);
 	    throw e;
 	}
+    }
+
+    /* -- Implement ServiceListener -- */
+
+    /** {@inheritDoc} */
+    public void receivedMessage(SgsClientSession session, byte[] message) {
     }
 
     /* -- Implement NonDurableTransactionParticipant -- */

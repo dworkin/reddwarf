@@ -24,6 +24,10 @@ public interface SgsProtocol {
     /** The version number. */
     final byte VERSION = 0x01;
 
+    final byte APPLICATION_SERVICE = 0x01;
+
+    final byte CHANNEL_SERVICE = 0x02;
+
     /**
      * Operation code unknown.
      * <ul>
@@ -134,6 +138,7 @@ public interface SgsProtocol {
      * Channel send request.
      * <ul>
      * <li> (String) name
+     * <li> (long) sequence number
      * <li> (short) number of recipients (0 = all)
      * <li> If number of recipients > 0, for each recipient:
      * <ul>
@@ -150,6 +155,7 @@ public interface SgsProtocol {
      * Channel message (to recipient on channel).
      * <ul>
      * <li> (String) name
+     * <li> (long) sequence number
      * <li> (short) size of sender's sessionId (=0 if server is sender)
      * <li> (byte[]) sender's sessionId
      * <li> (short) message size
