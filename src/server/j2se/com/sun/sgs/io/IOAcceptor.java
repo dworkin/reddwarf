@@ -12,7 +12,24 @@ import java.util.Collection;
  * @since       1.0
  */
 public interface IOAcceptor {
-
+    
+    /**
+     * Accepts incoming connections on the given address.  
+     * {@code AcceptedHandleListener.newHandle} is called as new 
+     * {@code IOHandle}s connect.  A new instance of the given filter class
+     * will be attached to each incoming {@code IOHandle}.
+     * 
+     * @param address                   the address on which to listen
+     * @param listener                  the listener that will be notified
+     *                                  of new connections
+     * @param filterClass               the type of filter to attach to incoming
+     *                                  {@code IOHandle}s
+     * 
+     * @throws IOException if there was a problem binding to the port
+     */
+    public void listen(SocketAddress address, AcceptedHandleListener listener, 
+                    Class<? extends IOFilter> filterClass) throws IOException;
+    
     /**
      * Accepts incoming connections on the given address.  
      * {@code AcceptedHandleListener.newHandle} is called as new 
