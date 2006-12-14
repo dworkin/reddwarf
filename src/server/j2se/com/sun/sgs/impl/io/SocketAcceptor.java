@@ -14,18 +14,22 @@ import org.apache.mina.common.IoAcceptor;
 
 import com.sun.sgs.io.AcceptedHandleListener;
 import com.sun.sgs.io.IOAcceptor;
+import com.sun.sgs.io.IOFilter;
 
 /**
- * This is an Apache Mina implementation of an {@code IOAcceptor}.  This 
- * implementation uses a Mina {@link IoAcceptor} to accept incoming 
- * connections.  This implementation is thread-safe.
+ * This is an implementation of an {@code IOAcceptor} that uses a Mina 
+ * {@link IoAcceptor} to accept incoming connections.  
+ * This implementation is thread-safe.
  * 
  * @author  Sten Anderson
  * @version 1.0
  */
 public class SocketAcceptor implements IOAcceptor {
     
+    /** The associated Mina acceptor that handles the binding */
     private IoAcceptor acceptor;
+    
+    /** A List of addresses that are bound by this acceptor */
     private List<SocketAddress> boundAddresses;
 
     /**
@@ -42,12 +46,28 @@ public class SocketAcceptor implements IOAcceptor {
     /**
      * {@inheritDoc}
      */
-    public void listen(SocketAddress address, AcceptedHandleListener listener) 
-                                                        throws IOException {
-        acceptor.bind(address, new AcceptedHandleAdapter(listener));
+    public void listen(SocketAddress address, AcceptedHandleListener listener, 
+                    Class<? extends IOFilter> filterClass) throws IOException {
+
+        if (filterClass == null) {
+            filterClass = PassthroughFilter.class;
+        }
+        acceptor.bind(address, new AcceptedHandleAdapter(listener, filterClass));
         synchronized (boundAddresses) {
             boundAddresses.add(address);
         }
+    }
+    
+    /**
+     * {@inheritDoc}
+     * <p>
+     * This implementation uses a {@code PassthroughFilter} which simply
+     * forwards any data on untouched.
+     */
+    public void listen(SocketAddress address, AcceptedHandleListener listener) 
+                                                        throws IOException {
+
+        listen(address, listener, PassthroughFilter.class);
     }
     
     /**
@@ -78,5 +98,7 @@ public class SocketAcceptor implements IOAcceptor {
             boundAddresses.clear();
         }
     }
+
+
 
 }

@@ -10,6 +10,7 @@ import org.apache.mina.common.IoFuture;
 import org.apache.mina.util.NewThreadExecutor;
 
 import com.sun.sgs.io.AcceptedHandleListener;
+import com.sun.sgs.io.IOFilter;
 import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
 import com.sun.sgs.io.IOConnector;
@@ -46,13 +47,24 @@ public class SocketConnector implements IOConnector {
     
     /**
      * {@inheritDoc}
+     * <p>
+     * A {@code PassthroughFilter} will be installed on the returned 
+     * {@code IOHandle}, which simply passes the data on untouched.
      */
     public IOHandle connect(InetAddress address, int port, IOHandler handler) {
+        return connect(address, port, handler, new PassthroughFilter());
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public IOHandle connect(InetAddress address, int port, IOHandler handler, 
+                            IOFilter filter) {
         InetSocketAddress socketAddress = new InetSocketAddress(address, port);
         
-        SocketHandle handle = new SocketHandle();
+        SocketHandle handle = new SocketHandle(filter);
         handle.setIOHandler(handler);
-        IoFuture future = connector.connect(socketAddress, new SocketHandler(handler));
+        IoFuture future = connector.connect(socketAddress, new SocketHandler());
         future.addListener(handle);
         
         // avoid a race condition b/w the time of getting a reference to the
@@ -63,9 +75,10 @@ public class SocketConnector implements IOConnector {
         
         return handle;
     }
-
+    
 
     public void shutdown() {
     }
+
 
 }
