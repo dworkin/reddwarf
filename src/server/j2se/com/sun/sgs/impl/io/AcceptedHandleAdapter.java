@@ -5,7 +5,9 @@ import org.apache.mina.common.IoHandler;
 import org.apache.mina.common.IoSession;
 
 import com.sun.sgs.io.AcceptedHandleListener;
+import com.sun.sgs.io.IOFilter;
 import com.sun.sgs.io.IOHandle;
+import com.sun.sgs.io.IOHandler;
 
 /**
  * This class functions as an adapter between the Mina {@link IoHandler}
@@ -14,87 +16,48 @@ import com.sun.sgs.io.IOHandle;
  * {@code AcceptedHandleListener.newHandle} method is called.
  * <p>
  * All other callbacks are forwarded to the {@code IOHandler} associated with 
- * the {@code IOHandle} from the given {@code IoSession}.
+ * the {@code IOHandle} from the given {@code IoSession}, as handled by the 
+ * superclass.
  * 
  * @author      Sten Anderson
  * @version     1.0
  */
-public class AcceptedHandleAdapter implements IoHandler {
+public class AcceptedHandleAdapter extends SocketHandler {
     
     private AcceptedHandleListener listener;
+    private Class<? extends IOFilter> filterClass;
     
     /**
      * Constructs a new {@code AcceptedHandleAdapter} with an 
      * {@code AcceptedHandleListener} that will be notified as new 
      * connections arrive.
      * 
-     * @param listener  the listener to be notified of incoming connections.
+     * @param listener          the listener to be notified of incoming 
+     *                          connections.
+     * @param filterClass       the type of filter to be attached to new handles
      */
-    public AcceptedHandleAdapter(AcceptedHandleListener listener) {
+    public AcceptedHandleAdapter(AcceptedHandleListener listener, 
+                                Class<? extends IOFilter> filterClass) {
+        
         this.listener = listener; 
+        this.filterClass = filterClass;
     }
     
-    // Mina IoHandler callbacks 
+    // Override this Mina IoHandler callback 
 
     /**
      * As new {@code IoSession}s come in, set up a {@code SocketHandle} and 
-     * notify the associated {@code AcceptedHandleListener}.
+     * notify the associated {@code AcceptedHandleListener}.  A new instance
+     * of the associated filter will be attached to the new handle.
      */
     public void sessionCreated(IoSession session) throws Exception {
-        SocketHandle handle = new SocketHandle();
+        IOFilter filterInstance = filterClass.newInstance();
+        SocketHandle handle = new SocketHandle(filterInstance);
         handle.setSession(session);
-        listener.newHandle(handle);
-    }
-
-    /**
-     * Fired by Mina when an {@code IoSession} disconnects.
-     * 
-     * @param session           the session that disconnected.
-     */
-    public void sessionClosed(IoSession session) throws Exception {
-        SocketHandle handle = (SocketHandle) session.getAttachment();
-        handle.getIOHandler().disconnected(handle);
-    }
-
-    /**
-     * This call-back is fired when there is an exception somewhere in Mina's
-     * framework.  The exception is forwarded onto the {@code IOHandler} 
-     * associated with the session. 
-     * 
-     * @param session           the session where the exception occurred
-     * @param throwable         the exception
-     */
-    public void exceptionCaught(IoSession session, Throwable throwable)
-            throws Exception {
-
-        SocketHandle handle = (SocketHandle) session.getAttachment();
-        handle.getIOHandler().exceptionThrown(throwable, handle);
-    }
-
-    /**
-     * Fired by Mina when a new message is received on a session.  The message
-     * is transferred into a byte array and forwarded to the associated 
-     * {@code IOHandler.messageReceived} callback.
-     */
-    public void messageReceived(IoSession session, Object message) throws Exception {
-        org.apache.mina.common.ByteBuffer minaBuffer = 
-                                (org.apache.mina.common.ByteBuffer) message;
-
-        SocketHandle handle = (SocketHandle) session.getAttachment();
+        IOHandler handler = listener.newHandle(handle);
         
-        byte[] array = new byte[minaBuffer.remaining()];
-        minaBuffer.get(array);
-        handle.getIOHandler().messageReceived(array, handle);
-        
+        handle.setIOHandler(handler);
     }
 
-    // not used
-    public void messageSent(IoSession arg0, Object arg1) throws Exception {}
-    
-    // not used
-    public void sessionIdle(IoSession arg0, IdleStatus arg1) throws Exception {}
-    
-    // not used
-    public void sessionOpened(IoSession arg0) throws Exception {}
     
 }
