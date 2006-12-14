@@ -22,7 +22,7 @@ public interface IOHandle {
      * 
      * @throws IOException if there was a problem sending the message
      */
-    public void sendMessage(byte[] message) throws IOException;
+    public void sendBytes(byte[] message) throws IOException;
     
     /**
      * Attempts to close the underlying <code>Connection</code>.  Note that
@@ -32,14 +32,6 @@ public interface IOHandle {
      * @throws IOException if there was a problem closing the handle
      */ 
     public void close() throws IOException;
-    
-    /**
-     * Sets the associated <code>IOHandler</code> which will 
-     * receive events for this <code>IOHandle</code>.
-     * 
-     * @param handler           the handler on which to receive events 
-     */
-    public void setIOHandler(IOHandler handler);
     
 
 }
