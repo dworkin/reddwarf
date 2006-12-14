@@ -676,6 +676,14 @@ public final class DataServiceImpl
 	    return null;
 	}
 	String prefix = serviceBinding ? "s." : "a.";
+	/*
+	 * If this is an application binding, then the name could start with
+	 * "s." if we've moved past all of the application bindings.
+	 * Otherwise, the prefix should be correct.  -tjb@sun.com (12/14/2006)
+	 */
+	assert name.startsWith(prefix) ||
+	    (!serviceBinding && name.startsWith("s."))
+	    : "Name has wrong prefix";
 	return name.startsWith(prefix) ? name.substring(2) : null;
     }	    
 

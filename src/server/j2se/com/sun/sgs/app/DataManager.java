@@ -93,9 +93,7 @@ public interface DataManager {
      * encoding used can be either <em>standard UTF-8</em>, as defined by the
      * IETF in <a href="http://tools.ietf.org/html/rfc3629">RFC 3629</a>, or
      * <em>modified UTF-8</em>, as used by Java serialization and defined by
-     * the {@link DataInput} interface.  As a practical matter, regardless of
-     * the encoding used, the ordering of names will follow standard dictionary
-     * order for printing ASCII characters.
+     * the {@link DataInput} interface.
      *
      * @param	name the name to search after, or <code>null</code> to start at
      *		the beginning

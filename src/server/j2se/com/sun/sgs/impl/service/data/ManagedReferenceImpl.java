@@ -91,6 +91,9 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
      */
     private transient Context context;
 
+    /** The value returned by getId, or null. */
+    private transient BigInteger id;
+
     /**
      * The object ID.
      *
@@ -339,7 +342,10 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
     }
 
     public BigInteger getId() {
-	return BigInteger.valueOf(oid);
+	if (id == null) {
+	    id = BigInteger.valueOf(oid);
+	}
+	return id;
     }
 
     /* -- Implement Serializable -- */

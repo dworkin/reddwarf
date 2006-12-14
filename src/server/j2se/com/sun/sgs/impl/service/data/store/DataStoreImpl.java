@@ -254,13 +254,14 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	/**
 	 * The currently open Berkeley DB cursor or null.  The cursor must be
 	 * closed before the transaction is prepared, committed, or aborted.
-	 * (Actually, I'm not certain about prepare, but seems like a safe
-	 * thing to do.  -tjb@sun.com (12/07/2006))
+	 * Note that the Berkeley DB documentation for prepare doesn't say you
+	 * need to close cursors, but my testing shows that you do.
+	 * -tjb@sun.com (12/14/2006)
 	 */
-	Cursor cursor;
+	private Cursor cursor;
 
 	/** The last key returned by the cursor or null. */
-	String lastCursorKey;
+	private String lastCursorKey;
 
 	TxnInfo(Transaction txn, Environment env) throws DatabaseException {
 	    this.txn = txn;
@@ -283,6 +284,33 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	void abort() throws DatabaseException {
 	    maybeCloseCursor();
 	    bdbTxn.abort();
+	}
+
+	/** Returns the next name in the names database. */
+	String nextName(String name, Database names) throws DatabaseException {
+	    if (cursor == null) {
+		cursor = names.openCursor(bdbTxn, null);
+	    }
+	    DatabaseEntry key = new DatabaseEntry();
+	    DatabaseEntry value = new DatabaseEntry();
+	    if (name == null) {
+		OperationStatus status = cursor.getFirst(key, value, null);
+		lastCursorKey = getNextBoundNameResult(status, key);
+	    } else {
+		boolean matchesLast = name.equals(lastCursorKey);
+		if (!matchesLast) {
+		    StringBinding.stringToEntry(name, key);
+		    OperationStatus status =
+			cursor.getSearchKeyRange(key, value, null);
+		    lastCursorKey = getNextBoundNameResult(status, key);
+		    matchesLast = name.equals(lastCursorKey);
+		}
+		if (matchesLast) {
+		    OperationStatus status = cursor.getNext(key, value, null);
+		    lastCursorKey = getNextBoundNameResult(status, key);
+		}
+	    }
+	    return lastCursorKey;
 	}
 
 	/**
@@ -791,7 +819,12 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	throw exception;
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc} <p>
+     *
+     * This implementation uses a single cursor, so it provides better
+     * performance when used to iterate over names in order.
+     */
     public String nextBoundName(Transaction txn, String name) {
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(
@@ -800,38 +833,13 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	RuntimeException exception;
 	try {
 	    TxnInfo txnInfo = checkTxn(txn);
-	    if (txnInfo.cursor == null) {
-		txnInfo.cursor = names.openCursor(txnInfo.bdbTxn, null);
-	    }
-	    DatabaseEntry key = new DatabaseEntry();
-	    DatabaseEntry value = new DatabaseEntry();
-	    String last = txnInfo.lastCursorKey;
-	    if (name == null) {
-		OperationStatus status =
-		    txnInfo.cursor.getFirst(key, value, null);
-		last = getNextBoundNameResult(status, key);
-	    } else {
-		boolean matchesLast = name.equals(last);
-		if (!matchesLast) {
-		    StringBinding.stringToEntry(name, key);
-		    OperationStatus status =
-			txnInfo.cursor.getSearchKeyRange(key, value, null);
-		    last = getNextBoundNameResult(status, key);
-		    matchesLast = name.equals(last);
-		}
-		if (matchesLast) {
-		    OperationStatus status =
-			txnInfo.cursor.getNext(key, value, null);
-		    last = getNextBoundNameResult(status, key);
-		}
-	    }
-	    txnInfo.lastCursorKey = last;
+	    String result = txnInfo.nextName(name, names);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
 			   "nextBoundName txn:{0}, name:{1} returns {2}",
-			   txn, name, txnInfo.lastCursorKey);
+			   txn, name, result);
 	    }
-	    return last;
+	    return result;
 	} catch (DatabaseException e) {
 	    exception = convertDatabaseException(e);
 	} catch (RuntimeException e) {
