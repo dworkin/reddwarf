@@ -19,7 +19,7 @@ public interface IOHandler {
      * @param buffer            the buffer containing the data
      * @param handle            the IOHandle on which the data arrived
      */
-    public void messageReceived(byte[] buffer, IOHandle handle);
+    public void bytesReceived(byte[] buffer, IOHandle handle);
     
     /**
      * Called when the given <code>IOHandle</code> is disconnected.
