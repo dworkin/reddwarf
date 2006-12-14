@@ -83,6 +83,13 @@ public class ProfilingDataManager implements DataManager, ProfilingManager {
     /**
      * {@inheritDoc}
      */
+    public String nextBoundName(String name) {
+        return backingManager.nextBoundName(name);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     public void removeObject(ManagedObject object) {
         backingManager.removeObject(object);
     }

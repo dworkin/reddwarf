@@ -3,6 +3,7 @@ package com.sun.sgs.impl.service.data.store;
 import com.sleepycat.bind.tuple.LongBinding;
 import com.sleepycat.bind.tuple.StringBinding;
 import com.sleepycat.db.CacheFileStats;
+import com.sleepycat.db.Cursor;
 import com.sleepycat.db.Database;
 import com.sleepycat.db.DatabaseConfig;
 import com.sleepycat.db.DatabaseEntry;
@@ -250,9 +251,51 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	/** Whether any changes have been made in this transaction. */
 	boolean modified;
 
+	/**
+	 * The currently open Berkeley DB cursor or null.  The cursor must be
+	 * closed before the transaction is prepared, committed, or aborted.
+	 * (Actually, I'm not certain about prepare, but seems like a safe
+	 * thing to do.  -tjb@sun.com (12/07/2006))
+	 */
+	Cursor cursor;
+
+	/** The last key returned by the cursor or null. */
+	String lastCursorKey;
+
 	TxnInfo(Transaction txn, Environment env) throws DatabaseException {
 	    this.txn = txn;
 	    bdbTxn = env.beginTransaction(null, null);
+	}
+
+	/** Prepares the transaction, first closing the cursor, if present. */
+	void prepare(byte[] gid) throws DatabaseException {
+	    maybeCloseCursor();
+	    bdbTxn.prepare(gid);
+	}
+
+	/** Commits the transaction, first closing the cursor, if present. */
+	void commit() throws DatabaseException {
+	    maybeCloseCursor();
+	    bdbTxn.commit();
+	}
+
+	/** Aborts the transaction, first closing the cursor, if present. */
+	void abort() throws DatabaseException {
+	    maybeCloseCursor();
+	    bdbTxn.abort();
+	}
+
+	/**
+	 * Close the cursor if it is open.  Always null the cursor field, since
+	 * the Berkeley DB API doesn't permit closing a cursor after an attempt
+	 * to close it.
+	 */
+	private void maybeCloseCursor() throws DatabaseException {
+	    if (cursor != null) {
+		Cursor c = cursor;
+		cursor = null;
+		c.close();
+	    }
 	}
     }
 
@@ -748,6 +791,60 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	throw exception;
     }
 
+    /** {@inheritDoc} */
+    public String nextBoundName(Transaction txn, String name) {
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(
+		Level.FINEST, "nextBoundName txn:{0}, name:{1}", txn, name);
+	}
+	RuntimeException exception;
+	try {
+	    TxnInfo txnInfo = checkTxn(txn);
+	    if (txnInfo.cursor == null) {
+		txnInfo.cursor = names.openCursor(txnInfo.bdbTxn, null);
+	    }
+	    DatabaseEntry key = new DatabaseEntry();
+	    DatabaseEntry value = new DatabaseEntry();
+	    String last = txnInfo.lastCursorKey;
+	    if (name == null) {
+		OperationStatus status =
+		    txnInfo.cursor.getFirst(key, value, null);
+		last = getNextBoundNameResult(status, key);
+	    } else {
+		boolean matchesLast = name.equals(last);
+		if (!matchesLast) {
+		    StringBinding.stringToEntry(name, key);
+		    OperationStatus status =
+			txnInfo.cursor.getSearchKeyRange(key, value, null);
+		    last = getNextBoundNameResult(status, key);
+		    matchesLast = name.equals(last);
+		}
+		if (matchesLast) {
+		    OperationStatus status =
+			txnInfo.cursor.getNext(key, value, null);
+		    last = getNextBoundNameResult(status, key);
+		}
+	    }
+	    txnInfo.lastCursorKey = last;
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST,
+			   "nextBoundName txn:{0}, name:{1} returns {2}",
+			   txn, name, txnInfo.lastCursorKey);
+	    }
+	    return last;
+	} catch (DatabaseException e) {
+	    exception = convertDatabaseException(e);
+	} catch (RuntimeException e) {
+	    exception = e;
+	}
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.logThrow(Level.FINEST, exception,
+			    "nextBoundName txn:{0}, name:{1} throws",
+			    txn, name);
+	}
+	throw exception;
+    }
+
     /* -- Implement TransactionParticipant -- */
 
     /** {@inheritDoc} */
@@ -775,7 +872,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 		 */
 		byte[] gid = new byte[128];
 		System.arraycopy(oid, 0, gid, 128 - oid.length, oid.length);
-		txnInfo.bdbTxn.prepare(gid);
+		txnInfo.prepare(gid);
 		txnInfo.prepared = true;
 	    } else {
 		/*
@@ -785,7 +882,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 		 * object after commit is called.
 		 */
 		threadTxnInfo.set(null);
-		txnInfo.bdbTxn.commit();
+		txnInfo.commit();
 	    }
 	    boolean result = !txnInfo.modified;
 	    if (logger.isLoggable(Level.FINER)) {
@@ -826,7 +923,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	     * after commit is called.
 	     */
 	    threadTxnInfo.set(null);
-	    txnInfo.bdbTxn.commit();
+	    txnInfo.commit();
 	    logger.log(Level.FINER, "commit txn:{0} returns", txn);
 	    return;
 	} catch (DatabaseException e) {
@@ -862,7 +959,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	     * after commit is called.
 	     */
 	    threadTxnInfo.set(null);
-	    txnInfo.bdbTxn.commit();
+	    txnInfo.commit();
 	    logger.log(Level.FINER, "prepareAndCommit txn:{0} returns", txn);
 	    return;
 	} catch (DatabaseException e) {
@@ -896,7 +993,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	     * after commit is called.
 	     */
 	    threadTxnInfo.set(null);
-	    txnInfo.bdbTxn.abort();
+	    txnInfo.abort();
 	    logger.log(Level.FINER, "abort txn:{0} returns", txn);
 	    return;
 	} catch (DatabaseException e) {
@@ -1014,6 +1111,23 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 		       env.getLogStats(null),
 		       env.getMutexStats(null),
 		       env.getTransactionStats(null));
+	}
+    }
+
+    /**
+     * Returns the name of the next binding given the results of a cursor
+     * operation and the associated key.
+     */
+    private static String getNextBoundNameResult(
+	OperationStatus status, DatabaseEntry key)
+    {
+	if (status == OperationStatus.NOTFOUND) {
+	    return null;
+	} else if (status == OperationStatus.SUCCESS) {
+	    return StringBinding.entryToString(key);
+	} else {
+	    throw new DataStoreException(
+		"Getting next binding failed: " + status);
 	}
     }
 }

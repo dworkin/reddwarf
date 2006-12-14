@@ -246,6 +246,11 @@ public final class DataServiceImpl
     }
 
     /** {@inheritDoc} */
+    public String nextBoundName(String name) {
+	return nextBoundNameInternal(name, false);
+    }
+
+    /** {@inheritDoc} */
     public void removeObject(ManagedObject object) {
 	try {
 	    if (object == null) {
@@ -330,6 +335,11 @@ public final class DataServiceImpl
     /** {@inheritDoc} */
     public void removeServiceBinding(String name) {
        removeBindingInternal(name, true);
+    }
+
+    /** {@inheritDoc} */
+    public String nextServiceBoundName(String name) {
+	return nextBoundNameInternal(name, true);
     }
 
     /* -- Implement TransactionParticipant -- */
@@ -500,6 +510,31 @@ public final class DataServiceImpl
 	}
     }
 
+    /** Implement nextBoundName and nextServiceBoundName. */
+    private String nextBoundNameInternal(String name, boolean serviceBinding) {
+	try {
+	    Context context = getContext();
+	    String result = getExternalName(
+		context.nextBoundName(getInternalName(name, serviceBinding)),
+		serviceBinding);
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(
+		    Level.FINEST, "{0} name:{1} returns {2}",
+		    serviceBinding ? "nextServiceBoundName" : "nextBoundName",
+		    name, result);
+	    }
+	    return result;
+	} catch (RuntimeException e) {
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.logThrow(
+		    Level.FINEST, e, "{0} name:{1} throws",
+		    serviceBinding ? "nextServiceBoundName" : "nextBoundName",
+		    name);
+	    }
+	    throw e;
+	}
+    }
+
     /* -- Other public methods -- */
 
     /**
@@ -617,13 +652,32 @@ public final class DataServiceImpl
 
     /**
      * Returns the name that should be used for a service or application
-     * binding.
+     * binding.  If name is null, then returns a name that will sort earlier
+     * than any non-null name.
      */
     private static String getInternalName(
 	String name, boolean serviceBinding)
     {
-	return (serviceBinding ? "s." : "a.") + name;
+	if (name == null) {
+	    return serviceBinding ? "s" : "a";
+	} else {
+	    return (serviceBinding ? "s." : "a.") + name;
+	}
     }
+
+    /**
+     * Returns the external name for a service or application binding name.
+     * Returns null if the name does not have the proper prefix, or is null.
+     */
+    private static String getExternalName(
+	String name, boolean serviceBinding)
+    {
+	if (name == null) {
+	    return null;
+	}
+	String prefix = serviceBinding ? "s." : "a.";
+	return name.startsWith(prefix) ? name.substring(2) : null;
+    }	    
 
     /**
      * Adds an action to be performed on abort, to roll back transient state
