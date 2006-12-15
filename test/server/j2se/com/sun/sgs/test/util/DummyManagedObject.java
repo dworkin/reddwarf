@@ -17,7 +17,7 @@ public class DummyManagedObject implements ManagedObject, Serializable {
     private static AtomicInteger nextId = new AtomicInteger(1);
 
     /** A unique identifier for this object -- used for equality checks. */
-    private final int id = nextId.getAndIncrement();
+    private final int id;
 
     /** An arbitrary object. */
     public Object value = null;
@@ -26,7 +26,14 @@ public class DummyManagedObject implements ManagedObject, Serializable {
     private ManagedReference next = null;
 
     /** Creates an instance of this class. */
-    public DummyManagedObject() { }
+    public DummyManagedObject() {
+	id = nextId.getAndIncrement();
+    }
+
+    /** Creates an instance of this class using a specific ID. */
+    public DummyManagedObject(int id) {
+	this.id = id;
+    }
 
     /**
      * Sets the value field, calling markForUpdate to note the

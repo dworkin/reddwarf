@@ -1,6 +1,7 @@
 package com.sun.sgs.app;
 
 import java.io.Serializable;
+import java.math.BigInteger;
 
 /**
  * Represents a reference to a managed object.  Classes that implement
@@ -58,6 +59,15 @@ public interface ManagedReference {
      * @see	DataManager#markForUpdate DataManager.markForUpdate
      */
     <T> T getForUpdate(Class<T> type);
+
+    /**
+     * Returns a unique identifier for the object associated with this
+     * reference.  Two references have equal identifiers if and only if they
+     * refer to the same object.
+     *
+     * @return	a unique identifier for this reference
+     */
+    BigInteger getId();
 
     /**
      * Compares the specified object with this reference.  Returns

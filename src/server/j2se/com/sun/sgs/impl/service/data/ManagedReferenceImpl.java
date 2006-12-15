@@ -9,6 +9,7 @@ import com.sun.sgs.impl.util.LoggerWrapper;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.math.BigInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -89,6 +90,9 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
      * that it can be set during deserialization.
      */
     private transient Context context;
+
+    /** The value returned by getId, or null. */
+    private transient BigInteger id;
 
     /**
      * The object ID.
@@ -335,6 +339,13 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 	    logger.logThrow(Level.FINEST, e, "getForUpdate {0} throws", this);
 	    throw e;
 	}
+    }
+
+    public BigInteger getId() {
+	if (id == null) {
+	    id = BigInteger.valueOf(oid);
+	}
+	return id;
     }
 
     /* -- Implement Serializable -- */
