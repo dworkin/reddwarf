@@ -812,7 +812,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    logger.log(
 		Level.FINEST, "nextBoundName txn:{0}, name:{1}", txn, name);
 	}
-	RuntimeException exception;
+	Exception exception;
 	try {
 	    TxnInfo txnInfo = checkTxn(txn);
 	    String result = txnInfo.nextName(name, names);
@@ -823,16 +823,12 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    }
 	    return result;
 	} catch (DatabaseException e) {
-	    exception = convertDatabaseException(e);
+	    exception = e;
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.logThrow(Level.FINEST, exception,
-			    "nextBoundName txn:{0}, name:{1} throws",
-			    txn, name);
-	}
-	throw exception;
+	throw convertException(Level.FINEST, exception,
+			       "nextBoundName txn:" + txn + ", name:" + name);
     }
 
     /* -- Implement TransactionParticipant -- */

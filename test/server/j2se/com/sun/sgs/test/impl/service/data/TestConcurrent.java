@@ -32,14 +32,15 @@ public class TestConcurrent extends TestCase {
 	"com.sun.sgs.impl.service.data.store.DataStoreImpl";
 
     /** The number of operations to perform. */
-    private static int operations =
+    private static final int operations =
 	Integer.getInteger("test.operations", 10000);
 
     /** The maximum number of objects to allocate. */
-    private static int objects = Integer.getInteger("test.objects", 1000);
+    private static final int objects =
+	Integer.getInteger("test.objects", 1000);
 
     /** The number of concurrent threads. */
-    private static int threads = Integer.getInteger("test.threads", 2);
+    private static final int threads = Integer.getInteger("test.threads", 2);
 
     /** Print test parameters. */
     static {
@@ -65,6 +66,9 @@ public class TestConcurrent extends TestCase {
 
     /** The total number of aborts seen by the various threads. */
     private int aborts;
+
+    /** The number of threads that are done. */
+    private int done;
 
     /** Creates the test. */
     public TestConcurrent(String name) {
@@ -111,7 +115,7 @@ public class TestConcurrent extends TestCase {
 	}
 	while (true) {
 	    synchronized (this) {
-		if (failure != null || threads == 0) {
+		if (failure != null || done >= threads) {
 		    break;
 		}
 		try {
@@ -126,9 +130,12 @@ public class TestConcurrent extends TestCase {
 	if (failure != null) {
 	    throw failure;
 	}
+	long ms = stop - start;
+	double s = (stop - start) / 1000.0d;
 	System.err.println(
-	    "Time: " + (stop - start) + " ms\n" +
-	    "Aborts: " + aborts);
+	    "Time: " + ms + " ms\n" +
+	    "Aborts: " + aborts + "\n" +
+	    "Ops per second: " + Math.round((threads * operations) / s));
     }
 
     /* -- Other methods and classes -- */
@@ -138,7 +145,7 @@ public class TestConcurrent extends TestCase {
      * of aborts that occurred in the thread.
      */
     synchronized void threadDone(int aborts) {
-	threads--;
+	done++;
 	this.aborts += aborts;
 	notifyAll();
     }
@@ -173,7 +180,21 @@ public class TestConcurrent extends TestCase {
 		    if (i % 1000 == 0) {
 			System.err.println(this + ": Operation " + i);
 		    }
-		    op(i);
+		    while (true) {
+			try {
+			    op(i);
+			    break;
+			} catch (TransactionAbortedException e) {
+			    if (logger.isLoggable(Level.FINE)) {
+				logger.log(Level.FINE, "{0}: {1}", this, e);
+			    }
+			    aborts++;
+			    if (txn != null) {
+				txn.abort();
+			    }
+			    createTxn();
+			}
+		    }
 		}
 		txn.abort();
 		threadDone(aborts);
@@ -187,67 +208,54 @@ public class TestConcurrent extends TestCase {
 	}
 
 	private void op(int i) throws Exception {
-	    try {
-		if (random.nextInt(10) == 0) {
-		    DummyTransaction t = txn;
-		    txn = null;
-		    t.commit();
-		    createTxn();
-		}
-		String name = "obj-" + (1 + random.nextInt(objects * threads));
-		switch (random.nextInt(6)) {
-		case 0:
-		    try {
-			service.getBinding(name, Object.class);
-		    } catch (NameNotBoundException e) {
-		    } catch (ObjectNotFoundException e) {
-		    }
-		    break;
-		case 1:
-		    service.setBinding(name, new DummyManagedObject());
-		    break;
-		case 2:
-		    try {
-			service.removeBinding(name);
-		    } catch (NameNotBoundException e) {
-		    }
-		    break;
-		case 3:
-		    /* Add null, obj-0 and obj-N+1 */
-		    // FIXME: Put in when nextBoundName is defined.
-		    // -tjb@sun.com (12/08/2006)
-		    // int r = random.nextInt(objects + 3);
-		    // name = (r == 0) ? null : "obj-" + (r - 1);
-		    // service.nextBoundName(name);
-		    break;
-		case 4:
-		    try {
-			service.removeObject(
-			    service.getBinding(name, ManagedObject.class));
-		    } catch (NameNotBoundException e) {
-		    } catch (ObjectNotFoundException e) {
-		    }
-		    break;
-		case 5:
-		    try {
-			service.markForUpdate(
-			    service.getBinding(name, ManagedObject.class));
-		    } catch (NameNotBoundException e) {
-		    } catch (ObjectNotFoundException e) {
-		    }
-		    break;
-		default:
-		    throw new AssertionError();
-		}
-	    } catch (TransactionAbortedException e) {
-		if (logger.isLoggable(Level.FINE)) {
-		    logger.log(Level.FINE, "{0}: {1}", this, e);
-		}
-		aborts++;
-		if (txn != null) {
-		    txn.abort();
-		}
+	    if (random.nextInt(10) == 0) {
+		DummyTransaction t = txn;
+		txn = null;
+		t.commit();
 		createTxn();
+	    }
+	    String name = "obj-" + (1 + random.nextInt(objects * threads));
+	    switch (random.nextInt(6)) {
+	    case 0:
+		try {
+		    service.getBinding(name, Object.class);
+		} catch (NameNotBoundException e) {
+		} catch (ObjectNotFoundException e) {
+		}
+		break;
+	    case 1:
+		service.setBinding(name, new DummyManagedObject());
+		break;
+	    case 2:
+		try {
+		    service.removeBinding(name);
+		} catch (NameNotBoundException e) {
+		}
+		break;
+	    case 3:
+		/* Add 3 so we can include null, obj-0, and obj-N+1 */
+		int r = random.nextInt(objects + 3);
+		name = (r == 0) ? null : "obj-" + (r - 1);
+		service.nextBoundName(name);
+		break;
+	    case 4:
+		try {
+		    service.removeObject(
+			service.getBinding(name, ManagedObject.class));
+		} catch (NameNotBoundException e) {
+		} catch (ObjectNotFoundException e) {
+		}
+		break;
+	    case 5:
+		try {
+		    service.markForUpdate(
+			service.getBinding(name, ManagedObject.class));
+		} catch (NameNotBoundException e) {
+		} catch (ObjectNotFoundException e) {
+		}
+		break;
+	    default:
+		throw new AssertionError();
 	    }
 	}
 
