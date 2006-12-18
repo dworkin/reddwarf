@@ -11,7 +11,7 @@ public class MessageBuffer {
     private int limit;
 
     public static int getSize(String s) {
-	return 2 + s.length();
+	return 2 + (s.length() * 2);
     }
 
     public MessageBuffer(int capacity) {

@@ -74,8 +74,11 @@ public class ChannelServiceImpl
      * Constructs an instance of this class with the specified properties.
      */
     public ChannelServiceImpl(Properties properties) {
-	logger.log(Level.CONFIG, "Creating ChannelServiceImpl properties:{0}",
-		   properties);
+	if (logger.isLoggable(Level.CONFIG)) {
+	    logger.log(
+		Level.CONFIG, "Creating ChannelServiceImpl properties:{0}",
+		properties);
+	}
 	try {
 	    appName = properties.getProperty(APP_NAME_PROPERTY);
 	    if (appName == null) {
@@ -85,7 +88,10 @@ public class ChannelServiceImpl
 	    }
 
 	} catch (RuntimeException e) {
-	    logger.log(Level.CONFIG, "Failed to create ChannelServiceImpl", e);
+	    if (logger.isLoggable(Level.CONFIG)) {
+		logger.logThrow(
+		    Level.CONFIG, e, "Failed to create ChannelServiceImpl");
+	    }
 	    throw e;
 	}
     }
@@ -100,8 +106,10 @@ public class ChannelServiceImpl
 
     /** {@inheritDoc} */
     public void configure(ComponentRegistry registry, TransactionProxy proxy) {
-	
-	logger.log(Level.CONFIG, "Configuring ChannelServiceImpl");
+
+	if (logger.isLoggable(Level.CONFIG)) {
+	    logger.log(Level.CONFIG, "Configuring ChannelServiceImpl");
+	}
 
 	try {
 	    if (registry == null) {
@@ -131,8 +139,11 @@ public class ChannelServiceImpl
 	    }
 	    
 	} catch (RuntimeException e) {
-	    logger.log(Level.CONFIG,
-		"Failed to configure ChannelServiceImpl", e);
+	    if (logger.isLoggable(Level.CONFIG)) {
+		logger.logThrow(
+		    Level.CONFIG, e,
+		    "Failed to configure ChannelServiceImpl");
+	    }
 	    throw e;
 	}
     }
@@ -161,8 +172,10 @@ public class ChannelServiceImpl
 	    return channel;
 	    
 	} catch (RuntimeException e) {
-	    logger.logThrow(
-		Level.FINEST, "createChannel name:{0} throws", e, name);
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.logThrow(
+		    Level.FINEST, e, "createChannel name:{0} throws", name);
+	    }
 	    throw e;
 	}
     }
@@ -183,8 +196,10 @@ public class ChannelServiceImpl
 	    return channel;
 	    
 	} catch (RuntimeException e) {
-	    logger.logThrow(
-		Level.FINEST, "getChannel name:{0} throws", e, name);
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.logThrow(
+		    Level.FINEST, e, "getChannel name:{0} throws", name);
+	    }
 	    throw e;
 	}
     }
@@ -209,7 +224,9 @@ public class ChannelServiceImpl
 	    
 	    return true;
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINER, "prepare txn:{0} throws", e, txn);
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.logThrow(Level.FINER, e, "prepare txn:{0} throws", txn);
+	    }
 	    throw e;
 	}
     }
@@ -219,9 +236,13 @@ public class ChannelServiceImpl
 	try {
 	    handleTransaction(txn, true);
 	    currentContext.set(null);
-	    logger.log(Level.FINER, "commit txn:{0} returns", txn);
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.log(Level.FINER, "commit txn:{0} returns", txn);
+	    }
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINER, "commit txn:{0} throws", e, txn);
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.logThrow(Level.FINER, e, "commit txn:{0} throws", txn);
+	    }
 	    throw e;
 	}
     }
@@ -231,10 +252,14 @@ public class ChannelServiceImpl
 	try {
 	    handleTransaction(txn, true);
 	    currentContext.set(null);
-	    logger.log(Level.FINER, "prepareAndCommit txn:{0} returns", txn);
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.log(Level.FINER, "prepareAndCommit txn:{0} returns", txn);
+	    }
 	} catch (RuntimeException e) {
-	    logger.logThrow(
-		Level.FINER, "prepareAndCommit txn:{0} throws", e, txn);
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.logThrow(
+		    Level.FINER, e, "prepareAndCommit txn:{0} throws", txn);
+	    }
 	    throw e;
 	}
     }
@@ -243,9 +268,13 @@ public class ChannelServiceImpl
     public void abort(Transaction txn) {
 	try {
 	    handleTransaction(txn, true);
-	    logger.log(Level.FINER, "abort txn:{0} returns", txn);
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.log(Level.FINER, "abort txn:{0} returns", txn);
+	    }
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINER, "abort txn:{0} throws", e, txn);
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.logThrow(Level.FINER, e, "abort txn:{0} throws", txn);
+	    }
 	    throw e;
 	}
     }
@@ -299,7 +328,9 @@ public class ChannelServiceImpl
 	}
 	Context context = currentContext.get();
 	if (context == null) {
-	    logger.log(Level.FINER, "join txn:{0}", txn);
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.log(Level.FINER, "join txn:{0}", txn);
+	    }
 	    txn.join(this);
 	    context = new Context(dataService, this, txn);
 	    currentContext.set(context);
@@ -370,7 +401,9 @@ public class ChannelServiceImpl
 			}
 		    }
 		    try {
-			logger.log(Level.FINEST, "Processing {0}", task);
+			if (logger.isLoggable(Level.FINEST)) {
+			    logger.log(Level.FINEST, "Processing {0}", task);
+			}
 		    } catch (Throwable t) {
 		    }
 
@@ -378,10 +411,11 @@ public class ChannelServiceImpl
 
 		} catch (Throwable t) {
 		    try {
-			logger.log(
-			    Level.FINEST,
-			    "Problem during processing -- continuing",
-			    t);
+			if (logger.isLoggable(Level.FINEST)) {
+			    logger.logThrow(
+			        Level.FINEST, t,
+				"Problem during processing -- continuing");
+			}
 		    } catch (Throwable t2) {
 		    }
 		}

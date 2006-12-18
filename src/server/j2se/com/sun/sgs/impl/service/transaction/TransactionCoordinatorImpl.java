@@ -61,6 +61,15 @@ public final class TransactionCoordinatorImpl
 	public void commit() throws Exception {
 	    txn.commit();
 	}
+
+	public void abort() {
+	    if (txn.isActive()) {
+		txn.abort();
+	    } else {
+		throw new TransactionNotActiveException(
+		    "No transaction is active");
+	    }
+	}
     }
 
     /**

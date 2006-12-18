@@ -185,7 +185,7 @@ public final class DataServiceImpl
 	    store = new DataStoreImpl(properties);
 	} catch (RuntimeException e) {
 	    logger.logThrow(
-		Level.SEVERE, "DataService initialization failed", e);
+		Level.SEVERE, e, "DataService initialization failed");
 	    throw e;
 	}
     }
@@ -246,6 +246,11 @@ public final class DataServiceImpl
     }
 
     /** {@inheritDoc} */
+    public String nextBoundName(String name) {
+	return nextBoundNameInternal(name, false);
+    }
+
+    /** {@inheritDoc} */
     public void removeObject(ManagedObject object) {
 	try {
 	    if (object == null) {
@@ -263,7 +268,7 @@ public final class DataServiceImpl
 		Level.FINEST, "removeObject object:{0} returns", object);
 	} catch (RuntimeException e) {
 	    logger.logThrow(
-		Level.FINEST, "removeObject object:{0} throws", e, object);
+		Level.FINEST, e, "removeObject object:{0} throws", object);
 	    throw e;
 	}
     }
@@ -286,7 +291,7 @@ public final class DataServiceImpl
 		Level.FINEST, "markForUpdate object:{0} returns", object);
 	} catch (RuntimeException e) {
 	    logger.logThrow(
-		Level.FINEST, "markForUpdate object:{0} throws", e, object);
+		Level.FINEST, e, "markForUpdate object:{0} throws", object);
 	    throw e;
 	}
     }
@@ -310,7 +315,7 @@ public final class DataServiceImpl
 	    return result;
 	} catch (RuntimeException e) {
 	    logger.logThrow(
-		Level.FINEST, "createReference object:{0} throws", e, object);
+		Level.FINEST, e, "createReference object:{0} throws", object);
 	    throw e;
 	}
     }
@@ -332,6 +337,11 @@ public final class DataServiceImpl
        removeBindingInternal(name, true);
     }
 
+    /** {@inheritDoc} */
+    public String nextServiceBoundName(String name) {
+	return nextBoundNameInternal(name, true);
+    }
+
     /* -- Implement TransactionParticipant -- */
 
     /** {@inheritDoc} */
@@ -349,7 +359,7 @@ public final class DataServiceImpl
 	    }
 	    return result;
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINER, "prepare txn:{0} throws", e, txn);
+	    logger.logThrow(Level.FINER, e, "prepare txn:{0} throws", txn);
 	    throw e;
 	}
     }
@@ -363,7 +373,7 @@ public final class DataServiceImpl
 	    context.commit();
 	    logger.log(Level.FINER, "commit txn:{0} returns", txn);
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.WARNING, "commit txn:{0} throws", e, txn);
+	    logger.logThrow(Level.WARNING, e, "commit txn:{0} throws", txn);
 	    throw e;
 	}
     }
@@ -378,7 +388,7 @@ public final class DataServiceImpl
 	    logger.log(Level.FINER, "prepareAndCommit txn:{0} returns", txn);
 	} catch (RuntimeException e) {
 	    logger.logThrow(
-		Level.FINER, "prepareAndCommit txn:{0} throws", e, txn);
+		Level.FINER, e, "prepareAndCommit txn:{0} throws", txn);
 	    throw e;
 	}
     }
@@ -397,7 +407,7 @@ public final class DataServiceImpl
 	    context.abort();
 	    logger.log(Level.FINER, "abort txn:{0} returns", txn);
 	} catch (RuntimeException e) {
-	    logger.logThrow(Level.WARNING, "abort txn:{0} throws", e, txn);
+	    logger.logThrow(Level.WARNING, e, "abort txn:{0} throws", txn);
 	    throw e;
 	}
     }
@@ -432,7 +442,7 @@ public final class DataServiceImpl
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
-		    Level.FINEST, "{0} name:{1}, type:{2} throws", e,
+		    Level.FINEST, e, "{0} name:{1}, type:{2} throws",
 		    serviceBinding ? "getServiceBinding" : "getBinding",
 		    name, type);
 	    }
@@ -462,7 +472,7 @@ public final class DataServiceImpl
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
-		    Level.FINEST, "{0} name:{1}, object:{2} throws", e,
+		    Level.FINEST, e, "{0} name:{1}, object:{2} throws",
 		    serviceBinding ? "setServiceBinding" : "setBinding",
 		    name, object);
 	    }
@@ -492,8 +502,33 @@ public final class DataServiceImpl
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
-		    Level.FINEST, "{0} name:{1} throws", e,
+		    Level.FINEST, e, "{0} name:{1} throws",
 		    serviceBinding ? "removeServiceBinding" : "removeBinding",
+		    name);
+	    }
+	    throw e;
+	}
+    }
+
+    /** Implement nextBoundName and nextServiceBoundName. */
+    private String nextBoundNameInternal(String name, boolean serviceBinding) {
+	try {
+	    Context context = getContext();
+	    String result = getExternalName(
+		context.nextBoundName(getInternalName(name, serviceBinding)),
+		serviceBinding);
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(
+		    Level.FINEST, "{0} name:{1} returns {2}",
+		    serviceBinding ? "nextServiceBoundName" : "nextBoundName",
+		    name, result);
+	    }
+	    return result;
+	} catch (RuntimeException e) {
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.logThrow(
+		    Level.FINEST, e, "{0} name:{1} throws",
+		    serviceBinding ? "nextServiceBoundName" : "nextBoundName",
 		    name);
 	    }
 	    throw e;
@@ -617,13 +652,40 @@ public final class DataServiceImpl
 
     /**
      * Returns the name that should be used for a service or application
-     * binding.
+     * binding.  If name is null, then returns a name that will sort earlier
+     * than any non-null name.
      */
     private static String getInternalName(
 	String name, boolean serviceBinding)
     {
-	return (serviceBinding ? "s." : "a.") + name;
+	if (name == null) {
+	    return serviceBinding ? "s" : "a";
+	} else {
+	    return (serviceBinding ? "s." : "a.") + name;
+	}
     }
+
+    /**
+     * Returns the external name for a service or application binding name.
+     * Returns null if the name does not have the proper prefix, or is null.
+     */
+    private static String getExternalName(
+	String name, boolean serviceBinding)
+    {
+	if (name == null) {
+	    return null;
+	}
+	String prefix = serviceBinding ? "s." : "a.";
+	/*
+	 * If this is an application binding, then the name could start with
+	 * "s." if we've moved past all of the application bindings.
+	 * Otherwise, the prefix should be correct.  -tjb@sun.com (12/14/2006)
+	 */
+	assert name.startsWith(prefix) ||
+	    (!serviceBinding && name.startsWith("s."))
+	    : "Name has wrong prefix";
+	return name.startsWith(prefix) ? name.substring(2) : null;
+    }	    
 
     /**
      * Adds an action to be performed on abort, to roll back transient state

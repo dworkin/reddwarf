@@ -6,6 +6,7 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionException;
+import java.io.DataInput;
 import java.io.Serializable;
 
 /**
@@ -77,4 +78,27 @@ public interface DataService extends DataManager, Service {
      * @see	#removeObject removeObject
      */
     void removeServiceBinding(String name);
+
+    /**
+     * Returns the next name after the specified name that has a service
+     * binding, or <code>null</code> if there are no more bound names.  If
+     * <code>name</code> is <code>null</code>, then the search starts at the
+     * beginning. <p>
+     *
+     * The order of the names corresponds to the ordering of the UTF-8 encoding
+     * of the names.  To provide flexibility to the implementation, the UTF-8
+     * encoding used can be either <em>standard UTF-8</em>, as defined by the
+     * IETF in <a href="http://tools.ietf.org/html/rfc3629">RFC 3629</a>, or
+     * <em>modified UTF-8</em>, as used by Java serialization and defined by
+     * the {@link DataInput} interface.
+     *
+     * @param	name the name to search after, or <code>null</code> to start at
+     *		the beginning
+     * @return	the next name with a service binding following
+     *		<code>name</code>, or <code>null</code> if there are no more
+     *		bound names
+     * @throws	TransactionException if the operation failed because of a
+     *		problem with the current transaction
+     */
+    String nextServiceBoundName(String name);
 }

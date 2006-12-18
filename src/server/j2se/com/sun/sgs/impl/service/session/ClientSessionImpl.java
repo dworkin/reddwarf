@@ -106,9 +106,7 @@ class ClientSessionImpl implements SgsClientSession {
 	    
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
-		logger.logThrow(
-		    Level.FINEST,
- 		    "getSessionId throws", e);
+		logger.logThrow(Level.FINEST, e, "getSessionId throws");
 	    }
 	    throw e;
 	}
@@ -157,8 +155,7 @@ class ClientSessionImpl implements SgsClientSession {
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
-		    Level.FINEST,
- 		    "send message:{0} throws", e, message);
+		    Level.FINEST, e, "send message:{0} throws", message);
 	    }
 	    throw e;
 	}
@@ -195,8 +192,8 @@ class ClientSessionImpl implements SgsClientSession {
 	} catch (IOException e) {
 	    if (logger.isLoggable(Level.WARNING)) {
 		logger.logThrow(
-		    Level.WARNING,
- 		    "sendMessage handle:{0} throws", e, sessionHandle);
+		    Level.WARNING, e,
+		    "sendMessage handle:{0} throws", sessionHandle);
 	    }
 	}
     }
@@ -265,9 +262,9 @@ class ClientSessionImpl implements SgsClientSession {
 	} catch (IOException e) {
 	    if (logger.isLoggable(Level.WARNING)) {
 		logger.logThrow(
-		    Level.WARNING,
- 		    "handleDisconnect (close) handle:{0} throws",
-		    e, sessionHandle);
+		    Level.WARNING, e,
+		    "handleDisconnect (close) handle:{0} throws",
+		    sessionHandle);
 	    }
 	}
 	submitTransactionalTask(new KernelRunnable() {
@@ -360,8 +357,8 @@ class ClientSessionImpl implements SgsClientSession {
 
 	    if (logger.isLoggable(Level.WARNING)) {
 		logger.logThrow(
-		    Level.WARNING, "Handler.exceptionThrown handle:{0}",
-		    exception, handle);
+		    Level.WARNING, exception,
+		    "Handler.exceptionThrown handle:{0}", handle);
 	    }
 	}
 

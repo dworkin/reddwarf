@@ -2,6 +2,7 @@ package com.sun.sgs.test.impl.service.channel;
 
 import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelListener;
+import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.NameExistsException;
@@ -11,6 +12,7 @@ import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.SgsClientSession;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
@@ -94,10 +96,12 @@ public class TestChannelServiceImpl extends TestCase {
 	dataService = createDataService(registry);
 	dataService.configure(registry, txnProxy);
 	registry.setComponent(DataService.class, dataService);
+	registry.registerAppContext();
 	txn.commit();
 	createTransaction();
 	channelService = createChannelService();
 	channelService.configure(registry, txnProxy);
+	registry.setComponent(ChannelManager.class, channelService);
 	txn.commit();
 	createTransaction();
     }
@@ -187,6 +191,7 @@ public class TestChannelServiceImpl extends TestCase {
 	try {
 	    channelService.createChannel(
 		"foo", null, Delivery.RELIABLE);
+	    System.err.println("channel created");
 	} catch (NullPointerException e) {
 	    fail("Got NullPointerException");
 	}
@@ -952,7 +957,7 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     private static class DummyClientSession
-	implements ClientSession, Serializable
+	implements SgsClientSession, Serializable
     {
 	private final static long serialVersionUID = 1L;
 	private static byte b = 0x00;
@@ -986,6 +991,15 @@ public class TestChannelServiceImpl extends TestCase {
 	    return true;
 	}
 
+	/* -- Implement SgsClientSession -- */
+	
+	public long nextSequenceNumber() {
+	    return 0;
+	}
+    
+	public void sendMessage(byte[] message, Delivery delivery) {
+	}
+	
 	/* -- Implement Object -- */
 	
 	public int hashCode() {

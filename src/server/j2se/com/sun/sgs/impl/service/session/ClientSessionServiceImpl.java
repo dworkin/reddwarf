@@ -89,9 +89,11 @@ public class ClientSessionServiceImpl implements ClientSessionService {
      * Constructs an instance of this class with the specified properties.
      */
     public ClientSessionServiceImpl(Properties properties) {
-	logger.log(
-	    Level.CONFIG, "Creating ClientSessionServiceImpl properties:{0}",
-	    properties);
+	if (logger.isLoggable(Level.CONFIG)) {
+	    logger.log(
+	        Level.CONFIG, "Creating ClientSessionServiceImpl properties:{0}",
+		properties);
+	}
 	try {
 	    appName = properties.getProperty(APP_NAME_PROPERTY);
 	    if (appName == null) {
@@ -114,8 +116,11 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	    }
 
 	} catch (RuntimeException e) {
-	    logger.log(
-		Level.CONFIG, "Failed to create ClientSessionServiceImpl", e);
+	    if (logger.isLoggable(Level.CONFIG)) {
+		logger.logThrow(
+		    Level.CONFIG, e,
+		    "Failed to create ClientSessionServiceImpl");
+	    }
 	    throw e;
 	}
     }
@@ -129,8 +134,10 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     
     /** {@inheritDoc} */
     public void configure(ComponentRegistry registry, TransactionProxy proxy) {
-	
-	logger.log(Level.CONFIG, "Configuring ClientSessionServiceImpl");
+
+	if (logger.isLoggable(Level.CONFIG)) {
+	    logger.log(Level.CONFIG, "Configuring ClientSessionServiceImpl");
+	}
 	try {
 	    if (registry == null) {
 		throw new NullPointerException("null registry");
@@ -157,8 +164,11 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 		// TBD: listen for UNRELIABLE connections as well?
 	    }
 	} catch (RuntimeException e) {
-	    logger.log(Level.CONFIG,
-		"Failed to configure ClientSessionServiceImpl", e);
+	    if (logger.isLoggable(Level.CONFIG)) {
+		logger.logThrow(
+		    Level.CONFIG, e,
+		    "Failed to configure ClientSessionServiceImpl");
+	    }
 	    throw e;
 	}
     }

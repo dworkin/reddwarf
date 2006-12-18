@@ -22,6 +22,9 @@ public class DummyTransaction implements Transaction {
 	ACTIVE, PREPARING, PREPARED, COMMITTING, COMMITTED, ABORTING, ABORTED
     };
 
+    /** Whether to use prepareAndCommit. */
+    public enum UsePrepareAndCommit { YES, NO, ARBITRARY };
+
     /** The ID for the next transaction. */
     private static AtomicLong nextId = new AtomicLong(1);
 
@@ -47,12 +50,9 @@ public class DummyTransaction implements Transaction {
     public final Set<TransactionParticipant> participants =
 	new HashSet<TransactionParticipant>();
 
-    /**
-     * Creates an instance of this class which decides arbitrarily whether or
-     * not to call prepareAndCommit.
-     */
+    /** Creates an instance of this class that always uses prepareAndCommit. */
     public DummyTransaction() {
-	usePrepareAndCommit = (id % 2 == 0);
+	usePrepareAndCommit = true;
 	logger.log(Level.FINER, "create {0}", this);
     }
 
@@ -60,8 +60,20 @@ public class DummyTransaction implements Transaction {
      * Creates an instance of this class which uses prepareAndCommit based on
      * the argument.
      */
-    public DummyTransaction(boolean usePrepareAndCommit) {
-	this.usePrepareAndCommit = usePrepareAndCommit;
+    public DummyTransaction(UsePrepareAndCommit usePrepareAndCommit) {
+	switch (usePrepareAndCommit) {
+	case YES:
+	    this.usePrepareAndCommit = true;
+	    break;
+	case NO:
+	    this.usePrepareAndCommit = false;
+	    break;
+	case ARBITRARY:
+	    this.usePrepareAndCommit = (id % 2 == 0);
+	    break;
+	default:
+	    throw new AssertionError();
+	}
     }
 
     /* -- Implement Transaction -- */
@@ -109,7 +121,7 @@ public class DummyTransaction implements Transaction {
 	    try {
 		participant.abort(this);
 	    } catch (RuntimeException e) {
-		logger.logThrow(Level.WARNING, "Abort failed", e);
+		logger.logThrow(Level.WARNING, e, "Abort failed");
 	    }
 	}
 	state = State.ABORTED;
@@ -157,7 +169,7 @@ public class DummyTransaction implements Transaction {
 		try {
 		    participant.commit(this);
 		} catch (RuntimeException e) {
-		    logger.logThrow(Level.WARNING, "Commit failed", e);
+		    logger.logThrow(Level.WARNING, e, "Commit failed");
 		}
 	    }
 	} else if (state != State.ACTIVE) {
@@ -185,7 +197,7 @@ public class DummyTransaction implements Transaction {
 		try {
 		    participant.commit(this);
 		} catch (RuntimeException e) {
-		    logger.logThrow(Level.WARNING, "Commit failed", e);
+		    logger.logThrow(Level.WARNING, e, "Commit failed");
 		}
 	    }
 	}

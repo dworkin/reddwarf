@@ -115,13 +115,14 @@ final class ChannelImpl implements Channel, Serializable {
 			putString(state.name);
 		    sendProtocolMessage(session, buf.getBuffer());
 		}});
+	    
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST, "join session:{0} returns", session);
 	    }
 	    
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
-		logger.logThrow(Level.FINEST, "leave throws", e);
+		logger.logThrow(Level.FINEST, e, "leave throws");
 	    }
 	    throw e;
 	}
@@ -166,7 +167,7 @@ final class ChannelImpl implements Channel, Serializable {
 	    
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
-		logger.logThrow(Level.FINEST, "leave throws", e);
+		logger.logThrow(Level.FINEST, e, "leave throws");
 	    }
 	    throw e;
 	}
@@ -203,7 +204,7 @@ final class ChannelImpl implements Channel, Serializable {
 	    }
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
-		logger.logThrow(Level.FINEST, "leave throws", e);
+		logger.logThrow(Level.FINEST, e, "leave throws");
 	    }
 	    throw e;
 	}
@@ -387,9 +388,9 @@ final class ChannelImpl implements Channel, Serializable {
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
-		    Level.FINEST,
+		    Level.FINEST, e,
 		    "sendProtcolMessage session:{0} message:{1} throws",
-		    e, session, message);
+		    session, message);
 	    }
 	    // eat exception
 	}

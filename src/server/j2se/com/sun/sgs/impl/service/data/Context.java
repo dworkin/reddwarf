@@ -187,6 +187,11 @@ final class Context {
 	store.removeBinding(txn, internalName);
     }
 
+    /** Returns the next bound name. */
+    String nextBoundName(String internalName) {
+	return store.nextBoundName(txn, internalName);
+    }
+
     /* -- Methods for TransactionParticipant -- */
 
     boolean prepare() throws Exception {
