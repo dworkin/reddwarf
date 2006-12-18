@@ -2,6 +2,7 @@ package com.sun.sgs.impl.service.session;
 
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.impl.io.AcceptorFactory;
+import com.sun.sgs.impl.io.CompleteMessageFilter;
 import com.sun.sgs.impl.io.IOConstants.TransportType;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.io.AcceptedHandleListener;
@@ -158,7 +159,8 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 		    AcceptorFactory.createAcceptor(TransportType.RELIABLE);
 		SocketAddress address = new InetSocketAddress(port);
 		try {
-		    acceptor.listen(address, listener);
+		    acceptor.listen(
+			address, listener, CompleteMessageFilter.class);
 		} catch (IOException e) {
 		    throw (RuntimeException) new RuntimeException().initCause(e);
 		}
@@ -190,6 +192,11 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	serviceListeners.put(serviceId, listener);
     }
 
+    /** {@inheritDoc} */
+    public SgsClientSession getClientSession(byte[] sessionId) {
+	return sessions.get(sessionId);
+    }
+
     /* -- Implement AcceptedHandleListener -- */
 
     class Listener implements AcceptedHandleListener {
@@ -200,11 +207,11 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	 * <p>Creates a new client session with the specified handle,
 	 * and adds the session to the internal session map.
 	 */
-	public void newHandle(IOHandle handle) {
+	public IOHandler newHandle(IOHandle handle) {
 	    ClientSessionImpl session =
 		new ClientSessionImpl(ClientSessionServiceImpl.this, handle);
-	    handle.setIOHandler(session.getHandler());
 	    sessions.put(session.getSessionId(), session);
+	    return session.getHandler();
 	}
     }
     
@@ -215,14 +222,6 @@ public class ClientSessionServiceImpl implements ClientSessionService {
      */
     ServiceListener getServiceListener(byte serviceId) {
 	return serviceListeners.get(serviceId);
-    }
-
-    /**
-     * Returns the client session associated with the specified
-     * session id.
-     */
-    SgsClientSession getClientSession(byte[] sessionId) {
-	return sessions.get(sessionId);
     }
 
     /**

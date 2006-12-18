@@ -100,11 +100,10 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
      * service of the current app context.
      */
     private ClientSessionImpl(
-	ClientSessionServiceImpl sessionService,
 	String name,
 	byte[] sessionId)
     {
-	this.sessionService = sessionService;
+	this.sessionService = null;
 	this.name = name;
 	this.sessionId = sessionId;
 	this.reconnectionKey = null;
@@ -218,7 +217,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     public void sendMessage(byte[] message, Delivery delivery) {
 	// TBI: ignore delivery for now...
 	try {
-	    sessionHandle.sendMessage(message);
+	    sessionHandle.sendBytes(message);
 	} catch (IOException e) {
 	    if (logger.isLoggable(Level.WARNING)) {
 		logger.logThrow(
@@ -266,11 +265,11 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		// ClientSessionServiceImpl feels like a hack.
 		// Perhaps we should add a 'getClientSession' method
 		// to the ClientSessionService interface.
-		ClientSessionServiceImpl service = (ClientSessionServiceImpl)
+		ClientSessionService service =
 		    AppContext.getManager(ClientSessionService.class);
 		ClientSession session = service.getClientSession(sessionId);
 		if (session == null) {
-		    session = new ClientSessionImpl(service, name, sessionId);
+		    session = new ClientSessionImpl(name, sessionId);
 		}
 		return session;
 		
@@ -446,7 +445,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	}
 
 	/** {@inheritDoc} */
-	public void messageReceived(byte[] buffer, IOHandle handle) {
+	public void bytesReceived(byte[] buffer, IOHandle handle) {
 	    synchronized (lock) {
 		if (handle != sessionHandle) {
 		    return;
