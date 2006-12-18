@@ -14,6 +14,7 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.ServiceListener;
+import com.sun.sgs.service.SgsClientSession;
 import com.sun.sgs.service.TransactionProxy;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -214,6 +215,14 @@ public class ClientSessionServiceImpl implements ClientSessionService {
      */
     ServiceListener getServiceListener(byte serviceId) {
 	return serviceListeners.get(serviceId);
+    }
+
+    /**
+     * Returns the client session associated with the specified
+     * session id.
+     */
+    SgsClientSession getClientSession(byte[] sessionId) {
+	return sessions.get(sessionId);
     }
 
     /**

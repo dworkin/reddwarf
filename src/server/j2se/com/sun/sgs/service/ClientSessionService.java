@@ -25,4 +25,13 @@ public interface ClientSessionService extends Service {
      * @param listener a service listener
      */
     void registerServiceListener(byte serviceId, ServiceListener listener);
+
+    /**
+     * Returns the client session corresponding to the specified
+     * session ID, or <code>null</code> if there is no existing client
+     * session for the specified ID.
+     *
+     * @return a client session, or <code>null</code>
+     */
+    SgsClientSession getClientSession(byte[] sessionId);
 }

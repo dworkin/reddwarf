@@ -1,5 +1,6 @@
 package com.sun.sgs.impl.service.session;
 
+import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
@@ -8,9 +9,15 @@ import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
 import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.ServiceListener;
 import com.sun.sgs.service.SgsClientSession;
 import java.io.IOException;
+import java.io.InvalidObjectException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.ObjectStreamException;
+import java.io.Serializable;
 import java.security.SecureRandom;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
@@ -21,7 +28,7 @@ import java.util.logging.Logger;
 /**
  * Implements a client session.
  */
-class ClientSessionImpl implements SgsClientSession {
+class ClientSessionImpl implements SgsClientSession, Serializable {
 
     /** Connection state. */
     private static enum State {
@@ -80,6 +87,29 @@ class ClientSessionImpl implements SgsClientSession {
 	this.handler = new Handler();
 	this.sessionId = generateId();
 	this.reconnectionKey = generateId();
+    }
+
+    /**
+     * Constructs an instance of this class with the specified name
+     * and session id.  The returned session is disconnected and cannot
+     * send or receive messages.
+     *
+     * This constructor is used during deserialization to construct a
+     * disconnected client session if a client session with the
+     * specified session id can't be located in the client session
+     * service of the current app context.
+     */
+    private ClientSessionImpl(
+	ClientSessionServiceImpl sessionService,
+	String name,
+	byte[] sessionId)
+    {
+	this.sessionService = sessionService;
+	this.name = name;
+	this.sessionId = sessionId;
+	this.reconnectionKey = null;
+	this.handler = null;
+	this.state = State.DISCONNECTED;
     }
 
     /* -- Implement ClientSession -- */
@@ -198,6 +228,59 @@ class ClientSessionImpl implements SgsClientSession {
 	}
     }
     
+    /* -- Serialization methods -- */
+
+    private Object writeReplace() {
+	return new External(name, sessionId);
+    }
+
+    /**
+     * Represents the persistent represntation for a client session
+     * (its name and session id).
+     */
+    private final static class External implements Serializable {
+
+	private final static long serialVersionUID = 1L;
+
+	private final String name;
+	private final byte[] sessionId;
+
+	External(String name, byte[] sessionId) {
+	    this.name = name;
+	    this.sessionId = sessionId;
+	}
+
+	private void writeObject(ObjectOutputStream out) throws IOException {
+	    out.defaultWriteObject();
+	}
+
+	private void readObject(ObjectInputStream in)
+	    throws IOException, ClassNotFoundException
+	{
+	    in.defaultReadObject();
+	}
+
+	private Object readResolve() throws ObjectStreamException {
+	    try {
+		// TBD: casting the client session service to a
+		// ClientSessionServiceImpl feels like a hack.
+		// Perhaps we should add a 'getClientSession' method
+		// to the ClientSessionService interface.
+		ClientSessionServiceImpl service = (ClientSessionServiceImpl)
+		    AppContext.getManager(ClientSessionService.class);
+		ClientSession session = service.getClientSession(sessionId);
+		if (session == null) {
+		    session = new ClientSessionImpl(service, name, sessionId);
+		}
+		return session;
+		
+	    } catch (RuntimeException e) {
+		throw (InvalidObjectException)
+		    new InvalidObjectException(e.getMessage()).initCause(e);
+	    }
+	}
+    }
+
     /* -- other methods -- */
 
     /**
