@@ -6,7 +6,11 @@ import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
+import com.sun.sgs.impl.service.session.MessageBuffer;
+import com.sun.sgs.impl.service.session.SgsProtocol;
 import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.service.SgsClientSession;
 import java.io.IOException;
 import java.io.InvalidObjectException;
 import java.io.ObjectInputStream;
@@ -77,47 +81,131 @@ final class ChannelImpl implements Channel, Serializable {
     }
 
     /** {@inheritDoc} */
-    public void join(ClientSession session, ChannelListener listener) {
-	checkClosed();
-	if (session == null) {
-	    throw new NullPointerException("null session");
-	}
-	if (listener != null && !(listener instanceof Serializable)) {
-	    throw new IllegalArgumentException("listener not serializable");
-	}
-	if (state.sessions.get(session) == null) {
-	    context.dataService.markForUpdate(state);
-	    state.sessions.put(session, listener);
-	}
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST, "join session:{0} returns", session);
+    public void join(final ClientSession session, ChannelListener listener) {
+	try {
+	    checkClosed();
+	    if (session == null) {
+		throw new NullPointerException("null session");
+	    }
+	    if (listener != null && !(listener instanceof Serializable)) {
+		throw new IllegalArgumentException("listener not serializable");
+	    }
+	    if (!(session instanceof SgsClientSession)) {
+		if (logger.isLoggable(Level.SEVERE)) {
+		    logger.log(
+			Level.SEVERE,
+			"join: session does not implement" +
+			"SgsClientSession:{0}", session);
+		}
+		throw new IllegalArgumentException(
+		    "unexpected ClientSession type: " + session);
+	    }
+	    if (state.sessions.get(session) == null) {
+		context.dataService.markForUpdate(state);
+		state.sessions.put(session, listener);
+	    }
+	    
+	    submitNonTransactionalTask(new KernelRunnable() {
+		public void run() {
+		    int nameSize = MessageBuffer.getSize(state.name);
+		    MessageBuffer buf = new MessageBuffer(3 + nameSize);
+		    buf.putByte(SgsProtocol.VERSION).
+			putByte(SgsProtocol.CHANNEL_SERVICE).
+			putByte(SgsProtocol.CHANNEL_JOIN).
+			putString(state.name);
+		    sendProtocolMessage(session, buf.getBuffer());
+		}});
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST, "join session:{0} returns", session);
+	    }
+	    
+	} catch (RuntimeException e) {
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.logThrow(Level.FINEST, "leave throws", e);
+	    }
+	    throw e;
 	}
     }
 
     /** {@inheritDoc} */
-    public void leave(ClientSession session) {
-	checkClosed();
-	if (session == null) {
-	    throw new NullPointerException("null client session");
-	}
-	if (state.sessions.get(session) != null) {
-	    context.dataService.markForUpdate(state);
-	    state.sessions.remove(session);
-	}
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST, "leave session:{0} returns", session);
+    public void leave(final ClientSession session) {
+	try {
+	    checkClosed();
+	    if (session == null) {
+		throw new NullPointerException("null client session");
+	    }
+	    if (!(session instanceof SgsClientSession)) {
+		if (logger.isLoggable(Level.SEVERE)) {
+		    logger.log(
+			Level.SEVERE,
+			"join: session does not implement " +
+			"SgsClientSession:{0}", session);
+		}
+		throw new IllegalArgumentException(
+		    "unexpected ClientSession type: " + session);
+	    }
+	    if (state.sessions.get(session) != null) {
+		context.dataService.markForUpdate(state);
+		state.sessions.remove(session);
+	    }
+	
+	    submitNonTransactionalTask(new KernelRunnable() {
+		public void run() {
+		    int nameSize = MessageBuffer.getSize(state.name);
+		    MessageBuffer buf = new MessageBuffer(3 + nameSize);
+		    buf.putByte(SgsProtocol.VERSION).
+			putByte(SgsProtocol.CHANNEL_SERVICE).
+			putByte(SgsProtocol.CHANNEL_LEAVE).
+			putString(state.name);
+		    sendProtocolMessage(session, buf.getBuffer());
+		}});
+	
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST, "leave session:{0} returns", session);
+	    }
+	    
+	} catch (RuntimeException e) {
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.logThrow(Level.FINEST, "leave throws", e);
+	    }
+	    throw e;
 	}
     }
 
     /** {@inheritDoc} */
     public void leaveAll() {
-	checkClosed();
-	if (!state.sessions.isEmpty()) {
-	    context.dataService.markForUpdate(state);
-	    state.sessions.clear();
-	}
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST, "leaveAll returns");
+	try {
+	    checkClosed();
+	    if (!state.sessions.isEmpty()) {
+		context.dataService.markForUpdate(state);
+		state.sessions.clear();
+	    }
+
+	    final Collection<ClientSession> sessions = getSessions();
+
+	    submitNonTransactionalTask(new KernelRunnable() {
+		public void run() {
+		    int nameSize = MessageBuffer.getSize(state.name);
+		    MessageBuffer buf = new MessageBuffer(3 + nameSize);
+		    buf.putByte(SgsProtocol.VERSION).
+			putByte(SgsProtocol.CHANNEL_SERVICE).
+			putByte(SgsProtocol.CHANNEL_LEAVE).
+			putString(state.name);
+		    byte[] message = buf.getBuffer();
+		    
+		    for (ClientSession session : sessions) {
+			sendProtocolMessage(session, message);
+		    }
+		}});
+	    
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST, "leaveAll returns");
+	    }
+	} catch (RuntimeException e) {
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.logThrow(Level.FINEST, "leave throws", e);
+	    }
+	    throw e;
 	}
     }
 
@@ -275,6 +363,38 @@ final class ChannelImpl implements Channel, Serializable {
 	}
     }
 
+    /**
+     * Submits a non-durable, non-transactional task.
+     */
+    private void submitNonTransactionalTask(KernelRunnable task) {
+	// TBD...
+	// sessionService.taskService.scheduleNonDurableTask(task);
+	// Do this for now...
+	try {
+	    task.run();
+	} catch (Exception e) {
+	    throw (RuntimeException) new RuntimeException().initCause(e);
+	}
+    }
+
+    /**
+     * Send a protocol message to the specified session, logging (but
+     * not throwing) any exception.
+     */
+    private void sendProtocolMessage(ClientSession session, byte[] message) {
+	try {
+	    ((SgsClientSession) session).sendMessage(message, state.delivery);
+	} catch (RuntimeException e) {
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.logThrow(
+		    Level.FINEST,
+		    "sendProtcolMessage session:{0} message:{1} throws",
+		    e, session, message);
+	    }
+	    // eat exception
+	}
+    }
+    
     private void scheduleSend(
 	final Collection<ClientSession> sessions, final byte[] message)
     {

@@ -10,6 +10,10 @@ public class MessageBuffer {
 
     private int limit;
 
+    public static int getSize(String s) {
+	return 2 + s.length();
+    }
+
     public MessageBuffer(int capacity) {
 	this(new byte[capacity]);
 	if (capacity == 0) {

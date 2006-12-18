@@ -140,8 +140,10 @@ class ClientSessionImpl implements SgsClientSession {
 	    case RECONNECTING:
 		submitNonTransactionalTask(new KernelRunnable() {
 	            public void run() throws IOException {
-			MessageBuffer buf = new MessageBuffer(4 + message.length);
+			MessageBuffer buf =
+			    new MessageBuffer(5 + message.length);
 			buf.putByte(SgsProtocol.VERSION).
+			    putByte(SgsProtocol.APPLICATION_SERVICE).
 			    putByte(SgsProtocol.MESSAGE_SEND).
 			    putShort(message.length).
 			    putBytes(message);
@@ -187,6 +189,16 @@ class ClientSessionImpl implements SgsClientSession {
     }
     
     public void sendMessage(byte[] message, Delivery delivery) {
+	// TBI: ignore delivery for now...
+	try {
+	    sessionHandle.sendMessage(message);
+	} catch (IOException e) {
+	    if (logger.isLoggable(Level.WARNING)) {
+		logger.logThrow(
+		    Level.WARNING,
+ 		    "sendMessage handle:{0} throws", e, sessionHandle);
+	    }
+	}
     }
     
     /* -- other methods -- */
@@ -207,17 +219,8 @@ class ClientSessionImpl implements SgsClientSession {
      * session's client, logging any exception that occurs.
      */
     private void sendProtocolMessage(MessageBuffer buf) {
-	try {
-	    synchronized (lock) {
-		sessionHandle.sendMessage(buf.getBuffer());
-	    }
-	} catch (IOException e) {
-	    if (logger.isLoggable(Level.WARNING)) {
-		logger.logThrow(
-		    Level.WARNING,
- 		    "sendMessage handle:{0} throws", e, sessionHandle);
-	    }
-	}
+	// TBI: specify reliable delivery for now
+	sendMessage(buf.getBuffer(), Delivery.RELIABLE);
     }
 
     /**
@@ -248,9 +251,10 @@ class ClientSessionImpl implements SgsClientSession {
 	}
 
 	sessionService.disconnected(this);
-	MessageBuffer disconnectMsg = new MessageBuffer(2);
+	MessageBuffer disconnectMsg = new MessageBuffer(3);
 	disconnectMsg.
 	    putByte(SgsProtocol.VERSION).
+	    putByte(SgsProtocol.APPLICATION_SERVICE).
 	    putByte(graceful ?
 		    SgsProtocol.LOGOUT_SUCCESS :
 		    SgsProtocol.SESSION_DISCONNECT);
@@ -461,8 +465,9 @@ class ClientSessionImpl implements SgsClientSession {
 			    handleDisconnect(true);
 			}});
 		} else {
-		    MessageBuffer ack = new MessageBuffer(2);
+		    MessageBuffer ack = new MessageBuffer(3);
 		    ack.putByte(SgsProtocol.VERSION).
+			putByte(SgsProtocol.APPLICATION_SERVICE).
 			putByte(SgsProtocol.SESSION_DISCONNECT);
 		    sendProtocolMessage(ack);
 		}
@@ -479,8 +484,9 @@ class ClientSessionImpl implements SgsClientSession {
 		// should this send an "unknown opcode" message to the
 		// client?
 
-		MessageBuffer ack = new MessageBuffer(3);
+		MessageBuffer ack = new MessageBuffer(4);
 		ack.putByte(SgsProtocol.VERSION).
+		    putByte(SgsProtocol.APPLICATION_SERVICE).
 		    putByte(SgsProtocol.OPCODE_UNKNOWN).
 		    putByte(opcode);
 		sendProtocolMessage(ack);
@@ -556,9 +562,11 @@ class ClientSessionImpl implements SgsClientSession {
 	 */
 	public void run() {
 	    if (listener == null) {
+		int stringSize = MessageBuffer.getSize(LOGIN_REFUSED_REASON);
 		MessageBuffer ack =
-		    new MessageBuffer(4 + LOGIN_REFUSED_REASON.length());
+		    new MessageBuffer(3 + stringSize);
 		ack.putByte(SgsProtocol.VERSION).
+		    putByte(SgsProtocol.APPLICATION_SERVICE).
 		    putByte(SgsProtocol.LOGIN_FAILURE).
 		    putString(LOGIN_REFUSED_REASON);
 		sendProtocolMessage(ack);
@@ -569,9 +577,9 @@ class ClientSessionImpl implements SgsClientSession {
 	    } else {
 		MessageBuffer ack =
 		    new MessageBuffer(
-			6 + sessionId.length + reconnectionKey.length);
-		ack.
-		    putByte(SgsProtocol.VERSION).
+			7 + sessionId.length + reconnectionKey.length);
+		ack.putByte(SgsProtocol.VERSION).
+		    putByte(SgsProtocol.APPLICATION_SERVICE).
 		    putByte(SgsProtocol.LOGIN_SUCCESS).
 		    putShort(sessionId.length). putBytes(sessionId).
 		    putShort(reconnectionKey.length).putBytes(reconnectionKey);
