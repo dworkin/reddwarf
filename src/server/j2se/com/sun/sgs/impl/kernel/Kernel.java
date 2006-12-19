@@ -197,15 +197,12 @@ class Kernel {
             // FIXME: add ClientSession and Channel services when they're ready
             /*
             serviceList.add(createService(
-        	    	 Class.forName(clientSessionServiceClass),
-        	    	 properties, systemRegistry));
+                            Class.forName(clientSessionServiceClass),
+                            properties, systemRegistry));
             setupService(channelServiceClass, serviceList,
-                    	 DEFAULT_CHANNEL_MANAGER, managerSet, properties,
-                    	 systemRegistry);
+                         DEFAULT_CHANNEL_MANAGER, managerSet, properties,
+                         systemRegistry);
             */
-            // FIXME: add the app services when they're ready
-            /*serviceList.add(setupService(Class.forName("app service name"),
-              properties, systemRegistry));*/
         } catch (Exception e) {
             if (logger.isLoggable(Level.SEVERE))
                 logger.logThrow(Level.SEVERE, e, "Could not setup service");
@@ -347,12 +344,18 @@ class Kernel {
      * application will also be provided as <code>com.sun.sgs.appName</code>.
      * <p>
      * Optionally, the properties <code>com.sun.sgs.channelService</code>,
+     * <code>com.sun.sgs.clientSessionService</code>,
      * <code>com.sun.sgs.dataService</code>, and
      * <code>com.sun.sgs.taskService</code> may be specified to use the
      * given service implementation for all applications. If any of these
      * properties is not specified, then the respective default service
      * is used.
-     *
+     * <p>
+     * The optional property <code>com.sun.sgs.config.file</code>, if
+     * set, must point to the location of a properties file.  The properties
+     * within that file will be added after those on the command-line,
+     * overriding any command-line properties with the same name.
+     * 
      * @param args the names of the applications to run
      *
      * @throws Exception if there is any problem starting the system
