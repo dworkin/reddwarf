@@ -42,7 +42,7 @@ public class SimpleClientConnection implements ClientConnection, IOHandler {
     // refactor to "sendMessage"
     public void sendMessage(byte[] message) {
         try {
-            handle.sendMessage(message);
+            handle.sendBytes(message);
         }
         catch (IOException ioe) {
             ioe.printStackTrace();
@@ -71,7 +71,7 @@ public class SimpleClientConnection implements ClientConnection, IOHandler {
      * @param   message         the raw byte message from the server
      * @param   handle          the IOHandle on which the message arrived
      */
-    public void messageReceived(byte[] message, IOHandle handle) {
+    public void bytesReceived(byte[] message, IOHandle handle) {
         messageDecoder.setMessage(message);
         int versionNumber = messageDecoder.readVersionNumber();
         // TODO check the version number against the current version.

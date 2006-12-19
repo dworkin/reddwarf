@@ -45,7 +45,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     public static final String APP_NAME_PROPERTY = "com.sun.sgs.appName";
 
     /** The property that specifies the port number. */
-    public static final String PORT_PROPERTY = "com.sun.sgs.app.port";
+    public static final String PORT_PROPERTY = "com.sun.sgs.port";
 
     /** The logger for this class. */
     private static final LoggerWrapper logger =

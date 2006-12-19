@@ -104,7 +104,7 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
      * @throws IllegalStateException if this session is disconnected
      */
     public SessionId getSessionId() {
-        throw new AssertionError("this method is not implemented");
+        return sessionId;
     }
 
     /** {@inheritDoc} */
@@ -143,6 +143,14 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
         connected = true;
         this.connection = connection;
         
+        PasswordAuthentication authentication = 
+            listener.getPasswordAuthentication("Enter Username/Password");
+
+        messageEncoder.startMessage(ProtocolMessage.LOGIN_REQUEST);
+        messageEncoder.add(authentication.getUserName());
+        // TODO wrapping the char[] in a String is probably not the way to go
+        messageEncoder.add(new String(authentication.getPassword()));
+        sendMessage();
     }
 
     public void disconnected(boolean graceful, byte[] message) {
@@ -159,36 +167,23 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
         int command = messageDecoder.readCommand();
         System.out.println("SimpleClient messageReceived: " + message.length + 
                             " command " + command);
-        if (command == ProtocolMessage.AUTHENTICATION_REQUEST) {
-            PasswordAuthentication authentication = 
-                listener.getPasswordAuthentication("Enter Username/Password");
-            
-            messageEncoder.startMessage(ProtocolMessage.AUTHENTICATION_REQUEST);
-            messageEncoder.add(authentication.getUserName());
-            // TODO wrapping the char[] in a String is probably not the way to go
-            messageEncoder.add(new String(authentication.getPassword()));
-            sendMessage();
-        }
-        else if (command == ProtocolMessage.LOGIN) {
+        if (command == ProtocolMessage.LOGIN_SUCCESS) {
             System.out.println("logging in");
-            boolean success = messageDecoder.readBoolean();
-            if (success) {
-                sessionStarted(message);
-            }
-            else {
-                listener.loginFailed(messageDecoder.readString());
-            }
+            sessionStarted(message);
+        } else if (command == ProtocolMessage.LOGIN_FAILURE) {
+            listener.loginFailed(messageDecoder.readString());
+        } else {
+            System.out.println("Unknown opcode: 0x" +
+        	    Integer.toHexString(command));
         }
     }
 
     public void reconnected(byte[] message) {
-        // TODO Auto-generated method stub
         listener.reconnected();
         
     }
 
     public void reconnecting(byte[] message) {
-        // TODO Auto-generated method stub
         listener.reconnecting();
     }
 
@@ -202,7 +197,6 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
     
     private void extractSessionId(byte[] message) {
         byte[] bytes = messageDecoder.readBytes();
-        // TODO uncomment this when it becomes implemented
-        //sessionId = SessionId.fromBytes(bytes);
+        sessionId = SessionId.fromBytes(bytes);
     }
 }

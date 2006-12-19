@@ -20,6 +20,8 @@ import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TransactionRunner;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 
 import java.lang.reflect.Constructor;
 
@@ -65,6 +67,8 @@ class Kernel {
     // the default services that are used for channels, data, and tasks
     private static final String DEFAULT_CHANNEL_SERVICE =
         "com.sun.sgs.impl.service.channel.ChannelServiceImpl";
+    private static final String DEFAULT_CLIENT_SESSION_SERVICE =
+        "com.sun.sgs.impl.service.session.ClientSessionServiceImpl";
     private static final String DEFAULT_DATA_SERVICE =
         "com.sun.sgs.impl.service.data.DataServiceImpl";
     private static final String DEFAULT_TASK_SERVICE =
@@ -165,7 +169,7 @@ class Kernel {
             new ComponentRegistryImpl(appSystemComponents);
 
         // create the services and their associated managers...call out
-        // the three standard services, because we need to get the
+        // the standard services, because we need to get the
         // ordering right
         ArrayList<Service> serviceList = new ArrayList<Service>();
         HashSet<Object> managerSet = new HashSet<Object>();
@@ -176,7 +180,13 @@ class Kernel {
                                        DEFAULT_DATA_SERVICE);
             String taskServiceClass =
                 properties.getProperty("com.sun.sgs.taskService",
-                                       DEFAULT_DATA_SERVICE);
+                                       DEFAULT_TASK_SERVICE);
+            String clientSessionServiceClass =
+                properties.getProperty("com.sun.sgs.clientSessionService",
+                                       DEFAULT_CLIENT_SESSION_SERVICE);
+            String channelServiceClass =
+                properties.getProperty("com.sun.sgs.channelService",
+                                       DEFAULT_CHANNEL_SERVICE);
 
             setupService(dataServiceClass, serviceList,
                          DEFAULT_DATA_MANAGER, managerSet, properties,
@@ -184,12 +194,12 @@ class Kernel {
             setupService(taskServiceClass, serviceList,
                          DEFAULT_TASK_MANAGER, managerSet, properties,
                          systemRegistry);
-            // FIXME: add the channel and app services when they're ready
-            /*serviceList.add(setupService(Class.forName("app service name"),
-              properties, systemRegistry));*/
-            /*setupService(DEFAULT_CHANNEL_SERVICE, serviceList,
-              DEFAULT_CHANNEL_MANAGER, managerSet, properties,
-              systemRegistry);*/
+            serviceList.add(createService(
+                            Class.forName(clientSessionServiceClass),
+                            properties, systemRegistry));
+            setupService(channelServiceClass, serviceList,
+                         DEFAULT_CHANNEL_MANAGER, managerSet, properties,
+                         systemRegistry);
         } catch (Exception e) {
             if (logger.isLoggable(Level.SEVERE))
                 logger.logThrow(Level.SEVERE, e, "Could not setup service");
@@ -331,55 +341,90 @@ class Kernel {
      * application will also be provided as <code>com.sun.sgs.appName</code>.
      * <p>
      * Optionally, the properties <code>com.sun.sgs.channelService</code>,
+     * <code>com.sun.sgs.clientSessionService</code>,
      * <code>com.sun.sgs.dataService</code>, and
      * <code>com.sun.sgs.taskService</code> may be specified to use the
      * given service implementation for all applications. If any of these
      * properties is not specified, then the respective default service
      * is used.
-     *
+     * <p>
+     * The optional property <code>com.sun.sgs.config.file</code>, if
+     * set, must point to the location of a properties file.  The properties
+     * within that file will be added after those on the command-line,
+     * overriding any command-line properties with the same name.
+     * 
      * @param args the names of the applications to run
      *
      * @throws Exception if there is any problem starting the system
      */
     public static void main(String [] args) throws Exception {
-        // for now, we'll just use the system properties for everything
+	// start with the system properties
         Properties systemProperties = System.getProperties();
 
+        // If a config file is specified, use it.
+        String propertiesFile =
+            System.getProperty("com.sun.sgs.config.file");
+        try {
+            if (propertiesFile != null) {
+        	FileInputStream fileReader =
+        	    new FileInputStream(propertiesFile);
+        	try {
+        	    Properties fileProperties = new Properties();
+        	    fileProperties.load(fileReader);
+
+        	    // merge in the properties from the config file
+        	    systemProperties.putAll(fileProperties);
+        	    
+        	} finally {
+        	    fileReader.close();
+        	}
+            }
+        } catch (IOException e) {
+            if (logger.isLoggable(Level.WARNING))
+                logger.logThrow(Level.WARNING, e,
+                        "Unable to load properties file {0}: ",
+                        propertiesFile);
+            throw e;
+        }
+        
         // boot the kernel
         Kernel kernel = new Kernel(systemProperties);
-
+        
+        // set the app default properties
+        Properties appDefaultProperties = new Properties(systemProperties);
+        appDefaultProperties.setProperty("com.sun.sgs.channelService",
+                                         DEFAULT_CHANNEL_SERVICE);
+        appDefaultProperties.setProperty("com.sun.sgs.clientSessionService",
+                                         DEFAULT_CLIENT_SESSION_SERVICE);
+        appDefaultProperties.setProperty("com.sun.sgs.dataService",
+                                         DEFAULT_DATA_SERVICE);
+        appDefaultProperties.setProperty("com.sun.sgs.taskService",
+                                         DEFAULT_TASK_SERVICE);
+        
         // setup and run each application
-        for (int i = 0; i < args.length; i++) {
-            Properties appProperties = new Properties(systemProperties);
-            appProperties.setProperty("com.sun.sgs.appName", args[i]);
+        for (String appName : args) {
+            Properties appProperties = new Properties(appDefaultProperties);
+            appProperties.setProperty("com.sun.sgs.appName", appName);
 
-            // set the root property
-            String rootDir =
-                appProperties.getProperty("com.sun.sgs." + args[i] +
-                                          ".rootDir");
-            appProperties.setProperty("com.sun.sgs.rootDir", rootDir);
+            final String appPrefix = "com.sun.sgs." + appName + ".";
+            for (String prop : systemProperties.stringPropertyNames()) {
+                if (!prop.startsWith(appPrefix))
+                    continue;
+                
+                final String appProp = "com.sun.sgs." +
+                    prop.substring(appPrefix.length());
+                
+                appProperties.setProperty(appProp,
+                        systemProperties.getProperty(prop));
+            }
 
-            // get the listener class
-            String app =
-                appProperties.getProperty("com.sun.sgs." + args[i] +
-                                          ".appListenerClass");
-            appProperties.setProperty("com.sun.sgs.appListenerClass", app);
-
-            // set the database location
-            appProperties.setProperty("com.sun.sgs.impl.service.data.store." +
-                                      "DataStoreImpl.directory",
-                                      rootDir + File.separator + "dsdb");
-
-            // get the (optional) services
-            if (! appProperties.containsKey("com.sun.sgs.channelService"))
-                appProperties.setProperty("com.sun.sgs.channelService",
-                                          DEFAULT_CHANNEL_SERVICE);
-            if (! appProperties.containsKey("com.sun.sgs.dataService"))
-                appProperties.setProperty("com.sun.sgs.dataService",
-                                          DEFAULT_DATA_SERVICE);
-            if (! appProperties.containsKey("com.sun.sgs.taskService"))
-                appProperties.setProperty("com.sun.sgs.taskService",
-                                          DEFAULT_TASK_SERVICE);
+            final String dbDirProp =
+                "com.sun.sgs.impl.service.data.store.DataStoreImpl.directory";
+            if (! appProperties.containsKey(dbDirProp))
+                // set the database location
+                appProperties.setProperty(dbDirProp,
+                        appProperties.getProperty("com.sun.sgs.rootDir") +
+                        File.separator + "dsdb");
             
             // start the application
             kernel.startupApplication(appProperties);
