@@ -194,7 +194,7 @@ class Kernel {
             setupService(taskServiceClass, serviceList,
                          DEFAULT_TASK_MANAGER, managerSet, properties,
                          systemRegistry);
-            // TODO: add the ClientSession and Channel services
+            // FIXME: add ClientSession and Channel services when they're ready
             /*
             serviceList.add(createService(
         	    	 Class.forName(clientSessionServiceClass),
@@ -359,7 +359,7 @@ class Kernel {
      */
     public static void main(String [] args) throws Exception {
 	// start with the system properties
-	Properties systemProperties = System.getProperties();
+        Properties systemProperties = System.getProperties();
 
         // If a config file is specified, use it.
         String propertiesFile =
@@ -394,19 +394,22 @@ class Kernel {
             Properties appProperties = new Properties(systemProperties);
             appProperties.setProperty("com.sun.sgs.appName", args[i]);
 
+            // set the root property
+            String rootDir =
+                appProperties.getProperty("com.sun.sgs." + args[i] +
+                                          ".rootDir");
+            appProperties.setProperty("com.sun.sgs.rootDir", rootDir);
+
             // get the listener class
             String app =
                 appProperties.getProperty("com.sun.sgs." + args[i] +
                                           ".appListenerClass");
             appProperties.setProperty("com.sun.sgs.appListenerClass", app);
 
-            // get the database location
-            String rootDir =
-                appProperties.getProperty("com.sun.sgs." + args[i] +
-                                          ".rootDir");
+            // set the database location
             appProperties.setProperty("com.sun.sgs.impl.service.data.store." +
                                       "DataStoreImpl.directory",
-                                      rootDir + "/dsdb");
+                                      rootDir + File.separator + "dsdb");
 
             // get the (optional) services
             if (! appProperties.containsKey("com.sun.sgs.channelService"))

@@ -80,9 +80,7 @@ public class NamePasswordAuthenticator implements IdentityAuthenticator
         // get the name of the password file
         String passFile = properties.getProperty(PASSWORD_FILE_PROPERTY);
         if (passFile == null) {
-            String appName = properties.getProperty("com.sun.sgs.appName");
-            String root =
-        	properties.getProperty("com.sun.sgs." + appName + ".rootDir");
+            String root = properties.getProperty("com.sun.sgs.rootDir");
             passFile = root + File.separator + DEFAULT_FILE_NAME;
         }
 
