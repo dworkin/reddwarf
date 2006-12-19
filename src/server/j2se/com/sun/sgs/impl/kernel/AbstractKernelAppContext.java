@@ -137,7 +137,7 @@ abstract class AbstractKernelAppContext implements KernelAppContext {
     }
 
     /**
-     * @{inheritDoc}
+     * {@inheritDoc}
      */
     public int hashCode() {
         return applicationCode;
