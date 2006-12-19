@@ -383,9 +383,10 @@ class Kernel {
         	}
             }
         } catch (IOException e) {
-            logger.logThrow(Level.WARNING, e,
-        	    "Unable to load properties file {0}: ",
-        	    propertiesFile);
+            if (logger.isLoggable(Level.WARNING))
+                logger.logThrow(Level.WARNING, e,
+                        "Unable to load properties file {0}: ",
+                        propertiesFile);
             throw e;
         }
         
