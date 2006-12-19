@@ -4,6 +4,7 @@ import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.impl.util.WrappedSerializable;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -26,7 +27,7 @@ final class ChannelState implements ManagedObject, Serializable {
     final String name;
 
     /** The listener for this channel. */
-    final ChannelListener listener;
+    private final WrappedSerializable<ChannelListener> listener;
 
     /** The delivery requirement for messages sent on this channel. */
     final Delivery delivery;
@@ -36,8 +37,8 @@ final class ChannelState implements ManagedObject, Serializable {
      * and whose values are per-session ChannelListeners (null values
      * allowed).
      */
-    final Map<ClientSession, ChannelListener> sessions =
-	new HashMap<ClientSession, ChannelListener>();
+    final Map<ClientSession, WrappedSerializable<ChannelListener>> sessions =
+	new HashMap<ClientSession, WrappedSerializable<ChannelListener>>();
 
     /**
      * Constructs an instance of this class with the specified name,
@@ -45,7 +46,10 @@ final class ChannelState implements ManagedObject, Serializable {
      */
     ChannelState(String name, ChannelListener listener, Delivery delivery) {
 	this.name = name;
-	this.listener = listener;
+	this.listener =
+	    listener != null ?
+	    new WrappedSerializable<ChannelListener>(listener) :
+	    null;
 	this.delivery = delivery;
     }
 
@@ -69,10 +73,7 @@ final class ChannelState implements ManagedObject, Serializable {
 	    return true;
 	} else if (obj.getClass() == this.getClass()) {
 	    ChannelState state = (ChannelState) obj;
-	    return
-		name.equals(state.name) &&
-		delivery.equals(state.delivery) &&
-		listener.equals(state.listener);
+	    return name.equals(state.name);
 	}
 	return false;
     }
@@ -85,6 +86,24 @@ final class ChannelState implements ManagedObject, Serializable {
     /** {@inheritDoc} */
     public String toString() {
 	return getClass().getName() + "[" + name + "]";
+    }
+
+    /* -- other methods -- */
+
+    void setListener(ClientSession session, ChannelListener listener) {
+	WrappedSerializable<ChannelListener> wrappedListener =
+	    listener != null ?
+	    new WrappedSerializable<ChannelListener>(listener) :
+	    null;
+	
+	sessions.put(session, wrappedListener);
+    }
+
+    ChannelListener getListener() {
+	return
+	    listener != null  ?
+	    listener.get(ChannelListener.class):
+	    null;
     }
 
     /* -- Serialization methods -- */

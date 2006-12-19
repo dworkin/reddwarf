@@ -126,12 +126,12 @@ public class TestClientSessionServiceImpl extends TestCase {
 	registry.setComponent(TaskScheduler.class, taskScheduler);
 	identityManager = createIdentityManager();
 	registry.setComponent(IdentityManager.class, identityManager);
-	sessionService = createSessionService();
+	sessionService = createSessionService(registry);
 	sessionService.configure(registry, txnProxy);
 	registry.setComponent(ClientSessionService.class, sessionService);
 	txn.commit();
 	createTransaction();
-	channelService = createChannelService();
+	channelService = createChannelService(registry);
 	channelService.configure(registry, txnProxy);
 	txn.commit();
 	createTransaction();
@@ -157,18 +157,27 @@ public class TestClientSessionServiceImpl extends TestCase {
  
     /* -- Test constructor -- */
 
-    public void testConstructorNullArg() {
+    public void testConstructorNullProperties() {
 	try {
-	    new ClientSessionServiceImpl(null);
+	    new ClientSessionServiceImpl(null, new DummyComponentRegistry());
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
 	}
     }
 
+    public void testConstructorNullComponentRegistry() {
+	try {
+	    new ClientSessionServiceImpl(serviceProps, null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
     public void testConstructorNoAppName() throws Exception {
 	try {
-	    new ClientSessionServiceImpl(new Properties());
+	    new ClientSessionServiceImpl(
+		new Properties(), new DummyComponentRegistry());
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -255,13 +264,17 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     /** Creates a new channel service. */
-    private static ChannelServiceImpl createChannelService() {
-	return new ChannelServiceImpl(serviceProps);
+    private static ChannelServiceImpl createChannelService(
+	ComponentRegistry registry)
+    {
+	return new ChannelServiceImpl(serviceProps, registry);
     }
 
     /** Creates a new client session service. */
-    private static ClientSessionServiceImpl createSessionService() {
-	return new ClientSessionServiceImpl(serviceProps);
+    private static ClientSessionServiceImpl createSessionService(
+	ComponentRegistry registry)
+    {
+	return new ClientSessionServiceImpl(serviceProps, registry);
     }
 
     private static class DummyTaskService implements TaskService {

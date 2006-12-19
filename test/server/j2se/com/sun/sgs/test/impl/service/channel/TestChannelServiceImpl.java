@@ -118,7 +118,7 @@ public class TestChannelServiceImpl extends TestCase {
 	registry.setComponent(ClientSessionService.class, sessionService);
 	txn.commit();
 	createTransaction();
-	channelService = createChannelService();
+	channelService = createChannelService(registry);
 	channelService.configure(registry, txnProxy);
 	registry.setComponent(ChannelManager.class, channelService);
 	txn.commit();
@@ -144,9 +144,18 @@ public class TestChannelServiceImpl extends TestCase {
 
     /* -- Test constructor -- */
 
-    public void testConstructorNullArg() {
+    public void testConstructorNullProperties() {
 	try {
-	    new ChannelServiceImpl(null);
+	    new ChannelServiceImpl(null, new DummyComponentRegistry());
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testConstructorNullComponentRegistry() {
+	try {
+	    new ChannelServiceImpl(serviceProps, null);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
@@ -155,7 +164,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testConstructorNoAppName() throws Exception {
 	try {
-	    new ChannelServiceImpl(new Properties());
+	    new ChannelServiceImpl(new Properties(), new DummyComponentRegistry());
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -165,7 +174,8 @@ public class TestChannelServiceImpl extends TestCase {
     /* -- Test configure -- */
 
     public void testConfigureNullRegistry() {
-	ChannelServiceImpl service = new ChannelServiceImpl(serviceProps);
+	ChannelServiceImpl service =
+	    new ChannelServiceImpl(serviceProps, new DummyComponentRegistry());
 	try {
 	    channelService.configure(null, new DummyTransactionProxy());
 	    fail("Expected NullPointerException");
@@ -176,7 +186,7 @@ public class TestChannelServiceImpl extends TestCase {
     
     public void testConfigureNullTransactionProxy() {
 	ChannelServiceImpl channelService =
-	    new ChannelServiceImpl(serviceProps);
+	    new ChannelServiceImpl(serviceProps, new DummyComponentRegistry());
 	try {
 	    channelService.configure(new DummyComponentRegistry(), null);
 	    fail("Expected NullPointerException");
@@ -965,8 +975,10 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
    /** Creates a new channel service. */
-    private static ChannelServiceImpl createChannelService() {
-	return new ChannelServiceImpl(serviceProps);
+    private static ChannelServiceImpl createChannelService(
+	DummyComponentRegistry registry)
+    {
+	return new ChannelServiceImpl(serviceProps, registry);
     }
     
     /* -- other classes -- */

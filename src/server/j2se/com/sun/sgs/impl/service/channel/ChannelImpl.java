@@ -102,7 +102,7 @@ final class ChannelImpl implements Channel, Serializable {
 	    }
 	    if (state.sessions.get(session) == null) {
 		context.dataService.markForUpdate(state);
-		state.sessions.put(session, listener);
+		state.setListener(session, listener);
 	    }
 	    
 	    submitNonTransactionalTask(new KernelRunnable() {

@@ -113,7 +113,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	this.sessionService = null;
 	this.name = name;
 	this.sessionId = sessionId;
-	this.reconnectionKey = null;
+	this.reconnectionKey = generateId(); // create bogus one
 	this.handler = null;
 	this.state = State.DISCONNECTED;
     }
@@ -233,6 +233,32 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    }
 	}
     }
+
+    /* -- Implement Object -- */
+
+    /** {@inheritDoc} */
+    public boolean equals(Object obj) {
+	if (this == obj) {
+	    return true;
+	} else if (obj.getClass() == this.getClass()) {
+	    ClientSessionImpl session = (ClientSessionImpl) obj;
+	    return
+		name.equals(session.name) &&
+		sessionId.equals(session.sessionId) &&
+		reconnectionKey.equals(session.reconnectionKey);
+	}
+	return false;
+    }
+
+    /** {@inheritDoc} */
+    public int hashCode() {
+	return name.hashCode();
+    }
+
+    /** {@inheritDoc} */
+    public String toString() {
+	return getClass().getName() + "[" + name + "]";
+    }
     
     /* -- Serialization methods -- */
 
@@ -241,7 +267,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     }
 
     /**
-     * Represents the persistent represntation for a client session
+     * Represents the persistent representation for a client session
      * (its name and session id).
      */
     private final static class External implements Serializable {

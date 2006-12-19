@@ -99,13 +99,18 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     /**
      * Constructs an instance of this class with the specified properties.
      */
-    public ClientSessionServiceImpl(Properties properties) {
+    public ClientSessionServiceImpl(
+	Properties properties, ComponentRegistry systemRegistry)
+    {
 	if (logger.isLoggable(Level.CONFIG)) {
 	    logger.log(
 	        Level.CONFIG, "Creating ClientSessionServiceImpl properties:{0}",
 		properties);
 	}
 	try {
+	    if (systemRegistry == null) {
+		throw new NullPointerException("null systemRegistry");
+	    }
 	    appName = properties.getProperty(APP_NAME_PROPERTY);
 	    if (appName == null) {
 		throw new IllegalArgumentException(
