@@ -24,6 +24,7 @@ import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskReservation;
 import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.TransactionProxy;
@@ -60,7 +61,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     /** Properties for the session service. */
     private static Properties serviceProps = createProperties(
-	"com.sun.sgs.app.name", "TestClientSessionServiceImpl",
+	"com.sun.sgs.appName", "TestClientSessionServiceImpl",
 	"com.sun.sgs.app.port", "8306");
 
     /** Properties for creating the shared database. */
@@ -125,14 +126,13 @@ public class TestClientSessionServiceImpl extends TestCase {
 	registry.setComponent(TaskScheduler.class, taskScheduler);
 	identityManager = createIdentityManager();
 	registry.setComponent(IdentityManager.class, identityManager);
+	sessionService = createSessionService();
+	sessionService.configure(registry, txnProxy);
+	registry.setComponent(ClientSessionService.class, sessionService);
 	txn.commit();
 	createTransaction();
 	channelService = createChannelService();
 	channelService.configure(registry, txnProxy);
-	txn.commit();
-	createTransaction();
-	sessionService = createSessionService();
-	sessionService.configure(registry, txnProxy);
 	txn.commit();
 	createTransaction();
     }

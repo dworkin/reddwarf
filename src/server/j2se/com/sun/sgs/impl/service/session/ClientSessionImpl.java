@@ -268,10 +268,6 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 
 	private Object readResolve() throws ObjectStreamException {
 	    try {
-		// TBD: casting the client session service to a
-		// ClientSessionServiceImpl feels like a hack.
-		// Perhaps we should add a 'getClientSession' method
-		// to the ClientSessionService interface.
 		ClientSessionService service =
 		    AppContext.getManager(ClientSessionService.class);
 		ClientSession session = service.getClientSession(sessionId);

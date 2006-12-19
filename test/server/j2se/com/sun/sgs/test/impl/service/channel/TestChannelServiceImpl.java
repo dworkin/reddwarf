@@ -16,7 +16,9 @@ import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.Priority;
+import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.ServiceListener;
 import com.sun.sgs.service.SgsClientSession;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.TransactionProxy;
@@ -33,6 +35,8 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -54,7 +58,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     /** Properties for the channel service. */
     private static Properties serviceProps = createProperties(
-	"com.sun.sgs.app.name", "TestChannelServiceImpl");
+	"com.sun.sgs.appName", "TestChannelServiceImpl");
 
     /** Properties for creating the shared database. */
     private static Properties dbProps = createProperties(
@@ -84,6 +88,8 @@ public class TestChannelServiceImpl extends TestCase {
     private DataServiceImpl dataService;
 
     private DummyTaskService taskService;
+
+    private DummySessionService sessionService;
     
     private ChannelServiceImpl channelService;
 
@@ -108,6 +114,8 @@ public class TestChannelServiceImpl extends TestCase {
 	registry.registerAppContext();
 	taskService = createTaskService();
 	registry.setComponent(TaskService.class, taskService);
+	sessionService = createSessionService();
+	registry.setComponent(ClientSessionService.class, sessionService);
 	txn.commit();
 	createTransaction();
 	channelService = createChannelService();
@@ -949,6 +957,13 @@ public class TestChannelServiceImpl extends TestCase {
 	return new DummyTaskService();
     }
 
+    /**
+     * Creates a client session service.
+     */
+    private DummySessionService createSessionService() {
+	return new DummySessionService();
+    }
+
    /** Creates a new channel service. */
     private static ChannelServiceImpl createChannelService() {
 	return new ChannelServiceImpl(serviceProps);
@@ -1109,6 +1124,34 @@ public class TestChannelServiceImpl extends TestCase {
 					   Priority priority)
 	{
 	    scheduleNonDurableTask(task);
+	}
+    }
+
+    private static class DummySessionService implements ClientSessionService {
+
+
+	private final Map<Byte, ServiceListener> serviceListeners =
+	    new HashMap<Byte, ServiceListener>();
+
+	/** A map of current sessions, from session ID to ClientSessionImpl. */
+	private final Map<byte[], SgsClientSession> sessions =
+	    new HashMap<byte[], SgsClientSession>();
+
+	public String getName() {
+	    return toString();
+	}
+	
+	public void configure(ComponentRegistry registry, TransactionProxy proxy) {
+	}
+	
+	public void registerServiceListener(
+	    byte serviceId, ServiceListener listener)
+	{
+	    serviceListeners.put(serviceId, listener);
+	}
+
+	public SgsClientSession getClientSession(byte[] sessionId) {
+	    return sessions.get(sessionId);
 	}
     }
 }

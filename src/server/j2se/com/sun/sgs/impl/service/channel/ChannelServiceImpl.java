@@ -9,6 +9,7 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Service;
@@ -32,7 +33,7 @@ public class ChannelServiceImpl
 {
 
     /** The property that specifies the application name. */
-    public static final String APP_NAME_PROPERTY = "com.sun.sgs.app.name";
+    public static final String APP_NAME_PROPERTY = "com.sun.sgs.appName";
 
     /** The name of this class. */
     private static final String CLASSNAME = ChannelServiceImpl.class.getName();
@@ -56,6 +57,9 @@ public class ChannelServiceImpl
 
     /** The data service. */
     private DataService dataService;
+
+    /** The client session service. */
+    private ClientSessionService sessionService;
 
     /** The task service. */
     private TaskService taskService;
@@ -114,6 +118,7 @@ public class ChannelServiceImpl
 		this.txnProxy = proxy;
 		dataService = registry.getComponent(DataService.class);
 		taskService = registry.getComponent(TaskService.class);
+		sessionService = registry.getComponent(ClientSessionService.class);
 	    }
 
 	    /*
@@ -322,7 +327,8 @@ public class ChannelServiceImpl
 		logger.log(Level.FINER, "join txn:{0}", txn);
 	    }
 	    txn.join(this);
-	    context = new Context(dataService, taskService, this, txn);
+	    context =
+		new Context(dataService, taskService, sessionService, this, txn);
 	    currentContext.set(context);
 	} else if (!txn.equals(context.txn)) {
 	    currentContext.set(null);

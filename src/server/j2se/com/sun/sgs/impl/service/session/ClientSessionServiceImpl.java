@@ -35,14 +35,14 @@ import java.util.logging.Logger;
  *
  * <p>Properties should include:
  * <ul>
- * <li><code>com.sun.sgs.app.name</code>
+ * <li><code>com.sun.sgs.appName</code>
  * <li><code>com.sun.sgs.app.port</code>
  * </ul>
  */
 public class ClientSessionServiceImpl implements ClientSessionService {
 
     /** The property that specifies the application name. */
-    public static final String APP_NAME_PROPERTY = "com.sun.sgs.app.name";
+    public static final String APP_NAME_PROPERTY = "com.sun.sgs.appName";
 
     /** The property that specifies the port number. */
     public static final String PORT_PROPERTY = "com.sun.sgs.app.port";

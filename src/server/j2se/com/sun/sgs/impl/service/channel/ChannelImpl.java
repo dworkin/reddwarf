@@ -407,8 +407,19 @@ final class ChannelImpl implements Channel, Serializable {
 	}
 
 	public void run() {
-	    for (byte[] id : clients) {
-		// TBI: send message to client specified by identifier...
+	    MessageBuffer buf = new MessageBuffer(5 + message.length);
+	    buf.putByte(SgsProtocol.VERSION).
+		putByte(SgsProtocol.CHANNEL_SERVICE).
+		putByte(SgsProtocol.MESSAGE_SEND).
+		putShort(message.length).
+		putBytes(message);
+	    
+	    for (byte[] sessionId : clients) {
+		SgsClientSession session = 
+		    context.sessionService.getClientSession(sessionId);
+		if (session != null && session.isConnected()) {
+		    session.sendMessage(message, state.delivery);
+		}
 	    }
 	}
     }

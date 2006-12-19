@@ -7,6 +7,7 @@ import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.NameExistsException;
 import com.sun.sgs.app.NameNotBoundException;
+import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.Transaction;
@@ -38,6 +39,9 @@ final class Context {
     /** The channel service. */
     final ChannelServiceImpl channelService;
 
+    /** The client session service. */
+    final ClientSessionService sessionService;
+
     /** The transaction. */
     final Transaction txn;
 
@@ -57,12 +61,14 @@ final class Context {
      */
     Context(DataService dataService,
 	    TaskService taskService,
+	    ClientSessionService sessionService,
 	    ChannelServiceImpl channelService,
 	    Transaction txn)
     {
 	assert dataService != null && channelService != null && txn != null;
 	this.dataService = dataService;
 	this.taskService = taskService;
+	this.sessionService = sessionService;
 	this.channelService = channelService;
 	this.txn = txn;
 	this.table = dataService.getServiceBinding(
