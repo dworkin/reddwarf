@@ -131,6 +131,9 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 		    "Port number can't be negative: " + port);
 	    }
 
+	    taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
+	    identityManager = systemRegistry.getComponent(IdentityManager.class);
+
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
 		logger.logThrow(
@@ -169,8 +172,6 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 		kernelAppContext = proxy.getCurrentOwner().getContext();
 		dataService = registry.getComponent(DataService.class);
 		taskService = registry.getComponent(TaskService.class);
-		taskScheduler = registry.getComponent(TaskScheduler.class);
-		identityManager = registry.getComponent(IdentityManager.class);
 		acceptor =
 		    AcceptorFactory.createAcceptor(TransportType.RELIABLE);
 		SocketAddress address = new InetSocketAddress(port);

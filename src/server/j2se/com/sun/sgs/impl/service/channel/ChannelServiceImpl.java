@@ -29,7 +29,7 @@ import java.util.logging.Logger;
  * Simple ChannelService implementation.
  */
 public class ChannelServiceImpl
-    implements ChannelManager, NonDurableTransactionParticipant
+    implements ChannelManager, Service, NonDurableTransactionParticipant
 {
 
     /** The property that specifies the application name. */

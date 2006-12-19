@@ -648,7 +648,20 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    AppListener appListener =
 		sessionService.dataService.getServiceBinding(
 		    "com.sun.sgs.app.AppListener", AppListener.class);
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(
+		    Level.FINEST,
+		    "LoginTask.run invoking AppListener.loggedIn session:{0}",
+		    name);
+	    }
 	    listener = appListener.loggedIn(ClientSessionImpl.this);
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(
+		    Level.FINEST,
+		    "LoginTask.run AppListener.loggedIn returned {0}",
+		    listener);
+	    }
+	    
 	    submitNonTransactionalTask(new LoginAckTask());
 	}
     }
