@@ -5,13 +5,17 @@ import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.Delivery;
+import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.auth.NamePasswordCredentials;
 import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.kernel.TaskOwnerImpl;
 import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.ServiceListener;
 import com.sun.sgs.service.SgsClientSession;
+import com.sun.sgs.service.TransactionRunner;
 import java.io.IOException;
 import java.io.InvalidObjectException;
 import java.io.ObjectInputStream;
@@ -23,7 +27,7 @@ import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
+import javax.security.auth.login.LoginException;
 
 /**
  * Implements a client session.
@@ -61,6 +65,9 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 
     /** The authenticated name for this session. */
     private String name;
+
+    /** The identity for this session. */
+    private Identity identity = null;
 
     /** The lock for accessing the connection state and sending messages. */
     private final Object lock = new Object();
@@ -349,10 +356,13 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		    sessionHandle);
 	    }
 	}
-	submitTransactionalTask(new KernelRunnable() {
-	    public void run() throws IOException {
-		listener.disconnected(graceful);
-	    }});
+
+	if (listener != null) {
+	    submitTransactionalTask(new KernelRunnable() {
+		public void run() throws IOException {
+		    listener.disconnected(graceful);
+		}});
+	}
     }
     
     /** Returns the IOHandler for this session. */
@@ -519,8 +529,14 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		name = msg.getString();
 		String password = msg.getString();
 
-		// TBD: need to athenticate here...
-		submitTransactionalTask(new LoginTask());
+		try {
+		    identity = authenticate(name, password);
+		    submitTransactionalTask(new LoginTask());
+		} catch (LoginException e) {
+		    // This will send a nack to client because
+		    // listener is null.
+		    submitTransactionalTask(new LoginAckTask());
+		}
 		break;
 		
 	    case SgsProtocol.RECONNECTION_REQUEST:
@@ -559,51 +575,39 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 			"Handler.messageReceived unknown operation code:{0}",
 			opcode);
 		}
-		// TBD: should the connection be disconnected, or
-		// should this send an "unknown opcode" message to the
-		// client?
 
-		MessageBuffer ack = new MessageBuffer(4);
-		ack.putByte(SgsProtocol.VERSION).
-		    putByte(SgsProtocol.APPLICATION_SERVICE).
-		    putByte(SgsProtocol.OPCODE_UNKNOWN).
-		    putByte(opcode);
-		sendProtocolMessage(ack);
+		submitNonTransactionalTask(new KernelRunnable() {
+		    public void run() {
+			handleDisconnect(false);
+		    }});
 		break;
 	    }
 	}
     }
 
     /**
+     */
+    private Identity authenticate(String name, String password)
+	throws LoginException
+    {
+	return sessionService.identityManager.authenticateIdentity(
+	    new NamePasswordCredentials(name, password.toCharArray()));
+    }
+
+    /**
      * Submits a non-durable, transactional task.
      */
     private void submitTransactionalTask(KernelRunnable task) {
-	// TBD...
-	/*
 	sessionService.taskScheduler.scheduleTask(
 	    new TransactionRunner(task),
-	    new TaskOwnerImpl(name, sessionService.kernelAppContext));
-	*/
-	// Do this for now...
-	try {
-	    task.run();
-	} catch (Exception e) {
-	    throw (RuntimeException) new RuntimeException().initCause(e);
-	}
+	    new TaskOwnerImpl(identity, sessionService.kernelAppContext));
     }
 
     /**
      * Submits a non-durable, non-transactional task.
      */
     private void submitNonTransactionalTask(KernelRunnable task) {
-	// TBD...
-	// sessionService.taskService.scheduleNonDurableTask(task);
-	// Do this for now...
-	try {
-	    task.run();
-	} catch (Exception e) {
-	    throw (RuntimeException) new RuntimeException().initCause(e);
-	}
+	sessionService.taskService.scheduleNonDurableTask(task);
     }
 
     /**

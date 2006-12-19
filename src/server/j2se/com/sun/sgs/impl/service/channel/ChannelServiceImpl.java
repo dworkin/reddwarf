@@ -14,7 +14,7 @@ import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.ServiceListener;
 import com.sun.sgs.service.SgsClientSession;
-//import com.sun.sgs.service.TaskService;
+import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import java.io.Serializable;
@@ -54,21 +54,11 @@ public class ChannelServiceImpl
     /** The transaction proxy, or null if configure has not been called. */    
     private TransactionProxy txnProxy;
 
-    /** List of tasks (e.g. for sending channel messages). */
-    private List<Runnable> tasks =
-	new LinkedList<Runnable>();
-
-    /** Lock for task list. */
-    private final Object tasksLock = new Object();
-
-    /** Thread for handling send tasks. */
-    private HandleTasksThread handleTasksThread;
-
     /** The data service. */
     private DataService dataService;
 
     /** The task service. */
-    //private TaskService taskService;
+    private TaskService taskService;
 
     /**
      * Constructs an instance of this class with the specified properties.
@@ -123,7 +113,7 @@ public class ChannelServiceImpl
 		}
 		this.txnProxy = proxy;
 		dataService = registry.getComponent(DataService.class);
-		//taskService = registry.getComponent(TaskService.class);
+		taskService = registry.getComponent(TaskService.class);
 	    }
 
 	    /*
@@ -332,7 +322,7 @@ public class ChannelServiceImpl
 		logger.log(Level.FINER, "join txn:{0}", txn);
 	    }
 	    txn.join(this);
-	    context = new Context(dataService, this, txn);
+	    context = new Context(dataService, taskService, this, txn);
 	    currentContext.set(context);
 	} else if (!txn.equals(context.txn)) {
 	    currentContext.set(null);
@@ -356,70 +346,5 @@ public class ChannelServiceImpl
 	    throw new TransactionNotActiveException(
 		"No transaction is active");
 	}
-    }
-
-    /**
-     * Adds a task to this instance's task queue.
-     */
-    void addTask(Runnable runnable) {
-	synchronized (tasksLock) {
-	    tasks.add(runnable);
-	    tasksLock.notify();
-	}
-    }
-
-    /**
-     * Thread for executing this channel service's tasks.
-     */
-    private final class HandleTasksThread extends Thread {
-
-	private boolean interrupted = false;
-	
-	HandleTasksThread() {
-	    super("HandleTasksThread");
-	    setDaemon(true);
-	}
-
-	public void interrupt() {
-	    interrupted = true;
-	}
-	
-	public void run() {
-	    while (!interrupted) {
-		try {
-		    Runnable task;
-		    synchronized (tasksLock) {
-			if (tasks.isEmpty()) {
-			    try {
-				tasksLock.wait();
-				continue;
-			    } catch (InterruptedException e) {
-				return;
-			    }
-			} else {
-			    task = tasks.remove(0);
-			}
-		    }
-		    try {
-			if (logger.isLoggable(Level.FINEST)) {
-			    logger.log(Level.FINEST, "Processing {0}", task);
-			}
-		    } catch (Throwable t) {
-		    }
-
-		    task.run();
-
-		} catch (Throwable t) {
-		    try {
-			if (logger.isLoggable(Level.FINEST)) {
-			    logger.logThrow(
-			        Level.FINEST, t,
-				"Problem during processing -- continuing");
-			}
-		    } catch (Throwable t2) {
-		    }
-		}
-	    }
-	};
     }
 }

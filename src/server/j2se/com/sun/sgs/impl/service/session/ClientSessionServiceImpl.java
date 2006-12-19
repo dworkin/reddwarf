@@ -1,6 +1,7 @@
 package com.sun.sgs.impl.service.session;
 
 import com.sun.sgs.app.AppListener;
+import com.sun.sgs.auth.IdentityManager;
 import com.sun.sgs.impl.io.AcceptorFactory;
 import com.sun.sgs.impl.io.CompleteMessageFilter;
 import com.sun.sgs.impl.io.IOConstants.TransportType;
@@ -9,13 +10,15 @@ import com.sun.sgs.io.AcceptedHandleListener;
 import com.sun.sgs.io.IOAcceptor;
 import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
-import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.KernelAppContext;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.KernelAppContext;
+import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.ServiceListener;
 import com.sun.sgs.service.SgsClientSession;
+import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.TransactionProxy;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -79,10 +82,16 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     private TransactionProxy txnProxy;
 
     /** The task service. */
-    //    `TaskService taskService;
+    TaskService taskService;
+
+    /** The task scheduler. */
+    TaskScheduler taskScheduler;
     
     /** The data service. */
     DataService dataService;
+
+    /** The identity manager. */
+    IdentityManager identityManager;
     
     /** The kernel context for tasks. */
     KernelAppContext kernelAppContext;
@@ -154,7 +163,9 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 		txnProxy = proxy;
 		kernelAppContext = proxy.getCurrentOwner().getContext();
 		dataService = registry.getComponent(DataService.class);
-		//taskService = registry.getComponent(TaskService.class);
+		taskService = registry.getComponent(TaskService.class);
+		taskScheduler = registry.getComponent(TaskScheduler.class);
+		identityManager = registry.getComponent(IdentityManager.class);
 		acceptor =
 		    AcceptorFactory.createAcceptor(TransportType.RELIABLE);
 		SocketAddress address = new InetSocketAddress(port);

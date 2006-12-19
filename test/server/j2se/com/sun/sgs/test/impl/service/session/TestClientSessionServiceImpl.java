@@ -6,12 +6,27 @@ import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.NameExistsException;
 import com.sun.sgs.app.NameNotBoundException;
+import com.sun.sgs.app.PeriodicTaskHandle;
+import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.auth.Identity;
+import com.sun.sgs.auth.IdentityCredentials;
+import com.sun.sgs.auth.IdentityManager;
+import com.sun.sgs.impl.auth.NamePasswordCredentials;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
+import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.kernel.Priority;
+import com.sun.sgs.kernel.RecurringTaskHandle;
+import com.sun.sgs.kernel.TaskOwner;
+import com.sun.sgs.kernel.TaskReservation;
+import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.TaskService;
+import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
@@ -79,6 +94,12 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     private ClientSessionServiceImpl sessionService;
 
+    private DummyTaskService taskService;
+
+    private DummyTaskScheduler taskScheduler;
+
+    private DummyIdentityManager identityManager;
+
     /** True if test passes. */
     private boolean passed;
 
@@ -97,6 +118,13 @@ public class TestClientSessionServiceImpl extends TestCase {
 	dataService = createDataService(registry);
 	dataService.configure(registry, txnProxy);
 	registry.setComponent(DataService.class, dataService);
+	registry.registerAppContext();
+	taskService = createTaskService();
+	registry.setComponent(TaskService.class, taskService);
+	taskScheduler = createTaskScheduler();
+	registry.setComponent(TaskScheduler.class, taskScheduler);
+	identityManager = createIdentityManager();
+	registry.setComponent(IdentityManager.class, identityManager);
 	txn.commit();
 	createTransaction();
 	channelService = createChannelService();
@@ -205,6 +233,27 @@ public class TestClientSessionServiceImpl extends TestCase {
 	return new DataServiceImpl(dbProps, registry);
     }
 
+    /**
+     * Creates a task service.
+     */
+    private DummyTaskService createTaskService() {
+	return new DummyTaskService();
+    }
+
+    /**
+     * Creates a task scheduler.
+     */
+    private DummyTaskScheduler createTaskScheduler() {
+	return new DummyTaskScheduler();
+    }
+
+    /**
+     * Creates an identity manager.
+     */
+    private DummyIdentityManager createIdentityManager() {
+	return new DummyIdentityManager();
+    }
+
     /** Creates a new channel service. */
     private static ChannelServiceImpl createChannelService() {
 	return new ChannelServiceImpl(serviceProps);
@@ -213,5 +262,137 @@ public class TestClientSessionServiceImpl extends TestCase {
     /** Creates a new client session service. */
     private static ClientSessionServiceImpl createSessionService() {
 	return new ClientSessionServiceImpl(serviceProps);
+    }
+
+    private static class DummyTaskService implements TaskService {
+
+	public String getName() {
+	    return toString();
+	}
+
+	public void configure(ComponentRegistry registry, TransactionProxy proxy) {
+	}
+
+	public PeriodicTaskHandle schedulePeriodicTask(
+	    Task task, long delay, long period)
+	{
+	    throw new AssertionError("Not implemented");
+	}
+
+	public void scheduleTask(Task task) {
+	    try {
+		task.run();
+	    } catch (Exception e) {
+		System.err.println(
+		    "DummyTaskService.scheduleTask exception: " + e);
+		e.printStackTrace();
+		throw (RuntimeException) (new RuntimeException()).initCause(e);
+	    }
+	}
+
+	public void scheduleTask(Task task, long delay) {
+	    scheduleTask(task);
+	}
+	
+	public void scheduleNonDurableTask(KernelRunnable task) {
+	    try {
+		task.run();
+	    } catch (Exception e) {
+		System.err.println(
+		    "DummyTaskService.scheduleNonDurableTask exception: " + e);
+		e.printStackTrace();
+		throw (RuntimeException) (new RuntimeException()).initCause(e);
+	    }
+	}
+	
+	public void scheduleNonDurableTask(KernelRunnable task, long delay) {
+	    scheduleNonDurableTask(task);
+	}
+	public void scheduleNonDurableTask(KernelRunnable task,
+					   Priority priority)
+	{
+	    scheduleNonDurableTask(task);
+	}
+    }
+
+    private static class DummyTaskScheduler implements TaskScheduler {
+
+	public TaskReservation reserveTask(KernelRunnable task, TaskOwner owner) {
+	    throw new AssertionError("Not implemented");
+	}
+
+	public TaskReservation reserveTask(KernelRunnable task, TaskOwner owner,
+					   Priority priority)
+	{
+	    throw new AssertionError("Not implemented");
+	}
+
+	public TaskReservation reserveTask(KernelRunnable task, TaskOwner owner,
+					   long startTime)
+	{
+	    throw new AssertionError("Not implemented");
+	}
+
+	public TaskReservation reserveTasks(Collection<? extends KernelRunnable>
+					    tasks, TaskOwner owner)
+	{
+	    throw new AssertionError("Not implemented");
+	}
+
+	public void scheduleTask(KernelRunnable task, TaskOwner owner) {
+	    try {
+		task.run();
+	    } catch (Exception e) {
+		System.err.println(
+		   "DummyTaskScheduler.scheduleTask exception: " + e);
+		e.printStackTrace();
+		throw (RuntimeException) (new RuntimeException()).initCause(e);
+	    }
+	}
+
+	public void scheduleTask(KernelRunnable task, TaskOwner owner,
+				 Priority priority)
+	{
+	    scheduleTask(task, owner);
+	}
+
+	public void scheduleTask(KernelRunnable task, TaskOwner owner,
+				 long startTime)
+	{
+	    scheduleTask(task, owner);
+	}
+
+	public RecurringTaskHandle scheduleRecurringTask(KernelRunnable task,
+							 TaskOwner owner,
+							 long startTime,
+							 long period)
+	{
+	    throw new AssertionError("Not implemented");
+	}
+
+	
+    }
+
+    private static class DummyIdentityManager implements IdentityManager {
+	public Identity authenticateIdentity(IdentityCredentials credentials) {
+	    return new DummyIdentity(credentials);
+	}
+    }
+
+    private static class DummyIdentity implements Identity {
+
+	private final String name;
+
+	DummyIdentity(IdentityCredentials credentials) {
+	    this.name = ((NamePasswordCredentials) credentials).getName();
+	}
+	
+	public String getName() {
+	    return name;
+	}
+
+	public void notifyLoggedIn() {}
+
+	public void notifyLoggedOut() {}
     }
 }

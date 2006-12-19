@@ -7,12 +7,19 @@ import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.NameExistsException;
 import com.sun.sgs.app.NameNotBoundException;
+import com.sun.sgs.app.PeriodicTaskHandle;
+import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
+import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.kernel.Priority;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.SgsClientSession;
+import com.sun.sgs.service.TaskService;
+import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
@@ -75,6 +82,8 @@ public class TestChannelServiceImpl extends TestCase {
     private DummyTransaction txn;
 
     private DataServiceImpl dataService;
+
+    private DummyTaskService taskService;
     
     private ChannelServiceImpl channelService;
 
@@ -97,6 +106,8 @@ public class TestChannelServiceImpl extends TestCase {
 	dataService.configure(registry, txnProxy);
 	registry.setComponent(DataService.class, dataService);
 	registry.registerAppContext();
+	taskService = createTaskService();
+	registry.setComponent(TaskService.class, taskService);
 	txn.commit();
 	createTransaction();
 	channelService = createChannelService();
@@ -931,6 +942,13 @@ public class TestChannelServiceImpl extends TestCase {
 	return new DataServiceImpl(dbProps, registry);
     }
 
+    /**
+     * Creates a task service.
+     */
+    private DummyTaskService createTaskService() {
+	return new DummyTaskService();
+    }
+
    /** Creates a new channel service. */
     private static ChannelServiceImpl createChannelService() {
 	return new ChannelServiceImpl(serviceProps);
@@ -1042,5 +1060,55 @@ public class TestChannelServiceImpl extends TestCase {
 	    }
 	}
     }
-    
+
+    private static class DummyTaskService implements TaskService {
+
+	public String getName() {
+	    return toString();
+	}
+
+	public void configure(ComponentRegistry registry, TransactionProxy proxy) {
+	}
+
+	public PeriodicTaskHandle schedulePeriodicTask(
+	    Task task, long delay, long period)
+	{
+	    throw new AssertionError("Not implemented");
+	}
+
+	public void scheduleTask(Task task) {
+	    try {
+		task.run();
+	    } catch (Exception e) {
+		System.err.println(
+		    "DummyTaskService.scheduleTask exception: " + e);
+		e.printStackTrace();
+		throw (RuntimeException) (new RuntimeException()).initCause(e);
+	    }
+	}
+
+	public void scheduleTask(Task task, long delay) {
+	    scheduleTask(task);
+	}
+	
+	public void scheduleNonDurableTask(KernelRunnable task) {
+	    try {
+		task.run();
+	    } catch (Exception e) {
+		System.err.println(
+		    "DummyTaskService.scheduleNonDurableTask exception: " + e);
+		e.printStackTrace();
+		throw (RuntimeException) (new RuntimeException()).initCause(e);
+	    }
+	}
+	
+	public void scheduleNonDurableTask(KernelRunnable task, long delay) {
+	    scheduleNonDurableTask(task);
+	}
+	public void scheduleNonDurableTask(KernelRunnable task,
+					   Priority priority)
+	{
+	    scheduleNonDurableTask(task);
+	}
+    }
 }

@@ -11,6 +11,7 @@ import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
+import com.sun.sgs.service.TaskService;
 import java.util.Map;
 import java.util.HashMap;
 
@@ -30,6 +31,9 @@ final class Context {
 
     /** The data service. */
     final DataService dataService;
+
+    /** The task service. */
+    final TaskService taskService;
 
     /** The channel service. */
     final ChannelServiceImpl channelService;
@@ -52,11 +56,13 @@ final class Context {
      * service and transaction.
      */
     Context(DataService dataService,
+	    TaskService taskService,
 	    ChannelServiceImpl channelService,
 	    Transaction txn)
     {
 	assert dataService != null && channelService != null && txn != null;
 	this.dataService = dataService;
+	this.taskService = taskService;
 	this.channelService = channelService;
 	this.txn = txn;
 	this.table = dataService.getServiceBinding(

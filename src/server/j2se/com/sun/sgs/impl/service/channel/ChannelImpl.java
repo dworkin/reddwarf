@@ -237,7 +237,8 @@ final class ChannelImpl implements Channel, Serializable {
 	if (message == null) {
 	    throw new NullPointerException("null message");
 	}
-	scheduleSend(state.getSessions(), message);
+	submitNonTransactionalTask(
+	    new SendTask(state.getSessions(), message));
     }
 
     /** {@inheritDoc} */
@@ -251,7 +252,7 @@ final class ChannelImpl implements Channel, Serializable {
 	
 	Collection<ClientSession> sessions = new ArrayList<ClientSession>();
 	sessions.add(recipient);
-	scheduleSend(sessions, message);
+	submitNonTransactionalTask(new SendTask(sessions, message));
     }
 
     /** {@inheritDoc} */
@@ -268,7 +269,8 @@ final class ChannelImpl implements Channel, Serializable {
 	if (recipients.isEmpty()) {
 	    return;
 	}
-	scheduleSend(recipients, message);
+
+	submitNonTransactionalTask(new SendTask(recipients, message));
     }
 
     /** {@inheritDoc} */
@@ -368,14 +370,7 @@ final class ChannelImpl implements Channel, Serializable {
      * Submits a non-durable, non-transactional task.
      */
     private void submitNonTransactionalTask(KernelRunnable task) {
-	// TBD...
-	// sessionService.taskService.scheduleNonDurableTask(task);
-	// Do this for now...
-	try {
-	    task.run();
-	} catch (Exception e) {
-	    throw (RuntimeException) new RuntimeException().initCause(e);
-	}
+	context.taskService.scheduleNonDurableTask(task);
     }
 
     /**
@@ -396,31 +391,10 @@ final class ChannelImpl implements Channel, Serializable {
 	}
     }
     
-    private void scheduleSend(
-	final Collection<ClientSession> sessions, final byte[] message)
-    {
-	/*
-	 * Schedule a non-durable task that runs outside a transaction
-	 * that will enqueue work (sending the specified message to
-	 * the specified sessions) for the channel manager.
-	 */
-	Runnable task = new Runnable() {
-		public void run() {
-		    context.channelService.addTask(
-			new SendTask(sessions, message));
-		}
-	    };
-
-	// TBI:
-	// context.taskService.scheduleNonDurableTask(task);
-	// for now, do this...
-	task.run();
-    }
-
     /**
      * Task for sending a message to a set of clients.
      */
-    final class SendTask implements Runnable {
+    private final class SendTask implements KernelRunnable {
 
 	private final Collection<byte[]> clients = new ArrayList<byte[]>();
 	private final byte[] message;
