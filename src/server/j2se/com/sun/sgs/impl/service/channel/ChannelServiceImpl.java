@@ -66,6 +66,9 @@ public class ChannelServiceImpl
 
     /**
      * Constructs an instance of this class with the specified properties.
+     *
+     * @param properties service properties
+     * @param systemRegistry system registry
      */
     public ChannelServiceImpl(
 	Properties properties, ComponentRegistry systemRegistry)

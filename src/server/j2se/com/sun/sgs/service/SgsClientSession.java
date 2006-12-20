@@ -10,6 +10,8 @@ public interface SgsClientSession extends ClientSession {
 
     /**
      * Returns the next sequence number for this client session.
+     *
+     * @return the next sequence number
      */
     long nextSequenceNumber();
 

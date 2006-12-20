@@ -98,6 +98,9 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 
     /**
      * Constructs an instance of this class with the specified properties.
+     *
+     * @param properties service properties
+     * @param systemRegistry system registry
      */
     public ClientSessionServiceImpl(
 	Properties properties, ComponentRegistry systemRegistry)
@@ -132,7 +135,8 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	    }
 
 	    taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
-	    identityManager = systemRegistry.getComponent(IdentityManager.class);
+	    identityManager =
+		systemRegistry.getComponent(IdentityManager.class);
 
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.CONFIG)) {

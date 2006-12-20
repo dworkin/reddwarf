@@ -174,6 +174,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    System.err.println(e);
 	}
     }
+
     public void testConstructorNoAppName() throws Exception {
 	try {
 	    new ClientSessionServiceImpl(
@@ -407,5 +408,19 @@ public class TestClientSessionServiceImpl extends TestCase {
 	public void notifyLoggedIn() {}
 
 	public void notifyLoggedOut() {}
+    }
+
+    private static class DummyClient {
+
+	private String name;
+	private String password;
+	
+	DummyClient(String name, String password) {
+	    this.name = name;
+	    this.password = password;
+	}
+
+	void connect(int port) {
+	}
     }
 }

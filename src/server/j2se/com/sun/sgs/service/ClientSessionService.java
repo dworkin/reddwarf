@@ -31,6 +31,7 @@ public interface ClientSessionService extends Service {
      * session ID, or <code>null</code> if there is no existing client
      * session for the specified ID.
      *
+     * @param sessionId a session ID
      * @return a client session, or <code>null</code>
      */
     SgsClientSession getClientSession(byte[] sessionId);

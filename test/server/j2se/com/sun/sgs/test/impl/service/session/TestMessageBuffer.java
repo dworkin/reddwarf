@@ -82,6 +82,7 @@ public class TestMessageBuffer extends TestCase {
 	    charArray[i] = buf.getChar();
 	    System.err.print(charArray[i]);
 	}
+	System.err.println();
 	if (!(s.equals(new String(charArray)))) {
 	    fail("strings don't match");
 	}
@@ -122,6 +123,18 @@ public class TestMessageBuffer extends TestCase {
 	    if (bytes[i] != moreBytes[i]) {
 		fail("Expected byte " + bytes[i] + ", got " + moreBytes[i]);
 	    }
+	}
+    }
+
+    public void testPutString() {
+	String s = "Supercalafragilisticexpalidocious";
+	MessageBuffer buf = new MessageBuffer(MessageBuffer.getSize(s));
+	buf.putString(s);
+	buf.rewind();
+	String newString = buf.getString();
+	System.err.println("newString: " + newString);
+	if (!s.equals(newString)) {
+	    fail("Expected: " + s + ", got: " + newString);
 	}
     }
 }

@@ -10,7 +10,9 @@ import java.io.Serializable;
 
 /**
  * A wrapper for an object that is serializable, but may or may not be
- * a {@link ManagedObject}.  
+ * a {@link ManagedObject}.
+ *
+ * @param <T> type of object wrapped
  */
 public final class WrappedSerializable<T> implements Serializable {
 
@@ -53,6 +55,7 @@ public final class WrappedSerializable<T> implements Serializable {
      * Returns the object in this wrapper.
      *
      * @param type the expected class of the object
+     * @return T the object in this wrapper
      *
      * @throws ClassCastException if the object in this wrapper is not
      * an instance of the specified type
