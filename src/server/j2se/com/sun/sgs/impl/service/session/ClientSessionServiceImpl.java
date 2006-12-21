@@ -25,6 +25,7 @@ import com.sun.sgs.service.TransactionProxy;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;   
@@ -68,8 +69,9 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	Collections.synchronizedMap(new HashMap<Byte, ServiceListener>());
 
     /** A map of current sessions, from session ID to ClientSessionImpl. */
-    private final Map<byte[], ClientSessionImpl> sessions =
-	Collections.synchronizedMap(new HashMap<byte[], ClientSessionImpl>());
+    private final Map<ByteArrayWrapper, ClientSessionImpl> sessions =
+	Collections.synchronizedMap(new HashMap<ByteArrayWrapper,
+                ClientSessionImpl>());
 
     /** The IOAcceptor for listening for new connections. */
     private IOAcceptor acceptor;
@@ -220,7 +222,36 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 
     /** {@inheritDoc} */
     public SgsClientSession getClientSession(byte[] sessionId) {
-	return sessions.get(sessionId);
+	return sessions.get(new ByteArrayWrapper(sessionId));
+    }
+    
+    static class ByteArrayWrapper {
+        private final byte[] bytes;
+        
+        ByteArrayWrapper(byte[] bytes) {
+            this.bytes = bytes;
+        }
+        
+        public byte[] getBytes() {
+            return bytes;
+        }
+
+        /** {@inheritDoc} */
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            
+            if (! (obj instanceof ByteArrayWrapper)) {
+                return false;
+            }
+            
+            return Arrays.equals(bytes, ((ByteArrayWrapper)obj).bytes);
+        }
+        /** {@inheritDoc} */
+        public int hashCode() {
+            return Arrays.hashCode(bytes);
+        }
     }
 
     /* -- Implement AcceptedHandleListener -- */
@@ -236,7 +267,8 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	public IOHandler newHandle(IOHandle handle) {
 	    ClientSessionImpl session =
 		new ClientSessionImpl(ClientSessionServiceImpl.this, handle);
-	    sessions.put(session.getSessionId(), session);
+	    sessions.put(
+                    new ByteArrayWrapper(session.getSessionId()), session);
 	    return session.getHandler();
 	}
     }
@@ -254,6 +286,6 @@ public class ClientSessionServiceImpl implements ClientSessionService {
      * Removes the specified session from the internal session map.
      */
     void disconnected(ClientSessionImpl session) {
-	sessions.remove(session.getSessionId());
+	sessions.remove(new ByteArrayWrapper(session.getSessionId()));
     }
 }

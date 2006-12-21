@@ -418,7 +418,7 @@ final class ChannelImpl implements Channel, Serializable {
 		SgsClientSession session = 
 		    context.sessionService.getClientSession(sessionId);
 		if (session != null && session.isConnected()) {
-		    session.sendMessage(message, state.delivery);
+		    session.sendMessage(buf.getBuffer(), state.delivery);
 		}
 	    }
 	}
