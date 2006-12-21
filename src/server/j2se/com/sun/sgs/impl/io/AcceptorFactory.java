@@ -1,12 +1,14 @@
 package com.sun.sgs.impl.io;
 
 import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.apache.mina.common.IoAcceptor;
 import org.apache.mina.transport.socket.nio.DatagramAcceptor;
 
 import com.sun.sgs.impl.io.IOConstants.TransportType;
+import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.io.IOAcceptor;
 
 /**
@@ -17,6 +19,8 @@ import com.sun.sgs.io.IOAcceptor;
  * @version     1.0
  */
 public class AcceptorFactory {
+    private static final LoggerWrapper logger =
+        new LoggerWrapper(Logger.getLogger(AcceptorFactory.class.getName()));
     
     private AcceptorFactory() {}
     
@@ -37,7 +41,9 @@ public class AcceptorFactory {
         else {
             minaAcceptor = new DatagramAcceptor();
         }
-        return new SocketAcceptor(minaAcceptor);
+        SocketAcceptor acceptor = new SocketAcceptor(minaAcceptor);
+        logger.log(Level.FINE, "returning {0}", acceptor);
+        return acceptor;
     }
     
     /**
@@ -85,7 +91,8 @@ public class AcceptorFactory {
         else {
             minaAcceptor = new DatagramAcceptor(adapter);
         }
-        return new SocketAcceptor(minaAcceptor);
-        
+        SocketAcceptor acceptor = new SocketAcceptor(minaAcceptor);
+        logger.log(Level.FINE, "returning {0}", acceptor);
+        return acceptor;
     }
 }

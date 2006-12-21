@@ -1,12 +1,14 @@
 package com.sun.sgs.impl.io;
 
-import org.apache.mina.common.IdleStatus;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 import org.apache.mina.common.IoHandler;
 import org.apache.mina.common.IoSession;
 
+import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.io.AcceptedHandleListener;
 import com.sun.sgs.io.IOFilter;
-import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
 
 /**
@@ -23,9 +25,12 @@ import com.sun.sgs.io.IOHandler;
  * @version     1.0
  */
 public class AcceptedHandleAdapter extends SocketHandler {
+    private static final LoggerWrapper logger =
+        new LoggerWrapper(Logger.getLogger(
+                AcceptedHandleAdapter.class.getName()));
     
-    private AcceptedHandleListener listener;
-    private Class<? extends IOFilter> filterClass;
+    private final AcceptedHandleListener listener;
+    private final Class<? extends IOFilter> filterClass;
     
     /**
      * Constructs a new {@code AcceptedHandleAdapter} with an 
@@ -37,8 +42,8 @@ public class AcceptedHandleAdapter extends SocketHandler {
      * @param filterClass       the type of filter to be attached to new handles
      */
     public AcceptedHandleAdapter(AcceptedHandleListener listener, 
-                                Class<? extends IOFilter> filterClass) {
-        
+            Class<? extends IOFilter> filterClass)
+    {    
         this.listener = listener; 
         this.filterClass = filterClass;
     }
@@ -51,11 +56,10 @@ public class AcceptedHandleAdapter extends SocketHandler {
      * of the associated filter will be attached to the new handle.
      */
     public void sessionCreated(IoSession session) throws Exception {
-        IOFilter filterInstance = filterClass.newInstance();
-        SocketHandle handle = new SocketHandle(filterInstance);
-        handle.setSession(session);
+        logger.log(Level.FINE, "accepted session {0}", session);
+        IOFilter filter = filterClass.newInstance();
+        SocketHandle handle = new SocketHandle(filter, session);
         IOHandler handler = listener.newHandle(handle);
-        
         handle.setIOHandler(handler);
     }
 

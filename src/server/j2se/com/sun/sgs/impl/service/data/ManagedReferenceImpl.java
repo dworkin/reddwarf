@@ -19,6 +19,7 @@ import java.util.logging.Logger;
  * canonicalized: only a single instance appears for a given object ID or
  * object.
  */
+@SuppressWarnings("fallthrough")
 final class ManagedReferenceImpl implements ManagedReference, Serializable {
 
     /** The version of the serialized form. */

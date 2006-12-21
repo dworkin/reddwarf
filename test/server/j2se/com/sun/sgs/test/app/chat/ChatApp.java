@@ -91,12 +91,18 @@ public class ChatApp
 		System.err.format("ChatApp: Removing \"%s\" from channel %s\n",
 			session.getName(), channel.getName());
 		channel.leave(session);
+            } else if (command.startsWith("/echo ")) {
+                String contents = command.substring(6);
+                System.err.format("ChatApp: \"%s\" wants us to echo \"%s\"\n",
+                        session.getName(), contents);
+                String reply = "ECHO" + contents;
+                session.send(reply.getBytes());
 	    } else if (command.equals("/exit")) {
 		System.err.format("ChatApp: \"%s\" requests exit\n", session.getName());
 		session.disconnect();
 	    } else if (command.equals("/shutdown")) {
 		System.err.format("ChatApp: \"%s\" requests shutdown\n", session.getName());
-		// TODO: app.halt();
+		// TODO: AppContext.requestShutdown();
 	    } else {
 		System.err.format("ChatApp: Error; \"%s\" sent unknown command [%s]\n",
 			session.getName(), command);

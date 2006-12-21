@@ -11,7 +11,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class DummyManagedObject implements ManagedObject, Serializable {
 
     /** The version of the serialized form. */
-    private static long serialVersionUID = 1;
+    private static final long serialVersionUID = 1L;
 
     /** The next value of the id field -- used for equality checks. */
     private static AtomicInteger nextId = new AtomicInteger(1);

@@ -1,8 +1,5 @@
 package com.sun.sgs.impl.io;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.apache.mina.common.ByteBuffer;
 
 import com.sun.sgs.io.IOFilter;

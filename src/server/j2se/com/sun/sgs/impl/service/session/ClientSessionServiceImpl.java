@@ -1,9 +1,11 @@
 package com.sun.sgs.impl.service.session;
 
 import com.sun.sgs.app.AppListener;
+import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityManager;
 import com.sun.sgs.impl.io.AcceptorFactory;
 import com.sun.sgs.impl.io.CompleteMessageFilter;
+import com.sun.sgs.impl.io.PassthroughFilter;
 import com.sun.sgs.impl.io.IOConstants.TransportType;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.io.AcceptedHandleListener;
@@ -80,6 +82,9 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     
     /** The transaction proxy, or null if configure has not been called. */    
     private TransactionProxy txnProxy;
+
+    /** The Identity representing this application. */ 
+    Identity appIdentity;
 
     /** The task service. */
     TaskService taskService;
@@ -169,6 +174,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 		}
 		this.registry = registry;
 		txnProxy = proxy;
+                appIdentity = proxy.getCurrentOwner().getIdentity();
 		kernelAppContext = proxy.getCurrentOwner().getContext();
 		dataService = registry.getComponent(DataService.class);
 		taskService = registry.getComponent(TaskService.class);
@@ -177,9 +183,12 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 		SocketAddress address = new InetSocketAddress(port);
 		try {
 		    acceptor.listen(
-			address, listener, CompleteMessageFilter.class);
+			address, listener,
+                        //CompleteMessageFilter.class
+                        PassthroughFilter.class
+                        );
 		} catch (IOException e) {
-		    throw (RuntimeException) new RuntimeException().initCause(e);
+		    throw new RuntimeException(e);
 		}
 		// TBD: listen for UNRELIABLE connections as well?
 	    }

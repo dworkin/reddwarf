@@ -7,6 +7,7 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 
 import com.sun.sgs.impl.io.ConnectorFactory;
@@ -225,15 +226,8 @@ public class ClientTest extends JFrame {
         }
         
         public void connect(IOConnector connector) {
-            try {
-                int port = 5150;
-                handle =
-                    connector.connect(InetAddress.getByName("127.0.0.1"),
-                            port, this);
-            }
-            catch (UnknownHostException uhe) {
-                uhe.printStackTrace();
-            }
+            InetSocketAddress addr = new InetSocketAddress("127.0.0.1", 5150);
+            connector.connect(addr, this);
         }
         
         public String getStatus() {
@@ -269,6 +263,7 @@ public class ClientTest extends JFrame {
         }
 
         public void connected(IOHandle h) {
+            handle = h;
             connected = true;
             status = "Connected";
             dataChanged();

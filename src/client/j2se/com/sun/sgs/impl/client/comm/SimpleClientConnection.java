@@ -23,6 +23,7 @@ import com.sun.sgs.io.IOHandler;
  * @author      Sten Anderson
  * @version     1.0
  */
+@SuppressWarnings("hiding")
 public class SimpleClientConnection implements ClientConnection, IOHandler {
     
     private ClientConnectionListener ccl;
@@ -41,6 +42,8 @@ public class SimpleClientConnection implements ClientConnection, IOHandler {
 
     // refactor to "sendMessage"
     public void sendMessage(byte[] message) {
+        System.err.println("SimpleClientConnection: sendMessage: " + message);
+        
         try {
             handle.sendBytes(message);
         }
@@ -50,16 +53,18 @@ public class SimpleClientConnection implements ClientConnection, IOHandler {
     }
 
     public void connected(IOHandle handle) {
+        System.err.println("SimpleClientConnection: connected: " + handle);
         this.handle = handle;
         ccl.connected(this);
     }
 
     public void disconnected(IOHandle handle) {
+        System.err.println("SimpleClientConnection: disconnected: " + handle);
         ccl.disconnected(true, null);
     }
 
     public void exceptionThrown(Throwable exception, IOHandle handle) {
-        System.out.println("SimpleCliectConnection: exceptionThrown");
+        System.err.println("SimpleClientConnection: exceptionThrown");
         exception.printStackTrace();
     }
 
@@ -72,14 +77,17 @@ public class SimpleClientConnection implements ClientConnection, IOHandler {
      * @param   handle          the IOHandle on which the message arrived
      */
     public void bytesReceived(byte[] message, IOHandle handle) {
+        System.err.println("SimpleClientConnection: bytesReceived: " +
+                message);
+        
         messageDecoder.setMessage(message);
         int versionNumber = messageDecoder.readVersionNumber();
         // TODO check the version number against the current version.
         // It's not clear yet where the "current version number" will live, 
         // but if it's a mismatch, bail out right away and notify the client.
         if (versionNumber != ProtocolMessage.VERSION) {
-            // TODO forward some error to the client, maybe even disconnect...
-            return;
+            throw new RuntimeException("Bad protocol version: " +
+                    Integer.toHexString(versionNumber));
         }
         
         // this doesn't quite work here.  The ClientConnectionListener has no

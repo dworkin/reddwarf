@@ -1,9 +1,7 @@
 package com.sun.sgs.test.client.simple;
 
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.util.concurrent.Executors;
 
 import com.sun.sgs.client.simple.ProtocolMessage;
 import com.sun.sgs.client.simple.ProtocolMessageDecoder;
@@ -92,7 +90,9 @@ public class SimpleServer implements AcceptedHandleListener, IOHandler {
             System.out.println("UserName: " + username + " Password " + password);
             
             if (password.equals("hi!")) {
-                messageEncoder.startMessage(ProtocolMessage.LOGIN_SUCCESS);
+                messageEncoder.startMessage(
+                        ProtocolMessage.APPLICATION_SERVICE,
+                        ProtocolMessage.LOGIN_SUCCESS);
                 // don't know what the SessionID will look like yet, but 
                 // it'll at least probably be a byte array.
                 byte[] sessionByteArray = new byte[10];
@@ -102,7 +102,9 @@ public class SimpleServer implements AcceptedHandleListener, IOHandler {
                 messageEncoder.add(sessionByteArray);
             }
             else {
-                messageEncoder.startMessage(ProtocolMessage.LOGIN_FAILURE);
+                messageEncoder.startMessage(
+                        ProtocolMessage.APPLICATION_SERVICE,
+                        ProtocolMessage.LOGIN_FAILURE);
                 messageEncoder.add("Bad password");
             }
             sendMessage(handle);
@@ -120,11 +122,6 @@ public class SimpleServer implements AcceptedHandleListener, IOHandler {
             ioe.printStackTrace();
         }
         messageEncoder.reset();
-    }
-    
-    private void sendAuthRequest(IOHandle handle) {
-        messageEncoder.startMessage(ProtocolMessage.LOGIN_REQUEST);
-        sendMessage(handle);
     }
 
 }

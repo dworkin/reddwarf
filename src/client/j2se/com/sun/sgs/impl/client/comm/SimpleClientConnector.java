@@ -2,6 +2,7 @@ package com.sun.sgs.impl.client.comm;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.util.Properties;
 import java.util.concurrent.Executors;
 
@@ -52,12 +53,12 @@ public class SimpleClientConnector extends ClientConnector {
             throw new IllegalArgumentException("Bad port number: " + port);
         }
         
-        InetAddress address = InetAddress.getByName(host);
+        InetSocketAddress address = new InetSocketAddress(host, port);
         
         SimpleClientConnection connection = 
                                 new SimpleClientConnection(connectionListener);
         
-        connector.connect(address, port, connection);
+        connector.connect(address, connection);
     }
 
 }

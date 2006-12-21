@@ -1,7 +1,6 @@
 package com.sun.sgs.client.simple;
 
 import java.io.UnsupportedEncodingException;
-import java.nio.ByteBuffer;
 
 /**
  * Translates protocol messages from bytes into their component parts.
@@ -23,48 +22,43 @@ public class ProtocolMessageDecoder {
     }
     
     public String readString() {
-        String str = null;
-        byte[] stringBytes = readBytes();
+        byte[] strBytes = readBytes();
         try {
-            str = new String(stringBytes, "UTF-8");
-        } catch (UnsupportedEncodingException uee) {
-            uee.printStackTrace();
+            return new String(strBytes, "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException(e);
         }
-
-        return str;
-    }
-    
-    /**
-     * Reads the next int off the buffer and returns true if it equals
-     * 1, otherwise false.
-     * 
-     * @param data the data buffer
-     * 
-     * @return true if the int read equals one.
-     */
-    public boolean readBoolean() {
-        return readInt() == 1;
     }
     
     public int readInt() {
         return (readUnsignedByte() << 24) + 
-                (readUnsignedByte() << 16) +
-                (readUnsignedByte() << 8) +
+               (readUnsignedByte() << 16) +
+               (readUnsignedByte() << 8) +
                 readUnsignedByte();
     }
+    
+    public short readShort() {
+        return (short) ((readUnsignedByte() << 8) +
+                         readUnsignedByte());
+    }
 
+    public char readChar() {
+        return (char) ((readUnsignedByte() << 8) +
+                        readUnsignedByte());
+    }
+    
     /**
-     * Reads the next int off the given ByteBuffer, interpreting it as a
+     * Reads the next short off the given ByteBuffer, interpreting it as a
      * size, and reads that many more bytes from the buffer, returning
      * the resulting byte array.
      * 
      * @param data the buffer to read from
      * 
-     * @return a byte array matching the length of the first int read
+     * @return a byte array matching the length of the first short read
      * from the buffer
      */
     public byte[] readBytes() {
-        int length = readInt();
+        int length = readShort();
         byte[] bytes = new byte[length];
         System.arraycopy(data, index, bytes, 0, length);
         
@@ -98,6 +92,10 @@ public class ProtocolMessageDecoder {
      * @return the first byte as the version number of the protocol.
      */
     public int readVersionNumber() {
+        return readUnsignedByte();
+    }
+
+    public int readService() {
         return readUnsignedByte();
     }
     

@@ -4,11 +4,19 @@ import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ChannelManager;
+import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.kernel.TaskOwnerImpl;
+import com.sun.sgs.impl.service.session.MessageBuffer;
+import com.sun.sgs.impl.service.session.SgsProtocol;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.KernelAppContext;
+import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.NonDurableTransactionParticipant;
@@ -18,18 +26,25 @@ import com.sun.sgs.service.SgsClientSession;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
+import com.sun.sgs.service.TransactionRunner;
+
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.security.auth.login.AppConfigurationEntry;
+import javax.security.auth.login.LoginException;
+
 /**
  * Simple ChannelService implementation.
  */
 public class ChannelServiceImpl
-    implements ChannelManager, Service, NonDurableTransactionParticipant
+    implements ChannelManager, Service, ServiceListener,
+        NonDurableTransactionParticipant
 {
 
     /** The property that specifies the application name. */
@@ -55,6 +70,9 @@ public class ChannelServiceImpl
     /** The transaction proxy, or null if configure has not been called. */    
     private TransactionProxy txnProxy;
 
+    /** The Identity representing this application. */ 
+    Identity appIdentity;
+
     /** The data service. */
     private DataService dataService;
 
@@ -63,6 +81,12 @@ public class ChannelServiceImpl
 
     /** The task service. */
     private TaskService taskService;
+
+    /** The task scheduler. */
+    final TaskScheduler taskScheduler;
+    
+    /** The kernel context for tasks. */
+    KernelAppContext kernelAppContext;
 
     /**
      * Constructs an instance of this class with the specified properties.
@@ -85,6 +109,8 @@ public class ChannelServiceImpl
 		    "The " + APP_NAME_PROPERTY +
 		    " property must be specified");
 	    }
+            
+            taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
 
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
@@ -121,6 +147,8 @@ public class ChannelServiceImpl
 		    throw new IllegalStateException("Already configured");
 		}
 		this.txnProxy = proxy;
+                appIdentity = proxy.getCurrentOwner().getIdentity();
+                kernelAppContext = proxy.getCurrentOwner().getContext();
 		dataService = registry.getComponent(DataService.class);
 		taskService = registry.getComponent(TaskService.class);
 		sessionService = registry.getComponent(ClientSessionService.class);
@@ -137,6 +165,12 @@ public class ChannelServiceImpl
 		dataService.setServiceBinding(
 		    ChannelTable.NAME, new ChannelTable());
 	    }
+            
+            /*
+             * Set ourselves as the handler of ChannelService messages
+             */
+            sessionService.registerServiceListener(
+                    SgsProtocol.CHANNEL_SERVICE, this);
 	    
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
@@ -207,7 +241,91 @@ public class ChannelServiceImpl
     /* -- Implement ServiceListener -- */
 
     /** {@inheritDoc} */
-    public void receivedMessage(SgsClientSession session, byte[] message) {
+    public void receivedMessage(SgsClientSession sender, byte[] message) {
+        MessageBuffer msg = new MessageBuffer(message);
+        msg.getByte(); // discard version, it was already checked.
+        
+
+        /*
+         * Handle service id.
+         */
+        byte serviceId = msg.getByte();
+
+        if (serviceId != SgsProtocol.CHANNEL_SERVICE) {
+            if (logger.isLoggable(Level.SEVERE)) {
+                logger.log(
+                        Level.SEVERE,
+                        "expected channel service ID, got: {0}",
+                        serviceId);
+            }
+            return;
+        }
+
+        /*
+         * Handle op code.
+         */
+        byte opcode = msg.getByte();
+
+        switch (opcode) {
+
+        case SgsProtocol.CHANNEL_SEND_REQUEST:
+            final String channelName = msg.getString();
+            int seqNum = msg.getInt();
+            int numRecipients = msg.getShort();
+
+            final List<ClientSession> recipients =
+                new ArrayList<ClientSession>(numRecipients);
+
+            for (int i = 0; i < numRecipients; ++i) {
+                int sidLength = msg.getShort();
+                byte[] sid = msg.getBytes(sidLength);
+                ClientSession recipient =
+                    sessionService.getClientSession(sid);
+                if (recipient != null && recipient.isConnected()) {
+                    recipients.add(recipient);
+                }
+            }
+
+            int size = msg.getShort();
+            final byte[] clientMessage = msg.getBytes(size);
+
+            KernelRunnable sendTask = 
+                (numRecipients == 0)
+                ? (new KernelRunnable() {
+                    public void run() {
+                        Channel channel = getChannel(channelName);
+                        channel.send(clientMessage);
+                    }})
+                : (new KernelRunnable() {
+                    public void run() {
+                        Channel channel = getChannel(channelName);
+                        channel.send(recipients, clientMessage);
+                    }});
+
+            scheduleTask(new TransactionRunner(sendTask));
+            
+            // TODO: if there's a listener, call back on it
+            
+            break;
+
+        default:
+            if (logger.isLoggable(Level.SEVERE)) {
+                logger.log(
+                        Level.SEVERE,
+                        "unknown operation code: 0x{0}",
+                        Integer.toHexString(opcode));
+            }
+            break;
+        }
+    }
+
+    /**
+     * Submits a non-durable task.
+     */
+    private void scheduleTask(KernelRunnable task) {
+        taskScheduler.scheduleTask(
+                task,
+                new TaskOwnerImpl(appIdentity, kernelAppContext));
     }
 
     /* -- Implement NonDurableTransactionParticipant -- */

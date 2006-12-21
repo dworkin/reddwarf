@@ -32,6 +32,7 @@ import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
 /** Test the DataServiceImpl class */
+@SuppressWarnings("hiding")
 public class TestDataServiceImpl extends TestCase {
 
     /** The test suite, to use for adding additional tests. */

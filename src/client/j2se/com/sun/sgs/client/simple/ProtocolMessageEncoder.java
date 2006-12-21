@@ -1,5 +1,7 @@
 package com.sun.sgs.client.simple;
 
+import java.io.UnsupportedEncodingException;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -11,19 +13,20 @@ import java.util.List;
  */
 public class ProtocolMessageEncoder {
     
-    private List list;
+    private List<Object> list;
     
     public ProtocolMessageEncoder() {
-        list = new ArrayList();
+        list = new ArrayList<Object>();
     }
     
     public void reset() {
         list.clear();
     }
     
-    public void startMessage(int command) {
-        list.add(ProtocolMessage.VERSION);
-        list.add(command);
+    public void startMessage(int service, int command) {
+        list.add(Integer.valueOf(ProtocolMessage.VERSION));
+        list.add(Integer.valueOf(service));
+        list.add(Integer.valueOf(command));
     }
     
     public void add(Object object) {
@@ -36,15 +39,16 @@ public class ProtocolMessageEncoder {
      * @return  a byte array packed with the contents of the message
      */
     public byte[] getMessage() {
-        List byteList = new ArrayList();
+        List<Object> byteList = new ArrayList<Object>();
         // protocol version and command are first and second position respectively.
         byteList.add(getUnsignedByte((Integer) list.get(0)));
         byteList.add(getUnsignedByte((Integer) list.get(1)));
-        int bufferSize = 2;
+        byteList.add(getUnsignedByte((Integer) list.get(2)));
+        int bufferSize = 3;
 
         // this first pass is twofold: to get the buffer size, and to
         // convert the input list to lengths (in ints) and byte arrays.
-        for (int i = 2; i < list.size(); i++) {
+        for (int i = 3; i < list.size(); i++) {
             Object curObj = list.get(i);
 
             // if the obj is null, translate that to a zero length
@@ -55,22 +59,36 @@ public class ProtocolMessageEncoder {
                 continue;
             }
             if (curObj instanceof String) {
-                byte[] strBytes = ((String) curObj).getBytes();
-                byteList.add(strBytes.length);
-                byteList.add(strBytes);
-                bufferSize += 4 + strBytes.length;
-            } else if (curObj instanceof Boolean) {
-                boolean b = (Boolean) curObj;
-                byteList.add(b ? 1 : 0);
-                bufferSize += 4;
+                String str = (String) curObj;
+                try {
+                    byte[] strBytes = str.getBytes("UTF-8");
+                    
+                    int len = strBytes.length;
+                    if (len > Short.MAX_VALUE)
+                        throw new IllegalStateException(
+                                "String too long: " + len);
+
+                    byteList.add(Short.valueOf((short) len));
+                    byteList.add(strBytes);
+                    bufferSize += 2 + len;
+                } catch (UnsupportedEncodingException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
             } else if (curObj instanceof Integer) {
                 byteList.add(curObj);
                 bufferSize += 4;
+            } else if (curObj instanceof Short) {
+                byteList.add(curObj);
+                bufferSize += 2;
             } else if (curObj instanceof byte[]) {
                 byte[] array = (byte[]) curObj;
-                byteList.add(array.length);
+                byteList.add(Short.valueOf((short) array.length));
                 byteList.add(array);
-                bufferSize += array.length + 4;
+                bufferSize += array.length + 2;
+            } else {
+                throw new IllegalStateException("Unsupported type: " +
+                        curObj.getClass().getName());
             }
         }
 
@@ -85,6 +103,9 @@ public class ProtocolMessageEncoder {
             } else if (curObj instanceof Integer) {
                 putInt((Integer) curObj, buffer, index);
                 index += 4;
+            } else if (curObj instanceof Short) {
+                putShort((Short) curObj, buffer, index);
+                index += 2;
             } else if (curObj instanceof byte[]) {
                 byte[] array = (byte[]) curObj;
                 System.arraycopy(array, 0, buffer, index, array.length);
@@ -103,10 +124,20 @@ public class ProtocolMessageEncoder {
      * @param offset
      */
     private void putInt(int value, byte[] data, int offset) {
-        data[offset] = (byte) (value >> 24); 
-        data[offset + 1] = (byte) (value >> 16); 
-        data[offset + 2] = (byte) (value >> 8); 
-        data[offset + 3] = (byte) value; 
+        data[offset    ] = (byte) (value >>> 24); 
+        data[offset + 1] = (byte) (value >>> 16); 
+        data[offset + 2] = (byte) (value >>> 8); 
+        data[offset + 3] = (byte)  value; 
+    }
+
+    private void putShort(short value, byte[] data, int offset) {
+        data[offset    ] = (byte) (value >>> 8); 
+        data[offset + 1] = (byte)  value; 
+    }
+
+    private void putChar(char value, byte[] data, int offset) {
+        data[offset    ] = (byte) (value >>> 8); 
+        data[offset + 1] = (byte)  value; 
     }
     
     /**
@@ -116,8 +147,8 @@ public class ProtocolMessageEncoder {
      * 
      * @return the same value returned as a byte unsigned.
      */
-    private byte getUnsignedByte(int b) {
-        return (byte) b;
+    private Byte getUnsignedByte(int b) {
+        return Byte.valueOf((byte) b);
     }
 
 }

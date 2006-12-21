@@ -5,6 +5,7 @@ import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagerNotFoundException;
 import com.sun.sgs.app.TaskManager;
+import com.sun.sgs.service.Service;
 
 /**
  * This class is used to resolve the state associated with the current task's
@@ -78,6 +79,10 @@ public final class ContextResolver {
      */
     public static <T> T getManager(Class<T> type) {
         return context.get().getManager(type);
+    }
+
+    public static <T extends Service> T getService(Class<T> type) {
+        return context.get().getService(type);
     }
 
     /**

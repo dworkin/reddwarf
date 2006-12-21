@@ -207,12 +207,12 @@ public class ChatClient extends JFrame
     }
 
     void joinChannel(String channelName) {
-	String cmd = "JOIN" + channelName;
+	String cmd = "/join " + channelName;
 	client.send(cmd.getBytes());
     }
  
     void leaveChannel(ClientChannel chan) {
-	String cmd = "LEAV" + chan.getName();
+	String cmd = "/leave " + chan.getName();
 	client.send(cmd.getBytes());
     }
 
@@ -288,6 +288,10 @@ public class ChatClient extends JFrame
     }
 
     public void receivedMessage(byte[] message) {
+        if (message.length < 4) {
+            System.err.format("ChatClient: Error, short command [%s]\n",
+                    new String(message));
+        }
 	byte[] cmdBytes = new byte[4];
 	System.arraycopy(message, 0, cmdBytes, 0, 4);
 	String command = new String(cmdBytes);
@@ -296,6 +300,9 @@ public class ChatClient extends JFrame
 	    userLogin(getSessionIdAfter(message, 4));
 	} else if (command.equals("LOGO")) {
 	    userLogout(getSessionIdAfter(message, 4));
+        } else if (command.equals("ECHO")) {
+            String msgString = new String(message);
+            System.out.println(msgString.substring(4));
 	} else {
 	    System.err.format("ChatClient: Error, unknown command [%s]\n",
 		    command);
