@@ -13,6 +13,13 @@ import com.sun.sgs.impl.io.IOConstants.TransportType;
 import com.sun.sgs.io.IOConnector;
 import com.sun.sgs.io.IOHandle;
 
+/**
+ * A basic implementation of a {@code ClientConnector} which uses an 
+ * {@code IOConnector} to establish connections.
+ * 
+ * @author      Sten Anderson
+ * @version     1.0
+ */
 public class SimpleClientConnector extends ClientConnector {
     
     private Properties properties;
@@ -31,8 +38,7 @@ public class SimpleClientConnector extends ClientConnector {
     
     @Override
     public void cancel() throws IOException {
-    // TODO Auto-generated method stub
-
+        // TODO not implemented...
     }
 
     @Override

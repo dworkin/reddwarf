@@ -2,7 +2,6 @@ package com.sun.sgs.client.simple;
 
 import java.io.IOException;
 import java.net.PasswordAuthentication;
-import java.nio.ByteBuffer;
 import java.util.Properties;
 
 import org.apache.mina.filter.codec.ProtocolEncoder;
@@ -14,6 +13,8 @@ import com.sun.sgs.client.comm.ClientConnection;
 import com.sun.sgs.client.comm.ClientConnectionListener;
 import com.sun.sgs.client.comm.ClientConnector;
 import com.sun.sgs.impl.client.comm.SimpleConnectorFactory;
+
+import static com.sun.sgs.client.simple.ProtocolMessage.*;
 
 /**
  * An implementation of {@link ServerSession} that clients can use to
@@ -40,15 +41,18 @@ import com.sun.sgs.impl.client.comm.SimpleConnectorFactory;
  * again, the {@link #getSessionId getSessionId} method will
  * return a new <code>SessionId</code>.
  */
-public class SimpleClient implements ServerSession, ClientConnectionListener {
+public class SimpleClient implements ServerSession {
+    
+    private final static String NOT_CONNECTED = "Client not connected";
     
     /** The listener for this simple client. */
-    private SimpleClientListener listener;
+    private SimpleClientListener simpleClientListener;
     private boolean connected = false;
     private ClientConnection connection;
     private SessionId sessionId;
-    private ProtocolMessageDecoder messageDecoder;
-    private ProtocolMessageEncoder messageEncoder;
+    private ClientConnectionListener clientConnectionListener;
+    private ChannelManager channelManager;
+    private byte[] reconnectKey;
     
     /**
      * Creates an instance of this class with the specified listener.
@@ -63,9 +67,8 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
      * client
      */
     public SimpleClient(SimpleClientListener listener) {
-        this.listener = listener;
-        messageDecoder = new ProtocolMessageDecoder();
-        messageEncoder = new ProtocolMessageEncoder();
+        this.simpleClientListener = listener;
+        clientConnectionListener = new SimpleClientConnectionListener();
     }
 
 
@@ -96,15 +99,20 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
      * use for this client's session (e.g., connection properties)
      */
     public void login(Properties props) throws IOException {
-        ClientConnector connector = new SimpleConnectorFactory().createConnector(props);
-        connector.connect(this);
+        channelManager = new ChannelManager(this, simpleClientListener);
+        ClientConnector connector = 
+                            new SimpleConnectorFactory().createConnector(props);
+        connector.connect(clientConnectionListener);
     }
 
     /** {@inheritDoc}
      * @throws IllegalStateException if this session is disconnected
      */
     public SessionId getSessionId() {
-        throw new AssertionError("this method is not implemented");
+        if (!isConnected()) {
+            throw new IllegalStateException(NOT_CONNECTED);
+        }
+        return sessionId;
     }
 
     /** {@inheritDoc} */
@@ -116,93 +124,154 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
      * @throws IllegalStateException if this session is disconnected
      */
     public void logout(boolean force) {
-	// TODO
+        if (!isConnected()) {
+            throw new IllegalStateException(NOT_CONNECTED);
+        }
+        ProtocolMessageEncoder messageEncoder = new ProtocolMessageEncoder(
+                                            APPLICATION_SERVICE, LOGOUT_SUCCESS);
+        sendMessage(messageEncoder);
     }
 
     /** {@inheritDoc}
      * @throws IllegalStateException if this session is disconnected
      */
     public void send(byte[] message) {
-	connection.sendMessage(message);
-    }
-    
-    
-    private void sendMessage() {
-        send(messageEncoder.getMessage());
-        messageEncoder.reset();
-    }
-
-    /**
-     * Called in the midst of the connection process.  At this point the connection
-     * has been established, but there is as yet no session.  
-     *
-     * @param connection        the live connection to the server
-     */
-    public void connected(ClientConnection connection) {
-        System.out.println("SimpleClient: connected");
-        connected = true;
-        this.connection = connection;
-        
-    }
-
-    public void disconnected(boolean graceful, byte[] message) {
-        connected = false;
-        listener.disconnected(graceful);
-    }
-
-    // refactor to receivedMessage(ByteBuffer)
-    // all API level messages will come in on this call-back.  From here they
-    // are interpreted and dispatched to a channel, or the ServerSessionListener.
-    public void receivedMessage(byte[] message) {
-        messageDecoder.setMessage(message);
-        int versionNumber = messageDecoder.readVersionNumber();
-        int command = messageDecoder.readCommand();
-        System.out.println("SimpleClient messageReceived: " + message.length + 
-                            " command " + command);
-        if (command == ProtocolMessage.AUTHENTICATION_REQUEST) {
-            PasswordAuthentication authentication = 
-                listener.getPasswordAuthentication("Enter Username/Password");
-            
-            messageEncoder.startMessage(ProtocolMessage.AUTHENTICATION_REQUEST);
-            messageEncoder.add(authentication.getUserName());
-            // TODO wrapping the char[] in a String is probably not the way to go
-            messageEncoder.add(new String(authentication.getPassword()));
-            sendMessage();
+        if (!isConnected()) {
+            throw new IllegalStateException(NOT_CONNECTED);
         }
-        else if (command == ProtocolMessage.LOGIN) {
-            System.out.println("logging in");
-            boolean success = messageDecoder.readBoolean();
-            if (success) {
+        ProtocolMessageEncoder messageEncoder = 
+            new ProtocolMessageEncoder(APPLICATION_SERVICE, MESSAGE_TO_SERVER);
+        
+        messageEncoder.writeBytes(message);
+        sendMessage(messageEncoder);
+    }
+    
+    /**
+     * Sends the contents of the given {@code ProtocolMessageEncoder} to the 
+     * server via the {@code ClientConnection}.
+     * 
+     * @param messageEncoder
+     */
+    void sendMessage(ProtocolMessageEncoder messageEncoder) {
+        connection.sendMessage(messageEncoder.getMessage());
+    }
+    
+    /**
+     * Receives call backs on the associated {@code ClientConnection}.
+     * 
+     * @author  Sten Anderson
+     * @version 1.0
+     */
+    private class SimpleClientConnectionListener implements 
+                                                    ClientConnectionListener {
+        
+
+        /**
+         * Called in the midst of the connection process.  At this point the 
+         * connection has been established, but there is as yet no session.  
+         *
+         * @param connection        the live connection to the server
+         */
+        public void connected(ClientConnection connection) {
+            connected = true;
+            SimpleClient.this.connection = connection;
+            PasswordAuthentication auth = 
+                            simpleClientListener.getPasswordAuthentication(
+                                                "Enter Username and Password");
+            
+         
+            ProtocolMessageEncoder messageEncoder = 
+                new ProtocolMessageEncoder(APPLICATION_SERVICE, LOGIN_REQUEST);
+
+            messageEncoder.writeString(auth.getUserName());
+            messageEncoder.writeString(new String(auth.getPassword()));
+            sendMessage(messageEncoder);
+        }
+    
+        /**
+         * Notification that the client has been disconnected.
+         * 
+         * TODO implement the graceful piece of this.
+         */
+        public void disconnected(boolean graceful, byte[] message) {
+            connected = false;
+            simpleClientListener.disconnected(graceful);
+        }
+    
+        /**
+         * All Protocol level messages will come in on this call-back from the
+         * associated {@code ClientConnection}.  From here they are interpreted 
+         * and dispatched to a channel, or the associated ServerSessionListener.
+         * 
+         * @param message       the incoming message from the server
+         */
+        public void receivedMessage(byte[] message) {
+            ProtocolMessageDecoder messageDecoder = 
+                                    new ProtocolMessageDecoder(message);
+            int versionNumber = messageDecoder.readVersionNumber();
+            if (versionNumber != ProtocolMessage.VERSION) {
+                // TODO not sure what to do here if the protocol versions don't
+                // match.  Probably need to disconnect the client with an error.
+                // It would be good to bubble up the reason though.
+                try {
+                    connection.disconnect();
+                }
+                catch (IOException ioe) {
+                    // doesn't matter
+                }
+                return;
+            }
+            
+            int serviceNumber = messageDecoder.readServiceNumber();
+            if (serviceNumber == ProtocolMessage.CHANNEL_SERVICE) {
+                channelManager.receivedMessage(messageDecoder);
+                return;
+            }
+            
+            // at this point, the message is assumed to be from the "Application
+            // Service" -- the only other service besides the "Channel Service".
+            int command = messageDecoder.readCommand();
+            if (command == lOGIN_SUCCESS) {
+                sessionId = SessionId.fromBytes(messageDecoder.readBytes());
+                reconnectKey = messageDecoder.readBytes();
                 sessionStarted(message);
             }
-            else {
-                listener.loginFailed(messageDecoder.readString());
+            else if (command == LOGIN_FAILURE) {
+                simpleClientListener.loginFailed(messageDecoder.readString());
+            }
+            else if (command == LOGOUT_SUCCESS) {
+                try {
+                    connection.disconnect();
+                }
+                catch (IOException ioe) {
+                    ioe.printStackTrace();
+                }
+            }
+            else if (command == MESSAGE_FROM_SERVER) {
+                byte[] serverMessage = new byte[message.length - 3];
+                System.arraycopy(message, 3, serverMessage, 0, 
+                                                        serverMessage.length);
+                simpleClientListener.receivedMessage(serverMessage);
             }
         }
-    }
-
-    public void reconnected(byte[] message) {
-        // TODO Auto-generated method stub
-        listener.reconnected();
-        
-    }
-
-    public void reconnecting(byte[] message) {
-        // TODO Auto-generated method stub
-        listener.reconnecting();
-    }
-
-    public ServerSessionListener sessionStarted(byte[] message) {
-        extractSessionId(message);
-        
-        listener.loggedIn();
-        
-        return listener;
-    }
     
-    private void extractSessionId(byte[] message) {
-        byte[] bytes = messageDecoder.readBytes();
-        // TODO uncomment this when it becomes implemented
-        //sessionId = SessionId.fromBytes(bytes);
+        public void reconnected(byte[] message) {
+            simpleClientListener.reconnected();
+            
+        }
+    
+        public void reconnecting(byte[] message) {
+            simpleClientListener.reconnecting();
+        }
+
+        // TODO not sure about the utility of having the message passed in here,
+        // it's already been fully interpreted at this point.
+        public ServerSessionListener sessionStarted(byte[] message) {
+            
+            simpleClientListener.loggedIn();
+            
+            return simpleClientListener;
+        }
+        
     }
 }

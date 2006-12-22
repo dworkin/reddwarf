@@ -1,5 +1,7 @@
 package com.sun.sgs.client;
 
+import com.sun.sgs.client.simple.SimpleSessionId;
+
 /**
  * Identifies a session between client and server.
  */
@@ -24,8 +26,8 @@ public abstract class SessionId {
      * <code>SessionId</code>
      */
     public static SessionId fromBytes(byte[] id) {
-	// TBI
-	throw new AssertionError("not implemented");
+        // TODO -- just a place-holder
+        return new SimpleSessionId(id);
     }
 
     /**

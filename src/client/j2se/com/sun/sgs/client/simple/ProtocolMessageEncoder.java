@@ -1,123 +1,164 @@
 package com.sun.sgs.client.simple;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+
+import com.sun.sgs.client.SessionId;
 
 /**
- * Convenience class for assembling a protocol message into bytes.
+ * Convenience class for assembling a protocol message into bytes.  Clients 
+ * should call the writeX methods to build their message, and getMessage()
+ * to obtain the resulting byte array.
  * 
  * @author      Sten Anderson
  * @version     1.0
  */
-public class ProtocolMessageEncoder {
+class ProtocolMessageEncoder {
     
-    private List list;
+    private DataOutputStream outputStream;
+    private ByteArrayOutputStream byteStream;
     
-    public ProtocolMessageEncoder() {
-        list = new ArrayList();
+    /**
+     * Starts assembling a message with the given service id number and op code. 
+     * Op Codes and service id numbers are defined in {@link ProtocolMessage}.
+     * 
+     * @param service           the id of the server-side service that should
+     *                          interpret this message 
+     * 
+     * @param command           the op code identifying the remainder of the 
+     *                          message 
+     */
+    ProtocolMessageEncoder(int service, int command) {
+        outputStream = new DataOutputStream(byteStream = 
+                                                new ByteArrayOutputStream());
+        writeUnsignedByte(ProtocolMessage.VERSION);
+        writeUnsignedByte(service);
+        writeUnsignedByte(command);
     }
     
-    public void reset() {
-        list.clear();
-    }
     
-    public void startMessage(int command) {
-        list.add(ProtocolMessage.VERSION);
-        list.add(command);
-    }
-    
-    public void add(Object object) {
-        list.add(object);
+    /**
+     * Returns the underlying byte array of the outgoing message.
+     * 
+     * @return a byte array containing the encoded message
+     */
+    byte[] getMessage() {
+        return byteStream.toByteArray();
     }
     
     /**
-     * Assembles the pieces of the message into a byte array.
+     * Writes the given int to the output stream as an unsigned byte.
      * 
-     * @return  a byte array packed with the contents of the message
+     * @param b         the int to write out as a byte
      */
-    public byte[] getMessage() {
-        List byteList = new ArrayList();
-        // protocol version and command are first and second position respectively.
-        byteList.add(getUnsignedByte((Integer) list.get(0)));
-        byteList.add(getUnsignedByte((Integer) list.get(1)));
-        int bufferSize = 2;
-
-        // this first pass is twofold: to get the buffer size, and to
-        // convert the input list to lengths (in ints) and byte arrays.
-        for (int i = 2; i < list.size(); i++) {
-            Object curObj = list.get(i);
-
-            // if the obj is null, translate that to a zero length
-            // "nothing" as a placeholder.
-            if (curObj == null) {
-                bufferSize += 4;
-                byteList.add(0);
-                continue;
-            }
-            if (curObj instanceof String) {
-                byte[] strBytes = ((String) curObj).getBytes();
-                byteList.add(strBytes.length);
-                byteList.add(strBytes);
-                bufferSize += 4 + strBytes.length;
-            } else if (curObj instanceof Boolean) {
-                boolean b = (Boolean) curObj;
-                byteList.add(b ? 1 : 0);
-                bufferSize += 4;
-            } else if (curObj instanceof Integer) {
-                byteList.add(curObj);
-                bufferSize += 4;
-            } else if (curObj instanceof byte[]) {
-                byte[] array = (byte[]) curObj;
-                byteList.add(array.length);
-                byteList.add(array);
-                bufferSize += array.length + 4;
-            }
+    private void writeUnsignedByte(int b) {
+        try {
+            outputStream.writeByte(b);
         }
-
-        // now that we know the buffer size, allocate the buffer
-        // and pack it with the contents of the byte list.
-        byte[] buffer = new byte[bufferSize];
-        int index = 0;
-        for (Object curObj : byteList) {
-            if (curObj instanceof Byte) {
-                buffer[index] = ((Byte) curObj);
-                index++;
-            } else if (curObj instanceof Integer) {
-                putInt((Integer) curObj, buffer, index);
-                index += 4;
-            } else if (curObj instanceof byte[]) {
-                byte[] array = (byte[]) curObj;
-                System.arraycopy(array, 0, buffer, index, array.length);
-                index += array.length;
-            }
+        catch (IOException ioe) {
+            // not thrown by the output stream
         }
-        
-        return buffer;
     }
     
     /**
-     * Packs an int value into the given buffer at the given offset. 
+     * Writes the given boolean to the output stream as a byte of value one 
+     * (if true), or zero (if false).
      * 
-     * @param value
-     * @param data
-     * @param offset
+     * @param b                 the boolean to write out
      */
-    private void putInt(int value, byte[] data, int offset) {
-        data[offset] = (byte) (value >> 24); 
-        data[offset + 1] = (byte) (value >> 16); 
-        data[offset + 2] = (byte) (value >> 8); 
-        data[offset + 3] = (byte) value; 
+    void writeBoolean(boolean b) {
+        try {
+            outputStream.writeBoolean(b);
+        }
+        catch (IOException ioe) {
+            // not thrown by the output stream
+        }
     }
     
     /**
-     * Converts the given int to an unsigned byte (by downcasting).
+     * Writes the given byte array to the output stream, prefaced by its
+     * length as a short.
      * 
-     * @param b the byte stored as an int
-     * 
-     * @return the same value returned as a byte unsigned.
+     * @param bytes             the byte array to write
      */
-    private byte getUnsignedByte(int b) {
-        return (byte) b;
+    void writeBytes(byte[] bytes) {
+        try {
+            outputStream.writeShort(bytes.length);
+            outputStream.write(bytes);
+        }
+        catch (IOException ioe) {
+            // not thrown by the output stream
+        }
+    }
+    
+    /**
+     * Writes the given String to the output stream in the Modified UTF-8 
+     * encoding.
+     * 
+     * @param string    the String to write
+     */
+    void writeString(String string) {
+        try {
+            outputStream.writeUTF(string);
+        }
+        catch (IOException ioe) {
+            // not thrown by the output stream
+        }
+    }
+
+    /**
+     * Writes the given long to the output stream in network byte order.
+     * 
+     * @param l         the long to write
+     */
+    void writeLong(long l) {
+        try {
+            outputStream.writeLong(l);
+        }
+        catch (IOException ioe) {
+            // not thrown by the output stream
+        }
+    }
+    
+    /**
+     * Writes the given int to the output stream in network byte order.
+     * 
+     * @param i         the int to write
+     */
+    void writeInt(int i) {
+        try {
+            outputStream.writeInt(i);
+        }
+        catch (IOException ioe) {
+            // not thrown by the output stream
+        }
+    }
+    
+    
+    /**
+     * Writes the given int to the output stream as a short in network byte 
+     * order.
+     * 
+     * @param num       the int to write as a short
+     */
+    void writeShort(int num) {
+        try {
+            outputStream.writeShort(num);
+        }
+        catch (IOException ioe) {
+            // not thrown by the output stream
+        }
+    }
+    
+    /**
+     * Writes the given SessionId to the output stream.  This is the same as
+     * writing a byte array. 
+     * 
+     * @param id        the SessionId to write
+     */
+    void writeSessionId(SessionId id) {
+        writeBytes(id.toBytes());
     }
 
 }
