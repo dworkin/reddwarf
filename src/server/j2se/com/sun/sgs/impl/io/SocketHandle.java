@@ -31,8 +31,9 @@ public class SocketHandle implements IOHandle, IoFutureListener {
     }
     
     /**
-     * {@inheritDoc}
+     * Sends the given byte message out on the underlying {@code IoSession}.
      * 
+     * @throws IOException if the session is not connected.
      */
     public void sendBytes(byte[] message) throws IOException {
         if (!session.isConnected()) {
@@ -42,7 +43,9 @@ public class SocketHandle implements IOHandle, IoFutureListener {
     }
 
     /**
-     * {@inheritDoc}
+     * Closes the undering {@code IoSession}.
+     *  
+     * @throws IOException if the session is not connected. 
      */
     public void close() throws IOException {
         if (!session.isConnected()) {
