@@ -7,12 +7,16 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.IOException;
 import java.net.PasswordAuthentication;
+import java.nio.charset.Charset;
+import java.util.Map;
 import java.util.Properties;
+import java.util.Map.Entry;
 
 
 import com.sun.sgs.client.ClientChannel;
 import com.sun.sgs.client.ClientChannelListener;
 import com.sun.sgs.client.ServerSession;
+import com.sun.sgs.client.SessionId;
 
 /**
  * A basic test harness for the Client API.
@@ -20,7 +24,7 @@ import com.sun.sgs.client.ServerSession;
  * @author      Sten Anderson
  * @version     1.0
  */
-public class ClientTest implements SimpleClientListener {
+public class ClientTest implements SimpleClientListener, ClientChannelListener {
 
     private SimpleClient client;
     
@@ -77,18 +81,19 @@ public class ClientTest implements SimpleClientListener {
     }
 
     public void disconnected(boolean graceful) {
-        // TODO Auto-generated method stub
-        
+        System.out.println("disconnected graceful: " + graceful);
+        System.exit(0);
     }
 
     public PasswordAuthentication getPasswordAuthentication(String prompt) {
         PasswordAuthentication auth = new PasswordAuthentication("Guest", 
-                new char[] {'h', 'i', '!', '!'});
+                new char[] {'h', 'i', '!'});
         return auth;
     }
 
     public void loggedIn() {
         System.out.println("Logged In");
+        client.send("some message".getBytes());
     }
 
     public void loginFailed(String reason) {
@@ -112,12 +117,29 @@ public class ClientTest implements SimpleClientListener {
     }
 
     public ClientChannelListener joinedChannel(ClientChannel channel) {
-        // TODO Auto-generated method stub
-        return null;
+        System.out.println("ClientTest joinedChannel: " + channel.getName());
+        
+        return this;
     }
 
     public void receivedMessage(byte[] message) {
-        // TODO Auto-generated method stub
+        System.out.println("Received general server message size " + 
+            message.length + " " + new String(message, 4, message.length - 4));        
+    }
+
+    // methods inherited from ClientChannelListener
+    
+    public void leftChannel(ClientChannel channel) {
+        System.out.println("ClientTest leftChannel " + channel.getName());
+        client.logout(false);
+    }
+
+    public void receivedMessage(ClientChannel channel, SessionId sender, byte[] message) {
+        System.out.println("ClientTest receivedChannelMessage " + channel.getName() + 
+                " from " + (sender != null ? sender.toString() : " Server ") + 
+                new String(message));
         
+        
+        channel.send("client message".getBytes());
     }
 }
