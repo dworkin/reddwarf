@@ -48,8 +48,6 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
     
     /** The listener for this simple client. */
     private final SimpleClientListener listener;
-    private final ProtocolMessageDecoder messageDecoder;
-    private final ProtocolMessageEncoder messageEncoder;
     private final AtomicInteger sequenceNumber;
     private final Map<String, SimpleClientChannel> channels;
     private boolean connected = false;
@@ -70,8 +68,6 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
      */
     public SimpleClient(SimpleClientListener listener) {
         this.listener = listener;
-        messageDecoder = new ProtocolMessageDecoder();
-        messageEncoder = new ProtocolMessageEncoder();
         sequenceNumber = new AtomicInteger();
         channels = new ConcurrentHashMap<String, SimpleClientChannel>();
     }
@@ -104,7 +100,8 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
      * use for this client's session (e.g., connection properties)
      */
     public void login(Properties props) throws IOException {
-        ClientConnector connector = new SimpleConnectorFactory().createConnector(props);
+        ClientConnector connector =
+            new SimpleConnectorFactory().createConnector(props);
         connector.connect(this);
     }
 
@@ -131,17 +128,16 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
      * @throws IllegalStateException if this session is disconnected
      */
     public void send(byte[] message) {
-        messageEncoder.startMessage(
+        ProtocolMessageEncoder m = new ProtocolMessageEncoder(
                 ProtocolMessage.APPLICATION_SERVICE,
                 ProtocolMessage.MESSAGE_SEND);
-        messageEncoder.add(message);
-        sendMessage();
+        m.writeBytes(message);
+        sendRaw(m.getMessage());
     }
     
     
-    private void sendMessage() {
-        connection.sendMessage(messageEncoder.getMessage());
-        messageEncoder.reset();
+    private void sendRaw(byte[] data) {
+        connection.sendMessage(data);
     }
 
     /**
@@ -158,13 +154,13 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
         PasswordAuthentication authentication = 
             listener.getPasswordAuthentication("Enter Username/Password");
 
-        messageEncoder.startMessage(
+        ProtocolMessageEncoder m = new ProtocolMessageEncoder(
                 ProtocolMessage.APPLICATION_SERVICE,
                 ProtocolMessage.LOGIN_REQUEST);
-        messageEncoder.add(authentication.getUserName());
+        m.writeString(authentication.getUserName());
         // TODO wrapping the char[] in a String is probably not the way to go
-        messageEncoder.add(new String(authentication.getPassword()));
-        sendMessage();
+        m.writeString(new String(authentication.getPassword()));
+        sendRaw(m.getMessage());
     }
 
     public void disconnected(boolean graceful, byte[] message) {
@@ -176,10 +172,10 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
     // all API level messages will come in on this call-back.  From here they
     // are interpreted and dispatched to a channel, or the ServerSessionListener.
     public void receivedMessage(byte[] message) {
-        messageDecoder.setMessage(message);
-        int versionNumber = messageDecoder.readVersionNumber();
-        int service = messageDecoder.readService();
-        int command = messageDecoder.readCommand();
+        ProtocolMessageDecoder decoder = new ProtocolMessageDecoder(message);
+        int versionNumber = decoder.readVersionNumber();
+        int service = decoder.readServiceNumber();
+        int command = decoder.readCommand();
         System.out.println("SimpleClient messageReceived: " + message.length + 
                             " command " + Integer.toHexString(command));
         
@@ -193,12 +189,12 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
                 break;
                 
             case ProtocolMessage.LOGIN_FAILURE:
-                listener.loginFailed(messageDecoder.readString());
+                listener.loginFailed(decoder.readString());
                 break;
 
                 
             case ProtocolMessage.MESSAGE_SEND:
-                listener.receivedMessage(messageDecoder.readBytes());
+                listener.receivedMessage(decoder.readBytes());
                 break;
                 
             default:
@@ -212,7 +208,7 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
             switch (command) {
             
             case ProtocolMessage.CHANNEL_JOIN: {
-                String channelName = messageDecoder.readString();
+                String channelName = decoder.readString();
                 System.err.println("joining channel " + channelName);
                 SimpleClientChannel channel =
                     new SimpleClientChannel(channelName);
@@ -222,7 +218,7 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
             }
                 
             case ProtocolMessage.CHANNEL_LEAVE: {
-                String channelName = messageDecoder.readString();
+                String channelName = decoder.readString();
                 SimpleClientChannel channel = channels.remove(channelName);
                 if (channel != null) {
                     channel.getListener().leftChannel(channel);
@@ -231,7 +227,7 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
             }
                 
             case ProtocolMessage.CHANNEL_MESSAGE:
-                String channelName = messageDecoder.readString();
+                String channelName = decoder.readString();
                 SimpleClientChannel channel = channels.get(channelName);
                 if (channel == null) {
                     System.err.println("Unknown opcode: 0x" +
@@ -239,9 +235,9 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
                     return;
                 }
                 SessionId sid =
-                    SessionId.fromBytes(messageDecoder.readBytes());
+                    SessionId.fromBytes(decoder.readBytes());
                 channel.getListener().receivedMessage(
-                        channel, sid, messageDecoder.readBytes());
+                        channel, sid, decoder.readBytes());
                 break;
                 
             default:
@@ -276,7 +272,8 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
     }
     
     private void extractSessionId(byte[] message) {
-        byte[] bytes = messageDecoder.readBytes();
+        ProtocolMessageDecoder decoder = new ProtocolMessageDecoder(message);
+        byte[] bytes = decoder.readBytes();
         sessionId = SessionId.fromBytes(bytes);
     }
 
@@ -315,21 +312,21 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
         public void sendInternal(Collection<SessionId> recipients,
                 byte[] message)
         {
-            messageEncoder.startMessage(
+            ProtocolMessageEncoder m = new ProtocolMessageEncoder(
                     ProtocolMessage.CHANNEL_SERVICE,
                     ProtocolMessage.CHANNEL_SEND_REQUEST);
-            messageEncoder.add(name);
-            messageEncoder.add(sequenceNumber.getAndIncrement());
+            m.writeString(name);
+            m.writeLong(sequenceNumber.getAndIncrement());
             if (recipients == null) {
-                messageEncoder.add(Short.valueOf((short) 0));
+                m.writeShort(Short.valueOf((short) 0));
             } else {
-                messageEncoder.add(Short.valueOf((short) recipients.size()));
+                m.writeShort(Short.valueOf((short) recipients.size()));
                 for (SessionId id : recipients) {
-                    messageEncoder.add(id.toBytes());
+                    m.writeSessionId(id);
                 }
             }
-            messageEncoder.add(message);
-            sendMessage();
+            m.writeBytes(message);
+            sendRaw(m.getMessage());
         }
     }
 }

@@ -101,7 +101,7 @@ public interface ProtocolMessage {
      * </ul>
      */
     final byte MESSAGE_SEND = 0x30;
-
+    final byte MESSAGE_TO_SERVER = 0x30; // TODO: MESSAGE_SEND better? -JM
 
     /**
      * Logout request.

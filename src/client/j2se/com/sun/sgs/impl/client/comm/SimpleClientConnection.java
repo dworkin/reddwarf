@@ -1,7 +1,6 @@
 package com.sun.sgs.impl.client.comm;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 
 import com.sun.sgs.client.ServerSessionListener;
 import com.sun.sgs.client.comm.ClientConnection;
@@ -29,11 +28,9 @@ public class SimpleClientConnection implements ClientConnection, IOHandler {
     private ClientConnectionListener ccl;
     private ServerSessionListener ssl;
     private IOHandle handle;
-    private ProtocolMessageDecoder messageDecoder;
     
     public SimpleClientConnection(ClientConnectionListener listener) {
         this.ccl = listener;
-        messageDecoder = new ProtocolMessageDecoder();
     }
 
     public void disconnect() throws IOException{
@@ -79,9 +76,9 @@ public class SimpleClientConnection implements ClientConnection, IOHandler {
     public void bytesReceived(byte[] message, IOHandle handle) {
         System.err.println("SimpleClientConnection: bytesReceived: " +
                 message);
-        
-        messageDecoder.setMessage(message);
-        int versionNumber = messageDecoder.readVersionNumber();
+
+        ProtocolMessageDecoder decoder = new ProtocolMessageDecoder(message);
+        int versionNumber = decoder.readVersionNumber();
         // TODO check the version number against the current version.
         // It's not clear yet where the "current version number" will live, 
         // but if it's a mismatch, bail out right away and notify the client.

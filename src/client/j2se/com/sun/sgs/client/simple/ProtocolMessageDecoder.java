@@ -1,85 +1,149 @@
 package com.sun.sgs.client.simple;
 
-import java.io.UnsupportedEncodingException;
+import java.io.ByteArrayInputStream;
+import java.io.DataInputStream;
+import java.io.IOException;
 
 /**
- * Translates protocol messages from bytes into their component parts.
+ * Convenience class for translating protocol messages from bytes into their 
+ * component parts.
  * 
  * @author      Sten Anderson
  * @version     1.0
  */
 public class ProtocolMessageDecoder {
     
-    private byte[] data;
-    private int index = 0;
+    private DataInputStream inputStream;
     
-    public ProtocolMessageDecoder() {
-    }
-    
-    public void setMessage(byte[] message) {
-        this.data = message;
-        index = 0;
-    }
-    
-    public String readString() {
-        byte[] strBytes = readBytes();
-        try {
-            return new String(strBytes, "UTF-8");
-        } catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e);
-        }
-    }
-    
-    public int readInt() {
-        return (readUnsignedByte() << 24) + 
-               (readUnsignedByte() << 16) +
-               (readUnsignedByte() << 8) +
-                readUnsignedByte();
-    }
-    
-    public short readShort() {
-        return (short) ((readUnsignedByte() << 8) +
-                         readUnsignedByte());
-    }
-
-    public char readChar() {
-        return (char) ((readUnsignedByte() << 8) +
-                        readUnsignedByte());
+    public ProtocolMessageDecoder(byte[] message) {
+        inputStream = new DataInputStream(new ByteArrayInputStream(message));
     }
     
     /**
-     * Reads the next short off the given ByteBuffer, interpreting it as a
-     * size, and reads that many more bytes from the buffer, returning
+     * Reads a String from the byte stream as Modified UTF-8 at the current
+     * position.
+     * 
+     * @return a Modified UTF-8 string
+     */
+    public String readString() {
+        String str = null;
+        try {
+            str = inputStream.readUTF();
+        }
+        catch (IOException ioe) {
+            // not thrown by the input stream
+        }
+        
+        return str;
+
+    }
+    
+    /**
+     * Reads the next int off the byte stream and returns true if it equals
+     * 1, otherwise false.
+     * 
+     * @return true if the int read equals one.
+     */
+    public boolean readBoolean() {
+        boolean b = false;
+        try {
+            b = inputStream.readBoolean();
+        }
+        catch (IOException ioe) {
+            // not thrown by the input stream
+        }
+        return b;
+    }
+
+    /**
+     * Reads the next 8 bytes off the byte stream at the current position
+     * and returns a network byte ordered long.
+     * 
+     * @return the next 8 bytes as a long
+     */
+    public long readLong() {
+        long num = 0;
+        try {
+            num = inputStream.readLong();
+        }
+        catch (IOException ioe) {
+            // not thrown by the input stream
+        }
+        return num;
+    }
+    
+    /**
+     * Reads the next 4 bytes from the byte stream at the current position
+     * and returns a network byte ordered int. 
+     * 
+     * @return the next 4 bytes as an int
+     */
+    public int readInt() {
+        int num = 0;
+        try {
+            num = inputStream.readInt();
+        }
+        catch (IOException ioe) {
+            // not thrown by the input stream
+        }
+        return num;
+    }
+    
+    /**
+     * Reads the next 2 bytes from the byte stream at the current position
+     * and returns a network byte ordered short.
+     * 
+     * @return the next 2 bytes as a short
+     */
+    public short readShort() {
+        short num = 0;
+        try {
+            num = inputStream.readShort();
+        }
+        catch (IOException ioe) {
+            // not thrown by the input stream
+        }
+        return num; 
+    }
+
+    /**
+     * Reads the next short from the input stream, interpreting it as a
+     * size, and reads that many more bytes from the stream, returning
      * the resulting byte array.
      * 
-     * @param data the buffer to read from
-     * 
      * @return a byte array matching the length of the first short read
-     * from the buffer
+     * from the stream
      */
     public byte[] readBytes() {
-        int length = readShort();
-        byte[] bytes = new byte[length];
-        System.arraycopy(data, index, bytes, 0, length);
+        byte[] bytes = null;
         
-        index += length;
-
+        try {
+            bytes = new byte[inputStream.readShort()];
+            inputStream.read(bytes);
+        }
+        catch (IOException ioe) {
+            // not thrown by the input stream 
+        }
+        
         return bytes;
     }
     
     /**
-     * Reads a regular old Java signed byte off the buffer and converts
-     * it to an unsigned one (0-255).
-     * 
-     * @param data the buffer from which to read
+     * Reads a Java signed byte off the buffer and converts it to an unsigned 
+     * one (0-255).
      * 
      * @return the unsigned representation of the next byte off the
      * buffer (as an int).
      */
     public int readUnsignedByte() {
-        int uByte = data[index] & 0xff;
+        int uByte = 0;
         
-        index++;
+        try {
+            uByte = inputStream.read() &  0xff;
+        }
+        catch (IOException ioe) {
+            // not thrown by the input stream
+        }
         
         return uByte;
     }
@@ -87,26 +151,27 @@ public class ProtocolMessageDecoder {
     /**
      * Convenience method for reading the first byte as the version number.
      * 
-     * @param data      the data to read from
-     * 
      * @return the first byte as the version number of the protocol.
      */
     public int readVersionNumber() {
         return readUnsignedByte();
     }
-
-    public int readService() {
-        return readUnsignedByte();
-    }
     
     /**
-     * Convenience method for reading the second byte as an unsigned byte.
+     * Convenience method for reading the third byte as the command op code.
      * 
-     * @param data      the data to read from
-     * 
-     * @return the first byte as the command code of a message.
+     * @return the third byte as the command code of the message.
      */
     public int readCommand() {
+        return readUnsignedByte();
+    }
+
+    /**
+     * Convenience method for reading the second byte as the service number.
+     * 
+     * @return the second byte as the service number.
+     */
+    public int readServiceNumber() {
         return readUnsignedByte();
     }
 
