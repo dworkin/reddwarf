@@ -1,19 +1,24 @@
 package com.sun.sgs.impl.client.comm;
 
 import java.io.IOException;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.util.Properties;
-import java.util.concurrent.Executors;
 
-import com.sun.sgs.client.comm.ClientConnection;
+import javax.naming.OperationNotSupportedException;
+
 import com.sun.sgs.client.comm.ClientConnectionListener;
 import com.sun.sgs.client.comm.ClientConnector;
 import com.sun.sgs.impl.io.ConnectorFactory;
 import com.sun.sgs.impl.io.IOConstants.TransportType;
 import com.sun.sgs.io.IOConnector;
-import com.sun.sgs.io.IOHandle;
 
+/**
+ * A basic implementation of a {@code ClientConnector} which uses an 
+ * {@code IOConnector} to establish connections.
+ * 
+ * @author      Sten Anderson
+ * @version     1.0
+ */
 public class SimpleClientConnector extends ClientConnector {
     
     private Properties properties;
@@ -32,8 +37,8 @@ public class SimpleClientConnector extends ClientConnector {
     
     @Override
     public void cancel() throws IOException {
-    // TODO Auto-generated method stub
-
+        // TODO implement
+        throw new UnsupportedOperationException("Cancel not yet implemented");
     }
 
     @Override

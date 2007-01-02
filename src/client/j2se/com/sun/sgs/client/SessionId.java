@@ -23,15 +23,8 @@ public abstract class SessionId {
      * does not contain a valid representation of a
      * <code>SessionId</code>
      */
-    public static SessionId fromBytes(final byte[] id) {
-	return new SessionId() {
-	    public byte[] toBytes() { return id; }
-	    public boolean equals(Object obj) {
-		if (! (obj instanceof SessionId))
-		    return false;
-		return id.equals(((SessionId)obj).toBytes());
-	    }
-	};
+    public static SessionId fromBytes(byte[] id) {
+	return new com.sun.sgs.client.simple.SimpleSessionId(id);
     }
 
     /**
