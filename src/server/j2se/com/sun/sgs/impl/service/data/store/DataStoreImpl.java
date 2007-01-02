@@ -295,19 +295,19 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    DatabaseEntry value = new DatabaseEntry();
 	    if (name == null) {
 		OperationStatus status = cursor.getFirst(key, value, null);
-		lastCursorKey = getNextBoundNameResult(status, key);
+		lastCursorKey = getNextBoundNameResult(name, status, key);
 	    } else {
 		boolean matchesLast = name.equals(lastCursorKey);
 		if (!matchesLast) {
 		    StringBinding.stringToEntry(name, key);
 		    OperationStatus status =
 			cursor.getSearchKeyRange(key, value, null);
-		    lastCursorKey = getNextBoundNameResult(status, key);
+		    lastCursorKey = getNextBoundNameResult(name, status, key);
 		    matchesLast = name.equals(lastCursorKey);
 		}
 		if (matchesLast) {
 		    OperationStatus status = cursor.getNext(key, value, null);
-		    lastCursorKey = getNextBoundNameResult(status, key);
+		    lastCursorKey = getNextBoundNameResult(name, status, key);
 		}
 	    }
 	    return lastCursorKey;
@@ -323,6 +323,24 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 		Cursor c = cursor;
 		cursor = null;
 		c.close();
+	    }
+	}
+
+	/**
+	 * Returns the name of the next binding given the results of a cursor
+	 * operation and the associated key.
+	 */
+	private String getNextBoundNameResult(
+	    String name, OperationStatus status, DatabaseEntry key)
+	{
+	    if (status == OperationStatus.NOTFOUND) {
+		return null;
+	    } else if (status == OperationStatus.SUCCESS) {
+		return StringBinding.entryToString(key);
+	    } else {
+		throw new DataStoreException(
+		    "nextBoundName txn:" + txn + ", name:" + name +
+		    " failed: " + status);
 	    }
 	}
     }
@@ -599,7 +617,8 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    throw new ObjectNotFoundException("Object not found: " + oid);
 	} else if (status != OperationStatus.SUCCESS) {
 	    throw new DataStoreException("getObject txn:" + txn + ", oid:" +
-					 oid + " failed: " + status);
+					 oid + ", forUpdate:" + forUpdate +
+					 " failed: " + status);
 	}
 	byte[] result = value.getData();
 	/* Berkeley DB returns null if the data is empty. */
@@ -1109,23 +1128,6 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 		       env.getLogStats(null),
 		       env.getMutexStats(null),
 		       env.getTransactionStats(null));
-	}
-    }
-
-    /**
-     * Returns the name of the next binding given the results of a cursor
-     * operation and the associated key.
-     */
-    private static String getNextBoundNameResult(
-	OperationStatus status, DatabaseEntry key)
-    {
-	if (status == OperationStatus.NOTFOUND) {
-	    return null;
-	} else if (status == OperationStatus.SUCCESS) {
-	    return StringBinding.entryToString(key);
-	} else {
-	    throw new DataStoreException(
-		"Getting next binding failed: " + status);
 	}
     }
 }
