@@ -36,8 +36,9 @@ public class SocketHandle implements IOHandle {
     }
     
     /**
-     * {@inheritDoc}
+     * Sends the given byte message out on the underlying {@code IoSession}.
      * 
+     * @throws IOException if the session is not connected.
      */
     public void sendBytes(byte[] message) throws IOException {
         logger.log(Level.FINEST, "message = {0}", message);
@@ -48,7 +49,9 @@ public class SocketHandle implements IOHandle {
     }
 
     /**
-     * {@inheritDoc}
+     * Closes the undering {@code IoSession}.
+     *  
+     * @throws IOException if the session is not connected. 
      */
     public void close() throws IOException {
         logger.log(Level.FINE, "session = {0}", session);

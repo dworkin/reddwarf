@@ -1,7 +1,6 @@
 package com.sun.sgs.impl.service.session;
 
 import java.io.UTFDataFormatException;
-import java.io.UnsupportedEncodingException;
 
 /**
  * A buffer for composing/decomposing messages.
@@ -212,7 +211,7 @@ public class MessageBuffer {
         putByte((v >>>  0) & 0xFF);
         return this;
     }
-    
+
     /**
      * Puts the specified string, encoded in modified UTF-8 format,
      * in the buffer starting in the buffer's the current position, and
@@ -225,21 +224,6 @@ public class MessageBuffer {
      * to this buffer would overflow the buffer
      */
     public MessageBuffer putString(String str) {
-        try {
-            byte[] utfBytes = str.getBytes("UTF-8");
-            int utfLen = utfBytes.length;
-            if (pos+utfLen+2 > capacity) {
-                throw new IndexOutOfBoundsException();
-            }
-            putShort(utfLen);
-            putBytes(utfBytes);
-            return this;
-        } catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e);
-        }
-    }
-    
-    public MessageBuffer putString2(String str) {
 	
 	// Note: code adapted from java.io.DataOutputStream.writeUTF
 	
@@ -395,15 +379,8 @@ public class MessageBuffer {
      * @throws IndexOutOfBoundsException if this buffer's limit would
      * be reached as a result of getting the encoded string
      */
+    @SuppressWarnings("cast")
     public String getString() {
-        try {
-            int utfLen = getShort();
-            return new String(getBytes(utfLen), "UTF-8");
-        } catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e);
-        }
-    }
-    public String getString2() {
 
 	// Note: code adapted from java.io.DataInputStream.readUTF
 	
@@ -419,7 +396,7 @@ public class MessageBuffer {
 	int utfLen = getShort();
 	int utfEnd = utfLen + pos;
 	if (utfEnd > limit) {
-	    pos = limit = savePos;
+            pos = savePos;
 	    throw new IndexOutOfBoundsException();
 	}
 
@@ -491,11 +468,9 @@ public class MessageBuffer {
 		}
 	    }
 
-	    limit =  (pos == capacity ? pos : pos + 1);
-		
 	} catch (UTFDataFormatException e) {
-	    // restore position and limit
-	    pos = limit = savePos;
+	    // restore position
+            pos = savePos;
 	    throw (RuntimeException) (new RuntimeException()).initCause(e);
 	}
         // The number of chars produced may be less than utfLen
