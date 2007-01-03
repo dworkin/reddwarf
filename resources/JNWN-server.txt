@@ -1,2 +1,0 @@
-# GameID    Deployment-descriptor URL
-21          file:apps/jnwn/deploy.xml
