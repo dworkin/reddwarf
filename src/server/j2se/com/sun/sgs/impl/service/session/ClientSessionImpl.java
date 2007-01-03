@@ -297,8 +297,8 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 
 	private Object readResolve() throws ObjectStreamException {
 	    try {
-		ClientSessionService service =
-                    ContextResolver.getService(ClientSessionService.class);
+		ClientSessionService service = 
+                    ClientSessionServiceImpl.getInstance();
 		ClientSession session = service.getClientSession(sessionId);
 		if (session == null) {
 		    session = new ClientSessionImpl(name, sessionId);

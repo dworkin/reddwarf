@@ -83,7 +83,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     private final Object lock = new Object();
     
     /** The transaction proxy, or null if configure has not been called. */    
-    private TransactionProxy txnProxy;
+    private static TransactionProxy txnProxy;
 
     /** The Identity representing this application. */ 
     Identity appIdentity;
@@ -150,6 +150,10 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	    throw e;
 	}
     }
+    
+    static ClientSessionService getInstance() {
+        return txnProxy.getService(ClientSessionService.class);
+    }
 
     /* -- Implement Service -- */
 
@@ -171,11 +175,12 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 		throw new NullPointerException("null transaction proxy");
 	    }
 	    synchronized (lock) {
-		if (this.txnProxy != null) {
-		    throw new IllegalStateException("Already configured");
-		}
+		if (ClientSessionServiceImpl.txnProxy == null) {
+		    ClientSessionServiceImpl.txnProxy = proxy;
+		} else {
+                    assert ClientSessionServiceImpl.txnProxy == proxy;
+                }
 		this.registry = registry;
-		txnProxy = proxy;
                 appIdentity = proxy.getCurrentOwner().getIdentity();
 		kernelAppContext = proxy.getCurrentOwner().getContext();
 		dataService = registry.getComponent(DataService.class);

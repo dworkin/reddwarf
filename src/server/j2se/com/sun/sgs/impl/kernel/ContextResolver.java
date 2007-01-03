@@ -81,10 +81,6 @@ public final class ContextResolver {
         return context.get().getManager(type);
     }
 
-    public static <T extends Service> T getService(Class<T> type) {
-        return context.get().getService(type);
-    }
-
     /**
      * Package-private method used to set the context. This is called each
      * time the <code>TaskHandler</code> is invoked to run under a new owner.
