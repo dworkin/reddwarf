@@ -320,7 +320,8 @@ public class TestPerformance extends TestCase {
     /** A simple managed object that maintains a count. */
     static class Counter implements ManagedObject, Serializable {
 	private static final long serialVersionUID = 1;
-	private int count;
+	@SuppressWarnings("hiding")
+        private int count;
 	Counter() { }
 	int next() { return ++count; }
     }

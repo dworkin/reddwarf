@@ -155,7 +155,8 @@ public class NamePasswordAuthenticator implements IdentityAuthenticator
     /**
      * {@inheritDoc}
      */
-    public void assignContext(KernelAppContext context) {
+    public void assignContext(
+            @SuppressWarnings("hiding") KernelAppContext context) {
         if (context == null)
             throw new NullPointerException("Null context not allowed");
         if (this.context == null)

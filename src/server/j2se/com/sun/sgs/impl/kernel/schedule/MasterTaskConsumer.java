@@ -67,7 +67,7 @@ class MasterTaskConsumer implements Runnable {
             try {
                 task = scheduler.getNextTask();
             } catch (InterruptedException ie) {
-                taskFinished = true;
+                return;
             }
 
             // run the task to completion
