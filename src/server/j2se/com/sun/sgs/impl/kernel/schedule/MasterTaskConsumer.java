@@ -53,6 +53,7 @@ class MasterTaskConsumer implements Runnable {
      * consumes and runs tasks, handling re-try and recurring cases as
      * appropriate.
      */
+    @SuppressWarnings("null")
     public void run() {
         logger.log(Level.FINE, "Starting a Master Task Consumer");
 
@@ -67,7 +68,7 @@ class MasterTaskConsumer implements Runnable {
             try {
                 task = scheduler.getNextTask();
             } catch (InterruptedException ie) {
-                return;
+                taskFinished = true;
             }
 
             // run the task to completion
