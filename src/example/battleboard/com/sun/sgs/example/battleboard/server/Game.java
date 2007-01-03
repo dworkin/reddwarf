@@ -1,94 +1,6 @@
-/*
- Copyright (c) 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa
- Clara, California 95054, U.S.A. All rights reserved.
- 
- Sun Microsystems, Inc. has intellectual property rights relating to
- technology embodied in the product that is described in this document.
- In particular, and without limitation, these intellectual property rights
- may include one or more of the U.S. patents listed at
- http://www.sun.com/patents and one or more additional patents or pending
- patent applications in the U.S. and in other countries.
- 
- U.S. Government Rights - Commercial software. Government users are subject
- to the Sun Microsystems, Inc. standard license agreement and applicable
- provisions of the FAR and its supplements.
- 
- This distribution may include materials developed by third parties.
- 
- Sun, Sun Microsystems, the Sun logo and Java are trademarks or registered
- trademarks of Sun Microsystems, Inc. in the U.S. and other countries.
- 
- UNIX is a registered trademark in the U.S. and other countries, exclusively
- licensed through X/Open Company, Ltd.
- 
- Products covered by and information contained in this service manual are
- controlled by U.S. Export Control laws and may be subject to the export
- or import laws in other countries. Nuclear, missile, chemical biological
- weapons or nuclear maritime end uses or end users, whether direct or
- indirect, are strictly prohibited. Export or reexport to countries subject
- to U.S. embargo or to entities identified on U.S. export exclusion lists,
- including, but not limited to, the denied persons and specially designated
- nationals lists is strictly prohibited.
- 
- DOCUMENTATION IS PROVIDED "AS IS" AND ALL EXPRESS OR IMPLIED CONDITIONS,
- REPRESENTATIONS AND WARRANTIES, INCLUDING ANY IMPLIED WARRANTY OF
- MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE OR NON-INFRINGEMENT,
- ARE DISCLAIMED, EXCEPT TO THE EXTENT THAT SUCH DISCLAIMERS ARE HELD TO BE
- LEGALLY INVALID.
- 
- Copyright © 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
- California 95054, Etats-Unis. Tous droits réservés.
- 
- Sun Microsystems, Inc. détient les droits de propriété intellectuels
- relatifs à la technologie incorporée dans le produit qui est décrit dans
- ce document. En particulier, et ce sans limitation, ces droits de
- propriété intellectuelle peuvent inclure un ou plus des brevets américains
- listés à l'adresse http://www.sun.com/patents et un ou les brevets
- supplémentaires ou les applications de brevet en attente aux Etats -
- Unis et dans les autres pays.
- 
- Cette distribution peut comprendre des composants développés par des
- tierces parties.
- 
- Sun, Sun Microsystems, le logo Sun et Java sont des marques de fabrique
- ou des marques déposées de Sun Microsystems, Inc. aux Etats-Unis et dans
- d'autres pays.
- 
- UNIX est une marque déposée aux Etats-Unis et dans d'autres pays et
- licenciée exlusivement par X/Open Company, Ltd.
- 
- see above Les produits qui font l'objet de ce manuel d'entretien et les
- informations qu'il contient sont regis par la legislation americaine en
- matiere de controle des exportations et peuvent etre soumis au droit
- d'autres pays dans le domaine des exportations et importations.
- Les utilisations finales, ou utilisateurs finaux, pour des armes
- nucleaires, des missiles, des armes biologiques et chimiques ou du
- nucleaire maritime, directement ou indirectement, sont strictement
- interdites. Les exportations ou reexportations vers des pays sous embargo
- des Etats-Unis, ou vers des entites figurant sur les listes d'exclusion
- d'exportation americaines, y compris, mais de maniere non exclusive, la
- liste de personnes qui font objet d'un ordre de ne pas participer, d'une
- facon directe ou indirecte, aux exportations des produits ou des services
- qui sont regi par la legislation americaine en matiere de controle des
- exportations et la liste de ressortissants specifiquement designes, sont
- rigoureusement interdites.
- 
- LA DOCUMENTATION EST FOURNIE "EN L'ETAT" ET TOUTES AUTRES CONDITIONS,
- DECLARATIONS ET GARANTIES EXPRESSES OU TACITES SONT FORMELLEMENT EXCLUES,
- DANS LA MESURE AUTORISEE PAR LA LOI APPLICABLE, Y COMPRIS NOTAMMENT TOUTE
- GARANTIE IMPLICITE RELATIVE A LA QUALITE MARCHANDE, A L'APTITUDE A UNE
- UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
-*/
+package com.sun.sgs.example.battleboard.server;
 
-package com.sun.gi.apps.battleboard.server;
-
-import com.sun.gi.apps.battleboard.BattleBoard;
-import com.sun.gi.comm.routing.ChannelID;
-import com.sun.gi.comm.routing.UserID;
-import com.sun.gi.gloutils.SequenceGLO;
-import com.sun.gi.logic.GLO;
-import com.sun.gi.logic.GLOReference;
-import com.sun.gi.logic.SimTask;
+import java.io.Serializable;
 import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.HashMap;
@@ -98,7 +10,17 @@ import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import static com.sun.gi.apps.battleboard.BattleBoard.PositionValue.CITY;
+
+import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.Channel;
+import com.sun.sgs.app.ChannelManager;
+import com.sun.sgs.app.DataManager;
+import com.sun.sgs.app.Delivery;
+import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.example.battleboard.BattleBoard;
+
+import static com.sun.sgs.example.battleboard.BattleBoard.PositionValue.CITY;
 
 /**
  * Game encapuslates the server-side management of a BattleBoard game.
@@ -110,45 +32,45 @@ import static com.sun.gi.apps.battleboard.BattleBoard.PositionValue.CITY;
  * records wins and losses, removes all players from this game's channel
  * and closes the server-side resources.
  */
-public class Game implements GLO {
+public class Game implements ManagedObject, Serializable {
 
     private static final long serialVersionUID = 1;
 
     private static Logger log =
-	Logger.getLogger("com.sun.gi.apps.battleboard.server");
+	Logger.getLogger(Game.class.getName());
 
     private final String gameName;
-    private final ChannelID channel;
+    private final Channel channel;
 
     /*
      * Players who are attached to the game and are still engaged
      * (they have cities, and have not withdrawn).
      */
-    private final LinkedList<GLOReference<Player>> players;
+    private final LinkedList<ManagedReference> players;
 
     /*
      * Players who have quit or lost the game may linger as
      * spectators, if they wish.
      */
-    private final LinkedList<GLOReference<Player>> spectators;
+    private final LinkedList<ManagedReference> spectators;
 
     /*
      * The current board of each player.
      */
-    private final Map<String, GLOReference<Board>> playerBoards;
+    private final Map<String, ManagedReference> playerBoards;
 
     /*
      * A mapping from the player name to the GLOReference for the
      * GLO that contains their "history" (how many games they've
      * won/lost).
      */
-    private final Map<String, GLOReference<PlayerHistory>> nameToHistory;
+    private final Map<String, ManagedReference> nameToHistory;
 
     /*
      * The currentPlayer is the player currently making a move.
      */
 
-    private GLOReference<Player> currentPlayerRef;
+    private ManagedReference currentPlayerRef;
 
     /*
      * The number of users currently attached to the game.  This is
@@ -177,7 +99,7 @@ public class Game implements GLO {
      * 
      * @param newPlayers a set of GLOReferences to Player GLOs
      */
-    protected Game(Set<GLOReference<Player>> newPlayers) {
+    protected Game(Set<ManagedReference> newPlayers) {
 
 	/*
 	 * Error checking:  without players, we can't proceed.  Note
@@ -191,11 +113,11 @@ public class Game implements GLO {
         if (newPlayers.size() == 0) {
             throw new IllegalArgumentException("newPlayers is empty");
         }
+        
+        DataManager dataMgr = AppContext.getDataManager();
+        ManagedReference gameRef = dataMgr.createReference(this);
 
-        SimTask task = SimTask.getCurrent();
-
-        gameName = "GameChannel-" +
-		SequenceGLO.getNext(task, "GameChannelSequence");
+        gameName = "GameChannel-" + gameRef.getId();
 
         log.info("New game channel is `" + gameName + "'");
 
@@ -203,13 +125,13 @@ public class Game implements GLO {
 	 * Create the list of players from the set of players, and
 	 * shuffle the order of the list to get the turn order.
 	 */
-        players = new LinkedList<GLOReference<Player>>(newPlayers);
+        players = new LinkedList<ManagedReference>(newPlayers);
         Collections.shuffle(players);
 
 	/*
 	 * Create the spectators list (initially empty).
 	 */ 
-        spectators = new LinkedList<GLOReference<Player>>();
+        spectators = new LinkedList<ManagedReference>();
 
 	/*
 	 * Create the map between player names and their boards, and
@@ -220,9 +142,9 @@ public class Game implements GLO {
 	 * chooses the board of each player:  the player has no
 	 * control over where his or her cities are placed.
 	 */
-        playerBoards = new HashMap<String, GLOReference<Board>>();
-        for (GLOReference<Player> playerRef : players) {
-            Player player = playerRef.get(task);
+        playerBoards = new HashMap<String, ManagedReference>();
+        for (ManagedReference playerRef : players) {
+            Player player = playerRef.get(Player.class);
             playerBoards.put(player.getPlayerName(),
 		    createBoard(player.getPlayerName()));
         }
@@ -231,10 +153,10 @@ public class Game implements GLO {
 	 * Create a map from player name to GLOReferences to the GLOs
 	 * that store the history of each player to cache this info.
 	 */
-        nameToHistory = new HashMap<String, GLOReference<PlayerHistory>>();
+        nameToHistory = new HashMap<String, ManagedReference>();
 
-        channel = task.openChannel(gameName);
-        task.lock(channel, true);
+        ChannelManager channelMgr = AppContext.getChannelManager();
+        channel = channelMgr.createChannel(gameName, null, Delivery.RELIABLE);
 
 	userCount = 0;
     }
@@ -246,15 +168,14 @@ public class Game implements GLO {
      * 
      * @return the GLOReference for a new Game
      */
-    public static GLOReference<Game> create(Set<GLOReference<Player>> players) {
-        SimTask task = SimTask.getCurrent();
-	GLOReference<Game> gameRef = task.createGLO(new Game(players));
-	ChannelID channel = gameRef.get(task).channel;
+    public static ManagedReference create(Set<ManagedReference> players) {
+	ManagedReference gameRef = task.createGLO(new Game(players));
+	Channel channel = gameRef.get(task).channel;
 
 	/*
 	 * Join all of the players onto this game's channel.
 	 */
-        for (GLOReference<Player> playerRef : players) {
+        for (ManagedReference playerRef : players) {
             Player player = playerRef.get(task);
             player.gameStarted(gameRef);
             task.join(player.getUID(), channel);
@@ -272,13 +193,13 @@ public class Game implements GLO {
      *
      * @return a {@link GLOReference} for the new {@link Board}.
      */
-    protected GLOReference<Board> createBoard(String playerName) {
+    protected ManagedReference createBoard(String playerName) {
         SimTask task = SimTask.getCurrent();
 
         Board board = new Board(playerName, boardWidth, boardHeight, numCities);
         board.populate();
 
-        GLOReference<Board> ref = task.createGLO(board, gameName +
+        ManagedReference ref = task.createGLO(board, gameName +
 		"-board-" + playerName);
 
         log.finer("createBoard[" + playerName + "] returning " + ref);
@@ -291,7 +212,7 @@ public class Game implements GLO {
      */
     protected void sendJoinOK() {
         SimTask task = SimTask.getCurrent();
-        for (GLOReference<Player> ref : players) {
+        for (ManagedReference ref : players) {
             Player player = ref.peek(task);
             sendJoinOK(player);
         }
@@ -341,7 +262,7 @@ public class Game implements GLO {
         SimTask task = SimTask.getCurrent();
         StringBuffer buf = new StringBuffer("turn-order ");
 
-        for (GLOReference<Player> playerRef : players) {
+        for (ManagedReference playerRef : players) {
             Player player = playerRef.peek(task);
             buf.append(" " + player.getPlayerName());
         }
@@ -400,7 +321,7 @@ public class Game implements GLO {
 
         String bombedPlayerNick = tokens[1];
 
-        GLOReference<Board> boardRef = playerBoards.get(bombedPlayerNick);
+        ManagedReference boardRef = playerBoards.get(bombedPlayerNick);
         if (boardRef == null) {
             log.warning(player.getPlayerName() +
 		    " tried to bomb non-existant player " + bombedPlayerNick);
@@ -476,9 +397,9 @@ public class Game implements GLO {
              * case.
              */
             if (players.size() == 1) {
-                GLOReference<Player> playerRef = players.get(0);
+                ManagedReference playerRef = players.get(0);
                 Player winner = playerRef.peek(task);
-                GLOReference<PlayerHistory> historyRef =
+                ManagedReference historyRef =
 			nameToHistory.get(winner.getUserName());
                 PlayerHistory history = historyRef.get(task);
                 history.win();
@@ -503,10 +424,10 @@ public class Game implements GLO {
 
         playerBoards.remove(loserNick);
 
-        Iterator<GLOReference<Player>> i = players.iterator();
+        Iterator<ManagedReference> i = players.iterator();
         Player loser = null;
         while (i.hasNext()) {
-            GLOReference<Player> ref = i.next();
+            ManagedReference ref = i.next();
             Player player = ref.peek(task);
             if (loserNick.equals(player.getPlayerName())) {
                 loser = player;
@@ -521,7 +442,7 @@ public class Game implements GLO {
             return;
         }
 
-        GLOReference<PlayerHistory> historyRef =
+        ManagedReference historyRef =
 		nameToHistory.get(loser.getUserName());
 
         PlayerHistory history = historyRef.get(task);
@@ -537,7 +458,7 @@ public class Game implements GLO {
      *
      * @param tokens the components of the response
      */
-    protected void handleResponse(GLOReference<Player> playerRef,
+    protected void handleResponse(ManagedReference playerRef,
             String[] tokens) {
 
         if (!playerRef.equals(currentPlayerRef)) {
@@ -571,12 +492,12 @@ public class Game implements GLO {
         UserID[] uids = new UserID[players.size() + spectators.size()];
 
         int i = 0;
-        for (GLOReference<Player> ref : players) {
+        for (ManagedReference ref : players) {
             Player player = ref.peek(task);
             uids[i++] = player.getUID();
         }
 
-        for (GLOReference<Player> ref : spectators) {
+        for (ManagedReference ref : spectators) {
             Player player = ref.peek(task);
             uids[i++] = player.getUID();
         }
@@ -601,9 +522,8 @@ public class Game implements GLO {
      * @param historyRef a GLOReference to the PlayerHistory instance
      * for the player with the given name
      */
-    public void addHistory(String playerName,
-            GLOReference<PlayerHistory> historyRef) {
-        nameToHistory.put(playerName, historyRef);
+    public void addHistory(PlayerHistory history) {
+        nameToHistory.put(history.getPlayerName(), history);
     }
 
     /**
@@ -616,12 +536,10 @@ public class Game implements GLO {
      *
      * @param data the buffer of data received
      */
-    public void userDataReceived(UserID uid, ByteBuffer data) {
-        log.finest("Game: Direct data from user " + uid);
+    public void receivedMessage(Player player, byte[] message) {
+        log.finest("Game: Direct data from " + player);
 
-        byte[] bytes = new byte[data.remaining()];
-        data.get(bytes);
-        String text = new String(bytes);
+        String text = new String(message);
 
         log.finest("userDataReceived: (" + text + ")");
         String[] tokens = text.split("\\s+");
@@ -630,7 +548,7 @@ public class Game implements GLO {
             return;
         }
 
-        GLOReference<Player> playerRef = Player.getRef(uid);
+        ManagedReference playerRef = Player.getRef(uid);
 
         if (playerRef == null) {
             log.warning("No Player found for uid " + uid);
@@ -652,7 +570,7 @@ public class Game implements GLO {
      *
      * @param uid the UserID of the joiner
      */
-    public void joinedChannel(ChannelID cid, UserID uid) {
+    public void joinedChannel(Channel cid, UserID uid) {
         log.finer("Game: User " + uid + " joined channel " + cid);
 
 	userCount++;
@@ -667,7 +585,7 @@ public class Game implements GLO {
 
         if (log.isLoggable(Level.FINE)) {
             log.finest("playerBoards size " + playerBoards.size());
-            for (Map.Entry<String, GLOReference<Board>> x :
+            for (Map.Entry<String, ManagedReference> x :
 			playerBoards.entrySet())
 	    {
                 log.finest("playerBoard[" + x.getKey() + "]=`" +
@@ -691,12 +609,12 @@ public class Game implements GLO {
      *
      * @param uid the UserID of the departing user
      */
-    public void leftChannel(ChannelID cid, UserID uid) {
+    public void playerDisconnected(Player player) {
         log.finer("Game: User " + uid + " left channel " + cid);
 
         SimTask task = SimTask.getCurrent();
 
-        GLOReference<Player> playerRef = Player.getRef(uid);
+        ManagedReference playerRef = Player.getRef(uid);
 
         if (playerRef == null) {
             log.warning("No PlayerRef found for uid " + uid);
@@ -730,7 +648,7 @@ public class Game implements GLO {
 	    log.finer("Destroying game");
 
 	    // Destroy all the players' boards
-	    for (GLOReference<? extends GLO> ref : playerBoards.values()) {
+	    for (ManagedReference ref : playerBoards.values()) {
 		task.destroyGLO(ref);
 	    }
 

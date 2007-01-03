@@ -1,97 +1,21 @@
-/*
- Copyright (c) 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa
- Clara, California 95054, U.S.A. All rights reserved.
- 
- Sun Microsystems, Inc. has intellectual property rights relating to
- technology embodied in the product that is described in this document.
- In particular, and without limitation, these intellectual property rights
- may include one or more of the U.S. patents listed at
- http://www.sun.com/patents and one or more additional patents or pending
- patent applications in the U.S. and in other countries.
- 
- U.S. Government Rights - Commercial software. Government users are subject
- to the Sun Microsystems, Inc. standard license agreement and applicable
- provisions of the FAR and its supplements.
- 
- This distribution may include materials developed by third parties.
- 
- Sun, Sun Microsystems, the Sun logo and Java are trademarks or registered
- trademarks of Sun Microsystems, Inc. in the U.S. and other countries.
- 
- UNIX is a registered trademark in the U.S. and other countries, exclusively
- licensed through X/Open Company, Ltd.
- 
- Products covered by and information contained in this service manual are
- controlled by U.S. Export Control laws and may be subject to the export
- or import laws in other countries. Nuclear, missile, chemical biological
- weapons or nuclear maritime end uses or end users, whether direct or
- indirect, are strictly prohibited. Export or reexport to countries subject
- to U.S. embargo or to entities identified on U.S. export exclusion lists,
- including, but not limited to, the denied persons and specially designated
- nationals lists is strictly prohibited.
- 
- DOCUMENTATION IS PROVIDED "AS IS" AND ALL EXPRESS OR IMPLIED CONDITIONS,
- REPRESENTATIONS AND WARRANTIES, INCLUDING ANY IMPLIED WARRANTY OF
- MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE OR NON-INFRINGEMENT,
- ARE DISCLAIMED, EXCEPT TO THE EXTENT THAT SUCH DISCLAIMERS ARE HELD TO BE
- LEGALLY INVALID.
- 
- Copyright © 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
- California 95054, Etats-Unis. Tous droits réservés.
- 
- Sun Microsystems, Inc. détient les droits de propriété intellectuels
- relatifs à la technologie incorporée dans le produit qui est décrit dans
- ce document. En particulier, et ce sans limitation, ces droits de
- propriété intellectuelle peuvent inclure un ou plus des brevets américains
- listés à l'adresse http://www.sun.com/patents et un ou les brevets
- supplémentaires ou les applications de brevet en attente aux Etats -
- Unis et dans les autres pays.
- 
- Cette distribution peut comprendre des composants développés par des
- tierces parties.
- 
- Sun, Sun Microsystems, le logo Sun et Java sont des marques de fabrique
- ou des marques déposées de Sun Microsystems, Inc. aux Etats-Unis et dans
- d'autres pays.
- 
- UNIX est une marque déposée aux Etats-Unis et dans d'autres pays et
- licenciée exlusivement par X/Open Company, Ltd.
- 
- see above Les produits qui font l'objet de ce manuel d'entretien et les
- informations qu'il contient sont regis par la legislation americaine en
- matiere de controle des exportations et peuvent etre soumis au droit
- d'autres pays dans le domaine des exportations et importations.
- Les utilisations finales, ou utilisateurs finaux, pour des armes
- nucleaires, des missiles, des armes biologiques et chimiques ou du
- nucleaire maritime, directement ou indirectement, sont strictement
- interdites. Les exportations ou reexportations vers des pays sous embargo
- des Etats-Unis, ou vers des entites figurant sur les listes d'exclusion
- d'exportation americaines, y compris, mais de maniere non exclusive, la
- liste de personnes qui font objet d'un ordre de ne pas participer, d'une
- facon directe ou indirecte, aux exportations des produits ou des services
- qui sont regi par la legislation americaine en matiere de controle des
- exportations et la liste de ressortissants specifiquement designes, sont
- rigoureusement interdites.
- 
- LA DOCUMENTATION EST FOURNIE "EN L'ETAT" ET TOUTES AUTRES CONDITIONS,
- DECLARATIONS ET GARANTIES EXPRESSES OU TACITES SONT FORMELLEMENT EXCLUES,
- DANS LA MESURE AUTORISEE PAR LA LOI APPLICABLE, Y COMPRIS NOTAMMENT TOUTE
- GARANTIE IMPLICITE RELATIVE A LA QUALITE MARCHANDE, A L'APTITUDE A UNE
- UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
-*/
+package com.sun.sgs.example.battleboard.server;
 
-package com.sun.gi.apps.battleboard.server;
-
-import com.sun.gi.comm.routing.ChannelID;
-import com.sun.gi.comm.routing.UserID;
-import com.sun.gi.logic.GLO;
-import com.sun.gi.logic.GLOReference;
-import com.sun.gi.logic.SimTask;
-import java.nio.ByteBuffer;
+import java.io.Serializable;
 import java.util.HashSet;
+import java.util.Properties;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.Channel;
+import com.sun.sgs.app.ChannelManager;
+import com.sun.sgs.app.ClientSession;
+import com.sun.sgs.app.DataManager;
+import com.sun.sgs.app.Delivery;
+import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.app.NameNotBoundException;
 
 /**
  * Matchmaker is responsible for collecting Players together until
@@ -113,85 +37,58 @@ import java.util.logging.Logger;
  * is that all of the playerNames joined into a particular game must
  * be unique.
  */
-public class Matchmaker implements GLO {
-
+public class Matchmaker
+    implements ManagedObject, Serializable
+{
     private static final long serialVersionUID = 1;
 
     private static Logger log =
-	    Logger.getLogger("com.sun.gi.apps.battleboard.server");
+	    Logger.getLogger(Matchmaker.class.getName());
 
-    private static final String MATCHMAKER_GLO_NAME = "matchmaker";
+    private static final String MATCHMAKER_NAME = "matchmaker";
 
-    private ChannelID channel;
+    private Channel channel;
 
     private int PLAYERS_PER_GAME = 2;
 
-    private Set<GLOReference<Player>> waitingPlayers =
-	    new HashSet<GLOReference<Player>>();
+    private Set<ManagedReference> waitingPlayers =
+	    new HashSet<ManagedReference>();
 
-    public static Matchmaker get() {
-        SimTask task = SimTask.getCurrent();
-        return (Matchmaker) task.findGLO(MATCHMAKER_GLO_NAME).get(task);
-    }
-
-    public static GLOReference<Matchmaker> create() {
-        SimTask task = SimTask.getCurrent();
-
-        /*
-         * Check for pre-existing matchmaker object.
-         * 
-         * In BattleBoard, this isn't necessary because only the boot
-         * object is supposed to call this method in order to create the
-         * matchmaker, and it does so with a mutex (or "GET-lock" held).
-         * But better safe than sorry...
-         */
-        GLOReference<Matchmaker> ref = task.findGLO(MATCHMAKER_GLO_NAME);
-        if (ref != null) {
-            log.severe("matchmaker GLO already exists");
-            return ref;
-        }
-
-        ref = task.createGLO(new Matchmaker(), MATCHMAKER_GLO_NAME);
-
-        /*
-         * More extra caution: for the reasons given above, this
-         * particular use of createGLO will succeed (unless something is
-         * terribly wrong), so this is purely defensive against errors
-         * elsewhere.
-         */
-        if (ref == null) {
-            ref = task.findGLO(MATCHMAKER_GLO_NAME);
-            if (ref == null) {
-                log.severe("matchmaker createGLO failed");
-                throw new RuntimeException("matchmaker createGLO failed");
-            }
-        }
-
-        return ref;
+    public static Matchmaker getInstance() {
+        return AppContext.getDataManager().getBinding(
+                MATCHMAKER_NAME, Matchmaker.class);
     }
 
     /**
-     * Only allow construction via the create() static method.
+     * Only allow construction via the startingUp() static method.
      */
-    protected Matchmaker() { }
+    protected Matchmaker() {
+        ChannelManager channelMgr = AppContext.getChannelManager();
+        channel =
+            channelMgr.createChannel("matchmaker", null, Delivery.RELIABLE);
+    }
 
     /**
-     * Creates the matchmaker channel so we can talk to non-playing
-     * clients.
+     * 
      */
-    public void boot() {
-        SimTask task = SimTask.getCurrent();
-        channel = task.openChannel("matchmaker");
-        task.lock(channel, true);
+    public static void startingUp(Properties props) {
+        DataManager dataMgr = AppContext.getDataManager();
+        
+        try {
+            dataMgr.getBinding(
+                MATCHMAKER_NAME, Matchmaker.class);
+        } catch (NameNotBoundException e) {
+            dataMgr.setBinding(MATCHMAKER_NAME, new Matchmaker());
+        }
     }
 
     /**
      * Adds a new user to the channel.
      * 
-     * @param uid the UserID of the new user
+     * @param session the ClientSession of the new user
      */
-    public void addUserID(UserID uid) {
-        SimTask.getCurrent().join(uid, channel);
+    public void addUserID(ClientSession session) {
+        channel.join(session, null);
     }
 
     /**
@@ -199,13 +96,10 @@ public class Matchmaker implements GLO {
      * they have requested is already waiting to join a game.
      * <p>
      * 
-     * @param uid the UserID of the user
+     * @param player the Player to send to
      */
-    protected void sendAlreadyJoined(UserID uid) {
-        ByteBuffer byteBuffer = ByteBuffer.wrap("already-joined".getBytes());
-        byteBuffer.position(byteBuffer.limit());
-        SimTask task = SimTask.getCurrent();
-        task.sendData(channel, new UserID[] { uid }, byteBuffer, true);
+    protected void sendAlreadyJoined(Player player) {
+        channel.send(player.getSession(), "already-joined".getBytes());
     }
 
     /**
@@ -216,16 +110,13 @@ public class Matchmaker implements GLO {
      * is a request to "join". Messages that do not begin with the
      * prefix <code>"join"</code> are rejected out of hand.
      * 
-     * @param uid the UserID of the user from whom the message is
+     * @param player the Player of the user from whom the message is
      * 
-     * @param data the contents of the message
+     * @param message the contents of the message
      */
-    public void userDataReceived(UserID uid, ByteBuffer data) {
-        log.fine("Matchmaker: data from user " + uid);
+    public void receivedMessage(Player player, byte[] message) {
 
-        byte[] bytes = new byte[data.remaining()];
-        data.get(bytes);
-        String text = new String(bytes);
+        String text = new String(message);
 
         String[] tokens = text.split("\\s+");
         if (tokens.length == 0) {
@@ -256,26 +147,20 @@ public class Matchmaker implements GLO {
          * that the playerName is not already in use. If so, then reject
          * the join.
          */
-        SimTask task = SimTask.getCurrent();
-        for (GLOReference<Player> ref : waitingPlayers) {
-            Player peekedPlayer = ref.peek(task);
-            if (playerName.equals(peekedPlayer.getPlayerName())) {
+        for (ManagedReference ref : waitingPlayers) {
+            Player waitingPlayer = ref.get(Player.class);
+            if (playerName.equals(waitingPlayer.getPlayerName())) {
                 log.warning("Matchmaker already has `" + playerName);
-                sendAlreadyJoined(uid);
+                sendAlreadyJoined(player);
                 return;
             }
         }
 
-        /*
-         * Get a reference to the player object for this user, set the
-         * name of that player to playerName, and add the playerRef to
-         * the set of waiting players.
-         */
-        GLOReference<Player> playerRef = Player.getRef(uid);
-        Player player = playerRef.get(task);
+        DataManager dataMgr = AppContext.getDataManager();
+        dataMgr.markForUpdate(player);
 
         player.setPlayerName(playerName);
-        waitingPlayers.add(playerRef);
+        waitingPlayers.add(dataMgr.createReference(player));
 
         /*
          * If there are enough players waiting, create a game.
@@ -292,9 +177,9 @@ public class Matchmaker implements GLO {
         if (waitingPlayers.size() == PLAYERS_PER_GAME) {
 	    if (log.isLoggable(Level.FINEST)) {
 		log.finest("Creating a new game for:");
-		for (GLOReference<Player> ref : waitingPlayers) {
-		    Player peekedPlayer = ref.peek(task);
-		    log.finest("    " + peekedPlayer.getPlayerName());
+		for (ManagedReference ref : waitingPlayers) {
+		    Player waitingPlayer = ref.get(Player.class);
+		    log.finest("    " + waitingPlayer.getPlayerName());
 		}
 	    }
 
@@ -303,16 +188,8 @@ public class Matchmaker implements GLO {
         }
     }
 
-    // Channel Join/Leave methods
-
-    public void joinedChannel(ChannelID cid, UserID uid) {
-        log.finer("Matchmaker: User " + uid + " joined channel " + cid);
-    }
-
-    public void leftChannel(ChannelID cid, UserID uid) {
-        log.finer("Matchmaker: User " + uid + " left channel " + cid);
-
-        GLOReference<Player> playerRef = Player.getRef(uid);
-        waitingPlayers.remove(playerRef);
+    public void playerDisconnected(Player player) {
+        DataManager dataMgr = AppContext.getDataManager();
+        waitingPlayers.remove(dataMgr.createReference(player));
     }
 }
