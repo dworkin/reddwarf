@@ -1080,11 +1080,13 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	     * Error and create a new DataStoreImpl instance, but this instance
 	     * is dead.  -tjb@sun.com (10/19/2006)
 	     */
-	    throw new Error(
+	    Error error = new Error(
 		operation + " failed: " +
 		"Database requires recovery -- need to restart the server " +
 		"or create a new instance of DataStoreImpl: " + e.getMessage(),
 		e);
+	    logger.logThrow(Level.SEVERE, error, "{0} throws", operation);
+	    throw error;
 	} else if (e instanceof DatabaseException) {
 	    re = new DataStoreException(
 		operation + " failed: " + e.getMessage(), e);
