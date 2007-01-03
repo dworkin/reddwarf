@@ -1167,8 +1167,7 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     public void testCreateReferenceRemoved() throws Exception {
-	@SuppressWarnings("unused")
-        ManagedReference ref = service.createReference(dummy);
+        service.createReference(dummy);
 	service.removeObject(dummy);
 	try {
 	    service.createReference(dummy);

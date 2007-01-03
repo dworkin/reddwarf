@@ -407,7 +407,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 		}
 		create = true;
 	    }
-	    this.info = infoTmp;
+	    info = infoTmp;
 	    try {
 		oids = env.openDatabase(
 		    bdbTxn, directory + File.separator + "oids", null,

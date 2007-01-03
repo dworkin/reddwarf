@@ -208,7 +208,7 @@ public final class DataServiceImpl
 	    if (this.txnProxy != null) {
 		throw new IllegalStateException("Already configured");
 	    }
-	    this.txnProxy = proxy;
+	    txnProxy = proxy;
 	    addAbortAction(
 		new Runnable() {
 		    public void run() {

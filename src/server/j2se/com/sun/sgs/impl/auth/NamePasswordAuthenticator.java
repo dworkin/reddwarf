@@ -158,9 +158,9 @@ public class NamePasswordAuthenticator implements IdentityAuthenticator
     public void assignContext(KernelAppContext ctx) {
         if (ctx == null)
             throw new NullPointerException("Null context not allowed");
-        if (this.context == null)
+        if (context != null)
             throw new IllegalStateException("Context was already assigned");
-        this.context = ctx;
+        context = ctx;
     }
 
     /**

@@ -161,7 +161,7 @@ public class TaskServiceImpl
             throw new NullPointerException("null proxy not allowed");
 
         // keep track of the proxy and the data service
-        TaskServiceImpl.transactionProxy = proxy;
+        transactionProxy = proxy;
         dataService = serviceRegistry.getComponent(DataService.class);
 
         // fetch the map of pending tasks, or create it if it doesn't
