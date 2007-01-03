@@ -10,7 +10,10 @@ import java.io.Serializable;
  * along with all of the serializable, non-managed objects it refers to.  If a
  * managed object refers to another managed object, it must do so through an
  * instance of {@link ManagedReference}, created by the {@link #createReference
- * createReference} method. <p>
+ * createReference} method.  Attempting to store a reference to a managed
+ * object using a standard reference rather than an instance of
+ * <code>ManagedReference</code> will typically result in an {@link
+ * ObjectIOException} being thrown when the current transaction commits. <p>
  *
  * Managed objects that are bound to names, and any managed objects they refer
  * to directly or indirectly, are stored by the <code>DataManager</code>.  It
