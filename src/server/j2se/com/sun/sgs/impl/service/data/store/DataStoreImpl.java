@@ -383,31 +383,31 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    createConfig.setAllowCreate(true);
 	    boolean create = false;
 	    String infoFileName = directory + File.separator + "info";
-	    Database info;
+	    Database infoTmp;
 	    try {
-		info = env.openDatabase(bdbTxn, infoFileName, null, null);
-		int minorVersion = DataStoreHeader.verify(info, bdbTxn);
+		infoTmp = env.openDatabase(bdbTxn, infoFileName, null, null);
+		int minorVersion = DataStoreHeader.verify(infoTmp, bdbTxn);
 		if (logger.isLoggable(Level.CONFIG)) {
 		    logger.log(Level.CONFIG, "Found existing header {0}",
 			       DataStoreHeader.headerString(minorVersion));
 		}
 	    } catch (FileNotFoundException e) {
 		try {
-		    info = env.openDatabase(
+		    infoTmp = env.openDatabase(
 			bdbTxn, infoFileName, null, createConfig);
 		} catch (FileNotFoundException e2) {
 		    throw new DataStoreException(
 			"Problem creating database: " + e2.getMessage(),
 			e2);
 		}
-		DataStoreHeader.create(info, bdbTxn);
+		DataStoreHeader.create(infoTmp, bdbTxn);
 		if (logger.isLoggable(Level.CONFIG)) {
 		    logger.log(Level.CONFIG, "Created new header {0}",
 			       DataStoreHeader.headerString());
 		}
 		create = true;
 	    }
-	    this.info = info;
+	    this.info = infoTmp;
 	    try {
 		oids = env.openDatabase(
 		    bdbTxn, directory + File.separator + "oids", null,

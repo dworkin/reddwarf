@@ -199,16 +199,16 @@ public final class DataServiceImpl
 
     /** {@inheritDoc} */
     public void configure(ComponentRegistry registry,
-			  TransactionProxy txnProxy)
+			  TransactionProxy proxy)
     {
-	if (registry == null || txnProxy == null) {
+	if (registry == null || proxy == null) {
 	    throw new NullPointerException("The arguments must not be null");
 	}
 	synchronized (lock) {
 	    if (this.txnProxy != null) {
 		throw new IllegalStateException("Already configured");
 	    }
-	    this.txnProxy = txnProxy;
+	    this.txnProxy = proxy;
 	    addAbortAction(
 		new Runnable() {
 		    public void run() {

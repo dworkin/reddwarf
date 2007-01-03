@@ -32,6 +32,7 @@ import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
 /** Test the DataServiceImpl class */
+@SuppressWarnings("hiding")
 public class TestDataServiceImpl extends TestCase {
 
     /** The test suite, to use for adding additional tests. */
@@ -671,10 +672,10 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     public void testRemoveBindingEmptyName() {
-	testRemoveBindingNullName(true);
+        testRemoveBindingEmptyName(true);
     }
     public void testRemoveServiceBindingEmptyName() {
-	testRemoveBindingNullName(false);
+        testRemoveBindingEmptyName(false);
     }
     private void testRemoveBindingEmptyName(boolean app) {
 	setBinding(app, service, "", dummy);
@@ -1166,7 +1167,8 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     public void testCreateReferenceRemoved() throws Exception {
-	ManagedReference ref = service.createReference(dummy);
+	@SuppressWarnings("unused")
+        ManagedReference ref = service.createReference(dummy);
 	service.removeObject(dummy);
 	try {
 	    service.createReference(dummy);
@@ -1609,6 +1611,7 @@ public class TestDataServiceImpl extends TestCase {
 
     /** A managed object that fails during serialization. */
     static class SerializationFails extends DummyManagedObject {
+        private static final long serialVersionUID = 1L;
 	private void writeObject(ObjectOutputStream out)
 	    throws IOException
 	{
@@ -1618,6 +1621,7 @@ public class TestDataServiceImpl extends TestCase {
 
     /** A managed object that fails during deserialization. */
     static class DeserializationFails extends DummyManagedObject {
+        private static final long serialVersionUID = 1L;
 	private void readObject(ObjectInputStream in)
 	    throws IOException
 	{
@@ -1627,6 +1631,7 @@ public class TestDataServiceImpl extends TestCase {
 
     /** A managed object that deserializes as null. */
     static class DeserializeAsNull extends DummyManagedObject {
+        private static final long serialVersionUID = 1L;
 	private Object readResolve() throws ObjectStreamException {
 	    return null;
 	}
@@ -1647,7 +1652,7 @@ public class TestDataServiceImpl extends TestCase {
     /** The set of bad transaction states */
     static enum BadTxnState {
 	Uninitialized, Aborting, Aborted, Preparing, Committing, Committed
-    };
+    }
 
     /** Defines a abstract class for testing bad transaction states. */
     static abstract class BadTxnTest extends TestDataServiceImpl {
