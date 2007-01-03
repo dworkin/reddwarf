@@ -21,6 +21,7 @@ import java.util.logging.Logger;
 import junit.framework.TestCase;
 
 /** Test concurrent operation. */
+@SuppressWarnings("hiding")
 public class TestConcurrent extends TestCase {
 
     /** Logger for this test. */
