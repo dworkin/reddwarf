@@ -46,11 +46,21 @@ public class NonDurableTaskScheduler {
 
     /**
      * Schedules a non-durable, non-transactional task using the task
-     * service obtained during construction.
+     * scheduler and task owner obtained during construction.
      *
      * @param task a task
      */
     public void scheduleNonTransactionalTask(KernelRunnable task) {
+        taskScheduler.scheduleTask(task, owner);
+    }
+
+    /**
+     * Schedules a non-durable, non-transactional task using the task
+     * service obtained during construction.
+     *
+     * @param task a task
+     */
+    public void scheduleNonTransactionalTaskUsingService(KernelRunnable task) {
 	taskService.scheduleNonDurableTask(task);
     }
 }

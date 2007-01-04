@@ -246,7 +246,8 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	public IOHandler newHandle(IOHandle handle) {
 	    ClientSessionImpl session =
 		new ClientSessionImpl(ClientSessionServiceImpl.this, handle);
-	    sessions.put(new SessionId(session.getSessionId()), session);
+	    sessions.put(new SessionId(session.getSessionIdInternal()),
+                    session);
 	    return session.getHandler();
 	}
     }
@@ -307,20 +308,27 @@ public class ClientSessionServiceImpl implements ClientSessionService {
      * Removes the specified session from the internal session map.
      */
     void disconnected(ClientSessionImpl session) {
-	sessions.remove(new SessionId(session.getSessionId()));
+	sessions.remove(new SessionId(session.getSessionIdInternal()));
     }
 
     /**
-     * Schedules a non-durable, transactional task.
+     * Schedules a non-durable, transactional task using the task scheduler.
      */
     void scheduleTask(KernelRunnable task) {
 	nonDurableTaskScheduler.scheduleTask(task);
     }
 
     /**
-     * Schedules a non-durable, non-transactional task.
+     * Schedules a non-durable, non-transactional task using the task scheduler.
      */
     void scheduleNonTransactionalTask(KernelRunnable task) {
-	nonDurableTaskScheduler.scheduleNonTransactionalTask(task);
+        nonDurableTaskScheduler.scheduleNonTransactionalTask(task);
+    }
+
+    /**
+     * Schedules a non-durable, non-transactional task using the task service.
+     */
+    void scheduleNonTransactionalTaskUsingService(KernelRunnable task) {
+	nonDurableTaskScheduler.scheduleNonTransactionalTaskUsingService(task);
     }
 }

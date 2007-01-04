@@ -131,14 +131,20 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     /** {@inheritDoc} */
     public byte[] getSessionId() {
 	try {
-	    if (!isConnected()) {
-		throw new IllegalStateException("client session not connected");
-	    }
-			     
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(Level.FINEST, "getSessionId returns {0}", sessionId);
-	    }
-	    return sessionId;
+            switch (getCurrentState()) {
+
+            case CONNECTING:
+            case CONNECTED:
+            case RECONNECTING:
+                if (logger.isLoggable(Level.FINEST)) {
+                    logger.log(Level.FINEST, "getSessionId returns {0}",
+                            sessionId);
+                }
+                return sessionId;
+            
+            default:
+                throw new IllegalStateException("client session not connected");
+            }
 	    
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -146,6 +152,15 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    }
 	    throw e;
 	}
+    }
+    
+    /**
+     * Does not check whether the session is connected.
+     * 
+     * @return the session id for this session
+     */
+    byte[] getSessionIdInternal() {
+        return sessionId;
     }
 
     /** {@inheritDoc} */
@@ -159,7 +174,8 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    currentState == State.RECONNECTING;
 
 	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST, "isConnected returns {0}", connected);
+	    logger.log(Level.FINEST, "isConnected returns {0} ({1})",
+                    connected, currentState);
 	}
 	return connected;
     }
@@ -172,7 +188,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    case CONNECTING:
 	    case CONNECTED:
 	    case RECONNECTING:
-		scheduleNonTransactionalTask(new KernelRunnable() {
+		scheduleNonTransactionalTaskUsingService(new KernelRunnable() {
 	            public void run() throws IOException {
 			MessageBuffer buf =
 			    new MessageBuffer(5 + message.length);
@@ -203,8 +219,14 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 
     /** {@inheritDoc} */
     public void disconnect() {
-	if (getCurrentState() != State.DISCONNECTED) {
-	    scheduleNonTransactionalTask(new KernelRunnable() {
+	switch (getCurrentState()) {
+        case DISCONNECTING:
+        case DISCONNECTED:
+            // do nothing
+            break;
+        
+        default:
+ 	    scheduleNonTransactionalTaskUsingService(new KernelRunnable() {
 		public void run() {
 		    handleDisconnect(false);
 		}});
@@ -337,12 +359,11 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     }
 
     /**
-     * Handles a disconnect request (if not already handlede) by doing
+     * Handles a disconnect request (if not already handled) by doing
      * the following:
      *
-     * a) sending a disconnect acknowledgement (either LOGOUT_SUCCESS
-     * if 'graceful' is true, or SESSION_DISCONNECT if 'graceful' is
-     * false)
+     * a) sending a disconnect acknowledgement (LOGOUT_SUCCESS)
+     * if 'graceful' is true
      *
      * b) closing this session's connection
      *
@@ -370,23 +391,24 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    disconnectMsg.
 		putByte(SgsProtocol.VERSION).
 		putByte(SgsProtocol.APPLICATION_SERVICE).
-		putByte(graceful ?
-			SgsProtocol.LOGOUT_SUCCESS :
-			SgsProtocol.SESSION_DISCONNECT);
+		putByte(SgsProtocol.LOGOUT_SUCCESS);
 
 	    sendProtocolMessage(disconnectMsg);
-	    try {
-		sessionHandle.close();
-	    } catch (IOException e) {
-		if (logger.isLoggable(Level.WARNING)) {
-		    logger.logThrow(
-			Level.WARNING, e,
-			"handleDisconnect (close) handle:{0} throws",
-			sessionHandle);
-		}
-	    }
-	}
+        }
 
+        if (getCurrentState() != State.DISCONNECTED) {
+            try {
+                sessionHandle.close();
+            } catch (IOException e) {
+                if (logger.isLoggable(Level.WARNING)) {
+                    logger.logThrow(
+                            Level.WARNING, e,
+                            "handleDisconnect (close) handle:{0} throws",
+                            sessionHandle);
+                }
+            }
+        }
+        
 	if (listener != null) {
 	    scheduleTask(new KernelRunnable() {
 		public void run() throws IOException {
@@ -462,15 +484,17 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		if (handle != sessionHandle) {
 		    return;
 		}
+                
+                if (state == State.DISCONNECTED) {
+                    return;
+                }
+                
+                state = State.DISCONNECTED;
 
-		if (!disconnectHandled) {
-		    scheduleNonTransactionalTask(new KernelRunnable() {
-			public void run() {
-			    handleDisconnect(false);
-			}});
-		}
-		    
-		state = State.DISCONNECTED;
+                scheduleNonTransactionalTask(new KernelRunnable() {
+                    public void run() {
+                        handleDisconnect(false);
+                    }});
 	    }
 	}
 
@@ -568,6 +592,13 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 
 		try {
 		    identity = authenticate(name, password);
+                    // TODO: this may be why I had separate KernelAppContext
+                    // and Identity fields in a previous version: so that
+                    // once the user logs in on a connection, we can
+                    // schedule future tasks on behalf of that user rather
+                    // than just on behalf of the app.  I don't know if
+                    // that's the right model for identity; maybe the app
+                    // identity is always the approprate one. -JM
 		    scheduleTask(new LoginTask());
 		} catch (LoginException e) {
 		    // This will send a nack to client because
@@ -597,6 +628,8 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 			    handleDisconnect(true);
 			}});
 		} else {
+                    // FIXME
+                    // If it's not connected, why send a message? -JM
 		    MessageBuffer ack = new MessageBuffer(3);
 		    ack.putByte(SgsProtocol.VERSION).
 			putByte(SgsProtocol.APPLICATION_SERVICE).
@@ -632,17 +665,24 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     }
 
     /**
-     * Submits a non-durable, transactional task.
+     * Submits a non-durable, transactional task using the task scheduler.
      */
     private void scheduleTask(KernelRunnable task) {
 	sessionService.scheduleTask(task);
     }
 
     /**
-     * Submits a non-durable, non-transactional task.
+     * Submits a non-durable, non-transactional task using the task scheduler.
      */
     private void scheduleNonTransactionalTask(KernelRunnable task) {
-	sessionService.scheduleNonTransactionalTask(task);
+        sessionService.scheduleNonTransactionalTask(task);
+    }
+    
+    /**
+     * Submits a non-durable, non-transactional task using the task service.
+     */
+    private void scheduleNonTransactionalTaskUsingService(KernelRunnable task) {
+	sessionService.scheduleNonTransactionalTaskUsingService(task);
     }
 
     /**
@@ -675,7 +715,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		    listener);
 	    }
 	    
-	    scheduleNonTransactionalTask(new LoginAckTask());
+	    scheduleNonTransactionalTaskUsingService(new LoginAckTask());
 	}
     }
 
