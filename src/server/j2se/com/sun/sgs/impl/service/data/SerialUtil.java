@@ -141,9 +141,7 @@ final class SerialUtil {
 		    !Modifier.isStatic(cl.getModifiers()))
 		{
 		    Class<?> enclosingClass = cl.getEnclosingClass();
-		    if (enclosingClass != null &&
-			ManagedObject.class.isAssignableFrom(enclosingClass))
-		    {
+		    if (ManagedObject.class.isAssignableFrom(enclosingClass)) {
 			throw new ObjectIOException(
 			    "Cannot store an instance of an inner class " +
 			    "whose enclosing class implements " +
