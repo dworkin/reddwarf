@@ -148,7 +148,7 @@ public class ChatClient extends JFrame
         try {
             Properties props = new Properties();
             props.put("host", "127.0.0.1");
-            props.put("port", "10002");
+            props.put("port", "2502");
             client = new SimpleClient(this);
             client.login(props);
             // TODO: enable the loginButton as a "Cancel Login" action.
