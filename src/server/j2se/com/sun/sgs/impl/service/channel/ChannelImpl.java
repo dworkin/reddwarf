@@ -464,7 +464,8 @@ final class ChannelImpl implements Channel, Serializable {
 	    for (byte[] sessionId : sessionIds) {
 		ClientSession session =
 		    context.sessionService.getClientSession(sessionId);
-		if (session != null) {
+                // Skip the sender and any disconnected sessions
+		if (session != null && (! session.equals(senderSession))) {
 		    sessions.add(session);
 		}
 	    }
@@ -541,11 +542,15 @@ final class ChannelImpl implements Channel, Serializable {
 	}
 
 	public void run() {
+            String name = state.name;
+            int nameLen = MessageBuffer.getSize(name);
 	    MessageBuffer buf =
-		new MessageBuffer(15 + senderId.length + message.length);
+		new MessageBuffer(15 + nameLen + senderId.length +
+                        message.length);
 	    buf.putByte(SgsProtocol.VERSION).
 		putByte(SgsProtocol.CHANNEL_SERVICE).
 		putByte(SgsProtocol.CHANNEL_MESSAGE).
+                putString(name).
 		putLong(sequenceNumber).
 		putShort(senderId.length).
 		putBytes(senderId).

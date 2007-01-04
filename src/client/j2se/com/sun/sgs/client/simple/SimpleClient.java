@@ -121,7 +121,19 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
      * @throws IllegalStateException if this session is disconnected
      */
     public void logout(boolean force) {
-	// TODO
+        connected = false;
+	if (force) {
+            try {
+                connection.disconnect();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        } else {
+            ProtocolMessageEncoder m = new ProtocolMessageEncoder(
+                    ProtocolMessage.APPLICATION_SERVICE,
+                    ProtocolMessage.LOGOUT_REQUEST);
+            sendRaw(m.getMessage());
+        }
     }
 
     /** {@inheritDoc}
@@ -177,7 +189,7 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
         int service = decoder.readServiceNumber();
         int command = decoder.readCommand();
         System.out.println("SimpleClient messageReceived: " + message.length + 
-                            " command " + Integer.toHexString(command));
+                            " command 0x" + Integer.toHexString(command));
         
         switch (service) {
         
@@ -195,6 +207,26 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
                 
             case ProtocolMessage.MESSAGE_SEND:
                 listener.receivedMessage(decoder.readBytes());
+                break;
+
+            case ProtocolMessage.RECONNECT_SUCCESS:
+                listener.reconnected();
+                break;
+
+            case ProtocolMessage.RECONNECT_FAILURE:
+                try {
+                    connection.disconnect();
+                } catch (IOException e) {
+                    // TODO
+                }
+                break;
+
+            case ProtocolMessage.LOGOUT_SUCCESS:
+                try {
+                    connection.disconnect();
+                } catch (IOException e) {
+                    // TODO
+                }
                 break;
                 
             default:
@@ -230,10 +262,11 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
                 String channelName = decoder.readString();
                 SimpleClientChannel channel = channels.get(channelName);
                 if (channel == null) {
-                    System.err.println("Unknown opcode: 0x" +
-                            Integer.toHexString(command));
+                    System.err.println("No channel found for '" +
+                            channelName + "'");
                     return;
                 }
+                long seq = decoder.readLong();
                 SessionId sid =
                     SessionId.fromBytes(decoder.readBytes());
                 channel.getListener().receivedMessage(
