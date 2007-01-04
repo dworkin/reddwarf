@@ -1,99 +1,17 @@
-/*
- Copyright (c) 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa
- Clara, California 95054, U.S.A. All rights reserved.
- 
- Sun Microsystems, Inc. has intellectual property rights relating to
- technology embodied in the product that is described in this document.
- In particular, and without limitation, these intellectual property rights
- may include one or more of the U.S. patents listed at
- http://www.sun.com/patents and one or more additional patents or pending
- patent applications in the U.S. and in other countries.
- 
- U.S. Government Rights - Commercial software. Government users are subject
- to the Sun Microsystems, Inc. standard license agreement and applicable
- provisions of the FAR and its supplements.
- 
- This distribution may include materials developed by third parties.
- 
- Sun, Sun Microsystems, the Sun logo and Java are trademarks or registered
- trademarks of Sun Microsystems, Inc. in the U.S. and other countries.
- 
- UNIX is a registered trademark in the U.S. and other countries, exclusively
- licensed through X/Open Company, Ltd.
- 
- Products covered by and information contained in this service manual are
- controlled by U.S. Export Control laws and may be subject to the export
- or import laws in other countries. Nuclear, missile, chemical biological
- weapons or nuclear maritime end uses or end users, whether direct or
- indirect, are strictly prohibited. Export or reexport to countries subject
- to U.S. embargo or to entities identified on U.S. export exclusion lists,
- including, but not limited to, the denied persons and specially designated
- nationals lists is strictly prohibited.
- 
- DOCUMENTATION IS PROVIDED "AS IS" AND ALL EXPRESS OR IMPLIED CONDITIONS,
- REPRESENTATIONS AND WARRANTIES, INCLUDING ANY IMPLIED WARRANTY OF
- MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE OR NON-INFRINGEMENT,
- ARE DISCLAIMED, EXCEPT TO THE EXTENT THAT SUCH DISCLAIMERS ARE HELD TO BE
- LEGALLY INVALID.
- 
- Copyright © 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
- California 95054, Etats-Unis. Tous droits réservés.
- 
- Sun Microsystems, Inc. détient les droits de propriété intellectuels
- relatifs à la technologie incorporée dans le produit qui est décrit dans
- ce document. En particulier, et ce sans limitation, ces droits de
- propriété intellectuelle peuvent inclure un ou plus des brevets américains
- listés à l'adresse http://www.sun.com/patents et un ou les brevets
- supplémentaires ou les applications de brevet en attente aux Etats -
- Unis et dans les autres pays.
- 
- Cette distribution peut comprendre des composants développés par des
- tierces parties.
- 
- Sun, Sun Microsystems, le logo Sun et Java sont des marques de fabrique
- ou des marques déposées de Sun Microsystems, Inc. aux Etats-Unis et dans
- d'autres pays.
- 
- UNIX est une marque déposée aux Etats-Unis et dans d'autres pays et
- licenciée exlusivement par X/Open Company, Ltd.
- 
- see above Les produits qui font l'objet de ce manuel d'entretien et les
- informations qu'il contient sont regis par la legislation americaine en
- matiere de controle des exportations et peuvent etre soumis au droit
- d'autres pays dans le domaine des exportations et importations.
- Les utilisations finales, ou utilisateurs finaux, pour des armes
- nucleaires, des missiles, des armes biologiques et chimiques ou du
- nucleaire maritime, directement ou indirectement, sont strictement
- interdites. Les exportations ou reexportations vers des pays sous embargo
- des Etats-Unis, ou vers des entites figurant sur les listes d'exclusion
- d'exportation americaines, y compris, mais de maniere non exclusive, la
- liste de personnes qui font objet d'un ordre de ne pas participer, d'une
- facon directe ou indirecte, aux exportations des produits ou des services
- qui sont regi par la legislation americaine en matiere de controle des
- exportations et la liste de ressortissants specifiquement designes, sont
- rigoureusement interdites.
- 
- LA DOCUMENTATION EST FOURNIE "EN L'ETAT" ET TOUTES AUTRES CONDITIONS,
- DECLARATIONS ET GARANTIES EXPRESSES OU TACITES SONT FORMELLEMENT EXCLUES,
- DANS LA MESURE AUTORISEE PAR LA LOI APPLICABLE, Y COMPRIS NOTAMMENT TOUTE
- GARANTIE IMPLICITE RELATIVE A LA QUALITE MARCHANDE, A L'APTITUDE A UNE
- UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
-*/
+package com.sun.sgs.example.battleboard.client;
 
-package com.sun.gi.apps.battleboard.client;
-
-import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
-import com.sun.gi.apps.battleboard.BattleBoard;
-import com.sun.gi.apps.battleboard.client.swing.Client;
-import com.sun.gi.comm.users.client.ClientChannel;
-import com.sun.gi.comm.users.client.ClientChannelListener;
-import com.sun.gi.comm.users.client.ClientConnectionManager;
+import com.sun.sgs.client.ClientChannel;
+import com.sun.sgs.client.ClientChannelListener;
+import com.sun.sgs.client.ServerSession;
+import com.sun.sgs.client.SessionId;
+import com.sun.sgs.example.battleboard.BattleBoard;
+import com.sun.sgs.example.battleboard.client.swing.Client;
 
 public class BattleBoardPlayer implements ClientChannelListener {
 
@@ -101,7 +19,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
         Logger.getLogger("com.sun.gi.apps.battleboard.client");
 
     private final ClientChannel channel;
-    private final ClientConnectionManager connectionManager;
+    private final ServerSession serverSession;
     private Display display;
     private List<String> playerNames = null;
     private List<BattleBoard> playerBoards = null;
@@ -129,16 +47,15 @@ public class BattleBoardPlayer implements ClientChannelListener {
      * connectionManager, ClientChannel, and player name.
      * <p>
      * 
-     * @param connectionManager the ClientConnectionManager for this
-     * game
+     * @param serverSession the ServerSession for this game
      * 
      * @param chan the ClientChannel for this game
      * 
      * @param playerName the name of the player
      */
-    public BattleBoardPlayer(ClientConnectionManager connectionManager,
+    public BattleBoardPlayer(ServerSession serverSession,
             ClientChannel chan, String playerName, boolean swingMode) {
-        this.connectionManager = connectionManager;
+        this.serverSession = serverSession;
         this.channel = chan;
         this.myName = playerName;
 	this.swingMode = swingMode;
@@ -160,6 +77,8 @@ public class BattleBoardPlayer implements ClientChannelListener {
 
     /**
      * {@inheritDoc}
+     * <p>
+     * TODO need to port to new API
      */
     public void playerLeft(byte[] playerID) {
         log.fine("playerLeft on " + channel.getName());
@@ -167,7 +86,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
         if (gameState != GameState.GAME_OVER) {
             gameState = GameState.GAME_OVER;
             log.info("Exiting because the other player left");
-            connectionManager.disconnect();
+            serverSession.logout(false);
             System.exit(-1);
         }
     }
@@ -175,12 +94,14 @@ public class BattleBoardPlayer implements ClientChannelListener {
     /**
      * {@inheritDoc}
      */
-    public void dataArrived(byte[] uid, ByteBuffer data, boolean reliable) {
-        log.fine("dataArrived on " + channel.getName());
+    public void receivedMessage(ClientChannel chan, SessionId sender,
+            byte[] message)
+    {
+        log.fine("dataArrived on " + chan.getName());
+        
+        assert chan.equals(channel);
 
-        byte[] bytes = new byte[data.remaining()];
-        data.get(bytes);
-        String text = new String(bytes);
+        String text = new String(message);
 
         log.finer("dataArrived: (" + text + ")");
 
@@ -196,8 +117,9 @@ public class BattleBoardPlayer implements ClientChannelListener {
     /**
      * {@inheritDoc}
      */
-    public void channelClosed() {
-        log.fine("channel " + channel.getName() + " closed");
+    public void leftChannel(ClientChannel chan) {
+        log.fine("channel " + chan.getName() + " closed");
+        assert chan.equals(channel);
     }
 
     /**
@@ -255,7 +177,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
                 display.message(playerBoards.get(0).getPlayerName() + " WINS!");
             }
             gameState = GameState.GAME_OVER;
-            connectionManager.disconnect();
+            serverSession.logout(false);
             display.gameOver();
         }
     }
@@ -384,9 +306,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
         String[] move = display.getMove();
 
         if ((move.length == 1) && "pass".equals(move[0])) {
-            ByteBuffer buf = ByteBuffer.wrap("pass".getBytes());
-            buf.position(buf.limit());
-            connectionManager.sendToServer(buf, true);
+            serverSession.send("pass".getBytes());
         } else if (move.length == 3) {
             String bombedPlayer = move[0];
             int x = Integer.parseInt(move[1]);
@@ -394,14 +314,10 @@ public class BattleBoardPlayer implements ClientChannelListener {
 
             String moveMessage = "move " + bombedPlayer + " " + x + " " + y;
 
-            ByteBuffer buf = ByteBuffer.wrap(moveMessage.getBytes());
-            buf.position(buf.limit());
-            connectionManager.sendToServer(buf, true);
+            serverSession.send(moveMessage.getBytes());
         } else {
             display.message("Improper move.  Passing instead....");
-            ByteBuffer buf = ByteBuffer.wrap("pass".getBytes());
-            buf.position(buf.limit());
-            connectionManager.sendToServer(buf, true);
+            serverSession.send("pass".getBytes());
         }
         return GameState.END_MOVE;
     }
@@ -588,4 +504,5 @@ public class BattleBoardPlayer implements ClientChannelListener {
     public boolean lost() {
         return lost;
     }
+
 }

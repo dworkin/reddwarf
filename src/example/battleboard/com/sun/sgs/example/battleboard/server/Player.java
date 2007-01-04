@@ -101,7 +101,7 @@ public class Player
         game.addHistory(history);
     }
 
-    public void gameEnded(ManagedReference gameRef) {
+    public void gameEnded(Game game) {
         myGameRef = null;
     }
 

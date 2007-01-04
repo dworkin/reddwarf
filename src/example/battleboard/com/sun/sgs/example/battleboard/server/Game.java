@@ -1,7 +1,6 @@
 package com.sun.sgs.example.battleboard.server;
 
 import java.io.Serializable;
-import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -73,13 +72,6 @@ public class Game implements ManagedObject, Serializable {
     private ManagedReference currentPlayerRef;
 
     /*
-     * The number of users currently attached to the game.  This is
-     * used to decide when there are enough players to actually begin
-     * play.
-     */
-    private int userCount;
-
-    /*
      * The default BattleBoard game is defined in the {@link
      * BattleBoard} class.
      * 
@@ -145,8 +137,9 @@ public class Game implements ManagedObject, Serializable {
         playerBoards = new HashMap<String, ManagedReference>();
         for (ManagedReference playerRef : players) {
             Player player = playerRef.get(Player.class);
+            Board board = createBoard(player.getPlayerName());
             playerBoards.put(player.getPlayerName(),
-		    createBoard(player.getPlayerName()));
+        	    dataMgr.createReference(board));
         }
 
 	/*
@@ -157,65 +150,66 @@ public class Game implements ManagedObject, Serializable {
 
         ChannelManager channelMgr = AppContext.getChannelManager();
         channel = channelMgr.createChannel(gameName, null, Delivery.RELIABLE);
-
-	userCount = 0;
     }
 
     /**
      * Creates a new Game object for the given players.
      * 
-     * @param players the set of GLOReferences to players
+     * @param players the set of ManagedReferences to players
      * 
-     * @return the GLOReference for a new Game
+     * @return the new Game
      */
-    public static ManagedReference create(Set<ManagedReference> players) {
-	ManagedReference gameRef = task.createGLO(new Game(players));
-	Channel channel = gameRef.get(task).channel;
+    public static Game create(Set<ManagedReference> players) {
+	Game game = new Game(players);
 
-	/*
-	 * Join all of the players onto this game's channel.
-	 */
+	// Join all of the players onto this game's channel.
         for (ManagedReference playerRef : players) {
-            Player player = playerRef.get(task);
-            player.gameStarted(gameRef);
-            task.join(player.getUID(), channel);
+            Player player = playerRef.get(Player.class);
+            player.gameStarted(game);
+            game.channel.join(player.getSession(), null);
+            game.sendJoinOK(player);
         }
 
-	return gameRef;
+        if (log.isLoggable(Level.FINEST)) {
+            log.finest("playerBoards size " + game.playerBoards.size());
+            for (Map.Entry<String, ManagedReference> x :
+                    game.playerBoards.entrySet())
+	    {
+                log.finest("playerBoard[" + x.getKey() + "]=`" +
+			x.getValue() + "'");
+            }
+        }
+        
+        game.sendTurnOrder();
+        game.startNextMove();
+
+	return game;
+    }
+    
+    private String boardNameForPlayer(String playerName) {
+        return gameName + "-board-" + playerName;
     }
 
     /**
-     * Creates a board for the given playerName.  <p>
-     *
+     * Creates a board for the given playerName.
+     * <p>
      * The city locations are chosen randomly.
      *
      * @param playerName the name of the player
      *
-     * @return a {@link GLOReference} for the new {@link Board}.
+     * @return a new {@link Board} for the Player.
      */
-    protected ManagedReference createBoard(String playerName) {
-        SimTask task = SimTask.getCurrent();
-
+    protected Board createBoard(String playerName) {
         Board board = new Board(playerName, boardWidth, boardHeight, numCities);
         board.populate();
 
-        ManagedReference ref = task.createGLO(board, gameName +
-		"-board-" + playerName);
+        String boardName = boardNameForPlayer(playerName);
+        
+        DataManager dataMgr = AppContext.getDataManager();
+        dataMgr.setBinding(boardName, board);
 
-        log.finer("createBoard[" + playerName + "] returning " + ref);
-        return ref;
-    }
-
-    /**
-     * Sends the "ok" message, which indicates to a player that he or
-     * she has been chosen to join a game, to all of the players.
-     */
-    protected void sendJoinOK() {
-        SimTask task = SimTask.getCurrent();
-        for (ManagedReference ref : players) {
-            Player player = ref.peek(task);
-            sendJoinOK(player);
-        }
+        log.finer("createBoard[" + playerName + "] returning " + board);
+        return board;
     }
 
     /**
@@ -227,14 +221,13 @@ public class Game implements ManagedObject, Serializable {
      * @param player the player to whom to send the message
      */
     protected void sendJoinOK(Player player) {
-        SimTask task = SimTask.getCurrent();
 
         StringBuffer buf = new StringBuffer("ok ");
 
         log.finer("playerBoards size " + playerBoards.size());
 
-        GLOReference boardRef = playerBoards.get(player.getPlayerName());
-        Board board = (Board) boardRef.peek(task);
+        ManagedReference boardRef = playerBoards.get(player.getPlayerName());
+        Board board = boardRef.get(Board.class);
 
         buf.append(board.getWidth() + " ");
         buf.append(board.getHeight() + " ");
@@ -248,22 +241,17 @@ public class Game implements ManagedObject, Serializable {
             }
         }
 
-        ByteBuffer byteBuffer = ByteBuffer.wrap(buf.toString().getBytes());
-        byteBuffer.position(byteBuffer.limit());
-
-        task.sendData(channel, new UserID[] { player.getUID() },
-                byteBuffer.asReadOnlyBuffer(), true);
+        channel.send(player.getSession(), buf.toString().getBytes());
     }
 
     /**
      * Broadcasts the turn order to all of the players.
      */
     protected void sendTurnOrder() {
-        SimTask task = SimTask.getCurrent();
         StringBuffer buf = new StringBuffer("turn-order ");
 
         for (ManagedReference playerRef : players) {
-            Player player = playerRef.peek(task);
+            Player player = playerRef.get(Player.class);
             buf.append(" " + player.getPlayerName());
         }
 
@@ -274,12 +262,11 @@ public class Game implements ManagedObject, Serializable {
      * Starts the next move.
      */
     protected void startNextMove() {
-        SimTask task = SimTask.getCurrent();
         log.finest("Running Game.startNextMove");
 
         currentPlayerRef = players.removeFirst();
         players.addLast(currentPlayerRef);
-        Player player = currentPlayerRef.peek(task);
+        Player player = currentPlayerRef.get(Player.class);
         sendMoveStarted(player);
     }
 
@@ -317,8 +304,7 @@ public class Game implements ManagedObject, Serializable {
      * @param tokens the tokens of the command
      */
     protected void handleMove(Player player, String[] tokens) {
-        SimTask task = SimTask.getCurrent();
-
+	
         String bombedPlayerNick = tokens[1];
 
         ManagedReference boardRef = playerBoards.get(bombedPlayerNick);
@@ -328,7 +314,8 @@ public class Game implements ManagedObject, Serializable {
             handlePass(player);
             return;
         }
-        Board board = boardRef.get(task);
+        
+        Board board = boardRef.get(Board.class);
 
         int x = Integer.parseInt(tokens[2]);
         int y = Integer.parseInt(tokens[3]);
@@ -398,10 +385,10 @@ public class Game implements ManagedObject, Serializable {
              */
             if (players.size() == 1) {
                 ManagedReference playerRef = players.get(0);
-                Player winner = playerRef.peek(task);
+                Player winner = playerRef.get(Player.class);
                 ManagedReference historyRef =
 			nameToHistory.get(winner.getUserName());
-                PlayerHistory history = historyRef.get(task);
+                PlayerHistory history = historyRef.get(PlayerHistory.class);
                 history.win();
                 log.finer(winner.getUserName() + " summary: " +
 			history.toString());
@@ -420,7 +407,6 @@ public class Game implements ManagedObject, Serializable {
      * @param loserNick the nickname of the losing player
      */
     protected void handlePlayerLoss(String loserNick) {
-        SimTask task = SimTask.getCurrent();
 
         playerBoards.remove(loserNick);
 
@@ -428,7 +414,7 @@ public class Game implements ManagedObject, Serializable {
         Player loser = null;
         while (i.hasNext()) {
             ManagedReference ref = i.next();
-            Player player = ref.peek(task);
+            Player player = ref.get(Player.class);
             if (loserNick.equals(player.getPlayerName())) {
                 loser = player;
                 spectators.add(ref);
@@ -445,7 +431,7 @@ public class Game implements ManagedObject, Serializable {
         ManagedReference historyRef =
 		nameToHistory.get(loser.getUserName());
 
-        PlayerHistory history = historyRef.get(task);
+        PlayerHistory history = historyRef.get(PlayerHistory.class);
         history.lose();
 
         log.fine(loserNick + " summary: " + history.toString());
@@ -458,16 +444,13 @@ public class Game implements ManagedObject, Serializable {
      *
      * @param tokens the components of the response
      */
-    protected void handleResponse(ManagedReference playerRef,
-            String[] tokens) {
+    protected void handleResponse(Player player, String[] tokens) {
 
-        if (!playerRef.equals(currentPlayerRef)) {
-            log.severe("PlayerRef != CurrentPlayerRef");
+        if (!player.equals(currentPlayerRef.get(Player.class))) {
+            log.severe("Player != CurrentPlayer");
             return;
         }
 
-        SimTask task = SimTask.getCurrent();
-        Player player = playerRef.peek(task);
         String cmd = tokens[0];
 
         if ("pass".equals(cmd)) {
@@ -488,27 +471,13 @@ public class Game implements ManagedObject, Serializable {
      * @param buf the message to broadcast
      */
     private void broadcast(StringBuffer buf) {
-        SimTask task = SimTask.getCurrent();
-        UserID[] uids = new UserID[players.size() + spectators.size()];
 
-        int i = 0;
-        for (ManagedReference ref : players) {
-            Player player = ref.peek(task);
-            uids[i++] = player.getUID();
-        }
+        byte[] message = buf.toString().getBytes();
 
-        for (ManagedReference ref : spectators) {
-            Player player = ref.peek(task);
-            uids[i++] = player.getUID();
-        }
-
-        ByteBuffer byteBuffer = ByteBuffer.wrap(buf.toString().getBytes());
-        byteBuffer.position(byteBuffer.limit());
-
-        log.finest("Game: Broadcasting " + byteBuffer.position() +
+        log.finest("Game: Broadcasting " + message.length +
 		" bytes on " + channel);
 
-        task.sendData(channel, uids, byteBuffer.asReadOnlyBuffer(), true);
+        channel.send(message);
     }
 
     /**
@@ -517,13 +486,11 @@ public class Game implements ManagedObject, Serializable {
      * 
      * When the game is done, each player is updated with a win or loss.
      * 
-     * @param playerName the name of the player
-     * 
-     * @param historyRef a GLOReference to the PlayerHistory instance
-     * for the player with the given name
+     * @param history the PlayerHistory instance for the player
      */
     public void addHistory(PlayerHistory history) {
-        nameToHistory.put(history.getPlayerName(), history);
+        nameToHistory.put(history.getPlayerName(),
+        	AppContext.getDataManager().createReference(history));
     }
 
     /**
@@ -541,96 +508,27 @@ public class Game implements ManagedObject, Serializable {
 
         String text = new String(message);
 
-        log.finest("userDataReceived: (" + text + ")");
+        log.finest("receivedMessage: (" + text + ")");
         String[] tokens = text.split("\\s+");
         if (tokens.length == 0) {
             log.warning("empty message");
             return;
         }
 
-        ManagedReference playerRef = Player.getRef(uid);
-
-        if (playerRef == null) {
-            log.warning("No Player found for uid " + uid);
-        }
-
-        handleResponse(playerRef, tokens);
-    }
-
-    // Channel Join/Leave methods
-
-    /**
-     * Waits until we get joinedChannel from all our players before
-     * starting the game.
-     *
-     * The Player GLO's userJoined handler forwards these events to
-     * us since we want to collect them across the entire channel.
-     *
-     * @param cid the ChannelID
-     *
-     * @param uid the UserID of the joiner
-     */
-    public void joinedChannel(Channel cid, UserID uid) {
-        log.finer("Game: User " + uid + " joined channel " + cid);
-
-	userCount++;
-
-	if (userCount < players.size()) {
-	    return;
-	}
-
-        log.finer("Everyone's on the channel, start the game");
-
-        SimTask task = SimTask.getCurrent();
-
-        if (log.isLoggable(Level.FINE)) {
-            log.finest("playerBoards size " + playerBoards.size());
-            for (Map.Entry<String, ManagedReference> x :
-			playerBoards.entrySet())
-	    {
-                log.finest("playerBoard[" + x.getKey() + "]=`" +
-			x.getValue() + "'");
-            }
-        }
-
-        sendJoinOK();
-        sendTurnOrder();
-        startNextMove();
+        handleResponse(player, tokens);
     }
 
     /**
-     * Waits until we get leftChannel from all our players before
+     * Waits until all our players leave before
      * deleting the game.
-     *
-     * The Player GLO's userLeft handler forwards these events to
-     * us since we want to collect them across the entire channel.
-     *
-     * @param cid the ChannelID
-     *
-     * @param uid the UserID of the departing user
      */
     public void playerDisconnected(Player player) {
-        log.finer("Game: User " + uid + " left channel " + cid);
+        log.finer("Game: player " + player + " left " + this);
 
-        SimTask task = SimTask.getCurrent();
-
-        ManagedReference playerRef = Player.getRef(uid);
-
-        if (playerRef == null) {
-            log.warning("No PlayerRef found for uid " + uid);
-        }
-
-        // Tell the player this game is over
-	Player player = playerRef.get(task);
-        if (player == null) {
-            log.warning("No Player found for uid " + uid);
-        }
-
-	log.finer("Game end for for " +
-	    player.getPlayerName() + " (" +
-	    player.getUserName() + ") uid " + uid);
-
-	player.gameEnded(task.lookupReferenceFor(this));
+	player.gameEnded(this);
+        
+        DataManager dataMgr = AppContext.getDataManager();
+        ManagedReference playerRef = dataMgr.createReference(player);
 
 	players.remove(playerRef);
 	spectators.remove(playerRef);
@@ -649,11 +547,15 @@ public class Game implements ManagedObject, Serializable {
 
 	    // Destroy all the players' boards
 	    for (ManagedReference ref : playerBoards.values()) {
-		task.destroyGLO(ref);
+                Board board = ref.get(Board.class);
+                String boardName = boardNameForPlayer(player.getPlayerName());
+                dataMgr.removeBinding(boardName);
+                dataMgr.removeObject(board);
 	    }
 
-	    // Destroy this Game GLO
-	    task.destroyGLO(task.lookupReferenceFor(this));
+	    // Destroy this Game
+            dataMgr.removeBinding(this.gameName);
+            dataMgr.removeObject(this);
 	}
     }
 }
