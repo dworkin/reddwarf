@@ -29,6 +29,8 @@ import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.util.DummyComponentRegistry;
+import com.sun.sgs.test.util.DummyTaskScheduler;
+import com.sun.sgs.test.util.DummyTaskService;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 import java.io.ByteArrayInputStream;
@@ -83,7 +85,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     /** A per-test database directory, or null if not created. */
     private String directory;
     
-    private DummyTransactionProxy txnProxy;
+    private static DummyTransactionProxy txnProxy = new DummyTransactionProxy();
 
     private DummyComponentRegistry registry;
 
@@ -113,16 +115,17 @@ public class TestClientSessionServiceImpl extends TestCase {
     protected void setUp() throws Exception {
 	passed = false;
 	System.err.println("Testcase: " + getName());
-	txnProxy = new DummyTransactionProxy();
+	//txnProxy = new DummyTransactionProxy();
 	createTransaction();
 	registry = new DummyComponentRegistry();
 	dataService = createDataService(registry);
 	dataService.configure(registry, txnProxy);
 	registry.setComponent(DataService.class, dataService);
 	registry.registerAppContext();
-	taskService = createTaskService();
+	taskService = new DummyTaskService();
 	registry.setComponent(TaskService.class, taskService);
-	taskScheduler = createTaskScheduler();
+	txnProxy.setComponent(TaskService.class, taskService);
+	taskScheduler = new DummyTaskScheduler();
 	registry.setComponent(TaskScheduler.class, taskScheduler);
 	identityManager = createIdentityManager();
 	registry.setComponent(IdentityManager.class, identityManager);
@@ -243,20 +246,6 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     /**
-     * Creates a task service.
-     */
-    private DummyTaskService createTaskService() {
-	return new DummyTaskService();
-    }
-
-    /**
-     * Creates a task scheduler.
-     */
-    private DummyTaskScheduler createTaskScheduler() {
-	return new DummyTaskScheduler();
-    }
-
-    /**
      * Creates an identity manager.
      */
     private DummyIdentityManager createIdentityManager() {
@@ -277,114 +266,6 @@ public class TestClientSessionServiceImpl extends TestCase {
 	return new ClientSessionServiceImpl(serviceProps, registry);
     }
 
-    private static class DummyTaskService implements TaskService {
-
-	public String getName() {
-	    return toString();
-	}
-
-	public void configure(ComponentRegistry registry, TransactionProxy proxy) {
-	}
-
-	public PeriodicTaskHandle schedulePeriodicTask(
-	    Task task, long delay, long period)
-	{
-	    throw new AssertionError("Not implemented");
-	}
-
-	public void scheduleTask(Task task) {
-	    try {
-		task.run();
-	    } catch (Exception e) {
-		System.err.println(
-		    "DummyTaskService.scheduleTask exception: " + e);
-		e.printStackTrace();
-		throw (RuntimeException) (new RuntimeException()).initCause(e);
-	    }
-	}
-
-	public void scheduleTask(Task task, long delay) {
-	    scheduleTask(task);
-	}
-	
-	public void scheduleNonDurableTask(KernelRunnable task) {
-	    try {
-		task.run();
-	    } catch (Exception e) {
-		System.err.println(
-		    "DummyTaskService.scheduleNonDurableTask exception: " + e);
-		e.printStackTrace();
-		throw (RuntimeException) (new RuntimeException()).initCause(e);
-	    }
-	}
-	
-	public void scheduleNonDurableTask(KernelRunnable task, long delay) {
-	    scheduleNonDurableTask(task);
-	}
-	public void scheduleNonDurableTask(KernelRunnable task,
-					   Priority priority)
-	{
-	    scheduleNonDurableTask(task);
-	}
-    }
-
-    private static class DummyTaskScheduler implements TaskScheduler {
-
-	public TaskReservation reserveTask(KernelRunnable task, TaskOwner owner) {
-	    throw new AssertionError("Not implemented");
-	}
-
-	public TaskReservation reserveTask(KernelRunnable task, TaskOwner owner,
-					   Priority priority)
-	{
-	    throw new AssertionError("Not implemented");
-	}
-
-	public TaskReservation reserveTask(KernelRunnable task, TaskOwner owner,
-					   long startTime)
-	{
-	    throw new AssertionError("Not implemented");
-	}
-
-	public TaskReservation reserveTasks(Collection<? extends KernelRunnable>
-					    tasks, TaskOwner owner)
-	{
-	    throw new AssertionError("Not implemented");
-	}
-
-	public void scheduleTask(KernelRunnable task, TaskOwner owner) {
-	    try {
-		task.run();
-	    } catch (Exception e) {
-		System.err.println(
-		   "DummyTaskScheduler.scheduleTask exception: " + e);
-		e.printStackTrace();
-		throw (RuntimeException) (new RuntimeException()).initCause(e);
-	    }
-	}
-
-	public void scheduleTask(KernelRunnable task, TaskOwner owner,
-				 Priority priority)
-	{
-	    scheduleTask(task, owner);
-	}
-
-	public void scheduleTask(KernelRunnable task, TaskOwner owner,
-				 long startTime)
-	{
-	    scheduleTask(task, owner);
-	}
-
-	public RecurringTaskHandle scheduleRecurringTask(KernelRunnable task,
-							 TaskOwner owner,
-							 long startTime,
-							 long period)
-	{
-	    throw new AssertionError("Not implemented");
-	}
-
-	
-    }
 
     private static class DummyIdentityManager implements IdentityManager {
 	public Identity authenticateIdentity(IdentityCredentials credentials) {
