@@ -205,14 +205,14 @@ public final class DataServiceImpl
 	    throw new NullPointerException("The arguments must not be null");
 	}
 	synchronized (lock) {
-	    if (this.txnProxy != null) {
+	    if (txnProxy != null) {
 		throw new IllegalStateException("Already configured");
 	    }
 	    txnProxy = proxy;
 	    addAbortAction(
 		new Runnable() {
 		    public void run() {
-			DataServiceImpl.this.txnProxy = null;
+			txnProxy = null;
 		    }
 		});
 	    DataServiceHeader header;
