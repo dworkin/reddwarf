@@ -138,7 +138,6 @@ public interface SgsProtocol {
      * Channel send request.
      * <ul>
      * <li> (String) name
-     * <li> (long) sequence number
      * <li> (short) number of recipients (0 = all)
      * <li> If number of recipients > 0, for each recipient:
      * <ul>

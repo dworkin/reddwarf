@@ -37,8 +37,9 @@ final class ChannelState implements ManagedObject, Serializable {
      * and whose values are per-session ChannelListeners (null values
      * allowed).
      */
-    final Map<ClientSession, WrappedSerializable<ChannelListener>> sessions =
-	new HashMap<ClientSession, WrappedSerializable<ChannelListener>>();
+    private final
+	Map<ClientSession, WrappedSerializable<ChannelListener>> listeners =
+	    new HashMap<ClientSession, WrappedSerializable<ChannelListener>>();
 
     /**
      * Constructs an instance of this class with the specified name,
@@ -59,7 +60,7 @@ final class ChannelState implements ManagedObject, Serializable {
      */
     Collection<ClientSession> getSessions() {
 	Collection<ClientSession> collection = new ArrayList<ClientSession>();
-	for (ClientSession session : sessions.keySet()) {
+	for (ClientSession session : listeners.keySet()) {
 	    collection.add(session);
 	}
 	return collection;
@@ -90,22 +91,47 @@ final class ChannelState implements ManagedObject, Serializable {
 
     /* -- other methods -- */
 
-    void setListener(ClientSession session, ChannelListener listener) {
+    boolean hasSession(ClientSession session) {
+	return listeners.containsKey(session);
+    }
+
+    boolean hasSessions() {
+	return !listeners.isEmpty();
+    }
+
+    void addSession(ClientSession session, ChannelListener listener) {
 	WrappedSerializable<ChannelListener> wrappedListener =
 	    listener != null ?
 	    new WrappedSerializable<ChannelListener>(listener) :
 	    null;
 	
-	sessions.put(session, wrappedListener);
+	listeners.put(session, wrappedListener);
+    }
+
+    void removeSession(ClientSession session) {
+	listeners.remove(session);
+    }
+
+    void removeAll() {
+	listeners.clear();
     }
 
     ChannelListener getListener() {
 	return
 	    listener != null  ?
-	    listener.get(ChannelListener.class):
+	    listener.get(ChannelListener.class) :
 	    null;
     }
 
+    ChannelListener getListener(ClientSession session) {
+	WrappedSerializable<ChannelListener> listener =
+	    listeners.get(session);
+	return
+	    listener != null ?
+	    listener.get(ChannelListener.class) :
+	    null;
+    }
+    
     /* -- Serialization methods -- */
 
     private void writeObject(ObjectOutputStream out)
