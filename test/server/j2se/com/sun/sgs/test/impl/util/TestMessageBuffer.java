@@ -1,6 +1,6 @@
-package com.sun.sgs.test.impl.service.session;
+package com.sun.sgs.test.impl.util;
 
-import com.sun.sgs.impl.service.session.MessageBuffer;
+import com.sun.sgs.impl.util.MessageBuffer;
 import junit.framework.TestCase;
 
 public class TestMessageBuffer extends TestCase {
@@ -130,6 +130,68 @@ public class TestMessageBuffer extends TestCase {
 	String s = "Supercalafragilisticexpalidocious";
 	MessageBuffer buf = new MessageBuffer(MessageBuffer.getSize(s));
 	buf.putString(s);
+	buf.rewind();
+	String newString = buf.getString();
+	System.err.println("newString: " + newString);
+	if (!s.equals(newString)) {
+	    fail("Expected: " + s + ", got: " + newString);
+	}
+    }
+
+    public void testPutStringAndInt() {
+	String s = "zowie!";
+	int x = 1024;
+	MessageBuffer buf = new MessageBuffer(MessageBuffer.getSize(s) + 4);
+	buf.putString(s);
+	buf.putInt(x);
+	buf.rewind();
+	String newString = buf.getString();
+	System.err.println("newString: " + newString);
+	int newX = buf.getInt();
+	System.err.println("newX: " + newX);
+	if (!s.equals(newString)) {
+	    fail("Expected string: " + s + ", got: " + newString);
+	}
+	if (x != newX) {
+	    fail("Expected int: " + x + ", got: " + newX);
+	}
+	if (buf.position() != buf.limit()) {
+	    fail("limit not equal to position; limit: " + buf.limit() +
+		 ", position: " + buf.position());
+	}
+    }
+
+    public void testPutStringGetUTF8() {
+	String s = "The quick brown fox jumps over the lazy dog.";
+	MessageBuffer buf = new MessageBuffer(MessageBuffer.getSize(s));
+	buf.putString(s);
+	buf.rewind();
+	short utfLen = buf.getShort();
+	byte[] utfBytes = buf.getBytes(utfLen);
+	String newString;
+	try {
+	    newString = new String(utfBytes, "UTF-8");
+	} catch (Exception e) {
+	    throw new RuntimeException(e);
+	}
+	System.err.println(newString);
+	if (!s.equals(newString)) {
+	    fail("Expected: " + s + ", got: " + newString);
+	}
+    }
+
+    public void testPutUTF8GetString() {
+	String s = "The quick brown fox jumps over the lazy dog.";
+	byte[] utfBytes;
+	try {
+	    utfBytes = s.getBytes("UTF-8");
+	} catch (Exception e) {
+	    throw new RuntimeException(e);
+	}
+	int utfLen = utfBytes.length;
+	MessageBuffer buf = new MessageBuffer(2 + utfLen);
+	buf.putShort(utfLen).
+	    putBytes(utfBytes);
 	buf.rewind();
 	String newString = buf.getString();
 	System.err.println("newString: " + newString);

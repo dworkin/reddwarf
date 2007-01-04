@@ -6,9 +6,9 @@ import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
-import com.sun.sgs.impl.service.session.MessageBuffer;
 import com.sun.sgs.impl.service.session.SgsProtocol;
 import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.util.MessageBuffer;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.service.SgsClientSession;
 import java.io.IOException;
@@ -33,6 +33,8 @@ final class ChannelImpl implements Channel, Serializable {
     private final static LoggerWrapper logger =
 	new LoggerWrapper(
 	    Logger.getLogger(ChannelImpl.class.getName()));
+
+    private final static byte[] EMPTY_ID = new byte[0];
 
     /** Transaction-related context information. */
     private final Context context;
@@ -100,12 +102,14 @@ final class ChannelImpl implements Channel, Serializable {
 		throw new IllegalArgumentException(
 		    "unexpected ClientSession type: " + session);
 	    }
-	    if (state.sessions.get(session) == null) {
-		context.dataService.markForUpdate(state);
-		state.setListener(session, listener);
+	    if (state.hasSession(session)) {
+		return;
 	    }
 	    
-	    submitNonTransactionalTask(new KernelRunnable() {
+	    context.dataService.markForUpdate(state);
+	    state.addSession(session, listener);
+	    
+	    scheduleNonTransactionalTask(new KernelRunnable() {
 		public void run() {
 		    int nameSize = MessageBuffer.getSize(state.name);
 		    MessageBuffer buf = new MessageBuffer(3 + nameSize);
@@ -145,12 +149,15 @@ final class ChannelImpl implements Channel, Serializable {
 		throw new IllegalArgumentException(
 		    "unexpected ClientSession type: " + session);
 	    }
-	    if (state.sessions.get(session) != null) {
-		context.dataService.markForUpdate(state);
-		state.sessions.remove(session);
+
+	    if (!state.hasSession(session)) {
+		return;
 	    }
+	    
+	    context.dataService.markForUpdate(state);
+	    state.removeSession(session);
 	
-	    submitNonTransactionalTask(new KernelRunnable() {
+	    scheduleNonTransactionalTask(new KernelRunnable() {
 		public void run() {
 		    int nameSize = MessageBuffer.getSize(state.name);
 		    MessageBuffer buf = new MessageBuffer(3 + nameSize);
@@ -177,14 +184,15 @@ final class ChannelImpl implements Channel, Serializable {
     public void leaveAll() {
 	try {
 	    checkClosed();
-	    if (!state.sessions.isEmpty()) {
-		context.dataService.markForUpdate(state);
-		state.sessions.clear();
+	    if (!state.hasSessions()) {
+		return;
 	    }
+	    context.dataService.markForUpdate(state);
+	    state.removeAll();
 
 	    final Collection<ClientSession> sessions = getSessions();
 
-	    submitNonTransactionalTask(new KernelRunnable() {
+	    scheduleNonTransactionalTask(new KernelRunnable() {
 		public void run() {
 		    int nameSize = MessageBuffer.getSize(state.name);
 		    MessageBuffer buf = new MessageBuffer(3 + nameSize);
@@ -213,7 +221,7 @@ final class ChannelImpl implements Channel, Serializable {
     /** {@inheritDoc} */
     public boolean hasSessions() {
 	checkClosed();
-	boolean hasSessions = !state.sessions.isEmpty();
+	boolean hasSessions = state.hasSessions();
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST, "hasSessions returns {0}", hasSessions);
 	}
@@ -224,7 +232,7 @@ final class ChannelImpl implements Channel, Serializable {
     public Collection<ClientSession> getSessions() {
 	checkClosed();
 	Collection<ClientSession> sessions =
-	    Collections.unmodifiableCollection(state.sessions.keySet());	
+	    Collections.unmodifiableCollection(state.getSessions());
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST, "getSessions returns {0}", sessions);
 	}
@@ -233,44 +241,90 @@ final class ChannelImpl implements Channel, Serializable {
 
     /** {@inheritDoc} */
     public void send(byte[] message) {
-	checkClosed();
-	if (message == null) {
-	    throw new NullPointerException("null message");
+	try {
+	    checkClosed();
+	    if (message == null) {
+		throw new NullPointerException("null message");
+	    }
+	    scheduleNonTransactionalTask(
+		new SendTask(EMPTY_ID, state.getSessions(), message,
+			     nextSequenceNumber()));
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST, "send message:{0} returns", message);
+	    }
+	    
+	} catch (RuntimeException e) {
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.logThrow(
+		    Level.FINEST, e, "send message:{0} throws", message);
+	    }
+	    throw e;
 	}
-	submitNonTransactionalTask(
-	    new SendTask(state.getSessions(), message));
     }
 
     /** {@inheritDoc} */
-    public void send(ClientSession recipient, byte[] message) { 
-	checkClosed();
-	if (recipient == null) {
-	    throw new NullPointerException("null recipient");
-	} else if (message == null) {
-	    throw new NullPointerException("null message");
-	}
+    public void send(ClientSession recipient, byte[] message) {
+	try {
+	    checkClosed();
+	    if (recipient == null) {
+		throw new NullPointerException("null recipient");
+	    } else if (message == null) {
+		throw new NullPointerException("null message");
+	    }
 	
-	Collection<ClientSession> sessions = new ArrayList<ClientSession>();
-	sessions.add(recipient);
-	submitNonTransactionalTask(new SendTask(sessions, message));
+	    Collection<ClientSession> sessions = new ArrayList<ClientSession>();
+	    sessions.add(recipient);
+	    scheduleNonTransactionalTask(
+		new SendTask(EMPTY_ID, sessions, message,
+			     nextSequenceNumber()));
+	    
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(
+		    Level.FINEST, "send recipient: {0} message:{1} returns",
+		    recipient, message);
+	    }
+	    
+	} catch (RuntimeException e) {
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.logThrow(
+		    Level.FINEST, e, "send recipient: {0} message:{1} throws",
+		    recipient, message);
+	    }
+	    throw e;
+	}
     }
 
     /** {@inheritDoc} */
     public void send(Collection<ClientSession> recipients,
 		     byte[] message)
     {
-	checkClosed();
-	if (recipients == null) {
-	    throw new NullPointerException("null recipients");
-	} else if (message == null) {
-	    throw new NullPointerException("null message");
-	}
+	try {
+	    checkClosed();
+	    if (recipients == null) {
+		throw new NullPointerException("null recipients");
+	    } else if (message == null) {
+		throw new NullPointerException("null message");
+	    }
 
-	if (recipients.isEmpty()) {
-	    return;
+	    if (!recipients.isEmpty()) {
+		scheduleNonTransactionalTask(
+		    new SendTask(EMPTY_ID, recipients, message,
+				 nextSequenceNumber()));
+	    }
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(
+		    Level.FINEST, "send recipients: {0} message:{1} returns",
+		    recipients, message);
+	    }
+	
+	} catch (RuntimeException e) {
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.logThrow(
+		    Level.FINEST, e, "send recipients: {0} message:{1} throws",
+		    recipients, message);
+	    }
+	    throw e;
 	}
-
-	submitNonTransactionalTask(new SendTask(recipients, message));
     }
 
     /** {@inheritDoc} */
@@ -367,9 +421,74 @@ final class ChannelImpl implements Channel, Serializable {
     }
 
     /**
-     * Submits a non-durable, non-transactional task.
+     * Notifies the appropriate channel listeners that the specified
+     * message was sent by the specified sender, and then schedules a
+     * non-transactional task to send the specified message to the
+     * specified recipient sessions.
      */
-    private void submitNonTransactionalTask(KernelRunnable task) {
+    void notifyAndSend(byte[] senderId,
+		       Collection<byte[]> sessionIds,
+		       byte[] message,
+		       long sequenceNumber)
+    {
+	checkContext();
+	if (channelClosed) {
+	    throw new IllegalStateException("channel is closed");
+	}
+	
+	ClientSession senderSession =
+	    context.sessionService.getClientSession(senderId);
+	if (senderSession == null) {
+	    /*
+	     * Sending session has disconnected, so return.
+	     */
+	    return;
+	}
+	
+	/*
+	 * Notify per-channel listener.
+	 */
+	ChannelListener listener = state.getListener();
+	if (listener != null) {
+	    listener.receivedMessage(this, senderSession, message);
+	}
+
+	/*
+	 * Notify per-session listeners.
+	 */
+	Collection<ClientSession> sessions;
+	if (sessionIds.size() == 0) {
+	    sessions = getSessions();
+	} else {
+	    sessions = new ArrayList<ClientSession>();
+	    for (byte[] sessionId : sessionIds) {
+		ClientSession session =
+		    context.sessionService.getClientSession(sessionId);
+		if (session != null) {
+		    sessions.add(session);
+		}
+	    }
+	}
+
+	for (ClientSession session : sessions) {
+	    listener = state.getListener(session);
+	    if (listener != null) {
+		listener.receivedMessage(this, senderSession, message);
+	    }
+	}
+
+	/*
+	 * Schedule a non-transactional task to send the channel
+	 * message to the specified client sessions.
+	 */
+	scheduleNonTransactionalTask(
+	    new SendTask(senderId, sessions, message, sequenceNumber));
+    }
+
+    /**
+     * schedules a non-durable, non-transactional task.
+     */
+    private void scheduleNonTransactionalTask(KernelRunnable task) {
 	context.taskService.scheduleNonDurableTask(task);
     }
 
@@ -390,7 +509,14 @@ final class ChannelImpl implements Channel, Serializable {
 	    // eat exception
 	}
     }
-    
+
+    /**
+     * Returns the channel service's next sequence number.
+     */
+    private long nextSequenceNumber() {
+	return context.channelService.nextSequenceNumber();
+    }
+
     /**
      * Task for sending a message to a set of clients.
      */
@@ -398,27 +524,41 @@ final class ChannelImpl implements Channel, Serializable {
 
 	private final Collection<byte[]> clients = new ArrayList<byte[]>();
 	private final byte[] message;
+	private final byte[] senderId;
+	private final long sequenceNumber;
 
-	SendTask(Collection<ClientSession> sessions, byte[] message) {
+	SendTask(byte[] senderId,
+		 Collection<ClientSession> sessions,
+		 byte[] message,
+		 long sequenceNumber)
+	{
+	    this.senderId = senderId;
 	    for (ClientSession session : sessions) {
 		this.clients.add(session.getSessionId());
 	    }
 	    this.message = message;
+	    this.sequenceNumber = sequenceNumber;
 	}
 
 	public void run() {
-	    MessageBuffer buf = new MessageBuffer(5 + message.length);
+	    MessageBuffer buf =
+		new MessageBuffer(15 + senderId.length + message.length);
 	    buf.putByte(SgsProtocol.VERSION).
 		putByte(SgsProtocol.CHANNEL_SERVICE).
-		putByte(SgsProtocol.MESSAGE_SEND).
+		putByte(SgsProtocol.CHANNEL_MESSAGE).
+		putLong(sequenceNumber).
+		putShort(senderId.length).
+		putBytes(senderId).
 		putShort(message.length).
 		putBytes(message);
+
+	    byte[] protocolMessage = buf.getBuffer();
 	    
 	    for (byte[] sessionId : clients) {
 		SgsClientSession session = 
 		    context.sessionService.getClientSession(sessionId);
 		if (session != null && session.isConnected()) {
-		    session.sendMessage(message, state.delivery);
+		    session.sendMessage(protocolMessage, state.delivery);
 		}
 	    }
 	}

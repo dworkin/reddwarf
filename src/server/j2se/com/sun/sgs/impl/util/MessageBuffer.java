@@ -1,4 +1,4 @@
-package com.sun.sgs.impl.service.session;
+package com.sun.sgs.impl.util;
 
 import java.io.UTFDataFormatException;
 
@@ -192,6 +192,52 @@ public class MessageBuffer {
     }
 
     /**
+     * Puts the specified int as four bytes (high byte first)
+     * starting in the buffer's current position, and advances the
+     * buffer's position and limit by 4.
+     *
+     * @param v an int value
+     * @return this buffer
+     * @throws IndexOutOfBoundsException if adding the int to this
+     * buffer would overflow the buffer
+     */
+    public MessageBuffer putInt(int v) {
+	if (pos+4 > capacity) {
+	    throw new IndexOutOfBoundsException();
+	}
+	putByte((v >>> 24) & 0xff);
+	putByte((v >>> 16) & 0xff);
+	putByte((v >>> 8) & 0xff);
+	putByte((v >>> 0) & 0xff);
+	return this;
+    }
+    
+    /**
+     * Puts the specified long as eight bytes (high byte first)
+     * starting in the buffer's current position, and advances the
+     * buffer's position and limit by 8.
+     *
+     * @param v a long value
+     * @return this buffer
+     * @throws IndexOutOfBoundsException if adding the long to this
+     * buffer would overflow the buffer
+     */
+    public MessageBuffer putLong(long v) {
+	if (pos+8 > capacity) {
+	    throw new IndexOutOfBoundsException();
+	}
+	putByte((byte) (v >>> 56));
+	putByte((byte) (v >>> 48));
+	putByte((byte) (v >>> 40));
+	putByte((byte) (v >>> 32));
+	putByte((byte) (v >>> 24));
+	putByte((byte) (v >>> 16));
+	putByte((byte) (v >>> 8));
+	putByte((byte) (v >>> 0));
+	return this;
+    }
+    
+    /**
      * Puts the specified string, encoded in modified UTF-8 format,
      * in the buffer starting in the buffer's the current position, and
      * advances the buffer's position and limit by the size of the
@@ -303,12 +349,56 @@ public class MessageBuffer {
 	if (pos+2 > limit) {
 	    throw new IndexOutOfBoundsException();
 	}
-
-	int b1 = getByte();
-	int b2 = getByte();
-	return (short) ((b1 << 8) + (b2 << 0));
+	
+	return (short) ((getByte() << 8) + (getByte() << 0));
     }
 
+    /**
+     * Returns an int value, composed of the next four bytes (high
+     * byte first) in this buffer, and advances the buffer's position
+     * by 4.
+     *
+     * @return the int value
+     * @throws IndexOutOfBoundsException if this buffer's limit would
+     * be reached as a result of getting the next four bytes
+     */
+    public int getInt() {
+	if (pos+4 > limit) {
+	    throw new IndexOutOfBoundsException();
+	}
+
+	return
+	    (getByte() << 24) +
+	    (getByte() << 16) +
+	    (getByte() << 8) +
+	    (getByte() << 0);
+    }
+    
+    /**
+     * Returns a long value, composed of the next eight bytes (high
+     * byte first) in this buffer, and advances the buffer's position
+     * by 8.
+     *
+     * @return the long value
+     * @throws IndexOutOfBoundsException if this buffer's limit would
+     * be reached as a result of getting the next eight bytes
+     */
+    public long getLong() {
+	if (pos+8 > limit) {
+	    throw new IndexOutOfBoundsException();
+	}
+
+	return
+	    ((long) (getByte() << 56)) +
+	    ((long) (getByte() & 255) << 48) +
+	    ((long) (getByte() & 255) << 40) +
+	    ((long) (getByte() & 255) << 32) +
+	    ((long) (getByte() & 255) << 24) +
+	    ((long) (getByte() & 255) << 16) +
+	    ((long) (getByte() & 255) << 8) +
+	    ((long) (getByte() & 255) << 0);
+    }
+    
     /**
      * Returns a char, composed of the next two bytes (high
      * byte first) in this buffer, and advances the buffer's position
@@ -323,9 +413,7 @@ public class MessageBuffer {
 	    throw new IndexOutOfBoundsException();
 	}
 
-	int b1 = getByte();
-	int b2 = getByte();
-	return (char) ((b1 << 8) + (b2 << 0));
+	return (char) ((getByte() << 8) + (getByte() << 0));
     }
 
     /**
@@ -353,7 +441,7 @@ public class MessageBuffer {
 	int utfLen = getShort();
 	int utfEnd = utfLen + pos;
 	if (utfEnd > limit) {
-	    pos = limit = savePos;
+	    pos = savePos;
 	    throw new IndexOutOfBoundsException();
 	}
 
@@ -424,12 +512,10 @@ public class MessageBuffer {
 			"malformed input around byte " + pos);
 		}
 	    }
-
-	    limit =  (pos == capacity ? pos : pos + 1);
 		
 	} catch (UTFDataFormatException e) {
-	    // restore position and limit
-	    pos = limit = savePos;
+	    // restore position
+	    pos = savePos;
 	    throw (RuntimeException) (new RuntimeException()).initCause(e);
 	}
         // The number of chars produced may be less than utfLen
