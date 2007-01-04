@@ -233,6 +233,7 @@ public class ChannelServiceImpl
 	}
     }
 
+
     /* -- Implement NonDurableTransactionParticipant -- */
        
     /** {@inheritDoc} */

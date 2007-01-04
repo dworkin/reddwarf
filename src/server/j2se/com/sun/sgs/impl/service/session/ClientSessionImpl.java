@@ -8,9 +8,8 @@ import com.sun.sgs.app.Delivery;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.auth.NamePasswordCredentials;
 import com.sun.sgs.impl.util.LoggerWrapper;
-import com.sun.sgs.impl.kernel.ContextResolver;
-import com.sun.sgs.impl.kernel.TaskOwnerImpl;
 import com.sun.sgs.impl.util.MessageBuffer;
+import com.sun.sgs.impl.kernel.ContextResolver;
 import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
 import com.sun.sgs.kernel.KernelRunnable;
@@ -300,8 +299,8 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 
 	private Object readResolve() throws ObjectStreamException {
 	    try {
-		ClientSessionService service = 
-                    ClientSessionServiceImpl.getInstance();
+		ClientSessionService service =
+		    ClientSessionServiceImpl.getInstance();
 		ClientSession session = service.getClientSession(sessionId);
 		if (session == null) {
 		    session = new ClientSessionImpl(name, sessionId);
@@ -505,7 +504,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		    return;
 		}
 	    }
-
+	    
 	    if (buffer.length < 3) {
 		if (logger.isLoggable(Level.SEVERE)) {
 		    logger.log(

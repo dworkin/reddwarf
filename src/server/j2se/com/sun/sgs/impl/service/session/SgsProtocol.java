@@ -24,8 +24,10 @@ public interface SgsProtocol {
     /** The version number. */
     final byte VERSION = 0x01;
 
+    /** Application service ID. */
     final byte APPLICATION_SERVICE = 0x01;
 
+    /** Channel service ID. */
     final byte CHANNEL_SERVICE = 0x02;
 
     /**
