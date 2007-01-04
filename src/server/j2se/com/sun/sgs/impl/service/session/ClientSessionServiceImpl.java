@@ -4,6 +4,7 @@ import com.sun.sgs.app.AppListener;
 import com.sun.sgs.auth.IdentityManager;
 import com.sun.sgs.impl.io.AcceptorFactory;
 import com.sun.sgs.impl.io.CompleteMessageFilter;
+import com.sun.sgs.impl.io.PassthroughFilter;
 import com.sun.sgs.impl.io.IOConstants.TransportType;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.NonDurableTaskScheduler;
@@ -18,6 +19,7 @@ import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.ServiceListener;
 import com.sun.sgs.service.SgsClientSession;
+import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.TransactionProxy;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -45,7 +47,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     public static final String APP_NAME_PROPERTY = "com.sun.sgs.appName";
 
     /** The property that specifies the port number. */
-    public static final String PORT_PROPERTY = "com.sun.sgs.app.port";
+    public static final String PORT_PROPERTY = "com.sun.sgs.port";
 
     /** The logger for this class. */
     private static final LoggerWrapper logger =
@@ -182,13 +184,19 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 		this.registry = registry;
 		dataService = registry.getComponent(DataService.class);
 		nonDurableTaskScheduler =
-		    new NonDurableTaskScheduler(taskScheduler, proxy);
+		    new NonDurableTaskScheduler(taskScheduler,
+                            proxy.getCurrentOwner(),
+                            registry.getComponent(TaskService.class));
 		acceptor =
 		    AcceptorFactory.createAcceptor(TransportType.RELIABLE);
 		SocketAddress address = new InetSocketAddress(port);
 		try {
 		    acceptor.listen(
-			address, listener, CompleteMessageFilter.class);
+			address,
+                        listener,
+                        //PassthroughFilter.class
+                        CompleteMessageFilter.class
+                        );
 		} catch (IOException e) {
 		    throw new RuntimeException(e);
 		}

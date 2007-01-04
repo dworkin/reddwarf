@@ -8,7 +8,9 @@ import javax.naming.OperationNotSupportedException;
 
 import com.sun.sgs.client.comm.ClientConnectionListener;
 import com.sun.sgs.client.comm.ClientConnector;
+import com.sun.sgs.impl.io.CompleteMessageFilter;
 import com.sun.sgs.impl.io.ConnectorFactory;
+import com.sun.sgs.impl.io.PassthroughFilter;
 import com.sun.sgs.impl.io.IOConstants.TransportType;
 import com.sun.sgs.io.IOConnector;
 
@@ -63,7 +65,10 @@ public class SimpleClientConnector extends ClientConnector {
         SimpleClientConnection connection = 
                                 new SimpleClientConnection(connectionListener);
         
-        connector.connect(address, connection);
+        connector.connect(address, connection,
+                //new PassthroughFilter()
+                new CompleteMessageFilter()
+                );
     }
 
 }

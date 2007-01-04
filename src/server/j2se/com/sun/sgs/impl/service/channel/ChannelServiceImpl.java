@@ -150,7 +150,9 @@ public class ChannelServiceImpl
 		taskService = registry.getComponent(TaskService.class);
 		sessionService = registry.getComponent(ClientSessionService.class);
 		nonDurableTaskScheduler =
-		    new NonDurableTaskScheduler(taskScheduler, proxy);
+		    new NonDurableTaskScheduler(taskScheduler,
+                            proxy.getCurrentOwner(),
+                            registry.getComponent(TaskService.class));
 	    }
 
 	    /*

@@ -4,7 +4,6 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.TaskService;
-import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.TransactionRunner;
 
 /**
@@ -18,31 +17,21 @@ public class NonDurableTaskScheduler {
     private final TaskService taskService;
 
     /**
-     * Constructs an instance of this class with the specified task
-     * scheduler and transaction proxy.  For tasks scheduled using the
-     * methods of this class:
-     *
-     * <p>The task owner for tasks scheduled using the {@link
-     * #scheduleTask scheduleTask} method is the owner returned by
-     * invoking {@link TransactionProxy#getCurrentOwner
-     * getCurrentOwner} on the specified proxy.
-     *
-     * <p>The task service used to schedule non-durable,
-     * non-transactionl tasks (using the {@link
-     * #scheduleNonTransactionalTask scheduleNonTransactionalTask}
-     * method) is obtained by invoking the {@link
-     * TransactionProxy#getService getService} method with the {@link
-     * TaskService} class object on the specified proxy.
+     * Constructs an instance of this class with the specified
+     * task owner, (non-transactional) task scheduler, and
+     * (transactional) task service.
      */
     public NonDurableTaskScheduler(
-	TaskScheduler taskScheduler, TransactionProxy proxy)
+	TaskScheduler taskScheduler,
+        TaskOwner owner,
+        TaskService taskService)
     {
-	if (taskScheduler == null || proxy == null) {
+	if (taskScheduler == null || owner == null || taskService == null) {
 	    throw new NullPointerException("null argument");
 	}
+        this.owner = owner;
 	this.taskScheduler = taskScheduler;
-	this.owner = proxy.getCurrentOwner();
-	this.taskService = proxy.getService(TaskService.class);
+	this.taskService = taskService;
     }
 
     /**
