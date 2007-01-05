@@ -13,7 +13,7 @@ public class DummyTransactionParticipant implements TransactionParticipant {
 	Logger.getLogger(DummyTransactionParticipant.class.getName());
 
     /** The possible states for a participant. */
-    public static enum State { ACTIVE, PREPARED, COMMITTED, ABORTED };
+    public static enum State { ACTIVE, PREPARED, COMMITTED, ABORTED }
 
     /** The state of this participant. */
     private State state = State.ACTIVE;
@@ -78,5 +78,5 @@ public class DummyTransactionParticipant implements TransactionParticipant {
     public boolean prepareReturnedTrue() { return prepareReturnedTrue; }
 
     /** Returns the value to be returned by prepare. */
-    protected boolean prepareResult() { return false; };
+    protected boolean prepareResult() { return false; }
 }

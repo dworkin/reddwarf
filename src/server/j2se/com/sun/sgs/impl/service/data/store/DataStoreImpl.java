@@ -295,19 +295,19 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    DatabaseEntry value = new DatabaseEntry();
 	    if (name == null) {
 		OperationStatus status = cursor.getFirst(key, value, null);
-		lastCursorKey = getNextBoundNameResult(status, key);
+		lastCursorKey = getNextBoundNameResult(name, status, key);
 	    } else {
 		boolean matchesLast = name.equals(lastCursorKey);
 		if (!matchesLast) {
 		    StringBinding.stringToEntry(name, key);
 		    OperationStatus status =
 			cursor.getSearchKeyRange(key, value, null);
-		    lastCursorKey = getNextBoundNameResult(status, key);
+		    lastCursorKey = getNextBoundNameResult(name, status, key);
 		    matchesLast = name.equals(lastCursorKey);
 		}
 		if (matchesLast) {
 		    OperationStatus status = cursor.getNext(key, value, null);
-		    lastCursorKey = getNextBoundNameResult(status, key);
+		    lastCursorKey = getNextBoundNameResult(name, status, key);
 		}
 	    }
 	    return lastCursorKey;
@@ -323,6 +323,24 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 		Cursor c = cursor;
 		cursor = null;
 		c.close();
+	    }
+	}
+
+	/**
+	 * Returns the name of the next binding given the results of a cursor
+	 * operation and the associated key.
+	 */
+	private String getNextBoundNameResult(
+	    String name, OperationStatus status, DatabaseEntry key)
+	{
+	    if (status == OperationStatus.NOTFOUND) {
+		return null;
+	    } else if (status == OperationStatus.SUCCESS) {
+		return StringBinding.entryToString(key);
+	    } else {
+		throw new DataStoreException(
+		    "nextBoundName txn:" + txn + ", name:" + name +
+		    " failed: " + status);
 	    }
 	}
     }
@@ -383,52 +401,52 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    createConfig.setAllowCreate(true);
 	    boolean create = false;
 	    String infoFileName = directory + File.separator + "info";
-	    Database info;
+	    Database infoTmp;
 	    try {
-		info = env.openDatabase(bdbTxn, infoFileName, null, null);
-		int minorVersion = DataStoreHeader.verify(info, bdbTxn);
+		infoTmp = env.openDatabase(bdbTxn, infoFileName, null, null);
+		int minorVersion = DataStoreHeader.verify(infoTmp, bdbTxn);
 		if (logger.isLoggable(Level.CONFIG)) {
 		    logger.log(Level.CONFIG, "Found existing header {0}",
 			       DataStoreHeader.headerString(minorVersion));
 		}
 	    } catch (FileNotFoundException e) {
 		try {
-		    info = env.openDatabase(
+		    infoTmp = env.openDatabase(
 			bdbTxn, infoFileName, null, createConfig);
 		} catch (FileNotFoundException e2) {
 		    throw new DataStoreException(
 			"Problem creating database: " + e2.getMessage(),
 			e2);
 		}
-		DataStoreHeader.create(info, bdbTxn);
+		DataStoreHeader.create(infoTmp, bdbTxn);
 		if (logger.isLoggable(Level.CONFIG)) {
 		    logger.log(Level.CONFIG, "Created new header {0}",
 			       DataStoreHeader.headerString());
 		}
 		create = true;
 	    }
-	    this.info = info;
+	    info = infoTmp;
 	    try {
 		oids = env.openDatabase(
 		    bdbTxn, directory + File.separator + "oids", null,
 		    create ? createConfig : null);
 	    } catch (FileNotFoundException e) {
-		throw new DataStoreException("Oids database not found");
+		throw new DataStoreException(
+		    "Oids database not found: " + e.getMessage(), e);
 	    }
 	    try {
 		names = env.openDatabase(
 		    bdbTxn, directory + File.separator + "names", null,
 		    create ? createConfig : null);
 	    } catch (FileNotFoundException e) {
-		throw new DataStoreException("Names database not found");
+		throw new DataStoreException(
+		    "Names database not found: " + e.getMessage(), e);
 	    }
 	    done = true;
 	    bdbTxn.commit();
 	} catch (DatabaseException e) {
-	    logger.logThrow(
-		Level.SEVERE, e, "DataStore initialization failed");
-	    throw new DataStoreException(
-		"Problem initializing DataStore: " + e.getMessage(), e);
+	    throw convertException(
+		Level.SEVERE, e, "DataStore initialization");
 	} finally {
 	    if (bdbTxn != null && !done) {
 		try {
@@ -485,7 +503,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
     /** {@inheritDoc} */
     public long createObject(Transaction txn) {
 	logger.log(Level.FINEST, "createObject txn:{0}", txn);
-	RuntimeException exception;
+	Exception exception;
 	try {
 	    checkTxn(txn);
 	    long result;
@@ -518,13 +536,12 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    }
 	    return result;
 	} catch (DatabaseException e) {
-	    exception = convertDatabaseException(e);
+	    exception = e;
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	logger.logThrow(
-	    Level.FINEST, exception, "createObject txn:{0} throws", txn);
-	throw exception;
+	throw convertException(
+	    Level.FINEST, exception, "createObject txn:" + txn);
     }
 
     /** {@inheritDoc} */
@@ -538,6 +555,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	 * without reading or writing, so get the object and ask for a write
 	 * lock.  -tjb@sun.com (10/06/2006)
 	 */
+	Exception exception;
 	try {
 	    getObjectInternal(txn, oid, true);
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -545,15 +563,14 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 			   "markForUpdate txn:{0}, oid:{1,number,#} returns",
 			   txn, oid);
 	    }
+	    return;
+	} catch (DatabaseException e) {
+	    exception = e;
 	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.logThrow(
-		    Level.FINEST,
-		    e, "markForUpdate txn:{0}, oid:{1,number,#} throws",
-		    txn, oid);
-	    }
-	    throw e;
+	    exception = e;
 	}
+	throw convertException(Level.FINEST, exception,
+			       "markForUpdate txn:" + txn + ", oid:" + oid);
     }
 
     /** {@inheritDoc} */
@@ -563,6 +580,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 		       "getObject txn:{0}, oid:{1,number,#}, forUpdate:{2}",
 		       txn, oid, forUpdate);
 	}
+	Exception exception;
 	try {
 	    byte[] result = getObjectInternal(txn, oid, forUpdate);
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -573,41 +591,38 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 		    txn, oid, forUpdate);
 	    }
 	    return result;
+	} catch (DatabaseException e) {
+	    exception = e;
 	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.logThrow(Level.FINEST, e,
-				"getObject txn:{0}, oid:{1,number,#}, " +
-				"forUpdate:{2} throws",
-				txn, oid, forUpdate);
-	    }
-	    throw e;
+	    exception = e;
 	}
+	throw convertException(Level.FINEST, exception,
+			       "getObject txn:" + txn + ", oid:" + oid +
+			       ", forUpdate:" + forUpdate);
     }
 
     /** Implement getObject, without logging. */
     private byte[] getObjectInternal(
 	Transaction txn, long oid, boolean forUpdate)
+	throws DatabaseException
     {
 	checkId(oid);
-	try {
-	    TxnInfo txnInfo = checkTxn(txn);
-	    DatabaseEntry key = new DatabaseEntry();
-	    LongBinding.longToEntry(oid, key);
-	    DatabaseEntry value = new DatabaseEntry();
-	    OperationStatus status = oids.get(
-		txnInfo.bdbTxn, key, value, forUpdate ? LockMode.RMW : null);
-	    if (status == OperationStatus.NOTFOUND) {
-		throw new ObjectNotFoundException("Object not found");
-	    } else if (status != OperationStatus.SUCCESS) {
-		throw new DataStoreException(
-		    "Getting object failed: " + status);
-	    }
-	    byte[] result = value.getData();
-	    /* Berkeley DB returns null if the data is empty. */
-	    return result != null ? result : NO_BYTES;
-	} catch (DatabaseException e) {
-	    throw convertDatabaseException(e);
+	TxnInfo txnInfo = checkTxn(txn);
+	DatabaseEntry key = new DatabaseEntry();
+	LongBinding.longToEntry(oid, key);
+	DatabaseEntry value = new DatabaseEntry();
+	OperationStatus status = oids.get(
+	    txnInfo.bdbTxn, key, value, forUpdate ? LockMode.RMW : null);
+	if (status == OperationStatus.NOTFOUND) {
+	    throw new ObjectNotFoundException("Object not found: " + oid);
+	} else if (status != OperationStatus.SUCCESS) {
+	    throw new DataStoreException("getObject txn:" + txn + ", oid:" +
+					 oid + ", forUpdate:" + forUpdate +
+					 " failed: " + status);
 	}
+	byte[] result = value.getData();
+	/* Berkeley DB returns null if the data is empty. */
+	return result != null ? result : NO_BYTES;
     }
 
     /** {@inheritDoc} */
@@ -616,7 +631,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    logger.log(Level.FINEST, "setObject txn:{0}, oid:{1,number,#}",
 		       txn, oid);
 	}
-	RuntimeException exception;
+	Exception exception;
 	try {
 	    checkId(oid);
 	    if (data == null) {
@@ -629,7 +644,8 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    OperationStatus status = oids.put(txnInfo.bdbTxn, key, value);
 	    if (status != OperationStatus.SUCCESS) {
 		throw new DataStoreException(
-		    "Setting object failed: " + status);
+		    "setObject txn: " + txn + ", oid:" + oid + " failed: " +
+		    status);
 	    }
 	    txnInfo.modified = true;
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -639,16 +655,12 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    }
 	    return;
 	} catch (DatabaseException e) {
-	    exception = convertDatabaseException(e);
+	    exception = e;
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	if (logger.isLoggable(Level.FINEST)) {
-		logger.logThrow(
-		    Level.FINEST, exception,
-		    "setObject txn:{0}, oid:{1,number,#} throws", txn, oid);
-	}
-	throw exception;
+	throw convertException(
+	    Level.FINEST, exception, "setObject txn:" + txn + ", oid:" + oid);
     }
 
     /** {@inheritDoc} */
@@ -657,7 +669,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    logger.log(Level.FINEST, "removeObject txn:{0}, oid:{1,number,#}",
 		       txn, oid);
 	}
-	RuntimeException exception;
+	Exception exception;
 	try {
 	    checkId(oid);
 	    TxnInfo txnInfo = checkTxn(txn);
@@ -668,7 +680,8 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 		throw new ObjectNotFoundException("Object not found: " + oid);
 	    } else if (status != OperationStatus.SUCCESS) {
 		throw new DataStoreException(
-		    "Removing object failed: " + status);
+		    "removeObject txn:" + txn + ", oid:" + oid + " failed: " +
+		    status);
 	    }
 	    txnInfo.modified = true;
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -678,16 +691,12 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    }
 	    return;
 	} catch (DatabaseException e) {
-	    exception = convertDatabaseException(e);
+	    exception = e;
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.logThrow(Level.FINEST, exception,
-			    "removeObject txn:{0}, oid:{1,number,#} throws",
-			    txn, oid);
-	}
-	throw exception;
+	throw convertException(Level.FINEST, exception,
+			       "removeObject txn:" + txn + ", oid:" + oid);
     }
 
     /** {@inheritDoc} */
@@ -696,7 +705,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    logger.log(
 		Level.FINEST, "getBinding txn:{0}, name:{1}", txn, name);
 	}
-	RuntimeException exception;
+	Exception exception;
 	try {
 	    if (name == null) {
 		throw new NullPointerException("Name must not be null");
@@ -711,7 +720,8 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 		throw new NameNotBoundException("Name not bound: " + name);
 	    } else if (status != OperationStatus.SUCCESS) {
 		throw new DataStoreException(
-		    "Getting binding failed: " + status);
+		    "getBinding txn:" + txn + ", name:" + name + " failed: " +
+		    status);
 	    }
 	    long result = LongBinding.entryToLong(value);
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -722,15 +732,12 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    }
 	    return result;
 	} catch (DatabaseException e) {
-	    exception = convertDatabaseException(e);
+	    exception = e;
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.logThrow(Level.FINEST, exception,
-			    "getBinding txn:{0}, name:{1} throws", txn, name);
-	}
-	throw exception;
+	throw convertException(Level.FINEST, exception,
+			       "getBinding txn:" + txn + ", name:" + name);
     }
 
     /** {@inheritDoc} */
@@ -740,7 +747,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 		Level.FINEST, "setBinding txn:{0}, name:{1}, oid:{2,number,#}",
 		txn, name, oid);
 	}
-	RuntimeException exception;
+	Exception exception;
 	try {
 	    if (name == null) {
 		throw new NullPointerException("Name must not be null");
@@ -754,7 +761,8 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    OperationStatus status = names.put(txnInfo.bdbTxn, key, value);
 	    if (status != OperationStatus.SUCCESS) {
 		throw new DataStoreException(
-		    "Setting binding failed: " + status);
+		    "setBinding txn:" + txn + ", name:" + name + " failed: " +
+		    status);
 	    }
 	    txnInfo.modified = true;
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -765,17 +773,13 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    }
 	    return;
 	} catch (DatabaseException e) {
-	    exception = convertDatabaseException(e);
+	    exception = e;
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.logThrow(
-		Level.FINEST, exception,
-		"setBinding txn:{0}, name:{1}, oid:{2,number,#} throws",
-		txn, name, oid);
-	}
-	throw exception;
+	throw convertException(
+	    Level.FINEST, exception,
+	    "setBinding txn:" + txn + ", name:" + name + ", oid:" + oid);
     }
 
     /** {@inheritDoc} */
@@ -784,7 +788,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    logger.log(
 		Level.FINEST, "removeBinding txn:{0}, name:{1}", txn, name);
 	}
-	RuntimeException exception;
+	Exception exception;
 	try {
 	    if (name == null) {
 		throw new NullPointerException("Name must not be null");
@@ -797,7 +801,8 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 		throw new NameNotBoundException("Name not bound: " + name);
 	    } else if (status != OperationStatus.SUCCESS) {
 		throw new DataStoreException(
-		    "Removing binding failed: " + status);
+		    "removeBinding txn:" + txn + ", name:" + name +
+		    " failed: " + status);
 	    }
 	    txnInfo.modified = true;
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -807,16 +812,12 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    }
 	    return;
 	} catch (DatabaseException e) {
-	    exception = convertDatabaseException(e);
+	    exception = e;
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.logThrow(Level.FINEST, exception,
-			    "removeBinding txn:{0}, name:{1} throws",
-			    txn, name);
-	}
-	throw exception;
+	throw convertException(Level.FINEST, exception,
+			       "removeBinding txn:" + txn + ", name:" + name);
     }
 
     /**
@@ -830,7 +831,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    logger.log(
 		Level.FINEST, "nextBoundName txn:{0}, name:{1}", txn, name);
 	}
-	RuntimeException exception;
+	Exception exception;
 	try {
 	    TxnInfo txnInfo = checkTxn(txn);
 	    String result = txnInfo.nextName(name, names);
@@ -841,16 +842,12 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    }
 	    return result;
 	} catch (DatabaseException e) {
-	    exception = convertDatabaseException(e);
+	    exception = e;
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.logThrow(Level.FINEST, exception,
-			    "nextBoundName txn:{0}, name:{1} throws",
-			    txn, name);
-	}
-	throw exception;
+	throw convertException(Level.FINEST, exception,
+			       "nextBoundName txn:" + txn + ", name:" + name);
     }
 
     /* -- Implement TransactionParticipant -- */
@@ -858,7 +855,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
     /** {@inheritDoc} */
     public boolean prepare(Transaction txn) {
 	logger.log(Level.FINER, "prepare txn:{0}", txn);
-	RuntimeException exception;
+	Exception exception;
 	try {
 	    if (txn == null) {
 		throw new NullPointerException("Transaction must not be null");
@@ -899,18 +896,17 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    }
 	    return result;
 	} catch (DatabaseException e) {
-	    exception = convertDatabaseException(e);
+	    exception = e;
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	logger.logThrow(Level.FINER, exception, "prepare txn:{0} throws", txn);
-	throw exception;
+	throw convertException(Level.FINER, exception, "prepare txn:" + txn);
     }
 
     /** {@inheritDoc} */
     public void commit(Transaction txn) {
 	logger.log(Level.FINER, "commit txn:{0}", txn);
-	RuntimeException exception;
+	Exception exception;
 	try {
 	    if (txn == null) {
 		throw new NullPointerException("Transaction must not be null");
@@ -935,18 +931,17 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    logger.log(Level.FINER, "commit txn:{0} returns", txn);
 	    return;
 	} catch (DatabaseException e) {
-	    exception = convertDatabaseException(e);
+	    exception = e;
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	logger.logThrow(Level.FINER, exception, "commit txn:{0} throws", txn);
-	throw exception;
+	throw convertException(Level.FINER, exception, "commit txn:" + txn);
     }
 
     /** {@inheritDoc} */
     public void prepareAndCommit(Transaction txn) {
 	logger.log(Level.FINER, "prepareAndCommit txn:{0}", txn);
-	RuntimeException exception;
+	Exception exception;
 	try {
 	    if (txn == null) {
 		throw new NullPointerException("Transaction must not be null");
@@ -971,19 +966,18 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    logger.log(Level.FINER, "prepareAndCommit txn:{0} returns", txn);
 	    return;
 	} catch (DatabaseException e) {
-	    exception = convertDatabaseException(e);
+	    exception = e;
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	logger.logThrow(
-	    Level.FINER, exception, "prepareAndCommit txn:{0} throws", txn);
-	throw exception;
+	throw convertException(
+	    Level.FINER, exception, "prepareAndCommit txn:" + txn);
     }
 
     /** {@inheritDoc} */
     public void abort(Transaction txn) {
 	logger.log(Level.FINER, "abort txn:{0}", txn);
-	RuntimeException exception;
+	Exception exception;
 	try {
 	    if (txn == null) {
 		throw new NullPointerException("Transaction must not be null");
@@ -1005,12 +999,11 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    logger.log(Level.FINER, "abort txn:{0} returns", txn);
 	    return;
 	} catch (DatabaseException e) {
-	    exception = convertDatabaseException(e);
+	    exception = e;
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	logger.logThrow(Level.FINER, exception, "abort txn:{0} throws", txn);
-	throw exception;
+	throw convertException(Level.FINER, exception, "abort txn:" + txn);
     }
 
     /* -- Other public methods -- */
@@ -1062,13 +1055,23 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 
     /**
      * Returns the correct SGS exception for a Berkeley DB DatabaseException
-     * thrown during an operation.  Throws an Error if recovery is needed.
+     * thrown during an operation.  Throws an Error if recovery is needed.  The
+     * level argument is used to log the exception.  The operation argument
+     * will be included in newly created exceptions and the log, and should
+     * describe the operation that was underway when the exception was thrown.
+     * The supplied exception may also be a RuntimeException, which will be
+     * logged and returned.
      */
-    private RuntimeException convertDatabaseException(DatabaseException e) {
+    private RuntimeException convertException(
+	Level level, Exception e, String operation)
+    {
+	RuntimeException re;
 	if (e instanceof LockNotGrantedException) {
-	    return new TransactionTimeoutException(e.getMessage(), e);
+	    re = new TransactionTimeoutException(
+		operation + " failed due to timeout: " + e.getMessage(), e);
 	} else if (e instanceof DeadlockException) {
-	    return new TransactionConflictException(e.getMessage(), e);
+	    re = new TransactionConflictException(
+		operation + " failed due to deadlock: " + e.getMessage(), e);
 	} else if (e instanceof RunRecoveryException) {
 	    /*
 	     * It is tricky to clean up the data structures in this instance in
@@ -1077,13 +1080,21 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	     * Error and create a new DataStoreImpl instance, but this instance
 	     * is dead.  -tjb@sun.com (10/19/2006)
 	     */
-	    throw new Error(
+	    Error error = new Error(
+		operation + " failed: " +
 		"Database requires recovery -- need to restart the server " +
-		"or create a new instance of DataStoreImpl",
+		"or create a new instance of DataStoreImpl: " + e.getMessage(),
 		e);
+	    logger.logThrow(Level.SEVERE, error, "{0} throws", operation);
+	    throw error;
+	} else if (e instanceof DatabaseException) {
+	    re = new DataStoreException(
+		operation + " failed: " + e.getMessage(), e);
 	} else {
-	    return new DataStoreException(e.getMessage(), e);
+	    re = (RuntimeException) e;
 	}
+	logger.logThrow(Level.FINEST, re, "{0} throws", operation);
+	return re;
     }
 
     /** Log statistics for the specified transaction. */
@@ -1119,23 +1130,6 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 		       env.getLogStats(null),
 		       env.getMutexStats(null),
 		       env.getTransactionStats(null));
-	}
-    }
-
-    /**
-     * Returns the name of the next binding given the results of a cursor
-     * operation and the associated key.
-     */
-    private static String getNextBoundNameResult(
-	OperationStatus status, DatabaseEntry key)
-    {
-	if (status == OperationStatus.NOTFOUND) {
-	    return null;
-	} else if (status == OperationStatus.SUCCESS) {
-	    return StringBinding.entryToString(key);
-	} else {
-	    throw new DataStoreException(
-		"Getting next binding failed: " + status);
 	}
     }
 }

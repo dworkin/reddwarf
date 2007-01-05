@@ -127,7 +127,15 @@ public class TestDataServiceImpl extends TestCase {
 	    deleteDirectory(directory);
 	}
 	if (txn != null) {
-	    txn.abort();
+	    try {
+		txn.abort();
+	    } catch (RuntimeException e) {
+		if (passed) {
+		    throw e;
+		} else {
+		    e.printStackTrace();
+		}
+	    }
 	    txn = null;
 	}
     }
@@ -672,10 +680,10 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     public void testRemoveBindingEmptyName() {
-	testRemoveBindingNullName(true);
+        testRemoveBindingEmptyName(true);
     }
     public void testRemoveServiceBindingEmptyName() {
-	testRemoveBindingNullName(false);
+        testRemoveBindingEmptyName(false);
     }
     private void testRemoveBindingEmptyName(boolean app) {
 	setBinding(app, service, "", dummy);
@@ -1167,7 +1175,7 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     public void testCreateReferenceRemoved() throws Exception {
-	ManagedReference ref = service.createReference(dummy);
+        service.createReference(dummy);
 	service.removeObject(dummy);
 	try {
 	    service.createReference(dummy);
@@ -1505,6 +1513,127 @@ public class TestDataServiceImpl extends TestCase {
 		      service.getBinding("b", ContentEquals.class));
     }
 
+    public void testSerializeReferenceToEnclosing() throws Exception {
+	service.setBinding("a", NonManaged.staticLocal);
+	service.setBinding("b", NonManaged.staticAnonymous);
+	service.setBinding("c", new NonManaged().createMember());
+	service.setBinding("d", new NonManaged().createInner());
+	service.setBinding("e", new NonManaged().createAnonymous());
+	service.setBinding("f", new NonManaged().createLocal());
+	txn.commit();
+	createTransaction();
+	service.setBinding("a", Managed.staticLocal);
+	service.setBinding("b", Managed.staticAnonymous);
+	service.setBinding("c", new NonManaged().createMember());
+	txn.commit();
+	createTransaction();
+	service.setBinding("a", new Managed().createInner());
+	try {
+	    txn.commit();
+	    fail("Expected ObjectIOException");
+	} catch (ObjectIOException e) {
+	    System.err.println(e);
+	} finally {
+	    txn = null;
+	}
+	createTransaction();
+	service.setBinding("b", new Managed().createAnonymous());
+	try {
+	    txn.commit();
+	    fail("Expected ObjectIOException");
+	} catch (ObjectIOException e) {
+	    System.err.println(e);
+	} finally {
+	    txn = null;
+	}
+	createTransaction();
+	service.setBinding("b", new Managed().createLocal());
+	try {
+	    txn.commit();
+	    fail("Expected ObjectIOException");
+	} catch (ObjectIOException e) {
+	    System.err.println(e);
+	} finally {
+	    txn = null;
+	}
+    }
+
+    static class NonManaged implements Serializable {
+	private static final long serialVersionUID = 1;
+	static final ManagedObject staticLocal;
+	static {
+	    class StaticLocal implements ManagedObject, Serializable {
+		private static final long serialVersionUID = 1;
+	    }
+	    staticLocal = new StaticLocal();
+	}
+	static final ManagedObject staticAnonymous =
+	    new DummyManagedObject() {
+	        private static final long serialVersionUID = 1L;
+	    };
+	static class Member implements ManagedObject, Serializable {
+	    private static final long serialVersionUID = 1;
+	}
+	ManagedObject createMember() {
+	    return new Inner();
+	}
+	class Inner implements ManagedObject, Serializable {
+	    private static final long serialVersionUID = 1;
+	}
+	ManagedObject createInner() {
+	    return new Inner();
+	}
+	ManagedObject createAnonymous() {
+	    return new DummyManagedObject() {
+                private static final long serialVersionUID = 1L;
+            };
+	}
+	ManagedObject createLocal() {
+	    class Local implements ManagedObject, Serializable {
+		private static final long serialVersionUID = 1;
+	    }
+	    return new Local();
+	}
+    }
+
+    static class Managed implements ManagedObject, Serializable {
+	private static final long serialVersionUID = 1;
+	static final ManagedObject staticLocal;
+	static {
+	    class StaticLocal implements ManagedObject, Serializable {
+		private static final long serialVersionUID = 1;
+	    }
+	    staticLocal = new StaticLocal();
+	}
+	static final ManagedObject staticAnonymous =
+	    new DummyManagedObject() {
+                private static final long serialVersionUID = 1L;
+            };
+	static class Member implements ManagedObject, Serializable {
+	    private static final long serialVersionUID = 1;
+	}
+	ManagedObject createMember() {
+	    return new Inner();
+	}
+	class Inner implements ManagedObject, Serializable {
+	    private static final long serialVersionUID = 1;
+	}
+	ManagedObject createInner() {
+	    return new Inner();
+        }
+	ManagedObject createAnonymous() {
+	    return new DummyManagedObject() {
+                private static final long serialVersionUID = 1L;
+            };
+	}
+	ManagedObject createLocal() {
+	    class Local implements ManagedObject, Serializable {
+		private static final long serialVersionUID = 1;
+	    }
+	    return new Local();
+	}
+    }
+
     /* -- App and service binding methods -- */
 
     <T> T getBinding(
@@ -1610,6 +1739,7 @@ public class TestDataServiceImpl extends TestCase {
 
     /** A managed object that fails during serialization. */
     static class SerializationFails extends DummyManagedObject {
+        private static final long serialVersionUID = 1L;
 	private void writeObject(ObjectOutputStream out)
 	    throws IOException
 	{
@@ -1619,6 +1749,7 @@ public class TestDataServiceImpl extends TestCase {
 
     /** A managed object that fails during deserialization. */
     static class DeserializationFails extends DummyManagedObject {
+        private static final long serialVersionUID = 1L;
 	private void readObject(ObjectInputStream in)
 	    throws IOException
 	{
@@ -1628,6 +1759,7 @@ public class TestDataServiceImpl extends TestCase {
 
     /** A managed object that deserializes as null. */
     static class DeserializeAsNull extends DummyManagedObject {
+        private static final long serialVersionUID = 1L;
 	private Object readResolve() throws ObjectStreamException {
 	    return null;
 	}
@@ -1648,7 +1780,7 @@ public class TestDataServiceImpl extends TestCase {
     /** The set of bad transaction states */
     static enum BadTxnState {
 	Uninitialized, Aborting, Aborted, Preparing, Committing, Committed
-    };
+    }
 
     /** Defines a abstract class for testing bad transaction states. */
     static abstract class BadTxnTest extends TestDataServiceImpl {

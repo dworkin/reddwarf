@@ -83,7 +83,7 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 
 	/** An object that has been removed after being dereferenced. */
 	REMOVED_FETCHED
-    };
+    }
 
     /**
      * Information related to the transaction in which this reference was
@@ -193,6 +193,7 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 
     /* -- Methods for DataService -- */
 
+    @SuppressWarnings("fallthrough")
     void removeObject() {
 	switch (state) {
 	case EMPTY:
@@ -220,6 +221,7 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 	}
     }
 
+    @SuppressWarnings("fallthrough")
     void markForUpdate() {
 	switch (state) {
 	case EMPTY:
@@ -255,6 +257,7 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 
     /* -- Implement ManagedReference -- */
 
+    @SuppressWarnings("fallthrough")
     public <T> T get(Class<T> type) {
 	if (type == null) {
 	    throw new NullPointerException(
@@ -298,6 +301,7 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 	}
     }
 
+    @SuppressWarnings("fallthrough")
     public <T> T getForUpdate(Class<T> type) {
 	if (type == null) {
 	    throw new NullPointerException(
@@ -396,6 +400,7 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
      * Checks the fields of this object to make sure they have valid values,
      * throwing an assertion error if a problem is found.
      */
+    @SuppressWarnings("fallthrough")
     void checkState() {
 	switch (state) {
 	case NEW:
@@ -446,6 +451,7 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
      * Stores any modifications to the data store, and changes the state to
      * FLUSHED.
      */
+    @SuppressWarnings("fallthrough")
     void flush() {
 	switch (state) {
 	case EMPTY:
@@ -505,14 +511,14 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
      * the return value is not null.
      */
     private ManagedObject deserialize(byte[] data) {
-	Object object =  SerialUtil.deserialize(data);
-	if (object == null) {
+	Object obj =  SerialUtil.deserialize(data);
+	if (obj == null) {
 	    throw new ObjectIOException(
 		"Managed object must not deserialize to null", false);
-	} else if (!(object instanceof ManagedObject)) {
+	} else if (!(obj instanceof ManagedObject)) {
 	    throw new ObjectIOException(
 		"Deserialized object must implement ManagedObject", false);
 	}
-	return (ManagedObject) object;
+	return (ManagedObject) obj;
     }
 }
