@@ -97,7 +97,15 @@ public class TestDataStoreImpl extends TestCase {
 	    deleteDirectory(directory);
 	}
 	if (txn != null) {
-	    txn.abort();
+	    try {
+		txn.abort();
+	    } catch (RuntimeException e) {
+		if (passed) {
+		    throw e;
+		} else {
+		    e.printStackTrace();
+		}
+	    }
 	    txn = null;
 	}
     }
