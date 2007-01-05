@@ -1567,9 +1567,10 @@ public class TestDataServiceImpl extends TestCase {
 	    }
 	    staticLocal = new StaticLocal();
 	}
-	@SuppressWarnings("serial")
 	static final ManagedObject staticAnonymous =
-	    new DummyManagedObject() { };
+	    new DummyManagedObject() {
+	        private static final long serialVersionUID = 1L;
+	    };
 	static class Member implements ManagedObject, Serializable {
 	    private static final long serialVersionUID = 1;
 	}
@@ -1582,9 +1583,10 @@ public class TestDataServiceImpl extends TestCase {
 	ManagedObject createInner() {
 	    return new Inner();
 	}
-	@SuppressWarnings("serial")
 	ManagedObject createAnonymous() {
-	    return new DummyManagedObject() { };
+	    return new DummyManagedObject() {
+                private static final long serialVersionUID = 1L;
+            };
 	}
 	ManagedObject createLocal() {
 	    class Local implements ManagedObject, Serializable {
@@ -1603,9 +1605,10 @@ public class TestDataServiceImpl extends TestCase {
 	    }
 	    staticLocal = new StaticLocal();
 	}
-	@SuppressWarnings("serial")
 	static final ManagedObject staticAnonymous =
-	    new DummyManagedObject() { };
+	    new DummyManagedObject() {
+                private static final long serialVersionUID = 1L;
+            };
 	static class Member implements ManagedObject, Serializable {
 	    private static final long serialVersionUID = 1;
 	}
@@ -1618,9 +1621,10 @@ public class TestDataServiceImpl extends TestCase {
 	ManagedObject createInner() {
 	    return new Inner();
         }
-        @SuppressWarnings("serial")
 	ManagedObject createAnonymous() {
-	    return new DummyManagedObject() { };
+	    return new DummyManagedObject() {
+                private static final long serialVersionUID = 1L;
+            };
 	}
 	ManagedObject createLocal() {
 	    class Local implements ManagedObject, Serializable {
