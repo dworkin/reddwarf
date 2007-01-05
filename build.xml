@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<project name="redstar" default="build" basedir=".">
+<project name="darkstar" default="build" basedir=".">
 
   <description>
     This is the Ant file that defines the build process for the Redstar
@@ -24,7 +24,7 @@
 
   <!-- Values for building the server -->
   <property name="server.jar" location="${build.dir}/lib/sgs.jar"/>
-  <property name="mina.jar" location="lib/mina-core-1.0.0.jar"/>
+  <property name="mina.jar" location="lib/mina-core-1.0.1.jar"/>
   <property name="slf4j.jar" location="lib/slf4j-simple.jar"/>
   <property name="backport-concurrent.jar" location="lib/backport-util-concurrent.jar"/>
 
@@ -83,7 +83,7 @@
 	    closure="true"/>
     <javac includeAntRuntime="no" debug="on" deprecation="on"
            srcdir="src/client/j2se" destdir="${build.dir}/classes/client"
-           classpath="${build.dir}/classes/client" source="${javac.source}">
+           classpath="${build.dir}/classes/client;${build.dir}/classes/server" source="${javac.source}">
       <compilerarg value="${javac.compilerargs}"/>
     </javac>
   </target>
@@ -215,9 +215,11 @@
     <mkdir dir="${build.dir}/test"/>
     <delete dir="${build.dir}/test/output"/>
     <mkdir dir="${build.dir}/test/output"/>
+  	
     <!-- XXX: We'd like to use forkmode="once" here, but that doesn't
 	 seem to work in Ant 1.6.1 -tjb@sun.com (01/13/2006)
       -->
+  <!--
     <junit fork="true"
 	   printsummary="on"
 	   showoutput="${test.showoutput}"
@@ -232,11 +234,6 @@
       <syspropertyset>
 	<propertyref prefix="test."/>
       </syspropertyset>
-      <!-- XXX: This doesn't work in Ant 1.6.1,
-	   either. -tjb@sun.com (01/13/2006) -->
-      <!-- <assertions>
-	     <enable/>
-	   </assertions> -->
       <jvmarg value="-enableassertions"/>
       <formatter type="${test.formatter.type}"/>
       <batchtest todir="${build.dir}/test/output">
@@ -246,6 +243,31 @@
       </batchtest>
     </junit>
     <fail if="tests.failed" message="Some tests failed"/>
+    -->
+  	
+  	
+  </target>
+	
+  <path id="test.classpath">
+  	<pathelement location="${build.dir}/test/classes" />
+  	<pathelement location="${build.dir}/classes/server" />
+  	<fileset dir="lib">
+		<include name="**/*.jar"/>
+  	</fileset>
+  </path>  
+	
+  <target name="run.tests" depends="-test.classes">
+	<junit printsummary="withOutAndErr" >
+		<classpath refid="test.classpath" />
+		
+		<formatter type="plain" usefile="false"/>
+		
+	    <batchtest fork="yes" >
+	    	<fileset dir="test/server/j2se">
+	      		<include name="**/*Test*.java"/>
+	    	</fileset>
+	  	</batchtest>
+	</junit>
   </target>
 
   <!-- Compiles tests -->
@@ -260,7 +282,7 @@
 	   includeAntRuntime="yes"
 	   debug="on"
 	   source="${javac.source}"
-	   classpath="${build.dir}/classes/server"
+	   classpath="${build.dir}/classes/server;${build.dir}/classes/client;"
 	   includes="**/*.java">
       <compilerarg line="${javac.compilerargs}"/>
     </javac>
