@@ -37,7 +37,7 @@ public class SimpleClientChannel implements ClientChannel {
      * {@inheritDoc}
      */
     public void send(byte[] message) {
-        send(new ArrayList(), message);
+        send(new ArrayList<SessionId>(), message);
     }
 
     /**

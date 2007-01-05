@@ -1,17 +1,17 @@
 package com.sun.sgs.impl.io;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.apache.mina.common.IoAcceptor;
 
+import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.io.AcceptedHandleListener;
 import com.sun.sgs.io.IOAcceptor;
 import com.sun.sgs.io.IOFilter;
@@ -25,6 +25,8 @@ import com.sun.sgs.io.IOFilter;
  * @version 1.0
  */
 public class SocketAcceptor implements IOAcceptor {
+    private static final LoggerWrapper logger =
+        new LoggerWrapper(Logger.getLogger(SocketAcceptor.class.getName()));
     
     /** The associated Mina acceptor that handles the binding */
     private IoAcceptor acceptor;
@@ -49,6 +51,9 @@ public class SocketAcceptor implements IOAcceptor {
     public void listen(SocketAddress address, AcceptedHandleListener listener, 
                     Class<? extends IOFilter> filterClass) throws IOException {
 
+        if (acceptor == null) {
+            throw new IllegalStateException("Acceptor has been shutdown");
+        }
         if (filterClass == null) {
             filterClass = PassthroughFilter.class;
         }
@@ -56,6 +61,7 @@ public class SocketAcceptor implements IOAcceptor {
         synchronized (boundAddresses) {
             boundAddresses.add(address);
         }
+        logger.log(Level.FINE, "listening on {0}", address);
     }
     
     /**
@@ -93,9 +99,12 @@ public class SocketAcceptor implements IOAcceptor {
      * {@inheritDoc}
      */
     public void shutdown() {
-        acceptor.unbindAll();
-        synchronized (boundAddresses) {
-            boundAddresses.clear();
+        if (acceptor != null) {
+            acceptor.unbindAll();
+            synchronized (boundAddresses) {
+                boundAddresses.clear();
+            }
+            acceptor = null;
         }
     }
 

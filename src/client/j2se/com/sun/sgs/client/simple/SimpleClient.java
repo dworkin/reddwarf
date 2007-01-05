@@ -4,8 +4,6 @@ import java.io.IOException;
 import java.net.PasswordAuthentication;
 import java.util.Properties;
 
-import org.apache.mina.filter.codec.ProtocolEncoder;
-
 import com.sun.sgs.client.ServerSession;
 import com.sun.sgs.client.ServerSessionListener;
 import com.sun.sgs.client.SessionId;

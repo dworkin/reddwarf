@@ -6,6 +6,7 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.Executors;
 
 import com.sun.sgs.impl.io.AcceptorFactory;
+import com.sun.sgs.impl.io.CompleteMessageFilter;
 import com.sun.sgs.impl.io.IOConstants.TransportType;
 import com.sun.sgs.io.AcceptedHandleListener;
 import com.sun.sgs.io.IOAcceptor;
@@ -24,14 +25,17 @@ public class ServerTest implements AcceptedHandleListener, IOHandler {
 
     public ServerTest() {
         acceptor = AcceptorFactory.createAcceptor(TransportType.RELIABLE, 
-                                            Executors.newCachedThreadPool());
+                                                Executors.newCachedThreadPool());
     }
 
     public void start() {
         int port = 5150;
         System.out.println("Listening on port " + port);
         try {
-            acceptor.listen(new InetSocketAddress("127.0.0.1", port), this);
+//            acceptor.listen(new InetSocketAddress("127.0.0.1", port), this);
+            acceptor.listen(new InetSocketAddress("127.0.0.1", port), this, 
+                                                CompleteMessageFilter.class);
+            
         }
         catch (IOException ioe) {
             ioe.printStackTrace();
@@ -42,12 +46,12 @@ public class ServerTest implements AcceptedHandleListener, IOHandler {
         new ServerTest().start();
     }
 
-    public void newHandle(IOHandle handle) {
+    public IOHandler newHandle(IOHandle handle) {
         synchronized (this) {
             numConnections++;
         }
-        handle.setIOHandler(this);
-
+        
+        return this;
     }
 
     public void connected(IOHandle handle) {
@@ -69,11 +73,11 @@ public class ServerTest implements AcceptedHandleListener, IOHandler {
         exception.printStackTrace();
     }
 
-    public void messageReceived(byte[] message, IOHandle handle) {
+    public void bytesReceived(byte[] message, IOHandle handle) {
         byte[] buffer = new byte[message.length]; 
         System.arraycopy(message, 0, buffer, 0, message.length); 
         try {
-            handle.sendMessage(buffer);
+            handle.sendBytes(buffer);
         }
         catch (IOException ioe) {
             ioe.printStackTrace();

@@ -26,6 +26,7 @@ public interface IOAcceptor {
      *                                  {@code IOHandle}s
      * 
      * @throws IOException if there was a problem binding to the port
+     * @throws IllegalStateException if the IOAcceptor has been shutdown
      */
     public void listen(SocketAddress address, AcceptedHandleListener listener, 
                     Class<? extends IOFilter> filterClass) throws IOException;
@@ -40,6 +41,7 @@ public interface IOAcceptor {
      *                                  of new connections
      * 
      * @throws IOException if there was a problem binding to the port
+     * @throws IllegalStateException if the IOAcceptor has been shutdown
      */
     public void listen(SocketAddress address, AcceptedHandleListener listener)
                                                         throws IOException;

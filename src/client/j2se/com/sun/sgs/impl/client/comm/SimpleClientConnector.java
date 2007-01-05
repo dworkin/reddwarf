@@ -1,9 +1,9 @@
 package com.sun.sgs.impl.client.comm;
 
 import java.io.IOException;
-import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.util.Properties;
-import java.util.concurrent.Executors;
 
 import com.sun.sgs.client.comm.ClientConnection;
 import com.sun.sgs.client.comm.ClientConnectionListener;
@@ -11,7 +11,6 @@ import com.sun.sgs.client.comm.ClientConnector;
 import com.sun.sgs.impl.io.ConnectorFactory;
 import com.sun.sgs.impl.io.IOConstants.TransportType;
 import com.sun.sgs.io.IOConnector;
-import com.sun.sgs.io.IOHandle;
 
 /**
  * A basic implementation of a {@code ClientConnector} which uses an 
@@ -58,12 +57,10 @@ public class SimpleClientConnector extends ClientConnector {
             throw new IllegalArgumentException("Bad port number: " + port);
         }
         
-        InetAddress address = InetAddress.getByName(host);
-        
         SimpleClientConnection connection = 
                                 new SimpleClientConnection(connectionListener);
-        
-        connector.connect(address, port, connection);
+        SocketAddress socketAddress = new InetSocketAddress(host, port);
+        connector.connect(socketAddress, connection);
     }
 
 }

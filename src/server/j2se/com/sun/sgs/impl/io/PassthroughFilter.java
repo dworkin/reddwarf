@@ -2,7 +2,6 @@ package com.sun.sgs.impl.io;
 
 import com.sun.sgs.io.IOFilter;
 import com.sun.sgs.io.IOHandle;
-import com.sun.sgs.io.IOHandler;
 
 /**
  * A filter that doesn't do anything except simply pass the messages through.
