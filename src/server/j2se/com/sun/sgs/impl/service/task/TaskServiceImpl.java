@@ -150,18 +150,18 @@ public class TaskServiceImpl
      * {@inheritDoc}
      */
     public void configure(ComponentRegistry serviceRegistry,
-                          TransactionProxy transactionProxy) {
+                          TransactionProxy proxy) {
         if (isConfigured)
             throw new IllegalStateException("Task Service already configured");
         isConfiguring = true;
 
         logger.log(Level.CONFIG, "starting TaskService configuration");
 
-        if (transactionProxy == null)
+        if (proxy == null)
             throw new NullPointerException("null proxy not allowed");
 
         // keep track of the proxy and the data service
-        TaskServiceImpl.transactionProxy = transactionProxy;
+        transactionProxy = proxy;
         dataService = serviceRegistry.getComponent(DataService.class);
 
         // fetch the map of pending tasks, or create it if it doesn't
@@ -192,7 +192,7 @@ public class TaskServiceImpl
         // so join the transaction only so we can set our isConfigured flag
         // on commit
         if (pmap.isEmpty()) {
-            transactionProxy.getCurrentTransaction().join(this);
+            proxy.getCurrentTransaction().join(this);
             return;
         }
 
@@ -205,7 +205,7 @@ public class TaskServiceImpl
             PendingTask task = entry.getValue();
             TaskRunner runner = new TaskRunner(this, entry.getKey());
             TaskOwner owner =
-                new TaskOwnerImpl(task.identity, transactionProxy.
+                new TaskOwnerImpl(task.identity, proxy.
                                   getCurrentOwner().getContext());
             if (task.period == PERIOD_NONE) {
                 // this is a non-periodic task
@@ -668,6 +668,7 @@ public class TaskServiceImpl
     private class TxnState {
         public boolean prepared = false;
         public HashSet<TaskReservation> reservationSet = null;
+        @SuppressWarnings("hiding")
         public HashMap<String,RecurringTaskHandle> recurringMap = null;
         public HashSet<String> cancelledSet = null;
     }

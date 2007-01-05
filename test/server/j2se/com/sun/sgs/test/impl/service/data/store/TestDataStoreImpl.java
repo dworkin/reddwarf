@@ -886,7 +886,7 @@ public class TestDataStoreImpl extends TestCase {
     }
 
     /* -- Test deadlock -- */
-
+    @SuppressWarnings("hiding")
     public void testDeadlock() throws Exception {
 	txn.abort();
 	txn = null;
@@ -1017,7 +1017,7 @@ public class TestDataStoreImpl extends TestCase {
     /** The set of bad transaction states */
     static enum BadTxnState {
 	Aborted, PreparedReadOnly, PreparedModified, Committed, Wrong
-    };
+    }
 
     /** Defines a abstract class for testing bad transaction states. */
     static abstract class BadTxnTest extends TestDataStoreImpl {

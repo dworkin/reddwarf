@@ -16,6 +16,7 @@ import java.util.Properties;
 import junit.framework.TestCase;
 
 /** Test TransactionCoordinatorImpl */
+@SuppressWarnings("hiding")
 public class TestTransactionCoordinatorImpl extends TestCase {
 
     /** The instance to test. */
