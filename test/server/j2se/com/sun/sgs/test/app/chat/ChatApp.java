@@ -10,7 +10,7 @@ import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
-import com.sun.sgs.app.NameNotBoundException;
+import com.sun.sgs.app.NameExistsException;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.ShutdownListener;
@@ -79,7 +79,7 @@ public class ChatApp
 		Channel channel;
 		try {
 		    channel = channelMgr.createChannel(channelName, app, Delivery.RELIABLE);
-		} catch (NameNotBoundException nnbe) {
+		} catch (NameExistsException e) {
 		    channel = channelMgr.getChannel(channelName);
 		}
 		System.err.format("ChatApp: Joining \"%s\" to channel %s\n",
