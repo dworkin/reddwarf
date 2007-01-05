@@ -59,44 +59,47 @@ class MasterTaskConsumer implements Runnable {
         while (true) {
             // wait for the next task...if we get interrupted while waiting,
             // then we'll loop back and try again
+            // NOTE: when we actually add shutdown and other management
+            // facilities, we will probably want to interpret interruption
+            // different, perhaps even returning from this thread
+            ScheduledTask task = null;
+            boolean taskFinished = false;
             try {
-                ScheduledTask task = scheduler.getNextTask();
-    
-                // run the task to completion
-                while (true) {
-                    try {
-                        taskHandler.runTaskAsOwner(task.getTask(),
-                                                   task.getOwner());
-                        break;
-                    } catch (Exception e) {
-                        if ((e instanceof ExceptionRetryStatus) &&
-                            (((ExceptionRetryStatus)e).shouldRetry())) {
-                            // NOTE: we're not doing anything fancy here to
-                            // guess about re-scheduling, adding right to the
-                            // ready queue, etc...this is just re-running in
-                            // place until the task is done, but this is one
-                            // of the first issues that will be investigated
-                            // for optimization
-                        } else {
-                            if (logger.isLoggable(Level.FINE))
-                                logger.logThrow(Level.FINE, e,
-                                        "dropping a failed task that " +
-                                        "did not ask to be re-tried: {0}",
-                                        task);
-                            break;
-                        }
+                task = scheduler.getNextTask();
+            } catch (InterruptedException ie) {
+                taskFinished = true;
+            }
+
+            // run the task to completion
+            while (! taskFinished) {
+                try {
+                    taskHandler.runTaskAsOwner(task.getTask(),
+                                               task.getOwner());
+                    taskFinished = true;
+                } catch (Exception e) {
+                    if ((e instanceof ExceptionRetryStatus) &&
+                        (((ExceptionRetryStatus)e).shouldRetry())) {
+                        // NOTE: we're not doing anything fancy here to
+                        // guess about re-scheduling, adding right to the
+                        // ready queue, etc...this is just re-running in
+                        // place until the task is done, but this is one
+                        // of the first issues that will be investigated
+                        // for optimization
+                    } else {
+                        if (logger.isLoggable(Level.FINE))
+                            logger.logThrow(Level.FINE, e,
+                                            "dropping a failed task that " +
+                                            "did not ask to be re-tried: {0}",
+                                            task);
+                        taskFinished = true;
                     }
                 }
-    
-                // if this is a recurring task, schedule the next run
-                if (task.isRecurring()) {
-                    long newStartTime = task.getStartTime() + task.getPeriod();
-                    scheduler.addFutureTask(new ScheduledTask(task, newStartTime));
-                }
-            } catch (InterruptedException ie) {
-                // NOTE: when we actually add shutdown and other management
-                // facilities, we will probably want to interpret interruption
-                // differently, perhaps even returning from this thread
+            }
+
+            // if this is a recurring task, we can now schedule the next run
+            if ((task != null) && (task.isRecurring())) {
+                long newStartTime = task.getStartTime() + task.getPeriod();
+                scheduler.addFutureTask(new ScheduledTask(task, newStartTime));
             }
         }
     }
