@@ -454,11 +454,20 @@ final class ChannelImpl implements Channel, Serializable {
 	}
 
 	/*
-	 * Notify per-session listeners.
+	 * Notify per-session listener.
 	 */
+	listener = state.getListener(senderSession);
+	if (listener != null) {
+	    listener.receivedMessage(this, senderSession, message);
+	}
+        
+        /*
+         * Build the list of recipients
+         */
 	Collection<ClientSession> sessions;
 	if (sessionIds.size() == 0) {
-	    sessions = getSessions();
+	    sessions = new ArrayList<ClientSession>(getSessions());
+            sessions.remove(senderSession);
 	} else {
 	    sessions = new ArrayList<ClientSession>();
 	    for (byte[] sessionId : sessionIds) {
@@ -470,13 +479,19 @@ final class ChannelImpl implements Channel, Serializable {
 		}
 	    }
 	}
-
-	for (ClientSession session : sessions) {
-	    listener = state.getListener(session);
-	    if (listener != null) {
-		listener.receivedMessage(this, senderSession, message);
-	    }
-	}
+        
+        /*
+         * If there are no connected sessions other than the sender,
+         * we don't need to send anything.
+         */
+        if (sessions.isEmpty()) {
+            if (logger.isLoggable(Level.FINEST)) {
+                logger.log(
+                    Level.FINEST,
+                    "no recipients except sender");
+            }
+            return;
+        }
 
 	/*
 	 * Schedule a non-transactional task to send the channel

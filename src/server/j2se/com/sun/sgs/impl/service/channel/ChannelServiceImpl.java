@@ -8,6 +8,7 @@ import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.service.session.SgsProtocol;
+import com.sun.sgs.impl.util.HexDumper;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.MessageBuffer;
 import com.sun.sgs.impl.util.NonDurableTaskScheduler;
@@ -26,8 +27,6 @@ import com.sun.sgs.service.TransactionProxy;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
@@ -508,6 +507,13 @@ public class ChannelServiceImpl
 		switch (opcode) {
 		    
 		case SgsProtocol.CHANNEL_SEND_REQUEST:
+                    if (logger.isLoggable(Level.FINEST)) {
+                        logger.log(
+                            Level.FINEST,
+                            "receivedMessage session:{0} message:{1} " +
+                            "opcode:{2}",
+                            session, HexDumper.format(message), opcode);
+                    }
 		    String name = buf.getString();
 		    short numRecipients = buf.getShort();
 		    if (numRecipients < 0) {
@@ -528,7 +534,8 @@ public class ChannelServiceImpl
 		    nonDurableTaskScheduler.scheduleTask(
 			new SendTask(
 			    name, session.getSessionId(),
-			    sessions, message, session.nextSequenceNumber()));
+			    sessions, channelMessage,
+                            session.nextSequenceNumber()));
 		    break;
 		    
 		default:
@@ -537,7 +544,7 @@ public class ChannelServiceImpl
 			    Level.SEVERE,
 			    "receivedMessage session:{0} message:{1} " +
 			    "unknown opcode:{2}",
-			    session, message, opcode);
+			    session, HexDumper.format(message), opcode);
 		    }
 		    break;
 		}
@@ -546,7 +553,7 @@ public class ChannelServiceImpl
 		    logger.log(
 			Level.FINEST,
 			"receivedMessage session:{0} message:{1} returns",
-			session, message);
+			session, HexDumper.format(message));
 		}
 		
 	    } catch (RuntimeException e) {
@@ -554,7 +561,7 @@ public class ChannelServiceImpl
 		    logger.logThrow(
 			Level.SEVERE, e,
 			"receivedMessage session:{0} message:{1} throws",
-			session, message);
+			session, HexDumper.format(message));
 		}
 	    }
 	}
@@ -586,17 +593,23 @@ public class ChannelServiceImpl
 
 	public void run() {
 	    try {
+                if (logger.isLoggable(Level.FINEST)) {
+                    logger.log(
+                        Level.FINEST,
+                        "SendTask.run name:{0}, message:{1}",
+                        name, HexDumper.format(message));
+                }
 		Context context = checkContext();
 		ChannelImpl channel = (ChannelImpl) context.getChannel(name);
 		channel.notifyAndSend(
 		    senderId, sessionIds, message, sequenceNumber);
 
 	    } catch (RuntimeException e) {
-		if (logger.isLoggable(Level.FINEST)) {
+		if (logger.isLoggable(Level.FINER)) {
 		    logger.logThrow(
-			Level.FINEST, e,
+			Level.FINER, e,
 			"SendTask.run name:{0}, message:{1} throws",
-			name, message);
+			name, HexDumper.format(message));
 		}
 		throw e;
 	    }

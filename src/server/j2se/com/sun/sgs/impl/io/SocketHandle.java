@@ -49,7 +49,7 @@ public class SocketHandle implements IOHandle {
     }
 
     /**
-     * Closes the undering {@code IoSession}.
+     * Closes the underlying {@code IoSession}.
      *  
      * @throws IOException if the session is not connected. 
      */

@@ -7,6 +7,7 @@ import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.auth.NamePasswordCredentials;
+import com.sun.sgs.impl.util.HexDumper;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.MessageBuffer;
 import com.sun.sgs.impl.kernel.ContextResolver;
@@ -22,6 +23,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.nio.ByteBuffer;
 import java.security.SecureRandom;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
@@ -514,7 +516,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
                 logger.log(
                     Level.FINEST,
                     "Handler.messageReceived handle:{0}, buffer:{1}",
-                    handle, buffer);
+                    handle, HexDumper.format(buffer));
             }
 	    
 	    synchronized (lock) {
@@ -534,7 +536,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		    logger.log(
 		        Level.SEVERE,
 			"Handler.messageReceived malformed protocol message:{0}",
-			buffer);
+                        HexDumper.format(buffer));
 		}
 		// TBD: should the connection be disconnected?
 		return;

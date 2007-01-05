@@ -349,7 +349,6 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
                     ProtocolMessage.CHANNEL_SERVICE,
                     ProtocolMessage.CHANNEL_SEND_REQUEST);
             m.writeString(name);
-            m.writeLong(sequenceNumber.getAndIncrement());
             if (recipients == null) {
                 m.writeShort(Short.valueOf((short) 0));
             } else {
