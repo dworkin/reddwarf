@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 
 import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.Properties;
 
@@ -407,7 +408,9 @@ class Kernel {
             appProperties.setProperty("com.sun.sgs.appName", appName);
 
             final String appPrefix = "com.sun.sgs." + appName + ".";
-            for (String prop : systemProperties.stringPropertyNames()) {
+            Enumeration<?> e = systemProperties.propertyNames();
+            while (e.hasMoreElements()) {
+        	String prop = (String) e.nextElement();
                 if (!prop.startsWith(appPrefix))
                     continue;
                 
