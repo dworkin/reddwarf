@@ -1,11 +1,15 @@
 package com.sun.sgs.impl.service.session;
 
+import com.sun.sgs.app.Delivery;
+import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.IdentityManager;
 import com.sun.sgs.impl.io.AcceptorFactory;
 import com.sun.sgs.impl.io.CompleteMessageFilter;
 import com.sun.sgs.impl.io.PassthroughFilter;
 import com.sun.sgs.impl.io.IOConstants.TransportType;
+import com.sun.sgs.impl.util.HexDumper;
 import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.util.MessageBuffer;
 import com.sun.sgs.impl.util.NonDurableTaskScheduler;
 import com.sun.sgs.io.AcceptedHandleListener;
 import com.sun.sgs.io.IOAcceptor;
@@ -16,18 +20,24 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.ServiceListener;
 import com.sun.sgs.service.SgsClientSession;
 import com.sun.sgs.service.TaskService;
+import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;   
 import java.util.Properties;
+import java.util.concurrent.Callable;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -40,7 +50,9 @@ import java.util.logging.Logger;
  * <li><code>com.sun.sgs.app.port</code>
  * </ul>
  */
-public class ClientSessionServiceImpl implements ClientSessionService {
+public class ClientSessionServiceImpl
+    implements ClientSessionService, NonDurableTransactionParticipant
+{
 
     /** The property that specifies the application name. */
     public static final String APP_NAME_PROPERTY = "com.sun.sgs.appName";
@@ -72,6 +84,10 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     /** A map of current sessions, from session ID to ClientSessionImpl. */
     private final Map<SessionId, ClientSessionImpl> sessions =
 	Collections.synchronizedMap(new HashMap<SessionId, ClientSessionImpl>());
+    
+    /** Provides transaction and other information for the current thread. */
+    private static final ThreadLocal<Context> currentContext =
+        new ThreadLocal<Context>();
 
     /** The component registry for this application, or null if
      * configure has not been called.
@@ -281,6 +297,129 @@ public class ClientSessionServiceImpl implements ClientSessionService {
             return Arrays.hashCode(bytes);
         }
     }
+
+    /* -- Implement NonDurableTransactionParticipant -- */
+       
+    /** {@inheritDoc} */
+    public boolean prepare(Transaction txn) throws Exception {
+        try {
+            boolean readOnly = currentContext.get().prepare();
+            handleTransaction(txn, readOnly);
+            if (logger.isLoggable(Level.FINE)) {
+                logger.log(Level.FINER, "prepare txn:{0} returns {1}",
+                           txn, readOnly);
+            }
+            
+            return readOnly;
+        } catch (RuntimeException e) {
+            if (logger.isLoggable(Level.FINER)) {
+                logger.logThrow(Level.FINER, e, "prepare txn:{0} throws", txn);
+            }
+            throw e;
+        }
+    }
+
+    /** {@inheritDoc} */
+    public void commit(Transaction txn) {
+        try {
+            handleTransaction(txn, true);
+            if (logger.isLoggable(Level.FINER)) {
+                logger.log(Level.FINER, "commit txn:{0} returns", txn);
+            }
+        } catch (RuntimeException e) {
+            if (logger.isLoggable(Level.FINER)) {
+                logger.logThrow(Level.FINER, e, "commit txn:{0} throws", txn);
+            }
+            throw e;
+        }
+    }
+
+    /** {@inheritDoc} */
+    public void prepareAndCommit(Transaction txn) throws Exception {
+        if (! prepare(txn)) {
+            commit(txn);
+        }
+    }
+
+    /** {@inheritDoc} */
+    public void abort(Transaction txn) {
+        try {
+            handleTransaction(txn, true);
+            if (logger.isLoggable(Level.FINER)) {
+                logger.log(Level.FINER, "abort txn:{0} returns", txn);
+            }
+        } catch (RuntimeException e) {
+            if (logger.isLoggable(Level.FINER)) {
+                logger.logThrow(Level.FINER, e, "abort txn:{0} throws", txn);
+            }
+            throw e;
+        }
+    }
+
+    /* -- other methods -- */
+
+    /**
+     * Checks the specified transaction, throwing IllegalStateException
+     * if the current context is null or if the specified transaction is
+     * not equal to the transaction in the current context. If
+     * 'nullifyContext' is 'true' or if the specified transaction does
+     * not match the current context's transaction, then sets the
+     * current context to null.
+     */
+    private void handleTransaction(Transaction txn, boolean nullifyContext) {
+        if (txn == null) {
+            throw new NullPointerException("null transaction");
+        }
+        Context context = currentContext.get();
+        if (context == null) {
+            throw new IllegalStateException("null context");
+        }
+        if (!txn.equals(context.txn)) {
+            currentContext.set(null);
+            throw new IllegalStateException(
+                "Wrong transaction: Expected " + context.txn + ", found " + txn);
+        }
+        if (nullifyContext) {
+            currentContext.set(null);
+        }
+    }
+
+   /**
+     * Obtains information associated with the current transaction, throwing a
+     * TransactionNotActiveException exception if there is no current
+     * transaction, and throwing IllegalStateException if there is a problem
+     * with the state of the transaction or if this service has not been
+     * configured with a transaction proxy.
+     */
+    private Context checkContext() {
+        Transaction txn;
+        synchronized (lock) {
+            if (txnProxy == null) {
+                throw new IllegalStateException("Not configured");
+            }
+            txn = txnProxy.getCurrentTransaction();
+        }
+        if (txn == null) {
+            throw new TransactionNotActiveException(
+                "No transaction is active");
+        }
+        Context context = currentContext.get();
+        if (context == null) {
+            if (logger.isLoggable(Level.FINER)) {
+                logger.log(Level.FINER, "join txn:{0}", txn);
+            }
+            txn.join(this);
+            context =
+                new Context(txn);
+            currentContext.set(context);
+        } else if (!txn.equals(context.txn)) {
+            currentContext.set(null);
+            throw new IllegalStateException(
+                "Wrong transaction: Expected " + context.txn +
+                ", found " + txn);
+        }
+        return context;
+    }
     
     /* -- Other methods -- */
 
@@ -329,5 +468,139 @@ public class ClientSessionServiceImpl implements ClientSessionService {
      */
     void scheduleNonTransactionalTaskUsingService(KernelRunnable task) {
 	nonDurableTaskScheduler.scheduleNonTransactionalTaskUsingService(task);
+    }
+
+    void addCommitBuffer(ClientSessionImpl session, byte[] message,
+            Delivery delivery)
+    {
+        checkContext().getSendTask().appendMessage(session, message, delivery);
+    }
+    
+    void addCommitBuffer(ClientSessionImpl session, Callable<byte[]> message,
+            Delivery delivery)
+    {
+        checkContext().getSendTask().appendMessage(session, message, delivery);
+    }
+    
+    static final class Context {
+        /** The transaction. */
+        private final Transaction txn;
+        private SendTask sendTask;
+        
+        Context(Transaction txn) {
+            this.txn = txn;
+            this.sendTask = null;
+        }
+        
+        boolean prepare() {
+            if (sendTask != null) {
+                sendTask.prepare();
+            }
+            return true;
+        }
+        
+        SendTask getSendTask() {
+            if (sendTask == null) {
+                sendTask = new SendTask();
+                txnProxy.getService(TaskService.class)
+                    .scheduleNonDurableTask(sendTask);
+            }
+            return sendTask;
+        }
+    }
+    
+    static final class SendTask implements KernelRunnable {
+
+        private final Map<ClientSessionImpl, List<Callable<byte[]>>>
+            sessionMessages;
+        private boolean prepared;
+
+        SendTask() {
+            sessionMessages =
+                new HashMap<ClientSessionImpl, List<Callable<byte[]>>>();
+            prepared = false;
+        }
+
+        void appendMessage(ClientSessionImpl session, final byte[] message,
+                Delivery delivery)
+        {
+            if (prepared) {
+                RuntimeException e =
+                    new IllegalStateException("SendTask is locked");
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.logThrow(Level.FINE, e,
+                            "Already locked while adding {0}, {1}",
+                            session, HexDumper.format(message));
+                }
+                throw e;
+            }
+            appendMessage(session, new Callable<byte[]>() {
+
+                public byte[] call() throws Exception {
+                    return message;
+                }
+                
+            }, delivery);
+        }
+        
+        void appendMessage(ClientSessionImpl session, Callable<byte[]> message,
+                Delivery delivery)
+        {
+            if (prepared) {
+                RuntimeException e =
+                    new IllegalStateException("SendTask is already prepared");
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.logThrow(Level.FINE, e,
+                            "Already prepared while adding {0}, {1}",
+                            session, message);
+                }
+                throw e;
+            }
+            List<Callable<byte[]>> messages = sessionMessages.get(session);
+            if (messages == null) {
+                messages = new ArrayList<Callable<byte[]>>();
+                sessionMessages.put(session, messages);
+            }
+
+            if (logger.isLoggable(Level.FINEST)) {
+                logger.log(Level.FINEST,
+                        "adding {0}, {1}",
+                        session, message);
+            }
+            messages.add(message);
+        }
+        
+        void prepare() {
+            if (prepared) {
+                RuntimeException e =
+                    new IllegalStateException("SendTask was already prepared");
+                logger.logThrow(Level.WARNING, e, "Already prepared");
+                throw e;
+            }
+            prepared = true;
+            logger.log(Level.FINEST, "prepare returns true");
+        }
+
+        public void run() throws Exception {
+            if (!prepared) {
+                RuntimeException e =
+                    new IllegalStateException(
+                            "prepare() must be called before run()");
+                logger.logThrow(Level.FINE, e, "Not yet prepared");
+                throw e;
+            }
+            logger.log(Level.INFO, "Running SessionService$SendTask, "
+                    + "map.size = {0}", sessionMessages.size());
+            for (Map.Entry<ClientSessionImpl, List<Callable<byte[]>>> entry
+                 : sessionMessages.entrySet())
+            {
+                ClientSessionImpl session = entry.getKey();
+                List<Callable<byte[]>> messages = entry.getValue();
+                // TODO it'd be nice to have IOHandle do gathering writes -JM
+                for (Callable<byte[]> message : messages) {
+                   session.sendMessage(message.call(), Delivery.RELIABLE);
+                }
+            }
+        }
     }
 }

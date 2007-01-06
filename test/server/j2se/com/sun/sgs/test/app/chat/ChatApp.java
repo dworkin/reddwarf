@@ -10,6 +10,7 @@ import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameExistsException;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
@@ -36,7 +37,9 @@ public class ChatApp
     }
 
     /** {@inheritDoc} */
-    public void receivedMessage(Channel channel, ClientSession sender, byte[] message) {
+    public void receivedMessage(Channel channel, ClientSession sender,
+            byte[] message)
+    {
 	String messageString = new String(message);
 	System.err.format("ChatApp: Echoing to \"%s\": [%s]\n",
 		sender.getName(), messageString);
@@ -50,17 +53,21 @@ public class ChatApp
     }
 
     static class ChatClientSessionListener
-    	    implements ClientSessionListener, Serializable
+    	    implements ClientSessionListener, ManagedObject, Serializable
     {
 	private static final long serialVersionUID = 1L;
-	private final ChatApp app;
+	private final ManagedReference appRef;
 	private final ClientSession session;
 
 	public ChatClientSessionListener (ChatApp app, ClientSession session) {
-	    this.app = app;
+	    this.appRef = AppContext.getDataManager().createReference(app);
 	    this.session = session;
 	}
-	
+
+	private ChatApp getApp() {
+	    return appRef.get(ChatApp.class);
+	}
+            
 	/** {@inheritDoc} */
 	public void disconnected(boolean graceful) {
 	    System.err.format("ChatApp: ClientSession [%s] disconnected, " +
@@ -78,7 +85,8 @@ public class ChatApp
 		String channelName = command.substring(6);
 		Channel channel;
 		try {
-		    channel = channelMgr.createChannel(channelName, app, Delivery.RELIABLE);
+		    channel = channelMgr.createChannel(
+                            channelName, getApp(), Delivery.RELIABLE);
 		} catch (NameExistsException e) {
 		    channel = channelMgr.getChannel(channelName);
 		}
@@ -98,13 +106,16 @@ public class ChatApp
                 String reply = "ECHO" + contents;
                 session.send(reply.getBytes());
 	    } else if (command.equals("/exit")) {
-		System.err.format("ChatApp: \"%s\" requests exit\n", session.getName());
+		System.err.format("ChatApp: \"%s\" requests exit\n",
+                        session.getName());
 		session.disconnect();
 	    } else if (command.equals("/shutdown")) {
-		System.err.format("ChatApp: \"%s\" requests shutdown\n", session.getName());
+		System.err.format("ChatApp: \"%s\" requests shutdown\n",
+                        session.getName());
 		// TODO: AppContext.requestShutdown();
 	    } else {
-		System.err.format("ChatApp: Error; \"%s\" sent unknown command [%s]\n",
+		System.err.format(
+                        "ChatApp: Error; \"%s\" sent unknown command [%s]\n",
 			session.getName(), command);
 	    }
 	}

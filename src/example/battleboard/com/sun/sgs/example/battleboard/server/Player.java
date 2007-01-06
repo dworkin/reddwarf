@@ -37,6 +37,13 @@ public class Player
      * The current ClientSession of this user, if logged in.
      */
     private ClientSession mySession;
+    
+    /**
+     * The ClientSession is not valid on disconnect, but we need this
+     * key (generated from the session) to unbind the Player object
+     * on disconnect.
+     */
+    private String mySessionKey;
 
     /**
      * The name under which the player is playing (i.e., a screen name
@@ -58,8 +65,12 @@ public class Player
     protected Player(String userName, ClientSession session) {
         myUserName = userName;
         mySession = session;
+        mySessionKey = keyForSession(session);
         myGameRef = null;
         myPlayerName = null;
+
+        DataManager dataMgr = AppContext.getDataManager();
+        dataMgr.setBinding(mySessionKey, this);
     }
 
     public static Player findBySession(ClientSession session) {
@@ -114,19 +125,19 @@ public class Player
     }
 
     protected static String keyForSession(ClientSession session) {
-        return Pattern.compile("\\W+")
-                            .matcher(session.toString()).replaceAll("");
+        byte[] sessionId = session.getSessionId();
+        StringBuilder buf = new StringBuilder("session-");
+        for (byte b : sessionId) {
+            buf.append(String.format("%02X", b));
+        }
+        return buf.toString();
     }
 
     public static Player loggedIn(ClientSession session) {
         log.log(Level.FINER, "User joined server: {0}", session);
 
-        String sessionKey = keyForSession(session);
         String userName = session.getName();
         Player player = new Player(userName, session);
-
-        DataManager dataMgr = AppContext.getDataManager();
-        dataMgr.setBinding(sessionKey, player);
 
         Matchmaker.getInstance().addUserID(session);
         return player;
@@ -149,10 +160,8 @@ public class Player
             matchmaker.playerDisconnected(this);
         }
 
-        String sessionKey = keyForSession(mySession);
-
         DataManager dataMgr = AppContext.getDataManager();
-        dataMgr.removeBinding(sessionKey);
+        dataMgr.removeBinding(mySessionKey);
         dataMgr.removeObject(this);
     }
 

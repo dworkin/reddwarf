@@ -110,6 +110,7 @@ public class Game implements ManagedObject, Serializable {
         ManagedReference gameRef = dataMgr.createReference(this);
 
         gameName = "GameChannel-" + gameRef.getId();
+        dataMgr.setBinding(gameName, this);
 
         log.info("New game channel is `" + gameName + "'");
 
@@ -387,7 +388,7 @@ public class Game implements ManagedObject, Serializable {
                 ManagedReference playerRef = players.get(0);
                 Player winner = playerRef.get(Player.class);
                 ManagedReference historyRef =
-			nameToHistory.get(winner.getUserName());
+			nameToHistory.get(winner.getPlayerName());
                 PlayerHistory history = historyRef.get(PlayerHistory.class);
                 history.win();
                 log.finer(winner.getUserName() + " summary: " +
@@ -429,7 +430,7 @@ public class Game implements ManagedObject, Serializable {
         }
 
         ManagedReference historyRef =
-		nameToHistory.get(loser.getUserName());
+		nameToHistory.get(loser.getPlayerName());
 
         PlayerHistory history = historyRef.get(PlayerHistory.class);
         history.lose();

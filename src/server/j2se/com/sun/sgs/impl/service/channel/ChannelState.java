@@ -4,7 +4,13 @@ import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.impl.service.session.SgsProtocol;
+import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.util.MessageBuffer;
 import com.sun.sgs.impl.util.WrappedSerializable;
+import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.service.SgsClientSession;
+
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -14,11 +20,18 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Persistent state of a channel.
  */
 final class ChannelState implements ManagedObject, Serializable {
+
+    /** The logger for this class. */
+    private final static LoggerWrapper logger =
+        new LoggerWrapper(
+            Logger.getLogger(ChannelState.class.getName()));
     
     /** Serialization version. */
     private static final long serialVersionUID = 1L;
@@ -59,9 +72,30 @@ final class ChannelState implements ManagedObject, Serializable {
      * the channel represented by this state.
      */
     Collection<ClientSession> getSessions() {
+        Collection<ClientSession> collection = new ArrayList<ClientSession>();
+        for (ClientSession session : listeners.keySet()) {
+            collection.add(session);
+        }
+        return collection;
+    }
+    
+    /**
+     * Returns a collection containing the client sessions joined to
+     * the channel represented by this state, excluding the session
+     * with the given sessionId.
+     * 
+     * @param sessionId the sessionId to exclude
+     */
+    Collection<ClientSession> getSessionsExcludingId(byte[] sessionId) {
 	Collection<ClientSession> collection = new ArrayList<ClientSession>();
 	for (ClientSession session : listeners.keySet()) {
-	    collection.add(session);
+            try {
+                if (! sessionId.equals(session.getSessionId())) {
+                    collection.add(session);
+                }
+            } catch (IllegalStateException e) {
+                // skip disconnected sessions
+            }
 	}
 	return collection;
     }
@@ -106,10 +140,26 @@ final class ChannelState implements ManagedObject, Serializable {
 	    null;
 	
 	listeners.put(session, wrappedListener);
+
+	int nameSize = MessageBuffer.getSize(name);
+	MessageBuffer buf = new MessageBuffer(3 + nameSize);
+	    buf.putByte(SgsProtocol.VERSION).
+	    putByte(SgsProtocol.CHANNEL_SERVICE).
+	    putByte(SgsProtocol.CHANNEL_JOIN).
+	    putString(name);
+	sendProtocolMessageOnCommit(session, buf.getBuffer());
     }
 
     void removeSession(ClientSession session) {
 	listeners.remove(session);
+        
+	int nameSize = MessageBuffer.getSize(name);
+	MessageBuffer buf = new MessageBuffer(3 + nameSize);
+	    buf.putByte(SgsProtocol.VERSION).
+	    putByte(SgsProtocol.CHANNEL_SERVICE).
+	    putByte(SgsProtocol.CHANNEL_LEAVE).
+	    putString(name);
+	sendProtocolMessageOnCommit(session, buf.getBuffer());
     }
 
     void removeAll() {
@@ -130,6 +180,26 @@ final class ChannelState implements ManagedObject, Serializable {
 	    listener != null ?
 	    listener.get(ChannelListener.class) :
 	    null;
+    }
+    
+    /**
+     * If this transaction commits, send a protocol message to the
+     * specified session, logging (but not throwing) any exception.
+     */
+    private void sendProtocolMessageOnCommit(ClientSession session,
+            byte[] message)
+    {
+        try {
+            ((SgsClientSession) session).sendMessageOnCommit(message, delivery);
+        } catch (RuntimeException e) {
+            if (logger.isLoggable(Level.FINEST)) {
+                logger.logThrow(
+                    Level.FINEST, e,
+                    "sendProtcolMessage session:{0} message:{1} throws",
+                    session, message);
+            }
+            // eat exception
+        }
     }
     
     /* -- Serialization methods -- */

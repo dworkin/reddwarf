@@ -26,6 +26,7 @@ import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.security.SecureRandom;
 import java.util.Random;
+import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -191,17 +192,14 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    case CONNECTING:
 	    case CONNECTED:
 	    case RECONNECTING:
-		scheduleNonTransactionalTaskUsingService(new KernelRunnable() {
-	            public void run() throws IOException {
-			MessageBuffer buf =
-			    new MessageBuffer(5 + message.length);
-			buf.putByte(SgsProtocol.VERSION).
-			    putByte(SgsProtocol.APPLICATION_SERVICE).
-			    putByte(SgsProtocol.MESSAGE_SEND).
-			    putShort(message.length).
-			    putBytes(message);
-			sendProtocolMessage(buf);
-		    }});
+		MessageBuffer buf =
+		    new MessageBuffer(5 + message.length);
+		buf.putByte(SgsProtocol.VERSION).
+		    putByte(SgsProtocol.APPLICATION_SERVICE).
+		    putByte(SgsProtocol.MESSAGE_SEND).
+		    putShort(message.length).
+		    putBytes(message);
+		sendProtocolMessageOnCommit(buf);
 		break;
 	    
 	    default:
@@ -264,6 +262,11 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	}
     }
 
+    /** {@inheritDoc} */
+    public void sendMessageOnCommit(byte[] message, Delivery delivery) {
+        sessionService.addCommitBuffer(this, message, delivery);
+    }
+    
     /* -- Implement Object -- */
 
     /** {@inheritDoc} */
@@ -353,13 +356,24 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     }
 
     /**
-     * Sends the protocol message in the specified buffer to this
-     * session's client, logging any exception that occurs.
+     * Immediately sends the protocol message in the specified buffer
+     * to this session's client, logging any exception that occurs.
      */
     private void sendProtocolMessage(MessageBuffer buf) {
 	// TBI: specify reliable delivery for now
 	sendMessage(buf.getBuffer(), Delivery.RELIABLE);
     }
+    
+    /**
+     * Sends the protocol message in the specified buffer to this
+     * session's client when the current transaction commits,
+     * logging any exception that occurs.
+     */
+    private void sendProtocolMessageOnCommit(MessageBuffer buf) {
+        // TBI: specify reliable delivery for now
+        sendMessageOnCommit(buf.getBuffer(), Delivery.RELIABLE);
+    }
+    
 
     /**
      * Handles a disconnect request (if not already handled) by doing
@@ -389,17 +403,17 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 
 	sessionService.disconnected(this);
 
-	if (graceful) {
-	    MessageBuffer disconnectMsg = new MessageBuffer(3);
-	    disconnectMsg.
-		putByte(SgsProtocol.VERSION).
-		putByte(SgsProtocol.APPLICATION_SERVICE).
-		putByte(SgsProtocol.LOGOUT_SUCCESS);
-
-	    sendProtocolMessage(disconnectMsg);
-        }
-
         if (getCurrentState() != State.DISCONNECTED) {
+            if (graceful) {
+                MessageBuffer disconnectMsg = new MessageBuffer(3);
+                disconnectMsg.
+                    putByte(SgsProtocol.VERSION).
+                    putByte(SgsProtocol.APPLICATION_SERVICE).
+                    putByte(SgsProtocol.LOGOUT_SUCCESS);
+
+                sendProtocolMessage(disconnectMsg);
+            }
+
             try {
                 sessionHandle.close();
             } catch (IOException e) {
@@ -615,7 +629,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		} catch (LoginException e) {
 		    // This will send a nack to client because
 		    // listener is null.
-		    scheduleTask(new LoginAckTask());
+		    scheduleNonTransactionalTask(new LoginNackTask());
 		}
 		break;
 		
@@ -679,11 +693,11 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 
     /**
      */
-    private Identity authenticate(String name, String password)
+    private Identity authenticate(String username, String password)
 	throws LoginException
     {
 	return sessionService.identityManager.authenticateIdentity(
-	    new NamePasswordCredentials(name, password.toCharArray()));
+	    new NamePasswordCredentials(username, password.toCharArray()));
     }
 
     /**
@@ -707,6 +721,18 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	sessionService.scheduleNonTransactionalTaskUsingService(task);
     }
 
+    static final class FutureMessage implements Callable<byte[]> {
+
+        private MessageBuffer message;
+        
+        void setMessage(MessageBuffer message) {
+            this.message = message;
+        }
+        
+        public byte[] call() throws Exception {
+            return message.getBuffer();
+        }
+    }
     /**
      * This is a transactional task to notify the application's
      * AppListener that this session has logged in.
@@ -729,6 +755,10 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		    "LoginTask.run invoking AppListener.loggedIn session:{0}",
 		    name);
 	    }
+            
+            FutureMessage loginAckHolder = new FutureMessage();
+            sessionService.addCommitBuffer(
+                    ClientSessionImpl.this, loginAckHolder, Delivery.RELIABLE);
             
             if (listenerKey != null) {
                 RuntimeException e =
@@ -755,48 +785,61 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
             listenerKey = getListenerKey(listener);
             dataSvc.setServiceBinding(listenerKey, (ManagedObject) listener);
             
-	    scheduleNonTransactionalTaskUsingService(new LoginAckTask());
+	    insertLoginAck(loginAckHolder);
 	}
     }
 
     /**
-     * This is a non-transactional task to handle acknowledging a
+     * Add the message data to handle acknowledging a
      * login request after the application's AppListener has been
      * notified that this session has been logged in.
+     * 
+     * If the listener is null, sends a LOGIN_FAILURE protocol
+     * message to the client; otherwise sends a LOGIN_SUCCESS
+     * protocol message with the sessionId and reconnectionKey.
      */
-    private class LoginAckTask implements KernelRunnable {
+    private void insertLoginAck(FutureMessage msg) {
+        if (listenerKey == null) {
+            msg.setMessage(getLoginNackMessage());
 
-	/**
-	 * If the listener is null, sends a LOGIN_FAILURE protocol
-	 * message to the client; otherwise sends a LOGIN_SUCCESS
-	 * protocol message with the sessionId and reconnectionKey.
-	 */
-	public void run() {
-	    if (listenerKey == null) {
-		int stringSize = MessageBuffer.getSize(LOGIN_REFUSED_REASON);
-		MessageBuffer ack =
-		    new MessageBuffer(3 + stringSize);
-		ack.putByte(SgsProtocol.VERSION).
-		    putByte(SgsProtocol.APPLICATION_SERVICE).
-		    putByte(SgsProtocol.LOGIN_FAILURE).
-		    putString(LOGIN_REFUSED_REASON);
-		sendProtocolMessage(ack);
+            // Disconnect session
+            handleDisconnect(false);
 
-		// Disconnect session
-		handleDisconnect(false);
-		
-	    } else {
-		MessageBuffer ack =
-		    new MessageBuffer(
-			7 + sessionId.length + reconnectionKey.length);
-		ack.putByte(SgsProtocol.VERSION).
-		    putByte(SgsProtocol.APPLICATION_SERVICE).
-		    putByte(SgsProtocol.LOGIN_SUCCESS).
-		    putShort(sessionId.length). putBytes(sessionId).
-		    putShort(reconnectionKey.length).putBytes(reconnectionKey);
-		sendProtocolMessage(ack);
-	    }
-	}
+        } else {
+            MessageBuffer ack =
+                new MessageBuffer(
+                        7 + sessionId.length + reconnectionKey.length);
+            ack.putByte(SgsProtocol.VERSION).
+                putByte(SgsProtocol.APPLICATION_SERVICE).
+                putByte(SgsProtocol.LOGIN_SUCCESS).
+                putShort(sessionId.length). putBytes(sessionId).
+                putShort(reconnectionKey.length).putBytes(reconnectionKey);
+            msg.setMessage(ack);
+        }
+    }
+    
+    private MessageBuffer getLoginNackMessage() {
+        int stringSize = MessageBuffer.getSize(LOGIN_REFUSED_REASON);
+        MessageBuffer ack =
+            new MessageBuffer(3 + stringSize);
+        ack.putByte(SgsProtocol.VERSION).
+            putByte(SgsProtocol.APPLICATION_SERVICE).
+            putByte(SgsProtocol.LOGIN_FAILURE).
+            putString(LOGIN_REFUSED_REASON);
+        return ack;
+    }
+
+    /** Non-transactional */
+    private class LoginNackTask implements KernelRunnable {
+
+        public void run() throws Exception {
+            MessageBuffer ack = getLoginNackMessage();
+            sendProtocolMessage(ack);
+            
+            // Disconnect session
+            handleDisconnect(false);
+        }
+
     }
 
     public String getListenerKey(ClientSessionListener listener) {
