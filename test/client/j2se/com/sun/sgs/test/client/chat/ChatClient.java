@@ -9,6 +9,7 @@ import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
 import java.net.PasswordAuthentication;
 import java.util.Collection;
+import java.util.Map;
 import java.util.Properties;
 
 import javax.swing.JButton;
@@ -48,16 +49,18 @@ public class ChatClient extends JFrame
 
     private static final String DCC_CHANNEL_NAME = "__DCC_Chan";
 
-    private final MemberList userList;	// a list of clients currently connected to the
-    			// ChatApp on the server.
+    /** a list of clients currently connected to the
+     *  ChatApp on the server.
+     */
+    private final MemberList userList;
 
-    private SimpleClient client;     // used for communication with the server.
+    /**  used for communication with the server */
+    private SimpleClient client;
+    
+    /** the well-known channel for Direct Client to Client communication */
+    private ClientChannel dccChannel;
 
-    private ClientChannel dccChannel;	// the well-known channel for Direct
-				// Client to Client communication.
-
-
-    private int quitAttempts = 0;
+    private volatile int quitAttempts = 0;
 
     // === Constructor ==
  
@@ -164,7 +167,13 @@ public class ChatClient extends JFrame
     }
 
     private void doQuit() {
-	++quitAttempts;
+        ++quitAttempts;
+        
+        if (client == null || (! client.isConnected())) {
+            disconnected(true);
+            return;
+        }
+        
 	switch (quitAttempts) {
 	case 1:
 	    client.logout(false);
@@ -228,7 +237,8 @@ public class ChatClient extends JFrame
 
     public void loggedIn() {
         statusMessage.setText("Status: Connected");
-        setTitle(String.format("Chat Test Client: %.8s", client.getSessionId().toString()));
+        setTitle(String.format("Chat Test Client: %.8s",
+                client.getSessionId().toString()));
         loginButton.setText("Logout");
         loginButton.setActionCommand("logout");
         setButtonsEnabled(true);
@@ -236,7 +246,12 @@ public class ChatClient extends JFrame
 
     public PasswordAuthentication getPasswordAuthentication(String prompt) {
         statusMessage.setText("Status: Validating...");
-        return new ValidatorDialog(this, prompt).getPasswordAuthentication();
+        String login = System.getProperty("login");
+        if (login == null) {
+            return new ValidatorDialog(this, prompt).getPasswordAuthentication();            
+        }
+        String[] cred = login.split(":");
+        return new PasswordAuthentication(cred[0], cred[1].toCharArray());
     }
     
     public void loginFailed(String reason) {
@@ -250,7 +265,7 @@ public class ChatClient extends JFrame
         setButtonsEnabled(false);
         statusMessage.setText("Status: logged out");
         if (quitAttempts > 0) {
-            this.dispose();
+            dispose();
         } else {
             loginButton.setText("Login");
             loginButton.setActionCommand("login");
@@ -311,7 +326,9 @@ public class ChatClient extends JFrame
 
     // === ClientChannelListener ===
     
-    public void receivedMessage(ClientChannel channel, SessionId sender, byte[] message) {
+    public void receivedMessage(ClientChannel channel, SessionId sender,
+            byte[] message)
+    {
 	JOptionPane.showMessageDialog(this,
 		new String(message),
 		String.format("Message from %.8s",
@@ -320,7 +337,8 @@ public class ChatClient extends JFrame
     }
 
     public void leftChannel(ClientChannel channel) {
-	System.err.format("ChatClient: Error, kicked off channel [%s]\n", channel.getName());
+	System.err.format("ChatClient: Error, kicked off channel [%s]\n",
+                channel.getName());
     }
 
     // === ActionListener ===
@@ -338,7 +356,8 @@ public class ChatClient extends JFrame
         } else if (command.equals("multiDcc")) {
             doMultiDCCMessage();
         } else {
-            System.err.format("ChatClient: Error, unknown GUI command [%s]\n", command);
+            System.err.format("ChatClient: Error, unknown GUI command [%s]\n",
+                    command);
         }
     }
 
@@ -357,7 +376,7 @@ public class ChatClient extends JFrame
 
     // === Main ===
     
-    public static void main(String[] args) {
+    public static void main(final String[] args) {
         new ChatClient(args);
     }
 }

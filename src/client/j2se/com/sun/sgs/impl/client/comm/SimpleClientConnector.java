@@ -23,8 +23,8 @@ import com.sun.sgs.io.IOConnector;
  */
 public class SimpleClientConnector extends ClientConnector {
     
-    private Properties properties;
-    private IOConnector connector;
+    private final Properties properties;
+    private final IOConnector connector;
     
     SimpleClientConnector(Properties properties) {
         this.properties = properties;
@@ -56,14 +56,14 @@ public class SimpleClientConnector extends ClientConnector {
             throw new IllegalArgumentException("Missing Property: port");
         }
         int port = Integer.parseInt(portStr);
-        if (port <= 0) {
+        if (port <= 0 || port >= 2 << 16) {
             throw new IllegalArgumentException("Bad port number: " + port);
         }
         
         InetSocketAddress address = new InetSocketAddress(host, port);
         
         SimpleClientConnection connection = 
-                                new SimpleClientConnection(connectionListener);
+            new SimpleClientConnection(connectionListener);
         
         connector.connect(address, connection,
                 //new PassthroughFilter()

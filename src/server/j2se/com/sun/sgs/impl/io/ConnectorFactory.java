@@ -3,6 +3,7 @@ package com.sun.sgs.impl.io;
 import java.util.concurrent.Executor;
 
 import org.apache.mina.common.IoConnector;
+import org.apache.mina.filter.executor.ExecutorExecutor;
 import org.apache.mina.transport.socket.nio.DatagramConnector;
 
 import com.sun.sgs.impl.io.IOConstants.TransportType;
@@ -29,14 +30,7 @@ public class ConnectorFactory {
      * @return an IOConnector with the appropriate transport type.
      */
     public static IOConnector createConnector(TransportType transportType) {
-        IoConnector minaConnector = null;  
-        if (transportType.equals(TransportType.RELIABLE)) {
-            minaConnector = new org.apache.mina.transport.socket.nio.SocketConnector();
-        }
-        else {
-            minaConnector = new DatagramConnector();
-        }
-        return new SocketConnector(minaConnector);        
+        return createConnector(transportType, new DaemonExecutor(), 1);       
     }
     
     /**
@@ -76,7 +70,7 @@ public class ConnectorFactory {
                                         Executor executor, int numProcessors) {
         
         IoConnector minaConnector = null;  
-        ExecutorAdapter adapter = new ExecutorAdapter(executor); 
+        ExecutorExecutor adapter = new ExecutorExecutor(executor); 
         if (transportType.equals(TransportType.RELIABLE)) {
             minaConnector = new org.apache.mina.transport.socket.nio.SocketConnector(
                                     numProcessors, adapter);
@@ -87,5 +81,4 @@ public class ConnectorFactory {
         return new SocketConnector(minaConnector);
         
     }
-
 }

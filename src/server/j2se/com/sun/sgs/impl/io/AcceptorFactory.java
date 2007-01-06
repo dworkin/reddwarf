@@ -5,6 +5,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.apache.mina.common.IoAcceptor;
+import org.apache.mina.filter.executor.ExecutorExecutor;
 import org.apache.mina.transport.socket.nio.DatagramAcceptor;
 
 import com.sun.sgs.impl.io.IOConstants.TransportType;
@@ -34,16 +35,7 @@ public class AcceptorFactory {
      * @return an IOAcceptor with the appropriate transport type.
      */
     public static IOAcceptor createAcceptor(TransportType transportType) {
-        IoAcceptor minaAcceptor = null;  
-        if (transportType.equals(TransportType.RELIABLE)) {
-            minaAcceptor = new org.apache.mina.transport.socket.nio.SocketAcceptor();
-        }
-        else {
-            minaAcceptor = new DatagramAcceptor();
-        }
-        SocketAcceptor acceptor = new SocketAcceptor(minaAcceptor);
-        logger.log(Level.FINE, "returning {0}", acceptor);
-        return acceptor;
+        return createAcceptor(transportType, new DaemonExecutor(), 1);
     }
     
     /**
@@ -83,7 +75,7 @@ public class AcceptorFactory {
                                         Executor executor, int numProcessors) {
         
         IoAcceptor minaAcceptor = null;  
-        ExecutorAdapter adapter = new ExecutorAdapter(executor); 
+        ExecutorExecutor adapter = new ExecutorExecutor(executor); 
         if (transportType.equals(TransportType.RELIABLE)) {
             minaAcceptor = new org.apache.mina.transport.socket.nio.SocketAcceptor(
                                     numProcessors, adapter);

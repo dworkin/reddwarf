@@ -121,6 +121,10 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
      * @throws IllegalStateException if this session is disconnected
      */
     public void logout(boolean force) {
+        if (connected == false) {
+            listener.disconnected(true);
+            return;
+        }
         connected = false;
 	if (force) {
             try {
