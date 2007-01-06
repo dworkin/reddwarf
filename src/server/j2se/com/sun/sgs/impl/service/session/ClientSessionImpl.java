@@ -1,20 +1,21 @@
 package com.sun.sgs.impl.service.session;
 
-import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.Delivery;
+import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.auth.NamePasswordCredentials;
 import com.sun.sgs.impl.util.HexDumper;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.MessageBuffer;
-import com.sun.sgs.impl.kernel.ContextResolver;
 import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.service.ClientSessionService;
+import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.ServiceListener;
 import com.sun.sgs.service.SgsClientSession;
 import java.io.IOException;
@@ -23,7 +24,6 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.nio.ByteBuffer;
 import java.security.SecureRandom;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
@@ -78,7 +78,8 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     private State state = State.CONNECTING;
 
     /** The listener for this client session.*/
-    private ClientSessionListener listener;
+    //private ClientSessionListener listener;
+    private String listenerKey;
 
     private boolean disconnectHandled = false;
 
@@ -411,10 +412,19 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
             }
         }
         
-	if (listener != null) {
+	if (listenerKey != null) {
 	    scheduleTask(new KernelRunnable() {
 		public void run() throws IOException {
+                    DataService dataSvc = sessionService.dataService;
+                    ClientSessionListener listener =
+                        dataSvc.getServiceBinding(
+                                listenerKey, ClientSessionListener.class);
 		    listener.disconnected(graceful);
+                    dataSvc.removeServiceBinding(listenerKey);
+                    // TODO if listener can be a non-ManagedObject,
+                    // additional logic is needed here; this assumes
+                    // it is a ManagedObject.  If it is not, then we
+                    // must remove the listener from the DataService! -JM
 		}});
 	}
     }
@@ -618,12 +628,17 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		scheduleTask(new KernelRunnable() {
 		    public void run() {
 			if (isConnected()) {
+                            ClientSessionListener listener =
+                                sessionService.dataService.getServiceBinding(
+                                        listenerKey,
+                                        ClientSessionListener.class);
 			    listener.receivedMessage(clientMessage);
 			}
 		    }});
 		break;
 
 	    case SgsProtocol.LOGOUT_REQUEST:
+                /*
 		if (isConnected()) {
 		    scheduleNonTransactionalTask(new KernelRunnable() {
 			public void run() {
@@ -638,6 +653,11 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 			putByte(SgsProtocol.SESSION_DISCONNECT);
 		    sendProtocolMessage(ack);
 		}
+                */
+	        scheduleNonTransactionalTask(new KernelRunnable() {
+	            public void run() {
+	                handleDisconnect(isConnected());
+	            }});
 		break;
 		
 	    default:
@@ -700,8 +720,8 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	 * client.
 	 */
 	public void run() {
-	    AppListener appListener =
-		sessionService.dataService.getServiceBinding(
+            DataService dataSvc = sessionService.dataService;
+	    AppListener appListener = dataSvc.getServiceBinding(
 		    "com.sun.sgs.app.AppListener", AppListener.class);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
@@ -709,14 +729,32 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		    "LoginTask.run invoking AppListener.loggedIn session:{0}",
 		    name);
 	    }
-	    listener = appListener.loggedIn(ClientSessionImpl.this);
+            
+            if (listenerKey != null) {
+                RuntimeException e =
+                    new RuntimeException(
+                            "LoginTask.run listener was already assigned: " +
+                            listenerKey);
+                
+                logger.logThrow(Level.SEVERE, e, "Login error");
+                throw e;
+            }
+            
+            ClientSessionListener listener =
+                appListener.loggedIn(ClientSessionImpl.this);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST,
 		    "LoginTask.run AppListener.loggedIn returned {0}",
 		    listener);
 	    }
-	    
+
+            // TODO check that listener is Serializable -JM
+            // TODO if listener can be a non-ManagedObject, additional
+            // logic is needed here; this assumes it is a ManagedObject. -JM
+            listenerKey = getListenerKey(listener);
+            dataSvc.setServiceBinding(listenerKey, (ManagedObject) listener);
+            
 	    scheduleNonTransactionalTaskUsingService(new LoginAckTask());
 	}
     }
@@ -734,7 +772,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	 * protocol message with the sessionId and reconnectionKey.
 	 */
 	public void run() {
-	    if (listener == null) {
+	    if (listenerKey == null) {
 		int stringSize = MessageBuffer.getSize(LOGIN_REFUSED_REASON);
 		MessageBuffer ack =
 		    new MessageBuffer(3 + stringSize);
@@ -759,5 +797,11 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		sendProtocolMessage(ack);
 	    }
 	}
+    }
+
+    public String getListenerKey(ClientSessionListener listener) {
+        ManagedReference listenerRef =
+            sessionService.dataService.createReference((ManagedObject)listener);
+        return ClientSessionImpl.class.getName() + "." + listenerRef.toString();
     }
 }

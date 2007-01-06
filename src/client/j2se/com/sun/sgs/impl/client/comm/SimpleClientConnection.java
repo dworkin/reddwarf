@@ -4,6 +4,7 @@ import java.io.IOException;
 
 import com.sun.sgs.client.comm.ClientConnection;
 import com.sun.sgs.client.comm.ClientConnectionListener;
+import com.sun.sgs.impl.util.HexDumper;
 import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
 
@@ -42,7 +43,8 @@ public class SimpleClientConnection implements ClientConnection, IOHandler {
      * {@inheritDoc}
      */
     public void sendMessage(byte[] message) {
-        System.err.println("SimpleClientConnection: sendMessage: " + message);
+        System.err.println("SimpleClientConnection: sendMessage: " +
+                HexDumper.format(message));
         try {
             myHandle.sendBytes(message);
         } catch (IOException ioe) {

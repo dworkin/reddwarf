@@ -1,6 +1,5 @@
 package com.sun.sgs.impl.service.session;
 
-import com.sun.sgs.app.AppListener;
 import com.sun.sgs.auth.IdentityManager;
 import com.sun.sgs.impl.io.AcceptorFactory;
 import com.sun.sgs.impl.io.CompleteMessageFilter;

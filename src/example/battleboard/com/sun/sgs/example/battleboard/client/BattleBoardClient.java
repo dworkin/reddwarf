@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.PasswordAuthentication;
 import java.util.Properties;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
@@ -104,6 +105,9 @@ public class BattleBoardClient
         } else {
             pass = getLine().toCharArray();
         }
+        
+        log.log(Level.FINEST, "login: {0}/{1}",
+                new Object[] { userName, new String(pass) });
             
         return new PasswordAuthentication(userName, pass);
     }
@@ -160,6 +164,9 @@ public class BattleBoardClient
      */    
     public void disconnected(boolean graceful) {
         log.fine("disconnected; graceful = " + graceful);
+        synchronized (BattleBoardClient.class) {
+            BattleBoardClient.class.notifyAll();
+        }
     }
     
     /**
@@ -275,8 +282,12 @@ public class BattleBoardClient
 	    client.setParams(args[0], args[1], args[2]);
         }
         
-        
-
-        client.run();
+        synchronized (BattleBoardClient.class) {
+            try {
+                client.run();
+                BattleBoardClient.class.wait();
+            } catch (InterruptedException e) {
+            }
+        }
     }
 }

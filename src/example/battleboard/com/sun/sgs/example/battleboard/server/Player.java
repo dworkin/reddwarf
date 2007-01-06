@@ -89,14 +89,14 @@ public class Player
 
         myGameRef = dataMgr.createReference(game);
 
-        String playerHistoryName = myUserName + ".history";
+        String playerHistoryName = myPlayerName + ".history";
 
         PlayerHistory history;
         try {
             history =
                 dataMgr.getBinding(playerHistoryName, PlayerHistory.class);
         } catch (NameNotBoundException e) {
-            history = new PlayerHistory(myUserName);
+            history = new PlayerHistory(myPlayerName);
         }
         game.addHistory(history);
     }
