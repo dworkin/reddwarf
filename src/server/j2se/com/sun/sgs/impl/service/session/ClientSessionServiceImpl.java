@@ -578,7 +578,6 @@ public class ClientSessionServiceImpl
                 throw e;
             }
             prepared = true;
-            logger.log(Level.FINEST, "prepare returns true");
         }
 
         public void run() throws Exception {
@@ -589,8 +588,6 @@ public class ClientSessionServiceImpl
                 logger.logThrow(Level.FINE, e, "Not yet prepared");
                 throw e;
             }
-            logger.log(Level.INFO, "Running SessionService$SendTask, "
-                    + "map.size = {0}", sessionMessages.size());
             for (Map.Entry<ClientSessionImpl, List<Callable<byte[]>>> entry
                  : sessionMessages.entrySet())
             {

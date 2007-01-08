@@ -182,6 +182,13 @@ public class NamePasswordAuthenticator implements IdentityAuthenticator
 
         // get the name, and make sure they have a password entry
         String name = npc.getName();
+        
+        // HUGE HACK
+        //
+        // JM - for debugging, just let them in
+        //
+
+if (false) {        
         byte [] validPass = passwordMap.get(name);
         if (validPass == null)
             throw new AccountNotFoundException("Unknown user: " + name);
@@ -202,6 +209,9 @@ public class NamePasswordAuthenticator implements IdentityAuthenticator
         // verify that the hashes match
         if (! Arrays.equals(validPass, pass))
             throw new CredentialException("Invalid credentials");
+
+}
+// END HUGE HACK
 
         return new IdentityImpl(name);
     }

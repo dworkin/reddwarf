@@ -649,7 +649,13 @@ public class TaskServiceImpl
                 (txnState.recurringMap.containsKey(objName))) {
                 txnState.recurringMap.remove(objName).cancel();
             } else {
-                throw new ObjectNotFoundException("task is already cancelled");
+        	ObjectNotFoundException e =
+        	    new ObjectNotFoundException(
+        		    "task " + objName + "is already cancelled");
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.logThrow(Level.FINE, e, e.getMessage());
+                }
+        	throw e;
             }
         } else {
             if (txnState.cancelledSet == null)
@@ -721,10 +727,34 @@ public class TaskServiceImpl
                             PendingTask ptask =
                                 taskService.fetchPendingTask(objName);
                             if (logger.isLoggable(Level.FINEST))
-                                logger.log(Level.FINEST, "running task {0} " +
-                                           "scheduled to run at {1}",
-                                           ptask.startTime, objName);
-                            ptask.getTask().run();
+                                logger.log(Level.FINEST,
+                                	   "running task {0} " +
+                                           "scheduled to run at {1,number,#}",
+                                           objName, ptask.startTime);
+                            Task task = null;
+                            try {
+                        	task = ptask.getTask();
+                            } catch (ObjectNotFoundException e) {
+                        	// If a periodic task's Task is gone,
+                        	// it's never coming back.  Cancel it.
+                        	if (ptask.period != PERIOD_NONE) {
+                                    if (logger.isLoggable(Level.FINE))
+                                        logger.logThrow(Level.FINE, e,
+                                        	"Cancel periodic task {0} " +
+                                        	"with missing Task " +
+                                        	"{1,number,#}",
+                                        	objName,
+                                        	ptask.taskRef.getId());
+                        	    taskService.cancelPeriodicTask(objName);
+                        	    return;
+                        	} else {
+                        	    throw e;
+                        	}
+                            }
+                            if (task == null) {
+                        	throw new NullPointerException("task is null");
+                            }
+                            task.run();
                         }
                     })).run();
             } catch (Exception e) {

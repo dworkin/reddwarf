@@ -1072,6 +1072,10 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	} else if (e instanceof DeadlockException) {
 	    re = new TransactionConflictException(
 		operation + " failed due to deadlock: " + e.getMessage(), e);
+	    if (level.intValue() < Level.FINER.intValue()) {
+		logger.logThrow(Level.FINER, re, "{0} throws", operation);
+	    }
+	    return re;
 	} else if (e instanceof RunRecoveryException) {
 	    /*
 	     * It is tricky to clean up the data structures in this instance in
