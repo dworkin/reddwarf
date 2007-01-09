@@ -214,16 +214,15 @@ public final class DataServiceImpl
 
     /** {@inheritDoc} */
     public void configure(ComponentRegistry registry,
-			  TransactionProxy txnProxy)
+			  TransactionProxy proxy)
     {
-	if (registry == null || txnProxy == null) {
+	if (registry == null || proxy == null) {
 	    throw new NullPointerException("The arguments must not be null");
 	}
 	synchronized (lock) {
 	    if (state != State.UNINITIALIZED) {
 		throw new IllegalStateException(
 		    "Service is already configured");
-	    }
 	    state = State.RUNNING;
 	    addAbortAction(
 		new Runnable() {
@@ -231,7 +230,7 @@ public final class DataServiceImpl
 			state = State.UNINITIALIZED;
 		    }
 		});
-	    this.txnProxy = txnProxy;
+	    txnProxy = proxy;
 	    DataServiceHeader header;
 	    try {
 		header = getServiceBinding(

@@ -968,7 +968,7 @@ public class TestDataStoreImpl extends TestCase {
     }
 
     /* -- Test deadlock -- */
-
+    @SuppressWarnings("hiding")
     public void testDeadlock() throws Exception {
 	for (int i = 0; i < 5; i++) {
 	    if (i > 0) {
@@ -1100,7 +1100,7 @@ public class TestDataStoreImpl extends TestCase {
     static enum UnusualState {
 	Aborted, PreparedReadOnly, PreparedModified, Committed,
 	WrongTxn, ShuttingDownExistingTxn, ShuttingDownNewTxn, Shutdown
-    };
+    }
 
     /** Defines a abstract class for testing unusual states. */
     static abstract class UnusualStateTest extends TestDataStoreImpl {
