@@ -230,17 +230,17 @@ public class TestTaskServiceImpl extends TestCase {
 
     public void testConfigurePendingSingleTasks() throws Exception {
         clearPendingTasksInStore();
-        // FIXME: implement this by seeding the dataservice
+        // FIXME: implement this once service shutdown is available
     }
 
     public void testConfigurePendingRecurringTasks() throws Exception {
         clearPendingTasksInStore();
-        // FIXME: implement this by seeding the dataservice
+        // FIXME: implement this once service shutdown is available
     }
 
     public void testConfigurePendingAnyTasks() throws Exception {
         clearPendingTasksInStore();
-        // FIXME: implement this by seeding the dataservice
+        // FIXME: implement this once service shutdown is available
     }
 
     /**
@@ -635,14 +635,14 @@ public class TestTaskServiceImpl extends TestCase {
      * Utility routines.
      */
 
-    private static DummyTransaction createTransaction() {
+    private DummyTransaction createTransaction() {
         DummyTransaction txn =
             new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
         txnProxy.setCurrentTransaction(txn);
         return txn;
     }
 
-    private static DataServiceImpl createDataService(String directory) {
+    private DataServiceImpl createDataService(String directory) {
         File dir = new File(directory);
         if (! dir.exists()) {
             if (! dir.mkdir()) {
@@ -658,7 +658,7 @@ public class TestTaskServiceImpl extends TestCase {
         return new DataServiceImpl(properties, systemRegistry);
     }
 
-    private static void deleteDirectory(String directory) {
+    private void deleteDirectory(String directory) {
         File dir = new File(directory);
         if (dir.exists()) {
             for (File file : dir.listFiles())
@@ -669,7 +669,7 @@ public class TestTaskServiceImpl extends TestCase {
         }
     }
 
-    private static void clearPendingTasksInStore() throws Exception {
+    private void clearPendingTasksInStore() throws Exception {
         DummyTransaction txn = createTransaction();
         String pendingNs = TaskServiceImpl.DS_PREFIX + "Pending.";
         String name = dataService.nextServiceBoundName(pendingNs);
