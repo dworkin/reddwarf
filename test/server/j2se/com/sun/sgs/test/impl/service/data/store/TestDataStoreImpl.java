@@ -186,6 +186,15 @@ public class TestDataStoreImpl extends TestCase {
     }
 
     public void testConstructorDirectoryNotWritable() throws Exception {
+        String osName = System.getProperty("os.name", "unknown");
+	/*
+	 * Can't seem to create a non-writable directory on Windows.
+	 * -tjb@sun.com (01/09/2007)
+	 */
+        if (osName.startsWith("Windows")) {
+            System.err.println("Skipping on " + osName);
+            return;
+        }
 	Properties props = createProperties(
 	    DataStoreImplClassName + ".directory",
 	    createDirectory());
@@ -196,13 +205,6 @@ public class TestDataStoreImpl extends TestCase {
 	} catch (DataStoreException e) {
 	    System.err.println(e);
 	}
-    }
-
-    public void testConstructorSuccess() throws Exception {
-	Properties props = createProperties(
-	    DataStoreImplClassName + ".directory",
-	    createDirectory());
-	new DataStoreImpl(props);
     }
 
     /* -- Test createObject -- */
