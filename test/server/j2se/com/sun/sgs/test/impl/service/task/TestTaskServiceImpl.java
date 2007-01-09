@@ -37,6 +37,9 @@ import java.util.Properties;
 
 import junit.framework.TestCase;
 
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+
 
 /** Test the TaskServiceImpl class */
 public class TestTaskServiceImpl extends TestCase {
@@ -67,18 +70,28 @@ public class TestTaskServiceImpl extends TestCase {
         super(name);
     }
 
+    // this should work to run setup once, but doesn't seem to..
+    @BeforeClass public void setupTests() {
+        System.out.println("Before");
+    }
+
+    // this should work to run teardown once, but doesn't seem to..
+    @AfterClass public void teardownTests() {
+        System.out.println("After");
+    }
+
     protected void setUp() throws Exception {
         appContext = MinimalTestKernel.createContext();
         systemRegistry = MinimalTestKernel.getSystemRegistry(appContext);
         serviceRegistry = MinimalTestKernel.getServiceRegistry(appContext);
-
+        
         // create the task and data services used by most of the tests
         // NOTE: this should probably be done on demand for those tests
         // that actually need services
         deleteDirectory(DB_DIRECTORY);
         dataService = createDataService(DB_DIRECTORY);
         taskService = new TaskServiceImpl(new Properties(), systemRegistry);
-
+        
         // configure the main service instances that will be used throughout
         // NOTE: this could be factored into some other utility class if it
         // seems valuable to do so
@@ -90,15 +103,15 @@ public class TestTaskServiceImpl extends TestCase {
         taskService.configure(serviceRegistry, txnProxy);
         txnProxy.setComponent(TaskServiceImpl.class, taskService);
         serviceRegistry.setComponent(TaskServiceImpl.class, taskService);
-
+        
         // add a counter for use in some of the tests, so we don't have to
         // check later if it's present
         dataService.setBinding("counter", new Counter());
-
+            
         txn.commit();
     }
 
-    protected void tearDown() throws Exception {
+    protected void tearDown() {
         deleteDirectory(DB_DIRECTORY);
         MinimalTestKernel.destroyContext(appContext);
     }
@@ -622,14 +635,14 @@ public class TestTaskServiceImpl extends TestCase {
      * Utility routines.
      */
 
-    DummyTransaction createTransaction() {
+    private static DummyTransaction createTransaction() {
         DummyTransaction txn =
             new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
         txnProxy.setCurrentTransaction(txn);
         return txn;
     }
 
-    DataServiceImpl createDataService(String directory) {
+    private static DataServiceImpl createDataService(String directory) {
         File dir = new File(directory);
         if (! dir.exists()) {
             if (! dir.mkdir()) {
@@ -645,7 +658,7 @@ public class TestTaskServiceImpl extends TestCase {
         return new DataServiceImpl(properties, systemRegistry);
     }
 
-    void deleteDirectory(String directory) {
+    private static void deleteDirectory(String directory) {
         File dir = new File(directory);
         if (dir.exists()) {
             for (File file : dir.listFiles())
@@ -656,7 +669,7 @@ public class TestTaskServiceImpl extends TestCase {
         }
     }
 
-    void clearPendingTasksInStore() throws Exception {
+    private static void clearPendingTasksInStore() throws Exception {
         DummyTransaction txn = createTransaction();
         String pendingNs = TaskServiceImpl.DS_PREFIX + "Pending.";
         String name = dataService.nextServiceBoundName(pendingNs);
@@ -674,6 +687,7 @@ public class TestTaskServiceImpl extends TestCase {
      */
 
     public static class Counter implements ManagedObject, Serializable {
+        private static final long serialVersionUID = 1;
         private int count = 0;
         public void clear() { count = 0; }
         public void increment() { count++; }
@@ -690,9 +704,13 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public static class ManagedTask extends AbstractTask
-        implements ManagedObject {}
+        implements ManagedObject {
+        private static final long serialVersionUID = 1;
+    }
 
-    public static class NonManagedTask extends AbstractTask {}
+    public static class NonManagedTask extends AbstractTask {
+        private static final long serialVersionUID = 1;
+    }
 
     public static class KernelRunnableImpl implements KernelRunnable {
         private Counter counter;
@@ -711,6 +729,7 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public static class ManagedHandle implements ManagedObject, Serializable {
+        private static final long serialVersionUID = 1;
         public PeriodicTaskHandle handle;
         public ManagedHandle(PeriodicTaskHandle handle) {
             this.handle = handle;

@@ -33,7 +33,7 @@ final class TransactionImpl implements Transaction {
 	COMMITTING,
 	/** Completed committing */
 	COMMITTED
-    };
+    }
 
     /** The transaction ID. */
     private final long tid;

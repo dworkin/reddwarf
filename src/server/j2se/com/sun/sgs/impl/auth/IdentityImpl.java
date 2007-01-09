@@ -15,6 +15,7 @@ import java.io.Serializable;
  */
 public class IdentityImpl implements Identity, Serializable
 {
+    private static final long serialVersionUID = 1L;
 
     // the name of this identity
     private final String name;
