@@ -240,6 +240,14 @@ public class TaskServiceImpl
     /**
      * {@inheritDoc}
      */
+    public boolean shutdown() {
+	/* FIXME: Implement this.  -tjb@sun.com (01/09/2007) */
+	return false;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     public boolean prepare(Transaction txn) throws Exception {
         if (logger.isLoggable(Level.FINER))
             logger.log(Level.FINER, "preparing txn:{0}", txn);

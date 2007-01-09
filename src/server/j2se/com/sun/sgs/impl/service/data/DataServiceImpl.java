@@ -120,10 +120,25 @@ public final class DataServiceImpl
     private final DataStore store;
 
     /**
-     * Synchronize on this object before accessing the txnProxy,
+     * Synchronize on this object before accessing the state, txnProxy,
      * debugCheckInterval, or detectModifications fields.
      */
     private final Object lock = new Object();
+
+    /** The possible states of this instance. */
+    enum State {
+	/** Before configure has been called */
+	UNINITIALIZED,
+	/** After configure and before shutdown */
+	RUNNING,
+	/** After start of a call to shutdown and before call finishes */
+	SHUTTING_DOWN,
+	/** After shutdown has completed successfully */
+	SHUTDOWN
+    }
+
+    /** The current state of this instance. */
+    private State state = State.UNINITIALIZED;
 
     /** The transaction proxy, or null if configure has not been called. */
     TransactionProxy txnProxy;
@@ -205,16 +220,18 @@ public final class DataServiceImpl
 	    throw new NullPointerException("The arguments must not be null");
 	}
 	synchronized (lock) {
-	    if (this.txnProxy != null) {
-		throw new IllegalStateException("Already configured");
+	    if (state != State.UNINITIALIZED) {
+		throw new IllegalStateException(
+		    "Service is already configured");
 	    }
-	    this.txnProxy = txnProxy;
+	    state = State.RUNNING;
 	    addAbortAction(
 		new Runnable() {
 		    public void run() {
-			DataServiceImpl.this.txnProxy = null;
+			state = State.UNINITIALIZED;
 		    }
 		});
+	    this.txnProxy = txnProxy;
 	    DataServiceHeader header;
 	    try {
 		header = getServiceBinding(
@@ -573,6 +590,62 @@ public final class DataServiceImpl
 
     /* -- Other methods -- */
 
+    /** 
+     * Attempts to shut down this service, returning a value indicating whether
+     * the attempt was successful.  The call will throw {@link
+     * IllegalStateException} if a call to this method has already completed
+     * with a return value of <code>true</code>. <p>
+     *
+     * This implementation will refuse to accept calls associated with
+     * transactions that were not joined prior to the <code>shutdown</code>xs
+     * call by throwing an <code>IllegalStateException</code>, and will wait
+     * for already joined transactions to commit or abort before returning.  It
+     * will also return <code>false</code> if {@link Thread#interrupt
+     * Thread.interrupt} is called on a thread that is currently blocked within
+     * a call to this method. <p>
+     *
+     * @return	<code>true</code> if the shut down was successful, else
+     *		<code>false</code>
+     * @throws	IllegalStateException if the <code>shutdown</code> method has
+     *		already been called and returned <code>true</code>
+     */
+    public boolean shutdown() {
+	synchronized (lock) {
+	    while (state == State.SHUTTING_DOWN) {
+		try {
+		    lock.wait();
+		} catch (InterruptedException e) {
+		    return false;
+		}
+	    }
+	    if (state == State.SHUTDOWN) {
+		throw new IllegalStateException(
+		    "Service is already shut down");
+	    }
+	    state = State.SHUTTING_DOWN;
+	}
+	boolean done = false;
+	try {
+	    if (store.shutdown()) {
+		synchronized (lock) {
+		    state = State.SHUTDOWN;
+		    lock.notifyAll();
+		}
+		done = true;
+		return true;
+	    } else {
+		return false;
+	    }
+	} finally {
+	    if (!done) {
+		synchronized (lock) {
+		    state = State.RUNNING;
+		    lock.notifyAll();
+		}
+	    }
+	}
+    }
+
     /**
      * Obtains information associated with the current transaction, throwing a
      * TransactionNotActiveException exception if there is no current
@@ -584,13 +657,17 @@ public final class DataServiceImpl
     private Context getContext() {
 	Transaction txn;
 	synchronized (lock) {
-	    if (txnProxy == null) {
-		throw new IllegalStateException("Not configured");
-	    }
+	    checkState();
 	    txn = txnProxy.getCurrentTransaction();
 	}
 	Context context = currentContext.get();
 	if (context == null) {
+	    synchronized (lock) {
+		if (state == State.SHUTTING_DOWN) {
+		    throw new IllegalStateException(
+			"Service is shutting down");
+		}
+	    }
 	    logger.log(Level.FINER, "join txn:{0}", txn);
 	    txn.join(this);
 	    context = new Context(
@@ -617,9 +694,29 @@ public final class DataServiceImpl
 	if (context == null) {
 	    throw new IllegalStateException("Not joined");
 	}
+	synchronized (lock) {
+	    checkState();
+	}
 	context.checkTxn(txn);
 	context.maybeCheckReferenceTable();
 	return context;
+    }
+
+    /** Checks that the current state is RUNNING or SHUTTING_DOWN. */
+    @SuppressWarnings("fallthrough")
+    private void checkState() {
+	assert Thread.holdsLock(lock);
+	switch (state) {
+	case UNINITIALIZED:
+	    throw new IllegalStateException("Service is not configured");
+	case RUNNING:
+	case SHUTTING_DOWN:
+	    break;
+	case SHUTDOWN:
+	    throw new IllegalStateException("Service is shut down");
+	default:
+	    throw new AssertionError();
+	}
     }
 
     /**

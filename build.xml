@@ -42,8 +42,10 @@
 
   <!-- Values for testing -->
   <property name="test.logging" location="test/test.logging"/>
+  <property name="test.assertions" value="-enableassertions"/>
   <property name="test.jvm.args"
-	    value="-Djava.util.logging.config.file=${test.logging}"/>
+	    value="${test.assertions}
+		   -Djava.util.logging.config.file=${test.logging}"/>
   <property name="test.formatter.type" value="plain"/>
   <property name="test.showoutput" value="false"/>
   <property name="test.include" value="**/Test*.java"/>
@@ -321,7 +323,6 @@
       <!-- <assertions>
 	     <enable/>
 	   </assertions> -->
-      <jvmarg value="-enableassertions"/>
       <formatter type="${test.formatter.type}"/>
       <batchtest todir="${build.dir}/test/output">
 	<fileset dir="test/server/j2se">

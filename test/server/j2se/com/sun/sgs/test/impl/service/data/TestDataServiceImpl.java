@@ -122,20 +122,24 @@ public class TestDataServiceImpl extends TestCase {
      * created, and aborts the current transaction.
      */
     protected void tearDown() throws Exception {
+	try {
+	    if (txn != null) {
+		txn.abort();
+	    }
+	    if (service != null) {
+		new ShutdownAction().waitForDone();
+	    }
+	} catch (RuntimeException e) {
+	    if (passed) {
+		throw e;
+	    } else {
+		e.printStackTrace();
+	    }
+	}
+	txn = null;
+	service = null;
 	if (passed && directory != null) {
 	    deleteDirectory(directory);
-	}
-	if (txn != null) {
-	    try {
-		txn.abort();
-	    } catch (RuntimeException e) {
-		if (passed) {
-		    throw e;
-		} else {
-		    e.printStackTrace();
-		}
-	    }
-	    txn = null;
 	}
     }
 
@@ -419,9 +423,9 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
-    private static class TestGetBindingBadTxn extends BadTxnTest {
+    private static class TestGetBindingUnusualState extends UnusualStateTest {
 	private final boolean app;
-	private TestGetBindingBadTxn(boolean app, BadTxnState state) {
+	private TestGetBindingUnusualState(boolean app, UnusualState state) {
 	    super(app ? "testGetBinding" : "testGetServiceBinding", state);
 	    this.app = app;
 	}
@@ -431,9 +435,9 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     static {
-	for (BadTxnState state : BadTxnState.values()) {
-	    new TestGetBindingBadTxn(true, state);
-	    new TestGetBindingBadTxn(false, state);
+	for (UnusualState state : UnusualState.values()) {
+	    new TestGetBindingUnusualState(true, state);
+	    new TestGetBindingUnusualState(false, state);
 	}
     }
 
@@ -547,9 +551,9 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
-    private static class TestSetBindingBadTxn extends BadTxnTest {
+    private static class TestSetBindingUnusualState extends UnusualStateTest {
 	private final boolean app;
-	private TestSetBindingBadTxn(boolean app, BadTxnState state) {
+	private TestSetBindingUnusualState(boolean app, UnusualState state) {
 	    super(app ? "testSetBinding" : "testSetServiceBinding", state);
 	    this.app = app;
 	}
@@ -559,9 +563,9 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     static {
-	for (BadTxnState state : BadTxnState.values()) {
-	    new TestSetBindingBadTxn(true, state);
-	    new TestSetBindingBadTxn(false, state);
+	for (UnusualState state : UnusualState.values()) {
+	    new TestSetBindingUnusualState(true, state);
+	    new TestSetBindingUnusualState(false, state);
 	}
     }
 
@@ -695,9 +699,13 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
-    private static class TestRemoveBindingBadTxn extends BadTxnTest {
+    private static class TestRemoveBindingUnusualState
+	extends UnusualStateTest
+    {
 	private final boolean app;
-	private TestRemoveBindingBadTxn(boolean app, BadTxnState state) {
+	private TestRemoveBindingUnusualState(
+	    boolean app, UnusualState state)
+	{
 	    super(app ? "testRemoveBinding" : "testRemoveServiceBinding",
 		  state);
 	    this.app = app;
@@ -708,9 +716,9 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     static {
-	for (BadTxnState state : BadTxnState.values()) {
-	    new TestRemoveBindingBadTxn(true, state);
-	    new TestRemoveBindingBadTxn(false, state);
+	for (UnusualState state : UnusualState.values()) {
+	    new TestRemoveBindingUnusualState(true, state);
+	    new TestRemoveBindingUnusualState(false, state);
 	}
     }
 
@@ -835,9 +843,13 @@ public class TestDataServiceImpl extends TestCase {
 	assertEquals(forNull, nextBoundName(app, service, ""));
     }
 
-    private static class TestNextBoundNameBadTxn extends BadTxnTest {
+    private static class TestNextBoundNameUnusualState
+	extends UnusualStateTest
+    {
 	private final boolean app;
-	private TestNextBoundNameBadTxn(boolean app, BadTxnState state) {
+	private TestNextBoundNameUnusualState(
+	    boolean app, UnusualState state)
+	{
 	    super(app ? "testNextBoundName" : "testNextServiceBoundName",
 		  state);
 	    this.app = app;
@@ -848,9 +860,9 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     static {
-	for (BadTxnState state : BadTxnState.values()) {
-	    new TestNextBoundNameBadTxn(true, state);
-	    new TestNextBoundNameBadTxn(false, state);
+	for (UnusualState state : UnusualState.values()) {
+	    new TestNextBoundNameUnusualState(true, state);
+	    new TestNextBoundNameUnusualState(false, state);
 	}
     }
 
@@ -979,8 +991,8 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     static {
-	for (BadTxnState state : BadTxnState.values()) {
-	    new BadTxnTest("testRemoveObject", state) {
+	for (UnusualState state : UnusualState.values()) {
+	    new UnusualStateTest("testRemoveObject", state) {
 		void action() {
 		    service.removeObject(dummy);
 		}
@@ -1054,8 +1066,8 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     static {
-	for (BadTxnState state : BadTxnState.values()) {
-	    new BadTxnTest("testMarkForUpdate", state) {
+	for (UnusualState state : UnusualState.values()) {
+	    new UnusualStateTest("testMarkForUpdate", state) {
 		void action() {
 		    service.markForUpdate(dummy);
 		}
@@ -1138,8 +1150,8 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     static {
-	for (BadTxnState state : BadTxnState.values()) {
-	    new BadTxnTest("testCreateReference", state) {
+	for (UnusualState state : UnusualState.values()) {
+	    new UnusualStateTest("testCreateReference", state) {
 		void action() {
 		    service.createReference(dummy);
 		}
@@ -1231,10 +1243,15 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     static {
-	for (BadTxnState state : BadTxnState.values()) {
-	    /* Can't get a reference when the service is not initialized */
-	    if (state != BadTxnState.Uninitialized) {
-		new BadTxnTest("testGetReference", state) {
+	for (UnusualState state : UnusualState.values()) {
+	    /*
+	     * Can't get a reference when the service is not initialized, or
+	     * as the first operation in a new transaction.
+	     */
+	    if (state != UnusualState.Uninitialized &&
+		state != UnusualState.ShuttingDownNewTxn)
+	    {
+		new UnusualStateTest("testGetReference", state) {
 		    private ManagedReference ref;
 		    protected void setUp() throws Exception {
 			super.setUp();
@@ -1242,6 +1259,19 @@ public class TestDataServiceImpl extends TestCase {
 		    }
 		    void action() {
 			ref.get(DummyManagedObject.class);
+		    }
+		    /* Expect TransactionNotActiveException */
+		    void shutdownTest() throws Exception {
+			txn.abort();
+			service.shutdown();
+			try {
+			    action();
+			    fail("Expected TransactionNotActiveException");
+			} catch (TransactionNotActiveException e) {
+			    System.err.println(e);
+			}
+			txn = null;
+			service = null;
 		    }
 		};
 	    }
@@ -1334,10 +1364,15 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     static {
-	for (BadTxnState state : BadTxnState.values()) {
-	    /* Can't get a reference when the service is not initialized */
-	    if (state != BadTxnState.Uninitialized) {
-		new BadTxnTest("testGetReferenceUpdate", state) {
+	for (UnusualState state : UnusualState.values()) {
+	    /*
+	     * Can't get a reference when the service is not initialized, or
+	     * as the first operation in a new transaction.
+	     */
+	    if (state != UnusualState.Uninitialized &&
+		state != UnusualState.ShuttingDownNewTxn)
+	    {
+		new UnusualStateTest("testGetReferenceUpdate", state) {
 		    private ManagedReference ref;
 		    protected void setUp() throws Exception {
 			super.setUp();
@@ -1345,6 +1380,19 @@ public class TestDataServiceImpl extends TestCase {
 		    }
 		    void action() {
 			ref.getForUpdate(DummyManagedObject.class);
+		    }
+		    /* Expect TransactionNotActiveException */
+		    void shutdownTest() throws Exception {
+			txn.abort();
+			service.shutdown();
+			try {
+			    action();
+			    fail("Expected TransactionNotActiveException");
+			} catch (TransactionNotActiveException e) {
+			    System.err.println(e);
+			}
+			txn = null;
+			service = null;
 		    }
 		};
 	    }
@@ -1445,6 +1493,71 @@ public class TestDataServiceImpl extends TestCase {
 	    public BigInteger getId() { return null; }
 	};
 	assertFalse(ref.equals(ref3));
+    }
+
+    /* -- Test shutdown -- */
+
+    public void testShutdownAgain() throws Exception {
+	txn.abort();
+	txn = null;
+	service.shutdown();
+	ShutdownAction action = new ShutdownAction();
+	try {
+	    action.waitForDone();
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	} finally {
+	    service = null;
+	}
+    }
+
+    public void testShutdownInterrupt() throws Exception {
+	ShutdownAction action = new ShutdownAction();
+	action.assertBlocked();
+	action.interrupt();
+	action.assertResult(false);
+	service.setBinding("dummy", new DummyManagedObject());
+	txn.commit();
+	txn = null;
+    }
+
+    public void testConcurrentShutdownInterrupt() throws Exception {
+	ShutdownAction action1 = new ShutdownAction();
+	action1.assertBlocked();
+	ShutdownAction action2 = new ShutdownAction();
+	action2.assertBlocked();
+	action1.interrupt();
+	action1.assertResult(false);
+	action2.assertBlocked();
+	txn.abort();
+	action2.assertResult(true);
+	txn = null;
+	service = null;
+    }
+
+    public void testConcurrentShutdownRace() throws Exception {
+	ShutdownAction action1 = new ShutdownAction();
+	action1.assertBlocked();
+	ShutdownAction action2 = new ShutdownAction();
+	action2.assertBlocked();
+	txn.abort();
+	boolean result1;
+	try {
+	    result1 = action1.waitForDone();
+	} catch (IllegalStateException e) {
+	    result1 = false;
+	}
+	boolean result2;
+	try {
+	    result2 = action2.waitForDone();
+	} catch (IllegalStateException e) {
+	    result2 = false;
+	}
+	assertTrue(result1 || result2);
+	assertFalse(result1 && result2);
+	txn = null;
+	service = null;
     }
 
     /* -- Other tests -- */
@@ -1765,23 +1878,23 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
-    /** The set of bad transaction states */
-    static enum BadTxnState {
-	Uninitialized, Aborting, Aborted, Preparing, Committing, Committed
+    /** The set of unusual states */
+    static enum UnusualState {
+	Uninitialized, Aborting, Aborted, Preparing, Committing, Committed,
+	ShuttingDownExistingTxn, ShuttingDownNewTxn, Shutdown
     };
 
-    /** Defines a abstract class for testing bad transaction states. */
-    static abstract class BadTxnTest extends TestDataServiceImpl {
+    /** Defines a abstract class for testing unusual states. */
+    static abstract class UnusualStateTest extends TestDataServiceImpl {
 
-	/** The bad state to test. */
-	private final BadTxnState state;
+	/** The unusual state to test. */
+	private final UnusualState state;
 
 	/**
 	 * Creates an instance with the specified generic name to test the
-	 * specified bad transaction state, and adds this test to the test
-	 * suite.
+	 * specified unusual state, and adds this test to the test suite.
 	 */
-	BadTxnTest(String name, BadTxnState state) {
+	UnusualStateTest(String name, UnusualState state) {
 	    super(name + state);
 	    this.state = state;
 	    suite.addTest(this);
@@ -1813,6 +1926,15 @@ public class TestDataServiceImpl extends TestCase {
 		break;
 	    case Committed:
 		committedTest();
+		break;
+	    case ShuttingDownExistingTxn:
+		shuttingDownExistingTxnTest();
+		break;
+	    case ShuttingDownNewTxn:
+		shuttingDownNewTxnTest();
+		break;
+	    case Shutdown:
+		shutdownTest();
 		break;
 	    default:
 		throw new AssertionError();
@@ -1923,6 +2045,116 @@ public class TestDataServiceImpl extends TestCase {
 	    } finally {
 		txn = null;
 	    }
+	}
+
+	/**
+	 * Runs the test for the existing transaction while shutting down case.
+	 */
+	private void shuttingDownExistingTxnTest() throws Exception {
+	    ShutdownAction shutdownAction = new ShutdownAction();
+	    shutdownAction.assertBlocked();
+	    action();
+	    if (txn != null) {
+		txn.commit();
+		txn = null;
+	    }
+	    shutdownAction.assertResult(true);
+	    service = null;
+	}
+
+	/** Runs the test for the new transaction while shutting down case. */
+	private void shuttingDownNewTxnTest() throws Exception {
+	    try {
+		DummyTransaction originalTxn = txn;
+		ShutdownAction shutdownAction = new ShutdownAction();
+		shutdownAction.assertBlocked();
+		createTransaction();
+		try {
+		    action();
+		    fail("Expected IllegalStateException");
+		} catch (IllegalStateException e) {
+		    System.err.println(e);
+		}
+		txn.abort();
+		txn = null;
+		originalTxn.abort();
+		shutdownAction.assertResult(true);
+	    } finally {
+		service = null;
+	    }
+	}
+
+	/** Runs the test for the shutdown case. */
+	void shutdownTest() throws Exception {
+	    txn.abort();
+	    service.shutdown();
+	    try {
+		action();
+		fail("Expected IllegalStateException");
+	    } catch (IllegalStateException e) {
+		System.err.println(e);
+	    }
+	    txn = null;
+	    service = null;
+	}
+    }
+
+    /** Use this thread to control a call to shutdown that may block. */
+    class ShutdownAction extends Thread {
+	private boolean done;
+	private Throwable exception;
+	private boolean result;
+
+	/** Creates an instance of this class and starts the thread. */
+	ShutdownAction() {
+	    start();
+	}
+
+	/** Performs the shutdown and collects the results. */
+	public void run() {
+	    try {
+		result = service.shutdown();
+	    } catch (Throwable t) {
+		exception = t;
+	    }
+	    synchronized (this) {
+		done = true;
+		notifyAll();
+	    }
+	}
+
+	/** Asserts that the shutdown call is blocked. */
+	synchronized void assertBlocked() throws InterruptedException {
+	    Thread.sleep(5);
+	    assertEquals("Expected no exception", null, exception);
+	    assertFalse("Expected shutdown to be blocked", done);
+	}
+	
+	/** Waits a while for the shutdown call to complete. */
+	synchronized boolean waitForDone() throws Exception {
+	    wait(500);
+	    if (!done) {
+		return false;
+	    } else if (exception == null) {
+		return result;
+	    } else if (exception instanceof Exception) {
+		throw (Exception) exception;
+	    } else {
+		throw (Error) exception;
+	    }
+	}
+
+	/**
+	 * Asserts that the shutdown call has completed with the specified
+	 * result.
+	 */
+	synchronized void assertResult(boolean expectedResult)
+	    throws InterruptedException
+	{
+	    wait(500);
+	    assertTrue("Expected shutdown to be done", done);
+	    assertEquals("Unexpected result", expectedResult, result);
+	    assertEquals("Expected no exception", null, exception);
 	}
     }
 }

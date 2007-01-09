@@ -26,21 +26,21 @@ import junit.framework.TestSuite;
  * Performance tests for the DataServiceImpl class.
  *
  * Results -- best times:
- * Date: 11/1/2006
- * Hardware: Power Mac G5, 2 2 GHz processors, 2.5 GB memory, HFS+ filesystem
- *	     with logging enabled
+ * Date: 1/9/2007
+ * Hardware: Host freeside, Power Mac G5, 2 2 GHz processors, 2.5 GB memory,
+ *	     HFS+ filesystem with logging enabled
  * Operating System: Mac OS X 10.4.8
  * Berkeley DB Version: 4.5.20
  * Java Version: 1.5.0_06
  * Parameters: test.items=400, test.modifyItems=200
  * Testcase: testRead
- * Time: 42 ms per transaction
+ * Time: 43 ms per transaction
  * Testcase: testReadNoDetectMods
- * Time: 27 ms per transaction
+ * Time: 26 ms per transaction
  * Testcase: testWrite
- * Time: 47 ms per transaction
+ * Time: 51 ms per transaction
  * Testcase: testWriteNoDetectMods
- * Time: 35 ms per transaction
+ * Time: 36 ms per transaction
  */
 public class TestPerformance extends TestCase {
 
@@ -106,6 +106,9 @@ public class TestPerformance extends TestCase {
     /** An initial, open transaction. */
     private DummyTransaction txn;
 
+    /** The service to test. */
+    private DataServiceImpl service;
+
     /** Creates the test. */
     public TestPerformance(String name) {
 	super(name);
@@ -141,6 +144,17 @@ public class TestPerformance extends TestCase {
      * created, and reinitializes logging.
      */
     protected void tearDown() throws Exception {
+	if (service != null) {
+	    try {
+		service.shutdown();
+	    } catch (RuntimeException e) {
+		if (passed) {
+		    throw e;
+		} else {
+		    e.printStackTrace();
+		}
+	    }
+	}
 	if (passed && directory != null) {
 	    deleteDirectory(directory);
 	}
@@ -166,8 +180,7 @@ public class TestPerformance extends TestCase {
 	    DataServiceImplClass + ".detectModifications",
 	    String.valueOf(detectMods),
 	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
-	DataServiceImpl service =
-	    new DataServiceImpl(props, componentRegistry);
+	service = new DataServiceImpl(props, componentRegistry);
 	service.configure(componentRegistry, txnProxy);
 	componentRegistry.setComponent(DataManager.class, service);
 	componentRegistry.registerAppContext();
@@ -219,8 +232,7 @@ public class TestPerformance extends TestCase {
 	    String.valueOf(detectMods),
 	    DataStoreImplClass + ".flushToDisk", String.valueOf(flush),
 	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
-	DataServiceImpl service =
-	    new DataServiceImpl(props, componentRegistry);
+	service = new DataServiceImpl(props, componentRegistry);
 	service.configure(componentRegistry, txnProxy);
 	componentRegistry.setComponent(DataManager.class, service);
 	componentRegistry.registerAppContext();
