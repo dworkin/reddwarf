@@ -223,6 +223,7 @@ public final class DataServiceImpl
 	    if (state != State.UNINITIALIZED) {
 		throw new IllegalStateException(
 		    "Service is already configured");
+	    }
 	    state = State.RUNNING;
 	    addAbortAction(
 		new Runnable() {

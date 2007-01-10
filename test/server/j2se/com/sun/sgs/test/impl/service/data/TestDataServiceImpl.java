@@ -1561,6 +1561,19 @@ public class TestDataServiceImpl extends TestCase {
 	service = null;
     }
 
+    public void testShutdownRestart() throws Exception {
+	txn.commit();
+	service.shutdown();
+	service = getDataServiceImpl();
+	createTransaction();
+	service.configure(componentRegistry, txnProxy);
+	componentRegistry.setComponent(DataManager.class, service);
+	txn.commit();
+	createTransaction();
+	assertEquals(
+	    dummy, service.getBinding("dummy", DummyManagedObject.class));
+    }
+
     /* -- Other tests -- */
 
     public void testCommitNoStoreParticipant() throws Exception {
@@ -2144,7 +2157,7 @@ public class TestDataServiceImpl extends TestCase {
 	
 	/** Waits a while for the shutdown call to complete. */
 	synchronized boolean waitForDone() throws Exception {
-	    wait(500);
+	    waitForDoneInternal();
 	    if (!done) {
 		return false;
 	    } else if (exception == null) {
@@ -2163,10 +2176,24 @@ public class TestDataServiceImpl extends TestCase {
 	synchronized void assertResult(boolean expectedResult)
 	    throws InterruptedException
 	{
-	    wait(500);
+	    waitForDoneInternal();
 	    assertTrue("Expected shutdown to be done", done);
 	    assertEquals("Unexpected result", expectedResult, result);
 	    assertEquals("Expected no exception", null, exception);
+	}
+
+	/** Wait until done, but give up after a while. */
+	private synchronized void waitForDoneInternal()
+	    throws InterruptedException
+	{
+	    long wait = 2000;
+	    long start = System.currentTimeMillis();
+	    while (!done && wait > 0) {
+		wait(wait);
+		long now = System.currentTimeMillis();
+		wait -= (now - start);
+		start = now;
+	    }
 	}
     }
 }

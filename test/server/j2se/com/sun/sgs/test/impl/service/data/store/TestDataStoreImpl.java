@@ -967,6 +967,19 @@ public class TestDataStoreImpl extends TestCase {
 	store = null;
     }
 
+    public void testShutdownRestart() throws Exception {
+	store.setBinding(txn, "foo", id);
+	byte[] bytes = { 1 };
+	store.setObject(txn, id, bytes);
+	txn.commit();
+	store.shutdown();
+	store = getDataStoreImpl();
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	id = store.getBinding(txn, "foo");
+	byte[] value = store.getObject(txn, id, false);
+	assertTrue(Arrays.equals(bytes, value));
+    }
+
     /* -- Test deadlock -- */
     @SuppressWarnings("hiding")
     public void testDeadlock() throws Exception {
@@ -1302,7 +1315,7 @@ public class TestDataStoreImpl extends TestCase {
 	
 	/** Waits a while for the shutdown call to complete. */
 	synchronized boolean waitForDone() throws Exception {
-	    wait(500);
+	    waitForDoneInternal();
 	    if (!done) {
 		return false;
 	    } else if (exception == null) {
@@ -1321,10 +1334,24 @@ public class TestDataStoreImpl extends TestCase {
 	synchronized void assertResult(boolean expectedResult)
 	    throws InterruptedException
 	{
-	    wait(500);
+	    waitForDoneInternal();
 	    assertTrue("Expected shutdown to be done", done);
 	    assertEquals("Unexpected result", expectedResult, result);
 	    assertEquals("Expected no exception", null, exception);
+	}
+
+	/** Wait until done, but give up after a while. */
+	private synchronized void waitForDoneInternal()
+	    throws InterruptedException
+	{
+	    long wait = 2000;
+	    long start = System.currentTimeMillis();
+	    while (!done && wait > 0) {
+		wait(wait);
+		long now = System.currentTimeMillis();
+		wait -= (now - start);
+		start = now;
+	    }
 	}
     }
 }
