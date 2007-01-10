@@ -9,8 +9,10 @@ import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
 import java.net.PasswordAuthentication;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 
 import javax.swing.JButton;
 import javax.swing.JDesktopPane;
@@ -197,8 +199,9 @@ public class ChatClient extends JFrame
     }
 
     private void doMultiDCCMessage() {
-	Collection<SessionId> targets = userList.getSelectedClients();
-    	if (targets == null || targets.isEmpty()) {
+	Set<SessionId> targets = new HashSet<SessionId>();
+        targets.addAll(userList.getSelectedClients());
+    	if (targets.isEmpty()) {
     	    return;
     	}
 

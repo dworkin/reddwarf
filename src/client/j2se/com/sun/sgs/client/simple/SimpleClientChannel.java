@@ -1,9 +1,7 @@
 package com.sun.sgs.client.simple;
 
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
-import java.util.List;
+import java.util.Set;
 
 import com.sun.sgs.client.ClientChannel;
 import com.sun.sgs.client.ClientChannelListener;
@@ -51,13 +49,13 @@ public class SimpleClientChannel implements ClientChannel {
     /**
      * {@inheritDoc}
      */
-    public void send(Collection<SessionId> recipients, byte[] message) {
+    public void send(Set<SessionId> recipients, byte[] message) {
         sendInternal(recipients, message);
     }
     
     // methods specific to SimpleClientChannel
 
-    private void sendInternal(Collection<SessionId> recipients, byte[] message) {
+    private void sendInternal(Set<SessionId> recipients, byte[] message) {
         manager.sendMessage(name, recipients, message);
     }
     

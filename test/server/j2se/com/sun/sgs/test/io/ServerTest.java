@@ -5,6 +5,7 @@ import java.net.InetSocketAddress;
 import java.util.concurrent.Executors;
 
 import com.sun.sgs.impl.io.AcceptorFactory;
+import com.sun.sgs.impl.io.CompleteMessageFilter;
 import com.sun.sgs.impl.io.IOConstants.TransportType;
 import com.sun.sgs.io.AcceptedHandleListener;
 import com.sun.sgs.io.IOAcceptor;
@@ -19,6 +20,9 @@ import com.sun.sgs.io.IOHandler;
  */
 public class ServerTest implements AcceptedHandleListener, IOHandler {
 
+    private static final String DEFAULT_HOST = "127.0.0.1";
+    private static final String DEFAULT_PORT = "5150";
+    
     IOAcceptor acceptor;
     private int numConnections;
 
@@ -28,10 +32,13 @@ public class ServerTest implements AcceptedHandleListener, IOHandler {
     }
 
     public void start() {
-        int port = 5150;
+        String host = System.getProperty("host", DEFAULT_HOST);
+        String portString = System.getProperty("port", DEFAULT_PORT);
+        int port = Integer.valueOf(portString);
+        InetSocketAddress addr = new InetSocketAddress(host, port);
         System.out.println("Listening on port " + port);
         try {
-            acceptor.listen(new InetSocketAddress("127.0.0.1", port), this);
+            acceptor.listen(addr, this, CompleteMessageFilter.class);
         }
         catch (IOException ioe) {
             ioe.printStackTrace();

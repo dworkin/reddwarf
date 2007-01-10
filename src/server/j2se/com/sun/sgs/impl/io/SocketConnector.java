@@ -34,6 +34,7 @@ public class SocketConnector implements IOConnector
         new LoggerWrapper(Logger.getLogger(SocketConnector.class.getName()));
     
     private final IoConnector connector;
+    private ConnectionHandler connectionHandler = null;
 
     /**
      * Constructs a {@code SocketConnector} using the given {@code IoConnector}
@@ -62,28 +63,73 @@ public class SocketConnector implements IOConnector
     public void connect(SocketAddress address, IOHandler handler, 
             IOFilter filter)
     {
+        synchronized (this) {
+            if (connectionHandler != null) {
+                RuntimeException e = new IllegalStateException(
+                            "Connection already in progress");
+                logger.logThrow(Level.FINE, e, e.getMessage());
+            }
+            connectionHandler = new ConnectionHandler(handler, filter);
+        }
         logger.log(Level.FINE, "connecting to {0}", address);
-        connector.connect(address, new ConnectionHandler(handler, filter));
+        connector.connect(address, connectionHandler);
     }
     
 
     /**
      * {@inheritDoc}
      */
-    public void shutdown() {
+    public synchronized void shutdown() {
         logger.log(Level.FINE, "shutdown called");
+        synchronized (this) {
+            if (connectionHandler == null) {
+                RuntimeException e = new IllegalStateException(
+                            "No connection in progress");
+                logger.logThrow(Level.FINE, e, e.getMessage());
+            }
+        }
+        connectionHandler.cancel();
     }
-
+    
     static class ConnectionHandler extends SocketHandler {
         private final IOHandler handler;
         private final IOFilter filter;
+        private boolean cancelled = false;
+        private boolean connected = false;
 
         ConnectionHandler(IOHandler handler, IOFilter filter) {
             this.handler = handler;
             this.filter = filter;
         }
+        
+        void cancel() {
+            synchronized (this) {
+                if (connected) {
+                    RuntimeException e = new IllegalStateException(
+                                "Already connected");
+                    logger.logThrow(Level.FINE, e, e.getMessage());
+                }
+                if (cancelled) {
+                    RuntimeException e = new IllegalStateException(
+                                "Already cancelled");
+                    logger.logThrow(Level.FINE, e, e.getMessage());
+                }
+                cancelled = true;
+            }
+        }
 
         public void sessionCreated(IoSession session) throws Exception {
+            synchronized (this) {
+                if (cancelled) {
+                    logger.log(Level.FINE,
+                            "cancelled; ignore created session {0}",
+                            session);
+                    session.close();
+                    return;
+                }
+                connected = true;
+            }
+            
             logger.log(Level.FINE, "created session {0}", session);
             SocketHandle handle = new SocketHandle(filter, session);
             handle.setIOHandler(handler);

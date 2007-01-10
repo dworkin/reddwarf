@@ -1,6 +1,6 @@
 package com.sun.sgs.client;
 
-import java.util.Collection;
+import java.util.Set;
 
 /**
  * Represents a client's view of a channel.  A channel is a
@@ -94,5 +94,5 @@ public interface ClientChannel {
      * @throws IllegalStateException if the associated client has been
      * removed from this channel
      */
-    void send(Collection<SessionId> recipients, byte[] message);
+    void send(Set<SessionId> recipients, byte[] message);
 }

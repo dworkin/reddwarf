@@ -2,12 +2,11 @@ package com.sun.sgs.client.simple;
 
 import java.io.IOException;
 import java.net.PasswordAuthentication;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import com.sun.sgs.client.ClientChannel;
 import com.sun.sgs.client.ClientChannelListener;
@@ -48,7 +47,6 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
     
     /** The listener for this simple client. */
     private final SimpleClientListener listener;
-    private final AtomicInteger sequenceNumber;
     private final Map<String, SimpleClientChannel> channels;
     private boolean connected = false;
     private ClientConnection connection;
@@ -68,7 +66,6 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
      */
     public SimpleClient(SimpleClientListener listener) {
         this.listener = listener;
-        sequenceNumber = new AtomicInteger();
         channels = new ConcurrentHashMap<String, SimpleClientChannel>();
     }
 
@@ -342,11 +339,11 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
             sendInternal(Collections.singleton(recipient), message);
         }
     
-        public void send(Collection<SessionId> recipients, byte[] message) {
+        public void send(Set<SessionId> recipients, byte[] message) {
             sendInternal(recipients, message);
         }
 
-        public void sendInternal(Collection<SessionId> recipients,
+        public void sendInternal(Set<SessionId> recipients,
                 byte[] message)
         {
             ProtocolMessageEncoder m = new ProtocolMessageEncoder(

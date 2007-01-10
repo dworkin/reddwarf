@@ -9,14 +9,14 @@ import java.net.SocketAddress;
  * {@code IOFilter}s on a per handle basis.  Filters allow for the manipulation
  * of the bytes before outgoing data is sent, and after incoming data is
  * received.
- * 
- * TODO: spec this to be non-reusable? -JM
+ * <p> 
+ * An {@code IOConnector} is non-reusable in that subsequent calls to connect() 
+ * after the first call with throw {@code IllegalStateException}. 
  * 
  * @author Sten Anderson
  * @since 1.0
  */
 public interface IOConnector {
-
     
     /**
      * Attempts to connect to the remote host on the given port.  This call is
@@ -48,8 +48,11 @@ public interface IOConnector {
     
     
     /**
-     * Shuts down this Connector.  Once shutdown, it cannot be restarted.
-     * If there is a pending connection, it is aborted.
+     * Shuts down this ConnectorShuts down this Connector, attempting to
+     * cancel any connection attempt 
+     * 
+     * @throws IllegalStateException if there is no connection attempt
+     *         in progress
      */
     public void shutdown();
 }

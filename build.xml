@@ -56,7 +56,7 @@
   <path id="server.classpath">
     <pathelement location="${build.dir}/classes/server"/>
     <pathelement location="${bdb.lib.dir}/db.jar"/>
-    <pathelement location="${lib.dir}/mina-core-1.0.0.jar"/>
+    <pathelement location="${lib.dir}/mina-core-1.0.1.jar"/>
     <pathelement location="${lib.dir}/backport-util-concurrent.jar"/>
     <pathelement location="${lib.dir}/slf4j-simple.jar"/>
   </path>

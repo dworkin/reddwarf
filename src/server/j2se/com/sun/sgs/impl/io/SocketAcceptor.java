@@ -2,10 +2,8 @@ package com.sun.sgs.impl.io;
 
 import java.io.IOException;
 import java.net.SocketAddress;
-import java.util.Collection;
 import java.util.Collections;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -30,9 +28,6 @@ public class SocketAcceptor implements IOAcceptor {
     
     /** The associated Mina acceptor that handles the binding */
     private final IoAcceptor acceptor;
-    
-    /** A List of addresses that are bound by this acceptor */
-    private final List<SocketAddress> boundAddresses;
 
     /**
      * Constructs a {@code SocketAcceptor} with the given {@code IoAcceptor}.
@@ -42,22 +37,19 @@ public class SocketAcceptor implements IOAcceptor {
      */
     SocketAcceptor(IoAcceptor acceptor) {
         this.acceptor = acceptor;
-        boundAddresses = new LinkedList<SocketAddress>();
     }
     
     /**
      * {@inheritDoc}
      */
     public void listen(SocketAddress address, AcceptedHandleListener listener, 
-                    Class<? extends IOFilter> filterClass) throws IOException {
-
+                    Class<? extends IOFilter> filterClass) throws IOException
+    {
         if (filterClass == null) {
             filterClass = PassthroughFilter.class;
         }
-        acceptor.bind(address, new AcceptedHandleAdapter(listener, filterClass));
-        synchronized (boundAddresses) {
-            boundAddresses.add(address);
-        }
+        acceptor.bind(address,
+                new AcceptedHandleAdapter(listener, filterClass));
         logger.log(Level.FINE, "listening on {0}", address);
     }
     
@@ -77,19 +69,18 @@ public class SocketAcceptor implements IOAcceptor {
      * {@inheritDoc}
      */
     public void unbind(SocketAddress address) {
-        synchronized(boundAddresses) {
-            if (boundAddresses.contains(address)) {
-                acceptor.unbind(address);
-                boundAddresses.remove(address);
-            }
-        }
+        acceptor.unbind(address);
     }
     
     /**
      * {@inheritDoc}
      */
-    public Collection<SocketAddress> listAddresses() {
-        return Collections.unmodifiableCollection(boundAddresses);
+    @SuppressWarnings("cast")
+    public Set<SocketAddress> listAddresses() {
+        Set<? extends SocketAddress> boundAddresses =
+            (Set<? extends SocketAddress>)
+                acceptor.getManagedServiceAddresses();
+        return Collections.unmodifiableSet(boundAddresses);
     }
 
     /**
@@ -97,11 +88,5 @@ public class SocketAcceptor implements IOAcceptor {
      */
     public void shutdown() {
         acceptor.unbindAll();
-        synchronized (boundAddresses) {
-            boundAddresses.clear();
-        }
     }
-
-
-
 }

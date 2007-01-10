@@ -4,8 +4,6 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Properties;
 
-import javax.naming.OperationNotSupportedException;
-
 import com.sun.sgs.client.comm.ClientConnectionListener;
 import com.sun.sgs.client.comm.ClientConnector;
 import com.sun.sgs.impl.io.CompleteMessageFilter;
@@ -56,7 +54,7 @@ public class SimpleClientConnector extends ClientConnector {
             throw new IllegalArgumentException("Missing Property: port");
         }
         int port = Integer.parseInt(portStr);
-        if (port <= 0 || port >= 2 << 16) {
+        if (port <= 0 || port >= 65536) {
             throw new IllegalArgumentException("Bad port number: " + port);
         }
         
