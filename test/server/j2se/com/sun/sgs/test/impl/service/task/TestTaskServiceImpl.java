@@ -3,6 +3,7 @@ package com.sun.sgs.test.impl.service.task;
 
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
+import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.PeriodicTaskHandle;
@@ -28,7 +29,6 @@ import com.sun.sgs.service.TaskService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyTaskScheduler;
 import com.sun.sgs.test.util.DummyTransaction;
-import com.sun.sgs.test.util.DummyTransaction.UsePrepareAndCommit;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 
 import java.io.File;
@@ -39,9 +39,6 @@ import java.util.Properties;
 
 import junit.framework.TestCase;
 
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-
 
 /** Test the TaskServiceImpl class */
 public class TestTaskServiceImpl extends TestCase {
@@ -50,6 +47,11 @@ public class TestTaskServiceImpl extends TestCase {
     private static String DB_DIRECTORY =
         System.getProperty("java.io.tmpdir") + File.separator +
         "TestTaskServiceImpl.db";
+
+    // the pending namespace in the TaskService
+    // NOTE: this assumes certain private structure in the task service
+    private static final String PENDING_NS =
+        TaskServiceImpl.DS_PREFIX + "Pending.";
 
     // the proxy used for all these tests
     private static DummyTransactionProxy txnProxy =
@@ -226,17 +228,17 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public void testConfigurePendingSingleTasks() throws Exception {
-        clearPendingTasksInStore();
+        //clearPendingTasksInStore();
         // FIXME: implement this once service shutdown is available
     }
 
     public void testConfigurePendingRecurringTasks() throws Exception {
-        clearPendingTasksInStore();
+        //clearPendingTasksInStore();
         // FIXME: implement this once service shutdown is available
     }
 
     public void testConfigurePendingAnyTasks() throws Exception {
-        clearPendingTasksInStore();
+        //clearPendingTasksInStore();
         // FIXME: implement this once service shutdown is available
     }
 
@@ -424,6 +426,32 @@ public class TestTaskServiceImpl extends TestCase {
         txn.abort();
     }
 
+    public void testRunNonRetiredTasks() throws Exception {
+        // NOTE: this test assumes a certain structure in the TaskService.
+        clearPendingTasksInStore();
+
+        DummyTransaction txn = createTransaction();
+        taskService.scheduleTask(new NonRetryNonManagedTask(false));
+        txn.commit();
+        Thread.sleep(200);
+        txn = createTransaction();
+        String name = dataService.nextServiceBoundName(PENDING_NS);
+        if ((name != null) && (name.startsWith(PENDING_NS)))
+            fail("Non-retried task didn't get removed from the pending set");
+        txn.abort();
+
+        clearPendingTasksInStore();
+        txn = createTransaction();
+        taskService.scheduleTask(new NonRetryNonManagedTask(true));
+        txn.commit();
+        Thread.sleep(200);
+        txn = createTransaction();
+        name = dataService.nextServiceBoundName(PENDING_NS);
+        if ((name != null) && (name.startsWith(PENDING_NS)))
+            fail("Non-retried task didn't get removed from the pending set");
+        txn.abort();
+    }
+
     public void testRunPendingTasks() throws Exception {
         DummyTransaction txn = createTransaction();
         Counter counter = getClearedCounter();
@@ -501,6 +529,38 @@ public class TestTaskServiceImpl extends TestCase {
         txn = createTransaction();
         assertCounterClear("Basic cancel of periodic tasks failed");
         txn.abort();
+    }
+
+    public void testCancelPeriodicTasksTxnCommitted() throws Exception {
+        DummyTransaction txn = createTransaction();
+        Counter counter = getClearedCounter();
+        PeriodicTaskHandle handle =
+            taskService.schedulePeriodicTask(new ManagedTask(), 200L, 500L);
+        counter.increment();
+        txn.commit();
+        try {
+            handle.cancel();
+            fail("Expected TransactionNotActiveException");
+        } catch (TransactionNotActiveException e) {
+            System.err.println(e);
+        }
+        Thread.sleep(200);
+        txn = createTransaction();
+        assertCounterClear("Cancel outside of transaction took effect");
+        txn.abort();
+    }
+
+    public void testCancelPeriodicTasksTxnAborted() throws Exception {
+        DummyTransaction txn = createTransaction();
+        PeriodicTaskHandle handle =
+            taskService.schedulePeriodicTask(new ManagedTask(), 200L, 500L);
+        txn.abort();
+        try {
+            handle.cancel();
+            fail("Expected TransactionNotActiveException");
+        } catch (TransactionNotActiveException e) {
+            System.err.println(e);
+        }
     }
 
     public void testCancelPeriodicTasksTwice() throws Exception {
@@ -721,9 +781,8 @@ public class TestTaskServiceImpl extends TestCase {
 
     private void clearPendingTasksInStore() throws Exception {
         DummyTransaction txn = createTransaction();
-        String pendingNs = TaskServiceImpl.DS_PREFIX + "Pending.";
-        String name = dataService.nextServiceBoundName(pendingNs);
-        while ((name != null) && (name.startsWith(pendingNs))) {
+        String name = dataService.nextServiceBoundName(PENDING_NS);
+        while ((name != null) && (name.startsWith(PENDING_NS))) {
             ManagedObject obj =
                 dataService.getBinding(name, ManagedObject.class);
             dataService.removeObject(obj);
@@ -773,6 +832,31 @@ public class TestTaskServiceImpl extends TestCase {
 
     public static class NonManagedTask extends AbstractTask {
         private static final long serialVersionUID = 1;
+    }
+
+    public static class NonRetryNonManagedTask implements Task, Serializable {
+        private static final long serialVersionUID = 1;
+        private boolean throwRetryException;
+        public NonRetryNonManagedTask(boolean throwRetryException) {
+            this.throwRetryException = throwRetryException;
+        }
+        public void run() throws Exception {
+            if (throwRetryException)
+                throw new RetryException();
+            else
+                throw new Exception("This is a non-retry exception");
+        }
+    }
+
+    public static class RetryException extends Exception
+        implements ExceptionRetryStatus {
+        private static final long serialVersionUID = 1;
+        public RetryException() {
+            super("This is a retry exception with status false");
+        }
+        public boolean shouldRetry() {
+            return false;
+        }
     }
 
     public static class KernelRunnableImpl implements KernelRunnable {

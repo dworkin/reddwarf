@@ -124,11 +124,9 @@ public final class MinimalTestKernel
         }
         public void commit() throws Exception {
             txn.commit();
-            proxy.setCurrentTransaction(null);
         }
         public void abort() {
             txn.abort();
-            proxy.setCurrentTransaction(null);
         }
     }
 
