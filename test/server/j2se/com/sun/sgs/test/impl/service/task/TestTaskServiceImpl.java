@@ -7,6 +7,7 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.PeriodicTaskHandle;
 import com.sun.sgs.app.Task;
+import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.app.TaskRejectedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 
@@ -22,6 +23,7 @@ import com.sun.sgs.kernel.Priority;
 import com.sun.sgs.kernel.TaskScheduler;
 
 import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.TaskService;
 
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyTaskScheduler;
@@ -70,16 +72,6 @@ public class TestTaskServiceImpl extends TestCase {
         super(name);
     }
 
-    // this should work to run setup once, but doesn't seem to..
-    @BeforeClass public void setupTests() {
-        System.out.println("Before");
-    }
-
-    // this should work to run teardown once, but doesn't seem to..
-    @AfterClass public void teardownTests() {
-        System.out.println("After");
-    }
-
     protected void setUp() throws Exception {
         appContext = MinimalTestKernel.createContext();
         systemRegistry = MinimalTestKernel.getSystemRegistry(appContext);
@@ -98,10 +90,15 @@ public class TestTaskServiceImpl extends TestCase {
         DummyTransaction txn = createTransaction();
         dataService.configure(serviceRegistry, txnProxy);
         txnProxy.setComponent(DataService.class, dataService);
+        txnProxy.setComponent(DataServiceImpl.class, dataService);
         serviceRegistry.setComponent(DataManager.class, dataService);
         serviceRegistry.setComponent(DataService.class, dataService);
+        serviceRegistry.setComponent(DataServiceImpl.class, dataService);
         taskService.configure(serviceRegistry, txnProxy);
+        txnProxy.setComponent(TaskService.class, taskService);
         txnProxy.setComponent(TaskServiceImpl.class, taskService);
+        serviceRegistry.setComponent(TaskManager.class, taskService);
+        serviceRegistry.setComponent(TaskService.class, taskService);
         serviceRegistry.setComponent(TaskServiceImpl.class, taskService);
         
         // add a counter for use in some of the tests, so we don't have to
@@ -150,7 +147,7 @@ public class TestTaskServiceImpl extends TestCase {
      */
 
     public void testGetName() {
-        assertNotNull(dataService.getName());
+        assertNotNull(taskService.getName());
     }
 
     /**
@@ -244,7 +241,7 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     /**
-     * DataManager tests.
+     * TaskManager tests.
      */
 
     public void testScheduleTaskNullArgs() {
@@ -360,6 +357,28 @@ public class TestTaskServiceImpl extends TestCase {
         txn.abort();
     }
 
+    public void testScheduleTaskNoTransaction() {
+        Task task = new ManagedTask();
+        try {
+            taskService.scheduleTask(task);
+            fail("Expected TransactionNotActiveException");
+        } catch (TransactionNotActiveException e) {
+            System.err.println(e);
+        }
+        try {
+            taskService.scheduleTask(task, 100L);
+            fail("Expected TransactionNotActiveException");
+        } catch (TransactionNotActiveException e) {
+            System.err.println(e);
+        }
+        try {
+            taskService.schedulePeriodicTask(task, 100L, 100L);
+            fail("Expected TransactionNotActiveException");
+        } catch (TransactionNotActiveException e) {
+            System.err.println(e);
+        }
+    }
+
     public void testScheduleRejected() {
         DummyTaskScheduler rejSched = new DummyTaskScheduler(null, true);
         DummyComponentRegistry registry = new DummyComponentRegistry();
@@ -393,56 +412,46 @@ public class TestTaskServiceImpl extends TestCase {
 
     public void testRunImmediateTasks() throws Exception {
         DummyTransaction txn = createTransaction();
-        Counter counter = dataService.getBinding("counter", Counter.class);
-        dataService.markForUpdate(counter);
-        counter.clear();
+        Counter counter = getClearedCounter();
         for (int i = 0; i < 3; i++) {
             taskService.scheduleTask(new NonManagedTask());
             counter.increment();
         }
         txn.commit();
-        Thread.sleep(1000);
+        Thread.sleep(500);
         txn = createTransaction();
-        counter = dataService.getBinding("counter", Counter.class);
-        if (! counter.isZero())
-            fail("Some immediate tasks did not run");
+        assertCounterClear("Some immediate tasks did not run");
         txn.abort();
     }
 
     public void testRunPendingTasks() throws Exception {
         DummyTransaction txn = createTransaction();
-        Counter counter = dataService.getBinding("counter", Counter.class);
-        dataService.markForUpdate(counter);
-        counter.clear();
-        for (int i = 0; i < 3; i++) {
-            taskService.scheduleTask(new NonManagedTask(), (long)(i * 100));
+        Counter counter = getClearedCounter();
+        for (long i = 0; i < 3; i++) {
+            taskService.scheduleTask(new NonManagedTask(), i * 100L);
             counter.increment();
         }
         txn.commit();
-        Thread.sleep(1000);
+        Thread.sleep(500);
         txn = createTransaction();
-        counter = dataService.getBinding("counter", Counter.class);
-        if (! counter.isZero())
-            fail("Some pending tasks did not run");
+        assertCounterClear("Some pending tasks did not run");
         txn.abort();
     }
 
     public void testRunPeriodicTasks() throws Exception {
         DummyTransaction txn = createTransaction();
-        Counter counter = dataService.getBinding("counter", Counter.class);
-        dataService.markForUpdate(counter);
-        counter.clear();
+        Counter counter = getClearedCounter();
         for (int i = 0; i < 3; i++) {
             PeriodicTaskHandle handle =
                 taskService.schedulePeriodicTask(new NonManagedTask(),
-                                                 0L, 2000L);
+                                                 0L, 500L);
             dataService.setBinding("runHandle." + i,
                                    new ManagedHandle(handle));
             counter.increment();
             counter.increment();
         }
         txn.commit();
-        Thread.sleep(2500);
+        Thread.sleep(750);
         txn = createTransaction();
         String name = dataService.nextBoundName("runHandle.");
         while ((name != null) && (name.startsWith("runHandle."))) {
@@ -453,19 +462,17 @@ public class TestTaskServiceImpl extends TestCase {
             dataService.removeBinding(name);
             name = dataService.nextBoundName(name);
         }
-        counter = dataService.getBinding("counter", Counter.class);
-        if (! counter.isZero())
-            fail("Some periodic tasks did not run");
+        assertCounterClear("Some periodic tasks did not run");
         txn.commit();
     }
 
-    // FIXME: add a counter and make sure it wasn't tripped
-
     public void testCancelPeriodicTasksBasic() throws Exception {
         DummyTransaction txn = createTransaction();
+        getClearedCounter();
+        
         // test the basic cancel operation, within a transaction
         PeriodicTaskHandle handle =
-            taskService.schedulePeriodicTask(new ManagedTask(), 1000L, 1000L);
+            taskService.schedulePeriodicTask(new ManagedTask(), 100L, 100L);
         try {
             handle.cancel();
         } catch (Exception e) {
@@ -474,8 +481,7 @@ public class TestTaskServiceImpl extends TestCase {
 
         // test the basic cancel operation, between transactions
         handle =
-            taskService.schedulePeriodicTask(new NonManagedTask(),
-                                             10000L, 100L);
+            taskService.schedulePeriodicTask(new NonManagedTask(), 500L, 100L);
         dataService.setBinding("TestTaskServiceImpl.handle",
                                new ManagedHandle(handle));
         txn.commit();
@@ -491,15 +497,20 @@ public class TestTaskServiceImpl extends TestCase {
         dataService.removeObject(mHandle);
         dataService.removeBinding("TestTaskServiceImpl.handle");
         txn.commit();
+        Thread.sleep(800);
+        txn = createTransaction();
+        assertCounterClear("Basic cancel of periodic tasks failed");
+        txn.abort();
     }
 
     public void testCancelPeriodicTasksTwice() throws Exception {
         DummyTransaction txn = createTransaction();
+
         // test the basic cancel operation, within a transaction
         PeriodicTaskHandle handle =
-            taskService.schedulePeriodicTask(new ManagedTask(), 1000L, 1000L);
+            taskService.schedulePeriodicTask(new ManagedTask(), 100L, 100L);
+        handle.cancel();
         try {
-            handle.cancel();
             handle.cancel();
             fail("Expected ObjectNotFoundException");
         } catch (ObjectNotFoundException e) {
@@ -509,7 +520,7 @@ public class TestTaskServiceImpl extends TestCase {
         // test the basic cancel operation, between transactions
         handle =
             taskService.schedulePeriodicTask(new NonManagedTask(),
-                                             10000L, 100L);
+                                             500L, 500L);
         dataService.setBinding("TestTaskServiceImpl.handle",
                                new ManagedHandle(handle));
         txn.commit();
@@ -533,10 +544,11 @@ public class TestTaskServiceImpl extends TestCase {
 
     public void testCancelPeriodicTasksTaskRemoved() throws Exception {
         DummyTransaction txn = createTransaction();
+        getClearedCounter();
         ManagedTask task = new ManagedTask();
         dataService.setBinding("TestTaskServiceImpl.task", task);
         PeriodicTaskHandle handle =
-            taskService.schedulePeriodicTask(task, 10000L, 100L);
+            taskService.schedulePeriodicTask(task, 500L, 100L);
         dataService.setBinding("TestTaskServiceImpl.handle",
                                new ManagedHandle(handle));
         txn.commit();
@@ -559,11 +571,21 @@ public class TestTaskServiceImpl extends TestCase {
         dataService.removeBinding("TestTaskServiceImpl.handle");
         dataService.removeBinding("TestTaskServiceImpl.task");
         txn.commit();
+        Thread.sleep(800);
+        txn = createTransaction();
+        assertCounterClear("TaskRemoved cancel of periodic tasks failed");
+        txn.abort();
     }
 
     /**
      * TaskService tests.
      */
+
+    public void testNonDurableTasksNonDurable() {
+        // FIXME: when we can do shutdown, make sure that non-durable tasks
+        // are indeed non-durable (i.e., they don't get saved and re-started
+        // when the system comes back up)
+    }
 
     public void testScheduleNonDurableTaskNullArgs() {
         DummyTransaction txn = createTransaction();
@@ -585,6 +607,13 @@ public class TestTaskServiceImpl extends TestCase {
         } catch (NullPointerException e) {
             System.err.println(e);
         }
+        try {
+            taskService.scheduleNonDurableTask(new KernelRunnableImpl(null),
+                                               null);
+            fail("Expected NullPointerException");
+        } catch (NullPointerException e) {
+            System.err.println(e);
+        }
         txn.abort();
     }
 
@@ -602,6 +631,28 @@ public class TestTaskServiceImpl extends TestCase {
         txn.abort();
     }
 
+    public void testScheduleNonDurableTaskNoTransaction() {
+        KernelRunnableImpl task = new KernelRunnableImpl(null);
+        try {
+            taskService.scheduleNonDurableTask(task);
+            fail("Expected TransactionNotActiveException");
+        } catch (TransactionNotActiveException e) {
+            System.err.println(e);
+        }
+        try {
+            taskService.scheduleNonDurableTask(task, 100L);
+            fail("Expected TransactionNotActiveException");
+        } catch (TransactionNotActiveException e) {
+            System.err.println(e);
+        }
+        try {
+            taskService.scheduleNonDurableTask(task, Priority.MEDIUM);
+            fail("Expected TransactionNotActiveException");
+        } catch (TransactionNotActiveException e) {
+            System.err.println(e);
+        }
+    }
+
     public void testRunImmediateNonDurableTasks() throws Exception {
         Counter counter = new Counter();
         DummyTransaction txn = createTransaction();
@@ -611,7 +662,7 @@ public class TestTaskServiceImpl extends TestCase {
             counter.increment();
         }
         txn.commit();
-        Thread.sleep(1000);
+        Thread.sleep(500);
         if (! counter.isZero())
             fail("Some immediate non-durable tasks did not run");
     }
@@ -619,14 +670,14 @@ public class TestTaskServiceImpl extends TestCase {
     public void testRunPendingNonDurableTasks() throws Exception {
         Counter counter = new Counter();
         DummyTransaction txn = createTransaction();
-        for (int i = 0; i < 3; i++) {
+        for (long i = 0; i < 3; i++) {
             taskService.
                 scheduleNonDurableTask(new KernelRunnableImpl(counter),
-                                       (long)(i * 100));
+                                       i * 100L);
             counter.increment();
         }
         txn.commit();
-        Thread.sleep(1000);
+        Thread.sleep(500);
         if (! counter.isZero())
             fail("Some pending non-durable tasks did not run");
     }
@@ -636,8 +687,7 @@ public class TestTaskServiceImpl extends TestCase {
      */
 
     private DummyTransaction createTransaction() {
-        DummyTransaction txn =
-            new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+        DummyTransaction txn = new DummyTransaction();
         txnProxy.setCurrentTransaction(txn);
         return txn;
     }
@@ -664,8 +714,8 @@ public class TestTaskServiceImpl extends TestCase {
             for (File file : dir.listFiles())
                 if (! file.delete())
                     throw new RuntimeException("couldn't delete: " + file);
-            /*if (! dir.delete())
-              throw new RuntimeException("couldn't remove: " + dir);*/
+            if (! dir.delete())
+                throw new RuntimeException("couldn't remove: " + dir);
         }
     }
 
@@ -680,6 +730,19 @@ public class TestTaskServiceImpl extends TestCase {
             dataService.removeBinding(name);
         }
         txn.commit();
+    }
+
+    private Counter getClearedCounter() {
+        Counter counter = dataService.getBinding("counter", Counter.class);
+        dataService.markForUpdate(counter);
+        counter.clear();
+        return counter;
+    }
+
+    private void assertCounterClear(String message) {
+        Counter counter = dataService.getBinding("counter", Counter.class);
+        if (! counter.isZero())
+            fail(message);
     }
 
     /**

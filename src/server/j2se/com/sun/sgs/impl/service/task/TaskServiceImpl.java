@@ -140,7 +140,7 @@ public class TaskServiceImpl
      * {@inheritDoc}
      */
     public void configure(ComponentRegistry serviceRegistry,
-                          TransactionProxy transactionProxy) {
+                          TransactionProxy proxy) {
         if (isConfigured)
             throw new IllegalStateException("Task Service already configured");
         isConfiguring = true;
@@ -149,11 +149,11 @@ public class TaskServiceImpl
 
         if (serviceRegistry == null)
             throw new NullPointerException("null registry not allowed");
-        if (transactionProxy == null)
+        if (proxy == null)
             throw new NullPointerException("null proxy not allowed");
 
         // keep track of the proxy and the data service
-        TaskServiceImpl.transactionProxy = transactionProxy;
+        TaskServiceImpl.transactionProxy = proxy;
         dataService = serviceRegistry.getComponent(DataService.class);
 
         logger.log(Level.CONFIG, "re-scheduling pending tasks");
@@ -458,6 +458,8 @@ public class TaskServiceImpl
      */
     public void scheduleNonDurableTask(KernelRunnable task,
                                        Priority priority) {
+        if (priority == null)
+            throw new NullPointerException("Priority must not be null");
         scheduleTask(task, transactionProxy.getCurrentOwner(), START_NOW,
                      priority);
     }
@@ -480,8 +482,7 @@ public class TaskServiceImpl
         // get the name of the new object and bind that into the pending
         // namespace for recovery on startup
         ManagedReference taskRef = dataService.createReference(ptask);
-        String objName = DS_PENDING_SPACE +
-            String.valueOf(taskRef.getId().longValue());
+        String objName = DS_PENDING_SPACE + taskRef.getId();
         dataService.setServiceBinding(objName, ptask);
 
         if (logger.isLoggable(Level.FINEST))
@@ -625,7 +626,6 @@ public class TaskServiceImpl
         try {
             ptask = dataService.getServiceBinding(objName, PendingTask.class);
         } catch (NameNotBoundException nnbe) {
-            System.out.println("caught NameNotBoundException");
             // either some one else cancelled this already, or it was only
             // just created in this transaction
             if ((txnState.recurringMap != null) &&
@@ -654,6 +654,7 @@ public class TaskServiceImpl
     private class TxnState {
         public boolean prepared = false;
         public HashSet<TaskReservation> reservationSet = null;
+        @SuppressWarnings("hiding")
         public HashMap<String,RecurringTaskHandle> recurringMap = null;
         public HashSet<String> cancelledSet = null;
     }
@@ -700,6 +701,7 @@ public class TaskServiceImpl
                 taskRef.get(Task.class);
                 return true;
             } catch (ObjectNotFoundException onfe) {
+                logger.log(Level.FINER, "Task was removed by application");
                 return false;
             }
         }

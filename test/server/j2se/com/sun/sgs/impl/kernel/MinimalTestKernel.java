@@ -12,7 +12,6 @@ import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyIdentity;
 import com.sun.sgs.test.util.DummyTaskScheduler;
 import com.sun.sgs.test.util.DummyTransaction;
-import com.sun.sgs.test.util.DummyTransaction.UsePrepareAndCommit;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -108,8 +107,7 @@ public final class MinimalTestKernel
      */
     static class TestTransactionCoordinator implements TransactionCoordinator {
         public TransactionHandle createTransaction() {
-            DummyTransaction txn =
-                new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+            DummyTransaction txn = new DummyTransaction();
             proxy.setCurrentTransaction(txn);
             return new TestTransactionHandle(txn);
         }
