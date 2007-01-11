@@ -33,7 +33,9 @@ public class SocketConnector implements IOConnector {
     
     private IoConnector connector;
     private boolean connectionInitiated = false;
-
+    
+    private SocketAddress address;
+    
     
     /**
      * Constructs a {@code SocketConnector} using the given {@code IoConnector}
@@ -41,9 +43,13 @@ public class SocketConnector implements IOConnector {
      * package, so use one of the {@code ConnectorFactory.createConnector} 
      * methods to create a new instance.
      * 
+     * @param address           the remote address to which to connect
+     * @param connector         the Mina IoConnector to use for establishing
+     *                          the connection
      */
-    SocketConnector(IoConnector connector) {
+    SocketConnector(SocketAddress address, IoConnector connector) {
         this.connector = connector;
+        this.address = address;
     }
     
     /**
@@ -52,15 +58,14 @@ public class SocketConnector implements IOConnector {
      * A {@code PassthroughFilter} will be installed on the connected 
      * {@code IOHandle}, which simply passes the data on untouched.
      */
-    public void connect(SocketAddress address, IOHandler handler) {
-        connect(address, handler, new PassthroughFilter());
+    public void connect(IOHandler handler) {
+        connect(handler, new PassthroughFilter());
     }
 
     /**
      * {@inheritDoc}
      */
-    public void connect(SocketAddress address, IOHandler handler, 
-            IOFilter filter) {
+    public void connect(IOHandler handler, IOFilter filter) {
         
         if (connectionInitiated) {
             throw new IllegalStateException("IOConnector has already " +

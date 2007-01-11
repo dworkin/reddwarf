@@ -12,8 +12,8 @@ import java.net.SocketAddress;
 import java.net.UnknownHostException;
 
 import com.sun.sgs.impl.io.CompleteMessageFilter;
-import com.sun.sgs.impl.io.ConnectorFactory;
 import com.sun.sgs.impl.io.SocketConnector;
+import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.IOConstants.TransportType;
 import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
@@ -105,9 +105,11 @@ public class ClientTest extends JFrame {
     
 
     public void start() {
-        IOConnector connector = ConnectorFactory.createConnector(
-                                                TransportType.RELIABLE,
-                                                Executors.newCachedThreadPool());
+        int port = 5150;
+        SocketAddress address = new InetSocketAddress("127.0.0.1", port);
+        IOConnector connector = new SocketEndpoint(address, 
+                      TransportType.RELIABLE, 
+                      Executors.newCachedThreadPool()).createConnector();
         model.connect(connector);
     }
     
@@ -242,10 +244,7 @@ public class ClientTest extends JFrame {
         }
         
         public void connect(IOConnector connector) {
-            int port = 5150;
-            //handle = connector.connect(InetAddress.getByName("127.0.0.1"), port, this);
-            SocketAddress address = new InetSocketAddress("127.0.0.1", port);
-            connector.connect(address, this, new CompleteMessageFilter());
+            connector.connect(this, new CompleteMessageFilter());
         }
         
         public String getStatus() {

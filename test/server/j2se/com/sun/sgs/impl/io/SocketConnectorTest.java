@@ -51,20 +51,22 @@ public class SocketConnectorTest {
         }
     }
     
+    /**
+     * Shutdown the acceptor and start over for the next test.
+     * 
+     * Note that even though the acceptor will shutdown in a separate thread,
+     * the current thread will block until shutdown is complete.  Even so, 
+     * it seems that sometimes the next call to "init" happens too quickly
+     * after the call to shutdown, causing subsequent tests to fail.  This
+     * may be an IO limitation of the machine, not being able to fully unbind
+     * the port before it is bound again.  
+     *
+     */
     @After
     public void cleanup() {
         acceptor.shutdown();
         acceptor = null;
         
-        // There seems to be a race condition between shutting the acceptor down
-        // and creating a new one (bound to the same port) in "init".  This 
-        // delay gives the acceptor time to shutdown.
-        synchronized(this) {
-            try {
-                wait(DELAY);
-            }
-            catch (InterruptedException ie) {}
-        }
     }
     
     /**
@@ -73,8 +75,8 @@ public class SocketConnectorTest {
     @Test
     public void testConnect() {
         IOConnector connector = 
-                    ConnectorFactory.createConnector(TransportType.RELIABLE, 
-                            Executors.newCachedThreadPool());
+                    new SocketEndpoint(ADDRESS, TransportType.RELIABLE, 
+                            Executors.newCachedThreadPool()).createConnector();
         
         
         IOHandler handler = new IOHandlerAdapter() {
@@ -85,7 +87,7 @@ public class SocketConnectorTest {
            
         };
         
-        connector.connect(ADDRESS, handler);
+        connector.connect(handler);
         
         synchronized(this) {
             try {
@@ -103,27 +105,27 @@ public class SocketConnectorTest {
      */
     @Test (expected=IllegalStateException.class)
     public void testMultipleConnect() {
-        IOConnector connector = 
-            ConnectorFactory.createConnector(TransportType.RELIABLE);
+        IOConnector connector = new SocketEndpoint(ADDRESS, 
+                                    TransportType.RELIABLE).createConnector();
 
 
         IOHandler handler = new IOHandlerAdapter();
         
-        connector.connect(ADDRESS, handler);
+        connector.connect(handler);
         
-        connector.connect(ADDRESS, handler);
+        connector.connect(handler);
     }
     
     @Test (expected=IllegalStateException.class)
     public void testShutdown() {
-        final IOConnector connector = 
-            ConnectorFactory.createConnector(TransportType.RELIABLE);
+        final IOConnector connector = new SocketEndpoint(ADDRESS, 
+                                    TransportType.RELIABLE).createConnector();
 
 
         IOHandler handler = new IOHandlerAdapter();
         
         connector.shutdown();
-        connector.connect(ADDRESS, handler);
+        connector.connect(handler);
         
     }
     

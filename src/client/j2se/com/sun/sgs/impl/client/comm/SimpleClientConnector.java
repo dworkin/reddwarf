@@ -8,7 +8,7 @@ import java.util.Properties;
 import com.sun.sgs.client.comm.ClientConnection;
 import com.sun.sgs.client.comm.ClientConnectionListener;
 import com.sun.sgs.client.comm.ClientConnector;
-import com.sun.sgs.impl.io.ConnectorFactory;
+import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.IOConstants.TransportType;
 import com.sun.sgs.io.IOConnector;
 
@@ -30,20 +30,7 @@ public class SimpleClientConnector extends ClientConnector {
         if (transport == null) {
             transport = "reliable";
         }
-        TransportType transportType = transport.equalsIgnoreCase("unreliable") ?
-                              TransportType.UNRELIABLE : TransportType.RELIABLE;
-        connector = ConnectorFactory.createConnector(transportType);
-    }
-    
-    @Override
-    public void cancel() throws IOException {
-        // TODO not implemented...
-    }
-
-    @Override
-    public void connect(ClientConnectionListener connectionListener)
-            throws IOException {
-
+        
         String host = properties.getProperty("host");
         if (host == null) {
             throw new IllegalArgumentException("Missing Property: host");
@@ -57,10 +44,28 @@ public class SimpleClientConnector extends ClientConnector {
             throw new IllegalArgumentException("Bad port number: " + port);
         }
         
+        TransportType transportType = transport.equalsIgnoreCase("unreliable") ?
+                              TransportType.UNRELIABLE : TransportType.RELIABLE;
+        SocketAddress socketAddress = new InetSocketAddress(host, port);
+        connector = 
+            new SocketEndpoint(socketAddress, transportType).createConnector();
+    }
+    
+    @Override
+    public void cancel() throws IOException {
+        // TODO not implemented...
+    }
+
+    @Override
+    public void connect(ClientConnectionListener connectionListener)
+            throws IOException {
+
+
+        
         SimpleClientConnection connection = 
                                 new SimpleClientConnection(connectionListener);
-        SocketAddress socketAddress = new InetSocketAddress(host, port);
-        connector.connect(socketAddress, connection);
+        
+        connector.connect(connection);
     }
 
 }
