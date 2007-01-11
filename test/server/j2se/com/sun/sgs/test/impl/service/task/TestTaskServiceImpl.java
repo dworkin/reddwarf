@@ -75,6 +75,7 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     protected void setUp() throws Exception {
+        System.err.println("Testcase: " + getName());
         appContext = MinimalTestKernel.createContext();
         systemRegistry = MinimalTestKernel.getSystemRegistry(appContext);
         serviceRegistry = MinimalTestKernel.getServiceRegistry(appContext);
@@ -111,6 +112,10 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     protected void tearDown() {
+        if (dataService != null) {
+            dataService.shutdown();
+        }
+        dataService = null;
         deleteDirectory(DB_DIRECTORY);
         MinimalTestKernel.destroyContext(appContext);
     }
@@ -544,10 +549,13 @@ public class TestTaskServiceImpl extends TestCase {
         } catch (TransactionNotActiveException e) {
             System.err.println(e);
         }
-        Thread.sleep(200);
+        Thread.sleep(300);
         txn = createTransaction();
-        assertCounterClear("Cancel outside of transaction took effect");
-        txn.abort();
+        try {
+            assertCounterClear("Cancel outside of transaction took effect");
+        } finally {
+            txn.abort();
+        }
     }
 
     public void testCancelPeriodicTasksTxnAborted() throws Exception {
