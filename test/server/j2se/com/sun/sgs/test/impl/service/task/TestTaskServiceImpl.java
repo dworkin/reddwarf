@@ -426,7 +426,7 @@ public class TestTaskServiceImpl extends TestCase {
         txn.abort();
     }
 
-    public void testRunNonRetiredTasks() throws Exception {
+    public void testRunNonRetriedTasks() throws Exception {
         // NOTE: this test assumes a certain structure in the TaskService.
         clearPendingTasksInStore();
 

@@ -213,6 +213,15 @@ public class TaskServiceImpl
     }
 
     /**
+     * FIXME: This is just a stub implementation right now. It needs to be
+     * implemented. It has been added here to support the new shutdown
+     * method on <code>Service</code>.
+     */
+    public boolean shutdown() {
+        return false;
+    }
+
+    /**
      * {@inheritDoc}
      */
     public boolean prepare(Transaction txn) throws Exception {
