@@ -8,11 +8,7 @@ import com.sun.sgs.kernel.TaskOwner;
 public class DummyTaskOwner implements TaskOwner {
 
     /** The identity. */
-    private final Identity identity = new Identity() {
-	public String getName() { return "Me!"; }
-	public void notifyLoggedIn() { }
-	public void notifyLoggedOut() { }
-    };
+    private final Identity identity = new DummyIdentity();
 
     /** The kernel application context. */
     private final KernelAppContext kernelAppContext =
