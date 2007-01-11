@@ -10,9 +10,12 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.PeriodicTaskHandle;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
+import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
+import com.sun.sgs.impl.service.task.TaskServiceImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.Priority;
@@ -23,9 +26,9 @@ import com.sun.sgs.service.ServiceListener;
 import com.sun.sgs.service.SgsClientSession;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.TransactionProxy;
-import com.sun.sgs.test.util.DummyTaskService;
-import com.sun.sgs.test.util.DummyTaskScheduler;
 import com.sun.sgs.test.util.DummyComponentRegistry;
+import com.sun.sgs.test.util.DummyTaskScheduler;
+import com.sun.sgs.test.util.DummyTaskScheduler;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 import java.io.ByteArrayInputStream;
@@ -84,13 +87,15 @@ public class TestChannelServiceImpl extends TestCase {
     
     private static DummyTransactionProxy txnProxy = new DummyTransactionProxy();
 
+    private static MinimalTestKernel kernel = new MinimalTestKernel(txnProxy);
+    
     private DummyComponentRegistry registry;
 
     private DummyTransaction txn;
 
     private DataServiceImpl dataService;
 
-    private DummyTaskService taskService;
+    private TaskService taskService;
 
     private DummyTaskScheduler taskScheduler;
 
@@ -110,24 +115,38 @@ public class TestChannelServiceImpl extends TestCase {
     protected void setUp() throws Exception {
 	passed = false;
 	System.err.println("Testcase: " + getName());
+	DummyComponentRegistry systemRegistry = new DummyComponentRegistry();
+	DummyComponentRegistry serviceRegistry = new DummyComponentRegistry();
+	DummyAbstractKernelAppContext context =
+	    new DummyAbstractKernelAppContext(serviceRegistry);
+	taskScheduler = new DummyTaskScheduler(kernel, context, false);
+	systemRegistry.setComponent(TaskScheduler.class, taskScheduler);
+	taskService = new TaskServiceImpl(new Properties(), systemRegistry);
+
+	// create and configure data service
 	createTransaction();
-	registry = new DummyComponentRegistry();
-	dataService = createDataService(registry);
-	dataService.configure(registry, txnProxy);
-	registry.setComponent(DataService.class, dataService);
-	registry.registerAppContext();
-	taskService = new DummyTaskService();
-	registry.setComponent(TaskService.class, taskService);
+	dataService = createDataService(systemRegistry);
+	dataService.configure(serviceRegistry, txnProxy);
+	txnProxy.setComponent(DataService.class, dataService);
+	serviceRegistry.setComponent(DataService.class, dataService);
+
+	// configure task service
+	taskService.configure(serviceRegistry, txnProxy);
 	txnProxy.setComponent(TaskService.class, taskService);
-	taskScheduler = new DummyTaskScheduler();
-	registry.setComponent(TaskScheduler.class, taskScheduler);
-	sessionService = createSessionService();
-	registry.setComponent(ClientSessionService.class, sessionService);
-	txn.commit();
-	createTransaction();
-	channelService = createChannelService(registry);
-	channelService.configure(registry, txnProxy);
-	registry.setComponent(ChannelManager.class, channelService);
+	//serviceRegistry.setComponent(TaskManager.class, taskService);
+	serviceRegistry.setComponent(TaskService.class, taskService);
+
+	serviceRegistry.registerAppContext();
+
+	// create and configure client session service
+	sessionService = new DummySessionService();
+	serviceRegistry.setComponent(
+	    ClientSessionService.class, sessionService);
+	
+	// create and configure channel service
+	channelService = new ChannelServiceImpl(serviceProps, systemRegistry);
+	channelService.configure(serviceRegistry, txnProxy);
+	serviceRegistry.setComponent(ChannelManager.class, channelService);
 	txn.commit();
 	createTransaction();
     }
@@ -181,11 +200,15 @@ public class TestChannelServiceImpl extends TestCase {
     /* -- Test configure -- */
 
     public void testConfigureNullRegistry() {
-	DummyComponentRegistry registry = new DummyComponentRegistry();
-	registry.setComponent(TaskScheduler.class, new DummyTaskScheduler());
+	DummyComponentRegistry systemRegistry = new DummyComponentRegistry();
+	DummyComponentRegistry serviceRegistry = new DummyComponentRegistry();
+	DummyAbstractKernelAppContext context =
+	    new DummyAbstractKernelAppContext(serviceRegistry);
+	taskScheduler = new DummyTaskScheduler(kernel, context, false);
+	systemRegistry.setComponent(TaskScheduler.class, taskScheduler);
 	   
 	ChannelServiceImpl service =
-	    new ChannelServiceImpl(serviceProps, registry);
+	    new ChannelServiceImpl(serviceProps, systemRegistry);
 	try {
 	    channelService.configure(null, new DummyTransactionProxy());
 	    fail("Expected NullPointerException");
@@ -195,11 +218,15 @@ public class TestChannelServiceImpl extends TestCase {
     }
     
     public void testConfigureNullTransactionProxy() {
-	DummyComponentRegistry registry = new DummyComponentRegistry();
-	registry.setComponent(TaskScheduler.class, new DummyTaskScheduler());
+	DummyComponentRegistry systemRegistry = new DummyComponentRegistry();
+	DummyComponentRegistry serviceRegistry = new DummyComponentRegistry();
+	DummyAbstractKernelAppContext context =
+	    new DummyAbstractKernelAppContext(serviceRegistry);
+	taskScheduler = new DummyTaskScheduler(kernel, context, false);
+	systemRegistry.setComponent(TaskScheduler.class, taskScheduler);
 	   
 	ChannelServiceImpl service =
-	    new ChannelServiceImpl(serviceProps, registry);
+	    new ChannelServiceImpl(serviceProps, systemRegistry);
 	try {
 	    channelService.configure(new DummyComponentRegistry(), null);
 	    fail("Expected NullPointerException");
@@ -210,7 +237,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testConfigureTwice() {
 	try {
-	    channelService.configure(registry, txnProxy);
+	    channelService.configure(new DummyComponentRegistry(), txnProxy);
 	    fail("Expected IllegalStateException");
 	} catch (IllegalStateException e) {
 	    System.err.println(e);
@@ -971,20 +998,6 @@ public class TestChannelServiceImpl extends TestCase {
 	    }
 	}
 	return new DataServiceImpl(dbProps, registry);
-    }
-    
-    /**
-     * Creates a client session service.
-     */
-    private DummySessionService createSessionService() {
-	return new DummySessionService();
-    }
-
-   /** Creates a new channel service. */
-    private static ChannelServiceImpl createChannelService(
-	DummyComponentRegistry registry)
-    {
-	return new ChannelServiceImpl(serviceProps, registry);
     }
     
     /* -- other classes -- */

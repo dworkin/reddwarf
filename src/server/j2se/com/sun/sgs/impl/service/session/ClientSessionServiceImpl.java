@@ -95,6 +95,9 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     /** The identity manager. */
     IdentityManager identityManager;
 
+    /** If true, this service is shutting down; initially, false. */
+    private boolean shuttingDown = false;
+
     /**
      * Constructs an instance of this class with the specified properties.
      *
@@ -189,6 +192,12 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 		try {
 		    acceptor.listen(
 			address, listener, CompleteMessageFilter.class);
+		    if (logger.isLoggable(Level.CONFIG)) {
+			logger.log(
+			    Level.CONFIG,
+			    "configure: listen successful. port:{0}",
+			    port);
+		    }
 		} catch (IOException e) {
 		    throw new RuntimeException(e);
 		}
@@ -207,8 +216,50 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     /**
      * Shuts down this service.
      */
-    public void shutdown() {
-	acceptor.shutdown();
+    public boolean shutdown() {
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(Level.FINEST, "shutdown");
+	}
+	
+	synchronized (this) {
+	    if (shuttingDown) {
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(Level.FINEST, "shutdown in progress");
+		}
+		return false;
+	    }
+	    shuttingDown = true;
+	}
+
+	try {
+	    if (acceptor != null) {
+		acceptor.shutdown();
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(Level.FINEST, "acceptor shutdown");
+		}
+		for (ClientSessionImpl session : sessions.values()) {
+		    try {
+			// should already be closed, but just in case...
+			session.closeSession();
+		    } catch (RuntimeException e) {
+			// ignore
+		    }
+		}
+	    }
+	} catch (RuntimeException e) {
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.logThrow(Level.FINEST, e, "shutdown exception occurred");
+	    }
+	    // swallow exception
+
+	} finally {
+	    sessions.clear();
+	    try {
+		Thread.sleep(2000);
+	    } catch (InterruptedException e) {
+	    }
+	}
+	return true;
     }
 
     /* -- Implement ClientSessionService -- */
@@ -236,6 +287,9 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	 * and adds the session to the internal session map.
 	 */
 	public IOHandler newHandle(IOHandle handle) {
+	    if (shuttingDown()) {
+		return null;
+	    }
 	    ClientSessionImpl session =
 		new ClientSessionImpl(ClientSessionServiceImpl.this, handle);
 	    sessions.put(new SessionId(session.getSessionId()), session);
@@ -298,8 +352,11 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     /**
      * Removes the specified session from the internal session map.
      */
-    void disconnected(ClientSessionImpl session) {
-	sessions.remove(new SessionId(session.getSessionId()));
+    void disconnected(byte[] sessionId) {
+	if (shuttingDown()) {
+	    return;
+	}
+	sessions.remove(new SessionId(sessionId));
     }
 
     /**
@@ -314,5 +371,9 @@ public class ClientSessionServiceImpl implements ClientSessionService {
      */
     void scheduleNonTransactionalTask(KernelRunnable task) {
 	nonDurableTaskScheduler.scheduleNonTransactionalTask(task);
+    }
+
+    private synchronized boolean shuttingDown() {
+	return shuttingDown;
     }
 }

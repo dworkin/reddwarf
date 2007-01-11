@@ -1,22 +1,36 @@
 package com.sun.sgs.test.impl.service.session;
 
+import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ClientSession;
+import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.NameExistsException;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.PeriodicTaskHandle;
+import com.sun.sgs.app.ShutdownListener;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityCredentials;
 import com.sun.sgs.auth.IdentityManager;
 import com.sun.sgs.impl.auth.NamePasswordCredentials;
+import com.sun.sgs.impl.io.CompleteMessageFilter;
+import com.sun.sgs.impl.io.ConnectorFactory;
+import com.sun.sgs.impl.io.IOConstants.TransportType;
+import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
+import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
+import com.sun.sgs.impl.service.session.SgsProtocol;
+import com.sun.sgs.impl.service.task.TaskServiceImpl;
+import com.sun.sgs.impl.util.MessageBuffer;
+import com.sun.sgs.io.IOConnector;
+import com.sun.sgs.io.IOHandle;
+import com.sun.sgs.io.IOHandler;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.Priority;
@@ -30,7 +44,6 @@ import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyTaskScheduler;
-import com.sun.sgs.test.util.DummyTaskService;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 import java.io.ByteArrayInputStream;
@@ -40,9 +53,13 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Properties;
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -61,10 +78,13 @@ public class TestClientSessionServiceImpl extends TestCase {
 	System.getProperty("java.io.tmpdir") + File.separator +
 	"TestClientSessionServiceImpl.db";
 
+    /** The port for the client session service. */
+    private static int PORT = 8307;
+
     /** Properties for the session service. */
     private static Properties serviceProps = createProperties(
 	"com.sun.sgs.appName", "TestClientSessionServiceImpl",
-	"com.sun.sgs.app.port", "8306");
+	"com.sun.sgs.app.port", Integer.toString(PORT));
 
     /** Properties for creating the shared database. */
     private static Properties dbProps = createProperties(
@@ -72,7 +92,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	dbDirectory,
 	"com.sun.sgs.appName", "TestClientSessionServiceImpl",
 	DataServiceImplClassName + ".debugCheckInterval", "1");
-    
+
+    private static String LOGIN_FAILED_MESSAGE = "login failed";
     /**
      * Delete the database directory at the start of the test run, but not for
      * each test.
@@ -86,8 +107,8 @@ public class TestClientSessionServiceImpl extends TestCase {
     private String directory;
     
     private static DummyTransactionProxy txnProxy = new DummyTransactionProxy();
-
-    private DummyComponentRegistry registry;
+    
+    private static MinimalTestKernel kernel = new MinimalTestKernel(txnProxy);
 
     private DummyTransaction txn;
 
@@ -97,7 +118,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     private ClientSessionServiceImpl sessionService;
 
-    private DummyTaskService taskService;
+    private TaskServiceImpl taskService;
 
     private DummyTaskScheduler taskScheduler;
 
@@ -115,27 +136,45 @@ public class TestClientSessionServiceImpl extends TestCase {
     protected void setUp() throws Exception {
 	passed = false;
 	System.err.println("Testcase: " + getName());
-	//txnProxy = new DummyTransactionProxy();
+	DummyComponentRegistry systemRegistry = new DummyComponentRegistry();
+	DummyComponentRegistry serviceRegistry = new DummyComponentRegistry();
+	DummyAbstractKernelAppContext context =
+	    new DummyAbstractKernelAppContext(serviceRegistry);
+	taskScheduler = new DummyTaskScheduler(kernel, context, false);
+	systemRegistry.setComponent(TaskScheduler.class, taskScheduler);
+	taskService = new TaskServiceImpl(new Properties(), systemRegistry);
+
+	// create and configure data service
 	createTransaction();
-	registry = new DummyComponentRegistry();
-	dataService = createDataService(registry);
-	dataService.configure(registry, txnProxy);
-	registry.setComponent(DataService.class, dataService);
-	registry.registerAppContext();
-	taskService = new DummyTaskService();
-	registry.setComponent(TaskService.class, taskService);
+	dataService = createDataService(systemRegistry);
+	dataService.configure(serviceRegistry, txnProxy);
+	txnProxy.setComponent(DataService.class, dataService);
+	serviceRegistry.setComponent(DataService.class, dataService);
+
+	// configure task service
+	taskService.configure(serviceRegistry, txnProxy);
 	txnProxy.setComponent(TaskService.class, taskService);
-	taskScheduler = new DummyTaskScheduler();
-	registry.setComponent(TaskScheduler.class, taskScheduler);
-	identityManager = createIdentityManager();
-	registry.setComponent(IdentityManager.class, identityManager);
-	sessionService = createSessionService(registry);
-	sessionService.configure(registry, txnProxy);
-	registry.setComponent(ClientSessionService.class, sessionService);
-	txn.commit();
-	createTransaction();
-	channelService = createChannelService(registry);
-	channelService.configure(registry, txnProxy);
+	//serviceRegistry.setComponent(TaskManager.class, taskService);
+	serviceRegistry.setComponent(TaskService.class, taskService);
+
+	serviceRegistry.registerAppContext();
+
+	// create dummy identity manager
+	identityManager = new DummyIdentityManager();
+	systemRegistry.setComponent(IdentityManager.class, identityManager);
+
+	// create and configure client session service
+	sessionService =
+	    new ClientSessionServiceImpl(serviceProps, systemRegistry);
+	sessionService.configure(serviceRegistry, txnProxy);
+	serviceRegistry.setComponent(
+	    ClientSessionService.class, sessionService);
+	txnProxy.setComponent(
+	    ClientSessionService.class, sessionService);
+	
+	// create and configure channel service
+	channelService = new ChannelServiceImpl(serviceProps, systemRegistry);
+	channelService.configure(serviceRegistry, txnProxy);
 	txn.commit();
 	createTransaction();
     }
@@ -187,7 +226,76 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    System.err.println(e);
 	}
     }
-    
+
+    /* -- Test connection -- */
+
+    public void testConnection() throws Exception {
+	txn.commit();
+	DummyClient client = null;
+	try {
+	    client = new DummyClient();
+	    client.connect(PORT);
+	} catch (Exception e) {
+	    System.err.println("Exception: " + e);
+	    Throwable t = e.getCause();
+	    System.err.println("caused by: " + t);
+	    System.err.println("detail message: " + t.getMessage());
+	    throw e;
+	    
+	} finally {
+	    if (client != null) {
+		client.disconnect(false);
+	    }
+	}
+    }
+
+    public void testLogin() throws Exception {
+	DummyAppListener appListener = new DummyAppListener();
+	dataService.setServiceBinding(
+	    "com.sun.sgs.app.AppListener", appListener);
+	txn.commit();
+	
+	DummyClient client = null;
+	try {
+	    client = new DummyClient();
+	    client.connect(PORT);
+	    client.login("foo", "bar");
+	} finally {
+	    if (client != null) {
+		client.disconnect(false);
+	    }
+	}
+    }
+
+    public void testLoginRefused() throws Exception {
+	DummyAppListener appListener = new DummyAppListener();
+	dataService.setServiceBinding(
+	    "com.sun.sgs.app.AppListener", appListener);
+	txn.commit();
+	
+	DummyClient client = null;
+	try {
+	    client = new DummyClient();
+	    client.connect(PORT);
+	    client.login("foo", "bar");
+	    try {
+		client.login("foo", "bar");
+	    } catch (RuntimeException e) {
+		if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
+		    System.err.println("login refused");
+		    return;
+		} else {
+		    fail("unexpected login failure: " + e);
+		}
+	    }
+	    fail("expected login failure");
+	} finally {
+	    if (client != null) {
+		client.disconnect(false);
+	    }
+	}
+    }
+
     /* -- other methods -- */
 
     /** Deletes the specified directory, if it exists. */
@@ -247,33 +355,17 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     /**
-     * Creates an identity manager.
+     * Dummy identity manager for testing purposes.
      */
-    private DummyIdentityManager createIdentityManager() {
-	return new DummyIdentityManager();
-    }
-
-    /** Creates a new channel service. */
-    private static ChannelServiceImpl createChannelService(
-	ComponentRegistry registry)
-    {
-	return new ChannelServiceImpl(serviceProps, registry);
-    }
-
-    /** Creates a new client session service. */
-    private static ClientSessionServiceImpl createSessionService(
-	ComponentRegistry registry)
-    {
-	return new ClientSessionServiceImpl(serviceProps, registry);
-    }
-
-
     private static class DummyIdentityManager implements IdentityManager {
 	public Identity authenticateIdentity(IdentityCredentials credentials) {
 	    return new DummyIdentity(credentials);
 	}
     }
-
+    
+    /**
+     * Identity returned by the DummyIdentityManager.
+     */
     private static class DummyIdentity implements Identity {
 
 	private final String name;
@@ -291,17 +383,255 @@ public class TestClientSessionServiceImpl extends TestCase {
 	public void notifyLoggedOut() {}
     }
 
+    /**
+     * Dummy client code for testing purposes.
+     */
     private static class DummyClient {
 
+	private final static int WAIT_TIME = 1000;
 	private String name;
 	private String password;
+	private IOConnector connector;
+	private IOHandler listener;
+	private IOHandle handle;
+	private boolean connected = false;
+	private final Object lock = new Object();
+	private boolean loginAck = false;
+	private boolean loginSuccess = false;
+	private String reason;
+	private byte[] sessionId;
+	private byte[] reconnectionKey;
 	
-	DummyClient(String name, String password) {
-	    this.name = name;
-	    this.password = password;
+	DummyClient() {
 	}
 
 	void connect(int port) {
+	    connected = false;
+	    connector =
+		ConnectorFactory.createConnector(TransportType.RELIABLE);
+	    listener = new Listener();
+	    try {
+		handle =
+		    connector.connect(
+		    	InetAddress.getLocalHost(), port, listener,
+			new CompleteMessageFilter());
+	    } catch (Exception e) {
+		System.err.println("DummyClient.connect throws: " + e);
+		e.printStackTrace();
+		throw new RuntimeException("DummyClient.connect failed", e);
+	    }
+	    synchronized (lock) {
+		try {
+		    if (connected == false) {
+			lock.wait(WAIT_TIME);
+		    }
+		    if (connected != true) {
+			throw new RuntimeException(
+ 			    "DummyClient.connect timed out");
+		    }
+		} catch (InterruptedException e) {
+		    throw new RuntimeException(
+			"DummyClient.connect timed out", e);
+		}
+	    }
+	    
+	}
+
+	void disconnect(boolean graceful) {
+	    if (!graceful) {
+		synchronized (lock) {
+		    if (connected == false) {
+			return;
+		    }
+		    System.err.println("DummyClient.disconnect");
+		    connected = false;
+		    try {
+			handle.close();
+		    } catch (IOException e) {
+			System.err.println(
+			    "DummyClient.disconnect exception:" + e);
+		    }
+		    lock.notifyAll();
+		}
+	    } else {
+		throw new AssertionError(
+		    "graceful disconnection not implemented");
+	    }
+	}
+
+	void login(String name, String password) {
+	    synchronized (lock) {
+		if (connected == false) {
+		    throw new RuntimeException(
+			"DummyClient.login not connected");
+		}
+	    }
+	    this.name = name;
+	    this.password = password;
+
+	    MessageBuffer buf =
+		new MessageBuffer(3 + MessageBuffer.getSize(name) +
+				  MessageBuffer.getSize(password));
+	    buf.putByte(SgsProtocol.VERSION).
+		putByte(SgsProtocol.APPLICATION_SERVICE).
+		putByte(SgsProtocol.LOGIN_REQUEST).
+		putString(name).
+		putString(password);
+	    loginAck = false;
+	    try {
+		handle.sendBytes(buf.getBuffer());
+	    } catch (IOException e) {
+		throw new RuntimeException(e);
+	    }
+	    synchronized (lock) {
+		try {
+		    if (loginAck == false) {
+			lock.wait(WAIT_TIME);
+		    }
+		    if (loginAck != true) {
+			throw new RuntimeException(
+			    "DummyClient.login timed out");
+		    }
+		    if (!loginSuccess) {
+			throw new RuntimeException(LOGIN_FAILED_MESSAGE);
+		    }
+		} catch (InterruptedException e) {
+		    throw new RuntimeException(
+			"DummyClient.login timed out", e);
+		}
+	    }
+	    
+	}
+
+	private class Listener implements IOHandler {
+	    public void bytesReceived(byte[] buffer, IOHandle h) {
+		if (h != handle) {
+		    System.err.println(
+			"DummyClient.Listener.connected wrong handle, got:" +
+			h + ", expected:" + handle);
+		    return;
+		}
+
+		MessageBuffer buf = new MessageBuffer(buffer);
+
+		byte version = buf.getByte();
+		if (version != SgsProtocol.VERSION) {
+		    System.err.println(
+			"bytesReceived: got version: " +
+			version + ", expected: " + SgsProtocol.VERSION);
+		    return;
+		}
+
+		byte serviceId = buf.getByte();
+		if (serviceId != SgsProtocol.APPLICATION_SERVICE) {
+		    System.err.println(
+			"bytesReceived: got version: " +
+			version + ", expected: " + SgsProtocol.VERSION);
+		    return;
+		}
+
+		byte opcode = buf.getByte();
+
+		switch (opcode) {
+
+		case SgsProtocol.LOGIN_SUCCESS:
+		    sessionId = buf.getBytes(buf.getShort());
+		    reconnectionKey = buf.getBytes(buf.getShort());
+		    synchronized (lock) {
+			loginAck = true;
+			loginSuccess = true;
+			System.err.println("login succeeded: " + name);
+			lock.notifyAll();
+		    }
+		    break;
+		    
+		case SgsProtocol.LOGIN_FAILURE:
+		    reason = buf.getString();
+		    synchronized (lock) {
+			loginAck = true;
+			loginSuccess = false;
+			System.err.println("login failed: " + name +
+					   ", reason:" + reason);
+			lock.notifyAll();
+		    }
+		    break;
+
+		default:
+		    System.err.println(
+			"bytesReceived: unknown op code: " + opcode);
+		    break;
+		}
+	    }
+
+	    public void connected(IOHandle h) {
+		System.err.println("DummyClient.Listener.connected");
+		if (h != handle) {
+		    System.err.println(
+			"DummyClient.Listener.connected wrong handle, got:" +
+			h + ", expected:" + handle);
+		    return;
+		}
+		synchronized (lock) {
+		    connected = true;
+		    lock.notifyAll();
+		}
+	    }
+
+	    public void disconnected(IOHandle handle) {
+	    }
+	    
+	    public void exceptionThrown(
+		Throwable exception, IOHandle handle)
+	    {
+		System.err.println("DummyClient.Listener.exceptionThrown " +
+				   "exception:" + exception);
+		exception.printStackTrace();
+	    }
+	}
+    }
+
+    private static class DummyAppListener implements AppListener, Serializable {
+
+	private final Map<ClientSession,ClientSessionListener> sessions =
+	    Collections.synchronizedMap(
+		new HashMap<ClientSession,ClientSessionListener>());
+	
+	public ClientSessionListener loggedIn(ClientSession session) {
+	    ClientSessionListener listener =
+		new DummyClientSessionListener(session);
+	    for (ClientSession activeSession : sessions.keySet()) {
+		if (session.getName().equals(activeSession.getName())) {
+		    System.err.println(
+			"DummyAppListener.loggedIn: user already logged in:" +
+			session);
+		    return null;
+		}
+	    }
+	    sessions.put(session, listener);
+	    System.err.println("DummyAppListener.loggedIn: session:" + session);
+	    return listener;
+	}
+
+	public void shuttingDown(ShutdownListener listener, boolean force) {
+	}
+
+	public void startingUp(Properties props) {
+	}
+    }
+
+    private static class DummyClientSessionListener
+	implements ClientSessionListener, Serializable
+    {
+	private final ClientSession session;
+	
+	DummyClientSessionListener(ClientSession session) {
+	    this.session = session;
+	}
+
+	public void disconnected(boolean graceful) {
+	}
+
+	public void receivedMessage(byte[] message) {
 	}
     }
 }

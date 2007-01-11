@@ -363,7 +363,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    }
 	}
 
-	sessionService.disconnected(this);
+	sessionService.disconnected(sessionId);
 
 	if (graceful) {
 	    MessageBuffer disconnectMsg = new MessageBuffer(3);
@@ -375,17 +375,9 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 			SgsProtocol.SESSION_DISCONNECT);
 
 	    sendProtocolMessage(disconnectMsg);
-	    try {
-		sessionHandle.close();
-	    } catch (IOException e) {
-		if (logger.isLoggable(Level.WARNING)) {
-		    logger.logThrow(
-			Level.WARNING, e,
-			"handleDisconnect (close) handle:{0} throws",
-			sessionHandle);
-		}
-	    }
 	}
+
+	closeSession();
 
 	if (listener != null) {
 	    scheduleTask(new KernelRunnable() {
@@ -394,7 +386,20 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		}});
 	}
     }
-    
+
+    void closeSession() {
+	try {
+	    sessionHandle.close();
+	} catch (IOException e) {
+	    if (logger.isLoggable(Level.WARNING)) {
+		logger.logThrow(
+		    Level.WARNING, e,
+		    "handleDisconnect (close) handle:{0} throws",
+		    sessionHandle);
+	    }
+	}
+    }
+	
     /** Returns the IOHandler for this session. */
     IOHandler getHandler() {
 	return handler;
@@ -559,6 +564,13 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	     * Handle application service messages.
 	     */
 	    byte opcode = msg.getByte();
+
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(
+ 		    Level.FINEST,
+		    "Handler.messageReceived processing opcode:{0}",
+		    Integer.toHexString((int) opcode));
+	    }
 	    
 	    switch (opcode) {
 		
