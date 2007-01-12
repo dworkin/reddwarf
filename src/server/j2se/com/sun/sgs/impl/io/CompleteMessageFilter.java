@@ -4,6 +4,7 @@ import org.apache.mina.common.ByteBuffer;
 
 import com.sun.sgs.io.IOFilter;
 import com.sun.sgs.io.IOHandle;
+import com.sun.sgs.io.IOHandler;
 
 /**
  * A filter that guarantees that only complete messages are delivered to the 
@@ -89,10 +90,13 @@ public class CompleteMessageFilter implements IOFilter {
         // as they appear in the array.  This can be called 0 to n times.
         while (totalLength > 0 && totalLength <= (message.length - index)) {
             byte[] nextMessage = new byte[totalLength];
-            System.arraycopy(message, index, nextMessage, 0, 
-                                                            nextMessage.length);
-            ((SocketHandle) handle).getIOHandler().bytesReceived(nextMessage, 
-                                                                handle);
+            System.arraycopy(
+                    message, index, nextMessage, 0, nextMessage.length);
+            IOHandler handler = 
+                ((SocketHandle) handle).getIOHandler();
+            if (handler != null) {
+                handler.bytesReceived(nextMessage, handle);
+            }
             
             index += totalLength;
             totalLength = readInt(message);

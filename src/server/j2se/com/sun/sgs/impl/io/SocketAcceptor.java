@@ -75,6 +75,8 @@ public class SocketAcceptor implements IOAcceptor {
     /**
      * {@inheritDoc}
      */
+    // MINA returns an raw Set type, but it is guaranteed to be
+    // a Set<SocketAddress> so this cast is safe. -JM
     @SuppressWarnings("cast")
     public Set<SocketAddress> listAddresses() {
         Set<? extends SocketAddress> boundAddresses =

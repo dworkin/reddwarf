@@ -27,7 +27,10 @@ public class SocketHandler extends IoHandlerAdapter {
     public void sessionOpened(IoSession session) throws Exception {
         SocketHandle handle = (SocketHandle) session.getAttachment();
         logger.log(Level.FINE, "opened session {0}", session);
-        handle.getIOHandler().connected(handle);
+        IOHandler handler = handle.getIOHandler();
+        if (handler != null) {
+            handler.connected(handle);
+        }
     }
     
     /**
@@ -37,7 +40,10 @@ public class SocketHandler extends IoHandlerAdapter {
     public void sessionClosed(IoSession session) throws Exception {
         SocketHandle handle = (SocketHandle) session.getAttachment();
         logger.log(Level.FINE, "disconnect on {0}", handle);
-        handle.getIOHandler().disconnected(handle);
+        IOHandler handler = handle.getIOHandler();
+        if (handler != null) {
+            handler.disconnected(handle);
+        }
     }
 
     /**
@@ -53,7 +59,11 @@ public class SocketHandler extends IoHandlerAdapter {
         
         SocketHandle handle = (SocketHandle) session.getAttachment();
         //logger.logThrow(Level.FINEST, exception, "exception on {0}", handle);
-        handle.getIOHandler().exceptionThrown(exception, handle);
+
+        IOHandler handler = handle.getIOHandler();
+        if (handler != null) {
+            handler.exceptionThrown(exception, handle);
+        }
     }
 
     /**
