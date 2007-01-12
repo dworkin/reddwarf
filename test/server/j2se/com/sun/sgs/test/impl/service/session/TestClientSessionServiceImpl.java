@@ -3,14 +3,17 @@ package com.sun.sgs.test.impl.service.session;
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelListener;
+import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
+import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.NameExistsException;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.PeriodicTaskHandle;
 import com.sun.sgs.app.ShutdownListener;
 import com.sun.sgs.app.Task;
+import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityCredentials;
@@ -106,22 +109,19 @@ public class TestClientSessionServiceImpl extends TestCase {
     /** A per-test database directory, or null if not created. */
     private String directory;
     
-    private static DummyTransactionProxy txnProxy = new DummyTransactionProxy();
+    private static DummyTransactionProxy txnProxy =
+	new DummyTransactionProxy();
     
-    private static MinimalTestKernel kernel = new MinimalTestKernel(txnProxy);
-
+    private DummyAbstractKernelAppContext appContext;
+    private DummyComponentRegistry systemRegistry;
+    private DummyComponentRegistry serviceRegistry;
     private DummyTransaction txn;
-
-    private DataServiceImpl dataService;
     
+    private DataServiceImpl dataService;
     private ChannelServiceImpl channelService;
-
     private ClientSessionServiceImpl sessionService;
-
     private TaskServiceImpl taskService;
-
     private DummyTaskScheduler taskScheduler;
-
     private DummyIdentityManager identityManager;
 
     /** True if test passes. */
@@ -136,45 +136,49 @@ public class TestClientSessionServiceImpl extends TestCase {
     protected void setUp() throws Exception {
 	passed = false;
 	System.err.println("Testcase: " + getName());
-	DummyComponentRegistry systemRegistry = new DummyComponentRegistry();
-	DummyComponentRegistry serviceRegistry = new DummyComponentRegistry();
-	DummyAbstractKernelAppContext context =
-	    new DummyAbstractKernelAppContext(serviceRegistry);
-	taskScheduler = new DummyTaskScheduler(kernel, context, false);
-	systemRegistry.setComponent(TaskScheduler.class, taskScheduler);
-	taskService = new TaskServiceImpl(new Properties(), systemRegistry);
-
-	// create and configure data service
-	createTransaction();
+	appContext = MinimalTestKernel.createContext();
+	systemRegistry = MinimalTestKernel.getSystemRegistry(appContext);
+	serviceRegistry = MinimalTestKernel.getServiceRegistry(appContext);
+	    
+	// create services
 	dataService = createDataService(systemRegistry);
-	dataService.configure(serviceRegistry, txnProxy);
-	txnProxy.setComponent(DataService.class, dataService);
-	serviceRegistry.setComponent(DataService.class, dataService);
-
-	// configure task service
-	taskService.configure(serviceRegistry, txnProxy);
-	txnProxy.setComponent(TaskService.class, taskService);
-	//serviceRegistry.setComponent(TaskManager.class, taskService);
-	serviceRegistry.setComponent(TaskService.class, taskService);
-
-	serviceRegistry.registerAppContext();
-
-	// create dummy identity manager
+	taskService = new TaskServiceImpl(new Properties(), systemRegistry);
 	identityManager = new DummyIdentityManager();
 	systemRegistry.setComponent(IdentityManager.class, identityManager);
-
-	// create and configure client session service
 	sessionService =
 	    new ClientSessionServiceImpl(serviceProps, systemRegistry);
+	channelService = new ChannelServiceImpl(serviceProps, systemRegistry);
+
+	createTransaction();
+
+	// configure data service
+        dataService.configure(serviceRegistry, txnProxy);
+        txnProxy.setComponent(DataService.class, dataService);
+        txnProxy.setComponent(DataServiceImpl.class, dataService);
+        serviceRegistry.setComponent(DataManager.class, dataService);
+        serviceRegistry.setComponent(DataService.class, dataService);
+        serviceRegistry.setComponent(DataServiceImpl.class, dataService);
+
+	// configure task service
+        taskService.configure(serviceRegistry, txnProxy);
+        txnProxy.setComponent(TaskService.class, taskService);
+        txnProxy.setComponent(TaskServiceImpl.class, taskService);
+        serviceRegistry.setComponent(TaskManager.class, taskService);
+        serviceRegistry.setComponent(TaskService.class, taskService);
+        serviceRegistry.setComponent(TaskServiceImpl.class, taskService);
+	//serviceRegistry.registerAppContext();
+
+	// configure client session service
 	sessionService.configure(serviceRegistry, txnProxy);
 	serviceRegistry.setComponent(
 	    ClientSessionService.class, sessionService);
 	txnProxy.setComponent(
 	    ClientSessionService.class, sessionService);
 	
-	// create and configure channel service
-	channelService = new ChannelServiceImpl(serviceProps, systemRegistry);
+	// configure channel service
 	channelService.configure(serviceRegistry, txnProxy);
+	serviceRegistry.setComponent(ChannelManager.class, channelService);
+	
 	txn.commit();
 	createTransaction();
     }
@@ -592,6 +596,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     private static class DummyAppListener implements AppListener, Serializable {
 
+	private final static long serialVersionUID = 1L;
+
 	private final Map<ClientSession,ClientSessionListener> sessions =
 	    Collections.synchronizedMap(
 		new HashMap<ClientSession,ClientSessionListener>());
@@ -622,6 +628,8 @@ public class TestClientSessionServiceImpl extends TestCase {
     private static class DummyClientSessionListener
 	implements ClientSessionListener, Serializable
     {
+	private final static long serialVersionUID = 1L;
+	
 	private final ClientSession session;
 	
 	DummyClientSessionListener(ClientSession session) {

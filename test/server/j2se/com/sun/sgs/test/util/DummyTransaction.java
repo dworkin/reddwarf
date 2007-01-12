@@ -20,10 +20,10 @@ public class DummyTransaction implements Transaction {
     /** The possible transaction states. */
     public enum State {
 	ACTIVE, PREPARING, PREPARED, COMMITTING, COMMITTED, ABORTING, ABORTED
-    };
+    }
 
     /** Whether to use prepareAndCommit. */
-    public enum UsePrepareAndCommit { YES, NO, ARBITRARY };
+    public enum UsePrepareAndCommit { YES, NO, ARBITRARY }
 
     /** The ID for the next transaction. */
     private static AtomicLong nextId = new AtomicLong(1);

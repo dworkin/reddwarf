@@ -20,7 +20,7 @@
   <!-- Values for controlling compilation -->
   <property name="javac.source" value="1.5"/>
   <property name="javac.compilerargs"
-	    value="-Xlint:unchecked,deprecation"/>
+	    value="-Xlint"/>
 
   <!-- Values for building the server -->
   <property name="server.jar" location="${build.dir}/lib/sgs.jar"/>

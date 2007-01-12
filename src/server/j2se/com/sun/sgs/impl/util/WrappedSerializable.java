@@ -16,6 +16,9 @@ import java.io.Serializable;
  */
 public final class WrappedSerializable<T> implements Serializable {
 
+    /** The serialVersionUID for this class. */
+    private final static long serialVersionUID = 1L;
+
     /** Indicates whether the object in this wrapper is managed. */
     private boolean managed = false;
 

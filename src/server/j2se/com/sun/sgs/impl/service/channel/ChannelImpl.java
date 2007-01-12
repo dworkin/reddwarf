@@ -29,6 +29,9 @@ import java.util.logging.Logger;
  */
 final class ChannelImpl implements Channel, Serializable {
 
+    /** The serialVersionUID for this class. */
+    private final static long serialVersionUID = 1L;
+    
     /** The logger for this class. */
     private final static LoggerWrapper logger =
 	new LoggerWrapper(

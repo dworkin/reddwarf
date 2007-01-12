@@ -34,6 +34,9 @@ import javax.security.auth.login.LoginException;
  */
 class ClientSessionImpl implements SgsClientSession, Serializable {
 
+    /** The serialVersionUID for this class. */
+    private final static long serialVersionUID = 1L;
+    
     /** Connection state. */
     private static enum State {
 	CONNECTING, CONNECTED, RECONNECTING, DISCONNECTING, DISCONNECTED };

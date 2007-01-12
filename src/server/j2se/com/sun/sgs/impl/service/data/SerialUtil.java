@@ -2,6 +2,7 @@ package com.sun.sgs.impl.service.data;
 
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ObjectIOException;
+import com.sun.sgs.impl.util.LoggerWrapper;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -9,12 +10,19 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamClass;
 import java.io.OutputStream;
+import java.lang.reflect.Modifier;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.Arrays;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /** Defines serialization utilities.  This class cannot be instantiated. */
 final class SerialUtil {
+
+    /** The logger for this class. */
+    private static final LoggerWrapper logger =
+	new LoggerWrapper(Logger.getLogger(SerialUtil.class.getName()));
 
     /** This class cannot be instantiated. */
     private SerialUtil() {
@@ -85,7 +93,8 @@ final class SerialUtil {
      * Define an ObjectOutputStream that checks for references to
      * ManagedObjects not made through ManagedReferences.  Note that this
      * stream will not be able to detect direct references to the top level
-     * object.
+     * object, except when the reference is the synthetic reference made by an
+     * inner class instance.
      */
     private static final class CheckReferencesObjectOutputStream
 	extends ObjectOutputStream
@@ -119,9 +128,44 @@ final class SerialUtil {
 		    "ManagedObject was not referenced through a " +
 		    "ManagedReference: " + object,
 		    false);
-	    } else {
-		return object;
+	    } else if (object != null) {
+		Class<?> cl = object.getClass();
+		/*
+		 * Check explicitly for instances of inner classes whose
+		 * enclosing instance is a managed object, so that the
+		 * exception can refer to the inner class instance, rather than
+		 * the enclosing one, which isn't really where the problem
+		 * lies.
+		 */
+		if (cl.isMemberClass() &&
+		    !Modifier.isStatic(cl.getModifiers()))
+		{
+		    Class<?> enclosingClass = cl.getEnclosingClass();
+		    if (ManagedObject.class.isAssignableFrom(enclosingClass)) {
+			throw new ObjectIOException(
+			    "Cannot store an instance of an inner class " +
+			    "whose enclosing class implements " +
+			    "ManagedObject: " + object + ", " + cl,
+			    false);
+		    }
+		} else if (cl.isAnonymousClass()) {
+		    if (logger.isLoggable(Level.FINE)) {
+			logger.log(
+			    Level.FINE,
+			    "Storing an instance of an anonymous class: " +
+			    "{0}, {1}",
+			    object, cl);
+		    }
+		} else if (cl.isLocalClass()) {
+		    if (logger.isLoggable(Level.FINE)) {
+			logger.log(
+			    Level.FINE,
+			    "Storing an instance of a local class: {0}, {1}",
+			    object, cl);
+		    }
+		}
 	    }
+	    return object;
 	}
     }
 
@@ -145,7 +189,7 @@ final class SerialUtil {
 		protected void writeClassDescriptor(ObjectStreamClass desc)
 		    throws IOException
 		{
-		    writeUTF(desc.getName());
+		    writeObject(desc.getName());
 		}
 	    };
 	    out.writeObject(object);
