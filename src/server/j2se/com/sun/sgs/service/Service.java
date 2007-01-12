@@ -82,6 +82,10 @@ public interface Service {
      * IllegalStateException} if a call to this method has already completed
      * with a return value of <code>true</code>. <p>
      *
+     * This method does not require a transaction, and should not be called
+     * from one because this method will typically not succeed if there are
+     * outstanding transactions. <p>
+     *
      * Typical implementations will refuse to accept calls associated with
      * transactions that were not joined prior to the <code>shutdown</code>
      * call by throwing an <code>IllegalStateException</code>, and will wait
