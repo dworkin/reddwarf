@@ -526,8 +526,11 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	Transaction txn1 = coordinator.createTransaction().getTransaction();
 	Thread.sleep(5);
 	Transaction txn2 = coordinator.createTransaction().getTransaction();
-	assertTrue(now < txn1.getCreationTime());
-	assertNotNull(txn1.getCreationTime() < txn2.getCreationTime());
+	assertTrue("Transaction creation time is too early: " + txn1,
+                now <= txn1.getCreationTime());
+	assertTrue("Transaction creation times out-of-order: "
+                + txn1 + " vs " + txn2,
+                txn1.getCreationTime() <= txn2.getCreationTime());
     }
 
     /* -- Test Transaction.join -- */
