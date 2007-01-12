@@ -70,6 +70,7 @@ public class SocketConnector implements IOConnector
                 RuntimeException e = new IllegalStateException(
                             "Connection already in progress");
                 logger.logThrow(Level.FINE, e, e.getMessage());
+                throw e;
             }
             connectionHandler = new ConnectionHandler(handler, filter);
         }
@@ -88,6 +89,7 @@ public class SocketConnector implements IOConnector
                 RuntimeException e = new IllegalStateException(
                             "No connection in progress");
                 logger.logThrow(Level.FINE, e, e.getMessage());
+                throw e;
             }
         }
         connectionHandler.cancel();
@@ -110,11 +112,13 @@ public class SocketConnector implements IOConnector
                     RuntimeException e = new IllegalStateException(
                                 "Already connected");
                     logger.logThrow(Level.FINE, e, e.getMessage());
+                    throw e;
                 }
                 if (cancelled) {
                     RuntimeException e = new IllegalStateException(
                                 "Already cancelled");
                     logger.logThrow(Level.FINE, e, e.getMessage());
+                    throw e;
                 }
                 cancelled = true;
             }

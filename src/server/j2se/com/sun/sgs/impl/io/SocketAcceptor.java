@@ -29,6 +29,9 @@ public class SocketAcceptor implements IOAcceptor {
     /** The associated Mina acceptor that handles the binding */
     private final IoAcceptor acceptor;
 
+    /** Whether this acceptor has been shutdown. */
+    private volatile boolean shutdown = false;
+
     /**
      * Constructs a {@code SocketAcceptor} with the given {@code IoAcceptor}.
      * 
@@ -45,14 +48,16 @@ public class SocketAcceptor implements IOAcceptor {
     public void listen(SocketAddress address, AcceptedHandleListener listener, 
                     Class<? extends IOFilter> filterClass) throws IOException
     {
-        if (filterClass == null) {
-            filterClass = PassthroughFilter.class;
-        }
-        acceptor.bind(address,
-                new AcceptedHandleAdapter(listener, filterClass));
+        checkShutdown();
+        AcceptedHandleAdapter adapter =
+            new AcceptedHandleAdapter(listener,
+                    (filterClass == null)
+                    ? PassthroughFilter.class
+                    : filterClass);
+        acceptor.bind(address, adapter);
         logger.log(Level.FINE, "listening on {0}", address);
     }
-    
+
     /**
      * {@inheritDoc}
      * <p>
@@ -60,8 +65,8 @@ public class SocketAcceptor implements IOAcceptor {
      * forwards any data on untouched.
      */
     public void listen(SocketAddress address, AcceptedHandleListener listener) 
-                                                        throws IOException {
-
+        throws IOException
+    {
         listen(address, listener, PassthroughFilter.class);
     }
     
@@ -69,6 +74,7 @@ public class SocketAcceptor implements IOAcceptor {
      * {@inheritDoc}
      */
     public void unbind(SocketAddress address) {
+        checkShutdown();
         acceptor.unbind(address);
     }
     
@@ -79,6 +85,8 @@ public class SocketAcceptor implements IOAcceptor {
     // a Set<SocketAddress> so this cast is safe. -JM
     @SuppressWarnings("cast")
     public Set<SocketAddress> listAddresses() {
+        checkShutdown();
+
         Set<? extends SocketAddress> boundAddresses =
             (Set<? extends SocketAddress>)
                 acceptor.getManagedServiceAddresses();
@@ -89,6 +97,21 @@ public class SocketAcceptor implements IOAcceptor {
      * {@inheritDoc}
      */
     public void shutdown() {
+        // TODO currently allow multiple calls to shutdown; shouuld we
+        // only allow one? -JM
+        shutdown = true;
         acceptor.unbindAll();
+    }
+    
+    /**
+     * Check whether this acceptor has been shutdown, throwing
+     * IllegalStateException if it has.
+     *
+     * @throws IllegalStateException if this acceptor has been shutdown.
+     */
+    private void checkShutdown() {
+        if (shutdown) {
+            throw new IllegalStateException("Acceptor has been shutdown");
+        }
     }
 }

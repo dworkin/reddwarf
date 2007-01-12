@@ -29,13 +29,7 @@ public class PassthroughFilter extends IOFilter {
     private int currentLength;
     
     
-    public void filterReceive(IOHandle handle, byte[] message) {
-        IOHandler handler = 
-            ((SocketHandle) handle).getIOHandler();
-        if (handler != null) {
-            handler.bytesReceived(message, handle);
-        }
-    
+    public void filterReceive(IOHandle handle, byte[] message) {    
         index = 0;
         
         // This Mina ByteBuffer will hold the contents of the message bytes as
@@ -92,9 +86,12 @@ public class PassthroughFilter extends IOFilter {
         buffer.flip();
         byte[] byteMessage = new byte[buffer.remaining()];
         buffer.get(byteMessage);
-        
-        SocketHandle socketHandle = (SocketHandle) handle;
-        socketHandle.getIOHandler().bytesReceived(byteMessage, handle);
+
+        IOHandler handler = 
+            ((SocketHandle) handle).getIOHandler();
+        if (handler != null) {
+            handler.bytesReceived(byteMessage, handle);
+        }
     }
 
     /**
