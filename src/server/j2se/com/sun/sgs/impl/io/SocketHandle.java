@@ -37,6 +37,8 @@ public class SocketHandle implements IOHandle {
     
     /**
      * Sends the given byte message out on the underlying {@code IoSession}.
+     * It prepends the length of the given byte array as an int, in network
+     * byte-order, and sends it out on the underlying {@code IoSession}. 
      * 
      * @throws IOException if the session is not connected.
      */
@@ -45,7 +47,14 @@ public class SocketHandle implements IOHandle {
         if (!session.isConnected()) {
             throw new IOException("session not connected");
         }
-        filter.filterSend(this, message);
+        ByteBuffer buffer = ByteBuffer.allocate(message.length + 4);
+        buffer.putInt(message.length);
+        buffer.put(message);
+        buffer.flip();
+        byte[] messageWithLength = new byte[buffer.remaining()];
+        buffer.get(messageWithLength);
+        
+        filter.filterSend(this, messageWithLength);
     }
 
     /**
@@ -110,8 +119,9 @@ public class SocketHandle implements IOHandle {
      * 
      * @param messageBuffer
      */
-    void doSend(ByteBuffer messageBuffer) {
+    private void doSend(ByteBuffer messageBuffer) {
         logger.log(Level.FINEST, "message = {0}", messageBuffer);
+        
         session.write(messageBuffer);
     }
 }

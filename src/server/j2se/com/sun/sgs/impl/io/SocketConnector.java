@@ -23,8 +23,6 @@ import com.sun.sgs.io.IOConnector;
  * {@code TransportType} to create a new instance. This implementation is 
  * thread-safe.
  * 
- * TODO: make non-reusable? cancel pending conn on shutdown? -JM
- * 
  * @author Sten Anderson
  * @since 1.0
  */
@@ -36,15 +34,20 @@ public class SocketConnector implements IOConnector
     private final IoConnector connector;
     private ConnectionHandler connectionHandler = null;
 
+    private final SocketAddress address;
     /**
      * Constructs a {@code SocketConnector} using the given {@code IoConnector}
      * for the underlying transport.  This constructor is only visible to the
      * package, so use one of the {@code ConnectorFactory.createConnector} 
      * methods to create a new instance.
      * 
+     * @param address           the remote address to which to connect
+     * @param connector         the Mina IoConnector to use for establishing
+     *                          the connection
      */
-    SocketConnector(IoConnector connector) {
+    SocketConnector(SocketAddress address, IoConnector connector) {
         this.connector = connector;
+        this.address = address;
     }
     
     /**
@@ -53,15 +56,14 @@ public class SocketConnector implements IOConnector
      * A {@code PassthroughFilter} will be installed on the connected 
      * {@code IOHandle}, which simply passes the data on untouched.
      */
-    public void connect(SocketAddress address, IOHandler handler) {
-        connect(address, handler, new PassthroughFilter());
+    public void connect(IOHandler handler) {
+        connect(handler, new PassthroughFilter());
     }
 
     /**
      * {@inheritDoc}
      */
-    public void connect(SocketAddress address, IOHandler handler, 
-            IOFilter filter)
+    public void connect(IOHandler handler, IOFilter filter)
     {
         synchronized (this) {
             if (connectionHandler != null) {

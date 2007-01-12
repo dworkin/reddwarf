@@ -9,7 +9,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 
 import com.sun.sgs.impl.io.CompleteMessageFilter;
-import com.sun.sgs.impl.io.ConnectorFactory;
+import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.IOConstants.TransportType;
 import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
@@ -102,9 +102,13 @@ public class ClientTest extends JFrame {
     
 
     public void start() {
-        IOConnector connector = ConnectorFactory.createConnector(
-                                                TransportType.RELIABLE,
-                                                Executors.newCachedThreadPool());
+        String host = System.getProperty("host", DEFAULT_HOST);
+        String portString = System.getProperty("port", DEFAULT_PORT);
+        int port = Integer.valueOf(portString);
+        InetSocketAddress addr = new InetSocketAddress(host, port);
+        IOConnector connector =
+            new SocketEndpoint(addr, TransportType.RELIABLE,
+                    Executors.newCachedThreadPool()).createConnector();
         model.connect(connector);
     }
     
@@ -240,11 +244,7 @@ public class ClientTest extends JFrame {
         }
         
         public void connect(IOConnector connector) {
-            String host = System.getProperty("host", DEFAULT_HOST);
-            String portString = System.getProperty("port", DEFAULT_PORT);
-            int port = Integer.valueOf(portString);
-            InetSocketAddress addr = new InetSocketAddress(host, port);
-            connector.connect(addr, this, new CompleteMessageFilter());
+            connector.connect(this, new CompleteMessageFilter());
         }
         
         public String getStatus() {

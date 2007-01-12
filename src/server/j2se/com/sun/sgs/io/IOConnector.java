@@ -9,9 +9,12 @@ import java.net.SocketAddress;
  * {@code IOFilter}s on a per handle basis.  Filters allow for the manipulation
  * of the bytes before outgoing data is sent, and after incoming data is
  * received.
- * <p> 
- * An {@code IOConnector} is non-reusable in that subsequent calls to connect() 
- * after the first call with throw {@code IllegalStateException}. 
+ * <p>
+ * {@code IOConnector}s are created via {@code Endpoint.createConnector}.
+ * 
+ * <p>
+ * An {@code IOConnector} is non-reusable in that subsequent calls to connect()
+ * after the first call with throw {@code IllegalStateException}.
  * 
  * @author Sten Anderson
  * @since 1.0
@@ -19,32 +22,30 @@ import java.net.SocketAddress;
 public interface IOConnector {
     
     /**
-     * Attempts to connect to the remote host on the given port.  This call is
-     * non-blocking, so a {@code connected()} callback will be generated on
-     * the {@code listener} upon successful connection, or
+     * Attempts to connect to the remote host associated with this connector.
+     * This call is non-blocking.  A {@code connected()} callback will be
+     * generated on the {@code listener} upon successful connection, or
      * {@code disconnected} if it fails.
      * 
-     * @param address           the remote address to which to connect
      * @param listener          the <code>IOHandler</code> that will
      *                          receive the associated connection events.
      */
-    public void connect(SocketAddress address, IOHandler listener);
+    public void connect(IOHandler listener);
     
     /**
-     * Attempts to connect to the remote host on the given port.  This call is
-     * non-blocking, so a {@code connected()} callback will be generated on
-     * the {@code listener} upon successful connection, or
-     * {@code disconnected} if it fails.  The given {@code IOFilter} will be
-     * attached to the {@code IOHandle} upon connecting.
+     * Attempts to connect to the remote host associated with this connector.
+     * This call is non-blocking.  A {@code connected()} callback will be
+     * generated on the {@code listener} upon successful connection, or
+     * {@code disconnected} if it fails.
+     * The given {@code IOFilter} will be attached to the {@code IOHandle}
+     * upon connecting.
      * 
-     * @param address           the remote address to which to connect
      * @param listener          the {@code IOHandler} that will
      *                          receive the associated connection events.
      * @param filter            the filter to attach to the connected 
      *                          {@code IOHandle}                          
      */
-    public void connect(SocketAddress address, IOHandler listener, 
-                            IOFilter filter);    
+    public void connect(IOHandler listener, IOFilter filter);    
     
     
     /**
