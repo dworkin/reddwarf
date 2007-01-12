@@ -1,17 +1,14 @@
 package com.sun.sgs.impl.io;
 
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
+import java.net.SocketAddress;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.apache.mina.common.IoConnector;
-import org.apache.mina.common.IoFuture;
-import org.apache.mina.util.NewThreadExecutor;
+import org.apache.mina.common.IoSession;
 
-import com.sun.sgs.io.AcceptedHandleListener;
+import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.io.IOFilter;
-import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
 import com.sun.sgs.io.IOConnector;
 
@@ -29,56 +26,116 @@ import com.sun.sgs.io.IOConnector;
  * @author Sten Anderson
  * @since 1.0
  */
-public class SocketConnector implements IOConnector {
+public class SocketConnector implements IOConnector
+{
+    private static final LoggerWrapper logger =
+        new LoggerWrapper(Logger.getLogger(SocketConnector.class.getName()));
     
-    private IoConnector connector;
+    private final IoConnector connector;
+    private ConnectionHandler connectionHandler = null;
 
-    
+    private final SocketAddress address;
     /**
      * Constructs a {@code SocketConnector} using the given {@code IoConnector}
      * for the underlying transport.  This constructor is only visible to the
      * package, so use one of the {@code ConnectorFactory.createConnector} 
      * methods to create a new instance.
      * 
+     * @param address           the remote address to which to connect
+     * @param connector         the Mina IoConnector to use for establishing
+     *                          the connection
      */
-    SocketConnector(IoConnector connector) {
+    SocketConnector(SocketAddress address, IoConnector connector) {
         this.connector = connector;
+        this.address = address;
     }
     
     /**
      * {@inheritDoc}
      * <p>
-     * A {@code PassthroughFilter} will be installed on the returned 
+     * A {@code PassthroughFilter} will be installed on the connected 
      * {@code IOHandle}, which simply passes the data on untouched.
      */
-    public IOHandle connect(InetAddress address, int port, IOHandler handler) {
-        return connect(address, port, handler, new PassthroughFilter());
+    public void connect(IOHandler handler) {
+        connect(handler, new PassthroughFilter());
     }
 
     /**
      * {@inheritDoc}
      */
-    public IOHandle connect(InetAddress address, int port, IOHandler handler, 
-                            IOFilter filter) {
-        InetSocketAddress socketAddress = new InetSocketAddress(address, port);
-        
-        SocketHandle handle = new SocketHandle(filter);
-        handle.setIOHandler(handler);
-        IoFuture future = connector.connect(socketAddress, new SocketHandler());
-        future.addListener(handle);
-        
-        // avoid a race condition b/w the time of getting a reference to the
-        // IoFuture and signing the handle up as a listener.
-        if (future.isReady()) {
-            handle.operationComplete(future);
+    public void connect(IOHandler handler, IOFilter filter)
+    {
+        synchronized (this) {
+            if (connectionHandler != null) {
+                RuntimeException e = new IllegalStateException(
+                            "Connection already in progress");
+                logger.logThrow(Level.FINE, e, e.getMessage());
+            }
+            connectionHandler = new ConnectionHandler(handler, filter);
         }
-        
-        return handle;
+        logger.log(Level.FINE, "connecting to {0}", address);
+        connector.connect(address, connectionHandler);
     }
     
 
-    public void shutdown() {
+    /**
+     * {@inheritDoc}
+     */
+    public synchronized void shutdown() {
+        logger.log(Level.FINE, "shutdown called");
+        synchronized (this) {
+            if (connectionHandler == null) {
+                RuntimeException e = new IllegalStateException(
+                            "No connection in progress");
+                logger.logThrow(Level.FINE, e, e.getMessage());
+            }
+        }
+        connectionHandler.cancel();
     }
+    
+    static class ConnectionHandler extends SocketHandler {
+        private final IOHandler handler;
+        private final IOFilter filter;
+        private boolean cancelled = false;
+        private boolean connected = false;
 
+        ConnectionHandler(IOHandler handler, IOFilter filter) {
+            this.handler = handler;
+            this.filter = filter;
+        }
+        
+        void cancel() {
+            synchronized (this) {
+                if (connected) {
+                    RuntimeException e = new IllegalStateException(
+                                "Already connected");
+                    logger.logThrow(Level.FINE, e, e.getMessage());
+                }
+                if (cancelled) {
+                    RuntimeException e = new IllegalStateException(
+                                "Already cancelled");
+                    logger.logThrow(Level.FINE, e, e.getMessage());
+                }
+                cancelled = true;
+            }
+        }
+
+        public void sessionCreated(IoSession session) throws Exception {
+            synchronized (this) {
+                if (cancelled) {
+                    logger.log(Level.FINE,
+                            "cancelled; ignore created session {0}",
+                            session);
+                    session.close();
+                    return;
+                }
+                connected = true;
+            }
+            
+            logger.log(Level.FINE, "created session {0}", session);
+            SocketHandle handle = new SocketHandle(filter, session);
+            handle.setIOHandler(handler);
+        }
+    }
 
 }

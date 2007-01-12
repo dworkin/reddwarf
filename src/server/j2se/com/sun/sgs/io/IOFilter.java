@@ -24,7 +24,10 @@ package com.sun.sgs.io;
  * <li>Acting as a chain of filters for all of the above</li>
  * </ul> 
  */
-public interface IOFilter {
+public abstract class IOFilter {
+    
+    /** The offset of the array that is currently being processed */
+    protected int index;
     
 
     /**
@@ -36,7 +39,7 @@ public interface IOFilter {
      * @param handle            the handle on which to send the data
      * @param message           the data to filter, and send
      */
-    public void filterSend(IOHandle handle, byte[] message);
+    public abstract void filterSend(IOHandle handle, byte[] message);
     
     
     /**
@@ -50,6 +53,29 @@ public interface IOFilter {
      * @param message           the data to filter and forward on to the 
      *                          associated call back
      */
-    public void filterReceive(IOHandle handle, byte[] message);
+    public abstract void filterReceive(IOHandle handle, byte[] message);
+    
+    /**
+     * Reads the next four bytes of the given array starting at the current index
+     * and assembles them into a network byte-ordered int.  It will increment
+     * the index by four if the read was successful.  It will return zero if not
+     * enough bytes remain in the array.
+     * 
+     * @param array             the array from which to read bytes
+     * 
+     * @return the next four bytes as an int, or zero if there aren't enough
+     *         bytes remaining in the array
+     */
+    protected int readInt(byte[] array) {
+        if (array.length < (index + 4)) {
+            return 0;
+        }
+        int num = ((array[index] & 0xFF) << 24) | ((array[index + 1] & 0xFF) << 16) |
+                ((array[index + 2] & 0xFF) << 8) | (array[index + 3] & 0xFF);
+        
+        index += 4;
+        
+        return num;
+    }
 
 }

@@ -1,12 +1,10 @@
 package com.sun.sgs.impl.io;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.apache.mina.common.ByteBuffer;
 
 import com.sun.sgs.io.IOFilter;
 import com.sun.sgs.io.IOHandle;
+import com.sun.sgs.io.IOHandler;
 
 /**
  * A filter that guarantees that only complete messages are delivered to the 
@@ -29,7 +27,7 @@ import com.sun.sgs.io.IOHandle;
  * thread-safe.  
  * 
  */
-public class CompleteMessageFilter implements IOFilter {
+public class CompleteMessageFilter extends IOFilter {
 
     /** A reference to an "in progress" message.  The length of the array
      * will be the final expected length of the message. */
@@ -38,8 +36,6 @@ public class CompleteMessageFilter implements IOFilter {
     /** The current length of the partial message. */
     private int currentLength;
     
-    /** The offset of the array that is currently being processed */
-    private int index;
     
     /**
      * Called each time the framework receives a bytes message.  It will
@@ -74,7 +70,7 @@ public class CompleteMessageFilter implements IOFilter {
             index += numBytes;
             currentLength += numBytes;
 
-            // the partial message is complete, sent it off to the listener
+            // the partial message is complete, send it off to the listener
             // and reset the sizing information.
             if (currentLength == partialMessage.length) {
                 ((SocketHandle) handle).getIOHandler().bytesReceived(
@@ -92,10 +88,13 @@ public class CompleteMessageFilter implements IOFilter {
         // as they appear in the array.  This can be called 0 to n times.
         while (totalLength > 0 && totalLength <= (message.length - index)) {
             byte[] nextMessage = new byte[totalLength];
-            System.arraycopy(message, index, nextMessage, 0, 
-                                                            nextMessage.length);
-            ((SocketHandle) handle).getIOHandler().bytesReceived(nextMessage, 
-                                                                handle);
+            System.arraycopy(
+                    message, index, nextMessage, 0, nextMessage.length);
+            IOHandler handler = 
+                ((SocketHandle) handle).getIOHandler();
+            if (handler != null) {
+                handler.bytesReceived(nextMessage, handle);
+            }
             
             index += totalLength;
             totalLength = readInt(message);
@@ -112,40 +111,13 @@ public class CompleteMessageFilter implements IOFilter {
     }
 
     /**
-     * Prepends the length of the given byte array as an int, in network
-     * byte-order, and sends it out on the given {@code IOHandle}. 
+     * Sends the message on without modification on the given {@code IOHandle}.
      */
     public void filterSend(IOHandle handle, byte[] message) {
-        ByteBuffer buffer = ByteBuffer.allocate(message.length + 4);
-        buffer.putInt(message.length);
-        buffer.put(message);
-        buffer.flip();
-        
-        ((SocketHandle) handle).doSend(buffer);
+        ((SocketHandle) handle).doSend(message);
     }
     
-    /**
-     * Reads the next four bytes of the given array starting at the current index
-     * and assembles them into a network byte-ordered int.  It will increment
-     * the index by four if the read was successful.  It will return zero if not
-     * enough bytes remain in the array.
-     * 
-     * @param array             the array from which to read bytes
-     * 
-     * @return the next four bytes as an int, or zero if there aren't enough
-     *         bytes remaining in the array
-     */
-    private int readInt(byte[] array) {
-        if (array.length < (index + 4)) {
-            return 0;
-        }
-        int num = ((array[index] & 0xFF) << 24) | ((array[index + 1] & 0xFF) << 16) |
-                ((array[index + 2] & 0xFF) << 8) | (array[index + 3] & 0xFF);
-        
-        index += 4;
-        
-        return num;
-    }
+
 
 
 }

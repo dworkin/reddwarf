@@ -54,11 +54,12 @@
   
   <!-- Server class path -->
   <path id="server.classpath">
-    <pathelement path="${build.dir}/classes/server"/>
-    <pathelement path="${bdb.lib.dir}/db.jar"/>
-    <pathelement path="${lib.dir}/mina-core-1.0.0.jar"/>
-    <pathelement path="${lib.dir}/backport-util-concurrent.jar"/>
-    <pathelement path="${lib.dir}/slf4j-simple.jar"/>
+    <pathelement location="${build.dir}/classes/server"/>
+    <pathelement location="${bdb.lib.dir}/db.jar"/>
+    <pathelement location="${lib.dir}/mina-core-1.0.1.jar"/>
+    <pathelement location="${lib.dir}/mina-java5-1.0.1.jar"/>
+    <pathelement location="${lib.dir}/backport-util-concurrent-Java50-3.0.jar"/>
+    <pathelement location="${lib.dir}/slf4j-jdk14.jar"/>
   </path>
 
   <!-- TARGET DEFINITIONS -->
@@ -125,11 +126,16 @@
   <!-- Build the internal server JavaDoc -->
   <target name="javadoc-server" depends="build-server"
 	  description="Builds internal (full) server javadoc">
-    <javadoc sourcepath="src/server/j2se" destdir="${build.dir}/javadoc/server"
-             classpathref="server.classpath" packagenames="com.sun.*"
+    <javadoc sourcepath="src/server/j2se:test/server/j2se"
+             destdir="${build.dir}/javadoc/server"
+             packagenames="com.sun.*"
              overview="src/server/j2se/overview.html"
              windowtitle="${project.name}" doctitle="${project.name}"
 	     author="no">
+      <classpath>
+        <path refid="server.classpath"/>
+        <pathelement location="${lib.dir}/junit-4.1.jar"/>
+      </classpath>
       <link href="${jdk.doc.api.url}"
 	    offline="true"
 	    packagelistLoc="${jdk.package.list}"/>
@@ -150,11 +156,23 @@
   <!-- Build the internal client JavaDoc -->
   <target name="javadoc-client" depends="build-client"
 	  description="Builds internal (full) client javadoc">
-    <javadoc sourcepath="src/client/j2se" destdir="${build.dir}/javadoc/client"
-             classpath="${build.dir}/classes/client" packagenames="com.sun.*"
+    <javadoc sourcepath="src/client/j2se:test/client/j2se"
+             destdir="${build.dir}/javadoc/client"
+             packagenames="com.sun.*"
              overview="src/client/j2se/overview.html"
              windowtitle="${project.name}" doctitle="${project.name}"
 	     author="no">
+      <classpath>
+        <pathelement location="${build.dir}/classes/client"/>
+        <fileset dir="${build.dir}/classes/server">
+          <include name="com/sun/sgs/**/io/**/*.class"/>
+        </fileset>
+        <pathelement location="${lib.dir}/mina-core-1.0.1.jar"/>
+        <pathelement location="${lib.dir}/mina-java5-1.0.1.jar"/>
+        <pathelement location="${lib.dir}/backport-util-concurrent-Java50-3.0.jar"/>
+        <pathelement location="${lib.dir}/slf4j-jdk14.jar"/>
+        <pathelement location="${lib.dir}/junit-4.1.jar"/>
+      </classpath>
       <link href="${jdk.doc.api.url}"
 	    offline="true"
 	    packagelistLoc="${jdk.package.list}"/>
@@ -319,9 +337,10 @@
       <classpath path="${build.dir}/test/classes/server;
 		       ${build.dir}/classes/server;
 		       ${bdb.lib.dir}/db.jar;
-		       ${lib.dir}/mina-core-1.0.0.jar;
-		       ${lib.dir}/backport-util-concurrent.jar;
-		       ${lib.dir}/slf4j-simple.jar"/>
+	               ${lib.dir}/mina-core-1.0.1.jar;
+	               ${lib.dir}/mina-java5-1.0.1.jar;
+		       ${lib.dir}/backport-util-concurrent-Java50-3.0.jar;
+		       ${lib.dir}/slf4j-jdk14.jar"/>
 
       <syspropertyset>
 	<propertyref prefix="test."/>

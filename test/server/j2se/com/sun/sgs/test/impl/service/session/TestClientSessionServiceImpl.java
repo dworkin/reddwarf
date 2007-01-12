@@ -20,7 +20,7 @@ import com.sun.sgs.auth.IdentityCredentials;
 import com.sun.sgs.auth.IdentityManager;
 import com.sun.sgs.impl.auth.NamePasswordCredentials;
 import com.sun.sgs.impl.io.CompleteMessageFilter;
-import com.sun.sgs.impl.io.ConnectorFactory;
+import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.IOConstants.TransportType;
 import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
@@ -57,6 +57,8 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -411,14 +413,14 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 	void connect(int port) {
 	    connected = false;
-	    connector =
-		ConnectorFactory.createConnector(TransportType.RELIABLE);
-	    listener = new Listener();
 	    try {
-		handle =
-		    connector.connect(
-		    	InetAddress.getLocalHost(), port, listener,
-			new CompleteMessageFilter());
+	        SocketAddress addr =
+	            new InetSocketAddress(InetAddress.getLocalHost(), port); 
+	        connector =
+	            new SocketEndpoint(addr, TransportType.RELIABLE)
+	                .createConnector();
+	        listener = new Listener();
+		connector.connect(listener, new CompleteMessageFilter());
 	    } catch (Exception e) {
 		System.err.println("DummyClient.connect throws: " + e);
 		e.printStackTrace();
@@ -569,23 +571,24 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 	    public void connected(IOHandle h) {
 		System.err.println("DummyClient.Listener.connected");
-		if (h != handle) {
-		    System.err.println(
-			"DummyClient.Listener.connected wrong handle, got:" +
-			h + ", expected:" + handle);
-		    return;
-		}
-		synchronized (lock) {
+                synchronized (lock) {
+                    if (handle != null) {
+                        System.err.println(
+                                "DummyClient.Listener.connected already has handle, " +
+                                "got:" + h + ", already have:" + handle);
+                        return;
+                    }
+                    handle = h;
 		    connected = true;
 		    lock.notifyAll();
 		}
 	    }
 
-	    public void disconnected(IOHandle handle) {
+	    public void disconnected(IOHandle h) {
 	    }
 	    
 	    public void exceptionThrown(
-		Throwable exception, IOHandle handle)
+		Throwable exception, IOHandle h)
 	    {
 		System.err.println("DummyClient.Listener.exceptionThrown " +
 				   "exception:" + exception);

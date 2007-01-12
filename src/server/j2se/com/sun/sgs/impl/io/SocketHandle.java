@@ -1,13 +1,13 @@
 package com.sun.sgs.impl.io;
 
 import java.io.IOException;
-import java.lang.annotation.Inherited;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.apache.mina.common.ByteBuffer;
-import org.apache.mina.common.IoFuture;
-import org.apache.mina.common.IoFutureListener;
 import org.apache.mina.common.IoSession;
 
+import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.io.IOFilter;
 import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
@@ -20,47 +20,54 @@ import com.sun.sgs.io.IOHandler;
  * @author Sten Anderson
  * @since 1.0
  */
-public class SocketHandle implements IOHandle, IoFutureListener {
+public class SocketHandle implements IOHandle {
+    private static final LoggerWrapper logger =
+        new LoggerWrapper(Logger.getLogger(SocketHandle.class.getName()));
+
+    private final IOFilter filter;
+    private final IoSession session;
 
     private IOHandler handler;
-    private IoSession session;
-    private IOFilter filter;
     
-    SocketHandle(IOFilter filter) {
+    SocketHandle(IOFilter filter, IoSession session) {
         this.filter = filter;
+        this.session = session;
+        session.setAttachment(this);
     }
     
     /**
-     * {@inheritDoc}
+     * Sends the given byte message out on the underlying {@code IoSession}.
+     * It prepends the length of the given byte array as an int, in network
+     * byte-order, and sends it out on the underlying {@code IoSession}. 
      * 
+     * @throws IOException if the session is not connected.
      */
     public void sendBytes(byte[] message) throws IOException {
+        logger.log(Level.FINEST, "message = {0}", message);
         if (!session.isConnected()) {
-            throw new IOException("SocketHandle.sendMessage: session not connected");
+            throw new IOException("session not connected");
         }
-        filter.filterSend(this, message);
+        ByteBuffer buffer = ByteBuffer.allocate(message.length + 4);
+        buffer.putInt(message.length);
+        buffer.put(message);
+        buffer.flip();
+        byte[] messageWithLength = new byte[buffer.remaining()];
+        buffer.get(messageWithLength);
+        
+        filter.filterSend(this, messageWithLength);
     }
 
     /**
-     * {@inheritDoc}
+     * Closes the underlying {@code IoSession}.
+     *  
+     * @throws IOException if the session is not connected. 
      */
     public void close() throws IOException {
+        logger.log(Level.FINE, "session = {0}", session);
         if (!session.isConnected()) {
             throw new IOException("SocketHandle.close: session not connected");
         }
         session.close();
-    }
-    
-    /**
-     * IoFutureListener call-back.  Once this is called, the handle is 
-     * considered "connected".  
-     */
-    public void operationComplete(IoFuture future) {
-        if (session != null) {
-            return;
-        }
-        setSession(future.getSession());
-        handler.connected(this);
     }
     
     // specific to SocketHandle
@@ -71,6 +78,8 @@ public class SocketHandle implements IOHandle, IoFutureListener {
      * @param handler           the handler to receive callbacks for this handle
      */
     void setIOHandler(IOHandler handler) {
+        if (this.handler != null)
+            throw new IllegalStateException("Already have a handler");
         this.handler = handler;
     }
     
@@ -110,18 +119,9 @@ public class SocketHandle implements IOHandle, IoFutureListener {
      * 
      * @param messageBuffer
      */
-    void doSend(ByteBuffer messageBuffer) {
+    private void doSend(ByteBuffer messageBuffer) {
+        logger.log(Level.FINEST, "message = {0}", messageBuffer);
+        
         session.write(messageBuffer);
-    }
-    
-    /**
-     * Sets the {@code IoSession} associated with this handle.  Sessions and
-     * handles have a one-to-one mapping.
-     * 
-     * @param session
-     */
-    void setSession(IoSession session) {
-        this.session = session;
-        session.setAttachment(this);
     }
 }

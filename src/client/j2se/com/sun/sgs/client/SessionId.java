@@ -24,8 +24,7 @@ public abstract class SessionId {
      * <code>SessionId</code>
      */
     public static SessionId fromBytes(byte[] id) {
-	// TBI
-	throw new AssertionError("not implemented");
+	return new com.sun.sgs.client.simple.SimpleSessionId(id);
     }
 
     /**
