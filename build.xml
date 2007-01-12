@@ -15,6 +15,7 @@
 
   <!-- Build location -->
   <property name="build.dir" location="build"/>
+  <property name="lib.dir" location="lib"/>
 
   <!-- Values for controlling compilation -->
   <property name="javac.source" value="1.5"/>
@@ -55,6 +56,9 @@
   <path id="server.classpath">
     <pathelement path="${build.dir}/classes/server"/>
     <pathelement path="${bdb.lib.dir}/db.jar"/>
+    <pathelement path="${lib.dir}/mina-core-1.0.0.jar"/>
+    <pathelement path="${lib.dir}/backport-util-concurrent.jar"/>
+    <pathelement path="${lib.dir}/slf4j-simple.jar"/>
   </path>
 
   <!-- TARGET DEFINITIONS -->
@@ -314,7 +318,11 @@
 		   file="${test.logging}"/>
       <classpath path="${build.dir}/test/classes/server;
 		       ${build.dir}/classes/server;
-		       ${bdb.lib.dir}/db.jar"/>
+		       ${bdb.lib.dir}/db.jar;
+		       ${lib.dir}/mina-core-1.0.0.jar;
+		       ${lib.dir}/backport-util-concurrent.jar;
+		       ${lib.dir}/slf4j-simple.jar"/>
+
       <syspropertyset>
 	<propertyref prefix="test."/>
       </syspropertyset>
