@@ -87,7 +87,9 @@ public class TestChannelServiceImpl extends TestCase {
     /** A per-test database directory, or null if not created. */
     private String directory;
     
-    private static DummyTransactionProxy txnProxy = new DummyTransactionProxy();
+    private static DummyTransactionProxy txnProxy =
+	MinimalTestKernel.getTransactionProxy();
+
 
     private DummyAbstractKernelAppContext appContext;
     private DummyComponentRegistry systemRegistry;
@@ -123,14 +125,6 @@ public class TestChannelServiceImpl extends TestCase {
 	channelService = new ChannelServiceImpl(serviceProps, systemRegistry);
 
 	createTransaction();
-
-	// configure data service
-        dataService.configure(serviceRegistry, txnProxy);
-        txnProxy.setComponent(DataService.class, dataService);
-        txnProxy.setComponent(DataServiceImpl.class, dataService);
-        serviceRegistry.setComponent(DataManager.class, dataService);
-        serviceRegistry.setComponent(DataService.class, dataService);
-        serviceRegistry.setComponent(DataServiceImpl.class, dataService);
 
 	// configure data service
         dataService.configure(serviceRegistry, txnProxy);

@@ -110,8 +110,8 @@ public class TestClientSessionServiceImpl extends TestCase {
     private String directory;
     
     private static DummyTransactionProxy txnProxy =
-	new DummyTransactionProxy();
-    
+	MinimalTestKernel.getTransactionProxy();
+
     private DummyAbstractKernelAppContext appContext;
     private DummyComponentRegistry systemRegistry;
     private DummyComponentRegistry serviceRegistry;
