@@ -35,14 +35,16 @@ public class NonDurableTaskScheduler {
      * TaskService} class object on the specified proxy.
      */
     public NonDurableTaskScheduler(
-	TaskScheduler taskScheduler, TransactionProxy proxy)
+	TaskScheduler taskScheduler,
+        TaskOwner owner,
+        TaskService taskService)
     {
-	if (taskScheduler == null || proxy == null) {
+	if (taskScheduler == null || owner == null || taskService == null) {
 	    throw new NullPointerException("null argument");
 	}
 	this.taskScheduler = taskScheduler;
-	this.owner = proxy.getCurrentOwner();
-	this.taskService = proxy.getService(TaskService.class);
+	this.owner = owner;
+	this.taskService = taskService;
     }
 
     /**

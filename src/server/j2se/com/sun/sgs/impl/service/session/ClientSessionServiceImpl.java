@@ -18,6 +18,7 @@ import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.ServiceListener;
 import com.sun.sgs.service.SgsClientSession;
+import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.TransactionProxy;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -185,7 +186,9 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 		this.registry = registry;
 		dataService = registry.getComponent(DataService.class);
 		nonDurableTaskScheduler =
-		    new NonDurableTaskScheduler(taskScheduler, proxy);
+		    new NonDurableTaskScheduler(
+                            taskScheduler, proxy.getCurrentOwner(),
+                            registry.getComponent(TaskService.class));
 		acceptor =
 		    AcceptorFactory.createAcceptor(TransportType.RELIABLE);
 		SocketAddress address = new InetSocketAddress(port);

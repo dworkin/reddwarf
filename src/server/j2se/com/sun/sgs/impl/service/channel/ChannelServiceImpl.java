@@ -142,15 +142,16 @@ public class ChannelServiceImpl
 		throw new NullPointerException("null transaction proxy");
 	    }
 	    synchronized (lock) {
-		if (this.txnProxy != null) {
+		if (txnProxy != null) {
 		    throw new IllegalStateException("Already configured");
 		}
-		this.txnProxy = proxy;
+		txnProxy = proxy;
 		dataService = registry.getComponent(DataService.class);
 		taskService = registry.getComponent(TaskService.class);
 		sessionService = registry.getComponent(ClientSessionService.class);
 		nonDurableTaskScheduler =
-		    new NonDurableTaskScheduler(taskScheduler, proxy);
+		    new NonDurableTaskScheduler(
+                            taskScheduler, proxy.getCurrentOwner(), taskService);
 	    }
 
 	    /*
@@ -454,7 +455,8 @@ public class ChannelServiceImpl
 		    nonDurableTaskScheduler.scheduleTask(
 			new SendTask(
 			    name, session.getSessionId(),
-			    sessions, message, session.nextSequenceNumber()));
+			    sessions, channelMessage,
+                            session.nextSequenceNumber()));
 		    break;
 		    
 		default:
