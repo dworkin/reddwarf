@@ -369,15 +369,12 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	sessionService.disconnected(sessionId);
 
 	if (graceful) {
-	    MessageBuffer disconnectMsg = new MessageBuffer(3);
-	    disconnectMsg.
-		putByte(SgsProtocol.VERSION).
+	    MessageBuffer buf = new MessageBuffer(3);
+	    buf.putByte(SgsProtocol.VERSION).
 		putByte(SgsProtocol.APPLICATION_SERVICE).
-		putByte(graceful ?
-			SgsProtocol.LOGOUT_SUCCESS :
-			SgsProtocol.SESSION_DISCONNECT);
-
-	    sendProtocolMessage(disconnectMsg);
+		putByte(SgsProtocol.LOGOUT_SUCCESS);
+	    
+	    sendProtocolMessage(buf);
 	}
 
 	closeSession();

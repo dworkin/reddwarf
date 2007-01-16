@@ -64,7 +64,9 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Properties;
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -233,13 +235,25 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
-    /* -- Test connection -- */
+    public void testConstructorNoPort() throws Exception {
+	try {
+	    Properties props =
+		createProperties("com.sun.sgs.appName",
+				 "TestClientSessionServiceImpl");
+	    new ClientSessionServiceImpl(
+		props, new DummyComponentRegistry());
+
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
+    /* -- Test connecting, logging in, logging out with server -- */
 
     public void testConnection() throws Exception {
-	txn.commit();
-	DummyClient client = null;
+	DummyClient client = new DummyClient();
 	try {
-	    client = new DummyClient();
 	    client.connect(PORT);
 	} catch (Exception e) {
 	    System.err.println("Exception: " + e);
@@ -249,21 +263,14 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    throw e;
 	    
 	} finally {
-	    if (client != null) {
-		client.disconnect(false);
-	    }
+	    client.disconnect(false);
 	}
     }
 
     public void testLogin() throws Exception {
-	DummyAppListener appListener = new DummyAppListener();
-	dataService.setServiceBinding(
-	    "com.sun.sgs.app.AppListener", appListener);
-	txn.commit();
-	
-	DummyClient client = null;
+	registerAppListener();
+	DummyClient client = new DummyClient();
 	try {
-	    client = new DummyClient();
 	    client.connect(PORT);
 	    client.login("foo", "bar");
 	} finally {
@@ -274,14 +281,9 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     public void testLoginRefused() throws Exception {
-	DummyAppListener appListener = new DummyAppListener();
-	dataService.setServiceBinding(
-	    "com.sun.sgs.app.AppListener", appListener);
-	txn.commit();
-	
-	DummyClient client = null;
+	registerAppListener();
+	DummyClient client = new DummyClient();
 	try {
-	    client = new DummyClient();
 	    client.connect(PORT);
 	    client.login("foo", "bar");
 	    try {
@@ -296,12 +298,123 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    }
 	    fail("expected login failure");
 	} finally {
-	    if (client != null) {
-		client.disconnect(false);
+	    client.disconnect(false);
+	}
+    }
+    public void testLogout() throws Exception {
+	registerAppListener();
+	DummyClient client = new DummyClient();
+	try {
+	    client.connect(PORT);
+	    client.login("foo", "bar");
+	    try {
+		client.login("foo", "bar");
+	    } catch (RuntimeException e) {
+		if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
+		    System.err.println("login refused");
+		    return;
+		} else {
+		    fail("unexpected login failure: " + e);
+		}
 	    }
+	    fail("expected login failure");
+	} finally {
+	    client.disconnect(false);
+	}
+	
+    }
+
+    /* -- test ClientSession -- */
+
+    public void testClientSessionIsConnected() throws Exception {
+	registerAppListener();
+	DummyClient client = new DummyClient();
+	String name = "clientname";
+	try {
+	    client.connect(PORT);
+	    client.login(name, "dummypassword");
+	    createTransaction();
+	    DummyAppListener appListener = getAppListener();
+	    Set<ClientSession> sessions = appListener.getSessions();
+	    if (sessions.isEmpty()) {
+		fail("appListener contains no client sessions!");
+	    }
+	    for (ClientSession session : appListener.getSessions()) {
+		if (session.isConnected() == true) {
+		    System.err.println("session is connected");
+		    txn.commit();
+		    return;
+		} else {
+		    fail("Expected connected session: " + session);
+		}
+	    }
+	    fail("expected a connected session");
+	} finally {
+	    client.disconnect(false);
+	}
+    }
+    
+    public void testClientSessionGetName() throws Exception {
+	registerAppListener();
+	DummyClient client = new DummyClient();
+	String name = "clientname";
+	try {
+	    client.connect(PORT);
+	    client.login(name, "dummypassword");
+	    createTransaction();
+	    DummyAppListener appListener = getAppListener();
+	    Set<ClientSession> sessions = appListener.getSessions();
+	    if (sessions.isEmpty()) {
+		fail("appListener contains no client sessions!");
+	    }
+	    for (ClientSession session : appListener.getSessions()) {
+		if (session.getName().equals(name)) {
+		    System.err.println("names match");
+		    txn.commit();
+		    return;
+		} else {
+		    fail("Expected session name: " + name +
+			 ", got: " + session.getName());
+		}
+	    }
+	    fail("expected d connected session");
+	} finally {
+	    client.disconnect(false);
 	}
     }
 
+    public void testClientSessionGetSessionId() throws Exception {
+	registerAppListener();
+	DummyClient client = new DummyClient();
+	String name = "clientname";
+	try {
+	    client.connect(PORT);
+	    client.login(name, "dummypassword");
+	    createTransaction();
+	    DummyAppListener appListener = getAppListener();
+	    Set<ClientSession> sessions = appListener.getSessions();
+	    if (sessions.isEmpty()) {
+		fail("appListener contains no client sessions!");
+	    }
+	    for (ClientSession session : appListener.getSessions()) {
+		if (Arrays.equals(session.getSessionId(), client.getSessionId())) {
+		    System.err.println("session IDs match");
+		    txn.commit();
+		    return;
+		} else {
+		    fail("Expected session id: " + client.getSessionId() +
+			 ", got: " + session.getSessionId());
+		}
+	    }
+	    fail("expected a connected session");
+	} finally {
+	    client.disconnect(false);
+	}
+	
+    }
+    
+    public void testClientSessionSend() throws Exception {
+    }
     /* -- other methods -- */
 
     /** Deletes the specified directory, if it exists. */
@@ -360,6 +473,20 @@ public class TestClientSessionServiceImpl extends TestCase {
 	return new DataServiceImpl(dbProps, registry);
     }
 
+    private void registerAppListener() throws Exception {
+	createTransaction();
+	DummyAppListener appListener = new DummyAppListener();
+	dataService.setServiceBinding(
+	    "com.sun.sgs.app.AppListener", appListener);
+	txn.commit();
+    }
+
+    private DummyAppListener getAppListener() {
+	return (DummyAppListener) dataService.getServiceBinding(
+	    "com.sun.sgs.app.AppListener", AppListener.class);
+    }
+    
+
     /**
      * Dummy identity manager for testing purposes.
      */
@@ -404,11 +531,16 @@ public class TestClientSessionServiceImpl extends TestCase {
 	private final Object lock = new Object();
 	private boolean loginAck = false;
 	private boolean loginSuccess = false;
+	private boolean logoutAck = false;
 	private String reason;
 	private byte[] sessionId;
 	private byte[] reconnectionKey;
 	
 	DummyClient() {
+	}
+
+	byte[] getSessionId() {
+	    return sessionId;
 	}
 
 	void connect(int port) {
@@ -444,12 +576,12 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
 
 	void disconnect(boolean graceful) {
+	    System.err.println("DummyClient.disconnect: " + graceful);
 	    if (!graceful) {
 		synchronized (lock) {
 		    if (connected == false) {
 			return;
 		    }
-		    System.err.println("DummyClient.disconnect");
 		    connected = false;
 		    try {
 			handle.close();
@@ -460,8 +592,35 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    lock.notifyAll();
 		}
 	    } else {
-		throw new AssertionError(
-		    "graceful disconnection not implemented");
+		synchronized (lock) {
+		    if (connected == false) {
+			return;
+		    }
+		    MessageBuffer buf = new MessageBuffer(3);
+		    buf.putByte(SgsProtocol.VERSION).
+			putByte(SgsProtocol.APPLICATION_SERVICE).
+			putByte(SgsProtocol.LOGOUT_REQUEST);
+		    logoutAck = false;
+		    try {
+			handle.sendBytes(buf.getBuffer());
+		    } catch (IOException e) {
+			throw new RuntimeException(e);
+		    }
+		    synchronized (lock) {
+			try {
+			    if (logoutAck == false) {
+				lock.wait(WAIT_TIME);
+			    }
+			    if (logoutAck != true) {
+				throw new RuntimeException(
+				    "DummyClient.disconnect timed out");
+			    }
+			} catch (InterruptedException e) {
+			    throw new RuntimeException(
+				"DummyClient.disconnect timed out", e);
+			}
+		    }
+		}
 	    }
 	}
 
@@ -510,6 +669,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
 
 	private class Listener implements IOHandler {
+
+	    List<byte[]> messageList = new ArrayList<byte[]>();
+	    
 	    public void bytesReceived(byte[] buffer, IOHandle h) {
 		if (h != handle) {
 		    System.err.println(
@@ -562,9 +724,26 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    }
 		    break;
 
+		case SgsProtocol.LOGOUT_SUCCESS:
+		    synchronized (lock) {
+			logoutAck = true;
+			System.err.println("logout succeeded: " + name);
+			lock.notifyAll();
+		    }
+		    break;
+
+		case SgsProtocol.MESSAGE_SEND:
+		    byte[] message = buf.getBytes(buf.getShort());
+		    synchronized (lock) {
+			messageList.add(message);
+			System.err.println("message received: " + message);
+			lock.notifyAll();
+		    }
+		    break;
+
 		default:
-		    System.err.println(
-			"bytesReceived: unknown op code: " + opcode);
+		    System.err.println(	
+		"bytesReceived: unknown op code: " + opcode);
 		    break;
 		}
 	    }
@@ -626,12 +805,17 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 	public void startingUp(Properties props) {
 	}
+
+	private Set<ClientSession> getSessions() {
+	    return sessions.keySet();
+	}
     }
 
     private static class DummyClientSessionListener
 	implements ClientSessionListener, Serializable
     {
 	private final static long serialVersionUID = 1L;
+	private boolean receivedDisconnectedCallback = false;
 	
 	private final ClientSession session;
 	
@@ -640,6 +824,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
 
 	public void disconnected(boolean graceful) {
+	    receivedDisconnectedCallback = true;
 	}
 
 	public void receivedMessage(byte[] message) {

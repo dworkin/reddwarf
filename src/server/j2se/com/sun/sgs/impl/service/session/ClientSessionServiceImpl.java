@@ -110,7 +110,8 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     {
 	if (logger.isLoggable(Level.CONFIG)) {
 	    logger.log(
-	        Level.CONFIG, "Creating ClientSessionServiceImpl properties:{0}",
+	        Level.CONFIG,
+		"Creating ClientSessionServiceImpl properties:{0}",
 		properties);
 	}
 	try {
