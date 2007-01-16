@@ -457,9 +457,16 @@ final class ChannelImpl implements Channel, Serializable {
 	}
 
 	/*
-	 * Notify per-session listeners.
+	 * Notify per-sender listener.
+         *
+         * JM - only notify sender's listener, not all receivers' listeners.
 	 */
-	Collection<ClientSession> sessions;
+        listener = state.getListener(senderSession);
+        if (listener != null) {
+            listener.receivedMessage(this, senderSession, message);
+        }
+
+        Collection<ClientSession> sessions;
 	if (sessionIds.size() == 0) {
 	    sessions = getSessions();
 	} else {
@@ -470,13 +477,6 @@ final class ChannelImpl implements Channel, Serializable {
 		if (session != null) {
 		    sessions.add(session);
 		}
-	    }
-	}
-
-	for (ClientSession session : sessions) {
-	    listener = state.getListener(session);
-	    if (listener != null) {
-		listener.receivedMessage(this, senderSession, message);
 	    }
 	}
 
