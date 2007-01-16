@@ -90,7 +90,6 @@ public class TestChannelServiceImpl extends TestCase {
     private static DummyTransactionProxy txnProxy =
 	MinimalTestKernel.getTransactionProxy();
 
-
     private DummyAbstractKernelAppContext appContext;
     private DummyComponentRegistry systemRegistry;
     private DummyComponentRegistry serviceRegistry;
