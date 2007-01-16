@@ -68,14 +68,16 @@ import java.util.logging.Logger;
  *	The maximum amount of time in milliseconds that a transaction will be
  *	permitted to run before it is a candidate for being aborted. <p>
  *
- * <li> <i>Key:</i> <code>com.sun.sgs.impl.service.data.store.directory</code>
- *	<br>
+ * <li> <i>Key:</i>
+ *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl.directory
+ *	</code> <br>
  *	<i>Required</i> <br>
  *	The directory in which to store database files.  Each instance of
  *	<code>DataStoreImpl</code> requires its own, unique directory. <p>
  *
  * <li> <i>Key:</i> <code>
- *	com.sun.sgs.impl.service.data.store.allocationBlockSize</code> <br>
+ *	com.sun.sgs.impl.service.data.store.DataStoreImpl.allocationBlockSize
+ *	</code> <br>
  *	<i>Default:</i> <code>100</code> <br>
  *	The number of object IDs to allocate at a time.  Object IDs are
  *	allocated in an independent transaction, and are discarded if a
@@ -85,13 +87,15 @@ import java.util.logging.Logger;
  *	allocated.  This number limits the maximum number of object IDs that
  *	would be discarded when the program exits. <p>
  *
- * <li> <i>Key:</i> <code>com.sun.sgs.impl.service.data.store.cacheSize</code>
- *	<br>
+ * <li> <i>Key:</i>
+ *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl.cacheSize
+ *	</code> <br>
  *	<i>Default:</i> <code>1000000</code> <br>
  *	The size in bytes of the Berkeley DB cache.  This value must not be
  *	less than 20000. <p>
  *
- * <li> <i>Key:</i> <code>com.sun.sgs.impl.service.data.store.flushToDisk
+ * <li> <i>Key:</i>
+ *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl.flushToDisk
  *	</code> <br>
  *	<i>Default:</i> <code>false</code>
  *	Whether to flush changes to disk when a transaction commits.  If
@@ -100,7 +104,8 @@ import java.util.logging.Logger;
  *	will be maintained.  Flushing changes to disk avoids data loss but
  *	introduces a significant reduction in performance. <p>
  *
- * <li> <i>Key:</i> <code>com.sun.sgs.impl.service.data.store.logStats</code>
+ * <li> <i>Key:</i>
+ *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl.logStats</code>
  *	<br>
  *	<i>Default:</i> <code>Integer.MAX_VALUE</code> <br>
  *	The number of transactions between logging database statistics. <p>
@@ -236,6 +241,12 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
      */
     private int logStatsCount = 0;
 
+    /** Object to synchronize on when accessing txnCount. */
+    private final Object txnCountLock = new Object();
+
+    /** The number of currently active transactions. */
+    private int txnCount = 0;
+
     /** Stores transaction information. */
     private static class TxnInfo {
 
@@ -356,8 +367,9 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
     private static class LoggingErrorHandler implements ErrorHandler {
 	public void error(Environment env, String prefix, String message) {
 	    if (logger.isLoggable(Level.WARNING)) {
-		logger.log(Level.WARNING, "Database error message: {0}{1}",
-			   prefix != null ? prefix : "", message);
+		logger.logThrow(Level.WARNING, new Exception("Stacktrace"),
+				"Database error message: {0}{1}",
+				prefix != null ? prefix : "", message);
 	    }
 	}
     }
@@ -857,15 +869,8 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	logger.log(Level.FINER, "prepare txn:{0}", txn);
 	Exception exception;
 	try {
-	    if (txn == null) {
-		throw new NullPointerException("Transaction must not be null");
-	    }
-	    TxnInfo txnInfo = threadTxnInfo.get();
-	    if (txnInfo == null) {
-		throw new IllegalStateException("Transaction is not active");
-	    } else if (!txnInfo.txn.equals(txn)) {
-		throw new IllegalStateException("Wrong transaction");
-	    } else if (txnInfo.prepared) {
+	    TxnInfo txnInfo = checkTxnNoJoin(txn, true);
+	    if (txnInfo.prepared) {
 		throw new IllegalStateException(
 		    "Transaction has already been prepared");
 	    }
@@ -886,8 +891,12 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 		 * Berkeley DB doesn't permit operating on its transaction
 		 * object after commit is called.
 		 */
-		threadTxnInfo.set(null);
-		txnInfo.commit();
+		try {
+		    threadTxnInfo.set(null);
+		    txnInfo.commit();
+		} finally {
+		    decrementTxnCount();
+		} 
 	    }
 	    boolean result = !txnInfo.modified;
 	    if (logger.isLoggable(Level.FINER)) {
@@ -908,15 +917,8 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	logger.log(Level.FINER, "commit txn:{0}", txn);
 	Exception exception;
 	try {
-	    if (txn == null) {
-		throw new NullPointerException("Transaction must not be null");
-	    }
-	    TxnInfo txnInfo = threadTxnInfo.get();
-	    if (txnInfo == null) {
-		throw new IllegalStateException("Transaction is not active");
-	    } else if (!txnInfo.txn.equals(txn)) {
-		throw new IllegalStateException("Wrong transaction");
-	    } else if (!txnInfo.prepared) {
+	    TxnInfo txnInfo = checkTxnNoJoin(txn, true);
+	    if (!txnInfo.prepared) {
 		throw new IllegalStateException(
 		    "Transaction has not been prepared");
 	    }
@@ -927,9 +929,13 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	     * after commit is called.
 	     */
 	    threadTxnInfo.set(null);
-	    txnInfo.commit();
-	    logger.log(Level.FINER, "commit txn:{0} returns", txn);
-	    return;
+	    try {
+		txnInfo.commit();
+		logger.log(Level.FINER, "commit txn:{0} returns", txn);
+		return;
+	    } finally {
+		decrementTxnCount();
+	    }
 	} catch (DatabaseException e) {
 	    exception = e;
 	} catch (RuntimeException e) {
@@ -943,15 +949,8 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	logger.log(Level.FINER, "prepareAndCommit txn:{0}", txn);
 	Exception exception;
 	try {
-	    if (txn == null) {
-		throw new NullPointerException("Transaction must not be null");
-	    }
-	    TxnInfo txnInfo = threadTxnInfo.get();
-	    if (txnInfo == null) {
-		throw new IllegalStateException("Transaction is not active");
-	    } else if (!txnInfo.txn.equals(txn)) {
-		throw new IllegalStateException("Wrong transaction");
-	    } else if (txnInfo.prepared) {
+	    TxnInfo txnInfo = checkTxnNoJoin(txn, true);
+	    if (txnInfo.prepared) {
 		throw new IllegalStateException(
 		    "Transaction has already been prepared");
 	    }
@@ -962,9 +961,14 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	     * after commit is called.
 	     */
 	    threadTxnInfo.set(null);
-	    txnInfo.commit();
-	    logger.log(Level.FINER, "prepareAndCommit txn:{0} returns", txn);
-	    return;
+	    try {
+		txnInfo.commit();
+		logger.log(
+		    Level.FINER, "prepareAndCommit txn:{0} returns", txn);
+		return;
+	    } finally {
+		decrementTxnCount();
+	    }
 	} catch (DatabaseException e) {
 	    exception = e;
 	} catch (RuntimeException e) {
@@ -979,15 +983,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	logger.log(Level.FINER, "abort txn:{0}", txn);
 	Exception exception;
 	try {
-	    if (txn == null) {
-		throw new NullPointerException("Transaction must not be null");
-	    }
-	    TxnInfo txnInfo = threadTxnInfo.get();
-	    if (txnInfo == null) {
-		throw new IllegalStateException("Transaction is not active");
-	    } else if (!txnInfo.txn.equals(txn)) {
-		throw new IllegalStateException("Wrong transaction");
-	    }
+	    TxnInfo txnInfo = checkTxnNoJoin(txn, false);
 	    /*
 	     * Make sure to clear the transaction information, regardless of
 	     * whether the Berkeley DB commit operation succeeds, since
@@ -995,9 +991,13 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	     * after commit is called.
 	     */
 	    threadTxnInfo.set(null);
-	    txnInfo.abort();
-	    logger.log(Level.FINER, "abort txn:{0} returns", txn);
-	    return;
+	    try {
+		txnInfo.abort();
+		logger.log(Level.FINER, "abort txn:{0} returns", txn);
+		return;
+	    } finally {
+		decrementTxnCount();
+	    }
 	} catch (DatabaseException e) {
 	    exception = e;
 	} catch (RuntimeException e) {
@@ -1007,6 +1007,45 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
     }
 
     /* -- Other public methods -- */
+
+    /** {@inheritDoc} */
+    public boolean shutdown() {
+	logger.log(Level.FINER, "shutdown");
+	Exception exception;
+	try {
+	    synchronized (txnCountLock) {
+		while (txnCount > 0) {
+		    try {
+			logger.log(Level.FINEST,
+				   "shutdown waiting for {0} transactions",
+				   txnCount);
+			txnCountLock.wait();
+		    } catch (InterruptedException e) {
+			logger.log(Level.FINEST, "shutdown interrupted");
+			break;
+		    }
+		}
+		if (txnCount < 0) {
+		    throw new IllegalStateException("DataStore is shut down");
+		}
+		boolean ok = (txnCount == 0);
+		if (ok) {
+		    info.close();
+		    oids.close();
+		    names.close();
+		    env.close();
+		    txnCount = -1;
+		}
+		logger.log(Level.FINER, "shutdown returns {0}", ok);
+		return ok;
+	    }
+	} catch (DatabaseException e) {
+	    exception = e;
+	} catch (RuntimeException e) {
+	    exception = e;
+	}
+	throw convertException(Level.FINER, exception, "shutdown");
+    }
 
     /**
      * Returns a string representation of this object.
@@ -1037,7 +1076,21 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	}
 	TxnInfo txnInfo = threadTxnInfo.get();
 	if (txnInfo == null) {
-	    txn.join(this);
+	    synchronized (txnCountLock) {
+		if (txnCount < 0) {
+		    throw new IllegalStateException("Service is shut down");
+		}
+		txnCount++;
+	    }
+	    boolean joined = false;
+	    try {
+		txn.join(this);
+		joined = true;
+	    } finally {
+		if (!joined) {
+		    decrementTxnCount();
+		}
+	    }
 	    txnInfo = new TxnInfo(txn, env);
 	    threadTxnInfo.set(txnInfo);
 	    if (++logStatsCount >= logStats) {
@@ -1049,6 +1102,29 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	} else if (txnInfo.prepared) {
 	    throw new IllegalStateException(
 		"Transaction has been prepared");
+	}
+	return txnInfo;
+    }
+
+    /**
+     * Checks that the correct transaction is in progress, throwing an
+     * exception if the transaction has not been joined.  Checks if the store
+     * is shutting down if requested.  Does not check the prepared state of the
+     * transaction.
+     */
+    private TxnInfo checkTxnNoJoin(
+	Transaction txn, boolean checkShuttingDown)
+    {
+	if (txn == null) {
+	    throw new NullPointerException("Transaction must not be null");
+	}
+	TxnInfo txnInfo = threadTxnInfo.get();
+	if (txnInfo == null) {
+	    throw new IllegalStateException("Transaction is not active");
+	} else if (!txnInfo.txn.equals(txn)) {
+	    throw new IllegalStateException("Wrong transaction");
+	} else if (checkShuttingDown && getTxnCount() < 0) {
+	    throw new IllegalStateException("DataStore is shutting down");
 	}
 	return txnInfo;
     }
@@ -1130,6 +1206,23 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 		       env.getLogStats(null),
 		       env.getMutexStats(null),
 		       env.getTransactionStats(null));
+	}
+    }
+
+    /** Returns the current transaction count. */
+    private int getTxnCount() {
+	synchronized (txnCountLock) {
+	    return txnCount;
+	}
+    }
+
+    /** Decrements the current transaction count. */
+    private void decrementTxnCount() {
+	synchronized (txnCountLock) {
+	    txnCount--;
+	    if (txnCount <= 0) {
+		txnCountLock.notifyAll();
+	    }
 	}
     }
 }

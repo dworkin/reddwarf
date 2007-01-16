@@ -1,5 +1,6 @@
 package com.sun.sgs.test.impl.service.data.store;
 
+import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.test.util.DummyTransaction;
 import java.io.File;
@@ -87,6 +88,9 @@ public class TestPerformance extends TestCase {
     /** A per-test database directory, or null if not created. */
     private String directory;
 
+    /** The store to test. */
+    private DataStore store;
+
     /** Creates the test. */
     public TestPerformance(String name) {
 	super(name);
@@ -118,6 +122,15 @@ public class TestPerformance extends TestCase {
      * created, and reinitializes logging.
      */
     protected void tearDown() throws Exception {
+	try {
+	    store.shutdown();
+	} catch (RuntimeException e) {
+	    if (passed) {
+		throw e;
+	    } else {
+		e.printStackTrace();
+	    }
+	}
 	if (passed && directory != null) {
 	    deleteDirectory(directory);
 	}
@@ -134,7 +147,7 @@ public class TestPerformance extends TestCase {
 	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
 	byte[] data = new byte[itemSize];
 	data[0] = 1;
-	DataStoreImpl store = new DataStoreImpl(props);
+	store = new DataStoreImpl(props);
 	DummyTransaction txn = new DummyTransaction();
 	long[] ids = new long[items];
 	for (int i = 0; i < items; i++) {
@@ -179,7 +192,7 @@ public class TestPerformance extends TestCase {
 	    DataStoreImplClass + ".flushToDisk", String.valueOf(flush));
 	byte[] data = new byte[itemSize];
 	data[0] = 1;
-	DataStoreImpl store = new DataStoreImpl(props);
+	store = new DataStoreImpl(props);
 	DummyTransaction txn = new DummyTransaction();
 	long[] ids = new long[items];
 	for (int i = 0; i < items; i++) {
@@ -211,7 +224,7 @@ public class TestPerformance extends TestCase {
 	Properties props = createProperties(
 	    DataStoreImplClass + ".directory", createDirectory(),
 	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
-	DataStoreImpl store = new DataStoreImpl(props);
+	store = new DataStoreImpl(props);
 	DummyTransaction txn = new DummyTransaction();
 	for (int i = 0; i < items; i++) {
 	    store.setBinding(txn, "name" + i, i);
@@ -236,7 +249,7 @@ public class TestPerformance extends TestCase {
 	Properties props = createProperties(
 	    DataStoreImplClass + ".directory", createDirectory(),
 	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
-	DataStoreImpl store = new DataStoreImpl(props);
+	store = new DataStoreImpl(props);
 	DummyTransaction txn = new DummyTransaction();
 	for (int i = 0; i < items; i++) {
 	    store.setBinding(txn, "name" + i, i);

@@ -158,4 +158,15 @@ public interface DataStore {
      *		problem with the current transaction
      */
     String nextBoundName(Transaction txn, String name);
+
+    /** 
+     * Attempts to shut down this data store, returning a value that specifies
+     * whether the attempt was successful. <p>
+     *
+     * @return	<code>true</code> if the shut down was successful, else
+     *		<code>false</code>
+     * @throws	IllegalStateException if the <code>shutdown</code> method has
+     *		already been called and returned <code>true</code>
+     */
+    boolean shutdown();
 }
