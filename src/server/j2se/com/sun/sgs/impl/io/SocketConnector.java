@@ -5,6 +5,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.apache.mina.common.IoConnector;
+import org.apache.mina.common.IoHandlerAdapter;
 import org.apache.mina.common.IoSession;
 
 import com.sun.sgs.impl.util.LoggerWrapper;
@@ -95,7 +96,7 @@ public class SocketConnector implements IOConnector
         connectionHandler.cancel();
     }
     
-    static class ConnectionHandler extends SocketHandler {
+    static final class ConnectionHandler extends IoHandlerAdapter {
         private final IOHandler handler;
         private final IOFilter filter;
         private boolean cancelled = false;

@@ -8,11 +8,13 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.apache.mina.common.IoAcceptor;
+import org.apache.mina.common.IoSession;
 
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.io.AcceptedHandleListener;
 import com.sun.sgs.io.IOAcceptor;
 import com.sun.sgs.io.IOFilter;
+import com.sun.sgs.io.IOHandler;
 
 /**
  * This is an implementation of an {@code IOAcceptor} that uses a Mina 
@@ -49,12 +51,12 @@ public class SocketAcceptor implements IOAcceptor {
                     Class<? extends IOFilter> filterClass) throws IOException
     {
         checkShutdown();
-        AcceptedHandleAdapter adapter =
-            new AcceptedHandleAdapter(listener,
+        AcceptHandler acceptHandler =
+            new AcceptHandler(listener,
                     (filterClass == null)
                     ? PassthroughFilter.class
                     : filterClass);
-        acceptor.bind(address, adapter);
+        acceptor.bind(address, acceptHandler);
         logger.log(Level.FINE, "listening on {0}", address);
     }
 
@@ -97,7 +99,7 @@ public class SocketAcceptor implements IOAcceptor {
      * {@inheritDoc}
      */
     public void shutdown() {
-        // TODO currently allow multiple calls to shutdown; shouuld we
+        // TODO currently allow multiple calls to shutdown; should we
         // only allow one? -JM
         shutdown = true;
         acceptor.unbindAll();
@@ -113,5 +115,44 @@ public class SocketAcceptor implements IOAcceptor {
         if (shutdown) {
             throw new IllegalStateException("Acceptor has been shutdown");
         }
+    }
+    
+    static final class AcceptHandler extends SocketHandler {
+        
+        private final AcceptedHandleListener listener;
+        private final Class<? extends IOFilter> filterClass;
+        
+        /**
+         * Constructs a new {@code AcceptHandler} with an 
+         * {@code AcceptedHandleListener} that will be notified as new 
+         * connections arrive.
+         * 
+         * @param listener          the listener to be notified of incoming 
+         *                          connections.
+         * @param filterClass       the type of filter to be attached to new handles
+         */
+        public AcceptHandler(AcceptedHandleListener listener, 
+                Class<? extends IOFilter> filterClass)
+        {    
+            this.listener = listener; 
+            this.filterClass = filterClass;
+        }
+        
+        // Override this Mina IoHandler callback 
+
+        /**
+         * As new {@code IoSession}s come in, set up a {@code SocketHandle} and 
+         * notify the associated {@code AcceptedHandleListener}.  A new instance
+         * of the associated filter will be attached to the new handle.
+         */
+        public void sessionCreated(IoSession session) throws Exception {
+            logger.log(Level.FINE, "accepted session {0}", session);
+            IOFilter filter = filterClass.newInstance();
+            SocketHandle handle = new SocketHandle(filter, session);
+            IOHandler handler = listener.newHandle(handle);
+            handle.setIOHandler(handler);
+        }
+
+        
     }
 }
