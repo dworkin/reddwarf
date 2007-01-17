@@ -5,14 +5,14 @@ package com.sun.sgs.io;
  * as they are received.
  * <p>
  * A filter's {@code filterSend} method is called after a client has requested
- * data be sent on the given {@code IOHandle}.  The filter is free to modify 
- * the data in any way, and sent it out on the {@code IOHandle} as a whole,
+ * data be sent on the given {@link IOHandle}.  The filter is free to modify 
+ * the data in any way, and sent it out on the {@link IOHandle} as a whole,
  * in pieces, or not at all. 
  * <p>
  * A filter's {@code filterReceived} is called as messages are received by the
- * framework on the given {@code IOHandle}, but before the client's 
- * {@code IOHandler} is notified.  The filter is free to modify the data in any
- * way, and call the handle's associated {@code IOHandler.messageReceived} 
+ * framework on the given {@link IOHandle}, but before the client's 
+ * {@link IOHandler} is notified.  The filter is free to modify the data in any
+ * way, and call the handle's associated {@link IOHandler#bytesReceived} 
  * callback once, several times, or not at all.
  * <p>
  * Potential uses for {@code IOFilter}s are:
@@ -24,58 +24,30 @@ package com.sun.sgs.io;
  * <li>Acting as a chain of filters for all of the above</li>
  * </ul> 
  */
-public abstract class IOFilter {
-    
-    /** The offset of the array that is currently being processed */
-    protected int index;
-    
+public interface IOFilter {
 
     /**
-     * Called after a client has requested data be sent on the given 
-     * {@code IOHandle}.  The filter is free to modify the data in any way, 
-     * and sent it out on the {@code IOHandle} as a whole,in pieces, or not 
-     * at all. 
+     * Called after a client has requested data be sent on the given
+     * {@link IOHandle}. The filter is free to modify the data in any way,
+     * and sent it out on the {@link IOHandle} as a whole,in pieces, or not
+     * at all.
      * 
-     * @param handle            the handle on which to send the data
-     * @param message           the data to filter, and send
+     * @param handle the handle on which to send the data
+     * @param message the data to filter, and send
      */
-    public abstract void filterSend(IOHandle handle, byte[] message);
-    
-    
-    /**
-     * Called as messages are received by the framework on the given 
-     * {@code IOHandle}, but before the client's {@code IOHandler} is notified.  
-     * The filter is free to modify the data in any way, and call the handle's 
-     * associated {@code IOHandler.messageReceived} callback once, several 
-     * times, or not at all.
-     * 
-     * @param handle            the handle on which the data was received
-     * @param message           the data to filter and forward on to the 
-     *                          associated call back
-     */
-    public abstract void filterReceive(IOHandle handle, byte[] message);
+    void filterSend(IOHandle handle, byte[] message);
     
     /**
-     * Reads the next four bytes of the given array starting at the current index
-     * and assembles them into a network byte-ordered int.  It will increment
-     * the index by four if the read was successful.  It will return zero if not
-     * enough bytes remain in the array.
+     * Called as messages are received by the framework on the given
+     * {@link IOHandle}, but before the client's {@link IOHandler} is
+     * notified. The filter is free to modify the data in any way, and call
+     * the handle's associated {@link IOHandler#bytesReceived} callback
+     * once, several times, or not at all.
      * 
-     * @param array             the array from which to read bytes
-     * 
-     * @return the next four bytes as an int, or zero if there aren't enough
-     *         bytes remaining in the array
+     * @param handle the handle on which the data was received
+     * @param message the data to filter and forward on to the associated
+     *        callback
      */
-    protected int readInt(byte[] array) {
-        if (array.length < (index + 4)) {
-            return 0;
-        }
-        int num = ((array[index] & 0xFF) << 24) | ((array[index + 1] & 0xFF) << 16) |
-                ((array[index + 2] & 0xFF) << 8) | (array[index + 3] & 0xFF);
-        
-        index += 4;
-        
-        return num;
-    }
+    void filterReceive(IOHandle handle, byte[] message);
 
 }

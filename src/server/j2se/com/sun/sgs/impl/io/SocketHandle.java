@@ -24,22 +24,37 @@ public class SocketHandle implements IOHandle {
     private static final LoggerWrapper logger =
         new LoggerWrapper(Logger.getLogger(SocketHandle.class.getName()));
 
+    /** The {@link IOHandler} for this {@code IOHandle}. */
+    private final IOHandler handler;
+
+    /** The {@link IOFilter} for this {@code IOHandle}. */
     private final IOFilter filter;
+
+    /** The {@link IoSession} for this {@code IOHandle}. */
     private final IoSession session;
 
-    private IOHandler handler;
-    
-    SocketHandle(IOFilter filter, IoSession session) {
+    /**
+     * Construct a new SocketHandle with the given handle, filter,
+     * and session.
+     * 
+     * @param handler the {@link IOHandler} for the {@code IOHandle}
+     * @param filter the {@link IOFilter} for the {@code IOHandle}
+     * @param session the {@link IoSession} for the {@code IOHandle}
+     */
+    SocketHandle(IOHandler handler, IOFilter filter, IoSession session) {
+        this.handler = handler;
         this.filter = filter;
         this.session = session;
-        session.setAttachment(this);
     }
     
     /**
-     * Sends the given byte message out on the underlying {@code IoSession}.
-     * It prepends the length of the given byte array as an int, in network
-     * byte-order, and sends it out on the underlying {@code IoSession}. 
+     * {@inheritDoc}
+     * <p>
+     * This implementation prepends the length of the given byte array as
+     * a 4-byte {@code int} in network byte-order, and sends it out on
+     * the underlying MINA {@code IoSession}. 
      * 
+     * @param message the data to send
      * @throws IOException if the session is not connected.
      */
     public void sendBytes(byte[] message) throws IOException {
@@ -58,7 +73,9 @@ public class SocketHandle implements IOHandle {
     }
 
     /**
-     * Closes the underlying {@code IoSession}.
+     * {@inheritDoc}
+     * <p>
+     * This implementation closes the underlying {@code IoSession}.
      *  
      * @throws IOException if the session is not connected. 
      */
@@ -71,17 +88,6 @@ public class SocketHandle implements IOHandle {
     }
     
     // specific to SocketHandle
-    
-    /**
-     * Sets the {@code IOHandler} for this handle.
-     * 
-     * @param handler           the handler to receive callbacks for this handle
-     */
-    void setIOHandler(IOHandler handler) {
-        if (this.handler != null)
-            throw new IllegalStateException("Already have a handler");
-        this.handler = handler;
-    }
     
     /**
      * Returns the {@code IOHandler} for this handle. 
@@ -102,9 +108,9 @@ public class SocketHandle implements IOHandle {
     }
     
     /**
-     * Sends this message wrapped in a Mina buffer.
+     * Sends this message wrapped in a MINA buffer.
      * 
-     * @param message           the byte message to send 
+     * @param message the byte message to send
      */
     void doSend(byte[] message) {
         ByteBuffer minaBuffer = ByteBuffer.allocate(message.length);
@@ -115,9 +121,9 @@ public class SocketHandle implements IOHandle {
     }
     
     /**
-     * Sends the given Mina buffer out on the associated {@code IoSession}.
+     * Sends the given MINA buffer out on the associated {@code IoSession}.
      * 
-     * @param messageBuffer
+     * @param messageBuffer the {@code MINA ByteBuffer} to send
      */
     private void doSend(ByteBuffer messageBuffer) {
         logger.log(Level.FINEST, "message = {0}", messageBuffer);

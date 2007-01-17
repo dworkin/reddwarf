@@ -4,11 +4,13 @@ import java.net.SocketAddress;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.apache.mina.common.ByteBuffer;
 import org.apache.mina.common.IoConnector;
 import org.apache.mina.common.IoHandlerAdapter;
 import org.apache.mina.common.IoSession;
 
 import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.io.Endpoint;
 import com.sun.sgs.io.IOFilter;
 import com.sun.sgs.io.IOHandler;
 import com.sun.sgs.io.IOConnector;
@@ -17,17 +19,15 @@ import com.sun.sgs.io.IOConnector;
  * This is a socket-based implementation of an {@code IOConnector} using
  * the Apache Mina framework for the underlying transport.  It uses an
  * {@link org.apache.mina.common.IoConnector} to initiate connections on 
- * remote hosts.  
+ * remote hosts.
  * <p>
- * Its constructor is "package-private", so use one of the 
- * {@code ConnectorFactory.createConnector} methods and specify a 
- * {@code TransportType} to create a new instance. This implementation is 
- * thread-safe.
+ * Its constructor is package-private, so use {@link Endpoint#createConnector}
+ * to create an instance. This implementation is thread-safe.
  * 
- * @author Sten Anderson
- * @since 1.0
+ * @author  Sten Anderson
+ * @since   1.0
  */
-public class SocketConnector implements IOConnector
+public class SocketConnector implements IOConnector<SocketAddress>
 {
     private static final LoggerWrapper logger =
         new LoggerWrapper(Logger.getLogger(SocketConnector.class.getName()));
@@ -35,20 +35,21 @@ public class SocketConnector implements IOConnector
     private final IoConnector connector;
     private ConnectionHandler connectionHandler = null;
 
-    private final SocketAddress address;
+    private final SocketEndpoint endpoint;
     /**
-     * Constructs a {@code SocketConnector} using the given {@code IoConnector}
-     * for the underlying transport.  This constructor is only visible to the
-     * package, so use one of the {@code ConnectorFactory.createConnector} 
-     * methods to create a new instance.
+     * Constructs a {@code SocketConnector} using the given
+     * {@code IoConnector} for the underlying transport. This constructor is
+     * only visible to the package, so use one of the
+     * {@code ConnectorFactory.createConnector} methods to create a new
+     * instance.
      * 
-     * @param address           the remote address to which to connect
-     * @param connector         the Mina IoConnector to use for establishing
-     *                          the connection
+     * @param endpoint the remote address to which to connect
+     * @param connector the Mina IoConnector to use for establishing the
+     *        connection
      */
-    SocketConnector(SocketAddress address, IoConnector connector) {
+    SocketConnector(SocketEndpoint endpoint, IoConnector connector) {
         this.connector = connector;
-        this.address = address;
+        this.endpoint = endpoint;
     }
     
     /**
@@ -75,8 +76,8 @@ public class SocketConnector implements IOConnector
             }
             connectionHandler = new ConnectionHandler(handler, filter);
         }
-        logger.log(Level.FINE, "connecting to {0}", address);
-        connector.connect(address, connectionHandler);
+        logger.log(Level.FINE, "connecting to {0}", endpoint);
+        connector.connect(endpoint.getAddress(), connectionHandler);
     }
     
 
@@ -95,18 +96,44 @@ public class SocketConnector implements IOConnector
         }
         connectionHandler.cancel();
     }
-    
-    static final class ConnectionHandler extends IoHandlerAdapter {
+
+    /**
+     * Internal adaptor class to handle events from the connector itself.
+     * 
+     * @author James Megquier
+     */
+    static final class ConnectionHandler extends SocketHandler {
+        /** The requested IOHandler for the connected session. */
         private final IOHandler handler;
+        
+        /** The IOFilter instance to attach to the new connection. */
         private final IOFilter filter;
+        
+        /** Whether this connector has been cancelled. */
         private boolean cancelled = false;
+        
+        /** Whether this connector has finished connecting. */
         private boolean connected = false;
 
+        /**
+         * Constructs a new {@code ConnectionHandler} with an
+         * {@code IOHandler} that will handle events for the new connectin.
+         * 
+         * @param handler the handler for the completed connection
+         * @param filter the IOFilter to attach to the connection
+         */
         ConnectionHandler(IOHandler handler, IOFilter filter) {
             this.handler = handler;
             this.filter = filter;
         }
         
+        /**
+         * If a connection is in progress, but not yet connected,
+         * cancel the pending connection.
+         * 
+         * @throw IllegalStateException if this connection attempt has
+         *        already completed or been cancelled.
+         */
         void cancel() {
             synchronized (this) {
                 if (connected) {
@@ -125,6 +152,12 @@ public class SocketConnector implements IOConnector
             }
         }
 
+        /**
+         * The connection is starting; set the IOHandler for it.
+         * 
+         * @param session the newly created {@code IoSession}
+         */
+        @Override
         public void sessionCreated(IoSession session) throws Exception {
             synchronized (this) {
                 if (cancelled) {
@@ -138,9 +171,16 @@ public class SocketConnector implements IOConnector
             }
             
             logger.log(Level.FINE, "created session {0}", session);
-            SocketHandle handle = new SocketHandle(filter, session);
-            handle.setIOHandler(handler);
+            SocketHandle handle = new SocketHandle(handler, filter, session);
+            session.setAttachment(handle);
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public SocketEndpoint getEndpoint() {
+        return endpoint;
     }
 
 }

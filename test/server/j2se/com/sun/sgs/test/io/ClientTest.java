@@ -7,10 +7,12 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 
 import com.sun.sgs.impl.io.CompleteMessageFilter;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.IOConstants.TransportType;
+import com.sun.sgs.io.Endpoint;
 import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
 import com.sun.sgs.io.IOConnector;
@@ -18,7 +20,6 @@ import com.sun.sgs.io.IOConnector;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-import java.util.concurrent.Executors;
 
 import javax.swing.JButton;
 import javax.swing.JFrame;
@@ -37,14 +38,14 @@ import javax.swing.table.AbstractTableModel;
 public class ClientTest extends JFrame {
     private static final long serialVersionUID = 1L;
 
-    private static final String DEFAULT_HOST = "127.0.0.1";
+    private static final String DEFAULT_HOST = "";
     private static final String DEFAULT_PORT = "5150";
     
     private SocketTableModel model;
-    private int numSockets = 20;
-    private int numDisconnects = 0;
-    boolean done = false;
-    boolean shouldClose = false;
+    private volatile int numSockets = 20;
+    private volatile int numDisconnects = 0;
+    volatile boolean done = false;
+    volatile boolean shouldClose = false;
     Random random;
     
     public ClientTest() {
@@ -94,6 +95,9 @@ public class ClientTest extends JFrame {
     void shutdown() {
         done = true;
         model.shutdown();
+        if (shouldClose) {
+            dispose();
+        }
     }
     
     public void dataChanged() {
@@ -106,10 +110,9 @@ public class ClientTest extends JFrame {
         String portString = System.getProperty("port", DEFAULT_PORT);
         int port = Integer.valueOf(portString);
         InetSocketAddress addr = new InetSocketAddress(host, port);
-        IOConnector connector =
-            new SocketEndpoint(addr, TransportType.RELIABLE,
-                    Executors.newCachedThreadPool()).createConnector();
-        model.connect(connector);
+        SocketEndpoint endpoint =
+            new SocketEndpoint(addr, TransportType.RELIABLE);
+        model.connect(endpoint);
     }
     
     public void stop() {
@@ -123,7 +126,7 @@ public class ClientTest extends JFrame {
     private class SocketTableModel extends AbstractTableModel {
         private static final long serialVersionUID = 1L;
         
-	private List<SocketInfo> list; 
+	private List<EndpointInfo> list; 
         private List<String> columnHeaders;
         
         SocketTableModel() {
@@ -135,27 +138,29 @@ public class ClientTest extends JFrame {
             columnHeaders.add("Bytes In");
             columnHeaders.add("Bytes Out");
             
-            list = new ArrayList<SocketInfo>();
+            list = new ArrayList<EndpointInfo>();
             for (int i = 0; i < numSockets; i++) {
-                list.add(new SocketInfo(i));
+                list.add(new EndpointInfo(i));
             }
         }
         
-        public void connect(IOConnector connector) {
-            for (SocketInfo info : list) {
-                info.connect(connector);
+        public void connect(Endpoint<?> endpoint) {
+            for (EndpointInfo info : list) {
+                info.connect(endpoint);
             }
         }
         
         public void disconnect() {
-            for (SocketInfo info : list) {
+            for (EndpointInfo info : list) {
                 info.close();
             }
         }
         
         public void shutdown() {
-            for (SocketInfo info : list) {
-                info.close();
+            for (EndpointInfo info : list) {
+                if (info.connected) {
+                    info.close();
+                }
             }
         }
         
@@ -173,7 +178,7 @@ public class ClientTest extends JFrame {
         
         public Object getValueAt(int row, int col) {
             String curCol = columnHeaders.get(col);
-            SocketInfo info = list.get(row);
+            EndpointInfo info = list.get(row);
             if (curCol.equals("ID")) {
                 return info.getID();
             }
@@ -197,7 +202,7 @@ public class ClientTest extends JFrame {
         }
     }
     
-    private class SocketInfo implements IOHandler {
+    private class EndpointInfo implements IOHandler {
         
         private IOHandle handle;
         private String status;
@@ -208,7 +213,7 @@ public class ClientTest extends JFrame {
         private int id;
         private boolean connected = false;
         
-        SocketInfo(int id) {
+        EndpointInfo(int id) {
             this.id = id;
             status = "Not Connected";
         }
@@ -243,8 +248,8 @@ public class ClientTest extends JFrame {
             
         }
         
-        public void connect(IOConnector connector) {
-            connector.connect(this, new CompleteMessageFilter());
+        public void connect(Endpoint<?> endpoint) {
+            endpoint.createConnector().connect(this, new CompleteMessageFilter());
         }
         
         public String getStatus() {
@@ -265,9 +270,6 @@ public class ClientTest extends JFrame {
         public void disconnected(IOHandle h) {
             connected = false;
             numDisconnects++;
-            if (shouldClose && numDisconnects >= numSockets) {
-                System.exit(0);
-            }
             status = "Disconnected";
             dataChanged();
         }

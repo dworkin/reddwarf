@@ -91,7 +91,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     /** Properties for the session service. */
     private static Properties serviceProps = createProperties(
 	"com.sun.sgs.appName", "TestClientSessionServiceImpl",
-	"com.sun.sgs.app.port", Integer.toString(PORT));
+	"com.sun.sgs.port", Integer.toString(PORT));
 
     /** Properties for creating the shared database. */
     private static Properties dbProps = createProperties(
@@ -524,7 +524,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	private final static int WAIT_TIME = 1000;
 	private String name;
 	private String password;
-	private IOConnector connector;
+	private IOConnector<SocketAddress> connector;
 	private IOHandler listener;
 	private IOHandle handle;
 	private boolean connected = false;

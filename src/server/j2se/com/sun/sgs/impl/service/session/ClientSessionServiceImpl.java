@@ -2,12 +2,13 @@ package com.sun.sgs.impl.service.session;
 
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.auth.IdentityManager;
-import com.sun.sgs.impl.io.AcceptorFactory;
 import com.sun.sgs.impl.io.CompleteMessageFilter;
+import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.IOConstants.TransportType;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.NonDurableTaskScheduler;
-import com.sun.sgs.io.AcceptedHandleListener;
+import com.sun.sgs.io.IOAcceptorListener;
+import com.sun.sgs.io.Endpoint;
 import com.sun.sgs.io.IOAcceptor;
 import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
@@ -63,7 +64,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     private final int port;
 
     /** The listener for accpeted connections. */
-    private final AcceptedHandleListener listener = new Listener();
+    private final IOAcceptorListener listener = new Listener();
 
     /** The registered service listeners. */
     private final Map<Byte, ServiceListener> serviceListeners =
@@ -79,7 +80,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     private ComponentRegistry registry;
     
     /** The IOAcceptor for listening for new connections. */
-    private IOAcceptor acceptor;
+    private IOAcceptor<SocketAddress> acceptor;
 
     /** Synchronize on this object before accessing the registry. */
     private final Object lock = new Object();
@@ -190,17 +191,17 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 		    new NonDurableTaskScheduler(
                             taskScheduler, proxy.getCurrentOwner(),
                             registry.getComponent(TaskService.class));
-		acceptor =
-		    AcceptorFactory.createAcceptor(TransportType.RELIABLE);
-		SocketAddress address = new InetSocketAddress(port);
+                Endpoint<SocketAddress> acceptorEndpoint =
+                    new SocketEndpoint(new InetSocketAddress(port),
+                            TransportType.RELIABLE);
+                acceptor = acceptorEndpoint.createAcceptor();
 		try {
-		    acceptor.listen(
-			address, listener, CompleteMessageFilter.class);
+		    acceptor.listen(listener, CompleteMessageFilter.class);
 		    if (logger.isLoggable(Level.CONFIG)) {
 			logger.log(
 			    Level.CONFIG,
-			    "configure: listen successful. port:{0}",
-			    port);
+			    "configure: listening on {0}",
+                            acceptor.getEndpoint().getAddress());
 		    }
 		} catch (IOException e) {
 		    throw new RuntimeException(e);
@@ -280,9 +281,9 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	return sessions.get(new SessionId(sessionId));
     }
 
-    /* -- Implement AcceptedHandleListener -- */
+    /* -- Implement IOAcceptorListener -- */
 
-    class Listener implements AcceptedHandleListener {
+    class Listener implements IOAcceptorListener {
 
 	/**
 	 * {@inheritDoc}
@@ -290,15 +291,23 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	 * <p>Creates a new client session with the specified handle,
 	 * and adds the session to the internal session map.
 	 */
-	public IOHandler newHandle(IOHandle handle) {
+	public IOHandler newHandle() {
 	    if (shuttingDown()) {
 		return null;
 	    }
 	    ClientSessionImpl session =
-		new ClientSessionImpl(ClientSessionServiceImpl.this, handle);
+		new ClientSessionImpl(ClientSessionServiceImpl.this);
 	    sessions.put(new SessionId(session.getSessionId()), session);
 	    return session.getHandler();
 	}
+
+        /**
+         * {@inheritDoc}
+         */
+	public void disconnected() {
+            // TODO Auto-generated method stub
+        }
+        
     }
 
     /* -- Implement wrapper for session ids. -- */

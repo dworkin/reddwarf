@@ -2,14 +2,15 @@ package com.sun.sgs.test.client.simple;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 
 import com.sun.sgs.client.SessionId;
 import com.sun.sgs.client.simple.ProtocolMessageDecoder;
 import com.sun.sgs.client.simple.ProtocolMessageEncoder;
 
-import com.sun.sgs.impl.io.AcceptorFactory;
+import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.IOConstants.TransportType;
-import com.sun.sgs.io.AcceptedHandleListener;
+import com.sun.sgs.io.IOAcceptorListener;
 import com.sun.sgs.io.IOAcceptor;
 import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
@@ -24,9 +25,9 @@ import static com.sun.sgs.client.simple.ProtocolMessage.*;
  * @author      Sten Anderson
  * @version     1.0
  */
-public class SimpleServer implements AcceptedHandleListener, IOHandler {
+public class SimpleServer implements IOHandler {
     
-    private IOAcceptor acceptor;
+    private IOAcceptor<SocketAddress> acceptor;
     private int port = 10002;
     private long sequenceNumber;
     
@@ -34,15 +35,31 @@ public class SimpleServer implements AcceptedHandleListener, IOHandler {
     private SessionId serverID;
     
     public SimpleServer() {
-        acceptor = AcceptorFactory.createAcceptor(TransportType.RELIABLE);
+        acceptor = new SocketEndpoint(
+                new InetSocketAddress(port),
+               TransportType.RELIABLE).createAcceptor();
         serverID = SessionId.fromBytes(new byte[10]);
     }
     
     private void start() {
         System.out.println("Listening on port " + port);
         try {
-            acceptor.listen(new InetSocketAddress("127.0.0.1", port), 
-                    SimpleServer.this);
+            acceptor.listen(new IOAcceptorListener() {
+                /**
+                 * {@inheritDoc}
+                 */
+                public IOHandler newHandle() {
+                    System.out.println("Server: New Connection");
+                    return SimpleServer.this;
+                }
+
+                /**
+                 * {@inheritDoc}
+                 */
+                public void disconnected() {
+                    // TODO Auto-generated method stub
+                }
+            });
         }
         catch (IOException ioe) {
             ioe.printStackTrace();
@@ -52,12 +69,6 @@ public class SimpleServer implements AcceptedHandleListener, IOHandler {
     
     public final static void main(String[] arg) {
         new SimpleServer().start();
-    }
-
-    public IOHandler newHandle(IOHandle handle) {
-        System.out.println("Server: New Connection");
-
-        return this;
     }
     
     public void connected(IOHandle handle) {
@@ -203,5 +214,4 @@ public class SimpleServer implements AcceptedHandleListener, IOHandler {
             ioe.printStackTrace();
         }
     }
-
 }

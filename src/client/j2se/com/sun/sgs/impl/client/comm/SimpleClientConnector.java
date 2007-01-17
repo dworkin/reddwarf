@@ -22,7 +22,7 @@ import com.sun.sgs.io.IOConnector;
  */
 public class SimpleClientConnector extends ClientConnector {
     
-    private final IOConnector connector;
+    private final IOConnector<SocketAddress> connector;
     
     SimpleClientConnector(Properties properties) {
         String transport = properties.getProperty("transport");

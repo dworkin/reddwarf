@@ -20,21 +20,25 @@ public abstract class ClientConnector {
     }
 
     /**
-     * Initiates a non-blocking connect to this ClientConnector's target remote address.
-     * TODO: more doc
-     *
-     * @param connectorListener The listener that will receive completion events for this Connector
-     *
-     * @return a ConnectionHandle that can be used to cancel this connection attempt.
+     * Initiates a non-blocking connect to this ClientConnector's target
+     * remote address. TODO: more doc
      * 
-     * @throws AlreadyConnectedException if this connector is already connected
-     * @throws ConnectionPendingException if a non-blocking connection operation is already in progress on this connector
+     * @param connectionListener The listener that will receive completion
+     *        events for this Connector
+     * 
+     * @throws AlreadyConnectedException if this connector is already
+     *         connected
+     * @throws ConnectionPendingException if a non-blocking connection
+     *         operation is already in progress on this connector
      * @throws ClosedChannelException if this connector is closed
-     * @throws UnsupportedAddressTypeException if the type of the given remote address is not supported
-     * @throws SecurityException if a security manager has been installed and it does not permit access to the given remote endpoint
+     * @throws UnsupportedAddressTypeException if the type of the given
+     *         remote address is not supported
+     * @throws SecurityException if a security manager has been installed
+     *         and it does not permit access to the given remote endpoint
      * @throws IOException if some other I/O error occurs
      */
-    public abstract void connect(ClientConnectionListener connectionListener) throws IOException;
+    public abstract void connect(ClientConnectionListener connectionListener)
+            throws IOException;
 
     /**
      * Cancels a pending connect operation on this ClientConnection.

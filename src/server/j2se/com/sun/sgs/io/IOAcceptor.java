@@ -1,73 +1,56 @@
 package com.sun.sgs.io;
 
 import java.io.IOException;
-import java.net.SocketAddress;
-import java.util.Set;
 
 /**
- * <code>IOAcceptor</code>s bind to addresses and listen for incoming connections.
- * Clients should call shutdown() when finished with them.
+ * {@code IOAcceptor}s bind to addresses and listen for incoming
+ * connections. Clients should call {@link #shutdown} when finished with
+ * them.
  * 
- * @author      Sten Anderson
- * @since       1.0
+ * @author Sten Anderson
+ * @since 1.0
  */
-public interface IOAcceptor {
-    
+public interface IOAcceptor<T> {
+
     /**
-     * Accepts incoming connections on the given address.  
-     * {@code AcceptedHandleListener.newHandle} is called as new 
-     * {@code IOHandle}s connect.  A new instance of the given filter class
-     * will be attached to each incoming {@code IOHandle}.
+     * Accepts incoming connections on the address it is configured with.
+     * {@link IOAcceptorListener#newHandle} is called as new
+     * {@link IOHandle}s connect. A new instance of the given filter class
+     * will be attached to each incoming {@link IOHandle}.
      * 
-     * @param address                   the address on which to listen
-     * @param listener                  the listener that will be notified
-     *                                  of new connections
-     * @param filterClass               the type of filter to attach to incoming
-     *                                  {@code IOHandle}s
+     * @param listener the listener that will be notified of new connections
+     * @param filterClass the type of filter to attach to incoming
+     *        {@link IOHandle}s
      * 
      * @throws IOException if there was a problem binding to the port
      * @throws IllegalStateException if the IOAcceptor has been shutdown
      */
-    public void listen(SocketAddress address, AcceptedHandleListener listener, 
-                    Class<? extends IOFilter> filterClass) throws IOException;
-    
+    void listen(IOAcceptorListener listener,
+            Class<? extends IOFilter> filterClass) throws IOException;
+
     /**
-     * Accepts incoming connections on the given address.  
-     * {@code AcceptedHandleListener.newHandle} is called as new 
-     * {@code IOHandle}s connect.
+     * Accepts incoming connections on the address it is configured with.
+     * {@link IOAcceptorListener#newHandle} is called as new
+     * {@link IOHandle}s connect.
      * 
-     * @param address                   the address on which to listen
-     * @param listener                  the listener that will be notified
-     *                                  of new connections
+     * @param listener the listener that will be notified of new connections
      * 
      * @throws IOException if there was a problem binding to the port
      * @throws IllegalStateException if the IOAcceptor has been shutdown
      */
-    public void listen(SocketAddress address, AcceptedHandleListener listener)
-                                                        throws IOException;
-                                                       
-    
+    void listen(IOAcceptorListener listener) throws IOException;
+
     /**
-     * Stops listening for incoming connections on the given address.
-     * If the acceptor was not listening on the given address, this
-     * method has no effect.
+     * Returns the {@link Endpoint} on which this IOAcceptor is listening.
      * 
-     * @param address           the address on which to stop listening
+     * @return the {@link Endpoint} on which this IOAcceptor is listening.
      */
-    public void unbind(SocketAddress address);
-    
+    Endpoint<T> getEndpoint();
+
     /**
-     * Returns a {@code Set} of ports on which this acceptor
-     * is listening. 
-     * 
-     * @return a {@code Set} of listening ports
-     */
-    public Set<SocketAddress> listAddresses();
-    
-    /**
-     * Shuts down this <code>IOAcceptor</code>.  Shutdown is custom to each
+     * Shuts down this {@code IOAcceptor}. Shutdown is custom to each
      * implementation, but generally this consists of unbinding to any
-     * listening ports.  Once shutdown, it cannot be restarted.
+     * listening ports. Once shutdown, it cannot be restarted.
      */
-    public void shutdown();
+    void shutdown();
 }

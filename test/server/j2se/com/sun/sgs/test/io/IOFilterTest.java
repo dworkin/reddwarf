@@ -11,11 +11,10 @@ import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import com.sun.sgs.impl.io.AcceptorFactory;
 import com.sun.sgs.impl.io.CompleteMessageFilter;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.IOConstants.TransportType;
-import com.sun.sgs.io.AcceptedHandleListener;
+import com.sun.sgs.io.IOAcceptorListener;
 import com.sun.sgs.io.IOAcceptor;
 import com.sun.sgs.io.IOConnector;
 import com.sun.sgs.io.IOHandle;
@@ -34,7 +33,7 @@ public class IOFilterTest {
     private final SocketAddress ADDRESS = 
                                 new InetSocketAddress("localhost", BIND_PORT);
     
-    IOAcceptor acceptor;
+    IOAcceptor<SocketAddress> acceptor;
     private boolean connected = false;
     
     /**
@@ -45,12 +44,14 @@ public class IOFilterTest {
     @Before
     public void init() {
         connected = false;
-        acceptor = AcceptorFactory.createAcceptor(TransportType.RELIABLE);
+        acceptor = new SocketEndpoint(
+                new InetSocketAddress(BIND_PORT),
+               TransportType.RELIABLE).createAcceptor();
         
         try {
-            acceptor.listen(ADDRESS, new AcceptedHandleListener() {
+            acceptor.listen(new IOAcceptorListener() {
 
-                public IOHandler newHandle(IOHandle h) {
+                public IOHandler newHandle() {
                     return new IOHandlerAdapter() {
                         
                         @Override
@@ -62,6 +63,11 @@ public class IOFilterTest {
                             catch (IOException ioe) {}
                         }
                     };
+                }
+
+                public void disconnected() {
+                    // TODO Auto-generated method stub
+                    
                 }
                 
             }, CompleteMessageFilter.class);
@@ -85,7 +91,7 @@ public class IOFilterTest {
      */
     @Test
     public void bigMessage() {
-        IOConnector connector = 
+        IOConnector<SocketAddress> connector = 
                     new SocketEndpoint(ADDRESS, TransportType.RELIABLE, 
                             Executors.newCachedThreadPool()).createConnector();
         
@@ -142,7 +148,7 @@ public class IOFilterTest {
     public void hybridFilter() {
         bytesIn = 0;
         final int messageSize = 1000;
-        IOConnector connector = 
+        IOConnector<SocketAddress> connector = 
                     new SocketEndpoint(ADDRESS, TransportType.RELIABLE, 
                             Executors.newCachedThreadPool()).createConnector();
         

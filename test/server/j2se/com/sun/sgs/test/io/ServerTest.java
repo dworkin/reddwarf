@@ -2,15 +2,16 @@ package com.sun.sgs.test.io;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.concurrent.Executors;
+import java.net.SocketAddress;
 
-import com.sun.sgs.impl.io.AcceptorFactory;
 import com.sun.sgs.impl.io.CompleteMessageFilter;
+import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.IOConstants.TransportType;
-import com.sun.sgs.io.AcceptedHandleListener;
+import com.sun.sgs.io.IOAcceptorListener;
 import com.sun.sgs.io.IOAcceptor;
 import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
+import com.sun.sgs.test.client.simple.SimpleServer;
 
 /**
  * A test harness for the server {@code Acceptor} code.
@@ -18,55 +19,74 @@ import com.sun.sgs.io.IOHandler;
  * @author      Sten Anderson
  * @version     1.0
  */
-public class ServerTest implements AcceptedHandleListener, IOHandler {
+public class ServerTest implements IOHandler {
 
-    private static final String DEFAULT_HOST = "127.0.0.1";
+    private static final String DEFAULT_HOST = "0.0.0.0";
     private static final String DEFAULT_PORT = "5150";
     
-    IOAcceptor acceptor;
+    IOAcceptor<SocketAddress> acceptor;
     private int numConnections;
 
-    public ServerTest() {
-        acceptor = AcceptorFactory.createAcceptor(TransportType.RELIABLE, 
-                                            Executors.newCachedThreadPool());
-    }
+    public ServerTest() { }
 
     public void start() {
         String host = System.getProperty("host", DEFAULT_HOST);
         String portString = System.getProperty("port", DEFAULT_PORT);
         int port = Integer.valueOf(portString);
         InetSocketAddress addr = new InetSocketAddress(host, port);
-        System.out.println("Listening on port " + port);
         try {
-            acceptor.listen(addr, this, CompleteMessageFilter.class);
-        }
-        catch (IOException ioe) {
+            acceptor = new SocketEndpoint(
+                    new InetSocketAddress(host, port),
+                   TransportType.RELIABLE).createAcceptor();
+            acceptor.listen(new IOAcceptorListener() {
+                /**
+                 * {@inheritDoc}
+                 */
+                public IOHandler newHandle() {
+                    return ServerTest.this;
+                }
+
+                /**
+                 * {@inheritDoc}
+                 */
+                public void disconnected() {
+                    // TODO Auto-generated method stub
+                }
+            },
+            CompleteMessageFilter.class);
+        } catch (IOException ioe) {
             ioe.printStackTrace();
         }
+        System.out.println("Listening on " +
+                acceptor.getEndpoint().getAddress());
     }
 
     public final static void main(String[] args) {
-        new ServerTest().start();
-    }
-
-    public IOHandler newHandle(IOHandle handle) {
-        synchronized (this) {
-            numConnections++;
+        ServerTest server = new ServerTest();
+        synchronized(server) {
+            server.start();
+            try {
+                server.wait();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
-        return this;
     }
 
     public void connected(IOHandle handle) {
+        synchronized (this) {
+            numConnections++;
+        }
         System.out.println("ServerTest: connected");
     }
 
     public void disconnected(IOHandle handle) {
         synchronized (this) {
             numConnections--;
-        }
-        if (numConnections <= 0) {
-            acceptor.shutdown();
-            System.exit(0);
+            if (numConnections <= 0) {
+                acceptor.shutdown();
+            }
+            this.notifyAll();
         }
     }
 

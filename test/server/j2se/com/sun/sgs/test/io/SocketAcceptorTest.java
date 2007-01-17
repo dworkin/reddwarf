@@ -10,7 +10,7 @@ import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.notification.Failure;
 
-import com.sun.sgs.impl.io.AcceptorFactory;
+import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.IOConstants.TransportType;
 import com.sun.sgs.io.IOAcceptor;
 
@@ -20,19 +20,23 @@ import com.sun.sgs.io.IOAcceptor;
  */
 public class SocketAcceptorTest {
     
-    private final static int BIND_PORT = 5000;
+    private final static int BIND_PORT = 0;
     
-    IOAcceptor acceptor;
+    IOAcceptor<SocketAddress> acceptor;
     
     @Before
     public void init() {
-        acceptor = AcceptorFactory.createAcceptor(TransportType.RELIABLE);
+        acceptor = new SocketEndpoint(
+                new InetSocketAddress(BIND_PORT),
+               TransportType.RELIABLE).createAcceptor();
     }
     
     @After
     public void cleanup() {
-        acceptor.shutdown();
-        acceptor = null;
+        if (acceptor != null) {
+            acceptor.shutdown();
+            acceptor = null;
+        }
     }
     
     /**
@@ -41,29 +45,11 @@ public class SocketAcceptorTest {
     @Test
     public void listen() {
         try {
-            acceptor.listen(new InetSocketAddress("localhost", BIND_PORT), null);
+            acceptor.listen(null);
         }
         catch (IOException ioe) {
             ioe.printStackTrace();
         }
-    }
-
-    /**
-     * Test listening on mulitple ports.
-     */
-    @Test
-    public void listenMultiple() {
-        try {
-            for (int i = 0; i < 10; i++) {
-                acceptor.listen(new InetSocketAddress("localhost", 
-                                                    BIND_PORT + i), null);
-                                                        
-            }
-        }
-        catch (IOException ioe) {
-            ioe.printStackTrace();
-        }
-       
     }
     
     /**
@@ -72,11 +58,10 @@ public class SocketAcceptorTest {
      */
     @Test (expected=IllegalStateException.class)
     public void listenAfterShutdown() {
-        SocketAddress address = new InetSocketAddress("localhost", BIND_PORT); 
         try {
-            acceptor.listen(address, null);
+            acceptor.listen(null);
             acceptor.shutdown();
-            acceptor.listen(address, null);
+            acceptor.listen(null);
         }
         catch (IOException ioe) {
             ioe.printStackTrace();

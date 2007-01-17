@@ -4,13 +4,10 @@
  * backs them.
  * <p>
  * To use this framework, typically a client would obtain an
- * <code>IOConnector</code> implementation through a 
- * <code>ConnectorFactory</code>, or an <code>IOAcceptor</code> implementation 
- * through an <code>AcceptorFactory</code>.
+ * {@link com.sun.sgs.io.IOConnector} or {@link com.sun.sgs.io.IOAcceptor}
+ * implementation through an {@link com.sun.sgs.io.Endpoint}.
  * <p>
- * Note that <code>java.nio.ByteBuffer</code>s are used throughout.  At some 
- * point they may want to be replaced by a custom ByteBuffer implementation, 
- * and/or a pooled buffer solution.
- *
+ * Note that {@code byte} arrays are used throughout.  At some 
+ * point they may be replaced by a custom {@code ByteBuffer} implementation.
  */
 package com.sun.sgs.io;
