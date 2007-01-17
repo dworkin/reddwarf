@@ -40,8 +40,6 @@ import java.util.Properties;
 
 import java.util.concurrent.ConcurrentHashMap;
 
-import java.util.concurrent.atomic.AtomicLong;
-
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -51,15 +49,6 @@ import java.util.logging.Logger;
  * single node. It handles persisting tasks and keeping track of which tasks
  * have not yet run to completion, so that in the event of a system failure
  * the tasks can be run on re-start.
- * <p>
- * Note that the current implementation is fairly inefficient, in that it
- * uses a single managed map for all of the pending tasks. This means that
- * there is contention on the map object each time a task is given to the
- * service, and each time the scheduler runs a task submitted by the service.
- * The right way to handle this problem is to use an efficient, hierarchical
- * data structure, but we haven't written one of those yet. The assumption
- * is that we will produce one of these soon, and in the mean time accept
- * the performance limitations of this service.
  *
  * @since 1.0
  * @author Seth Proctor
@@ -83,8 +72,11 @@ public class TaskServiceImpl
      */
     public static final String DS_PREFIX = NAME + ".";
 
-    // the name of the single map for the pending tasks
-    private static final String DS_PENDING_TASKS = DS_PREFIX + "PendingTasks";
+    // the namespace where pending tasks are kept
+    // NOTE: in the multi-node case, this will have to have the node
+    // identifier, or some other unique value, appended when the service
+    // is constructed
+    private static final String DS_PENDING_SPACE = DS_PREFIX + "Pending.";
 
     // the internal value used to represent a task with no delay
     private static final long START_NOW = 0;
@@ -112,12 +104,6 @@ public class TaskServiceImpl
     // the transient map for all recurring tasks' handles
     private ConcurrentHashMap<String,RecurringTaskHandle> recurringMap;
 
-    // a simple generator for unique names for each persisted task
-    // NOTE: when we move to a multi-stack system this will need to either
-    // use some global facility, prefix with the node name, or be generated
-    // as a universally unique identifier
-    private AtomicLong nameGenerator;
-
     // a local copy of the default priority, which is used in almost all
     // cases for tasks submitted by this service
     private static Priority defaultPriority = Priority.getDefaultPriority();
@@ -131,9 +117,13 @@ public class TaskServiceImpl
      */
     public TaskServiceImpl(Properties properties,
                            ComponentRegistry systemRegistry) {
+        if (properties == null)
+            throw new NullPointerException("Null properties not allowed");
+        if (systemRegistry == null)
+            throw new NullPointerException("Null registry not allowed");
+
         txnMap = new ConcurrentHashMap<Transaction,TxnState>();
         recurringMap = new ConcurrentHashMap<String,RecurringTaskHandle>();
-        nameGenerator = new AtomicLong();
 
         // the scheduler is the only system component that we use
         taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
@@ -157,56 +147,29 @@ public class TaskServiceImpl
 
         logger.log(Level.CONFIG, "starting TaskService configuration");
 
+        if (serviceRegistry == null)
+            throw new NullPointerException("null registry not allowed");
         if (proxy == null)
             throw new NullPointerException("null proxy not allowed");
 
         // keep track of the proxy and the data service
-        transactionProxy = proxy;
+        TaskServiceImpl.transactionProxy = proxy;
         dataService = serviceRegistry.getComponent(DataService.class);
 
-        // fetch the map of pending tasks, or create it if it doesn't
-        // already exist (which only happens if this service has never been
-        // used before)
-        PendingMap pmap = null;
-        try {
-            pmap = dataService.
-                getServiceBinding(DS_PENDING_TASKS, PendingMap.class);
-            logger.log(Level.CONFIG, "found existing pending map");
-        } catch (NameNotBoundException nnbe) {
-            logger.log(Level.CONFIG, "creating new pending map");
-            pmap = new PendingMap();
-            try {
-                dataService.setServiceBinding(DS_PENDING_TASKS, pmap);
-            } catch (RuntimeException re) {
-                if (logger.isLoggable(Level.SEVERE))
-                    logger.logThrow(Level.SEVERE, re,
-                                    "failed to bind pending map");
-                throw re;
-            }
-        }
+        logger.log(Level.CONFIG, "re-scheduling pending tasks");
 
-        // re-set the name generator
-        nameGenerator = new AtomicLong(pmap.nextId);
+        // start iterating from the root of the pending task namespace
+        String name = dataService.nextServiceBoundName(DS_PENDING_SPACE);
+        int taskCount = 0;
 
-        // if there are no pending tasks then we're finished configuring,
-        // so join the transaction only so we can set our isConfigured flag
-        // on commit
-        if (pmap.isEmpty()) {
-            proxy.getCurrentTransaction().join(this);
-            return;
-        }
-
-        if (logger.isLoggable(Level.CONFIG))
-            logger.log(Level.INFO, "re-scheduling {0} pending tasks",
-                       pmap.size());
-
-        // re-start all of the pending tasks
-        for (Entry<String,PendingTask> entry : pmap.entrySet()) {
-            PendingTask task = entry.getValue();
-            TaskRunner runner = new TaskRunner(this, entry.getKey());
+        while ((name != null) && (name.startsWith(DS_PENDING_SPACE))) {
+            PendingTask task =
+                dataService.getServiceBinding(name, PendingTask.class);
+            TaskRunner runner = new TaskRunner(this, name);
             TaskOwner owner =
-                new TaskOwnerImpl(task.identity, proxy.
+                new TaskOwnerImpl(task.identity, transactionProxy.
                                   getCurrentOwner().getContext());
+
             if (task.period == PERIOD_NONE) {
                 // this is a non-periodic task
                 scheduleTask(runner, owner, task.startTime, defaultPriority);
@@ -232,9 +195,30 @@ public class TaskServiceImpl
                 if (txnState.recurringMap == null)
                     txnState.recurringMap =
                         new HashMap<String,RecurringTaskHandle>();
-                txnState.recurringMap.put(entry.getKey(), handle);
+                txnState.recurringMap.put(name, handle);
             }
+
+            // finally, get the next name, and increment the task count
+            name = dataService.nextServiceBoundName(name);
+            taskCount++;
         }
+
+        // if we didn't re-schedule anything then we also didn't join the
+        // transaction, so take of that now to handle the configure bit
+        if (taskCount == 0)
+            getTxnState();
+
+        if (logger.isLoggable(Level.CONFIG))
+            logger.log(Level.CONFIG, "re-scheduled {0} tasks", taskCount);
+    }
+
+    /**
+     * FIXME: This is just a stub implementation right now. It needs to be
+     * implemented. It has been added here to support the new shutdown
+     * method on <code>Service</code>.
+     */
+    public boolean shutdown() {
+        return false;
     }
 
     /**
@@ -417,6 +401,8 @@ public class TaskServiceImpl
      * {@inheritDoc}
      */
     public void scheduleTask(Task task, long delay) {
+        if (delay < 0)
+            throw new IllegalArgumentException("Delay must not be negative");
         long startTime = System.currentTimeMillis() + delay;
         scheduleTask(getRunner(task, startTime, PERIOD_NONE),
                      transactionProxy.getCurrentOwner(), startTime,
@@ -430,6 +416,12 @@ public class TaskServiceImpl
                                                    long period) {
         // note the start time
         long startTime = System.currentTimeMillis() + delay;
+
+        if (task == null)
+            throw new NullPointerException("Task must not be null");
+
+        if ((delay < 0) || (period < 0))
+            throw new IllegalArgumentException("Times must not be null");
 
         if (logger.isLoggable(Level.FINEST))
             logger.log(Level.FINEST, "scheduling a periodic task starting " +
@@ -464,6 +456,8 @@ public class TaskServiceImpl
      * {@inheritDoc}
      */
     public void scheduleNonDurableTask(KernelRunnable task, long delay) {
+        if (delay < 0)
+            throw new IllegalArgumentException("Delay must not be negative");
         scheduleTask(task, transactionProxy.getCurrentOwner(),
                      System.currentTimeMillis() + delay, defaultPriority);
     }
@@ -473,6 +467,8 @@ public class TaskServiceImpl
      */
     public void scheduleNonDurableTask(KernelRunnable task,
                                        Priority priority) {
+        if (priority == null)
+            throw new NullPointerException("Priority must not be null");
         scheduleTask(task, transactionProxy.getCurrentOwner(), START_NOW,
                      priority);
     }
@@ -480,38 +476,26 @@ public class TaskServiceImpl
     /**
      * Private helper that creates a <code>KernelRunnable</code> for the
      * associated task, also generating a unique name for this task, taking
-     * care of persisting the task if that hasn't already been done, and
-     * tracking the task in the map of pending tasks.
+     * care of persisting the task if that hasn't already been done.
      */
     private TaskRunner getRunner(Task task, long startTime, long period) {
-        // get the next id, which we turn into a name
-        long nextId = nameGenerator.getAndIncrement();
-        String objName = String.valueOf(nextId);
+        logger.log(Level.FINEST, "setting up pending task");
+
+        if (task == null)
+            throw new NullPointerException("Task must not be null");
+
+        // create a new pending task that will be used when the runner runs
+        PendingTask ptask = new PendingTask(task, startTime, period,
+                                            dataService);
+
+        // get the name of the new object and bind that into the pending
+        // namespace for recovery on startup
+        ManagedReference taskRef = dataService.createReference(ptask);
+        String objName = DS_PENDING_SPACE + taskRef.getId();
+        dataService.setServiceBinding(objName, ptask);
 
         if (logger.isLoggable(Level.FINEST))
-            logger.log(Level.FINEST, "creating pending task {0}", objName);
-
-        PendingTask ptask = new PendingTask();
-        ptask.startTime = startTime;
-        ptask.period = period;
-        ptask.identity = transactionProxy.getCurrentOwner().getIdentity();
-
-        // if the Task is also a ManagedObject then the assumption is that
-        // object was already managed by the application so we just keep a
-        // reference...otherwise, we make it part of our state, which has
-        // the effect of persisting the task in the map
-        if (task instanceof ManagedObject)
-            ptask.taskRef = dataService.createReference((ManagedObject)task); 
-        else
-            ptask.task = task;
-
-        // remember the task in our pending map, and also store the next
-        // name (number) so we can start there when the system comes back up
-        PendingMap pmap =
-            dataService.getServiceBinding(DS_PENDING_TASKS, PendingMap.class);
-        dataService.markForUpdate(pmap);
-        pmap.put(objName, ptask);
-        pmap.nextId = nextId + 1;
+            logger.log(Level.FINEST, "created pending task {0}", objName);
 
         return new TaskRunner(this, objName);
     }
@@ -523,6 +507,9 @@ public class TaskServiceImpl
      */
     private void scheduleTask(KernelRunnable task, TaskOwner owner,
                               long startTime, Priority priority) {
+        if (task == null)
+            throw new NullPointerException("Task must not be null");
+
         if (logger.isLoggable(Level.FINEST))
             logger.log(Level.FINEST, "reserving a task starting " +
                        (startTime == START_NOW ? "now" : "at " + startTime));
@@ -557,27 +544,31 @@ public class TaskServiceImpl
      * Private helper that fetches the task associated with the given name. If
      * this is a non-periodic task, then the task is also removed from the
      * managed map of pending tasks. This method is typically used when a
-     * task actually runs.
+     * task actually runs. If the Task was managed by the application, and
+     * has been removed by the application, then this methods returns null
+     * meaning that there is no task to run.
      */
     private PendingTask fetchPendingTask(String objName) {
-        // get the task from the pending map
-        PendingMap pmap =
-            dataService.getServiceBinding(DS_PENDING_TASKS, PendingMap.class);
-        PendingTask ptask = pmap.get(objName);
+        PendingTask ptask =
+            dataService.getServiceBinding(objName, PendingTask.class);
+        boolean isAvailable = ptask.isTaskAvailable();
 
-        if (ptask == null) {
-            if (logger.isLoggable(Level.WARNING))
-                logger.log(Level.WARNING, "could not fetch task {0}", objName);
-            throw new ObjectNotFoundException("Unknown task: " + objName);
-        }
-
-        // if it's not periodic, remove it from the map
+        // if it's not periodic, remove both the task and the name binding
         if (ptask.period == PERIOD_NONE) {
-            dataService.markForUpdate(pmap);
-            pmap.remove(objName);
+            dataService.removeServiceBinding(objName);
+            dataService.removeObject(ptask);
+        } else {
+            // Make sure that the task is still available, because if it's
+            // not, then we need to remove the mapping and cancel the task.
+            // Note that this should be a very rare case
+            if (! isAvailable)
+                cancelPeriodicTask(objName);
         }
 
-        return ptask;
+        if (isAvailable)
+            return ptask;
+        else
+            return null;
     }
 
     /**
@@ -630,7 +621,7 @@ public class TaskServiceImpl
     /**
      * Private helper that cancels a periodic task. This is only ever called
      * by <code>PeriodicTaskHandleImpl</code>. This method cancels the
-     * underlying recurring task, removes the task from the pending map, and
+     * underlying recurring task, removes the task and name binding, and
      * notes the cancelled task in the local transaction state so the handle
      * can be removed from the local map at commit.
      */
@@ -639,26 +630,30 @@ public class TaskServiceImpl
             logger.log(Level.FINEST, "cancelling periodic task {0}", objName);
 
         TxnState txnState = getTxnState();
-        PendingMap pmap =
-            dataService.getServiceBinding(DS_PENDING_TASKS, PendingMap.class);
+        PendingTask ptask = null;
 
-        if (! pmap.containsKey(objName)) {
+        try {
+            ptask = dataService.getServiceBinding(objName, PendingTask.class);
+        } catch (NameNotBoundException nnbe) {
             // either some one else cancelled this already, or it was only
             // just created in this transaction
             if ((txnState.recurringMap != null) &&
                 (txnState.recurringMap.containsKey(objName))) {
                 txnState.recurringMap.remove(objName).cancel();
+                return;
             } else {
                 throw new ObjectNotFoundException("task is already cancelled");
             }
-        } else {
-            if (txnState.cancelledSet == null)
-                txnState.cancelledSet = new HashSet<String>();
-            txnState.cancelledSet.add(objName);
-
-            dataService.markForUpdate(pmap);
-            pmap.remove(objName);
         }
+
+        // note this as cancelled...
+        if (txnState.cancelledSet == null)
+            txnState.cancelledSet = new HashSet<String>();
+        txnState.cancelledSet.add(objName);
+
+        // ...and remove from the data service
+        dataService.removeServiceBinding(objName);
+        dataService.removeObject(ptask);
     }
 
     /**
@@ -674,28 +669,64 @@ public class TaskServiceImpl
     }
 
     /**
-     * Nested class used to manage the pending tasks in a managed object.
-     * The <code>nextId</code> field is used to start the object name
-     * atomic long when the stack starts up again.
-     */
-    private static class PendingMap extends HashMap<String,PendingTask>
-        implements ManagedObject, Serializable {
-        private static final long serialVersionUID = 1;
-        public long nextId = 0;
-    }
-
-    /**
      * Nested class that represents a single pending task in the managed map.
      */
-    private static class PendingTask implements Serializable {
+    private static class PendingTask implements ManagedObject, Serializable {
         private static final long serialVersionUID = 1;
-        public Task task = null;
-        public ManagedReference taskRef = null;
-        public long startTime = START_NOW;
-        public long period = PERIOD_NONE;
-        public Identity identity = null;
-        Task getTask() {
-            return (task != null) ? task : taskRef.get(Task.class);
+        private Task task = null;
+        private ManagedReference taskRef = null;
+        public long startTime;
+        public long period;
+        private Identity identity;
+        /**
+         * Creates an instance of <code>PendingTask</code>, handling the
+         * task reference correctly. Note that the <code>DataService</code>
+         * parameter is not kept as state, it is just used (if needed) to
+         * resolve a reference in the constructor.
+         */
+        PendingTask(Task task, long startTime, long period,
+                    DataService dataService) {
+            // if the Task is also a ManagedObject then the assumption is
+            // that the object was already managed by the application so we
+            // just keep a reference...otherwise, we make it part of our
+            // state, which has the effect of persisting the task
+            if (task instanceof ManagedObject)
+                taskRef = dataService.createReference((ManagedObject)task); 
+            else
+                this.task = task;
+
+            this.startTime = startTime;
+            this.period = period;
+            this.identity = TaskServiceImpl.transactionProxy.
+                getCurrentOwner().getIdentity();
+        }
+        // checks that the underlying task is available, which is only at
+        // question if the task was managed by the application and therefore
+        // could have been removed by the application
+        public boolean isTaskAvailable() {
+            if (task != null)
+                return true;
+            try {
+                taskRef.get(Task.class);
+                return true;
+            } catch (ObjectNotFoundException onfe) {
+                logger.log(Level.FINER, "Task was removed by application");
+                return false;
+            }
+        }
+        void run() throws Exception {
+            Task runTask = null;
+            try {
+                runTask = (task != null) ? task : taskRef.get(Task.class);
+            } catch (ObjectNotFoundException onfe) {
+                // This only happens when the application removed the task
+                // object but didn't cancel the task, and the fetchPendingTask
+                // cleans up after this, so we're done
+                logger.log(Level.FINER, "tried to run task that was removed " +
+                           "previously from the data service; giving up");
+                return;
+            }
+            runTask.run();
         }
     }
 
@@ -724,7 +755,8 @@ public class TaskServiceImpl
                                 logger.log(Level.FINEST, "running task {0} " +
                                            "scheduled to run at {1}",
                                            ptask.startTime, objName);
-                            ptask.getTask().run();
+                            if (ptask != null)
+                                ptask.run();
                         }
                     })).run();
             } catch (Exception e) {

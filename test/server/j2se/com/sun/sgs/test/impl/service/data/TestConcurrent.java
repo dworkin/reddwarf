@@ -71,6 +71,9 @@ public class TestConcurrent extends TestCase {
     /** The number of threads that are done. */
     private int done;
 
+    /** The service to test. */
+    private DataServiceImpl service;
+
     /** Creates the test. */
     public TestConcurrent(String name) {
 	super(name);
@@ -89,6 +92,17 @@ public class TestConcurrent extends TestCase {
 
     /** Deletes the directory if the test passes. */
     protected void tearDown() throws Exception {
+	if (service != null) {
+	    try {
+		service.shutdown();
+	    } catch (RuntimeException e) {
+		if (passed) {
+		    throw e;
+		} else {
+		    e.printStackTrace();
+		}
+	    }
+	}
 	if (passed) {
 	    deleteDirectory(directory);
 	}
@@ -102,8 +116,7 @@ public class TestConcurrent extends TestCase {
 	    "com.sun.sgs.appName", "TestConcurrent");
 	DummyComponentRegistry componentRegistry =
 	    new DummyComponentRegistry();
-	DataServiceImpl service =
-	    new DataServiceImpl(props, componentRegistry);
+	service = new DataServiceImpl(props, componentRegistry);
 	DummyTransaction txn = new DummyTransaction();
 	txnProxy.setCurrentTransaction(txn);
 	service.configure(componentRegistry, txnProxy);
