@@ -119,6 +119,10 @@ public final class TaskHandler {
         // run the task, watching for any exceptions
         try {
             task.run();
+	    // finally, actually commit the transaction, allowing any
+	    // exceptions to be thrown, since they will indicate whether this
+	    // task is re-tried
+	    handle.commit();
         } catch (Exception e) {
             // make sure that the transaction is aborted, then re-throw the
             // original exception
@@ -135,11 +139,6 @@ public final class TaskHandler {
             // regardless of the outcome, always clear the current state
             thread.clearCurrentTransaction(transaction);
         }
-
-        // finally, actually commit the transaction, allowing any exceptions
-        // to be thrown, since they will indicate whether this task is
-        // re-tried
-        handle.commit();
     }
 
 }

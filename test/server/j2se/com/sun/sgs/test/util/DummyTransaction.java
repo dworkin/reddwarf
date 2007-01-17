@@ -10,7 +10,13 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/** Provides a simple implementation of Transaction, for testing. */
+/**
+ * Provides a simple implementation of Transaction, for testing.
+ *
+ * If using this class with DummyTransactionProxy, make sure to call
+ * DummyTransactionProxy.setCurrentTransaction with the DummyTransaction, so
+ * that the proxy's transaction is cleared when the transaction is terminated.
+ */
 public class DummyTransaction implements Transaction {
 
     /** The logger for this class. */
@@ -102,6 +108,10 @@ public class DummyTransaction implements Transaction {
     }
 
     public synchronized void abort() {
+	abort(null);
+    }
+
+    public synchronized void abort(Throwable cause) {
 	logger.log(Level.FINER, "abort {0}", this);
 	if (state == State.ABORTING) {
 	    return;
@@ -147,7 +157,7 @@ public class DummyTransaction implements Transaction {
 		readOnly = participant.prepare(this);
 	    } catch (Exception e) {
 		if (state != State.ABORTED) {
-		    abort();
+		    abort(e);
 		}
 		throw e;
 	    }
@@ -186,7 +196,7 @@ public class DummyTransaction implements Transaction {
 		participant.prepareAndCommit(this);
 	    } catch (Exception e) {
 		if (state != State.ABORTED) {
-		    abort();
+		    abort(e);
 		}
 		throw e;
 	    }

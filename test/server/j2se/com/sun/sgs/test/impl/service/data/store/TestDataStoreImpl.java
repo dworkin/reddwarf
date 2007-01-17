@@ -2,6 +2,7 @@ package com.sun.sgs.test.impl.service.data.store;
 
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.app.TransactionTimeoutException;
@@ -1010,6 +1011,9 @@ public class TestDataStoreImpl extends TestCase {
 			store.getObject(txn2, id, true);
 			System.err.println(finalI + " txn2: commit");
 			txn2.commit();
+		    } catch (TransactionAbortedException e) {
+			System.err.println(finalI + " txn2: " + e);
+			exception2 = e;
 		    } catch (Exception e) {
 			System.err.println(finalI + " txn2: " + e);
 			exception2 = e;
@@ -1029,14 +1033,9 @@ public class TestDataStoreImpl extends TestCase {
 		store.getObject(txn, id2, true);
 		System.err.println(i + " txn1: commit");
 		txn.commit();
-	    } catch (TransactionConflictException e) {
+	    } catch (TransactionAbortedException e) {
 		System.err.println(i + " txn1: " + e);
 		exception = e;
-		txn.abort();
-	    } catch (TransactionTimeoutException e) {
-		System.err.println(i + " txn1: " + e);
-		exception = e;
-		txn.abort();
 	    }
 	    thread.join();
 	    if (myRunnable.exception2 != null &&
