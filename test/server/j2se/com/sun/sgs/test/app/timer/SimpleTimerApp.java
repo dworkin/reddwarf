@@ -8,7 +8,6 @@ import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ClientSession;
-import com.sun.sgs.app.ShutdownListener;
 import com.sun.sgs.app.Task;
 
 /**
@@ -31,15 +30,6 @@ public class SimpleTimerApp
 
 	AppContext.getTaskManager().schedulePeriodicTask(
 		this, TIMER_PERIOD_MILLIS, TIMER_PERIOD_MILLIS);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public void shuttingDown(ShutdownListener listener, boolean force) {
-	System.out.format("SimpleTimerApp shutting down, force = %b\n", force);
-
-	listener.shutdownComplete();
     }
 
     /**

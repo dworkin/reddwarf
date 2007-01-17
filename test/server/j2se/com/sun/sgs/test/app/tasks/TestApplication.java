@@ -10,7 +10,6 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.PeriodicTaskHandle;
-import com.sun.sgs.app.ShutdownListener;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TaskManager;
 
@@ -101,10 +100,12 @@ public class TestApplication
         return null;
     }
 
-    public void shuttingDown(ShutdownListener listener, boolean force) {
+    // FIXME: this used to be shuttingDown, but we took that out.
+    // When should we call cleanup(), or should we drop that part
+    // of this test? -JM
+    public void cleanup() {
         destroyManagedReference(fooRef);
         destroyNamedManagedObject(DATE_NAME);
-        listener.shutdownComplete();
     }
 
     static class Foo implements ManagedObject, Serializable {

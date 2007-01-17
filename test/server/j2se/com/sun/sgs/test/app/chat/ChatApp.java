@@ -14,7 +14,6 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameExistsException;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
-import com.sun.sgs.app.ShutdownListener;
 
 public class ChatApp
 	implements ManagedObject, Serializable, AppListener, ChannelListener
@@ -44,12 +43,6 @@ public class ChatApp
 	System.err.format("ChatApp: Echoing to \"%s\": [%s]\n",
 		sender.getName(), messageString);
         channel.send(sender, message);
-    }
-
-    /** {@inheritDoc} */
-    public void shuttingDown(ShutdownListener listener, boolean force) {
-	System.err.format("ChatApp: Shutting down, force = %b\n", force);
-	listener.shutdownComplete();
     }
 
     static class ChatClientSessionListener

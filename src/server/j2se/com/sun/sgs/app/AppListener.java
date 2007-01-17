@@ -73,33 +73,4 @@ public interface AppListener extends ManagedObject {
      * be terminated without completing the login process.
      */
     ClientSessionListener loggedIn(ClientSession session);
-
-    /**
-     * Notifies this listener that the associated application is
-     * shutting down.  This gives the application an opportunity to
-     * perform any necessary clean up, such as logging out client
-     * sessions, before the application is shut down.  If
-     * <code>force</code> is true, then the application should
-     * forcibly log out clients and shut down, otherwise it should
-     * wait for sessions to log out on their own before shutting down.
-     *
-     * <p>When the associated application has finished shutting down,
-     * it must invoke {@link ShutdownListener#shutdownComplete
-     * shutdownComplete} on the specified listener.  Note: An
-     * application is not permitted to start up again until a previous
-     * shutdown request has been completed.  Therefore, failure to
-     * notify the shutdown listener of shutdown completion (by
-     * invoking the specified listener's {@link
-     * ShutdownListener#shutdownComplete shutdownComplete} method) will
-     * prevent the application from starting up after a shutdown.
-     *
-     * <p>The shutdown listener passed to this method is guaranteed to
-     * implement {@link Serializable}.
-     *
-     * @param listener a shutdown listener
-     * @param force if <code>true</code>, the application should
-     * forcibly log out clients, otherwise it should wait for clients
-     * to log out gracefully
-     */
-    void shuttingDown(ShutdownListener listener, boolean force);
 }

@@ -8,7 +8,6 @@ import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.ManagedObject;
-import com.sun.sgs.app.ShutdownListener;
 
 /**
  * The {@link SimBoot} class of the BattleBoard server application. 
@@ -43,12 +42,5 @@ public class BattleBoardServer
      */
     public ClientSessionListener loggedIn(ClientSession session) {
         return Player.loggedIn(session);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public void shuttingDown(ShutdownListener listener, boolean force) {
-        listener.shutdownComplete();
     }
 }

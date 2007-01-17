@@ -11,7 +11,6 @@ import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.NameExistsException;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.PeriodicTaskHandle;
-import com.sun.sgs.app.ShutdownListener;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.app.TransactionNotActiveException;
@@ -798,9 +797,6 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    sessions.put(session, listener);
 	    System.err.println("DummyAppListener.loggedIn: session:" + session);
 	    return listener;
-	}
-
-	public void shuttingDown(ShutdownListener listener, boolean force) {
 	}
 
 	public void startingUp(Properties props) {
