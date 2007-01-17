@@ -1,6 +1,7 @@
 
 package com.sun.sgs.impl.kernel;
 
+import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionHandle;
@@ -120,13 +121,23 @@ public final class MinimalTestKernel
             this.txn = txn;
         }
         public Transaction getTransaction() {
-            return txn;
+	    if (txn.getState() == DummyTransaction.State.ACTIVE) {
+		return txn;
+	    } else {
+		throw new TransactionNotActiveException(
+		    "Transaction is not active");
+	    }
         }
         public void commit() throws Exception {
             txn.commit();
         }
         public void abort() {
-            txn.abort();
+	    if (txn.getState() == DummyTransaction.State.ACTIVE) {
+		txn.abort();
+	    } else {
+		throw new TransactionNotActiveException(
+		    "Transaction is not active");
+	    }
         }
     }
 

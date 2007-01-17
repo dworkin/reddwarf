@@ -693,6 +693,39 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	assertHandleNotActive(handle);
     }
 
+    public void testAbortSupplyCause() throws Exception {
+	Exception cause = new Exception("The cause");
+	txn.abort(cause);
+	try {
+	    txn.abort();
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	    assertEquals(cause, e.getCause());
+	}
+	try {
+	    handle.getTransaction();
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	    assertEquals(cause, e.getCause());
+	}
+	try {
+	    handle.commit();
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	    assertEquals(cause, e.getCause());
+	}
+	try {
+	    handle.abort();
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	    assertEquals(cause, e.getCause());
+	}
+    }
+
     public void testAbortActiveEmpty() throws Exception {
 	txn.abort();
 	assertHandleNotActive(handle);

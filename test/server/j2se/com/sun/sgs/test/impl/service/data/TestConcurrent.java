@@ -203,9 +203,6 @@ public class TestConcurrent extends TestCase {
 				logger.log(Level.FINE, "{0}: {1}", this, e);
 			    }
 			    aborts++;
-			    if (txn != null) {
-				txn.abort();
-			    }
 			    createTxn();
 			}
 		    }
