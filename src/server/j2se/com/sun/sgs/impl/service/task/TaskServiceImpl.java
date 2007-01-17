@@ -582,11 +582,10 @@ public class TaskServiceImpl
      * periodic. Note that this method is not called within an active
      * transaction.
      */
-    private void notifyNonRetry(Exception e, final String objName) {
+    private void notifyNonRetry(final String objName) {
         if (logger.isLoggable(Level.INFO))
-            logger.logThrow(
-		Level.INFO, e, "trying to remove non-retried task {0}",
-		objName);
+            logger.log(Level.INFO, "trying to remove non-retried task {0}",
+                       objName);
 
         // check if the task is in the recurring map, in which case we don't
         // do anything else, because we don't remove recurring tasks except
@@ -766,7 +765,7 @@ public class TaskServiceImpl
                 // notify the service
                 if ((! (e instanceof ExceptionRetryStatus)) ||
                     (! ((ExceptionRetryStatus)e).shouldRetry()))
-                    taskService.notifyNonRetry(e, objName);
+                    taskService.notifyNonRetry(objName);
                 throw e;
             }
         }

@@ -117,28 +117,42 @@ public final class TaskHandler {
         thread.setCurrentTransaction(transaction);
 
         // run the task, watching for any exceptions
+	Throwable throwable;
         try {
-            task.run();
-	    // finally, actually commit the transaction, allowing any
-	    // exceptions to be thrown, since they will indicate whether this
-	    // task is re-tried
+	    try {
+		task.run();
+	    } finally {
+		// regardless of the outcome, always clear the current state
+		// before aborting or committing
+		thread.clearCurrentTransaction(transaction);
+	    }
+	    // commit the transaction, allowing any exceptions to be thrown,
+	    // since they will indicate whether this task is re-tried
 	    handle.commit();
-        } catch (Exception e) {
-            // make sure that the transaction is aborted, then re-throw the
-            // original exception
-            try {
-                handle.abort();
-            } catch (TransactionNotActiveException tnae) {
-                // this isn't a problem, since it just means that some
-                // participant aborted the transaction before throwing the
-                // original exception
-                logger.log(Level.FINEST, "Transaction was already aborted");
-            }
-            throw e;
-        } finally {
-            // regardless of the outcome, always clear the current state
-            thread.clearCurrentTransaction(transaction);
-        }
+	    return;
+	} catch (Exception e) {
+	    throwable = e;
+	} catch (Error e) {
+	    throwable = e;
+	}
+
+	// the task or the commit failed -- make sure that the transaction is
+	// aborted
+	try {
+	    handle.abort();
+	} catch (TransactionNotActiveException tnae) {
+	    // this isn't a problem, since it just means that some
+	    // participant aborted the transaction before throwing the
+	    // original exception
+	    logger.log(Level.FINEST, "Transaction was already aborted");
+	}
+
+	// finally, re-throw the original exception
+	if (throwable instanceof Exception) {
+	    throw (Exception) throwable;
+	} else {
+	    throw (Error) throwable;
+	}
     }
 
 }

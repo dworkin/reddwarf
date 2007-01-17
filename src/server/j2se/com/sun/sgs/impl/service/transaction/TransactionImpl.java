@@ -62,7 +62,7 @@ final class TransactionImpl implements Transaction {
      * The exception that caused the transaction to be aborted, or null if no
      * cause was provided or if no abort occurred.
      */
-    private Throwable abortCause;
+    private Throwable abortCause = null;
 
     /** Creates an instance with the specified transaction ID. */
     TransactionImpl(long tid) {
