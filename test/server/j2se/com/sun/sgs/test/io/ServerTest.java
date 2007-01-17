@@ -33,7 +33,6 @@ public class ServerTest implements IOHandler {
         String host = System.getProperty("host", DEFAULT_HOST);
         String portString = System.getProperty("port", DEFAULT_PORT);
         int port = Integer.valueOf(portString);
-        InetSocketAddress addr = new InetSocketAddress(host, port);
         try {
             acceptor = new SocketEndpoint(
                     new InetSocketAddress(host, port),

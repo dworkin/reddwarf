@@ -32,8 +32,6 @@ public class SimpleClientTestUI extends JFrame {
     private final static String TITLE = "Simple Client Test";
     
     private SimpleClient client;
-    private JLabel sessionLabel;
-    private JLabel reconnectLabel;
     private DefaultListModel channelModel;
     private JTextArea channelField;
     
