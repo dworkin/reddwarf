@@ -28,11 +28,11 @@ public class BattleBoardServer
      * <p>
      * Invoked by the SGS stack when BattleBoard is booted.
      */
-    public void startingUp(Properties props) {
+    public void initialize(Properties props) {
         
         log.info("Booting BattleBoard Server");
 
-        Matchmaker.startingUp(props);
+        Matchmaker.initialize(props);
     }
 
     // SimUserListener methods

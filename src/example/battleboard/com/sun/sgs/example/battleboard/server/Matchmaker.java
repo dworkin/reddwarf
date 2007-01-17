@@ -71,7 +71,7 @@ public class Matchmaker
     /**
      * 
      */
-    public static void startingUp(Properties props) {
+    public static void initialize(Properties props) {
         DataManager dataMgr = AppContext.getDataManager();
         
         try {

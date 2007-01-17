@@ -38,7 +38,7 @@ public interface AppListener extends ManagedObject {
      *
      * @param props application-specific configuration properties
      */
-    void startingUp(Properties props);
+    void initialize(Properties props);
 
     /**
      * Notifies this listener that the specified client session has

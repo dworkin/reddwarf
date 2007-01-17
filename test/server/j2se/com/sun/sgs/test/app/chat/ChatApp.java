@@ -21,7 +21,7 @@ public class ChatApp
     private static final long serialVersionUID = 1L;
 
     /** {@inheritDoc} */
-    public void startingUp(Properties props) {
+    public void initialize(Properties props) {
         System.err.format("ChatApp: Starting up\n");
 
         AppContext.getChannelManager().createChannel(

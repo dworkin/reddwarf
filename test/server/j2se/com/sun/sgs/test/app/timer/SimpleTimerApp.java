@@ -25,7 +25,7 @@ public class SimpleTimerApp
     /**
      * {@inheritDoc}
      */
-    public void startingUp(Properties props) {
+    public void initialize(Properties props) {
 	System.out.format("SimpleTimerApp starting up\n");
 
 	AppContext.getTaskManager().schedulePeriodicTask(

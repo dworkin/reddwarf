@@ -799,7 +799,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    return listener;
 	}
 
-	public void startingUp(Properties props) {
+	public void initialize(Properties props) {
 	}
 
 	private Set<ClientSession> getSessions() {

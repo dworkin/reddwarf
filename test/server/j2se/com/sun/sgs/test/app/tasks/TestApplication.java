@@ -62,7 +62,7 @@ public class TestApplication
         fooCount = 0;
     }
 
-    public void startingUp(Properties props) {
+    public void initialize(Properties props) {
         DataManager dataManager = AppContext.getDataManager();
         dataManager.markForUpdate(this);
 
