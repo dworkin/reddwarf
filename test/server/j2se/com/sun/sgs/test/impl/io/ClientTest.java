@@ -1,4 +1,4 @@
-package com.sun.sgs.test.io;
+package com.sun.sgs.test.impl.io;
 
 import java.awt.BorderLayout;
 import java.awt.event.ActionEvent;

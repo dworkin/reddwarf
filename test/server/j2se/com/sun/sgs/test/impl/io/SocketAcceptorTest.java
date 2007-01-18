@@ -1,4 +1,4 @@
-package com.sun.sgs.test.io;
+package com.sun.sgs.test.impl.io;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
