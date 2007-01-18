@@ -151,7 +151,7 @@
         ${project.version}</font>]]>
       </footer>
       <bottom>
-        <![CDATA[<font size="-1">Copyright 2006 Sun Microsystems,
+        <![CDATA[<font size="-1">Copyright 2007 Sun Microsystems,
         Inc. All rights reserved. Use is subject to license
         terms.<p>Sun, Sun Microsystems, the Sun Logo, and Java are
         trademarks or registered trademarks of Sun Microsystems, Inc. in
@@ -176,7 +176,7 @@
         ${project.version}</font>]]>
       </footer>
       <bottom>
-        <![CDATA[<font size="-1">Copyright 2006 Sun Microsystems,
+        <![CDATA[<font size="-1">Copyright 2007 Sun Microsystems,
         Inc. All rights reserved. Use is subject to license
         terms.<p>Sun, Sun Microsystems, the Sun Logo, and Java are
         trademarks or registered trademarks of Sun Microsystems, Inc. in
@@ -203,7 +203,7 @@
         <![CDATA[<font size="-1">Sun Game Server version ${project.version}<br/>${project.build}</font>]]>
       </footer>
       <bottom>
-        <![CDATA[<font size="-1">Copyright 2006 Sun Microsystems,
+        <![CDATA[<font size="-1">Copyright 2007 Sun Microsystems,
         Inc. All rights reserved.
         <p>Sun, Sun Microsystems, the Sun Logo, and Java are
         trademarks or registered trademarks of Sun Microsystems, Inc. in
@@ -231,7 +231,7 @@
         <![CDATA[<font size="-1">Sun Game Server version ${project.version}<br/>${project.build}</font>]]>
       </footer>
       <bottom>
-        <![CDATA[<font size="-1">Copyright 2006 Sun Microsystems,
+        <![CDATA[<font size="-1">Copyright 2007 Sun Microsystems,
         Inc. All rights reserved.
         <p>Sun, Sun Microsystems, the Sun Logo, and Java are
         trademarks or registered trademarks of Sun Microsystems, Inc. in
