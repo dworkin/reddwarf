@@ -91,12 +91,12 @@ public class SimpleServer implements IOHandler {
         }
     }
 
-    public void exceptionThrown(Throwable exception, IOHandle handle) {
+    public void exceptionThrown(IOHandle handle, Throwable exception) {
         System.out.println("SimpleServer: exceptionThrown ");
         exception.printStackTrace();
     }
 
-    public void bytesReceived(byte[] buffer, IOHandle handle) {
+    public void bytesReceived(IOHandle handle, byte[] buffer) {
         System.err.println("SimpleServer: messageReceived: (" +
                 buffer.length + ") " + HexDumper.format(buffer));
         ProtocolMessageDecoder messageDecoder = 

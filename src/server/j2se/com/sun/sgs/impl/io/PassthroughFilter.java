@@ -102,7 +102,7 @@ public class PassthroughFilter extends AbstractFilter {
 
         IOHandler handler = ((SocketHandle) handle).getIOHandler();
         if (handler != null) {
-            handler.bytesReceived(byteMessage, handle);
+            handler.bytesReceived(handle, byteMessage);
         }
     }
 

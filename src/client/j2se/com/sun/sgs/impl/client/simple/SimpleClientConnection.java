@@ -86,7 +86,7 @@ public class SimpleClientConnection implements ClientConnection, IOHandler {
      * 
      * TODO should we take any action here?  Bubble this up to the CCL somehow?
      */
-    public void exceptionThrown(Throwable exception, IOHandle handle) {
+    public void exceptionThrown(IOHandle handle, Throwable exception) {
         assert handle.equals(this.myHandle);
         System.err.println("SimpleClientConnection: exceptionThrown");
         exception.printStackTrace();
@@ -96,11 +96,10 @@ public class SimpleClientConnection implements ClientConnection, IOHandler {
      * Call back on the IOHandler.  This is called when there is an incoming
      * message from the server.  All messages are forwarded on to the
      * associated {@code ClientConnectionListener}.
-     * 
-     * @param   message         the raw byte message from the server
      * @param   handle          the IOHandle on which the message arrived
+     * @param   message         the raw byte message from the server
      */
-    public void bytesReceived(byte[] message, IOHandle handle) {
+    public void bytesReceived(IOHandle handle, byte[] message) {
         assert handle.equals(this.myHandle);
         System.err.println("SimpleClientConnection: bytesReceived: " +
                 HexDumper.format(message));

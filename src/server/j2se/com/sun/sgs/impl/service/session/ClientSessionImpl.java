@@ -480,7 +480,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	}
 
 	/** {@inheritDoc} */
-	public void exceptionThrown(Throwable exception, IOHandle handle) {
+	public void exceptionThrown(IOHandle handle, Throwable exception) {
 
 	    if (logger.isLoggable(Level.WARNING)) {
 		logger.logThrow(
@@ -490,7 +490,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	}
 
 	/** {@inheritDoc} */
-	public void bytesReceived(byte[] buffer, IOHandle handle) {
+	public void bytesReceived(IOHandle handle, byte[] buffer) {
             if (logger.isLoggable(Level.FINEST)) {
                 logger.log(
                     Level.FINEST,

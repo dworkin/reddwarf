@@ -133,7 +133,7 @@ public class SocketConnectorTest {
     }
 
     private static class IOHandlerAdapter implements IOHandler {
-        public void bytesReceived(byte[] buffer, IOHandle handle) {
+        public void bytesReceived(IOHandle handle, byte[] buffer) {
         }
 
         public void connected(IOHandle handle) {
@@ -142,7 +142,7 @@ public class SocketConnectorTest {
         public void disconnected(IOHandle handle) {
         }
 
-        public void exceptionThrown(Throwable exception, IOHandle handle) {
+        public void exceptionThrown(IOHandle handle, Throwable exception) {
         }
     }
 

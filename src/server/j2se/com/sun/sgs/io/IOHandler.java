@@ -1,52 +1,63 @@
 package com.sun.sgs.io;
 
 /**
- * Attaches to an {@link IOHandle} in order to receive connection events,
- * such as data arriving.
- * 
+ * Receives asynchronous notification of connection events from an
+ * associated {@link IOHandle}.  The {@code connected} method is
+ * invoked when the {@code IOHandle}'s connection is established,
+ * either actively from an {@link IOConnector} or passively by an
+ * {@link IOAcceptor}.  The {@code bytesReceived} method is invoked
+ * when data arrives on the connection (after being processed by
+ * the {@link IOFilter} associated with the handle).  The
+ * {@code exceptionThrown} method is invoked to forward asynchronous
+ * network exceptions.  The {@code disconnected} method is invoked
+ * when the connection has been closed, or if the connection could
+ * not be initiated at all (e.g., when a connector fails to connect).
+ *
  * @author Sten Anderson
  * @since 1.0
  */
 public interface IOHandler {
 
     /**
-     * Called when a message is received on the associated handle. The
-     * message is simply a collection of bytes that may or may not contain
-     * complete "packets". It is up to this method to decide how to decode
-     * the bytes into a high level message.
-     * 
-     * @param buffer the {@code byte} array containing the data
-     * @param handle the {@link IOHandle} on which the data arrived
-     */
-    void bytesReceived(byte[] buffer, IOHandle handle);
-
-    /**
-     * Called when the given <code>IOHandle</code> is disconnected.
-     * 
-     * @param handle the handle that closed
-     */
-    void disconnected(IOHandle handle);
-
-    /**
-     * Called when an exception is thrown on the given handle. Exceptions
-     * can bubble up to this call for a number of reasons:
-     * <p>
-     * <ul>
-     * <li>As the result of the asynchronous work of a requested operation
-     * on the handle (such as "sendMessage")</li>
-     * <li>As the result of an unexpected condition (for example, an
-     * unplanned disconnect)</li>
-     * </ul>
-     * 
-     * @param exception the thrown exception
-     * @param handle the handle on which the exception occured
-     */
-    void exceptionThrown(Throwable exception, IOHandle handle);
-
-    /**
-     * Called when the given {@link IOHandle} is connected and ready
-     * to use. Once this call back is fired, the handle can be considered
-     * "live" and data may be sent and received on it.
+     * Invoked when the {@code IOHandle}'s connection is established,
+     * either actively from an {@link IOConnector} or passively by an
+     * {@link IOAcceptor}.  This indicates that the {@code handle} is
+     * ready for use, and data may be sent and received on it.
+     *
+     * @param handle the {@code IOHandle} that has become connected.
      */
     void connected(IOHandle handle);
+
+    /**
+     * Invoked when data arrives on a connection, after processing by
+     * the {@link IOFilter} associated with the {@code handle}.  The
+     * {@code message} is not guaranteed to be a single, whole message,
+     * unless the {@code handle}'s {@code IOFilter} makes that guarantee.
+     * Otherwise, implementations of {@code IOHandle} are responsible for
+     * their own application-level message framing.
+     * <p>
+     * Note: The filter may modify the incoming data in any way,
+     * and may invoke this once, multiple times, or not at all for
+     * a particlar receive event on the connection.
+     *
+     * @param handle the {@code IOHandle} on which the data arrived.
+     * @param message the received, filtered data.
+     */
+    void bytesReceived(IOHandle handle, byte[] message);
+
+    /**
+     * Notifies this listener of a network exception on {@code handle}.
+     * @param handle the {@code IOHandle} on which the exception occured.
+     * @param exception the thrown exception.
+     */
+    void exceptionThrown(IOHandle handle, Throwable exception);
+
+    /**
+     * Invoked when the {@code handle}'s connection has been closed, or if
+     * the connection could not be initiated (e.g., when a connector fails
+     * to connect).
+     *
+     * @param handle the {@code IOHandle} that has disconnected.
+     */
+    void disconnected(IOHandle handle);
 }

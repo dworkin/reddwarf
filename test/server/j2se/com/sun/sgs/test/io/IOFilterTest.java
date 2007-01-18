@@ -56,7 +56,7 @@ public class IOFilterTest {
                     return new IOHandlerAdapter() {
                         
                         @Override
-                        public void bytesReceived(byte[] buffer, IOHandle handle) {
+                        public void bytesReceived(IOHandle handle, byte[] buffer) {
                             byte[] echoMessage = new byte[buffer.length];
                             try {
                                 handle.sendBytes(echoMessage);
@@ -124,7 +124,7 @@ public class IOFilterTest {
                 }
             }
             
-            public void bytesReceived(byte[] buffer, IOHandle handle) {
+            public void bytesReceived(IOHandle handle, byte[] buffer) {
                 Assert.assertEquals(messageSize, buffer.length);
                 notifyAll();
                 try {
@@ -180,7 +180,7 @@ public class IOFilterTest {
                 }
             }
             
-            public void bytesReceived(byte[] buffer, IOHandle handle) {
+            public void bytesReceived(IOHandle handle, byte[] buffer) {
                 bytesIn += buffer.length;
                 System.err.println("Got " + buffer.length +
                         " bytes, total = " + bytesIn);
@@ -204,7 +204,7 @@ public class IOFilterTest {
     } 
     
     private static class IOHandlerAdapter implements IOHandler {
-        public void bytesReceived(byte[] buffer, IOHandle handle) {
+        public void bytesReceived(IOHandle handle, byte[] buffer) {
         }
 
         public void connected(IOHandle handle) {
@@ -213,7 +213,7 @@ public class IOFilterTest {
         public void disconnected(IOHandle handle) {
         }
 
-        public void exceptionThrown(Throwable exception, IOHandle handle) {
+        public void exceptionThrown(IOHandle handle, Throwable exception) {
         }   
     }
 

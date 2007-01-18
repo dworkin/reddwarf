@@ -1,62 +1,73 @@
 package com.sun.sgs.io;
 
+import java.io.IOException;
 import java.net.SocketAddress;
 
 /**
- * An {@code IOConnector} establishes connections, or {@link IOHandle}s, to
- * remote hosts. Clients should call shutdown() when finished with the
- * Connector. Clients have the option to attach {@link IOFilter}s on a per
- * handle basis. Filters allow for the manipulation of the bytes before
- * outgoing data is sent, and after incoming data is received. <p>
- * {@code IOConnector}s are created via {@link Endpoint#createConnector}.
- * <p> An {@code IOConnector} is non-reusable in that subsequent calls to
- * connect() after the first call with throw {@link IllegalStateException}.
- * 
+ * Actively initiates a single connection to an {@link Endpoint} and
+ * asynchronously notifies the associated {@link IOHandler} when the
+ * connection completes.
+ * <p>
+ * A connection attempt may be terminated by a call to {@link #shutdown},
+ * unless the connection has already finished connecting.  Once an
+ * {@code IOConnector} has connected or shut down, it may not be reused.
+ *
+ * @param <T> the address family encapsulated by this {@code IOConnector}'s
+ *        associated {@link Endpoint}
+ *
  * @author Sten Anderson
  * @since 1.0
  */
 public interface IOConnector<T> {
 
     /**
-     * Attempts to connect to the remote host associated with this
-     * connector. This call is non-blocking. {IOHandler#connected()} will be
-     * called on the {@code listener} upon successful connection, or
-     * {@link IOHandler#disconnected} if it fails.
-     * 
-     * @param listener the <code>IOHandler</code> that will receive the
-     *        associated connection events.
+     * Actively initate a connection to the associated {@link Endpoint}.
+     * This call is non-blocking. {@link IOHandler#connected} will be
+     * called asynchronously on the {@code listener} upon successful
+     * connection, or {@link IOHandler#disconnected} if it fails.
+     *
+     * @param listener the listener for all IO events on the connection,
+     *        including the result of the connection attempt.
+     *
+     * @throws IOException if there was a problem initating the connection.
+     * @throws IllegalStateException if the {@code IOConnector} has been
+     *         shut down or has already attempted a connection.
      */
     void connect(IOHandler listener);
 
     /**
-     * Attempts to connect to the remote host associated with this
-     * connector. This call is non-blocking. {IOHandler#connected()} will be
-     * called on the {@code listener} upon successful connection, or
-     * {@link IOHandler#disconnected} if it fails. The given
+     * Actively initate a connection to the associated {@link Endpoint}.
+     * This call is non-blocking. {@link IOHandler#connected} will be
+     * called asynchronously on the {@code listener} upon successful
+     * connection, or {@link IOHandler#disconnected} if it fails.  The given
      * {@link IOFilter} will be attached to the {@link IOHandle} upon
      * connecting.
-     * 
-     * @param listener the {@link IOHandler} that will receive the
-     *        associated connection events.
-     * @param filter the filter to attach to the connected {@link IOHandle}
+     *
+     * @param listener the listener for all IO events on the connection,
+     *        including the result of the connection attempt.
+     * @param filter the {@link IOFilter} to attach to the connection.
+     *
+     * @throws IOException if there was a problem initating the connection.
+     * @throws IllegalStateException if the {@code IOConnector} has been
+     *         shut down or has already attempted a connection.
      */
-    public void connect(IOHandler listener, IOFilter filter);
+    void connect(IOHandler listener, IOFilter filter);
 
     /**
-     * Shuts down this {@code IOConnector}, attempting to cancel any
-     * connection attempt in progress.
-     * 
-     * @throws IllegalStateException if there is no connection attempt in
-     *         progress
-     */
-    void shutdown();
-
-    /**
-     * Returns the {@link Endpoint} to which this {@code IOConnector} will
-     * connect.
-     * 
-     * @return the {@link Endpoint} to which this {@code IOConnector} will
-     *         connect.
+     * Returns the {@link Endpoint} on which this {@code IOConnector} is
+     * listening.
+     *
+     * @return the {@link Endpoint} on which this {@code IOConnector} is
+     *         listening.
      */
     Endpoint<T> getEndpoint();
+
+    /**
+     * Shuts down this {@code IOConnector}.  The pending connection attempt
+     * will be cancelled.
+     *
+     * @throws IllegalStateException if there is no connection attempt in
+     *         progress.
+     */
+    void shutdown();
 }

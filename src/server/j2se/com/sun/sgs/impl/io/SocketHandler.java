@@ -72,7 +72,7 @@ class SocketHandler extends IoHandlerAdapter {
 
         IOHandler handler = handle.getIOHandler();
         if (handler != null) {
-            handler.exceptionThrown(exception, handle);
+            handler.exceptionThrown(handle, exception);
         }
     }
 

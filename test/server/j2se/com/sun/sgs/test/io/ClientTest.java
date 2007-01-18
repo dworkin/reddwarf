@@ -256,7 +256,7 @@ public class ClientTest extends JFrame {
             return status;
         }
         
-        public void bytesReceived(byte[] message, IOHandle h) {
+        public void bytesReceived(IOHandle h, byte[] message) {
             messagesIn++;
             bytesIn += message.length;
             for (byte b : message) {
@@ -274,7 +274,7 @@ public class ClientTest extends JFrame {
             dataChanged();
         }
 
-        public void exceptionThrown(Throwable exception, IOHandle h) {
+        public void exceptionThrown(IOHandle h, Throwable exception) {
             System.out.println("ClientTest exceptionThrown");
             status = "Exception!";
             dataChanged();

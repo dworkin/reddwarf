@@ -87,7 +87,7 @@ public class CompleteMessageFilter extends AbstractFilter {
             // and reset the sizing information.
             if (currentLength == partialMessage.length) {
                 ((SocketHandle) handle).getIOHandler().bytesReceived(
-                        partialMessage, handle);
+                        handle, partialMessage);
                 partialMessage = null;
                 currentLength = 0;
             }
@@ -105,7 +105,7 @@ public class CompleteMessageFilter extends AbstractFilter {
                     nextMessage.length);
             IOHandler handler = ((SocketHandle) handle).getIOHandler();
             if (handler != null) {
-                handler.bytesReceived(nextMessage, handle);
+                handler.bytesReceived(handle, nextMessage);
             }
 
             index += totalLength;

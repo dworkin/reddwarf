@@ -88,12 +88,12 @@ public class ServerTest implements IOHandler {
         }
     }
 
-    public void exceptionThrown(Throwable exception, IOHandle handle) {
+    public void exceptionThrown(IOHandle handle, Throwable exception) {
         System.out.print("ServerTest: exceptionThrown ");
         exception.printStackTrace();
     }
 
-    public void bytesReceived(byte[] message, IOHandle handle) {
+    public void bytesReceived(IOHandle handle, byte[] message) {
         byte[] buffer = new byte[message.length]; 
         System.arraycopy(message, 0, buffer, 0, message.length); 
         try {

@@ -671,7 +671,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 	    List<byte[]> messageList = new ArrayList<byte[]>();
 	    
-	    public void bytesReceived(byte[] buffer, IOHandle h) {
+	    public void bytesReceived(IOHandle h, byte[] buffer) {
 		if (h != handle) {
 		    System.err.println(
 			"DummyClient.Listener.connected wrong handle, got:" +
@@ -766,7 +766,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    }
 	    
 	    public void exceptionThrown(
-		Throwable exception, IOHandle h)
+		IOHandle h, Throwable exception)
 	    {
 		System.err.println("DummyClient.Listener.exceptionThrown " +
 				   "exception:" + exception);
