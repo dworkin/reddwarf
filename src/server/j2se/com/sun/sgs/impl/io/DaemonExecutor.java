@@ -1,13 +1,13 @@
 package com.sun.sgs.impl.io;
 
 import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 
 /**
- * An {@code Executor} that {@code execute}s tasks in a new,
- * daemon {@code Thread}.
+ * An {@link Executor} that executes tasks in a new {@code Thread}
+ * that has been created with {@code setDaemon(true)}.
  * 
  * @author James Megquier
- * @since 1.0
  */
 public class DaemonExecutor implements Executor {
 
@@ -19,12 +19,18 @@ public class DaemonExecutor implements Executor {
     }
 
     /**
-     * Executes the given command immediately in a new
-     * daemon {@code Thread}.
-     * 
+     * Executes {@code command} immediately in a new daemon {@code Thread}.
+     *
+     * @param command the runnable task.
+     *
+     * @throws NullPointerException if {@code command} is null.
+     *
      * @see Thread#setDaemon
      */
     public void execute(Runnable command) {
+        if (command == null) {
+            throw new NullPointerException("command must not be null");
+        }
         Thread t = new Thread(command);
         t.setDaemon(true);
         t.start();

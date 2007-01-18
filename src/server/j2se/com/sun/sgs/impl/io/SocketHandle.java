@@ -13,8 +13,8 @@ import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
 
 /**
- * This is a socket implementation of an {@code IOHandle} using the Apache
- * Mina framework.  This implementation uses an {@link IoSession} to handle the
+ * This is a socket implementation of an {@link IOHandle} using the Apache
+ * Mina framework.  It uses a MINA {@link IoSession} to handle the
  * IO transport.
  * 
  * @author Sten Anderson

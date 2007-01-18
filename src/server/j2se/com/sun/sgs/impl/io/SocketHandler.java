@@ -16,7 +16,7 @@ import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
 
 /**
- * This is an adapter between an Apache Mina {@link IoHandler} and the SGS
+ * An adapter between an Apache Mina {@link IoHandler} and the SGS
  * IO framework {@link IOHandler}.  SocketHandlers exist one per handle on
  * the client {@link IOConnector} side, and exist one per {@link IOAcceptor}
  * on the server side.
@@ -97,5 +97,4 @@ class SocketHandler extends IoHandlerAdapter {
 
         handle.getFilter().filterReceive(handle, array);
     }
-
 }

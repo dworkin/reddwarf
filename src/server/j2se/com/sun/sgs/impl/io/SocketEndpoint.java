@@ -18,7 +18,7 @@ import com.sun.sgs.io.IOAcceptor;
 import com.sun.sgs.io.IOConnector;
 
 /**
- * An implementation of {@code Endpoint} that wraps a {@link SocketAddress}.
+ * An implementation of {@link Endpoint} that wraps a {@link SocketAddress}.
  * 
  * @author  Sten Anderson
  * @since   1.0
@@ -69,7 +69,7 @@ public class SocketEndpoint implements Endpoint<SocketAddress> {
      * Constructs a {@code SocketEndpoint} with the given TransportType
      * using the given {@link Executor} for thread management.
      * The {@code numProcessors} parameter refers to the number of
-     * {@code MINA SocketIOProcessors} to initially create.
+     * MINA {@code SocketIOProcessors} to initially create.
      * <p>
      * (Note: A {@code SocketIOProcessor} is a MINA implementation detail that
      * controls the internal processing of the IO. It is exposed here to allow
@@ -141,7 +141,7 @@ public class SocketEndpoint implements Endpoint<SocketAddress> {
      * Return the {@link TransportType} encapsulated by this
      * {@code SocketEndpoint}.
      * 
-     * @return the {@link TransportType} encapsulated by this
+     * @return the {@code TransportType} encapsulated by this
      *         {@code SocketEndpoint}.
      */
     public TransportType getTransportType() {

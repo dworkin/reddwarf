@@ -2,9 +2,13 @@ package com.sun.sgs.impl.io;
 
 import com.sun.sgs.io.IOFilter;
 
+// TODO move this functionality into protocol decode; we should
+// do framing in the protocol, not the transport. -JM
+
 /**
- * Common filter functionality.
- * 
+ * Common {@link IOFilter} functionality for reading a length
+ * in a message and maintaining an index into the buffer array.
+ *
  * @author Sten Anderson
  */
 abstract class AbstractFilter implements IOFilter {

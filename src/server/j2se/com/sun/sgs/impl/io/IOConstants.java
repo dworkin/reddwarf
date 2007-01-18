@@ -1,23 +1,27 @@
 package com.sun.sgs.impl.io;
 
 /**
- * A convenience class for defining common constants.
+ * Definition of transport constants.
  * 
  * @author Sten Anderson
- * @since  1.0
  */
 public class IOConstants {
 
     // TODO move this concept elsewhere? -JM
     
     // cannot instantiate
-    private IOConstants() {}
+    private IOConstants() {
+        // empty
+    }
     
     /**
      * The type of IO transport: TCP, or UDP
      */
     public enum TransportType {
+        /** Reliable transport, such as TCP */
         RELIABLE,
+        
+        /** Unreliable transport, such as UDP */
         UNRELIABLE
     }
 }

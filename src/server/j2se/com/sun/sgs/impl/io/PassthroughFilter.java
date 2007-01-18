@@ -7,16 +7,16 @@ import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
 
 /**
- * A filter that doesn't do anything except simply pass the messages through.
+ * A filter that simply passes messages through.
  * This is the default filter.  Since message length is encoded as part of the
  * wire protocol, this filter must extract the length information before
  * forwarding the bytes onto the event handler.
  * <p>
- * The {@link #filterReceive} portion of {@code PassthroughFilter} is not
+ * The {@code filterReceive} portion of {@code PassthroughFilter} is not
  * thread-safe since it retains state information about partial messages.
- * For this reason, each {@link IOHandle} should have its own instance, and
- * {@link #filterReceive} should be called by only one thread.
- * {@link #filterSend}, however, is thread-safe.  
+ * For this reason, each {@code IOHandle} should have its own instance, and
+ * {@code #filterReceive} should be called by only one thread.
+ * {@code #filterSend}, however, is thread-safe.  
  * 
  * @author Sten Anderson
  * @since  1.0
@@ -115,5 +115,4 @@ public class PassthroughFilter extends AbstractFilter {
     public void filterSend(IOHandle handle, byte[] message) {
         ((SocketHandle) handle).doSend(message);
     }
-
 }
