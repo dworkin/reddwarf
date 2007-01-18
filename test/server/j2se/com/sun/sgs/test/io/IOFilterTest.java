@@ -181,9 +181,9 @@ public class IOFilterTest {
             }
             
             public void bytesReceived(byte[] buffer, IOHandle handle) {
+                bytesIn += buffer.length;
                 System.err.println("Got " + buffer.length +
                         " bytes, total = " + bytesIn);
-                bytesIn += buffer.length;
             }
 
             public void disconnected(IOHandle handle) {
