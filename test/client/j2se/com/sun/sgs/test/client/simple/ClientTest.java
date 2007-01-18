@@ -58,7 +58,7 @@ public class ClientTest implements SimpleClientListener, ClientChannelListener {
     
     private void start() {
         Properties props = new Properties();
-        props.put("host", "127.0.0.1");
+        props.put("host", "");
         props.put("port", "10002");
         
         try {

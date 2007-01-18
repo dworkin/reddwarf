@@ -68,7 +68,15 @@ public class SimpleServer implements IOHandler {
     }
     
     public final static void main(String[] arg) {
-        new SimpleServer().start();
+        SimpleServer server = new SimpleServer();
+        synchronized(server) {
+            server.start();
+            try {
+                server.wait();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
     }
     
     public void connected(IOHandle handle) {
@@ -77,7 +85,9 @@ public class SimpleServer implements IOHandler {
 
     public void disconnected(IOHandle handle) {
         System.out.println("SimpleServer: disconnected");
-        System.exit(0);
+        synchronized(this) {
+            this.notifyAll();
+        }
     }
 
     public void exceptionThrown(Throwable exception, IOHandle handle) {
