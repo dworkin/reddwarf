@@ -182,7 +182,9 @@ public class SimpleClient2 implements ServerSession {
          *
          * @param connection        the live connection to the server
          */
-        public void connected(ClientConnection connection) {
+        public void connected(
+                @SuppressWarnings("hiding") ClientConnection connection)
+        {
             connected = true;
             SimpleClient2.this.connection = connection;
             PasswordAuthentication auth = 

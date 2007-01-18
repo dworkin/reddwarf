@@ -203,6 +203,12 @@ public class SimpleClient implements ServerSession {
         public void receivedMessage(byte[] message) {
             ProtocolMessageDecoder decoder = new ProtocolMessageDecoder(message);
             int versionNumber = decoder.readVersionNumber();
+            if (versionNumber != ProtocolMessage.VERSION) {
+                System.err.println("Bad version, got: 0x" +
+                        Integer.toHexString(versionNumber) +
+                        " wanted: 0x" + ProtocolMessage.VERSION);
+                return;
+            }
             int service = decoder.readServiceNumber();
             int command = decoder.readCommand();
             System.out.println("SimpleClient messageReceived: " + message.length + 

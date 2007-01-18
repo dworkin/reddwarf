@@ -10,6 +10,7 @@ import com.sun.sgs.impl.client.simple.ProtocolMessageDecoder;
 import com.sun.sgs.impl.client.simple.ProtocolMessageEncoder;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.IOConstants.TransportType;
+import com.sun.sgs.impl.util.HexDumper;
 import com.sun.sgs.io.IOAcceptorListener;
 import com.sun.sgs.io.IOAcceptor;
 import com.sun.sgs.io.IOHandle;
@@ -96,7 +97,8 @@ public class SimpleServer implements IOHandler {
     }
 
     public void bytesReceived(byte[] buffer, IOHandle handle) {
-        System.out.println("SimpleServer: messageReceived " + buffer.length);
+        System.err.println("SimpleServer: messageReceived: (" +
+                buffer.length + ") " + HexDumper.format(buffer));
         ProtocolMessageDecoder messageDecoder = 
                                     new ProtocolMessageDecoder(buffer);
         int versionNumber = messageDecoder.readVersionNumber();
@@ -108,6 +110,7 @@ public class SimpleServer implements IOHandler {
         int service = messageDecoder.readServiceNumber();
         int command = messageDecoder.readCommand();
         if (command == LOGIN_REQUEST) {
+            assert service == APPLICATION_SERVICE;
             ProtocolMessageEncoder messageEncoder = null;
             
             String username = messageDecoder.readString();
@@ -139,10 +142,10 @@ public class SimpleServer implements IOHandler {
             sendMessage(messageEncoder, handle);
         }
         else if (command == MESSAGE_TO_SERVER) {
-            short messageLength = messageDecoder.readShort();
+            assert service == APPLICATION_SERVICE;
             String serverMessage = messageDecoder.readString();
             System.out.println("Received general server message: " + 
-                       messageLength + " " + serverMessage);
+                       serverMessage);
             
             if (serverMessage.equals("Join Channel")) {
                 ProtocolMessageEncoder messageEncoder = new ProtocolMessageEncoder(
@@ -152,8 +155,7 @@ public class SimpleServer implements IOHandler {
                 sendMessage(messageEncoder, handle);
                 
                 sendPeriodicChannelMessages(handle);
-            }
-            else if (serverMessage.equals("Leave Channel")) {
+            } else if (serverMessage.equals("Leave Channel")) {
                 ProtocolMessageEncoder messageEncoder = new ProtocolMessageEncoder(
                         CHANNEL_SERVICE, CHANNEL_LEAVE);
                 messageEncoder.writeString("Test Channel");
@@ -161,6 +163,7 @@ public class SimpleServer implements IOHandler {
             }
         }
         else if (command == CHANNEL_SEND_REQUEST) {
+            assert service == CHANNEL_SERVICE;
             String channelName = messageDecoder.readString();
             int numRecipients = messageDecoder.readInt();
             String messageStr = messageDecoder.readString();
@@ -173,7 +176,8 @@ public class SimpleServer implements IOHandler {
             messageEncoder.writeString(channelName);
             sendMessage(messageEncoder, handle);
         }
-        else if (command == LOGOUT_SUCCESS) {
+        else if (command == LOGOUT_REQUEST) {
+            assert service == APPLICATION_SERVICE;
             ProtocolMessageEncoder messageEncoder = new ProtocolMessageEncoder(
                     APPLICATION_SERVICE, LOGOUT_SUCCESS);
             
@@ -216,8 +220,8 @@ public class SimpleServer implements IOHandler {
                                                             IOHandle handle) {
         try {
             byte[] byteMessage = messageEncoder.getMessage();
-            System.out.println("byteMessage: " + byteMessage.length + " " + 
-                                byteMessage[0]);
+            System.out.println("sendMessage: (" + byteMessage.length + ") " + 
+                                HexDumper.format(byteMessage));
             handle.sendBytes(byteMessage);
         }
         catch (IOException ioe) {

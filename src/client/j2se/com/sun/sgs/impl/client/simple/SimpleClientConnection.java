@@ -103,7 +103,7 @@ public class SimpleClientConnection implements ClientConnection, IOHandler {
     public void bytesReceived(byte[] message, IOHandle handle) {
         assert handle.equals(this.myHandle);
         System.err.println("SimpleClientConnection: bytesReceived: " +
-                message);
+                HexDumper.format(message));
         ccl.receivedMessage(message);
     }
 

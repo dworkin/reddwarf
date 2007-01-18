@@ -47,7 +47,7 @@ public class SimpleClientTestUI extends JFrame {
         loginButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                 Properties props = new Properties();
-                props.put("host", "127.0.0.1");
+                props.put("host", "");
                 props.put("port", "10002");
                 
                 try {

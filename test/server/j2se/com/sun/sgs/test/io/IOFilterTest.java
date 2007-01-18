@@ -27,14 +27,15 @@ import com.sun.sgs.io.IOHandler;
  * @author      Sten Anderson
  */
 public class IOFilterTest {
+
+    private final static int DELAY = 2000;
     
     private final static int BIND_PORT = 5000;
-    private final static int DELAY = 2000;
-    private final SocketAddress ADDRESS = 
-                                new InetSocketAddress("localhost", BIND_PORT);
+    private final SocketAddress BIND_ADDRESS = 
+        new InetSocketAddress("", BIND_PORT);
     
     IOAcceptor<SocketAddress> acceptor;
-    private boolean connected = false;
+    IOHandle connectedHandle = null;
     
     /**
      * Set up an IOAcceptor with a CompleteMessageFilter installed that echos
@@ -43,7 +44,7 @@ public class IOFilterTest {
      */
     @Before
     public void init() {
-        connected = false;
+        connectedHandle = null;
         acceptor = new SocketEndpoint(
                 new InetSocketAddress(BIND_PORT),
                TransportType.RELIABLE).createAcceptor();
@@ -71,14 +72,23 @@ public class IOFilterTest {
                 }
                 
             }, CompleteMessageFilter.class);
-        }
-        catch (IOException ioe) {
+        } catch (IOException ioe) {
             ioe.printStackTrace();
         }
     }
     
     @After
     public void cleanup() {
+        if (connectedHandle != null) {
+            try {
+                connectedHandle.close();
+            } catch (IOException e) {
+                System.err.println("Ignoring exception on close");
+                e.printStackTrace();
+                // ignore the exception
+            }
+            connectedHandle = null;
+        }
         acceptor.shutdown();
         acceptor = null;
     }
@@ -92,7 +102,7 @@ public class IOFilterTest {
     @Test
     public void bigMessage() {
         IOConnector<SocketAddress> connector = 
-                    new SocketEndpoint(ADDRESS, TransportType.RELIABLE, 
+                    new SocketEndpoint(BIND_ADDRESS, TransportType.RELIABLE, 
                             Executors.newCachedThreadPool()).createConnector();
         
         
@@ -101,6 +111,7 @@ public class IOFilterTest {
             int messageSize = 100000;
             
             public void connected(IOHandle handle) {
+                IOFilterTest.this.connectedHandle = handle;
                 byte[] bigMessage = new byte[messageSize];
                 for (int i = 0; i < messageSize; i++) {
                     bigMessage[i] = (byte) 1;
@@ -121,7 +132,10 @@ public class IOFilterTest {
                 }
                 catch (IOException ioe) {}
             }
-           
+
+            public void disconnected(IOHandle handle) {
+                IOFilterTest.this.connectedHandle = null;
+            }
         };
         
         connector.connect(handler, new CompleteMessageFilter());
@@ -149,14 +163,14 @@ public class IOFilterTest {
         bytesIn = 0;
         final int messageSize = 1000;
         IOConnector<SocketAddress> connector = 
-                    new SocketEndpoint(ADDRESS, TransportType.RELIABLE, 
+                    new SocketEndpoint(BIND_ADDRESS, TransportType.RELIABLE, 
                             Executors.newCachedThreadPool()).createConnector();
         
         
         IOHandler handler = new IOHandlerAdapter() {
             
             public void connected(IOHandle handle) {
-                connected = true;
+                IOFilterTest.this.connectedHandle = handle;
                 byte[] message = new byte[messageSize];
                 try {
                     handle.sendBytes(message);
@@ -171,7 +185,10 @@ public class IOFilterTest {
                         " bytes, total = " + bytesIn);
                 bytesIn += buffer.length;
             }
-           
+
+            public void disconnected(IOHandle handle) {
+                IOFilterTest.this.connectedHandle = null;
+            }
         };
         
         connector.connect(handler);

@@ -17,43 +17,13 @@ import com.sun.sgs.client.simple.SimpleClientListener;
  * @author      Sten Anderson
  * @version     1.0
  */
-public class ClientTest implements SimpleClientListener, ClientChannelListener {
-
+public class ClientTest
+    implements SimpleClientListener, ClientChannelListener
+{
     private SimpleClient client;
     
     public ClientTest() {
-        //super("Simple Client Test");
         client = new SimpleClient(this);
-        
-       /* JButton startButton = new JButton("Connect");
-        startButton.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent e) {
-                start();
-            }
-        });
-        
-        setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
-        
-        addWindowListener(new WindowAdapter() {
-           public void windowClosing(WindowEvent e) {
-               shutdown();
-           }
-        });
-        
-        JPanel bottomPanel = new JPanel();
-        bottomPanel.add(startButton);
-        
-        add(bottomPanel, BorderLayout.SOUTH);
-        
-        setBounds(200, 200, 600, 300);
-        
-        setVisible(true);
-         
-         */
-    }
-    
-    private void shutdown() {
-        System.exit(0);
     }
     
     private void start() {
@@ -69,7 +39,15 @@ public class ClientTest implements SimpleClientListener, ClientChannelListener {
     }
     
     public final static void main(String[] args) {
-        new ClientTest().start();
+        ClientTest client = new ClientTest();
+        synchronized(client) {
+            client.start();
+            try {
+                client.wait();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     public void disconnected(boolean graceful) {
@@ -85,7 +63,7 @@ public class ClientTest implements SimpleClientListener, ClientChannelListener {
 
     public void loggedIn() {
         System.out.println("Logged In");
-        client.send("some message".getBytes());
+        client.send("Join Channel".getBytes());
     }
 
     public void loginFailed(String reason) {
@@ -116,7 +94,7 @@ public class ClientTest implements SimpleClientListener, ClientChannelListener {
 
     public void receivedMessage(byte[] message) {
         System.out.println("Received general server message size " + 
-            message.length + " " + new String(message, 4, message.length - 4));        
+            message.length + " " + new String(message, 4, message.length - 4));
     }
 
     // methods inherited from ClientChannelListener
@@ -130,7 +108,6 @@ public class ClientTest implements SimpleClientListener, ClientChannelListener {
         System.out.println("ClientTest receivedChannelMessage " + channel.getName() + 
                 " from " + (sender != null ? sender.toString() : " Server ") + 
                 new String(message));
-        
         
         channel.send("client message".getBytes());
     }
