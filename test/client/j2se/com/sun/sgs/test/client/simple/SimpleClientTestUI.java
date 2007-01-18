@@ -98,15 +98,12 @@ public class SimpleClientTestUI extends JFrame {
     }
     
     private void sendServerMessage(String message) {
-        ByteArrayOutputStream byteStream = new ByteArrayOutputStream(); 
-        DataOutputStream dis = new DataOutputStream(byteStream);
         try {
-            dis.writeUTF(message);
+            sendMessage(message.getBytes("UTF-8"));
+        } catch (IOException e) {
+            e.printStackTrace();
+            return;
         }
-        catch (IOException ioe) {
-        }
-        
-        sendMessage(byteStream.toByteArray());
     }
     
     private JPanel doCenterLayout() {
