@@ -495,7 +495,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
         config.setInitializeCache(true);
         config.setInitializeLocking(true);
         config.setInitializeLogging(true);
-        config.setLockDetectMode(LockDetectMode.MINWRITE);
+        config.setLockDetectMode(LockDetectMode.YOUNGEST);
 	config.setLockTimeout(timeout);
 	config.setMessageHandler(new LoggingMessageHandler());
         config.setRunRecovery(true);
