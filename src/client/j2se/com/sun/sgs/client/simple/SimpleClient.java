@@ -13,10 +13,13 @@ import com.sun.sgs.client.ClientChannelListener;
 import com.sun.sgs.client.ServerSession;
 import com.sun.sgs.client.ServerSessionListener;
 import com.sun.sgs.client.SessionId;
-import com.sun.sgs.client.comm.ClientConnection;
-import com.sun.sgs.client.comm.ClientConnectionListener;
-import com.sun.sgs.client.comm.ClientConnector;
-import com.sun.sgs.impl.client.comm.SimpleConnectorFactory;
+import com.sun.sgs.impl.client.comm.ClientConnection;
+import com.sun.sgs.impl.client.comm.ClientConnectionListener;
+import com.sun.sgs.impl.client.comm.ClientConnector;
+import com.sun.sgs.impl.client.simple.ProtocolMessage;
+import com.sun.sgs.impl.client.simple.ProtocolMessageDecoder;
+import com.sun.sgs.impl.client.simple.ProtocolMessageEncoder;
+import com.sun.sgs.impl.client.simple.SimpleConnectorFactory;
 
 /**
  * An implementation of {@link ServerSession} that clients can use to
@@ -43,10 +46,11 @@ import com.sun.sgs.impl.client.comm.SimpleConnectorFactory;
  * again, the {@link #getSessionId getSessionId} method will
  * return a new <code>SessionId</code>.
  */
-public class SimpleClient implements ServerSession, ClientConnectionListener {
+public class SimpleClient implements ServerSession {
     
     /** The listener for this simple client. */
     private final SimpleClientListener listener;
+    private final ClientConnectionListener connListener;
     private final Map<String, SimpleClientChannel> channels;
     private boolean connected = false;
     private ClientConnection connection;
@@ -66,6 +70,7 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
      */
     public SimpleClient(SimpleClientListener listener) {
         this.listener = listener;
+        connListener = new SimpleClientConnectionListener();
         channels = new ConcurrentHashMap<String, SimpleClientChannel>();
     }
 
@@ -99,10 +104,12 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
     public void login(Properties props) throws IOException {
         ClientConnector connector =
             new SimpleConnectorFactory().createConnector(props);
-        connector.connect(this);
+        connector.connect(connListener);
     }
 
-    /** {@inheritDoc}
+    /**
+     * {@inheritDoc}
+     * <p>
      * @throws IllegalStateException if this session is disconnected
      */
     public SessionId getSessionId() {
@@ -114,7 +121,9 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
 	return connected;
     }
 
-    /** {@inheritDoc}
+    /**
+     * {@inheritDoc}
+     * <p>
      * @throws IllegalStateException if this session is disconnected
      */
     public void logout(boolean force) {
@@ -137,7 +146,9 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
         }
     }
 
-    /** {@inheritDoc}
+    /**
+     * {@inheritDoc}
+     * <p>
      * @throws IllegalStateException if this session is disconnected
      */
     public void send(byte[] message) {
@@ -153,162 +164,168 @@ public class SimpleClient implements ServerSession, ClientConnectionListener {
         connection.sendMessage(data);
     }
 
-    /**
-     * Called in the midst of the connection process.  At this point the connection
-     * has been established, but there is as yet no session.  
-     *
-     * @param connection        the live connection to the server
-     */
-    public void connected(ClientConnection connection) {
-        System.out.println("SimpleClient: connected");
-        connected = true;
-        this.connection = connection;
-        
-        PasswordAuthentication authentication = 
-            listener.getPasswordAuthentication("Enter Username/Password");
-
-        ProtocolMessageEncoder m = new ProtocolMessageEncoder(
-                ProtocolMessage.APPLICATION_SERVICE,
-                ProtocolMessage.LOGIN_REQUEST);
-        m.writeString(authentication.getUserName());
-        // TODO wrapping the char[] in a String is probably not the way to go
-        m.writeString(new String(authentication.getPassword()));
-        sendRaw(m.getMessage());
-    }
-
-    public void disconnected(boolean graceful, byte[] message) {
-        connected = false;
-        listener.disconnected(graceful);
-    }
-
-    // refactor to receivedMessage(ByteBuffer)
-    // all API level messages will come in on this call-back.  From here they
-    // are interpreted and dispatched to a channel, or the ServerSessionListener.
-    public void receivedMessage(byte[] message) {
-        ProtocolMessageDecoder decoder = new ProtocolMessageDecoder(message);
-        int versionNumber = decoder.readVersionNumber();
-        int service = decoder.readServiceNumber();
-        int command = decoder.readCommand();
-        System.out.println("SimpleClient messageReceived: " + message.length + 
-                            " command 0x" + Integer.toHexString(command));
-        
-        switch (service) {
-        
-        case ProtocolMessage.APPLICATION_SERVICE:
-            switch (command) {
-            case ProtocolMessage.LOGIN_SUCCESS:
-                System.out.println("logging in");
-                sessionStarted(message);
-                break;
-                
-            case ProtocolMessage.LOGIN_FAILURE:
-                listener.loginFailed(decoder.readString());
-                break;
-
-                
-            case ProtocolMessage.MESSAGE_SEND:
-                listener.receivedMessage(decoder.readBytes());
-                break;
-
-            case ProtocolMessage.RECONNECT_SUCCESS:
-                listener.reconnected();
-                break;
-
-            case ProtocolMessage.RECONNECT_FAILURE:
-                try {
-                    connection.disconnect();
-                } catch (IOException e) {
-                    // TODO
-                }
-                break;
-
-            case ProtocolMessage.LOGOUT_SUCCESS:
-                try {
-                    connection.disconnect();
-                } catch (IOException e) {
-                    // TODO
-                }
-                break;
-                
-            default:
-                System.err.println("Unknown opcode: 0x" +
-                    Integer.toHexString(command));
-                break;
-            }
-            break;
-
-        case ProtocolMessage.CHANNEL_SERVICE:
-            switch (command) {
+    final class SimpleClientConnectionListener
+        implements ClientConnectionListener
+    {
+        /**
+         * Called in the midst of the connection process.  At this point the connection
+         * has been established, but there is as yet no session.  
+         *
+         * @param connection        the live connection to the server
+         */
+        public void connected(
+                @SuppressWarnings("hiding") ClientConnection connection)
+        {
+            System.out.println("SimpleClient: connected");
+            connected = true;
+            SimpleClient.this.connection = connection;
             
-            case ProtocolMessage.CHANNEL_JOIN: {
-                String channelName = decoder.readString();
-                System.err.println("joining channel " + channelName);
-                SimpleClientChannel channel =
-                    new SimpleClientChannel(channelName);
-                channels.put(channelName, channel);
-                channel.setListener(listener.joinedChannel(channel));
-                break;
-            }
-                
-            case ProtocolMessage.CHANNEL_LEAVE: {
-                String channelName = decoder.readString();
-                SimpleClientChannel channel = channels.remove(channelName);
-                if (channel != null) {
-                    channel.getListener().leftChannel(channel);
-                }
-                break;
-            }
-                
-            case ProtocolMessage.CHANNEL_MESSAGE:
-                String channelName = decoder.readString();
-                SimpleClientChannel channel = channels.get(channelName);
-                if (channel == null) {
-                    System.err.println("No channel found for '" +
-                            channelName + "'");
-                    return;
-                }
-                long seq = decoder.readLong();
-                SessionId sid =
-                    SessionId.fromBytes(decoder.readBytes());
-                channel.getListener().receivedMessage(
-                        channel, sid, decoder.readBytes());
-                break;
-                
-            default:
-                System.err.println("Unknown opcode: 0x" +
-                    Integer.toHexString(command));
-                break;
-            }
-            break;
-            
-        default:
-            System.err.println("Unknown service: 0x" +
-                    Integer.toHexString(service));
-            break;
-        }
-    }
-
-    public void reconnected(byte[] message) {
-        listener.reconnected();
-        
-    }
-
-    public void reconnecting(byte[] message) {
-        listener.reconnecting();
-    }
-
-    public ServerSessionListener sessionStarted(byte[] message) {
-        extractSessionId(message);
-        
-        listener.loggedIn();
-        
-        return listener;
-    }
+            PasswordAuthentication authentication = 
+                listener.getPasswordAuthentication("Enter Username/Password");
     
-    private void extractSessionId(byte[] message) {
-        ProtocolMessageDecoder decoder = new ProtocolMessageDecoder(message);
-        byte[] bytes = decoder.readBytes();
-        sessionId = SessionId.fromBytes(bytes);
+            ProtocolMessageEncoder m = new ProtocolMessageEncoder(
+                    ProtocolMessage.APPLICATION_SERVICE,
+                    ProtocolMessage.LOGIN_REQUEST);
+            m.writeString(authentication.getUserName());
+            // TODO wrapping the char[] in a String is probably not the way to go
+            m.writeString(new String(authentication.getPassword()));
+            sendRaw(m.getMessage());
+        }
+    
+        public void disconnected(boolean graceful, byte[] message) {
+            connected = false;
+            listener.disconnected(graceful);
+        }
+    
+        // refactor to receivedMessage(ByteBuffer)
+        // all API level messages will come in on this call-back.  From here they
+        // are interpreted and dispatched to a channel, or the ServerSessionListener.
+        public void receivedMessage(byte[] message) {
+            ProtocolMessageDecoder decoder = new ProtocolMessageDecoder(message);
+            int versionNumber = decoder.readVersionNumber();
+            int service = decoder.readServiceNumber();
+            int command = decoder.readCommand();
+            System.out.println("SimpleClient messageReceived: " + message.length + 
+                                " command 0x" + Integer.toHexString(command));
+            
+            switch (service) {
+            
+            case ProtocolMessage.APPLICATION_SERVICE:
+                switch (command) {
+                case ProtocolMessage.LOGIN_SUCCESS:
+                    System.out.println("logging in");
+                    sessionStarted(message);
+                    break;
+                    
+                case ProtocolMessage.LOGIN_FAILURE:
+                    listener.loginFailed(decoder.readString());
+                    break;
+    
+                    
+                case ProtocolMessage.MESSAGE_SEND:
+                    listener.receivedMessage(decoder.readBytes());
+                    break;
+    
+                case ProtocolMessage.RECONNECT_SUCCESS:
+                    listener.reconnected();
+                    break;
+    
+                case ProtocolMessage.RECONNECT_FAILURE:
+                    try {
+                        connection.disconnect();
+                    } catch (IOException e) {
+                        // TODO
+                    }
+                    break;
+    
+                case ProtocolMessage.LOGOUT_SUCCESS:
+                    try {
+                        connection.disconnect();
+                    } catch (IOException e) {
+                        // TODO
+                    }
+                    break;
+                    
+                default:
+                    System.err.println("Unknown opcode: 0x" +
+                        Integer.toHexString(command));
+                    break;
+                }
+                break;
+    
+            case ProtocolMessage.CHANNEL_SERVICE:
+                switch (command) {
+                
+                case ProtocolMessage.CHANNEL_JOIN: {
+                    String channelName = decoder.readString();
+                    System.err.println("joining channel " + channelName);
+                    SimpleClientChannel channel =
+                        new SimpleClientChannel(channelName);
+                    channels.put(channelName, channel);
+                    channel.setListener(listener.joinedChannel(channel));
+                    break;
+                }
+                    
+                case ProtocolMessage.CHANNEL_LEAVE: {
+                    String channelName = decoder.readString();
+                    SimpleClientChannel channel = channels.remove(channelName);
+                    if (channel != null) {
+                        channel.getListener().leftChannel(channel);
+                    }
+                    break;
+                }
+                    
+                case ProtocolMessage.CHANNEL_MESSAGE:
+                    String channelName = decoder.readString();
+                    SimpleClientChannel channel = channels.get(channelName);
+                    if (channel == null) {
+                        System.err.println("No channel found for '" +
+                                channelName + "'");
+                        return;
+                    }
+                    long seq = decoder.readLong();
+                    SessionId sid =
+                        SessionId.fromBytes(decoder.readBytes());
+                    channel.getListener().receivedMessage(
+                            channel, sid, decoder.readBytes());
+                    break;
+                    
+                default:
+                    System.err.println("Unknown opcode: 0x" +
+                        Integer.toHexString(command));
+                    break;
+                }
+                break;
+                
+            default:
+                System.err.println("Unknown service: 0x" +
+                        Integer.toHexString(service));
+                break;
+            }
+        }
+    
+        public void reconnected(byte[] message) {
+            listener.reconnected();
+            
+        }
+    
+        public void reconnecting(byte[] message) {
+            listener.reconnecting();
+        }
+    
+        public ServerSessionListener sessionStarted(byte[] message) {
+            extractSessionId(message);
+            
+            listener.loggedIn();
+            
+            return listener;
+        }
+        
+        private void extractSessionId(byte[] message) {
+            ProtocolMessageDecoder decoder = new ProtocolMessageDecoder(message);
+            byte[] bytes = decoder.readBytes();
+            sessionId = SessionId.fromBytes(bytes);
+        }
     }
 
     final class SimpleClientChannel implements ClientChannel {

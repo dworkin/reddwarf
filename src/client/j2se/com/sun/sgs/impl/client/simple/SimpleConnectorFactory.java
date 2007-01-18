@@ -1,9 +1,9 @@
-package com.sun.sgs.impl.client.comm;
+package com.sun.sgs.impl.client.simple;
 
 import java.util.Properties;
 
-import com.sun.sgs.client.comm.ClientConnector;
-import com.sun.sgs.client.comm.ClientConnectorFactory;
+import com.sun.sgs.impl.client.comm.ClientConnector;
+import com.sun.sgs.impl.client.comm.ClientConnectorFactory;
 
 /**
  * A basic ClientConnectorFactory that simply creates a new 

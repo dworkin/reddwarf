@@ -3,18 +3,23 @@ package com.sun.sgs.client.simple;
 import java.io.IOException;
 import java.net.PasswordAuthentication;
 import java.util.Properties;
+import java.util.concurrent.Callable;
 
 import org.apache.mina.filter.codec.ProtocolEncoder;
 
 import com.sun.sgs.client.ServerSession;
 import com.sun.sgs.client.ServerSessionListener;
 import com.sun.sgs.client.SessionId;
-import com.sun.sgs.client.comm.ClientConnection;
-import com.sun.sgs.client.comm.ClientConnectionListener;
-import com.sun.sgs.client.comm.ClientConnector;
-import com.sun.sgs.impl.client.comm.SimpleConnectorFactory;
+import com.sun.sgs.impl.client.comm.ClientConnection;
+import com.sun.sgs.impl.client.comm.ClientConnectionListener;
+import com.sun.sgs.impl.client.comm.ClientConnector;
+import com.sun.sgs.impl.client.simple.ChannelManager;
+import com.sun.sgs.impl.client.simple.ProtocolMessage;
+import com.sun.sgs.impl.client.simple.ProtocolMessageDecoder;
+import com.sun.sgs.impl.client.simple.ProtocolMessageEncoder;
+import com.sun.sgs.impl.client.simple.SimpleConnectorFactory;
 
-import static com.sun.sgs.client.simple.ProtocolMessage.*;
+import static com.sun.sgs.impl.client.simple.ProtocolMessage.*;
 
 /**
  * An implementation of {@link ServerSession} that clients can use to
@@ -99,9 +104,14 @@ public class SimpleClient2 implements ServerSession {
      * use for this client's session (e.g., connection properties)
      */
     public void login(Properties props) throws IOException {
-        channelManager = new ChannelManager(this, simpleClientListener);
+        channelManager = new ChannelManager(
+                new Callable<ClientConnection>() {
+                    public ClientConnection call() throws Exception {
+                        return connection;
+                    }
+                }, simpleClientListener);
         ClientConnector connector = 
-                            new SimpleConnectorFactory().createConnector(props);
+            new SimpleConnectorFactory().createConnector(props);
         connector.connect(clientConnectionListener);
     }
 
@@ -152,7 +162,7 @@ public class SimpleClient2 implements ServerSession {
      * 
      * @param messageEncoder
      */
-    void sendMessage(ProtocolMessageEncoder messageEncoder) {
+    private void sendMessage(ProtocolMessageEncoder messageEncoder) {
         connection.sendMessage(messageEncoder.getMessage());
     }
     

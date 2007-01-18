@@ -1,4 +1,4 @@
-package com.sun.sgs.client.simple;
+package com.sun.sgs.impl.client.simple;
 
 import com.sun.sgs.client.SessionId;
 

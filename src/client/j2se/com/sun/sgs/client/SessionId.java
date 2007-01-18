@@ -24,7 +24,7 @@ public abstract class SessionId {
      * <code>SessionId</code>
      */
     public static SessionId fromBytes(byte[] id) {
-	return new com.sun.sgs.client.simple.SimpleSessionId(id);
+	return new com.sun.sgs.impl.client.simple.SimpleSessionId(id);
     }
 
     /**

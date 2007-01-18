@@ -1,13 +1,13 @@
-package com.sun.sgs.impl.client.comm;
+package com.sun.sgs.impl.client.simple;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.Properties;
 
-import com.sun.sgs.client.comm.ClientConnection;
-import com.sun.sgs.client.comm.ClientConnectionListener;
-import com.sun.sgs.client.comm.ClientConnector;
+import com.sun.sgs.impl.client.comm.ClientConnection;
+import com.sun.sgs.impl.client.comm.ClientConnectionListener;
+import com.sun.sgs.impl.client.comm.ClientConnector;
 import com.sun.sgs.impl.io.CompleteMessageFilter;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.IOConstants.TransportType;

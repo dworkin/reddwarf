@@ -1,4 +1,4 @@
-package com.sun.sgs.client.simple;
+package com.sun.sgs.impl.client.simple;
 
 import java.io.DataInput;
 
@@ -24,8 +24,10 @@ public interface ProtocolMessage {
     /** The version number. */
     final byte VERSION = 0x01;
 
+    /** Application Service */
     final byte APPLICATION_SERVICE = 0x01;
 
+    /** Channel Service */
     final byte CHANNEL_SERVICE = 0x02;
 
     /**
@@ -101,7 +103,9 @@ public interface ProtocolMessage {
      * </ul>
      */
     final byte MESSAGE_SEND = 0x30;
+    /** Message Send (remove?) */
     final byte MESSAGE_TO_SERVER = 0x30; // TODO: MESSAGE_SEND better? -JM
+    /** Message Send (remove?) */
     final byte MESSAGE_FROM_SERVER = 0x30; // TODO: MESSAGE_SEND better? -JM
 
     /**

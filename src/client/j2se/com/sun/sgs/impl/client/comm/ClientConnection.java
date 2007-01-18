@@ -1,4 +1,4 @@
-package com.sun.sgs.client.comm;
+package com.sun.sgs.impl.client.comm;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;

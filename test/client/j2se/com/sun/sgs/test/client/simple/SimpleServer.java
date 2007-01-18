@@ -5,9 +5,9 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 
 import com.sun.sgs.client.SessionId;
-import com.sun.sgs.client.simple.ProtocolMessageDecoder;
-import com.sun.sgs.client.simple.ProtocolMessageEncoder;
 
+import com.sun.sgs.impl.client.simple.ProtocolMessageDecoder;
+import com.sun.sgs.impl.client.simple.ProtocolMessageEncoder;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.IOConstants.TransportType;
 import com.sun.sgs.io.IOAcceptorListener;
@@ -15,7 +15,7 @@ import com.sun.sgs.io.IOAcceptor;
 import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
 
-import static com.sun.sgs.client.simple.ProtocolMessage.*;
+import static com.sun.sgs.impl.client.simple.ProtocolMessage.*;
 
 /**
  * A simple server harness for testing the Client API.  This server

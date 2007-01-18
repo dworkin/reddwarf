@@ -1,13 +1,16 @@
-package com.sun.sgs.client.simple;
+package com.sun.sgs.impl.client.simple;
 
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.concurrent.Callable;
 
+import com.sun.sgs.client.ClientChannel;
 import com.sun.sgs.client.ClientChannelListener;
 import com.sun.sgs.client.ServerSessionListener;
 import com.sun.sgs.client.SessionId;
+import com.sun.sgs.impl.client.comm.ClientConnection;
 
-import static com.sun.sgs.client.simple.ProtocolMessage.*;
+import static com.sun.sgs.impl.client.simple.ProtocolMessage.*;
 
 /**
  * The ChannelManager handles all the channel related functions of the client.
@@ -30,15 +33,17 @@ import static com.sun.sgs.client.simple.ProtocolMessage.*;
  * @author      Sten Anderson
  * @version     1.0
  */
-class ChannelManager {
+public class ChannelManager {
     
-    private SimpleClient2 client;
+    private final Callable<ClientConnection> connectionAccess;
     private ServerSessionListener ssl;
     private HashMap<String, SimpleClientChannel> channelMap;
     private long currentSequenceNumber;
     
-    ChannelManager(SimpleClient2 client, ServerSessionListener ssl) {
-        this.client = client;
+    public ChannelManager(Callable<ClientConnection> connectionAccess,
+            ServerSessionListener ssl)
+    {
+        this.connectionAccess = connectionAccess;
         this.ssl = ssl;
         channelMap = new HashMap<String, SimpleClientChannel>();
     }
@@ -66,7 +71,13 @@ class ChannelManager {
         }
         messageEncoder.writeBytes(message);
         
-        client.sendMessage(messageEncoder);
+        try {
+            connectionAccess.call().sendMessage(messageEncoder.getMessage());
+        } catch (Exception e) {
+            throw (e instanceof RuntimeException)
+                    ? RuntimeException.class.cast(e)
+                    : new RuntimeException(e);
+        }
     }
     
     /**
@@ -76,7 +87,7 @@ class ChannelManager {
      * @param messageDecoder    the message decoder, which is positioned at
      *                          the op code
      */
-    void receivedMessage(ProtocolMessageDecoder messageDecoder) {
+    public void receivedMessage(ProtocolMessageDecoder messageDecoder) {
         int command = messageDecoder.readCommand();
         String channelName = messageDecoder.readString();
         if (command == CHANNEL_JOIN) {
@@ -124,7 +135,7 @@ class ChannelManager {
         
         // if the message is from the server, the sender is null.
         if (senderBytes.length > 0) {
-            sender = SessionId.fromBytes(senderBytes);;
+            sender = SessionId.fromBytes(senderBytes);
         }
         channel.getListener().receivedMessage(channel, sender, 
                                             messageDecoder.readBytes());

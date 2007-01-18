@@ -1,4 +1,4 @@
-package com.sun.sgs.client.simple;
+package com.sun.sgs.impl.client.simple;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
