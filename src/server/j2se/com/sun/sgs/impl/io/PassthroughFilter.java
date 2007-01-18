@@ -30,6 +30,13 @@ public class PassthroughFilter extends AbstractFilter {
     private int currentLength;
 
     /**
+     * Default constructor.
+     */
+    public PassthroughFilter() {
+        // empty
+    }
+
+    /**
      * {@inheritDoc}
      * <p>
      * This implementation simply strips the length header from incoming

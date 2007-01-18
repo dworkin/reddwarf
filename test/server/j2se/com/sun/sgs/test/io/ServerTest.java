@@ -11,7 +11,6 @@ import com.sun.sgs.io.IOAcceptorListener;
 import com.sun.sgs.io.IOAcceptor;
 import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
-import com.sun.sgs.test.client.simple.SimpleServer;
 
 /**
  * A test harness for the server {@code Acceptor} code.

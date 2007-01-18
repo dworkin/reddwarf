@@ -12,10 +12,17 @@ import java.util.concurrent.Executor;
 public class DaemonExecutor implements Executor {
 
     /**
-     * {@inheritDoc}
-     * <p>
-     * This implementation executes the {@code command} in a new
+     * Default constructor.
+     */
+    public DaemonExecutor() {
+        // empty
+    }
+
+    /**
+     * Executes the given command immediately in a new
      * daemon {@code Thread}.
+     * 
+     * @see Thread#setDaemon
      */
     public void execute(Runnable command) {
         Thread t = new Thread(command);

@@ -18,13 +18,13 @@ import com.sun.sgs.io.IOHandler;
 /**
  * This is an adapter between an Apache Mina {@link IoHandler} and the SGS
  * IO framework {@link IOHandler}.  SocketHandlers exist one per handle on
- * the client {@link IOConnector} side, and exit one per {@link IOAcceptor}
+ * the client {@link IOConnector} side, and exist one per {@link IOAcceptor}
  * on the server side.
  * 
  * @author  Sten Anderson
  * @since   1.0
  */
-public class SocketHandler extends IoHandlerAdapter {
+class SocketHandler extends IoHandlerAdapter {
     private static final LoggerWrapper logger =
         new LoggerWrapper(Logger.getLogger(SocketHandler.class.getName()));
 

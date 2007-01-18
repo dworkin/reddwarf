@@ -1,7 +1,7 @@
 /**
- * The I/O package provides the high level abstraction for using I/O services.
- * Clients should use these interfaces, regardless of the implementation that
- * backs them.
+ * Provides a high-level abstraction for SGS I/O functionality.
+ * System components should use these interfaces to decouple them from
+ * the backing implementation.
  * <p>
  * To use this framework, typically a client would obtain an
  * {@link com.sun.sgs.io.IOConnector} or {@link com.sun.sgs.io.IOAcceptor}

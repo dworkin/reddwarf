@@ -38,6 +38,13 @@ public class CompleteMessageFilter extends AbstractFilter {
 
     /** The current length of the partial message. */
     private int currentLength;
+    
+    /**
+     * Default constructor.
+     */
+    public CompleteMessageFilter() {
+        // empty
+    }
 
     /**
      * Called each time the framework receives a bytes message. It will call
