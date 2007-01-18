@@ -15,6 +15,7 @@
 
   <!-- Build location -->
   <property name="build.dir" location="build"/>
+  <property name="lib.dir" location="lib"/>
 
   <!-- Values for controlling compilation -->
   <property name="javac.source" value="1.5"/>
@@ -53,8 +54,24 @@
   
   <!-- Server class path -->
   <path id="server.classpath">
-    <pathelement path="${build.dir}/classes/server"/>
-    <pathelement path="${bdb.lib.dir}/db.jar"/>
+    <pathelement location="${build.dir}/classes/server"/>
+    <pathelement location="${bdb.lib.dir}/db.jar"/>
+    <pathelement location="${lib.dir}/mina-core-1.0.1.jar"/>
+    <pathelement location="${lib.dir}/mina-java5-1.0.1.jar"/>
+    <pathelement location="${lib.dir}/backport-util-concurrent-Java50-3.0.jar"/>
+    <pathelement location="${lib.dir}/slf4j-jdk14.jar"/>
+  </path>
+
+  <!-- Client class path -->
+  <path id="client.classpath">
+    <pathelement location="${build.dir}/classes/client"/>
+    <fileset dir="${build.dir}/classes/server">
+      <include name="com/sun/sgs/**/io/**/*.class"/>
+    </fileset>
+    <pathelement location="${lib.dir}/mina-core-1.0.1.jar"/>
+    <pathelement location="${lib.dir}/mina-java5-1.0.1.jar"/>
+    <pathelement location="${lib.dir}/backport-util-concurrent-Java50-3.0.jar"/>
+    <pathelement location="${lib.dir}/slf4j-jdk14.jar"/>
   </path>
 
   <!-- TARGET DEFINITIONS -->
@@ -147,7 +164,7 @@
   <target name="javadoc-client" depends="build-client"
 	  description="Builds internal (full) client javadoc">
     <javadoc sourcepath="src/client/j2se" destdir="${build.dir}/javadoc/client"
-             classpath="${build.dir}/classes/client" packagenames="com.sun.*"
+             classpathref="client.classpath" packagenames="com.sun.*"
              overview="src/client/j2se/overview.html"
              windowtitle="${project.name}" doctitle="${project.name}"
 	     author="no">
@@ -312,9 +329,10 @@
       <sysproperty key="java.io.tmpdir" file="${build.dir}/test/output"/>
       <sysproperty key="java.util.logging.config.file"
 		   file="${test.logging}"/>
-      <classpath path="${build.dir}/test/classes/server;
-		       ${build.dir}/classes/server;
-		       ${bdb.lib.dir}/db.jar"/>
+      <classpath>
+        <pathelement location="${build.dir}/test/classes/server"/>
+        <path refid="server.classpath"/>
+      </classpath>
       <syspropertyset>
 	<propertyref prefix="test."/>
       </syspropertyset>
@@ -347,8 +365,40 @@
 	   source="${javac.source}"
 	   classpath="${build.dir}/classes/server"
 	   includes="**/*.java">
-      <compilerarg line="${javac.compilerargs}"/>
+      <compilerarg value="${javac.compilerargs}"/>
     </javac>
   </target>
 
+  <!-- Run IO test server -->
+  <target name="io-test-server" depends="build-server"
+          description="Runs the IO test server">
+    <java classname="com.sun.sgs.test.impl.io.ServerTest"
+          fork="true">
+      <jvmarg line="${test.jvm.args}"/>
+      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${test.logging}"/>
+      <classpath>
+        <pathelement location="${build.dir}/test/classes/server"/>
+        <path refid="server.classpath"/>
+      </classpath>
+    </java>
+  </target>
+
+  <!-- Run IO test client -->
+  <target name="io-test-client" depends="build-server"
+          description="Runs the IO test client">
+    <java classname="com.sun.sgs.test.impl.io.ClientTest"
+          fork="true">
+      <jvmarg line="${test.jvm.args}"/>
+      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${test.logging}"/>
+      <classpath>
+        <pathelement location="${build.dir}/test/classes/server"/>
+        <path refid="server.classpath"/>
+      </classpath>
+    </java>
+  </target>
+  
 </project>
