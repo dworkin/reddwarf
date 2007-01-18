@@ -27,8 +27,8 @@
 
   <!-- Values for the JavaDocs -->
   <property name="project.name" value="Sun Game Server"/>
-  <property name="project.version" value="0.2"/>
-  <property name="project.build" value="December 2006"/>
+  <property name="project.version" value="0.3"/>
+  <property name="project.build" value="January 2007"/>
   <property name="jdk.doc.api.url"
 	    value="http://java.sun.com/j2se/1.5/docs/api"/>
   <property name="jdk.package.list" value="etc/jdk5.0_package_list"/>
