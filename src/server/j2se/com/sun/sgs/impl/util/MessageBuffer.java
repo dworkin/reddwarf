@@ -6,7 +6,7 @@ import java.io.UTFDataFormatException;
  * A buffer for composing/decomposing messages.
  *
  * <p>Strings are encoded in modified UTF-8 format as described in
- * {@link DataInput}.
+ * {@link java.io.DataInput}.
  */
 public class MessageBuffer {
 
