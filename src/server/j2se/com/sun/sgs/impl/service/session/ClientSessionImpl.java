@@ -365,9 +365,8 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
      * Handles a disconnect request (if not already handlede) by doing
      * the following:
      *
-     * a) sending a disconnect acknowledgement (either LOGOUT_SUCCESS
-     * if 'graceful' is true, or SESSION_DISCONNECT if 'graceful' is
-     * false)
+     * a) sending a disconnect acknowledgement (LOGOUT_SUCCESS)
+     * if 'graceful' is true
      *
      * b) closing this session's connection
      *
@@ -771,9 +770,9 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		getContext().addMessageFirst(
 		    ClientSessionImpl.this, getLoginNackMessage().getBuffer(),
 		    Delivery.RELIABLE);
-		scheduleNonTransactionalTask(new KernelRunnable() {
+		scheduleNonTransactionalTaskOnCommit(new KernelRunnable() {
 			public void run() {
-			    //handleDisconnect(false);
+			    handleDisconnect(false);
 			}});
 	    } else {
 		listener = new SessionListener(returnedListener);

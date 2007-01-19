@@ -520,6 +520,15 @@ public class ClientSessionServiceImpl
 		     sessionMessages.entrySet())
             {
                 ClientSessionImpl session = entry.getKey();
+                if (! session.isConnected()) {
+                    if (logger.isLoggable(Level.FINER)) {
+                        logger.log(
+                                Level.FINER,
+                                "dropping messages for " +
+                                "disconnected session:{0}", session);
+                    }
+                    return;
+                }
                 List<byte[]> messages = entry.getValue();
                 for (byte[] message : messages) {
                    session.sendMessage(message, Delivery.RELIABLE);
