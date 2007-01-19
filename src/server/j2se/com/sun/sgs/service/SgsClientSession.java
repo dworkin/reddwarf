@@ -23,4 +23,13 @@ public interface SgsClientSession extends ClientSession {
      * @param delivery a delivery requirement
      */
     void sendMessage(byte[] message, Delivery delivery);
+
+    /**
+     * Sends the message in the specified byte array to this
+     * session's client when the current transaction commits.
+     *
+     * @param message a complete protocol message
+     * @param delivery a delivery requirement
+     */
+    void sendMessageOnCommit(byte[] message, Delivery delivery);
 }

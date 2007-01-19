@@ -66,6 +66,16 @@ public class NonDurableTaskScheduler {
     public void scheduleNonTransactionalTask(KernelRunnable task) {
 	taskService.scheduleNonDurableTask(task);
     }
+    
+    /**
+     * Schedules a non-durable, non-transactional task using the task
+     * service obtained during construction.
+     *
+     * @param task a task
+     */
+    public void scheduleNonTransactionalTaskOnCommit(KernelRunnable task) {
+	taskService.scheduleNonDurableTask(task);
+    }
 }
 
     

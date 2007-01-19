@@ -1055,6 +1055,9 @@ public class TestChannelServiceImpl extends TestCase {
     
 	public void sendMessage(byte[] message, Delivery delivery) {
 	}
+
+	public void sendMessageOnCommit(byte[] message, Delivery delivery) {
+	}
 	
 	/* -- Implement Object -- */
 	

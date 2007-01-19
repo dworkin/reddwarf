@@ -8,6 +8,7 @@ import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.Delivery;
+import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.NameExistsException;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.PeriodicTaskHandle;
@@ -546,7 +547,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    connected = false;
 	    try {
 	        SocketAddress addr =
-	            new InetSocketAddress(InetAddress.getLocalHost(), port); 
+	            new InetSocketAddress("", port); 
 	        connector =
 	            new SocketEndpoint(addr, TransportType.RELIABLE)
 	                .createConnector();
@@ -762,11 +763,11 @@ public class TestClientSessionServiceImpl extends TestCase {
 		}
 	    }
 
-	    public void disconnected(IOHandle h) {
+	    public void disconnected(IOHandle handle) {
 	    }
 	    
 	    public void exceptionThrown(
-		IOHandle h, Throwable exception)
+		IOHandle handle, Throwable exception)
 	    {
 		System.err.println("DummyClient.Listener.exceptionThrown " +
 				   "exception:" + exception);
@@ -784,8 +785,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 		new HashMap<ClientSession,ClientSessionListener>());
 	
 	public ClientSessionListener loggedIn(ClientSession session) {
-	    ClientSessionListener listener =
+	    DummyClientSessionListener listener =
 		new DummyClientSessionListener(session);
+	    //txnProxy.getService(DataService.class).createReference(listener);
 	    for (ClientSession activeSession : sessions.keySet()) {
 		if (session.getName().equals(activeSession.getName())) {
 		    System.err.println(
@@ -808,12 +810,12 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     private static class DummyClientSessionListener
-	implements ClientSessionListener, Serializable
+	implements ClientSessionListener, Serializable//, ManagedObject
     {
 	private final static long serialVersionUID = 1L;
 	private boolean receivedDisconnectedCallback = false;
 	
-	private final ClientSession session;
+	private transient final ClientSession session;
 	
 	DummyClientSessionListener(ClientSession session) {
 	    this.session = session;
