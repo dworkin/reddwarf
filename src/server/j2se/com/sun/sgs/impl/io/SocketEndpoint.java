@@ -131,16 +131,20 @@ public class SocketEndpoint implements Endpoint<SocketAddress> {
     }
 
     /**
-     * {@inheritDoc}
+     * Returns the {@link SocketAddress} encapsulated by this
+     * {@code SocketEndpoint}.
+     *
+     * @return the {@code SocketAddress} encapsulated by this
+     *         {@code SocketEndpoint}.
      */
     public SocketAddress getAddress() {
         return address;
     }
 
     /**
-     * Return the {@link TransportType} encapsulated by this
+     * Returns the {@link TransportType} encapsulated by this
      * {@code SocketEndpoint}.
-     * 
+     *
      * @return the {@code TransportType} encapsulated by this
      *         {@code SocketEndpoint}.
      */
@@ -149,7 +153,7 @@ public class SocketEndpoint implements Endpoint<SocketAddress> {
     }
 
     /**
-     * Return the {@link Executor} encapsulated by this {@code SocketEndpoint}.
+     * Returns the {@link Executor} encapsulated by this {@code SocketEndpoint}.
      * 
      * @return the {@link Executor} encapsulated by this {@code SocketEndpoint}.
      */
@@ -158,9 +162,9 @@ public class SocketEndpoint implements Endpoint<SocketAddress> {
     }
 
     /**
-     * Return the number of processors used by this {@code SocketEndpoint}.
+     * Returns the number of processors available to the MINA framework.
      * 
-     * @return the number of processors used by this {@code SocketEndpoint}.
+     * @return the number of processors available to the MINA framework
      */
     public int getNumProcessors() {
         return numProcessors;
