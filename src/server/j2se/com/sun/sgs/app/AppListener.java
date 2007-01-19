@@ -43,8 +43,11 @@ public interface AppListener extends ManagedObject {
     /**
      * Notifies this listener that the specified client session has
      * logged in, and returns a {@link ClientSessionListener} for that
-     * session.  The returned listener should implement {@link Serializable}
-     * so that it can be stored persistently.
+     * session.  The returned listener should implement {@link
+     * Serializable} so that it can be stored persistently.  If the
+     * returned listener does not implement <code>Serializable</code>,
+     * then the client session is disconnected without completing the
+     * login process.
      *
      * <p>The returned <code>ClientSessionListener</code> is notified as
      * follows:<ul>

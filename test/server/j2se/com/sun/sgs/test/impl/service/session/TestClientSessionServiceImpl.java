@@ -8,6 +8,7 @@ import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.Delivery;
+import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.NameExistsException;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.PeriodicTaskHandle;
@@ -57,6 +58,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.net.InetAddress;
+import java.net.SocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -90,7 +92,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     private static Properties serviceProps = createProperties(
 	"com.sun.sgs.appName", "TestClientSessionServiceImpl",
 	"com.sun.sgs.app.port", Integer.toString(PORT));
-
+    
     /** Properties for creating the shared database. */
     private static Properties dbProps = createProperties(
 	DataStoreImplClassName + ".directory",
@@ -782,8 +784,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 		new HashMap<ClientSession,ClientSessionListener>());
 	
 	public ClientSessionListener loggedIn(ClientSession session) {
-	    ClientSessionListener listener =
+	    DummyClientSessionListener listener =
 		new DummyClientSessionListener(session);
+	    //txnProxy.getService(DataService.class).createReference(listener);
 	    for (ClientSession activeSession : sessions.keySet()) {
 		if (session.getName().equals(activeSession.getName())) {
 		    System.err.println(
@@ -809,12 +812,12 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     private static class DummyClientSessionListener
-	implements ClientSessionListener, Serializable
+	implements ClientSessionListener, Serializable//, ManagedObject
     {
 	private final static long serialVersionUID = 1L;
 	private boolean receivedDisconnectedCallback = false;
 	
-	private final ClientSession session;
+	private transient final ClientSession session;
 	
 	DummyClientSessionListener(ClientSession session) {
 	    this.session = session;

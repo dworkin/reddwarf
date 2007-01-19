@@ -5,9 +5,13 @@ import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.Delivery;
+import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.app.NameExistsException;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.service.session.SgsProtocol;
+import com.sun.sgs.impl.util.HexDumper;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.MessageBuffer;
 import com.sun.sgs.impl.util.NonDurableTaskScheduler;
@@ -22,12 +26,15 @@ import com.sun.sgs.service.ServiceListener;
 import com.sun.sgs.service.SgsClientSession;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
+import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.service.TransactionProxy;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
@@ -70,16 +77,16 @@ public class ChannelServiceImpl
     private DataService dataService;
 
     /** The client session service. */
-    private ClientSessionService sessionService;
+    ClientSessionService sessionService;
 
     /** The task service. */
-    private TaskService taskService;
+    TaskService taskService;
 
     /** The task scheduler. */
     private TaskScheduler taskScheduler;
 
     /** The task scheduler for non-durable tasks. */
-    private NonDurableTaskScheduler nonDurableTaskScheduler;
+    NonDurableTaskScheduler nonDurableTaskScheduler;
     
     /** The sequence number for channel messages originating from the server. */
     private AtomicLong sequenceNumber = new AtomicLong(0);
@@ -356,8 +363,7 @@ public class ChannelServiceImpl
 		logger.log(Level.FINER, "join txn:{0}", txn);
 	    }
 	    txn.join(this);
-	    context =
-		new Context(dataService, taskService, sessionService, this, txn);
+	    context = new Context(txn);
 	    currentContext.set(context);
 	} else if (!txn.equals(context.txn)) {
 	    currentContext.set(null);
@@ -367,15 +373,6 @@ public class ChannelServiceImpl
 	}
 	return context;
     }
-
-    /**
-     * Returns the next sequence number for messages originating from
-     * this service.
-     */
-    long nextSequenceNumber() {
-	return sequenceNumber.getAndIncrement();
-    }
-    
 
     static Context getContext() {
 	return currentContext.get();
@@ -445,10 +442,19 @@ public class ChannelServiceImpl
 		    }
 		    short msgSize = buf.getShort();
 		    byte[] channelMessage = buf.getBytes(msgSize);
+                    long seq = session.nextSequenceNumber();
+		    byte[] senderId = session.getSessionId();
+
+                    // Immediately forward to receiving clients
 		    nonDurableTaskScheduler.scheduleTask(
-			new SendTask(
-			    name, session.getSessionId(),
-			    sessions, message, session.nextSequenceNumber()));
+                        new ForwardingTask(
+                            name, senderId, sessions, channelMessage, seq));
+                    
+                    // Notify listeners in the app in a transaction
+		    nonDurableTaskScheduler.scheduleTask(
+			new NotifyTask(
+			    name, senderId, channelMessage));
+		    
 		    break;
 		    
 		default:
@@ -481,45 +487,202 @@ public class ChannelServiceImpl
     }
 
     /**
-     * Task (transactional) for sending a message on a channel.
+     * Stores information relating to a specific transaction operating on
+     * channels.
+     *
+     * <p>This context maintains an internal table that maps (for the
+     * channels used in the context's associated transaction) channel name
+     * to channel implementation.  To create, obtain, or remove a channel
+     * within a transaction, the <code>createChannel</code>,
+     * <code>getChannel</code>, or <code>removeChannel</code> methods
+     * (respectively) must be called on the context so that the proper
+     * channel instances are used.
      */
-    private final class SendTask implements KernelRunnable {
+    final class Context {
+
+	/** The transaction. */
+	final Transaction txn;
+
+	final ChannelServiceImpl channelService;
+
+	/** Table of all channels, obtained from the data service. */
+	private final ChannelTable table;
+
+	/**
+	 * Map of channel name to transient channel impl (for those channels used
+	 * during this context's associated transaction).
+	 */
+	private final Map<String,Channel> internalTable =
+	    new HashMap<String,Channel>();
+
+	/**
+	 * Creates an instance of this class with the specified transaction.
+	 */
+	private Context(Transaction txn) {
+	    assert txn != null;
+	    this.txn = txn;
+	    this.channelService = ChannelServiceImpl.this;
+	    this.table = dataService.getServiceBinding(
+		ChannelTable.NAME, ChannelTable.class);
+	}
+
+	/* -- ChannelManager methods -- */
+
+	/**
+	 * Creates a channel with the specified name, listener, and
+	 * delivery requirement.
+	 */
+	private Channel createChannel(String name,
+				      ChannelListener listener,
+				      Delivery delivery)
+	{
+	    assert name != null;
+	    if (table.get(name) != null) {
+		throw new NameExistsException(name);
+	    }
+
+	    ChannelState channelState = new ChannelState(name, listener, delivery);
+	    ManagedReference ref =
+		dataService.createReference(channelState);
+	    dataService.markForUpdate(table);
+	    table.put(name, ref);
+	    Channel channel = new ChannelImpl(this, channelState);
+	    internalTable.put(name, channel);
+	    return channel;
+	}
+
+	/**
+	 * Returns a channel with the specified name.
+	 */
+	private Channel getChannel(String name) {
+	    assert name != null;
+	    Channel channel = internalTable.get(name);
+	    if (channel == null) {
+		ManagedReference ref = table.get(name);
+		if (ref == null) {
+		    throw new NameNotBoundException(name);
+		}
+		ChannelState channelState = ref.get(ChannelState.class);
+		channel = new ChannelImpl(this, channelState);
+		internalTable.put(name, channel);
+	    }
+	    return channel;
+	}
+
+	/**
+	 * Removes the channel with the specified name.  This method is
+	 * called when the 'close' method is invoked on a 'ChannelImpl'.
+	 */
+	void removeChannel(String name) {
+	    assert name != null;
+	    if (table.get(name) != null) {
+		dataService.markForUpdate(table);
+		table.remove(name);
+		internalTable.remove(name);
+	    }
+	}
+
+	<T extends Service> T getService(Class<T> type) {
+	    return txnProxy.getService(type);
+	}
+
+	/**
+	 * Returns the next sequence number for messages originating from
+	 * this service.
+	 */
+	long nextSequenceNumber() {
+	    return sequenceNumber.getAndIncrement();
+	}
+    }
+    
+    /**
+     * Task (transactional) for notifying channel listeners.
+     */
+    private final class NotifyTask implements KernelRunnable {
 
 	private final String name;
 	private final byte[] senderId;
-	private final Collection<byte[]> sessionIds;
 	private final byte[] message;
-	private final long sequenceNumber;
 
-	SendTask(String name,
+        NotifyTask(String name,
 		 byte[] senderId,
-		 Collection<byte[]> sessionIds,
-		 byte[] message,
-		 long sequenceNumber)
+		 byte[] message)
 	{
 	    this.name = name;
 	    this.senderId = senderId;
-	    this.sessionIds = sessionIds;
 	    this.message = message;
-	    this.sequenceNumber = sequenceNumber;
 	}
 
 	public void run() {
 	    try {
+                if (logger.isLoggable(Level.FINEST)) {
+                    logger.log(
+                        Level.FINEST,
+                        "NotifyTask.run name:{0}, message:{1}",
+                        name, HexDumper.format(message));
+                }
 		Context context = checkContext();
 		ChannelImpl channel = (ChannelImpl) context.getChannel(name);
-		channel.notifyAndSend(
-		    senderId, sessionIds, message, sequenceNumber);
+		channel.notifyListeners(senderId, message);
 
 	    } catch (RuntimeException e) {
-		if (logger.isLoggable(Level.FINEST)) {
+		if (logger.isLoggable(Level.FINER)) {
 		    logger.logThrow(
-			Level.FINEST, e,
-			"SendTask.run name:{0}, message:{1} throws",
-			name, message);
+			Level.FINER, e,
+			"NotifyTask.run name:{0}, message:{1} throws",
+			name, HexDumper.format(message));
 		}
 		throw e;
 	    }
 	}
+    }
+    
+    /**
+     * Task (transactional) for computing the membership info needed
+     * to forward a message to a channel.
+     */
+    private final class ForwardingTask implements KernelRunnable {
+
+        private final String name;
+        private final byte[] senderId;
+        private final Collection<byte[]> recipientIds;
+        private final byte[] message;
+        private final long seq;
+
+        ForwardingTask(String name,
+                byte[] senderId,
+                Collection<byte[]> recipientIds,
+                byte[] message,
+                long seq)
+        {
+            this.name = name;
+            this.senderId = senderId;
+            this.recipientIds = recipientIds;
+            this.message = message;
+            this.seq = seq;
+        }
+
+        public void run() {
+            try {
+                if (logger.isLoggable(Level.FINEST)) {
+                    logger.log(
+                        Level.FINEST,
+                        "name:{0}, message:{1}",
+                        name, HexDumper.format(message));
+                }
+                Context context = checkContext();
+                ChannelImpl channel = (ChannelImpl) context.getChannel(name);
+                channel.forwardMessage(senderId, recipientIds, message, seq);
+
+            } catch (RuntimeException e) {
+                if (logger.isLoggable(Level.FINER)) {
+                    logger.logThrow(
+                        Level.FINER, e,
+                        "name:{0}, message:{1} throws",
+                        name, HexDumper.format(message));
+                }
+                throw e;
+            }
+        }
     }
 }

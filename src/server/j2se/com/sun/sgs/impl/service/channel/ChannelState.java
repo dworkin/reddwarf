@@ -66,6 +66,27 @@ final class ChannelState implements ManagedObject, Serializable {
 	return collection;
     }
 
+    /**
+     * Returns a collection containing the client sessions joined to
+     * the channel represented by this state, excluding the session
+     * with the given sessionId.
+     * 
+     * @param sessionId the sessionId to exclude
+     */
+    Collection<ClientSession> getSessionsExcludingId(byte[] sessionId) {
+	Collection<ClientSession> collection = new ArrayList<ClientSession>();
+	for (ClientSession session : listeners.keySet()) {
+            try {
+                if (! sessionId.equals(session.getSessionId())) {
+                    collection.add(session);
+                }
+            } catch (IllegalStateException e) {
+                // skip disconnected sessions
+            }
+	}
+	return collection;
+    }
+    
     /* -- Implement Object -- */
 
     /** {@inheritDoc} */
