@@ -12,39 +12,36 @@ public abstract class SessionId {
     }
 
     /**
-     * Returns a session identifier whose representation is contained in
-     * the specified byte buffer.
-     *
+     * Returns a session identifier whose representation is contained in the
+     * specified byte buffer.
+     * 
      * @param id a byte array containing a session identifier
-     *
      * @return a session identifier
-     *
-     * @throws IllegalArgumentException if the specified byte array
-     * does not contain a valid representation of a
-     * <code>SessionId</code>
+     * @throws IllegalArgumentException if the specified byte array does not
+     *         contain a valid representation of a <code>SessionId</code>
      */
     public static SessionId fromBytes(byte[] id) {
-	return new com.sun.sgs.impl.client.simple.SimpleSessionId(id);
+        return new com.sun.sgs.impl.client.simple.SimpleSessionId(id);
     }
 
     /**
-     * Returns a byte array containing the representation of this
-     * session identifier.
-     *
-     * @return a read-only byte buffer containing the representation
-     * of this session identifier
+     * Returns a byte array containing the representation of this session
+     * identifier.
+     * 
+     * @return a read-only byte buffer containing the representation of this
+     *         session identifier
      */
     public abstract byte[] toBytes();
 
     /**
-     * Returns <code>true</code> if the specified object represents
-     * the same session identifier as this one, and <code>false</code>
+     * Returns <code>true</code> if the specified object represents the
+     * same session identifier as this one, and <code>false</code>
      * otherwise.
-     *
+     * 
      * @param obj an object to compare to
-     *
-     * @return <code>true</code> if the specified object represents
-     * the the same session identifier, and <code>false</code> otherwise
+     * @return <code>true</code> if the specified object represents the
+     *         the same session identifier, and <code>false</code>
+     *         otherwise
      */
     public abstract boolean equals(Object obj);
 }
