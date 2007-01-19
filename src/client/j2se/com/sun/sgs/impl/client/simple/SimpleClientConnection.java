@@ -43,9 +43,11 @@ public class SimpleClientConnection implements ClientConnection, IOHandler {
      * {@inheritDoc}
      */
     public void sendMessage(byte[] message) {
+        /*
         System.err.println("SimpleClientConnection: sendMessage: " +
                 HexDumper.format(message));
-        try {
+        */
+	try {
             myHandle.sendBytes(message);
         } catch (IOException ioe) {
             ioe.printStackTrace();
@@ -101,8 +103,10 @@ public class SimpleClientConnection implements ClientConnection, IOHandler {
      */
     public void bytesReceived(IOHandle handle, byte[] message) {
         assert handle.equals(this.myHandle);
+        /*
         System.err.println("SimpleClientConnection: bytesReceived: " +
                 HexDumper.format(message));
+        */
         ccl.receivedMessage(message);
     }
 

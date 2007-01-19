@@ -134,10 +134,11 @@ public class SimpleClientImpl implements ServerSession {
             }
             int service = decoder.readServiceNumber();
             int command = decoder.readCommand();
+            /*
             System.out.println("SimpleClient messageReceived: "
                                + message.length + " command 0x"
                                + Integer.toHexString(command));
-
+                               */
             switch (service) {
 
             case ProtocolMessage.APPLICATION_SERVICE:
