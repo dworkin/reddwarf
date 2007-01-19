@@ -49,6 +49,11 @@ public class NamePasswordAuthenticator implements IdentityAuthenticator
         "com.sun.sgs.impl.auth.NamePasswordAuthenticator.PasswordFile";
 
     /**
+     * The wildcard password character.
+     */
+    public static final char WILDCARD_PASSWORD = '*';
+
+    /**
      * The default name for the password file, relative to the app root.
      */
     public static final String DEFAULT_FILE_NAME = "passwords";
@@ -95,7 +100,12 @@ public class NamePasswordAuthenticator implements IdentityAuthenticator
             if (stok.nextToken() == StreamTokenizer.TT_EOF)
                 throw new IOException("Unexpected EOL at line " +
                                       stok.lineno());
-            byte [] password = decodeBytes(stok.sval.getBytes("UTF-8"));
+            byte [] password;
+            if (stok.ttype == WILDCARD_PASSWORD) {
+        	password = new byte[0];
+            } else {
+                password = decodeBytes(stok.sval.getBytes("UTF-8"));
+            }
             passwordMap.put(name, password);
         }
 
@@ -114,7 +124,7 @@ public class NamePasswordAuthenticator implements IdentityAuthenticator
      *
      * @return the original binary representation
      */
-    public static byte [] decodeBytes(byte [] bytes) {
+    public static byte [] decodeBytes(byte [] bytes) {	
         byte [] decoded = new byte[bytes.length / 2];
         for (int i = 0; i < decoded.length; i++) {
             int encodedIndex = i * 2;
@@ -185,8 +195,13 @@ public class NamePasswordAuthenticator implements IdentityAuthenticator
         byte [] validPass = passwordMap.get(name);
         if (validPass == null)
             throw new AccountNotFoundException("Unknown user: " + name);
+        
+        // check for wildcard password
+        if (validPass.length == 0) {
+            return new IdentityImpl(name);
+        }
 
-        // hash the given password
+        // otherwise, hash the given password
         byte [] pass = null;
         synchronized (digest) {
             digest.reset();
