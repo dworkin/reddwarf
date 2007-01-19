@@ -5,8 +5,8 @@ import java.util.Properties;
 
 /**
  * Listener for application-level events.  This listener is called
- * when the application starts up, when client sessions log in, and
- * when the application is shutting down.
+ * when the application is started for the first time, and when
+ * client sessions log in.
  *
  * <p>An implementation of a <code>AppListener</code> should implement
  * the {@link Serializable} interface, so that application listeners
@@ -32,9 +32,9 @@ import java.util.Properties;
 public interface AppListener extends ManagedObject {
 
     /**
-     * Notifies this listener that the application is starting up.
-     * This gives the application an opportunity to perform any
-     * necessary initialization.
+     * Notifies this listener that the application has been started
+     * for the first time.  This gives the application an opportunity
+     * to perform any necessary initialization.
      *
      * @param props application-specific configuration properties
      */
