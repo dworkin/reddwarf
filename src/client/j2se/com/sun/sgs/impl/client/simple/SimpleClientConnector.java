@@ -39,7 +39,7 @@ public class SimpleClientConnector extends ClientConnector {
             throw new IllegalArgumentException("Missing Property: port");
         }
         int port = Integer.parseInt(portStr);
-        if (port <= 0 || port >= 65536) {
+        if (port < 0 || port > 65535) {
             throw new IllegalArgumentException("Bad port number: " + port);
         }
         
