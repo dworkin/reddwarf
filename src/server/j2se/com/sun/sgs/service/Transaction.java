@@ -43,6 +43,14 @@ public interface Transaction {
      */
     public long getCreationTime();
 
+    /*
+     * FIXME: The join and abort methods should probably throw
+     * TransactionNotActiveException if the transaction has been aborted,
+     * rather than IllegalStateException, because this situation can occur if
+     * an application catches a TransactionAbortedException and attempts to
+     * continue.  -tjb@sun.com (01/17/2007)
+     */
+
     /**
      * Tells the <code>Transaction</code> that the given
      * <code>TransactionParticipant</code> is participating in the
@@ -78,5 +86,24 @@ public interface Transaction {
      *                               preparation or aborting
      */
     public void abort();
+
+    /**
+     * Aborts the transaction, optionally supplying the exception that caused
+     * the abort. This notifies all participants that the transaction has
+     * aborted, and invalidates all future use of this transaction. The caller
+     * should always follow a call to <code>abort</code> by throwing an
+     * exception that details why the transaction was aborted. This is needed
+     * not only to communicate the cause of the abort and whether to retry the
+     * exception, but also because the application code associated with this
+     * transaction will continue to execute normally unless an exception is
+     * raised. Supplying the cause to this method allows future calls to the
+     * transaction to include the cause to explain why the transaction is no
+     * longer active.
+     *
+     * @param cause the exception that caused the abort, or <code>null</code>
+     * @throws IllegalStateException if the transaction has completed
+     *                               preparation or aborting
+     */
+    public void abort(Throwable cause);
 
 }

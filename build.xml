@@ -42,8 +42,8 @@
 
   <!-- Values for testing -->
   <property name="test.logging" location="test/test.logging"/>
-  <property name="test.jvm.args"
-	    value="-Djava.util.logging.config.file=${test.logging}"/>
+  <property name="test.assertions" value="-enableassertions"/>
+  <property name="test.jvm.args" value="${test.assertions}"/>
   <property name="test.formatter.type" value="plain"/>
   <property name="test.showoutput" value="false"/>
   <property name="test.include" value="**/Test*.java"/>
@@ -308,8 +308,10 @@
 	   tempdir="${build.dir}/test/output"
 	   failureproperty="tests.failed">
       <jvmarg line="${test.jvm.args}"/>
-      <jvmarg value="-Djava.library.path=${bdb.lib.dir}"/>
-      <jvmarg value="-Djava.io.tmpdir=${build.dir}/test/output"/>
+      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
+      <sysproperty key="java.io.tmpdir" file="${build.dir}/test/output"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${test.logging}"/>
       <classpath path="${build.dir}/test/classes/server;
 		       ${build.dir}/classes/server;
 		       ${bdb.lib.dir}/db.jar"/>
@@ -321,7 +323,6 @@
       <!-- <assertions>
 	     <enable/>
 	   </assertions> -->
-      <jvmarg value="-enableassertions"/>
       <formatter type="${test.formatter.type}"/>
       <batchtest todir="${build.dir}/test/output">
 	<fileset dir="test/server/j2se">

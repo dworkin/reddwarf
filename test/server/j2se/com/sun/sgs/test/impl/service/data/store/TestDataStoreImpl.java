@@ -2,10 +2,12 @@ package com.sun.sgs.test.impl.service.data.store;
 
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.service.data.store.DataStoreException;
+import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.test.util.DummyTransaction;
@@ -62,7 +64,7 @@ public class TestDataStoreImpl extends TestCase {
     private String directory;
 
     /** An instance of the data store, to test. */
-    DataStoreImpl store;
+    DataStore store;
 
     /** An initial, open transaction. */
     DummyTransaction txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
@@ -93,12 +95,24 @@ public class TestDataStoreImpl extends TestCase {
      * created.
      */
     protected void tearDown() throws Exception {
+	try {
+	    if (txn != null) {
+		txn.abort();
+	    }
+	    if (store != null) {
+		new ShutdownAction().waitForDone();
+	    }
+	} catch (RuntimeException e) {
+	    if (passed) {
+		throw e;
+	    } else {
+		e.printStackTrace();
+	    }
+	}
+	txn = null;
+	store = null;
 	if (passed && directory != null) {
 	    deleteDirectory(directory);
-	}
-	if (txn != null) {
-	    txn.abort();
-	    txn = null;
 	}
     }
 
@@ -173,6 +187,15 @@ public class TestDataStoreImpl extends TestCase {
     }
 
     public void testConstructorDirectoryNotWritable() throws Exception {
+        String osName = System.getProperty("os.name", "unknown");
+	/*
+	 * Can't seem to create a non-writable directory on Windows.
+	 * -tjb@sun.com (01/09/2007)
+	 */
+        if (osName.startsWith("Windows")) {
+            System.err.println("Skipping on " + osName);
+            return;
+        }
 	Properties props = createProperties(
 	    DataStoreImplClassName + ".directory",
 	    createDirectory());
@@ -183,13 +206,6 @@ public class TestDataStoreImpl extends TestCase {
 	} catch (DataStoreException e) {
 	    System.err.println(e);
 	}
-    }
-
-    public void testConstructorSuccess() throws Exception {
-	Properties props = createProperties(
-	    DataStoreImplClassName + ".directory",
-	    createDirectory());
-	new DataStoreImpl(props);
     }
 
     /* -- Test createObject -- */
@@ -204,8 +220,8 @@ public class TestDataStoreImpl extends TestCase {
     }
 
     static {
-	for (BadTxnState state : BadTxnState.values()) {
-	    new BadTxnTest("testCreateObject", state) {
+	for (UnusualState state : UnusualState.values()) {
+	    new UnusualStateTest("testCreateObject", state) {
 		void action() {
 		    store.createObject(txn);
 		}
@@ -269,8 +285,8 @@ public class TestDataStoreImpl extends TestCase {
     }
 
     static {
-	for (BadTxnState state : BadTxnState.values()) {
-	    new BadTxnTest("testMarkForUpdate", state) {
+	for (UnusualState state : UnusualState.values()) {
+	    new UnusualStateTest("testMarkForUpdate", state) {
 		protected void setUp() {
 		    super.setUp();
 		    store.setObject(txn, id, new byte[] { 0 });
@@ -323,8 +339,8 @@ public class TestDataStoreImpl extends TestCase {
     }
 
     static {
-	for (BadTxnState state : BadTxnState.values()) {
-	    new BadTxnTest("testGetObject", state) {
+	for (UnusualState state : UnusualState.values()) {
+	    new UnusualStateTest("testGetObject", state) {
 		protected void setUp() {
 		    super.setUp();
 		    store.setObject(txn, id, new byte[] { 0 });
@@ -390,8 +406,8 @@ public class TestDataStoreImpl extends TestCase {
     }
 
     static {
-	for (BadTxnState state : BadTxnState.values()) {
-	    new BadTxnTest("testSetObject", state) {
+	for (UnusualState state : UnusualState.values()) {
+	    new UnusualStateTest("testSetObject", state) {
 		void action() {
 		    store.setObject(txn, id, new byte[] { 0 });
 		}
@@ -449,8 +465,8 @@ public class TestDataStoreImpl extends TestCase {
     }
 
     static {
-	for (BadTxnState state : BadTxnState.values()) {
-	    new BadTxnTest("testRemoveObject", state) {
+	for (UnusualState state : UnusualState.values()) {
+	    new UnusualStateTest("testRemoveObject", state) {
 		protected void setUp() {
 		    super.setUp();
 		    store.setObject(txn, id, new byte[] { 0 });
@@ -532,8 +548,8 @@ public class TestDataStoreImpl extends TestCase {
     }
 
     static {
-	for (BadTxnState state : BadTxnState.values()) {
-	    new BadTxnTest("testGetBinding", state) {
+	for (UnusualState state : UnusualState.values()) {
+	    new UnusualStateTest("testGetBinding", state) {
 		protected void setUp() {
 		    super.setUp();
 		    store.setBinding(txn, "foo", id);
@@ -576,8 +592,8 @@ public class TestDataStoreImpl extends TestCase {
     }
 
     static {
-	for (BadTxnState state : BadTxnState.values()) {
-	    new BadTxnTest("testSetBinding", state) {
+	for (UnusualState state : UnusualState.values()) {
+	    new UnusualStateTest("testSetBinding", state) {
 		void action() {
 		    store.setBinding(txn, "foo", id);
 		}
@@ -630,8 +646,8 @@ public class TestDataStoreImpl extends TestCase {
     }
 
     static {
-	for (BadTxnState state : BadTxnState.values()) {
-	    new BadTxnTest("testRemoveBinding", state) {
+	for (UnusualState state : UnusualState.values()) {
+	    new UnusualStateTest("testRemoveBinding", state) {
 		protected void setUp() {
 		    super.setUp();
 		    store.setBinding(txn, "foo", id);
@@ -689,8 +705,8 @@ public class TestDataStoreImpl extends TestCase {
     }
 
     static {
-	for (BadTxnState state : BadTxnState.values()) {
-	    new BadTxnTest("testNextBoundName", state) {
+	for (UnusualState state : UnusualState.values()) {
+	    new UnusualStateTest("testNextBoundName", state) {
 		void action() {
 		    store.nextBoundName(txn, null);
 		}
@@ -764,8 +780,8 @@ public class TestDataStoreImpl extends TestCase {
     }
 
     static {
-	for (BadTxnState state : BadTxnState.values()) {
-	    new BadTxnTest("testAbort", state) {
+	for (UnusualState state : UnusualState.values()) {
+	    new UnusualStateTest("testAbort", state) {
 		TransactionParticipant participant;
 		protected void setUp() {
 		    super.setUp();
@@ -773,6 +789,7 @@ public class TestDataStoreImpl extends TestCase {
 		}
 		void action() throws Exception {
 		    participant.abort(txn);
+		    txn = null;
 		}
 		void preparedModifiedTest() throws Exception {
 		    store.setObject(txn, id, new byte[] { 0 });
@@ -799,15 +816,16 @@ public class TestDataStoreImpl extends TestCase {
     }
 
     static {
-	for (BadTxnState state : BadTxnState.values()) {
-	    new BadTxnTest("testPrepare", state) {
+	for (UnusualState state : UnusualState.values()) {
+	    new UnusualStateTest("testPrepare", state) {
 		TransactionParticipant participant;
 		protected void setUp() {
 		    super.setUp();
 		    participant = txn.participants.iterator().next();
 		}
 		void action() throws Exception {
-		    participant.prepare(txn);
+		    assertTrue(participant.prepare(txn));
+		    txn = null;
 		}
 	    };
 	}
@@ -828,8 +846,8 @@ public class TestDataStoreImpl extends TestCase {
     }
 
     static {
-	for (BadTxnState state : BadTxnState.values()) {
-	    new BadTxnTest("testPrepare", state) {
+	for (UnusualState state : UnusualState.values()) {
+	    new UnusualStateTest("testPrepareAndCommit", state) {
 		TransactionParticipant participant;
 		protected void setUp() {
 		    super.setUp();
@@ -837,6 +855,7 @@ public class TestDataStoreImpl extends TestCase {
 		}
 		void action() throws Exception {
 		    participant.prepareAndCommit(txn);
+		    txn = null;
 		}
 	    };
 	}
@@ -857,8 +876,8 @@ public class TestDataStoreImpl extends TestCase {
     }
 
     static {
-	for (BadTxnState state : BadTxnState.values()) {
-	    new BadTxnTest("testCommit", state) {
+	for (UnusualState state : UnusualState.values()) {
+	    new UnusualStateTest("testCommit", state) {
 		TransactionParticipant participant;
 		protected void setUp() {
 		    super.setUp();
@@ -866,27 +885,110 @@ public class TestDataStoreImpl extends TestCase {
 		}
 		void action() throws Exception {
 		    participant.commit(txn);
+		    txn = null;
 		}
 		void preparedModifiedTest() throws Exception {
 		    store.setObject(txn, id, new byte[] { 0 });
-		    txn.prepare();
+		    assertFalse(txn.prepare());
 		    /* Committing a prepared, modified transaction is OK. */
 		    action();
+		}
+		void shuttingDownExistingTxnTest() throws Exception {
+		    store.setObject(txn, id, new byte[] { 0 });
+		    assertFalse(participant.prepare(txn));
+		    /* Committing a prepared, modified transaction is OK. */
+		    super.shuttingDownExistingTxnTest();
 		}
 	    };
 	}
     }
 
+    /* -- Test shutdown -- */
+
+    public void testShutdownAgain() throws Exception {
+	txn.abort();
+	txn = null;
+	store.shutdown();
+	ShutdownAction action = new ShutdownAction();
+	try {
+	    action.waitForDone();
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	} finally {
+	    store = null;
+	}
+    }
+
+    public void testShutdownInterrupt() throws Exception {
+	ShutdownAction action = new ShutdownAction();
+	action.assertBlocked();
+	action.interrupt();
+	action.assertResult(false);
+	store.setBinding(txn, "foo", id);
+	txn.commit();
+	txn = null;
+    }
+
+    public void testConcurrentShutdownInterrupt() throws Exception {
+	ShutdownAction action1 = new ShutdownAction();
+	action1.assertBlocked();
+	ShutdownAction action2 = new ShutdownAction();
+	action2.assertBlocked();
+	action1.interrupt();
+	action1.assertResult(false);
+	action2.assertBlocked();
+	txn.abort();
+	action2.assertResult(true);
+	txn = null;
+	store = null;
+    }
+
+    public void testConcurrentShutdownRace() throws Exception {
+	ShutdownAction action1 = new ShutdownAction();
+	action1.assertBlocked();
+	ShutdownAction action2 = new ShutdownAction();
+	action2.assertBlocked();
+	txn.abort();
+	boolean result1;
+	try {
+	    result1 = action1.waitForDone();
+	} catch (IllegalStateException e) {
+	    result1 = false;
+	}
+	boolean result2;
+	try {
+	    result2 = action2.waitForDone();
+	} catch (IllegalStateException e) {
+	    result2 = false;
+	}
+	assertTrue(result1 || result2);
+	assertFalse(result1 && result2);
+	txn = null;
+	store = null;
+    }
+
+    public void testShutdownRestart() throws Exception {
+	store.setBinding(txn, "foo", id);
+	byte[] bytes = { 1 };
+	store.setObject(txn, id, bytes);
+	txn.commit();
+	store.shutdown();
+	store = getDataStoreImpl();
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	id = store.getBinding(txn, "foo");
+	byte[] value = store.getObject(txn, id, false);
+	assertTrue(Arrays.equals(bytes, value));
+    }
+
     /* -- Test deadlock -- */
     @SuppressWarnings("hiding")
     public void testDeadlock() throws Exception {
-	txn.abort();
-	txn = null;
 	for (int i = 0; i < 5; i++) {
-	    final int j = i;
-	    final DataStoreImpl store = getDataStoreImpl();
-	    DummyTransaction txn =
-		new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	    if (i > 0) {
+		store = getDataStoreImpl();
+		txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	    }
 	    final long id = store.createObject(txn);
 	    store.setObject(txn, id, new byte[] { 0 });
 	    final long id2 = store.createObject(txn);
@@ -896,6 +998,7 @@ public class TestDataStoreImpl extends TestCase {
 	    store.getObject(txn, id, false);
 	    final Semaphore flag = new Semaphore(1);
 	    flag.acquire();
+	    final int finalI = i;
 	    class MyRunnable implements Runnable {
 		Exception exception2;
 		public void run() {
@@ -906,10 +1009,13 @@ public class TestDataStoreImpl extends TestCase {
 			store.getObject(txn2, id2, false);
 			flag.release();
 			store.getObject(txn2, id, true);
-			System.err.println(j + " txn2: commit");
+			System.err.println(finalI + " txn2: commit");
 			txn2.commit();
+		    } catch (TransactionAbortedException e) {
+			System.err.println(finalI + " txn2: " + e);
+			exception2 = e;
 		    } catch (Exception e) {
-			System.err.println(j + " txn2: " + e);
+			System.err.println(finalI + " txn2: " + e);
 			exception2 = e;
 			if (txn2 != null) {
 			    txn2.abort();
@@ -927,14 +1033,9 @@ public class TestDataStoreImpl extends TestCase {
 		store.getObject(txn, id2, true);
 		System.err.println(i + " txn1: commit");
 		txn.commit();
-	    } catch (TransactionConflictException e) {
+	    } catch (TransactionAbortedException e) {
 		System.err.println(i + " txn1: " + e);
 		exception = e;
-		txn.abort();
-	    } catch (TransactionTimeoutException e) {
-		System.err.println(i + " txn1: " + e);
-		exception = e;
-		txn.abort();
 	    }
 	    thread.join();
 	    if (myRunnable.exception2 != null &&
@@ -947,6 +1048,7 @@ public class TestDataStoreImpl extends TestCase {
 	    } else if (exception == null && myRunnable.exception2 == null) {
 		fail("Expected TransactionConflictException");
 	    }
+	    txn = null;
 	}
     }
 
@@ -1006,23 +1108,23 @@ public class TestDataStoreImpl extends TestCase {
 	return new DataStoreImpl(dbProps);
     }
 
-    /** The set of bad transaction states */
-    static enum BadTxnState {
-	Aborted, PreparedReadOnly, PreparedModified, Committed, Wrong
+    /** The set of unusual states */
+    static enum UnusualState {
+	Aborted, PreparedReadOnly, PreparedModified, Committed,
+	WrongTxn, ShuttingDownExistingTxn, ShuttingDownNewTxn, Shutdown
     }
 
-    /** Defines a abstract class for testing bad transaction states. */
-    static abstract class BadTxnTest extends TestDataStoreImpl {
+    /** Defines a abstract class for testing unusual states. */
+    static abstract class UnusualStateTest extends TestDataStoreImpl {
 
-	/** The bad state to test. */
-	private final BadTxnState state;
+	/** The state to test. */
+	private final UnusualState state;
 
 	/**
 	 * Creates an instance with the specified generic name to test the
-	 * specified bad transaction state, and adds this test to the test
-	 * suite.
+	 * specified unusual state, and adds this test to the test suite.
 	 */
-	BadTxnTest(String name, BadTxnState state) {
+	UnusualStateTest(String name, UnusualState state) {
 	    super(name + state);
 	    this.state = state;
 	    suite.addTest(this);
@@ -1030,11 +1132,11 @@ public class TestDataStoreImpl extends TestCase {
 
 	/**
 	 * Subclasses should implement this method to define the action that
-	 * should be tested in a bad transaction state.
+	 * should be tested in an unusual state.
 	 */
 	abstract void action() throws Exception;
 
-	/** Runs the test for the bad transaction state. */
+	/** Runs the test for the unusual state. */
 	protected void runTest() throws Exception {
 	    switch (state) {
 	    case Aborted:
@@ -1049,8 +1151,17 @@ public class TestDataStoreImpl extends TestCase {
 	    case Committed:
 		committedTest();
 		break;
-	    case Wrong:
-		wrongTest();
+	    case WrongTxn:
+		wrongTxnTest();
+		break;
+	    case ShuttingDownExistingTxn:
+		shuttingDownExistingTxnTest();
+		break;
+	    case ShuttingDownNewTxn:
+		shuttingDownNewTxnTest();
+		break;
+	    case Shutdown:
+		shutdownTest();
 		break;
 	    default:
 		throw new AssertionError();
@@ -1107,7 +1218,7 @@ public class TestDataStoreImpl extends TestCase {
 	}
 
 	/** Runs the test for the wrong transaction case. */
-	void wrongTest() throws Exception {
+	void wrongTxnTest() throws Exception {
 	    store.createObject(txn);
 	    DummyTransaction originalTxn = txn;
 	    txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
@@ -1118,6 +1229,127 @@ public class TestDataStoreImpl extends TestCase {
 		System.err.println(e);
 	    } finally {
 		originalTxn.abort();
+	    }
+	}
+
+	/**
+	 * Runs the test for the existing transaction while shutting down case.
+	 */
+	void shuttingDownExistingTxnTest() throws Exception {
+	    ShutdownAction shutdownAction = new ShutdownAction();
+	    shutdownAction.assertBlocked();
+	    action();
+	    if (txn != null) {
+		txn.commit();
+		txn = null;
+	    }
+	    shutdownAction.assertResult(true);
+	    store = null;
+	}
+
+	/** Runs the test for the new transaction while shutting down case. */
+	void shuttingDownNewTxnTest() throws Exception {
+	    DummyTransaction originalTxn = txn;
+	    ShutdownAction shutdownAction = new ShutdownAction();
+	    shutdownAction.assertBlocked();
+	    txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	    try {
+		action();
+		fail("Expected IllegalStateException");
+	    } catch (IllegalStateException e) {
+		System.err.println(e);
+	    }
+	    txn.abort();
+	    txn = null;
+	    originalTxn.abort();
+	    shutdownAction.assertResult(true);
+	    store = null;
+	}
+
+	/** Runs the test for the shutdown case. */
+	void shutdownTest() throws Exception {
+	    txn.abort();
+	    store.shutdown();
+	    try {
+		action();
+		fail("Expected IllegalStateException");
+	    } catch (IllegalStateException e) {
+		System.err.println(e);
+	    }
+	    txn = null;
+	    store = null;
+	}
+    }
+
+    /** Use this thread to control a call to shutdown that may block. */
+    class ShutdownAction extends Thread {
+	private boolean done;
+	private Throwable exception;
+	private boolean result;
+
+	/** Creates an instance of this class and starts the thread. */
+	ShutdownAction() {
+	    start();
+	}
+
+	/** Performs the shutdown and collects the results. */
+	public void run() {
+	    try {
+		result = store.shutdown();
+	    } catch (Throwable t) {
+		exception = t;
+	    }
+	    synchronized (this) {
+		done = true;
+		notifyAll();
+	    }
+	}
+
+	/** Asserts that the shutdown call is blocked. */
+	synchronized void assertBlocked() throws InterruptedException {
+	    Thread.sleep(5);
+	    assertEquals("Expected no exception", null, exception);
+	    assertFalse("Expected shutdown to be blocked", done);
+	}
+	
+	/** Waits a while for the shutdown call to complete. */
+	synchronized boolean waitForDone() throws Exception {
+	    waitForDoneInternal();
+	    if (!done) {
+		return false;
+	    } else if (exception == null) {
+		return result;
+	    } else if (exception instanceof Exception) {
+		throw (Exception) exception;
+	    } else {
+		throw (Error) exception;
+	    }
+	}
+
+	/**
+	 * Asserts that the shutdown call has completed with the specified
+	 * result.
+	 */
+	synchronized void assertResult(boolean expectedResult)
+	    throws InterruptedException
+	{
+	    waitForDoneInternal();
+	    assertTrue("Expected shutdown to be done", done);
+	    assertEquals("Unexpected result", expectedResult, result);
+	    assertEquals("Expected no exception", null, exception);
+	}
+
+	/** Wait until done, but give up after a while. */
+	private synchronized void waitForDoneInternal()
+	    throws InterruptedException
+	{
+	    long wait = 2000;
+	    long start = System.currentTimeMillis();
+	    while (!done && wait > 0) {
+		wait(wait);
+		long now = System.currentTimeMillis();
+		wait -= (now - start);
+		start = now;
 	    }
 	}
     }
