@@ -349,8 +349,7 @@ public class MessageBuffer {
 	if (pos+2 > limit) {
 	    throw new IndexOutOfBoundsException();
 	}
-	
-	return (short) ((getByte() << 8) + (getByte() << 0));
+	return (short) ((getByte() << 8) + (getByte() & 255));
     }
 
     /**
@@ -368,10 +367,10 @@ public class MessageBuffer {
 	}
 
 	return
-	    (getByte() << 24) +
-	    (getByte() << 16) +
-	    (getByte() << 8) +
-	    (getByte() << 0);
+	    ((getByte() & 255) << 24) +
+	    ((getByte() & 255) << 16) +
+	    ((getByte() & 255) << 8) +
+	    ((getByte() & 255) << 0);
     }
     
     /**
@@ -389,7 +388,7 @@ public class MessageBuffer {
 	}
 
 	return
-	    ((long) (getByte() << 56)) +
+	    ((long) (getByte() & 255) << 56) +
 	    ((long) (getByte() & 255) << 48) +
 	    ((long) (getByte() & 255) << 40) +
 	    ((long) (getByte() & 255) << 32) +
@@ -413,7 +412,7 @@ public class MessageBuffer {
 	    throw new IndexOutOfBoundsException();
 	}
 
-	return (char) ((getByte() << 8) + (getByte() << 0));
+	return (char) ((getByte() << 8) + (getByte() & 255));
     }
 
     /**
@@ -453,7 +452,7 @@ public class MessageBuffer {
         int index = 0;
 
         while (pos < utfEnd) {
-            c = (int) buf[pos] & 0xff;      
+            c = buf[pos] & 0xff;      
             if (c > 127) break;
             pos++;
             chars[index++] = (char) c;
@@ -461,7 +460,7 @@ public class MessageBuffer {
 
 	try {
 	    while (pos < utfEnd) {
-		c = (int) buf[pos] & 0xff;
+		c = buf[pos] & 0xff;
 		
 		switch (c >> 4) {
 		    
@@ -478,7 +477,7 @@ public class MessageBuffer {
                         throw new UTFDataFormatException(
 			    "malformed input: partial character at end");
 		    }
-                    char2 = (int) buf[pos-1];
+                    char2 = buf[pos-1];
                     if ((char2 & 0xC0) != 0x80) {
                         throw new UTFDataFormatException(
 			    "malformed input around byte " + pos);
@@ -494,8 +493,8 @@ public class MessageBuffer {
                         throw new UTFDataFormatException(
 			    "malformed input: partial character at end");
 		    }
-                    char2 = (int) buf[pos-2];
-                    char3 = (int) buf[pos-1];
+                    char2 = buf[pos-2];
+                    char3 = buf[pos-1];
                     if (((char2 & 0xC0) != 0x80) || ((char3 & 0xC0) != 0x80)) {
                         throw new UTFDataFormatException(
 			    "malformed input around byte " + (pos-1));

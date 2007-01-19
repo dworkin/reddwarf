@@ -98,7 +98,62 @@ public class TestMessageBuffer extends TestCase {
 	    fail("Expected short " + value1 + ", got " + value2);
 	}
     }
+    
+    public void testPutShortSignedBytes() {
+        MessageBuffer buf = new MessageBuffer(2);
+        short value1 = 0x10ff;
+        buf.putShort(value1);
+        buf.rewind();
+        short value2 = buf.getShort();
+        if (value1 != value2) {
+            fail("Expected short " + value1 + ", got " + value2);
+        }
+    }
 
+    public void testPutInt() {
+        MessageBuffer buf = new MessageBuffer(4);
+        int value1 = 0x01020304;
+        buf.putInt(value1);
+        buf.rewind();
+        int value2 = buf.getInt();
+        if (value1 != value2) {
+            fail("Expected int " + value1 + ", got " + value2);
+        }
+    }
+
+    public void testPutIntSignedBytes() {
+        MessageBuffer buf = new MessageBuffer(4);
+        int value1 = 0x01ff02fe;
+        buf.putInt(value1);
+        buf.rewind();
+        int value2 = buf.getInt();
+        if (value1 != value2) {
+            fail("Expected int " + value1 + ", got " + value2);
+        }
+    }
+
+    public void testPutLong() {
+        MessageBuffer buf = new MessageBuffer(8);
+        long value1 = 0x0102030405060708L;
+        buf.putLong(value1);
+        buf.rewind();
+        long value2 = buf.getLong();
+        if (value1 != value2) {
+            fail("Expected long " + value1 + ", got " + value2);
+        }
+    }
+
+    public void testPutLongSignedBytes() {
+        MessageBuffer buf = new MessageBuffer(8);
+        long value1 = 0x01f203f4f506f708L;
+        buf.putLong(value1);
+        buf.rewind();
+        long value2 = buf.getLong();
+        if (value1 != value2) {
+            fail("Expected long " + value1 + ", got " + value2);
+        }
+    }
+    
     public void testPutBytes() {
 	int size = 100;
 	byte[] bytes = new byte[size];
