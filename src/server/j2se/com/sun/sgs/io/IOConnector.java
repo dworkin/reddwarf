@@ -54,11 +54,9 @@ public interface IOConnector<T> {
     void connect(IOHandler listener, IOFilter filter);
 
     /**
-     * Returns the {@link Endpoint} on which this {@code IOConnector} is
-     * listening.
+     * Returns the {@link Endpoint} this {@code IOConnector} will connect to.
      *
-     * @return the {@link Endpoint} on which this {@code IOConnector} is
-     *         listening.
+     * @return the {@code Endpoint} this {@code IOConnector} will connect to.
      */
     Endpoint<T> getEndpoint();
 
