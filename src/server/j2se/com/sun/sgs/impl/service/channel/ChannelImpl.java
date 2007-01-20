@@ -468,7 +468,7 @@ final class ChannelImpl implements Channel, Serializable {
 		        getClientSession(sessionId);
                 // Skip the sender and any disconnected sessions
                 if ((session != null) &&
-                    (! senderId.equals(session.getSessionId())))
+                    (!senderId.equals(session.getSessionId())))
                 {
                     recipients.add(session);
                 }
@@ -488,7 +488,6 @@ final class ChannelImpl implements Channel, Serializable {
             return;
         }
         
-        final String name = state.name;
         final Delivery delivery = state.delivery;
         
         context.channelService.nonDurableTaskScheduler.
@@ -496,7 +495,7 @@ final class ChannelImpl implements Channel, Serializable {
                 new KernelRunnable() {
                     public void run() throws Exception {
                         forwardToSessions(
-                            name, senderId, recipients, message, seq, delivery);
+                            senderId, recipients, message, seq, delivery);
                     }
                 });
     }
@@ -504,7 +503,7 @@ final class ChannelImpl implements Channel, Serializable {
     /**
      * Forward a message to the given recipients.
      */
-    static void forwardToSessions(String name,
+    private void forwardToSessions(
             byte[] senderId,
             Collection<ClientSession> recipients,
             byte[] message,
@@ -512,9 +511,8 @@ final class ChannelImpl implements Channel, Serializable {
             Delivery delivery)
     {
         try {
-
             MessageBuffer protocolMessage =
-                getChannelMessage(name, senderId, message, seq);
+                getChannelMessage(senderId, message, seq);
 
             for (ClientSession session : recipients) {
                 ((SgsClientSession) session).sendMessage(
@@ -525,25 +523,30 @@ final class ChannelImpl implements Channel, Serializable {
             if (logger.isLoggable(Level.FINER)) {
                 logger.logThrow(
                         Level.FINER, e,
-                        "name:{0}, message:{1} throws",
-                        name, HexDumper.format(message));
+                        "forwardToSessions name:{0}, message:{1} throws",
+                        state.name, HexDumper.format(message));
             }
             throw e;
         }
     }
-    
-    static MessageBuffer getChannelMessage(String name, byte[] senderId,
-            byte[] message, long seq)
+
+    /**
+     * Returns a MessageBuffer containing a CHANNEL_MESSAGE protocol
+     * message with this channel's name, and the specified sender,
+     * message, and sequence number.
+     */
+    private MessageBuffer getChannelMessage(
+	byte[] senderId, byte[] message, long sequenceNumber)
     {
-        int nameLen = MessageBuffer.getSize(name);
+        int nameLen = MessageBuffer.getSize(state.name);
         MessageBuffer buf =
             new MessageBuffer(15 + nameLen + senderId.length +
                     message.length);
         buf.putByte(SgsProtocol.VERSION).
             putByte(SgsProtocol.CHANNEL_SERVICE).
             putByte(SgsProtocol.CHANNEL_MESSAGE).
-            putString(name).
-            putLong(seq).
+            putString(state.name).
+            putLong(sequenceNumber).
             putShort(senderId.length).
             putBytes(senderId).
             putShort(message.length).
@@ -599,7 +602,9 @@ final class ChannelImpl implements Channel, Serializable {
     }
 
     /**
-     * Task for sending a message to a set of clients.
+     * Sends a channel message with the specified sender, message, and
+     * sequence number to the set of specified clients when this
+     * transaction commits.
      */
     private void sendToClients(byte[] senderId,
 			       Collection<ClientSession> sessions,
@@ -611,16 +616,7 @@ final class ChannelImpl implements Channel, Serializable {
 	    clients.add(session.getSessionId());
 	}
 	MessageBuffer buf =
-	    new MessageBuffer(15 + senderId.length + message.length);
-	buf.putByte(SgsProtocol.VERSION).
-	    putByte(SgsProtocol.CHANNEL_SERVICE).
-	    putByte(SgsProtocol.CHANNEL_MESSAGE).
-	    putLong(sequenceNumber).
-	    putShort(senderId.length).
-	    putBytes(senderId).
-	    putShort(message.length).
-	    putBytes(message);
-
+	    getChannelMessage(senderId, message, sequenceNumber);
 	byte[] protocolMessage = buf.getBuffer();
 	    
 	for (byte[] sessionId : clients) {
@@ -628,7 +624,7 @@ final class ChannelImpl implements Channel, Serializable {
 		context.getService(ClientSessionService.class).
 		    getClientSession(sessionId);
 	    if (session != null && session.isConnected()) {
-		session.sendMessage(protocolMessage, state.delivery);
+		session.sendMessageOnCommit(protocolMessage, state.delivery);
 	    }
 	}
     }

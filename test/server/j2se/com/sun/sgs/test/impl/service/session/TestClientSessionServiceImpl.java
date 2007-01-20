@@ -9,6 +9,7 @@ import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameExistsException;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.PeriodicTaskHandle;
@@ -203,6 +204,15 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    }
 	    txn = null;
 	}
+
+	/*
+	if (dataService != null) {
+	    dataService.shutdown();
+	}
+	*/
+	dataService = null;
+	deleteDirectory(dbDirectory);
+	MinimalTestKernel.destroyContext(appContext);
     }
  
     /* -- Test constructor -- */
@@ -779,14 +789,16 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 	private final static long serialVersionUID = 1L;
 
-	private final Map<ClientSession,ClientSessionListener> sessions =
+	private final Map<ClientSession, ManagedReference> sessions =
 	    Collections.synchronizedMap(
-		new HashMap<ClientSession,ClientSessionListener>());
+		new HashMap<ClientSession, ManagedReference>());
 	
 	public ClientSessionListener loggedIn(ClientSession session) {
 	    DummyClientSessionListener listener =
 		new DummyClientSessionListener(session);
-	    //txnProxy.getService(DataService.class).createReference(listener);
+	    ManagedReference listenerRef =
+		txnProxy.getService(DataService.class).
+		    createReference(listener);
 	    for (ClientSession activeSession : sessions.keySet()) {
 		if (session.getName().equals(activeSession.getName())) {
 		    System.err.println(
@@ -795,7 +807,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    return null;
 		}
 	    }
-	    sessions.put(session, listener);
+	    sessions.put(session, listenerRef);
 	    System.err.println("DummyAppListener.loggedIn: session:" + session);
 	    return listener;
 	}
@@ -812,7 +824,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     private static class DummyClientSessionListener
-	implements ClientSessionListener, Serializable//, ManagedObject
+	implements ClientSessionListener, Serializable, ManagedObject
     {
 	private final static long serialVersionUID = 1L;
 	private boolean receivedDisconnectedCallback = false;

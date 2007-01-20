@@ -407,10 +407,10 @@ public class ClientSessionServiceImpl
         /** The transaction. */
         private final Transaction txn;
 
-	/** Map of client sessions to list of messages tp send when
-	 * transaction commits. */
-        private final Map<ClientSessionImpl, List<byte[]>> sessionMessages =
-	    new HashMap<ClientSessionImpl, List<byte[]>>();
+	/** Map of client sessions to an object containing a list of
+	 * messages to send when transaction commits. */
+        private final Map<ClientSessionImpl, SessionInfo> sessionsInfo =
+	    new HashMap<ClientSessionImpl, SessionInfo>();
 
 	/** If true, indicates the associated transaction is prepared. */
         private boolean prepared = false;
@@ -418,7 +418,7 @@ public class ClientSessionServiceImpl
 	/**
 	 * Constructs a context with the specified transaction.
 	 */
-        Context(Transaction txn) {
+        private Context(Transaction txn) {
             this.txn = txn;
 	    txnProxy.getService(TaskService.class).
 		scheduleNonDurableTask(this);
@@ -444,6 +444,32 @@ public class ClientSessionServiceImpl
 	    addMessage0(session, message, delivery, true);
 	}
 
+	/**
+	 * Requests that the specified session be disconnected when
+	 * this transaction commits, but only after all session
+	 * messages are sent.
+	 */
+	void requestDisconnect(ClientSessionImpl session) {
+	    try {
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(
+			Level.FINEST,
+			"Context.setDisconnect session:{0}", session);
+		}
+		checkPrepared();
+
+		getSessionInfo(session).disconnect = true;
+		
+	    } catch (RuntimeException e) {
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.logThrow(
+			Level.FINE, e,
+			"Context.setDisconnect throws");
+                }
+                throw e;
+            }
+	}
+
 	private void addMessage0(
 	    ClientSessionImpl session, byte[] message, Delivery delivery,
 	    boolean isFirst)
@@ -457,19 +483,13 @@ public class ClientSessionServiceImpl
 		}
 		checkPrepared();
 
-		List<byte[]> messages = sessionMessages.get(session);
-		if (messages == null) {
-		    messages = new ArrayList<byte[]>();
-		    sessionMessages.put(session, messages);
-		}
-
+		SessionInfo info = getSessionInfo(session);
 		if (isFirst) {
-		    messages.add(0, message);
+		    info.messages.add(0, message);
 		} else {
-		    messages.add(message);
+		    info.messages.add(message);
 		}
 	    
-		
 	    } catch (RuntimeException e) {
                 if (logger.isLoggable(Level.FINE)) {
                     logger.logThrow(
@@ -478,6 +498,16 @@ public class ClientSessionServiceImpl
                 }
                 throw e;
             }
+	}
+
+	private SessionInfo getSessionInfo(ClientSessionImpl session) {
+
+	    SessionInfo info = sessionsInfo.get(session);
+	    if (info == null) {
+		info = new SessionInfo(session);
+		sessionsInfo.put(session, info);
+	    }
+	    return info;
 	}
 
 	private void checkPrepared() {
@@ -504,16 +534,33 @@ public class ClientSessionServiceImpl
                 throw e;
             }
 	    
-            for (Map.Entry<ClientSessionImpl, List<byte[]>> entry :
-		     sessionMessages.entrySet())
-            {
-                ClientSessionImpl session = entry.getKey();
-                List<byte[]> messages = entry.getValue();
+            for (SessionInfo info : sessionsInfo.values()) {
+		info.sendMessages();
+            }
+        }
+
+	private static class SessionInfo {
+
+	    private final ClientSessionImpl session;
+	    /** List of protocol messages to send on commit. */
+	    List<byte[]> messages = new ArrayList<byte[]>();
+
+	    /** If true, disconnect after sending messages. */
+	    boolean disconnect = false;
+
+	    SessionInfo(ClientSessionImpl session) {
+		this.session = session;
+	    }
+
+	    private void sendMessages() {
                 for (byte[] message : messages) {
                    session.sendMessage(message, Delivery.RELIABLE);
                 }
-            }
-        }
+		if (disconnect) {
+		    session.handleDisconnect(false);
+		}
+	    }
+	}
     }
     
     /* -- Other methods -- */
