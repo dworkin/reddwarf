@@ -209,7 +209,9 @@ public class ClientSessionServiceImpl
 		dataService = registry.getComponent(DataService.class);
 		removeListenerBindings();
 		nonDurableTaskScheduler =
-		    new NonDurableTaskScheduler(taskScheduler, proxy);
+		    new NonDurableTaskScheduler(
+			taskScheduler, proxy.getCurrentOwner(),
+			registry.getComponent(TaskService.class));
 		acceptor =
 		    AcceptorFactory.createAcceptor(TransportType.RELIABLE);
 		SocketAddress address = new InetSocketAddress(port);
