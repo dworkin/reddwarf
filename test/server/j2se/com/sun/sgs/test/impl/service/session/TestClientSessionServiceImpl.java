@@ -102,6 +102,11 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DataServiceImplClassName + ".debugCheckInterval", "1");
 
     private static String LOGIN_FAILED_MESSAGE = "login failed";
+
+    private final static int WAIT_TIME = 1000;
+    
+    private static Object disconnectedCallbackLock = new Object();
+    
     /**
      * Delete the database directory at the start of the test run, but not for
      * each test.
@@ -277,7 +282,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
-    public void testLogin() throws Exception {
+    public void testLoginSuccess() throws Exception {
 	registerAppListener();
 	DummyClient client = new DummyClient();
 	try {
@@ -311,17 +316,51 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client.disconnect(false);
 	}
     }
-    public void testLogout() throws Exception {
+    
+    public void testLogoutRequestAndDisconnectedCallback() throws Exception {
 	registerAppListener();
 	DummyClient client = new DummyClient();
+	String name = "logout";
 	try {
 	    client.connect(PORT);
-	    client.login("logout", "test");
+	    client.login(name, "test");
 	    client.logout();
+	    DummyClientSessionListener sessionListener =
+		getClientSessionListener(name);
+	    if (sessionListener == null) {
+		fail("listener is null!");
+	    } else {
+		synchronized (disconnectedCallbackLock) {
+
+		    if (!sessionListener.receivedDisconnectedCallback) {
+			disconnectedCallbackLock.wait(WAIT_TIME);
+			sessionListener = getClientSessionListener(name);
+		    }
+
+		    if (!sessionListener.receivedDisconnectedCallback) {
+			fail("disconnected callback not invoked");
+		    } else if (!sessionListener.graceful) {
+			fail("disconnection was not graceful");
+		    }
+		    System.err.println("Logout successful");
+		}
+	    }
+	} catch (InterruptedException e) {
+	    e.printStackTrace();
+	    fail("testLogout interrupted");
 	} finally {
 	    client.disconnect(false);
 	}
-	
+    }
+
+    private DummyClientSessionListener getClientSessionListener(String name)
+	throws Exception
+    {
+	createTransaction();
+	DummyClientSessionListener sessionListener =
+	    getAppListener().getClientSessionListener(name);
+	txn.commit();
+	return sessionListener;
     }
 
     /* -- test ClientSession -- */
@@ -521,7 +560,6 @@ public class TestClientSessionServiceImpl extends TestCase {
      */
     private static class DummyClient {
 
-	private final static int WAIT_TIME = 1000;
 	private String name;
 	private String password;
 	private IOConnector connector;
@@ -817,7 +855,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	private final Map<ClientSession, ManagedReference> sessions =
 	    Collections.synchronizedMap(
 		new HashMap<ClientSession, ManagedReference>());
-	
+
 	public ClientSessionListener loggedIn(ClientSession session) {
 	    DummyClientSessionListener listener =
 		new DummyClientSessionListener(session);
@@ -846,22 +884,46 @@ public class TestClientSessionServiceImpl extends TestCase {
 	private Set<ClientSession> getSessions() {
 	    return sessions.keySet();
 	}
+
+	DummyClientSessionListener getClientSessionListener(String name) {
+
+	    for (Map.Entry<ClientSession,ManagedReference> entry :
+		     sessions.entrySet()) {
+
+		ClientSession session = entry.getKey();
+		ManagedReference listenerRef = entry.getValue();
+		if (session.getName().equals(name)) {
+		    return listenerRef.get(DummyClientSessionListener.class);
+		}
+	    }
+	    return null;
+	}
     }
 
     private static class DummyClientSessionListener
 	implements ClientSessionListener, Serializable, ManagedObject
     {
 	private final static long serialVersionUID = 1L;
-	private boolean receivedDisconnectedCallback = false;
+	private final String name;
+	boolean receivedDisconnectedCallback = false;
+	boolean graceful = false;
 	
 	private transient final ClientSession session;
 	
 	DummyClientSessionListener(ClientSession session) {
 	    this.session = session;
+	    this.name = session.getName();
 	}
 
 	public void disconnected(boolean graceful) {
-	    receivedDisconnectedCallback = true;
+	    System.err.println("DummyClientSessionListener[" + name +
+
+			       "] disconnected invoked with " + graceful);
+	    synchronized (disconnectedCallbackLock) {
+		receivedDisconnectedCallback = true;
+		this.graceful = graceful;
+		disconnectedCallbackLock.notifyAll();
+	    }
 	}
 
 	public void receivedMessage(byte[] message) {
