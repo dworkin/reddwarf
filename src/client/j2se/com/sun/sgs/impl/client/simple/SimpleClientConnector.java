@@ -21,11 +21,6 @@ import com.sun.sgs.io.IOConnector;
  */
 public class SimpleClientConnector extends ClientConnector {
     
-    // Set the default connector factory.
-    static {
-        setConnectorFactory(new SimpleConnectorFactory());
-    }
-    
     private final IOConnector<SocketAddress> connector;
     
     SimpleClientConnector(Properties properties) {

@@ -11,7 +11,8 @@ import java.util.Properties;
 public abstract class ClientConnector
 {
     /** The static singleton factory. */
-    private static ClientConnectorFactory theSingletonFactory;
+    private static ClientConnectorFactory theSingletonFactory =
+        new com.sun.sgs.impl.client.simple.SimpleConnectorFactory();
 
     /**
      * Create a {@code ClientConnector} according to the given
