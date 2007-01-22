@@ -8,7 +8,6 @@ import java.util.concurrent.Executors;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import com.sun.sgs.impl.io.CompleteMessageFilter;
@@ -98,9 +97,11 @@ public class IOFilterTest {
      * arrives in one piece on the other end (and is subsequently echoed back).
      * Mina's internal buffers max out at about 8k, so a 100k message will be 
      * split into 12 or so chunks.
+     *
+     * @throws IOException if an unexpected IO problem occurs
      */
     @Test
-    public void bigMessage() {
+    public void bigMessage() throws IOException {
         IOConnector<SocketAddress> connector = 
                     new SocketEndpoint(BIND_ADDRESS, TransportType.RELIABLE, 
                             Executors.newCachedThreadPool()).createConnector();
@@ -157,9 +158,10 @@ public class IOFilterTest {
      * through.  In this case the server has a CompleteMessageFilter installed,
      * and the client has the default PassthroughFilter installed.
      *
+     * @throws IOException if an unexpected IO problem occurs
      */
     @Test
-    public void hybridFilter() {
+    public void hybridFilter() throws IOException {
         bytesIn = 0;
         final int messageSize = 1000;
         IOConnector<SocketAddress> connector = 

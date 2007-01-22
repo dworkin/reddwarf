@@ -4,9 +4,7 @@ import java.net.SocketAddress;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.apache.mina.common.ByteBuffer;
 import org.apache.mina.common.IoConnector;
-import org.apache.mina.common.IoHandlerAdapter;
 import org.apache.mina.common.IoSession;
 
 import com.sun.sgs.impl.util.LoggerWrapper;

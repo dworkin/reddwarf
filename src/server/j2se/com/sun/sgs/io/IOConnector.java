@@ -1,7 +1,6 @@
 package com.sun.sgs.io;
 
 import java.io.IOException;
-import java.net.SocketAddress;
 
 /**
  * Actively initiates a single connection to an {@link Endpoint} and
@@ -33,7 +32,7 @@ public interface IOConnector<T> {
      * @throws IllegalStateException if the {@code IOConnector} has been
      *         shut down or has already attempted a connection.
      */
-    void connect(IOHandler listener);
+    void connect(IOHandler listener) throws IOException;
 
     /**
      * Actively initate a connection to the associated {@link Endpoint}.
@@ -51,7 +50,7 @@ public interface IOConnector<T> {
      * @throws IllegalStateException if the {@code IOConnector} has been
      *         shut down or has already attempted a connection.
      */
-    void connect(IOHandler listener, IOFilter filter);
+    void connect(IOHandler listener, IOFilter filter) throws IOException;
 
     /**
      * Returns the {@link Endpoint} this {@code IOConnector} will connect to.

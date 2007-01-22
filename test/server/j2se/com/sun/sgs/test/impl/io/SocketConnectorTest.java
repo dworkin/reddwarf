@@ -8,7 +8,6 @@ import java.util.concurrent.Executors;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import com.sun.sgs.impl.io.SocketEndpoint;
@@ -77,9 +76,11 @@ public class SocketConnectorTest {
 
     /**
      * Test connectivity.
+     *
+     * @throws IOException if an unexpected IO problem occurs
      */
     @Test
-    public void testConnect() {
+    public void testConnect() throws IOException {
         IOConnector<SocketAddress> connector = new SocketEndpoint(ADDRESS,
                 TransportType.RELIABLE, Executors.newCachedThreadPool())
                 .createConnector();
@@ -106,10 +107,11 @@ public class SocketConnectorTest {
 
     /**
      * Test the IOConnector's lack of re-usability.
-     * 
+     *
+     * @throws IOException if an unexpected IO problem occurs
      */
     @Test(expected = IllegalStateException.class)
-    public void testMultipleConnect() {
+    public void testMultipleConnect() throws IOException {
         IOConnector<SocketAddress> connector = new SocketEndpoint(ADDRESS,
                 TransportType.RELIABLE).createConnector();
 
@@ -121,7 +123,7 @@ public class SocketConnectorTest {
     }
 
     @Test(expected = IllegalStateException.class)
-    public void testShutdown() {
+    public void testShutdown() throws IOException {
         final IOConnector<SocketAddress> connector = new SocketEndpoint(ADDRESS,
                 TransportType.RELIABLE).createConnector();
 

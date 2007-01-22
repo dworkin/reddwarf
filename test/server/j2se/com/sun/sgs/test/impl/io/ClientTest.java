@@ -146,7 +146,11 @@ public class ClientTest extends JFrame {
         
         public void connect(Endpoint<?> endpoint) {
             for (EndpointInfo info : list) {
-                info.connect(endpoint);
+                try {
+                    info.connect(endpoint);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
         }
         
@@ -248,7 +252,7 @@ public class ClientTest extends JFrame {
             
         }
         
-        public void connect(Endpoint<?> endpoint) {
+        public void connect(Endpoint<?> endpoint) throws IOException {
             endpoint.createConnector().connect(this, new CompleteMessageFilter());
         }
         

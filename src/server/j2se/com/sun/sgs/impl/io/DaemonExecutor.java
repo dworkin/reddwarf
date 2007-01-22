@@ -1,7 +1,6 @@
 package com.sun.sgs.impl.io;
 
 import java.util.concurrent.Executor;
-import java.util.concurrent.RejectedExecutionException;
 
 /**
  * An {@link Executor} that executes tasks in a new {@code Thread}
