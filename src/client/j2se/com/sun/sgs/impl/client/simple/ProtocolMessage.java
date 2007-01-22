@@ -24,10 +24,10 @@ public interface ProtocolMessage {
     /** The version number. */
     final byte VERSION = 0x01;
 
-    /** Application Service */
+    /** Application service ID. */
     final byte APPLICATION_SERVICE = 0x01;
 
-    /** Channel Service */
+    /** Channel service ID. */
     final byte CHANNEL_SERVICE = 0x02;
 
     /**
@@ -103,10 +103,7 @@ public interface ProtocolMessage {
      * </ul>
      */
     final byte MESSAGE_SEND = 0x30;
-    /** Message Send (remove?) */
-    final byte MESSAGE_TO_SERVER = 0x30; // TODO: MESSAGE_SEND better? -JM
-    /** Message Send (remove?) */
-    final byte MESSAGE_FROM_SERVER = 0x30; // TODO: MESSAGE_SEND better? -JM
+
 
     /**
      * Logout request.
@@ -143,7 +140,6 @@ public interface ProtocolMessage {
      * Channel send request.
      * <ul>
      * <li> (String) name
-     * <li> (long) sequence number
      * <li> (short) number of recipients (0 = all)
      * <li> If number of recipients > 0, for each recipient:
      * <ul>
@@ -171,3 +167,4 @@ public interface ProtocolMessage {
     
 
 }
+    

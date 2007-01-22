@@ -76,7 +76,7 @@ public class SimpleClientImpl2 implements ServerSession {
             throw new IllegalStateException("Client not connected");
         }
         ProtocolMessageEncoder messageEncoder =
-            new ProtocolMessageEncoder(APPLICATION_SERVICE, MESSAGE_TO_SERVER);
+            new ProtocolMessageEncoder(APPLICATION_SERVICE, MESSAGE_SEND);
 
         messageEncoder.writeBytes(message);
         sendMessage(messageEncoder);
@@ -182,7 +182,7 @@ public class SimpleClientImpl2 implements ServerSession {
                 } catch (IOException ioe) {
                     ioe.printStackTrace();
                 }
-            } else if (command == MESSAGE_FROM_SERVER) {
+            } else if (command == MESSAGE_SEND) {
                 byte[] serverMessage = new byte[message.length - 3];
                 System.arraycopy(message, 3, serverMessage, 0,
                                  serverMessage.length);
