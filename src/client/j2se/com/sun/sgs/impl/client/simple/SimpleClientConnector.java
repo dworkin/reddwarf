@@ -5,7 +5,6 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.Properties;
 
-import com.sun.sgs.impl.client.comm.ClientConnection;
 import com.sun.sgs.impl.client.comm.ClientConnectionListener;
 import com.sun.sgs.impl.client.comm.ClientConnector;
 import com.sun.sgs.impl.io.CompleteMessageFilter;
@@ -21,6 +20,11 @@ import com.sun.sgs.io.IOConnector;
  * @version     1.0
  */
 public class SimpleClientConnector extends ClientConnector {
+    
+    // Set the default connector factory.
+    static {
+        setConnectorFactory(new SimpleConnectorFactory());
+    }
     
     private final IOConnector<SocketAddress> connector;
     
@@ -49,13 +53,19 @@ public class SimpleClientConnector extends ClientConnector {
         connector = 
             new SocketEndpoint(socketAddress, transportType).createConnector();
     }
-    
+
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void cancel() throws IOException {
         // TODO implement
         throw new UnsupportedOperationException("Cancel not yet implemented");
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void connect(ClientConnectionListener connectionListener)
         throws IOException

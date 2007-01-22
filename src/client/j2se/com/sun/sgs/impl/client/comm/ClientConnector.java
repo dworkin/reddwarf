@@ -3,49 +3,67 @@ package com.sun.sgs.impl.client.comm;
 import java.io.IOException;
 import java.util.Properties;
 
-public abstract class ClientConnector {
-
+/**
+ * An abstract mechanism for actively initiating a {@link ClientConnection}.
+ *
+ * @author Sten Anderson
+ */
+public abstract class ClientConnector
+{
+    /** The static singleton factory. */
     private static ClientConnectorFactory theSingletonFactory;
 
-    public static ClientConnector create(Properties props) {
-	return theSingletonFactory.createConnector(props);
-    }
-    
-    public static void setConnectorFactory(ClientConnectorFactory factory) {
-	theSingletonFactory = factory;
-    }
-    
-    protected ClientConnector() {
-	// Empty
+    /**
+     * Create a {@code ClientConnector} according to the given
+     * {@code properties}.
+     *
+     * @param properties which affect the implementation of
+     *        ClientConnector returned.
+     * @return a {@code ClientConnector}
+     */
+    public static ClientConnector create(Properties properties) {
+	return theSingletonFactory.createConnector(properties);
     }
 
     /**
-     * Initiates a non-blocking connect to this ClientConnector's target
-     * remote address. TODO: more doc
-     * 
-     * @param connectionListener The listener that will receive completion
-     *        events for this Connector
-     * 
-     * @throws AlreadyConnectedException if this connector is already
-     *         connected
-     * @throws ConnectionPendingException if a non-blocking connection
-     *         operation is already in progress on this connector
-     * @throws ClosedChannelException if this connector is closed
-     * @throws UnsupportedAddressTypeException if the type of the given
-     *         remote address is not supported
-     * @throws SecurityException if a security manager has been installed
-     *         and it does not permit access to the given remote endpoint
-     * @throws IOException if some other I/O error occurs
+     * Set the {@link ClientConnectorFactory} that will be used
+     * to create new {@code ClientConnector}s.
+     *
+     * @param factory the factory to create new ClientConnectors.
      */
-    public abstract void connect(ClientConnectionListener connectionListener)
+    protected static void setConnectorFactory(ClientConnectorFactory factory) {
+	theSingletonFactory = factory;
+    }
+
+    /**
+     * Only allow construction by subclasses.
+     */
+    protected ClientConnector() {
+	// empty
+    }
+
+    /**
+     * Actively initate a connection to the target remote address.
+     * This call is non-blocking. {@link ClientConnectionListener#connected}
+     * will be called asynchronously on the {@code listener} upon successful
+     * connection, or {@link ClientConnectionListener#disconnected} if it
+     * fails.
+     *
+     * @param listener the listener for all IO events on the
+     *        connection, including the result of the connection attempt.
+     *
+     * @throws IOException if an IO error occurs synchronously.
+     * @throws SecurityException if a security manager has been installed
+     *         and it does not permit access to the remote endpoint.
+     */
+    public abstract void connect(ClientConnectionListener listener)
             throws IOException;
 
     /**
      * Cancels a pending connect operation on this ClientConnection.
      *
-     * @throws AlreadyConnectedException if this connector is already connected
-     * @throws ClosedChannelException if this connector is closed
-     * @throws IOException if some other I/O error occurs
+     * @throws IOException if an IO error occurs synchronously.
      */
     public abstract void cancel() throws IOException;
+
 }

@@ -1,5 +1,6 @@
 package com.sun.sgs.client;
 
+import java.io.IOException;
 import java.util.Set;
 
 /**
@@ -57,8 +58,9 @@ public interface ClientChannel {
      *
      * @throws IllegalStateException if the sender is not a member of
      *         this channel
+     * @throws IOException if a synchronous IO problem occurs
      */
-    void send(byte[] message);
+    void send(byte[] message) throws IOException;
 
     /**
      * Sends the given {@code message} to the {@code recipient} on this
@@ -74,8 +76,9 @@ public interface ClientChannel {
      *
      * @throws IllegalStateException if the sender is not a member of
      *         this channel
+     * @throws IOException if a synchronous IO problem occurs
      */
-    void send(SessionId recipient, byte[] message);
+    void send(SessionId recipient, byte[] message) throws IOException;
 
     /**
      * Sends the given {@code message} data to the specified
@@ -89,8 +92,11 @@ public interface ClientChannel {
      * @param recipients the subset of channel members that should receive
      *        the message
      * @param message the data to send
+     *
      * @throws IllegalStateException if the sender is not a member of this
      *         channel
+     * @throws IOException if a synchronous IO problem occurs
      */
-    void send(Set<SessionId> recipients, byte[] message);
+    void send(Set<SessionId> recipients, byte[] message) throws IOException;
+
 }

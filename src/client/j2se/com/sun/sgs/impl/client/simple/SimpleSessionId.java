@@ -13,17 +13,28 @@ import com.sun.sgs.client.SessionId;
 public class SimpleSessionId extends SessionId {
 
     private byte[] id;
-    
+
+    /**
+     * Construct a new {@code SimpleSessionId} from the given bytes.
+     *
+     * @param id the byte representation of this session id.
+     */
     public SimpleSessionId(byte[] id) {
         this.id = id;
     }
-    
+
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public boolean equals(Object obj) {
         return (obj instanceof SessionId && 
                 toBytes().equals(((SessionId) obj).toBytes()));
     }
- 
+
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public byte[] toBytes() {
         return id;

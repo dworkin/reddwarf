@@ -5,6 +5,7 @@ import java.awt.Container;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.io.IOException;
 
 import javax.swing.JInternalFrame;
 import javax.swing.JLabel;
@@ -103,7 +104,11 @@ public class ChatChannelFrame extends JInternalFrame
     }
     
     public void actionPerformed(ActionEvent action) {
-        chan.send(inputField.getText().getBytes());
+        try {
+            chan.send(inputField.getText().getBytes());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         inputField.setText("");
     }
     

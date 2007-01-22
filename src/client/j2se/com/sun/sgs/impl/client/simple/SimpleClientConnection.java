@@ -4,7 +4,7 @@ import java.io.IOException;
 
 import com.sun.sgs.impl.client.comm.ClientConnection;
 import com.sun.sgs.impl.client.comm.ClientConnectionListener;
-import com.sun.sgs.impl.util.HexDumper;
+//import com.sun.sgs.impl.util.HexDumper;
 import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
 

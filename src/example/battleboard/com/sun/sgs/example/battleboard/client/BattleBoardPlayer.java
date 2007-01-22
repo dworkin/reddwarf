@@ -1,5 +1,6 @@
 package com.sun.sgs.example.battleboard.client;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -48,10 +49,9 @@ public class BattleBoardPlayer implements ClientChannelListener {
      * <p>
      * 
      * @param serverSession the ServerSession for this game
-     * 
      * @param chan the ClientChannel for this game
-     * 
      * @param playerName the name of the player
+     * @param swingMode {@code true} if the client should use swing
      */
     public BattleBoardPlayer(ServerSession serverSession,
             ClientChannel chan, String playerName, boolean swingMode) {
@@ -69,16 +69,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
     }
 
     /**
-     * {@inheritDoc}
-     */
-    public void playerJoined(byte[] playerID) {
-        log.fine("playerJoined on " + channel.getName());
-    }
-
-    /**
-     * {@inheritDoc}
-     * <p>
-     * TODO need to port to new API
+     * FIXME need to port to new API
      */
     public void playerLeft(byte[] playerID) {
         log.fine("playerLeft on " + channel.getName());
@@ -306,7 +297,7 @@ public class BattleBoardPlayer implements ClientChannelListener {
         String[] move = display.getMove();
 
         if ((move.length == 1) && "pass".equals(move[0])) {
-            serverSession.send("pass".getBytes());
+            send("pass".getBytes());
         } else if (move.length == 3) {
             String bombedPlayer = move[0];
             int x = Integer.parseInt(move[1]);
@@ -314,12 +305,26 @@ public class BattleBoardPlayer implements ClientChannelListener {
 
             String moveMessage = "move " + bombedPlayer + " " + x + " " + y;
 
-            serverSession.send(moveMessage.getBytes());
+            send(moveMessage.getBytes());
         } else {
             display.message("Improper move.  Passing instead....");
-            serverSession.send("pass".getBytes());
+            send("pass".getBytes());
         }
         return GameState.END_MOVE;
+    }
+    
+    /**
+     * Send the message to the server, exiting if there is an IO problem.
+     *
+     * @param message the data to send to the server
+     */
+    private void send(byte[] message) {
+        try {
+            serverSession.send(message);
+        } catch (IOException e) {
+            e.printStackTrace();
+            System.exit(1);
+        }
     }
 
     /**

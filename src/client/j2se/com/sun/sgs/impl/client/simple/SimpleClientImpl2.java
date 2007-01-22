@@ -5,8 +5,6 @@ import java.net.PasswordAuthentication;
 import java.util.Properties;
 import java.util.concurrent.Callable;
 
-import org.apache.mina.filter.codec.ProtocolEncoder;
-
 import com.sun.sgs.client.ServerSession;
 import com.sun.sgs.client.ServerSessionListener;
 import com.sun.sgs.client.SessionId;
@@ -41,8 +39,7 @@ public class SimpleClientImpl2 implements ServerSession {
                 return connection;
             }
         }, clientListener);
-        ClientConnector connector =
-            new SimpleConnectorFactory().createConnector(props);
+        ClientConnector connector = ClientConnector.create(props);
         connector.connect(connListener);
     }
 
@@ -57,16 +54,24 @@ public class SimpleClientImpl2 implements ServerSession {
         return connected;
     }
 
-    public void logout(boolean force) {
+    public void logout(boolean force) throws IllegalStateException {
         if (!isConnected()) {
             throw new IllegalStateException("Client not connected");
         }
         ProtocolMessageEncoder messageEncoder =
             new ProtocolMessageEncoder(APPLICATION_SERVICE, LOGOUT_SUCCESS);
-        sendMessage(messageEncoder);
+        try {
+            sendMessage(messageEncoder);
+        } catch (IOException e) {
+            try {
+                connection.disconnect();
+            } catch (IOException e2) {
+                // ignore
+            }
+        }
     }
 
-    public void send(byte[] message) {
+    public void send(byte[] message) throws IOException {
         if (!isConnected()) {
             throw new IllegalStateException("Client not connected");
         }
@@ -77,7 +82,9 @@ public class SimpleClientImpl2 implements ServerSession {
         sendMessage(messageEncoder);
     }
 
-    private void sendMessage(ProtocolMessageEncoder messageEncoder) {
+    private void sendMessage(ProtocolMessageEncoder messageEncoder)
+        throws IOException
+    {
         connection.sendMessage(messageEncoder.getMessage());
     }
 
@@ -97,8 +104,9 @@ public class SimpleClientImpl2 implements ServerSession {
          * 
          * @param connection the live connection to the server
          */
-        public void connected(@SuppressWarnings("hiding")
-        ClientConnection connection)
+        public void connected(
+                @SuppressWarnings("hiding")
+                ClientConnection connection)
         {
             connected = true;
             SimpleClientImpl2.this.connection = connection;
@@ -111,12 +119,17 @@ public class SimpleClientImpl2 implements ServerSession {
 
             messageEncoder.writeString(auth.getUserName());
             messageEncoder.writeString(new String(auth.getPassword()));
-            sendMessage(messageEncoder);
+            try {
+                sendMessage(messageEncoder);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
 
         /**
-         * Notification that the client has been disconnected. TODO
-         * implement the graceful piece of this.
+         * {@inheritDoc}
+         *
+         * TODO implement the graceful piece of this.
          */
         public void disconnected(boolean graceful, byte[] message) {
             connected = false;

@@ -21,7 +21,6 @@ import com.sun.sgs.impl.client.comm.ClientConnector;
 import com.sun.sgs.impl.client.simple.ProtocolMessage;
 import com.sun.sgs.impl.client.simple.ProtocolMessageDecoder;
 import com.sun.sgs.impl.client.simple.ProtocolMessageEncoder;
-import com.sun.sgs.impl.client.simple.SimpleConnectorFactory;
 
 public class SimpleClientImpl implements ServerSession {
 
@@ -43,8 +42,7 @@ public class SimpleClientImpl implements ServerSession {
     }
 
     public void login(Properties props) throws IOException {
-        ClientConnector connector =
-            new SimpleConnectorFactory().createConnector(props);
+        ClientConnector connector = ClientConnector.create(props);
         connector.connect(connListener);
     }
 
@@ -69,15 +67,24 @@ public class SimpleClientImpl implements ServerSession {
                 e.printStackTrace();
             }
         } else {
-            ProtocolMessageEncoder m =
-                new ProtocolMessageEncoder(
-                    ProtocolMessage.APPLICATION_SERVICE,
-                    ProtocolMessage.LOGOUT_REQUEST);
-            sendRaw(m.getMessage());
+            try {
+                ProtocolMessageEncoder m =
+                    new ProtocolMessageEncoder(
+                        ProtocolMessage.APPLICATION_SERVICE,
+                        ProtocolMessage.LOGOUT_REQUEST);
+                sendRaw(m.getMessage());
+            } catch (IOException e) {
+                e.printStackTrace();
+                try {
+                    connection.disconnect();
+                } catch (IOException e2) {
+                    e2.printStackTrace();
+                }
+            }
         }
     }
 
-    public void send(byte[] message) {
+    public void send(byte[] message) throws IOException {
         ProtocolMessageEncoder m =
             new ProtocolMessageEncoder(ProtocolMessage.APPLICATION_SERVICE,
                 ProtocolMessage.MESSAGE_SEND);
@@ -85,7 +92,7 @@ public class SimpleClientImpl implements ServerSession {
         sendRaw(m.getMessage());
     }
 
-    private void sendRaw(byte[] data) {
+    private void sendRaw(byte[] data) throws IOException {
         connection.sendMessage(data);
     }
 
@@ -114,7 +121,12 @@ public class SimpleClientImpl implements ServerSession {
                     ProtocolMessage.LOGIN_REQUEST);
             m.writeString(authentication.getUserName());
             m.writeString(new String(authentication.getPassword()));
-            sendRaw(m.getMessage());
+            try {
+                sendRaw(m.getMessage());
+            } catch (IOException e) {
+                e.printStackTrace();
+                logout(true);
+            }
         }
 
         public void disconnected(boolean graceful, byte[] message) {
@@ -277,19 +289,25 @@ public class SimpleClientImpl implements ServerSession {
             return channelListener;
         }
 
-        public void send(byte[] message) {
+        public void send(byte[] message) throws IOException {
             sendInternal(null, message);
         }
 
-        public void send(SessionId recipient, byte[] message) {
+        public void send(SessionId recipient, byte[] message)
+            throws IOException
+        {
             sendInternal(Collections.singleton(recipient), message);
         }
 
-        public void send(Set<SessionId> recipients, byte[] message) {
+        public void send(Set<SessionId> recipients, byte[] message)
+            throws IOException
+        {
             sendInternal(recipients, message);
         }
 
-        public void sendInternal(Set<SessionId> recipients, byte[] message) {
+        public void sendInternal(Set<SessionId> recipients, byte[] message)
+            throws IOException
+        {
             ProtocolMessageEncoder m =
                 new ProtocolMessageEncoder(ProtocolMessage.CHANNEL_SERVICE,
                     ProtocolMessage.CHANNEL_SEND_REQUEST);

@@ -130,7 +130,11 @@ public class SimpleClientTestUI extends JFrame {
     }
     
     private void sendMessage(byte[] message) {
-        client.send(message);
+        try {
+            client.send(message);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
     
     private JPanel doNorthLayout() {

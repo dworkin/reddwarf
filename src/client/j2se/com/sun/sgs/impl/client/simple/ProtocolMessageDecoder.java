@@ -14,7 +14,12 @@ import java.io.IOException;
 public class ProtocolMessageDecoder {
     
     private DataInputStream inputStream;
-    
+
+    /**
+     * Create a decoder for the given {@code message}.
+     * 
+     * @param message the data to decode.
+     */
     public ProtocolMessageDecoder(byte[] message) {
         inputStream = new DataInputStream(new ByteArrayInputStream(message));
     }

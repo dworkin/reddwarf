@@ -7,6 +7,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
+import java.io.IOException;
 import java.net.PasswordAuthentication;
 import java.util.Collection;
 import java.util.HashSet;
@@ -195,7 +196,11 @@ public class ChatClient extends JFrame
 
     private void doServerMessage() {
 	String message = getUserInput("Enter server message:");
-        client.send(message.getBytes());
+        try {
+            client.send(message.getBytes());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     private void doMultiDCCMessage() {
@@ -206,7 +211,11 @@ public class ChatClient extends JFrame
     	}
 
         String message = getUserInput("Enter private message:");
-        dccChannel.send(targets, message.getBytes());
+        try {
+            dccChannel.send(targets, message.getBytes());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     void doDCCMessage() {
@@ -215,17 +224,29 @@ public class ChatClient extends JFrame
 	    return;
 	}
 	String message = getUserInput("Enter private message:");
-        dccChannel.send(target, message.getBytes());
+        try {
+            dccChannel.send(target, message.getBytes());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     void joinChannel(String channelName) {
 	String cmd = "/join " + channelName;
-	client.send(cmd.getBytes());
+        try {
+            client.send(cmd.getBytes());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
  
     void leaveChannel(ClientChannel chan) {
 	String cmd = "/leave " + chan.getName();
-	client.send(cmd.getBytes());
+        try {
+            client.send(cmd.getBytes());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     private void userLogin(SessionId member) {

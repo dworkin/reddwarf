@@ -63,7 +63,11 @@ public class ClientTest
 
     public void loggedIn() {
         System.out.println("Logged In");
-        client.send("Join Channel".getBytes());
+        try {
+            client.send("Join Channel".getBytes());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     public void loginFailed(String reason) {
@@ -109,6 +113,11 @@ public class ClientTest
                 " from " + (sender != null ? sender.toString() : " Server ") + 
                 new String(message));
         
-        channel.send("client message".getBytes());
+        
+        try {
+            channel.send("client message".getBytes());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }

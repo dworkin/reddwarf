@@ -237,9 +237,15 @@ public class BattleBoardClient
     }
 
     protected void sendJoinReq(ClientChannel chan) {
-        String cmd = "join " + playerName;
-        client.send(cmd.getBytes());
-        System.out.println("Waiting for players");
+        try {
+            String cmd = "join " + playerName;
+            client.send(cmd.getBytes());
+            System.out.println("Waiting for players");
+        } catch (IOException e) {
+            // TODO handle more gracefully
+            e.printStackTrace();
+            System.exit(1);
+        }
     }
 
     /**

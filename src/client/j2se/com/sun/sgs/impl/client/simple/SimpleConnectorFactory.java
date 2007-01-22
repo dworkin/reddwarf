@@ -12,7 +12,7 @@ import com.sun.sgs.impl.client.comm.ClientConnectorFactory;
  * @author      Sten Anderson
  * @version     1.0
  */
-public class SimpleConnectorFactory implements ClientConnectorFactory {
+class SimpleConnectorFactory implements ClientConnectorFactory {
 
     /**
      * {@inheritDoc}

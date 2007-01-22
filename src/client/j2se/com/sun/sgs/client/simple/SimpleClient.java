@@ -2,14 +2,9 @@ package com.sun.sgs.client.simple;
 
 import java.io.IOException;
 import java.net.PasswordAuthentication;
-import java.util.Collections;
-import java.util.Map;
 import java.util.Properties;
 
-import com.sun.sgs.client.ClientChannel;
-import com.sun.sgs.client.ClientChannelListener;
 import com.sun.sgs.client.ServerSession;
-import com.sun.sgs.client.ServerSessionListener;
 import com.sun.sgs.client.SessionId;
 import com.sun.sgs.impl.client.simple.SimpleClientImpl;
 
@@ -77,8 +72,10 @@ public class SimpleClient implements ServerSession {
      * If this client is disconnected for any reason (including login
      * failure), this method may be used again to log in.
      * 
-     * @param props a properties list specifying properties to use for this
-     *        client's session (e.g., connection properties)
+     * @param props the connection properties to use in creating the
+     *        client's session.
+     *
+     * @throws IOException if a synchronous IO error occurs.
      */
     public void login(Properties props) throws IOException {
         impl.login(props);
@@ -86,22 +83,20 @@ public class SimpleClient implements ServerSession {
 
     /**
      * {@inheritDoc}
-     * 
-     * @throws IllegalStateException if this session is disconnected
      */
     public SessionId getSessionId() {
         return impl.getSessionId();
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     * */
     public boolean isConnected() {
         return impl.isConnected();
     }
 
     /**
      * {@inheritDoc}
-     * 
-     * @throws IllegalStateException if this session is disconnected
      */
     public void logout(boolean force) {
         impl.logout(force);
@@ -109,10 +104,8 @@ public class SimpleClient implements ServerSession {
 
     /**
      * {@inheritDoc}
-     * 
-     * @throws IllegalStateException if this session is disconnected
      */
-    public void send(byte[] message) {
+    public void send(byte[] message) throws IOException {
         impl.send(message);
     }
 }

@@ -40,6 +40,15 @@ public class ChannelManager {
     private HashMap<String, SimpleClientChannel> channelMap;
     private long currentSequenceNumber;
     
+    /**
+     * Create a {@code ChannelManager} that will send data on the
+     * connection obtained from {@code connectionAccess} and deliver
+     * channel messages to the given {@link ServerSessionListener}.
+     *
+     * @param connectionAccess a {@code Callable} that returns the
+     *        connection on which to send data.
+     * @param ssl the listener to invoke with incoming channel events.
+     */
     public ChannelManager(Callable<ClientConnection> connectionAccess,
             ServerSessionListener ssl)
     {

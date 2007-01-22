@@ -1,5 +1,7 @@
 package com.sun.sgs.client;
 
+import java.io.IOException;
+
 /**
  * Represents a client's view of a login session with the server. Each time
  * a client logs in, it will be assigned a different server session. A
@@ -19,6 +21,7 @@ public interface ServerSession {
      * Returns the session identifier for this server session.
      * 
      * @return the session identifier for this server session
+     *
      * @throws IllegalStateException if this session is disconnected
      */
     SessionId getSessionId();
@@ -33,11 +36,13 @@ public interface ServerSession {
      * The specified byte array must not be modified after invoking this
      * method; if the byte array is modified, then this method may have
      * unpredictable results.
-     * 
+     *
      * @param message a message
-     * @throws IllegalStateException if this session is disconnected
+     *
+     * @throws IOException if this session is disconnected or an IO error
+     *         occurs.
      */
-    void send(byte[] message);
+    void send(byte[] message) throws IOException;
 
     /**
      * Returns <code>true</code> if this session is connected, otherwise
@@ -65,7 +70,9 @@ public interface ServerSession {
      * 
      * @param force if <code>true</code>, this session is forcibly
      *        terminated; otherwise the session is gracefully disconnected
+     *
      * @throws IllegalStateException if this session is disconnected
      */
     void logout(boolean force);
+
 }
