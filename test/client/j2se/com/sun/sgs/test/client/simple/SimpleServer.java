@@ -141,7 +141,7 @@ public class SimpleServer implements IOHandler {
             }
             sendMessage(messageEncoder, handle);
         }
-        else if (command == MESSAGE_TO_SERVER) {
+        else if (command == MESSAGE_SEND) {
             assert service == APPLICATION_SERVICE;
             String serverMessage = messageDecoder.readString();
             System.out.println("Received general server message: " + 
