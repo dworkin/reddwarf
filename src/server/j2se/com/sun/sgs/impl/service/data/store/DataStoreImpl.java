@@ -21,6 +21,7 @@ import com.sleepycat.db.OperationStatus;
 import com.sleepycat.db.RunRecoveryException;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.util.LoggerWrapper;
@@ -539,7 +540,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	    bdbTxn.commit();
 	} catch (DatabaseException e) {
 	    throw convertException(
-		Level.SEVERE, e, "DataStore initialization");
+		null, Level.SEVERE, e, "DataStore initialization");
 	} finally {
 	    if (bdbTxn != null && !done) {
 		try {
@@ -576,7 +577,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
         config.setInitializeCache(true);
         config.setInitializeLocking(true);
         config.setInitializeLogging(true);
-        config.setLockDetectMode(LockDetectMode.MINWRITE);
+        config.setLockDetectMode(LockDetectMode.YOUNGEST);
 	config.setLockTimeout(timeout);
 	config.setMessageHandler(new LoggingMessageHandler());
         config.setRunRecovery(true);
@@ -622,7 +623,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	    exception = e;
 	}
 	throw convertException(
-	    Level.FINEST, exception, "createObject txn:" + txn);
+	    txn, Level.FINEST, exception, "createObject txn:" + txn);
     }
 
     /** {@inheritDoc} */
@@ -650,7 +651,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	throw convertException(Level.FINEST, exception,
+	throw convertException(txn, Level.FINEST, exception,
 			       "markForUpdate txn:" + txn + ", oid:" + oid);
     }
 
@@ -677,7 +678,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	throw convertException(Level.FINEST, exception,
+	throw convertException(txn, Level.FINEST, exception,
 			       "getObject txn:" + txn + ", oid:" + oid +
 			       ", forUpdate:" + forUpdate);
     }
@@ -740,8 +741,8 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	throw convertException(
-	    Level.FINEST, exception, "setObject txn:" + txn + ", oid:" + oid);
+	throw convertException(txn, Level.FINEST, exception,
+			       "setObject txn:" + txn + ", oid:" + oid);
     }
 
     /** {@inheritDoc} */
@@ -776,7 +777,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	throw convertException(Level.FINEST, exception,
+	throw convertException(txn, Level.FINEST, exception,
 			       "removeObject txn:" + txn + ", oid:" + oid);
     }
 
@@ -817,7 +818,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	throw convertException(Level.FINEST, exception,
+	throw convertException(txn, Level.FINEST, exception,
 			       "getBinding txn:" + txn + ", name:" + name);
     }
 
@@ -859,7 +860,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	    exception = e;
 	}
 	throw convertException(
-	    Level.FINEST, exception,
+	    txn, Level.FINEST, exception,
 	    "setBinding txn:" + txn + ", name:" + name + ", oid:" + oid);
     }
 
@@ -897,7 +898,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	throw convertException(Level.FINEST, exception,
+	throw convertException(txn, Level.FINEST, exception,
 			       "removeBinding txn:" + txn + ", name:" + name);
     }
 
@@ -927,7 +928,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	throw convertException(Level.FINEST, exception,
+	throw convertException(txn, Level.FINEST, exception,
 			       "nextBoundName txn:" + txn + ", name:" + name);
     }
 
@@ -1017,7 +1018,8 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	throw convertException(Level.FINER, exception, "prepare txn:" + txn);
+	throw convertException(
+	    txn, Level.FINER, exception, "prepare txn:" + txn);
     }
 
     /** {@inheritDoc} */
@@ -1049,7 +1051,8 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	throw convertException(Level.FINER, exception, "commit txn:" + txn);
+	throw convertException(
+	    txn, Level.FINER, exception, "commit txn:" + txn);
     }
 
     /** {@inheritDoc} */
@@ -1083,7 +1086,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	    exception = e;
 	}
 	throw convertException(
-	    Level.FINER, exception, "prepareAndCommit txn:" + txn);
+	    txn, Level.FINER, exception, "prepareAndCommit txn:" + txn);
     }
 
     /** {@inheritDoc} */
@@ -1111,7 +1114,8 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	throw convertException(Level.FINER, exception, "abort txn:" + txn);
+	throw convertException(
+	    txn, Level.FINER, exception, "abort txn:" + txn);
     }
 
     /* -- Other public methods -- */
@@ -1166,7 +1170,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	    exception = e;
 	}
 	throw convertException(
-	    Level.FINEST, exception, "allocateObjects count:" + count);
+	    null, Level.FINEST, exception, "allocateObjects count:" + count);
     }
 
     /**
@@ -1304,14 +1308,16 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
     /**
      * Returns the correct SGS exception for a Berkeley DB DatabaseException
      * thrown during an operation.  Throws an Error if recovery is needed.  The
-     * level argument is used to log the exception.  The operation argument
-     * will be included in newly created exceptions and the log, and should
-     * describe the operation that was underway when the exception was thrown.
-     * The supplied exception may also be a RuntimeException, which will be
-     * logged and returned.
+     * txn argument, if non-null, is used to abort the transaction if a
+     * TransactionAbortedException is going to be thrown.  The level argument
+     * is used to log the exception.  The operation argument will be included
+     * in newly created exceptions and the log, and should describe the
+     * operation that was underway when the exception was thrown.  The supplied
+     * exception may also be a RuntimeException, which will be logged and
+     * returned.
      */
     private RuntimeException convertException(
-	Level level, Exception e, String operation)
+	Transaction txn, Level level, Exception e, String operation)
     {
 	RuntimeException re;
 	/*
@@ -1345,6 +1351,13 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 		operation + " failed: " + e.getMessage(), e);
 	} else {
 	    re = (RuntimeException) e;
+	}
+	/*
+	 * If we're throwing an exception saying that the transaction was
+	 * aborted, then make sure to abort the transaction now.
+	 */
+	if (re instanceof TransactionAbortedException && txn != null) {
+	    txn.abort(re);
 	}
 	logger.logThrow(Level.FINEST, re, "{0} throws", operation);
 	return re;

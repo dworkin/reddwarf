@@ -113,6 +113,10 @@ final class Context {
 	    originalTxn.abort();
 	}
 
+	public void abort(Throwable cause) {
+	    originalTxn.abort(cause);
+	}
+
 	/* -- Object methods -- */
 
 	public boolean equals(Object object) {

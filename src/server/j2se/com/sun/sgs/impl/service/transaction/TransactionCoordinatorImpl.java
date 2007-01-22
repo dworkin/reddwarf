@@ -54,7 +54,7 @@ public final class TransactionCoordinatorImpl
 		return txn;
 	    } else {
 		throw new TransactionNotActiveException(
-		    "No transaction is active");
+		    "No transaction is active", txn.getInactiveCause());
 	    }
 	}
 
@@ -67,7 +67,7 @@ public final class TransactionCoordinatorImpl
 		txn.abort();
 	    } else {
 		throw new TransactionNotActiveException(
-		    "No transaction is active");
+		    "No transaction is active", txn.getInactiveCause());
 	    }
 	}
     }
