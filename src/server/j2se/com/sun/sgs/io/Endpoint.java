@@ -1,9 +1,6 @@
 package com.sun.sgs.io;
 
 import java.io.IOException;
-import java.util.concurrent.Executor;
-
-import com.sun.sgs.impl.io.IOConstants.TransportType;
 
 /**
  * Represents a communication endpoint with no transport or protocol
@@ -29,9 +26,9 @@ public interface Endpoint<T> {
      * @return an {@link IOConnector} configured to connect to this
      *         {@code Endpoint}.
      *
-     * @throws java.io.IOException if a connector cannot be created.
+     * @throws IOException if a connector cannot be created.
      */
-    IOConnector<T> createConnector();
+    IOConnector<T> createConnector() throws IOException;
 
     /**
      * Creates a non-reusable acceptor to passively listen for connections
@@ -40,9 +37,9 @@ public interface Endpoint<T> {
      * @return an {@link IOAcceptor} configured to listen on this
      *         {@code Endpoint}.
      *
-     * @throws java.io.IOException if an acceptor cannot be created.
+     * @throws IOException if an acceptor cannot be created.
      */
-    IOAcceptor<T> createAcceptor();
+    IOAcceptor<T> createAcceptor() throws IOException;
 
     /**
      * Return the address of type {@code T} encapsulated by this

@@ -41,31 +41,25 @@ public class SocketAcceptorTest {
     
     /**
      * Test listening on one port.
+     *
+     * @throws IOException if an unexpected IO problem occurs
      */
     @Test
-    public void listen() {
-        try {
-            acceptor.listen(null);
-        }
-        catch (IOException ioe) {
-            ioe.printStackTrace();
-        }
+    public void listen() throws IOException {
+        acceptor.listen(null);
     }
     
     /**
      * Test that verifies the IOAcceptor won't listen on any port after 
      * shutdown.
+     *
+     * @throws IOException if an unexpected IO problem occurs
      */
     @Test (expected=IllegalStateException.class)
-    public void listenAfterShutdown() {
-        try {
-            acceptor.listen(null);
-            acceptor.shutdown();
-            acceptor.listen(null);
-        }
-        catch (IOException ioe) {
-            ioe.printStackTrace();
-        }
+    public void listenAfterShutdown() throws IOException {
+        acceptor.listen(null);
+        acceptor.shutdown();
+        acceptor.listen(null);
     }
 
 }

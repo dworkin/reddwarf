@@ -1,8 +1,5 @@
 package com.sun.sgs.impl.io;
 
-import org.apache.mina.common.ByteBuffer;
-
-import com.sun.sgs.io.IOFilter;
 import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
 
