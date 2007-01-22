@@ -437,7 +437,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    }
 
 	    synchronized (lock) {
-		// check if handle is current
+		// check if there is already a handle set
 		if (sessionHandle != null) {
 		    return;
 		}
