@@ -795,8 +795,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    DummyClientSessionListener listener =
 		new DummyClientSessionListener(session);
             ManagedReference listenerRef =
-                txnProxy.getService(DataService.class)
-                    .createReference(listener);
+                txnProxy.getService(DataService.class).
+                    createReference(listener);
 	    for (ClientSession activeSession : sessions.keySet()) {
 		if (session.getName().equals(activeSession.getName())) {
 		    System.err.println(

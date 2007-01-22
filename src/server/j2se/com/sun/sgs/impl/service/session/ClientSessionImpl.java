@@ -203,10 +203,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     /** {@inheritDoc} */
     public void disconnect() {
 	if (getCurrentState() != State.DISCONNECTED) {
-	    scheduleNonTransactionalTaskOnCommit(new KernelRunnable() {
-		public void run() {
-		    handleDisconnect(false);
-		}});
+	    getContext().requestDisconnect(this);
 	}
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST, "disconnect returns");
@@ -376,7 +373,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
      * @param graceful if the disconnection was graceful (i.e., due to
      * a logout request).
      */
-    private void handleDisconnect(final boolean graceful) {
+    void handleDisconnect(final boolean graceful) {
 	synchronized (lock) {
 	    if (disconnectHandled) {
 		return;
@@ -770,10 +767,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		getContext().addMessageFirst(
 		    ClientSessionImpl.this, getLoginNackMessage().getBuffer(),
 		    Delivery.RELIABLE);
-		scheduleNonTransactionalTaskOnCommit(new KernelRunnable() {
-			public void run() {
-			    handleDisconnect(false);
-			}});
+		getContext().requestDisconnect(ClientSessionImpl.this);
 	    } else {
 		listener = new SessionListener(returnedListener);
 		MessageBuffer ack =
