@@ -350,7 +350,7 @@ public class MessageBuffer {
 	    throw new IndexOutOfBoundsException();
 	}
 	
-	return (short) ((getByte() << 8) + (getByte() & 255);
+	return (short) ((getByte() << 8) + (getByte() & 255));
     }
 
     /**
