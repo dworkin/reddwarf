@@ -24,7 +24,7 @@ import com.sun.sgs.kernel.Priority;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
-import com.sun.sgs.service.ServiceListener;
+import com.sun.sgs.service.ProtocolMessageListener;
 import com.sun.sgs.service.SgsClientSession;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.TransactionProxy;
@@ -1049,14 +1049,11 @@ public class TestChannelServiceImpl extends TestCase {
 
 	/* -- Implement SgsClientSession -- */
 	
-	public long nextSequenceNumber() {
-	    return 0;
-	}
-    
-	public void sendMessage(byte[] message, Delivery delivery) {
+	public void sendProtocolMessage(byte[] message, Delivery delivery) {
 	}
 
-	public void sendMessageOnCommit(byte[] message, Delivery delivery) {
+	public void sendProtocolMessageOnCommit(
+		byte[] message, Delivery delivery) {
 	}
 	
 	/* -- Implement Object -- */
@@ -1105,8 +1102,8 @@ public class TestChannelServiceImpl extends TestCase {
     private static class DummySessionService implements ClientSessionService {
 
 
-	private final Map<Byte, ServiceListener> serviceListeners =
-	    new HashMap<Byte, ServiceListener>();
+	private final Map<Byte, ProtocolMessageListener> serviceListeners =
+	    new HashMap<Byte, ProtocolMessageListener>();
 
 	/** A map of current sessions, from session ID to ClientSessionImpl. */
 	private final Map<byte[], SgsClientSession> sessions =
@@ -1119,8 +1116,8 @@ public class TestChannelServiceImpl extends TestCase {
 	public void configure(ComponentRegistry registry, TransactionProxy proxy) {
 	}
 	
-	public void registerServiceListener(
-	    byte serviceId, ServiceListener listener)
+	public void registerProtocolMessageListener(
+	    byte serviceId, ProtocolMessageListener listener)
 	{
 	    serviceListeners.put(serviceId, listener);
 	}

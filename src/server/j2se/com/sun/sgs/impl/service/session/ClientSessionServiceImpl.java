@@ -20,7 +20,7 @@ import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.NonDurableTransactionParticipant;
-import com.sun.sgs.service.ServiceListener;
+import com.sun.sgs.service.ProtocolMessageListener;
 import com.sun.sgs.service.SgsClientSession;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
@@ -51,7 +51,8 @@ import java.util.logging.Logger;
  * </ul>
  */
 public class ClientSessionServiceImpl
-    implements ClientSessionService, NonDurableTransactionParticipant {
+    implements ClientSessionService, NonDurableTransactionParticipant
+{
 
     /** The property that specifies the application name. */
     public static final String APP_NAME_PROPERTY = "com.sun.sgs.appName";
@@ -59,6 +60,10 @@ public class ClientSessionServiceImpl
     /** The property that specifies the port number. */
     public static final String PORT_PROPERTY = "com.sun.sgs.app.port";
 
+    /** The prefix for ClientSessionListeners bound in the data store. */
+    public static final String LISTENER_PREFIX =
+	ClientSessionImpl.class.getName();
+    
     /** The logger for this class. */
     private static final LoggerWrapper logger =
 	new LoggerWrapper(
@@ -81,8 +86,9 @@ public class ClientSessionServiceImpl
     private final AcceptedHandleListener listener = new Listener();
 
     /** The registered service listeners. */
-    private final Map<Byte, ServiceListener> serviceListeners =
-	Collections.synchronizedMap(new HashMap<Byte, ServiceListener>());
+    private final Map<Byte, ProtocolMessageListener> serviceListeners =
+	Collections.synchronizedMap(
+	    new HashMap<Byte, ProtocolMessageListener>());
 
     /** A map of current sessions, from session ID to ClientSessionImpl. */
     private final Map<SessionId, ClientSessionImpl> sessions =
@@ -231,8 +237,18 @@ public class ClientSessionServiceImpl
 	}
     }
 
+    /**
+     * Returns the addresses that this service is listening on.
+     *
+     * @return a collection of addresses that this service is listening on
+     */
     public Collection<SocketAddress> listAddresses() {
-	return acceptor.listAddresses();
+	synchronized (lock) {
+	    if (acceptor == null) {
+		throw new IllegalStateException("not configured");
+	    }
+	    return acceptor.listAddresses();
+	}
     }
 
     /**
@@ -271,8 +287,10 @@ public class ClientSessionServiceImpl
 	}
 
 	sessions.clear();
-
-	// TBI: should remove listener bindings...
+	
+	// TBI: The bindings can only be removed if this is called within a
+	// transaction, so comment out for now...
+	// removeListenerBindings();
 
 	return true;
     }
@@ -280,8 +298,8 @@ public class ClientSessionServiceImpl
     /* -- Implement ClientSessionService -- */
 
     /** {@inheritDoc} */
-    public void registerServiceListener(
-	byte serviceId, ServiceListener listener)
+    public void registerProtocolMessageListener(
+	byte serviceId, ProtocolMessageListener listener)
     {
 	serviceListeners.put(serviceId, listener);
     }
@@ -535,7 +553,7 @@ public class ClientSessionServiceImpl
             }
 	    
             for (SessionInfo info : sessionsInfo.values()) {
-		info.sendMessages();
+		info.sendProtocolMessages();
             }
         }
 
@@ -552,9 +570,9 @@ public class ClientSessionServiceImpl
 		this.session = session;
 	    }
 
-	    private void sendMessages() {
+	    private void sendProtocolMessages() {
                 for (byte[] message : messages) {
-                   session.sendMessage(message, Delivery.RELIABLE);
+                   session.sendProtocolMessage(message, Delivery.RELIABLE);
                 }
 		if (disconnect) {
 		    session.handleDisconnect(false);
@@ -643,7 +661,7 @@ public class ClientSessionServiceImpl
     /**
      * Returns the service listener for the specified service id.
      */
-    ServiceListener getServiceListener(byte serviceId) {
+    ProtocolMessageListener getProtocolMessageListener(byte serviceId) {
 	return serviceListeners.get(serviceId);
     }
 
@@ -682,13 +700,15 @@ public class ClientSessionServiceImpl
 	return shuttingDown;
     }
 
+    /**
+     * Removes all ClientSessionListener bindings from the data store.
+     */
     private void removeListenerBindings() {
 
 	for (;;) {
 	    String listenerKey =
-		dataService.nextServiceBoundName(
-		    ClientSessionImpl.class.getName());
-	    if (listenerKey != null) {
+		dataService.nextServiceBoundName(LISTENER_PREFIX);
+	    if (listenerKey != null && isListenerKey(listenerKey)) {
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(
 			Level.FINEST,
@@ -700,5 +720,14 @@ public class ClientSessionServiceImpl
 		break;
 	    }
 	}
+    }
+
+    /**
+     * Returns true if the specified key has the prefix of a
+     * ClientSessionListener key.
+     */
+    private static boolean isListenerKey(String key) {
+	return key.regionMatches(
+	    0, LISTENER_PREFIX, 0, LISTENER_PREFIX.length());
     }
 }

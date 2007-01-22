@@ -6,12 +6,12 @@ package com.sun.sgs.service;
 public interface ClientSessionService extends Service {
 
     /**
-     * Registers the specified service listener for the specified
-     * service ID.
+     * Registers the specified protocol message listener for the
+     * specified service ID.
      *
      * <p>When a client session receives a protocol message with the
      * specified service ID, the specified listener's {@link
-     * ServiceListener#receivedMessage receivedMessage} method is
+     * ProtocolMessageListener#receivedMessage receivedMessage} method is
      * invoked with the {@link SgsClientSession client session} and
      * the complete protocol message.
      *
@@ -22,9 +22,10 @@ public interface ClientSessionService extends Service {
      * </ul>
      *
      * @param serviceId a service ID
-     * @param listener a service listener
+     * @param listener a protocol message listener
      */
-    void registerServiceListener(byte serviceId, ServiceListener listener);
+    void registerProtocolMessageListener(
+	byte serviceId, ProtocolMessageListener listener);
 
     /**
      * Returns the client session corresponding to the specified

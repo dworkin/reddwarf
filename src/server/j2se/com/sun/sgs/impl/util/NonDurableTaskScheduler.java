@@ -33,6 +33,9 @@ public class NonDurableTaskScheduler {
      * method) is obtained by invoking the {@link
      * TransactionProxy#getService getService} method with the {@link
      * TaskService} class object on the specified proxy.
+     *
+     * @param taskScheduler a task scheduler
+     * @param proxy a transaction proxy
      */
     public NonDurableTaskScheduler(
 	TaskScheduler taskScheduler, TransactionProxy proxy)
