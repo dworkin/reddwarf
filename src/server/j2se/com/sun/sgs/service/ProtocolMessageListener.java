@@ -1,7 +1,13 @@
 package com.sun.sgs.service;
 
 /**
- * Service listener for protocol messgages.
+ * Listener for protocol messgages.  A service can register a
+ * <code>ProtocolMessageListener</code> and associate service ID with
+ * the {@link ClientSessionService} in order to be notified of
+ * protocol messages received by client sessions that are destined for
+ * that service.
+ *
+ * @see ClientSessionService#registerProtocolMessageListener
  */
 public interface ProtocolMessageListener {
 
