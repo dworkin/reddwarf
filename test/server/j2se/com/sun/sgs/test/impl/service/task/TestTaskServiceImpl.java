@@ -66,10 +66,6 @@ public class TestTaskServiceImpl extends TestCase {
     private DummyComponentRegistry systemRegistry;
     private DummyComponentRegistry serviceRegistry;
 
-    // the transaction used, which is class state so that it can be aborted
-    // (if it's still active) at teardown
-    private DummyTransaction txn;
-
     /**
      * Test management.
      */
@@ -79,8 +75,6 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     protected void setUp() throws Exception {
-        System.err.println("Testcase: " + getName());
-
         appContext = MinimalTestKernel.createContext();
         systemRegistry = MinimalTestKernel.getSystemRegistry(appContext);
         serviceRegistry = MinimalTestKernel.getServiceRegistry(appContext);
@@ -95,7 +89,7 @@ public class TestTaskServiceImpl extends TestCase {
         // configure the main service instances that will be used throughout
         // NOTE: this could be factored into some other utility class if it
         // seems valuable to do so
-        txn = createTransaction();
+        DummyTransaction txn = createTransaction();
         dataService.configure(serviceRegistry, txnProxy);
         txnProxy.setComponent(DataService.class, dataService);
         txnProxy.setComponent(DataServiceImpl.class, dataService);
@@ -117,22 +111,7 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     protected void tearDown() {
-        // if a transaction is still active, abort it now (this is only a
-        // problem if some tested failed)
-        if ((txn != null) &&
-            (txn.getState() == DummyTransaction.State.ACTIVE)) {
-            System.err.println("had to abort txn for test: " + getName());
-            txn.abort();
-        }
-
-        // FIXME: This should move into the Minimal Kernel, where Services
-        // can all be shutdown correctly, but since we're not really
-        // supporting shutdown yet, the call is here for now
-        if (dataService != null)
-            dataService.shutdown();
         deleteDirectory(DB_DIRECTORY);
-
-        // clean up after this app
         MinimalTestKernel.destroyContext(appContext);
     }
 
@@ -180,7 +159,7 @@ public class TestTaskServiceImpl extends TestCase {
     public void testConfigureNullArgs() {
         TaskServiceImpl service =
             new TaskServiceImpl(new Properties(), systemRegistry);
-        txn = createTransaction();
+        DummyTransaction txn = createTransaction();
         try {
             service.configure(null, txnProxy);
             fail("Expected NullPointerException");
@@ -210,7 +189,7 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public void testConfigureAgain() {
-        txn = createTransaction();
+        DummyTransaction txn = createTransaction();
         try {
             taskService.configure(serviceRegistry, txnProxy);
             fail("Expected IllegalStateException");
@@ -223,7 +202,7 @@ public class TestTaskServiceImpl extends TestCase {
     public void testConfigureAborted() throws Exception {
         TaskServiceImpl service =
             new TaskServiceImpl(new Properties(), systemRegistry);
-        txn = createTransaction();
+        DummyTransaction txn = createTransaction();
         service.configure(serviceRegistry, txnProxy);
         txn.abort();
         txn = createTransaction();
@@ -238,7 +217,7 @@ public class TestTaskServiceImpl extends TestCase {
     public void testConfigureNoDataService() {
         TaskServiceImpl service =
             new TaskServiceImpl(new Properties(), systemRegistry);
-        txn = createTransaction();
+        DummyTransaction txn = createTransaction();
         try {
             service.configure(new DummyComponentRegistry(), txnProxy);
             fail("Expected MissingResourceException");
@@ -268,7 +247,7 @@ public class TestTaskServiceImpl extends TestCase {
      */
 
     public void testScheduleTaskNullArgs() {
-        txn = createTransaction();
+        DummyTransaction txn = createTransaction();
         try {
             taskService.scheduleTask(null);
             fail("Expected NullPointerException");
@@ -291,7 +270,7 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public void testScheduleTaskNotSerializable() {
-        txn = createTransaction();
+        DummyTransaction txn = createTransaction();
         Task task = new NonSerializableTask();
         try {
             taskService.scheduleTask(task);
@@ -315,7 +294,7 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public void testScheduleTaskNotManagedObject() {
-        txn = createTransaction();
+        DummyTransaction txn = createTransaction();
         Task task = new NonManagedTask();
         try {
             taskService.scheduleTask(task);
@@ -336,7 +315,7 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public void testScheduleTaskIsManagedObject() {
-        txn = createTransaction();
+        DummyTransaction txn = createTransaction();
         Task task = new ManagedTask();
         try {
             taskService.scheduleTask(task);
@@ -357,7 +336,7 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public void testScheduleNegativeTime() {
-        txn = createTransaction();
+        DummyTransaction txn = createTransaction();
         Task task = new ManagedTask();
         try {
             taskService.scheduleTask(task, -1L);
@@ -409,7 +388,7 @@ public class TestTaskServiceImpl extends TestCase {
         TaskServiceImpl service =
             new TaskServiceImpl(new Properties(), registry);
         registry = new DummyComponentRegistry();
-        txn = createTransaction();
+        DummyTransaction txn = createTransaction();
         service.configure(serviceRegistry, txnProxy);
         Task task = new ManagedTask();
         try {
@@ -434,7 +413,7 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public void testRunImmediateTasks() throws Exception {
-        txn = createTransaction();
+        DummyTransaction txn = createTransaction();
         Counter counter = getClearedCounter();
         for (int i = 0; i < 3; i++) {
             taskService.scheduleTask(new NonManagedTask());
@@ -451,7 +430,7 @@ public class TestTaskServiceImpl extends TestCase {
         // NOTE: this test assumes a certain structure in the TaskService.
         clearPendingTasksInStore();
 
-        txn = createTransaction();
+        DummyTransaction txn = createTransaction();
         taskService.scheduleTask(new NonRetryNonManagedTask(false));
         txn.commit();
         Thread.sleep(200);
@@ -474,7 +453,7 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public void testRunPendingTasks() throws Exception {
-        txn = createTransaction();
+        DummyTransaction txn = createTransaction();
         Counter counter = getClearedCounter();
         for (long i = 0; i < 3; i++) {
             taskService.scheduleTask(new NonManagedTask(), i * 100L);
@@ -488,7 +467,7 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public void testRunPeriodicTasks() throws Exception {
-        txn = createTransaction();
+        DummyTransaction txn = createTransaction();
         Counter counter = getClearedCounter();
         for (int i = 0; i < 3; i++) {
             PeriodicTaskHandle handle =
@@ -516,7 +495,7 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public void testCancelPeriodicTasksBasic() throws Exception {
-        txn = createTransaction();
+        DummyTransaction txn = createTransaction();
         getClearedCounter();
         
         // test the basic cancel operation, within a transaction
@@ -553,7 +532,7 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public void testCancelPeriodicTasksTxnCommitted() throws Exception {
-        txn = createTransaction();
+        DummyTransaction txn = createTransaction();
         Counter counter = getClearedCounter();
         PeriodicTaskHandle handle =
             taskService.schedulePeriodicTask(new ManagedTask(), 200L, 500L);
@@ -565,14 +544,14 @@ public class TestTaskServiceImpl extends TestCase {
         } catch (TransactionNotActiveException e) {
             System.err.println(e);
         }
-        Thread.sleep(300);
+        Thread.sleep(200);
         txn = createTransaction();
         assertCounterClear("Cancel outside of transaction took effect");
         txn.abort();
     }
 
     public void testCancelPeriodicTasksTxnAborted() throws Exception {
-        txn = createTransaction();
+        DummyTransaction txn = createTransaction();
         PeriodicTaskHandle handle =
             taskService.schedulePeriodicTask(new ManagedTask(), 200L, 500L);
         txn.abort();
@@ -585,7 +564,7 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public void testCancelPeriodicTasksTwice() throws Exception {
-        txn = createTransaction();
+        DummyTransaction txn = createTransaction();
 
         // test the basic cancel operation, within a transaction
         PeriodicTaskHandle handle =
@@ -624,7 +603,7 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public void testCancelPeriodicTasksTaskRemoved() throws Exception {
-        txn = createTransaction();
+        DummyTransaction txn = createTransaction();
         getClearedCounter();
         ManagedTask task = new ManagedTask();
         dataService.setBinding("TestTaskServiceImpl.task", task);
@@ -669,7 +648,7 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public void testScheduleNonDurableTaskNullArgs() {
-        txn = createTransaction();
+        DummyTransaction txn = createTransaction();
         try {
             taskService.scheduleNonDurableTask(null);
             fail("Expected NullPointerException");
@@ -699,7 +678,7 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     public void testScheduleNonDurableTaskNegativeTime() {
-        txn = createTransaction();
+        DummyTransaction txn = createTransaction();
         KernelRunnable r = new KernelRunnable() {
                 public void run() throws Exception {}
             };
@@ -736,7 +715,7 @@ public class TestTaskServiceImpl extends TestCase {
 
     public void testRunImmediateNonDurableTasks() throws Exception {
         Counter counter = new Counter();
-        txn = createTransaction();
+        DummyTransaction txn = createTransaction();
         for (int i = 0; i < 3; i++) {
             taskService.
                 scheduleNonDurableTask(new KernelRunnableImpl(counter));
@@ -750,7 +729,7 @@ public class TestTaskServiceImpl extends TestCase {
 
     public void testRunPendingNonDurableTasks() throws Exception {
         Counter counter = new Counter();
-        txn = createTransaction();
+        DummyTransaction txn = createTransaction();
         for (long i = 0; i < 3; i++) {
             taskService.
                 scheduleNonDurableTask(new KernelRunnableImpl(counter),
@@ -801,7 +780,7 @@ public class TestTaskServiceImpl extends TestCase {
     }
 
     private void clearPendingTasksInStore() throws Exception {
-        txn = createTransaction();
+        DummyTransaction txn = createTransaction();
         String name = dataService.nextServiceBoundName(PENDING_NS);
         while ((name != null) && (name.startsWith(PENDING_NS))) {
             ManagedObject obj =
