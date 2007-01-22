@@ -3,7 +3,7 @@ package com.sun.sgs.service;
 /**
  * Service listener for protocol messgages.
  */
-public interface ServiceListener {
+public interface ProtocolMessageListener {
 
     /**
      * Notifies this listener that the specified protocol

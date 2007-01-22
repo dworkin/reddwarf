@@ -359,7 +359,7 @@ final class ChannelImpl implements Channel, Serializable {
     }
 
     /**
-     * Represents the persistent represntation for a channel (just its name).
+     * Represents the persistent representation for a channel (just its name).
      */
     private final static class External implements Serializable {
 
@@ -468,7 +468,7 @@ final class ChannelImpl implements Channel, Serializable {
 		        getClientSession(sessionId);
                 // Skip the sender and any disconnected sessions
                 if ((session != null) &&
-                    (! senderId.equals(session.getSessionId())))
+                    (!senderId.equals(session.getSessionId())))
                 {
                     recipients.add(session);
                 }
@@ -511,13 +511,11 @@ final class ChannelImpl implements Channel, Serializable {
             Delivery delivery)
     {
         try {
-
-            MessageBuffer protocolMessage =
-                getChannelMessage(senderId, message, seq);
+            byte[] protocolMessage = getChannelMessage(senderId, message, seq);
 
             for (ClientSession session : recipients) {
-                ((SgsClientSession) session).sendMessage(
-                        protocolMessage.getBuffer(), delivery);
+                ((SgsClientSession) session).sendProtocolMessage(
+                        protocolMessage, delivery);
             }
 
         } catch (RuntimeException e) {
@@ -530,13 +528,13 @@ final class ChannelImpl implements Channel, Serializable {
             throw e;
         }
     }
-    
+
     /**
      * Returns a MessageBuffer containing a CHANNEL_MESSAGE protocol
      * message with this channel's name, and the specified sender,
      * message, and sequence number.
      */
-    private MessageBuffer getChannelMessage(
+    private byte[] getChannelMessage(
 	byte[] senderId, byte[] message, long sequenceNumber)
     {
         int nameLen = MessageBuffer.getSize(state.name);
@@ -553,7 +551,7 @@ final class ChannelImpl implements Channel, Serializable {
             putShort(message.length).
             putBytes(message);
 
-        return buf;
+        return buf.getBuffer();
     }
     
     /**
@@ -569,7 +567,8 @@ final class ChannelImpl implements Channel, Serializable {
      */
     private void sendProtocolMessage(ClientSession session, byte[] message) {
 	try {
-	    ((SgsClientSession) session).sendMessage(message, state.delivery);
+	    ((SgsClientSession) session).sendProtocolMessage(
+		message, state.delivery);
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.logThrow(
@@ -590,7 +589,7 @@ final class ChannelImpl implements Channel, Serializable {
     {
         try {
             ((SgsClientSession) session).
-		sendMessageOnCommit(message, state.delivery);
+		sendProtocolMessageOnCommit(message, state.delivery);
         } catch (RuntimeException e) {
             if (logger.isLoggable(Level.FINEST)) {
                 logger.logThrow(
@@ -616,16 +615,16 @@ final class ChannelImpl implements Channel, Serializable {
 	for (ClientSession session : sessions) {
 	    clients.add(session.getSessionId());
 	}
-	MessageBuffer buf =
-            getChannelMessage(senderId, message, sequenceNumber);
-	byte[] protocolMessage = buf.getBuffer();
+	byte[] protocolMessage =
+	    getChannelMessage(senderId, message, sequenceNumber);
 	    
 	for (byte[] sessionId : clients) {
 	    SgsClientSession session = 
 		context.getService(ClientSessionService.class).
 		    getClientSession(sessionId);
 	    if (session != null && session.isConnected()) {
-		session.sendMessageOnCommit(protocolMessage, state.delivery);
+		session.sendProtocolMessageOnCommit(
+		    protocolMessage, state.delivery);
 	    }
 	}
     }

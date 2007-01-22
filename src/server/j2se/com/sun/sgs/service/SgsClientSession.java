@@ -4,32 +4,28 @@ import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
 
 /**
- * These operations are only supported in a non-transactional context.
+ * A representation of a {@link ClientSession} used to send protocol
+ * messages to a session's client.
  */
 public interface SgsClientSession extends ClientSession {
-
     /**
-     * Returns the next sequence number for this client session.
-     *
-     * @return the next sequence number
-     */
-    long nextSequenceNumber();
-
-    /**
-     * Sends the specified protocol message to this session's client
-     * with the specified delivery guarantee.
+     * Sends (with the specified delivery guarantee) the specified
+     * protocol message to this session's client.  This method is not
+     * transactional, and therefore this message send cannot be
+     * aborted.
      *
      * @param message a complete protocol message
      * @param delivery a delivery requirement
      */
-    void sendMessage(byte[] message, Delivery delivery);
+    void sendProtocolMessage(byte[] message, Delivery delivery);
 
     /**
-     * Sends the message in the specified byte array to this
-     * session's client when the current transaction commits.
+     * Sends (with the specified delivery guarantee) the specified
+     * protocol message to this session's client when the current
+     * transaction commits.
      *
      * @param message a complete protocol message
      * @param delivery a delivery requirement
      */
-    void sendMessageOnCommit(byte[] message, Delivery delivery);
+    void sendProtocolMessageOnCommit(byte[] message, Delivery delivery);
 }

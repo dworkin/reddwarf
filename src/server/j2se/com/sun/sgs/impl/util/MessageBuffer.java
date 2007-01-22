@@ -349,6 +349,7 @@ public class MessageBuffer {
 	if (pos+2 > limit) {
 	    throw new IndexOutOfBoundsException();
 	}
+	
 	return (short) ((getByte() << 8) + (getByte() & 255));
     }
 

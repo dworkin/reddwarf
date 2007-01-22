@@ -98,7 +98,7 @@ public class TestMessageBuffer extends TestCase {
 	    fail("Expected short " + value1 + ", got " + value2);
 	}
     }
-    
+
     public void testPutShortSignedBytes() {
         MessageBuffer buf = new MessageBuffer(2);
         short value1 = 0x10ff;

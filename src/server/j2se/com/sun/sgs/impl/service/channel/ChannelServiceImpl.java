@@ -22,7 +22,7 @@ import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Service;
-import com.sun.sgs.service.ServiceListener;
+import com.sun.sgs.service.ProtocolMessageListener;
 import com.sun.sgs.service.SgsClientSession;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
@@ -36,6 +36,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -68,7 +69,7 @@ public class ChannelServiceImpl
     private final Object lock = new Object();
 
     /** The listener that receives incoming channel protocol messages. */
-    private final ServiceListener protocolMessageListener;
+    private final ProtocolMessageListener protocolMessageListener;
     
     /** The transaction proxy, or null if configure has not been called. */    
     private TransactionProxy txnProxy;
@@ -77,16 +78,17 @@ public class ChannelServiceImpl
     private DataService dataService;
 
     /** The client session service. */
-    ClientSessionService sessionService;
-
-    /** The task service. */
-    TaskService taskService;
+    private ClientSessionService sessionService;
 
     /** The task scheduler. */
     private TaskScheduler taskScheduler;
 
     /** The task scheduler for non-durable tasks. */
     NonDurableTaskScheduler nonDurableTaskScheduler;
+
+    /** Map (with weak keys) of client sessions to sequence numbers. */
+    private final WeakHashMap<SgsClientSession, AtomicLong> sequenceNumberMap =
+	new WeakHashMap<SgsClientSession, AtomicLong>();
     
     /** The sequence number for channel messages originating from the server. */
     private AtomicLong sequenceNumber = new AtomicLong(0);
@@ -154,11 +156,13 @@ public class ChannelServiceImpl
 		}
 		txnProxy = proxy;
 		dataService = registry.getComponent(DataService.class);
-		taskService = registry.getComponent(TaskService.class);
-		sessionService = registry.getComponent(ClientSessionService.class);
+		sessionService =
+		    registry.getComponent(ClientSessionService.class);
 		nonDurableTaskScheduler =
 		    new NonDurableTaskScheduler(
-                            taskScheduler, proxy.getCurrentOwner(), taskService);
+                            taskScheduler,
+                            proxy.getCurrentOwner(),
+                            registry.getComponent(TaskService.class));
 	    }
 
 	    /*
@@ -172,7 +176,7 @@ public class ChannelServiceImpl
 		dataService.setServiceBinding(
 		    ChannelTable.NAME, new ChannelTable());
 	    }
-	    sessionService.registerServiceListener(
+	    sessionService.registerProtocolMessageListener(
 		SgsProtocol.CHANNEL_SERVICE, protocolMessageListener);
 	    
 	} catch (RuntimeException e) {
@@ -396,10 +400,26 @@ public class ChannelServiceImpl
 	}
     }
 
-    /* -- Implement ServiceListener -- */
+    /**
+     * Returns the next sequence number for the given client session.
+     */
+    private long nextSequenceNumber(SgsClientSession session) {
+	synchronized (sequenceNumberMap) {
+	    // Using AtomicLong is overkill because the map is synchronized,
+	    // but it is easy at this point...
+	    AtomicLong sequenceNumber = sequenceNumberMap.get(session);
+	    if (sequenceNumber == null) {
+		sequenceNumber = new AtomicLong(0);
+		sequenceNumberMap.put(session, sequenceNumber);
+	    }
+	    return sequenceNumber.getAndIncrement();
+	}
+    }
+
+    /* -- Implement ProtocolMessageListener -- */
 
     private final class ChannelProtocolMessageListener
-	implements ServiceListener
+	implements ProtocolMessageListener
     {
 	/** {@inheritDoc} */
 	public void receivedMessage(SgsClientSession session, byte[] message) {
@@ -449,7 +469,7 @@ public class ChannelServiceImpl
 		    }
 		    short msgSize = buf.getShort();
 		    byte[] channelMessage = buf.getBytes(msgSize);
-                    long seq = session.nextSequenceNumber();
+                    long seq = nextSequenceNumber(session);
 		    byte[] senderId = session.getSessionId();
 
                     // Immediately forward to receiving clients
