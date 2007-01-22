@@ -316,18 +316,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient();
 	try {
 	    client.connect(PORT);
-	    client.login("foo", "bar");
-	    try {
-		client.login("foo", "bar");
-	    } catch (RuntimeException e) {
-		if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
-		    System.err.println("login refused");
-		    return;
-		} else {
-		    fail("unexpected login failure: " + e);
-		}
-	    }
-	    fail("expected login failure");
+	    client.login("logout", "test");
+	    client.logout();
 	} finally {
 	    client.disconnect(false);
 	}
@@ -673,6 +663,41 @@ public class TestClientSessionServiceImpl extends TestCase {
 		} catch (InterruptedException e) {
 		    throw new RuntimeException(
 			"DummyClient.login timed out", e);
+		}
+	    }
+	}
+
+	void logout() {
+	    synchronized (lock) {
+		if (connected == false) {
+		    throw new RuntimeException(
+			"DummyClient.login not connected");
+		}
+	    }
+
+	    MessageBuffer buf = new MessageBuffer(3);
+	    buf.putByte(SgsProtocol.VERSION).
+		putByte(SgsProtocol.APPLICATION_SERVICE).
+		putByte(SgsProtocol.LOGOUT_REQUEST);
+	    logoutAck = false;
+
+	    try {
+		handle.sendBytes(buf.getBuffer());
+	    } catch (IOException e) {
+		throw new RuntimeException(e);
+	    }
+	    synchronized (lock) {
+		try {
+		    if (logoutAck == false) {
+			lock.wait(WAIT_TIME);
+		    }
+		    if (logoutAck != true) {
+			throw new RuntimeException(
+			    "DummyClient.logout timed out");
+		    }
+		} catch (InterruptedException e) {
+		    throw new RuntimeException(
+			"DummyClient.logout timed out", e);
 		}
 	    }
 	    
