@@ -56,6 +56,9 @@ public class SimpleClient implements ServerSession {
     private ClientConnection connection;
     private boolean connected = false;
     private SessionId sessionId;
+    
+    /** Reconnection key.  TODO reconnect not implemented */
+    @SuppressWarnings("unused")
     private byte[] reconnectKey;
 
     /**
