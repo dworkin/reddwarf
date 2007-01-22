@@ -146,7 +146,7 @@ public class TestDataServiceImpl extends TestCase {
 
     /* -- Test constructor -- */
 
-    public void testConstructorNullArgs() {
+    public void testConstructorNullArgs() throws Exception {
 	try {
 	    new DataServiceImpl(null, componentRegistry);
 	    fail("Expected NullPointerException");
@@ -1840,7 +1840,7 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     /** Returns a DataServiceImpl for the shared database. */
-    DataServiceImpl getDataServiceImpl() {
+    DataServiceImpl getDataServiceImpl() throws Exception {
 	File dir = new File(dbDirectory);
 	if (!dir.exists()) {
 	    if (!dir.mkdir()) {

@@ -25,9 +25,13 @@ import java.math.BigInteger;
  * Key 3 stores the ID of the next free ID number to use for allocating new
  * objects.
  *
+ * Key 4 stores the ID of the next free ID number for the network version to
+ * use in allocating transactions
+ *
  * Version history:
  *
  * Version 1.0: Initial version, 11/3/2006
+ * Version 2.0: Add NEXT_TXN_ID, 1/19/2007
  */
 final class DataStoreHeader {
 
@@ -40,20 +44,29 @@ final class DataStoreHeader {
     /** The key for the minor version number. */
     static final long MINOR_KEY = 2;
 
-    /** The key for the value of the next free ID. */
-    static final long NEXT_ID_KEY = 3;
+    /** The key for the value of the next free object ID. */
+    static final long NEXT_OBJ_ID_KEY = 3;
+
+    /**
+     * The key for the value of the next free transaction ID, used in the
+     * network version.
+     */
+    static final long NEXT_TXN_ID_KEY = 4;
 
     /** The magic number: DaRkStAr. */
     static final long MAGIC = 0x4461526b53744172L;
 
     /** The major version number. */
-    static final short MAJOR_VERSION = 1;
+    static final short MAJOR_VERSION = 2;
 
     /** The minor version number. */
     static final short MINOR_VERSION = 0;
 
-    /** The first free ID. */
-    static final long INITIAL_NEXT_ID = 1;
+    /** The first free object ID. */
+    static final long INITIAL_NEXT_OBJ_ID = 1;
+
+    /** The first free transaction ID. */
+    static final long INITIAL_NEXT_TXN_ID = 1;
 
     /** This class cannot be instantiated. */
     private DataStoreHeader() {
@@ -125,33 +138,42 @@ final class DataStoreHeader {
 	ShortBinding.shortToEntry(MINOR_VERSION, value);
 	putNoOverwrite(db, bdbTxn, key, value);
 
-	LongBinding.longToEntry(NEXT_ID_KEY, key);
-	LongBinding.longToEntry(INITIAL_NEXT_ID, value);
+	LongBinding.longToEntry(NEXT_OBJ_ID_KEY, key);
+	LongBinding.longToEntry(INITIAL_NEXT_OBJ_ID, value);
+	putNoOverwrite(db, bdbTxn, key, value);
+
+	LongBinding.longToEntry(NEXT_TXN_ID_KEY, key);
+	LongBinding.longToEntry(INITIAL_NEXT_TXN_ID, value);
 	putNoOverwrite(db, bdbTxn, key, value);
     }
 
     /**
-     * Returns the next available ID for storing a newly allocated object, and
+     * Returns the next available ID stored under the specified key, and
      * increments the stored value by the specified amount.  The return value
      * will be a positive number.
      *
+     * @param	key the key under which the ID is stored
      * @param	db the database
      * @param	bdbTxn the Berkeley DB transaction
      * @param	increment the amount to increment the stored amount
      * @return	the next available ID
      * @throws	DatabaseException if a problem occurs accessing the database
+     * @see	#NEXT_OBJ_ID_KEY NEXT_OBJ_ID_KEY
+     * @see	#NEXT_TXN_ID_KEY NEXT_TXN_ID_KEY
      */
-    static long getNextId(
-	Database db, com.sleepycat.db.Transaction bdbTxn, long increment)
+    static long getNextId(long key,
+			  Database db,
+			  com.sleepycat.db.Transaction bdbTxn,
+			  long increment)
 	throws DatabaseException
     {
-	DatabaseEntry key = new DatabaseEntry();
-	LongBinding.longToEntry(NEXT_ID_KEY, key);
-	DatabaseEntry value = new DatabaseEntry();
-	get(db, bdbTxn, key, value, LockMode.RMW);
-	long result = LongBinding.entryToLong(value);
-	LongBinding.longToEntry(result + increment, value);
-	put(db, bdbTxn, key, value);
+	DatabaseEntry keyEntry = new DatabaseEntry();
+	LongBinding.longToEntry(key, keyEntry);
+	DatabaseEntry valueEntry = new DatabaseEntry();
+	get(db, bdbTxn, keyEntry, valueEntry, LockMode.RMW);
+	long result = LongBinding.entryToLong(valueEntry);
+	LongBinding.longToEntry(result + increment, valueEntry);
+	put(db, bdbTxn, keyEntry, valueEntry);
 	return result;
     }
 

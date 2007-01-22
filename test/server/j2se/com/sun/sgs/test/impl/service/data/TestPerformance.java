@@ -84,6 +84,8 @@ public class TestPerformance extends TestCase {
     /** Whether to do logging, which is otherwise disabled. */
     private static boolean doLogging = Boolean.getBoolean("test.doLogging");
 
+    private static String storeServer = System.getProperty("test.storeServer");
+
     /** Print test parameters. */
     static {
 	System.err.println("Parameters: test.items=" + items +
@@ -180,6 +182,14 @@ public class TestPerformance extends TestCase {
 	    DataServiceImplClass + ".detectModifications",
 	    String.valueOf(detectMods),
 	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
+	if (storeServer != null) {
+	    props.setProperty(
+		DataServiceImplClass + ".dataStoreClass",
+		"com.sun.sgs.impl.service.data.store.net.DataStoreClient");
+	    props.setProperty(
+		"com.sun.sgs.impl.service.data.store.net.DataStoreClient" +
+		".host", storeServer);
+	}
 	service = new DataServiceImpl(props, componentRegistry);
 	service.configure(componentRegistry, txnProxy);
 	componentRegistry.setComponent(DataManager.class, service);

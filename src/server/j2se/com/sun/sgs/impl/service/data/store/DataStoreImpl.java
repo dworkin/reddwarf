@@ -128,7 +128,7 @@ import java.util.logging.Logger;
  * <li> {@link Level#FINEST FINEST} - Name and object operations
  * </ul>
  */
-public final class DataStoreImpl implements DataStore, TransactionParticipant {
+public class DataStoreImpl implements DataStore, TransactionParticipant {
 
     /** The property that specifies the transaction timeout in milliseconds. */
     private static final String TXN_TIMEOUT_PROPERTY =
@@ -214,9 +214,8 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
     /** The Berkeley DB database that maps name bindings to object IDs. */
     private final Database names;
 
-    /** Provides information about the transaction for the current thread. */
-    private final ThreadLocal<TxnInfo> threadTxnInfo =
-	new ThreadLocal<TxnInfo>();
+    /** Stores information about transactions. */
+    private final TxnInfoTable<TxnInfo> txnInfoTable;
 
     /**
      * Object to synchronize on when accessing nextObjectId and
@@ -247,11 +246,93 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
     /** The number of currently active transactions. */
     private int txnCount = 0;
 
+    /**
+     * Records information about all active transactions.
+     *
+     * @param	<T> the type of information stored for each transaction
+     */
+    public interface TxnInfoTable<T> {
+
+	/**
+	 * Returns the information associated with the transaction, or null if
+	 * none is found.
+	 *
+	 * @param	txn the transaction
+	 * @return	the associated information, or null if none is found
+	 * @throws	IllegalStateException if the implementation determines
+	 *		that the specified transaction does not match the
+	 *		current context
+	 */
+	T get(Transaction txn);
+
+	/**
+	 * Removes the information associated with the transaction.
+	 *
+	 * @param	txn the transaction
+	 */
+	void remove(Transaction txn);
+
+	/**
+	 * Sets the information associated with the transaction, which should
+	 * not currently have associated information.
+	 *
+	 * @param	txn the transaction
+	 * @param	info the associated information
+	 * @param	explicit whether the transaction was joined explicitly
+	 */
+	void set(Transaction txn, T info, boolean explicit);
+    }
+
+    /**
+     * An implementation of TxnInfoTable that uses a thread local to record
+     * information about transactions, and requires that the same thread always
+     * be used with a given transaction.
+     */
+    private static class ThreadTxnInfoTable<T> implements TxnInfoTable<T> {
+
+	/**
+	 * Provides information about the transaction for the current thread.
+	 */
+	private final ThreadLocal<Entry<T>> threadInfo =
+	    new ThreadLocal<Entry<T>>();
+
+	/** Stores a transaction and the associated information. */
+	private static class Entry<T> {
+	    final Transaction txn;
+	    final T info;
+	    Entry(Transaction txn, T info) {
+		this.txn = txn;
+		this.info = info;
+	    }
+	}
+
+	/** Creates an instance. */
+	ThreadTxnInfoTable() { }
+
+	/* -- Implement TxnInfoTable -- */
+
+	public T get(Transaction txn) {
+	    Entry<T> entry = threadInfo.get();
+	    if (entry == null) {
+		return null;
+	    } else if (!entry.txn.equals(txn)) {
+		throw new IllegalStateException("Wrong transaction");
+	    } else {
+		return entry.info;
+	    }
+	}
+
+	public void remove(Transaction txn) {
+	    threadInfo.set(null);
+	}
+
+	public void set(Transaction txn, T info, boolean explicit) {
+	    threadInfo.set(new Entry<T>(txn, info));
+	}
+    }
+
     /** Stores transaction information. */
     private static class TxnInfo {
-
-	/** The SGS transaction. */
-	final Transaction txn;
 
 	/** The associated Berkeley DB transaction. */
 	final com.sleepycat.db.Transaction bdbTxn;
@@ -274,8 +355,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	/** The last key returned by the cursor or null. */
 	private String lastCursorKey;
 
-	TxnInfo(Transaction txn, Environment env) throws DatabaseException {
-	    this.txn = txn;
+	TxnInfo(Environment env) throws DatabaseException {
 	    bdbTxn = env.beginTransaction(null, null);
 	}
 
@@ -343,15 +423,14 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	 */
 	private String getNextBoundNameResult(
 	    String name, OperationStatus status, DatabaseEntry key)
+	    throws DatabaseException
 	{
 	    if (status == OperationStatus.NOTFOUND) {
 		return null;
 	    } else if (status == OperationStatus.SUCCESS) {
 		return StringBinding.entryToString(key);
 	    } else {
-		throw new DataStoreException(
-		    "nextBoundName txn:" + txn + ", name:" + name +
-		    " failed: " + status);
+		throw new DatabaseException("Unexpected status: " + status);
 	    }
 	}
     }
@@ -393,7 +472,8 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	directory = wrappedProps.getProperty(DIRECTORY_PROPERTY);
 	if (directory == null) {
-	    throw new IllegalArgumentException("Directory must be specified");
+	    throw new IllegalArgumentException(
+		"The " + DIRECTORY_PROPERTY + " property must be specified");
 	}
 	allocationBlockSize = wrappedProps.getIntProperty(
 	    ALLOCATION_BLOCK_SIZE_PROPERTY, DEFAULT_ALLOCATION_BLOCK_SIZE);
@@ -403,6 +483,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	}
 	logStats = wrappedProps.getIntProperty(
 	    LOG_STATS_PROPERTY, Integer.MAX_VALUE);
+	txnInfoTable = getTxnInfoTable(TxnInfo.class);
 	com.sleepycat.db.Transaction bdbTxn = null;
 	boolean done = false;
 	try {
@@ -522,20 +603,8 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    synchronized (objectIdLock) {
 		if (nextObjectId > lastObjectId) {
 		    logger.log(Level.FINE, "Allocate more object IDs");
-		    long newNextObjectId;
-		    com.sleepycat.db.Transaction bdbTxn =
-			env.beginTransaction(null, null);
-		    boolean done = false;
-		    try {
-			newNextObjectId = DataStoreHeader.getNextId(
-			    info, bdbTxn, allocationBlockSize);
-			done = true;
-			bdbTxn.commit();
-		    } finally {
-			if (!done) {
-			    bdbTxn.abort();
-			}
-		    }
+		    long newNextObjectId = getNextId(
+			DataStoreHeader.NEXT_OBJ_ID_KEY, allocationBlockSize);
 		    nextObjectId = newNextObjectId;
 		    lastObjectId = newNextObjectId + allocationBlockSize - 1;
 		}
@@ -862,152 +931,6 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 			       "nextBoundName txn:" + txn + ", name:" + name);
     }
 
-    /* -- Implement TransactionParticipant -- */
-
-    /** {@inheritDoc} */
-    public boolean prepare(Transaction txn) {
-	logger.log(Level.FINER, "prepare txn:{0}", txn);
-	Exception exception;
-	try {
-	    TxnInfo txnInfo = checkTxnNoJoin(txn, true);
-	    if (txnInfo.prepared) {
-		throw new IllegalStateException(
-		    "Transaction has already been prepared");
-	    }
-	    if (txnInfo.modified) {
-		byte[] oid = txn.getId();
-		/*
-		 * Berkeley DB requires transaction IDs to be at least 128
-		 * bytes long.  -tjb@sun.com (11/07/2006)
-		 */
-		byte[] gid = new byte[128];
-		System.arraycopy(oid, 0, gid, 128 - oid.length, oid.length);
-		txnInfo.prepare(gid);
-		txnInfo.prepared = true;
-	    } else {
-		/*
-		 * Make sure to clear the transaction information, regardless
-		 * of whether the Berkeley DB commit operation succeeds, since
-		 * Berkeley DB doesn't permit operating on its transaction
-		 * object after commit is called.
-		 */
-		try {
-		    threadTxnInfo.set(null);
-		    txnInfo.commit();
-		} finally {
-		    decrementTxnCount();
-		} 
-	    }
-	    boolean result = !txnInfo.modified;
-	    if (logger.isLoggable(Level.FINER)) {
-		logger.log(
-		    Level.FINER, "prepare txn:{0} returns {1}", txn, result);
-	    }
-	    return result;
-	} catch (DatabaseException e) {
-	    exception = e;
-	} catch (RuntimeException e) {
-	    exception = e;
-	}
-	throw convertException(Level.FINER, exception, "prepare txn:" + txn);
-    }
-
-    /** {@inheritDoc} */
-    public void commit(Transaction txn) {
-	logger.log(Level.FINER, "commit txn:{0}", txn);
-	Exception exception;
-	try {
-	    TxnInfo txnInfo = checkTxnNoJoin(txn, true);
-	    if (!txnInfo.prepared) {
-		throw new IllegalStateException(
-		    "Transaction has not been prepared");
-	    }
-	    /*
-	     * Make sure to clear the transaction information, regardless of
-	     * whether the Berkeley DB commit operation succeeds, since
-	     * Berkeley DB doesn't permit operating on its transaction object
-	     * after commit is called.
-	     */
-	    threadTxnInfo.set(null);
-	    try {
-		txnInfo.commit();
-		logger.log(Level.FINER, "commit txn:{0} returns", txn);
-		return;
-	    } finally {
-		decrementTxnCount();
-	    }
-	} catch (DatabaseException e) {
-	    exception = e;
-	} catch (RuntimeException e) {
-	    exception = e;
-	}
-	throw convertException(Level.FINER, exception, "commit txn:" + txn);
-    }
-
-    /** {@inheritDoc} */
-    public void prepareAndCommit(Transaction txn) {
-	logger.log(Level.FINER, "prepareAndCommit txn:{0}", txn);
-	Exception exception;
-	try {
-	    TxnInfo txnInfo = checkTxnNoJoin(txn, true);
-	    if (txnInfo.prepared) {
-		throw new IllegalStateException(
-		    "Transaction has already been prepared");
-	    }
-	    /*
-	     * Make sure to clear the transaction information, regardless of
-	     * whether the Berkeley DB commit operation succeeds, since
-	     * Berkeley DB doesn't permit operating on its transaction object
-	     * after commit is called.
-	     */
-	    threadTxnInfo.set(null);
-	    try {
-		txnInfo.commit();
-		logger.log(
-		    Level.FINER, "prepareAndCommit txn:{0} returns", txn);
-		return;
-	    } finally {
-		decrementTxnCount();
-	    }
-	} catch (DatabaseException e) {
-	    exception = e;
-	} catch (RuntimeException e) {
-	    exception = e;
-	}
-	throw convertException(
-	    Level.FINER, exception, "prepareAndCommit txn:" + txn);
-    }
-
-    /** {@inheritDoc} */
-    public void abort(Transaction txn) {
-	logger.log(Level.FINER, "abort txn:{0}", txn);
-	Exception exception;
-	try {
-	    TxnInfo txnInfo = checkTxnNoJoin(txn, false);
-	    /*
-	     * Make sure to clear the transaction information, regardless of
-	     * whether the Berkeley DB commit operation succeeds, since
-	     * Berkeley DB doesn't permit operating on its transaction object
-	     * after commit is called.
-	     */
-	    threadTxnInfo.set(null);
-	    try {
-		txnInfo.abort();
-		logger.log(Level.FINER, "abort txn:{0} returns", txn);
-		return;
-	    } finally {
-		decrementTxnCount();
-	    }
-	} catch (DatabaseException e) {
-	    exception = e;
-	} catch (RuntimeException e) {
-	    exception = e;
-	}
-	throw convertException(Level.FINER, exception, "abort txn:" + txn);
-    }
-
-    /* -- Other public methods -- */
-
     /** {@inheritDoc} */
     public boolean shutdown() {
 	logger.log(Level.FINER, "shutdown");
@@ -1047,6 +970,152 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	throw convertException(Level.FINER, exception, "shutdown");
     }
 
+    /* -- Implement TransactionParticipant -- */
+
+    /** {@inheritDoc} */
+    public boolean prepare(Transaction txn) {
+	logger.log(Level.FINER, "prepare txn:{0}", txn);
+	Exception exception;
+	try {
+	    TxnInfo txnInfo = checkTxnNoJoin(txn, true);
+	    if (txnInfo.prepared) {
+		throw new IllegalStateException(
+		    "Transaction has already been prepared");
+	    }
+	    if (txnInfo.modified) {
+		byte[] oid = txn.getId();
+		/*
+		 * Berkeley DB requires transaction IDs to be at least 128
+		 * bytes long.  -tjb@sun.com (11/07/2006)
+		 */
+		byte[] gid = new byte[128];
+		System.arraycopy(oid, 0, gid, 128 - oid.length, oid.length);
+		txnInfo.prepare(gid);
+		txnInfo.prepared = true;
+	    } else {
+		/*
+		 * Make sure to clear the transaction information, regardless
+		 * of whether the Berkeley DB commit operation succeeds, since
+		 * Berkeley DB doesn't permit operating on its transaction
+		 * object after commit is called.
+		 */
+		try {
+		    txnInfoTable.remove(txn);
+		    txnInfo.commit();
+		} finally {
+		    decrementTxnCount();
+		} 
+	    }
+	    boolean result = !txnInfo.modified;
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.log(
+		    Level.FINER, "prepare txn:{0} returns {1}", txn, result);
+	    }
+	    return result;
+	} catch (DatabaseException e) {
+	    exception = e;
+	} catch (RuntimeException e) {
+	    exception = e;
+	}
+	throw convertException(Level.FINER, exception, "prepare txn:" + txn);
+    }
+
+    /** {@inheritDoc} */
+    public void commit(Transaction txn) {
+	logger.log(Level.FINER, "commit txn:{0}", txn);
+	Exception exception;
+	try {
+	    TxnInfo txnInfo = checkTxnNoJoin(txn, true);
+	    if (!txnInfo.prepared) {
+		throw new IllegalStateException(
+		    "Transaction has not been prepared");
+	    }
+	    /*
+	     * Make sure to clear the transaction information, regardless of
+	     * whether the Berkeley DB commit operation succeeds, since
+	     * Berkeley DB doesn't permit operating on its transaction object
+	     * after commit is called.
+	     */
+	    txnInfoTable.remove(txn);
+	    try {
+		txnInfo.commit();
+		logger.log(Level.FINER, "commit txn:{0} returns", txn);
+		return;
+	    } finally {
+		decrementTxnCount();
+	    }
+	} catch (DatabaseException e) {
+	    exception = e;
+	} catch (RuntimeException e) {
+	    exception = e;
+	}
+	throw convertException(Level.FINER, exception, "commit txn:" + txn);
+    }
+
+    /** {@inheritDoc} */
+    public void prepareAndCommit(Transaction txn) {
+	logger.log(Level.FINER, "prepareAndCommit txn:{0}", txn);
+	Exception exception;
+	try {
+	    TxnInfo txnInfo = checkTxnNoJoin(txn, true);
+	    if (txnInfo.prepared) {
+		throw new IllegalStateException(
+		    "Transaction has already been prepared");
+	    }
+	    /*
+	     * Make sure to clear the transaction information, regardless of
+	     * whether the Berkeley DB commit operation succeeds, since
+	     * Berkeley DB doesn't permit operating on its transaction object
+	     * after commit is called.
+	     */
+	    txnInfoTable.remove(txn);
+	    try {
+		txnInfo.commit();
+		logger.log(
+		    Level.FINER, "prepareAndCommit txn:{0} returns", txn);
+		return;
+	    } finally {
+		decrementTxnCount();
+	    }
+	} catch (DatabaseException e) {
+	    exception = e;
+	} catch (RuntimeException e) {
+	    exception = e;
+	}
+	throw convertException(
+	    Level.FINER, exception, "prepareAndCommit txn:" + txn);
+    }
+
+    /** {@inheritDoc} */
+    public void abort(Transaction txn) {
+	logger.log(Level.FINER, "abort txn:{0}", txn);
+	Exception exception;
+	try {
+	    TxnInfo txnInfo = checkTxnNoJoin(txn, false);
+	    /*
+	     * Make sure to clear the transaction information, regardless of
+	     * whether the Berkeley DB commit operation succeeds, since
+	     * Berkeley DB doesn't permit operating on its transaction object
+	     * after commit is called.
+	     */
+	    txnInfoTable.remove(txn);
+	    try {
+		txnInfo.abort();
+		logger.log(Level.FINER, "abort txn:{0} returns", txn);
+		return;
+	    } finally {
+		decrementTxnCount();
+	    }
+	} catch (DatabaseException e) {
+	    exception = e;
+	} catch (RuntimeException e) {
+	    exception = e;
+	}
+	throw convertException(Level.FINER, exception, "abort txn:" + txn);
+    }
+
+    /* -- Other public methods -- */
+
     /**
      * Returns a string representation of this object.
      *
@@ -1054,6 +1123,99 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
      */
     public String toString() {
 	return "DataStoreImpl[directory=\"" + directory + "\"]";
+    }
+
+    /* -- Protected methods -- */
+
+    /**
+     * Returns the table that will be used to store transaction information.
+     * Note that this method will be called during instance construction.
+     *
+     * @param	<T> the type of the information to be stored
+     * @param	txnInfoType a class representing the type of the information to
+     *		be stored
+     * @return	the table
+     */
+    protected <T> TxnInfoTable<T> getTxnInfoTable(Class<T> txnInfoType) {
+	return new ThreadTxnInfoTable<T>();
+    }
+
+    /**
+     * Returns the next available object ID, and reserves the specified number
+     * of IDs.
+     *
+     * @param	count the number of IDs to reserve
+     * @return	the next available object ID
+     */
+    protected long allocateObjects(int count) {
+	logger.log(Level.FINEST, "allocateObjects count:{0}", count);
+	Exception exception;
+	try {
+	    long result = getNextId(
+		DataStoreHeader.NEXT_OBJ_ID_KEY, count);
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST,
+			   "allocateObjects count:{0,number,#} " +
+			   "returns oid:{1,number,#}",
+			   count, result);
+	    }
+	    return result;
+	} catch (DatabaseException e) {
+	    exception = e;
+	} catch (RuntimeException e) {
+	    exception = e;
+	}
+	throw convertException(
+	    Level.FINEST, exception, "allocateObjects count:" + count);
+    }
+
+    /**
+     * Returns the next available transaction ID, and reserves the specified
+     * number of IDs.
+     *
+     * @param	count the number of IDs to reserve
+     * @return	the next available transaction ID
+     */
+    protected long getNextTxnId(int count) {
+	logger.log(Level.FINEST, "getNextTxnId count:{0}", count);
+	Exception exception;
+	try {
+	    long result = getNextId(
+		DataStoreHeader.NEXT_TXN_ID_KEY, count);
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST,
+			   "getNextTxnId count:{0,number,#} " +
+			   "returns tid:{1,number,#}",
+			   count, result);
+	    }
+	    return result;
+	} catch (DatabaseException e) {
+	    exception = e;
+	} catch (RuntimeException e) {
+	    exception = e;
+	}
+	throw convertException(
+	    Level.FINEST, exception, "getNextTxnId count:" + count);
+    }
+
+    /**
+     * Explicitly joins a new transaction.
+     *
+     * @param	txn the transacction to join
+     */
+    protected void joinNewTransaction(Transaction txn) {
+	logger.log(Level.FINEST, "joinNewTransaction txn:{0}", txn);
+	Exception exception;
+	try {
+	    joinTransaction(txn, true);
+	    return;
+	} catch (DatabaseException e) {
+	    exception = e;
+	} catch (RuntimeException e) {
+	    exception = e;
+	}
+	throw convertException(
+	    Level.FINEST, exception, "joinNewTransaction txn:" + txn);
     }
 
     /* -- Private methods -- */
@@ -1074,34 +1236,46 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	if (txn == null) {
 	    throw new NullPointerException("Transaction must not be null");
 	}
-	TxnInfo txnInfo = threadTxnInfo.get();
+	TxnInfo txnInfo = txnInfoTable.get(txn);
 	if (txnInfo == null) {
-	    synchronized (txnCountLock) {
-		if (txnCount < 0) {
-		    throw new IllegalStateException("Service is shut down");
-		}
-		txnCount++;
-	    }
-	    boolean joined = false;
-	    try {
-		txn.join(this);
-		joined = true;
-	    } finally {
-		if (!joined) {
-		    decrementTxnCount();
-		}
-	    }
-	    txnInfo = new TxnInfo(txn, env);
-	    threadTxnInfo.set(txnInfo);
-	    if (++logStatsCount >= logStats) {
-		logStatsCount = 0;
-		logStats(txnInfo);
-	    }
-	} else if (!txnInfo.txn.equals(txn)) {
-	    throw new IllegalStateException("Wrong transaction");
+	    return joinTransaction(txn, false);
 	} else if (txnInfo.prepared) {
 	    throw new IllegalStateException(
 		"Transaction has been prepared");
+	}
+	return txnInfo;
+    }
+
+    /**
+     * Joins the specified transaction, checking first to see if the data store
+     * is currently shutting down, and returning the new TxnInfo.  The explicit
+     * parameter specifies whether there was an explicit request to join the
+     * transaction, or it is being joined during the first operation called for
+     * that transaction.
+     */
+    private TxnInfo joinTransaction(Transaction txn, boolean explicit)
+	throws DatabaseException
+    {
+	synchronized (txnCountLock) {
+	    if (txnCount < 0) {
+		throw new IllegalStateException("Service is shut down");
+	    }
+	    txnCount++;
+	}
+	boolean joined = false;
+	try {
+	    txn.join(this);
+	    joined = true;
+	} finally {
+	    if (!joined) {
+		decrementTxnCount();
+	    }
+	}
+	TxnInfo txnInfo = new TxnInfo(env);
+	txnInfoTable.set(txn, txnInfo, explicit);
+	if (++logStatsCount >= logStats) {
+	    logStatsCount = 0;
+	    logStats(txnInfo);
 	}
 	return txnInfo;
     }
@@ -1118,11 +1292,9 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	if (txn == null) {
 	    throw new NullPointerException("Transaction must not be null");
 	}
-	TxnInfo txnInfo = threadTxnInfo.get();
+	TxnInfo txnInfo = txnInfoTable.get(txn);
 	if (txnInfo == null) {
 	    throw new IllegalStateException("Transaction is not active");
-	} else if (!txnInfo.txn.equals(txn)) {
-	    throw new IllegalStateException("Wrong transaction");
 	} else if (checkShuttingDown && getTxnCount() < 0) {
 	    throw new IllegalStateException("DataStore is shutting down");
 	}
@@ -1142,12 +1314,17 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	Level level, Exception e, String operation)
     {
 	RuntimeException re;
+	/*
+	 * Don't include DatabaseExceptions as the cause because, even though
+	 * that class implements Serializable, the Environment object
+	 * optionally contained within them is not.  -tjb@sun.com (01/19/2007)
+	 */
 	if (e instanceof LockNotGrantedException) {
 	    re = new TransactionTimeoutException(
-		operation + " failed due to timeout: " + e.getMessage(), e);
+		operation + " failed due to timeout: " + e);
 	} else if (e instanceof DeadlockException) {
 	    re = new TransactionConflictException(
-		operation + " failed due to deadlock: " + e.getMessage(), e);
+		operation + " failed due to deadlock: " + e);
 	} else if (e instanceof RunRecoveryException) {
 	    /*
 	     * It is tricky to clean up the data structures in this instance in
@@ -1222,6 +1399,26 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    txnCount--;
 	    if (txnCount <= 0) {
 		txnCountLock.notifyAll();
+	    }
+	}
+    }
+
+    /**
+     * Returns the next available ID stored under the specified key, and
+     * increments the stored value by the specified amount.
+     */
+    private long getNextId(long key, int blockSize) throws DatabaseException {
+	assert blockSize > 0;
+	com.sleepycat.db.Transaction bdbTxn = env.beginTransaction(null, null);
+	boolean done = false;
+	try {
+	    long id = DataStoreHeader.getNextId(key, info, bdbTxn, blockSize);
+	    done = true;
+	    bdbTxn.commit();
+	    return id;
+	} finally {
+	    if (!done) {
+		bdbTxn.abort();
 	    }
 	}
     }

@@ -83,10 +83,12 @@ public class TestPerformance extends TestCase {
     }
 
     /** Set when the test passes. */
-    private boolean passed;
+    protected boolean passed;
 
     /** A per-test database directory, or null if not created. */
     private String directory;
+
+    protected Properties dbProps;
 
     /** The store to test. */
     private DataStore store;
@@ -97,7 +99,7 @@ public class TestPerformance extends TestCase {
     }
 
     /** Prints the test case and disables logging if necessary. */
-    protected void setUp() {
+    protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
 	if (!doLogging) {
 	    /* Disable logging */
@@ -109,6 +111,9 @@ public class TestPerformance extends TestCase {
 		Logger.getLogger(loggerName).setLevel(Level.WARNING);
 	    }
 	}
+	dbProps = createProperties(
+	    DataStoreImplClass + ".directory", createDirectory(),
+	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
     }
 
     /** Sets passed if the test passes. */
@@ -123,7 +128,7 @@ public class TestPerformance extends TestCase {
      */
     protected void tearDown() throws Exception {
 	try {
-	    store.shutdown();
+	    shutdown();
 	} catch (RuntimeException e) {
 	    if (passed) {
 		throw e;
@@ -139,15 +144,17 @@ public class TestPerformance extends TestCase {
 	}
     }
 
+    /** Shuts down the store. */
+    protected boolean shutdown() {
+	return store.shutdown();
+    }
+
     /* -- Tests -- */
 
     public void testReadIds() throws Exception {
-	Properties props = createProperties(
-	    DataStoreImplClass + ".directory", createDirectory(),
-	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
 	byte[] data = new byte[itemSize];
 	data[0] = 1;
-	store = new DataStoreImpl(props);
+	store = getDataStore();
 	DummyTransaction txn = new DummyTransaction();
 	long[] ids = new long[items];
 	for (int i = 0; i < items; i++) {
@@ -186,13 +193,11 @@ public class TestPerformance extends TestCase {
     }
 
     void testWriteIdsInternal(boolean flush) throws Exception {
-	Properties props = createProperties(
-	    DataStoreImplClass + ".directory", createDirectory(),
-	    DataStoreImplClass + ".logStats", String.valueOf(logStats),
+	dbProps.setProperty(
 	    DataStoreImplClass + ".flushToDisk", String.valueOf(flush));
 	byte[] data = new byte[itemSize];
 	data[0] = 1;
-	store = new DataStoreImpl(props);
+	store = getDataStore();
 	DummyTransaction txn = new DummyTransaction();
 	long[] ids = new long[items];
 	for (int i = 0; i < items; i++) {
@@ -221,10 +226,7 @@ public class TestPerformance extends TestCase {
     }
 
     public void testReadNames() throws Exception {
-	Properties props = createProperties(
-	    DataStoreImplClass + ".directory", createDirectory(),
-	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
-	store = new DataStoreImpl(props);
+	store = getDataStore();
 	DummyTransaction txn = new DummyTransaction();
 	for (int i = 0; i < items; i++) {
 	    store.setBinding(txn, "name" + i, i);
@@ -246,10 +248,7 @@ public class TestPerformance extends TestCase {
     }
 
     public void testWriteNames() throws Exception {
-	Properties props = createProperties(
-	    DataStoreImplClass + ".directory", createDirectory(),
-	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
-	store = new DataStoreImpl(props);
+	store = getDataStore();
 	DummyTransaction txn = new DummyTransaction();
 	for (int i = 0; i < items; i++) {
 	    store.setBinding(txn, "name" + i, i);
@@ -275,6 +274,18 @@ public class TestPerformance extends TestCase {
     }
 
     /* -- Other methods -- */
+
+    /** Returns a DataStore for the shared database. */
+    protected DataStore getDataStore() throws Exception {
+	File dir = new File(directory);
+	if (!dir.exists()) {
+	    if (!dir.mkdir()) {
+		throw new RuntimeException(
+		    "Problem creating directory: " + dir);
+	    }
+	}
+	return new DataStoreImpl(dbProps);
+    }
 
     /** Creates a per-test directory. */
     private String createDirectory() throws IOException {

@@ -16,6 +16,7 @@ import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.service.TransactionProxy;
 import java.io.Serializable;
+import java.lang.reflect.Constructor;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
@@ -105,6 +106,13 @@ public final class DataServiceImpl
     private static final String DETECT_MODIFICATIONS_PROPERTY =
 	CLASSNAME + ".detectModifications";
 
+    /**
+     * The property that specifies the name of the class that implements
+     * DataStore.
+     */
+    private static final String DATA_STORE_CLASS_PROPERTY =
+	CLASSNAME + ".dataStoreClass";
+
     /** The logger for this class. */
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
@@ -174,6 +182,7 @@ public final class DataServiceImpl
      */
     public DataServiceImpl(
 	Properties properties, ComponentRegistry componentRegistry)
+	throws Exception
     {
 	if (logger.isLoggable(Level.CONFIG)) {
 	    logger.log(Level.CONFIG,
@@ -197,8 +206,19 @@ public final class DataServiceImpl
 		DEBUG_CHECK_INTERVAL_PROPERTY, Integer.MAX_VALUE);
 	    detectModifications = wrappedProps.getBooleanProperty(
 		DETECT_MODIFICATIONS_PROPERTY, Boolean.TRUE);
-	    store = new DataStoreImpl(properties);
-	} catch (RuntimeException e) {
+	    String dataStoreClassName = wrappedProps.getProperty(
+		DATA_STORE_CLASS_PROPERTY);
+	    if (dataStoreClassName == null) {
+		store = new DataStoreImpl(properties);
+	    } else {
+		Class<? extends DataStore> cl =
+		    Class.forName(dataStoreClassName).asSubclass(
+			DataStore.class);
+		Constructor<? extends DataStore> cons =
+		    cl.getConstructor(Properties.class);
+		store = cons.newInstance(properties);
+	    }
+	} catch (Exception e) {
 	    logger.logThrow(
 		Level.SEVERE, e, "DataService initialization failed");
 	    throw e;
