@@ -43,5 +43,7 @@ public abstract class SessionId {
      *         the same session identifier, and <code>false</code>
      *         otherwise
      */
+    @Override
     public abstract boolean equals(Object obj);
+
 }

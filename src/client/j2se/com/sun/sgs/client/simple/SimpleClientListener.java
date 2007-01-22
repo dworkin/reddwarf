@@ -39,4 +39,5 @@ public interface SimpleClientListener extends ServerSessionListener {
      * @param reason a description of the failure
      */
     void loginFailed(String reason);
+
 }

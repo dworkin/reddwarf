@@ -29,15 +29,13 @@ public class SimpleClientConnector extends ClientConnector {
     private final IOConnector<SocketAddress> connector;
     
     SimpleClientConnector(Properties properties) {
-        String transport = properties.getProperty("transport");
-        if (transport == null) {
-            transport = "reliable";
-        }
+        String transport = properties.getProperty("transport", "reliable");
         
         String host = properties.getProperty("host");
         if (host == null) {
             throw new IllegalArgumentException("Missing Property: host");
         }
+        
         String portStr = properties.getProperty("port");
         if (portStr == null) {
             throw new IllegalArgumentException("Missing Property: port");
@@ -47,8 +45,10 @@ public class SimpleClientConnector extends ClientConnector {
             throw new IllegalArgumentException("Bad port number: " + port);
         }
         
-        TransportType transportType = transport.equalsIgnoreCase("unreliable") ?
-                              TransportType.UNRELIABLE : TransportType.RELIABLE;
+        TransportType transportType =
+            transport.equalsIgnoreCase("unreliable")
+                ? TransportType.UNRELIABLE
+                : TransportType.RELIABLE;
         SocketAddress socketAddress = new InetSocketAddress(host, port);
         connector = 
             new SocketEndpoint(socketAddress, transportType).createConnector();

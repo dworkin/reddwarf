@@ -6,8 +6,9 @@ import com.sun.sgs.impl.client.comm.ClientConnector;
 import com.sun.sgs.impl.client.comm.ClientConnectorFactory;
 
 /**
- * A basic ClientConnectorFactory that simply creates a new 
- * {@code SimpleClientConnector} for each call to {@code createConnector}.
+ * A trivial ClientConnectorFactory that creates a new 
+ * {@code SimpleClientConnector} each time {@code createConnector}
+ * is invoked.
  * 
  * @author      Sten Anderson
  * @version     1.0

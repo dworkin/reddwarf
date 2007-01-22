@@ -4,7 +4,6 @@ import java.io.IOException;
 
 import com.sun.sgs.impl.client.comm.ClientConnection;
 import com.sun.sgs.impl.client.comm.ClientConnectionListener;
-//import com.sun.sgs.impl.util.HexDumper;
 import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
 
@@ -21,8 +20,8 @@ import com.sun.sgs.io.IOHandler;
  */
 public class SimpleClientConnection implements ClientConnection, IOHandler {
     
-    private ClientConnectionListener ccl;
-    private IOHandle myHandle;
+    private final ClientConnectionListener ccl;
+    private IOHandle myHandle = null;
     
     SimpleClientConnection(ClientConnectionListener listener) {
         this.ccl = listener;
@@ -31,11 +30,14 @@ public class SimpleClientConnection implements ClientConnection, IOHandler {
     // ClientConnection methods
 
     /**
-     * Disconnects the underlying {@code IOHandle}.
-     * 
-     * @throws IOException if the handle is not connected
+     * {@inheritDoc}
+     * <p>
+     * This implementation disconnects the underlying {@code IOHandle}.
      */
-    public void disconnect() throws IOException{
+    public void disconnect() throws IOException {
+        if (myHandle == null) {
+            throw new IllegalStateException("not connected");
+        }
         myHandle.close();
     }
 
@@ -57,9 +59,10 @@ public class SimpleClientConnection implements ClientConnection, IOHandler {
     // IOHandler methods
 
     /**
-     * Called when the associated {@code IOHandle} finishes connecting and 
-     * becomes "live".  The associated {@code ClientConnectionListener} is
-     * notified.
+     * {@inheritDoc}
+     * <p>
+     * This implementation notifies the associated
+     * {@code ClientConnectionListener}.
      * 
      * @param handle    the associated handle that connected
      */
@@ -71,42 +74,40 @@ public class SimpleClientConnection implements ClientConnection, IOHandler {
 
     /**
      * {@inheritDoc}
+     * <p>
+     * This implementation notifies the associated
+     * {@code ClientConnectionListener}.
      * 
-     * This associated {@code ClientConnectionListener} is notified of the 
-     * disconnect.
-     * 
-     * TODO what is graceful?
      */
     public void disconnected(IOHandle handle) {
         assert handle.equals(this.myHandle);
         System.err.println("SimpleClientConnection: disconnected: " + handle);
+        // TODO what is graceful?
         ccl.disconnected(true, null);
     }
 
     /**
      * {@inheritDoc}
-     * 
-     * TODO should we take any action here?  Bubble this up to the CCL somehow?
      */
     public void exceptionThrown(IOHandle handle, Throwable exception) {
         assert handle.equals(this.myHandle);
         System.err.println("SimpleClientConnection: exceptionThrown");
         exception.printStackTrace();
+        // TODO should we take any action here?  Bubble this up
+        // to the CCL somehow?
     }
 
     /**
-     * Call back on the IOHandler.  This is called when there is an incoming
-     * message from the server.  All messages are forwarded on to the
+     * {@inheritDoc}
+     * <p>
+     * This implemenation forwards the message to the
      * associated {@code ClientConnectionListener}.
+     *
      * @param   handle          the IOHandle on which the message arrived
      * @param   message         the raw byte message from the server
      */
     public void bytesReceived(IOHandle handle, byte[] message) {
         assert handle.equals(this.myHandle);
-        /*
-        System.err.println("SimpleClientConnection: bytesReceived: " +
-                HexDumper.format(message));
-        */
         ccl.receivedMessage(message);
     }
 

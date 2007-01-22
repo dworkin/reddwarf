@@ -117,20 +117,20 @@ public class ProtocolMessageDecoder {
      * the resulting byte array.
      * 
      * @return a byte array matching the length of the first short read
-     * from the stream
+     * from the stream, or {@code null} if the length is zero.
      */
-    public byte[] readBytes() {
-        byte[] bytes = null;
-        
+    public byte[] readBytes() {        
         try {
-            bytes = new byte[inputStream.readShort()];
+            short len = inputStream.readShort();
+            if (len == 0) {
+                return null;
+            }
+            byte[] bytes = new byte[len];
             inputStream.read(bytes);
+            return bytes;
+        } catch (IOException ioe) {
+            return null;
         }
-        catch (IOException ioe) {
-            // not thrown by the input stream 
-        }
-        
-        return bytes;
     }
     
     /**
