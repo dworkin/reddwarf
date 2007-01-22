@@ -3,15 +3,15 @@ package com.sun.sgs.impl.service.session;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.IdentityManager;
-import com.sun.sgs.impl.io.AcceptorFactory;
 import com.sun.sgs.impl.io.CompleteMessageFilter;
 import com.sun.sgs.impl.io.PassthroughFilter;
+import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.IOConstants.TransportType;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.MessageBuffer;
 import com.sun.sgs.impl.util.NonDurableTaskScheduler;
-import com.sun.sgs.io.AcceptedHandleListener;
 import com.sun.sgs.io.IOAcceptor;
+import com.sun.sgs.io.IOAcceptorListener;
 import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
 import com.sun.sgs.kernel.ComponentRegistry;
@@ -83,7 +83,7 @@ public class ClientSessionServiceImpl
     private final int port;
 
     /** The listener for accpeted connections. */
-    private final AcceptedHandleListener listener = new Listener();
+    private final IOAcceptorListener listener = new Listener();
 
     /** The registered service listeners. */
     private final Map<Byte, ProtocolMessageListener> serviceListeners =
@@ -100,7 +100,7 @@ public class ClientSessionServiceImpl
     private ComponentRegistry registry;
     
     /** The IOAcceptor for listening for new connections. */
-    private IOAcceptor acceptor;
+    private IOAcceptor<SocketAddress> acceptor;
 
     /** Synchronize on this object before accessing the registry. */
     private final Object lock = new Object();
@@ -212,12 +212,13 @@ public class ClientSessionServiceImpl
 		    new NonDurableTaskScheduler(
 			taskScheduler, proxy.getCurrentOwner(),
 			registry.getComponent(TaskService.class));
-		acceptor =
-		    AcceptorFactory.createAcceptor(TransportType.RELIABLE);
-		SocketAddress address = new InetSocketAddress(port);
+		SocketEndpoint endpoint =
+		    new SocketEndpoint(
+		        new InetSocketAddress(port), TransportType.RELIABLE);
+		acceptor = endpoint.createAcceptor();
 		try {
 		    acceptor.listen(
-			address, listener, CompleteMessageFilter.class);
+			listener, CompleteMessageFilter.class);
 		    if (logger.isLoggable(Level.CONFIG)) {
 			logger.log(
 			    Level.CONFIG,
@@ -244,6 +245,7 @@ public class ClientSessionServiceImpl
      *
      * @return a collection of addresses that this service is listening on
      */
+    /*
     public Collection<SocketAddress> listAddresses() {
 	synchronized (lock) {
 	    if (acceptor == null) {
@@ -252,6 +254,7 @@ public class ClientSessionServiceImpl
 	    return acceptor.listAddresses();
 	}
     }
+    */
 
     /**
      * Shuts down this service.
@@ -313,7 +316,7 @@ public class ClientSessionServiceImpl
 
     /* -- Implement AcceptedHandleListener -- */
 
-    class Listener implements AcceptedHandleListener {
+    class Listener implements IOAcceptorListener {
 
 	/**
 	 * {@inheritDoc}
@@ -321,14 +324,18 @@ public class ClientSessionServiceImpl
 	 * <p>Creates a new client session with the specified handle,
 	 * and adds the session to the internal session map.
 	 */
-	public IOHandler newHandle(IOHandle handle) {
+	public IOHandler newHandle() {
 	    if (shuttingDown()) {
 		return null;
 	    }
 	    ClientSessionImpl session =
-		new ClientSessionImpl(ClientSessionServiceImpl.this, handle);
+		new ClientSessionImpl(ClientSessionServiceImpl.this);
 	    sessions.put(new SessionId(session.getSessionId()), session);
 	    return session.getHandler();
+	}
+
+	public void disconnected() {
+	    // TBI...
 	}
     }
 

@@ -22,7 +22,7 @@ import com.sun.sgs.auth.IdentityCredentials;
 import com.sun.sgs.auth.IdentityManager;
 import com.sun.sgs.impl.auth.NamePasswordCredentials;
 import com.sun.sgs.impl.io.CompleteMessageFilter;
-import com.sun.sgs.impl.io.ConnectorFactory;
+import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.IOConstants.TransportType;
 import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
@@ -59,6 +59,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -583,14 +584,14 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 	void connect(int port) {
 	    connected = false;
-	    connector =
-		ConnectorFactory.createConnector(TransportType.RELIABLE);
 	    listener = new Listener();
 	    try {
-		handle =
-		    connector.connect(
-		    	InetAddress.getLocalHost(), port, listener,
-			new CompleteMessageFilter());
+		SocketEndpoint endpoint =
+		    new SocketEndpoint(
+		        new InetSocketAddress(InetAddress.getLocalHost(), port),
+			TransportType.RELIABLE);
+		connector = endpoint.createConnector();
+		connector.connect(listener, new CompleteMessageFilter());
 	    } catch (Exception e) {
 		System.err.println("DummyClient.connect throws: " + e);
 		e.printStackTrace();
@@ -745,10 +746,10 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 	    List<byte[]> messageList = new ArrayList<byte[]>();
 	    
-	    public void bytesReceived(byte[] buffer, IOHandle h) {
-		if (h != handle) {
+	    public void bytesReceived(IOHandle h, byte[] buffer) {
+		if (handle != h) {
 		    System.err.println(
-			"DummyClient.Listener.connected wrong handle, got:" +
+			"DummyClient.Listener connected wrong handle, got:" +
 			h + ", expected:" + handle);
 		    return;
 		}
@@ -823,12 +824,13 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 	    public void connected(IOHandle h) {
 		System.err.println("DummyClient.Listener.connected");
-		if (h != handle) {
+		if (handle != null) {
 		    System.err.println(
-			"DummyClient.Listener.connected wrong handle, got:" +
-			h + ", expected:" + handle);
+			"DummyClient.Listener.already connected handle: " +
+			handle);
 		    return;
 		}
+		handle = h;
 		synchronized (lock) {
 		    connected = true;
 		    lock.notifyAll();
@@ -838,9 +840,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    public void disconnected(IOHandle handle) {
 	    }
 	    
-	    public void exceptionThrown(
-		Throwable exception, IOHandle handle)
-	    {
+	    public void exceptionThrown(IOHandle handle, Throwable exception) {
 		System.err.println("DummyClient.Listener.exceptionThrown " +
 				   "exception:" + exception);
 		exception.printStackTrace();

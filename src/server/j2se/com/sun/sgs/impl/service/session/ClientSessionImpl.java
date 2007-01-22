@@ -90,12 +90,8 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     /**
      * Constructs an instance of this class with the specified handle.
      */
-    ClientSessionImpl(
-	ClientSessionServiceImpl sessionService,
-	IOHandle handle)
-    {
+    ClientSessionImpl(ClientSessionServiceImpl sessionService) {
 	this.sessionService = sessionService;
-	this.sessionHandle = handle;
 	this.handler = new Handler();
 	this.sessionId = generateId();
 	this.reconnectionKey = generateId();
@@ -442,9 +438,11 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 
 	    synchronized (lock) {
 		// check if handle is current
-		if (handle != sessionHandle) {
+		if (sessionHandle != null) {
 		    return;
 		}
+
+		sessionHandle = handle;
 		
 		switch (state) {
 		    
@@ -482,7 +480,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	}
 
 	/** {@inheritDoc} */
-	public void exceptionThrown(Throwable exception, IOHandle handle) {
+	public void exceptionThrown(IOHandle handle, Throwable exception) {
 
 	    if (logger.isLoggable(Level.WARNING)) {
 		logger.logThrow(
@@ -492,7 +490,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	}
 
 	/** {@inheritDoc} */
-	public void bytesReceived(byte[] buffer, IOHandle handle) {
+	public void bytesReceived(IOHandle handle, byte[] buffer) {
             if (logger.isLoggable(Level.FINEST)) {
                 logger.log(
                     Level.FINEST,
