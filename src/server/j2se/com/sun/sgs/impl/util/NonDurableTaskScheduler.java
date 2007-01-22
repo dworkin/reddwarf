@@ -35,7 +35,8 @@ public class NonDurableTaskScheduler {
      * TaskService} class object on the specified proxy.
      *
      * @param taskScheduler a task scheduler
-     * @param proxy a transaction proxy
+     * @param owner a task owner
+     * @param taskService a task service
      */
     public NonDurableTaskScheduler(
 	TaskScheduler taskScheduler,
