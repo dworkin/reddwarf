@@ -211,8 +211,8 @@ public class ClientSessionServiceImpl
 		removeListenerBindings();
 		nonDurableTaskScheduler =
 		    new NonDurableTaskScheduler(
-                            taskScheduler, proxy.getCurrentOwner(),
-                            registry.getComponent(TaskService.class));
+                        taskScheduler, proxy.getCurrentOwner(),
+                        registry.getComponent(TaskService.class));
                 Endpoint<SocketAddress> acceptorEndpoint =
                     new SocketEndpoint(new InetSocketAddress(port),
                             TransportType.RELIABLE);
