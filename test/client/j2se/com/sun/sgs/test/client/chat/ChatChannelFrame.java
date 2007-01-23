@@ -22,12 +22,10 @@ import com.sun.sgs.client.ClientChannelListener;
 import com.sun.sgs.client.SessionId;
 
 /**
- * <p>
  * ChatChannelFrame presents a GUI so that a user can interact with
  * a channel. The users connected to the channel are displayed in a list
  * on the right side. Messages can be sent on the channel via an input
  * area on the left side.
- * </p>
  */
 public class ChatChannelFrame extends JInternalFrame
         implements ActionListener, InternalFrameListener,
@@ -45,7 +43,8 @@ public class ChatChannelFrame extends JInternalFrame
     /**
      * Constructs a new ChatChannelFrame as a wrapper around the given
      * channel.
-     * 
+     *
+     * @param client the parent {@code ChatClient} of this frame.
      * @param channel the channel that this class will manage.
      */
     public ChatChannelFrame(ChatClient client, ClientChannel channel) {
@@ -83,6 +82,9 @@ public class ChatChannelFrame extends JInternalFrame
 	return SessionId.fromBytes(sessionIdBytes);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public void receivedMessage(ClientChannel channel, SessionId sender, byte[] message) {
 	byte[] cmdBytes = new byte[4];
 	System.arraycopy(message, 0, cmdBytes, 0, 4);
@@ -97,12 +99,18 @@ public class ChatChannelFrame extends JInternalFrame
 	}
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public void leftChannel(ClientChannel channel) {
         if (getDesktopPane() != null) {
             getDesktopPane().remove(this);
         }
     }
     
+    /**
+     * {@inheritDoc}
+     */
     public void actionPerformed(ActionEvent action) {
         try {
             chan.send(inputField.getText().getBytes());
@@ -111,15 +119,30 @@ public class ChatChannelFrame extends JInternalFrame
         }
         inputField.setText("");
     }
-    
-    public void internalFrameOpened(InternalFrameEvent event)      { /* unused */ }
-    public void internalFrameClosed(InternalFrameEvent event)      { /* unused */ }
-    public void internalFrameIconified(InternalFrameEvent event)   { /* unused */ }
-    public void internalFrameDeiconified(InternalFrameEvent event) { /* unused */ }
-    public void internalFrameActivated(InternalFrameEvent event)   { /* unused */ }
-    public void internalFrameDeactivated(InternalFrameEvent event) { /* unused */ }
 
+    /**
+     * {@inheritDoc}
+     */
     public void internalFrameClosing(InternalFrameEvent event) {
         myChatClient.leaveChannel(chan);
     }
+
+    /** {@inheritDoc} */
+    public void internalFrameOpened(InternalFrameEvent event)      { /* unused */ }
+
+    /** {@inheritDoc} */
+    public void internalFrameClosed(InternalFrameEvent event)      { /* unused */ }
+
+    /** {@inheritDoc} */
+    public void internalFrameIconified(InternalFrameEvent event)   { /* unused */ }
+
+    /** {@inheritDoc} */
+    public void internalFrameDeiconified(InternalFrameEvent event) { /* unused */ }
+
+    /** {@inheritDoc} */
+    public void internalFrameActivated(InternalFrameEvent event)   { /* unused */ }
+
+    /** {@inheritDoc} */
+    public void internalFrameDeactivated(InternalFrameEvent event) { /* unused */ }
+
 }

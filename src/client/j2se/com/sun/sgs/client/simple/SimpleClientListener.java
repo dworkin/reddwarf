@@ -6,8 +6,8 @@ import java.net.PasswordAuthentication;
 /**
  * A listener used in conjunction with a {@link SimpleClient}.
  * <p>
- * A <code>SimpleClientListener</code>, specified when a
- * <code>SimpleClient</code> is constructed, is notified of
+ * A {@code SimpleClientListener}, specified when a
+ * {@code SimpleClient} is constructed, is notified of
  * connection-related events generated during login session establishment,
  * client reconnection, and client logout, and also is notified of message
  * receipt and channel join events.

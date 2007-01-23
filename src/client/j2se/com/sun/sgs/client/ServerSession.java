@@ -5,7 +5,7 @@ import java.io.IOException;
 /**
  * Represents a client's view of a login session with the server. Each time
  * a client logs in, it will be assigned a different server session. A
- * client can use its <code>ServerSession</code> to send messages to the
+ * client can use its {@code ServerSession} to send messages to the
  * server, to check if it is connected, or to log out.
  * <p>
  * A server session has an associated {@link ServerSessionListener} that is
@@ -45,30 +45,30 @@ public interface ServerSession {
     void send(byte[] message) throws IOException;
 
     /**
-     * Returns <code>true</code> if this session is connected, otherwise
-     * returns <code>false</code>.
+     * Returns {@code true} if this session is connected, otherwise
+     * returns {@code false}.
      * 
-     * @return <code>true</code> if this session is connected, and
-     *         <code>false</code> otherwise
+     * @return {@code true} if this session is connected, and
+     *         {@code false} otherwise
      */
     boolean isConnected();
 
     /**
-     * Initiates logging out from the server. If <code>force</code> is
-     * <code>true</code> then this session is forcibly terminated, for
+     * Initiates logging out from the server. If {@code force} is
+     * {@code true} then this session is forcibly terminated, for
      * example, by terminating the associated client's network connections.
-     * If <code>force</code> is <code>false</code>, then this session
+     * If {@code force} is {@code false}, then this session
      * is gracefully disconnected, notifying the server that the client
      * logged out. When a session has been logged out, gracefully or
      * otherwise, the {@link ServerSessionListener#disconnected
      * disconnected} method is invoked on this session's associated {@link
-     * ServerSessionListener} passing a <code>boolean</code> indicating
+     * ServerSessionListener} passing a {@code boolean} indicating
      * whether the disconnection was graceful.
      * <p>
      * If this server session is already disconnected, then no action is
      * taken.
      * 
-     * @param force if <code>true</code>, this session is forcibly
+     * @param force if {@code true}, this session is forcibly
      *        terminated; otherwise the session is gracefully disconnected
      *
      * @throws IllegalStateException if this session is disconnected

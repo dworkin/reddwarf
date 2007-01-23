@@ -9,9 +9,7 @@ import java.awt.event.WindowEvent;
 import java.awt.event.WindowListener;
 import java.io.IOException;
 import java.net.PasswordAuthentication;
-import java.util.Collection;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 
@@ -66,7 +64,12 @@ public class ChatClient extends JFrame
     private volatile int quitAttempts = 0;
 
     // === Constructor ==
- 
+
+    /**
+     * Construct a ChatClient with the given {@code args}.
+     * 
+     * @param args the commandline arguments.
+     */
     public ChatClient(String[] args) {
         super();
         
@@ -257,8 +260,11 @@ public class ChatClient extends JFrame
         userList.removeClient(member);
     }
 
-    // === SimpleClientListener ===
+    // Implement SimpleClientListener
 
+    /**
+     * {@inheritDoc}
+     */
     public void loggedIn() {
         statusMessage.setText("Status: Connected");
         setTitle(String.format("Chat Test Client: %.8s",
@@ -268,6 +274,9 @@ public class ChatClient extends JFrame
         setButtonsEnabled(true);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public PasswordAuthentication getPasswordAuthentication(String prompt) {
         statusMessage.setText("Status: Validating...");
         String login = System.getProperty("login");
@@ -278,6 +287,9 @@ public class ChatClient extends JFrame
         return new PasswordAuthentication(cred[0], cred[1].toCharArray());
     }
     
+    /**
+     * {@inheritDoc}
+     */
     public void loginFailed(String reason) {
         statusMessage.setText("Status: Login failed (" + reason + ")");
         loginButton.setText("Login");
@@ -285,6 +297,9 @@ public class ChatClient extends JFrame
         loginButton.setEnabled(true);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public void disconnected(boolean graceful) {
         setButtonsEnabled(false);
         statusMessage.setText("Status: logged out");
@@ -297,16 +312,25 @@ public class ChatClient extends JFrame
         }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public void reconnecting() {
         statusMessage.setText("Status: Reconnecting");
         setSessionButtonsEnabled(false);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public void reconnected() {
         statusMessage.setText("Status: Reconnected");
         setSessionButtonsEnabled(true);
     }
     
+    /**
+     * {@inheritDoc}
+     */
     public ClientChannelListener joinedChannel(ClientChannel channel) {
         if (channel.getName().equals(DCC_CHANNEL_NAME)) {
             dccChannel = channel;
@@ -326,6 +350,9 @@ public class ChatClient extends JFrame
 	return SessionId.fromBytes(sessionIdBytes);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public void receivedMessage(byte[] message) {
         if (message.length < 4) {
             System.err.format("ChatClient: Error, short command [%s]\n",
@@ -348,8 +375,11 @@ public class ChatClient extends JFrame
 	}
     }
 
-    // === ClientChannelListener ===
+    // Implement ClientChannelListener
     
+    /**
+     * {@inheritDoc}
+     */
     public void receivedMessage(ClientChannel channel, SessionId sender,
             byte[] message)
     {
@@ -360,13 +390,19 @@ public class ChatClient extends JFrame
 			JOptionPane.INFORMATION_MESSAGE);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public void leftChannel(ClientChannel channel) {
 	System.err.format("ChatClient: Error, kicked off channel [%s]\n",
                 channel.getName());
     }
 
-    // === ActionListener ===
+    // Implement ActionListener
 
+    /**
+     * {@inheritDoc}
+     */
     public void actionPerformed(ActionEvent action) {
 	final String command = action.getActionCommand();
         if (command.equals("login")) {
@@ -385,22 +421,42 @@ public class ChatClient extends JFrame
         }
     }
 
-    // === WindowListener ===
+    // Implement WindowListener
 
+    /**
+     * {@inheritDoc}
+     */
     public void windowClosing(WindowEvent e) {
 	doQuit();
     }
-
+    
+    /** {@inheritDoc} */
     public void windowActivated(WindowEvent e)   { /*unused */ }
+    
+    /** {@inheritDoc} */
     public void windowClosed(WindowEvent e)      { /*unused */ }
+    
+    /** {@inheritDoc} */
     public void windowDeactivated(WindowEvent e) { /*unused */ }
+    
+    /** {@inheritDoc} */
     public void windowDeiconified(WindowEvent e) { /*unused */ }
+    
+    /** {@inheritDoc} */
     public void windowIconified(WindowEvent e)   { /*unused */ }
+    
+    /** {@inheritDoc} */
     public void windowOpened(WindowEvent e)      { /*unused */ }
 
-    // === Main ===
+    // Main
     
+    /**
+     * Create a new Chat Client with the given {@code args}.
+     * 
+     * @param args the commandline arguments.
+     */
     public static void main(final String[] args) {
         new ChatClient(args);
     }
+
 }

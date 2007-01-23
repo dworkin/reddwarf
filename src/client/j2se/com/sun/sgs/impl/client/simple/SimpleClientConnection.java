@@ -64,8 +64,6 @@ public class SimpleClientConnection implements ClientConnection, IOHandler {
      * <p>
      * This implementation notifies the associated
      * {@code ClientConnectionListener}.
-     * 
-     * @param handle    the associated handle that connected
      */
     public void connected(IOHandle handle) {
         System.err.println("SimpleClientConnection: connected: " + handle);
@@ -78,7 +76,6 @@ public class SimpleClientConnection implements ClientConnection, IOHandler {
      * <p>
      * This implementation notifies the associated
      * {@code ClientConnectionListener}.
-     * 
      */
     public void disconnected(IOHandle handle) {
         assert handle.equals(this.myHandle);
@@ -103,9 +100,6 @@ public class SimpleClientConnection implements ClientConnection, IOHandler {
      * <p>
      * This implemenation forwards the message to the
      * associated {@code ClientConnectionListener}.
-     *
-     * @param   handle          the IOHandle on which the message arrived
-     * @param   message         the raw byte message from the server
      */
     public void bytesReceived(IOHandle handle, byte[] message) {
         assert handle.equals(this.myHandle);

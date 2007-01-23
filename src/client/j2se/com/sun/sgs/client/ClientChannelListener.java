@@ -6,21 +6,20 @@ package com.sun.sgs.client;
  * When the server adds a client session to a channel, the client's
  * {@link ServerSessionListener}'s {@link
  * ServerSessionListener#joinedChannel joinedChannel} method is invoked with
- * that client channel, returning the client's
- * <code>ClientChannelListener</code> for the channel. A
- * <code>ClientChannelListener</code> for a client channel is notified as
- * follows:
+ * that client channel, returning the client's {@code ClientChannelListener}
+ * for the channel. A {@code ClientChannelListener} for a client channel
+ * is notified as follows:
  * <ul>
  * <li>When a message is received on a client channel, the listener's
  * {@link ClientChannelListener#receivedMessage receivedMessage} method is
  * invoked with the channel, the sender's session identifier, and the
- * message. A <code>null</code> sender indicates that the message was sent
+ * message. A {@code null} sender indicates that the message was sent
  * by the server. The listener is <i>not</i> notified of messages that its
- * client sends on its associated channel.
+ * client sends on its associated channel.</li>
  * <li> When the associated client leaves a channel, the listener's
  * {@link ClientChannelListener#leftChannel leftChannel} method is invoked
  * with the channel. Once a client has been removed from a channel, that
- * client can no longer send messages on that channel.
+ * client can no longer send messages on that channel.</li>
  * </ul>
  */
 public interface ClientChannelListener {
@@ -28,11 +27,11 @@ public interface ClientChannelListener {
     /**
      * Notifies this listener that the specified message, sent by the
      * specified sender, was received on the specified channel. If the
-     * specified sender is <code>null</code>, then the specified message
+     * specified sender is {@code null}, then the specified message
      * was sent by the server.
      * 
      * @param channel a client channel
-     * @param sender sender's session identifier, or <code>null</code>
+     * @param sender sender's session identifier, or {@code null}
      * @param message a byte array containing a message.
      */
     void receivedMessage(ClientChannel channel,

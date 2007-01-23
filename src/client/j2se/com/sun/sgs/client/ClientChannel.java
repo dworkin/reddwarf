@@ -17,14 +17,14 @@ import java.util.Set;
  * {@link ServerSessionListener}'s {@link
  * ServerSessionListener#joinedChannel joinedChannel} method is
  * invoked with that client channel, returning the client's
- * <code>ClientChannelListener</code> for the channel.  A
- * <code>ClientChannelListener</code> for a client channel is notified
+ * {@code ClientChannelListener} for the channel.  A
+ * {@code ClientChannelListener} for a client channel is notified
  * as follows:
  * <ul>
  * <li>When a message is received on a client channel, the listener's
  * {@link ClientChannelListener#receivedMessage receivedMessage}
  * method is invoked with the channel, the sender's session identifier,
- * and the message.  A <code>null</code> sender indicates that the
+ * and the message.  A {@code null} sender indicates that the
  * message was sent by the server.  The listener is <i>not</i>
  * notified of messages that its client sends on its associated
  * channel.</li>

@@ -21,18 +21,18 @@ import com.sun.sgs.impl.client.simple.ProtocolMessageEncoder;
 
 /**
  * An implementation of {@link ServerSession} that clients can use to manage
- * logging in and communicating with the server. A <code>SimpleClient</code>
+ * logging in and communicating with the server. A {@code SimpleClient}
  * is used to establish (or re-establish) a login session with the server,
  * send messages to the server, and log out.
  * <p>
- * A <code>SimpleClient</code> is constructed with a {@link
+ * A {@code SimpleClient} is constructed with a {@link
  * SimpleClientListener} which receives connection-related events, receives
  * messages from the server, and also receives notification of each channel
  * the client is joined to.
  * <p>
  * If the server session associated with a simple client becomes
  * disconnected, then its {@link #send send} and {@link #getSessionId
- * getSessionId} methods will throw <code>IllegalStateException</code>.
+ * getSessionId} methods will throw {@code IllegalStateException}.
  * Additionally, when a client is disconnected, the server removes that
  * client from the channels that it had been joined to. A disconnected
  * client can use the {@link #login login} method to log in again.
@@ -40,7 +40,7 @@ import com.sun.sgs.impl.client.simple.ProtocolMessageEncoder;
  * Note that the session identifier of a client changes with each login
  * session; so if a server session is disconnected and then logs in again,
  * the {@link #getSessionId getSessionId} method will return a new
- * <code>SessionId</code>.
+ * {@code SessionId}.
  */
 public class SimpleClient implements ServerSession {
 
@@ -67,7 +67,7 @@ public class SimpleClient implements ServerSession {
      * the specified listener receives connection-related events, receives
      * messages from the server, and also receives notification of each
      * channel the client is joined to. If this client becomes disconnected
-     * for any reason, it may use the <code>login</code> method to log in
+     * for any reason, it may use the {@code login} method to log in
      * again.
      * 
      * @param listener a listener that will receive events for this client
@@ -92,7 +92,7 @@ public class SimpleClient implements ServerSession {
      * failure with the server, a login authentication failure, or some
      * other failure, the client listener's
      * {@link SimpleClientListener#loginFailed loginFailed} method is
-     * invoked with a <code>String</code> indicating the reason for the
+     * invoked with a {@code String} indicating the reason for the
      * failure.
      * <p>
      * If this client is disconnected for any reason (including login

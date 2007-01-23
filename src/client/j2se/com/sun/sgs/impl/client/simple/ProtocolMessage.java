@@ -4,15 +4,15 @@ import java.io.DataInput;
 
 /**
  * SGS Protocol constants.
- *
- * <p>A protocol message is constructed as follows:
+ * <p>
+ * A protocol message is constructed as follows:
  * <ul>
  * <li> (byte) version number
  * <li> (byte) operation code
  * <li> optional content, depending on the operation code.
  * </ul>
- *
- * <p>A <code>String</code> is encoded as follows:
+ * <p>
+ * A {@code String} is encoded as follows:
  * <ul>
  * <li> (short) number of bytes of modified UTF-8 encoded String
  * <li> (byte[]) String encoded in modified UTF-8 as described
@@ -164,7 +164,5 @@ public interface ProtocolMessage {
      * </ul>
      */
     final byte CHANNEL_MESSAGE = 0x54;
-    
 
 }
-    

@@ -65,6 +65,9 @@ public class ValidatorDialog extends JDialog
 	return passwordAuth;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public void actionPerformed(ActionEvent e) {
 	passwordAuth = new PasswordAuthentication(
 		nameField.getText(), passwordField.getPassword());

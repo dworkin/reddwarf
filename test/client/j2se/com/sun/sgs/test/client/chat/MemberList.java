@@ -14,8 +14,9 @@ import javax.swing.ListSelectionModel;
 
 import com.sun.sgs.client.SessionId;
 
-//=== Represent channel members and user lists in the GUI ===
-
+/**
+ * Represent channel members and user lists in the GUI.
+ */
 public class MemberList extends JList
 	implements ListCellRenderer, MouseListener
 {
@@ -57,6 +58,9 @@ public class MemberList extends JList
 
     private final JLabel textLabel = new JLabel();
 
+    /**
+     * {@inheritDoc}
+     */
     public Component getListCellRendererComponent(JList list, Object value, int index,
 	    boolean isSelected, boolean cellHasFocus)
     {
@@ -64,14 +68,24 @@ public class MemberList extends JList
 	return textLabel;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public void mouseClicked(MouseEvent evt) {
 	if (evt.getClickCount() == 2) {
 	    myChatClient.doDCCMessage();
 	}
     }
 
+    /** {@inheritDoc} */
     public void mouseEntered(MouseEvent e)  { /* unused */ }
+
+    /** {@inheritDoc} */
     public void mouseExited(MouseEvent e)   { /* unused */ }
+
+    /** {@inheritDoc} */
     public void mousePressed(MouseEvent e)  { /* unused */ }
+
+    /** {@inheritDoc} */
     public void mouseReleased(MouseEvent e) { /* unused */ }
 }

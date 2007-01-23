@@ -4,10 +4,11 @@ package com.sun.sgs.client;
  * A client's listener for handling messages sent from server to client and
  * for handling other connection-related events.
  * <p>
- * A <code>ServerSessionListener</code> for a client is notified in the
- * following cases: when the associated client is joined to a channel ({@link #joinedChannel joinedChannel}),
- * a message is received from the server ({@link #receivedMessage
- * receivedMessage}), a connection with the server is being re-established ({@link #reconnecting reconnecting}),
+ * A {@code ServerSessionListener} for a client is notified in the
+ * following cases: when the associated client is joined to a channel
+ * ({@link #joinedChannel joinedChannel}), a message is received from the
+ * server ({@link #receivedMessage receivedMessage}), a connection with
+ * the server is being re-established ({@link #reconnecting reconnecting}),
  * a connection has been re-established ({@link #reconnected reconnected}),
  * or finally when the associated server session becomes disconnected,
  * gracefully or otherwise ({@link #disconnected disconnected}).
@@ -26,7 +27,7 @@ public interface ServerSessionListener {
      * When a message is received on the specified channel, the returned
      * listener's {@link ClientChannelListener#receivedMessage
      * receivedMessage} method is invoked with the specified channel, the
-     * sender's session identifier, and the message. A <code>null</code>
+     * sender's session identifier, and the message. A {@code null}
      * sender indicates that the message was sent by the server. The
      * returned listener is <i>not</i> notified of messages that its client
      * sends on the specified channel.
@@ -56,8 +57,8 @@ public interface ServerSessionListener {
      * If a connection can be re-established with the server in a timely
      * manner, this listener's {@link #reconnected reconnected} method will
      * be invoked. Otherwise, if a connection cannot be re-established, this
-     * listener's <code>disconnected</code> method will be invoked with
-     * <code>false</code> indicating that the associated session is
+     * listener's {@code disconnected} method will be invoked with
+     * {@code false} indicating that the associated session is
      * disconnected from the server and the client must log in again.
      */
     void reconnecting();
@@ -72,17 +73,17 @@ public interface ServerSessionListener {
      * Notifies this listener that the associated server session is
      * disconnected.
      * <p>
-     * If <code>graceful</code> is <code>true</code>, the disconnection
+     * If {@code graceful} is {@code true}, the disconnection
      * was due to the associated client gracefully logging out; otherwise,
      * the disconnection was due to other circumstances, such as forced
      * disconnection.
      * 
-     * @param graceful <code>true</code> if disconnection was due to the
+     * @param graceful {@code true} if disconnection was due to the
      *        associated client gracefully logging out, and
-     *        <code>false</code> otherwise TODO perhaps this should
-     *        additionally take byte[] message bubbled up from the
-     *        ClientConnectionListener with the reason for disconnection.
-     *        For example, the protocol versions may not match.
+     *        {@code false} otherwise.
      */
+    // TODO perhaps this should additionally take byte[] message bubbled
+    // up from the ClientConnectionListener with the reason for disconnection.
+    // For example, the protocol versions may not match.
     void disconnected(boolean graceful);
 }
