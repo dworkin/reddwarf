@@ -39,7 +39,6 @@ public class SimpleClientConnection implements ClientConnection, IOHandler {
             throw new IllegalStateException("not connected");
         }
         myHandle.close();
-        myHandle = null;
     }
 
     /**
