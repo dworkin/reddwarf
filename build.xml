@@ -65,9 +65,8 @@
   <!-- Client class path -->
   <path id="client.classpath">
     <pathelement location="${build.dir}/classes/client"/>
-    <fileset dir="${build.dir}/classes/server">
-      <include name="com/sun/sgs/**/io/**/*.class"/>
-    </fileset>
+    <!-- IO classes are currently under server, but client needs them -->
+    <pathelement location="${build.dir}/classes/server"/>
     <pathelement location="${lib.dir}/mina-core-1.0.1.jar"/>
     <pathelement location="${lib.dir}/mina-java5-1.0.1.jar"/>
     <pathelement location="${lib.dir}/backport-util-concurrent-Java50-3.0.jar"/>
@@ -109,7 +108,7 @@
 	    closure="true"/>
     <javac includeAntRuntime="no" debug="on" deprecation="on"
            srcdir="src/client/j2se" destdir="${build.dir}/classes/client"
-           classpath="${build.dir}/classes/client" source="${javac.source}">
+           classpathref="client.classpath" source="${javac.source}">
       <compilerarg value="${javac.compilerargs}"/>
     </javac>
   </target>
@@ -369,8 +368,25 @@
     </javac>
   </target>
 
+  <target name="-test-client.classes" depends="build">
+    <mkdir dir="${build.dir}/test/classes/client"/>
+    <depend srcdir="test/client/j2se"
+	    destdir="${build.dir}/test/classes/client"
+	    cache="${build.dir}/test/depend"
+	    closure="true"/>
+    <javac srcdir="test/client/j2se"
+	   destdir="${build.dir}/test/classes/client"
+	   includeAntRuntime="yes"
+	   debug="on"
+	   source="${javac.source}"
+	   classpathref="client.classpath"
+	   includes="**/*.java">
+      <compilerarg value="${javac.compilerargs}"/>
+    </javac>
+  </target>
+
   <!-- Run IO test server -->
-  <target name="io-test-server" depends="build-server"
+  <target name="io-test-server" depends="-test-server.classes"
           description="Runs the IO test server">
     <java classname="com.sun.sgs.test.impl.io.ServerTest"
           fork="true">
@@ -386,7 +402,7 @@
   </target>
 
   <!-- Run IO test client -->
-  <target name="io-test-client" depends="build-server"
+  <target name="io-test-client" depends="-test-server.classes"
           description="Runs the IO test client">
     <java classname="com.sun.sgs.test.impl.io.ClientTest"
           fork="true">
@@ -397,6 +413,54 @@
       <classpath>
         <pathelement location="${build.dir}/test/classes/server"/>
         <path refid="server.classpath"/>
+      </classpath>
+    </java>
+  </target>
+
+  <!-- Run Client API test server -->
+  <target name="clientapi-test-server" depends="-test-client.classes"
+          description="Runs the Client API test server">
+    <java classname="com.sun.sgs.test.client.simple.SimpleServer"
+          fork="true">
+      <jvmarg line="${test.jvm.args}"/>
+      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${test.logging}"/>
+      <classpath>
+        <pathelement location="${build.dir}/test/classes/client"/>
+        <path refid="client.classpath"/>
+      </classpath>
+    </java>
+  </target>
+
+  <!-- Run Client API test client -->
+  <target name="clientapi-test-client" depends="-test-client.classes"
+          description="Runs the Client API test client">
+    <java classname="com.sun.sgs.test.client.simple.ClientTest"
+          fork="true">
+      <jvmarg line="${test.jvm.args}"/>
+      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${test.logging}"/>
+      <classpath>
+        <pathelement location="${build.dir}/test/classes/client"/>
+        <path refid="client.classpath"/>
+      </classpath>
+    </java>
+  </target>
+  
+  <!-- Run Client API test client GUI -->
+  <target name="clientapi-test-client-gui" depends="-test-client.classes"
+          description="Runs the Client API test client GUI">
+    <java classname="com.sun.sgs.test.client.simple.SimpleClientTestUI"
+          fork="true">
+      <jvmarg line="${test.jvm.args}"/>
+      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${test.logging}"/>
+      <classpath>
+        <pathelement location="${build.dir}/test/classes/client"/>
+        <path refid="client.classpath"/>
       </classpath>
     </java>
   </target>
