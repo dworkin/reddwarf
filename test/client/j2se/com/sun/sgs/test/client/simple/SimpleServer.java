@@ -10,7 +10,7 @@ import com.sun.sgs.impl.client.simple.ProtocolMessageDecoder;
 import com.sun.sgs.impl.client.simple.ProtocolMessageEncoder;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.IOConstants.TransportType;
-import com.sun.sgs.impl.util.HexDumper;
+//import com.sun.sgs.impl.util.HexDumper;
 import com.sun.sgs.io.IOAcceptorListener;
 import com.sun.sgs.io.IOAcceptor;
 import com.sun.sgs.io.IOHandle;
@@ -117,8 +117,8 @@ public class SimpleServer implements IOHandler {
      * {@inheritDoc}
      */
     public void bytesReceived(IOHandle handle, byte[] buffer) {
-        System.err.println("SimpleServer: messageReceived: ("
-                + buffer.length + ") " + HexDumper.format(buffer));
+        //System.err.println("SimpleServer: messageReceived: ("
+        //        + buffer.length + ") " + HexDumper.format(buffer));
         ProtocolMessageDecoder messageDecoder = new ProtocolMessageDecoder(
                 buffer);
         int versionNumber = messageDecoder.readVersionNumber();
@@ -242,8 +242,8 @@ public class SimpleServer implements IOHandler {
             ProtocolMessageEncoder messageEncoder) {
         try {
             byte[] byteMessage = messageEncoder.getMessage();
-            System.out.println("sendMessage: (" + byteMessage.length + ") "
-                    + HexDumper.format(byteMessage));
+            //System.out.println("sendMessage: (" + byteMessage.length + ") "
+            //        + HexDumper.format(byteMessage));
             handle.sendBytes(byteMessage);
         } catch (IOException ioe) {
             ioe.printStackTrace();
