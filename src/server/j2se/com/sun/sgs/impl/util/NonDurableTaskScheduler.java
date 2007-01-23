@@ -22,7 +22,7 @@ public class NonDurableTaskScheduler {
      * scheduler, task owner, and task service.
      *
      * @param taskScheduler a task scheduler
-     * @param proxy a transaction proxy
+     * @param owner a task owner
      * @param taskService a task service
      */
     public NonDurableTaskScheduler(

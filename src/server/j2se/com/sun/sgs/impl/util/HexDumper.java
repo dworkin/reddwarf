@@ -8,7 +8,7 @@ public final class HexDumper {
      * Returns a string constructed with the contents of the byte
      * array converted to hex format.
      *
-     * @param a byte array to convert
+     * @param bytes a byte array to convert
      * @return the converted byte array as a hex-formatted string
      */
     public static String format(byte[] bytes) {
