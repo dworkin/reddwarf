@@ -580,13 +580,13 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 	void connect(int port) {
 	    connected = false;
+	    listener = new Listener();
 	    try {
-	        SocketAddress addr =
-	            new InetSocketAddress("", port); 
-	        connector =
-	            new SocketEndpoint(addr, TransportType.RELIABLE)
-	                .createConnector();
-	        listener = new Listener();
+		SocketEndpoint endpoint =
+		    new SocketEndpoint(
+		        new InetSocketAddress(InetAddress.getLocalHost(), port),
+			TransportType.RELIABLE);
+		connector = endpoint.createConnector();
 		connector.connect(listener, new CompleteMessageFilter());
 	    } catch (Exception e) {
 		System.err.println("DummyClient.connect throws: " + e);
@@ -743,9 +743,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    List<byte[]> messageList = new ArrayList<byte[]>();
 	    
 	    public void bytesReceived(IOHandle h, byte[] buffer) {
-		if (h != handle) {
+		if (handle != h) {
 		    System.err.println(
-			"DummyClient.Listener.connected wrong handle, got:" +
+			"DummyClient.Listener connected wrong handle, got:" +
 			h + ", expected:" + handle);
 		    return;
 		}
@@ -820,14 +820,14 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 	    public void connected(IOHandle h) {
 		System.err.println("DummyClient.Listener.connected");
-                synchronized (lock) {
-                    if (handle != null) {
-                        System.err.println(
-                                "DummyClient.Listener.connected already has handle, " +
-                                "got:" + h + ", already have:" + handle);
-                        return;
-                    }
-                    handle = h;
+		if (handle != null) {
+		    System.err.println(
+			"DummyClient.Listener.already connected handle: " +
+			handle);
+		    return;
+		}
+		handle = h;
+		synchronized (lock) {
 		    connected = true;
 		    lock.notifyAll();
 		}
@@ -836,9 +836,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    public void disconnected(IOHandle handle) {
 	    }
 	    
-	    public void exceptionThrown(
-		IOHandle handle, Throwable exception)
-	    {
+	    public void exceptionThrown(IOHandle handle, Throwable exception) {
 		System.err.println("DummyClient.Listener.exceptionThrown " +
 				   "exception:" + exception);
 		exception.printStackTrace();
@@ -850,16 +848,16 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 	private final static long serialVersionUID = 1L;
 
-	private final Map<ClientSession,ManagedReference> sessions =
+	private final Map<ClientSession, ManagedReference> sessions =
 	    Collections.synchronizedMap(
-		new HashMap<ClientSession,ManagedReference>());
+		new HashMap<ClientSession, ManagedReference>());
 
 	public ClientSessionListener loggedIn(ClientSession session) {
 	    DummyClientSessionListener listener =
 		new DummyClientSessionListener(session);
-            ManagedReference listenerRef =
-                txnProxy.getService(DataService.class).
-                    createReference(listener);
+	    ManagedReference listenerRef =
+		txnProxy.getService(DataService.class).
+		    createReference(listener);
 	    for (ClientSession activeSession : sessions.keySet()) {
 		if (session.getName().equals(activeSession.getName())) {
 		    System.err.println(

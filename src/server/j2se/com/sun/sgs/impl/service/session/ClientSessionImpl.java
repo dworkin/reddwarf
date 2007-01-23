@@ -90,8 +90,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     /**
      * Constructs an instance of this class with the specified handle.
      */
-    ClientSessionImpl(ClientSessionServiceImpl sessionService)
-    {
+    ClientSessionImpl(ClientSessionServiceImpl sessionService) {
 	this.sessionService = sessionService;
 	this.handler = new Handler();
 	this.sessionId = generateId();
@@ -438,13 +437,12 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    }
 
 	    synchronized (lock) {
-		// check if there's already a handle set
+		// check if there is already a handle set
 		if (sessionHandle != null) {
-                    // TODO what should we do here?  I think it depends
-                    // on whether we're reconnecting -JM
 		    return;
 		}
-                sessionHandle = handle;
+
+		sessionHandle = handle;
 		
 		switch (state) {
 		    

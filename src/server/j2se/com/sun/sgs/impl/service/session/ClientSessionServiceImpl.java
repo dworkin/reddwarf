@@ -10,9 +10,8 @@ import com.sun.sgs.impl.io.IOConstants.TransportType;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.MessageBuffer;
 import com.sun.sgs.impl.util.NonDurableTaskScheduler;
-import com.sun.sgs.io.IOAcceptorListener;
-import com.sun.sgs.io.Endpoint;
 import com.sun.sgs.io.IOAcceptor;
+import com.sun.sgs.io.IOAcceptorListener;
 import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
 import com.sun.sgs.kernel.ComponentRegistry;
@@ -211,13 +210,13 @@ public class ClientSessionServiceImpl
 		removeListenerBindings();
 		nonDurableTaskScheduler =
 		    new NonDurableTaskScheduler(
-                        taskScheduler, proxy.getCurrentOwner(),
-                        registry.getComponent(TaskService.class));
-                Endpoint<SocketAddress> acceptorEndpoint =
-                    new SocketEndpoint(new InetSocketAddress(port),
-                            TransportType.RELIABLE);
+			taskScheduler, proxy.getCurrentOwner(),
+			registry.getComponent(TaskService.class));
+		SocketEndpoint endpoint =
+		    new SocketEndpoint(
+		        new InetSocketAddress(port), TransportType.RELIABLE);
 		try {
-                    acceptor = acceptorEndpoint.createAcceptor();
+                    acceptor = endpoint.createAcceptor();
 		    acceptor.listen(listener, CompleteMessageFilter.class);
 		    if (logger.isLoggable(Level.CONFIG)) {
 			logger.log(
@@ -332,13 +331,9 @@ public class ClientSessionServiceImpl
 	    return session.getHandler();
 	}
 
-        /**
-         * {@inheritDoc}
-         */
 	public void disconnected() {
-            // TODO Auto-generated method stub
-        }
-        
+	    // TBI...
+	}
     }
 
     /* -- Implement wrapper for session ids. -- */
@@ -564,8 +559,6 @@ public class ClientSessionServiceImpl
             }
 	    
             for (SessionInfo info : sessionsInfo.values()) {
-                // FIXME: check whether the session is already
-                // disconnected first? -JM
 		info.sendProtocolMessages();
             }
         }

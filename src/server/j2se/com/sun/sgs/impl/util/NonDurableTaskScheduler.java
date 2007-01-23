@@ -19,7 +19,7 @@ public class NonDurableTaskScheduler {
 
     /**
      * Constructs an instance of this class with the specified task
-     * scheduler, task owner, and task service. 
+     * scheduler, task owner, and task service.
      *
      * @param taskScheduler a task scheduler
      * @param owner a task owner
@@ -55,7 +55,7 @@ public class NonDurableTaskScheduler {
      * @param task a task
      */
     public void scheduleNonTransactionalTask(KernelRunnable task) {
-        taskScheduler.scheduleTask(task, owner);
+	taskScheduler.scheduleTask(task, owner);
     }
     
     /**
