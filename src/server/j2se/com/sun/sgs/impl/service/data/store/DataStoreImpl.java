@@ -968,7 +968,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	throw convertException(Level.FINER, exception, "shutdown");
+	throw convertException(null, Level.FINER, exception, "shutdown");
     }
 
     /* -- Implement TransactionParticipant -- */
@@ -1199,7 +1199,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	    exception = e;
 	}
 	throw convertException(
-	    Level.FINEST, exception, "getNextTxnId count:" + count);
+	    null, Level.FINEST, exception, "getNextTxnId count:" + count);
     }
 
     /**
@@ -1219,7 +1219,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	    exception = e;
 	}
 	throw convertException(
-	    Level.FINEST, exception, "joinNewTransaction txn:" + txn);
+	    txn, Level.FINEST, exception, "joinNewTransaction txn:" + txn);
     }
 
     /* -- Private methods -- */

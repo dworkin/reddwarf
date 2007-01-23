@@ -17,9 +17,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Properties;
 import java.util.concurrent.Semaphore;
-import junit.framework.Test;
 import junit.framework.TestCase;
-import junit.framework.TestSuite;
 
 /*
  * XXX: Test recovery of prepared transactions after a crash
@@ -28,13 +26,6 @@ import junit.framework.TestSuite;
 
 /** Test the DataStoreImpl class */
 public class TestDataStoreImpl extends TestCase {
-
-    /** The test suite, to use for adding additional tests. */
-    private static final TestSuite suite =
-	new TestSuite(TestDataStoreImpl.class);
-
-    /** Provides the test suite to the test runner. */
-    public static Test suite() { return suite; }
 
     /** The name of the DataStoreImpl class. */
     private static final String DataStoreImplClassName =
@@ -85,7 +76,6 @@ public class TestDataStoreImpl extends TestCase {
 	System.err.println("Testcase: " + getName());
 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
 	store = getDataStore();
-	System.err.println("store:" + store);
 	id = store.createObject(txn);
     }
 
@@ -117,868 +107,1097 @@ public class TestDataStoreImpl extends TestCase {
 
     /* -- Test constructor -- */
 
-//     public void testConstructorNullArg() {
-// 	try {
-// 	    new DataStoreImpl(null);
-// 	    fail("Expected NullPointerException");
-// 	} catch (NullPointerException e) {
-// 	    System.err.println(e);
-// 	}
-//     }
-
-//     public void testConstructorNoDirectory() {
-// 	Properties props = new Properties();
-// 	try {
-// 	    new DataStoreImpl(props);
-// 	    fail("Expected IllegalArgumentException");
-// 	} catch (IllegalArgumentException e) {
-// 	    System.err.println(e);
-// 	}
-//     }
-
-//     public void testConstructorBadAllocationBlockSize() {
-// 	Properties props = createProperties(
-// 	    DataStoreImplClassName + ".directory", "foo",
-// 	    DataStoreImplClassName + ".allocationBlockSize", "gorp");
-// 	try {
-// 	    new DataStoreImpl(props);
-// 	    fail("Expected IllegalArgumentException");
-// 	} catch (IllegalArgumentException e) {
-// 	    System.err.println(e);
-// 	}
-//     }
-
-//     public void testConstructorNegativeAllocationBlockSize() {
-// 	Properties props = createProperties(
-// 	    DataStoreImplClassName + ".directory", "foo",
-// 	    DataStoreImplClassName + ".allocationBlockSize", "-3");
-// 	try {
-// 	    new DataStoreImpl(props);
-// 	    fail("Expected IllegalArgumentException");
-// 	} catch (IllegalArgumentException e) {
-// 	    System.err.println(e);
-// 	}
-//     }
-
-//     public void testConstructorNonexistentDirectory() {
-// 	Properties props = createProperties(
-// 	    DataStoreImplClassName + ".directory",
-// 	    "/this-is-a-non-existent-directory/yup");
-// 	try {
-// 	    new DataStoreImpl(props);
-// 	    fail("Expected DataStoreException");
-// 	} catch (DataStoreException e) {
-// 	    System.err.println(e);	    
-// 	}
-//     }
-
-//     public void testConstructorDirectoryIsFile() throws Exception {
-// 	String file = File.createTempFile("existing", "db").getPath();
-// 	Properties props = createProperties(
-// 	    DataStoreImplClassName + ".directory",
-// 	    file);
-// 	try {
-// 	    new DataStoreImpl(props);
-// 	    fail("Expected DataStoreException");
-// 	} catch (DataStoreException e) {
-// 	    System.err.println(e);
-// 	}
-//     }
-
-//     public void testConstructorDirectoryNotWritable() throws Exception {
-//         String osName = System.getProperty("os.name", "unknown");
-// 	/*
-// 	 * Can't seem to create a non-writable directory on Windows.
-// 	 * -tjb@sun.com (01/09/2007)
-// 	 */
-//         if (osName.startsWith("Windows")) {
-//             System.err.println("Skipping on " + osName);
-//             return;
-//         }
-// 	Properties props = createProperties(
-// 	    DataStoreImplClassName + ".directory",
-// 	    createDirectory());
-// 	new File(directory).setReadOnly();
-// 	try {
-// 	    new DataStoreImpl(props);
-// 	    fail("Expected DataStoreException");
-// 	} catch (DataStoreException e) {
-// 	    System.err.println(e);
-// 	}
-//     }
-
-//     /* -- Test createObject -- */
-
-//     public void testCreateObjectNullTxn() {
-// 	try {
-// 	    store.createObject(null);
-// 	    fail("Expected NullPointerException");
-// 	} catch (NullPointerException e) {
-// 	    System.err.println(e);
-// 	}
-//     }
-
-//     static {
-// 	for (UnusualState state : UnusualState.values()) {
-// 	    new UnusualStateTest("testCreateObject", state) {
-// 		void action() {
-// 		    store.createObject(txn);
-// 		}
-// 	    };
-// 	}
-//     }
-
-//     public void testCreateObjectSuccess() throws Exception {
-// 	assertTrue(id >= 0);
-// 	assertTrue(txn.participants.contains(store));
-// 	long id2 = store.createObject(txn);
-// 	assertTrue(id2 >= 0);
-// 	assertTrue(id != id2);
-// 	/*
-// 	 * Only setting the object causes the current transaction to contain
-// 	 * modifications!  -tjb@sun.com (10/18/2006)
-// 	 */
-// 	assertTrue(txn.prepare());
-//     }
-
-//     public void testCreateObjectMany() throws Exception {
-// 	for (int i = 0; i < 10; i++) {
-// 	    if (i != 0) {
-// 		txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
-// 	    }
-// 	    for (int j = 0; j < 200; j++) {
-// 		store.createObject(txn);
-// 	    }
-// 	    txn.commit();
-// 	}
-// 	txn = null;
-//     }
-
-//     /* -- Test markForUpdate -- */
-
-//     public void testMarkForUpdateNullTxn() {
-// 	try {
-// 	    store.markForUpdate(null, 3);
-// 	    fail("Expected NullPointerException");
-// 	} catch (NullPointerException e) {
-// 	    System.err.println(e);
-// 	}
-//     }
-
-//     public void testMarkForUpdateBadId() {
-// 	try {
-// 	    store.markForUpdate(txn, -3);
-// 	    fail("Expected IllegalArgumentException");
-// 	} catch (IllegalArgumentException e) {
-// 	    System.err.println(e);
-// 	}
-//     }
-
-//     public void testMarkForUpdateNotFound() throws Exception {
-// 	try {
-// 	    store.markForUpdate(txn, id);
-// 	    fail("Expected ObjectNotFoundException");
-// 	} catch (ObjectNotFoundException e) {
-// 	    System.err.println(e);
-// 	}
-//     }
-
-//     static {
-// 	for (UnusualState state : UnusualState.values()) {
-// 	    new UnusualStateTest("testMarkForUpdate", state) {
-// 		protected void setUp() throws Exception {
-// 		    super.setUp();
-// 		    store.setObject(txn, id, new byte[] { 0 });
-// 		}
-// 		void action() {
-// 		    store.markForUpdate(txn, id);
-// 		}
-// 	    };
-// 	}
-//     }
-
-//     public void testMarkForUpdateSuccess() throws Exception {
-// 	store.setObject(txn, id, new byte[] { 0 });
-// 	txn.commit();
-// 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
-// 	store.markForUpdate(txn, id);
-// 	store.markForUpdate(txn, id);
-// 	assertTrue(txn.participants.contains(store));
-// 	/* Marking for update is not an update! */
-// 	assertTrue(txn.prepare());
-//     }
-
-//     /* -- Test getObject -- */
-
-//     public void testGetObjectNullTxn() {
-// 	try {
-// 	    store.getObject(null, 3, false);
-// 	    fail("Expected NullPointerException");
-// 	} catch (NullPointerException e) {
-// 	    System.err.println(e);
-// 	}
-//     }
-
-//     public void testGetObjectBadId() {
-// 	try {
-// 	    store.getObject(txn, -3, false);
-// 	    fail("Expected IllegalArgumentException");
-// 	} catch (IllegalArgumentException e) {
-// 	    System.err.println(e);
-// 	}
-//     }
-
-//     public void testGetObjectNotFound() throws Exception {
-// 	try {
-// 	    store.getObject(txn, id, false);
-// 	    fail("Expected ObjectNotFoundException");
-// 	} catch (ObjectNotFoundException e) {
-// 	    System.err.println(e);
-// 	}
-//     }
-
-//     static {
-// 	for (UnusualState state : UnusualState.values()) {
-// 	    new UnusualStateTest("testGetObject", state) {
-// 		protected void setUp() throws Exception {
-// 		    super.setUp();
-// 		    store.setObject(txn, id, new byte[] { 0 });
-// 		}
-// 		void action() {
-// 		    store.getObject(txn, id, false);
-// 		}
-// 	    };
-// 	}
-//     }
-
-//     public void testGetObjectSuccess() throws Exception {
-// 	byte[] data = { 1, 2 };
-// 	store.setObject(txn, id, data);
-// 	txn.commit();
-// 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
-// 	byte[] result =	store.getObject(txn, id, false);
-// 	assertTrue(txn.participants.contains(store));
-// 	assertTrue(Arrays.equals(data, result));
-// 	store.getObject(txn, id, false);
-// 	/* Getting for update is not an update! */
-// 	assertTrue(txn.prepare());
-//     }
-
-//     /* -- Test setObject -- */
-
-//     public void testSetObjectNullTxn() {
-// 	byte[] data = { 0 };
-// 	try {
-// 	    store.setObject(null, 3, data);
-// 	    fail("Expected NullPointerException");
-// 	} catch (NullPointerException e) {
-// 	    System.err.println(e);
-// 	}
-//     }
-
-//     public void testSetObjectBadId() {
-// 	byte[] data = { 0 };
-// 	try {
-// 	    store.setObject(txn, -3, data);
-// 	    fail("Expected IllegalArgumentException");
-// 	} catch (IllegalArgumentException e) {
-// 	    System.err.println(e);
-// 	}
-//     }
-
-//     public void testSetObjectNullData() {
-// 	try {
-// 	    store.setObject(txn, id, null);
-// 	    fail("Expected NullPointerException");
-// 	} catch (NullPointerException e) {
-// 	    System.err.println(e);
-// 	}
-//     }
-
-//     public void testSetObjectEmptyData() throws Exception {
-// 	byte[] data = { };
-// 	store.setObject(txn, id, data);
-// 	txn.commit();
-// 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
-// 	byte[] result = store.getObject(txn, id, false);
-// 	assertTrue(result.length == 0);
-//     }
-
-//     static {
-// 	for (UnusualState state : UnusualState.values()) {
-// 	    new UnusualStateTest("testSetObject", state) {
-// 		void action() {
-// 		    store.setObject(txn, id, new byte[] { 0 });
-// 		}
-// 	    };
-// 	}
-//     }
-
-//     public void testSetObjectSuccess() throws Exception {
-// 	byte[] data = { 1, 2 };
-// 	store.setObject(txn, id, data);
-// 	assertFalse(txn.prepare());
-// 	txn.commit();
-// 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
-// 	byte[] result = store.getObject(txn, id, false);
-// 	assertTrue(Arrays.equals(data, result));
-// 	byte[] newData = new byte[] { 3 };
-// 	store.setObject(txn, id, newData);
-// 	assertTrue(Arrays.equals(newData, store.getObject(txn, id, true)));
-// 	txn.abort();
-// 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
-// 	assertTrue(Arrays.equals(data, store.getObject(txn, id, true)));
-// 	store.setObject(txn, id, newData);
-// 	txn.commit();
-// 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
-// 	assertTrue(Arrays.equals(newData, store.getObject(txn, id, true)));
-//     }
-
-//     /* -- Test removeObject -- */
-
-//     public void testRemoveObjectNullTxn() {
-// 	try {
-// 	    store.removeObject(null, 3);
-// 	    fail("Expected NullPointerException");
-// 	} catch (NullPointerException e) {
-// 	    System.err.println(e);
-// 	}
-//     }
-
-//     public void testRemoveObjectBadId() {
-// 	try {
-// 	    store.removeObject(txn, -3);
-// 	    fail("Expected IllegalArgumentException");
-// 	} catch (IllegalArgumentException e) {
-// 	    System.err.println(e);
-// 	}
-//     }
-
-//     public void testRemoveObjectNotFound() {
-// 	try {
-// 	    store.removeObject(txn, id);
-// 	    fail("Expected ObjectNotFoundException");
-// 	} catch (ObjectNotFoundException e) {
-// 	    System.err.println(e);
-// 	}
-//     }
-
-//     static {
-// 	for (UnusualState state : UnusualState.values()) {
-// 	    new UnusualStateTest("testRemoveObject", state) {
-// 		protected void setUp() throws Exception {
-// 		    super.setUp();
-// 		    store.setObject(txn, id, new byte[] { 0 });
-// 		}
-// 		void action() {
-// 		    store.removeObject(txn, id);
-// 		}
-// 	    };
-// 	}
-//     }
-
-//     public void testRemoveObjectSuccess() throws Exception {
-// 	store.setObject(txn, id, new byte[] { 0 });
-// 	txn.commit();
-// 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
-// 	store.removeObject(txn, id);
-// 	assertFalse(txn.prepare());
-// 	txn.abort();
-// 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
-// 	store.removeObject(txn, id);
-// 	try {
-// 	    store.getObject(txn, id, false);
-// 	    fail("Expected ObjectNotFoundException");
-// 	} catch (ObjectNotFoundException e) {
-// 	}
-// 	txn.commit();
-// 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
-// 	try {
-// 	    store.getObject(txn, id, false);
-// 	    fail("Expected ObjectNotFoundException");
-// 	} catch (ObjectNotFoundException e) {
-// 	}
-//     }
-
-//     /* -- Test getBinding -- */
-
-//     public void testGetBindingNullTxn() {
-// 	try {
-// 	    store.getBinding(null, "foo");
-// 	    fail("Expected NullPointerException");
-// 	} catch (NullPointerException e) {
-// 	    System.err.println(e);
-// 	}
-//     }
-
-//     public void testGetBindingNullName() {
-// 	try {
-// 	    store.getBinding(txn, null);
-// 	    fail("Expected NullPointerException");
-// 	} catch (NullPointerException e) {
-// 	    System.err.println(e);
-// 	}
-//     }
-
-//     public void testGetBindingEmptyName() throws Exception {
-// 	store.setObject(txn, id, new byte[] { 0 });
-// 	store.setBinding(txn, "", id);
-// 	txn.commit();
-// 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
-// 	long result = store.getBinding(txn, "");
-// 	assertEquals(id, result);
-//     }
-
-//     public void testGetBindingNotFound() throws Exception {
-// 	try {
-// 	    store.getBinding(txn, "unknown");
-// 	    fail("Expected NameNotBoundException");
-// 	} catch (NameNotBoundException e) {
-// 	    System.err.println(e);
-// 	}
-//     }
-
-//     public void testGetBindingObjectNotFound() throws Exception {
-// 	store.setBinding(txn, "foo", id);
-// 	txn.commit();
-// 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
-// 	long result = store.getBinding(txn, "foo");
-// 	assertEquals(id, result);
-//     }
-
-//     static {
-// 	for (UnusualState state : UnusualState.values()) {
-// 	    new UnusualStateTest("testGetBinding", state) {
-// 		protected void setUp() throws Exception {
-// 		    super.setUp();
-// 		    store.setBinding(txn, "foo", id);
-// 		}
-// 		void action() {
-// 		    store.getBinding(txn, "foo");
-// 		}
-// 	    };
-// 	}
-//     }
-
-//     public void testGetBindingSuccess() throws Exception {
-// 	store.setObject(txn, id, new byte[] { 0 });
-// 	store.setBinding(txn, "foo", id);
-// 	txn.commit();
-// 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
-// 	long result = store.getBinding(txn, "foo");
-// 	assertEquals(id, result);
-// 	assertTrue(txn.prepare());
-//     }
-
-//     /* -- Test setBinding -- */
-
-//     public void testSetBindingNullTxn() {
-// 	try {
-// 	    store.setBinding(null, "foo", 3);
-// 	    fail("Expected NullPointerException");
-// 	} catch (NullPointerException e) {
-// 	    System.err.println(e);
-// 	}
-//     }
-
-//     public void testSetBindingNullName() {
-// 	try {
-// 	    store.setBinding(txn, null, id);
-// 	    fail("Expected NullPointerException");
-// 	} catch (NullPointerException e) {
-// 	    System.err.println(e);
-// 	}
-//     }
-
-//     static {
-// 	for (UnusualState state : UnusualState.values()) {
-// 	    new UnusualStateTest("testSetBinding", state) {
-// 		void action() {
-// 		    store.setBinding(txn, "foo", id);
-// 		}
-// 	    };
-// 	}
-//     }
-
-//     public void testSetBindingSuccess() throws Exception {
-// 	long newId = store.createObject(txn);
-// 	store.setObject(txn, id, new byte[] { 0 });
-// 	store.setBinding(txn, "foo", id);
-// 	assertFalse(txn.prepare());
-// 	txn.commit();
-// 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
-// 	assertEquals(id, store.getBinding(txn, "foo"));
-// 	store.setBinding(txn, "foo", newId);
-// 	assertEquals(newId, store.getBinding(txn, "foo"));
-// 	txn.abort();
-// 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
-// 	assertEquals(id, store.getBinding(txn, "foo"));
-//     }
-
-//     /* -- Test removeBinding -- */
-
-//     public void testRemoveBindingNullTxn() {
-// 	try {
-// 	    store.removeBinding(null, "foo");
-// 	    fail("Expected NullPointerException");
-// 	} catch (NullPointerException e) {
-// 	    System.err.println(e);
-// 	}
-//     }
-
-//     public void testRemoveBindingNullName() {
-// 	try {
-// 	    store.removeBinding(txn, null);
-// 	    fail("Expected NullPointerException");
-// 	} catch (NullPointerException e) {
-// 	    System.err.println(e);
-// 	}
-//     }
-
-//     public void testRemoveBindingNotFound() {
-// 	try {
-// 	    store.removeBinding(txn, "unknown");
-// 	    fail("Expected NameNotBoundException");
-// 	} catch (NameNotBoundException e) {
-// 	    System.err.println(e);
-// 	}
-//     }
-
-//     static {
-// 	for (UnusualState state : UnusualState.values()) {
-// 	    new UnusualStateTest("testRemoveBinding", state) {
-// 		protected void setUp() throws Exception {
-// 		    super.setUp();
-// 		    store.setBinding(txn, "foo", id);
-// 		}
-// 		void action() {
-// 		    store.removeBinding(txn, "foo");
-// 		}
-// 	    };
-// 	}
-//     }
-
-//     public void testRemoveBindingSuccess() throws Exception {
-// 	store.setObject(txn, id, new byte[] { 0 });
-// 	store.setBinding(txn, "foo", id);
-// 	txn.commit();
-// 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
-// 	store.removeBinding(txn, "foo");
-// 	assertFalse(txn.prepare());
-// 	txn.abort();
-// 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
-// 	assertEquals(id, store.getBinding(txn, "foo"));
-// 	store.removeBinding(txn, "foo");
-// 	try {
-// 	    store.getBinding(txn, "foo");
-// 	    fail("Expected NameNotBoundException");
-// 	} catch (NameNotBoundException e) {
-// 	    System.err.println(e);
-// 	}
-// 	txn.commit();
-// 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
-// 	try {
-// 	    store.getBinding(txn, "foo");
-// 	    fail("Expected NameNotBoundException");
-// 	} catch (NameNotBoundException e) {
-// 	    System.err.println(e);
-// 	}
-//     }
-
-//     /* -- Test nextBoundName -- */
-
-//     public void testNextBoundNameNullTxn() {
-// 	try {
-// 	    store.nextBoundName(null, "foo");
-// 	    fail("Expected NullPointerException");
-// 	} catch (NullPointerException e) {
-// 	    System.err.println(e);
-// 	}
-//     }
-
-//     public void testNextBoundNameEmpty() {
-// 	assertEquals(null, store.nextBoundName(txn, ""));
-// 	store.setBinding(txn, "", id);
-// 	assertEquals("", store.nextBoundName(txn, null));
-// 	assertEquals(null, store.nextBoundName(txn, ""));
-//     }
-
-//     static {
-// 	for (UnusualState state : UnusualState.values()) {
-// 	    new UnusualStateTest("testNextBoundName", state) {
-// 		void action() {
-// 		    store.nextBoundName(txn, null);
-// 		}
-// 	    };
-// 	}
-//     }
-
-//     public void testNextBoundNameSuccess() throws Exception {
-// 	for (String name = null;
-// 	     (name = store.nextBoundName(txn, name)) != null; )
-// 	{
-// 	    store.removeBinding(txn, name);
-// 	}
-// 	assertNull(store.nextBoundName(txn, null));
-// 	assertNull(store.nextBoundName(txn, "name-1"));
-// 	assertNull(store.nextBoundName(txn, ""));
-// 	store.setBinding(txn, "name-1", id);
-// 	assertEquals("name-1", store.nextBoundName(txn, null));
-// 	assertEquals(null, store.nextBoundName(txn, "name-1"));
-// 	assertEquals(null, store.nextBoundName(txn, "name-2"));
-// 	assertEquals(null, store.nextBoundName(txn, "name-1"));
-// 	assertEquals("name-1", store.nextBoundName(txn, "name-0"));
-// 	assertEquals("name-1", store.nextBoundName(txn, null));
-// 	assertEquals("name-1", store.nextBoundName(txn, "name-0"));
-// 	store.setBinding(txn, "name-2", id);
-// 	txn.commit();
-// 	txn = new DummyTransaction();
-// 	assertEquals("name-1", store.nextBoundName(txn, null));
-// 	assertEquals("name-2", store.nextBoundName(txn, "name-1"));
-// 	assertNull(store.nextBoundName(txn, "name-2"));
-// 	assertNull(store.nextBoundName(txn, "name-3"));
-// 	assertEquals("name-1", store.nextBoundName(txn, "name-0"));
-// 	assertEquals("name-2", store.nextBoundName(txn, "name-1"));
-// 	assertEquals("name-1", store.nextBoundName(txn, null));
-// 	store.removeBinding(txn, "name-1");
-// 	assertEquals("name-2", store.nextBoundName(txn, null));
-// 	assertEquals("name-2", store.nextBoundName(txn, "name-1"));
-// 	assertEquals(null, store.nextBoundName(txn, "name-2"));
-// 	assertEquals(null, store.nextBoundName(txn, "name-3"));
-// 	assertEquals("name-2", store.nextBoundName(txn, "name-0"));
-// 	store.removeBinding(txn, "name-2");
-// 	assertNull(store.nextBoundName(txn, "name-2"));
-// 	assertNull(store.nextBoundName(txn, null));
-// 	store.setBinding(txn, "name-1", id);
-// 	store.setBinding(txn, "name-2", id);
-// 	txn.commit();
-// 	txn = new DummyTransaction();
-// 	assertEquals("name-1", store.nextBoundName(txn, null));
-// 	assertEquals("name-1", store.nextBoundName(txn, null));
-// 	store.removeBinding(txn, "name-1");
-// 	assertEquals("name-2", store.nextBoundName(txn, null));
-// 	store.removeBinding(txn, "name-2");
-// 	assertNull(store.nextBoundName(txn, null));
-// 	txn.abort();
-// 	txn = new DummyTransaction();
-// 	assertEquals("name-1", store.nextBoundName(txn, null));
-//     }
-
-//     /* -- Test abort -- */
-
-//     public void testAbortNullTxn() throws Exception {
-// 	store.createObject(txn);
-// 	TransactionParticipant participant =
-// 	    txn.participants.iterator().next();
-// 	try {
-// 	    participant.abort(null);
-// 	    fail("Expected NullPointerException");
-// 	} catch (NullPointerException e) {
-// 	    System.err.println(e);
-// 	}
-//     }
-
-//     static {
-// 	for (UnusualState state : UnusualState.values()) {
-// 	    new UnusualStateTest("testAbort", state) {
-// 		TransactionParticipant participant;
-// 		protected void setUp() throws Exception {
-// 		    super.setUp();
-// 		    participant = txn.participants.iterator().next();
-// 		}
-// 		void action() throws Exception {
-// 		    participant.abort(txn);
-// 		    txn = null;
-// 		}
-// 		void preparedModifiedTest() throws Exception {
-// 		    store.setObject(txn, id, new byte[] { 0 });
-// 		    txn.prepare();
-// 		    /* Aborting a prepared, modified transaction is OK. */
-// 		    action();
-// 		}
-// 	    };
-// 	}
-//     }
-
-//     /* -- Test prepare -- */
-
-//     public void testPrepareNullTxn() throws Exception {
-// 	store.createObject(txn);
-// 	TransactionParticipant participant =
-// 	    txn.participants.iterator().next();
-// 	try {
-// 	    participant.prepare(null);
-// 	    fail("Expected NullPointerException");
-// 	} catch (NullPointerException e) {
-// 	    System.err.println(e);
-// 	}
-//     }
-
-//     static {
-// 	for (UnusualState state : UnusualState.values()) {
-// 	    new UnusualStateTest("testPrepare", state) {
-// 		TransactionParticipant participant;
-// 		protected void setUp() throws Exception {
-// 		    super.setUp();
-// 		    participant = txn.participants.iterator().next();
-// 		}
-// 		void action() throws Exception {
-// 		    assertTrue(participant.prepare(txn));
-// 		    txn = null;
-// 		}
-// 	    };
-// 	}
-//     }
-
-//     /* -- Test prepareAndCommit -- */
-
-//     public void testPrepareAndCommitNullTxn() throws Exception {
-// 	store.createObject(txn);
-// 	TransactionParticipant participant =
-// 	    txn.participants.iterator().next();
-// 	try {
-// 	    participant.prepareAndCommit(null);
-// 	    fail("Expected NullPointerException");
-// 	} catch (NullPointerException e) {
-// 	    System.err.println(e);
-// 	}
-//     }
-
-//     static {
-// 	for (UnusualState state : UnusualState.values()) {
-// 	    new UnusualStateTest("testPrepareAndCommit", state) {
-// 		TransactionParticipant participant;
-// 		protected void setUp() throws Exception {
-// 		    super.setUp();
-// 		    participant = txn.participants.iterator().next();
-// 		}
-// 		void action() throws Exception {
-// 		    participant.prepareAndCommit(txn);
-// 		    txn = null;
-// 		}
-// 	    };
-// 	}
-//     }
-
-//     /* -- Test commit -- */
-
-//     public void testCommitNullTxn() throws Exception {
-// 	store.createObject(txn);
-// 	TransactionParticipant participant =
-// 	    txn.participants.iterator().next();
-// 	try {
-// 	    participant.commit(null);
-// 	    fail("Expected NullPointerException");
-// 	} catch (NullPointerException e) {
-// 	    System.err.println(e);
-// 	}
-//     }
-
-//     static {
-// 	for (UnusualState state : UnusualState.values()) {
-// 	    new UnusualStateTest("testCommit", state) {
-// 		TransactionParticipant participant;
-// 		protected void setUp() throws Exception {
-// 		    super.setUp();
-// 		    participant = txn.participants.iterator().next();
-// 		}
-// 		void action() throws Exception {
-// 		    participant.commit(txn);
-// 		    txn = null;
-// 		}
-// 		void preparedModifiedTest() throws Exception {
-// 		    store.setObject(txn, id, new byte[] { 0 });
-// 		    assertFalse(txn.prepare());
-// 		    /* Committing a prepared, modified transaction is OK. */
-// 		    action();
-// 		}
-// 		void shuttingDownExistingTxnTest() throws Exception {
-// 		    store.setObject(txn, id, new byte[] { 0 });
-// 		    assertFalse(participant.prepare(txn));
-// 		    /* Committing a prepared, modified transaction is OK. */
-// 		    super.shuttingDownExistingTxnTest();
-// 		}
-// 	    };
-// 	}
-//     }
-
-//     /* -- Test shutdown -- */
-
-//     public void testShutdownAgain() throws Exception {
-// 	txn.abort();
-// 	txn = null;
-// 	store.shutdown();
-// 	ShutdownAction action = new ShutdownAction();
-// 	try {
-// 	    action.waitForDone();
-// 	    fail("Expected IllegalStateException");
-// 	} catch (IllegalStateException e) {
-// 	    System.err.println(e);
-// 	} finally {
-// 	    store = null;
-// 	}
-//     }
-
-//     public void testShutdownInterrupt() throws Exception {
-// 	ShutdownAction action = new ShutdownAction();
-// 	action.assertBlocked();
-// 	action.interrupt();
-// 	action.assertResult(false);
-// 	store.setBinding(txn, "foo", id);
-// 	txn.commit();
-// 	txn = null;
-//     }
-
-//     public void testConcurrentShutdownInterrupt() throws Exception {
-// 	ShutdownAction action1 = new ShutdownAction();
-// 	action1.assertBlocked();
-// 	ShutdownAction action2 = new ShutdownAction();
-// 	action2.assertBlocked();
-// 	action1.interrupt();
-// 	action1.assertResult(false);
-// 	action2.assertBlocked();
-// 	txn.abort();
-// 	action2.assertResult(true);
-// 	txn = null;
-// 	store = null;
-//     }
-
-//     public void testConcurrentShutdownRace() throws Exception {
-// 	ShutdownAction action1 = new ShutdownAction();
-// 	action1.assertBlocked();
-// 	ShutdownAction action2 = new ShutdownAction();
-// 	action2.assertBlocked();
-// 	txn.abort();
-// 	boolean result1;
-// 	try {
-// 	    result1 = action1.waitForDone();
-// 	} catch (IllegalStateException e) {
-// 	    result1 = false;
-// 	}
-// 	boolean result2;
-// 	try {
-// 	    result2 = action2.waitForDone();
-// 	} catch (IllegalStateException e) {
-// 	    result2 = false;
-// 	}
-// 	assertTrue(result1 || result2);
-// 	assertFalse(result1 && result2);
-// 	txn = null;
-// 	store = null;
-//     }
-
-//     public void testShutdownRestart() throws Exception {
-// 	store.setBinding(txn, "foo", id);
-// 	byte[] bytes = { 1 };
-// 	store.setObject(txn, id, bytes);
-// 	txn.commit();
-// 	store.shutdown();
-// 	store = getDataStore();
-// 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
-// 	id = store.getBinding(txn, "foo");
-// 	byte[] value = store.getObject(txn, id, false);
-// 	assertTrue(Arrays.equals(bytes, value));
-//     }
+    public void testConstructorNullArg() {
+	try {
+	    new DataStoreImpl(null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testConstructorNoDirectory() {
+	Properties props = new Properties();
+	try {
+	    new DataStoreImpl(props);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testConstructorBadAllocationBlockSize() {
+	Properties props = createProperties(
+	    DataStoreImplClassName + ".directory", "foo",
+	    DataStoreImplClassName + ".allocationBlockSize", "gorp");
+	try {
+	    new DataStoreImpl(props);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testConstructorNegativeAllocationBlockSize() {
+	Properties props = createProperties(
+	    DataStoreImplClassName + ".directory", "foo",
+	    DataStoreImplClassName + ".allocationBlockSize", "-3");
+	try {
+	    new DataStoreImpl(props);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testConstructorNonexistentDirectory() {
+	Properties props = createProperties(
+	    DataStoreImplClassName + ".directory",
+	    "/this-is-a-non-existent-directory/yup");
+	try {
+	    new DataStoreImpl(props);
+	    fail("Expected DataStoreException");
+	} catch (DataStoreException e) {
+	    System.err.println(e);	    
+	}
+    }
+
+    public void testConstructorDirectoryIsFile() throws Exception {
+	String file = File.createTempFile("existing", "db").getPath();
+	Properties props = createProperties(
+	    DataStoreImplClassName + ".directory",
+	    file);
+	try {
+	    new DataStoreImpl(props);
+	    fail("Expected DataStoreException");
+	} catch (DataStoreException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testConstructorDirectoryNotWritable() throws Exception {
+        String osName = System.getProperty("os.name", "unknown");
+	/*
+	 * Can't seem to create a non-writable directory on Windows.
+	 * -tjb@sun.com (01/09/2007)
+	 */
+        if (osName.startsWith("Windows")) {
+            System.err.println("Skipping on " + osName);
+            return;
+        }
+	Properties props = createProperties(
+	    DataStoreImplClassName + ".directory",
+	    createDirectory());
+	new File(directory).setReadOnly();
+	try {
+	    new DataStoreImpl(props);
+	    fail("Expected DataStoreException");
+	} catch (DataStoreException e) {
+	    System.err.println(e);
+	}
+    }
+
+    /* -- Test createObject -- */
+
+    public void testCreateObjectNullTxn() {
+	try {
+	    store.createObject(null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    /* -- Unusual states -- */
+    private final Action createObject = new Action() {
+	void run() { store.createObject(txn); };
+    };
+    public void testCreateObjectAborted() throws Exception {
+	testAborted(createObject);
+    }
+    public void testCreateObjectPreparedReadOnly() throws Exception {
+	testPreparedReadOnly(createObject);
+    }
+    public void testCreateObjectPreparedModified() throws Exception {
+	testPreparedModified(createObject);
+    }
+    public void testCreateObjectCommitted() throws Exception {
+	testCommitted(createObject);
+    }
+    public void testCreateObjectWrongTxn() throws Exception {
+	testWrongTxn(createObject);
+    }
+    public void testCreateObjectShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(createObject);
+    }
+    public void testCreateObjectShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(createObject);
+    }
+    public void testCreateObjectShutdown() throws Exception {
+	testShutdown(createObject);
+    }
+
+    public void testCreateObjectSuccess() throws Exception {
+	assertTrue(id >= 0);
+	assertTrue(txn.participants.contains(store));
+	long id2 = store.createObject(txn);
+	assertTrue(id2 >= 0);
+	assertTrue(id != id2);
+	/*
+	 * Only setting the object causes the current transaction to contain
+	 * modifications!  -tjb@sun.com (10/18/2006)
+	 */
+	assertTrue(txn.prepare());
+    }
+
+    public void testCreateObjectMany() throws Exception {
+	for (int i = 0; i < 10; i++) {
+	    if (i != 0) {
+		txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	    }
+	    for (int j = 0; j < 200; j++) {
+		store.createObject(txn);
+	    }
+	    txn.commit();
+	}
+	txn = null;
+    }
+
+    /* -- Test markForUpdate -- */
+
+    public void testMarkForUpdateNullTxn() {
+	try {
+	    store.markForUpdate(null, 3);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testMarkForUpdateBadId() {
+	try {
+	    store.markForUpdate(txn, -3);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testMarkForUpdateNotFound() throws Exception {
+	try {
+	    store.markForUpdate(txn, id);
+	    fail("Expected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	    System.err.println(e);
+	}
+    }
+
+    /* -- Unusual states -- */
+    private final Action markForUpdate = new Action() {
+	void setUp() { store.setObject(txn, id, new byte[] { 0 }); }
+	void run() { store.markForUpdate(txn, id); }
+    };
+    public void testMarkForUpdateAborted() throws Exception {
+	testAborted(markForUpdate);
+    }
+    public void testMarkForUpdatePreparedReadOnly() throws Exception {
+	testPreparedReadOnly(markForUpdate);
+    }
+    public void testMarkForUpdatePreparedModified() throws Exception {
+	testPreparedModified(markForUpdate);
+    }
+    public void testMarkForUpdateCommitted() throws Exception {
+	testCommitted(markForUpdate);
+    }
+    public void testMarkForUpdateWrongTxn() throws Exception {
+	testWrongTxn(markForUpdate);
+    }
+    public void testMarkForUpdateShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(markForUpdate);
+    }
+    public void testMarkForUpdateShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(markForUpdate);
+    }
+    public void testMarkForUpdateShutdown() throws Exception {
+	testShutdown(markForUpdate);
+    }
+
+    public void testMarkForUpdateSuccess() throws Exception {
+	store.setObject(txn, id, new byte[] { 0 });
+	txn.commit();
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	store.markForUpdate(txn, id);
+	store.markForUpdate(txn, id);
+	assertTrue(txn.participants.contains(store));
+	/* Marking for update is not an update! */
+	assertTrue(txn.prepare());
+    }
+
+    /* -- Test getObject -- */
+
+    public void testGetObjectNullTxn() {
+	try {
+	    store.getObject(null, 3, false);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testGetObjectBadId() {
+	try {
+	    store.getObject(txn, -3, false);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testGetObjectNotFound() throws Exception {
+	try {
+	    store.getObject(txn, id, false);
+	    fail("Expected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	    System.err.println(e);
+	}
+    }
+
+    /* -- Unusual states -- */
+    private final Action getObject = new Action() {
+	void setUp() { store.setObject(txn, id, new byte[] { 0 }); }
+	void run() { store.getObject(txn, id, false); };
+    };
+    public void testGetObjectAborted() throws Exception {
+	testAborted(getObject);
+    }
+    public void testGetObjectPreparedReadOnly() throws Exception {
+	testPreparedReadOnly(getObject);
+    }
+    public void testGetObjectPreparedModified() throws Exception {
+	testPreparedModified(getObject);
+    }
+    public void testGetObjectCommitted() throws Exception {
+	testCommitted(getObject);
+    }
+    public void testGetObjectWrongTxn() throws Exception {
+	testWrongTxn(getObject);
+    }
+    public void testGetObjectShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(getObject);
+    }
+    public void testGetObjectShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(getObject);
+    }
+    public void testGetObjectShutdown() throws Exception {
+	testShutdown(getObject);
+    }
+
+    public void testGetObjectSuccess() throws Exception {
+	byte[] data = { 1, 2 };
+	store.setObject(txn, id, data);
+	txn.commit();
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	byte[] result =	store.getObject(txn, id, false);
+	assertTrue(txn.participants.contains(store));
+	assertTrue(Arrays.equals(data, result));
+	store.getObject(txn, id, false);
+	/* Getting for update is not an update! */
+	assertTrue(txn.prepare());
+    }
+
+    /* -- Test setObject -- */
+
+    public void testSetObjectNullTxn() {
+	byte[] data = { 0 };
+	try {
+	    store.setObject(null, 3, data);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testSetObjectBadId() {
+	byte[] data = { 0 };
+	try {
+	    store.setObject(txn, -3, data);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testSetObjectNullData() {
+	try {
+	    store.setObject(txn, id, null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testSetObjectEmptyData() throws Exception {
+	byte[] data = { };
+	store.setObject(txn, id, data);
+	txn.commit();
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	byte[] result = store.getObject(txn, id, false);
+	assertTrue(result.length == 0);
+    }
+
+    /* -- Unusual states -- */
+    private final Action setObject = new Action() {
+	void run() { store.setObject(txn, id, new byte[] { 0 }); }
+    };
+    public void testSetObjectAborted() throws Exception {
+	testAborted(setObject);
+    }
+    public void testSetObjectPreparedReadOnly() throws Exception {
+	testPreparedReadOnly(setObject);
+    }
+    public void testSetObjectPreparedModified() throws Exception {
+	testPreparedModified(setObject);
+    }
+    public void testSetObjectCommitted() throws Exception {
+	testCommitted(setObject);
+    }
+    public void testSetObjectWrongTxn() throws Exception {
+	testWrongTxn(setObject);
+    }
+    public void testSetObjectShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(setObject);
+    }
+    public void testSetObjectShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(setObject);
+    }
+    public void testSetObjectShutdown() throws Exception {
+	testShutdown(setObject);
+    }
+
+    public void testSetObjectSuccess() throws Exception {
+	byte[] data = { 1, 2 };
+	store.setObject(txn, id, data);
+	assertFalse(txn.prepare());
+	txn.commit();
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	byte[] result = store.getObject(txn, id, false);
+	assertTrue(Arrays.equals(data, result));
+	byte[] newData = new byte[] { 3 };
+	store.setObject(txn, id, newData);
+	assertTrue(Arrays.equals(newData, store.getObject(txn, id, true)));
+	txn.abort();
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	assertTrue(Arrays.equals(data, store.getObject(txn, id, true)));
+	store.setObject(txn, id, newData);
+	txn.commit();
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	assertTrue(Arrays.equals(newData, store.getObject(txn, id, true)));
+    }
+
+    /* -- Test removeObject -- */
+
+    public void testRemoveObjectNullTxn() {
+	try {
+	    store.removeObject(null, 3);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testRemoveObjectBadId() {
+	try {
+	    store.removeObject(txn, -3);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testRemoveObjectNotFound() {
+	try {
+	    store.removeObject(txn, id);
+	    fail("Expected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	    System.err.println(e);
+	}
+    }
+
+    /* -- Unusual states -- */
+    private final Action removeObject = new Action() {
+	void setUp() { store.setObject(txn, id, new byte[] { 0 }); }
+	void run() { store.removeObject(txn, id); }
+    };
+    public void testRemoveObjectAborted() throws Exception {
+	testAborted(removeObject);
+    }
+    public void testRemoveObjectPreparedReadOnly() throws Exception {
+	testPreparedReadOnly(removeObject);
+    }
+    public void testRemoveObjectPreparedModified() throws Exception {
+	testPreparedModified(removeObject);
+    }
+    public void testRemoveObjectCommitted() throws Exception {
+	testCommitted(removeObject);
+    }
+    public void testRemoveObjectWrongTxn() throws Exception {
+	testWrongTxn(removeObject);
+    }
+    public void testRemoveObjectShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(removeObject);
+    }
+    public void testRemoveObjectShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(removeObject);
+    }
+    public void testRemoveObjectShutdown() throws Exception {
+	testShutdown(removeObject);
+    }
+
+    public void testRemoveObjectSuccess() throws Exception {
+	store.setObject(txn, id, new byte[] { 0 });
+	txn.commit();
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	store.removeObject(txn, id);
+	assertFalse(txn.prepare());
+	txn.abort();
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	store.removeObject(txn, id);
+	try {
+	    store.getObject(txn, id, false);
+	    fail("Expected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	}
+	txn.commit();
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	try {
+	    store.getObject(txn, id, false);
+	    fail("Expected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	}
+    }
+
+    /* -- Test getBinding -- */
+
+    public void testGetBindingNullTxn() {
+	try {
+	    store.getBinding(null, "foo");
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testGetBindingNullName() {
+	try {
+	    store.getBinding(txn, null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testGetBindingEmptyName() throws Exception {
+	store.setObject(txn, id, new byte[] { 0 });
+	store.setBinding(txn, "", id);
+	txn.commit();
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	long result = store.getBinding(txn, "");
+	assertEquals(id, result);
+    }
+
+    public void testGetBindingNotFound() throws Exception {
+	try {
+	    store.getBinding(txn, "unknown");
+	    fail("Expected NameNotBoundException");
+	} catch (NameNotBoundException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testGetBindingObjectNotFound() throws Exception {
+	store.setBinding(txn, "foo", id);
+	txn.commit();
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	long result = store.getBinding(txn, "foo");
+	assertEquals(id, result);
+    }
+
+    /* -- Unusual states -- */
+    private final Action getBinding = new Action() {
+	void setUp() { store.setBinding(txn, "foo", id); }
+	void run() { store.getBinding(txn, "foo"); }
+    };
+    public void testGetBindingAborted() throws Exception {
+	testAborted(getBinding);
+    }
+    public void testGetBindingPreparedReadOnly() throws Exception {
+	testPreparedReadOnly(getBinding);
+    }
+    public void testGetBindingPreparedModified() throws Exception {
+	testPreparedModified(getBinding);
+    }
+    public void testGetBindingCommitted() throws Exception {
+	testCommitted(getBinding);
+    }
+    public void testGetBindingWrongTxn() throws Exception {
+	testWrongTxn(getBinding);
+    }
+    public void testGetBindingShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(getBinding);
+    }
+    public void testGetBindingShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(getBinding);
+    }
+    public void testGetBindingShutdown() throws Exception {
+	testShutdown(getBinding);
+    }
+
+    public void testGetBindingSuccess() throws Exception {
+	store.setObject(txn, id, new byte[] { 0 });
+	store.setBinding(txn, "foo", id);
+	txn.commit();
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	long result = store.getBinding(txn, "foo");
+	assertEquals(id, result);
+	assertTrue(txn.prepare());
+    }
+
+    /* -- Test setBinding -- */
+
+    public void testSetBindingNullTxn() {
+	try {
+	    store.setBinding(null, "foo", 3);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testSetBindingNullName() {
+	try {
+	    store.setBinding(txn, null, id);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    /* -- Unusual states -- */
+    private final Action setBinding = new Action() {
+	void run() { store.setBinding(txn, "foo", id); }
+    };
+    public void testSetBindingAborted() throws Exception {
+	testAborted(setBinding);
+    }
+    public void testSetBindingPreparedReadOnly() throws Exception {
+	testPreparedReadOnly(setBinding);
+    }
+    public void testSetBindingPreparedModified() throws Exception {
+	testPreparedModified(setBinding);
+    }
+    public void testSetBindingCommitted() throws Exception {
+	testCommitted(setBinding);
+    }
+    public void testSetBindingWrongTxn() throws Exception {
+	testWrongTxn(setBinding);
+    }
+    public void testSetBindingShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(setBinding);
+    }
+    public void testSetBindingShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(setBinding);
+    }
+    public void testSetBindingShutdown() throws Exception {
+	testShutdown(setBinding);
+    }
+
+    public void testSetBindingSuccess() throws Exception {
+	long newId = store.createObject(txn);
+	store.setObject(txn, id, new byte[] { 0 });
+	store.setBinding(txn, "foo", id);
+	assertFalse(txn.prepare());
+	txn.commit();
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	assertEquals(id, store.getBinding(txn, "foo"));
+	store.setBinding(txn, "foo", newId);
+	assertEquals(newId, store.getBinding(txn, "foo"));
+	txn.abort();
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	assertEquals(id, store.getBinding(txn, "foo"));
+    }
+
+    /* -- Test removeBinding -- */
+
+    public void testRemoveBindingNullTxn() {
+	try {
+	    store.removeBinding(null, "foo");
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testRemoveBindingNullName() {
+	try {
+	    store.removeBinding(txn, null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testRemoveBindingNotFound() {
+	try {
+	    store.removeBinding(txn, "unknown");
+	    fail("Expected NameNotBoundException");
+	} catch (NameNotBoundException e) {
+	    System.err.println(e);
+	}
+    }
+
+    /* -- Unusual states -- */
+    private final Action removeBinding = new Action() {
+	void setUp() { store.setBinding(txn, "foo", id); }
+	void run() { store.removeBinding(txn, "foo"); }
+    };
+    public void testRemoveBindingAborted() throws Exception {
+	testAborted(removeBinding);
+    }
+    public void testRemoveBindingPreparedReadOnly() throws Exception {
+	testPreparedReadOnly(removeBinding);
+    }
+    public void testRemoveBindingPreparedModified() throws Exception {
+	testPreparedModified(removeBinding);
+    }
+    public void testRemoveBindingCommitted() throws Exception {
+	testCommitted(removeBinding);
+    }
+    public void testRemoveBindingWrongTxn() throws Exception {
+	testWrongTxn(removeBinding);
+    }
+    public void testRemoveBindingShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(removeBinding);
+    }
+    public void testRemoveBindingShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(removeBinding);
+    }
+    public void testRemoveBindingShutdown() throws Exception {
+	testShutdown(removeBinding);
+    }
+
+    public void testRemoveBindingSuccess() throws Exception {
+	store.setObject(txn, id, new byte[] { 0 });
+	store.setBinding(txn, "foo", id);
+	txn.commit();
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	store.removeBinding(txn, "foo");
+	assertFalse(txn.prepare());
+	txn.abort();
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	assertEquals(id, store.getBinding(txn, "foo"));
+	store.removeBinding(txn, "foo");
+	try {
+	    store.getBinding(txn, "foo");
+	    fail("Expected NameNotBoundException");
+	} catch (NameNotBoundException e) {
+	    System.err.println(e);
+	}
+	txn.commit();
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	try {
+	    store.getBinding(txn, "foo");
+	    fail("Expected NameNotBoundException");
+	} catch (NameNotBoundException e) {
+	    System.err.println(e);
+	}
+    }
+
+    /* -- Test nextBoundName -- */
+
+    public void testNextBoundNameNullTxn() {
+	try {
+	    store.nextBoundName(null, "foo");
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testNextBoundNameEmpty() {
+	assertEquals(null, store.nextBoundName(txn, ""));
+	store.setBinding(txn, "", id);
+	assertEquals("", store.nextBoundName(txn, null));
+	assertEquals(null, store.nextBoundName(txn, ""));
+    }
+
+    /* -- Unusual states -- */
+    private final Action nextBoundName = new Action() {
+	void run() { store.nextBoundName(txn, null); }
+    };
+    public void testNextBoundNameAborted() throws Exception {
+	testAborted(nextBoundName);
+    }
+    public void testNextBoundNamePreparedReadOnly() throws Exception {
+	testPreparedReadOnly(nextBoundName);
+    }
+    public void testNextBoundNamePreparedModified() throws Exception {
+	testPreparedModified(nextBoundName);
+    }
+    public void testNextBoundNameCommitted() throws Exception {
+	testCommitted(nextBoundName);
+    }
+    public void testNextBoundNameWrongTxn() throws Exception {
+	testWrongTxn(nextBoundName);
+    }
+    public void testNextBoundNameShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(nextBoundName);
+    }
+    public void testNextBoundNameShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(nextBoundName);
+    }
+    public void testNextBoundNameShutdown() throws Exception {
+	testShutdown(nextBoundName);
+    }
+
+    public void testNextBoundNameSuccess() throws Exception {
+	for (String name = null;
+	     (name = store.nextBoundName(txn, name)) != null; )
+	{
+	    store.removeBinding(txn, name);
+	}
+	assertNull(store.nextBoundName(txn, null));
+	assertNull(store.nextBoundName(txn, "name-1"));
+	assertNull(store.nextBoundName(txn, ""));
+	store.setBinding(txn, "name-1", id);
+	assertEquals("name-1", store.nextBoundName(txn, null));
+	assertEquals(null, store.nextBoundName(txn, "name-1"));
+	assertEquals(null, store.nextBoundName(txn, "name-2"));
+	assertEquals(null, store.nextBoundName(txn, "name-1"));
+	assertEquals("name-1", store.nextBoundName(txn, "name-0"));
+	assertEquals("name-1", store.nextBoundName(txn, null));
+	assertEquals("name-1", store.nextBoundName(txn, "name-0"));
+	store.setBinding(txn, "name-2", id);
+	txn.commit();
+	txn = new DummyTransaction();
+	assertEquals("name-1", store.nextBoundName(txn, null));
+	assertEquals("name-2", store.nextBoundName(txn, "name-1"));
+	assertNull(store.nextBoundName(txn, "name-2"));
+	assertNull(store.nextBoundName(txn, "name-3"));
+	assertEquals("name-1", store.nextBoundName(txn, "name-0"));
+	assertEquals("name-2", store.nextBoundName(txn, "name-1"));
+	assertEquals("name-1", store.nextBoundName(txn, null));
+	store.removeBinding(txn, "name-1");
+	assertEquals("name-2", store.nextBoundName(txn, null));
+	assertEquals("name-2", store.nextBoundName(txn, "name-1"));
+	assertEquals(null, store.nextBoundName(txn, "name-2"));
+	assertEquals(null, store.nextBoundName(txn, "name-3"));
+	assertEquals("name-2", store.nextBoundName(txn, "name-0"));
+	store.removeBinding(txn, "name-2");
+	assertNull(store.nextBoundName(txn, "name-2"));
+	assertNull(store.nextBoundName(txn, null));
+	store.setBinding(txn, "name-1", id);
+	store.setBinding(txn, "name-2", id);
+	txn.commit();
+	txn = new DummyTransaction();
+	assertEquals("name-1", store.nextBoundName(txn, null));
+	assertEquals("name-1", store.nextBoundName(txn, null));
+	store.removeBinding(txn, "name-1");
+	assertEquals("name-2", store.nextBoundName(txn, null));
+	store.removeBinding(txn, "name-2");
+	assertNull(store.nextBoundName(txn, null));
+	txn.abort();
+	txn = new DummyTransaction();
+	assertEquals("name-1", store.nextBoundName(txn, null));
+    }
+
+    /* -- Test abort -- */
+
+    public void testAbortNullTxn() throws Exception {
+	store.createObject(txn);
+	TransactionParticipant participant =
+	    txn.participants.iterator().next();
+	try {
+	    participant.abort(null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    /* -- Unusual states -- */
+    private final Action abort = new Action() {
+	TransactionParticipant participant;
+	void setUp() { participant = txn.participants.iterator().next(); }
+	void run() {
+	    participant.abort(txn);
+	    txn = null;
+	}
+    };
+    public void testAbortAborted() throws Exception {
+	testAborted(abort);
+    }
+    public void testAbortPreparedReadOnly() throws Exception {
+	testPreparedReadOnly(abort);
+    }
+    public void testAbortPreparedModified() throws Exception {
+	abort.setUp();
+	store.setObject(txn, id, new byte[] { 0 });
+	txn.prepare();
+	/* Aborting a prepared, modified transaction is OK. */
+	abort.run();
+    }
+    public void testAbortCommitted() throws Exception {
+	testCommitted(abort);
+    }
+    public void testAbortWrongTxn() throws Exception {
+	testWrongTxn(abort);
+    }
+    public void testAbortShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(abort);
+    }
+    public void testAbortShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(abort);
+    }
+    public void testAbortShutdown() throws Exception {
+	testShutdown(abort);
+    }
+
+    /* -- Test prepare -- */
+
+    public void testPrepareNullTxn() throws Exception {
+	store.createObject(txn);
+	TransactionParticipant participant =
+	    txn.participants.iterator().next();
+	try {
+	    participant.prepare(null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    /* -- Unusual states -- */
+    private final Action prepare = new Action() {
+	private TransactionParticipant participant;
+	void setUp() { participant = txn.participants.iterator().next(); }
+	void run() throws Exception {
+	    assertTrue(participant.prepare(txn));
+	    txn = null;
+	}
+    };
+    public void testPrepareAborted() throws Exception {
+	testAborted(prepare);
+    }
+    public void testPreparePreparedReadOnly() throws Exception {
+	testPreparedReadOnly(prepare);
+    }
+    public void testPreparePreparedModified() throws Exception {
+	testPreparedModified(prepare);
+    }
+    public void testPrepareCommitted() throws Exception {
+	testCommitted(prepare);
+    }
+    public void testPrepareWrongTxn() throws Exception {
+	testWrongTxn(prepare);
+    }
+    public void testPrepareShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(prepare);
+    }
+    public void testPrepareShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(prepare);
+    }
+    public void testPrepareShutdown() throws Exception {
+	testShutdown(prepare);
+    }
+
+    /* -- Test prepareAndCommit -- */
+
+    public void testPrepareAndCommitNullTxn() throws Exception {
+	store.createObject(txn);
+	TransactionParticipant participant =
+	    txn.participants.iterator().next();
+	try {
+	    participant.prepareAndCommit(null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    /* -- Unusual states -- */
+    private final Action prepareAndCommit = new Action() {
+	private TransactionParticipant participant;
+	void setUp() { participant = txn.participants.iterator().next(); }
+	void run() throws Exception {
+	    participant.prepareAndCommit(txn);
+	    txn = null;
+	}
+    };
+    public void testPrepareAndCommitAborted() throws Exception {
+	testAborted(prepareAndCommit);
+    }
+    public void testPrepareAndCommitPrepareAndCommitdReadOnly()
+	throws Exception
+    {
+	testPreparedReadOnly(prepareAndCommit);
+    }
+    public void testPrepareAndCommitPrepareAndCommitdModified()
+	throws Exception
+    {
+	testPreparedModified(prepareAndCommit);
+    }
+    public void testPrepareAndCommitCommitted() throws Exception {
+	testCommitted(prepareAndCommit);
+    }
+    public void testPrepareAndCommitWrongTxn() throws Exception {
+	testWrongTxn(prepareAndCommit);
+    }
+    public void testPrepareAndCommitShuttingDownExistingTxn()
+	throws Exception
+    {
+	testShuttingDownExistingTxn(prepareAndCommit);
+    }
+    public void testPrepareAndCommitShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(prepareAndCommit);
+    }
+    public void testPrepareAndCommitShutdown() throws Exception {
+	testShutdown(prepareAndCommit);
+    }
+
+    /* -- Test commit -- */
+
+    public void testCommitNullTxn() throws Exception {
+	store.createObject(txn);
+	TransactionParticipant participant =
+	    txn.participants.iterator().next();
+	try {
+	    participant.commit(null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    /* -- Unusual states -- */
+    class CommitAction extends Action {
+	private TransactionParticipant participant;
+	void setUp() { participant = txn.participants.iterator().next(); }
+	void run() throws Exception {
+	    participant.commit(txn);
+	    txn = null;
+	}
+    }
+    private final CommitAction commit = new CommitAction();
+    public void testCommitAborted() throws Exception {
+	testAborted(commit);
+    }
+    public void testCommitPreparedReadOnly() throws Exception {
+	testPreparedReadOnly(commit);
+    }
+    public void testCommitPreparedModified() throws Exception {
+	commit.setUp();
+	store.setObject(txn, id, new byte[] { 0 });
+	assertFalse(txn.prepare());
+	/* Committing a prepared, modified transaction is OK. */
+	commit.run();
+    }
+    public void testCommitCommitted() throws Exception {
+	testCommitted(commit);
+    }
+    public void testCommitWrongTxn() throws Exception {
+	testWrongTxn(commit);
+    }
+    public void testCommitShuttingDownExistingTxn() throws Exception {
+	commit.setUp();
+	store.setObject(txn, id, new byte[] { 0 });
+	assertFalse(txn.prepare());
+	/* Committing a prepared, modified transaction is OK. */
+	testShuttingDownExistingTxn(commit);
+    }
+    public void testCommitShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(commit);
+    }
+    public void testCommitShutdown() throws Exception {
+	testShutdown(commit);
+    }
+
+    /* -- Test shutdown -- */
+
+    public void testShutdownAgain() throws Exception {
+	txn.abort();
+	txn = null;
+	store.shutdown();
+	ShutdownAction action = new ShutdownAction();
+	try {
+	    action.waitForDone();
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	} finally {
+	    store = null;
+	}
+    }
+
+    public void testShutdownInterrupt() throws Exception {
+	ShutdownAction action = new ShutdownAction();
+	action.assertBlocked();
+	action.interrupt();
+	action.assertResult(false);
+	store.setBinding(txn, "foo", id);
+	txn.commit();
+	txn = null;
+    }
+
+    public void testConcurrentShutdownInterrupt() throws Exception {
+	ShutdownAction action1 = new ShutdownAction();
+	action1.assertBlocked();
+	ShutdownAction action2 = new ShutdownAction();
+	action2.assertBlocked();
+	action1.interrupt();
+	action1.assertResult(false);
+	action2.assertBlocked();
+	txn.abort();
+	action2.assertResult(true);
+	txn = null;
+	store = null;
+    }
+
+    public void testConcurrentShutdownRace() throws Exception {
+	ShutdownAction action1 = new ShutdownAction();
+	action1.assertBlocked();
+	ShutdownAction action2 = new ShutdownAction();
+	action2.assertBlocked();
+	txn.abort();
+	boolean result1;
+	try {
+	    result1 = action1.waitForDone();
+	} catch (IllegalStateException e) {
+	    result1 = false;
+	}
+	boolean result2;
+	try {
+	    result2 = action2.waitForDone();
+	} catch (IllegalStateException e) {
+	    result2 = false;
+	}
+	assertTrue(result1 || result2);
+	assertFalse(result1 && result2);
+	txn = null;
+	store = null;
+    }
+
+    public void testShutdownRestart() throws Exception {
+	store.setBinding(txn, "foo", id);
+	byte[] bytes = { 1 };
+	store.setObject(txn, id, bytes);
+	txn.commit();
+	store.shutdown();
+	store = getDataStore();
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	id = store.getBinding(txn, "foo");
+	byte[] value = store.getObject(txn, id, false);
+	assertTrue(Arrays.equals(bytes, value));
+    }
 
     /* -- Test deadlock -- */
     @SuppressWarnings("hiding")
@@ -1023,7 +1242,7 @@ public class TestDataStoreImpl extends TestCase {
 		}
 	    }
 	    MyRunnable myRunnable = new MyRunnable();
-	    Thread thread = new Thread(myRunnable);
+	    Thread thread = new Thread(myRunnable, "testDeadlockThread");
 	    thread.start();
 	    Thread.sleep(i * 500);
 	    flag.acquire();
@@ -1091,177 +1310,135 @@ public class TestDataStoreImpl extends TestCase {
 	return new DataStoreImpl(dbProps);
     }
 
-    /** The set of unusual states */
-    static enum UnusualState {
-	Aborted, PreparedReadOnly, PreparedModified, Committed,
-	WrongTxn, ShuttingDownExistingTxn, ShuttingDownNewTxn, Shutdown
+    /* -- Support for testing unusual states -- */
+
+    /**
+     * An action, with an optional setup step, to be run in the context of an
+     * unusual state.
+     */
+    abstract class Action {
+	void setUp() throws Exception { };
+	abstract void run() throws Exception;
     }
 
-    /** Defines a abstract class for testing unusual states. */
-    static abstract class UnusualStateTest extends TestDataStoreImpl {
-
-	/** The state to test. */
-	private final UnusualState state;
-
-	/**
-	 * Creates an instance with the specified generic name to test the
-	 * specified unusual state, and adds this test to the test suite.
-	 */
-	UnusualStateTest(String name, UnusualState state) {
-	    super(name + state);
-	    this.state = state;
-	    suite.addTest(this);
-	}
-
-	/**
-	 * Subclasses should implement this method to define the action that
-	 * should be tested in an unusual state.
-	 */
-	abstract void action() throws Exception;
-
-	/** Runs the test for the unusual state. */
-	protected void runTest() throws Exception {
-	    switch (state) {
-	    case Aborted:
-		abortedTest();
-		break;
-	    case PreparedReadOnly:
-		preparedReadOnlyTest();
-		break;
-	    case PreparedModified:
-		preparedModifiedTest();
-		break;
-	    case Committed:
-		committedTest();
-		break;
-	    case WrongTxn:
-		wrongTxnTest();
-		break;
-	    case ShuttingDownExistingTxn:
-		shuttingDownExistingTxnTest();
-		break;
-	    case ShuttingDownNewTxn:
-		shuttingDownNewTxnTest();
-		break;
-	    case Shutdown:
-		shutdownTest();
-		break;
-	    default:
-		throw new AssertionError();
-	    }
-	}
-
-	/** Runs the test for the aborted case. */
-	void abortedTest() throws Exception {
-	    txn.abort();
-	    try {
-		action();
-		fail("Expected IllegalStateException");
-	    } catch (IllegalStateException e) {
-		System.err.println(e);
-	    } finally {
-		txn = null;
-	    }
-	}
-
-	/** Runs the test for the prepared returns read-only case. */
-	void preparedReadOnlyTest() throws Exception {
-	    txn.prepare();
-	    try {
-		action();
-		fail("Expected IllegalStateException");
-	    } catch (IllegalStateException e) {
-		System.err.println(e);
-	    }
-	}
-
-	/** Runs the test for the prepared returns modified case. */
-	void preparedModifiedTest() throws Exception {
-	    store.setObject(txn, id, new byte[] { 0 });
-	    txn.prepare();
-	    try {
-		action();
-		fail("Expected IllegalStateException");
-	    } catch (IllegalStateException e) {
-		System.err.println(e);
-	    }
-	}
-
-	/** Runs the test for the committed case. */
-	void committedTest() throws Exception {
-	    txn.commit();
-	    try {
-		action();
-		fail("Expected IllegalStateException");
-	    } catch (IllegalStateException e) {
-		System.err.println(e);
-	    } finally {
-		txn = null;
-	    }
-	}
-
-	/** Runs the test for the wrong transaction case. */
-	void wrongTxnTest() throws Exception {
-	    store.createObject(txn);
-	    DummyTransaction originalTxn = txn;
-	    txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
-	    try {
-		action();
-		fail("Expected IllegalStateException");
-	    } catch (IllegalStateException e) {
-		System.err.println(e);
-	    } finally {
-		originalTxn.abort();
-	    }
-	}
-
-	/**
-	 * Runs the test for the existing transaction while shutting down case.
-	 */
-	void shuttingDownExistingTxnTest() throws Exception {
-	    ShutdownAction shutdownAction = new ShutdownAction();
-	    shutdownAction.assertBlocked();
-	    action();
-	    if (txn != null) {
-		txn.commit();
-		txn = null;
-	    }
-	    shutdownAction.assertResult(true);
-	    store = null;
-	}
-
-	/** Runs the test for the new transaction while shutting down case. */
-	void shuttingDownNewTxnTest() throws Exception {
-	    DummyTransaction originalTxn = txn;
-	    ShutdownAction shutdownAction = new ShutdownAction();
-	    shutdownAction.assertBlocked();
-	    txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
-	    try {
-		action();
-		fail("Expected IllegalStateException");
-	    } catch (IllegalStateException e) {
-		System.err.println(e);
-	    }
-	    txn.abort();
+    /** Tests running the action after abort. */
+    void testAborted(Action action) throws Exception {
+	action.setUp();
+	txn.abort();
+	try {
+	    action.run();
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	} finally {
 	    txn = null;
+	}
+    }
+
+    /** Tests running the action after prepare returns read-only. */
+    void testPreparedReadOnly(Action action) throws Exception {
+	action.setUp();
+	txn.prepare();
+	try {
+	    action.run();
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
+    /** Tests running the action after prepare returns modified. */
+    void testPreparedModified(Action action) throws Exception {
+	action.setUp();
+	store.setObject(txn, id, new byte[] { 0 });
+	txn.prepare();
+	try {
+	    action.run();
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
+    /** Tests running the action after commit. */
+    void testCommitted(Action action) throws Exception {
+	action.setUp();
+	txn.commit();
+	try {
+	    action.run();
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	} finally {
+	    txn = null;
+	}
+    }
+
+    /** Tests running the action in the wrong transaction. */
+    void testWrongTxn(Action action) throws Exception {
+	action.setUp();
+	store.createObject(txn);
+	DummyTransaction originalTxn = txn;
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	try {
+	    action.run();
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	} finally {
 	    originalTxn.abort();
-	    shutdownAction.assertResult(true);
-	    store = null;
 	}
+    }
 
-	/** Runs the test for the shutdown case. */
-	void shutdownTest() throws Exception {
-	    txn.abort();
-	    store.shutdown();
-	    try {
-		action();
-		fail("Expected IllegalStateException");
-	    } catch (IllegalStateException e) {
-		System.err.println(e);
-	    }
+    /**
+     * Tests running the action in an existing transaction while shutting down.
+     */
+    void testShuttingDownExistingTxn(Action action) throws Exception {
+	action.setUp();
+	ShutdownAction shutdownAction = new ShutdownAction();
+	shutdownAction.assertBlocked();
+	action.run();
+	if (txn != null) {
+	    txn.commit();
 	    txn = null;
-	    store = null;
 	}
+	shutdownAction.assertResult(true);
+	store = null;
+    }
+
+    /** Tests running the action in a new transaction while shutting down. */
+    void testShuttingDownNewTxn(Action action) throws Exception {
+	action.setUp();
+	DummyTransaction originalTxn = txn;
+	ShutdownAction shutdownAction = new ShutdownAction();
+	shutdownAction.assertBlocked();
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	try {
+	    action.run();
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+	txn.abort();
+	txn = null;
+	originalTxn.abort();
+	shutdownAction.assertResult(true);
+	store = null;
+    }
+
+    /** Tests running the action after shutdown. */
+    void testShutdown(Action action) throws Exception {
+	action.setUp();
+	txn.abort();
+	store.shutdown();
+	try {
+	    action.run();
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+	txn = null;
+	store = null;
     }
 
     /** Use this thread to control a call to shutdown that may block. */
