@@ -8,7 +8,7 @@ import java.util.Properties;
  * when the application starts up, when client sessions log in, and
  * when the application is shutting down.
  *
- * <p>An implementation of a <code>AppListener</code> should implement
+ * <p>An implementation of a {@code AppListener} should implement
  * the {@link Serializable} interface, so that application listeners
  * can be stored persistently.  If a given listener has mutable state,
  * that listener should also implement the {@link ManagedObject}
@@ -20,7 +20,7 @@ import java.util.Properties;
  * and that method throws an exception, that exception implements
  * {@link ExceptionRetryStatus}, and its {@link
  * ExceptionRetryStatus#shouldRetry shouldRetry} method returns
- * <code>true</code>, then the <code>TaskManager</code> will make
+ * {@code true}, then the {@code TaskManager} will make
  * further attempts to retry the task that invoked the listener's
  * method.  It will continue those attempts until either an attempt
  * succeeds or it notices an exception is thrown that is not
@@ -45,11 +45,11 @@ public interface AppListener extends ManagedObject {
      * logged in, and returns a {@link ClientSessionListener} for that
      * session.  The returned listener should implement {@link
      * Serializable} so that it can be stored persistently.  If the
-     * returned listener does not implement <code>Serializable</code>,
+     * returned listener does not implement {@code Serializable},
      * then the client session is disconnected without completing the
      * login process.
      *
-     * <p>The returned <code>ClientSessionListener</code> is notified as
+     * <p>The returned {@code ClientSessionListener} is notified as
      * follows:<ul>
      *
      * <li>If a message is received from the specified client session,
@@ -60,19 +60,19 @@ public interface AppListener extends ManagedObject {
      * <li>If the specified client session logs out or becomes
      * disconnected for other reasons, the returned listener's {@link
      * ClientSessionListener#disconnected disconnected} method is
-     * invoked with a <code>boolean</code> that is <code>true</code>
-     * if the client logged out gracefully, and is <code>false</code>
+     * invoked with a {@code boolean} that is {@code true}
+     * if the client logged out gracefully, and is {@code false}
      * otherwise.
      * </ul>
      * 
-     * <p>A return value of <code>null</code> has special meaning,
+     * <p>A return value of {@code null} has special meaning,
      * indicating that the specified client session should not
      * complete the login process and should be disconnected
      * immediately.
      *
      * @param session a client session
      * @return a (serializable) listener for the client session,
-     * or <code>null</code> to indicate that the session should
+     * or {@code null} to indicate that the session should
      * be terminated without completing the login process.
      */
     ClientSessionListener loggedIn(ClientSession session);
@@ -82,7 +82,7 @@ public interface AppListener extends ManagedObject {
      * shutting down.  This gives the application an opportunity to
      * perform any necessary clean up, such as logging out client
      * sessions, before the application is shut down.  If
-     * <code>force</code> is true, then the application should
+     * {@code force} is true, then the application should
      * forcibly log out clients and shut down, otherwise it should
      * wait for sessions to log out on their own before shutting down.
      *
@@ -100,7 +100,7 @@ public interface AppListener extends ManagedObject {
      * implement {@link Serializable}.
      *
      * @param listener a shutdown listener
-     * @param force if <code>true</code>, the application should
+     * @param force if {@code true}, the application should
      * forcibly log out clients, otherwise it should wait for clients
      * to log out gracefully
      */

@@ -513,8 +513,8 @@ public class ChannelServiceImpl
      * <p>This context maintains an internal table that maps (for the
      * channels used in the context's associated transaction) channel name
      * to channel implementation.  To create, obtain, or remove a channel
-     * within a transaction, the <code>createChannel</code>,
-     * <code>getChannel</code>, or <code>removeChannel</code> methods
+     * within a transaction, the {@code createChannel},
+     * {@code getChannel}, or {@code removeChannel} methods
      * (respectively) must be called on the context so that the proper
      * channel instances are used.
      */
