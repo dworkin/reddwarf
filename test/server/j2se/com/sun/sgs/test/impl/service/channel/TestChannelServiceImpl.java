@@ -40,12 +40,12 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import junit.framework.Test;
 import junit.framework.TestCase;
 
@@ -527,7 +527,7 @@ public class TestChannelServiceImpl extends TestCase {
 	Channel channel = channelService.createChannel(
 		channelName, new DummyChannelListener(), Delivery.RELIABLE);
 	String[] names = new String[] { "foo", "bar", "baz" };
-	Collection<ClientSession> savedSessions = new ArrayList<ClientSession>();
+	Set<ClientSession> savedSessions = new HashSet<ClientSession>();
 
 	for (String name : names) {
 	    ClientSession session = new DummyClientSession(name);
@@ -538,7 +538,7 @@ public class TestChannelServiceImpl extends TestCase {
 	createTransaction();
 	try {
 	    channel = channelService.getChannel(channelName);
-	    Collection<ClientSession> sessions = channel.getSessions();
+	    Set<ClientSession> sessions = channel.getSessions();
 	    if (sessions.size() != names.length) {
 		fail("Expected " + names.length + " sessions, got " +
 		     sessions.size());
@@ -605,7 +605,7 @@ public class TestChannelServiceImpl extends TestCase {
 	Channel channel = channelService.createChannel(
 		channelName, new DummyChannelListener(), Delivery.RELIABLE);
 	String[] names = new String[] { "foo", "bar", "baz" };
-	Collection<ClientSession> savedSessions = new ArrayList<ClientSession>();
+	Set<ClientSession> savedSessions = new HashSet<ClientSession>();
 
 	for (String name : names) {
 	    ClientSession session = new DummyClientSession(name);
@@ -616,7 +616,7 @@ public class TestChannelServiceImpl extends TestCase {
 	createTransaction();
 	try {
 	    channel = channelService.getChannel(channelName);
-	    Collection<ClientSession> sessions = channel.getSessions();
+	    Set<ClientSession> sessions = channel.getSessions();
 	    if (sessions.size() != names.length) {
 		fail("Expected " + names.length + " sessions, got " +
 		     sessions.size());
@@ -679,7 +679,7 @@ public class TestChannelServiceImpl extends TestCase {
 	Channel channel = channelService.createChannel(
 		channelName, new DummyChannelListener(), Delivery.RELIABLE);
 	String[] names = new String[] { "foo", "bar", "baz" };
-	Collection<ClientSession> savedSessions = new ArrayList<ClientSession>();
+	Set<ClientSession> savedSessions = new HashSet<ClientSession>();
 
 	for (String name : names) {
 	    ClientSession session = new DummyClientSession(name);
@@ -690,7 +690,7 @@ public class TestChannelServiceImpl extends TestCase {
 	createTransaction();
 	try {
 	    channel = channelService.getChannel(channelName);
-	    Collection<ClientSession> sessions = channel.getSessions();
+	    Set<ClientSession> sessions = channel.getSessions();
 	    if (sessions.size() != names.length) {
 		fail("Expected " + names.length + " sessions, got " +
 		     sessions.size());
@@ -793,7 +793,7 @@ public class TestChannelServiceImpl extends TestCase {
 	Channel channel = channelService.getChannel("testy");
 	ClientSession savedSession = new DummyClientSession("getSessionTest");
 	channel.join(savedSession,  null);
-	Collection<ClientSession> sessions = channel.getSessions();
+	Set<ClientSession> sessions = channel.getSessions();
 	if (sessions.isEmpty()) {
 	    fail("Expected non-empty collection");
 	}
@@ -862,7 +862,7 @@ public class TestChannelServiceImpl extends TestCase {
     public void testChannelSendToMultiplelNoTxn() throws Exception {
 	Channel channel = channelService.getChannel("testy");
 	txn.commit();
-	Collection<ClientSession> sessions = new ArrayList<ClientSession>();
+	Set<ClientSession> sessions = new HashSet<ClientSession>();
 	sessions.add(new DummyClientSession("dummy"));
 	try {
 	    channel.send(sessions, testMessage);
@@ -875,7 +875,7 @@ public class TestChannelServiceImpl extends TestCase {
     public void testChannelSendToMultipleClosedChannel() {
 	Channel channel = channelService.getChannel("testy");
 	channel.close();
-	Collection<ClientSession> sessions = new ArrayList<ClientSession>();
+	Set<ClientSession> sessions = new HashSet<ClientSession>();
 	sessions.add(new DummyClientSession("dummy"));
 	try {
 	    channel.send(sessions, testMessage);

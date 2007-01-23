@@ -1,7 +1,7 @@
 package com.sun.sgs.app;
 
 import java.io.Serializable;
-import java.util.Collection;
+import java.util.Set;
 
 /**
  * Interface representing a communication group, a
@@ -159,19 +159,19 @@ public interface Channel {
     boolean hasSessions();
 
     /**
-     * Returns a collection containing the client sessions joined to
+     * Returns a set containing the client sessions joined to
      * this channel.
      *
      * <p>Note: This operation may be expensive, so it should be used
      * judiciously.
      * 
-     * @return a collection containing the sessions joined to this channel
+     * @return a set containing the sessions joined to this channel
      *
      * @throws IllegalStateException if this channel is closed
      * @throws TransactionException if the operation failed because of
      * a problem with the current transaction
      */
-    Collection<ClientSession> getSessions();
+    Set<ClientSession> getSessions();
 
     /**
      * Sends the message contained in the specified byte array to all
@@ -210,7 +210,7 @@ public interface Channel {
 
     /**
      * Sends a message contained in the specified byte array to the
-     * client sessions in the specified collection.  Any specified
+     * client sessions in the specified set.  Any specified
      * recipient sessions that are not currently joined to the channel
      * are ignored.
      *
@@ -218,14 +218,14 @@ public interface Channel {
      * this method; if the byte array is modified, then this method
      * may have unpredictable results.
      *
-     * @param recipients a collection of recipient sessions
+     * @param recipients a set of recipient sessions
      * @param message a message
      *
      * @throws IllegalStateException if this channel is closed
      * @throws TransactionException if the operation failed because of
      * a problem with the current transaction
      */
-    void send(Collection<ClientSession> recipients, byte[] message);
+    void send(Set<ClientSession> recipients, byte[] message);
 
     /**
      * Closes this channel and removes its named binding.  If this

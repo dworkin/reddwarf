@@ -9,9 +9,8 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -58,8 +57,8 @@ final class ChannelState implements ManagedObject, Serializable {
      * Returns a collection containing the client sessions joined to
      * the channel represented by this state.
      */
-    Collection<ClientSession> getSessions() {
-	Collection<ClientSession> collection = new ArrayList<ClientSession>();
+    Set<ClientSession> getSessions() {
+	Set<ClientSession> collection = new HashSet<ClientSession>();
 	for (ClientSession session : listeners.keySet()) {
 	    collection.add(session);
 	}
@@ -73,8 +72,8 @@ final class ChannelState implements ManagedObject, Serializable {
      * 
      * @param sessionId the sessionId to exclude
      */
-    Collection<ClientSession> getSessionsExcludingId(byte[] sessionId) {
-	Collection<ClientSession> collection = new ArrayList<ClientSession>();
+    Set<ClientSession> getSessionsExcludingId(byte[] sessionId) {
+	Set<ClientSession> collection = new HashSet<ClientSession>();
 	for (ClientSession session : listeners.keySet()) {
             try {
                 if (! sessionId.equals(session.getSessionId())) {
