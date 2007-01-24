@@ -54,7 +54,7 @@ public interface ClientChannel {
      * this method; if the byte array is modified, then this method
      * may have unpredictable results.
      *
-     * @param a message data to send
+     * @param message a message to send
      *
      * @throws IllegalStateException if the sender is not a member of
      *         this channel

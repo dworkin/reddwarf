@@ -1,5 +1,5 @@
 /**
- * Defines the interfaces that will become the pluggable transport
- * and protocol layer of the SGS client framework for JavaSE.
+ * Defines the interfaces for client communication with the
+ * Sun Game Server.
  */
 package com.sun.sgs.impl.client.comm;

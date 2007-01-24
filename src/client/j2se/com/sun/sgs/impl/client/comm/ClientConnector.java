@@ -5,8 +5,6 @@ import java.util.Properties;
 
 /**
  * An abstract mechanism for actively initiating a {@link ClientConnection}.
- *
- * @author Sten Anderson
  */
 public abstract class ClientConnector
 {
@@ -15,11 +13,11 @@ public abstract class ClientConnector
         new com.sun.sgs.impl.client.simple.SimpleConnectorFactory();
 
     /**
-     * Create a {@code ClientConnector} according to the given
+     * Creates a {@code ClientConnector} according to the given
      * {@code properties}.
      *
      * @param properties which affect the implementation of
-     *        ClientConnector returned.
+     *        {@code ClientConnector} returned
      * @return a {@code ClientConnector}
      */
     public static ClientConnector create(Properties properties) {
@@ -27,10 +25,10 @@ public abstract class ClientConnector
     }
 
     /**
-     * Set the {@link ClientConnectorFactory} that will be used
+     * Sets the {@link ClientConnectorFactory} that will be used
      * to create new {@code ClientConnector}s.
      *
-     * @param factory the factory to create new ClientConnectors.
+     * @param factory the factory to create new {@code ClientConnector}s
      */
     protected static void setConnectorFactory(ClientConnectorFactory factory) {
 	theSingletonFactory = factory;
@@ -44,26 +42,26 @@ public abstract class ClientConnector
     }
 
     /**
-     * Actively initate a connection to the target remote address.
+     * Actively initates a connection to the target remote address.
      * This call is non-blocking. {@link ClientConnectionListener#connected}
      * will be called asynchronously on the {@code listener} upon successful
      * connection, or {@link ClientConnectionListener#disconnected} if it
      * fails.
      *
      * @param listener the listener for all IO events on the
-     *        connection, including the result of the connection attempt.
+     *        connection, including the result of the connection attempt
      *
-     * @throws IOException if an IO error occurs synchronously.
+     * @throws IOException if an IO error occurs synchronously
      * @throws SecurityException if a security manager has been installed
-     *         and it does not permit access to the remote endpoint.
+     *         and it does not permit access to the remote endpoint
      */
     public abstract void connect(ClientConnectionListener listener)
             throws IOException;
 
     /**
-     * Cancels a pending connect operation on this ClientConnection.
+     * Cancels a pending connect operation on this {@code ClientConnecton}.
      *
-     * @throws IOException if an IO error occurs synchronously.
+     * @throws IOException if an IO error occurs synchronously
      */
     public abstract void cancel() throws IOException;
 

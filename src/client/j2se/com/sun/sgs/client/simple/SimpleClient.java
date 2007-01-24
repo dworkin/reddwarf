@@ -53,8 +53,8 @@ public class SimpleClient implements ServerSession {
     /** The listener for this simple client. */
     private final SimpleClientListener clientListener;
 
-    private ClientConnection connection;
-    private boolean connected = false;
+    private volatile ClientConnection clientConnection = null;
+    private volatile boolean connectionStateChanging = false;
     private SessionId sessionId;
     
     /** Reconnection key.  TODO reconnect not implemented */
@@ -99,11 +99,22 @@ public class SimpleClient implements ServerSession {
      * failure), this method may be used again to log in.
      * 
      * @param props the connection properties to use in creating the
-     *        client's session.
+     *        client's session
      *
-     * @throws IOException if a synchronous IO error occurs.
+     * @throws IOException if a synchronous IO error occurs
+     * @throws IllegalStateException if this session is already connected
+     *         or connecting
+     * @throws SecurityException if the caller does not have permission
+     *         to connect to the remote endpoint
      */
     public void login(Properties props) throws IOException {
+        synchronized (this) {
+            if (connectionStateChanging || clientConnection != null) {
+                throw new IllegalStateException(
+                    "Session already connected or connecting");
+            }
+            connectionStateChanging = true;
+        }
         ClientConnector connector = ClientConnector.create(props);
         connector.connect(connListener);
     }
@@ -120,21 +131,22 @@ public class SimpleClient implements ServerSession {
      * {@inheritDoc}
      */
     public boolean isConnected() {
-        return connected;
+        return (clientConnection != null);
     }
 
     /**
      * {@inheritDoc}
      */
     public void logout(boolean force) {
-        if (! isConnected()) {
-            clientListener.disconnected(true);
-            return;
+        synchronized (this) {
+            if (connectionStateChanging || clientConnection == null) {
+                throw new IllegalStateException("Client not connected");
+            }
+            connectionStateChanging = true;
         }
-        connected = false;
         if (force) {
             try {
-                connection.disconnect();
+                clientConnection.disconnect();
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -148,7 +160,7 @@ public class SimpleClient implements ServerSession {
             } catch (IOException e) {
                 e.printStackTrace();
                 try {
-                    connection.disconnect();
+                    clientConnection.disconnect();
                 } catch (IOException e2) {
                     e2.printStackTrace();
                 }
@@ -169,7 +181,7 @@ public class SimpleClient implements ServerSession {
     }
 
     private void sendRaw(byte[] data) throws IOException {
-        connection.sendMessage(data);
+        clientConnection.sendMessage(data);
     }
     
     void checkConnected() {
@@ -180,9 +192,6 @@ public class SimpleClient implements ServerSession {
 
     /**
      * Receives callbacks on the associated {@code ClientConnection}.
-     * 
-     * @author Sten Anderson
-     * @version 1.0
      */
     final class SimpleClientConnectionListener
         implements ClientConnectionListener
@@ -192,12 +201,13 @@ public class SimpleClient implements ServerSession {
         /**
          * {@inheritDoc}
          */
-        public void connected(@SuppressWarnings("hiding")
-        ClientConnection connection)
+        public void connected(ClientConnection connection)
         {
             System.out.println("SimpleClient: connected");
-            connected = true;
-            SimpleClient.this.connection = connection;
+            synchronized (SimpleClient.this) {
+                connectionStateChanging = false;
+                clientConnection = connection;
+            }
 
             PasswordAuthentication authentication =
                 clientListener.getPasswordAuthentication(
@@ -221,7 +231,10 @@ public class SimpleClient implements ServerSession {
          * {@inheritDoc}
          */
         public void disconnected(boolean graceful, byte[] message) {
-            connected = false;
+            synchronized (SimpleClient.this) {
+                clientConnection = null;
+                connectionStateChanging = false;
+            }
             clientListener.disconnected(graceful);
         }
 
@@ -271,7 +284,7 @@ public class SimpleClient implements ServerSession {
 
                 case ProtocolMessage.RECONNECT_FAILURE:
                     try {
-                        connection.disconnect();
+                        clientConnection.disconnect();
                     } catch (IOException e) {
                         // TODO
                         e.printStackTrace();
@@ -280,7 +293,7 @@ public class SimpleClient implements ServerSession {
 
                 case ProtocolMessage.LOGOUT_SUCCESS:
                     try {
-                        connection.disconnect();
+                        clientConnection.disconnect();
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -302,8 +315,11 @@ public class SimpleClient implements ServerSession {
                     System.err.println("joining channel " + channelName);
                     SimpleClientChannel channel =
                         new SimpleClientChannel(channelName);
-                    channels.put(channelName, channel);
-                    channel.joined();
+                    if (channels.putIfAbsent(channelName, channel) == null) {
+                        channel.joined();
+                    } else {
+                        // TODO log that we were already a member
+                    }
                     break;
                 }
 
@@ -313,6 +329,8 @@ public class SimpleClient implements ServerSession {
                         channels.remove(channelName);
                     if (channel != null) {
                         channel.left();
+                    } else {
+                        // TODO log that we were not a member
                     }
                     break;
                 }

@@ -32,7 +32,7 @@ public interface ClientChannelListener {
      * 
      * @param channel a client channel
      * @param sender sender's session identifier, or {@code null}
-     * @param message a byte array containing a message.
+     * @param message a byte array containing a message
      */
     void receivedMessage(ClientChannel channel,
                          SessionId sender,

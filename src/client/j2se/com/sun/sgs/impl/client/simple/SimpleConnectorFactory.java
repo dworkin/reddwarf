@@ -2,24 +2,25 @@ package com.sun.sgs.impl.client.simple;
 
 import java.util.Properties;
 
-import com.sun.sgs.impl.client.comm.ClientConnector;
 import com.sun.sgs.impl.client.comm.ClientConnectorFactory;
 
 /**
  * A trivial ClientConnectorFactory that creates a new 
  * {@code SimpleClientConnector} each time {@code createConnector}
  * is invoked.
- * 
- * @author      Sten Anderson
- * @version     1.0
  */
 public class SimpleConnectorFactory implements ClientConnectorFactory {
 
     /**
-     * {@inheritDoc}
+     * Creates a new instance of {@link SimpleClientConnector} based on
+     * the given {@code properties}.
+     * 
+     * @param properties which affect the creation of the
+     *        {@code SimpleClientConnector} returned
+     * @return a {@code SimpleClientConnector}
      */
-    public ClientConnector createConnector(Properties props) {
-        return new SimpleClientConnector(props);
+    public SimpleClientConnector createConnector(Properties properties) {
+        return new SimpleClientConnector(properties);
     }
 
 }

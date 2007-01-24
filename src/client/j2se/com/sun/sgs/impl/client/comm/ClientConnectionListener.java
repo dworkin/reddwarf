@@ -3,10 +3,8 @@ package com.sun.sgs.impl.client.comm;
 import com.sun.sgs.client.ServerSessionListener;
 
 /**
- * Listens for communications events that occur on an associated
+ * Listener for communications events that occur on an associated
  * {@link ClientConnection}.
- *
- * @author Sten Anderson
  */
 public interface ClientConnectionListener {
 
@@ -14,7 +12,7 @@ public interface ClientConnectionListener {
      * Notifies this listener that a transport connection has
      * been established.
      *
-     * @param connection the newly-established connection.
+     * @param connection the newly-established connection
      */
     void connected(ClientConnection connection);
 
@@ -22,17 +20,17 @@ public interface ClientConnectionListener {
      * Notifies this listener that protocol data has arrived from the
      * server.
      *
-     * @param message protocol-specific message data.
+     * @param message protocol-specific message data
      */
     void receivedMessage(byte[] message);
 
     /**
      * Notifies this listener that a new session has successfully logged in.
      *
-     * @param message protocol-specific session-start data.
+     * @param message protocol-specific session-start data
      *
      * @return the listener for events on the new
-     * {@link com.sun.sgs.client.ServerSession}.
+     * {@link com.sun.sgs.client.ServerSession}
      */
     ServerSessionListener sessionStarted(byte[] message);
 
@@ -48,14 +46,14 @@ public interface ClientConnectionListener {
      * the associated session has been disconnected from the server
      * and the client must log in again.
      *
-     * @param message protocol-specific reconnection data.
+     * @param message protocol-specific reconnection data
      */
     void reconnecting(byte[] message);
 
     /**
      * Notifies this listener that a reconnection effort was successful.
      *
-     * @param message protocol-specific reconnection data.
+     * @param message protocol-specific reconnection data
      */
     void reconnected(byte[] message);
     
@@ -69,8 +67,8 @@ public interface ClientConnectionListener {
      * disconnection or network failure.
      *
      * @param graceful {@code true} if disconnection was part of graceful
-     *        logout, otherwise {@code false}.
-     * @param message protocol-specific reconnection data.
+     *        logout, otherwise {@code false}
+     * @param message protocol-specific reconnection data
      */
     void disconnected(boolean graceful, byte[] message);
 

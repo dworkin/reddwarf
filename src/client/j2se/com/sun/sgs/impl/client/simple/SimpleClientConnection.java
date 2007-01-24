@@ -18,7 +18,7 @@ import com.sun.sgs.io.IOHandler;
  * @author      Sten Anderson
  * @version     1.0
  */
-public class SimpleClientConnection implements ClientConnection, IOHandler {
+class SimpleClientConnection implements ClientConnection, IOHandler {
     
     private final ClientConnectionListener ccl;
     private IOHandle myHandle = null;
