@@ -68,7 +68,7 @@ public class ClientTest implements SimpleClientListener,
     /**
      * {@inheritDoc}
      */
-    public PasswordAuthentication getPasswordAuthentication(String prompt) {
+    public PasswordAuthentication getPasswordAuthentication() {
         PasswordAuthentication auth = new PasswordAuthentication("guest",
                 new char[] { 'g', 'u', 'e', 's', 't' });
         return auth;

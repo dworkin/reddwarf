@@ -92,9 +92,9 @@ public class BattleBoardClient
 
     // Implement SimpleClientListener
 
-    public PasswordAuthentication getPasswordAuthentication(String prompt) {
+    public PasswordAuthentication getPasswordAuthentication() {
         if (userName == null) {
-            showPrompt(prompt);
+            showPrompt("Enter username: ");
             String line = getLine();
             userName = wsRegexp.matcher(line).replaceAll("");
         }
@@ -103,6 +103,7 @@ public class BattleBoardClient
         if (userPassword != null) {
             pass = userPassword.toCharArray();
         } else {
+            showPrompt("Enter password: ");
             pass = getLine().toCharArray();
         }
         

@@ -277,11 +277,11 @@ public class ChatClient extends JFrame
     /**
      * {@inheritDoc}
      */
-    public PasswordAuthentication getPasswordAuthentication(String prompt) {
+    public PasswordAuthentication getPasswordAuthentication() {
         statusMessage.setText("Status: Validating...");
         String login = System.getProperty("login");
         if (login == null) {
-            return new ValidatorDialog(this, prompt).getPasswordAuthentication();            
+            return new ValidatorDialog(this).getPasswordAuthentication();            
         }
         String[] cred = login.split(":");
         return new PasswordAuthentication(cred[0], cred[1].toCharArray());

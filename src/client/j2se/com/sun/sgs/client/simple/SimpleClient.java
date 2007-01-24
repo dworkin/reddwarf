@@ -6,6 +6,8 @@ import java.util.Collections;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import com.sun.sgs.client.ClientChannel;
 import com.sun.sgs.client.ClientChannelListener;
@@ -18,6 +20,7 @@ import com.sun.sgs.impl.client.comm.ClientConnector;
 import com.sun.sgs.impl.client.simple.ProtocolMessage;
 import com.sun.sgs.impl.client.simple.ProtocolMessageDecoder;
 import com.sun.sgs.impl.client.simple.ProtocolMessageEncoder;
+import com.sun.sgs.impl.util.LoggerWrapper;
 
 /**
  * An implementation of {@link ServerSession} that clients can use to manage
@@ -44,17 +47,37 @@ import com.sun.sgs.impl.client.simple.ProtocolMessageEncoder;
  */
 public class SimpleClient implements ServerSession {
 
+    /** The logger for this class. */
+    private static final LoggerWrapper logger =
+        new LoggerWrapper(Logger.getLogger(SimpleClient.class.getName()));
+
+    /**
+     * The listener for the {@code ClientConnection} the session
+     * is communicating on.
+     */
     private final ClientConnectionListener connListener =
         new SimpleClientConnectionListener();
 
+    /** The map of channels this client is a member of */
     private final ConcurrentHashMap<String, SimpleClientChannel> channels =
         new ConcurrentHashMap<String, SimpleClientChannel>();
 
     /** The listener for this simple client. */
     private final SimpleClientListener clientListener;
 
-    private ClientConnection connection;
-    private boolean connected = false;
+    /**
+     * The current {@code ClientConnection}, if connected, or
+     * {@code} null if disconnected.
+     */
+    private volatile ClientConnection clientConnection = null;
+
+    /**
+     * Indicates that either a connection or disconnection attempt
+     * is in progress.
+     */
+    private volatile boolean connectionStateChanging = false;
+    
+    /** The current sessionId, if logged in. */
     private SessionId sessionId;
     
     /** Reconnection key.  TODO reconnect not implemented */
@@ -97,13 +120,37 @@ public class SimpleClient implements ServerSession {
      * <p>
      * If this client is disconnected for any reason (including login
      * failure), this method may be used again to log in.
-     * 
-     * @param props the connection properties to use in creating the
-     *        client's session.
+     * <p>
+     * The supported connection properties are:
+     * <table summary="Shows property keys and associated values">
+     * <tr><th>Key</th>
+     *     <th>Description of Associated Value</th></tr>
+     * <tr><td>{@host}</td>
+     *     <td>SGS host address <b>(required)</b></td></tr>
+     * <tr><td>{@port}</td>
+     *     <td>SGS port <b>(required)</b></td></tr>
+     * </table>
      *
-     * @throws IOException if a synchronous IO error occurs.
+     * @param props the connection properties to use in creating the
+     *        client's session
+     *
+     * @throws IOException if a synchronous IO error occurs
+     * @throws IllegalStateException if this session is already connected
+     *         or connecting
+     * @throws SecurityException if the caller does not have permission
+     *         to connect to the remote endpoint
      */
     public void login(Properties props) throws IOException {
+        synchronized (this) {
+            if (connectionStateChanging || clientConnection != null) {
+                RuntimeException re =
+                    new IllegalStateException(
+                        "Session already connected or connecting");
+                logger.logThrow(Level.FINE, re, re.getMessage());
+                throw re;
+            }
+            connectionStateChanging = true;
+        }
         ClientConnector connector = ClientConnector.create(props);
         connector.connect(connListener);
     }
@@ -120,23 +167,28 @@ public class SimpleClient implements ServerSession {
      * {@inheritDoc}
      */
     public boolean isConnected() {
-        return connected;
+        return (clientConnection != null);
     }
 
     /**
      * {@inheritDoc}
      */
     public void logout(boolean force) {
-        if (! isConnected()) {
-            clientListener.disconnected(true);
-            return;
+        synchronized (this) {
+            if (connectionStateChanging || clientConnection == null) {
+                RuntimeException re =
+                    new IllegalStateException("Client not connected");
+                logger.logThrow(Level.FINE, re, re.getMessage());
+                throw re;
+            }
+            connectionStateChanging = true;
         }
-        connected = false;
         if (force) {
             try {
-                connection.disconnect();
+                clientConnection.disconnect();
             } catch (IOException e) {
-                e.printStackTrace();
+                logger.logThrow(Level.FINE, e, "During forced logout:");
+                // ignore
             }
         } else {
             try {
@@ -146,11 +198,12 @@ public class SimpleClient implements ServerSession {
                         ProtocolMessage.LOGOUT_REQUEST);
                 sendRaw(m.getMessage());
             } catch (IOException e) {
-                e.printStackTrace();
+                logger.logThrow(Level.FINE, e, "During graceful logout:");
                 try {
-                    connection.disconnect();
+                    clientConnection.disconnect();
                 } catch (IOException e2) {
-                    e2.printStackTrace();
+                    logger.logThrow(Level.FINE, e2, "During forced logout:");
+                    // ignore
                 }
             }
         }
@@ -163,26 +216,26 @@ public class SimpleClient implements ServerSession {
         checkConnected();
         ProtocolMessageEncoder m =
             new ProtocolMessageEncoder(ProtocolMessage.APPLICATION_SERVICE,
-                ProtocolMessage.MESSAGE_SEND);
+                ProtocolMessage.SESSION_MESSAGE);
         m.writeBytes(message);
         sendRaw(m.getMessage());
     }
 
     private void sendRaw(byte[] data) throws IOException {
-        connection.sendMessage(data);
+        clientConnection.sendMessage(data);
     }
     
     void checkConnected() {
         if (!isConnected()) {
-            throw new IllegalStateException("Client not connected");
+            RuntimeException re =
+                new IllegalStateException("Client not connected");
+            logger.logThrow(Level.FINE, re, re.getMessage());
+            throw re;
         }
     }
 
     /**
      * Receives callbacks on the associated {@code ClientConnection}.
-     * 
-     * @author Sten Anderson
-     * @version 1.0
      */
     final class SimpleClientConnectionListener
         implements ClientConnectionListener
@@ -192,16 +245,16 @@ public class SimpleClient implements ServerSession {
         /**
          * {@inheritDoc}
          */
-        public void connected(@SuppressWarnings("hiding")
-        ClientConnection connection)
+        public void connected(ClientConnection connection)
         {
-            System.out.println("SimpleClient: connected");
-            connected = true;
-            SimpleClient.this.connection = connection;
+            logger.log(Level.FINER, "Connected");
+            synchronized (SimpleClient.this) {
+                connectionStateChanging = false;
+                clientConnection = connection;
+            }
 
             PasswordAuthentication authentication =
-                clientListener.getPasswordAuthentication(
-                    "Enter Username and Password");
+                clientListener.getPasswordAuthentication();
 
             ProtocolMessageEncoder m =
                 new ProtocolMessageEncoder(
@@ -212,7 +265,7 @@ public class SimpleClient implements ServerSession {
             try {
                 sendRaw(m.getMessage());
             } catch (IOException e) {
-                e.printStackTrace();
+                logger.logThrow(Level.FINE, e, "During login request:");
                 logout(true);
             }
         }
@@ -221,7 +274,11 @@ public class SimpleClient implements ServerSession {
          * {@inheritDoc}
          */
         public void disconnected(boolean graceful, byte[] message) {
-            connected = false;
+            synchronized (SimpleClient.this) {
+                clientConnection = null;
+                connectionStateChanging = false;
+            }
+            sessionId = null;
             clientListener.disconnected(graceful);
         }
 
@@ -233,62 +290,84 @@ public class SimpleClient implements ServerSession {
                 new ProtocolMessageDecoder(message);
             int versionNumber = decoder.readVersionNumber();
             if (versionNumber != ProtocolMessage.VERSION) {
-                System.err.println("Bad version, got: 0x"
-                                   + Integer.toHexString(versionNumber)
-                                   + " wanted: 0x" + ProtocolMessage.VERSION);
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.log(Level.FINE,
+                        "Bad version 0x{0}, wanted: 0x{1}",
+                        Integer.toHexString(versionNumber),
+                        Integer.toHexString(ProtocolMessage.VERSION));
+                }
                 return;
             }
             int service = decoder.readServiceNumber();
             int command = decoder.readCommand();
-            /*
-            System.out.println("SimpleClient messageReceived: "
-                               + message.length + " command 0x"
-                               + Integer.toHexString(command));
-                               */
+            
+            if (logger.isLoggable(Level.FINER)) {
+                logger.log(Level.FINER,
+                    "Received {0,number,#} byte message, command 0x{1}",
+                    message.length,
+                    Integer.toHexString(command));
+            }
+
             switch (service) {
 
             // Handle "Application Service" messages
             case ProtocolMessage.APPLICATION_SERVICE:
                 switch (command) {
                 case ProtocolMessage.LOGIN_SUCCESS:
-                    System.out.println("logging in");
+                    logger.log(Level.FINER, "Logged in");
                     sessionId = SessionId.fromBytes(decoder.readBytes());
                     reconnectKey = decoder.readBytes();
                     clientListener.loggedIn();
                     break;
 
                 case ProtocolMessage.LOGIN_FAILURE:
+                    logger.log(Level.FINER, "Login failed");
                     clientListener.loginFailed(decoder.readString());
                     break;
 
-                case ProtocolMessage.MESSAGE_SEND:
+                case ProtocolMessage.SESSION_MESSAGE:
+                    logger.log(Level.FINEST, "Direct receive");
                     clientListener.receivedMessage(decoder.readBytes());
                     break;
 
                 case ProtocolMessage.RECONNECT_SUCCESS:
+                    logger.log(Level.FINER, "Reconnected");
                     clientListener.reconnected();
                     break;
 
                 case ProtocolMessage.RECONNECT_FAILURE:
                     try {
-                        connection.disconnect();
+                        logger.log(Level.FINER, "Reconnect failed");
+                        clientConnection.disconnect();
                     } catch (IOException e) {
-                        // TODO
-                        e.printStackTrace();
+                        if (logger.isLoggable(Level.FINE)) {
+                            logger.logThrow(Level.FINE, e,
+                                "Disconnecting a failed reconnect");
+                        }
+                        // ignore
                     }
                     break;
 
                 case ProtocolMessage.LOGOUT_SUCCESS:
+                    logger.log(Level.FINER, "Logged out gracefully");
                     try {
-                        connection.disconnect();
+                        clientConnection.disconnect();
                     } catch (IOException e) {
-                        e.printStackTrace();
+                        if (logger.isLoggable(Level.FINE)) {
+                            logger.logThrow(Level.FINE, e,
+                                "Disconnecting after graceful logout");
+                        }
+                        // ignore
                     }
                     break;
 
                 default:
-                    System.err.println("Unknown opcode: 0x"
-                            + Integer.toHexString(command));
+                    if (logger.isLoggable(Level.FINE)) {
+                        logger.log(Level.FINE,
+                            "Unknown opcode: 0x{0}",
+                            Integer.toHexString(command));
+                    }
+                    // TODO disconnect?
                     break;
                 }
                 break;
@@ -298,31 +377,49 @@ public class SimpleClient implements ServerSession {
                 switch (command) {
 
                 case ProtocolMessage.CHANNEL_JOIN: {
+                    logger.log(Level.FINER, "Channel join");
                     String channelName = decoder.readString();
-                    System.err.println("joining channel " + channelName);
                     SimpleClientChannel channel =
                         new SimpleClientChannel(channelName);
-                    channels.put(channelName, channel);
-                    channel.joined();
+                    if (channels.putIfAbsent(channelName, channel) == null) {
+                        channel.joined();
+                    } else {
+                        if (logger.isLoggable(Level.FINE)) {
+                            logger.log(Level.FINE,
+                                "Cannot leave channel {0}: already a member",
+                                channelName);
+                        }
+                    }
                     break;
                 }
 
                 case ProtocolMessage.CHANNEL_LEAVE: {
+                    logger.log(Level.FINER, "Channel leave");
                     String channelName = decoder.readString();
                     SimpleClientChannel channel =
                         channels.remove(channelName);
                     if (channel != null) {
                         channel.left();
+                    } else {
+                        if (logger.isLoggable(Level.FINE)) {
+                            logger.log(Level.FINE,
+                                "Cannot leave channel {0}: not a member",
+                                channelName);
+                        }
                     }
                     break;
                 }
 
                 case ProtocolMessage.CHANNEL_MESSAGE:
+                    logger.log(Level.FINEST, "Channel recv");
                     String channelName = decoder.readString();
                     SimpleClientChannel channel = channels.get(channelName);
                     if (channel == null) {
-                        System.err.println("No channel found for '"
-                                           + channelName + "'");
+                        if (logger.isLoggable(Level.FINE)) {
+                            logger.log(Level.FINE,
+                                "Ignore message on channel {0}: not a member",
+                                channelName);
+                        }
                         return;
                     }
                     // TODO: discard sequence number for now, we're always
@@ -337,15 +434,23 @@ public class SimpleClient implements ServerSession {
                     break;
 
                 default:
-                    System.err.println("Unknown opcode: 0x"
-                            + Integer.toHexString(command));
+                    if (logger.isLoggable(Level.FINE)) {
+                        logger.log(Level.FINE,
+                            "Unknown opcode: 0x{0}",
+                            Integer.toHexString(command));
+                    }
+                    // TODO disconnect?
                     break;
                 }
                 break;
 
             default:
-                System.err.println("Unknown service: 0x"
-                        + Integer.toHexString(service));
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.log(Level.FINE,
+                        "Unknown service: 0x{0}",
+                        Integer.toHexString(service));
+                }
+                // TODO disconnect?
                 break;
             }
         }
@@ -354,24 +459,33 @@ public class SimpleClient implements ServerSession {
          * {@inheritDoc}
          */
         public void reconnected(byte[] message) {
-            throw new UnsupportedOperationException(
-                "Not supported by SimpleClient");
+            RuntimeException re =
+                new UnsupportedOperationException(
+                        "Not supported by SimpleClient");
+            logger.logThrow(Level.FINE, re, re.getMessage());
+            throw re;
         }
 
         /**
          * {@inheritDoc}
          */
         public void reconnecting(byte[] message) {
-            throw new UnsupportedOperationException(
-                "Not supported by SimpleClient");
+            RuntimeException re =
+                new UnsupportedOperationException(
+                        "Not supported by SimpleClient");
+            logger.logThrow(Level.FINE, re, re.getMessage());
+            throw re;
         }
 
         /**
          * {@inheritDoc}
          */
         public ServerSessionListener sessionStarted(byte[] message) {
-            throw new UnsupportedOperationException(
-                "Not supported by SimpleClient");
+            RuntimeException re =
+                new UnsupportedOperationException(
+                        "Not supported by SimpleClient");
+            logger.logThrow(Level.FINE, re, re.getMessage());
+            throw re;
         }
     }
 
@@ -431,7 +545,11 @@ public class SimpleClient implements ServerSession {
 
         void left() {
             if (! joined) {
-                System.err.println("Already left channel " + name);
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.log(Level.FINE,
+                        "Cannot leave channel {0}: not a member",
+                        name);
+                }
                 return;
             }
             joined = false;
@@ -443,7 +561,11 @@ public class SimpleClient implements ServerSession {
         
         void receivedMessage(SessionId sid, byte[] message) {
             if (! joined) {
-                System.err.println("Not a member of channel " + name);
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.log(Level.FINE,
+                        "Ignore message on channel {0}: not a member",
+                        name);
+                }
                 return;
             }
             listener.receivedMessage(this, sid, message);
@@ -453,7 +575,11 @@ public class SimpleClient implements ServerSession {
             throws IOException
         {
             if (! joined) {
-                System.err.println("Not a member of channel " + name);
+                if (logger.isLoggable(Level.FINE)) {
+                    logger.log(Level.FINE,
+                        "Cannot send on channel {0}: not a member",
+                        name);
+                }
                 return;
             }
             ProtocolMessageEncoder m =

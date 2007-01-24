@@ -54,7 +54,7 @@ public interface ClientChannel {
      * this method; if the byte array is modified, then this method
      * may have unpredictable results.
      *
-     * @param message the data to send
+     * @param message a message to send
      *
      * @throws IllegalStateException if the sender is not a member of
      *         this channel
@@ -72,7 +72,7 @@ public interface ClientChannel {
      * may have unpredictable results.
      *
      * @param recipient the channel member that should receive the message
-     * @param message the data to send
+     * @param message a message to send
      *
      * @throws IllegalStateException if the sender is not a member of
      *         this channel
@@ -91,7 +91,7 @@ public interface ClientChannel {
      * 
      * @param recipients the subset of channel members that should receive
      *        the message
-     * @param message the data to send
+     * @param message a message to send
      *
      * @throws IllegalStateException if the sender is not a member of this
      *         channel

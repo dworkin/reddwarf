@@ -40,7 +40,7 @@ public interface ServerSession {
      * @param message a message
      *
      * @throws IOException if this session is disconnected or an IO error
-     *         occurs.
+     *         occurs
      */
     void send(byte[] message) throws IOException;
 

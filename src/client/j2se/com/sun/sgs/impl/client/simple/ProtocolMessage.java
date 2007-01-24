@@ -31,14 +31,6 @@ public interface ProtocolMessage {
     final byte CHANNEL_SERVICE = 0x02;
 
     /**
-     * Operation code unknown.
-     * <ul>
-     * <li> (byte) operation code
-     * </ul>
-     */
-    final byte OPCODE_UNKNOWN = 0x0f;
-
-    /**
      * Login request.
      * <ul>
      * <li> (String) name
@@ -73,7 +65,7 @@ public interface ProtocolMessage {
      * <li> (byte[]) reconnectionKey
      * </ul>
      */
-    final byte RECONNECTION_REQUEST = 0x20;
+    final byte RECONNECT_REQUEST = 0x20;
 
     /**
      * Reconnect success (reconnection request acknowledgment).
@@ -93,7 +85,7 @@ public interface ProtocolMessage {
     final byte RECONNECT_FAILURE = 0x22;
 
     /**
-     * Message send.
+     * Session message.
      *
      * <p> TBD: do we want to allow messages longer than 2^16 bytes?
      *
@@ -102,7 +94,7 @@ public interface ProtocolMessage {
      * <li> (byte[]) message
      * </ul>
      */
-    final byte MESSAGE_SEND = 0x30;
+    final byte SESSION_MESSAGE = 0x30;
 
 
     /**
@@ -114,11 +106,6 @@ public interface ProtocolMessage {
      * Logout success (logout request acknowledgment).
      */
     final byte LOGOUT_SUCCESS = 0x41;
-
-    /**
-     * Session disconnect (logout request acknowledgment, or forced disconnect).
-     */
-    final byte SESSION_DISCONNECT = 0x42;
 
     /**
      * Channel join.

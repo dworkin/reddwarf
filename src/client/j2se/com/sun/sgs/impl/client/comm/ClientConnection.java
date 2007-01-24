@@ -3,9 +3,7 @@ package com.sun.sgs.impl.client.comm;
 import java.io.IOException;
 
 /**
- * Represents an abstract connection to an SGS server.
- *
- * @author Sten Anderson
+ * Represents an abstract network connection with the Sun Game Server.
  */
 public interface ClientConnection {
 
@@ -16,10 +14,10 @@ public interface ClientConnection {
      * method; if the byte array is modified, then this method may have
      * unpredictable results.
      *
-     * @param message the message data to send.
+     * @param message the message data to send
      *
      * @throws IOException if there was a synchronous problem sending
-     *         the message.
+     *         the message
      */
     void sendMessage(byte[] message) throws IOException;
 
@@ -29,7 +27,7 @@ public interface ClientConnection {
      * {@link ClientConnectionListener#disconnected} is invoked.
      *
      * @throws IOException if there was a synchronous problem closing
-     *         the connection.
+     *         the connection
      */
     void disconnect() throws IOException;
 

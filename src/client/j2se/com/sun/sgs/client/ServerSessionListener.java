@@ -80,7 +80,7 @@ public interface ServerSessionListener {
      * 
      * @param graceful {@code true} if disconnection was due to the
      *        associated client gracefully logging out, and
-     *        {@code false} otherwise.
+     *        {@code false} otherwise
      */
     // TODO perhaps this should additionally take byte[] message bubbled
     // up from the ClientConnectionListener with the reason for disconnection.

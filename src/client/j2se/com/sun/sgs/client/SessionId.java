@@ -13,7 +13,7 @@ public abstract class SessionId {
 
     /**
      * Returns a session identifier whose representation is contained in the
-     * specified byte buffer.
+     * specified byte array.
      * 
      * @param id a byte array containing a session identifier
      * @return a session identifier
@@ -28,7 +28,7 @@ public abstract class SessionId {
      * Returns a byte array containing the representation of this session
      * identifier.
      * 
-     * @return a read-only byte buffer containing the representation of this
+     * @return a byte array containing the representation of this
      *         session identifier
      */
     public abstract byte[] toBytes();

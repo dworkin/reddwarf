@@ -31,7 +31,7 @@ public class ValidatorDialog extends JDialog
 
     private PasswordAuthentication passwordAuth;
 
-    public ValidatorDialog(Frame parent, String prompt) {
+    public ValidatorDialog(Frame parent) {
         super(parent, "Login Dialog", true);
         
         actionSemaphore = new Semaphore(0);

@@ -160,7 +160,7 @@ public class SimpleServer implements IOHandler {
                 messageEncoder.writeString("Bad password");
             }
             sendMessage(handle, messageEncoder);
-        } else if (command == MESSAGE_SEND) {
+        } else if (command == SESSION_MESSAGE) {
             assert service == APPLICATION_SERVICE;
             String serverMessage = messageDecoder.readString();
             System.out.println("Received general server message: "
