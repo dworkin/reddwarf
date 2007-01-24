@@ -182,8 +182,7 @@ public class SimpleClientTestUI extends JFrame {
         /**
          * {@inheritDoc}
          */
-        public PasswordAuthentication getPasswordAuthentication(
-                String prompt)
+        public PasswordAuthentication getPasswordAuthentication()
         {
             JTextField usernameField = new JTextField("sten");
             JPasswordField passwordField = new JPasswordField("secret");

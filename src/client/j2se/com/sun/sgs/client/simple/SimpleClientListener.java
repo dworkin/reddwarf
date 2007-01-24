@@ -19,11 +19,10 @@ public interface SimpleClientListener extends ServerSessionListener {
     /**
      * Requests a login credential for the client associated with this
      * listener.
-     * 
-     * @param prompt a login prompt
+     *
      * @return a login credential for the client
      */
-    PasswordAuthentication getPasswordAuthentication(String prompt);
+    PasswordAuthentication getPasswordAuthentication();
 
     /**
      * Notifies this listener that a session has been established with the

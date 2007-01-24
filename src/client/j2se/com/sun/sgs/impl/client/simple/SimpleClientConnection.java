@@ -1,9 +1,12 @@
 package com.sun.sgs.impl.client.simple;
 
 import java.io.IOException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import com.sun.sgs.impl.client.comm.ClientConnection;
 import com.sun.sgs.impl.client.comm.ClientConnectionListener;
+import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
 
@@ -19,6 +22,11 @@ import com.sun.sgs.io.IOHandler;
  * @version     1.0
  */
 class SimpleClientConnection implements ClientConnection, IOHandler {
+
+    /** The logger for this class. */
+    private static final LoggerWrapper logger =
+        new LoggerWrapper(Logger.getLogger(
+                SimpleClientConnection.class.getName()));
     
     private final ClientConnectionListener ccl;
     private IOHandle myHandle = null;
@@ -36,7 +44,10 @@ class SimpleClientConnection implements ClientConnection, IOHandler {
      */
     public void disconnect() throws IOException {
         if (myHandle == null) {
-            throw new IllegalStateException("not connected");
+            RuntimeException re =
+                new IllegalStateException("Not connected");
+            logger.logThrow(Level.FINE, re, re.getMessage());
+            throw re;
         }
         myHandle.close();
     }
@@ -45,14 +56,15 @@ class SimpleClientConnection implements ClientConnection, IOHandler {
      * {@inheritDoc}
      */
     public void sendMessage(byte[] message) {
-        /*
-        System.err.println("SimpleClientConnection: sendMessage: " +
-                HexDumper.format(message));
-        */
+        if (logger.isLoggable(Level.FINEST)) {
+            // FIXME comment back in when HexDumper is committed
+            //logger.log(Level.FINEST, "send on {0}: {1}",
+            //    myHandle, HexDumper.format(message));
+        }
 	try {
             myHandle.sendBytes(message);
-        } catch (IOException ioe) {
-            ioe.printStackTrace();
+        } catch (IOException e) {
+            logger.logThrow(Level.FINE, e, "Send failed:");
         }
     }
 
@@ -65,7 +77,9 @@ class SimpleClientConnection implements ClientConnection, IOHandler {
      * {@code ClientConnectionListener}.
      */
     public void connected(IOHandle handle) {
-        System.err.println("SimpleClientConnection: connected: " + handle);
+        if (logger.isLoggable(Level.FINER)) {
+            logger.log(Level.FINER, "connected: {0}", handle);
+        }
         this.myHandle = handle;
         ccl.connected(this);
     }
@@ -77,8 +91,10 @@ class SimpleClientConnection implements ClientConnection, IOHandler {
      * {@code ClientConnectionListener}.
      */
     public void disconnected(IOHandle handle) {
+        if (logger.isLoggable(Level.FINER)) {
+            logger.log(Level.FINER, "disconnected: {0}", handle);
+        }
         assert handle.equals(this.myHandle);
-        System.err.println("SimpleClientConnection: disconnected: " + handle);
         // TODO what is graceful?
         ccl.disconnected(true, null);
     }
@@ -87,9 +103,12 @@ class SimpleClientConnection implements ClientConnection, IOHandler {
      * {@inheritDoc}
      */
     public void exceptionThrown(IOHandle handle, Throwable exception) {
+        if (logger.isLoggable(Level.FINER)) {
+            logger.logThrow(Level.FINER, exception,
+                    "exception on: {0}: ", handle);
+        }
         assert handle.equals(this.myHandle);
-        System.err.println("SimpleClientConnection: exceptionThrown");
-        exception.printStackTrace();
+
         // TODO should we take any action here?  Bubble this up
         // to the CCL somehow?
     }
@@ -101,6 +120,11 @@ class SimpleClientConnection implements ClientConnection, IOHandler {
      * associated {@code ClientConnectionListener}.
      */
     public void bytesReceived(IOHandle handle, byte[] message) {
+        if (logger.isLoggable(Level.FINEST)) {
+            // FIXME comment back in when HexDumper is committed
+            //logger.log(Level.FINEST, "recv on {0}: {1}",
+            //    handle, HexDumper.format(message));
+        }
         assert handle.equals(this.myHandle);
         ccl.receivedMessage(message);
     }
