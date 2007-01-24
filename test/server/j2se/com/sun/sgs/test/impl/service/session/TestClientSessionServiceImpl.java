@@ -92,7 +92,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     /** Properties for the session service. */
     private static Properties serviceProps = createProperties(
 	"com.sun.sgs.appName", "TestClientSessionServiceImpl",
-	"com.sun.sgs.port", Integer.toString(PORT));
+	"com.sun.sgs.app.port", Integer.toString(PORT));
 
     /** Properties for creating the shared database. */
     private static Properties dbProps = createProperties(
