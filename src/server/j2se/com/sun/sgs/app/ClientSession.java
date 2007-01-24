@@ -5,18 +5,18 @@ import java.io.Serializable;
 /**
  * Interface representing a single, connected login session between a
  * client and the server.  Classes that implement
- * <code>ClientSession</code> must also implement {@link Serializable}.
+ * {@code ClientSession} must also implement {@link Serializable}.
  *
  * <p>When a client logs in, the application's {@link
  * AppListener#loggedIn(ClientSession) AppListener.loggedIn} method is
- * invoked with a new <code>ClientSession</code> instance which
+ * invoked with a new {@code ClientSession} instance which
  * represents the current connection between that client and the
  * server.  The application should register a {@link
  * ClientSessionListener} for each session logged in, so that it can
  * receive notification when a client session sends a message, is
  * disconnected, or logs out.
  *
- * <p>A <code>ClientSession</code> is used to identify a client that is
+ * <p>A {@code ClientSession} is used to identify a client that is
  * logged in, to send messages to that client, to register a listener
  * to receive messages sent by that client, and to forcibly disconnect
  * that client from the server.
@@ -30,14 +30,14 @@ import java.io.Serializable;
  * a connection to the client cannot be re-established in a timely manner
  * </ul>
  *
- * <p>If a client associated with a <code>ClientSession</code> becomes
+ * <p>If a client associated with a {@code ClientSession} becomes
  * disconnected due to one of these conditions, the {@link
  * ClientSessionListener#disconnected(boolean) disconnected} method is
  * invoked on that session's registered
- * <code>ClientSessionListener</code> with a <code>boolean</code> that
- * if <code>true</code> indicates the client logged out gracefully.
+ * {@code ClientSessionListener} with a {@code boolean} that
+ * if {@code true} indicates the client logged out gracefully.
  *
- * <p>Once a client becomes disconnected, its <code>ClientSession</code>
+ * <p>Once a client becomes disconnected, its {@code ClientSession}
  * becomes invalid and can no longer be used to communicate with that
  * client.  When that client logs back in again, a new session is
  * established with the server.
@@ -47,10 +47,6 @@ public interface ClientSession {
     /**
      * Returns the login name used to authenticate this session.
      *
-     * <p>This method may be replaced by a <code>getUser</code> method
-     * that returns a <code>User</code> object that provides the
-     * user's login name and possibly more information.
-     *
      * @return the name used to authenticate this session
      *
      * @throws TransactionException if the operation failed because of
@@ -59,7 +55,7 @@ public interface ClientSession {
     String getName();
 
     /**
-     * Returns a byte array containing the representation of session
+     * Returns a byte array containing the representation of the session
      * identifier for this session.
      *
      * @return the representation of the session identifier for this
@@ -96,11 +92,11 @@ public interface ClientSession {
     void disconnect();
 
     /**
-     * Returns <code>true</code> if the client is connected,
-     * otherwise returns <code>false</code>.
+     * Returns {@code true} if the client is connected,
+     * otherwise returns {@code false}.
      *
-     * @return <code>true</code> if the client is connected,
-     * otherwise returns <code>false</code>
+     * @return {@code true} if the client is connected,
+     * otherwise returns {@code false}
      *
      * @throws TransactionException if the operation failed because of
      * a problem with the current transaction

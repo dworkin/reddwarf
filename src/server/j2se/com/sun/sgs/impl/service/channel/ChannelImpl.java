@@ -22,9 +22,9 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -191,7 +191,7 @@ final class ChannelImpl implements Channel, Serializable {
 	    context.getService(DataService.class).markForUpdate(state);
 	    state.removeAll();
 
-	    final Collection<ClientSession> sessions = getSessions();
+	    final Set<ClientSession> sessions = getSessions();
 
 	    int nameSize = MessageBuffer.getSize(state.name);
 	    MessageBuffer buf = new MessageBuffer(3 + nameSize);
@@ -227,10 +227,10 @@ final class ChannelImpl implements Channel, Serializable {
     }
 
     /** {@inheritDoc} */
-    public Collection<ClientSession> getSessions() {
+    public Set<ClientSession> getSessions() {
 	checkClosed();
-	Collection<ClientSession> sessions =
-	    Collections.unmodifiableCollection(state.getSessions());
+	Set<ClientSession> sessions =
+	    Collections.unmodifiableSet(state.getSessions());
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST, "getSessions returns {0}", sessions);
 	}
@@ -269,7 +269,7 @@ final class ChannelImpl implements Channel, Serializable {
 		throw new NullPointerException("null message");
 	    }
 	
-	    Collection<ClientSession> sessions = new ArrayList<ClientSession>();
+	    Set<ClientSession> sessions = new HashSet<ClientSession>();
 	    sessions.add(recipient);
 	    sendToClients(EMPTY_ID, sessions, message,
 			  context.nextSequenceNumber());
@@ -291,7 +291,7 @@ final class ChannelImpl implements Channel, Serializable {
     }
 
     /** {@inheritDoc} */
-    public void send(Collection<ClientSession> recipients,
+    public void send(Set<ClientSession> recipients,
 		     byte[] message)
     {
 	try {
@@ -453,15 +453,15 @@ final class ChannelImpl implements Channel, Serializable {
      * Forwards message to recipient sessions.
      */
     void forwardMessage(final byte[] senderId,
-            final Collection<byte[]> recipientIds,
+            final Set<byte[]> recipientIds,
             final byte[] message, final long seq)
     {
         // Build the list of recipients
-        final Collection<ClientSession> recipients;
+        final Set<ClientSession> recipients;
         if (recipientIds.size() == 0) {
             recipients = state.getSessionsExcludingId(senderId);
         } else {
-            recipients = new ArrayList<ClientSession>();
+            recipients = new HashSet<ClientSession>();
             for (byte[] sessionId : recipientIds) {
                 ClientSession session =
                     context.getService(ClientSessionService.class).
@@ -505,7 +505,7 @@ final class ChannelImpl implements Channel, Serializable {
      */
     private void forwardToSessions(
             byte[] senderId,
-            Collection<ClientSession> recipients,
+            Set<ClientSession> recipients,
             byte[] message,
             long seq,
             Delivery delivery)
@@ -607,11 +607,11 @@ final class ChannelImpl implements Channel, Serializable {
      * transaction commits.
      */
     private void sendToClients(byte[] senderId,
-			       Collection<ClientSession> sessions,
+			       Set<ClientSession> sessions,
 			       byte[] message,
 			       long sequenceNumber)
     {
-	Collection<byte[]> clients = new ArrayList<byte[]>();
+	Set<byte[]> clients = new HashSet<byte[]>();
 	for (ClientSession session : sessions) {
 	    clients.add(session.getSessionId());
 	}

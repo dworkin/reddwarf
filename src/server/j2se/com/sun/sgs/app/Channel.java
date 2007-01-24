@@ -1,12 +1,12 @@
 package com.sun.sgs.app;
 
 import java.io.Serializable;
-import java.util.Collection;
+import java.util.Set;
 
 /**
  * Interface representing a communication group, a
- * <code>Channel</code>, consisting of multiple client sessions and
- * the server.  Classes that implement <code>Channel</code> must
+ * {@code Channel}, consisting of multiple client sessions and
+ * the server.  Classes that implement {@code Channel} must
  * also implement {@link Serializable}.
  *
  * <p>A channel is created by invoking the {@link
@@ -14,16 +14,16 @@ import java.util.Collection;
  * method with a name for the channel, a {@link ChannelListener}, and
  * a {@link Delivery} requirement.  A {@link ClientSession} can
  * be added or removed from a channel using that
- * <code>Channel</code>'s {@link #join join} and {@link #leave leave}
+ * {@code Channel}'s {@link #join join} and {@link #leave leave}
  * methods respectively.  All client sessions can be removed from a
  * channel by invoking {@link #leaveAll leaveAll} on the channel.
  *
  * <p>The server can send a message to any or all client sessions
- * joined to a channel by using one of the channel's <code>send</code>
+ * joined to a channel by using one of the channel's {@code send}
  * methods.  Note that the methods of this interface are invoked
  * within the context of an executing {@link Task}; as a result, a
  * message sent to client sessions using one of the channel's
- * <code>send</code> methods will not be sent until after its
+ * {@code send} methods will not be sent until after its
  * corresponding task completes.  Messages sent on a channel will be
  * delivered according to that channel's {@link Delivery} requirement,
  * specified at channel creation time.
@@ -37,7 +37,7 @@ import java.util.Collection;
  *
  * <p>If the server needs to receive notification of messages sent by
  * an individual client session on a channel, the application can
- * specify a non-<code>null</code> {@link ChannelListener} when
+ * specify a non-{@code null} {@link ChannelListener} when
  * invoking the {@link #join join} method to add a client session to a
  * channel.
  *
@@ -52,7 +52,7 @@ import java.util.Collection;
  * joined to:
  * <ul>
  * <li> that client session is removed from the channel
- * <li> if an individual <code>ChannelListener</code> is registered
+ * <li> if an individual {@code ChannelListener} is registered
  * for that session, then that listener is unregistered from the
  * channel
  * </ul>
@@ -94,24 +94,24 @@ public interface Channel {
      * session is already joined to this channel, then no action is
      * taken.
      *
-     * <p>If the specified <code>listener</code> is
-     * non-<code>null</code>, then when the specified client session
+     * <p>If the specified {@code listener} is
+     * non-{@code null}, then when the specified client session
      * sends a message on this channel, the specified listener's {@link
      * ChannelListener#receivedMessage(Channel,ClientSession,byte[])
      * receivedMessage} method is invoked with this channel, the
      * session, and the message.  The specified listener is not
      * invoked for messages that the server sends on this channel via
-     * one of the channel's <code>send</code> methods.  If the specified
-     * listener is non-<code>null</code> then it must also be serializable.
+     * one of the channel's {@code send} methods.  If the specified
+     * listener is non-{@code null} then it must also be serializable.
      *
      * <p>Note: This operation has no effect on notifications to the
      * channel listener specified when this channel was created.
      *
      * @param session a session
-     * @param listener a channel listener, or <code>null</code>
+     * @param listener a channel listener, or {@code null}
      *
-     * @throws IllegalArgumentException if <code>listener</code> is
-     * non-<code>null</code> and is not <code>Serializable</code>
+     * @throws IllegalArgumentException if {@code listener} is
+     * non-{@code null} and is not {@code Serializable}
      * @throws IllegalStateException if this channel is closed
      * @throws TransactionException if the operation failed because of
      * a problem with the current transaction
@@ -146,11 +146,11 @@ public interface Channel {
     void leaveAll();
 
     /**
-     * Returns <code>true</code> if this channel has client sessions
-     * joined to it, otherwise returns <code>false</code>.
+     * Returns {@code true} if this channel has client sessions
+     * joined to it, otherwise returns {@code false}.
      *
-     * @return <code>true</code> if this channel has sessions joined
-     * to it, otherwise returns <code>false</code>.
+     * @return {@code true} if this channel has sessions joined
+     * to it, otherwise returns {@code false}
      *
      * @throws IllegalStateException if this channel is closed
      * @throws TransactionException if the operation failed because of
@@ -159,19 +159,19 @@ public interface Channel {
     boolean hasSessions();
 
     /**
-     * Returns a collection containing the client sessions joined to
+     * Returns a set containing the client sessions joined to
      * this channel.
      *
      * <p>Note: This operation may be expensive, so it should be used
      * judiciously.
      * 
-     * @return a collection containing the sessions joined to this channel
+     * @return a set containing the sessions joined to this channel
      *
      * @throws IllegalStateException if this channel is closed
      * @throws TransactionException if the operation failed because of
      * a problem with the current transaction
      */
-    Collection<ClientSession> getSessions();
+    Set<ClientSession> getSessions();
 
     /**
      * Sends the message contained in the specified byte array to all
@@ -210,7 +210,7 @@ public interface Channel {
 
     /**
      * Sends a message contained in the specified byte array to the
-     * client sessions in the specified collection.  Any specified
+     * client sessions in the specified set.  Any specified
      * recipient sessions that are not currently joined to the channel
      * are ignored.
      *
@@ -218,14 +218,14 @@ public interface Channel {
      * this method; if the byte array is modified, then this method
      * may have unpredictable results.
      *
-     * @param recipients a collection of recipient sessions
+     * @param recipients a set of recipient sessions
      * @param message a message
      *
      * @throws IllegalStateException if this channel is closed
      * @throws TransactionException if the operation failed because of
      * a problem with the current transaction
      */
-    void send(Collection<ClientSession> recipients, byte[] message);
+    void send(Set<ClientSession> recipients, byte[] message);
 
     /**
      * Closes this channel and removes its named binding.  If this

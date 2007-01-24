@@ -87,7 +87,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	"TestClientSessionServiceImpl.db";
 
     /** The port for the client session service. */
-    private static int PORT = 8307;
+    private static int PORT = 0;
 
     /** Properties for the session service. */
     private static Properties serviceProps = createProperties(
@@ -133,6 +133,9 @@ public class TestClientSessionServiceImpl extends TestCase {
     private TaskServiceImpl taskService;
     private DummyTaskScheduler taskScheduler;
     private DummyIdentityManager identityManager;
+
+    /** The listen port for the client session service. */
+    private int port;
 
     /** True if test passes. */
     private boolean passed;
@@ -184,6 +187,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    ClientSessionService.class, sessionService);
 	txnProxy.setComponent(
 	    ClientSessionService.class, sessionService);
+	port = sessionService.getListenPort();
 	
 	// configure channel service
 	channelService.configure(serviceRegistry, txnProxy);
@@ -266,7 +270,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     public void testConnection() throws Exception {
 	DummyClient client = new DummyClient();
 	try {
-	    client.connect(PORT);
+	    client.connect(port);
 	} catch (Exception e) {
 	    System.err.println("Exception: " + e);
 	    Throwable t = e.getCause();
@@ -283,7 +287,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	registerAppListener();
 	DummyClient client = new DummyClient();
 	try {
-	    client.connect(PORT);
+	    client.connect(port);
 	    client.login("foo", "bar");
 	} finally {
 	    if (client != null) {
@@ -296,7 +300,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	registerAppListener();
 	DummyClient client = new DummyClient();
 	try {
-	    client.connect(PORT);
+	    client.connect(port);
 	    client.login("foo", "bar");
 	    try {
 		client.login("foo", "bar");
@@ -319,7 +323,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient();
 	String name = "logout";
 	try {
-	    client.connect(PORT);
+	    client.connect(port);
 	    client.login(name, "test");
 	    client.logout();
 	    DummyClientSessionListener sessionListener =
@@ -367,7 +371,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient();
 	String name = "clientname";
 	try {
-	    client.connect(PORT);
+	    client.connect(port);
 	    client.login(name, "dummypassword");
 	    createTransaction();
 	    DummyAppListener appListener = getAppListener();
@@ -395,7 +399,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient();
 	String name = "clientname";
 	try {
-	    client.connect(PORT);
+	    client.connect(port);
 	    client.login(name, "dummypassword");
 	    createTransaction();
 	    DummyAppListener appListener = getAppListener();
@@ -424,7 +428,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient();
 	String name = "clientname";
 	try {
-	    client.connect(PORT);
+	    client.connect(port);
 	    client.login(name, "dummypassword");
 	    createTransaction();
 	    DummyAppListener appListener = getAppListener();

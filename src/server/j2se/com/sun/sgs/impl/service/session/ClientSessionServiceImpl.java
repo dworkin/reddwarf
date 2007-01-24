@@ -4,15 +4,12 @@ import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.IdentityManager;
 import com.sun.sgs.impl.io.CompleteMessageFilter;
-import com.sun.sgs.impl.io.PassthroughFilter;
-import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.IOConstants.TransportType;
+import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.util.LoggerWrapper;
-import com.sun.sgs.impl.util.MessageBuffer;
 import com.sun.sgs.impl.util.NonDurableTaskScheduler;
 import com.sun.sgs.io.IOAcceptor;
 import com.sun.sgs.io.IOAcceptorListener;
-import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
@@ -28,16 +25,13 @@ import com.sun.sgs.service.TransactionProxy;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;   
 import java.util.Properties;
-import java.util.concurrent.Callable;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -46,8 +40,8 @@ import java.util.logging.Logger;
  *
  * <p>Properties should include:
  * <ul>
- * <li><code>com.sun.sgs.appName</code>
- * <li><code>com.sun.sgs.app.port</code>
+ * <li>{@code com.sun.sgs.appName}</li>
+ * <li>{@code com.sun.sgs.app.port}</li>
  * </ul>
  */
 public class ClientSessionServiceImpl
@@ -58,7 +52,7 @@ public class ClientSessionServiceImpl
     public static final String APP_NAME_PROPERTY = "com.sun.sgs.appName";
 
     /** The property that specifies the port number. */
-    public static final String PORT_PROPERTY = "com.sun.sgs.port";
+    public static final String PORT_PROPERTY = "com.sun.sgs.app.port";
 
     /** The prefix for ClientSessionListeners bound in the data store. */
     public static final String LISTENER_PREFIX =
@@ -83,7 +77,7 @@ public class ClientSessionServiceImpl
     private final int port;
 
     /** The listener for accpeted connections. */
-    private final IOAcceptorListener listener = new Listener();
+    private final IOAcceptorListener acceptorListener = new Listener();
 
     /** The registered service listeners. */
     private final Map<Byte, ProtocolMessageListener> serviceListeners =
@@ -92,13 +86,9 @@ public class ClientSessionServiceImpl
 
     /** A map of current sessions, from session ID to ClientSessionImpl. */
     private final Map<SessionId, ClientSessionImpl> sessions =
-	Collections.synchronizedMap(new HashMap<SessionId, ClientSessionImpl>());
+	Collections.synchronizedMap(
+	    new HashMap<SessionId, ClientSessionImpl>());
 
-    /** The component registry for this application, or null if
-     * configure has not been called.
-     */
-    private ComponentRegistry registry;
-    
     /** The IOAcceptor for listening for new connections. */
     private IOAcceptor<SocketAddress> acceptor;
 
@@ -202,10 +192,9 @@ public class ClientSessionServiceImpl
 	    }
 	    
 	    synchronized (lock) {
-		if (this.registry != null) {
+		if (this.acceptor != null) {
 		    throw new IllegalArgumentException("Already configured");
 		}
-		this.registry = registry;
 		dataService = registry.getComponent(DataService.class);
 		removeListenerBindings();
 		nonDurableTaskScheduler =
@@ -217,12 +206,13 @@ public class ClientSessionServiceImpl
 		        new InetSocketAddress(port), TransportType.RELIABLE);
 		try {
                     acceptor = endpoint.createAcceptor();
-		    acceptor.listen(listener, CompleteMessageFilter.class);
+		    acceptor.listen(
+			acceptorListener, CompleteMessageFilter.class);
 		    if (logger.isLoggable(Level.CONFIG)) {
 			logger.log(
 			    Level.CONFIG,
 			    "configure: listen successful. address:{0}",
-                            acceptor.getEndpoint().getAddress());
+                            getListenPort());
 		    }
 		} catch (IOException e) {
 		    throw new RuntimeException(e);
@@ -240,24 +230,25 @@ public class ClientSessionServiceImpl
     }
 
     /**
-     * Returns the address that this service is listening on.
+     * Returns the port this service is listening on.
      *
-     * @return the address that this service is listening on
+     * @return the port this service is listening on
      */
-    public SocketAddress getAddress() {
+    public int getListenPort() {
 	synchronized (lock) {
 	    if (acceptor == null) {
-		throw new IllegalStateException("not configured");
+		throw new IllegalArgumentException("not configured");
 	    }
-	    return acceptor.getEndpoint().getAddress();
+	    return ((InetSocketAddress) acceptor.getEndpoint().getAddress()).
+		getPort();
 	}
     }
 
     /**
      * Shuts down this service.
      *
-     * @return <code>true</code> if shutdown is successful, otherwise
-     * <code>false</code>
+     * @return {@code true} if shutdown is successful, otherwise
+     * {@code false}
      */
     public boolean shutdown() {
 	if (logger.isLoggable(Level.FINEST)) {

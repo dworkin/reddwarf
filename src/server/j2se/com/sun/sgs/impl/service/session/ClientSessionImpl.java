@@ -1,6 +1,5 @@
 package com.sun.sgs.impl.service.session;
 
-import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
@@ -8,10 +7,9 @@ import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.auth.NamePasswordCredentials;
+import com.sun.sgs.impl.service.session.ClientSessionServiceImpl.Context;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.MessageBuffer;
-import com.sun.sgs.impl.kernel.ContextResolver;
-import com.sun.sgs.impl.service.session.ClientSessionServiceImpl.Context;
 import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
 import com.sun.sgs.kernel.KernelRunnable;
@@ -41,7 +39,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     
     /** Connection state. */
     private static enum State {
-	CONNECTING, CONNECTED, RECONNECTING, DISCONNECTING, DISCONNECTED };
+	CONNECTING, CONNECTED, RECONNECTING, DISCONNECTING, DISCONNECTED }
 
     /** Random number generator for generating session ids. */
     private static final Random random = new Random(getSeed());
@@ -210,11 +208,6 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     }
 
     /* -- Implement SgsClientSession -- */
-
-    /** {@inheritDoc} */
-    public long nextSequenceNumber() {
-	return sequenceNumber.getAndIncrement();
-    }
 
     /** {@inheritDoc} */
     public void sendProtocolMessage(byte[] message, Delivery delivery) {
@@ -569,7 +562,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		logger.log(
  		    Level.FINEST,
 		    "Handler.messageReceived processing opcode:{0}",
-		    Integer.toHexString((int) opcode));
+		    Integer.toHexString(opcode));
 	    }
 	    
 	    switch (opcode) {
@@ -673,7 +666,8 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	private boolean isManaged = false;
 
 	private ClientSessionListener listener;
-
+	
+	@SuppressWarnings("hiding")
 	SessionListener(ClientSessionListener listener) {
 	    assert listener != null && listener instanceof Serializable;
 	    if (listener instanceof ManagedObject) {

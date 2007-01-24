@@ -21,21 +21,21 @@ import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.NonDurableTransactionParticipant;
-import com.sun.sgs.service.Service;
 import com.sun.sgs.service.ProtocolMessageListener;
+import com.sun.sgs.service.Service;
 import com.sun.sgs.service.SgsClientSession;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.service.TransactionProxy;
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
@@ -458,7 +458,7 @@ public class ChannelServiceImpl
 			return;
 		    }
 
-		    Collection<byte[]> sessions = new ArrayList<byte[]>();
+		    Set<byte[]> sessions = new HashSet<byte[]>();
 		    if (numRecipients > 0) {
 			for (int i = 0; i < numRecipients; i++) {
 			    short idLength = buf.getShort();
@@ -519,8 +519,8 @@ public class ChannelServiceImpl
      * <p>This context maintains an internal table that maps (for the
      * channels used in the context's associated transaction) channel name
      * to channel implementation.  To create, obtain, or remove a channel
-     * within a transaction, the <code>createChannel</code>,
-     * <code>getChannel</code>, or <code>removeChannel</code> methods
+     * within a transaction, the {@code createChannel},
+     * {@code getChannel}, or {@code removeChannel} methods
      * (respectively) must be called on the context so that the proper
      * channel instances are used.
      */
@@ -671,13 +671,13 @@ public class ChannelServiceImpl
 
         private final String name;
         private final byte[] senderId;
-        private final Collection<byte[]> recipientIds;
+        private final Set<byte[]> recipientIds;
         private final byte[] message;
         private final long seq;
 
         ForwardingTask(String name,
                 byte[] senderId,
-                Collection<byte[]> recipientIds,
+                Set<byte[]> recipientIds,
                 byte[] message,
                 long seq)
         {
