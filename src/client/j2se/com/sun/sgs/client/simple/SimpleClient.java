@@ -125,9 +125,9 @@ public class SimpleClient implements ServerSession {
      * <table summary="Shows property keys and associated values">
      * <tr><th>Key</th>
      *     <th>Description of Associated Value</th></tr>
-     * <tr><td>{@host}</td>
+     * <tr><td>{@code host}</td>
      *     <td>SGS host address <b>(required)</b></td></tr>
-     * <tr><td>{@port}</td>
+     * <tr><td>{@code port}</td>
      *     <td>SGS port <b>(required)</b></td></tr>
      * </table>
      *
