@@ -3,8 +3,6 @@ package com.sun.sgs.service;
 
 import com.sun.sgs.kernel.ComponentRegistry;
 
-import java.util.Properties;
-
 
 /**
  * This is the base interface used for all services. Services support
@@ -73,7 +71,41 @@ public interface Service {
      *              transaction
      *
      * @throws IllegalStateException if this method has already been called
+     * @throws RuntimeException if there is any trouble configuring this
+     *                          <code>Service</code>
      */
     public void configure(ComponentRegistry registry, TransactionProxy proxy);
+
+    /** 
+     * Attempts to shut down this service, returning a value indicating whether
+     * the attempt was successful.  The call will throw {@link
+     * IllegalStateException} if a call to this method has already completed
+     * with a return value of <code>true</code>. <p>
+     *
+     * This method does not require a transaction, and should not be called
+     * from one because this method will typically not succeed if there are
+     * outstanding transactions. <p>
+     *
+     * Typical implementations will refuse to accept calls associated with
+     * transactions that were not joined prior to the <code>shutdown</code>
+     * call by throwing an <code>IllegalStateException</code>, and will wait
+     * for already joined transactions to commit or abort before returning,
+     * although the precise behavior is implementation specific.
+     * Implementations are also permitted, but not required, to return
+     * <code>false</code> if {@link Thread#interrupt Thread.interrupt} is
+     * called on a thread that is currently blocked within a call to this
+     * method. <p>
+     *
+     * Callers should assume that, in a worst case, this method may block
+     * indefinitely, and so should arrange to take other action (for example,
+     * calling {@link System#exit System.exit}) if the call fails to complete
+     * successfully in a certain amount of time.
+     *
+     * @return	<code>true</code> if the shut down was successful, else
+     *		<code>false</code>
+     * @throws	IllegalStateException if the <code>shutdown</code> method has
+     *		already been called and returned <code>true</code>
+     */
+    public boolean shutdown();
 
 }

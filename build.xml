@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<project name="redstar" default="build" basedir=".">
+<project name="sgs" default="build" basedir=".">
 
   <description>
-    This is the Ant file that defines the build process for the Redstar
-    revision of Project Darkstar.
+    Builds the Sun Game Server project
   </description>
 
   <!-- First load the user's properties -->
@@ -20,7 +19,7 @@
   <!-- Values for controlling compilation -->
   <property name="javac.source" value="1.5"/>
   <property name="javac.compilerargs"
-	    value="-Xlint:unchecked,deprecation"/>
+	    value="-Xlint"/>
 
   <!-- Values for building the server -->
   <property name="server.jar" location="${build.dir}/lib/sgs.jar"/>
@@ -28,31 +27,50 @@
   <!-- Values for the JavaDocs -->
   <property name="project.name" value="Sun Game Server"/>
   <property name="project.version" value="0.2"/>
+  <property name="project.build" value="December 2006"/>
   <property name="jdk.doc.api.url"
 	    value="http://java.sun.com/j2se/1.5/docs/api"/>
   <property name="jdk.package.list" value="etc/jdk5.0_package_list"/>
+
+  <property name="apidoc.server.zip"
+            location="${build.dir}/sgs-server-apidoc.zip"/>
+  <property name="apidoc.client.zip"
+            location="${build.dir}/sgs-client-apidoc.zip"/>
 
   <!-- Values for programming style checks -->
   <import file="${checkstyle.dir}/checkstyle_task.xml" optional="true"/>
 
   <!-- Values for testing -->
   <property name="test.logging" location="test/test.logging"/>
-  <property name="test.jvm.args"
-	    value="-Djava.util.logging.config.file=${test.logging}"/>
+  <property name="test.assertions" value="-enableassertions"/>
+  <property name="test.jvm.args" value="${test.assertions}"/>
   <property name="test.formatter.type" value="plain"/>
   <property name="test.showoutput" value="false"/>
   <property name="test.include" value="**/Test*.java"/>
 
+  <!-- Directory containing Berkeley DB libraries -->
+  <!-- The caller should make sure to set the bdb.lib.dir property -->
+  
+  <!-- Server class path -->
+  <path id="server.classpath">
+    <pathelement path="${build.dir}/classes/server"/>
+    <pathelement path="${bdb.lib.dir}/db.jar"/>
+  </path>
+
   <!-- TARGET DEFINITIONS -->
 
   <!-- Builds everything -->
-  <target name="all" depends="jar, javadoc, checkstyle, test"/>
+  <target name="all" depends="jar, javadoc, checkstyle, test"
+	  description="Builds everything"/>
 
   <!-- Builds a debug version of the complete project -->
-  <target name="build" depends="build-server,build-client"/>
+  <target name="build" depends="build-server,build-client"
+	  description="Builds code"/>
 
   <!-- Builds the server -->
-  <target name="build-server">
+  <target name="build-server" description="Builds server code">
+    <fail unless="bdb.lib.dir"
+	  message="The bdb.lib.dir property must be set"/>
     <mkdir dir="${build.dir}/classes/server"/>
     <depend srcdir="j2se"
 	    destdir="${build.dir}/classes/server"
@@ -60,13 +78,13 @@
 	    closure="true"/>
     <javac includeAntRuntime="no" debug="on" deprecation="on"
            srcdir="src/server/j2se" destdir="${build.dir}/classes/server"
-           classpath="${build.dir}/classes/server" source="${javac.source}">
+           classpathref="server.classpath" source="${javac.source}">
       <compilerarg value="${javac.compilerargs}"/>
     </javac>
   </target>
 
   <!-- Builds the client -->
-  <target name="build-client">
+  <target name="build-client" description="Builds client code">
     <mkdir dir="${build.dir}/classes/client"/>
     <depend srcdir="j2se"
 	    destdir="${build.dir}/classes/client"
@@ -80,7 +98,7 @@
   </target>
 
   <!-- Removes all built files and all ~ files -->
-  <target name="clean">
+  <target name="clean" description="Removes all built files and all ~ files">
     <delete dir="${build.dir}"/>
     <delete>
       <fileset dir="." defaultexcludes="no" includes="**/*~"/>
@@ -88,15 +106,23 @@
   </target>
 
   <!-- Builds the documentation -->
-  <target name="doc" depends="javadoc"/>
+  <target name="doc" depends="javadoc" description="Builds documentation"/>
 
   <!-- Build the JavaDoc from the source -->
-  <target name="javadoc" depends="javadoc-server,javadoc-client"/>
+  <target name="javadoc" depends="javadoc-api,javadoc-internal"
+	  description="Builds javadoc"/>
 
-  <!-- Build the server JavaDoc -->
-  <target name="javadoc-server" depends="build-server">
+  <target name="javadoc-internal" depends="javadoc-server,javadoc-client"
+	  description="Builds internal (full) javadoc"/>
+
+  <target name="javadoc-api" depends="javadoc-api-server,javadoc-api-client"
+	  description="Builds public API javadoc"/>
+
+  <!-- Build the internal server JavaDoc -->
+  <target name="javadoc-server" depends="build-server"
+	  description="Builds internal (full) server javadoc">
     <javadoc sourcepath="src/server/j2se" destdir="${build.dir}/javadoc/server"
-             classpath="${build.dir}/classes/server" packagenames="com.sun.*"
+             classpathref="server.classpath" packagenames="com.sun.*"
              overview="src/server/j2se/overview.html"
              windowtitle="${project.name}" doctitle="${project.name}"
 	     author="no">
@@ -117,8 +143,9 @@
     </javadoc>
   </target>
 
-  <!-- Build the client JavaDoc -->
-  <target name="javadoc-client" depends="build-client">
+  <!-- Build the internal client JavaDoc -->
+  <target name="javadoc-client" depends="build-client"
+	  description="Builds internal (full) client javadoc">
     <javadoc sourcepath="src/client/j2se" destdir="${build.dir}/javadoc/client"
              classpath="${build.dir}/classes/client" packagenames="com.sun.*"
              overview="src/client/j2se/overview.html"
@@ -141,23 +168,117 @@
     </javadoc>
   </target>
 
-  <!-- Builds the jar files for the project classes -->
-  <target name="jar" depends="jar-server"/>
+  <!-- Build the public Application API JavaDoc -->
+  <target name="javadoc-api-server" depends="build-server"
+	  description="Builds public server application API javadoc">
+    <javadoc sourcepath="src/server/j2se"
+             destdir="${build.dir}/javadoc/apidoc/sgs-server-apidoc"
+             classpathref="server.classpath"
+             packagenames="com.sun.sgs.app.*"
+             overview="src/server/j2se/overview.html"
+             windowtitle="${project.name} Server API"
+             doctitle="${project.name} Server API"
+             public="true" author="no">
+      <link href="${jdk.doc.api.url}"
+	    offline="true"
+	    packagelistLoc="${jdk.package.list}"/>
+      <footer>
+        <![CDATA[<font size="-1">Sun Game Server version ${project.version}<br/>${project.build}</font>]]>
+      </footer>
+      <bottom>
+        <![CDATA[<font size="-1">Copyright 2006 Sun Microsystems,
+        Inc. All rights reserved.
+        <p>Sun, Sun Microsystems, the Sun Logo, and Java are
+        trademarks or registered trademarks of Sun Microsystems, Inc. in
+        the US and other countries.
+        <p>THIS PRODUCT CONTAINS CONFIDENTIAL INFORMATION AND TRADE SECRETS OF SUN MICROSYSTEMS, INC. USE, DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT THE PRIOR EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC.</font>]]>
+      </bottom>
+    </javadoc>
+  </target>
 
-  <!-- builds the server jar file -->
-  <target name="jar-server" depends="build-server">
+  <!-- Build the public Client API JavaDoc -->
+  <target name="javadoc-api-client" depends="build-client"
+	  description="Builds public client API javadoc">
+    <javadoc sourcepath="src/client/j2se"
+             destdir="${build.dir}/javadoc/apidoc/sgs-client-apidoc"
+             classpath="${build.dir}/classes/client"
+             packagenames="com.sun.sgs.client,com.sun.sgs.client.simple"
+             overview="src/client/j2se/overview.html"
+             windowtitle="${project.name} Client API"
+             doctitle="${project.name} Client API"
+             public="true" author="no">
+      <link href="${jdk.doc.api.url}"
+	    offline="true"
+	    packagelistLoc="${jdk.package.list}"/>
+      <footer>
+        <![CDATA[<font size="-1">Sun Game Server version ${project.version}<br/>${project.build}</font>]]>
+      </footer>
+      <bottom>
+        <![CDATA[<font size="-1">Copyright 2006 Sun Microsystems,
+        Inc. All rights reserved.
+        <p>Sun, Sun Microsystems, the Sun Logo, and Java are
+        trademarks or registered trademarks of Sun Microsystems, Inc. in
+        the US and other countries.
+        <p>THIS PRODUCT CONTAINS CONFIDENTIAL INFORMATION AND TRADE SECRETS OF SUN MICROSYSTEMS, INC. USE, DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT THE PRIOR EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC.</font>]]>
+      </bottom>
+    </javadoc>
+  </target>
+
+  <!-- Builds the API javadoc zip files -->
+  <target name="apidoc" depends="zip-apidoc-server,zip-apidoc-client"
+	  description="Builds API javadoc zip files"/>
+
+  <!-- Builds the app API javadoc zip file -->
+  <target name="zip-apidoc-server" depends="javadoc-api-server"
+	  description="Builds app API javadoc zip file">
+    <zip destfile="${apidoc.server.zip}"
+          basedir="${build.dir}/javadoc/apidoc"
+          includes="sgs-server-apidoc/**"/>
+  </target>
+
+  <!-- Builds the client API javadoc zip file -->
+  <target name="zip-apidoc-client" depends="javadoc-api-client"
+	  description="Builds client API javadoc zip file">
+    <zip destfile="${apidoc.client.zip}"
+          basedir="${build.dir}/javadoc/apidoc"
+          includes="sgs-client-apidoc/**"/>
+  </target>
+
+  <!-- Builds the jar files for the project classes -->
+  <target name="jar" depends="jar-server"
+	  description="Builds JAR files"/>
+
+  <!-- Builds the server jar file -->
+  <target name="jar-server" depends="build-server"
+	  description="Builds server JAR files">
     <mkdir dir="${build.dir}/lib"/>
     <jar destfile="${server.jar}" basedir="${build.dir}/classes/server"/>
   </target>
 
   <!-- Checks Java coding style -->
   <target name="checkstyle"
-	  depends="build,-checkstyle.init"
+	  depends="checkstyle-client, checkstyle-server"
 	  description="Checks Java coding style">
-      <checkstyle config="${neuromancer_checks.xml}"
-		  classpath="${build.dir}/classes/server">
-	  <fileset dir="src/server/j2se"/>
-      </checkstyle>
+  </target>
+
+  <!-- Checks client Java coding style -->
+  <target name="checkstyle-client"
+	  depends="build-client,-checkstyle.init"
+	  description="Checks client Java coding style">
+    <checkstyle config="${neuromancer_checks.xml}"
+		classpath="${build.dir}/classes/client">
+      <fileset dir="src/client/j2se"/>
+    </checkstyle>
+  </target>
+
+  <!-- Checks server Java coding style -->
+  <target name="checkstyle-server"
+	  depends="build-server,-checkstyle.init"
+	  description="Checks server Java coding style">
+    <checkstyle config="${neuromancer_checks.xml}"
+		classpathref="server.classpath">
+      <fileset dir="src/server/j2se"/>
+    </checkstyle>
   </target>
 
   <!-- Verify checkstyle.dir is set, calculate checkstyle.includes, and
@@ -187,8 +308,10 @@
 	   tempdir="${build.dir}/test/output"
 	   failureproperty="tests.failed">
       <jvmarg line="${test.jvm.args}"/>
-      <jvmarg value="-Djava.library.path=${bdb.lib.dir}"/>
-      <jvmarg value="-Djava.io.tmpdir=${build.dir}/test/output"/>
+      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
+      <sysproperty key="java.io.tmpdir" file="${build.dir}/test/output"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${test.logging}"/>
       <classpath path="${build.dir}/test/classes/server;
 		       ${build.dir}/classes/server;
 		       ${bdb.lib.dir}/db.jar"/>
@@ -200,7 +323,6 @@
       <!-- <assertions>
 	     <enable/>
 	   </assertions> -->
-      <jvmarg value="-enableassertions"/>
       <formatter type="${test.formatter.type}"/>
       <batchtest todir="${build.dir}/test/output">
 	<fileset dir="test/server/j2se">

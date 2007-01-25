@@ -54,12 +54,21 @@ public final class TransactionCoordinatorImpl
 		return txn;
 	    } else {
 		throw new TransactionNotActiveException(
-		    "No transaction is active");
+		    "No transaction is active", txn.getInactiveCause());
 	    }
 	}
 
 	public void commit() throws Exception {
 	    txn.commit();
+	}
+
+	public void abort() {
+	    if (txn.isActive()) {
+		txn.abort();
+	    } else {
+		throw new TransactionNotActiveException(
+		    "No transaction is active", txn.getInactiveCause());
+	    }
 	}
     }
 

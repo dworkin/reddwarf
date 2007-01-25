@@ -16,6 +16,7 @@ import java.util.Properties;
 import junit.framework.TestCase;
 
 /** Test TransactionCoordinatorImpl */
+@SuppressWarnings("hiding")
 public class TestTransactionCoordinatorImpl extends TestCase {
 
     /** The instance to test. */
@@ -692,6 +693,39 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	assertHandleNotActive(handle);
     }
 
+    public void testAbortSupplyCause() throws Exception {
+	Exception cause = new Exception("The cause");
+	txn.abort(cause);
+	try {
+	    txn.abort();
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	    assertEquals(cause, e.getCause());
+	}
+	try {
+	    handle.getTransaction();
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	    assertEquals(cause, e.getCause());
+	}
+	try {
+	    handle.commit();
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	    assertEquals(cause, e.getCause());
+	}
+	try {
+	    handle.abort();
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	    assertEquals(cause, e.getCause());
+	}
+    }
+
     public void testAbortActiveEmpty() throws Exception {
 	txn.abort();
 	assertHandleNotActive(handle);
@@ -931,6 +965,81 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	    txn.join(participant);
 	}
 	txn.abort();
+	for (DummyTransactionParticipant participant : participants) {
+	    if (!participant.prepareReturnedTrue()) {
+		assertEquals(
+		    (participant == participants[1]
+		     ? State.ACTIVE : State.ABORTED),
+		    participant.getState());
+	    }
+	}
+	assertHandleNotActive(handle);
+    }
+
+    /* -- Test TransactionHandle.abort -- */
+
+    public void testHandleAbortActive() {
+	DummyTransactionParticipant[] participants = {
+	    new DummyNonDurableTransactionParticipant(),
+	    new DummyNonDurableTransactionParticipant() {
+		protected boolean prepareResult() { return true; }
+	    },
+	    new DummyTransactionParticipant()
+	};
+	for (TransactionParticipant participant : participants) {
+	    txn.join(participant);
+	}
+	handle.abort();
+	for (DummyTransactionParticipant participant : participants) {
+	    if (!participant.prepareReturnedTrue()) {
+		assertEquals(State.ABORTED, participant.getState());
+	    }
+	}
+	assertHandleNotActive(handle);
+    }
+
+    public void testHandleAbortActiveEmpty() throws Exception {
+	handle.abort();
+	assertHandleNotActive(handle);
+    }
+
+    public void testHandleAbortAborted() throws Exception {
+	txn.join(new DummyTransactionParticipant());
+	txn.abort();
+	try {
+	    handle.abort();
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testHandleAbortCommitted() throws Exception {
+	txn.join(new DummyTransactionParticipant());
+	handle.commit();
+	try {
+	    handle.abort();
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testHandleAbortFails() throws Exception {
+	DummyTransactionParticipant[] participants = {
+	    new DummyNonDurableTransactionParticipant(),
+	    new DummyNonDurableTransactionParticipant() {
+		public void abort(Transaction txn) {
+		    throw new RuntimeException("Commit failed");
+		}
+	    },
+	    new DummyTransactionParticipant() {
+	    }
+	};
+	for (TransactionParticipant participant : participants) {
+	    txn.join(participant);
+	}
+	handle.abort();
 	for (DummyTransactionParticipant participant : participants) {
 	    if (!participant.prepareReturnedTrue()) {
 		assertEquals(

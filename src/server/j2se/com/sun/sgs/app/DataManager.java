@@ -1,5 +1,6 @@
 package com.sun.sgs.app;
 
+import java.io.DataInput;
 import java.io.Serializable;
 
 /**
@@ -9,7 +10,10 @@ import java.io.Serializable;
  * along with all of the serializable, non-managed objects it refers to.  If a
  * managed object refers to another managed object, it must do so through an
  * instance of {@link ManagedReference}, created by the {@link #createReference
- * createReference} method. <p>
+ * createReference} method.  Attempting to store a reference to a managed
+ * object using a standard reference rather than an instance of
+ * <code>ManagedReference</code> will typically result in an {@link
+ * ObjectIOException} being thrown when the current transaction commits. <p>
  *
  * Managed objects that are bound to names, and any managed objects they refer
  * to directly or indirectly, are stored by the <code>DataManager</code>.  It
@@ -44,7 +48,7 @@ public interface DataManager {
      * @see	#markForUpdate markForUpdate
      * @see	ManagedReference#getForUpdate ManagedReference.getForUpdate
      */
-    <T extends ManagedObject> T getBinding(String name, Class<T> type);
+    <T> T getBinding(String name, Class<T> type);
 
     /**
      * Binds an object to a name, replacing any previous binding.  The object,
@@ -61,6 +65,7 @@ public interface DataManager {
      * @param	object the object
      * @throws	IllegalArgumentException if <code>object</code> does not
      *		implement {@link Serializable}
+     * @throws	ObjectNotFoundException if the object has been removed
      * @throws	TransactionException if the operation failed because of a
      *		problem with the current transaction
      */
@@ -81,6 +86,28 @@ public interface DataManager {
     void removeBinding(String name);
 
     /**
+     * Returns the next name after the specified name that has a binding, or
+     * <code>null</code> if there are no more bound names.  If
+     * <code>name</code> is <code>null</code>, then the search starts at the
+     * beginning. <p>
+     *
+     * The order of the names corresponds to the ordering of the UTF-8 encoding
+     * of the names.  To provide flexibility to the implementation, the UTF-8
+     * encoding used can be either <em>standard UTF-8</em>, as defined by the
+     * IETF in <a href="http://tools.ietf.org/html/rfc3629">RFC 3629</a>, or
+     * <em>modified UTF-8</em>, as used by Java serialization and defined by
+     * the {@link DataInput} interface.
+     *
+     * @param	name the name to search after, or <code>null</code> to start at
+     *		the beginning
+     * @return	the next name with a binding following <code>name</code>, or
+     *		<code>null</code> if there are no more bound names
+     * @throws	TransactionException if the operation failed because of a
+     *		problem with the current transaction
+     */
+    String nextBoundName(String name);
+
+    /**
      * Removes an object from the <code>DataManager</code>.  The system will
      * make an effort to flag subsequent references to the removed object
      * through {@link #getBinding getBinding} or {@link ManagedReference} by
@@ -90,6 +117,7 @@ public interface DataManager {
      * @param	object the object
      * @throws	IllegalArgumentException if <code>object</code> does not
      *		implement {@link Serializable}
+     * @throws	ObjectNotFoundException if the object has already been removed
      * @throws	TransactionException if the operation failed because of a
      *		problem with the current transaction
      */
@@ -103,6 +131,7 @@ public interface DataManager {
      * @param	object the object
      * @throws	IllegalArgumentException if <code>object</code> does not
      *		implement {@link Serializable}
+     * @throws	ObjectNotFoundException if the object has been removed
      * @throws	TransactionException if the operation failed because of a
      *		problem with the current transaction
      * @see	ManagedReference#getForUpdate ManagedReference.getForUpdate 
@@ -114,13 +143,13 @@ public interface DataManager {
      * managed references when a managed object refers to another managed
      * object, either directly or indirectly through non-managed objects.
      *
-     * @param	<T> the type of the object
      * @param	object the object
      * @return	the managed reference
      * @throws	IllegalArgumentException if <code>object</code> does not
      *		implement {@link Serializable}
+     * @throws	ObjectNotFoundException if the object has been removed
      * @throws	TransactionException if the operation failed because of a
      *		problem with the current transaction
      */
-    <T extends ManagedObject> ManagedReference<T> createReference(T object);
+    ManagedReference createReference(ManagedObject object);
 }

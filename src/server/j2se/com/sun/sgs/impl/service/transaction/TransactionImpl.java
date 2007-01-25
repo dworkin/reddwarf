@@ -33,7 +33,7 @@ final class TransactionImpl implements Transaction {
 	COMMITTING,
 	/** Completed committing */
 	COMMITTED
-    };
+    }
 
     /** The transaction ID. */
     private final long tid;
@@ -57,6 +57,12 @@ final class TransactionImpl implements Transaction {
 
     /** Whether this transaction has a durable participant. */
     private boolean hasDurableParticipant = false;
+
+    /**
+     * The exception that caused the transaction to be aborted, or null if no
+     * cause was provided or if no abort occurred.
+     */
+    private Throwable abortCause = null;
 
     /** Creates an instance with the specified transaction ID. */
     TransactionImpl(long tid) {
@@ -89,7 +95,13 @@ final class TransactionImpl implements Transaction {
 	if (participant == null) {
 	    throw new NullPointerException("Participant must not be null");
 	} else if (state != State.ACTIVE) {
-	    throw new IllegalStateException("Transaction is not active");
+	    /*
+	     * FIXME: Should throw TransactionNotActiveException if the
+	     * transaction was aborted, and use the cause to specify the right
+	     * retry state.  -tjb@sun.com (01/17/2007)
+	     */
+	    throw new IllegalStateException(
+		"Transaction is not active", getInactiveCause());
 	}
 	if (!participants.contains(participant)) {
 	    if (participant instanceof NonDurableTransactionParticipant) {
@@ -110,6 +122,11 @@ final class TransactionImpl implements Transaction {
 
     /** {@inheritDoc} */
     public void abort() {
+	abort(null);
+    }
+
+    /** {@inheritDoc} */
+    public void abort(Throwable cause) {
 	assert Thread.currentThread() == owner : "Wrong thread";
 	logger.log(Level.FINER, "abort {0}", this);
 	switch (state) {
@@ -119,6 +136,13 @@ final class TransactionImpl implements Transaction {
 	case ABORTING:
 	    return;
 	case ABORTED:
+	    /*
+	     * FIXME: Should throw TransactionNotActiveException, and use the
+	     * cause to specify the right retry state.  -tjb@sun.com
+	     * (01/17/2007)
+	     */
+	    throw new IllegalStateException(
+		"Transaction is not active", abortCause);
 	case COMMITTING:
 	case COMMITTED:
 	    throw new IllegalStateException("Transaction is not active");
@@ -136,12 +160,13 @@ final class TransactionImpl implements Transaction {
 	    } catch (Exception e) {
 		if (logger.isLoggable(Level.WARNING)) {
 		    logger.logThrow(
-			Level.WARNING, "abort {0} participant:{1} failed",
-			e, this, participant);
+			Level.WARNING, e, "abort {0} participant:{1} failed",
+			this, participant);
 		}
 	    }
 	}
 	state = State.ABORTED;
+	abortCause = cause;
     }
 
     /* -- Object methods -- */
@@ -192,8 +217,12 @@ final class TransactionImpl implements Transaction {
 	assert Thread.currentThread() == owner : "Wrong thread";
 	logger.log(Level.FINER, "commit {0}", this);
 	if (state != State.ACTIVE) {
+	    /*
+	     * FIXME: Should use the cause to specify the right retry state.
+	     * -tjb@sun.com (01/17/2007)
+	     */
 	    throw new TransactionNotActiveException(
-		"Transaction is not active");
+		"Transaction is not active", getInactiveCause());
 	}
 	state = State.PREPARING;
 	for (Iterator<TransactionParticipant> iter = participants.iterator();
@@ -224,12 +253,12 @@ final class TransactionImpl implements Transaction {
 	    } catch (Exception e) {
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.logThrow(
-			Level.FINEST, "{0} {1} participant:{1} throws",
-			e, iter.hasNext() ? "prepare" : "prepareAndCommit",
+			Level.FINEST, e, "{0} {1} participant:{1} throws",
+			iter.hasNext() ? "prepare" : "prepareAndCommit",
 			this, participant);
 		}
 		if (state != State.ABORTED) {
-		    abort();
+		    abort(e);
 		}
 		throw e;
 	    }
@@ -249,8 +278,8 @@ final class TransactionImpl implements Transaction {
 	    } catch (Exception e) {
 		if (logger.isLoggable(Level.WARNING)) {
 		    logger.logThrow(
-			Level.WARNING, "commit {0} participant:{1} failed",
-			e, this, participant);
+			Level.WARNING, e, "commit {0} participant:{1} failed",
+			this, participant);
 		}
 	    }
 	}
@@ -261,6 +290,14 @@ final class TransactionImpl implements Transaction {
     boolean isActive() {
 	assert Thread.currentThread() == owner : "Wrong thread";
 	return state == State.ACTIVE;
+    }
+
+    /**
+     * Returns the exception that caused the transaction to be inactive, or
+     * null if the transaction isn't inactive or the cause isn't known.
+     */
+    Throwable getInactiveCause() {
+	return state == State.ABORTED ? abortCause : null;
     }
 
     /** Returns a byte array that represents the specified long. */
