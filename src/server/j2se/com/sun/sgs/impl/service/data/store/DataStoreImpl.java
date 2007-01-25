@@ -115,7 +115,7 @@ import java.util.logging.Logger;
  * <li> <i>Key:</i> <code>
  *	com.sun.sgs.impl.service.data.store.DataStoreImpl.logOps
  *	</code> <br>
- *	<i>Default:</i> <code>1000</code> <br>
+ *	<i>Default:</i> <code>100000</code> <br>
  *	The number of transactions between logging tallies of operations
  *	performed. <p>
  *
@@ -209,7 +209,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
      * The default number of transactions between logging tallies of operations
      * performed.
      */
-    private static final int DEFAULT_LOG_OPS = 1000;
+    private static final int DEFAULT_LOG_OPS = 100000;
 
     /** The logger for this class. */
     static final LoggerWrapper logger =
