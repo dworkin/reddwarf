@@ -217,6 +217,7 @@ public final class DataServiceImpl
 		Constructor<? extends DataStore> cons =
 		    cl.getConstructor(Properties.class);
 		store = cons.newInstance(properties);
+		logger.log(Level.CONFIG, "Using data store {0}", store);
 	    }
 	} catch (Exception e) {
 	    logger.logThrow(

@@ -5,6 +5,7 @@ import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
+import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyTransaction;
@@ -334,7 +335,7 @@ public class TestPerformance extends TestCase {
     }
 
     protected DataService getDataService(
-	Properties props, DummyComponentRegistry componentRegistry)
+	Properties props, ComponentRegistry componentRegistry)
 	throws Exception
     {
 	return new DataServiceImpl(props, componentRegistry);
