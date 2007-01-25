@@ -1,12 +1,15 @@
 package com.sun.sgs.test.impl.service.data.store.net;
 
+import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
 import com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl;
-import com.sun.sgs.test.impl.service.data.store.TestDataStoreImpl;
+import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.service.DataService;
+import com.sun.sgs.test.impl.service.data.TestPerformance;
 import java.util.Properties;
 
-public class TestDataStoreClient extends TestDataStoreImpl {
+public class TestDataServiceClientPerformance extends TestPerformance {
     private static boolean externalServer =
 	Boolean.getBoolean("test.externalServer");
     private static String serverHost =
@@ -22,9 +25,12 @@ public class TestDataStoreClient extends TestDataStoreImpl {
     private static final String DataStoreServerImplClassName =
 	DataStoreServerImpl.class.getName();
 
+    private static final String DataServiceImplClassName =
+	DataServiceImpl.class.getName();
+
     DataStoreServerImpl server;
 
-    public TestDataStoreClient(String name) {
+    public TestDataServiceClientPerformance(String name) {
 	super(name);
     }
 
@@ -32,11 +38,7 @@ public class TestDataStoreClient extends TestDataStoreImpl {
 	super.tearDown();
 	try {
 	    if (server != null) {
-		new ShutdownAction() {
-		    protected boolean shutdown() {
-			return server.shutdown();
-		    }
-		}.waitForDone();
+		server.shutdown();
 	    }
 	} catch (RuntimeException e) {
 	    if (passed) {
@@ -47,8 +49,10 @@ public class TestDataStoreClient extends TestDataStoreImpl {
 	}
     }
 
-    /** Gets a DataStore using the default properties. */
-    protected DataStore getDataStore() throws Exception {
+    protected DataService getDataService(Properties props,
+					 ComponentRegistry componentRegistry)
+	throws Exception
+    {
 	if (!externalServer) {
 	    props.setProperty(DataStoreServerImplClassName + ".port", "0");
 	    DataStoreServerImpl serverImpl = new DataStoreServerImpl(props);
@@ -58,33 +62,8 @@ public class TestDataStoreClient extends TestDataStoreImpl {
 	props.setProperty(DataStoreClientClassName + ".host", serverHost);
 	props.setProperty(DataStoreClientClassName + ".port",
 			  String.valueOf(serverPort));
-	return createDataStore(props);
-    }
-
-    protected DataStore createDataStore(Properties props) throws Exception {
-	return new DataStoreClient(props);
-    }
-
-    /* -- Tests -- */
-
-    /* No directory is required by the constructor */
-    public void testConstructorNoDirectory() throws Exception {
-	System.err.println("Skipping");
-    }
-    public void testConstructorBadAllocationBlockSize() throws Exception {
-	System.err.println("Skipping");
-    }
-    public void testConstructorNegativeAllocationBlockSize() throws Exception {
-	System.err.println("Skipping");
-    }
-    public void testConstructorNonexistentDirectory() throws Exception {
-	System.err.println("Skipping");
-    }
-    public void testConstructorDirectoryIsFile() throws Exception {
-	System.err.println("Skipping");
-
-    }
-    public void testConstructorDirectoryNotWritable() throws Exception {
-	System.err.println("Skipping");
+	props.setProperty(DataServiceImplClassName + ".dataStoreClass",
+			    DataStoreClientClassName);
+	return new DataServiceImpl(props, componentRegistry);
     }
 }

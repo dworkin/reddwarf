@@ -199,6 +199,12 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
     /** The number of transactions between logging database statistics. */
     private final int logStats;
 
+    /** The transaction timeout in milliseconds. */
+    private final long txnTimeout;
+
+    /** Stores information about transactions. */
+    private final TxnInfoTable<TxnInfo> txnInfoTable;
+
     /** The Berkeley DB environment. */
     private final Environment env;
 
@@ -214,9 +220,6 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 
     /** The Berkeley DB database that maps name bindings to object IDs. */
     private final Database names;
-
-    /** Stores information about transactions. */
-    private final TxnInfoTable<TxnInfo> txnInfoTable;
 
     /**
      * Object to synchronize on when accessing nextObjectId and
@@ -484,6 +487,8 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	}
 	logStats = wrappedProps.getIntProperty(
 	    LOG_STATS_PROPERTY, Integer.MAX_VALUE);
+	txnTimeout = wrappedProps.getLongProperty(
+	    TXN_TIMEOUT_PROPERTY, DEFAULT_TXN_TIMEOUT);
 	txnInfoTable = getTxnInfoTable(TxnInfo.class);
 	com.sleepycat.db.Transaction bdbTxn = null;
 	boolean done = false;
@@ -560,8 +565,6 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	throws DatabaseException
     {
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
-	long timeout = 1000L * wrappedProps.getLongProperty(
-	    TXN_TIMEOUT_PROPERTY, DEFAULT_TXN_TIMEOUT);
 	boolean flushToDisk = wrappedProps.getBooleanProperty(
 	    FLUSH_TO_DISK_PROPERTY, false);
 	long cacheSize = wrappedProps.getLongProperty(
@@ -578,11 +581,11 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
         config.setInitializeLocking(true);
         config.setInitializeLogging(true);
         config.setLockDetectMode(LockDetectMode.YOUNGEST);
-	config.setLockTimeout(timeout);
+	config.setLockTimeout(1000 * txnTimeout);
 	config.setMessageHandler(new LoggingMessageHandler());
         config.setRunRecovery(true);
         config.setTransactional(true);
-	config.setTxnTimeout(timeout);
+	config.setTxnTimeout(1000 * txnTimeout);
 	config.setTxnWriteNoSync(!flushToDisk);
 	try {
 	    return new Environment(new File(directory), config);
@@ -1246,6 +1249,8 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	} else if (txnInfo.prepared) {
 	    throw new IllegalStateException(
 		"Transaction has been prepared");
+	} else if (txnTimedOut(txn)) {
+	    throw new TransactionTimeoutException("Transaction has timed out");
 	}
 	return txnInfo;
     }
@@ -1286,21 +1291,26 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 
     /**
      * Checks that the correct transaction is in progress, throwing an
-     * exception if the transaction has not been joined.  Checks if the store
-     * is shutting down if requested.  Does not check the prepared state of the
-     * transaction.
+     * exception if the transaction has not been joined.  If notAborting is
+     * true, then checks if the store is shutting down and if the transaction
+     * has timed out.  Does not check the prepared state of the transaction.
      */
-    private TxnInfo checkTxnNoJoin(
-	Transaction txn, boolean checkShuttingDown)
-    {
+    private TxnInfo checkTxnNoJoin(Transaction txn, boolean notAborting) {
 	if (txn == null) {
 	    throw new NullPointerException("Transaction must not be null");
 	}
 	TxnInfo txnInfo = txnInfoTable.get(txn);
 	if (txnInfo == null) {
 	    throw new IllegalStateException("Transaction is not active");
-	} else if (checkShuttingDown && getTxnCount() < 0) {
-	    throw new IllegalStateException("DataStore is shutting down");
+	} else if (notAborting) {
+	    if (getTxnCount() < 0) {
+		throw new IllegalStateException("DataStore is shutting down");
+	    } else if (txn.getCreationTime() + txnTimeout <
+		       System.currentTimeMillis())
+	    {
+		throw new TransactionTimeoutException(
+		    "Transaction has timed out");
+	    }
 	}
 	return txnInfo;
     }
@@ -1434,5 +1444,10 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 		bdbTxn.abort();
 	    }
 	}
+    }
+
+    /** Checks if the transaction has timed out. */
+    private boolean txnTimedOut(Transaction txn) {
+	return txn.getCreationTime() + txnTimeout < System.currentTimeMillis();
     }
 }

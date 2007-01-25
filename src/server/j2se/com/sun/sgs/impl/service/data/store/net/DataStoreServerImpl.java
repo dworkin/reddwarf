@@ -1,5 +1,6 @@
 package com.sun.sgs.impl.service.data.store.net;
 
+import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl.TxnInfoTable;
@@ -18,12 +19,14 @@ import java.rmi.server.UnicastRemoteObject;
 import java.util.Properties;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/*
- * FIXME: Timeout transactions
- */
 /**
  * Provides an implementation of <code>DataStoreServer</code>, using the {@link
  * DataStoreImpl} class to support the same databases which that class
@@ -33,6 +36,13 @@ import java.util.logging.Logger;
  */
 public class DataStoreServerImpl implements DataStoreServer {
 
+    /** The property that specifies the transaction timeout in milliseconds. */
+    private static final String TXN_TIMEOUT_PROPERTY =
+	"com.sun.sgs.txnTimeout";
+
+    /** The default transaction timeout in milliseconds. */
+    private static final long DEFAULT_TXN_TIMEOUT = 1000;
+
     /** The name of this class. */
     private static final String CLASSNAME =
 	DataStoreServerImpl.class.getName();
@@ -40,6 +50,15 @@ public class DataStoreServerImpl implements DataStoreServer {
     /** The logger for this class. */
     static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
+
+    /**
+     * The property that specifies the delay in milliseconds between attempts
+     * to reap timed out transactions.
+     */
+    private static final String REAP_DELAY_PROPERTY = CLASSNAME + ".reapDelay";
+
+    /** The default reap delay. */
+    private static final long DEFAULT_REAP_DELAY = 500;
 
     /**
      * The name of the property for specifying the port for running the
@@ -65,11 +84,17 @@ public class DataStoreServerImpl implements DataStoreServer {
     /** Stores information about transactions. */
     private TxnTable<?> txnTable;
 
-    /** The port for running the RMI registry and the server. */
-    private int port;
+    /** The transaction timeout in milliseconds. */
+    private final long txnTimeout;
 
-    /** The RMI registry. */
+    /** The port for running the RMI registry and the server. */
+    private final int port;
+
+    /** The RMI registry, or null if shutdown */
     private Registry registry;
+
+    /** Used to execute the expired transaction reaper. */
+    private final ScheduledExecutorService executor;
 
     /** Object to synchronize on when accessing nextTxnId and lastTxnId. */
     private final Object tidLock = new Object();
@@ -94,12 +119,10 @@ public class DataStoreServerImpl implements DataStoreServer {
 	/** The creation time. */
 	private final long creationTime;
 
-	/** Synchronize on this object when accessing the inUse field. */
-	private final Object inUseLock = new Object();
-
 	/** Whether this transaction is in use. */
-	private boolean inUse;
+	boolean inUse;
 
+	/** The transaction participant or null. */
 	private TransactionParticipant participant;
 
 	/** Creates an instance with the specified ID. */
@@ -111,26 +134,6 @@ public class DataStoreServerImpl implements DataStoreServer {
 	/** Returns the associated ID as a long. */
 	long getTid() {
 	    return tid;
-	}
-
-	/** Marks this transaction as in use. */
-	void lock() {
-	    synchronized (inUseLock) {
-		if (inUse) {
-		    throw new IllegalStateException();
-		}
-		inUse = true;
-	    }
-	}
-
-	/** Marks this transaction as not in use. */
-	void unlock() {
-	    synchronized (inUseLock) {
-		if (!inUse) {
-		    throw new IllegalStateException();
-		}
-		inUse = false;
-	    }
 	}
 
 	/* -- Implement Transaction -- */
@@ -158,7 +161,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 	/* -- Other methods -- */
 
 	public String toString() {
-	    return "Txn[tid:" + tid + "]";
+	    return "Txn[stid:" + tid + "]";
 	}
 
 	public boolean equals(Object object) {
@@ -185,10 +188,17 @@ public class DataStoreServerImpl implements DataStoreServer {
     private static class TxnTable<T> implements TxnInfoTable<T> {
 
 	/**
+	 * Synchronize on this object when accessing the table or the inUse
+	 * field of a TxnInfo object.
+	 */
+	private final Object lock = new Object();
+
+	/**
 	 * Maps transaction IDs to transactions and their associated
 	 * information.
 	 */
-	final SortedMap<Long, Entry<T>> table = new TreeMap<Long, Entry<T>>();
+	private final SortedMap<Long, Entry<T>> table =
+	    new TreeMap<Long, Entry<T>>();
 
 	/** Stores a transaction and the associated information. */
 	private static class Entry<T> {
@@ -203,11 +213,15 @@ public class DataStoreServerImpl implements DataStoreServer {
 	/** Creates an instance. */
 	TxnTable() { }
 
-	/** Gets the transaction associated with the specified ID. */
+	/**
+	 * Gets the transaction associated with the specified ID, and marks
+	 * it in use.
+	 */
 	Txn get(long tid) {
-	    synchronized (table) {
+	    synchronized (lock) {
 		Entry<T> entry = table.get(tid);
 		if (entry != null) {
+		    entry.txn.inUse = true;
 		    return entry.txn;
 		}
 	    }
@@ -215,12 +229,36 @@ public class DataStoreServerImpl implements DataStoreServer {
 		"Transaction is not active");
 	}
 
+	/** Marks the transaction as not in use. */
+	void notInUse(Txn txn) {
+	    synchronized (lock) {
+		txn.inUse = false;
+	    }
+	}
+
+	/** Returns all expired transactions that are not in use. */
+	Collection<Transaction> getExpired(long txnTimeout) {
+	    Collection<Transaction> result = new ArrayList<Transaction>();
+	    long last = System.currentTimeMillis() - txnTimeout;
+	    synchronized (lock) {
+		for (Entry<?> entry : table.values()) {
+		    Txn txn = entry.txn;
+		    if (txn.getCreationTime() > last) {
+			break;
+		    } else if (!txn.inUse) {
+			result.add(txn);
+		    }
+		}
+	    }
+	    return result;
+	}
+
 	/* -- Implement TxnInfoTable -- */
 
 	public T get(Transaction txn) {
 	    if (txn instanceof Txn) {
 		long tid = ((Txn) txn).getTid();
-		synchronized (table) {
+		synchronized (lock) {
 		    Entry<T> entry = table.get(tid);
 		    if (entry != null) {
 			return entry.info;
@@ -234,13 +272,13 @@ public class DataStoreServerImpl implements DataStoreServer {
 	public void remove(Transaction txn) {
 	    if (txn instanceof Txn) {
 		long tid = ((Txn) txn).getTid();
-		synchronized (table) {
+		synchronized (lock) {
 		    table.remove(tid);
 		}
 	    }
 	}
 
-	public synchronized void set(
+	public void set(
 	    Transaction txn, T info, boolean explicit)
 	{
 	    if (!explicit) {
@@ -250,7 +288,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 		Txn t = (Txn) txn;
 		long tid = t.getTid();
 		Entry<T> newInfo = new Entry<T>(t, info);
-		synchronized (table) {
+		synchronized (lock) {
 		    table.put(tid, newInfo);
 		}
 	    }
@@ -340,6 +378,8 @@ public class DataStoreServerImpl implements DataStoreServer {
 		   properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	store = new CustomDataStoreImpl(properties);
+	txnTimeout = wrappedProps.getLongProperty(
+	    TXN_TIMEOUT_PROPERTY, DEFAULT_TXN_TIMEOUT);
 	int requestedPort = wrappedProps.getIntProperty(
 	    PORT_PROPERTY, DEFAULT_PORT);
 	ServerSocketFactory ssf = new ServerSocketFactory();
@@ -348,6 +388,22 @@ public class DataStoreServerImpl implements DataStoreServer {
 	registry.rebind(
 	    "DataStoreServer",
 	    UnicastRemoteObject.exportObject(this, requestedPort, null, ssf));
+	long reapDelay = wrappedProps.getLongProperty(
+	    REAP_DELAY_PROPERTY, DEFAULT_REAP_DELAY);
+	executor = Executors.newSingleThreadScheduledExecutor();
+	executor.scheduleAtFixedRate(
+	    new Runnable() {
+		public void run() {
+		    try {
+			reapExpiredTransactions();
+		    } catch (Throwable t) {
+			logger.logThrow(
+			    Level.WARNING, t,
+			    "Problem reaping expired transactions");
+		    }
+		}
+	    },
+	    reapDelay, reapDelay, TimeUnit.MILLISECONDS);
     }
 
     /* -- Implement DataStoreServer -- */
@@ -359,42 +415,82 @@ public class DataStoreServerImpl implements DataStoreServer {
 
     /** {@inheritDoc} */
     public void markForUpdate(long tid, long oid) {
-	store.markForUpdate(getTxn(tid), oid);
+	Txn txn = getTxn(tid);
+	try {
+	    store.markForUpdate(txn, oid);
+	} finally {
+	    txnTable.notInUse(txn);
+	}
     }
 
     /** {@inheritDoc} */
     public byte[] getObject(long tid, long oid, boolean forUpdate) {
-	return store.getObject(getTxn(tid), oid, forUpdate);
+	Txn txn = getTxn(tid);
+	try {
+	    return store.getObject(txn, oid, forUpdate);
+	} finally {
+	    txnTable.notInUse(txn);
+	}
     }
 
     /** {@inheritDoc} */
     public void setObject(long tid, long oid, byte[] data) {
-	store.setObject(getTxn(tid), oid, data);
+	Txn txn = getTxn(tid);
+	try {
+	    store.setObject(txn, oid, data);
+	} finally {
+	    txnTable.notInUse(txn);
+	}
     }
 
     /** {@inheritDoc} */
     public void removeObject(long tid, long oid) {
-	store.removeObject(getTxn(tid), oid);
+	Txn txn = getTxn(tid);
+	try {
+	    store.removeObject(txn, oid);
+	} finally {
+	    txnTable.notInUse(txn);
+	}
     }
 
     /** {@inheritDoc} */
     public long getBinding(long tid, String name) {
-	return store.getBinding(getTxn(tid), name);
+	Txn txn = getTxn(tid);
+	try {
+	    return store.getBinding(txn, name);
+	} finally {
+	    txnTable.notInUse(txn);
+	}
     }
 
     /** {@inheritDoc} */
     public void setBinding(long tid, String name, long oid) {
-	store.setBinding(getTxn(tid), name, oid);
+	Txn txn = getTxn(tid);
+	try {
+	    store.setBinding(txn, name, oid);
+	} finally {
+	    txnTable.notInUse(txn);
+	}
     }
 
     /** {@inheritDoc} */
     public void removeBinding(long tid, String name) {
-	store.removeBinding(getTxn(tid), name);
+	Txn txn = getTxn(tid);
+	try {
+	    store.removeBinding(txn, name);
+	} finally {
+	    txnTable.notInUse(txn);
+	}
     }
 
     /** {@inheritDoc} */
     public String nextBoundName(long tid, String name) {
-	return store.nextBoundName(getTxn(tid), name);
+	Txn txn = getTxn(tid);
+	try {
+	    return store.nextBoundName(txn, name);
+	} finally {
+	    txnTable.notInUse(txn);
+	}
     }
 
     /** {@inheritDoc} */
@@ -404,22 +500,42 @@ public class DataStoreServerImpl implements DataStoreServer {
 
     /** {@inheritDoc} */
     public boolean prepare(long tid) {
-	return store.prepare(getTxn(tid));
+	Txn txn = getTxn(tid);
+	try {
+	    return store.prepare(txn);
+	} finally {
+	    txnTable.notInUse(txn);
+	}
     }
 
     /** {@inheritDoc} */
     public void commit(long tid) {
-	store.commit(getTxn(tid));
+	Txn txn = getTxn(tid);
+	try {
+	    store.commit(txn);
+	} finally {
+	    txnTable.notInUse(txn);
+	}
     }
 
     /** {@inheritDoc} */
     public void prepareAndCommit(long tid) {
-	store.prepareAndCommit(getTxn(tid));
+	Txn txn = getTxn(tid);
+	try {
+	    store.prepareAndCommit(txn);
+	} finally {
+	    txnTable.notInUse(txn);
+	}
     }
 
     /** {@inheritDoc} */
     public void abort(long tid) {
-	store.abort(getTxn(tid));
+	Txn txn = getTxn(tid);
+	try {
+	    store.abort(txn);
+	} finally {
+	    txnTable.notInUse(txn);
+	}
     }
 
     /* -- Other public methods -- */
@@ -441,6 +557,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 	if (!store.shutdown()) {
 	    return false;
 	}
+	executor.shutdownNow();
 	try {
 	    UnicastRemoteObject.unexportObject(this, true);
 	} catch (NoSuchObjectException e) {
@@ -475,18 +592,35 @@ public class DataStoreServerImpl implements DataStoreServer {
 	return "DataStoreServerImpl[store:" + store + ", port:" + port + "]";
     }
 
-    /* -- Private methods -- */
+    /* -- Package access and private methods -- */
+
+    /**
+     * Find expired transactions that are expired and not in use, and tell the
+     * data store to abort them.  The data store needs this nudging to notice
+     * that it can perform the abort.
+     */
+    void reapExpiredTransactions() {
+	Collection<Transaction> expired = txnTable.getExpired(txnTimeout);
+	for (Transaction txn : expired) {
+	    try {
+		store.abort(txn);
+	    } catch (TransactionNotActiveException e) {
+	    }
+	}
+	logger.log(
+	    Level.FINE, "Reaped {0} expired transactions", expired.size());
+    }
 
     /**
      * Returns the transaction for the specified ID, or null if not found, and
      * throwing TransactionNotActiveException if the transaction is not active.
      */
-    private Transaction getTxn(long tid) {
+    private Txn getTxn(long tid) {
 	try {
 	    return txnTable.get(tid);
 	} catch (RuntimeException e) {
 	    logger.logThrow(Level.FINE, e,
-			    "Getting transaction tid:{0,number,#} failed",
+			    "Getting transaction stid:{0,number,#} failed",
 			    tid);
 	    throw e;
 	}

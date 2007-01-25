@@ -71,6 +71,8 @@ public class TestConcurrent extends TestCase {
     /** The number of threads that are done. */
     private int done;
 
+    protected Properties props;
+
     /** The service to test. */
     private DataServiceImpl service;
 
@@ -80,8 +82,11 @@ public class TestConcurrent extends TestCase {
     }
 
     /** Prints the name of the test case. */
-    protected void setUp() {
+    protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
+	props = createProperties(
+	    DataStoreImplClass + ".directory", createDirectory(),
+	    "com.sun.sgs.appName", "TestConcurrent");
     }
 
     /** Sets passed if the test passes. */
@@ -94,7 +99,7 @@ public class TestConcurrent extends TestCase {
     protected void tearDown() throws Exception {
 	if (service != null) {
 	    try {
-		service.shutdown();
+		shutdown();
 	    } catch (RuntimeException e) {
 		if (passed) {
 		    throw e;
@@ -108,12 +113,14 @@ public class TestConcurrent extends TestCase {
 	}
     }
 
+    /** Shuts down the service. */
+    protected boolean shutdown() {
+	return service.shutdown();
+    }
+
     /* -- Tests -- */
 
     public void testConcurrent() throws Throwable {
-	Properties props = createProperties(
-	    DataStoreImplClass + ".directory", createDirectory(),
-	    "com.sun.sgs.appName", "TestConcurrent");
 	DummyComponentRegistry componentRegistry =
 	    new DummyComponentRegistry();
 	service = new DataServiceImpl(props, componentRegistry);

@@ -1,26 +1,23 @@
 package com.sun.sgs.test.impl.service.data;
 
 import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
-import com.sun.sgs.app.DataManager;
+import com.sun.sgs.impl.service.data.DataServiceImpl;
+import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
-import com.sun.sgs.impl.service.data.DataServiceImpl;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Enumeration;
 import java.util.List;
 import java.util.Properties;
-import java.util.logging.Level;
 import java.util.logging.LogManager;
-import java.util.logging.Logger;
-import junit.framework.Test;
 import junit.framework.TestCase;
-import junit.framework.TestSuite;
 
 /**
  * Performance tests for the DataServiceImpl class.
@@ -43,13 +40,6 @@ import junit.framework.TestSuite;
  * Time: 36 ms per transaction
  */
 public class TestPerformance extends TestCase {
-
-    /** The test suite, to use for adding additional tests. */
-    private static final TestSuite suite =
-	new TestSuite(TestPerformance.class);
-
-    /** Provides the test suite to the test runner. */
-    public static Test suite() { return suite; }
 
     /** The name of the DataStoreImpl class. */
     private static final String DataStoreImplClass =
@@ -84,7 +74,13 @@ public class TestPerformance extends TestCase {
     /** Whether to do logging, which is otherwise disabled. */
     private static boolean doLogging = Boolean.getBoolean("test.doLogging");
 
-    private static String storeServer = System.getProperty("test.storeServer");
+    /** The logging to do for good performance. */
+    private static final String performanceLogging =
+	".level = WARNING\n" +
+	"handlers = java.util.logging.ConsoleHandler\n" +
+	"java.util.logging.ConsoleHandler.formatter =" +
+	" java.util.logging.SimpleFormatter\n" +
+	"java.util.logging.ConsoleHandler.level = WARNING";
 
     /** Print test parameters. */
     static {
@@ -93,10 +89,13 @@ public class TestPerformance extends TestCase {
     }
 
     /** Set when the test passes. */
-    private boolean passed;
+    protected boolean passed;
 
     /** A per-test database directory, or null if not created. */
     private String directory;
+
+    /** Properties for creating services. */
+    protected Properties props;
 
     /** A transaction proxy. */
     private DummyTransactionProxy txnProxy = new DummyTransactionProxy();
@@ -109,7 +108,7 @@ public class TestPerformance extends TestCase {
     private DummyTransaction txn;
 
     /** The service to test. */
-    private DataServiceImpl service;
+    private DataService service;
 
     /** Creates the test. */
     public TestPerformance(String name) {
@@ -120,19 +119,18 @@ public class TestPerformance extends TestCase {
      * Prints the test case, initializes the transaction, and disables logging
      * if necessary.
      */
-    protected void setUp() {
+    protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
 	createTransaction();
 	if (!doLogging) {
-	    /* Disable logging */
-	    for (Enumeration<String> loggerNames =
-		     LogManager.getLogManager().getLoggerNames();
-		 loggerNames.hasMoreElements(); )
-	    {
-		String loggerName = loggerNames.nextElement();
-		Logger.getLogger(loggerName).setLevel(Level.WARNING);
-	    }
+	    /* Change logging */
+	    LogManager.getLogManager().readConfiguration(
+		new ByteArrayInputStream(performanceLogging.getBytes()));
 	}
+	props = createProperties(
+	    DataStoreImplClass + ".directory", createDirectory(),
+	    "com.sun.sgs.appName", "TestPerformance",
+	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
     }
 
     /** Sets passed if the test passes. */
@@ -148,7 +146,7 @@ public class TestPerformance extends TestCase {
     protected void tearDown() throws Exception {
 	if (service != null) {
 	    try {
-		service.shutdown();
+		shutdown();
 	    } catch (RuntimeException e) {
 		if (passed) {
 		    throw e;
@@ -165,6 +163,11 @@ public class TestPerformance extends TestCase {
 	}
     }
 
+    /** Shuts down the service. */
+    protected boolean shutdown() {
+	return service.shutdown();
+    }
+
     /* -- Tests -- */
 
     public void testRead() throws Exception {
@@ -176,21 +179,9 @@ public class TestPerformance extends TestCase {
     }
 
     private void doTestRead(boolean detectMods) throws Exception {
-	Properties props = createProperties(
-	    DataStoreImplClass + ".directory", createDirectory(),
-	    "com.sun.sgs.appName", "TestPerformance",
-	    DataServiceImplClass + ".detectModifications",
-	    String.valueOf(detectMods),
-	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
-	if (storeServer != null) {
-	    props.setProperty(
-		DataServiceImplClass + ".dataStoreClass",
-		"com.sun.sgs.impl.service.data.store.net.DataStoreClient");
-	    props.setProperty(
-		"com.sun.sgs.impl.service.data.store.net.DataStoreClient" +
-		".host", storeServer);
-	}
-	service = new DataServiceImpl(props, componentRegistry);
+	props.setProperty(DataServiceImplClass + ".detectModifications",
+			  String.valueOf(detectMods));
+	service = getDataService(props, componentRegistry);
 	service.configure(componentRegistry, txnProxy);
 	componentRegistry.setComponent(DataManager.class, service);
 	componentRegistry.registerAppContext();
@@ -223,26 +214,20 @@ public class TestPerformance extends TestCase {
 	doTestWrite(false, false);
     }
 
-    static {
-	if (testFlush) {
-	    suite.addTest(
-		new TestPerformance("testWriteFlush") {
-		    protected void runTest() throws Exception {
-			doTestWrite(false, true);
-		    }
-		});
+    public void testWriteFlush() throws Exception {
+	if (!testFlush) {
+	    System.err.println("Skipping");
+	    return;
 	}
+	doTestWrite(false, true);
     }
 
     void doTestWrite(boolean detectMods, boolean flush) throws Exception {
-	Properties props = createProperties(
-	    DataStoreImplClass + ".directory", createDirectory(),
-	    "com.sun.sgs.appName", "TestPerformance",
-	    DataServiceImplClass + ".detectModifications",
-	    String.valueOf(detectMods),
-	    DataStoreImplClass + ".flushToDisk", String.valueOf(flush),
-	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
-	service = new DataServiceImpl(props, componentRegistry);
+	props.setProperty(DataServiceImplClass + ".detectModifications",
+			  String.valueOf(detectMods));
+	props.setProperty(DataStoreImplClass + ".flushToDisk",
+			  String.valueOf(flush));
+	service = getDataService(props, componentRegistry);
 	service.configure(componentRegistry, txnProxy);
 	componentRegistry.setComponent(DataManager.class, service);
 	componentRegistry.registerAppContext();
@@ -346,5 +331,12 @@ public class TestPerformance extends TestCase {
         private int count;
 	Counter() { }
 	int next() { return ++count; }
+    }
+
+    protected DataService getDataService(
+	Properties props, DummyComponentRegistry componentRegistry)
+	throws Exception
+    {
+	return new DataServiceImpl(props, componentRegistry);
     }
 }

@@ -2,6 +2,7 @@ package com.sun.sgs.impl.service.data.store.net;
 
 import com.sun.sgs.app.ObjectIOException;
 import com.sun.sgs.app.TransactionAbortedException;
+import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.util.LoggerWrapper;
@@ -594,9 +595,16 @@ public final class DataStoreClient
 	    boolean joined = false;
 	    long tid;
 	    try {
-		tid = server.createTransaction();
 		txn.join(this);
 		joined = true;
+		tid = server.createTransaction();
+		if (logger.isLoggable(Level.FINER)) {
+		    logger.log(
+			Level.FINER,
+			"Created server transaction stid:{0,number,#} " +
+			" for transaction {1}",
+			tid, txn);
+		}
 	    } finally {
 		if (!joined) {
 		    decrementTxnCount();
@@ -609,10 +617,6 @@ public final class DataStoreClient
 		"Transaction has been prepared");
 	} else if (!txnInfo.txn.equals(txn)) {
 	    throw new IllegalStateException("Wrong transaction");
-	} else if (System.currentTimeMillis() >=
-		   txn.getCreationTime() + txnTimeout)
-	{
-	    throw new TransactionTimeoutException("Transaction has timed out");
 	}
 	return txnInfo;
     }
@@ -658,7 +662,13 @@ public final class DataStoreClient
 		e.getMessage(),
 		e);
 	} else if (e instanceof TransactionAbortedException) {
-	       re = (RuntimeException) e;
+	    re = (RuntimeException) e;
+	} else if (e instanceof TransactionNotActiveException &&
+		   txnInfo != null &&
+		   txnTimedOut(txnInfo.txn))
+	{
+	    re = new TransactionTimeoutException(
+		"Transaction has timed out", e);
 	} else {
 	    re = (RuntimeException) e;
 	}
@@ -689,5 +699,10 @@ public final class DataStoreClient
 		txnCountLock.notifyAll();
 	    }
 	}
+    }
+
+    /** Checks if the transaction has timed out. */
+    private boolean txnTimedOut(Transaction txn) {
+	return txn.getCreationTime() + txnTimeout < System.currentTimeMillis();
     }
 }

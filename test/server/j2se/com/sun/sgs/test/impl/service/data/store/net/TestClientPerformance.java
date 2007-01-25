@@ -42,23 +42,17 @@ public class TestClientPerformance extends TestPerformance {
 	}
     }
 
-    /** Returns a DataStore for the shared database. */
+    /** Gets a DataStore using the default properties. */
     protected DataStore getDataStore() throws Exception {
 	if (!externalServer) {
-	    dbProps.setProperty(DataStoreServerImplClassName + ".port", "0");
-	    DataStoreServerImpl serverImpl = new DataStoreServerImpl(dbProps);
+	    props.setProperty(DataStoreServerImplClassName + ".port", "0");
+	    DataStoreServerImpl serverImpl = new DataStoreServerImpl(props);
 	    server = serverImpl;
 	    serverPort = serverImpl.getPort();
 	}
-	dbProps.setProperty(DataStoreClientClassName + ".host", serverHost);
-	dbProps.setProperty(DataStoreClientClassName + ".port",
-			    String.valueOf(serverPort));
-	/*
-	 * XXX: I shouldn't need to use a non-standard timeout here.  See if it
-	 * can go away when I do transaction timeouts on the server.
-	 * -tjb@sun.com (01/23/2007)
-	 */
-	dbProps.setProperty("com.sun.sgs.txnTimeout", "5000");
-	return new DataStoreClient(dbProps);
+	props.setProperty(DataStoreClientClassName + ".host", serverHost);
+	props.setProperty(DataStoreClientClassName + ".port",
+			  String.valueOf(serverPort));
+	return new DataStoreClient(props);
     }
 }

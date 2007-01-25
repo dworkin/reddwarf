@@ -3,16 +3,13 @@ package com.sun.sgs.test.impl.service.data.store;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.test.util.DummyTransaction;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
-import java.util.Enumeration;
+import java.io.InputStream;
 import java.util.Properties;
-import java.util.logging.Level;
 import java.util.logging.LogManager;
-import java.util.logging.Logger;
-import junit.framework.Test;
 import junit.framework.TestCase;
-import junit.framework.TestSuite;
 
 /**
  * Performance tests for the DataServiceImpl class.
@@ -35,13 +32,6 @@ import junit.framework.TestSuite;
  * Time: 7 ms per transaction
  */
 public class TestPerformance extends TestCase {
-
-    /** The test suite, to use for adding additional tests. */
-    private static final TestSuite suite =
-	new TestSuite(TestPerformance.class);
-
-    /** Provides the test suite to the test runner. */
-    public static Test suite() { return suite; }
 
     /** The name of the DataStoreImpl class. */
     private static final String DataStoreImplClass =
@@ -75,6 +65,14 @@ public class TestPerformance extends TestCase {
     /** Whether to do logging, which is otherwise disabled. */
     private static boolean doLogging = Boolean.getBoolean("test.doLogging");
 
+    /** The logging to do for good performance. */
+    private static final String performanceLogging =
+	".level = WARNING\n" +
+	"handlers = java.util.logging.ConsoleHandler\n" +
+	"java.util.logging.ConsoleHandler.formatter =" +
+	" java.util.logging.SimpleFormatter\n" +
+	"java.util.logging.ConsoleHandler.level = WARNING";
+
     /** Print test parameters. */
     static {
 	System.err.println("Parameters: test.items=" + items +
@@ -88,7 +86,8 @@ public class TestPerformance extends TestCase {
     /** A per-test database directory, or null if not created. */
     private String directory;
 
-    protected Properties dbProps;
+    /** Properties for creating the DataStore. */
+    protected Properties props;
 
     /** The store to test. */
     private DataStore store;
@@ -102,16 +101,11 @@ public class TestPerformance extends TestCase {
     protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
 	if (!doLogging) {
-	    /* Disable logging */
-	    for (Enumeration<String> loggerNames =
-		     LogManager.getLogManager().getLoggerNames();
-		 loggerNames.hasMoreElements(); )
-	    {
-		String loggerName = loggerNames.nextElement();
-		Logger.getLogger(loggerName).setLevel(Level.WARNING);
-	    }
+	    /* Change logging */
+	    LogManager.getLogManager().readConfiguration(
+		new ByteArrayInputStream(performanceLogging.getBytes()));
 	}
-	dbProps = createProperties(
+	props = createProperties(
 	    DataStoreImplClass + ".directory", createDirectory(),
 	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
     }
@@ -146,7 +140,7 @@ public class TestPerformance extends TestCase {
 
     /** Shuts down the store. */
     protected boolean shutdown() {
-	return store.shutdown();
+	return store == null || store.shutdown();
     }
 
     /* -- Tests -- */
@@ -181,19 +175,16 @@ public class TestPerformance extends TestCase {
 	testWriteIdsInternal(false);
     }	
 
-    static {
-	if (testFlush) {
-	    suite.addTest(
-		new TestPerformance("testWriteIdsFlush") {
-		    protected void runTest() throws Exception {
-			testWriteIdsInternal(true);
-		    }
-		});
+    public void testWriteIdsFlush() throws Exception {
+	if (!testFlush) {
+	    System.err.println("Skipping");
+	    return;
 	}
+	testWriteIdsInternal(true);
     }
 
     void testWriteIdsInternal(boolean flush) throws Exception {
-	dbProps.setProperty(
+	props.setProperty(
 	    DataStoreImplClass + ".flushToDisk", String.valueOf(flush));
 	byte[] data = new byte[itemSize];
 	data[0] = 1;
@@ -275,16 +266,9 @@ public class TestPerformance extends TestCase {
 
     /* -- Other methods -- */
 
-    /** Returns a DataStore for the shared database. */
+    /** Gets a DataStore using the default properties. */
     protected DataStore getDataStore() throws Exception {
-	File dir = new File(directory);
-	if (!dir.exists()) {
-	    if (!dir.mkdir()) {
-		throw new RuntimeException(
-		    "Problem creating directory: " + dir);
-	    }
-	}
-	return new DataStoreImpl(dbProps);
+	return new DataStoreImpl(props);
     }
 
     /** Creates a per-test directory. */

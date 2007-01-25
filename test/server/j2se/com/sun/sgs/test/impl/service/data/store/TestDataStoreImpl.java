@@ -36,19 +36,9 @@ public class TestDataStoreImpl extends TestCase {
 	System.getProperty("java.io.tmpdir") + File.separator +
 	"TestDataStoreImpl.db";
 
-    /** Properties for creating the shared database. */
-    protected static Properties dbProps = createProperties(
-	DataStoreImplClassName + ".directory", dbDirectory);
-
-    /** Make sure that the database directory exists. */
+    /** Make sure an empty version of the directory exists. */
     static {
-	File dir = new File(dbDirectory);
-	if (!dir.exists()) {
-	    if (!dir.mkdir()) {
-		throw new RuntimeException(
-		    "Problem creating directory: " + dir);
-	    }
-	}
+	cleanDirectory(dbDirectory);
     }
 
     /** Set when the test passes. */
@@ -56,6 +46,9 @@ public class TestDataStoreImpl extends TestCase {
 
     /** A per-test database directory, or null if not created. */
     private String directory;
+
+    /** Properties for creating the DataStore. */
+    protected Properties props;
 
     /** An instance of the data store, to test. */
     DataStore store;
@@ -75,6 +68,8 @@ public class TestDataStoreImpl extends TestCase {
     protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	props = createProperties(
+	    DataStoreImplClassName + ".directory", dbDirectory);
 	store = getDataStore();
 	id = store.createObject(txn);
     }
@@ -107,55 +102,53 @@ public class TestDataStoreImpl extends TestCase {
 
     /* -- Test constructor -- */
 
-    public void testConstructorNullArg() {
+    public void testConstructorNullArg() throws Exception {
 	try {
-	    new DataStoreImpl(null);
+	    createDataStore(null);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
 	}
     }
 
-    public void testConstructorNoDirectory() {
-	Properties props = new Properties();
+    public void testConstructorNoDirectory() throws Exception {
+	props.remove(DataStoreImplClassName + ".directory");
 	try {
-	    new DataStoreImpl(props);
+	    createDataStore(props);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
 	}
     }
 
-    public void testConstructorBadAllocationBlockSize() {
-	Properties props = createProperties(
-	    DataStoreImplClassName + ".directory", "foo",
+    public void testConstructorBadAllocationBlockSize() throws Exception {
+	props.setProperty(
 	    DataStoreImplClassName + ".allocationBlockSize", "gorp");
 	try {
-	    new DataStoreImpl(props);
+	    createDataStore(props);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
 	}
     }
 
-    public void testConstructorNegativeAllocationBlockSize() {
-	Properties props = createProperties(
-	    DataStoreImplClassName + ".directory", "foo",
+    public void testConstructorNegativeAllocationBlockSize() throws Exception {
+	props.setProperty(
 	    DataStoreImplClassName + ".allocationBlockSize", "-3");
 	try {
-	    new DataStoreImpl(props);
+	    createDataStore(props);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
 	}
     }
 
-    public void testConstructorNonexistentDirectory() {
-	Properties props = createProperties(
+    public void testConstructorNonexistentDirectory() throws Exception {
+	props.setProperty(
 	    DataStoreImplClassName + ".directory",
 	    "/this-is-a-non-existent-directory/yup");
 	try {
-	    new DataStoreImpl(props);
+	    createDataStore(props);
 	    fail("Expected DataStoreException");
 	} catch (DataStoreException e) {
 	    System.err.println(e);	    
@@ -164,11 +157,11 @@ public class TestDataStoreImpl extends TestCase {
 
     public void testConstructorDirectoryIsFile() throws Exception {
 	String file = File.createTempFile("existing", "db").getPath();
-	Properties props = createProperties(
+	props.setProperty(
 	    DataStoreImplClassName + ".directory",
 	    file);
 	try {
-	    new DataStoreImpl(props);
+	    createDataStore(props);
 	    fail("Expected DataStoreException");
 	} catch (DataStoreException e) {
 	    System.err.println(e);
@@ -185,12 +178,11 @@ public class TestDataStoreImpl extends TestCase {
             System.err.println("Skipping on " + osName);
             return;
         }
-	Properties props = createProperties(
-	    DataStoreImplClassName + ".directory",
-	    createDirectory());
+	props.setProperty(
+	    DataStoreImplClassName + ".directory", createDirectory());
 	new File(directory).setReadOnly();
 	try {
-	    new DataStoreImpl(props);
+	    createDataStore(props);
 	    fail("Expected DataStoreException");
 	} catch (DataStoreException e) {
 	    System.err.println(e);
@@ -1204,7 +1196,6 @@ public class TestDataStoreImpl extends TestCase {
     public void testDeadlock() throws Exception {
 	for (int i = 0; i < 5; i++) {
 	    if (i > 0) {
-		store = getDataStore();
 		txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
 	    }
 	    final long id = store.createObject(txn);
@@ -1258,13 +1249,11 @@ public class TestDataStoreImpl extends TestCase {
 	    thread.join();
 	    if (myRunnable.exception2 != null &&
 		!(myRunnable.exception2
-		  instanceof TransactionConflictException ||
-		  myRunnable.exception2
-		  instanceof TransactionTimeoutException))
+		  instanceof TransactionAbortedException))
 	    {
 		throw myRunnable.exception2;
 	    } else if (exception == null && myRunnable.exception2 == null) {
-		fail("Expected TransactionConflictException");
+		fail("Expected TransactionAbortedException");
 	    }
 	    txn = null;
 	}
@@ -1286,6 +1275,26 @@ public class TestDataStoreImpl extends TestCase {
 	return directory;
     }
 
+    /** Insures an empty version of the directory exists. */
+    private static void cleanDirectory(String directory) {
+	File dir = new File(directory);
+	if (dir.exists()) {
+	    for (File f : dir.listFiles()) {
+		if (!f.delete()) {
+		    throw new RuntimeException("Failed to delete file: " + f);
+		}
+	    }
+	    if (!dir.delete()) {
+		throw new RuntimeException(
+		    "Failed to delete directory: " + dir);
+	    }
+	}
+	if (!dir.mkdir()) {
+	    throw new RuntimeException(
+		"Failed to create directory: " + dir);
+	}
+    }
+
     /** Creates a property list with the specified keys and values. */
     private static Properties createProperties(String... args) {
 	Properties props = new Properties();
@@ -1298,16 +1307,14 @@ public class TestDataStoreImpl extends TestCase {
 	return props;
     }
 
-    /** Returns a DataStore for the shared database. */
+    /** Gets a DataStore using the default properties. */
     protected DataStore getDataStore() throws Exception {
-	File dir = new File(dbDirectory);
-	if (!dir.exists()) {
-	    if (!dir.mkdir()) {
-		throw new RuntimeException(
-		    "Problem creating directory: " + dir);
-	    }
-	}
-	return new DataStoreImpl(dbProps);
+	return createDataStore(props);
+    }
+
+    /** Creates a DataStore using the specified properties. */
+    protected DataStore createDataStore(Properties props) throws Exception {
+	return new DataStoreImpl(props);
     }
 
     /* -- Support for testing unusual states -- */
