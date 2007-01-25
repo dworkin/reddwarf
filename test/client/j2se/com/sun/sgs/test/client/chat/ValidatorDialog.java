@@ -31,6 +31,12 @@ public class ValidatorDialog extends JDialog
 
     private PasswordAuthentication passwordAuth;
 
+    /**
+     * Creates a new {@code ValidatorDialog} with the given {@code parent}
+     * frame.
+     *
+     * @param parent the parent frame of this dialog
+     */
     public ValidatorDialog(Frame parent) {
         super(parent, "Login Dialog", true);
         
@@ -56,6 +62,20 @@ public class ValidatorDialog extends JDialog
         setVisible(true);
     }
     
+    /**
+     * Returns a {@code PasswordAuthentication} containing the username and
+     * password the user has supplied to this dialog, or {@code null} if the
+     * dialog was cancelled. This method blocks until the dialog is
+     * completed, but may be cancelled by {@link Thread#interrupt()} on the
+     * blocked thread.
+     * 
+     * @return a {@code PasswordAuthentication} containing the username and
+     *         password supplied by the user, or {@code null} if the dialog
+     *         was cancelled
+     * 
+     * @see com.sun.sgs.client.simple.SimpleClientListener#getPasswordAuthentication()
+     * @see Thread#interrupt()
+     */
     public PasswordAuthentication getPasswordAuthentication() {
 	try {
 	    actionSemaphore.acquire();

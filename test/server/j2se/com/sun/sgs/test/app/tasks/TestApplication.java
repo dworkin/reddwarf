@@ -18,6 +18,10 @@ import java.io.Serializable;
 import java.util.Date;
 import java.util.Properties;
 
+/**
+ * An ad-hoc SGS test application that exercises the DataManager
+ * and TaskManager.
+ */
 public class TestApplication
 	implements AppListener, Serializable
 {
@@ -25,7 +29,7 @@ public class TestApplication
 
     private static final String DATE_NAME = "startupDate";
 
-    private int fooCount;
+    private int fooCount = 0;
     private ManagedReference fooRef;
     
     static void destroyNamedManagedObject(String name) {
@@ -58,10 +62,9 @@ public class TestApplication
         } catch (ObjectNotFoundException e) { /* ignore */ }
     }
 
-    public TestApplication() {
-        fooCount = 0;
-    }
-
+    /**
+     * {@inheritDoc}
+     */
     public void initialize(Properties props) {
         DataManager dataManager = AppContext.getDataManager();
         dataManager.markForUpdate(this);
@@ -95,6 +98,9 @@ public class TestApplication
         taskManager.scheduleTask(new RequestShutdownTask(), 6000);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public ClientSessionListener loggedIn(ClientSession session) {
 	// Reject any client login attempts.
         return null;
@@ -142,6 +148,9 @@ public class TestApplication
             this.fooRef = fooRef;
         }
 
+        /**
+         * {@inheritDoc}
+         */
         public void run() throws Exception {
             Foo foo = getFoo();
             //foo.incrementCounter();
@@ -161,6 +170,9 @@ public class TestApplication
             this.handle2 = handle2;
         }
 
+        /**
+         * {@inheritDoc}
+         */
         public void run() throws Exception {
             System.out.println("cancel periodic tasks");
             handle.cancel();

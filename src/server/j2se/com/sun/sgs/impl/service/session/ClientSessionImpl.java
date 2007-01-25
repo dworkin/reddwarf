@@ -655,32 +655,46 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	sessionService.scheduleNonTransactionalTaskOnCommit(task);
     }
 
+    private static final class ManagedSessionListenerWrapper
+        implements Serializable, ManagedObject
+    {
+        private static final long serialVersionUID = 1L;
+        private final ClientSessionListener listener;
+        
+        ManagedSessionListenerWrapper(ClientSessionListener l) {
+            this.listener = l;
+        }
+        
+        ClientSessionListener getListener() {
+            return listener;
+        }
+    }
     /**
      * Wrapper for persisting a ClientSessionListener if it is a
      * ManagedObject.
      */
     private class SessionListener {
 
-	private String listenerKey;
+	private final String listenerKey;
 
 	private boolean isManaged = false;
-
-	private ClientSessionListener listener;
 	
 	@SuppressWarnings("hiding")
 	SessionListener(ClientSessionListener listener) {
 	    assert listener != null && listener instanceof Serializable;
+            listenerKey =
+                ClientSessionImpl.class.getName() + "." +
+                Integer.toHexString(random.nextInt());
+            ManagedObject listenerObject;
 	    if (listener instanceof ManagedObject) {
 		isManaged = true;
-		listenerKey =
-		    ClientSessionImpl.class.getName() + "." +
-		    Integer.toHexString(random.nextInt());
-		sessionService.dataService.
-		    setServiceBinding(listenerKey, (ManagedObject) listener);
+                listenerObject = (ManagedObject)listener;
 	    } else {
 		isManaged = false;
-		this.listener = listener;
+                listenerObject = new ManagedSessionListenerWrapper(listener);
 	    }
+	    sessionService.dataService.
+	        setServiceBinding(listenerKey, listenerObject);
 	}
 
 	ClientSessionListener get() {
@@ -689,11 +703,15 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		    sessionService.dataService.getServiceBinding(
 			listenerKey, ClientSessionListener.class);
 	    } else {
-		return listener;
+                return
+                    sessionService.dataService.getServiceBinding(
+                        listenerKey,
+                        ManagedSessionListenerWrapper.class).getListener();
 	    }
 	}
 
 	void remove() {
+	    sessionService.dataService.removeServiceBinding(listenerKey);
 	    if (isManaged) {
 		sessionService.dataService.removeServiceBinding(listenerKey);
 	    }

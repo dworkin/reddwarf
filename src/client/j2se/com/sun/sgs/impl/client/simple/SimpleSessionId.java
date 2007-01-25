@@ -1,5 +1,7 @@
 package com.sun.sgs.impl.client.simple;
 
+import java.util.Arrays;
+
 import com.sun.sgs.client.SessionId;
 
 /**
@@ -23,8 +25,19 @@ public class SimpleSessionId extends SessionId {
      */
     @Override
     public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
         return (obj instanceof SessionId && 
-                toBytes().equals(((SessionId) obj).toBytes()));
+                Arrays.equals(id, (((SessionId) obj).toBytes())));
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public int hashCode() {
+        return Arrays.hashCode(id);
     }
 
     /**
@@ -35,4 +48,17 @@ public class SimpleSessionId extends SessionId {
         return id;
     }
 
+    /**
+     * {@inheritDoc}
+     */   
+    @Override
+    public String toString() {
+        StringBuilder buf = new StringBuilder(2 + id.length * 2);
+        buf.append('[');
+        for (byte b : id) {
+            buf.append(String.format("%02X", b));
+        }
+        buf.append(']');
+        return buf.toString();
+    }
 }

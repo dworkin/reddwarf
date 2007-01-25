@@ -6,6 +6,7 @@ import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 import javax.swing.JInternalFrame;
 import javax.swing.JLabel;
@@ -14,12 +15,14 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.WindowConstants;
+import javax.swing.event.InternalFrameAdapter;
 import javax.swing.event.InternalFrameEvent;
-import javax.swing.event.InternalFrameListener;
 
 import com.sun.sgs.client.ClientChannel;
 import com.sun.sgs.client.ClientChannelListener;
 import com.sun.sgs.client.SessionId;
+
+import static com.sun.sgs.test.client.chat.ChatClient.*;
 
 /**
  * ChatChannelFrame presents a GUI so that a user can interact with
@@ -28,13 +31,12 @@ import com.sun.sgs.client.SessionId;
  * area on the left side.
  */
 public class ChatChannelFrame extends JInternalFrame
-        implements ActionListener, InternalFrameListener,
-        	ClientChannelListener
+        implements ActionListener, ClientChannelListener
 {
     private static final long serialVersionUID = 1L;
 
     private final ChatClient myChatClient;
-    private final ClientChannel chan;
+    private final ClientChannel myChannel;
 
     private final MemberList memberList;
     private final JTextField inputField;
@@ -50,14 +52,15 @@ public class ChatChannelFrame extends JInternalFrame
     public ChatChannelFrame(ChatClient client, ClientChannel channel) {
         super("Channel: " + channel.getName());
         myChatClient = client;
-        chan = channel;
+        myChannel = channel;
         Container c = getContentPane();
         c.setLayout(new BorderLayout());
         JPanel eastPanel = new JPanel();
         eastPanel.setLayout(new BorderLayout());
         c.add(eastPanel, BorderLayout.EAST);
         eastPanel.add(new JLabel("Users"), BorderLayout.NORTH);
-        memberList = new MemberList(myChatClient);
+        memberList = new MemberList();
+        memberList.addMouseListener(myChatClient.getDCCMouseListener());
         eastPanel.add(new JScrollPane(memberList), BorderLayout.CENTER);
         JPanel southPanel = new JPanel();
         c.add(southPanel, BorderLayout.SOUTH);
@@ -70,37 +73,52 @@ public class ChatChannelFrame extends JInternalFrame
         setSize(400, 400);
         setClosable(true);
         setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
-        addInternalFrameListener(this);
+        addInternalFrameListener(new FrameClosingListener(this));
         setResizable(true);
         setVisible(true);
-    }
-    
-    private static SessionId getSessionIdAfter(byte[] message, int bytesRead) {
-	int sessionIdLen = message.length - bytesRead;
-	byte[] sessionIdBytes = new byte[sessionIdLen];
-	System.arraycopy(message, 0, sessionIdBytes, 0, sessionIdLen);
-	return SessionId.fromBytes(sessionIdBytes);
     }
 
     /**
      * {@inheritDoc}
+     * <p>
+     * Handles messages received from other clients on this channel,
+     * as well as server notifications about other clients joining and
+     * leaving this channel.
      */
-    public void receivedMessage(ClientChannel channel, SessionId sender, byte[] message) {
-	byte[] cmdBytes = new byte[4];
-	System.arraycopy(message, 0, cmdBytes, 0, 4);
-	String command = new String(cmdBytes);
-	if (command.equals("CHNJ")) {
-	    memberList.addClient(getSessionIdAfter(message, 4));
-	} else if (command.equals("CHNL")) {
-	    memberList.removeClient(getSessionIdAfter(message, 4));
-	} else {
-	    outputArea.append(String.format("%.8s: %s\n",
-		    sender.toString(), new String(message)));
+    public void receivedMessage(ClientChannel channel, SessionId sender,
+            byte[] message)
+    {
+        ByteBuffer buf = ByteBuffer.wrap(message);
+
+	byte opcode = buf.get();
+
+        switch (opcode) {
+        case OP_JOINED:
+	    memberList.addClient(ChatClient.getSessionId(buf));
+            break;
+        case OP_LEFT:
+	    memberList.removeClient(ChatClient.getSessionId(buf));
+            break;
+        case OP_MESSAGE: {
+            byte[] contents = new byte[buf.remaining()];
+            buf.get(contents);
+            // The server sends us a separate, private echoback in this
+            // application; those were from us originally, so use our
+            // own SessionId (instead of null).
+	    outputArea.append(String.format("%s: %s\n",
+		    (sender != null) ? sender : myChatClient.getSessionId(),
+                    new String(contents)));
+            break;
+        }
+        default:
+            System.err.format("Unknown opcode 0x%02X\n", opcode);
 	}
     }
 
     /**
      * {@inheritDoc}
+     * <p>
+     * Closes this frame.
      */
     public void leftChannel(ClientChannel channel) {
         if (getDesktopPane() != null) {
@@ -110,10 +128,14 @@ public class ChatChannelFrame extends JInternalFrame
     
     /**
      * {@inheritDoc}
+     * <p>
+     * Broadcasts on this channel the text entered by the user.
      */
     public void actionPerformed(ActionEvent action) {
         try {
-            chan.send(inputField.getText().getBytes());
+            byte[] contents = inputField.getText().getBytes();
+            byte[] message = ChatClient.getMessage(OP_MESSAGE, contents);
+            myChannel.send(message);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -121,28 +143,25 @@ public class ChatChannelFrame extends JInternalFrame
     }
 
     /**
-     * {@inheritDoc}
+     * Listener that requests to leave the channel when the
+     * frame closes.
      */
-    public void internalFrameClosing(InternalFrameEvent event) {
-        myChatClient.leaveChannel(chan);
+    static final class FrameClosingListener extends InternalFrameAdapter {
+        private final ChatChannelFrame frame;
+
+        /** Creates a new {@code FrameClosingListener}. */
+        FrameClosingListener(ChatChannelFrame frame) {
+            this.frame = frame;
+        }
+
+        /**
+         * {@inheritDoc}
+         * <p>
+         * Requests that the server remove this client from this channel.
+         */
+        public void internalFrameClosing(InternalFrameEvent event) {
+            frame.myChatClient.leaveChannel(frame.myChannel);
+        }        
     }
-
-    /** {@inheritDoc} */
-    public void internalFrameOpened(InternalFrameEvent event)      { /* unused */ }
-
-    /** {@inheritDoc} */
-    public void internalFrameClosed(InternalFrameEvent event)      { /* unused */ }
-
-    /** {@inheritDoc} */
-    public void internalFrameIconified(InternalFrameEvent event)   { /* unused */ }
-
-    /** {@inheritDoc} */
-    public void internalFrameDeiconified(InternalFrameEvent event) { /* unused */ }
-
-    /** {@inheritDoc} */
-    public void internalFrameActivated(InternalFrameEvent event)   { /* unused */ }
-
-    /** {@inheritDoc} */
-    public void internalFrameDeactivated(InternalFrameEvent event) { /* unused */ }
 
 }

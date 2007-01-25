@@ -5,10 +5,14 @@ import java.awt.Container;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.awt.event.MouseListener;
+import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
-import java.awt.event.WindowListener;
 import java.io.IOException;
 import java.net.PasswordAuthentication;
+import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.Properties;
 import java.util.Set;
@@ -36,10 +40,14 @@ import com.sun.sgs.client.simple.SimpleClient;
  * </p>
  */
 public class ChatClient extends JFrame
-        implements ActionListener, WindowListener,
-        	SimpleClientListener, ClientChannelListener
+        implements ActionListener, SimpleClientListener, ClientChannelListener
 {
     private static final long serialVersionUID = 1L;
+
+    // TODO: move these to a common location for app and client
+    static final byte OP_JOINED     = 0x4A;
+    static final byte OP_LEFT       = 0x4C;
+    static final byte OP_MESSAGE    = 0x4D;
 
     private final JButton loginButton;
     private final JButton openChannelButton;
@@ -48,20 +56,25 @@ public class ChatClient extends JFrame
     private final JLabel statusMessage;
     private final JDesktopPane desktop;
 
-    private static final String DCC_CHANNEL_NAME = "__DCC_Chan";
+    private static final String GLOBAL_CHANNEL_NAME = "_Global_";
 
-    /** a list of clients currently connected to the
-     *  ChatApp on the server.
+    /**
+     * a list of clients currently connected to the
+     * ChatApp on the server.
      */
     private final MemberList userList;
 
-    /**  used for communication with the server */
+    /** used for communication with the server */
     private SimpleClient client;
     
+    /** The listener for double-clicks on a memberlist. */
+    private final MouseListener dccMouseListener;
+
     /** the well-known channel for Direct Client to Client communication */
     private ClientChannel dccChannel;
 
     private volatile int quitAttempts = 0;
+
 
     // === Constructor ==
 
@@ -72,6 +85,8 @@ public class ChatClient extends JFrame
      */
     public ChatClient(String[] args) {
         super();
+        
+        dccMouseListener = new DCCMouseListener(this);
         
         setTitle("Chat Test Client");
         Container c = getContentPane();
@@ -91,8 +106,8 @@ public class ChatClient extends JFrame
         JPanel eastPanel = new JPanel();
         eastPanel.setLayout(new BorderLayout());
         eastPanel.add(new JLabel("Users"), BorderLayout.NORTH);
-        userList = new MemberList(this);
-
+        userList = new MemberList();
+        userList.addMouseListener(getDCCMouseListener());
         eastPanel.add(new JScrollPane(userList), BorderLayout.CENTER);
         c.add(eastPanel, BorderLayout.EAST);
 
@@ -120,10 +135,11 @@ public class ChatClient extends JFrame
         buttonPanel.add(serverSendButton);
         buttonPanel.add(multiDccButton);
 
+        addWindowListener(new QuitWindowListener(this));
+        
         pack();
-        setSize(800, 600);
+        //setSize(800, 600);
 
-        addWindowListener(this);
         setVisible(true);
     }
     
@@ -147,6 +163,40 @@ public class ChatClient extends JFrame
 	} finally {
 	    setButtonsEnabled(true);
 	}
+    }
+    
+    MouseListener getDCCMouseListener() {
+        return dccMouseListener;
+    }
+
+    /**
+     * Returns the {@link SessionId} for this client.
+     *
+     * @return the {@link SessionId} for this client
+     */
+    SessionId getSessionId() {
+        return client.getSessionId();
+    }
+
+    /**
+     * Returns a {@link SessionId} encoded in the bytes remaining in
+     * the given {@link ByteBuffer}.
+     *
+     * @param buffer the {@code ByteBuffer} containing an encoded
+     *        {@code SessionId} from its current position to the end
+     * @return the {@code SessionId} encoded in the buffer
+     */
+    static SessionId getSessionId(ByteBuffer buffer) {
+        byte[] idBytes = new byte[buffer.remaining()];
+        buffer.get(idBytes);
+        return SessionId.fromBytes(idBytes);
+    }
+
+    static byte[] getMessage(byte opcode, byte[] payload) {
+        byte[] message = new byte[1 + payload.length];
+        message[0] = opcode;
+        System.arraycopy(payload, 0, message, 1, payload.length);
+        return message;
     }
 
     // === Handle main window GUI actions ===
@@ -213,9 +263,10 @@ public class ChatClient extends JFrame
     	    return;
     	}
 
-        String message = getUserInput("Enter private message:");
+        String text = getUserInput("Enter private message:");
+        byte[] message = getMessage(OP_MESSAGE, text.getBytes());
         try {
-            dccChannel.send(targets, message.getBytes());
+            dccChannel.send(targets, message);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -226,9 +277,10 @@ public class ChatClient extends JFrame
 	if (target == null) {
 	    return;
 	}
-	String message = getUserInput("Enter private message:");
+	String text = getUserInput("Enter private message:");
+        byte[] message = getMessage(OP_MESSAGE, text.getBytes());
         try {
-            dccChannel.send(target, message.getBytes());
+            dccChannel.send(target, message);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -332,7 +384,7 @@ public class ChatClient extends JFrame
      * {@inheritDoc}
      */
     public ClientChannelListener joinedChannel(ClientChannel channel) {
-        if (channel.getName().equals(DCC_CHANNEL_NAME)) {
+        if (channel.getName().equals(GLOBAL_CHANNEL_NAME)) {
             dccChannel = channel;
             return this;
         } else {
@@ -343,36 +395,34 @@ public class ChatClient extends JFrame
         }
     }
 
-    private static SessionId getSessionIdAfter(byte[] message, int bytesRead) {
-	int sessionIdLen = message.length - bytesRead;
-	byte[] sessionIdBytes = new byte[sessionIdLen];
-	System.arraycopy(message, 0, sessionIdBytes, 0, sessionIdLen);
-	return SessionId.fromBytes(sessionIdBytes);
-    }
-
     /**
      * {@inheritDoc}
      */
     public void receivedMessage(byte[] message) {
-        if (message.length < 4) {
-            System.err.format("ChatClient: Error, short command [%s]\n",
-                    new String(message));
+        if (message.length < 1) {
+            System.err.format("ChatClient: Error, short command\n");
         }
-	byte[] cmdBytes = new byte[4];
-	System.arraycopy(message, 0, cmdBytes, 0, 4);
-	String command = new String(cmdBytes);
-	System.err.format("ChatClient: Command recv [%s]\n", command);
-	if (command.equals("LOGI")) {
-	    userLogin(getSessionIdAfter(message, 4));
-	} else if (command.equals("LOGO")) {
-	    userLogout(getSessionIdAfter(message, 4));
-        } else if (command.equals("ECHO")) {
-            String msgString = new String(message);
-            System.out.println(msgString.substring(4));
-	} else {
-	    System.err.format("ChatClient: Error, unknown command [%s]\n",
-		    command);
-	}
+
+        ByteBuffer buf = ByteBuffer.wrap(message);
+        byte opcode = buf.get();
+
+        switch (opcode) {
+        case OP_JOINED:
+            userLogin(getSessionId(buf));
+            break;
+        case OP_LEFT:
+            userLogout(getSessionId(buf));
+            break;
+        case OP_MESSAGE:
+            byte[] msgBytes = new byte[buf.remaining()];
+            buf.get(msgBytes);
+            String msgString = new String(msgBytes);
+            System.out.println(msgString);
+            break;
+        default:
+            System.err.format("Unknown opcode 0x%02X\n", opcode);
+            break;
+        }
     }
 
     // Implement ClientChannelListener
@@ -421,32 +471,51 @@ public class ChatClient extends JFrame
         }
     }
 
-    // Implement WindowListener
+    /**
+     * Listener that brings up a DCC send dialog when a {@code MemberList}
+     * is double-clicked.
+     */
+    static final class DCCMouseListener extends MouseAdapter {
+        private final ChatClient client;
+
+        /** Creates a new {@code DCCMouseListener}. */
+        DCCMouseListener(ChatClient client) {
+            this.client = client;
+        }
+
+        /**
+         * {@inheritDoc}
+         * <p>
+         * Brings up a DCC send dialog when a double-click is received.
+         */
+        @Override
+        public void mouseClicked(MouseEvent evt) {
+            if (evt.getClickCount() == 2) {
+                client.doDCCMessage();
+            }
+        }
+    }
 
     /**
-     * {@inheritDoc}
+     * Listener that quits the {@code ChatClient} when the window
+     * is closed.
      */
-    public void windowClosing(WindowEvent e) {
-	doQuit();
+    static final class QuitWindowListener extends WindowAdapter {
+        private final ChatClient client;
+
+        /** Creates a new {@code QuitWindowListener}. */
+        QuitWindowListener(ChatClient client) {
+            this.client = client;
+        }
+        
+        /**
+         * {@inheritDoc}
+         */
+        @Override
+        public void windowClosing(WindowEvent e) {
+            client.doQuit();
+        }
     }
-    
-    /** {@inheritDoc} */
-    public void windowActivated(WindowEvent e)   { /*unused */ }
-    
-    /** {@inheritDoc} */
-    public void windowClosed(WindowEvent e)      { /*unused */ }
-    
-    /** {@inheritDoc} */
-    public void windowDeactivated(WindowEvent e) { /*unused */ }
-    
-    /** {@inheritDoc} */
-    public void windowDeiconified(WindowEvent e) { /*unused */ }
-    
-    /** {@inheritDoc} */
-    public void windowIconified(WindowEvent e)   { /*unused */ }
-    
-    /** {@inheritDoc} */
-    public void windowOpened(WindowEvent e)      { /*unused */ }
 
     // Main
     
