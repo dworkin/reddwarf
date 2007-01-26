@@ -9,7 +9,6 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 
-import com.sun.sgs.impl.io.CompleteMessageFilter;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.IOConstants.TransportType;
 import com.sun.sgs.io.Endpoint;
@@ -250,7 +249,7 @@ public class ClientTest extends JFrame {
         }
         
         public void connect(Endpoint<?> endpoint) throws IOException {
-            endpoint.createConnector().connect(this, new CompleteMessageFilter());
+            endpoint.createConnector().connect(this);
         }
         
         public String getStatus() {

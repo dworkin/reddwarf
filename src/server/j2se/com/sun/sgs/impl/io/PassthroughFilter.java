@@ -17,7 +17,7 @@ import com.sun.sgs.io.IOHandler;
  * {@code #filterReceive} should be called by only one thread.
  * {@code #filterSend}, however, is thread-safe.
  */
-public class PassthroughFilter extends AbstractFilter {
+class PassthroughFilter extends IOFilter {
 
     /** The total expected length of an "in progress" partial message. */
     private int partialMessageLength;
@@ -38,6 +38,7 @@ public class PassthroughFilter extends AbstractFilter {
      * This implementation simply strips the length header from incoming
      * packets.
      */
+    @Override
     public void filterReceive(IOHandle handle, byte[] message) {
         index = 0;
 
@@ -108,6 +109,7 @@ public class PassthroughFilter extends AbstractFilter {
      * This implementation simply sends out each byte message without
      * modification.
      */
+    @Override
     public void filterSend(IOHandle handle, byte[] message) {
         ((SocketHandle) handle).doSend(message);
     }

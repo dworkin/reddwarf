@@ -11,7 +11,6 @@ import org.apache.mina.common.IoSession;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.io.IOAcceptor;
 import com.sun.sgs.io.IOConnector;
-import com.sun.sgs.io.IOFilter;
 import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
 
@@ -78,8 +77,9 @@ class SocketHandler extends IoHandlerAdapter {
     /**
      * {@inheritDoc}
      * <p>
-     * Obtains the {@link IOFilter} for the associated {@link IOHandle}, and
-     * forwards incoming data to {@link IOFilter#filterReceive}.
+     * Obtains the {@link CompleteMessageFilter} for the associated
+     * {@link IOHandle}, and forwards incoming data to the filter's
+     * {@link CompleteMessageFilter#filterReceive filterReceive} method.
      */
     @Override
     public void messageReceived(IoSession session, Object message)

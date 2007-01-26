@@ -3,7 +3,6 @@ package com.sun.sgs.impl.service.session;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.IdentityManager;
-import com.sun.sgs.impl.io.CompleteMessageFilter;
 import com.sun.sgs.impl.io.IOConstants.TransportType;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.util.LoggerWrapper;
@@ -206,8 +205,7 @@ public class ClientSessionServiceImpl
 		        new InetSocketAddress(port), TransportType.RELIABLE);
 		try {
                     acceptor = endpoint.createAcceptor();
-		    acceptor.listen(
-			acceptorListener, CompleteMessageFilter.class);
+		    acceptor.listen(acceptorListener);
 		    if (logger.isLoggable(Level.CONFIG)) {
 			logger.log(
 			    Level.CONFIG,

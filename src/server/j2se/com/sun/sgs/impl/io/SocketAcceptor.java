@@ -13,7 +13,6 @@ import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.io.Endpoint;
 import com.sun.sgs.io.IOAcceptorListener;
 import com.sun.sgs.io.IOAcceptor;
-import com.sun.sgs.io.IOFilter;
 import com.sun.sgs.io.IOHandler;
 
 /**
@@ -49,35 +48,22 @@ public class SocketAcceptor implements IOAcceptor<SocketAddress> {
         this.endpoint = endpoint;
         this.acceptor = acceptor;
     }
-    
-    /**
-     * {@inheritDoc}
-     */
-    public void listen(IOAcceptorListener listener, 
-                    Class<? extends IOFilter> filterClass) throws IOException
-    {
-        checkShutdown();
-        AcceptHandler acceptHandler =
-            new AcceptHandler(listener,
-                    (filterClass == null)
-                    ? PassthroughFilter.class
-                    : filterClass);
-        acceptor.bind(endpoint.getAddress(), acceptHandler);
-        logger.log(Level.FINE, "listening on {0}", getEndpoint());
-    }
 
     /**
      * {@inheritDoc}
      * <p>
-     * This implementation uses a {@code PassthroughFilter} which simply
-     * forwards any data on untouched.
+     * This implementation ensures that only complete messages are
+     * delivered on the handles that it accepts.
      */
     public void listen(IOAcceptorListener listener) 
         throws IOException
     {
-        listen(listener, PassthroughFilter.class);
+        checkShutdown();
+        AcceptHandler acceptHandler = new AcceptHandler(listener);
+        acceptor.bind(endpoint.getAddress(), acceptHandler);
+        logger.log(Level.FINE, "listening on {0}", getEndpoint());
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -128,9 +114,6 @@ public class SocketAcceptor implements IOAcceptor<SocketAddress> {
         /** The IOAcceptorListener for our parent IOAcceptor. */
         private final IOAcceptorListener listener;
         
-        /** The class of IOFilter to attach to new connections. */
-        private final Class<? extends IOFilter> filterClass;
-        
         /**
          * Constructs a new {@code AcceptHandler} with an
          * {@code IOAcceptorListener} that will be notified as new
@@ -138,28 +121,23 @@ public class SocketAcceptor implements IOAcceptor<SocketAddress> {
          * 
          * @param listener the listener to be notified of incoming
          *        connections
-         * @param filterClass the type of filter to be attached to new
-         *        handles
          */
-        public AcceptHandler(IOAcceptorListener listener, 
-                Class<? extends IOFilter> filterClass)
-        {    
-            this.listener = listener; 
-            this.filterClass = filterClass;
+        public AcceptHandler(IOAcceptorListener listener) {
+            this.listener = listener;
         }
         
         /**
          * As new MINA {@code IoSession}s come in, set up a
          * {@code SocketHandle} and notify the associated
-         * {@code IOAcceptorListener}. A new instance of the associated
-         * filter will be attached to the new handle.
+         * {@code IOAcceptorListener}. A new {@code CompleteMessageFilter}
+         * instance will be attached to the new handle.
          * 
          * @param session the newly created {@code IoSession}
          */
         @Override
         public void sessionCreated(IoSession session) throws Exception {
             logger.log(Level.FINE, "accepted session {0}", session);
-            IOFilter filter = filterClass.newInstance();
+            CompleteMessageFilter filter = new CompleteMessageFilter();
             IOHandler handler = listener.newHandle();
             SocketHandle handle = new SocketHandle(handler, filter, session);
             session.setAttachment(handle);

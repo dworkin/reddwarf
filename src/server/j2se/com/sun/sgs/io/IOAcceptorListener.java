@@ -11,19 +11,19 @@ package com.sun.sgs.io;
 public interface IOAcceptorListener {
 
     /**
-     * Invoked by the associated {@link IOAcceptor} to obtain an appropriate
-     * {@link IOHandler} for a newly-accepted connection.
-     * The connection's {@link IOHandle} will be passed to the
-     * {@code connected} method of the returned {@code IOHandler}
-     * when the connection is fully established.
+     * Returns an appropriate {@link IOHandler} for a newly-accepted
+     * connection.  The {@link IOHandle} for the new connection is
+     * passed to the {@link IOHandler#connected connected} method of the
+     * returned {@code IOHandler} once the connection is fully established.
      *
-     * @return an {@link IOHandler} that will receive events for the
+     * @return an {@link IOHandler} to receive events for the
      *          newly-accepted connection
      */
     IOHandler newHandle();
 
     /**
-     * Invoked when the associated {@link IOAcceptor} is shut down.
+     * Notifies this listener that its associated {@link IOAcceptor}
+     * has shut down.
      */
     void disconnected();
 

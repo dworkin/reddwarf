@@ -22,7 +22,7 @@ import com.sun.sgs.io.IOHandler;
  * instance, and {@code filterReceive} should be called by only one thread.
  * {@code filterSend}, however, is thread-safe.
  */
-public class CompleteMessageFilter extends AbstractFilter {
+class CompleteMessageFilter extends IOFilter {
 
     /**
      * An partial message still waiting for its remaining data.
@@ -60,6 +60,7 @@ public class CompleteMessageFilter extends AbstractFilter {
      * the listener, otherwise it continues to be held for the next call.</li>
      * </ul>
      */
+    @Override
     public void filterReceive(IOHandle handle, byte[] message) {
         index = 0;
 
@@ -117,6 +118,7 @@ public class CompleteMessageFilter extends AbstractFilter {
      * This implementation sends the message without modification on
      * the {@code handle}.
      */
+    @Override
     public void filterSend(IOHandle handle, byte[] message) {
         ((SocketHandle) handle).doSend(message);
     }

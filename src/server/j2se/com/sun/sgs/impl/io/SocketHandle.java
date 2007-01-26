@@ -8,7 +8,6 @@ import org.apache.mina.common.ByteBuffer;
 import org.apache.mina.common.IoSession;
 
 import com.sun.sgs.impl.util.LoggerWrapper;
-import com.sun.sgs.io.IOFilter;
 import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
 
@@ -26,8 +25,8 @@ public class SocketHandle implements IOHandle {
     /** The {@link IOHandler} for this {@code IOHandle}. */
     private final IOHandler handler;
 
-    /** The {@link IOFilter} for this {@code IOHandle}. */
-    private final IOFilter filter;
+    /** The {@link CompleteMessageFilter} for this {@code IOHandle}. */
+    private final CompleteMessageFilter filter;
 
     /** The {@link IoSession} for this {@code IOHandle}. */
     private final IoSession session;
@@ -37,10 +36,10 @@ public class SocketHandle implements IOHandle {
      * and session.
      * 
      * @param handler the {@link IOHandler} for the {@code IOHandle}
-     * @param filter the {@link IOFilter} for the {@code IOHandle}
+     * @param filter the {@link CompleteMessageFilter} for the {@code IOHandle}
      * @param session the {@link IoSession} for the {@code IOHandle}
      */
-    SocketHandle(IOHandler handler, IOFilter filter, IoSession session) {
+    SocketHandle(IOHandler handler, CompleteMessageFilter filter, IoSession session) {
         this.handler = handler;
         this.filter = filter;
         this.session = session;
@@ -102,7 +101,7 @@ public class SocketHandle implements IOHandle {
      * 
      * @return the associated filter
      */
-    IOFilter getFilter() {
+    CompleteMessageFilter getFilter() {
         return filter;
     }
     

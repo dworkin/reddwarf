@@ -3,10 +3,9 @@ package com.sun.sgs.io;
 import java.io.IOException;
 
 /**
- * Represents a communication endpoint with no transport or protocol
- * attachment. Implementations of {@code Endpoint} encapsulate the
- * connection-creation mechanism for particular address families (such as
- * {@link java.net.SocketAddress}).
+ * Represents an abstract communication endpoint. Implementations of
+ * {@code Endpoint} encapsulate the connection-creation mechanism for
+ * particular address families (such as {@link java.net.SocketAddress}).
  * <p>
  * Active or passive connection initiation is accomplished by obtaining an
  * {@code Endpoint}'s {@link IOConnector} or {@link IOAcceptor},
@@ -17,10 +16,10 @@ import java.io.IOException;
 public interface Endpoint<T> {
 
     /**
-     * Creates a non-reusable connector for actively initiating a connection
+     * Creates an {@link IOConnector} for actively initiating a connection
      * to this remote {@code Endpoint}.
      *
-     * @return an {@link IOConnector} configured to connect to this
+     * @return an {@code IOConnector} configured to connect to this
      *         {@code Endpoint}
      *
      * @throws IOException if a connector cannot be created
@@ -28,10 +27,10 @@ public interface Endpoint<T> {
     IOConnector<T> createConnector() throws IOException;
 
     /**
-     * Creates a non-reusable acceptor to passively listen for connections
+     * Creates an {@link IOAcceptor} to passively listen for connections
      * on this local {@code Endpoint}.
      *
-     * @return an {@link IOAcceptor} configured to listen on this
+     * @return an {@code IOAcceptor} configured to listen on this
      *         {@code Endpoint}
      *
      * @throws IOException if an acceptor cannot be created
@@ -39,7 +38,7 @@ public interface Endpoint<T> {
     IOAcceptor<T> createAcceptor() throws IOException;
 
     /**
-     * Return the address of type {@code T} encapsulated by this
+     * Returns the address of type {@code T} encapsulated by this
      * {@code Endpoint}.
      *
      * @return the address encapsulated by this {@code Endpoint}

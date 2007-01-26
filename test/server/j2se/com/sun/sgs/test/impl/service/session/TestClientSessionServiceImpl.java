@@ -20,7 +20,6 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityCredentials;
 import com.sun.sgs.auth.IdentityManager;
 import com.sun.sgs.impl.auth.NamePasswordCredentials;
-import com.sun.sgs.impl.io.CompleteMessageFilter;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.IOConstants.TransportType;
 import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
@@ -591,7 +590,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		        new InetSocketAddress(InetAddress.getLocalHost(), port),
 			TransportType.RELIABLE);
 		connector = endpoint.createConnector();
-		connector.connect(listener, new CompleteMessageFilter());
+		connector.connect(listener);
 	    } catch (Exception e) {
 		System.err.println("DummyClient.connect throws: " + e);
 		e.printStackTrace();

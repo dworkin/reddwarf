@@ -10,7 +10,6 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.sun.sgs.impl.io.CompleteMessageFilter;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.IOConstants.TransportType;
 import com.sun.sgs.io.IOAcceptorListener;
@@ -67,7 +66,7 @@ public class IOFilterTest {
                     
                 }
                 
-            }, CompleteMessageFilter.class);
+            });
         } catch (IOException ioe) {
             ioe.printStackTrace();
         }
@@ -136,7 +135,7 @@ public class IOFilterTest {
             }
         };
         
-        connector.connect(handler, new CompleteMessageFilter());
+        connector.connect(handler);
         
         synchronized(this) {
             try {

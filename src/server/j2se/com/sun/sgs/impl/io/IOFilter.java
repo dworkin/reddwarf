@@ -1,4 +1,10 @@
-package com.sun.sgs.io;
+package com.sun.sgs.impl.io;
+
+import com.sun.sgs.io.IOHandle;
+import com.sun.sgs.io.IOHandler;
+
+// TODO move this functionality into protocol decode; we should
+// do framing in the protocol, not the transport. -JM
 
 /**
  * Filter hooks that allow {@link IOHandle} messages to be modified before
@@ -14,11 +20,15 @@ package com.sun.sgs.io;
  * {@code IOHandler}.  The filter may modify the incoming data in any way,
  * and may invoke the handler once, multiple times, or not at all.
  * <p>
- * Some xample applications of {@code IOFilter} implementations include
+ * Some example applications of {@code IOFilter} implementations include
  * fragment reassembly, packet logging, profanity filters, and filter
  * chaining.
+ * <p>
+ *
+ * Includes common functionality for reading a length in a message and
+ * maintaining an index into the buffer array.
  */
-public interface IOFilter {
+abstract class IOFilter {
 
     /**
      * Invoked after a caller has requested data be sent on the associated
@@ -29,7 +39,7 @@ public interface IOFilter {
      * @param message the data to filter and optionally send on the
      *        connection represented by the given {@code handle}
      */
-    void filterSend(IOHandle handle, byte[] message);
+    public abstract void filterSend(IOHandle handle, byte[] message);
 
     /**
      * Invoked as messages are received by the {@code IOHandle} before
@@ -41,6 +51,34 @@ public interface IOFilter {
      * @param message the data to filter and optionally deliver to the
      *        {@code IOHandler} for the given {@code handle}
      */
-    void filterReceive(IOHandle handle, byte[] message);
+    public abstract void filterReceive(IOHandle handle, byte[] message);
 
+    /** The offset of the array that is currently being processed. */
+    protected int index;
+
+    /**
+     * Reads the next four bytes of the given array starting at the current
+     * index and assembles them into a network byte-ordered int. It will
+     * increment the index by four if the read was successful. It will
+     * return zero if not enough bytes remain in the array.
+     *
+     * @param array the array from which to read bytes
+     *
+     * @return the next four bytes as an int, or zero if there aren't enough
+     *         bytes remaining in the array
+     */
+    protected int readInt(byte[] array) {
+        if (array.length < (index + 4)) {
+            return 0;
+        }
+        int num =
+              ((array[index]     & 0xFF) << 24) |
+              ((array[index + 1] & 0xFF) << 16) |
+              ((array[index + 2] & 0xFF) <<  8) |
+               (array[index + 3] & 0xFF);
+        
+        index += 4;
+        
+        return num;
+    }
 }

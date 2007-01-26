@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 
-import com.sun.sgs.impl.io.CompleteMessageFilter;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.IOConstants.TransportType;
 import com.sun.sgs.io.IOAcceptorListener;
@@ -47,8 +46,7 @@ public class ServerTest implements IOHandler {
                 public void disconnected() {
                     // TODO Auto-generated method stub
                 }
-            },
-            CompleteMessageFilter.class);
+            });
         } catch (IOException ioe) {
             ioe.printStackTrace();
         }

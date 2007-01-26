@@ -17,10 +17,11 @@ import java.io.IOException;
 public interface IOConnector<T> {
 
     /**
-     * Actively initate a connection to the associated {@link Endpoint}.
-     * This call is non-blocking. {@link IOHandler#connected} will be
-     * called asynchronously on the {@code listener} upon successful
-     * connection, or {@link IOHandler#disconnected} if it fails.
+     * Actively initates a connection to the associated {@link Endpoint}.
+     * This call is non-blocking. {@link IOHandler#connected connected}
+     * will be called asynchronously on the given {@code listener} upon
+     * successful connection, or {@link IOHandler#disconnected disconnected}
+     * if it fails.
      *
      * @param listener the listener for all IO events on the connection,
      *        including the result of the connection attempt
@@ -32,27 +33,9 @@ public interface IOConnector<T> {
     void connect(IOHandler listener) throws IOException;
 
     /**
-     * Actively initate a connection to the associated {@link Endpoint}.
-     * This call is non-blocking. {@link IOHandler#connected} will be
-     * called asynchronously on the {@code listener} upon successful
-     * connection, or {@link IOHandler#disconnected} if it fails.  The given
-     * {@link IOFilter} will be attached to the {@link IOHandle} upon
-     * connecting.
+     * Returns the {@link Endpoint} for this {@code IOConnector}.
      *
-     * @param listener the listener for all IO events on the connection,
-     *        including the result of the connection attempt
-     * @param filter the {@link IOFilter} to attach to the connection
-     *
-     * @throws IOException if there was a problem initating the connection
-     * @throws IllegalStateException if the {@code IOConnector} has been
-     *         shut down or has already attempted a connection
-     */
-    void connect(IOHandler listener, IOFilter filter) throws IOException;
-
-    /**
-     * Returns the {@link Endpoint} this {@code IOConnector} will connect to.
-     *
-     * @return the {@code Endpoint} this {@code IOConnector} will connect to
+     * @return the {@code Endpoint} for this {@code IOConnector}
      */
     Endpoint<T> getEndpoint();
 

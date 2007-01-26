@@ -9,7 +9,6 @@ import org.apache.mina.common.IoSession;
 
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.io.Endpoint;
-import com.sun.sgs.io.IOFilter;
 import com.sun.sgs.io.IOHandler;
 import com.sun.sgs.io.IOConnector;
 
@@ -52,17 +51,10 @@ public class SocketConnector implements IOConnector<SocketAddress>
     /**
      * {@inheritDoc}
      * <p>
-     * A {@code PassthroughFilter} will be installed on the connected 
-     * {@code IOHandle}, which simply passes the data on untouched.
+     * This implementation ensures that only complete messages are
+     * delivered on the handle that it connects.
      */
-    public void connect(IOHandler handler) {
-        connect(handler, new PassthroughFilter());
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public void connect(IOHandler handler, IOFilter filter)
+    public void connect(IOHandler handler)
     {
         synchronized (this) {
             if (connectionHandler != null) {
@@ -71,12 +63,11 @@ public class SocketConnector implements IOConnector<SocketAddress>
                 logger.logThrow(Level.FINE, e, e.getMessage());
                 throw e;
             }
-            connectionHandler = new ConnectionHandler(handler, filter);
+            connectionHandler = new ConnectionHandler(handler);
         }
         logger.log(Level.FINE, "connecting to {0}", endpoint);
         connector.connect(endpoint.getAddress(), connectionHandler);
     }
-    
 
     /**
      * {@inheritDoc}
@@ -102,9 +93,6 @@ public class SocketConnector implements IOConnector<SocketAddress>
         /** The requested IOHandler for the connected session. */
         private final IOHandler handler;
         
-        /** The IOFilter instance to attach to the new connection. */
-        private final IOFilter filter;
-        
         /** Whether this connector has been cancelled. */
         private boolean cancelled = false;
         
@@ -113,14 +101,12 @@ public class SocketConnector implements IOConnector<SocketAddress>
 
         /**
          * Constructs a new {@code ConnectionHandler} with an
-         * {@code IOHandler} that will handle events for the new connectin.
+         * {@code IOHandler} that will handle events for the new connection.
          * 
          * @param handler the handler for the completed connection
-         * @param filter the IOFilter to attach to the connection
          */
-        ConnectionHandler(IOHandler handler, IOFilter filter) {
+        ConnectionHandler(IOHandler handler) {
             this.handler = handler;
-            this.filter = filter;
         }
         
         /**
@@ -167,6 +153,7 @@ public class SocketConnector implements IOConnector<SocketAddress>
             }
             
             logger.log(Level.FINE, "created session {0}", session);
+            CompleteMessageFilter filter = new CompleteMessageFilter();
             SocketHandle handle = new SocketHandle(handler, filter, session);
             session.setAttachment(handle);
         }

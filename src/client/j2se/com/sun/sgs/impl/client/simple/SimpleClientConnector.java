@@ -7,7 +7,6 @@ import java.util.Properties;
 
 import com.sun.sgs.impl.client.comm.ClientConnectionListener;
 import com.sun.sgs.impl.client.comm.ClientConnector;
-import com.sun.sgs.impl.io.CompleteMessageFilter;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.IOConstants.TransportType;
 import com.sun.sgs.io.IOConnector;
@@ -65,7 +64,7 @@ class SimpleClientConnector extends ClientConnector {
         SimpleClientConnection connection = 
             new SimpleClientConnection(connectionListener);
         
-        connector.connect(connection, new CompleteMessageFilter());
+        connector.connect(connection);
     }
 
 }
