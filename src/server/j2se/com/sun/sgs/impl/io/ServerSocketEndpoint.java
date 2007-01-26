@@ -10,7 +10,7 @@ import org.apache.mina.filter.executor.ExecutorExecutor;
 import org.apache.mina.transport.socket.nio.DatagramAcceptor;
 
 import com.sun.sgs.impl.util.LoggerWrapper;
-import com.sun.sgs.io.IOAcceptor;
+import com.sun.sgs.io.Acceptor;
 import com.sun.sgs.io.ServerEndpoint;
 
 /**
@@ -81,11 +81,12 @@ public class ServerSocketEndpoint extends AbstractSocketEndpoint
     /**
      * {@inheritDoc}
      */
-    public IOAcceptor<SocketAddress> createAcceptor() {
+    public Acceptor<SocketAddress> createAcceptor() {
         IoAcceptor minaAcceptor;
         ExecutorExecutor adapter = new ExecutorExecutor(executor);
         if (transportType.equals(TransportType.RELIABLE)) {
-            minaAcceptor = new org.apache.mina.transport.socket.nio.SocketAcceptor(
+            minaAcceptor =
+                new org.apache.mina.transport.socket.nio.SocketAcceptor(
                     numProcessors, adapter);
         } else {
             minaAcceptor = new DatagramAcceptor(adapter);

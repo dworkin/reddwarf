@@ -7,9 +7,9 @@ import com.sun.sgs.impl.io.ServerSocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.NonDurableTaskScheduler;
-import com.sun.sgs.io.IOAcceptor;
-import com.sun.sgs.io.IOAcceptorListener;
-import com.sun.sgs.io.IOHandler;
+import com.sun.sgs.io.Acceptor;
+import com.sun.sgs.io.AcceptorListener;
+import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskScheduler;
@@ -76,7 +76,7 @@ public class ClientSessionServiceImpl
     private final int port;
 
     /** The listener for accpeted connections. */
-    private final IOAcceptorListener acceptorListener = new Listener();
+    private final AcceptorListener acceptorListener = new Listener();
 
     /** The registered service listeners. */
     private final Map<Byte, ProtocolMessageListener> serviceListeners =
@@ -88,8 +88,8 @@ public class ClientSessionServiceImpl
 	Collections.synchronizedMap(
 	    new HashMap<SessionId, ClientSessionImpl>());
 
-    /** The IOAcceptor for listening for new connections. */
-    private IOAcceptor<SocketAddress> acceptor;
+    /** The Acceptor for listening for new connections. */
+    private Acceptor<SocketAddress> acceptor;
 
     /** Synchronize on this object before accessing the registry. */
     private final Object lock = new Object();
@@ -300,9 +300,9 @@ public class ClientSessionServiceImpl
 	return sessions.get(new SessionId(sessionId));
     }
 
-    /* -- Implement IOAcceptorListener -- */
+    /* -- Implement AcceptorListener -- */
 
-    class Listener implements IOAcceptorListener {
+    class Listener implements AcceptorListener {
 
 	/**
 	 * {@inheritDoc}
@@ -310,7 +310,7 @@ public class ClientSessionServiceImpl
 	 * <p>Creates a new client session with the specified handle,
 	 * and adds the session to the internal session map.
 	 */
-	public IOHandler newHandle() {
+	public ConnectionListener newConnection() {
 	    if (shuttingDown()) {
 		return null;
 	    }

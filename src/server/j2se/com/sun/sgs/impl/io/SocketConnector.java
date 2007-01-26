@@ -9,11 +9,11 @@ import org.apache.mina.common.IoSession;
 
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.io.Endpoint;
-import com.sun.sgs.io.IOHandler;
-import com.sun.sgs.io.IOConnector;
+import com.sun.sgs.io.ConnectionListener;
+import com.sun.sgs.io.Connector;
 
 /**
- * This is a socket-based implementation of an {@code IOConnector} using
+ * This is a socket-based implementation of an {@code Connector} using
  * the Apache MINA framework for the underlying transport.  It uses an
  * {@link org.apache.mina.common.IoConnector} to initiate connections on 
  * remote hosts.
@@ -21,14 +21,14 @@ import com.sun.sgs.io.IOConnector;
  * Its constructor is package-private, so use {@link Endpoint#createConnector}
  * to create an instance. This implementation is thread-safe.
  */
-class SocketConnector implements IOConnector<SocketAddress>
+class SocketConnector implements Connector<SocketAddress>
 {
     /** The logger for this class. */
     private static final LoggerWrapper logger =
         new LoggerWrapper(Logger.getLogger(SocketConnector.class.getName()));
     
     private final IoConnector connector;
-    private ConnectionHandler connectionHandler = null;
+    private ConnectorConnListner connListener = null;
 
     private final SocketEndpoint endpoint;
 
@@ -52,21 +52,21 @@ class SocketConnector implements IOConnector<SocketAddress>
      * {@inheritDoc}
      * <p>
      * This implementation ensures that only complete messages are
-     * delivered on the handle that it connects.
+     * delivered on the connection that it connects.
      */
-    public void connect(IOHandler handler)
+    public void connect(ConnectionListener listener)
     {
         synchronized (this) {
-            if (connectionHandler != null) {
+            if (connListener != null) {
                 RuntimeException e = new IllegalStateException(
                             "Connection already in progress");
                 logger.logThrow(Level.FINE, e, e.getMessage());
                 throw e;
             }
-            connectionHandler = new ConnectionHandler(handler);
+            connListener = new ConnectorConnListner(listener);
         }
         logger.log(Level.FINE, "connecting to {0}", endpoint);
-        connector.connect(endpoint.getAddress(), connectionHandler);
+        connector.connect(endpoint.getAddress(), connListener);
     }
 
     /**
@@ -75,23 +75,23 @@ class SocketConnector implements IOConnector<SocketAddress>
     public synchronized void shutdown() {
         logger.log(Level.FINE, "shutdown called");
         synchronized (this) {
-            if (connectionHandler == null) {
+            if (connListener == null) {
                 RuntimeException e = new IllegalStateException(
                             "No connection in progress");
                 logger.logThrow(Level.FINE, e, e.getMessage());
                 throw e;
             }
         }
-        connectionHandler.cancel();
+        connListener.cancel();
     }
 
     /**
      * Internal adaptor class to handle events from the connector itself.
      */
-    static final class ConnectionHandler extends SocketHandler {
+    static final class ConnectorConnListner extends SocketConnectionListener {
 
-        /** The requested IOHandler for the connected session. */
-        private final IOHandler handler;
+        /** The requested ConnectionListener for the connected session. */
+        private final ConnectionListener listener;
         
         /** Whether this connector has been cancelled. */
         private boolean cancelled = false;
@@ -101,12 +101,14 @@ class SocketConnector implements IOConnector<SocketAddress>
 
         /**
          * Constructs a new {@code ConnectionHandler} with an
-         * {@code IOHandler} that will handle events for the new connection.
+         * {@code ConnectionListener} that will handle events for the new
+         * connection.
          * 
-         * @param handler the handler for the completed connection
+         * @param listener the ConnectionListener for the completed
+         *        connection
          */
-        ConnectionHandler(IOHandler handler) {
-            this.handler = handler;
+        ConnectorConnListner(ConnectionListener listener) {
+            this.listener = listener;
         }
         
         /**
@@ -135,7 +137,7 @@ class SocketConnector implements IOConnector<SocketAddress>
         }
 
         /**
-         * The connection is starting; set the IOHandler for it.
+         * The connection is starting; set the ConnectionListener for it.
          * 
          * @param session the newly created {@code IoSession}
          */
@@ -154,8 +156,9 @@ class SocketConnector implements IOConnector<SocketAddress>
             
             logger.log(Level.FINE, "created session {0}", session);
             CompleteMessageFilter filter = new CompleteMessageFilter();
-            SocketHandle handle = new SocketHandle(handler, filter, session);
-            session.setAttachment(handle);
+            SocketConnection connection =
+                new SocketConnection(listener, filter, session);
+            session.setAttachment(connection);
         }
     }
 

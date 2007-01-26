@@ -31,9 +31,9 @@ import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
 import com.sun.sgs.impl.service.session.SgsProtocol;
 import com.sun.sgs.impl.service.task.TaskServiceImpl;
 import com.sun.sgs.impl.util.MessageBuffer;
-import com.sun.sgs.io.IOConnector;
-import com.sun.sgs.io.IOHandle;
-import com.sun.sgs.io.IOHandler;
+import com.sun.sgs.io.Connector;
+import com.sun.sgs.io.Connection;
+import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.Priority;
@@ -562,9 +562,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 	private String name;
 	private String password;
-	private IOConnector<SocketAddress> connector;
-	private IOHandler listener;
-	private IOHandle handle;
+	private Connector<SocketAddress> connector;
+	private ConnectionListener listener;
+	private Connection connection;
 	private boolean connected = false;
 	private final Object lock = new Object();
 	private boolean loginAck = false;
@@ -622,7 +622,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    }
 		    connected = false;
 		    try {
-			handle.close();
+			connection.close();
 		    } catch (IOException e) {
 			System.err.println(
 			    "DummyClient.disconnect exception:" + e);
@@ -640,7 +640,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 			putByte(SgsProtocol.LOGOUT_REQUEST);
 		    logoutAck = false;
 		    try {
-			handle.sendBytes(buf.getBuffer());
+			connection.sendBytes(buf.getBuffer());
 		    } catch (IOException e) {
 			throw new RuntimeException(e);
 		    }
@@ -682,7 +682,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		putString(password);
 	    loginAck = false;
 	    try {
-		handle.sendBytes(buf.getBuffer());
+		connection.sendBytes(buf.getBuffer());
 	    } catch (IOException e) {
 		throw new RuntimeException(e);
 	    }
@@ -720,7 +720,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    logoutAck = false;
 
 	    try {
-		handle.sendBytes(buf.getBuffer());
+		connection.sendBytes(buf.getBuffer());
 	    } catch (IOException e) {
 		throw new RuntimeException(e);
 	    }
@@ -741,15 +741,15 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    
 	}
 
-	private class Listener implements IOHandler {
+	private class Listener implements ConnectionListener {
 
 	    List<byte[]> messageList = new ArrayList<byte[]>();
 	    
-	    public void bytesReceived(IOHandle h, byte[] buffer) {
-		if (handle != h) {
+	    public void bytesReceived(Connection conn, byte[] buffer) {
+		if (connection != conn) {
 		    System.err.println(
 			"DummyClient.Listener connected wrong handle, got:" +
-			h + ", expected:" + handle);
+			conn + ", expected:" + connection);
 		    return;
 		}
 
@@ -821,25 +821,25 @@ public class TestClientSessionServiceImpl extends TestCase {
 		}
 	    }
 
-	    public void connected(IOHandle h) {
+	    public void connected(Connection conn) {
 		System.err.println("DummyClient.Listener.connected");
-		if (handle != null) {
+		if (connection != null) {
 		    System.err.println(
 			"DummyClient.Listener.already connected handle: " +
-			handle);
+			connection);
 		    return;
 		}
-		handle = h;
+		connection = conn;
 		synchronized (lock) {
 		    connected = true;
 		    lock.notifyAll();
 		}
 	    }
 
-	    public void disconnected(IOHandle handle) {
+	    public void disconnected(Connection conn) {
 	    }
 	    
-	    public void exceptionThrown(IOHandle handle, Throwable exception) {
+	    public void exceptionThrown(Connection conn, Throwable exception) {
 		System.err.println("DummyClient.Listener.exceptionThrown " +
 				   "exception:" + exception);
 		exception.printStackTrace();

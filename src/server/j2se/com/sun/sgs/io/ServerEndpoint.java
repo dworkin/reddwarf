@@ -9,22 +9,22 @@ import java.io.IOException;
  * {@link java.net.SocketAddress}).
  * <p>
  * Passive connection initiation is accomplished by obtaining a
- * {@code ServerEndpoint}'s {@link IOAcceptor} via {@link #createAcceptor}.
+ * {@code ServerEndpoint}'s {@link Acceptor} via {@link #createAcceptor}.
  *
  * @param <T> the address family encapsulated by this {@code ServerEndpoint}
  */
 public interface ServerEndpoint<T> {
 
     /**
-     * Creates an {@link IOAcceptor} to passively listen for connections
+     * Creates an {@link Acceptor} to passively listen for connections
      * on this local {@code ServerEndpoint}.
      *
-     * @return an {@code IOAcceptor} configured to listen on this
+     * @return an {@code Acceptor} configured to listen on this
      *         {@code ServerEndpoint}
      *
      * @throws IOException if an acceptor cannot be created
      */
-    IOAcceptor<T> createAcceptor() throws IOException;
+    Acceptor<T> createAcceptor() throws IOException;
 
     /**
      * Returns the address of type {@code T} encapsulated by this

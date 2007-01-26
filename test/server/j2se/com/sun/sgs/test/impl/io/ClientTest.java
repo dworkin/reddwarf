@@ -11,8 +11,8 @@ import java.net.InetSocketAddress;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.io.Endpoint;
-import com.sun.sgs.io.IOHandle;
-import com.sun.sgs.io.IOHandler;
+import com.sun.sgs.io.Connection;
+import com.sun.sgs.io.ConnectionListener;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -204,9 +204,9 @@ public class ClientTest extends JFrame {
         }
     }
     
-    private class EndpointInfo implements IOHandler {
+    private class EndpointInfo implements ConnectionListener {
         
-        private IOHandle handle;
+        private Connection connection;
         private String status;
         private int messagesIn;
         private int messagesOut;
@@ -242,7 +242,7 @@ public class ClientTest extends JFrame {
         
         public void close() {
             try {
-                handle.close();
+                connection.close();
             }
             catch (IOException ioe) {
                 ioe.printStackTrace();
@@ -258,7 +258,7 @@ public class ClientTest extends JFrame {
             return status;
         }
         
-        public void bytesReceived(IOHandle h, byte[] message) {
+        public void bytesReceived(Connection conn, byte[] message) {
             messagesIn++;
             bytesIn += message.length;
             for (byte b : message) {
@@ -269,22 +269,22 @@ public class ClientTest extends JFrame {
             dataChanged();
         }
 
-        public void disconnected(IOHandle h) {
+        public void disconnected(Connection conn) {
             connected = false;
             numDisconnects++;
             status = "Disconnected";
             dataChanged();
         }
 
-        public void exceptionThrown(IOHandle h, Throwable exception) {
+        public void exceptionThrown(Connection conn, Throwable exception) {
             System.out.println("ClientTest exceptionThrown");
             status = "Exception!";
             dataChanged();
             exception.printStackTrace();
         }
 
-        public void connected(IOHandle h) {
-            handle = h;
+        public void connected(Connection conn) {
+            connection = conn;
             connected = true;
             status = "Connected";
             dataChanged();
@@ -316,7 +316,7 @@ public class ClientTest extends JFrame {
                 buffer[i] = (byte) 1;
             }
             try {
-                handle.sendBytes(buffer);
+                connection.sendBytes(buffer);
             }
             catch (IOException ioe) {
                 ioe.printStackTrace();

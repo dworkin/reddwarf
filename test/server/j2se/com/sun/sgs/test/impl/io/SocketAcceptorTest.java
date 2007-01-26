@@ -11,7 +11,7 @@ import org.junit.Test;
 
 import com.sun.sgs.impl.io.ServerSocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
-import com.sun.sgs.io.IOAcceptor;
+import com.sun.sgs.io.Acceptor;
 
 /**
  * JUnit test class for the SocketAcceptor. 
@@ -21,7 +21,7 @@ public class SocketAcceptorTest {
     
     private final static int BIND_PORT = 0;
     
-    IOAcceptor<SocketAddress> acceptor;
+    Acceptor<SocketAddress> acceptor;
     
     @Before
     public void init() {
@@ -49,7 +49,7 @@ public class SocketAcceptorTest {
     }
     
     /**
-     * Test that verifies the IOAcceptor won't listen on any port after 
+     * Test that verifies the Acceptor won't listen on any port after 
      * shutdown.
      *
      * @throws IOException if an unexpected IO problem occurs

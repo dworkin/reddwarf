@@ -8,44 +8,46 @@ import org.apache.mina.common.ByteBuffer;
 import org.apache.mina.common.IoSession;
 
 import com.sun.sgs.impl.util.LoggerWrapper;
-import com.sun.sgs.io.IOHandle;
-import com.sun.sgs.io.IOHandler;
+import com.sun.sgs.io.Connection;
+import com.sun.sgs.io.ConnectionListener;
 
 /**
- * This is a socket implementation of an {@link IOHandle} using the Apache
+ * This is a socket implementation of an {@link Connection} using the Apache
  * MINA framework.  It uses a {@link IoSession MINA IoSession} to handle the
  * IO transport.
  */
-public class SocketHandle implements IOHandle {
+public class SocketConnection implements Connection {
 
     /** The logger for this class. */
     private static final LoggerWrapper logger =
-        new LoggerWrapper(Logger.getLogger(SocketHandle.class.getName()));
+        new LoggerWrapper(Logger.getLogger(SocketConnection.class.getName()));
 
-    /** The {@link IOHandler} for this {@code IOHandle}. */
-    private final IOHandler handler;
+    /** The {@link ConnectionListener} for this {@code Connection}. */
+    private final ConnectionListener listener;
 
-    /** The {@link CompleteMessageFilter} for this {@code IOHandle}. */
+    /** The {@link CompleteMessageFilter} for this {@code Connection}. */
     private final CompleteMessageFilter filter;
 
-    /** The {@link IoSession} for this {@code IOHandle}. */
+    /** The {@link IoSession} for this {@code Connection}. */
     private final IoSession session;
 
     /**
-     * Construct a new SocketHandle with the given handler, filter,
-     * and session.
+     * Construct a new SocketConnection with the given listener, filter, and
+     * session.
      * 
-     * @param handler the {@code IOHandler} for the {@code IOHandle}
-     * @param filter the {@code CompleteMessageFilter} for the {@code IOHandle}
-     * @param session the {@code IoSession} for the {@code IOHandle}
+     * @param listener the {@code ConnectionListener} for the
+     *        {@code Connection}
+     * @param filter the {@code CompleteMessageFilter} for the
+     *        {@code Connection}
+     * @param session the {@code IoSession} for the {@code Connection}
      */
-    SocketHandle(IOHandler handler, CompleteMessageFilter filter,
+    SocketConnection(ConnectionListener listener, CompleteMessageFilter filter,
                  IoSession session)
     {
-        if (handler == null || filter == null || session == null) {
+        if (listener == null || filter == null || session == null) {
             throw new NullPointerException("null argument to constructor");
         }
-        this.handler = handler;
+        this.listener = listener;
         this.filter = filter;
         this.session = session;
     }
@@ -63,7 +65,9 @@ public class SocketHandle implements IOHandle {
     public void sendBytes(byte[] message) throws IOException {
         logger.log(Level.FINEST, "message = {0}", message);
         if (!session.isConnected()) {
-            throw new IOException("session not connected");
+            IOException ioe = new IOException(
+                "SocketConnection.close: session not connected");
+            logger.logThrow(Level.FINE, ioe, ioe.getMessage());
         }
         ByteBuffer buffer = ByteBuffer.allocate(message.length + 4);
         buffer.putInt(message.length);
@@ -83,26 +87,28 @@ public class SocketHandle implements IOHandle {
      * @throws IOException if the session is not connected
      */
     public void close() throws IOException {
-        logger.log(Level.FINE, "session = {0}", session);
+        logger.log(Level.FINER, "session = {0}", session);
         if (!session.isConnected()) {
-            throw new IOException("SocketHandle.close: session not connected");
+            IOException ioe = new IOException(
+                "SocketConnection.close: session not connected");
+            logger.logThrow(Level.FINE, ioe, ioe.getMessage());
         }
         session.close();
     }
     
-    // specific to SocketHandle
+    // specific to SocketConnection
     
     /**
-     * Returns the {@code IOHandler} for this handle. 
+     * Returns the {@code ConnectionListener} for this connection. 
      * 
-     * @return the handler associated with this handle
+     * @return the listener associated with this connection
      */
-    IOHandler getIOHandler() {
-        return handler;
+    ConnectionListener getConnectionListener() {
+        return listener;
     }
     
     /**
-     * Returns the {@code IOFilter} associated with this handle.
+     * Returns the {@code IOFilter} associated with this connection.
      * 
      * @return the associated filter
      */

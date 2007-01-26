@@ -13,11 +13,11 @@ import org.junit.Test;
 import com.sun.sgs.impl.io.ServerSocketEndpoint;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
-import com.sun.sgs.io.IOAcceptorListener;
-import com.sun.sgs.io.IOAcceptor;
-import com.sun.sgs.io.IOConnector;
-import com.sun.sgs.io.IOHandle;
-import com.sun.sgs.io.IOHandler;
+import com.sun.sgs.io.AcceptorListener;
+import com.sun.sgs.io.Acceptor;
+import com.sun.sgs.io.Connector;
+import com.sun.sgs.io.Connection;
+import com.sun.sgs.io.ConnectionListener;
 
 /**
  * A set of JUnit tests for the SocketConnector class.
@@ -30,7 +30,7 @@ public class SocketConnectorTest {
 
     private final SocketAddress ADDRESS = new InetSocketAddress(BIND_PORT);
 
-    IOAcceptor<SocketAddress> acceptor;
+    Acceptor<SocketAddress> acceptor;
 
     private boolean connected = false;
 
@@ -41,10 +41,10 @@ public class SocketConnectorTest {
         try {
             acceptor = new ServerSocketEndpoint(ADDRESS, TransportType.RELIABLE)
                     .createAcceptor();
-            acceptor.listen(new IOAcceptorListener() {
+            acceptor.listen(new AcceptorListener() {
 
-                public IOHandler newHandle() {
-                    return new IOHandlerAdapter();
+                public ConnectionListener newConnection() {
+                    return new ConnectionAdapter();
                 }
 
                 public void disconnected() {
@@ -82,20 +82,20 @@ public class SocketConnectorTest {
      */
     @Test
     public void testConnect() throws IOException {
-        IOConnector<SocketAddress> connector =
+        Connector<SocketAddress> connector =
             new SocketEndpoint(ADDRESS,
                                TransportType.RELIABLE,
                                Executors.newCachedThreadPool())
                 .createConnector();
 
-        IOHandler handler = new IOHandlerAdapter() {
-            public void connected(IOHandle handle) {
+        ConnectionListener listener = new ConnectionAdapter() {
+            public void connected(Connection conn) {
                 connected = true;
                 notifyAll();
             }
         };
 
-        connector.connect(handler);
+        connector.connect(listener);
 
         synchronized (this) {
             try {
@@ -108,48 +108,55 @@ public class SocketConnectorTest {
     }
 
     /**
-     * Test the IOConnector's lack of re-usability.
+     * Test the Connector's lack of re-usability.
      *
      * @throws IOException if an unexpected IO problem occurs
      */
     @Test(expected = IllegalStateException.class)
     public void testMultipleConnect() throws IOException {
-        IOConnector<SocketAddress> connector =
+        Connector<SocketAddress> connector =
             new SocketEndpoint(ADDRESS,
                                TransportType.RELIABLE).createConnector();
 
-        IOHandler handler = new IOHandlerAdapter();
+        ConnectionListener listener = new ConnectionAdapter();
 
-        connector.connect(handler);
+        connector.connect(listener);
 
-        connector.connect(handler);
+        connector.connect(listener);
     }
 
     @Test(expected = IllegalStateException.class)
     public void testShutdown() throws IOException {
-        final IOConnector<SocketAddress> connector =
+        final Connector<SocketAddress> connector =
             new SocketEndpoint(ADDRESS,
                                TransportType.RELIABLE).createConnector();
 
-        IOHandler handler = new IOHandlerAdapter();
+        ConnectionListener listener = new ConnectionAdapter();
 
         connector.shutdown();
-        connector.connect(handler);
+        connector.connect(listener);
 
     }
 
-    private static class IOHandlerAdapter implements IOHandler {
-        public void bytesReceived(IOHandle handle, byte[] buffer) {
+    private static class ConnectionAdapter implements ConnectionListener {
+        /** {@inheritDoc} */
+        public void bytesReceived(Connection conn, byte[] buffer) {
+            //empty
         }
 
-        public void connected(IOHandle handle) {
+        /** {@inheritDoc} */
+        public void connected(Connection conn) {
+            //empty
         }
 
-        public void disconnected(IOHandle handle) {
+        /** {@inheritDoc} */
+        public void disconnected(Connection conn) {
+            //empty
         }
 
-        public void exceptionThrown(IOHandle handle, Throwable exception) {
-        }
+        /** {@inheritDoc} */
+        public void exceptionThrown(Connection conn, Throwable exception) {
+            //empty
+        }   
     }
-
 }

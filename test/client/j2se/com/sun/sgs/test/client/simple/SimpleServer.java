@@ -11,10 +11,10 @@ import com.sun.sgs.impl.client.simple.ProtocolMessageEncoder;
 import com.sun.sgs.impl.io.ServerSocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.util.HexDumper;
-import com.sun.sgs.io.IOAcceptorListener;
-import com.sun.sgs.io.IOAcceptor;
-import com.sun.sgs.io.IOHandle;
-import com.sun.sgs.io.IOHandler;
+import com.sun.sgs.io.AcceptorListener;
+import com.sun.sgs.io.Acceptor;
+import com.sun.sgs.io.Connection;
+import com.sun.sgs.io.ConnectionListener;
 
 import static com.sun.sgs.impl.client.simple.ProtocolMessage.*;
 
@@ -23,9 +23,9 @@ import static com.sun.sgs.impl.client.simple.ProtocolMessage.*;
  * respond to the client/server protocol. It uses the IO framework for its
  * networking.
  */
-public class SimpleServer implements IOHandler {
+public class SimpleServer implements ConnectionListener {
 
-    private IOAcceptor<SocketAddress> acceptor;
+    private Acceptor<SocketAddress> acceptor;
 
     private int port = 10002;
 
@@ -46,11 +46,11 @@ public class SimpleServer implements IOHandler {
     private void start() {
         System.out.println("Listening on port " + port);
         try {
-            acceptor.listen(new IOAcceptorListener() {
+            acceptor.listen(new AcceptorListener() {
                 /**
                  * {@inheritDoc}
                  */
-                public IOHandler newHandle() {
+                public ConnectionListener newConnection() {
                     System.out.println("Server: New Connection");
                     return SimpleServer.this;
                 }
@@ -88,14 +88,14 @@ public class SimpleServer implements IOHandler {
     /**
      * {@inheritDoc}
      */
-    public void connected(IOHandle handle) {
+    public void connected(Connection conn) {
         System.out.println("SimpleServer: connected");
     }
 
     /**
      * {@inheritDoc}
      */
-    public void disconnected(IOHandle handle) {
+    public void disconnected(Connection conn) {
         System.out.println("SimpleServer: disconnected");
         synchronized (this) {
             this.notifyAll();
@@ -105,7 +105,7 @@ public class SimpleServer implements IOHandler {
     /**
      * {@inheritDoc}
      */
-    public void exceptionThrown(IOHandle handle, Throwable exception) {
+    public void exceptionThrown(Connection conn, Throwable exception) {
         System.out.println("SimpleServer: exceptionThrown ");
         exception.printStackTrace();
     }
@@ -113,7 +113,7 @@ public class SimpleServer implements IOHandler {
     /**
      * {@inheritDoc}
      */
-    public void bytesReceived(IOHandle handle, byte[] buffer) {
+    public void bytesReceived(Connection conn, byte[] buffer) {
         System.err.println("SimpleServer: messageReceived: ("
                 + buffer.length + ") " + HexDumper.format(buffer));
         ProtocolMessageDecoder messageDecoder = new ProtocolMessageDecoder(
@@ -156,7 +156,7 @@ public class SimpleServer implements IOHandler {
                         APPLICATION_SERVICE, LOGIN_FAILURE);
                 messageEncoder.writeString("Bad password");
             }
-            sendMessage(handle, messageEncoder);
+            sendMessage(conn, messageEncoder);
         } else if (command == SESSION_MESSAGE) {
             assert service == APPLICATION_SERVICE;
             String serverMessage = messageDecoder.readString();
@@ -169,15 +169,15 @@ public class SimpleServer implements IOHandler {
                         CHANNEL_SERVICE, CHANNEL_JOIN);
 
                 messageEncoder.writeString("Test Channel");
-                sendMessage(handle, messageEncoder);
+                sendMessage(conn, messageEncoder);
 
-                sendPeriodicChannelMessages(handle);
+                sendPeriodicChannelMessages(conn);
             } else if (serverMessage.equals("Leave Channel")) {
                 ProtocolMessageEncoder messageEncoder =
                     new ProtocolMessageEncoder(
                         CHANNEL_SERVICE, CHANNEL_LEAVE);
                 messageEncoder.writeString("Test Channel");
-                sendMessage(handle, messageEncoder);
+                sendMessage(conn, messageEncoder);
             }
         } else if (command == CHANNEL_SEND_REQUEST) {
             assert service == CHANNEL_SERVICE;
@@ -193,23 +193,23 @@ public class SimpleServer implements IOHandler {
                     CHANNEL_SERVICE, CHANNEL_LEAVE);
 
             messageEncoder.writeString(channelName);
-            sendMessage(handle, messageEncoder);
+            sendMessage(conn, messageEncoder);
         } else if (command == LOGOUT_REQUEST) {
             assert service == APPLICATION_SERVICE;
             ProtocolMessageEncoder messageEncoder =
                 new ProtocolMessageEncoder(
                     APPLICATION_SERVICE, LOGOUT_SUCCESS);
 
-            sendMessage(handle, messageEncoder);
+            sendMessage(conn, messageEncoder);
         }
     }
 
-    private void sendPeriodicChannelMessages(final IOHandle handle) {
+    private void sendPeriodicChannelMessages(final Connection conn) {
         Thread t = new Thread() {
             public void run() {
                 while (true) {
                     sendChannelMessage(
-                            "Channel Message " + sequenceNumber, handle);
+                            "Channel Message " + sequenceNumber, conn);
                     try {
                         Thread.sleep((int) (Math.random() * 1000) + 50);
                     } catch (InterruptedException ie) {
@@ -221,7 +221,7 @@ public class SimpleServer implements IOHandler {
         t.start();
     }
 
-    private void sendChannelMessage(String chanMessage, IOHandle handle) {
+    private void sendChannelMessage(String chanMessage, Connection conn) {
         ProtocolMessageEncoder message = new ProtocolMessageEncoder(
                 CHANNEL_SERVICE, CHANNEL_MESSAGE);
 
@@ -232,16 +232,16 @@ public class SimpleServer implements IOHandler {
 
         message.writeShort(2 + chanMessage.getBytes().length);
         message.writeString(chanMessage);
-        sendMessage(handle, message);
+        sendMessage(conn, message);
     }
 
-    private void sendMessage(IOHandle handle,
+    private void sendMessage(Connection conn,
             ProtocolMessageEncoder messageEncoder) {
         try {
             byte[] byteMessage = messageEncoder.getMessage();
             System.out.println("sendMessage: (" + byteMessage.length + ") "
                     + HexDumper.format(byteMessage));
-            handle.sendBytes(byteMessage);
+            conn.sendBytes(byteMessage);
         } catch (IOException ioe) {
             ioe.printStackTrace();
         }

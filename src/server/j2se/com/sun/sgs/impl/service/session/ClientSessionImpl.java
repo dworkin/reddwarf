@@ -10,8 +10,8 @@ import com.sun.sgs.impl.auth.NamePasswordCredentials;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl.Context;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.MessageBuffer;
-import com.sun.sgs.io.IOHandle;
-import com.sun.sgs.io.IOHandler;
+import com.sun.sgs.io.Connection;
+import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.ProtocolMessageListener;
@@ -54,8 +54,8 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     /** The client session service that created this client session. */
     private final ClientSessionServiceImpl sessionService;
     
-    /** The IOHandle for sending messages to the client. */
-    private IOHandle sessionHandle;
+    /** The Connection for sending messages to the client. */
+    private Connection sessionHandle;
 
     /** The session id. */
     private final byte[] sessionId;
@@ -63,8 +63,8 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     /** The reconnection key. */
     private final byte[] reconnectionKey;
 
-    /** The IOHandler for receiving messages from the client. */
-    private final IOHandler handler;
+    /** The ConnectionListener for receiving messages from the client. */
+    private final ConnectionListener handler;
 
     /** The authenticated name for this session. */
     private String name;
@@ -391,8 +391,8 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	}
     }
     
-    /** Returns the IOHandler for this session. */
-    IOHandler getHandler() {
+    /** Returns the ConnectionListener for this session. */
+    ConnectionListener getHandler() {
 	return handler;
     }
 
@@ -414,19 +414,19 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	return id;
     }
 
-    /* -- IOHandler implementation -- */
+    /* -- ConnectionListener implementation -- */
 
     /**
      * Handler for connection-related events for this session's
-     * IOHandle.
+     * Connection.
      */
-    class Handler implements IOHandler {
+    class Handler implements ConnectionListener {
 
 	/** {@inheritDoc} */
-	public void connected(IOHandle handle) {
+	public void connected(Connection conn) {
 	    if (logger.isLoggable(Level.FINER)) {
 		logger.log(
-		    Level.FINER, "Handler.connected handle:{0}", handle);
+		    Level.FINER, "Handler.connected handle:{0}", conn);
 	    }
 
 	    synchronized (lock) {
@@ -435,7 +435,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		    return;
 		}
 
-		sessionHandle = handle;
+		sessionHandle = conn;
 		
 		switch (state) {
 		    
@@ -450,14 +450,14 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	}
 
 	/** {@inheritDoc} */
-	public void disconnected(IOHandle handle) {
+	public void disconnected(Connection conn) {
 	    if (logger.isLoggable(Level.FINER)) {
 		logger.log(
-		    Level.FINER, "Handler.disconnected handle:{0}", handle);
+		    Level.FINER, "Handler.disconnected handle:{0}", conn);
 	    }
 
 	    synchronized (lock) {
-		if (handle != sessionHandle) {
+		if (conn != sessionHandle) {
 		    return;
 		}
 
@@ -473,31 +473,31 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	}
 
 	/** {@inheritDoc} */
-	public void exceptionThrown(IOHandle handle, Throwable exception) {
+	public void exceptionThrown(Connection conn, Throwable exception) {
 
 	    if (logger.isLoggable(Level.WARNING)) {
 		logger.logThrow(
 		    Level.WARNING, exception,
-		    "Handler.exceptionThrown handle:{0}", handle);
+		    "Handler.exceptionThrown handle:{0}", conn);
 	    }
 	}
 
 	/** {@inheritDoc} */
-	public void bytesReceived(IOHandle handle, byte[] buffer) {
+	public void bytesReceived(Connection conn, byte[] buffer) {
             if (logger.isLoggable(Level.FINEST)) {
                 logger.log(
                     Level.FINEST,
                     "Handler.messageReceived handle:{0}, buffer:{1}",
-                    handle, buffer);
+                    conn, buffer);
             }
 	    
 	    synchronized (lock) {
-		if (handle != sessionHandle) {
+		if (conn != sessionHandle) {
                     if (logger.isLoggable(Level.FINE)) {
                         logger.log(
                             Level.FINE, 
                             "Handle mismatch: expected: {0}, got: {1}",
-                            sessionHandle, handle);
+                            sessionHandle, conn);
                     }
 		    return;
 		}

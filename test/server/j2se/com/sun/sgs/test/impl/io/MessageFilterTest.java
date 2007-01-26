@@ -13,17 +13,17 @@ import org.junit.Test;
 import com.sun.sgs.impl.io.ServerSocketEndpoint;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
-import com.sun.sgs.io.IOAcceptorListener;
-import com.sun.sgs.io.IOAcceptor;
-import com.sun.sgs.io.IOConnector;
-import com.sun.sgs.io.IOHandle;
-import com.sun.sgs.io.IOHandler;
+import com.sun.sgs.io.AcceptorListener;
+import com.sun.sgs.io.Acceptor;
+import com.sun.sgs.io.Connector;
+import com.sun.sgs.io.Connection;
+import com.sun.sgs.io.ConnectionListener;
 
 /**
  * This suite of tests is intended to test the functionality of the 
- * {@code IOFilter}s.  As new filters are written, they can be tested here.
+ * {code CompleteMessageFilter}.
  */
-public class IOFilterTest {
+public class MessageFilterTest {
 
     private final static int DELAY = 2000;
     
@@ -31,31 +31,31 @@ public class IOFilterTest {
     private final SocketAddress SERVER_ADDRESS = 
         new InetSocketAddress("", SERVER_PORT);
     
-    IOAcceptor<SocketAddress> acceptor;
-    IOHandle connectedHandle = null;
+    Acceptor<SocketAddress> acceptor;
+    Connection connection = null;
     
     /**
-     * Set up an IOAcceptor with a CompleteMessageFilter installed that echos
+     * Set up an Acceptor with a CompleteMessageFilter installed that echos
      * the packets back to the client.
      */
     @Before
     public void init() {
-        connectedHandle = null;
+        connection = null;
         acceptor = new ServerSocketEndpoint(
                 new InetSocketAddress(SERVER_PORT),
                TransportType.RELIABLE).createAcceptor();
         
         try {
-            acceptor.listen(new IOAcceptorListener() {
+            acceptor.listen(new AcceptorListener() {
 
-                public IOHandler newHandle() {
-                    return new IOHandlerAdapter() {
+                public ConnectionListener newConnection() {
+                    return new ConnectionAdapter() {
                         
                         @Override
-                        public void bytesReceived(IOHandle handle, byte[] buffer) {
+                        public void bytesReceived(Connection conn, byte[] buffer) {
                             byte[] echoMessage = new byte[buffer.length];
                             try {
-                                handle.sendBytes(echoMessage);
+                                conn.sendBytes(echoMessage);
                             }
                             catch (IOException ioe) {}
                         }
@@ -73,17 +73,20 @@ public class IOFilterTest {
         }
     }
     
+    /**
+     * Perform cleanup after each test case.
+     */
     @After
     public void cleanup() {
-        if (connectedHandle != null) {
+        if (connection != null) {
             try {
-                connectedHandle.close();
+                connection.close();
             } catch (IOException e) {
                 System.err.println("Ignoring exception on close");
                 e.printStackTrace();
                 // ignore the exception
             }
-            connectedHandle = null;
+            connection = null;
         }
         acceptor.shutdown();
         acceptor = null;
@@ -99,44 +102,44 @@ public class IOFilterTest {
      */
     @Test
     public void bigMessage() throws IOException {
-        IOConnector<SocketAddress> connector = 
+        Connector<SocketAddress> connector = 
                     new SocketEndpoint(SERVER_ADDRESS, TransportType.RELIABLE, 
                             Executors.newCachedThreadPool()).createConnector();
         
         
-        IOHandler handler = new IOHandlerAdapter() {
+        ConnectionListener listener = new ConnectionAdapter() {
             
             int messageSize = 100000;
             
-            public void connected(IOHandle handle) {
-                IOFilterTest.this.connectedHandle = handle;
+            public void connected(Connection conn) {
+                MessageFilterTest.this.connection = conn;
                 byte[] bigMessage = new byte[messageSize];
                 for (int i = 0; i < messageSize; i++) {
                     bigMessage[i] = (byte) 1;
                 }
                 try {
-                    handle.sendBytes(bigMessage);
+                    conn.sendBytes(bigMessage);
                 }
                 catch (IOException ioe) {
                     ioe.printStackTrace();
                 }
             }
             
-            public void bytesReceived(IOHandle handle, byte[] buffer) {
+            public void bytesReceived(Connection conn, byte[] buffer) {
                 Assert.assertEquals(messageSize, buffer.length);
                 notifyAll();
                 try {
-                    handle.close();
+                    conn.close();
                 }
                 catch (IOException ioe) {}
             }
 
-            public void disconnected(IOHandle handle) {
-                IOFilterTest.this.connectedHandle = null;
+            public void disconnected(Connection conn) {
+                MessageFilterTest.this.connection = null;
             }
         };
         
-        connector.connect(handler);
+        connector.connect(listener);
         
         synchronized(this) {
             try {
@@ -150,47 +153,45 @@ public class IOFilterTest {
     private int bytesIn;
     
     /**
-     * Tests the ability to have different filters installed on the client and
-     * the server and still ultimately have the same number of bytes come
-     * through.  In this case the server has a CompleteMessageFilter installed,
-     * and the client has the default PassthroughFilter installed.
+     * Tests the basic interoperability of the message filter between
+     * client and server.
      *
      * @throws IOException if an unexpected IO problem occurs
      */
     @Test
-    public void hybridFilter() throws IOException {
+    public void completeMessage() throws IOException {
         bytesIn = 0;
         final int messageSize = 1000;
-        IOConnector<SocketAddress> connector = 
+        Connector<SocketAddress> connector = 
                     new SocketEndpoint(SERVER_ADDRESS, TransportType.RELIABLE, 
                             Executors.newCachedThreadPool()).createConnector();
         
         
-        IOHandler handler = new IOHandlerAdapter() {
+        ConnectionListener listener = new ConnectionAdapter() {
             
-            public void connected(IOHandle handle) {
-                IOFilterTest.this.connectedHandle = handle;
+            public void connected(Connection conn) {
+                MessageFilterTest.this.connection = conn;
                 byte[] message = new byte[messageSize];
                 try {
-                    handle.sendBytes(message);
+                    conn.sendBytes(message);
                 }
                 catch (IOException ioe) {
                     ioe.printStackTrace();
                 }
             }
             
-            public void bytesReceived(IOHandle handle, byte[] buffer) {
+            public void bytesReceived(Connection conn, byte[] buffer) {
                 bytesIn += buffer.length;
                 System.err.println("Got " + buffer.length +
                         " bytes, total = " + bytesIn);
             }
 
-            public void disconnected(IOHandle handle) {
-                IOFilterTest.this.connectedHandle = null;
+            public void disconnected(Connection conn) {
+                MessageFilterTest.this.connection = null;
             }
         };
         
-        connector.connect(handler);
+        connector.connect(listener);
         
         synchronized(this) {
             try {
@@ -202,17 +203,25 @@ public class IOFilterTest {
 
     } 
     
-    private static class IOHandlerAdapter implements IOHandler {
-        public void bytesReceived(IOHandle handle, byte[] buffer) {
+    private static class ConnectionAdapter implements ConnectionListener {
+        /** {@inheritDoc} */
+        public void bytesReceived(Connection conn, byte[] buffer) {
+            //empty
         }
 
-        public void connected(IOHandle handle) {
+        /** {@inheritDoc} */
+        public void connected(Connection conn) {
+            //empty
         }
 
-        public void disconnected(IOHandle handle) {
+        /** {@inheritDoc} */
+        public void disconnected(Connection conn) {
+            //empty
         }
 
-        public void exceptionThrown(IOHandle handle, Throwable exception) {
+        /** {@inheritDoc} */
+        public void exceptionThrown(Connection conn, Throwable exception) {
+            //empty
         }   
     }
 

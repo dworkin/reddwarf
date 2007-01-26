@@ -6,19 +6,21 @@ import java.util.logging.Logger;
 
 import com.sun.sgs.impl.client.comm.ClientConnection;
 import com.sun.sgs.impl.client.comm.ClientConnectionListener;
+import com.sun.sgs.impl.util.HexDumper;
 import com.sun.sgs.impl.util.LoggerWrapper;
-import com.sun.sgs.io.IOHandle;
-import com.sun.sgs.io.IOHandler;
+import com.sun.sgs.io.Connection;
+import com.sun.sgs.io.ConnectionListener;
 
 /**
- * A {@code ClientConnection} is the central point of communication with the 
- * server. This {@code SimpleClientConnection} uses an {@link IOHandle} for its 
- * transport.  All outbound messages to the server go out via the IOHandle.send.
- * Incoming messages come in on the {@code IOHandler.messageReceived} callback 
- * and are dispatched to the appropriate callback on either the associated 
+ * A {@code ClientConnection} is the central point of communication with the
+ * server. This {@code SimpleClientConnection} uses an {@link Connection}
+ * for its transport. All outbound messages to the server go out via the
+ * Connection.send. Incoming messages come in on the
+ * {@code ConnectionListener.messageReceived} callback and are dispatched to
+ * the appropriate callback on either the associated
  * {@link ClientConnectionListener}.
  */
-class SimpleClientConnection implements ClientConnection, IOHandler {
+class SimpleClientConnection implements ClientConnection, ConnectionListener {
 
     /** The logger for this class. */
     private static final LoggerWrapper logger =
@@ -26,7 +28,7 @@ class SimpleClientConnection implements ClientConnection, IOHandler {
                 SimpleClientConnection.class.getName()));
     
     private final ClientConnectionListener ccl;
-    private IOHandle myHandle = null;
+    private Connection myHandle = null;
     
     SimpleClientConnection(ClientConnectionListener listener) {
         this.ccl = listener;
@@ -37,7 +39,7 @@ class SimpleClientConnection implements ClientConnection, IOHandler {
     /**
      * {@inheritDoc}
      * <p>
-     * This implementation disconnects the underlying {@code IOHandle}.
+     * This implementation disconnects the underlying {@code Connection}.
      */
     public void disconnect() throws IOException {
         if (myHandle == null) {
@@ -65,7 +67,7 @@ class SimpleClientConnection implements ClientConnection, IOHandler {
         }
     }
 
-    // IOHandler methods
+    // ConnectionListener methods
 
     /**
      * {@inheritDoc}
@@ -73,11 +75,11 @@ class SimpleClientConnection implements ClientConnection, IOHandler {
      * This implementation notifies the associated
      * {@code ClientConnectionListener}.
      */
-    public void connected(IOHandle handle) {
+    public void connected(Connection conn) {
         if (logger.isLoggable(Level.FINER)) {
-            logger.log(Level.FINER, "connected: {0}", handle);
+            logger.log(Level.FINER, "connected: {0}", conn);
         }
-        this.myHandle = handle;
+        this.myHandle = conn;
         ccl.connected(this);
     }
 
@@ -87,11 +89,11 @@ class SimpleClientConnection implements ClientConnection, IOHandler {
      * This implementation notifies the associated
      * {@code ClientConnectionListener}.
      */
-    public void disconnected(IOHandle handle) {
+    public void disconnected(Connection conn) {
         if (logger.isLoggable(Level.FINER)) {
-            logger.log(Level.FINER, "disconnected: {0}", handle);
+            logger.log(Level.FINER, "disconnected: {0}", conn);
         }
-        assert handle.equals(this.myHandle);
+        assert conn.equals(this.myHandle);
         // TODO what is graceful?
         ccl.disconnected(true, null);
     }
@@ -99,12 +101,12 @@ class SimpleClientConnection implements ClientConnection, IOHandler {
     /**
      * {@inheritDoc}
      */
-    public void exceptionThrown(IOHandle handle, Throwable exception) {
+    public void exceptionThrown(Connection conn, Throwable exception) {
         if (logger.isLoggable(Level.FINER)) {
             logger.logThrow(Level.FINER, exception,
-                    "exception on: {0}: ", handle);
+                    "exception on: {0}: ", conn);
         }
-        assert handle.equals(this.myHandle);
+        assert conn.equals(this.myHandle);
 
         // TODO should we take any action here?  Bubble this up
         // to the CCL somehow?
@@ -116,13 +118,12 @@ class SimpleClientConnection implements ClientConnection, IOHandler {
      * This implemenation forwards the message to the
      * associated {@code ClientConnectionListener}.
      */
-    public void bytesReceived(IOHandle handle, byte[] message) {
+    public void bytesReceived(Connection conn, byte[] message) {
         if (logger.isLoggable(Level.FINEST)) {
-            // FIXME comment back in when HexDumper is committed
-            //logger.log(Level.FINEST, "recv on {0}: {1}",
-            //    handle, HexDumper.format(message));
+            logger.log(Level.FINEST, "recv on {0}: {1}",
+                conn, HexDumper.format(message));
         }
-        assert handle.equals(this.myHandle);
+        assert conn.equals(this.myHandle);
         ccl.receivedMessage(message);
     }
 

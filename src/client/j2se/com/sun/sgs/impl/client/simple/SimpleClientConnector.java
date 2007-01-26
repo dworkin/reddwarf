@@ -9,15 +9,15 @@ import com.sun.sgs.impl.client.comm.ClientConnectionListener;
 import com.sun.sgs.impl.client.comm.ClientConnector;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
-import com.sun.sgs.io.IOConnector;
+import com.sun.sgs.io.Connector;
 
 /**
  * A basic implementation of a {@code ClientConnector} which uses an 
- * {@code IOConnector} to establish connections.
+ * {@code Connector} to establish connections.
  */
 class SimpleClientConnector extends ClientConnector {
     
-    private final IOConnector<SocketAddress> connector;
+    private final Connector<SocketAddress> connector;
     
     SimpleClientConnector(Properties properties) {
         String transport = properties.getProperty("transport", "reliable");

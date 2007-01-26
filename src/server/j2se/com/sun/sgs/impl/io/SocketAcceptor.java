@@ -11,19 +11,19 @@ import org.apache.mina.common.IoSession;
 
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.io.ServerEndpoint;
-import com.sun.sgs.io.IOAcceptorListener;
-import com.sun.sgs.io.IOAcceptor;
-import com.sun.sgs.io.IOHandler;
+import com.sun.sgs.io.AcceptorListener;
+import com.sun.sgs.io.Acceptor;
+import com.sun.sgs.io.ConnectionListener;
 
 /**
- * This is an implementation of an {@link IOAcceptor} that uses a MINA 
+ * This is an implementation of an {@link Acceptor} that uses a MINA 
  * {@link IoAcceptor} to accept incoming connections.
  * <p>
  * Its constructor is package-private, so use
  * {@link ServerEndpoint#createAcceptor} to create an instance.
  * This implementation is thread-safe.
  */
-class SocketAcceptor implements IOAcceptor<SocketAddress> {
+class SocketAcceptor implements Acceptor<SocketAddress> {
 
     /** The logger for this class. */
     private static final LoggerWrapper logger =
@@ -55,9 +55,9 @@ class SocketAcceptor implements IOAcceptor<SocketAddress> {
      * {@inheritDoc}
      * <p>
      * This implementation ensures that only complete messages are
-     * delivered on the handles that it accepts.
+     * delivered on the connections that it accepts.
      */
-    public void listen(IOAcceptorListener listener) 
+    public void listen(AcceptorListener listener) 
         throws IOException
     {
         synchronized (this) {
@@ -124,28 +124,28 @@ class SocketAcceptor implements IOAcceptor<SocketAddress> {
     /**
      * Internal adaptor class to handle events from the acceptor itself.
      */
-    static final class AcceptHandler extends SocketHandler {
+    static final class AcceptHandler extends SocketConnectionListener {
         
-        /** The IOAcceptorListener for our parent IOAcceptor. */
-        private final IOAcceptorListener listener;
+        /** The AcceptorListener for our parent Acceptor. */
+        private final AcceptorListener acceptorListener;
         
         /**
          * Constructs a new {@code AcceptHandler} with an
-         * {@code IOAcceptorListener} that will be notified as new
+         * {@code AcceptorListener} that will be notified as new
          * connections arrive.
          * 
          * @param listener the listener to be notified of incoming
          *        connections
          */
-        public AcceptHandler(IOAcceptorListener listener) {
-            this.listener = listener;
+        public AcceptHandler(AcceptorListener listener) {
+            this.acceptorListener = listener;
         }
         
         /**
          * As new MINA {@code IoSession}s come in, set up a
-         * {@code SocketHandle} and notify the associated
-         * {@code IOAcceptorListener}. A new {@code CompleteMessageFilter}
-         * instance will be attached to the new handle.
+         * {@code SocketConnection} and notify the associated
+         * {@code AcceptorListener}. A new {@code CompleteMessageFilter}
+         * instance will be attached to the new connection.
          * 
          * @param session the newly created {@code IoSession}
          */
@@ -153,9 +153,10 @@ class SocketAcceptor implements IOAcceptor<SocketAddress> {
         public void sessionCreated(IoSession session) throws Exception {
             logger.log(Level.FINE, "accepted session {0}", session);
             CompleteMessageFilter filter = new CompleteMessageFilter();
-            IOHandler handler = listener.newHandle();
-            SocketHandle handle = new SocketHandle(handler, filter, session);
-            session.setAttachment(handle);
+            ConnectionListener connListener = acceptorListener.newConnection();
+            SocketConnection connection =
+                new SocketConnection(connListener, filter, session);
+            session.setAttachment(connection);
         }
     }
 }

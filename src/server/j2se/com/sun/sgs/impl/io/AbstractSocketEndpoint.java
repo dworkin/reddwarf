@@ -5,13 +5,13 @@ import java.util.concurrent.Executor;
 
 abstract class AbstractSocketEndpoint {
 
-    /** The socket address this Endpoint encapsulates. */
+    /** The socket address this endpoint encapsulates. */
     protected final SocketAddress address;
 
-    /** The transport type this Endpoint encapsulates. */
+    /** The transport type this endpoint encapsulates. */
     protected final TransportType transportType;
 
-    /** The {@code Executor} used by this Endpoint's connector or acceptor. */
+    /** The {@code Executor} used by this endpoint's connector or acceptor. */
     protected final Executor executor;
 
     /** A MINA configuration parameter whose value may affect performance. */
@@ -20,23 +20,23 @@ abstract class AbstractSocketEndpoint {
     /**
      * Constructs an {@code AbstractSocketEndpoint} with the given
      * TransportType using the given {@link Executor} for thread management.
-     * The {@code numProcessors} parameter refers to the number of
-     * MINA {@code SocketIOProcessors} to initially create.
-     * {@code numProcessors} must be greater than 0.
+     * The {@code numProcessors} parameter refers to the number of MINA
+     * {@code SocketIOProcessors} to initially create. {@code numProcessors}
+     * must be greater than 0.
      * <p>
-     * (Note: A {@code SocketIOProcessor} is a MINA implementation detail that
-     * controls the internal processing of the IO. It is exposed here to allow
-     * clients the option to configure this value, which may aid
+     * (Note: A {@code SocketIOProcessor} is a MINA implementation detail
+     * that controls the internal processing of the IO. It is exposed here
+     * to allow clients the option to configure this value, which may aid
      * performance tuning).
      *
      * @param address the socket address to encapsulate
      * @param type the type of transport
      * @param executor An {@code Executor} specifying the threading policy
      * @param numProcessors the number of processors available on this
-     *        system.  This value must be greater than 0.
+     *        system. This value must be greater than 0.
      *
-     * @throws IllegalArgumentException if {@code numProcessors} is
-     *         zero or negative.
+     * @throws IllegalArgumentException if {@code numProcessors} is zero or
+     *         negative.
      */
     protected AbstractSocketEndpoint(SocketAddress address,
             TransportType type, Executor executor, int numProcessors)
@@ -54,31 +54,27 @@ abstract class AbstractSocketEndpoint {
     }
 
     /**
-     * Returns the {@link SocketAddress} encapsulated by this
-     * {@code SocketEndpoint}.
+     * Returns the {@link SocketAddress} encapsulated by this endpoint.
      *
-     * @return the {@code SocketAddress} encapsulated by this
-     *         {@code SocketEndpoint}
+     * @return the {@code SocketAddress} encapsulated by this endpoint
      */
     public SocketAddress getAddress() {
         return address;
     }
 
     /**
-     * Returns the {@link TransportType} encapsulated by this
-     * {@code SocketEndpoint}.
+     * Returns the {@link TransportType} encapsulated by this endpoint.
      *
-     * @return the {@code TransportType} encapsulated by this
-     *         {@code SocketEndpoint}
+     * @return the {@code TransportType} encapsulated by this endpoint
      */
     public TransportType getTransportType() {
         return transportType;
     }
 
     /**
-     * Returns the {@link Executor} encapsulated by this {@code SocketEndpoint}.
+     * Returns the {@link Executor} encapsulated by this endpoint.
      * 
-     * @return the {@code Executor} encapsulated by this {@code SocketEndpoint}
+     * @return the {@code Executor} encapsulated by this endpoint
      */
     public Executor getExecutor() {
         return executor;

@@ -6,20 +6,20 @@ import java.net.SocketAddress;
 
 import com.sun.sgs.impl.io.ServerSocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
-import com.sun.sgs.io.IOAcceptorListener;
-import com.sun.sgs.io.IOAcceptor;
-import com.sun.sgs.io.IOHandle;
-import com.sun.sgs.io.IOHandler;
+import com.sun.sgs.io.AcceptorListener;
+import com.sun.sgs.io.Acceptor;
+import com.sun.sgs.io.Connection;
+import com.sun.sgs.io.ConnectionListener;
 
 /**
  * A test harness for the server {@code Acceptor} code.
  */
-public class ServerTest implements IOHandler {
+public class ServerTest implements ConnectionListener {
 
     private static final String DEFAULT_HOST = "0.0.0.0";
     private static final String DEFAULT_PORT = "5150";
     
-    IOAcceptor<SocketAddress> acceptor;
+    Acceptor<SocketAddress> acceptor;
     private int numConnections;
 
     public ServerTest() { }
@@ -32,11 +32,11 @@ public class ServerTest implements IOHandler {
             acceptor = new ServerSocketEndpoint(
                     new InetSocketAddress(host, port),
                    TransportType.RELIABLE).createAcceptor();
-            acceptor.listen(new IOAcceptorListener() {
+            acceptor.listen(new AcceptorListener() {
                 /**
                  * {@inheritDoc}
                  */
-                public IOHandler newHandle() {
+                public ConnectionListener newConnection() {
                     return ServerTest.this;
                 }
 
@@ -66,14 +66,14 @@ public class ServerTest implements IOHandler {
         }
     }
 
-    public void connected(IOHandle handle) {
+    public void connected(Connection conn) {
         synchronized (this) {
             numConnections++;
         }
         System.out.println("ServerTest: connected");
     }
 
-    public void disconnected(IOHandle handle) {
+    public void disconnected(Connection conn) {
         synchronized (this) {
             numConnections--;
             if (numConnections <= 0) {
@@ -83,16 +83,16 @@ public class ServerTest implements IOHandler {
         }
     }
 
-    public void exceptionThrown(IOHandle handle, Throwable exception) {
+    public void exceptionThrown(Connection conn, Throwable exception) {
         System.out.print("ServerTest: exceptionThrown ");
         exception.printStackTrace();
     }
 
-    public void bytesReceived(IOHandle handle, byte[] message) {
+    public void bytesReceived(Connection conn, byte[] message) {
         byte[] buffer = new byte[message.length]; 
         System.arraycopy(message, 0, buffer, 0, message.length); 
         try {
-            handle.sendBytes(buffer);
+            conn.sendBytes(buffer);
         }
         catch (IOException ioe) {
             ioe.printStackTrace();

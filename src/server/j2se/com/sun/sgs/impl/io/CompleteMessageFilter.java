@@ -1,28 +1,28 @@
 package com.sun.sgs.impl.io;
 
-import com.sun.sgs.io.IOHandle;
-import com.sun.sgs.io.IOHandler;
+import com.sun.sgs.io.Connection;
+import com.sun.sgs.io.ConnectionListener;
 
 // TODO move this functionality into protocol decode; we should
 // do framing in the protocol, not the transport. -JM
 
 /**
- * This filter guarantees that only complete messages are delivered to
- * this connection's {@link IOHandler}. That is, each call to
+ * This filter guarantees that only complete messages are delivered to this
+ * connection's {@link ConnectionListener}. That is, each call to
  * {@code sendBytes} by the sender results in exactly one call to
- * {@code bytesReceived} on the receiver's {@code IOHandler}.
+ * {@code bytesReceived} on the receiver's {@code ConnectionListener}.
  * <p>
- * It prepends the message length on
- * sending, and reads the length of each message on receiving. It will fire
- * the {@code bytesReceived} callback on the {@code IOHandler} once for each
- * complete message. If partial messages are received, this filter will hold
- * the partial message until the rest of the message is received, even if the
- * message spans multiple calls to {@code filterReceive}.
+ * It prepends the message length on sending, and reads the length of each
+ * message on receiving. It will fire the {@code bytesReceived} callback on
+ * the {@code ConnectionListener} once for each complete message. If partial
+ * messages are received, this filter will hold the partial message until
+ * the rest of the message is received, even if the message spans multiple
+ * calls to {@code filterReceive}.
  * <p>
- * The {@code filterReceive} portion of this {@code IOFilter} is
- * not thread-safe since it retains state information about partial
- * messages. For this reason, each {@code IOHandle} should have its own
- * instance, and {@code filterReceive} should be called by only one thread.
+ * The {@code filterReceive} portion of this filter is not thread-safe since
+ * it retains state information about partial messages. For this reason,
+ * each {@code Connection} should have its own instance, and
+ * {@code filterReceive} should be called by only one thread.
  * {@code filterSend}, however, is thread-safe.
  */
 class CompleteMessageFilter {
@@ -47,36 +47,37 @@ class CompleteMessageFilter {
     }
 
     /**
-     * Invoked as messages are received by the {@code IOHandle} before
-     * dispatching to the handle's {@code IOHandler}. The filter
-     * is free to modify the incoming data in any way, and to invoke
-     * {@link IOHandler#bytesReceived} once, multiple times, or not at all.
+     * Invoked as messages are received by the {@code Connection} before
+     * dispatching to its {@code ConnectionListener}. The filter is free to
+     * modify the incoming data in any way, and to invoke
+     * {@link ConnectionListener#bytesReceived} once, multiple times, = or
+     * not at all.
      * <p>
      * This implementation will call {@code bytesReceived} on the associated
-     * {@code IOHandler} once for each complete message. The size of a
-     * message must be encoded as the first four bytes. This method can be
-     * in one of a number of states each time it is called:
+     * {@code ConnectionListener} once for each complete message. The size
+     * of a message must be encoded as the first four bytes. This method can
+     * be in one of a number of states each time it is called:
      * <ul>
      * <li>It can be called with a new, incoming packet. In this case, the
      * length of the message is read as the first int, and that many byte
-     * are read from the array and dispatched to the listener. This continues
-     * until all the bytes are read from the array. If the array ends in the
-     * middle of a message, the remaining bytes are held in a partial message
-     * until the next call.</li>
-     * <li>If there is a message in progress, then the
-     * smaller of the rest of the message, or the length of the array is
-     * added to the message. If the message is complete, it is dispatched to
-     * the listener, otherwise it continues to be held for the next call.</li>
+     * are read from the array and dispatched to the listener. This
+     * continues until all the bytes are read from the array. If the array
+     * ends in the middle of a message, the remaining bytes are held in a
+     * partial message until the next call.</li>
+     * <li>If there is a message in progress, then the smaller of the rest
+     * of the message, or the length of the array is added to the message.
+     * If the message is complete, it is dispatched to the listener,
+     * otherwise it continues to be held for the next call.</li>
      * </ul>
-     *
-     * @param handle the {@link IOHandle} which received the data
+     * 
+     * @param conn the {@link Connection} which received the data
      * @param message the data to filter and optionally deliver to the
-     *        {@code IOHandler} for the given {@code handle}
+     *        {@code ConnectionListener} for the given connection
      */
-    void filterReceive(IOHandle handle, byte[] message) {
+    void filterReceive(Connection conn, byte[] message) {
         index = 0;
 
-        IOHandler handler = ((SocketHandle) handle).getIOHandler();
+        ConnectionListener listener = ((SocketConnection) conn).getConnectionListener();
 
         // first check to see if we have an incomplete message from the
         // last time.
@@ -92,7 +93,7 @@ class CompleteMessageFilter {
             // the partial message is complete, send it off to the listener
             // and reset the sizing information.
             if (partialLength == partialMessage.length) {
-                handler.bytesReceived(handle, partialMessage);
+                listener.bytesReceived(conn, partialMessage);
                 partialMessage = null;
                 partialLength = 0;
             }
@@ -101,13 +102,13 @@ class CompleteMessageFilter {
         // now the next piece of array data is the size of the next message
         int totalLength = readInt(message);
 
-        // continue to notify the IOHandler of complete messages
+        // continue to notify the ConnectionListener of complete messages
         // as they appear in the array. This can be called 0 to n times.
         while (totalLength > 0 && totalLength <= (message.length - index)) {
             byte[] nextMessage = new byte[totalLength];
             System.arraycopy(
                     message, index, nextMessage, 0, nextMessage.length);
-            handler.bytesReceived(handle, nextMessage);
+            listener.bytesReceived(conn, nextMessage);
 
             index += totalLength;
             totalLength = readInt(message);
@@ -126,18 +127,18 @@ class CompleteMessageFilter {
 
     /**
      * Invoked after a caller has requested data be sent on the associated
-     * {@code IOHandle}. The filter may modify the data in any way, and may
+     * {@code Connection}. The filter may modify the data in any way, and may
      * send it on the underlying connection whole, in pieces, or not at all.
      * <p>
      * This filter sends the message without modification on
-     * the {@code handle}.
+     * the {@code Connection}.
      *
-     * @param handle the {@link IOHandle} on which to send the data
+     * @param conn the {@link Connection} on which to send the data
      * @param message the data to filter and optionally send on the
-     *        connection represented by the given {@code handle}
+     *        connection represented by the given connection
      */
-    void filterSend(IOHandle handle, byte[] message) {
-        ((SocketHandle) handle).doSend(message);
+    void filterSend(Connection conn, byte[] message) {
+        ((SocketConnection) conn).doSend(message);
     }
 
     /**

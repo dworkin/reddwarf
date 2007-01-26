@@ -11,7 +11,7 @@ import org.apache.mina.transport.socket.nio.DatagramConnector;
 
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.io.Endpoint;
-import com.sun.sgs.io.IOConnector;
+import com.sun.sgs.io.Connector;
 
 /**
  * An implementation of {@link Endpoint} that wraps a {@link SocketAddress}.
@@ -80,11 +80,12 @@ public class SocketEndpoint extends AbstractSocketEndpoint
     /**
      * {@inheritDoc}
      */
-    public IOConnector<SocketAddress> createConnector() {
+    public Connector<SocketAddress> createConnector() {
         IoConnector minaConnector;
         ExecutorExecutor adapter = new ExecutorExecutor(executor);
         if (transportType.equals(TransportType.RELIABLE)) {
-            minaConnector = new org.apache.mina.transport.socket.nio.SocketConnector(
+            minaConnector =
+                new org.apache.mina.transport.socket.nio.SocketConnector(
                     numProcessors, adapter);
         } else {
             minaConnector = new DatagramConnector(adapter);
