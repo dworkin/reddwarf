@@ -10,15 +10,21 @@ package com.sun.sgs.io;
  * asynchronous network exceptions. The {@code disconnected} method is
  * invoked when the connection has been closed, or if the connection could
  * not be initiated at all (e.g., when a connector fails to connect).
+ * <p>
+ * The IO framework ensures that only one notification is processed at
+ * a time for each instance of {@code IOHandle}.  Thus, an {@code IOHandler}
+ * does not need to take any special steps to ensure thread safety so long
+ * as it does not access resources shared among the handlers for other
+ * {@code IOHandle}s.
  */
 public interface IOHandler {
 
     /**
-     * Notifies this listener that the {@code IOHandle}'s connection is established,
-     * either actively from an {@link IOConnector} or passively by an
-     * {@link IOAcceptor}.  This indicates that the {@code handle} is
+     * Notifies this listener that the {@code IOHandle}'s connection is
+     * established, either actively from an {@link IOConnector} or passively
+     * by an {@link IOAcceptor}. This indicates that the {@code handle} is
      * ready for use, and data may be sent and received on it.
-     *
+     * 
      * @param handle the {@code IOHandle} that has become connected.
      */
     void connected(IOHandle handle);

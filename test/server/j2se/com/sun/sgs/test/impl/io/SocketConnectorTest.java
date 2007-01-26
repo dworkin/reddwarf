@@ -10,6 +10,7 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.sun.sgs.impl.io.ServerSocketEndpoint;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.io.IOAcceptorListener;
@@ -38,7 +39,7 @@ public class SocketConnectorTest {
         connected = false;
 
         try {
-            acceptor = new SocketEndpoint(ADDRESS, TransportType.RELIABLE)
+            acceptor = new ServerSocketEndpoint(ADDRESS, TransportType.RELIABLE)
                     .createAcceptor();
             acceptor.listen(new IOAcceptorListener() {
 
@@ -81,8 +82,10 @@ public class SocketConnectorTest {
      */
     @Test
     public void testConnect() throws IOException {
-        IOConnector<SocketAddress> connector = new SocketEndpoint(ADDRESS,
-                TransportType.RELIABLE, Executors.newCachedThreadPool())
+        IOConnector<SocketAddress> connector =
+            new SocketEndpoint(ADDRESS,
+                               TransportType.RELIABLE,
+                               Executors.newCachedThreadPool())
                 .createConnector();
 
         IOHandler handler = new IOHandlerAdapter() {
@@ -90,7 +93,6 @@ public class SocketConnectorTest {
                 connected = true;
                 notifyAll();
             }
-
         };
 
         connector.connect(handler);
@@ -112,8 +114,9 @@ public class SocketConnectorTest {
      */
     @Test(expected = IllegalStateException.class)
     public void testMultipleConnect() throws IOException {
-        IOConnector<SocketAddress> connector = new SocketEndpoint(ADDRESS,
-                TransportType.RELIABLE).createConnector();
+        IOConnector<SocketAddress> connector =
+            new SocketEndpoint(ADDRESS,
+                               TransportType.RELIABLE).createConnector();
 
         IOHandler handler = new IOHandlerAdapter();
 
@@ -124,8 +127,9 @@ public class SocketConnectorTest {
 
     @Test(expected = IllegalStateException.class)
     public void testShutdown() throws IOException {
-        final IOConnector<SocketAddress> connector = new SocketEndpoint(ADDRESS,
-                TransportType.RELIABLE).createConnector();
+        final IOConnector<SocketAddress> connector =
+            new SocketEndpoint(ADDRESS,
+                               TransportType.RELIABLE).createConnector();
 
         IOHandler handler = new IOHandlerAdapter();
 

@@ -4,7 +4,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 
-import com.sun.sgs.impl.io.SocketEndpoint;
+import com.sun.sgs.impl.io.ServerSocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.io.IOAcceptorListener;
 import com.sun.sgs.io.IOAcceptor;
@@ -29,7 +29,7 @@ public class ServerTest implements IOHandler {
         String portString = System.getProperty("port", DEFAULT_PORT);
         int port = Integer.valueOf(portString);
         try {
-            acceptor = new SocketEndpoint(
+            acceptor = new ServerSocketEndpoint(
                     new InetSocketAddress(host, port),
                    TransportType.RELIABLE).createAcceptor();
             acceptor.listen(new IOAcceptorListener() {

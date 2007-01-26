@@ -7,14 +7,12 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.SocketAddress;
 
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.io.Endpoint;
 import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
-import com.sun.sgs.io.IOConnector;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -44,7 +42,7 @@ public class ClientTest extends JFrame {
     volatile boolean shouldClose = false;
     Random random;
     
-    public ClientTest() {
+    ClientTest() {
         super("Client Test");
         
         random = new Random();
@@ -96,12 +94,11 @@ public class ClientTest extends JFrame {
         }
     }
     
-    public void dataChanged() {
+    void dataChanged() {
         model.fireTableDataChanged();
     }
-    
 
-    public void start() {
+    void start() {
         String host = System.getProperty("host", DEFAULT_HOST);
         String portString = System.getProperty("port", DEFAULT_PORT);
         int port = Integer.valueOf(portString);
@@ -111,10 +108,15 @@ public class ClientTest extends JFrame {
         model.connect(endpoint);
     }
     
-    public void stop() {
+    void stop() {
         model.disconnect();
     }
 
+    /**
+     * Run the test client.
+     *
+     * @param args the commandline arguments
+     */
     public static void main(String[] args) {
         new ClientTest();
     }

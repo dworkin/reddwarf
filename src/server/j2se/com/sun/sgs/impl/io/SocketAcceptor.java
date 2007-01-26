@@ -10,7 +10,7 @@ import org.apache.mina.common.IoAcceptor;
 import org.apache.mina.common.IoSession;
 
 import com.sun.sgs.impl.util.LoggerWrapper;
-import com.sun.sgs.io.Endpoint;
+import com.sun.sgs.io.ServerEndpoint;
 import com.sun.sgs.io.IOAcceptorListener;
 import com.sun.sgs.io.IOAcceptor;
 import com.sun.sgs.io.IOHandler;
@@ -19,8 +19,9 @@ import com.sun.sgs.io.IOHandler;
  * This is an implementation of an {@link IOAcceptor} that uses a MINA 
  * {@link IoAcceptor} to accept incoming connections.
  * <p>
- * Its constructor is package-private, so use {@link Endpoint#createAcceptor}
- * to create an instance. This implementation is thread-safe.
+ * Its constructor is package-private, so use
+ * {@link ServerEndpoint#createAcceptor} to create an instance.
+ * This implementation is thread-safe.
  */
 class SocketAcceptor implements IOAcceptor<SocketAddress> {
 
@@ -32,7 +33,7 @@ class SocketAcceptor implements IOAcceptor<SocketAddress> {
     private final IoAcceptor acceptor;
 
     /** The endpoint on which to listen. */
-    private final SocketEndpoint endpoint;
+    private final ServerSocketEndpoint endpoint;
 
     /** Whether this acceptor has been shutdown. */
     private volatile boolean shutdown = false;
@@ -45,7 +46,7 @@ class SocketAcceptor implements IOAcceptor<SocketAddress> {
      * @param acceptor the MINA {@code IoAcceptor} to use for the underlying
      *        IO processing
      */
-    SocketAcceptor(SocketEndpoint endpoint, IoAcceptor acceptor) {
+    SocketAcceptor(ServerSocketEndpoint endpoint, IoAcceptor acceptor) {
         this.endpoint = endpoint;
         this.acceptor = acceptor;
     }
@@ -70,14 +71,14 @@ class SocketAcceptor implements IOAcceptor<SocketAddress> {
     /**
      * {@inheritDoc}
      */
-    public SocketEndpoint getEndpoint() {
+    public ServerSocketEndpoint getEndpoint() {
         return endpoint;
     }
 
     /**
      * {@inheritDoc}
      */
-    public SocketEndpoint getBoundEndpoint() {
+    public ServerSocketEndpoint getBoundEndpoint() {
         synchronized (this) {
             checkShutdown();
 
@@ -89,7 +90,7 @@ class SocketAcceptor implements IOAcceptor<SocketAddress> {
             }
             SocketAddress sockAddr =
                 (SocketAddress) boundAddresses.iterator().next();
-            return new SocketEndpoint(sockAddr,
+            return new ServerSocketEndpoint(sockAddr,
                                       endpoint.getTransportType(),
                                       endpoint.getExecutor(),
                                       endpoint.getNumProcessors());

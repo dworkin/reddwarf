@@ -5,53 +5,54 @@ import java.util.concurrent.Executor;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.apache.mina.common.IoConnector;
+import org.apache.mina.common.IoAcceptor;
 import org.apache.mina.filter.executor.ExecutorExecutor;
-import org.apache.mina.transport.socket.nio.DatagramConnector;
+import org.apache.mina.transport.socket.nio.DatagramAcceptor;
 
 import com.sun.sgs.impl.util.LoggerWrapper;
-import com.sun.sgs.io.Endpoint;
-import com.sun.sgs.io.IOConnector;
+import com.sun.sgs.io.IOAcceptor;
+import com.sun.sgs.io.ServerEndpoint;
 
 /**
- * An implementation of {@link Endpoint} that wraps a {@link SocketAddress}.
+ * An implementation of {@link ServerEndpoint} that wraps a
+ * local {@link SocketAddress}.
  */
-public class SocketEndpoint extends AbstractSocketEndpoint
-        implements Endpoint<SocketAddress>
+public class ServerSocketEndpoint extends AbstractSocketEndpoint
+        implements ServerEndpoint<SocketAddress>
 {
     /** The logger for this class. */
     private static final LoggerWrapper logger =
-        new LoggerWrapper(Logger.getLogger(SocketEndpoint.class.getName()));
+        new LoggerWrapper(Logger.getLogger(
+                ServerSocketEndpoint.class.getName()));
 
     /**
-     * Constructs a {@code SocketEndpoint} with the given
+     * Constructs a {@code ServerSocketEndpoint} with the given
      * {@link TransportType}. This is the simplest way to create a
-     * {@code SocketEndpoint}. The returned endpoint will use 
+     * {@code ServerSocketEndpoint}. The returned endpoint will use 
      * new daemon threads as necessary for processing events.
      *
      * @param address the socket address to encapsulate
      * @param type the type of transport
      */
-    public SocketEndpoint(SocketAddress address, TransportType type) {
+    public ServerSocketEndpoint(SocketAddress address, TransportType type) {
         this(address, type, new DaemonExecutor());
     }
 
     /**
-     * Constructs a {@code SocketEndpoint} with the given TransportType
+     * Constructs a {@code ServerSocketEndpoint} with the given TransportType
      * using the given {@link Executor} for thread management.
      * 
      * @param address the socket address to encapsulate
      * @param type the type of transport
      * @param executor an {@code Executor} specifying the threading policy
      */
-    public SocketEndpoint(SocketAddress address,
-                          TransportType type, Executor executor)
-    {
+    public ServerSocketEndpoint(SocketAddress address, TransportType type,
+            Executor executor) {
         this(address, type, executor, 1);
     }
 
     /**
-     * Constructs a {@code SocketEndpoint} with the given TransportType
+     * Constructs a {@code ServerSocketEndpoint} with the given TransportType
      * using the given {@link Executor} for thread management.
      * The {@code numProcessors} parameter refers to the number of
      * MINA {@code SocketIOProcessors} to initially create.
@@ -71,7 +72,7 @@ public class SocketEndpoint extends AbstractSocketEndpoint
      * @throws IllegalArgumentException if {@code numProcessors} is
      *         zero or negative.
      */
-    public SocketEndpoint(SocketAddress address, TransportType type,
+    public ServerSocketEndpoint(SocketAddress address, TransportType type,
             Executor executor, int numProcessors)
     {
         super(address, type, executor, numProcessors);
@@ -80,17 +81,17 @@ public class SocketEndpoint extends AbstractSocketEndpoint
     /**
      * {@inheritDoc}
      */
-    public IOConnector<SocketAddress> createConnector() {
-        IoConnector minaConnector;
+    public IOAcceptor<SocketAddress> createAcceptor() {
+        IoAcceptor minaAcceptor;
         ExecutorExecutor adapter = new ExecutorExecutor(executor);
         if (transportType.equals(TransportType.RELIABLE)) {
-            minaConnector = new org.apache.mina.transport.socket.nio.SocketConnector(
+            minaAcceptor = new org.apache.mina.transport.socket.nio.SocketAcceptor(
                     numProcessors, adapter);
         } else {
-            minaConnector = new DatagramConnector(adapter);
+            minaAcceptor = new DatagramAcceptor(adapter);
         }
-        SocketConnector connector = new SocketConnector(this, minaConnector);
-        logger.log(Level.FINE, "returning {0}", connector);
-        return connector;
+        SocketAcceptor acceptor = new SocketAcceptor(this, minaAcceptor);
+        logger.log(Level.FINE, "returning {0}", acceptor);
+        return acceptor;
     }
 }

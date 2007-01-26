@@ -3,7 +3,7 @@ package com.sun.sgs.impl.service.session;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.IdentityManager;
-import com.sun.sgs.impl.io.SocketEndpoint;
+import com.sun.sgs.impl.io.ServerSocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.NonDurableTaskScheduler;
@@ -200,8 +200,8 @@ public class ClientSessionServiceImpl
 		    new NonDurableTaskScheduler(
 			taskScheduler, proxy.getCurrentOwner(),
 			registry.getComponent(TaskService.class));
-		SocketEndpoint endpoint =
-		    new SocketEndpoint(
+		ServerSocketEndpoint endpoint =
+		    new ServerSocketEndpoint(
 		        new InetSocketAddress(port), TransportType.RELIABLE);
 		try {
                     acceptor = endpoint.createAcceptor();

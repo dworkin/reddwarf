@@ -8,9 +8,8 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
-import org.junit.runner.notification.Failure;
 
-import com.sun.sgs.impl.io.SocketEndpoint;
+import com.sun.sgs.impl.io.ServerSocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.io.IOAcceptor;
 
@@ -26,7 +25,7 @@ public class SocketAcceptorTest {
     
     @Before
     public void init() {
-        acceptor = new SocketEndpoint(
+        acceptor = new ServerSocketEndpoint(
                 new InetSocketAddress(BIND_PORT),
                TransportType.RELIABLE).createAcceptor();
     }

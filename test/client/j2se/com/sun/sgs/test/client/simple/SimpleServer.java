@@ -8,7 +8,7 @@ import com.sun.sgs.client.SessionId;
 
 import com.sun.sgs.impl.client.simple.ProtocolMessageDecoder;
 import com.sun.sgs.impl.client.simple.ProtocolMessageEncoder;
-import com.sun.sgs.impl.io.SocketEndpoint;
+import com.sun.sgs.impl.io.ServerSocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.util.HexDumper;
 import com.sun.sgs.io.IOAcceptorListener;
@@ -38,7 +38,7 @@ public class SimpleServer implements IOHandler {
      * Construct a new SimpleServer to accept incoming connections.
      */
     public SimpleServer() {
-        acceptor = new SocketEndpoint(new InetSocketAddress(port),
+        acceptor = new ServerSocketEndpoint(new InetSocketAddress(port),
                 TransportType.RELIABLE).createAcceptor();
         serverID = SessionId.fromBytes(new byte[10]);
     }

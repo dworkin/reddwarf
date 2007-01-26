@@ -10,6 +10,7 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.sun.sgs.impl.io.ServerSocketEndpoint;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.io.IOAcceptorListener;
@@ -26,9 +27,9 @@ public class IOFilterTest {
 
     private final static int DELAY = 2000;
     
-    private final static int BIND_PORT = 5000;
-    private final SocketAddress BIND_ADDRESS = 
-        new InetSocketAddress("", BIND_PORT);
+    private final static int SERVER_PORT = 5000;
+    private final SocketAddress SERVER_ADDRESS = 
+        new InetSocketAddress("", SERVER_PORT);
     
     IOAcceptor<SocketAddress> acceptor;
     IOHandle connectedHandle = null;
@@ -40,8 +41,8 @@ public class IOFilterTest {
     @Before
     public void init() {
         connectedHandle = null;
-        acceptor = new SocketEndpoint(
-                new InetSocketAddress(BIND_PORT),
+        acceptor = new ServerSocketEndpoint(
+                new InetSocketAddress(SERVER_PORT),
                TransportType.RELIABLE).createAcceptor();
         
         try {
@@ -99,7 +100,7 @@ public class IOFilterTest {
     @Test
     public void bigMessage() throws IOException {
         IOConnector<SocketAddress> connector = 
-                    new SocketEndpoint(BIND_ADDRESS, TransportType.RELIABLE, 
+                    new SocketEndpoint(SERVER_ADDRESS, TransportType.RELIABLE, 
                             Executors.newCachedThreadPool()).createConnector();
         
         
@@ -161,7 +162,7 @@ public class IOFilterTest {
         bytesIn = 0;
         final int messageSize = 1000;
         IOConnector<SocketAddress> connector = 
-                    new SocketEndpoint(BIND_ADDRESS, TransportType.RELIABLE, 
+                    new SocketEndpoint(SERVER_ADDRESS, TransportType.RELIABLE, 
                             Executors.newCachedThreadPool()).createConnector();
         
         
