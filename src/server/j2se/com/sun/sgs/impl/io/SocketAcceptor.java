@@ -22,13 +22,13 @@ import com.sun.sgs.io.IOHandler;
  * Its constructor is package-private, so use {@link Endpoint#createAcceptor}
  * to create an instance. This implementation is thread-safe.
  */
-public class SocketAcceptor implements IOAcceptor<SocketAddress> {
+class SocketAcceptor implements IOAcceptor<SocketAddress> {
 
     /** The logger for this class. */
     private static final LoggerWrapper logger =
         new LoggerWrapper(Logger.getLogger(SocketAcceptor.class.getName()));
     
-    /** The associated Mina acceptor that handles the binding. */
+    /** The associated MINA acceptor that handles the binding. */
     private final IoAcceptor acceptor;
 
     /** The endpoint on which to listen. */
@@ -40,8 +40,9 @@ public class SocketAcceptor implements IOAcceptor<SocketAddress> {
     /**
      * Constructs a {@code SocketAcceptor} with the given MINA
      * {@link IoAcceptor}.
-     * 
-     * @param acceptor the MINA {@code IoAcceptor} will use for the underlying
+     *
+     * @param endpoint the local address to which to listen
+     * @param acceptor the MINA {@code IoAcceptor} to use for the underlying
      *        IO processing
      */
     SocketAcceptor(SocketEndpoint endpoint, IoAcceptor acceptor) {
@@ -58,42 +59,55 @@ public class SocketAcceptor implements IOAcceptor<SocketAddress> {
     public void listen(IOAcceptorListener listener) 
         throws IOException
     {
-        checkShutdown();
-        AcceptHandler acceptHandler = new AcceptHandler(listener);
-        acceptor.bind(endpoint.getAddress(), acceptHandler);
-        logger.log(Level.FINE, "listening on {0}", getEndpoint());
+        synchronized (this) {
+            checkShutdown();
+            AcceptHandler acceptHandler = new AcceptHandler(listener);
+            acceptor.bind(endpoint.getAddress(), acceptHandler);
+        }
+        logger.log(Level.FINE, "listening on {0}", getBoundEndpoint());
     }
 
     /**
      * {@inheritDoc}
      */
     public SocketEndpoint getEndpoint() {
-        checkShutdown();
+        return endpoint;
+    }
 
-        Set<?> boundAddresses = acceptor.getManagedServiceAddresses();
-        if (boundAddresses.size() != 1) {
-            logger.log(Level.WARNING,
-                    "Expected 1 bound address, got {0}",
-                    boundAddresses.size());
+    /**
+     * {@inheritDoc}
+     */
+    public SocketEndpoint getBoundEndpoint() {
+        synchronized (this) {
+            checkShutdown();
+
+            Set<?> boundAddresses = acceptor.getManagedServiceAddresses();
+            if (boundAddresses.size() != 1) {
+                logger.log(Level.WARNING,
+                           "Expected 1 bound address, got {0}",
+                           boundAddresses.size());
+            }
+            SocketAddress sockAddr =
+                (SocketAddress) boundAddresses.iterator().next();
+            return new SocketEndpoint(sockAddr,
+                                      endpoint.getTransportType(),
+                                      endpoint.getExecutor(),
+                                      endpoint.getNumProcessors());
         }
-        SocketAddress sockAddr =
-            (SocketAddress) boundAddresses.iterator().next();
-        return new SocketEndpoint(sockAddr,
-                endpoint.getTransportType(),
-                endpoint.getExecutor(),
-                endpoint.getNumProcessors());
     }
 
     /**
      * {@inheritDoc}
      */
     public void shutdown() {
-        // TODO currently allow multiple calls to shutdown; should we
-        // only allow one? -JM
-        shutdown = true;
-        acceptor.unbindAll();
+        synchronized (this) {
+            // TODO currently allow multiple calls to shutdown; should we
+            // only allow one? -JM
+            shutdown = true;
+            acceptor.unbindAll();
+        }
     }
-    
+
     /**
      * Check whether this acceptor has been shutdown, throwing
      * IllegalStateException if it has.

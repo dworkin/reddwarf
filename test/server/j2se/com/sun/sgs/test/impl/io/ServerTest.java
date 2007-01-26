@@ -5,7 +5,7 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 
 import com.sun.sgs.impl.io.SocketEndpoint;
-import com.sun.sgs.impl.io.IOConstants.TransportType;
+import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.io.IOAcceptorListener;
 import com.sun.sgs.io.IOAcceptor;
 import com.sun.sgs.io.IOHandle;
@@ -51,7 +51,7 @@ public class ServerTest implements IOHandler {
             ioe.printStackTrace();
         }
         System.out.println("Listening on " +
-                acceptor.getEndpoint().getAddress());
+                acceptor.getBoundEndpoint().getAddress());
     }
 
     public final static void main(String[] args) {

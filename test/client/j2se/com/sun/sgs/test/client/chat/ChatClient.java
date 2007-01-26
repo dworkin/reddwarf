@@ -476,7 +476,13 @@ public class ChatClient extends JFrame
     static final class DCCMouseListener extends MouseAdapter {
         private final ChatClient client;
 
-        /** Creates a new {@code DCCMouseListener}. */
+        /**
+         * Creates a new {@code DCCMouseListener} for the given
+         * {@code ChatClient}.
+         *
+         * @param client the client to notify when a double-click
+         *        should trigger a DCC dialog.
+         */
         DCCMouseListener(ChatClient client) {
             this.client = client;
         }
@@ -501,7 +507,12 @@ public class ChatClient extends JFrame
     static final class QuitWindowListener extends WindowAdapter {
         private final ChatClient client;
 
-        /** Creates a new {@code QuitWindowListener}. */
+        /**
+         * Creates a new {@code QuitWindowListener} for the given
+         * {@code ChatClient}.
+         *
+         * @param client the client to notify on windowClosing
+         */
         QuitWindowListener(ChatClient client) {
             this.client = client;
         }

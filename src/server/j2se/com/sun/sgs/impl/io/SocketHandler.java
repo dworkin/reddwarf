@@ -15,8 +15,8 @@ import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
 
 /**
- * An adapter between an Apache Mina {@link IoHandler} and the SGS
- * IO framework {@link IOHandler}.  SocketHandlers exist one per handle on
+ * An adapter between an Apache {@link IoHandler MINA IoHandler} and the SGS
+ * IO framework {@link IOHandler}. SocketHandlers exist one per handle on
  * the client {@link IOConnector} side, and exist one per {@link IOAcceptor}
  * on the server side.
  */
@@ -32,28 +32,26 @@ class SocketHandler extends IoHandlerAdapter {
      * Forwards to {@link IOHandler#connected}.
      */
     @Override
-    public void sessionOpened(IoSession session) throws Exception {
+    public void sessionOpened(IoSession session) throws Exception
+    {
         SocketHandle handle = (SocketHandle) session.getAttachment();
         logger.log(Level.FINE, "opened session {0}", session);
         IOHandler handler = handle.getIOHandler();
-        if (handler != null) {
-            handler.connected(handle);
-        }
+        handler.connected(handle);
     }
-    
+
     /**
      * {@inheritDoc}
      * <p>
      * Forwards to {@link IOHandler#disconnected}.
      */
     @Override
-    public void sessionClosed(IoSession session) throws Exception {
+    public void sessionClosed(IoSession session) throws Exception
+    {
         SocketHandle handle = (SocketHandle) session.getAttachment();
         logger.log(Level.FINE, "disconnect on {0}", handle);
         IOHandler handler = handle.getIOHandler();
-        if (handler != null) {
-            handler.disconnected(handle);
-        }
+        handler.disconnected(handle);
     }
 
     /**
@@ -63,15 +61,16 @@ class SocketHandler extends IoHandlerAdapter {
      */
     @Override
     public void exceptionCaught(IoSession session, Throwable exception)
-                                                            throws Exception {
-        
+        throws Exception
+    {
         SocketHandle handle = (SocketHandle) session.getAttachment();
-        //logger.logThrow(Level.FINEST, exception, "exception on {0}", handle);
+        logger.logThrow(Level.FINEST, exception, "exception on {0}", handle);
+        if (handle == null) {
+            return;
+        }
 
         IOHandler handler = handle.getIOHandler();
-        if (handler != null) {
-            handler.exceptionThrown(handle, exception);
-        }
+        handler.exceptionThrown(handle, exception);
     }
 
     /**
@@ -83,11 +82,13 @@ class SocketHandler extends IoHandlerAdapter {
      */
     @Override
     public void messageReceived(IoSession session, Object message)
-            throws Exception
+        throws Exception
     {
         SocketHandle handle = (SocketHandle) session.getAttachment();
 
-        logger.log(Level.FINEST, "recv on {0}: {1}", handle, message);
+        if (logger.isLoggable(Level.FINEST)) {
+            logger.log(Level.FINEST, "recv on {0}: {1}", handle, message);
+        }
 
         ByteBuffer minaBuffer = (ByteBuffer) message;
 

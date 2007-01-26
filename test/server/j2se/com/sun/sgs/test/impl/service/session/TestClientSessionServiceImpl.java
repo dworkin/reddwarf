@@ -21,7 +21,7 @@ import com.sun.sgs.auth.IdentityCredentials;
 import com.sun.sgs.auth.IdentityManager;
 import com.sun.sgs.impl.auth.NamePasswordCredentials;
 import com.sun.sgs.impl.io.SocketEndpoint;
-import com.sun.sgs.impl.io.IOConstants.TransportType;
+import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;

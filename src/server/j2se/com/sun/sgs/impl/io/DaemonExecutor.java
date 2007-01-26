@@ -6,7 +6,7 @@ import java.util.concurrent.Executor;
  * An {@link Executor} that executes tasks in a new {@code Thread}
  * that has been created with {@code setDaemon(true)}.
  */
-public class DaemonExecutor implements Executor {
+final class DaemonExecutor implements Executor {
 
     /**
      * Default constructor.

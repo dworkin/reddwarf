@@ -11,7 +11,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.sun.sgs.impl.io.SocketEndpoint;
-import com.sun.sgs.impl.io.IOConstants.TransportType;
+import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.io.IOAcceptorListener;
 import com.sun.sgs.io.IOAcceptor;
 import com.sun.sgs.io.IOConnector;

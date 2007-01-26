@@ -20,7 +20,9 @@ public class SimpleTimerApp
 {
     private static final long serialVersionUID = 1L;
 
-    static final long TIMER_PERIOD_MILLIS = 100;
+    /** The interval for this app's periodic timer task. */
+    public static final int TIMER_PERIOD_MILLIS = 100;
+
     private long tickCount = 0;
 
     /**

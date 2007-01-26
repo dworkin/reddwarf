@@ -13,7 +13,7 @@ import com.sun.sgs.io.IOHandler;
 
 /**
  * This is a socket implementation of an {@link IOHandle} using the Apache
- * Mina framework.  It uses a MINA {@link IoSession} to handle the
+ * MINA framework.  It uses a {@link IoSession MINA IoSession} to handle the
  * IO transport.
  */
 public class SocketHandle implements IOHandle {
@@ -32,19 +32,24 @@ public class SocketHandle implements IOHandle {
     private final IoSession session;
 
     /**
-     * Construct a new SocketHandle with the given handle, filter,
+     * Construct a new SocketHandle with the given handler, filter,
      * and session.
      * 
-     * @param handler the {@link IOHandler} for the {@code IOHandle}
-     * @param filter the {@link CompleteMessageFilter} for the {@code IOHandle}
-     * @param session the {@link IoSession} for the {@code IOHandle}
+     * @param handler the {@code IOHandler} for the {@code IOHandle}
+     * @param filter the {@code CompleteMessageFilter} for the {@code IOHandle}
+     * @param session the {@code IoSession} for the {@code IOHandle}
      */
-    SocketHandle(IOHandler handler, CompleteMessageFilter filter, IoSession session) {
+    SocketHandle(IOHandler handler, CompleteMessageFilter filter,
+                 IoSession session)
+    {
+        if (handler == null || filter == null || session == null) {
+            throw new NullPointerException("null argument to constructor");
+        }
         this.handler = handler;
         this.filter = filter;
         this.session = session;
     }
-    
+
     /**
      * {@inheritDoc}
      * <p>

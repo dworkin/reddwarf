@@ -3,8 +3,11 @@ package com.sun.sgs.impl.io;
 import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
 
+// TODO move this functionality into protocol decode; we should
+// do framing in the protocol, not the transport. -JM
+
 /**
- * A filter that guarantees that only complete messages are delivered to
+ * This filter guarantees that only complete messages are delivered to
  * this connection's {@link IOHandler}. That is, each call to
  * {@code sendBytes} by the sender results in exactly one call to
  * {@code bytesReceived} on the receiver's {@code IOHandler}.
@@ -22,10 +25,13 @@ import com.sun.sgs.io.IOHandler;
  * instance, and {@code filterReceive} should be called by only one thread.
  * {@code filterSend}, however, is thread-safe.
  */
-class CompleteMessageFilter extends IOFilter {
+class CompleteMessageFilter {
+
+    /** The offset of the array that is currently being processed. */
+    private int index;
 
     /**
-     * An partial message still waiting for its remaining data.
+     * A partial message still waiting for its remaining data.
      * The length of the array is the final expected length of the message.
      */
     private byte[] partialMessage;
@@ -36,12 +42,15 @@ class CompleteMessageFilter extends IOFilter {
     /**
      * Default constructor.
      */
-    public CompleteMessageFilter() {
+    CompleteMessageFilter() {
         // empty
     }
 
     /**
-     * {@inheritDoc}
+     * Invoked as messages are received by the {@code IOHandle} before
+     * dispatching to the handle's {@code IOHandler}. The filter
+     * is free to modify the incoming data in any way, and to invoke
+     * {@link IOHandler#bytesReceived} once, multiple times, or not at all.
      * <p>
      * This implementation will call {@code bytesReceived} on the associated
      * {@code IOHandler} once for each complete message. The size of a
@@ -59,9 +68,12 @@ class CompleteMessageFilter extends IOFilter {
      * added to the message. If the message is complete, it is dispatched to
      * the listener, otherwise it continues to be held for the next call.</li>
      * </ul>
+     *
+     * @param handle the {@link IOHandle} which received the data
+     * @param message the data to filter and optionally deliver to the
+     *        {@code IOHandler} for the given {@code handle}
      */
-    @Override
-    public void filterReceive(IOHandle handle, byte[] message) {
+    void filterReceive(IOHandle handle, byte[] message) {
         index = 0;
 
         IOHandler handler = ((SocketHandle) handle).getIOHandler();
@@ -113,13 +125,44 @@ class CompleteMessageFilter extends IOFilter {
     }
 
     /**
-     * {@inheritDoc}
+     * Invoked after a caller has requested data be sent on the associated
+     * {@code IOHandle}. The filter may modify the data in any way, and may
+     * send it on the underlying connection whole, in pieces, or not at all.
      * <p>
-     * This implementation sends the message without modification on
+     * This filter sends the message without modification on
      * the {@code handle}.
+     *
+     * @param handle the {@link IOHandle} on which to send the data
+     * @param message the data to filter and optionally send on the
+     *        connection represented by the given {@code handle}
      */
-    @Override
-    public void filterSend(IOHandle handle, byte[] message) {
+    void filterSend(IOHandle handle, byte[] message) {
         ((SocketHandle) handle).doSend(message);
+    }
+
+    /**
+     * Reads the next four bytes of the given array starting at the current
+     * index and assembles them into a network byte-ordered int. It will
+     * increment the index by four if the read was successful. It will
+     * return zero if not enough bytes remain in the array.
+     *
+     * @param array the array from which to read bytes
+     *
+     * @return the next four bytes as an int, or zero if there aren't enough
+     *         bytes remaining in the array
+     */
+    private int readInt(byte[] array) {
+        if (array.length < (index + 4)) {
+            return 0;
+        }
+        int num =
+              ((array[index]     & 0xFF) << 24) |
+              ((array[index + 1] & 0xFF) << 16) |
+              ((array[index + 2] & 0xFF) <<  8) |
+               (array[index + 3] & 0xFF);
+        
+        index += 4;
+        
+        return num;
     }
 }

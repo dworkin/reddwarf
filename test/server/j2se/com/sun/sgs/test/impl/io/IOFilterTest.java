@@ -11,7 +11,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import com.sun.sgs.impl.io.SocketEndpoint;
-import com.sun.sgs.impl.io.IOConstants.TransportType;
+import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.io.IOAcceptorListener;
 import com.sun.sgs.io.IOAcceptor;
 import com.sun.sgs.io.IOConnector;
@@ -91,7 +91,7 @@ public class IOFilterTest {
     /**
      * This test ensures that a message big enough to be split into pieces
      * arrives in one piece on the other end (and is subsequently echoed back).
-     * Mina's internal buffers max out at about 8k, so a 100k message will be 
+     * MINA's internal buffers max out at about 8k, so a 100k message will be 
      * split into 12 or so chunks.
      *
      * @throws IOException if an unexpected IO problem occurs

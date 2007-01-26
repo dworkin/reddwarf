@@ -109,7 +109,7 @@ public class TestApplication
     // FIXME: this used to be shuttingDown, but we took that out.
     // When should we call cleanup(), or should we drop that part
     // of this test? -JM
-    public void cleanup() {
+    void cleanup() {
         destroyManagedReference(fooRef);
         destroyNamedManagedObject(DATE_NAME);
     }
@@ -118,14 +118,17 @@ public class TestApplication
 	private static final long serialVersionUID = 1L;
         private final String name;
         private int count;
-        public Foo(String name) {
+        Foo(String name) {
             this.name = name;
         }
         
-        public void incrementCounter() {
+        void incrementCounter() {
             ++count;
         }
 
+        /**
+         * {@inheritDoc}
+         */
         public String toString() {
             return String.format("[%s:%d]", name, count);
         }
@@ -139,12 +142,12 @@ public class TestApplication
 	private static final long serialVersionUID = 1L;
         private final ManagedReference fooRef;
 
-        protected Foo getFoo() {
+        Foo getFoo() {
             //return fooRef.getForUpdate(Foo.class);
             return fooRef.get(Foo.class);
         }
 
-        public SerializableTask(ManagedReference fooRef) {
+        SerializableTask(ManagedReference fooRef) {
             this.fooRef = fooRef;
         }
 
@@ -164,7 +167,7 @@ public class TestApplication
         private final PeriodicTaskHandle handle;
         private final PeriodicTaskHandle handle2;
 
-        public CancelTask(PeriodicTaskHandle handle,
+        CancelTask(PeriodicTaskHandle handle,
         	PeriodicTaskHandle handle2) {
             this.handle = handle;
             this.handle2 = handle2;
@@ -182,6 +185,10 @@ public class TestApplication
     
     static class RequestShutdownTask implements Task, Serializable {
 	private static final long serialVersionUID = 1L;
+        
+        /**
+         * {@inheritDoc}
+         */
         public void run() throws Exception {
             System.out.println("requesting shutdown");
             //com.sun.sgs.impl.kernel.AppShutdownTask.requestShutdown();

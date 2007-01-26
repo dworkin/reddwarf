@@ -10,7 +10,7 @@ import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 
 import com.sun.sgs.impl.io.SocketEndpoint;
-import com.sun.sgs.impl.io.IOConstants.TransportType;
+import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.io.Endpoint;
 import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;

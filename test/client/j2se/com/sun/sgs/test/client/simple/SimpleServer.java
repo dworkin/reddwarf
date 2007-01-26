@@ -9,7 +9,7 @@ import com.sun.sgs.client.SessionId;
 import com.sun.sgs.impl.client.simple.ProtocolMessageDecoder;
 import com.sun.sgs.impl.client.simple.ProtocolMessageEncoder;
 import com.sun.sgs.impl.io.SocketEndpoint;
-import com.sun.sgs.impl.io.IOConstants.TransportType;
+import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.util.HexDumper;
 import com.sun.sgs.io.IOAcceptorListener;
 import com.sun.sgs.io.IOAcceptor;

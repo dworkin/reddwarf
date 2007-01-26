@@ -3,8 +3,8 @@ package com.sun.sgs.impl.service.session;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.IdentityManager;
-import com.sun.sgs.impl.io.IOConstants.TransportType;
 import com.sun.sgs.impl.io.SocketEndpoint;
+import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.NonDurableTaskScheduler;
 import com.sun.sgs.io.IOAcceptor;
@@ -237,7 +237,7 @@ public class ClientSessionServiceImpl
 	    if (acceptor == null) {
 		throw new IllegalArgumentException("not configured");
 	    }
-	    return ((InetSocketAddress) acceptor.getEndpoint().getAddress()).
+	    return ((InetSocketAddress) acceptor.getBoundEndpoint().getAddress()).
 		getPort();
 	}
     }

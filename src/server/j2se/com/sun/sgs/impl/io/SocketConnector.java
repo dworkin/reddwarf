@@ -14,14 +14,14 @@ import com.sun.sgs.io.IOConnector;
 
 /**
  * This is a socket-based implementation of an {@code IOConnector} using
- * the Apache Mina framework for the underlying transport.  It uses an
+ * the Apache MINA framework for the underlying transport.  It uses an
  * {@link org.apache.mina.common.IoConnector} to initiate connections on 
  * remote hosts.
  * <p>
  * Its constructor is package-private, so use {@link Endpoint#createConnector}
  * to create an instance. This implementation is thread-safe.
  */
-public class SocketConnector implements IOConnector<SocketAddress>
+class SocketConnector implements IOConnector<SocketAddress>
 {
     /** The logger for this class. */
     private static final LoggerWrapper logger =
@@ -40,8 +40,8 @@ public class SocketConnector implements IOConnector<SocketAddress>
      * instance.
      * 
      * @param endpoint the remote address to which to connect
-     * @param connector the Mina IoConnector to use for establishing the
-     *        connection
+     * @param connector the {@link IoConnector MINA IoConnector} to use
+     *        for establishing the connection
      */
     SocketConnector(SocketEndpoint endpoint, IoConnector connector) {
         this.connector = connector;

@@ -35,13 +35,23 @@ public interface IOAcceptor<T> {
     void listen(IOAcceptorListener listener) throws IOException;
 
     /**
+     * Returns the {@link Endpoint} this {@code IOAcceptor} was created with.
+     *
+     * @return the {@link Endpoint} this {@code IOAcceptor} was created with
+     */
+    Endpoint<T> getEndpoint();
+
+    /**
      * Returns the {@link Endpoint} on which this {@code IOAcceptor} is
      * listening.
      *
      * @return the {@link Endpoint} on which this {@code IOAcceptor} is
      *         listening
+     * 
+     * @throws IllegalStateException if the {@code IOAcceptor} has been
+     *         shut down or was not listening
      */
-    Endpoint<T> getEndpoint();
+    Endpoint<T> getBoundEndpoint();
 
     /**
      * Shuts down this {@code IOAcceptor}, releasing any resources in use.

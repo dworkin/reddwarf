@@ -32,6 +32,9 @@
   <property name="jdk.doc.api.url"
 	    value="http://java.sun.com/j2se/1.5/docs/api"/>
   <property name="jdk.package.list" value="etc/jdk5.0_package_list"/>
+  <property name="mina.doc.api.url"
+            value="http://mina.apache.org/report/1.0/apidocs"/>
+  <property name="mina.package.list" value="etc/mina1.0_package_list"/>
 
   <property name="apidoc.server.zip"
             location="${build.dir}/sgs-server-apidoc.zip"/>
@@ -145,6 +148,9 @@
       <link href="${jdk.doc.api.url}"
 	    offline="true"
 	    packagelistLoc="${jdk.package.list}"/>
+      <link href="${mina.doc.api.url}"
+            offline="true"
+            packagelistLoc="${mina.package.list}"/>
       <footer>
         <![CDATA[<font size="-1">Sun Game Server, Version
         ${project.version}</font>]]>
@@ -170,6 +176,9 @@
       <link href="${jdk.doc.api.url}"
 	    offline="true"
 	    packagelistLoc="${jdk.package.list}"/>
+      <link href="${mina.doc.api.url}"
+            offline="true"
+            packagelistLoc="${mina.package.list}"/>
       <footer>
         <![CDATA[<font size="-1">Project Darkstar: Version
         ${project.version}</font>]]>
@@ -198,6 +207,9 @@
       <link href="${jdk.doc.api.url}"
 	    offline="true"
 	    packagelistLoc="${jdk.package.list}"/>
+      <link href="${mina.doc.api.url}"
+            offline="true"
+            packagelistLoc="${mina.package.list}"/>
       <footer>
         <![CDATA[<font size="-1">Sun Game Server version ${project.version}<br/>${project.build}</font>]]>
       </footer>
@@ -226,6 +238,9 @@
       <link href="${jdk.doc.api.url}"
 	    offline="true"
 	    packagelistLoc="${jdk.package.list}"/>
+      <link href="${mina.doc.api.url}"
+            offline="true"
+            packagelistLoc="${mina.package.list}"/>
       <footer>
         <![CDATA[<font size="-1">Sun Game Server version ${project.version}<br/>${project.build}</font>]]>
       </footer>

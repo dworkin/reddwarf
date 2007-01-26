@@ -11,7 +11,6 @@ import org.apache.mina.filter.executor.ExecutorExecutor;
 import org.apache.mina.transport.socket.nio.DatagramAcceptor;
 import org.apache.mina.transport.socket.nio.DatagramConnector;
 
-import com.sun.sgs.impl.io.IOConstants.TransportType;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.io.Endpoint;
 import com.sun.sgs.io.IOAcceptor;
@@ -35,7 +34,7 @@ public class SocketEndpoint implements Endpoint<SocketAddress> {
     /** The {@code Executor} used by this Endpoint's connector or acceptor. */
     private Executor executor;
 
-    /** A Mina configuration parameter whose value may affect performance. */
+    /** A MINA configuration parameter whose value may affect performance. */
     private int numProcessors;
 
     /**
@@ -57,7 +56,7 @@ public class SocketEndpoint implements Endpoint<SocketAddress> {
      * 
      * @param address the socket address to encapsulate
      * @param type the type of transport
-     * @param executor An {@code Executor} specifying the threading policy
+     * @param executor an {@code Executor} specifying the threading policy
      */
     public SocketEndpoint(SocketAddress address, TransportType type,
             Executor executor) {
@@ -69,16 +68,21 @@ public class SocketEndpoint implements Endpoint<SocketAddress> {
      * using the given {@link Executor} for thread management.
      * The {@code numProcessors} parameter refers to the number of
      * MINA {@code SocketIOProcessors} to initially create.
+     * {@code numProcessors} must be greater than 0.
      * <p>
      * (Note: A {@code SocketIOProcessor} is a MINA implementation detail that
      * controls the internal processing of the IO. It is exposed here to allow
      * clients the option to configure this value, which may aid
      * performance tuning).
-     * 
+     *
      * @param address the socket address to encapsulate
      * @param type the type of transport
      * @param executor An {@code Executor} specifying the threading policy
-     * @param numProcessors the number of processors available on this system
+     * @param numProcessors the number of processors available on this
+     *        system.  This value must be greater than 0.
+     *
+     * @throws IllegalArgumentException if {@code numProcessors} is
+     *         zero or negative.
      */
     public SocketEndpoint(SocketAddress address, TransportType type,
             Executor executor, int numProcessors)

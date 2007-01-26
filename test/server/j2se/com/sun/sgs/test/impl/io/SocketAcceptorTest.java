@@ -11,7 +11,7 @@ import org.junit.Test;
 import org.junit.runner.notification.Failure;
 
 import com.sun.sgs.impl.io.SocketEndpoint;
-import com.sun.sgs.impl.io.IOConstants.TransportType;
+import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.io.IOAcceptor;
 
 /**

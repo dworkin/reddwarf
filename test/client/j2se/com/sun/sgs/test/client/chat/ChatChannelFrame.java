@@ -149,7 +149,13 @@ public class ChatChannelFrame extends JInternalFrame
     static final class FrameClosingListener extends InternalFrameAdapter {
         private final ChatChannelFrame frame;
 
-        /** Creates a new {@code FrameClosingListener}. */
+        /**
+         * Creates a new {@code FrameClosingListener} for the given
+         * {@code ChatChannelFrame}.
+         *
+         * @param frame the {@code ChatChannelFrame} notify when
+         *        it is closing.
+         */
         FrameClosingListener(ChatChannelFrame frame) {
             this.frame = frame;
         }
