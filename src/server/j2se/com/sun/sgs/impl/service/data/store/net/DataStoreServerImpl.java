@@ -607,8 +607,11 @@ public class DataStoreServerImpl implements DataStoreServer {
 	    } catch (TransactionNotActiveException e) {
 	    }
 	}
-	logger.log(
-	    Level.FINE, "Reaped {0} expired transactions", expired.size());
+	int numExpired = expired.size();
+	if (numExpired > 0) {
+	    logger.log(
+		Level.FINE, "Reaped {0} expired transactions", numExpired);
+	}
     }
 
     /**
