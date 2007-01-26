@@ -317,6 +317,7 @@
 		       ${bdb.lib.dir}/db.jar"/>
       <syspropertyset>
 	<propertyref prefix="test."/>
+	<propertyref prefix="com.sun.sgs."/>
 	<propertyref name="java.util.logging.config.file"/>
       </syspropertyset>
       <!-- XXX: This doesn't work in Ant 1.6.1,
