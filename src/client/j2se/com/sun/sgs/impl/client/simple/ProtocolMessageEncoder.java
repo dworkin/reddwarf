@@ -10,9 +10,6 @@ import com.sun.sgs.client.SessionId;
  * Convenience class for assembling a protocol message into bytes.  Clients 
  * should call the writeX methods to build their message, and getMessage()
  * to obtain the resulting byte array.
- * 
- * @author      Sten Anderson
- * @version     1.0
  */
 public class ProtocolMessageEncoder {
     

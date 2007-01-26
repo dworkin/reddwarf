@@ -16,11 +16,10 @@ import com.sun.sgs.io.IOHandler;
  * This is a socket implementation of an {@link IOHandle} using the Apache
  * Mina framework.  It uses a MINA {@link IoSession} to handle the
  * IO transport.
- * 
- * @author Sten Anderson
- * @since 1.0
  */
 public class SocketHandle implements IOHandle {
+
+    /** The logger for this class. */
     private static final LoggerWrapper logger =
         new LoggerWrapper(Logger.getLogger(SocketHandle.class.getName()));
 
@@ -55,7 +54,7 @@ public class SocketHandle implements IOHandle {
      * the underlying MINA {@code IoSession}. 
      * 
      * @param message the data to send
-     * @throws IOException if the session is not connected.
+     * @throws IOException if the session is not connected
      */
     public void sendBytes(byte[] message) throws IOException {
         logger.log(Level.FINEST, "message = {0}", message);
@@ -77,7 +76,7 @@ public class SocketHandle implements IOHandle {
      * <p>
      * This implementation closes the underlying {@code IoSession}.
      *  
-     * @throws IOException if the session is not connected. 
+     * @throws IOException if the session is not connected
      */
     public void close() throws IOException {
         logger.log(Level.FINE, "session = {0}", session);

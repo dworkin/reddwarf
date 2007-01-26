@@ -9,7 +9,11 @@ import com.sun.sgs.client.SessionId;
  */
 public class SimpleSessionId extends SessionId {
 
-    private byte[] id;
+    /** The byte array representation of the session identifier. */
+    private final byte[] id;
+
+    /** The prefix to use when creating a toString() representation */
+    private static final String SESSION_STRING_PREFIX = "Session@";
 
     /**
      * Construct a new {@code SimpleSessionId} from the given byte array.
@@ -53,12 +57,12 @@ public class SimpleSessionId extends SessionId {
      */   
     @Override
     public String toString() {
-        StringBuilder buf = new StringBuilder(2 + id.length * 2);
-        buf.append('[');
+        int len = SESSION_STRING_PREFIX.length() + id.length * 2;
+        StringBuilder buf = new StringBuilder(len);
+        buf.append(SESSION_STRING_PREFIX);
         for (byte b : id) {
             buf.append(String.format("%02X", b));
         }
-        buf.append(']');
         return buf.toString();
     }
 }

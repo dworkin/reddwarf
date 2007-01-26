@@ -22,11 +22,10 @@ import com.sun.sgs.io.IOHandler;
  * <p>
  * Its constructor is package-private, so use {@link Endpoint#createAcceptor}
  * to create an instance. This implementation is thread-safe.
- * 
- * @author  Sten Anderson
- * @since   1.0
  */
 public class SocketAcceptor implements IOAcceptor<SocketAddress> {
+
+    /** The logger for this class. */
     private static final LoggerWrapper logger =
         new LoggerWrapper(Logger.getLogger(SocketAcceptor.class.getName()));
     
@@ -44,7 +43,7 @@ public class SocketAcceptor implements IOAcceptor<SocketAddress> {
      * {@link IoAcceptor}.
      * 
      * @param acceptor the MINA {@code IoAcceptor} will use for the underlying
-     *        IO processing.
+     *        IO processing
      */
     SocketAcceptor(SocketEndpoint endpoint, IoAcceptor acceptor) {
         this.endpoint = endpoint;
@@ -123,8 +122,6 @@ public class SocketAcceptor implements IOAcceptor<SocketAddress> {
     
     /**
      * Internal adaptor class to handle events from the acceptor itself.
-     * 
-     * @author James Megquier
      */
     static final class AcceptHandler extends SocketHandler {
         
@@ -140,7 +137,7 @@ public class SocketAcceptor implements IOAcceptor<SocketAddress> {
          * connections arrive.
          * 
          * @param listener the listener to be notified of incoming
-         *        connections.
+         *        connections
          * @param filterClass the type of filter to be attached to new
          *        handles
          */

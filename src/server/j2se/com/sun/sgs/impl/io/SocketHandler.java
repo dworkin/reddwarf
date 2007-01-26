@@ -20,11 +20,10 @@ import com.sun.sgs.io.IOHandler;
  * IO framework {@link IOHandler}.  SocketHandlers exist one per handle on
  * the client {@link IOConnector} side, and exist one per {@link IOAcceptor}
  * on the server side.
- * 
- * @author  Sten Anderson
- * @since   1.0
  */
 class SocketHandler extends IoHandlerAdapter {
+
+    /** The logger for this class. */
     private static final LoggerWrapper logger =
         new LoggerWrapper(Logger.getLogger(SocketHandler.class.getName()));
 

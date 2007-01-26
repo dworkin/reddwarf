@@ -12,9 +12,6 @@ package com.sun.sgs.io;
  * network exceptions.  The {@code disconnected} method is invoked
  * when the connection has been closed, or if the connection could
  * not be initiated at all (e.g., when a connector fails to connect).
- *
- * @author Sten Anderson
- * @since 1.0
  */
 public interface IOHandler {
 
@@ -40,15 +37,16 @@ public interface IOHandler {
      * and may invoke this once, multiple times, or not at all for
      * a particlar receive event on the connection.
      *
-     * @param handle the {@code IOHandle} on which the data arrived.
-     * @param message the received, filtered data.
+     * @param handle the {@code IOHandle} on which the data arrive
+     * @param message the received, filtered data
      */
     void bytesReceived(IOHandle handle, byte[] message);
 
     /**
      * Notifies this listener of a network exception on {@code handle}.
-     * @param handle the {@code IOHandle} on which the exception occured.
-     * @param exception the thrown exception.
+     *
+     * @param handle the {@code IOHandle} on which the exception occured
+     * @param exception the thrown exception
      */
     void exceptionThrown(IOHandle handle, Throwable exception);
 
@@ -57,7 +55,8 @@ public interface IOHandler {
      * the connection could not be initiated (e.g., when a connector fails
      * to connect).
      *
-     * @param handle the {@code IOHandle} that has disconnected.
+     * @param handle the {@code IOHandle} that has disconnected
      */
     void disconnected(IOHandle handle);
+
 }

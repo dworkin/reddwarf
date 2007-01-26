@@ -14,9 +14,6 @@ import com.sun.sgs.io.IOHandler;
 
 /**
  * A test harness for the server {@code Acceptor} code.
- * 
- * @author      Sten Anderson
- * @version     1.0
  */
 public class ServerTest implements IOHandler {
 

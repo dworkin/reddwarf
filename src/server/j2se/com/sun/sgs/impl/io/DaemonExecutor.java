@@ -5,8 +5,6 @@ import java.util.concurrent.Executor;
 /**
  * An {@link Executor} that executes tasks in a new {@code Thread}
  * that has been created with {@code setDaemon(true)}.
- * 
- * @author James Megquier
  */
 public class DaemonExecutor implements Executor {
 
@@ -20,9 +18,9 @@ public class DaemonExecutor implements Executor {
     /**
      * Executes {@code command} immediately in a new daemon {@code Thread}.
      *
-     * @param command the runnable task.
+     * @param command the runnable task
      *
-     * @throws NullPointerException if {@code command} is null.
+     * @throws NullPointerException if {@code command} is null
      *
      * @see Thread#setDaemon
      */

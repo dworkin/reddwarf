@@ -17,9 +17,6 @@ import com.sun.sgs.io.IOHandler;
  * Incoming messages come in on the {@code IOHandler.messageReceived} callback 
  * and are dispatched to the appropriate callback on either the associated 
  * {@link ClientConnectionListener}.
- * 
- * @author      Sten Anderson
- * @version     1.0
  */
 class SimpleClientConnection implements ClientConnection, IOHandler {
 

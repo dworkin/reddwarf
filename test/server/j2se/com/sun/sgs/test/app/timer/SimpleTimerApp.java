@@ -11,15 +11,16 @@ import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Task;
 
 /**
- * @author James Megquier
- * @version 1.0
+ * A simple example app that uses persistence and timed tasks.
+ * It increments a counter on a preset {@value #TIMER_PERIOD_MILLIS}ms
+ * interval and displays the current time and counter value.
  */
 public class SimpleTimerApp
 	implements AppListener, Task, ManagedObject, Serializable
 {
     private static final long serialVersionUID = 1L;
 
-    private static final long TIMER_PERIOD_MILLIS = 100;
+    static final long TIMER_PERIOD_MILLIS = 100;
     private long tickCount = 0;
 
     /**

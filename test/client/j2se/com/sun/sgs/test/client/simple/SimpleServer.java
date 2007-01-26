@@ -22,9 +22,6 @@ import static com.sun.sgs.impl.client.simple.ProtocolMessage.*;
  * A simple server harness for testing the Client API. This server will
  * respond to the client/server protocol. It uses the IO framework for its
  * networking.
- * 
- * @author Sten Anderson
- * @version 1.0
  */
 public class SimpleServer implements IOHandler {
 

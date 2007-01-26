@@ -21,12 +21,10 @@ import com.sun.sgs.io.IOConnector;
  * <p>
  * Its constructor is package-private, so use {@link Endpoint#createConnector}
  * to create an instance. This implementation is thread-safe.
- * 
- * @author  Sten Anderson
- * @since   1.0
  */
 public class SocketConnector implements IOConnector<SocketAddress>
 {
+    /** The logger for this class. */
     private static final LoggerWrapper logger =
         new LoggerWrapper(Logger.getLogger(SocketConnector.class.getName()));
     
@@ -34,6 +32,7 @@ public class SocketConnector implements IOConnector<SocketAddress>
     private ConnectionHandler connectionHandler = null;
 
     private final SocketEndpoint endpoint;
+
     /**
      * Constructs a {@code SocketConnector} using the given
      * {@code IoConnector} for the underlying transport. This constructor is
@@ -97,10 +96,9 @@ public class SocketConnector implements IOConnector<SocketAddress>
 
     /**
      * Internal adaptor class to handle events from the connector itself.
-     * 
-     * @author James Megquier
      */
     static final class ConnectionHandler extends SocketHandler {
+
         /** The requested IOHandler for the connected session. */
         private final IOHandler handler;
         
@@ -130,7 +128,7 @@ public class SocketConnector implements IOConnector<SocketAddress>
          * cancel the pending connection.
          * 
          * @throw IllegalStateException if this connection attempt has
-         *        already completed or been cancelled.
+         *        already completed or been cancelled
          */
         void cancel() {
             synchronized (this) {

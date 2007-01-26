@@ -8,22 +8,20 @@ import com.sun.sgs.io.IOFilter;
 /**
  * Common {@link IOFilter} functionality for reading a length
  * in a message and maintaining an index into the buffer array.
- *
- * @author Sten Anderson
  */
 abstract class AbstractFilter implements IOFilter {
-    
-    /** The offset of the array that is currently being processed */
+
+    /** The offset of the array that is currently being processed. */
     protected int index;
-    
+
     /**
      * Reads the next four bytes of the given array starting at the current
      * index and assembles them into a network byte-ordered int. It will
      * increment the index by four if the read was successful. It will
      * return zero if not enough bytes remain in the array.
-     * 
+     *
      * @param array the array from which to read bytes
-     * 
+     *
      * @return the next four bytes as an int, or zero if there aren't enough
      *         bytes remaining in the array
      */

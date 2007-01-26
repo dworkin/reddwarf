@@ -24,9 +24,6 @@ import com.sun.sgs.client.simple.SimpleClientListener;
 
 /**
  * A simple GUI test harness for the Client API.
- * 
- * @author Sten Anderson
- * @version 1.0
  */
 public class SimpleClientTestUI extends JFrame {
 

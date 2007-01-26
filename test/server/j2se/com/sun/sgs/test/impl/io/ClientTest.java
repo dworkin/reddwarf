@@ -30,10 +30,7 @@ import javax.swing.table.AbstractTableModel;
 
 /**
  * This is a simple test class that demonstrates potential usage of the IO
- * Framework.  
- *
- * @author      Sten Anderson
- * @version     1.0
+ * Framework.
  */
 public class ClientTest extends JFrame {
     private static final long serialVersionUID = 1L;

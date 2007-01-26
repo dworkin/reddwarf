@@ -15,14 +15,11 @@ import com.sun.sgs.io.IOHandler;
  * thread-safe since it retains state information about partial messages.
  * For this reason, each {@code IOHandle} should have its own instance, and
  * {@code #filterReceive} should be called by only one thread.
- * {@code #filterSend}, however, is thread-safe.  
- * 
- * @author Sten Anderson
- * @since  1.0
+ * {@code #filterSend}, however, is thread-safe.
  */
 public class PassthroughFilter extends AbstractFilter {
 
-    /** The total expected length of an "in progress" partial message */
+    /** The total expected length of an "in progress" partial message. */
     private int partialMessageLength;
 
     /** The current length of the partial message. */

@@ -32,12 +32,10 @@ import com.sun.sgs.client.simple.SimpleClientListener;
 import com.sun.sgs.client.simple.SimpleClient;
 
 /**
- * <p>
  * The ChatClient implements a simple chat program using a Swing UI,
  * mainly for server channel testing purposes. It allows the user to
  * open arbitrary channels by name, or to use the Direct Client to
  * Client (DCC) channel.
- * </p>
  */
 public class ChatClient extends JFrame
         implements ActionListener, SimpleClientListener, ClientChannelListener
@@ -80,10 +78,8 @@ public class ChatClient extends JFrame
 
     /**
      * Construct a ChatClient with the given {@code args}.
-     * 
-     * @param args the commandline arguments.
      */
-    public ChatClient(String[] args) {
+    public ChatClient() {
         super();
         
         dccMouseListener = new DCCMouseListener(this);
@@ -384,15 +380,17 @@ public class ChatClient extends JFrame
      * {@inheritDoc}
      */
     public ClientChannelListener joinedChannel(ClientChannel channel) {
+        // ChatClient handles the global channel
         if (channel.getName().equals(GLOBAL_CHANNEL_NAME)) {
             dccChannel = channel;
             return this;
-        } else {
-            ChatChannelFrame cframe = new ChatChannelFrame(this, channel);
-            desktop.add(cframe);
-            desktop.repaint();
-            return cframe;
         }
+
+        // Other channels are handled by a new ChatChannelFrame
+        ChatChannelFrame cframe = new ChatChannelFrame(this, channel);
+        desktop.add(cframe);
+        desktop.repaint();
+        return cframe;
     }
 
     /**
@@ -524,8 +522,8 @@ public class ChatClient extends JFrame
      * 
      * @param args the commandline arguments.
      */
-    public static void main(final String[] args) {
-        new ChatClient(args);
+    public static void main(String[] args) {
+        new ChatClient();
     }
 
 }

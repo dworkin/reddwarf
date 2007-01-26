@@ -7,9 +7,6 @@ import java.io.IOException;
 /**
  * Convenience class for translating protocol messages from bytes into their 
  * component parts.
- * 
- * @author      Sten Anderson
- * @version     1.0
  */
 public class ProtocolMessageDecoder {
     

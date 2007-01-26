@@ -2,8 +2,6 @@ package com.sun.sgs.impl.io;
 
 /**
  * Definition of transport constants.
- * 
- * @author Sten Anderson
  */
 public class IOConstants {
 
@@ -15,13 +13,13 @@ public class IOConstants {
     }
     
     /**
-     * The type of IO transport: TCP, or UDP
+     * The type of IO transport: TCP, or UDP.
      */
     public enum TransportType {
-        /** Reliable transport, such as TCP */
+        /** Reliable transport, such as TCP. */
         RELIABLE,
         
-        /** Unreliable transport, such as UDP */
+        /** Unreliable transport, such as UDP. */
         UNRELIABLE
     }
 }

@@ -12,9 +12,6 @@ import com.sun.sgs.client.simple.SimpleClientListener;
 
 /**
  * A basic test harness for the Client API.
- * 
- * @author Sten Anderson
- * @version 1.0
  */
 public class ClientTest implements SimpleClientListener,
         ClientChannelListener

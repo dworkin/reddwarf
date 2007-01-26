@@ -13,9 +13,6 @@ import java.io.IOException;
  *
  * @param <T> the address family encapsulated by this {@code IOAcceptor}'s
  *        associated {@link Endpoint}
- * 
- * @author Sten Anderson
- * @since 1.0
  */
 public interface IOAcceptor<T> {
 
@@ -26,12 +23,12 @@ public interface IOAcceptor<T> {
      * connection will result in an asynchronous call to
      * {@link IOAcceptorListener#newHandle} on the given {@code listener}.
      *
-     * @param listener the listener that will be notified of new connections.
+     * @param listener the listener that will be notified of new connections
      *
      * @throws IOException if there was a problem binding to the
-     *         {@code Endpoint}.
+     *         {@code Endpoint}
      * @throws IllegalStateException if the {@code IOAcceptor} has been
-     *         shut down or is already listening.
+     *         shut down or is already listening
      */
     void listen(IOAcceptorListener listener) throws IOException;
 
@@ -44,14 +41,14 @@ public interface IOAcceptor<T> {
      * A new instance of the given {@code filterClass}, created from its
      * default no-arg constructor, will be attached to the connection.
      *
-     * @param listener the listener that will be notified of new connections.
+     * @param listener the listener that will be notified of new connections
      * @param filterClass the concrete class of {@link IOFilter} instances
-     *        that will be attached to accepted connections.
+     *        that will be attached to accepted connections
      *
      * @throws IOException if there was a problem binding to the
-     *         {@code Endpoint}.
+     *         {@code Endpoint}
      * @throws IllegalStateException if the {@code IOAcceptor} has been
-     *         shut down or is already listening.
+     *         shut down or is already listening
      */
     void listen(IOAcceptorListener listener,
                 Class<? extends IOFilter> filterClass) throws IOException;
@@ -61,7 +58,7 @@ public interface IOAcceptor<T> {
      * listening.
      *
      * @return the {@link Endpoint} on which this {@code IOAcceptor} is
-     *         listening.
+     *         listening
      */
     Endpoint<T> getEndpoint();
 
@@ -70,7 +67,8 @@ public interface IOAcceptor<T> {
      * Once shutdown, an {@code IOAcceptor} cannot be restarted.
      *
      * @throws IllegalStateException if the {@code IOAcceptor} has been
-     *         shut down or was not listening.
+     *         shut down or was not listening
      */
     void shutdown();
+
 }

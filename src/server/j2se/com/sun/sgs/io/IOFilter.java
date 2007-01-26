@@ -25,9 +25,9 @@ public interface IOFilter {
      * {@code IOHandle}. The filter may modify the data in any way, and may
      * send it on the underlying connection whole, in pieces, or not at all.
      *
-     * @param handle the {@link IOHandle} on which to send the data.
+     * @param handle the {@link IOHandle} on which to send the data
      * @param message the data to filter and optionally send on the
-     *        connection represented by the given {@code handle}.
+     *        connection represented by the given {@code handle}
      */
     void filterSend(IOHandle handle, byte[] message);
 
@@ -37,9 +37,10 @@ public interface IOFilter {
      * is free to modify the incoming data in any way, and to invoke
      * {@link IOHandler#bytesReceived} once, multiple times, or not at all.
      *
-     * @param handle the {@link IOHandle} which received the data.
+     * @param handle the {@link IOHandle} which received the data
      * @param message the data to filter and optionally deliver to the
-     *        {@code IOHandler} for the given {@code handle}.
+     *        {@code IOHandler} for the given {@code handle}
      */
     void filterReceive(IOHandle handle, byte[] message);
+
 }

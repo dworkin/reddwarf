@@ -22,8 +22,6 @@ import com.sun.sgs.io.IOHandler;
 /**
  * This suite of tests is intended to test the functionality of the 
  * {@code IOFilter}s.  As new filters are written, they can be tested here.
- * 
- * @author      Sten Anderson
  */
 public class IOFilterTest {
 
@@ -38,8 +36,7 @@ public class IOFilterTest {
     
     /**
      * Set up an IOAcceptor with a CompleteMessageFilter installed that echos
-     * the packets back to the client. 
-     *
+     * the packets back to the client.
      */
     @Before
     public void init() {

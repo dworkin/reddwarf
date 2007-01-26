@@ -13,9 +13,6 @@ import java.io.IOException;
  *
  * @param <T> the address family encapsulated by this {@code IOConnector}'s
  *        associated {@link Endpoint}
- *
- * @author Sten Anderson
- * @since 1.0
  */
 public interface IOConnector<T> {
 
@@ -26,11 +23,11 @@ public interface IOConnector<T> {
      * connection, or {@link IOHandler#disconnected} if it fails.
      *
      * @param listener the listener for all IO events on the connection,
-     *        including the result of the connection attempt.
+     *        including the result of the connection attempt
      *
-     * @throws IOException if there was a problem initating the connection.
+     * @throws IOException if there was a problem initating the connection
      * @throws IllegalStateException if the {@code IOConnector} has been
-     *         shut down or has already attempted a connection.
+     *         shut down or has already attempted a connection
      */
     void connect(IOHandler listener) throws IOException;
 
@@ -43,19 +40,19 @@ public interface IOConnector<T> {
      * connecting.
      *
      * @param listener the listener for all IO events on the connection,
-     *        including the result of the connection attempt.
-     * @param filter the {@link IOFilter} to attach to the connection.
+     *        including the result of the connection attempt
+     * @param filter the {@link IOFilter} to attach to the connection
      *
-     * @throws IOException if there was a problem initating the connection.
+     * @throws IOException if there was a problem initating the connection
      * @throws IllegalStateException if the {@code IOConnector} has been
-     *         shut down or has already attempted a connection.
+     *         shut down or has already attempted a connection
      */
     void connect(IOHandler listener, IOFilter filter) throws IOException;
 
     /**
      * Returns the {@link Endpoint} this {@code IOConnector} will connect to.
      *
-     * @return the {@code Endpoint} this {@code IOConnector} will connect to.
+     * @return the {@code Endpoint} this {@code IOConnector} will connect to
      */
     Endpoint<T> getEndpoint();
 
@@ -64,7 +61,8 @@ public interface IOConnector<T> {
      * will be cancelled.
      *
      * @throws IllegalStateException if there is no connection attempt in
-     *         progress.
+     *         progress
      */
     void shutdown();
+
 }

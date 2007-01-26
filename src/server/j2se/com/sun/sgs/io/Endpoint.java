@@ -7,15 +7,12 @@ import java.io.IOException;
  * attachment. Implementations of {@code Endpoint} encapsulate the
  * connection-creation mechanism for particular address families (such as
  * {@link java.net.SocketAddress}).
- *
+ * <p>
  * Active or passive connection initiation is accomplished by obtaining an
  * {@code Endpoint}'s {@link IOConnector} or {@link IOAcceptor},
  * respectively.
  *
  * @param <T> the address family encapsulated by this {@code Endpoint}
- *
- * @author Sten Anderson
- * @since 1.0
  */
 public interface Endpoint<T> {
 
@@ -24,9 +21,9 @@ public interface Endpoint<T> {
      * to this remote {@code Endpoint}.
      *
      * @return an {@link IOConnector} configured to connect to this
-     *         {@code Endpoint}.
+     *         {@code Endpoint}
      *
-     * @throws IOException if a connector cannot be created.
+     * @throws IOException if a connector cannot be created
      */
     IOConnector<T> createConnector() throws IOException;
 
@@ -35,9 +32,9 @@ public interface Endpoint<T> {
      * on this local {@code Endpoint}.
      *
      * @return an {@link IOAcceptor} configured to listen on this
-     *         {@code Endpoint}.
+     *         {@code Endpoint}
      *
-     * @throws IOException if an acceptor cannot be created.
+     * @throws IOException if an acceptor cannot be created
      */
     IOAcceptor<T> createAcceptor() throws IOException;
 
@@ -45,7 +42,8 @@ public interface Endpoint<T> {
      * Return the address of type {@code T} encapsulated by this
      * {@code Endpoint}.
      *
-     * @return the address encapsulated by this {@code Endpoint}.
+     * @return the address encapsulated by this {@code Endpoint}
      */
     T getAddress();
+
 }

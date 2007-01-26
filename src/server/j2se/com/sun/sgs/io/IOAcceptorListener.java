@@ -7,9 +7,6 @@ package com.sun.sgs.io;
  * {@link IOHandler} from the listener.  When the
  * {@code IOAcceptor} is shut down, the listener is notified by
  * invoking its {@code disconnected()} method.
- *
- * @author Sten Anderson
- * @since 1.0
  */
 public interface IOAcceptorListener {
 
@@ -21,7 +18,7 @@ public interface IOAcceptorListener {
      * when the connection is fully established.
      *
      * @return an {@link IOHandler} that will receive events for the
-     *          newly-accepted connection.
+     *          newly-accepted connection
      */
     IOHandler newHandle();
 
@@ -29,4 +26,5 @@ public interface IOAcceptorListener {
      * Invoked when the associated {@link IOAcceptor} is shut down.
      */
     void disconnected();
+
 }

@@ -19,21 +19,20 @@ import com.sun.sgs.io.IOConnector;
 
 /**
  * An implementation of {@link Endpoint} that wraps a {@link SocketAddress}.
- * 
- * @author  Sten Anderson
- * @since   1.0
  */
 public class SocketEndpoint implements Endpoint<SocketAddress> {
+
+    /** The logger for this class. */
     private static final LoggerWrapper logger = new LoggerWrapper(Logger
             .getLogger(SocketEndpoint.class.getName()));
 
-    /** The socket address this Endpoint encapsulates */
+    /** The socket address this Endpoint encapsulates. */
     private SocketAddress address;
 
-    /** The transport type this Endpoint encapsulates */
+    /** The transport type this Endpoint encapsulates. */
     private TransportType transportType;
 
-    /** The {@code Executor} used by this Endpoint's connector or acceptor */
+    /** The {@code Executor} used by this Endpoint's connector or acceptor. */
     private Executor executor;
 
     /** A Mina configuration parameter whose value may affect performance. */
@@ -135,7 +134,7 @@ public class SocketEndpoint implements Endpoint<SocketAddress> {
      * {@code SocketEndpoint}.
      *
      * @return the {@code SocketAddress} encapsulated by this
-     *         {@code SocketEndpoint}.
+     *         {@code SocketEndpoint}
      */
     public SocketAddress getAddress() {
         return address;
@@ -146,7 +145,7 @@ public class SocketEndpoint implements Endpoint<SocketAddress> {
      * {@code SocketEndpoint}.
      *
      * @return the {@code TransportType} encapsulated by this
-     *         {@code SocketEndpoint}.
+     *         {@code SocketEndpoint}
      */
     public TransportType getTransportType() {
         return transportType;
@@ -155,7 +154,7 @@ public class SocketEndpoint implements Endpoint<SocketAddress> {
     /**
      * Returns the {@link Executor} encapsulated by this {@code SocketEndpoint}.
      * 
-     * @return the {@link Executor} encapsulated by this {@code SocketEndpoint}.
+     * @return the {@code Executor} encapsulated by this {@code SocketEndpoint}
      */
     public Executor getExecutor() {
         return executor;

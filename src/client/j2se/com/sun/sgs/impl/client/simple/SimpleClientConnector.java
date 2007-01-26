@@ -15,11 +15,8 @@ import com.sun.sgs.io.IOConnector;
 /**
  * A basic implementation of a {@code ClientConnector} which uses an 
  * {@code IOConnector} to establish connections.
- * 
- * @author      Sten Anderson
- * @version     1.0
  */
-public class SimpleClientConnector extends ClientConnector {
+class SimpleClientConnector extends ClientConnector {
     
     private final IOConnector<SocketAddress> connector;
     

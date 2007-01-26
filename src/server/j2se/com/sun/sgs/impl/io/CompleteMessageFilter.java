@@ -21,9 +21,6 @@ import com.sun.sgs.io.IOHandler;
  * messages. For this reason, each {@code IOHandle} should have its own
  * instance, and {@code filterReceive} should be called by only one thread.
  * {@code filterSend}, however, is thread-safe.
- *
- * @author Sten Anderson
- * @since  1.0
  */
 public class CompleteMessageFilter extends AbstractFilter {
 
@@ -35,7 +32,7 @@ public class CompleteMessageFilter extends AbstractFilter {
 
     /** The current length of the partial message. */
     private int partialLength;
-    
+
     /**
      * Default constructor.
      */
