@@ -111,10 +111,9 @@ public class TestConcurrent extends TestCase {
     /* -- Tests -- */
 
     public void testConcurrent() throws Throwable {
-	Properties props = new Properties(System.getProperties());
-	props.setProperty(DataStoreImplClass + ".directory",
-			  createDirectory());
-	props.setProperty("com.sun.sgs.appName", "TestConcurrent");
+	Properties props = createProperties(
+	    DataStoreImplClass + ".directory", createDirectory(),
+	    "com.sun.sgs.appName", "TestConcurrent");
 	DummyComponentRegistry componentRegistry =
 	    new DummyComponentRegistry();
 	service = new DataServiceImpl(props, componentRegistry);
@@ -309,5 +308,19 @@ public class TestConcurrent extends TestCase {
 		    "Failed to delete directory: " + dir);
 	    }
 	}
+    }
+
+    /** Creates a property list with the specified keys and values. */
+    private static Properties createProperties(String... args) {
+	Properties props = new Properties();
+	if (args.length % 2 != 0) {
+	    throw new RuntimeException("Odd number of arguments");
+	}
+	for (int i = 0; i < args.length; i += 2) {
+	    props.setProperty(args[i], args[i + 1]);
+	}
+	/* Include system properties and allow them to override */
+	props.putAll(System.getProperties());
+	return props;
     }
 }
