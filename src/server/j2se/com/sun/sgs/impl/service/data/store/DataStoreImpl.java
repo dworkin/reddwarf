@@ -584,6 +584,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	config.setLockTimeout(1000 * txnTimeout);
 	config.setMessageHandler(new LoggingMessageHandler());
         config.setRunRecovery(true);
+	config.setThreaded(true);
         config.setTransactional(true);
 	config.setTxnTimeout(1000 * txnTimeout);
 	config.setTxnWriteNoSync(!flushToDisk);
