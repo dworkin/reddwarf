@@ -1,10 +1,13 @@
 package com.sun.sgs.impl.service.data;
 
 import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.impl.service.data.store.DataStore.ObjectData;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
-import java.util.Map;
+import java.util.Iterator;
+import java.util.NoSuchElementException;
 import java.util.Map.Entry;
+import java.util.Map;
 
 /**
  * Stores information about managed references within a particular transaction.
@@ -92,10 +95,49 @@ final class ReferenceTable {
 	}
     }
 
-    /** Saves all object modifications to the data store. */
-    void flushChanges() {
-	for (ManagedReferenceImpl ref : oids.values()) {
-	    ref.flush();
+    /**
+     * Returns an iterator that supplies the object data that needs to be
+     * stored to the data store and flushes all references as a side effect.
+     */
+    Iterator<ObjectData> flushModifiedObjects() {
+	return new FlushObjectsIterator(oids);
+
+    }
+
+    /**
+     * Supplies object data that needs to be stored to the data store, and
+     * flushes all references.
+     */
+    private static class FlushObjectsIterator implements Iterator<ObjectData> {
+	private final Iterator<ManagedReferenceImpl> iter;
+	private ObjectData next;
+	ObjectDataIter(Set<ManagedReferenceImpl> refs) {
+	    this.iter = refs.iterator();
+	    next = getNext();
+	}
+	public boolean hasNext() {
+	    return next != null;
+	}
+	public ObjectData next() {
+	    if (!hasNext()) {
+		throw new NoSuchElementException();
+	    }
+	    ObjectData result = next;
+	    next = getNext();
+	    return result;
+	}
+	public void remove() {
+	    throw new UnsupportedOperationException();
+	}
+	private ObjectData getNext() {
+	    while (iter.hasNext()) {
+		ManagedReferenceImpl ref = iter.next();
+		byte[] data = ref.flush();
+		if (data != null) {
+		    return new ObjectData(ref.oid, data);
+		}
+	    }
+	    return null;
 	}
     }
 

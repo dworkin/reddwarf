@@ -2,8 +2,9 @@ package com.sun.sgs.impl.service.data.store.net;
 
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
-import com.sun.sgs.impl.service.data.store.DataStoreImpl;
+import com.sun.sgs.impl.service.data.store.DataStore.ObjectData;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl.TxnInfoTable;
+import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.PropertiesWrapper;
 import com.sun.sgs.service.Transaction;
@@ -16,14 +17,16 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.RMIServerSocketFactory;
 import java.rmi.server.UnicastRemoteObject;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.NoSuchElementException;
 import java.util.Properties;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -440,6 +443,44 @@ public class DataStoreServerImpl implements DataStoreServer {
 	    store.setObject(txn, oid, data);
 	} finally {
 	    txnTable.notInUse(txn);
+	}
+    }
+
+    /** {@inheritDoc} */
+    public void setObjects(
+	long tid, final long[] oids, final byte[][] dataArray)
+    {
+	Txn txn = getTxn(tid);
+	try {
+	    store.setObjects(
+		txn, DataObjectsIterator(oids, dataArray));
+	} finally {
+	    txnTable.notInUse(txn);
+	}
+    }
+
+    private static class DataObjectsIterator implements Iterator<ObjectData> {
+	private final long[] oids;
+	private final byte[][] dataArray;
+	private int i = 0;
+	DataObjectsIterator(long[] oids, byte[][] dataArray) {
+	    this.oids = oids;
+	    this.dataArray = dataArray;
+	}
+	public boolean hasNext() {
+	    return i < oids.length;
+	}
+	public ObjectData next() {
+	    if (!hasNext()) {
+		throw new NoSuchElementException();
+	    }
+	    ObjectData result =
+		new ObjectData(oids[i], dataArray[i]);
+	    i++;
+	    return result;
+	}
+	public void remove() {
+	    throw new UnsupportedOperationException();
 	}
     }
 

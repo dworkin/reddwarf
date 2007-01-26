@@ -5,11 +5,13 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ObjectIOException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.impl.service.data.store.DataStore.ObjectData;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.math.BigInteger;
+import java.util.Iterator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -441,31 +443,33 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 	}
     }
 
-    /** Saves all object modifications to the data store. */
-    static void flushAll(Context context) {
-	context.refs.flushChanges();
+    /**
+     * Returns an iterator that supplies the object data that needs to be
+     * stored to the data store, and flushes all references as a side effect.
+     */
+    static Iterator<ObjectData> flushModifiedObjects(Context context) {
+	return context.refs.flushModifiedObjects();
     }
 
     /**
-     * Stores any modifications to the data store, and changes the state to
-     * FLUSHED.
+     * Returns any modifications that need to be stored to the data store, or
+     * null if there are none, and changes the state to FLUSHED.
      */
     @SuppressWarnings("fallthrough")
-    void flush() {
+    byte[] flush() {
+	byte[] result = null;
 	switch (state) {
 	case EMPTY:
 	case REMOVED_EMPTY:
 	    break;
 	case NEW:
 	case MODIFIED:
- 	    context.store.setObject(
-		context.txn, oid, SerialUtil.serialize(object));
+	    result = SerialUtil.serialize(object);
 	    context.refs.unregisterObject(object);
 	    break;
 	case MAYBE_MODIFIED:
 	    if (!SerialUtil.matchingFingerprint(object, fingerprint)) {
-		context.store.setObject(
-		    context.txn, oid, SerialUtil.serialize(object));
+		result = SerialUtil.serialize(object);
 	    }
 	    /* Fall through */
 	case NOT_MODIFIED:
@@ -480,6 +484,7 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 	object = null;
 	fingerprint = null;
 	state = State.FLUSHED;
+	return result;
     }
 
     /**

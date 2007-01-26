@@ -200,7 +200,7 @@ final class Context {
 
     boolean prepare() throws Exception {
 	txn.setInactive();
-	ManagedReferenceImpl.flushAll(this);
+	store.setObjects(txn, ManagedReferenceImpl.flushModifiedObjects(this));
 	if (storeParticipant == null) {
 	    return true;
 	} else {
@@ -217,7 +217,7 @@ final class Context {
 
     void prepareAndCommit() throws Exception {
 	txn.setInactive();
-	ManagedReferenceImpl.flushAll(this);
+	store.setObjects(txn, ManagedReferenceImpl.flushModifiedObjects(this));
 	if (storeParticipant != null) {
 	    storeParticipant.prepareAndCommit(txn);
 	}

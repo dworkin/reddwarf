@@ -72,6 +72,9 @@ public interface DataStoreServer extends Remote {
      */
     void setObject(long tid, long oid, byte[] data) throws RemoteException;
 
+    void setObjects(long tid, long[] oids, byte[][] dataArray)
+	throws RemoteException;
+
     /**
      * Removes the object with the specified object ID.
      *

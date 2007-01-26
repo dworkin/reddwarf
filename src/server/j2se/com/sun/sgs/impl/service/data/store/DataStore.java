@@ -5,6 +5,7 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.service.Transaction;
+import java.util.Iterator;
 
 /**
  * Defines the interface to the underlying persistence mechanism that {@link
@@ -82,6 +83,22 @@ public interface DataStore {
      *		problem with the current transaction
      */
     void setObject(Transaction txn, long oid, byte[] data);
+
+    public final class ObjectData {
+	private final long oid;
+	private final byte[] data;
+	public ObjectData(long oid, byte[] data) {
+	    this.oid = oid;
+	    this.data = data;
+	}
+	public long getOid() {
+	    return oid;
+	}
+	public byte[] getData() {
+	    return data;
+	}
+    }
+    void setObjects(Transaction txn, Iterator<ObjectData> dataIterator);
 
     /**
      * Removes the object with the specified object ID.  The implementation

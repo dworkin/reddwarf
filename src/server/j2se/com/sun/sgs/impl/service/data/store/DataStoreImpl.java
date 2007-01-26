@@ -30,6 +30,7 @@ import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.util.Iterator;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -747,6 +748,60 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	}
 	throw convertException(txn, Level.FINEST, exception,
 			       "setObject txn:" + txn + ", oid:" + oid);
+    }
+
+    /** {@inheritDoc} */
+    public void setObjects(
+	Transaction txn, Iterator<ObjectData> dataIterator)
+    {
+	logger.log(Level.FINEST, "setObjects txn:{0}", txn);
+	Exception exception;
+	long oid = -1;
+	try {
+	    TxnInfo txnInfo = checkTxn(txn);
+	    if (dataIterator == null) {
+		throw new NullPointerException(
+		    "The dataIterator must not be null");
+	    }
+	    DatabaseEntry key = new DatabaseEntry();
+	    DatabaseEntry value = new DatabaseEntry();
+	    while (dataIterator.hasNext()) {
+		ObjectData objectData = dataIterator.next();
+		oid = objectData.getOid();
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(Level.FINEST,
+			       "setObjects txn:{0}, oid:{1,number,#}",
+			       txn, oid);
+		}
+		checkId(oid);
+		byte[] data = objectData.getData();
+		if (data == null) {
+		    throw new NullPointerException(
+			"The data must not be null");
+		}
+		LongBinding.longToEntry(oid, key);
+		value.setData(data);
+		OperationStatus status = oids.put(txnInfo.bdbTxn, key, value);
+		if (status != OperationStatus.SUCCESS) {
+		    throw new DataStoreException(
+			"setObjects txn: " + txn + ", oid:" + oid +
+			" failed: " + status);
+		}
+	    }
+	    txnInfo.modified = true;
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(
+		    Level.FINEST, "setObjects txn:{0} returns", txn, oid);
+	    }
+	    return;
+	} catch (DatabaseException e) {
+	    exception = e;
+	} catch (RuntimeException e) {
+	    exception = e;
+	}
+	throw convertException(
+	    txn, Level.FINEST, exception,
+	    "setObject txn:" + txn + (oid < 0 ? "" : ", oid:" + oid));
     }
 
     /** {@inheritDoc} */
