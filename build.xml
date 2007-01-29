@@ -349,6 +349,7 @@
       </classpath>
       <syspropertyset>
 	<propertyref prefix="test."/>
+	<propertyref prefix="com.sun.sgs."/>
       </syspropertyset>
       <!-- XXX: This doesn't work in Ant 1.6.1,
 	   either. -tjb@sun.com (01/13/2006) -->
