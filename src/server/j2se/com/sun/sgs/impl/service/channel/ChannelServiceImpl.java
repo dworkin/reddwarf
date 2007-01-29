@@ -1,11 +1,9 @@
 package com.sun.sgs.impl.service.channel;
 
-import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.Delivery;
-import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameExistsException;
 import com.sun.sgs.app.NameNotBoundException;
@@ -26,13 +24,10 @@ import com.sun.sgs.service.Service;
 import com.sun.sgs.service.SgsClientSession;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
-import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.service.TransactionProxy;
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -406,12 +401,12 @@ public class ChannelServiceImpl
 	synchronized (sequenceNumberMap) {
 	    // Using AtomicLong is overkill because the map is synchronized,
 	    // but it is easy at this point...
-	    AtomicLong sequenceNumber = sequenceNumberMap.get(session);
-	    if (sequenceNumber == null) {
-		sequenceNumber = new AtomicLong(0);
-		sequenceNumberMap.put(session, sequenceNumber);
+	    AtomicLong seq = sequenceNumberMap.get(session);
+	    if (seq == null) {
+		seq = new AtomicLong(0);
+		sequenceNumberMap.put(session, seq);
 	    }
-	    return sequenceNumber.getAndIncrement();
+	    return seq.getAndIncrement();
 	}
     }
 
@@ -640,6 +635,7 @@ public class ChannelServiceImpl
 	    this.message = message;
 	}
 
+        /** {@inheritDoc} */
 	public void run() {
 	    try {
                 if (logger.isLoggable(Level.FINEST)) {
@@ -689,6 +685,7 @@ public class ChannelServiceImpl
             this.seq = seq;
         }
 
+        /** {@inheritDoc} */
         public void run() {
             try {
                 if (logger.isLoggable(Level.FINEST)) {

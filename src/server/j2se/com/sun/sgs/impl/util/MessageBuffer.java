@@ -348,7 +348,7 @@ public class MessageBuffer {
         int savePos = pos;
         try {
             return getBytes(getUnsignedShort());
-        } catch (RuntimeException e) {
+        } catch (IndexOutOfBoundsException e) {
             pos = savePos;
             throw e;
         }

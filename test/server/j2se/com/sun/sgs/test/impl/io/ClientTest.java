@@ -166,18 +166,22 @@ public class ClientTest extends JFrame {
             }
         }
         
+        /** {@inheritDoc} */
         public String getColumnName(int col) {
             return columnHeaders.get(col);
         }
         
+        /** {@inheritDoc} */
         public int getRowCount() {
             return list.size();
         }
         
+        /** {@inheritDoc} */
         public int getColumnCount() {
             return columnHeaders.size();
         }
         
+        /** {@inheritDoc} */
         public Object getValueAt(int row, int col) {
             String curCol = columnHeaders.get(col);
             EndpointInfo info = list.get(row);
@@ -258,6 +262,7 @@ public class ClientTest extends JFrame {
             return status;
         }
         
+        /** {@inheritDoc} */
         public void bytesReceived(Connection conn, byte[] message) {
             messagesIn++;
             bytesIn += message.length;
@@ -269,6 +274,7 @@ public class ClientTest extends JFrame {
             dataChanged();
         }
 
+        /** {@inheritDoc} */
         public void disconnected(Connection conn) {
             connected = false;
             numDisconnects++;
@@ -276,6 +282,7 @@ public class ClientTest extends JFrame {
             dataChanged();
         }
 
+        /** {@inheritDoc} */
         public void exceptionThrown(Connection conn, Throwable exception) {
             System.out.println("ClientTest exceptionThrown");
             status = "Exception!";
@@ -283,6 +290,7 @@ public class ClientTest extends JFrame {
             exception.printStackTrace();
         }
 
+        /** {@inheritDoc} */
         public void connected(Connection conn) {
             connection = conn;
             connected = true;

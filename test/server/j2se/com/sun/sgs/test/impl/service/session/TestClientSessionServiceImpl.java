@@ -1,21 +1,13 @@
 package com.sun.sgs.test.impl.service.session;
 
 import com.sun.sgs.app.AppListener;
-import com.sun.sgs.app.Channel;
-import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.DataManager;
-import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
-import com.sun.sgs.app.NameExistsException;
-import com.sun.sgs.app.NameNotBoundException;
-import com.sun.sgs.app.PeriodicTaskHandle;
-import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TaskManager;
-import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityCredentials;
 import com.sun.sgs.auth.IdentityManager;
@@ -33,42 +25,28 @@ import com.sun.sgs.impl.util.MessageBuffer;
 import com.sun.sgs.io.Connector;
 import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
-import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.Priority;
-import com.sun.sgs.kernel.RecurringTaskHandle;
-import com.sun.sgs.kernel.TaskOwner;
-import com.sun.sgs.kernel.TaskReservation;
-import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TaskService;
-import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyTaskScheduler;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Properties;
-import junit.framework.Test;
 import junit.framework.TestCase;
 
 public class TestClientSessionServiceImpl extends TestCase {
@@ -289,9 +267,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client.connect(port);
 	    client.login("foo", "bar");
 	} finally {
-	    if (client != null) {
-		client.disconnect(false);
-	    }
+            client.disconnect(false);
 	}
     }
 
@@ -745,6 +721,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 	    List<byte[]> messageList = new ArrayList<byte[]>();
 	    
+            /** {@inheritDoc} */
 	    public void bytesReceived(Connection conn, byte[] buffer) {
 		if (connection != conn) {
 		    System.err.println(
@@ -823,6 +800,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		}
 	    }
 
+            /** {@inheritDoc} */
 	    public void connected(Connection conn) {
 		System.err.println("DummyClient.Listener.connected");
 		if (connection != null) {
@@ -838,9 +816,11 @@ public class TestClientSessionServiceImpl extends TestCase {
 		}
 	    }
 
+            /** {@inheritDoc} */
 	    public void disconnected(Connection conn) {
 	    }
 	    
+            /** {@inheritDoc} */
 	    public void exceptionThrown(Connection conn, Throwable exception) {
 		System.err.println("DummyClient.Listener.exceptionThrown " +
 				   "exception:" + exception);
@@ -857,6 +837,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    Collections.synchronizedMap(
 		new HashMap<ClientSession, ManagedReference>());
 
+        /** {@inheritDoc} */
 	public ClientSessionListener loggedIn(ClientSession session) {
 	    DummyClientSessionListener listener =
 		new DummyClientSessionListener(session);
@@ -876,6 +857,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    return listener;
 	}
 
+        /** {@inheritDoc} */
 	public void initialize(Properties props) {
 	}
 
@@ -913,9 +895,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    this.name = session.getName();
 	}
 
+        /** {@inheritDoc} */
 	public void disconnected(boolean graceful) {
 	    System.err.println("DummyClientSessionListener[" + name +
-
 			       "] disconnected invoked with " + graceful);
 	    synchronized (disconnectedCallbackLock) {
 		receivedDisconnectedCallback = true;
@@ -924,6 +906,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    }
 	}
 
+        /** {@inheritDoc} */
 	public void receivedMessage(byte[] message) {
 	}
     }

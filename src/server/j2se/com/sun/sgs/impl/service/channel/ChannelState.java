@@ -26,7 +26,7 @@ final class ChannelState implements ManagedObject, Serializable {
     final String name;
 
     /** The listener for this channel. */
-    private final WrappedSerializable<ChannelListener> listener;
+    private final WrappedSerializable<ChannelListener> channelListener;
 
     /** The delivery requirement for messages sent on this channel. */
     final Delivery delivery;
@@ -46,7 +46,7 @@ final class ChannelState implements ManagedObject, Serializable {
      */
     ChannelState(String name, ChannelListener listener, Delivery delivery) {
 	this.name = name;
-	this.listener =
+	this.channelListener =
 	    listener != null ?
 	    new WrappedSerializable<ChannelListener>(listener) :
 	    null;
@@ -138,8 +138,8 @@ final class ChannelState implements ManagedObject, Serializable {
 
     ChannelListener getListener() {
 	return
-	    listener != null  ?
-	    listener.get(ChannelListener.class) :
+	    channelListener != null  ?
+	    channelListener.get(ChannelListener.class) :
 	    null;
     }
 

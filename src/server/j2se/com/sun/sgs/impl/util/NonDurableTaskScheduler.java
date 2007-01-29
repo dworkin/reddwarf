@@ -4,7 +4,6 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.TaskService;
-import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.TransactionRunner;
 
 /**

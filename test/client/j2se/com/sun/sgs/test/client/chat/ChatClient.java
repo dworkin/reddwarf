@@ -395,6 +395,8 @@ public class ChatClient extends JFrame
 
     /**
      * {@inheritDoc}
+     * <p>
+     * Handles the direct {@code /echo} command.
      */
     public void receivedMessage(byte[] message) {
         if (message.length < 1) {
@@ -405,12 +407,6 @@ public class ChatClient extends JFrame
         byte opcode = buf.get();
 
         switch (opcode) {
-        case OP_JOINED:
-            userLogin(getSessionId(buf));
-            break;
-        case OP_LEFT:
-            userLogout(getSessionId(buf));
-            break;
         case OP_MESSAGE:
             byte[] msgBytes = new byte[buf.remaining()];
             buf.get(msgBytes);
@@ -431,11 +427,33 @@ public class ChatClient extends JFrame
     public void receivedMessage(ClientChannel channel, SessionId sender,
             byte[] message)
     {
-	JOptionPane.showMessageDialog(this,
-		new String(message),
-		String.format("Message from %.8s",
-			sender.toString()),
-			JOptionPane.INFORMATION_MESSAGE);
+        if (message.length < 1) {
+            System.err.format("ChatClient: Error, short command\n");
+        }
+
+        ByteBuffer buf = ByteBuffer.wrap(message);
+        byte opcode = buf.get();
+
+        switch (opcode) {
+        case OP_JOINED:
+            userLogin(getSessionId(buf));
+            break;
+        case OP_LEFT:
+            userLogout(getSessionId(buf));
+            break;
+        case OP_MESSAGE:
+            byte[] msgBytes = new byte[buf.remaining()];
+            buf.get(msgBytes);
+            String msgString = new String(msgBytes);
+            // Display message from another client
+            JOptionPane.showMessageDialog(this,
+                    msgString, "Message from " + sender,
+                    JOptionPane.INFORMATION_MESSAGE);
+            break;
+        default:
+            System.err.format("Unknown opcode 0x%02X\n", opcode);
+            break;
+        }
     }
 
     /**

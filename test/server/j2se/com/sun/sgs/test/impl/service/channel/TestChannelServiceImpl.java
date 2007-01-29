@@ -8,8 +8,6 @@ import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.NameExistsException;
 import com.sun.sgs.app.NameNotBoundException;
-import com.sun.sgs.app.PeriodicTaskHandle;
-import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
@@ -19,9 +17,6 @@ import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.task.TaskServiceImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.Priority;
-import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.ProtocolMessageListener;
@@ -29,7 +24,6 @@ import com.sun.sgs.service.SgsClientSession;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.util.DummyComponentRegistry;
-import com.sun.sgs.test.util.DummyTaskScheduler;
 import com.sun.sgs.test.util.DummyTaskScheduler;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
@@ -46,7 +40,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import junit.framework.Test;
 import junit.framework.TestCase;
 
 public class TestChannelServiceImpl extends TestCase {
@@ -209,7 +202,7 @@ public class TestChannelServiceImpl extends TestCase {
 	ChannelServiceImpl service =
 	    new ChannelServiceImpl(serviceProps, systemRegistry);
 	try {
-	    channelService.configure(null, new DummyTransactionProxy());
+            service.configure(null, new DummyTransactionProxy());
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
@@ -220,7 +213,7 @@ public class TestChannelServiceImpl extends TestCase {
 	ChannelServiceImpl service =
 	    new ChannelServiceImpl(serviceProps, systemRegistry);
 	try {
-	    channelService.configure(new DummyComponentRegistry(), null);
+            service.configure(new DummyComponentRegistry(), null);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
@@ -999,6 +992,7 @@ public class TestChannelServiceImpl extends TestCase {
     {
 	NonSerializableChannelListener() {}
 	
+        /** {@inheritDoc} */
 	public void receivedMessage(
 	    Channel channel, ClientSession session, byte[] message)
 	{
@@ -1016,52 +1010,61 @@ public class TestChannelServiceImpl extends TestCase {
 	implements SgsClientSession, Serializable
     {
 	private final static long serialVersionUID = 1L;
-	private static byte b = 0x00;
+	private static byte nextByte = 0x00;
 
 	private final String name;
 	private transient byte[] id = new byte[1];
 	
 	DummyClientSession(String name) {
 	    this.name = name;
-	    this.id[0] = b;
-	    b += 0x01;
+	    this.id[0] = nextByte;
+	    nextByte += 0x01;
 	}
 
 	/* -- Implement ClientSession -- */
 	
+        /** {@inheritDoc} */
 	public String getName() {
 	    return name;
 	}
 
+        /** {@inheritDoc} */
 	public byte[] getSessionId() {
 	    return id;
 	}
 
+        /** {@inheritDoc} */
 	public void send(byte[] message) {
 	}
 
+        /** {@inheritDoc} */
 	public void disconnect() {
 	}
 
+        /** {@inheritDoc} */
 	public boolean isConnected() {
 	    return true;
 	}
 
 	/* -- Implement SgsClientSession -- */
 	
+        /** {@inheritDoc} */
 	public void sendProtocolMessage(byte[] message, Delivery delivery) {
 	}
 
+        /** {@inheritDoc} */
 	public void sendProtocolMessageOnCommit(
 		byte[] message, Delivery delivery) {
 	}
 	
 	/* -- Implement Object -- */
 	
+        /** {@inheritDoc} */
 	public int hashCode() {
-	    return (int) id[0];
+	    return id[0];
 	}
 
+        /** {@inheritDoc} */
 	public boolean equals(Object obj) {
 	    if (this == obj) {
 		return true;
@@ -1073,6 +1076,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    return false;
 	}
 
+        /** {@inheritDoc} */
 	public String toString() {
 	    return getClass().getName() + "[" + name + "]";
 	}
@@ -1109,23 +1113,28 @@ public class TestChannelServiceImpl extends TestCase {
 	private final Map<byte[], SgsClientSession> sessions =
 	    new HashMap<byte[], SgsClientSession>();
 
+        /** {@inheritDoc} */
 	public String getName() {
 	    return toString();
 	}
 	
+        /** {@inheritDoc} */
 	public void configure(ComponentRegistry registry, TransactionProxy proxy) {
 	}
 	
+        /** {@inheritDoc} */
 	public void registerProtocolMessageListener(
 	    byte serviceId, ProtocolMessageListener listener)
 	{
 	    serviceListeners.put(serviceId, listener);
 	}
 
+        /** {@inheritDoc} */
 	public SgsClientSession getClientSession(byte[] sessionId) {
 	    return sessions.get(sessionId);
 	}
 
+        /** {@inheritDoc} */
 	public boolean shutdown() {
 	    return false;
 	}

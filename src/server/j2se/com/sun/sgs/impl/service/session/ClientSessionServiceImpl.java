@@ -209,7 +209,7 @@ public class ClientSessionServiceImpl
 		    if (logger.isLoggable(Level.CONFIG)) {
 			logger.log(
 			    Level.CONFIG,
-			    "configure: listen successful. address:{0}",
+			    "configure: listen successful. port:{0}",
                             getListenPort());
 		    }
 		} catch (IOException e) {
@@ -320,6 +320,7 @@ public class ClientSessionServiceImpl
 	    return session.getHandler();
 	}
 
+        /** {@inheritDoc} */
 	public void disconnected() {
 	    // TBI...
 	}
@@ -334,6 +335,11 @@ public class ClientSessionServiceImpl
             this.bytes = bytes;
         }
         
+        /**
+         * Returns the byte array representation of this session id.
+         *
+         * @return the byte array representation of this session id
+         */
         public byte[] getBytes() {
             return bytes;
         }
@@ -350,6 +356,7 @@ public class ClientSessionServiceImpl
             
             return Arrays.equals(bytes, ((SessionId) obj).bytes);
         }
+
         /** {@inheritDoc} */
         public int hashCode() {
             return Arrays.hashCode(bytes);
@@ -534,7 +541,8 @@ public class ClientSessionServiceImpl
 	    prepared = true;
             return true;
         }
-	
+        
+        /** {@inheritDoc} */
         public void run() throws Exception {
             if (!prepared) {
                 RuntimeException e =
