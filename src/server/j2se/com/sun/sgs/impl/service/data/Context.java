@@ -2,7 +2,6 @@ package com.sun.sgs.impl.service.data;
 
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.impl.service.data.store.DataStore;
-import com.sun.sgs.impl.service.data.store.DataStore.ObjectData;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.service.TransactionProxy;
@@ -256,10 +255,9 @@ final class Context {
 
     /** Flush all modified objects. */
     private void flushAll() {
-	Iterator<ObjectData> iter =
-	    ManagedReferenceImpl.flushModifiedObjects(this);
-	if (iter.hasNext()) {
-	    store.setObjects(txn, iter);
+	FlushInfo info = ManagedReferenceImpl.flushModifiedObjects(this);
+	if (info != null) {
+	    store.setObjects(txn, info.getOids(), info.getDataArray());
 	}
     }
 }

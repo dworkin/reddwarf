@@ -31,7 +31,6 @@ import com.sun.sgs.service.TransactionParticipant;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.Arrays;
-import java.util.Iterator;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -246,13 +245,13 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
      * information.  This information is stored in a separate database to avoid
      * concurrency conflicts between the object ID and other data.
      */
-    private final Database info;
+    private final Database infoDb;
 
     /** The Berkeley DB database that maps object IDs to object bytes. */
-    private final Database oids;
+    private final Database oidsDb;
 
     /** The Berkeley DB database that maps name bindings to object IDs. */
-    private final Database names;
+    private final Database namesDb;
 
     /**
      * Object to synchronize on when accessing nextObjectId and
@@ -691,9 +690,9 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 		}
 		create = true;
 	    }
-	    info = infoTmp;
+	    infoDb = infoTmp;
 	    try {
-		oids = env.openDatabase(
+		oidsDb = env.openDatabase(
 		    bdbTxn, directory + File.separator + "oids", null,
 		    create ? createConfig : null);
 	    } catch (FileNotFoundException e) {
@@ -701,7 +700,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 		    "Oids database not found: " + e.getMessage(), e);
 	    }
 	    try {
-		names = env.openDatabase(
+		namesDb = env.openDatabase(
 		    bdbTxn, directory + File.separator + "names", null,
 		    create ? createConfig : null);
 	    } catch (FileNotFoundException e) {
@@ -866,7 +865,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	DatabaseEntry key = new DatabaseEntry();
 	LongBinding.longToEntry(oid, key);
 	DatabaseEntry value = new DatabaseEntry();
-	OperationStatus status = oids.get(
+	OperationStatus status = oidsDb.get(
 	    txnInfo.bdbTxn, key, value, forUpdate ? LockMode.RMW : null);
 	if (status == OperationStatus.NOTFOUND) {
 	    throw new ObjectNotFoundException("Object not found: " + oid);
@@ -896,7 +895,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	    DatabaseEntry key = new DatabaseEntry();
 	    LongBinding.longToEntry(oid, key);
 	    DatabaseEntry value = new DatabaseEntry(data);
-	    OperationStatus status = oids.put(txnInfo.bdbTxn, key, value);
+	    OperationStatus status = oidsDb.put(txnInfo.bdbTxn, key, value);
 	    if (status != OperationStatus.SUCCESS) {
 		throw new DataStoreException(
 		    "setObject txn: " + txn + ", oid:" + oid + " failed: " +
@@ -919,37 +918,36 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
     }
 
     /** {@inheritDoc} */
-    public void setObjects(
-	Transaction txn, Iterator<ObjectData> dataIterator)
-    {
+    public void setObjects(Transaction txn, long[] oids, byte[][] dataArray) {
 	logger.log(Level.FINEST, "setObjects txn:{0}", txn);
 	Exception exception;
 	long oid = -1;
 	try {
 	    TxnInfo txnInfo = checkTxn(txn, Ops.SET_OBJECTS);
-	    if (dataIterator == null) {
-		throw new NullPointerException(
-		    "The dataIterator must not be null");
+	    int len = oids.length;
+	    if (len != dataArray.length) {
+		throw new IllegalArgumentException(
+		    "The oids and dataArray must be the same length");
 	    }
 	    DatabaseEntry key = new DatabaseEntry();
 	    DatabaseEntry value = new DatabaseEntry();
-	    while (dataIterator.hasNext()) {
-		ObjectData objectData = dataIterator.next();
-		oid = objectData.getOid();
+	    for (int i = 0; i < len; i++) {
+		oid = oids[i];
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(Level.FINEST,
 			       "setObjects txn:{0}, oid:{1,number,#}",
 			       txn, oid);
 		}
 		checkId(oid);
-		byte[] data = objectData.getData();
+		byte[] data = dataArray[i];
 		if (data == null) {
 		    throw new NullPointerException(
 			"The data must not be null");
 		}
 		LongBinding.longToEntry(oid, key);
 		value.setData(data);
-		OperationStatus status = oids.put(txnInfo.bdbTxn, key, value);
+		OperationStatus status =
+		    oidsDb.put(txnInfo.bdbTxn, key, value);
 		if (status != OperationStatus.SUCCESS) {
 		    throw new DataStoreException(
 			"setObjects txn: " + txn + ", oid:" + oid +
@@ -984,7 +982,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	    TxnInfo txnInfo = checkTxn(txn, Ops.REMOVE_OBJECT);
 	    DatabaseEntry key = new DatabaseEntry();
 	    LongBinding.longToEntry(oid, key);
-	    OperationStatus status = oids.delete(txnInfo.bdbTxn, key);
+	    OperationStatus status = oidsDb.delete(txnInfo.bdbTxn, key);
 	    if (status == OperationStatus.NOTFOUND) {
 		throw new ObjectNotFoundException("Object not found: " + oid);
 	    } else if (status != OperationStatus.SUCCESS) {
@@ -1024,7 +1022,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	    StringBinding.stringToEntry(name, key);
 	    DatabaseEntry value = new DatabaseEntry();
 	    OperationStatus status =
-		names.get(txnInfo.bdbTxn, key, value, null);
+		namesDb.get(txnInfo.bdbTxn, key, value, null);
 	    if (status == OperationStatus.NOTFOUND) {
 		throw new NameNotBoundException("Name not bound: " + name);
 	    } else if (status != OperationStatus.SUCCESS) {
@@ -1067,7 +1065,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	    StringBinding.stringToEntry(name, key);
 	    DatabaseEntry value = new DatabaseEntry();
 	    LongBinding.longToEntry(oid, value);
-	    OperationStatus status = names.put(txnInfo.bdbTxn, key, value);
+	    OperationStatus status = namesDb.put(txnInfo.bdbTxn, key, value);
 	    if (status != OperationStatus.SUCCESS) {
 		throw new DataStoreException(
 		    "setBinding txn:" + txn + ", name:" + name + " failed: " +
@@ -1105,7 +1103,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	    TxnInfo txnInfo = checkTxn(txn, Ops.REMOVE_BINDING);
 	    DatabaseEntry key = new DatabaseEntry();
 	    StringBinding.stringToEntry(name, key);
-	    OperationStatus status = names.delete(txnInfo.bdbTxn, key);
+	    OperationStatus status = namesDb.delete(txnInfo.bdbTxn, key);
 	    if (status == OperationStatus.NOTFOUND) {
 		throw new NameNotBoundException("Name not bound: " + name);
 	    } else if (status != OperationStatus.SUCCESS) {
@@ -1143,7 +1141,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	Exception exception;
 	try {
 	    TxnInfo txnInfo = checkTxn(txn, Ops.NEXT_BOUND_NAME);
-	    String result = txnInfo.nextName(name, names);
+	    String result = txnInfo.nextName(name, namesDb);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
 			   "nextBoundName txn:{0}, name:{1} returns {2}",
@@ -1181,9 +1179,9 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 		}
 		boolean ok = (txnCount == 0);
 		if (ok) {
-		    info.close();
-		    oids.close();
-		    names.close();
+		    infoDb.close();
+		    oidsDb.close();
+		    namesDb.close();
 		    env.close();
 		    txnCount = -1;
 		}
@@ -1629,9 +1627,9 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 		       "{6}\n" +
 		       "{7}\n" +
 		       "{8}",
-		       info.getStats(txnInfo.bdbTxn, null),
-		       oids.getStats(txnInfo.bdbTxn, null),
-		       names.getStats(txnInfo.bdbTxn, null),
+		       infoDb.getStats(txnInfo.bdbTxn, null),
+		       oidsDb.getStats(txnInfo.bdbTxn, null),
+		       namesDb.getStats(txnInfo.bdbTxn, null),
 		       allCacheFileStats,
 		       env.getCacheStats(null),
 		       env.getLockStats(null),
@@ -1671,7 +1669,8 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	com.sleepycat.db.Transaction bdbTxn = env.beginTransaction(null, null);
 	boolean done = false;
 	try {
-	    long id = DataStoreHeader.getNextId(key, info, bdbTxn, blockSize);
+	    long id = DataStoreHeader.getNextId(
+		key, infoDb, bdbTxn, blockSize);
 	    done = true;
 	    bdbTxn.commit();
 	    return id;

@@ -72,6 +72,20 @@ public interface DataStoreServer extends Remote {
      */
     void setObject(long tid, long oid, byte[] data) throws RemoteException;
 
+    /** 
+     * Specifies data to associate with a series of object IDs.
+     *
+     * @param	txn the transaction under which the operation should take place
+     * @param	oids the object IDs
+     * @param	dataArray the associated data values
+     * @throws	TransactionAbortedException if the transaction was aborted due
+     *		to a lock conflict or timeout
+     * @throws	IllegalArgumentException if <code>oids</code> and
+     *		<code>data</code> are not the same length, or if
+     *		<code>oids</code> contains a value that is negative
+     * @throws	IllegalStateException if the operation failed because of a
+     *		problem with the current transaction
+     */
     void setObjects(long tid, long[] oids, byte[][] dataArray)
 	throws RemoteException;
 

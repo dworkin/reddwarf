@@ -5,7 +5,6 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.service.Transaction;
-import java.util.Iterator;
 
 /**
  * Defines the interface to the underlying persistence mechanism that {@link
@@ -87,63 +86,17 @@ public interface DataStore {
      * Specifies data to associate with a series of object IDs.
      *
      * @param	txn the transaction under which the operation should take place
-     * @param	dataIterator an iterator that supplies the object IDs and data
+     * @param	oids the object IDs
+     * @param	dataArray the associated data values
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
+     * @throws	IllegalArgumentException if <code>oids</code> and
+     *		<code>data</code> are not the same length, or if
+     *		<code>oids</code> contains a value that is negative
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
-    void setObjects(Transaction txn, Iterator<ObjectData> dataIterator);
-
-    /**
-     * Holds an object ID and the data to associate with it for use in calls to
-     * {@link #setObjects setObjects}.
-     */
-    public final class ObjectData {
-
-	/** The object ID. */
-	private final long oid;
-
-	/** The data to associate with the object ID. */
-	private final byte[] data;
-
-	/**
-	 * Creates an instance with the specified object ID and data.
-	 *
-	 * @param	oid the object ID
-	 * @param	data the data
-	 * @throws	IllegalStateException if <code>oid</code> is negative
-	 */
-	public ObjectData(long oid, byte[] data) {
-	    this.oid = oid;
-	    this.data = data;
-	    if (oid < 0) {
-		throw new IllegalArgumentException(
-		    "Object ID must not be negative");
-	    }
-	    if (data == null) {
-		throw new NullPointerException("The data must not be null");
-	    }
-	}
-
-	/**
-	 * Returns the object ID.
-	 *
-	 * @return	the object ID
-	 */
-	public long getOid() {
-	    return oid;
-	}
-
-	/**
-	 * Returns the data.
-	 *
-	 * @return	the data
-	 */
-	public byte[] getData() {
-	    return data;
-	}
-    }
+    void setObjects(Transaction txn, long[] oids, byte[][] dataArray);
 
     /**
      * Removes the object with the specified object ID.  The implementation

@@ -355,8 +355,8 @@
 
   <!-- Run network server -->
   <target name="test-network-server" depends="build">
-    <delete dir="${build.dir}/test/output/network-server"/>
-    <mkdir dir="${build.dir}/test/output/network-server"/>
+    <delete dir="${build.dir}/test/network-server"/>
+    <mkdir dir="${build.dir}/test/network-server"/>
     <java
        classname="com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl"
        classpath="${build.dir}/classes/server;${bdb.lib.dir}/db.jar"
@@ -365,8 +365,9 @@
       <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
       <sysproperty
 	 key="com.sun.sgs.impl.service.data.store.DataStoreImpl.directory"
-	 file="${build.dir}/test/output/network-server"/>
+	 file="${build.dir}/test/network-server"/>
       <sysproperty key="java.util.logging.config.file" file="${test.logging}"/>
+      <sysproperty key="java.rmi.server.hostname" value="${test.server.host}"/>
     </java>
   </target>
 

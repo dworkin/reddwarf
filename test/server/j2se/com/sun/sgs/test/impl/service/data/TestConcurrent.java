@@ -7,16 +7,19 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyManagedObject;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
 import java.util.Random;
 import java.util.logging.Level;
+import java.util.logging.LogManager;
 import java.util.logging.Logger;
 import junit.framework.TestCase;
 
@@ -43,6 +46,14 @@ public class TestConcurrent extends TestCase {
     /** The number of concurrent threads. */
     private static final int threads = Integer.getInteger("test.threads", 2);
 
+    /** The logging to do for good performance. */
+    private static final String performanceLogging =
+	".level = WARNING\n" +
+	"handlers = java.util.logging.ConsoleHandler\n" +
+	"java.util.logging.ConsoleHandler.formatter =" +
+	" java.util.logging.SimpleFormatter\n" +
+	"java.util.logging.ConsoleHandler.level = WARNING";
+
     /** Print test parameters. */
     static {
 	System.err.println("Parameters: test.operations=" + operations +
@@ -51,10 +62,10 @@ public class TestConcurrent extends TestCase {
     }
 
     /** The transaction proxy. */
-    final DummyTransactionProxy txnProxy = new DummyTransactionProxy();
+    DummyTransactionProxy txnProxy;
 
     /** Set when the test passes. */
-    private boolean passed;
+    protected boolean passed;
 
     /** A per-test database directory. */
     private String directory = System.getProperty("test.directory");
@@ -74,7 +85,7 @@ public class TestConcurrent extends TestCase {
     protected Properties props;
 
     /** The service to test. */
-    private DataServiceImpl service;
+    private DataService service;
 
     /** Creates the test. */
     public TestConcurrent(String name) {
@@ -84,9 +95,15 @@ public class TestConcurrent extends TestCase {
     /** Prints the name of the test case. */
     protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
+	if (System.getProperty("test.logging") == null) {
+	    /* Change logging */
+	    LogManager.getLogManager().readConfiguration(
+		new ByteArrayInputStream(performanceLogging.getBytes()));
+	}
 	props = createProperties(
 	    DataStoreImplClass + ".directory", createDirectory(),
 	    "com.sun.sgs.appName", "TestConcurrent");
+	txnProxy = new DummyTransactionProxy();
     }
 
     /** Sets passed if the test passes. */
@@ -111,6 +128,9 @@ public class TestConcurrent extends TestCase {
 	if (passed) {
 	    deleteDirectory(directory);
 	}
+	if (System.getProperty("test.logging") == null) {
+	    LogManager.getLogManager().readConfiguration();
+	}
     }
 
     /** Shuts down the service. */
@@ -123,7 +143,7 @@ public class TestConcurrent extends TestCase {
     public void testConcurrent() throws Throwable {
 	DummyComponentRegistry componentRegistry =
 	    new DummyComponentRegistry();
-	service = new DataServiceImpl(props, componentRegistry);
+	service = getDataService(props, componentRegistry);
 	DummyTransaction txn = new DummyTransaction();
 	txnProxy.setCurrentTransaction(txn);
 	service.configure(componentRegistry, txnProxy);
@@ -329,5 +349,12 @@ public class TestConcurrent extends TestCase {
 	/* Include system properties and allow them to override */
 	props.putAll(System.getProperties());
 	return props;
+    }
+
+    protected DataService getDataService(
+	Properties props, ComponentRegistry componentRegistry)
+	throws Exception
+    {
+	return new DataServiceImpl(props, componentRegistry);
     }
 }

@@ -2,7 +2,6 @@ package com.sun.sgs.impl.service.data.store.net;
 
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
-import com.sun.sgs.impl.service.data.store.DataStore.ObjectData;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl.TxnInfoTable;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.util.LoggerWrapper;
@@ -452,35 +451,9 @@ public class DataStoreServerImpl implements DataStoreServer {
     {
 	Txn txn = getTxn(tid);
 	try {
-	    store.setObjects(
-		txn, new DataObjectsIterator(oids, dataArray));
+	    store.setObjects(txn, oids, dataArray);
 	} finally {
 	    txnTable.notInUse(txn);
-	}
-    }
-
-    private static class DataObjectsIterator implements Iterator<ObjectData> {
-	private final long[] oids;
-	private final byte[][] dataArray;
-	private int i = 0;
-	DataObjectsIterator(long[] oids, byte[][] dataArray) {
-	    this.oids = oids;
-	    this.dataArray = dataArray;
-	}
-	public boolean hasNext() {
-	    return i < oids.length;
-	}
-	public ObjectData next() {
-	    if (!hasNext()) {
-		throw new NoSuchElementException();
-	    }
-	    ObjectData result =
-		new ObjectData(oids[i], dataArray[i]);
-	    i++;
-	    return result;
-	}
-	public void remove() {
-	    throw new UnsupportedOperationException();
 	}
     }
 

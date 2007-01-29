@@ -5,7 +5,6 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ObjectIOException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
-import com.sun.sgs.impl.service.data.store.DataStore.ObjectData;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
@@ -444,10 +443,10 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
     }
 
     /**
-     * Returns an iterator that supplies the object data that needs to be
-     * stored to the data store, and flushes all references as a side effect.
+     * Flushes all references.  Returns information about any objects found to
+     * be modified, or null if none were modified.
      */
-    static Iterator<ObjectData> flushModifiedObjects(Context context) {
+    static FlushInfo flushModifiedObjects(Context context) {
 	return context.refs.flushModifiedObjects();
     }
 

@@ -1,15 +1,10 @@
 package com.sun.sgs.impl.service.data;
 
 import com.sun.sgs.app.ManagedObject;
-import com.sun.sgs.impl.service.data.store.DataStore.ObjectData;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
-import java.util.Iterator;
-import java.util.NoSuchElementException;
 import java.util.Map.Entry;
 import java.util.Map;
-
 
 /**
  * Stores information about managed references within a particular transaction.
@@ -98,49 +93,21 @@ final class ReferenceTable {
     }
 
     /**
-     * Returns an iterator that supplies the object data that needs to be
-     * stored to the data store and flushes all references as a side effect.
+     * Flushes all references.  Returns information about any objects found to
+     * be modified, or null if none were modified.
      */
-    Iterator<ObjectData> flushModifiedObjects() {
-	return new FlushObjectsIterator(oids.values());
-
-    }
-
-    /**
-     * Supplies object data that needs to be stored to the data store, and
-     * flushes all references.
-     */
-    private static class FlushObjectsIterator implements Iterator<ObjectData> {
-	private final Iterator<ManagedReferenceImpl> iter;
-	private ObjectData next;
-	FlushObjectsIterator(Collection<ManagedReferenceImpl> refs) {
-	    this.iter = refs.iterator();
-	    next = getNext();
-	}
-	public boolean hasNext() {
-	    return next != null;
-	}
-	public ObjectData next() {
-	    if (!hasNext()) {
-		throw new NoSuchElementException();
-	    }
-	    ObjectData result = next;
-	    next = getNext();
-	    return result;
-	}
-	public void remove() {
-	    throw new UnsupportedOperationException();
-	}
-	private ObjectData getNext() {
-	    while (iter.hasNext()) {
-		ManagedReferenceImpl ref = iter.next();
-		byte[] data = ref.flush();
-		if (data != null) {
-		    return new ObjectData(ref.oid, data);
+    FlushInfo flushModifiedObjects() {
+	FlushInfo flushInfo = null;
+	for (ManagedReferenceImpl ref : oids.values()) {
+	    byte[] data = ref.flush();
+	    if (data != null) {
+		if (flushInfo == null) {
+		    flushInfo = new FlushInfo();
 		}
+		flushInfo.add(ref.oid, data);
 	    }
-	    return null;
 	}
+	return flushInfo;
     }
 
     /**

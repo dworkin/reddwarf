@@ -1,6 +1,5 @@
 package com.sun.sgs.impl.service.data.store.net;
 
-import com.sun.sgs.app.ObjectIOException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
@@ -14,7 +13,6 @@ import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.RMIClientSocketFactory;
-import java.util.Iterator;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -292,9 +290,7 @@ public final class DataStoreClient
     }
 
     /** {@inheritDoc} */
-    public void setObjects(
-	Transaction txn, Iterator<ObjectData> dataIterator)
-    {
+    public void setObjects(Transaction txn, long[] oids, byte[][] dataArray) {
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST, "setObjects txn:{0}", txn);
 	}
@@ -302,37 +298,7 @@ public final class DataStoreClient
 	Exception exception;
 	try {
 	    txnInfo = checkTxn(txn);
-	    if (dataIterator == null) {
-		throw new NullPointerException(
-		    "The dataIterator must not be null");
-	    }
-	    final int max = 10;
-	    int i = 0;
-	    long[] oids = new long[max];
-	    byte[][] dataArray = new byte[max][];
-	    while (dataIterator.hasNext()) {
-		ObjectData objectData = dataIterator.next();
-		oids[i] = objectData.getOid();
-		dataArray[i] = objectData.getData();
-		i++;
-		if (i == max) {
-		    server.setObjects(txnInfo.tid, oids, dataArray);
-		    oids = new long[max];
-		    dataArray = new byte[max][];
-		    i = 0;
-		}
-	    }
-	    if (i > 0) {
-		if (i < max) {
-		    long[] newOids = new long[i];
-		    System.arraycopy(oids, 0, newOids, 0, i);
-		    oids = newOids;
-		    byte[][] newDataArray = new byte[i][];
-		    System.arraycopy(dataArray, 0, newDataArray, 0, i);
-		    dataArray = newDataArray;
-		}
-		server.setObjects(txnInfo.tid, oids, dataArray);
-	    }
+	    server.setObjects(txnInfo.tid, oids, dataArray);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST, "setObjects txn:{0} returns", txn);
 	    }
