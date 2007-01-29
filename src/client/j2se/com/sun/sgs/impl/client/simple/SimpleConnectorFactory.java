@@ -12,7 +12,7 @@ import com.sun.sgs.impl.client.comm.ClientConnectorFactory;
 public class SimpleConnectorFactory implements ClientConnectorFactory {
 
     /**
-     * Creates a new instance of {@link SimpleClientConnector} based on
+     * Creates a new instance of {@code SimpleClientConnector} based on
      * the given {@code properties}.
      * 
      * @param properties which affect the creation of the

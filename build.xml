@@ -229,7 +229,7 @@
 	  description="Builds public client API javadoc">
     <javadoc sourcepath="src/client/j2se"
              destdir="${build.dir}/javadoc/apidoc/sgs-client-apidoc"
-             classpath="${build.dir}/classes/client"
+             classpathref="client.classpath"
              packagenames="com.sun.sgs.client,com.sun.sgs.client.simple"
              overview="src/client/j2se/overview.html"
              windowtitle="${project.name} Client API"
