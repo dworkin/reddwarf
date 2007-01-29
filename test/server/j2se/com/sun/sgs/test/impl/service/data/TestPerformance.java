@@ -59,9 +59,6 @@ public class TestPerformance extends TestCase {
     private static int modifyItems =
 	Integer.getInteger("test.modifyItems", 200);
 
-    /** The number of times to run the test while timing. */
-    private static int count = Integer.getInteger("test.count", 60);
-
     /** The number of times to repeat the timing. */
     private static int repeat = Integer.getInteger("test.repeat", 5);
 
@@ -83,11 +80,11 @@ public class TestPerformance extends TestCase {
 	" java.util.logging.SimpleFormatter\n" +
 	"java.util.logging.ConsoleHandler.level = WARNING";
 
-    /** Print test parameters. */
-    static {
-	System.err.println("Parameters: test.items=" + items +
-			   ", test.modifyItems=" + modifyItems);
-    }
+    /** Whether we've printed the parameters. */
+    private static boolean printedParameters;
+
+    /** The number of times to run the test while timing. */
+    protected int count;
 
     /** Set when the test passes. */
     protected boolean passed;
@@ -114,6 +111,7 @@ public class TestPerformance extends TestCase {
     /** Creates the test. */
     public TestPerformance(String name) {
 	super(name);
+	count = Integer.getInteger("test.count", 60);
     }
 
     /**
@@ -121,6 +119,7 @@ public class TestPerformance extends TestCase {
      * if necessary.
      */
     protected void setUp() throws Exception {
+	maybePrintParameters();
 	System.err.println("Testcase: " + getName());
 	createTransaction();
 	if (!doLogging) {
@@ -132,6 +131,16 @@ public class TestPerformance extends TestCase {
 	    DataStoreImplClass + ".directory", createDirectory(),
 	    "com.sun.sgs.appName", "TestPerformance",
 	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
+    }
+
+    private void maybePrintParameters() {
+	if (!printedParameters) {
+	    System.err.println("Parameters:" +
+			       "\n  test.count=" + count +
+			       "\n  test.items=" + items +
+			       "\n  test.modifyItems=" + modifyItems);
+	    printedParameters = true;
+	}
     }
 
     /** Sets passed if the test passes. */

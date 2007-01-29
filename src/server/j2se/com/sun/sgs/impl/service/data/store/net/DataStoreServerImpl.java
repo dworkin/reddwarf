@@ -453,7 +453,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 	Txn txn = getTxn(tid);
 	try {
 	    store.setObjects(
-		txn, DataObjectsIterator(oids, dataArray));
+		txn, new DataObjectsIterator(oids, dataArray));
 	} finally {
 	    txnTable.notInUse(txn);
 	}

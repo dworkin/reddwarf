@@ -2,9 +2,11 @@ package com.sun.sgs.impl.service.data;
 
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.impl.service.data.store.DataStore;
+import com.sun.sgs.impl.service.data.store.DataStore.ObjectData;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.service.TransactionProxy;
+import java.util.Iterator;
 
 /** Stores information for a specific transaction. */
 final class Context {
@@ -200,7 +202,7 @@ final class Context {
 
     boolean prepare() throws Exception {
 	txn.setInactive();
-	store.setObjects(txn, ManagedReferenceImpl.flushModifiedObjects(this));
+	flushAll();
 	if (storeParticipant == null) {
 	    return true;
 	} else {
@@ -217,7 +219,7 @@ final class Context {
 
     void prepareAndCommit() throws Exception {
 	txn.setInactive();
-	store.setObjects(txn, ManagedReferenceImpl.flushModifiedObjects(this));
+	flushAll();
 	if (storeParticipant != null) {
 	    storeParticipant.prepareAndCommit(txn);
 	}
@@ -250,5 +252,14 @@ final class Context {
      */
     void checkTxn(Transaction otherTxn) {
 	txn.check(otherTxn);
+    }
+
+    /** Flush all modified objects. */
+    private void flushAll() {
+	Iterator<ObjectData> iter =
+	    ManagedReferenceImpl.flushModifiedObjects(this);
+	if (iter.hasNext()) {
+	    store.setObjects(txn, iter);
+	}
     }
 }

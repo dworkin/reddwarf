@@ -75,8 +75,7 @@ public interface DataStore {
      * @param	txn the transaction under which the operation should take place
      * @param	oid the object ID
      * @param	data the data
-     * @throws	IllegalArgumentException if <code>oid</code> is negative, or if
-     *		<code>data</code> is empty
+     * @throws	IllegalArgumentException if <code>oid</code> is negative
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
      * @throws	IllegalStateException if the operation failed because of a
@@ -84,21 +83,67 @@ public interface DataStore {
      */
     void setObject(Transaction txn, long oid, byte[] data);
 
+    /** 
+     * Specifies data to associate with a series of object IDs.
+     *
+     * @param	txn the transaction under which the operation should take place
+     * @param	dataIterator an iterator that supplies the object IDs and data
+     * @throws	TransactionAbortedException if the transaction was aborted due
+     *		to a lock conflict or timeout
+     * @throws	IllegalStateException if the operation failed because of a
+     *		problem with the current transaction
+     */
+    void setObjects(Transaction txn, Iterator<ObjectData> dataIterator);
+
+    /**
+     * Holds an object ID and the data to associate with it for use in calls to
+     * {@link #setObjects setObjects}.
+     */
     public final class ObjectData {
+
+	/** The object ID. */
 	private final long oid;
+
+	/** The data to associate with the object ID. */
 	private final byte[] data;
+
+	/**
+	 * Creates an instance with the specified object ID and data.
+	 *
+	 * @param	oid the object ID
+	 * @param	data the data
+	 * @throws	IllegalStateException if <code>oid</code> is negative
+	 */
 	public ObjectData(long oid, byte[] data) {
 	    this.oid = oid;
 	    this.data = data;
+	    if (oid < 0) {
+		throw new IllegalArgumentException(
+		    "Object ID must not be negative");
+	    }
+	    if (data == null) {
+		throw new NullPointerException("The data must not be null");
+	    }
 	}
+
+	/**
+	 * Returns the object ID.
+	 *
+	 * @return	the object ID
+	 */
 	public long getOid() {
 	    return oid;
 	}
+
+	/**
+	 * Returns the data.
+	 *
+	 * @return	the data
+	 */
 	public byte[] getData() {
 	    return data;
 	}
     }
-    void setObjects(Transaction txn, Iterator<ObjectData> dataIterator);
 
     /**
      * Removes the object with the specified object ID.  The implementation

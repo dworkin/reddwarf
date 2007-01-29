@@ -76,10 +76,10 @@ public class TestDataServiceImpl extends TestCase {
     String directory;
 
     /** A transaction proxy. */
-    DummyTransactionProxy txnProxy = new DummyTransactionProxy();
+    DummyTransactionProxy txnProxy;
 
     /** A component registry. */
-    DummyComponentRegistry componentRegistry = new DummyComponentRegistry();
+    DummyComponentRegistry componentRegistry;
 
     /** An initial, open transaction. */
     DummyTransaction txn;
@@ -101,7 +101,9 @@ public class TestDataServiceImpl extends TestCase {
      */
     protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
+	txnProxy = new DummyTransactionProxy();
 	createTransaction();
+	componentRegistry = new DummyComponentRegistry();
 	service = getDataServiceImpl();
 	service.configure(componentRegistry, txnProxy);
 	componentRegistry.setComponent(DataManager.class, service);
@@ -1121,12 +1123,12 @@ public class TestDataServiceImpl extends TestCase {
 	    }
 	};
 	thread.start();
-	assertTrue(threadFlag.tryAcquire(1, TimeUnit.SECONDS));
+	assertTrue(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
 	mainFlag.release();
-	assertFalse(threadFlag.tryAcquire(1, TimeUnit.SECONDS));	
+	assertFalse(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
 	txn.commit();
 	txn = null;
-	assertTrue(threadFlag.tryAcquire(1, TimeUnit.SECONDS));
+	assertTrue(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
     }
 
     /* -- Test createReference -- */
@@ -1454,12 +1456,12 @@ public class TestDataServiceImpl extends TestCase {
 	    }
 	};
 	thread.start();
-	assertTrue(threadFlag.tryAcquire(1, TimeUnit.SECONDS));
+	assertTrue(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
 	mainFlag.release();
-	assertFalse(threadFlag.tryAcquire(1, TimeUnit.SECONDS));	
+	assertFalse(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
 	txn.commit();
 	txn = null;
-	assertTrue(threadFlag.tryAcquire(1, TimeUnit.SECONDS));
+	assertTrue(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
     }
 
     /* -- Test ManagedReference.getId -- */

@@ -2,12 +2,14 @@ package com.sun.sgs.impl.service.data;
 
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.impl.service.data.store.DataStore.ObjectData;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Map.Entry;
 import java.util.Map;
+
 
 /**
  * Stores information about managed references within a particular transaction.
@@ -100,7 +102,7 @@ final class ReferenceTable {
      * stored to the data store and flushes all references as a side effect.
      */
     Iterator<ObjectData> flushModifiedObjects() {
-	return new FlushObjectsIterator(oids);
+	return new FlushObjectsIterator(oids.values());
 
     }
 
@@ -111,7 +113,7 @@ final class ReferenceTable {
     private static class FlushObjectsIterator implements Iterator<ObjectData> {
 	private final Iterator<ManagedReferenceImpl> iter;
 	private ObjectData next;
-	ObjectDataIter(Set<ManagedReferenceImpl> refs) {
+	FlushObjectsIterator(Collection<ManagedReferenceImpl> refs) {
 	    this.iter = refs.iterator();
 	    next = getNext();
 	}

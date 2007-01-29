@@ -375,7 +375,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
     private static class Ops {
 
 	/** Number of operations -- increment when adding a new one. */
-	private static final int NUM_OPS = 12;
+	private static final int NUM_OPS = 13;
 
 	/** Operation names. */
 	private static String[] OP_NAMES = new String[NUM_OPS];
@@ -388,11 +388,12 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	static final int GET_OBJECT = op(4, "getObject");
 	static final int GET_OBJECT_FOR_UPDATE = op(5, "getObjectForUpdate");
 	static final int SET_OBJECT = op(6, "setObject");
-	static final int REMOVE_OBJECT = op(7, "removeObject");
-	static final int GET_BINDING = op(8, "getBinding");
-	static final int SET_BINDING = op(9, "setBinding");
-	static final int REMOVE_BINDING = op(10, "removeBinding");
-	static final int NEXT_BOUND_NAME = op(11, "nextBoundName");
+	static final int SET_OBJECTS = op(7, "setObjects");
+	static final int REMOVE_OBJECT = op(8, "removeObject");
+	static final int GET_BINDING = op(9, "getBinding");
+	static final int SET_BINDING = op(10, "setBinding");
+	static final int REMOVE_BINDING = op(11, "removeBinding");
+	static final int NEXT_BOUND_NAME = op(12, "nextBoundName");
 
 	/** An array of operation counts. */
 	private final int[] ops = new int[NUM_OPS];
@@ -478,6 +479,9 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 
     /** Stores transaction information. */
     private static class TxnInfo {
+
+	/** The SGS transaction. */
+	final Transaction txn;
 
 	/** The associated Berkeley DB transaction. */
 	final com.sleepycat.db.Transaction bdbTxn;
@@ -922,7 +926,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	Exception exception;
 	long oid = -1;
 	try {
-	    TxnInfo txnInfo = checkTxn(txn);
+	    TxnInfo txnInfo = checkTxn(txn, Ops.SET_OBJECTS);
 	    if (dataIterator == null) {
 		throw new NullPointerException(
 		    "The dataIterator must not be null");

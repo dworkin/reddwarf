@@ -32,6 +32,7 @@ public class TestDataServiceClientPerformance extends TestPerformance {
 
     public TestDataServiceClientPerformance(String name) {
 	super(name);
+	count = Integer.getInteger("test.count", 20);
     }
 
     protected void tearDown() throws Exception {
