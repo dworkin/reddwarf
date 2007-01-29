@@ -131,22 +131,10 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     
     /** {@inheritDoc} */
     public byte[] getSessionId() {
-	try {
-	    if (!isConnected()) {
-		throw new IllegalStateException("client session not connected");
-	    }
-			     
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(Level.FINEST, "getSessionId returns {0}", sessionId);
-	    }
-	    return sessionId;
-	    
-	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.logThrow(Level.FINEST, e, "getSessionId throws");
-	    }
-	    throw e;
-	}
+        if (logger.isLoggable(Level.FINEST)) {
+            logger.log(Level.FINEST, "getSessionId returns {0}", sessionId);
+        }
+        return sessionId;
     }
 
     /** {@inheritDoc} */
@@ -475,7 +463,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 			    handleDisconnect(false);
 			}});
 		}
-		    
+
 		state = State.DISCONNECTED;
 	    }
 	}

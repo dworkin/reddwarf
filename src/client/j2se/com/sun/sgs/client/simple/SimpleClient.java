@@ -77,6 +77,9 @@ public class SimpleClient implements ServerSession {
      */
     private volatile boolean connectionStateChanging = false;
     
+    /** TODO */
+    private volatile boolean expectingDisconnect = false;
+    
     /** The current sessionId, if logged in. */
     private SessionId sessionId;
 
@@ -294,8 +297,15 @@ public class SimpleClient implements ServerSession {
                 connectionStateChanging = false;
             }
             sessionId = null;
-            MessageBuffer msg = new MessageBuffer(message);
-            clientListener.disconnected(graceful, msg.getString());
+            String reason = null;
+            if (message != null) {
+                MessageBuffer msg = new MessageBuffer(message);
+                reason = msg.getString();
+            }
+            // FIXME ignore graceful from connection for now (not implemented),
+            // instead look at the boolean we set when expecting disconnect
+            clientListener.disconnected(expectingDisconnect, reason);
+            expectingDisconnect = false;
         }
 
         /**
@@ -395,6 +405,9 @@ public class SimpleClient implements ServerSession {
 
             case SimpleSgsProtocol.LOGOUT_SUCCESS:
                 logger.log(Level.FINER, "Logged out gracefully");
+                expectingDisconnect = true;
+                // Server should disconnect us
+                /*
                 try {
                     clientConnection.disconnect();
                 } catch (IOException e) {
@@ -404,6 +417,7 @@ public class SimpleClient implements ServerSession {
                     }
                     // ignore
                 }
+                */
                 break;
 
             default:
