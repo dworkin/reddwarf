@@ -1,1 +1,3 @@
 guest	iejidmgaphnkknmbmligjigcbpiacmanjpjkdmdmcjfmibaheiplaeibbfmbigom
+test1	*
+test2	*
