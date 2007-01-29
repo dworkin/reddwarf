@@ -271,13 +271,7 @@ public class SimpleClientTestUI extends JFrame {
         public void receivedMessage(ClientChannel channel,
                 SessionId sender, byte[] message)
         {
-            try {
-                addChannelMessage(channel, DataInputStream
-                        .readUTF(new DataInputStream(
-                                new ByteArrayInputStream(message))));
-            } catch (IOException ioe) {
-                ioe.printStackTrace();
-            }
+            addChannelMessage(channel, new String(message));
         }
     }
     

@@ -119,7 +119,7 @@ public class ClientTest implements SimpleClientListener,
     public void receivedMessage(byte[] message) {
         System.out.println("Received general server message size "
                 + message.length + " "
-                + new String(message, 4, message.length - 4));
+                + new String(message));
     }
 
     // methods inherited from ClientChannelListener

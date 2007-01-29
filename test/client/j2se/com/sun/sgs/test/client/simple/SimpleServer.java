@@ -210,7 +210,7 @@ public class SimpleServer implements ConnectionListener {
             assert service == CHANNEL_SERVICE;
             String channelName = msg.getString();
             msg.getLong(); // FIXME sequence number
-            int numRecipients = msg.getInt();
+            int numRecipients = msg.getShort();
             String messageStr = msg.getString();
             System.out.println("Channel Message " + channelName
                     + " num recipients " + numRecipients + " message "
@@ -234,6 +234,12 @@ public class SimpleServer implements ConnectionListener {
                   putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
                   putByte(SimpleSgsProtocol.LOGOUT_SUCCESS);
             sendMessage(conn, reply.getBuffer());
+            try {
+                conn.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+                // ignore
+            }
         }
     }
 

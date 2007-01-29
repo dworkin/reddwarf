@@ -22,7 +22,7 @@ import java.util.Properties;
  * An ad-hoc SGS test application that exercises the DataManager
  * and TaskManager.
  */
-public class TestApplication
+public class SimpleTaskApp
 	implements AppListener, Serializable
 {
     private static final long serialVersionUID = 1L;
