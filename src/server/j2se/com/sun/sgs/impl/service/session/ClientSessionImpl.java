@@ -167,7 +167,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    case CONNECTED:
 	    case RECONNECTING:
 		MessageBuffer buf =
-		    new MessageBuffer(5 + message.length);
+		    new MessageBuffer(3 + 8 + 2 + message.length);
 		buf.putByte(SimpleSgsProtocol.VERSION).
 		    putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
 		    putByte(SimpleSgsProtocol.SESSION_MESSAGE).
