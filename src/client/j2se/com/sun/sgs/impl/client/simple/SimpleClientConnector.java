@@ -20,7 +20,6 @@ class SimpleClientConnector extends ClientConnector {
     private final Connector<SocketAddress> connector;
     
     SimpleClientConnector(Properties properties) {
-        String transport = properties.getProperty("transport", "reliable");
         
         String host = properties.getProperty("host");
         if (host == null) {
@@ -36,10 +35,9 @@ class SimpleClientConnector extends ClientConnector {
             throw new IllegalArgumentException("Bad port number: " + port);
         }
         
-        TransportType transportType =
-            transport.equalsIgnoreCase("unreliable")
-                ? TransportType.UNRELIABLE
-                : TransportType.RELIABLE;
+        // TODO only RELIABLE supported for now.
+        TransportType transportType = TransportType.RELIABLE;
+
         SocketAddress socketAddress = new InetSocketAddress(host, port);
         connector = 
             new SocketEndpoint(socketAddress, transportType).createConnector();
