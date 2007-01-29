@@ -124,7 +124,7 @@ public class NamePasswordAuthenticator implements IdentityAuthenticator
      *
      * @return the original binary representation
      */
-    public static byte [] decodeBytes(byte [] bytes) {	
+    public static byte [] decodeBytes(byte [] bytes) {
         byte [] decoded = new byte[bytes.length / 2];
         for (int i = 0; i < decoded.length; i++) {
             int encodedIndex = i * 2;
