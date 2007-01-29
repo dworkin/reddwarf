@@ -223,7 +223,7 @@ public class SimpleClient implements ServerSession {
             putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
             putByte(SimpleSgsProtocol.SESSION_MESSAGE).
             putLong(sequenceNumber.getAndIncrement()).
-            putBytes(message);
+            putByteArray(message);
         sendRaw(msg.getBuffer());
     }
 
