@@ -23,10 +23,10 @@ class ScheduledTask {
     private final Priority priority;
     private final long startTime;
     private final long period;
-    private RecurringTaskHandle recurringTaskHandle = null;
+    private InternalRecurringTaskHandle recurringTaskHandle = null;
 
     // identifier that represents a non-recurring task.
-    private static final int NON_RECURRING = -1;
+    public static final int NON_RECURRING = -1;
 
     /**
      * Creates an instance of <code>ScheduledTask</code> with all the same
@@ -51,7 +51,6 @@ class ScheduledTask {
      * @param priority the <code>Priority</code> of the task
      * @param startTime the time at which to start in milliseconds since
      *                  January 1, 1970
-     * @param period the delay between recurring executions
      */
     ScheduledTask(KernelRunnable task, TaskOwner owner, Priority priority,
                   long startTime) {
@@ -66,11 +65,17 @@ class ScheduledTask {
      * @param priority the <code>Priority</code> of the task
      * @param startTime the time at which to start in milliseconds since
      *                  January 1, 1970
-     * @param period the delay between recurring executions, or -1 if
-     *               if this task is not recurring
+     * @param period the delay between recurring executions
      */
     ScheduledTask(KernelRunnable task, TaskOwner owner, Priority priority,
                   long startTime, long period) {
+        if (task == null)
+            throw new NullPointerException("Task cannot be null");
+        if (owner == null)
+            throw new NullPointerException("Owner cannot be null");
+        if (priority == null)
+            throw new NullPointerException("Priority cannot be null");
+
         this.task = task;
         this.owner = owner;
         this.priority = priority;
@@ -106,9 +111,7 @@ class ScheduledTask {
     }
 
     /**
-     * Returns the time at which this task is scheduled to start. For tasks
-     * that are not scheduled with a delay, this time is the time at which
-     * the task was scheduled.
+     * Returns the time at which this task is scheduled to start.
      *
      * @return the scheduled run time for the task
      */
@@ -117,8 +120,8 @@ class ScheduledTask {
     }
 
     /**
-     * Returns the period for the task if it's recurring, or -1 if this is
-     * not a recurring task.
+     * Returns the period for the task if it's recurring, or
+     * <code>NON_RECURRING</code> if this is not a recurring task.
      *
      * @return the period between recurring executions.
      */
@@ -131,21 +134,19 @@ class ScheduledTask {
      *
      * @return <code>true</code> if this task is a recurring task,
      * <code>false</code> otherwise.
-     *
-     * 
      */
     boolean isRecurring() {
         return period != NON_RECURRING;
     }
 
     /**
-     * Sets the <code>RecurringTaskHandle</code> for this task if the task
-     * is recurring and if the handle has not already been set.
+     * Sets the <code>InternalRecurringTaskHandle</code> for this task if
+     * the task is recurring and if the handle has not already been set.
      *
      * @return <code>true</code> if the task is recurring and the handle
      *         has not already been set, <code>false</code> otherwise
      */
-    boolean setRecurringTaskHandle(RecurringTaskHandle handle) {
+    boolean setRecurringTaskHandle(InternalRecurringTaskHandle handle) {
         if ((! isRecurring()) || (recurringTaskHandle != null))
             return false;
         recurringTaskHandle = handle;
@@ -153,12 +154,13 @@ class ScheduledTask {
     }
 
     /**
-     * Returns the <code>RecurringTaskHandle</code> for this task, or
+     * Returns the <code>InternalRecurringTaskHandle</code> for this task, or
      * <code>null</code> if this not a recurring task.
      *
-     * @return the task's <code>RecurringTaskHandle</code> or <code>null</code>
+     * @return the task's <code>InternalRecurringTaskHandle</code> or
+     *         <code>null</code>
      */
-    RecurringTaskHandle getRecurringTaskHandle() {
+    InternalRecurringTaskHandle getRecurringTaskHandle() {
         return recurringTaskHandle;
     }
 
