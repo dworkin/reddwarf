@@ -30,6 +30,7 @@ import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.util.Arrays;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -111,6 +112,13 @@ import java.util.logging.Logger;
  *	<i>Default:</i> <code>Integer.MAX_VALUE</code> <br>
  *	The number of transactions between logging database statistics. <p>
  *
+ * <li> <i>Key:</i> <code>
+ *	com.sun.sgs.impl.service.data.store.DataStoreImpl.logOps
+ *	</code> <br>
+ *	<i>Default:</i> <code>100000</code> <br>
+ *	The number of transactions between logging tallies of operations
+ *	performed. <p>
+ *
  * </ul> <p>
  *
  * This class uses the {@link Logger} named
@@ -127,7 +135,15 @@ import java.util.logging.Logger;
  *	object IDs
  * <li> {@link Level#FINER FINER} - Transaction operations
  * <li> {@link Level#FINEST FINEST} - Name and object operations
- * </ul>
+ * </ul> <p>
+ *
+ * This class also uses the <code>Logger</code> named
+ * <code>com.sun.sgs.impl.service.data.DataStoreImpl.ops</code> to log
+ * information at the following logging levels: <p>
+ *
+ * <ul>
+ * <li> {@link Level#FINE FINE} - Operation tallies
+ * </ul> <p>
  */
 public final class DataStoreImpl implements DataStore, TransactionParticipant {
 
@@ -183,9 +199,25 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
      */
     private static final String LOG_STATS_PROPERTY = CLASSNAME + ".logStats";
 
+    /**
+     * The property that specifies the number of transactions between logging
+     * tallies of operations performed.
+     */
+    private static final String LOG_OPS_PROPERTY = CLASSNAME + ".logOps";
+
+    /**
+     * The default number of transactions between logging tallies of operations
+     * performed.
+     */
+    private static final int DEFAULT_LOG_OPS = 100000;
+
     /** The logger for this class. */
     static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
+
+    /** The logger for logging tallies of operations. */
+    static final LoggerWrapper opsLogger =
+	new LoggerWrapper(Logger.getLogger(CLASSNAME + ".ops"));
 
     /** An empty array returned when Berkeley DB returns null for a value. */
     private static final byte[] NO_BYTES = { };
@@ -242,11 +274,119 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
      */
     private int logStatsCount = 0;
 
-    /** Object to synchronize on when accessing txnCount. */
+    /** Object to synchronize on when accessing txnCount and allOps. */
     private final Object txnCountLock = new Object();
 
     /** The number of currently active transactions. */
     private int txnCount = 0;
+
+    /** Records and logs information about operations performed. */
+    private final AllOps allOps;
+
+    /** Records counts of operations performed. */
+    private static class Ops {
+
+	/** Number of operations -- increment when adding a new one. */
+	private static final int NUM_OPS = 12;
+
+	/** Operation names. */
+	private static String[] OP_NAMES = new String[NUM_OPS];
+
+	/* -- The operations -- transactions plus the DataStore API -- */
+	static final int COMMIT = op(0, "commit");
+	static final int ABORT = op(1, "abort");
+	static final int CREATE_OBJECT = op(2, "createObject");
+	static final int MARK_FOR_UPDATE = op(3, "markForUpdate");
+	static final int GET_OBJECT = op(4, "getObject");
+	static final int GET_OBJECT_FOR_UPDATE = op(5, "getObjectForUpdate");
+	static final int SET_OBJECT = op(6, "setObject");
+	static final int REMOVE_OBJECT = op(7, "removeObject");
+	static final int GET_BINDING = op(8, "getBinding");
+	static final int SET_BINDING = op(9, "setBinding");
+	static final int REMOVE_BINDING = op(10, "removeBinding");
+	static final int NEXT_BOUND_NAME = op(11, "nextBoundName");
+
+	/** An array of operation counts. */
+	private final int[] ops = new int[NUM_OPS];
+
+	/** Creates an instance. */
+	Ops() { }
+
+	/** Helper for defining operations. */
+	private static int op(int index, String name) {
+	    OP_NAMES[index] = name;
+	    return index;
+	}
+
+	/** Increments the count for the specified operation. */
+	void count(int op) { ops[op]++; }
+
+	/** Returns the count for the specified operation. */
+	int getCount(int op) { return ops[op]; }
+
+	/** Increments operation counts by the counts in the argument. */
+	void tally(Ops otherOps) {
+	    for (int i = 0; i < NUM_OPS; i++) {
+		ops[i] += otherOps.getCount(i);
+	    }
+	}
+
+	/** Returns a string describing the operation counts. */
+	String getTally() {
+	    StringBuilder sb = new StringBuilder();
+	    for (int i = 0; i < NUM_OPS; i++) {
+		if (i != 0) {
+		    sb.append('\n');
+		}
+		sb.append("  ").append(OP_NAMES[i]).append(": ");
+		sb.append(ops[i]);
+	    }
+	    return sb.toString();
+	}
+
+	/** Clears all operation counts. */
+	void clear() {
+	    Arrays.fill(ops, 0);
+	}
+    }
+
+    /** Records and logs information about all operations performed. */
+    private static class AllOps extends Ops {
+
+	/** After how many transactions to log and clear the tallies. */
+	private final int count;
+
+	/** When the current tally began. */
+	private long start = System.currentTimeMillis();
+
+	/** Creates an instance that logs at the specified interval. */
+	AllOps(int count) {
+	    this.count = count;
+	}
+
+	/**
+	 * Tallies operations recorded in the argument, if not null, and logs
+	 * results.
+	 */
+	void tallyAndLog(Ops otherOps) {
+	    if (otherOps != null) {
+		tally(otherOps);
+		if (getCount(Ops.COMMIT) + getCount(Ops.ABORT) >= count) {
+		    long now = System.currentTimeMillis();
+		    long elapsed = now - start;
+		    start = now;
+		    if (opsLogger.isLoggable(Level.FINE)) {
+			opsLogger.log(
+			    Level.FINE,
+			    "Operations:\n" +
+			    "  elapsed time: " + elapsed + " ms\n" +
+			    getTally());
+		    }
+		    clear();
+		}
+	    }
+	}
+    }
 
     /** Stores transaction information. */
     private static class TxnInfo {
@@ -275,9 +415,17 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	/** The last key returned by the cursor or null. */
 	private String lastCursorKey;
 
+	/** Tallies operations performed within this transaction. */
+	private final Ops ops = new Ops();
+
 	TxnInfo(Transaction txn, Environment env) throws DatabaseException {
 	    this.txn = txn;
 	    bdbTxn = env.beginTransaction(null, null);
+	}
+
+	/** Count an occurrence of an operation. */
+	void countOp(int op) {
+	    ops.count(op);
 	}
 
 	/** Prepares the transaction, first closing the cursor, if present. */
@@ -286,16 +434,26 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    bdbTxn.prepare(gid);
 	}
 
-	/** Commits the transaction, first closing the cursor, if present. */
-	void commit() throws DatabaseException {
+	/**
+	 * Commits the transaction, first closing the cursor, if present, and
+	 * returning the operations count for this transaction.
+	 */
+	Ops commit() throws DatabaseException {
 	    maybeCloseCursor();
 	    bdbTxn.commit();
+	    ops.count(Ops.COMMIT);
+	    return ops;
 	}
 
-	/** Aborts the transaction, first closing the cursor, if present. */
-	void abort() throws DatabaseException {
+	/**
+	 * Aborts the transaction, first closing the cursor, if present, and
+	 * returning the operations count for this transaction.
+	 */
+	Ops abort() throws DatabaseException {
 	    maybeCloseCursor();
 	    bdbTxn.abort();
+	    ops.count(Ops.ABORT);
+	    return ops;
 	}
 
 	/** Returns the next name in the names database. */
@@ -404,6 +562,9 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	}
 	logStats = wrappedProps.getIntProperty(
 	    LOG_STATS_PROPERTY, Integer.MAX_VALUE);
+	int logOps = wrappedProps.getIntProperty(
+	    LOG_OPS_PROPERTY, DEFAULT_LOG_OPS);
+	allOps = new AllOps(logOps);
 	com.sleepycat.db.Transaction bdbTxn = null;
 	boolean done = false;
 	try {
@@ -518,7 +679,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	logger.log(Level.FINEST, "createObject txn:{0}", txn);
 	Exception exception;
 	try {
-	    checkTxn(txn);
+	    checkTxn(txn, Ops.CREATE_OBJECT);
 	    long result;
 	    synchronized (objectIdLock) {
 		if (nextObjectId > lastObjectId) {
@@ -570,7 +731,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	 */
 	Exception exception;
 	try {
-	    getObjectInternal(txn, oid, true);
+	    getObjectInternal(txn, oid, true, Ops.MARK_FOR_UPDATE);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
 			   "markForUpdate txn:{0}, oid:{1,number,#} returns",
@@ -595,7 +756,9 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	}
 	Exception exception;
 	try {
-	    byte[] result = getObjectInternal(txn, oid, forUpdate);
+	    byte[] result = getObjectInternal(
+		txn, oid, forUpdate,
+		forUpdate ? Ops.GET_OBJECT_FOR_UPDATE : Ops.GET_OBJECT);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST,
@@ -616,11 +779,11 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 
     /** Implement getObject, without logging. */
     private byte[] getObjectInternal(
-	Transaction txn, long oid, boolean forUpdate)
+	Transaction txn, long oid, boolean forUpdate, int op)
 	throws DatabaseException
     {
 	checkId(oid);
-	TxnInfo txnInfo = checkTxn(txn);
+	TxnInfo txnInfo = checkTxn(txn, op);
 	DatabaseEntry key = new DatabaseEntry();
 	LongBinding.longToEntry(oid, key);
 	DatabaseEntry value = new DatabaseEntry();
@@ -650,7 +813,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    if (data == null) {
 		throw new NullPointerException("The data must not be null");
 	    }
-	    TxnInfo txnInfo = checkTxn(txn);
+	    TxnInfo txnInfo = checkTxn(txn, Ops.SET_OBJECT);
 	    DatabaseEntry key = new DatabaseEntry();
 	    LongBinding.longToEntry(oid, key);
 	    DatabaseEntry value = new DatabaseEntry(data);
@@ -685,7 +848,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	Exception exception;
 	try {
 	    checkId(oid);
-	    TxnInfo txnInfo = checkTxn(txn);
+	    TxnInfo txnInfo = checkTxn(txn, Ops.REMOVE_OBJECT);
 	    DatabaseEntry key = new DatabaseEntry();
 	    LongBinding.longToEntry(oid, key);
 	    OperationStatus status = oids.delete(txnInfo.bdbTxn, key);
@@ -723,7 +886,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    if (name == null) {
 		throw new NullPointerException("Name must not be null");
 	    }
-	    TxnInfo txnInfo = checkTxn(txn);
+	    TxnInfo txnInfo = checkTxn(txn, Ops.GET_BINDING);
 	    DatabaseEntry key = new DatabaseEntry();
 	    StringBinding.stringToEntry(name, key);
 	    DatabaseEntry value = new DatabaseEntry();
@@ -766,7 +929,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 		throw new NullPointerException("Name must not be null");
 	    }
 	    checkId(oid);
-	    TxnInfo txnInfo = checkTxn(txn);
+	    TxnInfo txnInfo = checkTxn(txn, Ops.SET_BINDING);
 	    DatabaseEntry key = new DatabaseEntry();
 	    StringBinding.stringToEntry(name, key);
 	    DatabaseEntry value = new DatabaseEntry();
@@ -806,7 +969,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    if (name == null) {
 		throw new NullPointerException("Name must not be null");
 	    }
-	    TxnInfo txnInfo = checkTxn(txn);
+	    TxnInfo txnInfo = checkTxn(txn, Ops.REMOVE_BINDING);
 	    DatabaseEntry key = new DatabaseEntry();
 	    StringBinding.stringToEntry(name, key);
 	    OperationStatus status = names.delete(txnInfo.bdbTxn, key);
@@ -846,7 +1009,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	}
 	Exception exception;
 	try {
-	    TxnInfo txnInfo = checkTxn(txn);
+	    TxnInfo txnInfo = checkTxn(txn, Ops.NEXT_BOUND_NAME);
 	    String result = txnInfo.nextName(name, names);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
@@ -892,11 +1055,12 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 		 * Berkeley DB doesn't permit operating on its transaction
 		 * object after commit is called.
 		 */
+		Ops ops = null;
 		try {
 		    threadTxnInfo.set(null);
-		    txnInfo.commit();
+		    ops = txnInfo.commit();
 		} finally {
-		    decrementTxnCount();
+		    decrementTxnCount(ops);
 		} 
 	    }
 	    boolean result = !txnInfo.modified;
@@ -931,12 +1095,13 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	     * after commit is called.
 	     */
 	    threadTxnInfo.set(null);
+	    Ops ops = null;
 	    try {
-		txnInfo.commit();
+		ops = txnInfo.commit();
 		logger.log(Level.FINER, "commit txn:{0} returns", txn);
 		return;
 	    } finally {
-		decrementTxnCount();
+		decrementTxnCount(ops);
 	    }
 	} catch (DatabaseException e) {
 	    exception = e;
@@ -964,13 +1129,14 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	     * after commit is called.
 	     */
 	    threadTxnInfo.set(null);
+	    Ops ops = null;
 	    try {
-		txnInfo.commit();
+		ops = txnInfo.commit();
 		logger.log(
 		    Level.FINER, "prepareAndCommit txn:{0} returns", txn);
 		return;
 	    } finally {
-		decrementTxnCount();
+		decrementTxnCount(ops);
 	    }
 	} catch (DatabaseException e) {
 	    exception = e;
@@ -994,12 +1160,13 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	     * after commit is called.
 	     */
 	    threadTxnInfo.set(null);
+	    Ops ops = null;
 	    try {
-		txnInfo.abort();
+		ops = txnInfo.abort();
 		logger.log(Level.FINER, "abort txn:{0} returns", txn);
 		return;
 	    } finally {
-		decrementTxnCount();
+		decrementTxnCount(ops);
 	    }
 	} catch (DatabaseException e) {
 	    exception = e;
@@ -1072,9 +1239,12 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 
     /**
      * Checks that the correct transaction is in progress, and join if none is
-     * in progress.
+     * in progress.  The op argument, if non-null, specifies the operation
+     * being performed under the specified transaction.
      */
-    private TxnInfo checkTxn(Transaction txn) throws DatabaseException {
+    private TxnInfo checkTxn(Transaction txn, int op)
+	throws DatabaseException
+    {
 	if (txn == null) {
 	    throw new NullPointerException("Transaction must not be null");
 	}
@@ -1092,7 +1262,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 		joined = true;
 	    } finally {
 		if (!joined) {
-		    decrementTxnCount();
+		    decrementTxnCount(null);
 		}
 	    }
 	    txnInfo = new TxnInfo(txn, env);
@@ -1107,6 +1277,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    throw new IllegalStateException(
 		"Transaction has been prepared");
 	}
+	txnInfo.countOp(op);
 	return txnInfo;
     }
 
@@ -1229,10 +1400,14 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	}
     }
 
-    /** Decrements the current transaction count. */
-    private void decrementTxnCount() {
+    /**
+     * Decrements the current transaction count.  If the argument is not null,
+     * tallies the operations that were recorded for the transaction.
+     */
+    private void decrementTxnCount(Ops ops) {
 	synchronized (txnCountLock) {
 	    txnCount--;
+	    allOps.tallyAndLog(ops);
 	    if (txnCount <= 0) {
 		txnCountLock.notifyAll();
 	    }
