@@ -15,6 +15,7 @@
 
   <!-- Build location -->
   <property name="build.dir" location="build"/>
+  <property name="lib.dir" location="lib"/>
 
   <!-- Values for controlling compilation -->
   <property name="javac.source" value="1.5"/>
@@ -26,11 +27,14 @@
 
   <!-- Values for the JavaDocs -->
   <property name="project.name" value="Sun Game Server"/>
-  <property name="project.version" value="0.2"/>
-  <property name="project.build" value="December 2006"/>
+  <property name="project.version" value="0.3"/>
+  <property name="project.build" value="January 2007"/>
   <property name="jdk.doc.api.url"
 	    value="http://java.sun.com/j2se/1.5/docs/api"/>
   <property name="jdk.package.list" value="etc/jdk5.0_package_list"/>
+  <property name="mina.doc.api.url"
+            value="http://mina.apache.org/report/1.0/apidocs"/>
+  <property name="mina.package.list" value="etc/mina1.0_package_list"/>
 
   <property name="apidoc.server.zip"
             location="${build.dir}/sgs-server-apidoc.zip"/>
@@ -53,8 +57,23 @@
   
   <!-- Server class path -->
   <path id="server.classpath">
-    <pathelement path="${build.dir}/classes/server"/>
-    <pathelement path="${bdb.lib.dir}/db.jar"/>
+    <pathelement location="${build.dir}/classes/server"/>
+    <pathelement location="${bdb.lib.dir}/db.jar"/>
+    <pathelement location="${lib.dir}/mina-core-1.0.1.jar"/>
+    <pathelement location="${lib.dir}/mina-java5-1.0.1.jar"/>
+    <pathelement location="${lib.dir}/backport-util-concurrent-Java50-3.0.jar"/>
+    <pathelement location="${lib.dir}/slf4j-jdk14.jar"/>
+  </path>
+
+  <!-- Client class path -->
+  <path id="client.classpath">
+    <pathelement location="${build.dir}/classes/client"/>
+    <!-- IO classes are currently under server, but client needs them -->
+    <pathelement location="${build.dir}/classes/server"/>
+    <pathelement location="${lib.dir}/mina-core-1.0.1.jar"/>
+    <pathelement location="${lib.dir}/mina-java5-1.0.1.jar"/>
+    <pathelement location="${lib.dir}/backport-util-concurrent-Java50-3.0.jar"/>
+    <pathelement location="${lib.dir}/slf4j-jdk14.jar"/>
   </path>
 
   <!-- TARGET DEFINITIONS -->
@@ -92,7 +111,7 @@
 	    closure="true"/>
     <javac includeAntRuntime="no" debug="on" deprecation="on"
            srcdir="src/client/j2se" destdir="${build.dir}/classes/client"
-           classpath="${build.dir}/classes/client" source="${javac.source}">
+           classpathref="client.classpath" source="${javac.source}">
       <compilerarg value="${javac.compilerargs}"/>
     </javac>
   </target>
@@ -129,12 +148,15 @@
       <link href="${jdk.doc.api.url}"
 	    offline="true"
 	    packagelistLoc="${jdk.package.list}"/>
+      <link href="${mina.doc.api.url}"
+            offline="true"
+            packagelistLoc="${mina.package.list}"/>
       <footer>
         <![CDATA[<font size="-1">Sun Game Server, Version
         ${project.version}</font>]]>
       </footer>
       <bottom>
-        <![CDATA[<font size="-1">Copyright 2006 Sun Microsystems,
+        <![CDATA[<font size="-1">Copyright 2007 Sun Microsystems,
         Inc. All rights reserved. Use is subject to license
         terms.<p>Sun, Sun Microsystems, the Sun Logo, and Java are
         trademarks or registered trademarks of Sun Microsystems, Inc. in
@@ -147,19 +169,22 @@
   <target name="javadoc-client" depends="build-client"
 	  description="Builds internal (full) client javadoc">
     <javadoc sourcepath="src/client/j2se" destdir="${build.dir}/javadoc/client"
-             classpath="${build.dir}/classes/client" packagenames="com.sun.*"
+             classpathref="client.classpath" packagenames="com.sun.*"
              overview="src/client/j2se/overview.html"
              windowtitle="${project.name}" doctitle="${project.name}"
 	     author="no">
       <link href="${jdk.doc.api.url}"
 	    offline="true"
 	    packagelistLoc="${jdk.package.list}"/>
+      <link href="${mina.doc.api.url}"
+            offline="true"
+            packagelistLoc="${mina.package.list}"/>
       <footer>
         <![CDATA[<font size="-1">Project Darkstar: Version
         ${project.version}</font>]]>
       </footer>
       <bottom>
-        <![CDATA[<font size="-1">Copyright 2006 Sun Microsystems,
+        <![CDATA[<font size="-1">Copyright 2007 Sun Microsystems,
         Inc. All rights reserved. Use is subject to license
         terms.<p>Sun, Sun Microsystems, the Sun Logo, and Java are
         trademarks or registered trademarks of Sun Microsystems, Inc. in
@@ -182,11 +207,14 @@
       <link href="${jdk.doc.api.url}"
 	    offline="true"
 	    packagelistLoc="${jdk.package.list}"/>
+      <link href="${mina.doc.api.url}"
+            offline="true"
+            packagelistLoc="${mina.package.list}"/>
       <footer>
         <![CDATA[<font size="-1">Sun Game Server version ${project.version}<br/>${project.build}</font>]]>
       </footer>
       <bottom>
-        <![CDATA[<font size="-1">Copyright 2006 Sun Microsystems,
+        <![CDATA[<font size="-1">Copyright 2007 Sun Microsystems,
         Inc. All rights reserved.
         <p>Sun, Sun Microsystems, the Sun Logo, and Java are
         trademarks or registered trademarks of Sun Microsystems, Inc. in
@@ -210,11 +238,14 @@
       <link href="${jdk.doc.api.url}"
 	    offline="true"
 	    packagelistLoc="${jdk.package.list}"/>
+      <link href="${mina.doc.api.url}"
+            offline="true"
+            packagelistLoc="${mina.package.list}"/>
       <footer>
         <![CDATA[<font size="-1">Sun Game Server version ${project.version}<br/>${project.build}</font>]]>
       </footer>
       <bottom>
-        <![CDATA[<font size="-1">Copyright 2006 Sun Microsystems,
+        <![CDATA[<font size="-1">Copyright 2007 Sun Microsystems,
         Inc. All rights reserved.
         <p>Sun, Sun Microsystems, the Sun Logo, and Java are
         trademarks or registered trademarks of Sun Microsystems, Inc. in
@@ -312,9 +343,10 @@
       <sysproperty key="java.io.tmpdir" file="${build.dir}/test/output"/>
       <sysproperty key="java.util.logging.config.file"
 		   file="${test.logging}"/>
-      <classpath path="${build.dir}/test/classes/server;
-		       ${build.dir}/classes/server;
-		       ${bdb.lib.dir}/db.jar"/>
+      <classpath>
+        <pathelement location="${build.dir}/test/classes/server"/>
+        <path refid="server.classpath"/>
+      </classpath>
       <syspropertyset>
 	<propertyref prefix="test."/>
 	<propertyref prefix="com.sun.sgs."/>
@@ -348,8 +380,105 @@
 	   source="${javac.source}"
 	   classpath="${build.dir}/classes/server"
 	   includes="**/*.java">
-      <compilerarg line="${javac.compilerargs}"/>
+      <compilerarg value="${javac.compilerargs}"/>
     </javac>
   </target>
 
+  <target name="-test-client.classes" depends="build">
+    <mkdir dir="${build.dir}/test/classes/client"/>
+    <depend srcdir="test/client/j2se"
+	    destdir="${build.dir}/test/classes/client"
+	    cache="${build.dir}/test/depend"
+	    closure="true"/>
+    <javac srcdir="test/client/j2se"
+	   destdir="${build.dir}/test/classes/client"
+	   includeAntRuntime="yes"
+	   debug="on"
+	   source="${javac.source}"
+	   classpathref="client.classpath"
+	   includes="**/*.java">
+      <compilerarg value="${javac.compilerargs}"/>
+    </javac>
+  </target>
+
+  <!-- Run IO test server -->
+  <target name="io-test-server" depends="-test-server.classes"
+          description="Runs the IO test server">
+    <java classname="com.sun.sgs.test.impl.io.ServerTest"
+          fork="true">
+      <jvmarg line="${test.jvm.args}"/>
+      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${test.logging}"/>
+      <classpath>
+        <pathelement location="${build.dir}/test/classes/server"/>
+        <path refid="server.classpath"/>
+      </classpath>
+    </java>
+  </target>
+
+  <!-- Run IO test client -->
+  <target name="io-test-client" depends="-test-server.classes"
+          description="Runs the IO test client">
+    <java classname="com.sun.sgs.test.impl.io.ClientTest"
+          fork="true">
+      <jvmarg line="${test.jvm.args}"/>
+      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${test.logging}"/>
+      <classpath>
+        <pathelement location="${build.dir}/test/classes/server"/>
+        <path refid="server.classpath"/>
+      </classpath>
+    </java>
+  </target>
+
+  <!-- Run Client API test server -->
+  <target name="clientapi-test-server" depends="-test-client.classes"
+          description="Runs the Client API test server">
+    <java classname="com.sun.sgs.test.client.simple.SimpleServer"
+          fork="true">
+      <jvmarg line="${test.jvm.args}"/>
+      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${test.logging}"/>
+      <classpath>
+        <pathelement location="${build.dir}/test/classes/client"/>
+        <path refid="client.classpath"/>
+      </classpath>
+    </java>
+  </target>
+
+  <!-- Run Client API test client -->
+  <target name="clientapi-test-client" depends="-test-client.classes"
+          description="Runs the Client API test client">
+    <java classname="com.sun.sgs.test.client.simple.ClientTest"
+          fork="true">
+      <jvmarg line="${test.jvm.args}"/>
+      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${test.logging}"/>
+      <classpath>
+        <pathelement location="${build.dir}/test/classes/client"/>
+        <path refid="client.classpath"/>
+      </classpath>
+    </java>
+  </target>
+  
+  <!-- Run Client API test client GUI -->
+  <target name="clientapi-test-client-gui" depends="-test-client.classes"
+          description="Runs the Client API test client GUI">
+    <java classname="com.sun.sgs.test.client.simple.SimpleClientTestUI"
+          fork="true">
+      <jvmarg line="${test.jvm.args}"/>
+      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${test.logging}"/>
+      <classpath>
+        <pathelement location="${build.dir}/test/classes/client"/>
+        <path refid="client.classpath"/>
+      </classpath>
+    </java>
+  </target>
+  
 </project>
