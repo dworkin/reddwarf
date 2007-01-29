@@ -685,8 +685,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     private class SessionListener {
 
 	private final String listenerKey;
-
-	private boolean isManaged = false;
+	private final boolean wrappedListener;
 	
 	@SuppressWarnings("hiding")
 	SessionListener(ClientSessionListener listener) {
@@ -696,10 +695,10 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
                 Integer.toHexString(random.nextInt());
             ManagedObject listenerObject;
 	    if (listener instanceof ManagedObject) {
-		isManaged = true;
+		wrappedListener = false;
                 listenerObject = (ManagedObject)listener;
 	    } else {
-		isManaged = false;
+		wrappedListener = true;
                 listenerObject = new ManagedSessionListenerWrapper(listener);
 	    }
 	    sessionService.dataService.
@@ -707,23 +706,28 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	}
 
 	ClientSessionListener get() {
-	    if (isManaged) {
-		return
-		    sessionService.dataService.getServiceBinding(
-			listenerKey, ClientSessionListener.class);
-	    } else {
-                return
+            ClientSessionListener theListener;
+	    if (wrappedListener) {
+                theListener =
                     sessionService.dataService.getServiceBinding(
                         listenerKey,
                         ManagedSessionListenerWrapper.class).getListener();
-	    }
+	    } else {
+                theListener =
+                    sessionService.dataService.getServiceBinding(
+                        listenerKey, ClientSessionListener.class);
+            }
+            return theListener;
 	}
 
 	void remove() {
-	    sessionService.dataService.removeServiceBinding(listenerKey);
-	    if (isManaged) {
-		sessionService.dataService.removeServiceBinding(listenerKey);
+            if (wrappedListener) {
+                ManagedObject wrapper =
+                    sessionService.dataService.getServiceBinding(
+                        listenerKey, ManagedSessionListenerWrapper.class);
+                sessionService.dataService.removeObject(wrapper);
 	    }
+            sessionService.dataService.removeServiceBinding(listenerKey);
 	}
     }
 

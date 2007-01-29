@@ -133,6 +133,27 @@ public class MessageBuffer {
     }
 
     /**
+     * Puts into this buffer a short representing the length of the specified
+     * byte array followed by the bytes from the specified byte array,
+     * starting at the buffer's current position.  The buffer's
+     * position and limit are advanced by the length of the specified
+     * byte array plus two.
+     *
+     * @param bytes a byte array
+     * @return this buffer
+     * @throws IndexOutOfBoundsException if adding the bytes to this
+     * buffer would overflow the buffer
+     */
+    public MessageBuffer putByteArray(byte[] bytes) {
+        if (pos + 2 + bytes.length > capacity) {
+            throw new IndexOutOfBoundsException();
+        }
+        putShort(bytes.length);
+        putBytes(bytes);
+        return this;
+    }
+
+    /**
      * Puts the bytes from the specified byte array in this buffer,
      * starting at the buffer's current position.  The buffer's
      * position and limit are advanced by the length of the specified
@@ -315,6 +336,25 @@ public class MessageBuffer {
     }
 
     /**
+     * Returns a byte array encoded as a 2-byte length followed by the
+     * bytes, starting at this buffer's current position, and advances
+     * the buffer's position by the number of bytes obtained.
+     *
+     * @return a byte array with the bytes from this buffer
+     * @throws IndexOutOfBoundsException if this buffer's limit would
+     * be reached as a result of getting the encoded bytes
+     */
+    public byte[] getByteArray() {
+        int savePos = pos;
+        try {
+            return getBytes(getUnsignedShort());
+        } catch (RuntimeException e) {
+            pos = savePos;
+            throw e;
+        }
+    }
+
+    /**
      * Returns a byte array containing the specified number of bytes,
      * starting at this buffer's current position, and advances the
      * buffer's position by the number of bytes obtained.
@@ -456,7 +496,7 @@ public class MessageBuffer {
 	/*
 	 * Get length of UTF encoded string.
 	 */
-	int utfLen = getShort();
+	int utfLen = getUnsignedShort();
 	int utfEnd = utfLen + pos;
 	if (utfEnd > limit) {
 	    pos = savePos;

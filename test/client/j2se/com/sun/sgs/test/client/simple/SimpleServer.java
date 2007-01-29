@@ -4,17 +4,15 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 
-import com.sun.sgs.client.SessionId;
-
-import com.sun.sgs.impl.client.simple.ProtocolMessageDecoder;
-import com.sun.sgs.impl.client.simple.ProtocolMessageEncoder;
 import com.sun.sgs.impl.io.ServerSocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.util.HexDumper;
+import com.sun.sgs.impl.util.MessageBuffer;
 import com.sun.sgs.io.AcceptorListener;
 import com.sun.sgs.io.Acceptor;
 import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
+import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 
 import static com.sun.sgs.protocol.simple.SimpleSgsProtocol.*;
 
@@ -31,8 +29,7 @@ public class SimpleServer implements ConnectionListener {
 
     private long sequenceNumber;
 
-    // just a place holder for some sort of ID
-    private SessionId serverID;
+    final String TEST_CHANNEL_NAME = "Test Channel";
 
     /**
      * Construct a new SimpleServer to accept incoming connections.
@@ -40,7 +37,6 @@ public class SimpleServer implements ConnectionListener {
     public SimpleServer() {
         acceptor = new ServerSocketEndpoint(new InetSocketAddress(port),
                 TransportType.RELIABLE).createAcceptor();
-        serverID = SessionId.fromBytes(new byte[10]);
     }
 
     private void start() {
@@ -116,93 +112,128 @@ public class SimpleServer implements ConnectionListener {
     public void bytesReceived(Connection conn, byte[] buffer) {
         System.err.println("SimpleServer: messageReceived: ("
                 + buffer.length + ") " + HexDumper.format(buffer));
-        ProtocolMessageDecoder messageDecoder = new ProtocolMessageDecoder(
-                buffer);
-        int versionNumber = messageDecoder.readVersionNumber();
-        if (versionNumber != VERSION) {
-            System.out.println("Version number mismatch: " + versionNumber
+
+        if (buffer.length < 3) {
+            System.err.println("protocol message to short, length:" +
+                buffer.length);
+            try {
+                conn.close();
+            } catch (IOException e) {
+                // ignore
+            }
+            return;
+        }
+
+        MessageBuffer msg = new MessageBuffer(buffer);
+
+        byte version = msg.getByte();
+        if (version != VERSION) {
+            System.out.println("Version number mismatch: " + version
                     + " " + VERSION);
             return;
         }
-        int service = messageDecoder.readServiceNumber();
-        int command = messageDecoder.readCommand();
+        byte service = msg.getByte();
+        byte command = msg.getByte();
         if (command == LOGIN_REQUEST) {
             assert service == APPLICATION_SERVICE;
-            ProtocolMessageEncoder messageEncoder = null;
 
-            String username = messageDecoder.readString();
-            String password = messageDecoder.readString();
+            String username = msg.getString();
+            String password = msg.getString();
 
             System.out.println("UserName: " + username + " Password "
                     + password);
 
+            MessageBuffer reply;
             if (password.equals("guest")) {
-                messageEncoder = new ProtocolMessageEncoder(
-                        APPLICATION_SERVICE, LOGIN_SUCCESS);
+                
+                byte[] sessionIdBytes = new byte[] {
+                    (byte)0xda, 0x2c, 0x57, (byte)0xa2,
+                    0x01, 0x02, 0x03, 0x04 
+                };
+                byte[] reconnectKeyBytes = new byte[] {
+                    0x1a, 0x1b, 0x1c, 0x1d, 0x30, 0x31, 0x32, 0x33 
+                };
 
-                // don't know what the SessionID will look like yet, but
-                // it'll at least probably be a byte array.
-                messageEncoder.writeSessionId(serverID);
-                byte[] sessionByteArray = new byte[10];
-                for (byte b = 0; b < sessionByteArray.length; b++) {
-                    sessionByteArray[b] = b;
-                }
-                messageEncoder.writeBytes(sessionByteArray);
-
-                // send the reconnect key
-                messageEncoder.writeBytes(new byte[10]);
+                reply =
+                    new MessageBuffer(3 +
+                        2 + sessionIdBytes.length +
+                        2 + reconnectKeyBytes.length);
+                reply.putByte(SimpleSgsProtocol.VERSION).
+                      putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
+                      putByte(SimpleSgsProtocol.LOGIN_SUCCESS).
+                      putByteArray(sessionIdBytes).
+                      putByteArray(reconnectKeyBytes);
             } else {
-                messageEncoder = new ProtocolMessageEncoder(
-                        APPLICATION_SERVICE, LOGIN_FAILURE);
-                messageEncoder.writeString("Bad password");
+                String reason = "Bad password";
+                reply =
+                    new MessageBuffer(3 + MessageBuffer.getSize(reason));
+
+                reply.putByte(SimpleSgsProtocol.VERSION).
+                      putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
+                      putByte(SimpleSgsProtocol.LOGIN_FAILURE).
+                      putString(reason);
             }
-            sendMessage(conn, messageEncoder);
+            sendMessage(conn, reply.getBuffer());
         } else if (command == SESSION_MESSAGE) {
             assert service == APPLICATION_SERVICE;
-            messageDecoder.readLong(); // FIXME sequence number
-            String serverMessage = messageDecoder.readString();
+            msg.getLong(); // FIXME sequence number
+            String serverMessage = msg.getString();
             System.out.println("Received general server message: "
                     + serverMessage);
 
             if (serverMessage.equals("Join Channel")) {
-                ProtocolMessageEncoder messageEncoder =
-                    new ProtocolMessageEncoder(
-                        CHANNEL_SERVICE, CHANNEL_JOIN);
+                MessageBuffer reply =
+                    new MessageBuffer(3 +
+                        MessageBuffer.getSize(TEST_CHANNEL_NAME));
 
-                messageEncoder.writeString("Test Channel");
-                sendMessage(conn, messageEncoder);
+                reply.putByte(SimpleSgsProtocol.VERSION).
+                      putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
+                      putByte(SimpleSgsProtocol.CHANNEL_JOIN).
+                      putString(TEST_CHANNEL_NAME);
+                
+                sendMessage(conn, reply.getBuffer());
 
                 sendPeriodicChannelMessages(conn);
             } else if (serverMessage.equals("Leave Channel")) {
-                ProtocolMessageEncoder messageEncoder =
-                    new ProtocolMessageEncoder(
-                        CHANNEL_SERVICE, CHANNEL_LEAVE);
-                messageEncoder.writeString("Test Channel");
-                sendMessage(conn, messageEncoder);
+                MessageBuffer reply =
+                    new MessageBuffer(3 +
+                        MessageBuffer.getSize(TEST_CHANNEL_NAME));
+
+                reply.putByte(SimpleSgsProtocol.VERSION).
+                      putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
+                      putByte(SimpleSgsProtocol.CHANNEL_LEAVE).
+                      putString(TEST_CHANNEL_NAME);
+                
+                sendMessage(conn, reply.getBuffer());
             }
         } else if (command == CHANNEL_SEND_REQUEST) {
             assert service == CHANNEL_SERVICE;
-            String channelName = messageDecoder.readString();
-            messageDecoder.readLong(); // FIXME sequence number
-            int numRecipients = messageDecoder.readInt();
-            String messageStr = messageDecoder.readString();
+            String channelName = msg.getString();
+            msg.getLong(); // FIXME sequence number
+            int numRecipients = msg.getInt();
+            String messageStr = msg.getString();
             System.out.println("Channel Message " + channelName
                     + " num recipients " + numRecipients + " message "
                     + messageStr);
 
-            ProtocolMessageEncoder messageEncoder =
-                new ProtocolMessageEncoder(
-                    CHANNEL_SERVICE, CHANNEL_LEAVE);
+            // Reply with a channel-leave message, for this test.
+            MessageBuffer reply =
+                new MessageBuffer(3 +
+                    MessageBuffer.getSize(TEST_CHANNEL_NAME));
 
-            messageEncoder.writeString(channelName);
-            sendMessage(conn, messageEncoder);
+            reply.putByte(SimpleSgsProtocol.VERSION).
+                  putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
+                  putByte(SimpleSgsProtocol.CHANNEL_LEAVE).
+                  putString(TEST_CHANNEL_NAME);
+            
+            sendMessage(conn, reply.getBuffer());
         } else if (command == LOGOUT_REQUEST) {
             assert service == APPLICATION_SERVICE;
-            ProtocolMessageEncoder messageEncoder =
-                new ProtocolMessageEncoder(
-                    APPLICATION_SERVICE, LOGOUT_SUCCESS);
-
-            sendMessage(conn, messageEncoder);
+            MessageBuffer reply = new MessageBuffer(3);
+            reply.putByte(SimpleSgsProtocol.VERSION).
+                  putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
+                  putByte(SimpleSgsProtocol.LOGOUT_SUCCESS);
+            sendMessage(conn, reply.getBuffer());
         }
     }
 
@@ -224,26 +255,33 @@ public class SimpleServer implements ConnectionListener {
     }
 
     private void sendChannelMessage(String chanMessage, Connection conn) {
-        ProtocolMessageEncoder message = new ProtocolMessageEncoder(
-                CHANNEL_SERVICE, CHANNEL_MESSAGE);
-
-        message.writeString("Test Channel");
+        
         sequenceNumber++;
-        message.writeLong(sequenceNumber % 3 == 0 ? 2 : sequenceNumber);
-        message.writeShort(0);
+        long seq = sequenceNumber % 3 == 0 ? 2 : sequenceNumber;
+        
+        int msgLen = 3 +
+            MessageBuffer.getSize(TEST_CHANNEL_NAME) +
+            8 +
+            2 +
+            MessageBuffer.getSize(chanMessage);
+        
+        MessageBuffer msg = new MessageBuffer(msgLen);
+        msg.putByte(SimpleSgsProtocol.VERSION).
+            putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
+            putByte(SimpleSgsProtocol.CHANNEL_MESSAGE).
+            putString(TEST_CHANNEL_NAME).
+            putLong(seq).
+            putShort(0).
+            putString(chanMessage);
 
-        message.writeShort(2 + chanMessage.getBytes().length);
-        message.writeString(chanMessage);
-        sendMessage(conn, message);
+        sendMessage(conn, msg.getBuffer());
     }
 
-    private void sendMessage(Connection conn,
-            ProtocolMessageEncoder messageEncoder) {
+    private void sendMessage(Connection conn, byte[] message) {
         try {
-            byte[] byteMessage = messageEncoder.getMessage();
-            System.out.println("sendMessage: (" + byteMessage.length + ") "
-                    + HexDumper.format(byteMessage));
-            conn.sendBytes(byteMessage);
+            System.out.println("sendMessage: (" + message.length + ") "
+                    + HexDumper.format(message));
+            conn.sendBytes(message);
         } catch (IOException ioe) {
             ioe.printStackTrace();
         }

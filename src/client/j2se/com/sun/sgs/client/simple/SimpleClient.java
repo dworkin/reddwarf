@@ -18,9 +18,8 @@ import com.sun.sgs.client.SessionId;
 import com.sun.sgs.impl.client.comm.ClientConnection;
 import com.sun.sgs.impl.client.comm.ClientConnectionListener;
 import com.sun.sgs.impl.client.comm.ClientConnector;
-import com.sun.sgs.impl.client.simple.ProtocolMessageDecoder;
-import com.sun.sgs.impl.client.simple.ProtocolMessageEncoder;
 import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.util.MessageBuffer;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 
 /**
@@ -196,11 +195,11 @@ public class SimpleClient implements ServerSession {
             }
         } else {
             try {
-                ProtocolMessageEncoder m =
-                    new ProtocolMessageEncoder(
-                        SimpleSgsProtocol.APPLICATION_SERVICE,
-                        SimpleSgsProtocol.LOGOUT_REQUEST);
-                sendRaw(m.getMessage());
+                MessageBuffer msg = new MessageBuffer(3);
+                msg.putByte(SimpleSgsProtocol.VERSION).
+                    putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
+                    putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
+                sendRaw(msg.getBuffer());
             } catch (IOException e) {
                 logger.logThrow(Level.FINE, e, "During graceful logout:");
                 try {
@@ -218,12 +217,14 @@ public class SimpleClient implements ServerSession {
      */
     public void send(byte[] message) throws IOException {
         checkConnected();
-        ProtocolMessageEncoder m =
-            new ProtocolMessageEncoder(SimpleSgsProtocol.APPLICATION_SERVICE,
-                SimpleSgsProtocol.SESSION_MESSAGE);
-        m.writeLong(sequenceNumber.getAndIncrement());
-        m.writeBytes(message);
-        sendRaw(m.getMessage());
+        MessageBuffer msg =
+            new MessageBuffer(3 + 8 + 2 + message.length);
+        msg.putByte(SimpleSgsProtocol.VERSION).
+            putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
+            putByte(SimpleSgsProtocol.SESSION_MESSAGE).
+            putLong(sequenceNumber.getAndIncrement()).
+            putBytes(message);
+        sendRaw(msg.getBuffer());
     }
 
     private void sendRaw(byte[] data) throws IOException {
@@ -261,14 +262,19 @@ public class SimpleClient implements ServerSession {
             PasswordAuthentication authentication =
                 clientListener.getPasswordAuthentication();
 
-            ProtocolMessageEncoder m =
-                new ProtocolMessageEncoder(
-                    SimpleSgsProtocol.APPLICATION_SERVICE,
-                    SimpleSgsProtocol.LOGIN_REQUEST);
-            m.writeString(authentication.getUserName());
-            m.writeString(new String(authentication.getPassword()));
+            String user = authentication.getUserName();
+            String pass = new String(authentication.getPassword());
+            MessageBuffer msg =
+                new MessageBuffer(3 +
+                    MessageBuffer.getSize(user) +
+                    MessageBuffer.getSize(pass));
+            msg.putByte(SimpleSgsProtocol.VERSION).
+                putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
+                putByte(SimpleSgsProtocol.LOGIN_REQUEST).
+                putString(user).
+                putString(pass);
             try {
-                sendRaw(m.getMessage());
+                sendRaw(msg.getBuffer());
             } catch (IOException e) {
                 logger.logThrow(Level.FINE, e, "During login request:");
                 logout(true);
@@ -288,9 +294,8 @@ public class SimpleClient implements ServerSession {
                 connectionStateChanging = false;
             }
             sessionId = null;
-            ProtocolMessageDecoder decoder =
-                new ProtocolMessageDecoder(message);
-            clientListener.disconnected(graceful, decoder.readString());
+            MessageBuffer msg = new MessageBuffer(message);
+            clientListener.disconnected(graceful, msg.getString());
         }
 
         /**
@@ -298,9 +303,8 @@ public class SimpleClient implements ServerSession {
          */
         public void receivedMessage(byte[] message) {
             try {
-                ProtocolMessageDecoder decoder =
-                    new ProtocolMessageDecoder(message);
-                int version = decoder.readVersionNumber();
+                MessageBuffer msg = new MessageBuffer(message);
+                byte version = msg.getByte();
                 if (version != SimpleSgsProtocol.VERSION) {
                     throw new IOException(
                         String.format("Bad version 0x%02X, wanted: 0x%02X",
@@ -308,26 +312,26 @@ public class SimpleClient implements ServerSession {
                             SimpleSgsProtocol.VERSION));
                 }
                 
-                int service = decoder.readServiceNumber();
+                byte service = msg.getByte();
                 
                 if (logger.isLoggable(Level.FINER)) {
-                    String msg = String.format(
+                    String logMessage = String.format(
                         "Message length:%d service:0x%02X",
                         message.length,
                         service);
-                    logger.log(Level.FINER, msg);
+                    logger.log(Level.FINER, logMessage);
                 }
     
                 switch (service) {
 
                 // Handle "Application Service" messages
                 case SimpleSgsProtocol.APPLICATION_SERVICE:
-                    handleApplicationMessage(decoder);
+                    handleApplicationMessage(msg);
                     break;
 
                 // Handle Channel Service messages
                 case SimpleSgsProtocol.CHANNEL_SERVICE:
-                    handleChannelMessage(decoder);
+                    handleChannelMessage(msg);
                     break;
 
                 default:
@@ -348,27 +352,27 @@ public class SimpleClient implements ServerSession {
             }
         }
 
-        private void handleApplicationMessage(ProtocolMessageDecoder decoder)
+        private void handleApplicationMessage(MessageBuffer msg)
             throws IOException
         {
-            int command = decoder.readCommand();
+            byte command = msg.getByte();
             switch (command) {
             case SimpleSgsProtocol.LOGIN_SUCCESS:
                 logger.log(Level.FINER, "Logged in");
-                sessionId = SessionId.fromBytes(decoder.readBytes());
-                reconnectKey = decoder.readBytes();
+                sessionId = SessionId.fromBytes(msg.getByteArray());
+                reconnectKey = msg.getByteArray();
                 clientListener.loggedIn();
                 break;
 
             case SimpleSgsProtocol.LOGIN_FAILURE:
                 logger.log(Level.FINER, "Login failed");
-                clientListener.loginFailed(decoder.readString());
+                clientListener.loginFailed(msg.getString());
                 break;
 
             case SimpleSgsProtocol.SESSION_MESSAGE:
                 logger.log(Level.FINEST, "Direct receive");
-                decoder.readLong(); // FIXME sequence number
-                clientListener.receivedMessage(decoder.readBytes());
+                msg.getLong(); // FIXME sequence number
+                clientListener.receivedMessage(msg.getByteArray());
                 break;
 
             case SimpleSgsProtocol.RECONNECT_SUCCESS:
@@ -408,15 +412,15 @@ public class SimpleClient implements ServerSession {
             }
         }
         
-        private void handleChannelMessage(ProtocolMessageDecoder decoder)
+        private void handleChannelMessage(MessageBuffer msg)
             throws IOException
         {
-            int command = decoder.readCommand();
+            byte command = msg.getByte();
             switch (command) {
 
             case SimpleSgsProtocol.CHANNEL_JOIN: {
                 logger.log(Level.FINER, "Channel join");
-                String channelName = decoder.readString();
+                String channelName = msg.getString();
                 SimpleClientChannel channel =
                     new SimpleClientChannel(channelName);
                 if (channels.putIfAbsent(channelName, channel) == null) {
@@ -431,7 +435,7 @@ public class SimpleClient implements ServerSession {
 
             case SimpleSgsProtocol.CHANNEL_LEAVE: {
                 logger.log(Level.FINER, "Channel leave");
-                String channelName = decoder.readString();
+                String channelName = msg.getString();
                 SimpleClientChannel channel =
                     channels.remove(channelName);
                 if (channel != null) {
@@ -446,7 +450,7 @@ public class SimpleClient implements ServerSession {
 
             case SimpleSgsProtocol.CHANNEL_MESSAGE:
                 logger.log(Level.FINEST, "Channel recv");
-                String channelName = decoder.readString();
+                String channelName = msg.getString();
                 SimpleClientChannel channel = channels.get(channelName);
                 if (channel == null) {
                     logger.log(Level.FINE,
@@ -455,13 +459,13 @@ public class SimpleClient implements ServerSession {
                     return;
                 }
 
-                decoder.readLong(); // FIXME sequence number
+                msg.getLong(); // FIXME sequence number
                 
-                byte[] sidBytes = decoder.readBytes();
+                byte[] sidBytes = msg.getByteArray();
                 SessionId sid = (sidBytes == null) ?
                         null : SessionId.fromBytes(sidBytes);
                 
-                channel.receivedMessage(sid, decoder.readBytes());
+                channel.receivedMessage(sid, msg.getByteArray());
                 break;
 
             default:
@@ -597,21 +601,34 @@ public class SimpleClient implements ServerSession {
                 }
                 return;
             }
-            ProtocolMessageEncoder m =
-                new ProtocolMessageEncoder(SimpleSgsProtocol.CHANNEL_SERVICE,
-                    SimpleSgsProtocol.CHANNEL_SEND_REQUEST);
-            m.writeString(name);
-            m.writeLong(sequenceNumber.getAndIncrement());
-            if (recipients == null) {
-                m.writeShort(Short.valueOf((short) 0));
-            } else {
-                m.writeShort(Short.valueOf((short) recipients.size()));
+            int totalSessionLength = 0;
+            if (recipients != null) {
                 for (SessionId id : recipients) {
-                    m.writeSessionId(id);
+                    totalSessionLength += 2 + id.toBytes().length;
                 }
             }
-            m.writeBytes(message);
-            sendRaw(m.getMessage());
+            
+            MessageBuffer msg =
+                new MessageBuffer(3 +
+                    MessageBuffer.getSize(name) +
+                    8 +
+                    2 + totalSessionLength +
+                    2 + message.length);
+            msg.putByte(SimpleSgsProtocol.VERSION).
+                putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
+                putByte(SimpleSgsProtocol.CHANNEL_SEND_REQUEST).
+                putString(name).
+                putLong(sequenceNumber.getAndIncrement());
+            if (recipients == null) {
+                msg.putShort(0);
+            } else {
+                msg.putShort(recipients.size());
+                for (SessionId id : recipients) {
+                    msg.putByteArray(id.toBytes());
+                }
+            }
+            msg.putByteArray(message);
+            sendRaw(msg.getBuffer());
         }
     }
 }
