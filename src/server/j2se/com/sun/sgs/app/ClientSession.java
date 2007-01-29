@@ -55,12 +55,12 @@ public interface ClientSession {
     String getName();
 
     /**
-     * Returns a byte array containing the representation of the session
-     * identifier for this session.
+     * Returns a byte array containing the representation of the
+     * session identifier for this session.  The session identifier is
+     * constant for the life of this session.
      *
      * @return the representation of the session identifier for this
      * session
-     * @throws IllegalStateException if this session is disconnected
      * @throws TransactionException if the operation failed because of
      * a problem with the current transaction
      */

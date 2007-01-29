@@ -14,6 +14,7 @@ import com.sun.sgs.io.IOHandle;
 import com.sun.sgs.io.IOHandler;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.service.ClientSessionService;
+import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.ProtocolMessageListener;
 import com.sun.sgs.service.SgsClientSession;
 import java.io.IOException;
@@ -53,6 +54,8 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 
     /** The client session service that created this client session. */
     private final ClientSessionServiceImpl sessionService;
+
+    private final DataService dataService;
     
     /** The IOHandle for sending messages to the client. */
     private IOHandle sessionHandle;
@@ -90,6 +93,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
      */
     ClientSessionImpl(ClientSessionServiceImpl sessionService) {
 	this.sessionService = sessionService;
+	this.dataService = sessionService.dataService;
 	this.handler = new Handler();
 	this.sessionId = generateId();
 	this.reconnectionKey = generateId();
@@ -110,6 +114,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	byte[] sessionId)
     {
 	this.sessionService = null;
+	this.dataService = null;
 	this.name = name;
 	this.sessionId = sessionId;
 	this.reconnectionKey = generateId(); // create bogus one
@@ -129,22 +134,11 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     
     /** {@inheritDoc} */
     public byte[] getSessionId() {
-	try {
-	    if (!isConnected()) {
-		throw new IllegalStateException("client session not connected");
-	    }
-			     
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(Level.FINEST, "getSessionId returns {0}", sessionId);
-	    }
-	    return sessionId;
-	    
-	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.logThrow(Level.FINEST, e, "getSessionId throws");
-	    }
-	    throw e;
+	
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(Level.FINEST, "getSessionId returns {0}", sessionId);
 	}
+	return sessionId;
     }
 
     /** {@inheritDoc} */
@@ -656,8 +650,8 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     }
 
     /**
-     * Wrapper for persisting a ClientSessionListener if it is a
-     * ManagedObject.
+     * Wrapper for persisting a ClientSessionListener that is either a
+     * ManagedObject or Serializable.
      */
     private class SessionListener {
 
@@ -665,38 +659,62 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 
 	private boolean isManaged = false;
 
-	private ClientSessionListener listener;
-	
 	@SuppressWarnings("hiding")
 	SessionListener(ClientSessionListener listener) {
 	    assert listener != null && listener instanceof Serializable;
+	    
+	    ManagedObject managedObj;
 	    if (listener instanceof ManagedObject) {
 		isManaged = true;
-		listenerKey =
-		    ClientSessionImpl.class.getName() + "." +
-		    Integer.toHexString(random.nextInt());
-		sessionService.dataService.
-		    setServiceBinding(listenerKey, (ManagedObject) listener);
+		managedObj = (ManagedObject) listener;
+		
 	    } else {
+		// listener is simply Serializable
 		isManaged = false;
-		this.listener = listener;
+		managedObj = new ClientSessionListenerWrapper(listener);
 	    }
+	    
+	    listenerKey =
+		ClientSessionImpl.class.getName() + "." +
+		Integer.toHexString(random.nextInt());
+	    dataService.setServiceBinding(listenerKey, managedObj);
 	}
 
 	ClientSessionListener get() {
-	    if (isManaged) {
-		return
-		    sessionService.dataService.getServiceBinding(
-			listenerKey, ClientSessionListener.class);
-	    } else {
-		return listener;
-	    }
+	    ManagedObject obj = 
+		    dataService.getServiceBinding(
+			listenerKey, ManagedObject.class);
+	    return
+		(isManaged) ?
+		((ClientSessionListener) obj) :
+		((ClientSessionListenerWrapper) obj).get();
 	}
 
 	void remove() {
-	    if (isManaged) {
-		sessionService.dataService.removeServiceBinding(listenerKey);
+	    if (!isManaged) {
+		ClientSessionListenerWrapper wrapper =
+		    dataService.getServiceBinding(
+			listenerKey, ClientSessionListenerWrapper.class);
+		dataService.removeObject(wrapper);
 	    }
+	    dataService.removeServiceBinding(listenerKey);
+	}
+    }
+
+    private static class ClientSessionListenerWrapper
+	implements ManagedObject, Serializable
+    {
+	private final static long serialVersionUID = 1L;
+	
+	private ClientSessionListener listener;
+
+	ClientSessionListenerWrapper(ClientSessionListener listener) {
+	    assert listener != null && listener instanceof Serializable;
+	    this.listener = listener;
+	}
+
+	ClientSessionListener get() {
+	    return listener;
 	}
     }
 
@@ -717,7 +735,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	 */
 	public void run() {
 	    AppListener appListener =
-		sessionService.dataService.getServiceBinding(
+		dataService.getServiceBinding(
 		    "com.sun.sgs.app.AppListener", AppListener.class);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
