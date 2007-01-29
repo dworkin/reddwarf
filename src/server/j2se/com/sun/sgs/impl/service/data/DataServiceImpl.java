@@ -720,16 +720,15 @@ public final class DataServiceImpl
     }
 
     /**
-     * Checks that the specified context is currently active, throwing
-     * TransactionNotActiveException if it isn't.
+     * Checks that the specified context is currently active.  Throws
+     * TransactionNotActiveException if there is no current transaction.
+     * Otherwise, returns true if the current transaction matches the argument.
      */
-    static void checkContext(Context context) {
+    static boolean checkContext(Context context) {
 	context.txnProxy.getCurrentTransaction();
-	if (context != currentContext.get()) {
-	    throw new TransactionNotActiveException(
-		"No transaction is active");
-	}
+	boolean result = (context == currentContext.get());
 	context.maybeCheckReferenceTable();
+	return result;
     }
 
     /**

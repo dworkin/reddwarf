@@ -263,7 +263,12 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 		"The type argument must not be null");
 	}
 	try {
-	    DataServiceImpl.checkContext(context);
+	    if (!DataServiceImpl.checkContext(context)) {
+		throw new TransactionNotActiveException(
+		    "Attempt to obtain the object associated with a " +
+		    "managed reference that was created in another " +
+		    "transaction");
+	    }
 	    switch (state) {
 	    case EMPTY:
 		object = deserialize(
@@ -307,7 +312,12 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 		"The type argument must not be null");
 	}
 	try {
-	    DataServiceImpl.checkContext(context);
+	    if (!DataServiceImpl.checkContext(context)) {
+		throw new TransactionNotActiveException(
+		    "Attempt to obtain the object associated with a " +
+		    "managed reference that was created in another " +
+		    "transaction");
+	    }
 	    switch (state) {
 	    case EMPTY:
 		object = deserialize(
