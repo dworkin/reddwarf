@@ -57,7 +57,7 @@ public class ClientTest implements SimpleClientListener,
     /**
      * {@inheritDoc}
      */
-    public void disconnected(boolean graceful) {
+    public void disconnected(boolean graceful, String reason) {
         System.out.println("disconnected graceful: " + graceful);
         System.exit(0);
     }

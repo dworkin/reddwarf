@@ -1,4 +1,4 @@
-package com.sun.sgs.impl.client.simple;
+package com.sun.sgs.protocol.simple;
 
 import java.io.DataInput;
 
@@ -8,18 +8,31 @@ import java.io.DataInput;
  * A protocol message is constructed as follows:
  * <ul>
  * <li> (byte) version number
+ * <li> (byte) service id
  * <li> (byte) operation code
  * <li> optional content, depending on the operation code.
  * </ul>
  * <p>
+ * A {@code ByteArray} is encoded as follows:
+ * <ul>
+ * <li> (unsigned short) number of bytes in the array
+ * <li> (byte[]) the bytes in the array
+ * </ul>
+ * <p>
  * A {@code String} is encoded as follows:
  * <ul>
- * <li> (short) number of bytes of modified UTF-8 encoded String
+ * <li> (unsigned short) number of bytes of modified UTF-8 encoded String
  * <li> (byte[]) String encoded in modified UTF-8 as described
- * in {@link DataInput}.
+ * in {@link DataInput}
  * </ul>
  */
-public interface ProtocolMessage {
+public interface SimpleSgsProtocol {
+    
+    /**
+     * The maximum length of any protocol message field defined as a
+     * {@code String} or {@code byte[]}: {@value #MAX_MESSAGE_LENGTH} bytes.
+     */
+    final int MAX_MESSAGE_LENGTH = 65535;
 
     /** The version number. */
     final byte VERSION = 0x01;
@@ -42,10 +55,8 @@ public interface ProtocolMessage {
     /**
      * Login success (login request acknowledgment).
      * <ul>
-     * <li> (short) sessionId size
-     * <li> (byte[]) sessionId
-     * <li> (short) reconnectionKey size
-     * <li> (byte[]) reconnectionKey
+     * <li> (ByteArray) sessionId
+     * <li> (ByteArray) reconnectionKey
      * </ul>
      */
     final byte LOGIN_SUCCESS = 0x11;
@@ -61,8 +72,7 @@ public interface ProtocolMessage {
     /**
      * Reconnection request.
      * <ul>
-     * <li> (short) reconnectionKey size
-     * <li> (byte[]) reconnectionKey
+     * <li> (ByteArray) reconnectionKey
      * </ul>
      */
     final byte RECONNECT_REQUEST = 0x20;
@@ -70,8 +80,7 @@ public interface ProtocolMessage {
     /**
      * Reconnect success (reconnection request acknowledgment).
      * <ul>
-     * <li> (short) reconnectionKey size
-     * <li> (byte[]) reconnectionKey
+     * <li> (ByteArray) reconnectionKey
      * </ul>
      */
     final byte RECONNECT_SUCCESS = 0x21;
@@ -85,13 +94,13 @@ public interface ProtocolMessage {
     final byte RECONNECT_FAILURE = 0x22;
 
     /**
-     * Session message.
-     *
-     * <p> TBD: do we want to allow messages longer than 2^16 bytes?
+     * Session message.  Maximum length is 64 KB minus one byte.
+     * Larger messages require fragmentation and reassembly above
+     * this protocol layer.
      *
      * <ul>
-     * <li> (short) size
-     * <li> (byte[]) message
+     * <li> (long) sequence number
+     * <li> (ByteArray) message
      * </ul>
      */
     final byte SESSION_MESSAGE = 0x30;
@@ -110,7 +119,7 @@ public interface ProtocolMessage {
     /**
      * Channel join.
      * <ul>
-     * <li> (String) name
+     * <li> (String) channel name
      * </ul>
      */
     final byte CHANNEL_JOIN = 0x50;
@@ -118,7 +127,7 @@ public interface ProtocolMessage {
     /**
      * Channel leave.
      * <ul>
-     * <li> (String) name
+     * <li> (String) channel name
      * </ul>
      */
     final byte CHANNEL_LEAVE = 0x52;
@@ -126,15 +135,14 @@ public interface ProtocolMessage {
     /**
      * Channel send request.
      * <ul>
-     * <li> (String) name
+     * <li> (String) channel name
+     * <li> (long) sequence number
      * <li> (short) number of recipients (0 = all)
      * <li> If number of recipients > 0, for each recipient:
      * <ul>
-     * <li> (short) sessionId size
-     * <li> (byte[]) sessionId
+     * <li> (ByteArray) sessionId
      * </ul>
-     * <li> (short) message size
-     * <li> (byte[]) message
+     * <li> (ByteArray) message
      * </ul>
      */
     final byte CHANNEL_SEND_REQUEST = 0x53;
@@ -142,12 +150,10 @@ public interface ProtocolMessage {
     /**
      * Channel message (to recipient on channel).
      * <ul>
-     * <li> (String) name
+     * <li> (String) channel name
      * <li> (long) sequence number
-     * <li> (short) size of sender's sessionId (=0 if server is sender)
-     * <li> (byte[]) sender's sessionId
-     * <li> (short) message size
-     * <li> (byte[]) message
+     * <li> (ByteArray) sender's sessionId (zero-length if sent by server)
+     * <li> (ByteArray) message
      * </ul>
      */
     final byte CHANNEL_MESSAGE = 0x54;

@@ -6,11 +6,11 @@ import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
+import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl.Context;
-import com.sun.sgs.impl.service.session.SgsProtocol;
 import com.sun.sgs.impl.util.HexDumper;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.MessageBuffer;
@@ -118,9 +118,9 @@ final class ChannelImpl implements Channel, Serializable {
 	    state.addSession(session, listener);
 	    int nameSize = MessageBuffer.getSize(state.name);
 	    MessageBuffer buf = new MessageBuffer(3 + nameSize);
-	    buf.putByte(SgsProtocol.VERSION).
-		putByte(SgsProtocol.CHANNEL_SERVICE).
-		putByte(SgsProtocol.CHANNEL_JOIN).
+	    buf.putByte(SimpleSgsProtocol.VERSION).
+		putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
+		putByte(SimpleSgsProtocol.CHANNEL_JOIN).
 		putString(state.name);
 	    sendProtocolMessageOnCommit(session, buf.getBuffer());
 	    
@@ -163,9 +163,9 @@ final class ChannelImpl implements Channel, Serializable {
 	
 	    int nameSize = MessageBuffer.getSize(state.name);
 	    MessageBuffer buf = new MessageBuffer(3 + nameSize);
-	    buf.putByte(SgsProtocol.VERSION).
-		putByte(SgsProtocol.CHANNEL_SERVICE).
-		putByte(SgsProtocol.CHANNEL_LEAVE).
+	    buf.putByte(SimpleSgsProtocol.VERSION).
+		putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
+		putByte(SimpleSgsProtocol.CHANNEL_LEAVE).
 		putString(state.name);
 	    sendProtocolMessageOnCommit(session, buf.getBuffer());
 	    
@@ -195,9 +195,9 @@ final class ChannelImpl implements Channel, Serializable {
 
 	    int nameSize = MessageBuffer.getSize(state.name);
 	    MessageBuffer buf = new MessageBuffer(3 + nameSize);
-	    buf.putByte(SgsProtocol.VERSION).
-		putByte(SgsProtocol.CHANNEL_SERVICE).
-		putByte(SgsProtocol.CHANNEL_LEAVE).
+	    buf.putByte(SimpleSgsProtocol.VERSION).
+		putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
+		putByte(SimpleSgsProtocol.CHANNEL_LEAVE).
 		putString(state.name);
 	    byte[] message = buf.getBuffer();
 		    
@@ -244,6 +244,11 @@ final class ChannelImpl implements Channel, Serializable {
 	    if (message == null) {
 		throw new NullPointerException("null message");
 	    }
+            if (message.length > SimpleSgsProtocol.MAX_MESSAGE_LENGTH) {
+                throw new IllegalArgumentException(
+                    "message too long: " + message.length + " > " +
+                        SimpleSgsProtocol.MAX_MESSAGE_LENGTH);
+            }
 	    sendToClients(EMPTY_ID, state.getSessions(), message,
 			  context.nextSequenceNumber());
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -268,6 +273,11 @@ final class ChannelImpl implements Channel, Serializable {
 	    } else if (message == null) {
 		throw new NullPointerException("null message");
 	    }
+            if (message.length > SimpleSgsProtocol.MAX_MESSAGE_LENGTH) {
+                throw new IllegalArgumentException(
+                    "message too long: " + message.length + " > " +
+                        SimpleSgsProtocol.MAX_MESSAGE_LENGTH);
+            }
 	
 	    Set<ClientSession> sessions = new HashSet<ClientSession>();
 	    sessions.add(recipient);
@@ -301,6 +311,11 @@ final class ChannelImpl implements Channel, Serializable {
 	    } else if (message == null) {
 		throw new NullPointerException("null message");
 	    }
+            if (message.length > SimpleSgsProtocol.MAX_MESSAGE_LENGTH) {
+                throw new IllegalArgumentException(
+                    "message too long: " + message.length + " > " +
+                        SimpleSgsProtocol.MAX_MESSAGE_LENGTH);
+            }
 
 	    if (!recipients.isEmpty()) {
 		sendToClients(EMPTY_ID, recipients, message,
@@ -541,9 +556,9 @@ final class ChannelImpl implements Channel, Serializable {
         MessageBuffer buf =
             new MessageBuffer(15 + nameLen + senderId.length +
                     message.length);
-        buf.putByte(SgsProtocol.VERSION).
-            putByte(SgsProtocol.CHANNEL_SERVICE).
-            putByte(SgsProtocol.CHANNEL_MESSAGE).
+        buf.putByte(SimpleSgsProtocol.VERSION).
+            putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
+            putByte(SimpleSgsProtocol.CHANNEL_MESSAGE).
             putString(state.name).
             putLong(sequenceNumber).
             putShort(senderId.length).

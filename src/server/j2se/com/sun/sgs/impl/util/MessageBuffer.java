@@ -354,6 +354,24 @@ public class MessageBuffer {
     }
 
     /**
+     * Returns an unsigned short value (as an int), composed of the
+     * next two bytes (high byte first) in this buffer, and advances
+     * the buffer's position by two.  The value returned is between
+     * 0 and 65535, inclusive.
+     *
+     * @return the unsigned short value as an int between 0 and 65535
+     * @throws IndexOutOfBoundsException if this buffer's limit would
+     * be reached as a result of getting the next two bytes
+     */
+    public int getUnsignedShort() {
+        if (pos+2 > limit) {
+            throw new IndexOutOfBoundsException();
+        }
+        
+        return ((getByte() & 255) << 8) + ((getByte() & 255) << 0);
+    }
+
+    /**
      * Returns an int value, composed of the next four bytes (high
      * byte first) in this buffer, and advances the buffer's position
      * by 4.

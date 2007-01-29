@@ -10,7 +10,6 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameExistsException;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
-import com.sun.sgs.impl.service.session.SgsProtocol;
 import com.sun.sgs.impl.util.HexDumper;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.MessageBuffer;
@@ -18,6 +17,7 @@ import com.sun.sgs.impl.util.NonDurableTaskScheduler;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.NonDurableTransactionParticipant;
@@ -176,7 +176,7 @@ public class ChannelServiceImpl
 		    ChannelTable.NAME, new ChannelTable());
 	    }
 	    sessionService.registerProtocolMessageListener(
-		SgsProtocol.CHANNEL_SERVICE, protocolMessageListener);
+		SimpleSgsProtocol.CHANNEL_SERVICE, protocolMessageListener);
 	    
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
@@ -432,7 +432,7 @@ public class ChannelServiceImpl
 		 */
 		byte serviceId = buf.getByte();
 
-		if (serviceId != SgsProtocol.CHANNEL_SERVICE) {
+		if (serviceId != SimpleSgsProtocol.CHANNEL_SERVICE) {
 		    if (logger.isLoggable(Level.SEVERE)) {
 			logger.log(
                             Level.SEVERE,
@@ -450,8 +450,9 @@ public class ChannelServiceImpl
 
 		switch (opcode) {
 		    
-		case SgsProtocol.CHANNEL_SEND_REQUEST:
+		case SimpleSgsProtocol.CHANNEL_SEND_REQUEST:
 		    String name = buf.getString();
+                    buf.getLong(); // TODO Check sequence num
 		    short numRecipients = buf.getShort();
 		    if (numRecipients < 0) {
 			// TBD: log error...

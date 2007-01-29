@@ -13,6 +13,7 @@ import com.sun.sgs.impl.util.MessageBuffer;
 import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.ProtocolMessageListener;
 import com.sun.sgs.service.SgsClientSession;
@@ -83,6 +84,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 
     private boolean disconnectHandled = false;
 
+    /** The sequence number for ordered messages sent from this client. */
     private AtomicLong sequenceNumber = new AtomicLong(0);
 
     /**
@@ -165,7 +167,12 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 
     /** {@inheritDoc} */
     public void send(final byte[] message) {
-	try {	
+	try {
+            if (message.length > SimpleSgsProtocol.MAX_MESSAGE_LENGTH) {
+                throw new IllegalArgumentException(
+                    "message too long: " + message.length + " > " +
+                        SimpleSgsProtocol.MAX_MESSAGE_LENGTH);
+            }
 	    switch (getCurrentState()) {
 
 	    case CONNECTING:
@@ -173,9 +180,10 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    case RECONNECTING:
 		MessageBuffer buf =
 		    new MessageBuffer(5 + message.length);
-		buf.putByte(SgsProtocol.VERSION).
-		    putByte(SgsProtocol.APPLICATION_SERVICE).
-		    putByte(SgsProtocol.MESSAGE_SEND).
+		buf.putByte(SimpleSgsProtocol.VERSION).
+		    putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
+		    putByte(SimpleSgsProtocol.SESSION_MESSAGE).
+                    putLong(sequenceNumber.getAndIncrement()).
 		    putShort(message.length).
 		    putBytes(message);
 		sendProtocolMessageOnCommit(buf.getBuffer(), Delivery.RELIABLE);
@@ -363,9 +371,9 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	if (getCurrentState() != State.DISCONNECTED) {
 	    if (graceful) {
 		MessageBuffer buf = new MessageBuffer(3);
-		buf.putByte(SgsProtocol.VERSION).
-		    putByte(SgsProtocol.APPLICATION_SERVICE).
-		    putByte(SgsProtocol.LOGOUT_SUCCESS);
+		buf.putByte(SimpleSgsProtocol.VERSION).
+		    putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
+		    putByte(SimpleSgsProtocol.LOGOUT_SUCCESS);
 	    
 		sendProtocolMessage(buf.getBuffer(), Delivery.RELIABLE);
 	    }
@@ -520,12 +528,12 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	     * Handle version.
 	     */
 	    byte version = msg.getByte();
-	    if (version != SgsProtocol.VERSION) {
+	    if (version != SimpleSgsProtocol.VERSION) {
 		if (logger.isLoggable(Level.SEVERE)) {
 		    logger.log(
 			Level.SEVERE,
 			"Handler.messageReceived protocol version:{0}, " +
-			"expected {1}", version, SgsProtocol.VERSION);
+			"expected {1}", version, SimpleSgsProtocol.VERSION);
 		}
 		    // TBD: should the connection be disconnected?
 		return;
@@ -536,7 +544,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	     */
 	    byte serviceId = msg.getByte();
 
-	    if (serviceId != SgsProtocol.APPLICATION_SERVICE) {
+	    if (serviceId != SimpleSgsProtocol.APPLICATION_SERVICE) {
 		ProtocolMessageListener serviceListener =
 		    sessionService.getProtocolMessageListener(serviceId);
 		if (serviceListener != null) {
@@ -567,7 +575,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    
 	    switch (opcode) {
 		
-	    case SgsProtocol.LOGIN_REQUEST:
+	    case SimpleSgsProtocol.LOGIN_REQUEST:
 		name = msg.getString();
 		String password = msg.getString();
 
@@ -584,11 +592,12 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		}
 		break;
 		
-	    case SgsProtocol.RECONNECTION_REQUEST:
+	    case SimpleSgsProtocol.RECONNECT_REQUEST:
 		break;
 
-	    case SgsProtocol.MESSAGE_SEND:
-		int size = msg.getShort();
+	    case SimpleSgsProtocol.SESSION_MESSAGE:
+                msg.getLong(); // TODO Check sequence num
+		int size = msg.getUnsignedShort();
 		final byte[] clientMessage = msg.getBytes(size);
 		scheduleTask(new KernelRunnable() {
 		    public void run() {
@@ -598,7 +607,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		    }});
 		break;
 
-	    case SgsProtocol.LOGOUT_REQUEST:
+	    case SimpleSgsProtocol.LOGOUT_REQUEST:
 	        scheduleNonTransactionalTask(new KernelRunnable() {
 	            public void run() {
 	                handleDisconnect(isConnected());
@@ -765,9 +774,9 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		MessageBuffer ack =
 		    new MessageBuffer(
 			7 + sessionId.length + reconnectionKey.length);
-		ack.putByte(SgsProtocol.VERSION).
-		    putByte(SgsProtocol.APPLICATION_SERVICE).
-		    putByte(SgsProtocol.LOGIN_SUCCESS).
+		ack.putByte(SimpleSgsProtocol.VERSION).
+		    putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
+		    putByte(SimpleSgsProtocol.LOGIN_SUCCESS).
 		    putShort(sessionId.length). putBytes(sessionId).
 		    putShort(reconnectionKey.length).putBytes(reconnectionKey);
 		
@@ -781,9 +790,9 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
         int stringSize = MessageBuffer.getSize(LOGIN_REFUSED_REASON);
         MessageBuffer ack =
             new MessageBuffer(3 + stringSize);
-        ack.putByte(SgsProtocol.VERSION).
-            putByte(SgsProtocol.APPLICATION_SERVICE).
-            putByte(SgsProtocol.LOGIN_FAILURE).
+        ack.putByte(SimpleSgsProtocol.VERSION).
+            putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
+            putByte(SimpleSgsProtocol.LOGIN_FAILURE).
             putString(LOGIN_REFUSED_REASON);
         return ack.getBuffer();
     }

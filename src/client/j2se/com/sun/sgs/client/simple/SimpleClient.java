@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -17,10 +18,10 @@ import com.sun.sgs.client.SessionId;
 import com.sun.sgs.impl.client.comm.ClientConnection;
 import com.sun.sgs.impl.client.comm.ClientConnectionListener;
 import com.sun.sgs.impl.client.comm.ClientConnector;
-import com.sun.sgs.impl.client.simple.ProtocolMessage;
 import com.sun.sgs.impl.client.simple.ProtocolMessageDecoder;
 import com.sun.sgs.impl.client.simple.ProtocolMessageEncoder;
 import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 
 /**
  * An implementation of {@link ServerSession} that clients can use to manage
@@ -79,7 +80,10 @@ public class SimpleClient implements ServerSession {
     
     /** The current sessionId, if logged in. */
     private SessionId sessionId;
-    
+
+    /** The sequence number for ordered messages sent from this client. */
+    private AtomicLong sequenceNumber = new AtomicLong(0);
+
     /** Reconnection key.  TODO reconnect not implemented */
     @SuppressWarnings("unused")
     private byte[] reconnectKey;
@@ -194,8 +198,8 @@ public class SimpleClient implements ServerSession {
             try {
                 ProtocolMessageEncoder m =
                     new ProtocolMessageEncoder(
-                        ProtocolMessage.APPLICATION_SERVICE,
-                        ProtocolMessage.LOGOUT_REQUEST);
+                        SimpleSgsProtocol.APPLICATION_SERVICE,
+                        SimpleSgsProtocol.LOGOUT_REQUEST);
                 sendRaw(m.getMessage());
             } catch (IOException e) {
                 logger.logThrow(Level.FINE, e, "During graceful logout:");
@@ -215,8 +219,9 @@ public class SimpleClient implements ServerSession {
     public void send(byte[] message) throws IOException {
         checkConnected();
         ProtocolMessageEncoder m =
-            new ProtocolMessageEncoder(ProtocolMessage.APPLICATION_SERVICE,
-                ProtocolMessage.SESSION_MESSAGE);
+            new ProtocolMessageEncoder(SimpleSgsProtocol.APPLICATION_SERVICE,
+                SimpleSgsProtocol.SESSION_MESSAGE);
+        m.writeLong(sequenceNumber.getAndIncrement());
         m.writeBytes(message);
         sendRaw(m.getMessage());
     }
@@ -225,7 +230,7 @@ public class SimpleClient implements ServerSession {
         clientConnection.sendMessage(data);
     }
     
-    void checkConnected() {
+    private void checkConnected() {
         if (!isConnected()) {
             RuntimeException re =
                 new IllegalStateException("Client not connected");
@@ -258,8 +263,8 @@ public class SimpleClient implements ServerSession {
 
             ProtocolMessageEncoder m =
                 new ProtocolMessageEncoder(
-                    ProtocolMessage.APPLICATION_SERVICE,
-                    ProtocolMessage.LOGIN_REQUEST);
+                    SimpleSgsProtocol.APPLICATION_SERVICE,
+                    SimpleSgsProtocol.LOGIN_REQUEST);
             m.writeString(authentication.getUserName());
             m.writeString(new String(authentication.getPassword()));
             try {
@@ -275,183 +280,193 @@ public class SimpleClient implements ServerSession {
          */
         public void disconnected(boolean graceful, byte[] message) {
             synchronized (SimpleClient.this) {
+                if (clientConnection == null && (! connectionStateChanging)) {
+                    // Someone else beat us here
+                    return;
+                }
                 clientConnection = null;
                 connectionStateChanging = false;
             }
             sessionId = null;
-            clientListener.disconnected(graceful);
+            ProtocolMessageDecoder decoder =
+                new ProtocolMessageDecoder(message);
+            clientListener.disconnected(graceful, decoder.readString());
         }
 
         /**
          * {@inheritDoc}
          */
         public void receivedMessage(byte[] message) {
-            ProtocolMessageDecoder decoder =
-                new ProtocolMessageDecoder(message);
-            int versionNumber = decoder.readVersionNumber();
-            if (versionNumber != ProtocolMessage.VERSION) {
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.log(Level.FINE,
-                        "Bad version 0x{0}, wanted: 0x{1}",
-                        Integer.toHexString(versionNumber),
-                        Integer.toHexString(ProtocolMessage.VERSION));
+            try {
+                ProtocolMessageDecoder decoder =
+                    new ProtocolMessageDecoder(message);
+                int version = decoder.readVersionNumber();
+                if (version != SimpleSgsProtocol.VERSION) {
+                    throw new IOException(
+                        String.format("Bad version 0x%02X, wanted: 0x%02X",
+                            version,
+                            SimpleSgsProtocol.VERSION));
                 }
-                return;
-            }
-            int service = decoder.readServiceNumber();
-            int command = decoder.readCommand();
-            
-            if (logger.isLoggable(Level.FINER)) {
-                logger.log(Level.FINER,
-                    "Received {0,number,#} byte message, command 0x{1}",
-                    message.length,
-                    Integer.toHexString(command));
-            }
+                
+                int service = decoder.readServiceNumber();
+                
+                if (logger.isLoggable(Level.FINER)) {
+                    String msg = String.format(
+                        "Message length:%d service:0x%02X",
+                        message.length,
+                        service);
+                    logger.log(Level.FINER, msg);
+                }
+    
+                switch (service) {
 
-            switch (service) {
-
-            // Handle "Application Service" messages
-            case ProtocolMessage.APPLICATION_SERVICE:
-                switch (command) {
-                case ProtocolMessage.LOGIN_SUCCESS:
-                    logger.log(Level.FINER, "Logged in");
-                    sessionId = SessionId.fromBytes(decoder.readBytes());
-                    reconnectKey = decoder.readBytes();
-                    clientListener.loggedIn();
+                // Handle "Application Service" messages
+                case SimpleSgsProtocol.APPLICATION_SERVICE:
+                    handleApplicationMessage(decoder);
                     break;
 
-                case ProtocolMessage.LOGIN_FAILURE:
-                    logger.log(Level.FINER, "Login failed");
-                    clientListener.loginFailed(decoder.readString());
-                    break;
-
-                case ProtocolMessage.SESSION_MESSAGE:
-                    logger.log(Level.FINEST, "Direct receive");
-                    clientListener.receivedMessage(decoder.readBytes());
-                    break;
-
-                case ProtocolMessage.RECONNECT_SUCCESS:
-                    logger.log(Level.FINER, "Reconnected");
-                    clientListener.reconnected();
-                    break;
-
-                case ProtocolMessage.RECONNECT_FAILURE:
-                    try {
-                        logger.log(Level.FINER, "Reconnect failed");
-                        clientConnection.disconnect();
-                    } catch (IOException e) {
-                        if (logger.isLoggable(Level.FINE)) {
-                            logger.logThrow(Level.FINE, e,
-                                "Disconnecting a failed reconnect");
-                        }
-                        // ignore
-                    }
-                    break;
-
-                case ProtocolMessage.LOGOUT_SUCCESS:
-                    logger.log(Level.FINER, "Logged out gracefully");
-                    try {
-                        clientConnection.disconnect();
-                    } catch (IOException e) {
-                        if (logger.isLoggable(Level.FINE)) {
-                            logger.logThrow(Level.FINE, e,
-                                "Disconnecting after graceful logout");
-                        }
-                        // ignore
-                    }
+                // Handle Channel Service messages
+                case SimpleSgsProtocol.CHANNEL_SERVICE:
+                    handleChannelMessage(decoder);
                     break;
 
                 default:
-                    if (logger.isLoggable(Level.FINE)) {
-                        logger.log(Level.FINE,
-                            "Unknown opcode: 0x{0}",
-                            Integer.toHexString(command));
+                    throw new IOException(
+                        String.format("Unknown service 0x%02X", service));
+                }
+            } catch (IOException e) {
+                logger.logThrow(Level.FINER, e, e.getMessage());
+                if (isConnected()) {
+                    try {
+                        clientConnection.disconnect();
+                    } catch (IOException e2) {
+                        logger.logThrow(Level.FINEST, e2,
+                            "Disconnect failed after {0}", e.getMessage());
+                        // Ignore
                     }
-                    // TODO disconnect?
-                    break;
+                }
+            }
+        }
+
+        private void handleApplicationMessage(ProtocolMessageDecoder decoder)
+            throws IOException
+        {
+            int command = decoder.readCommand();
+            switch (command) {
+            case SimpleSgsProtocol.LOGIN_SUCCESS:
+                logger.log(Level.FINER, "Logged in");
+                sessionId = SessionId.fromBytes(decoder.readBytes());
+                reconnectKey = decoder.readBytes();
+                clientListener.loggedIn();
+                break;
+
+            case SimpleSgsProtocol.LOGIN_FAILURE:
+                logger.log(Level.FINER, "Login failed");
+                clientListener.loginFailed(decoder.readString());
+                break;
+
+            case SimpleSgsProtocol.SESSION_MESSAGE:
+                logger.log(Level.FINEST, "Direct receive");
+                decoder.readLong(); // FIXME sequence number
+                clientListener.receivedMessage(decoder.readBytes());
+                break;
+
+            case SimpleSgsProtocol.RECONNECT_SUCCESS:
+                logger.log(Level.FINER, "Reconnected");
+                clientListener.reconnected();
+                break;
+
+            case SimpleSgsProtocol.RECONNECT_FAILURE:
+                try {
+                    logger.log(Level.FINER, "Reconnect failed");
+                    clientConnection.disconnect();
+                } catch (IOException e) {
+                    if (logger.isLoggable(Level.FINE)) {
+                        logger.logThrow(Level.FINE, e,
+                            "Disconnecting a failed reconnect");
+                    }
+                    // ignore
                 }
                 break;
 
-            // Handle Channel Service messages
-            case ProtocolMessage.CHANNEL_SERVICE:
-                switch (command) {
-
-                case ProtocolMessage.CHANNEL_JOIN: {
-                    logger.log(Level.FINER, "Channel join");
-                    String channelName = decoder.readString();
-                    SimpleClientChannel channel =
-                        new SimpleClientChannel(channelName);
-                    if (channels.putIfAbsent(channelName, channel) == null) {
-                        channel.joined();
-                    } else {
-                        if (logger.isLoggable(Level.FINE)) {
-                            logger.log(Level.FINE,
-                                "Cannot leave channel {0}: already a member",
-                                channelName);
-                        }
-                    }
-                    break;
-                }
-
-                case ProtocolMessage.CHANNEL_LEAVE: {
-                    logger.log(Level.FINER, "Channel leave");
-                    String channelName = decoder.readString();
-                    SimpleClientChannel channel =
-                        channels.remove(channelName);
-                    if (channel != null) {
-                        channel.left();
-                    } else {
-                        if (logger.isLoggable(Level.FINE)) {
-                            logger.log(Level.FINE,
-                                "Cannot leave channel {0}: not a member",
-                                channelName);
-                        }
-                    }
-                    break;
-                }
-
-                case ProtocolMessage.CHANNEL_MESSAGE:
-                    logger.log(Level.FINEST, "Channel recv");
-                    String channelName = decoder.readString();
-                    SimpleClientChannel channel = channels.get(channelName);
-                    if (channel == null) {
-                        if (logger.isLoggable(Level.FINE)) {
-                            logger.log(Level.FINE,
-                                "Ignore message on channel {0}: not a member",
-                                channelName);
-                        }
-                        return;
-                    }
-                    // TODO: discard sequence number for now, we're always
-                    // on a reliable transport.
-                    /* long seq = */ decoder.readLong();
-                    
-                    byte[] sidBytes = decoder.readBytes();
-                    SessionId sid = (sidBytes == null) ?
-                            null : SessionId.fromBytes(sidBytes);
-                    
-                    channel.receivedMessage(sid, decoder.readBytes());
-                    break;
-
-                default:
+            case SimpleSgsProtocol.LOGOUT_SUCCESS:
+                logger.log(Level.FINER, "Logged out gracefully");
+                try {
+                    clientConnection.disconnect();
+                } catch (IOException e) {
                     if (logger.isLoggable(Level.FINE)) {
-                        logger.log(Level.FINE,
-                            "Unknown opcode: 0x{0}",
-                            Integer.toHexString(command));
+                        logger.logThrow(Level.FINE, e,
+                            "Disconnecting after graceful logout");
                     }
-                    // TODO disconnect?
-                    break;
+                    // ignore
                 }
                 break;
 
             default:
-                if (logger.isLoggable(Level.FINE)) {
+                throw new IOException(
+                    String.format("Unknown session opcode: 0x%02X", command));
+            }
+        }
+        
+        private void handleChannelMessage(ProtocolMessageDecoder decoder)
+            throws IOException
+        {
+            int command = decoder.readCommand();
+            switch (command) {
+
+            case SimpleSgsProtocol.CHANNEL_JOIN: {
+                logger.log(Level.FINER, "Channel join");
+                String channelName = decoder.readString();
+                SimpleClientChannel channel =
+                    new SimpleClientChannel(channelName);
+                if (channels.putIfAbsent(channelName, channel) == null) {
+                    channel.joined();
+                } else {
                     logger.log(Level.FINE,
-                        "Unknown service: 0x{0}",
-                        Integer.toHexString(service));
+                        "Cannot leave channel {0}: already a member",
+                        channelName);
                 }
-                // TODO disconnect?
                 break;
+            }
+
+            case SimpleSgsProtocol.CHANNEL_LEAVE: {
+                logger.log(Level.FINER, "Channel leave");
+                String channelName = decoder.readString();
+                SimpleClientChannel channel =
+                    channels.remove(channelName);
+                if (channel != null) {
+                    channel.left();
+                } else {
+                    logger.log(Level.FINE,
+                        "Cannot leave channel {0}: not a member",
+                        channelName);
+                }
+                break;
+            }
+
+            case SimpleSgsProtocol.CHANNEL_MESSAGE:
+                logger.log(Level.FINEST, "Channel recv");
+                String channelName = decoder.readString();
+                SimpleClientChannel channel = channels.get(channelName);
+                if (channel == null) {
+                    logger.log(Level.FINE,
+                        "Ignore message on channel {0}: not a member",
+                        channelName);
+                    return;
+                }
+
+                decoder.readLong(); // FIXME sequence number
+                
+                byte[] sidBytes = decoder.readBytes();
+                SessionId sid = (sidBytes == null) ?
+                        null : SessionId.fromBytes(sidBytes);
+                
+                channel.receivedMessage(sid, decoder.readBytes());
+                break;
+
+            default:
+                throw new IOException(
+                    String.format("Unknown channel opcode: 0x%02X", command));
             }
         }
 
@@ -583,9 +598,10 @@ public class SimpleClient implements ServerSession {
                 return;
             }
             ProtocolMessageEncoder m =
-                new ProtocolMessageEncoder(ProtocolMessage.CHANNEL_SERVICE,
-                    ProtocolMessage.CHANNEL_SEND_REQUEST);
+                new ProtocolMessageEncoder(SimpleSgsProtocol.CHANNEL_SERVICE,
+                    SimpleSgsProtocol.CHANNEL_SEND_REQUEST);
             m.writeString(name);
+            m.writeLong(sequenceNumber.getAndIncrement());
             if (recipients == null) {
                 m.writeShort(Short.valueOf((short) 0));
             } else {

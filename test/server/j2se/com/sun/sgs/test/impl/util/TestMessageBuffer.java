@@ -110,6 +110,25 @@ public class TestMessageBuffer extends TestCase {
         }
     }
 
+    public void testGetUnsignedShort() {
+        MessageBuffer buf = new MessageBuffer(2);
+        int value1 = 64000;
+        buf.putShort(value1);
+        buf.rewind();
+        int value2 = buf.getUnsignedShort();
+        if (value1 != value2) {
+            fail("Expected unsigned short " + value1 + ", got " + value2);
+        }
+        
+        // test that signed getShort is different
+        buf.rewind();
+        value2 = buf.getShort();
+        if (value1 == value2) {
+            fail("Expected unequal, but got " + value2);
+        }
+        System.err.println("ushort " + value1 + " != " + value2);
+    }
+
     public void testPutInt() {
         MessageBuffer buf = new MessageBuffer(4);
         int value1 = 0x01020304;

@@ -109,16 +109,16 @@ public class ProtocolMessageDecoder {
     }
 
     /**
-     * Reads the next short from the input stream, interpreting it as a
-     * size, and reads that many more bytes from the stream, returning
+     * Reads the next unsigned short from the input stream, interpreting it
+     * as a size, and reads that many more bytes from the stream, returning
      * the resulting byte array.
      * 
-     * @return a byte array matching the length of the first short read
+     * @return a byte array the length of the first unsigned short read
      * from the stream, or {@code null} if the length is zero.
      */
     public byte[] readBytes() {        
         try {
-            short len = inputStream.readShort();
+            int len = inputStream.readUnsignedShort();
             if (len == 0) {
                 return null;
             }

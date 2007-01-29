@@ -222,7 +222,7 @@ public class ChatClient extends JFrame
         ++quitAttempts;
         
         if (client == null || (! client.isConnected())) {
-            disconnected(true);
+            disconnected(true, "Quit");
             return;
         }
         
@@ -348,7 +348,7 @@ public class ChatClient extends JFrame
     /**
      * {@inheritDoc}
      */
-    public void disconnected(boolean graceful) {
+    public void disconnected(boolean graceful, String reason) {
         setButtonsEnabled(false);
         statusMessage.setText("Status: logged out");
         if (quitAttempts > 0) {

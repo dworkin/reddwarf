@@ -28,7 +28,6 @@ import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
-import com.sun.sgs.impl.service.session.SgsProtocol;
 import com.sun.sgs.impl.service.task.TaskServiceImpl;
 import com.sun.sgs.impl.util.MessageBuffer;
 import com.sun.sgs.io.Connector;
@@ -41,6 +40,7 @@ import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskReservation;
 import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TaskService;
@@ -635,9 +635,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 			return;
 		    }
 		    MessageBuffer buf = new MessageBuffer(3);
-		    buf.putByte(SgsProtocol.VERSION).
-			putByte(SgsProtocol.APPLICATION_SERVICE).
-			putByte(SgsProtocol.LOGOUT_REQUEST);
+		    buf.putByte(SimpleSgsProtocol.VERSION).
+			putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
+			putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
 		    logoutAck = false;
 		    try {
 			connection.sendBytes(buf.getBuffer());
@@ -675,9 +675,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    MessageBuffer buf =
 		new MessageBuffer(3 + MessageBuffer.getSize(name) +
 				  MessageBuffer.getSize(password));
-	    buf.putByte(SgsProtocol.VERSION).
-		putByte(SgsProtocol.APPLICATION_SERVICE).
-		putByte(SgsProtocol.LOGIN_REQUEST).
+	    buf.putByte(SimpleSgsProtocol.VERSION).
+		putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
+		putByte(SimpleSgsProtocol.LOGIN_REQUEST).
 		putString(name).
 		putString(password);
 	    loginAck = false;
@@ -714,9 +714,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    }
 
 	    MessageBuffer buf = new MessageBuffer(3);
-	    buf.putByte(SgsProtocol.VERSION).
-		putByte(SgsProtocol.APPLICATION_SERVICE).
-		putByte(SgsProtocol.LOGOUT_REQUEST);
+	    buf.putByte(SimpleSgsProtocol.VERSION).
+		putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
+		putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
 	    logoutAck = false;
 
 	    try {
@@ -756,18 +756,19 @@ public class TestClientSessionServiceImpl extends TestCase {
 		MessageBuffer buf = new MessageBuffer(buffer);
 
 		byte version = buf.getByte();
-		if (version != SgsProtocol.VERSION) {
+		if (version != SimpleSgsProtocol.VERSION) {
 		    System.err.println(
 			"bytesReceived: got version: " +
-			version + ", expected: " + SgsProtocol.VERSION);
+			version + ", expected: " + SimpleSgsProtocol.VERSION);
 		    return;
 		}
 
 		byte serviceId = buf.getByte();
-		if (serviceId != SgsProtocol.APPLICATION_SERVICE) {
+		if (serviceId != SimpleSgsProtocol.APPLICATION_SERVICE) {
 		    System.err.println(
-			"bytesReceived: got version: " +
-			version + ", expected: " + SgsProtocol.VERSION);
+			"bytesReceived: got service id: " +
+                        serviceId + ", expected: " +
+                        SimpleSgsProtocol.APPLICATION_SERVICE);
 		    return;
 		}
 
@@ -775,9 +776,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 
 		switch (opcode) {
 
-		case SgsProtocol.LOGIN_SUCCESS:
-		    sessionId = buf.getBytes(buf.getShort());
-		    reconnectionKey = buf.getBytes(buf.getShort());
+		case SimpleSgsProtocol.LOGIN_SUCCESS:
+		    sessionId = buf.getBytes(buf.getUnsignedShort());
+		    reconnectionKey = buf.getBytes(buf.getUnsignedShort());
 		    synchronized (lock) {
 			loginAck = true;
 			loginSuccess = true;
@@ -786,7 +787,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    }
 		    break;
 		    
-		case SgsProtocol.LOGIN_FAILURE:
+		case SimpleSgsProtocol.LOGIN_FAILURE:
 		    reason = buf.getString();
 		    synchronized (lock) {
 			loginAck = true;
@@ -797,7 +798,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    }
 		    break;
 
-		case SgsProtocol.LOGOUT_SUCCESS:
+		case SimpleSgsProtocol.LOGOUT_SUCCESS:
 		    synchronized (lock) {
 			logoutAck = true;
 			System.err.println("logout succeeded: " + name);
@@ -805,8 +806,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    }
 		    break;
 
-		case SgsProtocol.MESSAGE_SEND:
-		    byte[] message = buf.getBytes(buf.getShort());
+		case SimpleSgsProtocol.SESSION_MESSAGE:
+                    buf.getLong(); // FIXME sequence number
+		    byte[] message = buf.getBytes(buf.getUnsignedShort());
 		    synchronized (lock) {
 			messageList.add(message);
 			System.err.println("message received: " + message);

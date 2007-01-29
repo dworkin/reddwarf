@@ -163,7 +163,7 @@ public class BattleBoardClient
     /**
      * {@inheritDoc}
      */    
-    public void disconnected(boolean graceful) {
+    public void disconnected(boolean graceful, String reason) {
         log.fine("disconnected; graceful = " + graceful);
         synchronized (BattleBoardClient.class) {
             BattleBoardClient.class.notifyAll();

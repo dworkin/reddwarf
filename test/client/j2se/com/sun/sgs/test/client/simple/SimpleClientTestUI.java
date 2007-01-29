@@ -223,7 +223,7 @@ public class SimpleClientTestUI extends JFrame {
         /**
          * {@inheritDoc}
          */
-        public void disconnected(boolean graceful) {
+        public void disconnected(boolean graceful, String reason) {
             setStatus("Disconnected");
 
         }

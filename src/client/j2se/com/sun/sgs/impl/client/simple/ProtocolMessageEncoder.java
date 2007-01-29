@@ -5,6 +5,7 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 
 import com.sun.sgs.client.SessionId;
+import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 
 /**
  * Convenience class for assembling a protocol message into bytes.  Clients 
@@ -19,7 +20,7 @@ public class ProtocolMessageEncoder {
     /**
      * Starts assembling a message with the given service id number and op
      * code. Op Codes and service id numbers are defined in
-     * {@link ProtocolMessage}.
+     * {@link SimpleSgsProtocol}.
      * 
      * @param service the id of the server-side service that should
      *        interpret this message
@@ -29,7 +30,7 @@ public class ProtocolMessageEncoder {
     public ProtocolMessageEncoder(int service, int command) {
         outputStream =
             new DataOutputStream(byteStream = new ByteArrayOutputStream());
-        writeUnsignedByte(ProtocolMessage.VERSION);
+        writeUnsignedByte(SimpleSgsProtocol.VERSION);
         writeUnsignedByte(service);
         writeUnsignedByte(command);
     }

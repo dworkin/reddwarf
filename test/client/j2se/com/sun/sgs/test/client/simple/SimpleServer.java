@@ -16,7 +16,7 @@ import com.sun.sgs.io.Acceptor;
 import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
 
-import static com.sun.sgs.impl.client.simple.ProtocolMessage.*;
+import static com.sun.sgs.protocol.simple.SimpleSgsProtocol.*;
 
 /**
  * A simple server harness for testing the Client API. This server will
@@ -159,6 +159,7 @@ public class SimpleServer implements ConnectionListener {
             sendMessage(conn, messageEncoder);
         } else if (command == SESSION_MESSAGE) {
             assert service == APPLICATION_SERVICE;
+            messageDecoder.readLong(); // FIXME sequence number
             String serverMessage = messageDecoder.readString();
             System.out.println("Received general server message: "
                     + serverMessage);
@@ -182,6 +183,7 @@ public class SimpleServer implements ConnectionListener {
         } else if (command == CHANNEL_SEND_REQUEST) {
             assert service == CHANNEL_SERVICE;
             String channelName = messageDecoder.readString();
+            messageDecoder.readLong(); // FIXME sequence number
             int numRecipients = messageDecoder.readInt();
             String messageStr = messageDecoder.readString();
             System.out.println("Channel Message " + channelName
