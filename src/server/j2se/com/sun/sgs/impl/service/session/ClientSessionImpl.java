@@ -60,7 +60,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     private final DataService dataService;
     
     /** The Connection for sending messages to the client. */
-    private Connection sessionHandle;
+    private Connection sessionConnection;
 
     /** The session id. */
     private final byte[] sessionId;
@@ -69,7 +69,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     private final byte[] reconnectionKey;
 
     /** The ConnectionListener for receiving messages from the client. */
-    private final ConnectionListener handler;
+    private final ConnectionListener connectionListener;
 
     /** The authenticated name for this session. */
     private String name;
@@ -97,7 +97,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     ClientSessionImpl(ClientSessionServiceImpl sessionService) {
 	this.sessionService = sessionService;
         this.dataService = sessionService.dataService;
-	this.handler = new Handler();
+	this.connectionListener = new Listener();
 	this.sessionId = generateId();
 	this.reconnectionKey = generateId();
     }
@@ -121,7 +121,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	this.name = name;
 	this.sessionId = sessionId;
 	this.reconnectionKey = generateId(); // create bogus one
-	this.handler = null;
+	this.connectionListener = null;
 	this.state = State.DISCONNECTED;
     }
 
@@ -215,7 +215,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     public void sendProtocolMessage(byte[] message, Delivery delivery) {
 	// TBI: ignore delivery for now...
 	try {
-	    sessionHandle.sendBytes(message);
+	    sessionConnection.sendBytes(message);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
 		    Level.FINEST, "sendProtocolMessage message:{0} returns",
@@ -225,7 +225,8 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    if (logger.isLoggable(Level.WARNING)) {
 		logger.logThrow(
 		    Level.WARNING, e,
-		    "sendProtocolMessage handle:{0} throws", sessionHandle);
+		    "sendProtocolMessage handle:{0} throws",
+                    sessionConnection);
 	    }
 	}
     }
@@ -373,13 +374,13 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    }
 
 	    try {
-		sessionHandle.close();
+		sessionConnection.close();
 	    } catch (IOException e) {
 		if (logger.isLoggable(Level.WARNING)) {
 		    logger.logThrow(
 		    	Level.WARNING, e,
 			"handleDisconnect (close) handle:{0} throws",
-			sessionHandle);
+			sessionConnection);
 		}
 	    }
 	}
@@ -394,8 +395,8 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     }
     
     /** Returns the ConnectionListener for this session. */
-    ConnectionListener getHandler() {
-	return handler;
+    ConnectionListener getConnectionListener() {
+	return connectionListener;
     }
 
     /** Returns a random seed to use in generating session ids. */
@@ -419,10 +420,10 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     /* -- ConnectionListener implementation -- */
 
     /**
-     * Handler for connection-related events for this session's
+     * Listener for connection-related events for this session's
      * Connection.
      */
-    class Handler implements ConnectionListener {
+    class Listener implements ConnectionListener {
 
 	/** {@inheritDoc} */
 	public void connected(Connection conn) {
@@ -433,11 +434,11 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 
 	    synchronized (lock) {
 		// check if there is already a handle set
-		if (sessionHandle != null) {
+		if (sessionConnection != null) {
 		    return;
 		}
 
-		sessionHandle = conn;
+		sessionConnection = conn;
 		
 		switch (state) {
 		    
@@ -459,7 +460,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    }
 
 	    synchronized (lock) {
-		if (conn != sessionHandle) {
+		if (conn != sessionConnection) {
 		    return;
 		}
 
@@ -494,12 +495,12 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
             }
 	    
 	    synchronized (lock) {
-		if (conn != sessionHandle) {
+		if (conn != sessionConnection) {
                     if (logger.isLoggable(Level.FINE)) {
                         logger.log(
                             Level.FINE, 
                             "Handle mismatch: expected: {0}, got: {1}",
-                            sessionHandle, conn);
+                            sessionConnection, conn);
                     }
 		    return;
 		}

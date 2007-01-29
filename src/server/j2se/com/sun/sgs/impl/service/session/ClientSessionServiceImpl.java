@@ -317,7 +317,7 @@ public class ClientSessionServiceImpl
 	    ClientSessionImpl session =
 		new ClientSessionImpl(ClientSessionServiceImpl.this);
 	    sessions.put(new SessionId(session.getSessionId()), session);
-	    return session.getHandler();
+	    return session.getConnectionListener();
 	}
 
         /** {@inheritDoc} */
