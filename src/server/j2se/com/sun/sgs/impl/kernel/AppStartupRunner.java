@@ -87,7 +87,7 @@ class AppStartupRunner implements KernelRunnable {
 
                 // since we created the listener, we're the first one to
                 // start the app, so we also need to start it up
-                listener.startingUp(properties);
+                listener.initialize(properties);
             } catch (Exception e) {
                 if (logger.isLoggable(Level.SEVERE))
                     logger.logThrow(Level.SEVERE, e,
