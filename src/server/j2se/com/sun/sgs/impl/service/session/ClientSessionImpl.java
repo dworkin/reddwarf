@@ -711,7 +711,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	}
     }
 
-    private static class ClientSessionListenerWrapper
+    static class ClientSessionListenerWrapper
 	implements ManagedObject, Serializable
     {
 	private final static long serialVersionUID = 1L;
