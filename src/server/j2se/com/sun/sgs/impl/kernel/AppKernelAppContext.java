@@ -55,10 +55,7 @@ class AppKernelAppContext extends AbstractKernelAppContext {
         this.managerComponents = managerComponents;
 
         // pre-fetch the three standard managers
-        // FIXME: add this back in when we have support for channels
-        /*channelManager = managerComponents.
-          getComponent(ChannelManager.class);*/
-        channelManager = null;
+        channelManager = managerComponents.getComponent(ChannelManager.class);
         dataManager = managerComponents.getComponent(DataManager.class);
         taskManager = managerComponents.getComponent(TaskManager.class);
     }

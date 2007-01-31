@@ -1,4 +1,9 @@
 .level = ALL
 handlers = java.util.logging.ConsoleHandler
 java.util.logging.ConsoleHandler.formatter = java.util.logging.SimpleFormatter
-java.util.logging.ConsoleHandler.level = WARNING
+java.util.logging.ConsoleHandler.level = FINE
+
+# Quiet logging from java internals
+sun.awt.level = WARNING
+java.awt.level = WARNING
+javax.swing.level = WARNING
