@@ -368,6 +368,10 @@
 	 file="${build.dir}/test/network-server"/>
       <sysproperty key="java.util.logging.config.file" file="${test.logging}"/>
       <sysproperty key="java.rmi.server.hostname" value="${test.server.host}"/>
+      <syspropertyset>
+	<propertyref prefix="test."/>
+	<propertyref prefix="com.sun.sgs."/>
+      </syspropertyset>
     </java>
   </target>
 
