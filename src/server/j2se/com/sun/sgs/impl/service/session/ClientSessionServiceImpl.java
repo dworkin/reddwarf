@@ -253,15 +253,11 @@ public class ClientSessionServiceImpl
      * {@code false}
      */
     public boolean shutdown() {
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST, "shutdown");
-	}
+	logger.log(Level.FINEST, "shutdown");
 	
 	synchronized (this) {
 	    if (shuttingDown) {
-		if (logger.isLoggable(Level.FINEST)) {
-		    logger.log(Level.FINEST, "shutdown in progress");
-		}
+		logger.log(Level.FINEST, "shutdown in progress");
 		return false;
 	    }
 	    shuttingDown = true;
@@ -270,14 +266,10 @@ public class ClientSessionServiceImpl
 	try {
 	    if (acceptor != null) {
 		acceptor.shutdown();
-		if (logger.isLoggable(Level.FINEST)) {
-		    logger.log(Level.FINEST, "acceptor shutdown");
-		}
+		logger.log(Level.FINEST, "acceptor shutdown");
 	    }
 	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.logThrow(Level.FINEST, e, "shutdown exception occurred");
-	    }
+	    logger.logThrow(Level.FINEST, e, "shutdown exception occurred");
 	    // swallow exception
 	}
 
@@ -726,27 +718,26 @@ public class ClientSessionServiceImpl
 		break;
 	    }
 	    
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(
-		    Level.FINEST,
-		    "removeListenerBindings removing: {0}",
-		    key);
-	    }
+	    logger.log(
+		Level.FINEST,
+		"notifyDisconnectedSessions key: {0}",
+		key);
 
 	    final String listenerKey = key;		
-	    final ManagedObject obj =
-		dataService.getServiceBinding(listenerKey, ManagedObject.class);
-	    final boolean isWrapped =
-		obj instanceof ClientSessionListenerWrapper;
-	    final ClientSessionListener listener =
-		isWrapped ?
-		((ClientSessionListenerWrapper) obj).get() :
-		((ClientSessionListener) obj);
 	    final DataService dataSvc = dataService;
 		
 	    nonDurableTaskScheduler.scheduleTask(
 		new KernelRunnable() {
 		    public void run() throws Exception {
+			ManagedObject obj = 
+			    dataService.getServiceBinding(
+				listenerKey, ManagedObject.class);
+			 boolean isWrapped =
+			     obj instanceof ClientSessionListenerWrapper;
+			 ClientSessionListener listener =
+			     isWrapped ?
+			     ((ClientSessionListenerWrapper) obj).get() :
+			     ((ClientSessionListener) obj);
 			listener.disconnected(false);
 			dataSvc.removeServiceBinding(listenerKey);
 			if (isWrapped) {
