@@ -77,8 +77,12 @@ public class DataStoreServerImpl implements DataStoreServer {
     /** The number of transactions to allocate at a time. */
     private static final int TXN_ALLOCATION_BLOCK_SIZE = 100;
 
+    private static final boolean noRMI = Boolean.getBoolean("test.noRMI");
+
     /** Set by main to make sure that the server is reachable. */
     private static DataStoreServerImpl server;
+
+    private DataStoreServerRemote serverRemote;
 
     /** The underlying data store. */
     private final CustomDataStoreImpl store;
@@ -375,7 +379,7 @@ public class DataStoreServerImpl implements DataStoreServer {
      *		property is not a valid integer greater than zero
      * @throws	RemoteException if a network problem occurs
      */
-    public DataStoreServerImpl(Properties properties) throws RemoteException {
+    public DataStoreServerImpl(Properties properties) throws IOException {
 	logger.log(Level.CONFIG, "Creating DataStoreServerImpl properties:{0}",
 		   properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
@@ -384,12 +388,18 @@ public class DataStoreServerImpl implements DataStoreServer {
 	    TXN_TIMEOUT_PROPERTY, DEFAULT_TXN_TIMEOUT);
 	int requestedPort = wrappedProps.getIntProperty(
 	    PORT_PROPERTY, DEFAULT_PORT);
-	ServerSocketFactory ssf = new ServerSocketFactory();
-	registry = LocateRegistry.createRegistry(requestedPort, null, ssf);
-	port = ssf.getLocalPort();
-	registry.rebind(
-	    "DataStoreServer",
-	    UnicastRemoteObject.exportObject(this, requestedPort, null, ssf));
+	if (!noRMI) {
+	    ServerSocketFactory ssf = new ServerSocketFactory();
+	    registry = LocateRegistry.createRegistry(requestedPort, null, ssf);
+	    port = ssf.getLocalPort();
+	    registry.rebind(
+		"DataStoreServer",
+		UnicastRemoteObject.exportObject(
+		    this, requestedPort, null, ssf));
+	} else {
+	    serverRemote = new DataStoreServerRemote(requestedPort, this);
+	    port = serverRemote.serverSocket.getLocalPort();
+	}
 	long reapDelay = wrappedProps.getLongProperty(
 	    REAP_DELAY_PROPERTY, DEFAULT_REAP_DELAY);
 	executor = Executors.newSingleThreadScheduledExecutor();
@@ -564,25 +574,36 @@ public class DataStoreServerImpl implements DataStoreServer {
      *		already been called and returned <code>true</code>
      */
     public synchronized boolean shutdown() {
-	if (registry == null) {
-	    throw new IllegalStateException(
-		"The server is already shut down");
+	if (!noRMI) {
+	    if (registry == null) {
+		throw new IllegalStateException(
+		    "The server is already shut down");
+	    }
 	}
 	if (!store.shutdown()) {
 	    return false;
 	}
 	executor.shutdownNow();
-	try {
-	    UnicastRemoteObject.unexportObject(this, true);
-	} catch (NoSuchObjectException e) {
-	    logger.logThrow(Level.FINE, e, "Problem unexporting server");
-	    return false;
-	}
-	try {
-	    UnicastRemoteObject.unexportObject(registry, true);
-	} catch (NoSuchObjectException e) {
-	    logger.logThrow(Level.FINE, e, "Problem unexporting registry");
-	    return false;
+	if (!noRMI) {
+	    try {
+		UnicastRemoteObject.unexportObject(this, true);
+	    } catch (NoSuchObjectException e) {
+		logger.logThrow(Level.FINE, e, "Problem unexporting server");
+		return false;
+	    }
+	    try {
+		UnicastRemoteObject.unexportObject(registry, true);
+	    } catch (NoSuchObjectException e) {
+		logger.logThrow(Level.FINE, e, "Problem unexporting registry");
+		return false;
+	    }
+	} else {
+	    try {
+		serverRemote.shutdown();
+	    } catch (IOException e) {
+		logger.logThrow(Level.FINE, e, "Problem shutting down server");
+		return false;
+	    }
 	}
 	registry = null;
 	return true;

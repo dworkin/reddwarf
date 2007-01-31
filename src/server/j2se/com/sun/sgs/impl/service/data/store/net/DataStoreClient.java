@@ -8,8 +8,8 @@ import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.PropertiesWrapper;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
+import java.io.IOException;
 import java.rmi.NotBoundException;
-import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.RMIClientSocketFactory;
@@ -49,6 +49,8 @@ public final class DataStoreClient
     /** The logger for this class. */
     static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
+
+    private static final boolean noRMI = Boolean.getBoolean("test.noRMI");
 
     private final String serverHost;
     private final int serverPort;
@@ -115,12 +117,12 @@ public final class DataStoreClient
      *
      * @param	properties the properties for configuring this instance
      * @throws	IllegalArgumentException bad properties
-     * @throws	RemoteException if a network problem occurs
+     * @throws	IOException if a network problem occurs
      * @throws	NotBoundException if the server is not found in the RMI
      *		registry
      */
     public DataStoreClient(Properties properties)
-	throws RemoteException, NotBoundException
+	throws IOException, NotBoundException
     {
 	logger.log(Level.CONFIG,
 		   "Creating DataStoreClient properties:{0}",
@@ -145,7 +147,7 @@ public final class DataStoreClient
     }
 
     private DataStoreServer getServer()
-	throws RemoteException, NotBoundException
+	throws IOException, NotBoundException
     {
 	boolean done = false;
 	for (int i = 0; !done; i++) {
@@ -153,10 +155,14 @@ public final class DataStoreClient
 		done = true;
 	    }
 	    try {
-		Registry registry = LocateRegistry.getRegistry(
-		    serverHost, serverPort);
-		return (DataStoreServer) registry.lookup("DataStoreServer");
-	    } catch (RemoteException e) {
+		if (!noRMI) {
+		    Registry registry = LocateRegistry.getRegistry(
+			serverHost, serverPort);
+		    return (DataStoreServer) registry.lookup("DataStoreServer");
+		} else {
+		    return new DataStoreClientRemote(serverHost, serverPort);
+		}
+	    } catch (IOException e) {
 		if (done) {
 		    throw e;
 		}
@@ -195,7 +201,7 @@ public final class DataStoreClient
 			   txn, result);
 	    }
 	    return result;
-	} catch (RemoteException e) {
+	} catch (IOException e) {
 	    exception = e;
 	} catch (RuntimeException e) {
 	    exception = e;
@@ -221,7 +227,7 @@ public final class DataStoreClient
 			   txn, oid);
 	    }
 	    return;
-	} catch (RemoteException e) {
+	} catch (IOException e) {
 	    exception = e;
 	} catch (RuntimeException e) {
 	    exception = e;
@@ -250,7 +256,7 @@ public final class DataStoreClient
 		    txn, oid, forUpdate);
 	    }
 	    return result;
-	} catch (RemoteException e) {
+	} catch (IOException e) {
 	    exception = e;
 	} catch (RuntimeException e) {
 	    exception = e;
@@ -280,7 +286,7 @@ public final class DataStoreClient
 			   txn, oid);
 	    }
 	    return;
-	} catch (RemoteException e) {
+	} catch (IOException e) {
 	    exception = e;
 	} catch (RuntimeException e) {
 	    exception = e;
@@ -303,7 +309,7 @@ public final class DataStoreClient
 		logger.log(Level.FINEST, "setObjects txn:{0} returns", txn);
 	    }
 	    return;
-	} catch (RemoteException e) {
+	} catch (IOException e) {
 	    exception = e;
 	} catch (RuntimeException e) {
 	    exception = e;
@@ -329,7 +335,7 @@ public final class DataStoreClient
 			   txn, oid);
 	    }
 	    return;
-	} catch (RemoteException e) {
+	} catch (IOException e) {
 	    exception = e;
 	} catch (RuntimeException e) {
 	    exception = e;
@@ -356,7 +362,7 @@ public final class DataStoreClient
 		    txn, name, result);
 	    }
 	    return result;
-	} catch (RemoteException e) {
+	} catch (IOException e) {
 	    exception = e;
 	} catch (RuntimeException e) {
 	    exception = e;
@@ -384,7 +390,7 @@ public final class DataStoreClient
 		    txn, name, oid);
 	    }
 	    return;
-	} catch (RemoteException e) {
+	} catch (IOException e) {
 	    exception = e;
 	} catch (RuntimeException e) {
 	    exception = e;
@@ -411,7 +417,7 @@ public final class DataStoreClient
 		    txn, name);
 	    }
 	    return;
-	} catch (RemoteException e) {
+	} catch (IOException e) {
 	    exception = e;
 	} catch (RuntimeException e) {
 	    exception = e;
@@ -437,7 +443,7 @@ public final class DataStoreClient
 			   txn, name, result);
 	    }
 	    return result;
-	} catch (RemoteException e) {
+	} catch (IOException e) {
 	    exception = e;
 	} catch (RuntimeException e) {
 	    exception = e;
@@ -470,7 +476,7 @@ public final class DataStoreClient
 		decrementTxnCount();
 	    }
 	    return result;
-	} catch (RemoteException e) {
+	} catch (IOException e) {
 	    exception = e;
 	} catch (RuntimeException e) {
 	    exception = e;
@@ -495,7 +501,7 @@ public final class DataStoreClient
 	    decrementTxnCount();
 	    logger.log(Level.FINER, "commit txn:{0} returns", txn);
 	    return;
-	} catch (RemoteException e) {
+	} catch (IOException e) {
 	    exception = e;
 	} catch (RuntimeException e) {
 	    exception = e;
@@ -520,7 +526,7 @@ public final class DataStoreClient
 	    decrementTxnCount();
 	    logger.log(Level.FINER, "prepareAndCommit txn:{0} returns", txn);
 	    return;
-	} catch (RemoteException e) {
+	} catch (IOException e) {
 	    exception = e;
 	} catch (RuntimeException e) {
 	    exception = e;
@@ -543,7 +549,7 @@ public final class DataStoreClient
 	    decrementTxnCount();
 	    logger.log(Level.FINER, "abort txn:{0} returns", txn);
 	    return;
-	} catch (RemoteException e) {
+	} catch (IOException e) {
 	    exception = e;
 	} catch (RuntimeException e) {
 	    exception = e;
@@ -602,7 +608,7 @@ public final class DataStoreClient
      * Checks that the correct transaction is in progress, and join if none is
      * in progress.
      */
-    private TxnInfo checkTxn(Transaction txn) throws RemoteException {
+    private TxnInfo checkTxn(Transaction txn) throws IOException {
 	if (txn == null) {
 	    throw new NullPointerException("Transaction must not be null");
 	}
@@ -624,7 +630,7 @@ public final class DataStoreClient
 		    logger.log(
 			Level.FINER,
 			"Created server transaction stid:{0,number,#} " +
-			" for transaction {1}",
+			"for transaction {1}",
 			tid, txn);
 		}
 	    } finally {
@@ -665,7 +671,7 @@ public final class DataStoreClient
     }
 
     /**
-     * Returns the correct SGS exception for a RemoteException thrown during an
+     * Returns the correct SGS exception for a IOException thrown during an
      * operation.  The txnInfo argument, if non-null, is used to abort the
      * transaction if a TransactionAbortedException is going to be thrown.  The
      * level argument is used to log the exception.  The operation argument
@@ -678,7 +684,7 @@ public final class DataStoreClient
 	TxnInfo txnInfo, Level level, Exception e, String operation)
     {
 	RuntimeException re;
-	if (e instanceof RemoteException) {
+	if (e instanceof IOException) {
 	    re = new NetworkException(
 		operation + " failed due to a communication problem: " +
 		e.getMessage(),

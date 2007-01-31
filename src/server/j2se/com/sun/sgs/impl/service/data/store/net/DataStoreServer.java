@@ -1,7 +1,7 @@
 package com.sun.sgs.impl.service.data.store.net;
 
+import java.io.IOException;
 import java.rmi.Remote;
-import java.rmi.RemoteException;
 
 /** Defines the network interface for the data store server. */
 public interface DataStoreServer extends Remote {
@@ -14,9 +14,9 @@ public interface DataStoreServer extends Remote {
      * @return	the next available object ID
      * @throws	IllegalArgumentException if <code>count</code> is less than
      *		<code>1</code>
-     * @throws	RemoteException if a network problem occurs
+     * @throws	IOException if a network problem occurs
      */
-    long allocateObjects(int count) throws RemoteException;
+    long allocateObjects(int count) throws IOException;
 
     /**
      * Notifies the server that an object is going to be modified.
@@ -30,9 +30,9 @@ public interface DataStoreServer extends Remote {
      *		to a lock conflict or timeout
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
-     * @throws	RemoteException if a network problem occurs
+     * @throws	IOException if a network problem occurs
      */
-    void markForUpdate(long tid, long oid) throws RemoteException;
+    void markForUpdate(long tid, long oid) throws IOException;
 
     /**
      * Obtains the data associated with an object ID.  If the
@@ -50,10 +50,10 @@ public interface DataStoreServer extends Remote {
      *		to a lock conflict or timeout
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
-     * @throws	RemoteException if a network problem occurs
+     * @throws	IOException if a network problem occurs
      */
     byte[] getObject(long tid, long oid, boolean forUpdate)
-	throws RemoteException;
+	throws IOException;
 
     /**
      * Specifies data to associate with an object ID.
@@ -68,9 +68,9 @@ public interface DataStoreServer extends Remote {
      *		to a lock conflict or timeout
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
-     * @throws	RemoteException if a network problem occurs
+     * @throws	IOException if a network problem occurs
      */
-    void setObject(long tid, long oid, byte[] data) throws RemoteException;
+    void setObject(long tid, long oid, byte[] data) throws IOException;
 
     /** 
      * Specifies data to associate with a series of object IDs.
@@ -87,7 +87,7 @@ public interface DataStoreServer extends Remote {
      *		problem with the current transaction
      */
     void setObjects(long tid, long[] oids, byte[][] dataArray)
-	throws RemoteException;
+	throws IOException;
 
     /**
      * Removes the object with the specified object ID.
@@ -101,9 +101,9 @@ public interface DataStoreServer extends Remote {
      *		to a lock conflict or timeout
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
-     * @throws	RemoteException if a network problem occurs
+     * @throws	IOException if a network problem occurs
      */
-    void removeObject(long tid, long oid) throws RemoteException;
+    void removeObject(long tid, long oid) throws IOException;
 
     /**
      * Obtains the object ID bound to a name.
@@ -117,9 +117,9 @@ public interface DataStoreServer extends Remote {
      *		to a lock conflict or timeout
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
-     * @throws	RemoteException if a network problem occurs
+     * @throws	IOException if a network problem occurs
      */
-    long getBinding(long tid, String name) throws RemoteException;
+    long getBinding(long tid, String name) throws IOException;
 
     /**
      * Binds an object ID to a name.
@@ -133,9 +133,9 @@ public interface DataStoreServer extends Remote {
      *		to a lock conflict or timeout
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
-     * @throws	RemoteException if a network problem occurs
+     * @throws	IOException if a network problem occurs
      */
-    void setBinding(long tid, String name, long oid) throws RemoteException;
+    void setBinding(long tid, String name, long oid) throws IOException;
 
     /**
      * Removes the binding for a name.
@@ -148,9 +148,9 @@ public interface DataStoreServer extends Remote {
      *		to a lock conflict or timeout
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
-     * @throws	RemoteException if a network problem occurs
+     * @throws	IOException if a network problem occurs
      */
-    void removeBinding(long tid, String name) throws RemoteException;
+    void removeBinding(long tid, String name) throws IOException;
 
     /**
      * Returns the next name after the specified name that has a binding, or
@@ -168,17 +168,17 @@ public interface DataStoreServer extends Remote {
      *		to a lock conflict or timeout
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
-     * @throws	RemoteException if a network problem occurs
+     * @throws	IOException if a network problem occurs
      */
-    String nextBoundName(long tid, String name) throws RemoteException;
+    String nextBoundName(long tid, String name) throws IOException;
 
     /** 
      * Creates a new transaction and returns the associated ID.
      *
      * @return	the ID of the new transaction
-     * @throws	RemoteException if a network problem occurs
+     * @throws	IOException if a network problem occurs
      */
-    long createTransaction() throws RemoteException;
+    long createTransaction() throws IOException;
 
     /**
      * Prepares the transaction to commit.  Returns <code>true</code> when no
@@ -191,9 +191,9 @@ public interface DataStoreServer extends Remote {
      * @throws	Exception if there are any failures in preparing
      * @throws	IllegalStateException if the transaction has been prepared,
      *		committed, or aborted, or if the transaction is not known
-     * @throws	RemoteException if a network problem occurs
+     * @throws	IOException if a network problem occurs
      */
-    boolean prepare(long tid) throws RemoteException;
+    boolean prepare(long tid) throws IOException;
 
     /**
      * Commits the transaction.
@@ -202,9 +202,9 @@ public interface DataStoreServer extends Remote {
      * @throws	IllegalStateException if the transaction has not been
      *		prepared, if it has been committed or aborted, or if the
      *		transaction is not known
-     * @throws	RemoteException if a network problem occurs
+     * @throws	IOException if a network problem occurs
      */
-    void commit(long tid) throws RemoteException;
+    void commit(long tid) throws IOException;
 
     /**
      * Prepares and commits the transaction.
@@ -212,9 +212,9 @@ public interface DataStoreServer extends Remote {
      * @param	tid the ID of the transaction
      * @throws	IllegalStateException if the transaction has been prepared,
      *		committed, or aborted, or if the transaction is not known
-     * @throws	RemoteException if a network problem occurs
+     * @throws	IOException if a network problem occurs
      */
-    void prepareAndCommit(long tid) throws RemoteException;
+    void prepareAndCommit(long tid) throws IOException;
 
     /**
      * Aborts the transaction.
@@ -222,7 +222,7 @@ public interface DataStoreServer extends Remote {
      * @param	tid the ID of the transaction
      * @throws	IllegalStateException if the transaction has been committed or
      *		aborted, or if the transaction is not known
-     * @throws	RemoteException if a network problem occurs
+     * @throws	IOException if a network problem occurs
      */
-    void abort(long tid) throws RemoteException;
+    void abort(long tid) throws IOException;
 }
