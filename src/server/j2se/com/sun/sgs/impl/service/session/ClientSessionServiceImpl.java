@@ -725,9 +725,28 @@ public class ClientSessionServiceImpl
 		Level.FINEST,
 		"notifyDisconnectedSessions key: {0}",
 		key);
-            
+
+	    final String listenerKey = key;		
+	    final DataService dataSvc = dataService;
+		
 	    nonDurableTaskScheduler.scheduleTaskOnCommit(
-                new DisconnectRunnable(key));
+		new KernelRunnable() {
+		    public void run() throws Exception {
+			ManagedObject obj = 
+                            dataSvc.getServiceBinding(
+				listenerKey, ManagedObject.class);
+			 boolean isWrapped =
+			     obj instanceof ClientSessionListenerWrapper;
+			 ClientSessionListener listener =
+			     isWrapped ?
+			     ((ClientSessionListenerWrapper) obj).get() :
+			     ((ClientSessionListener) obj);
+			listener.disconnected(false);
+			dataSvc.removeServiceBinding(listenerKey);
+			if (isWrapped) {
+			    dataSvc.removeObject(obj);
+			}
+		    }});
 	}
     }
 
@@ -738,35 +757,5 @@ public class ClientSessionServiceImpl
     private static boolean isListenerKey(String key) {
 	return key.regionMatches(
 	    0, LISTENER_PREFIX, 0, LISTENER_PREFIX.length());
-    }
-
-    static final class DisconnectRunnable
-            implements KernelRunnable
-    {
-        private final String listenerKey;
-
-        DisconnectRunnable(String key) {
-            listenerKey = key;
-        }
-
-        /** {@inheritDoc} */
-        public void run() throws Exception {
-            ClientSessionServiceImpl sessionSvc =
-                (ClientSessionServiceImpl) ClientSessionServiceImpl.getInstance();
-            DataService dataSvc = sessionSvc.dataService;
-            ManagedObject obj = 
-                dataSvc.getServiceBinding(listenerKey, ManagedObject.class);
-             boolean isWrapped =
-                 obj instanceof ClientSessionListenerWrapper;
-             ClientSessionListener listener =
-                 isWrapped ?
-                 ((ClientSessionListenerWrapper) obj).get() :
-                 ((ClientSessionListener) obj);
-            listener.disconnected(false);
-            dataSvc.removeServiceBinding(listenerKey);
-            if (isWrapped) {
-                dataSvc.removeObject(obj);
-            }
-        }
     }
 }
