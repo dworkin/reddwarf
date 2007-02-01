@@ -25,7 +25,7 @@ final class ChannelState implements ManagedObject, Serializable {
     /** The name of this channel. */
     final String name;
 
-    /** The listener for this channel. */
+    /** The listener for this channel, or null. */
     private WrappedSerializable<ChannelListener> channelListener;
 
     /** The delivery requirement for messages sent on this channel. */
