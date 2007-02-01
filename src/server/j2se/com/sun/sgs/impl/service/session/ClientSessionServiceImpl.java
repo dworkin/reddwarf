@@ -25,8 +25,6 @@ import com.sun.sgs.service.SgsClientSession;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
-import com.sun.sgs.service.TransactionRunner;
-
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -751,6 +749,7 @@ public class ClientSessionServiceImpl
             listenerKey = key;
         }
 
+        /** {@inheritDoc} */
         public void run() throws Exception {
             ClientSessionServiceImpl sessionSvc =
                 (ClientSessionServiceImpl) ClientSessionServiceImpl.getInstance();
