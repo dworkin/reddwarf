@@ -273,11 +273,14 @@ public class ClientSessionServiceImpl
 	    // swallow exception
 	}
 
+	for (ClientSessionImpl session : sessions.values()) {
+	    session.shutdown();
+	}
 	sessions.clear();
 	
 	// TBI: The bindings can only be removed if this is called within a
 	// transaction, so comment out for now...
-	// removeListenerBindings();
+	// notifyDisconnectedSessions();
 
 	return true;
     }
@@ -298,7 +301,7 @@ public class ClientSessionServiceImpl
 
     /* -- Implement AcceptorListener -- */
 
-    class Listener implements AcceptorListener {
+    private class Listener implements AcceptorListener {
 
 	/**
 	 * {@inheritDoc}
@@ -709,10 +712,10 @@ public class ClientSessionServiceImpl
      * task removes the wrapper as well.
      */
     private void notifyDisconnectedSessions() {
+	String key = LISTENER_PREFIX;
 
 	for (;;) {
-	    String key =
-		dataService.nextServiceBoundName(LISTENER_PREFIX);
+	    key = dataService.nextServiceBoundName(key);
 	    
 	    if (key == null || ! isListenerKey(key)) {
 		break;
