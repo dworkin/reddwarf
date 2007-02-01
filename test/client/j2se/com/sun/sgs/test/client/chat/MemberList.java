@@ -121,8 +121,8 @@ public class MemberList extends JList
     /**
      * {@inheritDoc}
      */
-    public Component getListCellRendererComponent(JList list, Object value, int index,
-	    boolean isSelected, boolean cellHasFocus)
+    public Component getListCellRendererComponent(JList list, Object value,
+            int index, boolean isSelected, boolean cellHasFocus)
     {
 	textLabel.setText(value.toString());
 	return textLabel;

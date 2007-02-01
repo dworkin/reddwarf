@@ -12,8 +12,10 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.IOException;
 import java.net.PasswordAuthentication;
-import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 
@@ -42,11 +44,6 @@ public class ChatClient extends JFrame
 {
     private static final long serialVersionUID = 1L;
 
-    // TODO: move these to a common location for app and client
-    static final byte OP_JOINED     = 0x4A;
-    static final byte OP_LEFT       = 0x4C;
-    static final byte OP_MESSAGE    = 0x4D;
-
     private final JButton loginButton;
     private final JButton openChannelButton;
     private final JButton multiDccButton;
@@ -54,7 +51,11 @@ public class ChatClient extends JFrame
     private final JLabel statusMessage;
     private final JDesktopPane desktop;
 
-    private static final String GLOBAL_CHANNEL_NAME = "_Global_";
+    /** The name of the global channel. */
+    public static final String GLOBAL_CHANNEL_NAME = "Global";
+
+    /** The {@link Charset} encoding for client/server messages. */
+    public static final Charset CHARSET_UTF8 = Charset.forName("UTF8");
 
     /**
      * a list of clients currently connected to the
@@ -73,6 +74,8 @@ public class ChatClient extends JFrame
 
     private volatile int quitAttempts = 0;
 
+    private final Map<SessionId, String> sessionNames =
+        new HashMap<SessionId, String>();
 
     // === Constructor ==
 
@@ -174,20 +177,6 @@ public class ChatClient extends JFrame
         return client.getSessionId();
     }
 
-    /**
-     * Returns a {@link SessionId} encoded in the bytes remaining in
-     * the given {@link ByteBuffer}.
-     *
-     * @param buffer the {@code ByteBuffer} containing an encoded
-     *        {@code SessionId} from its current position to the end
-     * @return the {@code SessionId} encoded in the buffer
-     */
-    static SessionId getSessionId(ByteBuffer buffer) {
-        byte[] idBytes = new byte[buffer.remaining()];
-        buffer.get(idBytes);
-        return SessionId.fromBytes(idBytes);
-    }
-
     static byte[] getMessage(byte opcode, byte[] payload) {
         byte[] message = new byte[1 + payload.length];
         message[0] = opcode;
@@ -246,7 +235,7 @@ public class ChatClient extends JFrame
     private void doServerMessage() {
 	String message = getUserInput("Enter server message:");
         try {
-            client.send(message.getBytes());
+            client.send(message.getBytes(CHARSET_UTF8));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -260,9 +249,9 @@ public class ChatClient extends JFrame
     	}
 
         String text = getUserInput("Enter private message:");
-        byte[] message = getMessage(OP_MESSAGE, text.getBytes());
+        String message = "/dcc " + text.getBytes();
         try {
-            dccChannel.send(targets, message);
+            dccChannel.send(targets, message.getBytes(CHARSET_UTF8));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -274,9 +263,9 @@ public class ChatClient extends JFrame
 	    return;
 	}
 	String text = getUserInput("Enter private message:");
-        byte[] message = getMessage(OP_MESSAGE, text.getBytes());
+        String message = "/dcc " + text.getBytes();
         try {
-            dccChannel.send(target, message);
+            dccChannel.send(target, message.getBytes(CHARSET_UTF8));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -285,7 +274,7 @@ public class ChatClient extends JFrame
     void joinChannel(String channelName) {
 	String cmd = "/join " + channelName;
         try {
-            client.send(cmd.getBytes());
+            client.send(cmd.getBytes(CHARSET_UTF8));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -294,18 +283,43 @@ public class ChatClient extends JFrame
     void leaveChannel(ClientChannel chan) {
 	String cmd = "/leave " + chan.getName();
         try {
-            client.send(cmd.getBytes());
+            client.send(cmd.getBytes(CHARSET_UTF8));
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
-
-    private void userLogin(SessionId member) {
-        userList.addClient(member);
+    
+    static byte[] hexToBytes(String arg) {
+        String hexString = arg.substring(1, arg.length() - 1);
+        byte[] bytes = new byte[hexString.length() / 2];
+        for (int i = 0; i < bytes.length; ++i) {
+            String hexByte = hexString.substring(2*i, 2*i+2);
+            bytes[i] = Integer.valueOf(hexByte, 16).byteValue();
+        }
+        return bytes;
     }
 
-    private void userLogout(SessionId member) {
-        userList.removeClient(member);
+    String getSessionName(SessionId s) {
+        return sessionNames.get(s);
+    }
+
+    private void userLogin(String memberString) {
+        System.err.println("userLogin: " + memberString);
+        String[] split = memberString.split(":", 2);
+        String idString = split[0];
+        SessionId session = SessionId.fromBytes(hexToBytes(idString));
+        if (split.length > 1) {
+            String memberName = split[1];
+            sessionNames.put(session, memberName);
+        }
+        userList.addClient(session);
+    }
+
+    private void userLogout(String idString) {
+        System.err.println("userLogout: " + idString);
+        SessionId session = SessionId.fromBytes(hexToBytes(idString));
+        userList.removeClient(session);
+        sessionNames.remove(session);
     }
 
     // Implement SimpleClientListener
@@ -315,8 +329,7 @@ public class ChatClient extends JFrame
      */
     public void loggedIn() {
         statusMessage.setText("Status: Connected");
-        setTitle(String.format("Chat Test Client: %.8s",
-                client.getSessionId().toString()));
+        setTitle("Chat Test Client: " + client.getSessionId());
         loginButton.setText("Logout");
         loginButton.setActionCommand("logout");
         setButtonsEnabled(true);
@@ -393,66 +406,59 @@ public class ChatClient extends JFrame
         return cframe;
     }
 
+
     /**
      * {@inheritDoc}
      * <p>
      * Handles the direct {@code /echo} command.
      */
     public void receivedMessage(byte[] message) {
-        if (message.length < 1) {
-            System.err.format("ChatClient: Error, short command\n");
-        }
+        String messageString = new String(message, CHARSET_UTF8);
+        System.err.format("Recv direct: %s\n", messageString);
+        String[] args = messageString.split(" ", 2);
+        String command = args[0];
 
-        ByteBuffer buf = ByteBuffer.wrap(message);
-        byte opcode = buf.get();
-
-        switch (opcode) {
-        case OP_MESSAGE:
-            byte[] msgBytes = new byte[buf.remaining()];
-            buf.get(msgBytes);
-            String msgString = new String(msgBytes);
-            System.out.println(msgString);
-            break;
-        default:
-            System.err.format("Unknown opcode 0x%02X\n", opcode);
-            break;
+        if (command.equals("/pong")) {
+            System.out.println(args[1]);            
+        } else {
+            System.err.format("Unknown command: %s\n", messageString);
         }
     }
 
     // Implement ClientChannelListener
-    
+
     /**
      * {@inheritDoc}
      */
     public void receivedMessage(ClientChannel channel, SessionId sender,
             byte[] message)
     {
-        if (message.length < 1) {
-            System.err.format("ChatClient: Error, short command\n");
-        }
+        try {
+            String messageString = new String(message, CHARSET_UTF8);
+            System.err.format("Recv on %s from %s: %s\n",
+                    channel.getName(), sender, messageString);
+            String[] args = messageString.split(" ", 2);
+            String command = args[0];
 
-        ByteBuffer buf = ByteBuffer.wrap(message);
-        byte opcode = buf.get();
-
-        switch (opcode) {
-        case OP_JOINED:
-            userLogin(getSessionId(buf));
-            break;
-        case OP_LEFT:
-            userLogout(getSessionId(buf));
-            break;
-        case OP_MESSAGE:
-            byte[] msgBytes = new byte[buf.remaining()];
-            buf.get(msgBytes);
-            String msgString = new String(msgBytes);
-            // Display message from another client
-            JOptionPane.showMessageDialog(this,
-                    msgString, "Message from " + sender,
-                    JOptionPane.INFORMATION_MESSAGE);
-            break;
-        default:
-            System.err.format("Unknown opcode 0x%02X\n", opcode);
-            break;
+            if (command.equals("/joined")) {
+                userLogin(args[1]);
+            } else if (command.equals("/left")) {
+                userLogout(args[1]);
+            } else if (command.equals("/members")) {
+                String[] members = args[1].split(" ");
+                for (String member : members) {
+                    userLogin(member);
+                }
+            } else if (command.startsWith("/")) {
+                System.err.format("Unknown command %s\n", command);
+            } else {
+                // Display message from another client
+                JOptionPane.showMessageDialog(this,
+                        messageString, "Message from " + sender,
+                        JOptionPane.INFORMATION_MESSAGE);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 

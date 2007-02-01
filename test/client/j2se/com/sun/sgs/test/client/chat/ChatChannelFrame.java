@@ -6,7 +6,6 @@ import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 
 import javax.swing.JInternalFrame;
 import javax.swing.JLabel;
@@ -88,31 +87,32 @@ public class ChatChannelFrame extends JInternalFrame
     public void receivedMessage(ClientChannel channel, SessionId sender,
             byte[] message)
     {
-        ByteBuffer buf = ByteBuffer.wrap(message);
+        try {
+            String messageString = new String(message, CHARSET_UTF8);
+            System.err.format("Recv on %s from %s: %s\n",
+                    channel.getName(), sender, messageString);
+            String[] args = messageString.split(" ", 2);
+            String command = args[0];
 
-	byte opcode = buf.get();
-
-        switch (opcode) {
-        case OP_JOINED:
-	    memberList.addClient(ChatClient.getSessionId(buf));
-            break;
-        case OP_LEFT:
-	    memberList.removeClient(ChatClient.getSessionId(buf));
-            break;
-        case OP_MESSAGE: {
-            byte[] contents = new byte[buf.remaining()];
-            buf.get(contents);
-            // The server sends us a separate, private echoback in this
-            // application; those were from us originally, so use our
-            // own SessionId (instead of null).
-	    outputArea.append(String.format("%s: %s\n",
-		    (sender != null) ? sender : myChatClient.getSessionId(),
-                    new String(contents)));
-            break;
+            if (command.equals("/joined")) {
+                memberList.addClient(SessionId.fromBytes(hexToBytes(args[1])));
+            } else if (command.equals("/left")) {
+                memberList.removeClient(SessionId.fromBytes(hexToBytes(args[1])));
+            } else if (command.equals("/members")) {
+                String[] members = args[1].split(" ");
+                for (String member : members) {
+                    memberList.addClient(SessionId.fromBytes(hexToBytes(member)));
+                }
+            } else if (command.startsWith("/")) {
+                System.err.format("Unknown command %s\n", command);
+            } else {
+                outputArea.append(String.format("%s: %s\n",
+                        myChatClient.getSessionName(sender),
+                        messageString));
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-        default:
-            System.err.format("Unknown opcode 0x%02X\n", opcode);
-	}
     }
 
     /**
@@ -133,9 +133,11 @@ public class ChatChannelFrame extends JInternalFrame
      */
     public void actionPerformed(ActionEvent action) {
         try {
-            byte[] contents = inputField.getText().getBytes();
-            byte[] message = ChatClient.getMessage(OP_MESSAGE, contents);
-            myChannel.send(message);
+            String message = inputField.getText();
+            byte[] msgBytes = message.getBytes(ChatClient.CHARSET_UTF8);
+            myChannel.send(msgBytes);
+            // Deliver to our own receivedMessage, since server won't echo.
+            receivedMessage(myChannel, myChatClient.getSessionId(), msgBytes);
         } catch (IOException e) {
             e.printStackTrace();
         }
