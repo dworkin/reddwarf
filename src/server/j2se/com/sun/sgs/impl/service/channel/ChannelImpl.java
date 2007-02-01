@@ -50,7 +50,7 @@ final class ChannelImpl implements Channel, Serializable {
     /** Persistent channel state. */
     private final ChannelState state;
 
-    /** Flag that is 'true' if this channel is closed. */
+    /** Flag that is 'true' if this channel is close. */
     private boolean channelClosed = false;
 
     /**
@@ -189,7 +189,7 @@ final class ChannelImpl implements Channel, Serializable {
 		return;
 	    }
 	    context.getService(DataService.class).markForUpdate(state);
-	    state.removeAll();
+	    state.removeAllSessions();
 
 	    final Set<ClientSession> sessions = getSessions();
 
@@ -341,6 +341,7 @@ final class ChannelImpl implements Channel, Serializable {
     public void close() {
 	checkContext();
 	channelClosed = true;
+	state.removeAll();
 	context.removeChannel(state.name);
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST, "close returns");

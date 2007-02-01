@@ -26,7 +26,7 @@ final class ChannelState implements ManagedObject, Serializable {
     final String name;
 
     /** The listener for this channel. */
-    private final WrappedSerializable<ChannelListener> channelListener;
+    private WrappedSerializable<ChannelListener> channelListener;
 
     /** The delivery requirement for messages sent on this channel. */
     final Delivery delivery;
@@ -129,11 +129,30 @@ final class ChannelState implements ManagedObject, Serializable {
     }
 
     void removeSession(ClientSession session) {
-	listeners.remove(session);
+	WrappedSerializable<ChannelListener> listener =
+	    listeners.remove(session);
+	if (listener != null) {
+	    listener.remove();
+	}
+    }
+
+    void removeAllSessions() {
+	for (WrappedSerializable<ChannelListener> listener :
+	     listeners.values())
+	{
+	    if (listener != null) {
+		listener.remove();
+	    }
+	}
+	listeners.clear();
     }
 
     void removeAll() {
-	listeners.clear();
+	removeAllSessions();
+	if (channelListener != null) {
+	    channelListener.remove();
+	}
+	channelListener = null;
     }
 
     ChannelListener getListener() {
