@@ -50,7 +50,7 @@ final class ChannelImpl implements Channel, Serializable {
     /** Persistent channel state. */
     private final ChannelState state;
 
-    /** Flag that is 'true' if this channel is close. */
+    /** Flag that is 'true' if this channel is closed. */
     private boolean channelClosed = false;
 
     /**
@@ -204,18 +204,14 @@ final class ChannelImpl implements Channel, Serializable {
 	    for (ClientSession session : sessions) {
 		sendProtocolMessageOnCommit(session, message);
 	    }
+	    logger.log(Level.FINEST, "leaveAll returns");
 	    
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(Level.FINEST, "leaveAll returns");
-	    }
 	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.logThrow(Level.FINEST, e, "leave throws");
-	    }
+	    logger.logThrow(Level.FINEST, e, "leave throws");
 	    throw e;
 	}
     }
-
+    
     /** {@inheritDoc} */
     public boolean hasSessions() {
 	checkClosed();
@@ -340,12 +336,14 @@ final class ChannelImpl implements Channel, Serializable {
     /** {@inheritDoc} */
     public void close() {
 	checkContext();
-	channelClosed = true;
-	state.removeAll();
-	context.removeChannel(state.name);
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST, "close returns");
+	if (!channelClosed) {
+	    leaveAll();
+	    state.removeAll();
+	    context.removeChannel(state.name);
+	    channelClosed = true;
 	}
+	
+	logger.log(Level.FINEST, "close returns");
     }
 
     /* -- Implement Object -- */
