@@ -519,6 +519,42 @@ public class TestChannelServiceImpl extends TestCase {
 	String channelName = "joinTest";
 	Channel channel = channelService.createChannel(
 		channelName, new DummyChannelListener(), Delivery.RELIABLE);
+	String[] names = new String[] { "a", "b", "c" };
+	Set<ClientSession> savedSessions = new HashSet<ClientSession>();
+
+	for (String name : names) {
+	    ClientSession session = new DummyClientSession(name);
+	    savedSessions.add(session);
+	    channel.join(session, new DummyChannelListener(channel));
+	}
+	txn.commit();
+	createTransaction();
+	try {
+	    channel = channelService.getChannel(channelName);
+	    Set<ClientSession> sessions = channel.getSessions();
+	    if (sessions.size() != names.length) {
+		fail("Expected " + names.length + " sessions, got " +
+		     sessions.size());
+	    }
+	    
+	    for (ClientSession session : savedSessions) {
+		if (!sessions.contains(session)) {
+		    fail("Expected session: " + session);
+		}
+	    }
+
+	    System.err.println("All sessions joined");
+
+	} finally {
+	    channel.close();
+	    txn.commit();
+	}
+    }
+
+    public void testChannelJoinWithListenerReferringToChannel() throws Exception {
+	String channelName = "joinWithListenerReferringToChannelTest";
+	Channel channel = channelService.createChannel(
+		channelName, new DummyChannelListener(), Delivery.RELIABLE);
 	String[] names = new String[] { "foo", "bar", "baz" };
 	Set<ClientSession> savedSessions = new HashSet<ClientSession>();
 
@@ -1004,6 +1040,16 @@ public class TestChannelServiceImpl extends TestCase {
 	implements Serializable
     {
 	private final static long serialVersionUID = 1L;
+
+	private final Channel channel;
+
+	DummyChannelListener() {
+	    this(null);
+	}
+
+	DummyChannelListener(Channel channel) {
+	    this.channel = channel;
+	}
     }
 
     private static class DummyClientSession
