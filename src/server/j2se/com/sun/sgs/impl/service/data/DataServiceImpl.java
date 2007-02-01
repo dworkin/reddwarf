@@ -179,6 +179,7 @@ public final class DataServiceImpl
      *		<code>com.sun.sgs.impl.service.data.debugCheckInterval</code>
      *		property is not a valid integer, or if the data store
      *		constructor detects an illegal property value
+     * @throws	Exception if a problem occurs creating the service
      */
     public DataServiceImpl(
 	Properties properties, ComponentRegistry componentRegistry)

@@ -12,10 +12,26 @@ import java.io.IOException;
 import java.rmi.NotBoundException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
-import java.rmi.server.RMIClientSocketFactory;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+/**
+ * Provides an implementation of <code>DataStore</code> by communicating over
+ * the network to an implementation of {@link DataStoreServer}. <p>
+ *
+ * The {@link #DataStoreClient constructor} supports the following properties:
+ * <p>
+ *
+ * <ul>
+ *
+ * <li> <i>Key:</i> <code>com.sun.sgs.txnTimeout</code> <br>
+ *	<i>Default:</i> <code>1000</code> <br>
+ *	The maximum amount of time in milliseconds that a transaction will be
+ *	permitted to run before it is a candidate for being aborted. <p>
+ *
+ * </ul>
+ */
 
 public final class DataStoreClient
     implements DataStore, TransactionParticipant
@@ -35,27 +51,55 @@ public final class DataStoreClient
      * time.
      */
     private static final String ALLOCATION_BLOCK_SIZE_PROPERTY =
-	CLASSNAME + ".allocationBlockSize";
+	CLASSNAME + ".allocation.block.size";
 
     /** The default for the number of object IDs to allocate at one time. */
     private static final int DEFAULT_ALLOCATION_BLOCK_SIZE = 100;
 
-    private static final String SERVER_HOST_PROPERTY = CLASSNAME + ".host";
-    private static final String SERVER_PORT_PROPERTY = CLASSNAME + ".port";
+    /** The property that specifies the name of the server host. */
+    private static final String SERVER_HOST_PROPERTY =
+	CLASSNAME + ".server.host";
+
+    /** The property that specifies the server port. */
+    private static final String SERVER_PORT_PROPERTY =
+	CLASSNAME + ".server.port";
+
+    /** The default for the server port. */
     private static final int DEFAULT_SERVER_PORT = 54321;
+
+    /**
+     * The number of times to retry attempting to obtain the server after a
+     * failure to obtain it initially.
+     */
     private static final int GET_SERVER_MAX_RETRIES = 3;
+
+    /**
+     * The number of milliseconds to wait between attempts to obtain the
+     * server.
+     */
     private static final long GET_SERVER_WAIT = 10000;
 
     /** The logger for this class. */
     static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
 
-    private static final boolean noRMI = Boolean.getBoolean("test.noRMI");
+    /**
+     * The name of the undocumented property that controls whether to replace
+     * Java RMI with an experimental, socket-based facility.
+     */
+    private static final boolean noRmi = Boolean.getBoolean(
+	CLASSNAME + ".no.rmi");
 
+    /** The server host name. */
     private final String serverHost;
+
+    /** The server port. */
     private final int serverPort;
-    private final RMIClientSocketFactory registrySocketFactory = null; 
+
+    /** The server. */
     private final DataStoreServer server;
+
+    /** The transaction timeout in milliseconds. */
     private final long txnTimeout;
 
     /** The number of object IDs to allocate at one time. */
@@ -144,35 +188,6 @@ public final class DataStoreClient
 	txnTimeout = wrappedProps.getLongProperty(
 	    TXN_TIMEOUT_PROPERTY, DEFAULT_TXN_TIMEOUT);
 	server = getServer();
-    }
-
-    private DataStoreServer getServer()
-	throws IOException, NotBoundException
-    {
-	boolean done = false;
-	for (int i = 0; !done; i++) {
-	    if (i == GET_SERVER_MAX_RETRIES) {
-		done = true;
-	    }
-	    try {
-		if (!noRMI) {
-		    Registry registry = LocateRegistry.getRegistry(
-			serverHost, serverPort);
-		    return (DataStoreServer) registry.lookup("DataStoreServer");
-		} else {
-		    return new DataStoreClientRemote(serverHost, serverPort);
-		}
-	    } catch (IOException e) {
-		if (done) {
-		    throw e;
-		}
-	    } catch (NotBoundException e) {
-		if (done) {
-		    throw e;
-		}
-	    }
-	}
-	throw new AssertionError();
     }
 
     /* -- Implement DataStore -- */
@@ -452,6 +467,38 @@ public final class DataStoreClient
 			       "nextBoundName txn:" + txn + ", name:" + name);
     }
 
+    /** {@inheritDoc} */
+    public boolean shutdown() {
+	logger.log(Level.FINER, "shutdown");
+	Exception exception;
+	try {
+	    synchronized (txnCountLock) {
+		while (txnCount > 0) {
+		    try {
+			logger.log(Level.FINEST,
+				   "shutdown waiting for {0} transactions",
+				   txnCount);
+			txnCountLock.wait();
+		    } catch (InterruptedException e) {
+			logger.log(Level.FINEST, "shutdown interrupted");
+			break;
+		    }
+		}
+		if (txnCount < 0) {
+		    throw new IllegalStateException("DataStore is shut down");
+		}
+		boolean ok = (txnCount == 0);
+		if (ok) {
+		    txnCount = -1;
+		}
+		logger.log(Level.FINER, "shutdown returns {0}", ok);
+		return ok;
+	    }
+	} catch (RuntimeException e) {
+	    throw convertException(null, Level.FINER, e, "shutdown");
+	}
+    }
+
     /* -- Implement TransactionParticipant -- */
 
     /** {@inheritDoc} */
@@ -556,38 +603,6 @@ public final class DataStoreClient
 	}
 	throw convertException(txnInfo, Level.FINER, exception,
 			       "abort txn:" + txn);
-    }
-
-    /** {@inheritDoc} */
-    public boolean shutdown() {
-	logger.log(Level.FINER, "shutdown");
-	Exception exception;
-	try {
-	    synchronized (txnCountLock) {
-		while (txnCount > 0) {
-		    try {
-			logger.log(Level.FINEST,
-				   "shutdown waiting for {0} transactions",
-				   txnCount);
-			txnCountLock.wait();
-		    } catch (InterruptedException e) {
-			logger.log(Level.FINEST, "shutdown interrupted");
-			break;
-		    }
-		}
-		if (txnCount < 0) {
-		    throw new IllegalStateException("DataStore is shut down");
-		}
-		boolean ok = (txnCount == 0);
-		if (ok) {
-		    txnCount = -1;
-		}
-		logger.log(Level.FINER, "shutdown returns {0}", ok);
-		return ok;
-	    }
-	} catch (RuntimeException e) {
-	    throw convertException(null, Level.FINER, e, "shutdown");
-	}
     }
 
     /* -- Other public methods -- */
@@ -732,5 +747,34 @@ public final class DataStoreClient
     /** Checks if the transaction has timed out. */
     private boolean txnTimedOut(Transaction txn) {
 	return txn.getCreationTime() + txnTimeout < System.currentTimeMillis();
+    }
+
+    /** Obtains the server. */
+    private DataStoreServer getServer() throws IOException, NotBoundException {
+	boolean done = false;
+	for (int i = 0; !done; i++) {
+	    if (i == GET_SERVER_MAX_RETRIES) {
+		done = true;
+	    }
+	    try {
+		if (!noRmi) {
+		    Registry registry = LocateRegistry.getRegistry(
+			serverHost, serverPort);
+		    return (DataStoreServer) registry.lookup(
+			"DataStoreServer");
+		} else {
+		    return new DataStoreClientRemote(serverHost, serverPort);
+		}
+	    } catch (IOException e) {
+		if (done) {
+		    throw e;
+		}
+	    } catch (NotBoundException e) {
+		if (done) {
+		    throw e;
+		}
+	    }
+	}
+	throw new AssertionError();
     }
 }

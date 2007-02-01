@@ -1,9 +1,8 @@
 package com.sun.sgs.impl.service.data.store.net;
 
-import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
-import com.sun.sgs.impl.service.data.store.DataStoreImpl.TxnInfoTable;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
+import com.sun.sgs.impl.service.data.store.DataStoreImpl.TxnInfoTable;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.PropertiesWrapper;
 import com.sun.sgs.service.Transaction;
@@ -11,15 +10,12 @@ import com.sun.sgs.service.TransactionParticipant;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.rmi.NoSuchObjectException;
-import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.RMIServerSocketFactory;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Iterator;
-import java.util.NoSuchElementException;
 import java.util.Properties;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -31,10 +27,28 @@ import java.util.logging.Logger;
 
 /**
  * Provides an implementation of <code>DataStoreServer</code>, using the {@link
- * DataStoreImpl} class to support the same databases which that class
- * supports.
+ * DataStoreImpl} class to support the same database format which that class
+ * supports. <p>
  *
- * FIXME: Document properties
+ * In addition to those supported by the {@link DataStoreImpl} class, the
+ * {@link #DataStoreServerImpl constructor} supports the following properties:
+ * <p>
+ *
+ * <ul>
+ *
+ * <li> <i>Key:</i> <code>
+ *	com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl.reap.delay
+ *	</code> <br>
+ *      <i>Default:</i> <code>500</code> <br>
+ *	The delay in milliseconds between attempts to reap timed out
+ *	transactions. <p>
+ *
+ * <li> <i>Key:</i> <code>
+ *	com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl.port
+ *	</code> <br>
+ *      <i>Default:</i> <code>54321</code> <br>
+ *	The network port for running the server. <p>
+ * </ul>
  */
 public class DataStoreServerImpl implements DataStoreServer {
 
@@ -57,75 +71,64 @@ public class DataStoreServerImpl implements DataStoreServer {
      * The property that specifies the delay in milliseconds between attempts
      * to reap timed out transactions.
      */
-    private static final String REAP_DELAY_PROPERTY = CLASSNAME + ".reapDelay";
+    private static final String REAP_DELAY_PROPERTY = CLASSNAME +
+	".reap.delay";
 
     /** The default reap delay. */
     private static final long DEFAULT_REAP_DELAY = 500;
 
     /**
-     * The name of the property for specifying the port for running the
-     * RMI registry.
+     * The name of the property for specifying the port for running the server.
      */
     private static final String PORT_PROPERTY = CLASSNAME + ".port";
 
-    /**
-     * The default value of the port for running the RMI registry and the
-     * server.
-     */
+    /** The default value of the port for running the server. */
     private static final int DEFAULT_PORT = 54321;
 
     /** The number of transactions to allocate at a time. */
     private static final int TXN_ALLOCATION_BLOCK_SIZE = 100;
 
-    private static final boolean noRMI = Boolean.getBoolean("test.noRMI");
+    /**
+     * The name of the undocumented property that controls whether to replace
+     * Java RMI with an experimental, socket-based facility.
+     */
+    private static final boolean noRmi = Boolean.getBoolean(
+	CLASSNAME + ".no.rmi");
 
     /** Set by main to make sure that the server is reachable. */
     private static DataStoreServerImpl server;
 
-    private DataStoreServerRemote serverRemote;
+    /** The object used to export the server. */
+    private Exporter exporter;
 
     /** The underlying data store. */
     private final CustomDataStoreImpl store;
 
     /** Stores information about transactions. */
-    private TxnTable<?> txnTable;
+    TxnTable<?> txnTable;
 
     /** The transaction timeout in milliseconds. */
     private final long txnTimeout;
 
-    /** The port for running the RMI registry and the server. */
+    /** The port for running the server. */
     private final int port;
-
-    /** The RMI registry, or null if shutdown */
-    private Registry registry;
 
     /** Used to execute the expired transaction reaper. */
     private final ScheduledExecutorService executor;
 
-    /** Object to synchronize on when accessing nextTxnId and lastTxnId. */
-    private final Object tidLock = new Object();
-
-    /**
-     * The next transaction ID to use for allocation Transaction IDs.  Valid if
-     * not greater than lastTxnId.
-     */
-    private long nextTxnId = 0;
-
-    /**
-     * The last transaction ID that is free for allocating an transaction ID
-     * before needing to obtain more IDs from the database.
-     */
-    private long lastTxnId = -1;
-
     /** Implement Transactions using a long for the transaction ID. */
     private static class Txn implements Transaction {
+
 	/** The transaction ID. */
 	private final long tid;
 
 	/** The creation time. */
 	private final long creationTime;
 
-	/** Whether this transaction is in use. */
+	/**
+	 * Whether this transaction is in use.  Synchronized on the
+	 * TxnTable.lock field when accessing this field.
+	 */
 	boolean inUse;
 
 	/** The transaction participant or null. */
@@ -306,14 +309,33 @@ public class DataStoreServerImpl implements DataStoreServer {
      * transactions explicitly, and to allocate blocks of objects.
      */
     private class CustomDataStoreImpl extends DataStoreImpl {
+
+	/** Object to synchronize on when accessing nextTxnId and lastTxnId. */
+	private final Object tidLock = new Object();
+
+	/**
+	 * The next transaction ID to use for allocation Transaction IDs.
+	 * Valid if not greater than lastTxnId.
+	 */
+	private long nextTxnId = 0;
+
+	/**
+	 * The last transaction ID that is free for allocating an transaction
+	 * ID before needing to obtain more IDs from the database.
+	 */
+	private long lastTxnId = -1;
+
+	/** Creates an instance. */
 	CustomDataStoreImpl(Properties properties) {
 	    super(properties);
 	}
+
 	protected <T> TxnInfoTable<T> getTxnInfoTable(Class<T> txnInfoType) {
 	    TxnTable<T> table = new TxnTable<T>();
 	    txnTable = table;
 	    return table;
 	}
+
 	/** Creates a new transaction. */
 	long createTransaction() {
 	    long tid;
@@ -327,6 +349,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 	    joinNewTransaction(new Txn(tid));
 	    return tid;
 	}
+
 	/* Make this method accessible to the containing class. */
 	protected long allocateObjects(int count) {
 	    return super.allocateObjects(count);
@@ -334,16 +357,115 @@ public class DataStoreServerImpl implements DataStoreServer {
     }
 
     /**
+     * Provides for making the server available on the network, and removing
+     * from the network during shutdown.
+     */
+    private static class Exporter {
+
+	/** The server for handling inbound requests. */
+	private DataStoreServer server;
+
+	/** The RMI registry for advertising the server. */
+	private Registry registry;
+
+	/** Creates an instance. */
+	Exporter() { }
+
+	/**
+	 * Makes the server available on the network on the specified port.  If
+	 * the port is 0, choses an anonymous port.  Returns the actual port on
+	 * which the server is available.
+	 */
+	int export(DataStoreServer server, int port) throws IOException {
+	    this.server = server;
+	    ServerSocketFactory ssf = new ServerSocketFactory();
+	    registry = LocateRegistry.createRegistry(port, null, ssf);
+	    registry.rebind(
+		"DataStoreServer",
+		UnicastRemoteObject.exportObject(server, port, null, ssf));
+	    return ssf.getLocalPort();
+	}
+
+	/**
+	 * Removes the server from the network, returning true if successful.
+	 * Throws IllegalStateException if the server has already been removed
+	 * from the network.
+	 */
+	boolean unexport() {
+	    if (registry == null) {
+		throw new IllegalStateException(
+		    "The server is already shut down");
+	    }
+	    if (server != null) {
+		try {
+		    UnicastRemoteObject.unexportObject(server, true);
+		    server = null;
+		} catch (NoSuchObjectException e) {
+		    logger.logThrow(
+			Level.FINE, e, "Problem unexporting server");
+		    return false;
+		}
+	    }
+	    try {
+		UnicastRemoteObject.unexportObject(registry, true);
+		registry = null;
+	    } catch (NoSuchObjectException e) {
+		logger.logThrow(
+		    Level.FINE, e, "Problem unexporting registry");
+		return false;
+	    }
+	    return true;
+	}
+    }   
+
+    /**
+     * An alternative exporter that uses an experimental socket-based facility
+     * instead of Java RMI.
+     */
+    private static class SocketExporter extends Exporter {
+	private DataStoreServerRemote remote;
+	SocketExporter() { }
+	int export(DataStoreServer server, int port) throws IOException {
+	    remote = new DataStoreServerRemote(server, port);
+	    return remote.serverSocket.getLocalPort();
+	}
+	boolean unexport() {
+	    if (remote == null) {
+		throw new IllegalStateException(
+		    "The server is already shut down");
+	    }
+	    try {
+		remote.shutdown();
+		remote = null;
+	    } catch (IOException e) {
+		logger.logThrow(
+		    Level.FINE, e, "Problem shutting down server");
+		return false;
+	    }
+	    return true;
+	}
+    }
+
+    /**
      * Defines a server socket factory that provides access to the server
      * socket's local port.
      */
-    private class ServerSocketFactory implements RMIServerSocketFactory {
+    private static class ServerSocketFactory
+	implements RMIServerSocketFactory
+    {
+	/** The last server socket created. */
 	private ServerSocket serverSocket;
+
+	/** Creates an instance. */
 	ServerSocketFactory() { }
+
+	/** {@inheritDoc} */
 	public ServerSocket createServerSocket(int port) throws IOException {
 	    serverSocket = new ServerSocket(port);
 	    return serverSocket;
 	}
+
+	/** Returns the local port of the last server socket created. */
 	int getLocalPort() {
 	    return (serverSocket == null) ? -1 : serverSocket.getLocalPort();
 	}
@@ -377,7 +499,7 @@ public class DataStoreServerImpl implements DataStoreServer {
      *		is not specified, or if the value of the <code>
      *		com.sun.sgs.impl.service.data.store.allocationBlockSize</code>
      *		property is not a valid integer greater than zero
-     * @throws	RemoteException if a network problem occurs
+     * @throws	IOException if a network problem occurs
      */
     public DataStoreServerImpl(Properties properties) throws IOException {
 	logger.log(Level.CONFIG, "Creating DataStoreServerImpl properties:{0}",
@@ -388,18 +510,8 @@ public class DataStoreServerImpl implements DataStoreServer {
 	    TXN_TIMEOUT_PROPERTY, DEFAULT_TXN_TIMEOUT);
 	int requestedPort = wrappedProps.getIntProperty(
 	    PORT_PROPERTY, DEFAULT_PORT);
-	if (!noRMI) {
-	    ServerSocketFactory ssf = new ServerSocketFactory();
-	    registry = LocateRegistry.createRegistry(requestedPort, null, ssf);
-	    port = ssf.getLocalPort();
-	    registry.rebind(
-		"DataStoreServer",
-		UnicastRemoteObject.exportObject(
-		    this, requestedPort, null, ssf));
-	} else {
-	    serverRemote = new DataStoreServerRemote(requestedPort, this);
-	    port = serverRemote.serverSocket.getLocalPort();
-	}
+	exporter = noRmi ? new SocketExporter() : new Exporter();
+	port = exporter.export(this, requestedPort);
 	long reapDelay = wrappedProps.getLongProperty(
 	    REAP_DELAY_PROPERTY, DEFAULT_REAP_DELAY);
 	executor = Executors.newSingleThreadScheduledExecutor();
@@ -574,39 +686,11 @@ public class DataStoreServerImpl implements DataStoreServer {
      *		already been called and returned <code>true</code>
      */
     public synchronized boolean shutdown() {
-	if (!noRMI) {
-	    if (registry == null) {
-		throw new IllegalStateException(
-		    "The server is already shut down");
-	    }
-	}
 	if (!store.shutdown()) {
 	    return false;
 	}
 	executor.shutdownNow();
-	if (!noRMI) {
-	    try {
-		UnicastRemoteObject.unexportObject(this, true);
-	    } catch (NoSuchObjectException e) {
-		logger.logThrow(Level.FINE, e, "Problem unexporting server");
-		return false;
-	    }
-	    try {
-		UnicastRemoteObject.unexportObject(registry, true);
-	    } catch (NoSuchObjectException e) {
-		logger.logThrow(Level.FINE, e, "Problem unexporting registry");
-		return false;
-	    }
-	} else {
-	    try {
-		serverRemote.shutdown();
-	    } catch (IOException e) {
-		logger.logThrow(Level.FINE, e, "Problem shutting down server");
-		return false;
-	    }
-	}
-	registry = null;
-	return true;
+	return exporter.unexport();
     }
 
     /**

@@ -75,7 +75,8 @@ public interface DataStoreServer extends Remote {
     /** 
      * Specifies data to associate with a series of object IDs.
      *
-     * @param	txn the transaction under which the operation should take place
+     * @param	tid the ID of the transaction under which the operation should
+     *		take place
      * @param	oids the object IDs
      * @param	dataArray the associated data values
      * @throws	TransactionAbortedException if the transaction was aborted due
