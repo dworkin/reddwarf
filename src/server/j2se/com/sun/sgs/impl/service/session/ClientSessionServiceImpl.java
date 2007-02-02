@@ -733,7 +733,7 @@ public class ClientSessionServiceImpl
 		new KernelRunnable() {
 		    public void run() throws Exception {
 			ManagedObject obj = 
-                            dataSvc.getServiceBinding(
+			    dataService.getServiceBinding(
 				listenerKey, ManagedObject.class);
 			 boolean isWrapped =
 			     obj instanceof ClientSessionListenerWrapper;

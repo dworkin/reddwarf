@@ -48,16 +48,6 @@ public class NonDurableTaskScheduler {
     }
 
     /**
-     * Schedules a non-durable, transactional task using the task
-     * service specified during construction.
-     *
-     * @param task a task
-     */
-    public void scheduleTaskOnCommit(KernelRunnable task) {
-        taskService.scheduleNonDurableTask(new TransactionRunner(task));
-    }
-
-    /**
      * Schedules a non-durable, non-transactional task using the task
      * scheduler and task owner specified during construction.
      *
@@ -65,6 +55,16 @@ public class NonDurableTaskScheduler {
      */
     public void scheduleNonTransactionalTask(KernelRunnable task) {
 	taskScheduler.scheduleTask(task, owner);
+    }
+
+    /**
+     * Schedules a non-durable, transactional task using the task
+     * service specified during construction.
+     *
+     * @param task a task
+     */
+    public void scheduleTaskOnCommit(KernelRunnable task) {
+	taskService.scheduleNonDurableTask(new TransactionRunner(task));
     }
     
     /**
