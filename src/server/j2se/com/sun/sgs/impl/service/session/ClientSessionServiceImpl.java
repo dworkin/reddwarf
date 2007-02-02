@@ -729,7 +729,7 @@ public class ClientSessionServiceImpl
 	    final String listenerKey = key;		
 	    final DataService dataSvc = dataService;
 		
-	    nonDurableTaskScheduler.scheduleTask(
+	    nonDurableTaskScheduler.scheduleTaskOnCommit(
 		new KernelRunnable() {
 		    public void run() throws Exception {
 			ManagedObject obj = 
