@@ -349,7 +349,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    }
 	}
 
-	sessionService.disconnected(sessionId);
+	sessionService.disconnected(this);
 
 	if (getCurrentState() != State.DISCONNECTED) {
 	    if (graceful) {
