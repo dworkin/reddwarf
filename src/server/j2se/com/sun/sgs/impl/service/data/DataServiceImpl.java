@@ -56,6 +56,15 @@ import java.util.logging.Logger;
  *	that the modifications are recorded by the
  *	<code>DataService</code>. <p>
  *
+ * <li> <i>Key:</i> <code>
+ *	com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class
+ *	</code> <br>
+ *	<i>Default:</i>
+ *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl</code> <br>
+ *	The name of the class that implements {@link DataStore}.  The class
+ *	should be public and should provide a public constructor with a {@link
+ *	Properties} parameter.
+ *
  * </ul> <p>
  *
  * The constructor also passes the properties to the {@link DataStoreImpl}
@@ -111,7 +120,7 @@ public final class DataServiceImpl
      * DataStore.
      */
     private static final String DATA_STORE_CLASS_PROPERTY =
-	CLASSNAME + ".dataStoreClass";
+	CLASSNAME + ".data.store.class";
 
     /** The logger for this class. */
     private static final LoggerWrapper logger =

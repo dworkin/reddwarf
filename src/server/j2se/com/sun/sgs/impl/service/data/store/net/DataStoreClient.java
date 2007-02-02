@@ -25,26 +25,46 @@ import java.util.logging.Logger;
  *
  * <ul>
  *
- * <li> <i>Key:</i> <code>com.sun.sgs.txnTimeout</code> <br>
- *	<i>Default:</i> <code>1000</code> <br>
- *	The maximum amount of time in milliseconds that a transaction will be
- *	permitted to run before it is a candidate for being aborted. <p>
+ * <li> <i>Key:</i> <code>
+ *	com.sun.sgs.impl.service.data.store.net.DataStoreClient.allocation.block.size
+ *	</code> <br>
+ *	<i>Default:</i> <code>100</code> <br>
+ *	The number of object IDs to allocate at one time. <p>
  *
+ *	<i>Key:</i> <code>
+ *	com.sun.sgs.impl.service.data.store.net.DataStoreClient.server.host
+ *	</code> <br>
+ *	<i>No default &mdash; required</i> <br>
+ *	The name of the host running the <code>DataStoreServer</code>. <p>
+ *
+ *	<i>Key:</i> <code>
+ *	com.sun.sgs.impl.service.data.store.net.DataStoreClient.server.port
+ *	</code> <br>
+ *	<i>Default:</i> <code>54321</code>
+ *	The network port for the <code>DataStoreServer</code>.  This value must
+ *	be greater than <code>0</code> and no greater than <code>65535</code>.
+ *
+ * </ul> <p>
+ *
+ * This class uses the {@link Logger} named
+ * <code>com.sun.sgs.impl.service.data.store.net.DataStoreClient</code> to log
+ * information at the following levels: <p>
+ *
+ * <ul>
+ * <li> {@link Level#CONFIG CONFIG} - Constructor properties
+ * <li> {@link Level#FINE FINE} - Allocating object IDs.
+ * <li> {@link Level#FINEST FINEST} - Object operations
  * </ul>
  */
-
 public final class DataStoreClient
     implements DataStore, TransactionParticipant
 {
-    /** The property that specifies the transaction timeout in milliseconds. */
-    private static final String TXN_TIMEOUT_PROPERTY =
-	"com.sun.sgs.txnTimeout";
-
-    /** The default transaction timeout in milliseconds. */
-    private static final long DEFAULT_TXN_TIMEOUT = 1000;
-
     /** The name of this class. */
     private static final String CLASSNAME = DataStoreClient.class.getName();
+
+    /** The logger for this class. */
+    static final LoggerWrapper logger =
+	new LoggerWrapper(Logger.getLogger(CLASSNAME));
 
     /**
      * The property that specifies the number of object IDs to allocate at one
@@ -79,10 +99,6 @@ public final class DataStoreClient
      */
     private static final long GET_SERVER_WAIT = 10000;
 
-    /** The logger for this class. */
-    static final LoggerWrapper logger =
-	new LoggerWrapper(Logger.getLogger(CLASSNAME));
-
     /**
      * The name of the undocumented property that controls whether to replace
      * Java RMI with an experimental, socket-based facility.
@@ -98,9 +114,6 @@ public final class DataStoreClient
 
     /** The server. */
     private final DataStoreServer server;
-
-    /** The transaction timeout in milliseconds. */
-    private final long txnTimeout;
 
     /** The number of object IDs to allocate at one time. */
     private final int allocationBlockSize;
@@ -148,6 +161,7 @@ public final class DataStoreClient
 	/** Whether the server side has already aborted. */
 	boolean serverAborted;
 
+	/** Creates an instance. */
 	TxnInfo(Transaction txn, long tid) {
 	    this.txn = txn;
 	    this.tid = tid;
@@ -160,7 +174,15 @@ public final class DataStoreClient
      * list of supported properties.
      *
      * @param	properties the properties for configuring this instance
-     * @throws	IllegalArgumentException bad properties
+     * @throws	IllegalArgumentException if the <code>
+     *		com.sun.sgs.impl.service.data.store.net.DataStoreClient.server.host
+     *		</code> property is not set, if the value of the <code>
+     *		com.sun.sgs.impl.service.data.store.net.DataStoreClient.allocation.block.size
+     *		</code> property is not a valid integer greater than zero, or
+     *		if the value of the <code>
+     *		com.sun.sgs.impl.service.data.store.net.DataStoreClient.server.port
+     *		</code> property is not a valid integer greater than
+     *		<code>0</code> and not greater than <code>65535</code>
      * @throws	IOException if a network problem occurs
      * @throws	NotBoundException if the server is not found in the RMI
      *		registry
@@ -179,14 +201,17 @@ public final class DataStoreClient
 	}
 	serverPort = wrappedProps.getIntProperty(
 	    SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT);
+	if (serverPort < 1 || serverPort > 65535) {
+	    throw new IllegalArgumentException(
+		"The " + SERVER_PORT_PROPERTY + " property value must be " +
+		"greater than 0 and less than 65535: " + serverPort);
+	}
 	allocationBlockSize = wrappedProps.getIntProperty(
 	    ALLOCATION_BLOCK_SIZE_PROPERTY, DEFAULT_ALLOCATION_BLOCK_SIZE);
 	if (allocationBlockSize < 1) {
 	    throw new IllegalArgumentException(
 		"The allocation block size must be greater than zero");
 	}
-	txnTimeout = wrappedProps.getLongProperty(
-	    TXN_TIMEOUT_PROPERTY, DEFAULT_TXN_TIMEOUT);
 	server = getServer();
     }
 
@@ -601,8 +626,8 @@ public final class DataStoreClient
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	throw convertException(txnInfo, Level.FINER, exception,
-			       "abort txn:" + txn);
+	throw convertException(
+	    txnInfo, Level.FINER, exception, "abort txn:" + txn);
     }
 
     /* -- Other public methods -- */
@@ -619,6 +644,35 @@ public final class DataStoreClient
 
     /* -- Private methods -- */
 
+    /** Obtains the server. */
+    private DataStoreServer getServer() throws IOException, NotBoundException {
+	boolean done = false;
+	for (int i = 0; !done; i++) {
+	    if (i == GET_SERVER_MAX_RETRIES) {
+		done = true;
+	    }
+	    try {
+		if (!noRmi) {
+		    Registry registry = LocateRegistry.getRegistry(
+			serverHost, serverPort);
+		    return (DataStoreServer) registry.lookup(
+			"DataStoreServer");
+		} else {
+		    return new DataStoreClientRemote(serverHost, serverPort);
+		}
+	    } catch (IOException e) {
+		if (done) {
+		    throw e;
+		}
+	    } catch (NotBoundException e) {
+		if (done) {
+		    throw e;
+		}
+	    }
+	}
+	throw new AssertionError();
+    }
+
     /**
      * Checks that the correct transaction is in progress, and join if none is
      * in progress.
@@ -629,32 +683,7 @@ public final class DataStoreClient
 	}
 	TxnInfo txnInfo = threadTxnInfo.get();
 	if (txnInfo == null) {
-	    synchronized (txnCountLock) {
-		if (txnCount < 0) {
-		    throw new IllegalStateException("Service is shut down");
-		}
-		txnCount++;
-	    }
-	    boolean joined = false;
-	    long tid;
-	    try {
-		txn.join(this);
-		joined = true;
-		tid = server.createTransaction();
-		if (logger.isLoggable(Level.FINER)) {
-		    logger.log(
-			Level.FINER,
-			"Created server transaction stid:{0,number,#} " +
-			"for transaction {1}",
-			tid, txn);
-		}
-	    } finally {
-		if (!joined) {
-		    decrementTxnCount();
-		}
-	    }
-	    txnInfo = new TxnInfo(txn, tid);
-	    threadTxnInfo.set(txnInfo);
+	    return joinTransaction(txn);
 	} else if (txnInfo.prepared) {
 	    throw new IllegalStateException(
 		"Transaction has been prepared");
@@ -665,19 +694,52 @@ public final class DataStoreClient
     }
 
     /**
-     * Checks that the correct transaction is in progress, throwing an
-     * exception if the transaction has not been joined.
+     * Joins the specified transaction, checking first to see if the data store
+     * is currently shutting down, and returning the new TxnInfo.
      */
-    private TxnInfo checkTxnNoJoin(
-	Transaction txn, boolean checkShuttingDown)
-    {
+    private TxnInfo joinTransaction(Transaction txn) throws IOException {
+	synchronized (txnCountLock) {
+	    if (txnCount < 0) {
+		throw new IllegalStateException("Service is shut down");
+	    }
+	    txnCount++;
+	}
+	boolean joined = false;
+	long tid;
+	try {
+	    txn.join(this);
+	    joined = true;
+	    tid = server.createTransaction();
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.log(
+		    Level.FINER,
+		    "Created server transaction stid:{0,number,#} " +
+		    "for transaction {1}",
+		    tid, txn);
+	    }
+	} finally {
+	    if (!joined) {
+		decrementTxnCount();
+	    }
+	}
+	TxnInfo txnInfo = new TxnInfo(txn, tid);
+	threadTxnInfo.set(txnInfo);
+	return txnInfo;
+    }
+
+    /**
+     * Checks that the correct transaction is in progress, throwing an
+     * exception if the transaction has not been joined.  If notAborting is
+     * true, then checks if the store is shutting down.
+     */
+    private TxnInfo checkTxnNoJoin(Transaction txn, boolean notAborting) {
 	if (txn == null) {
 	    throw new NullPointerException("Transaction must not be null");
 	}
 	TxnInfo txnInfo = threadTxnInfo.get();
 	if (txnInfo == null) {
 	    throw new IllegalStateException("Transaction is not active");
-	} else if (checkShuttingDown && getTxnCount() < 0) {
+	} else if (notAborting && getTxnCount() < 0) {
 	    throw new IllegalStateException("DataStore is shutting down");
 	} else if (!txnInfo.txn.equals(txn)) {
 	    throw new IllegalStateException("Wrong transaction");
@@ -707,11 +769,17 @@ public final class DataStoreClient
 	} else if (e instanceof TransactionAbortedException) {
 	    re = (RuntimeException) e;
 	} else if (e instanceof TransactionNotActiveException &&
-		   txnInfo != null &&
-		   txnTimedOut(txnInfo.txn))
+		   txnInfo != null)
 	{
+	    /*
+	     * If the transaction is not active on the server, then it must
+	     * have timed out.
+	     */
+	    long duration =
+		System.currentTimeMillis() - txnInfo.txn.getCreationTime();
 	    re = new TransactionTimeoutException(
-		"Transaction has timed out", e);
+		operation + " failed: Transaction timed out after " +
+		duration + " ms");
 	} else {
 	    re = (RuntimeException) e;
 	}
@@ -742,39 +810,5 @@ public final class DataStoreClient
 		txnCountLock.notifyAll();
 	    }
 	}
-    }
-
-    /** Checks if the transaction has timed out. */
-    private boolean txnTimedOut(Transaction txn) {
-	return txn.getCreationTime() + txnTimeout < System.currentTimeMillis();
-    }
-
-    /** Obtains the server. */
-    private DataStoreServer getServer() throws IOException, NotBoundException {
-	boolean done = false;
-	for (int i = 0; !done; i++) {
-	    if (i == GET_SERVER_MAX_RETRIES) {
-		done = true;
-	    }
-	    try {
-		if (!noRmi) {
-		    Registry registry = LocateRegistry.getRegistry(
-			serverHost, serverPort);
-		    return (DataStoreServer) registry.lookup(
-			"DataStoreServer");
-		} else {
-		    return new DataStoreClientRemote(serverHost, serverPort);
-		}
-	    } catch (IOException e) {
-		if (done) {
-		    throw e;
-		}
-	    } catch (NotBoundException e) {
-		if (done) {
-		    throw e;
-		}
-	    }
-	}
-	throw new AssertionError();
     }
 }

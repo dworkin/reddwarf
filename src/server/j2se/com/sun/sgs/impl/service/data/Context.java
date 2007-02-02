@@ -5,7 +5,6 @@ import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.service.TransactionProxy;
-import java.util.Iterator;
 
 /** Stores information for a specific transaction. */
 final class Context {
@@ -201,7 +200,7 @@ final class Context {
 
     boolean prepare() throws Exception {
 	txn.setInactive();
-	flushAll();
+	ManagedReferenceImpl.flushAll(this);
 	if (storeParticipant == null) {
 	    return true;
 	} else {
@@ -218,7 +217,7 @@ final class Context {
 
     void prepareAndCommit() throws Exception {
 	txn.setInactive();
-	flushAll();
+	ManagedReferenceImpl.flushAll(this);
 	if (storeParticipant != null) {
 	    storeParticipant.prepareAndCommit(txn);
 	}
@@ -251,13 +250,5 @@ final class Context {
      */
     void checkTxn(Transaction otherTxn) {
 	txn.check(otherTxn);
-    }
-
-    /** Flush all modified objects. */
-    private void flushAll() {
-	FlushInfo info = ManagedReferenceImpl.flushModifiedObjects(this);
-	if (info != null) {
-	    store.setObjects(txn, info.getOids(), info.getDataArray());
-	}
     }
 }

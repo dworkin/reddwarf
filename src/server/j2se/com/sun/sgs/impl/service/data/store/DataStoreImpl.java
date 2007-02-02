@@ -31,6 +31,7 @@ import com.sun.sgs.service.TransactionParticipant;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -590,14 +591,15 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	 */
 	private String getNextBoundNameResult(
 	    String name, OperationStatus status, DatabaseEntry key)
-	    throws DatabaseException
 	{
 	    if (status == OperationStatus.NOTFOUND) {
 		return null;
 	    } else if (status == OperationStatus.SUCCESS) {
 		return StringBinding.entryToString(key);
 	    } else {
-		throw new DatabaseException("Unexpected status: " + status);
+		throw new DataStoreException(
+		    "nextBoundName txn:" + txn + ", name:" + name +
+		    " failed: " + status);
 	    }
 	}
     }
@@ -628,10 +630,14 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
      * @param	properties the properties for configuring this instance
      * @throws	DataStoreException if there is a problem with the database
      * @throws	IllegalArgumentException if the <code>
-     *		com.sun.sgs.impl.service.data.store.directory</code> property
-     *		is not specified, or if the value of the <code>
+     *		com.sun.sgs.impl.service.data.store.DataStoreImpl.directory
+     *		</code> property is not specified, if the value of the <code>
      *		com.sun.sgs.impl.service.data.store.allocationBlockSize</code>
-     *		property is not a valid integer greater than zero
+     *		property is not a valid integer greater than zero, or if the
+     *		value of the <code>
+     *		com.sun.sgs.impl.service.data.store.DataStoreImpl.cacheSize
+     *		</code> property is not a valid integer greater than or equal
+     *		to <code>20000</code>
      */
     public DataStoreImpl(Properties properties) {
 	logger.log(
@@ -922,6 +928,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	logger.log(Level.FINEST, "setObjects txn:{0}", txn);
 	Exception exception;
 	long oid = -1;
+	boolean oidSet = false;
 	try {
 	    TxnInfo txnInfo = checkTxn(txn, Ops.SET_OBJECTS);
 	    int len = oids.length;
@@ -933,6 +940,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	    DatabaseEntry value = new DatabaseEntry();
 	    for (int i = 0; i < len; i++) {
 		oid = oids[i];
+		oidSet = true;
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(Level.FINEST,
 			       "setObjects txn:{0}, oid:{1,number,#}",
@@ -967,7 +975,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	}
 	throw convertException(
 	    txn, Level.FINEST, exception,
-	    "setObject txn:" + txn + (oid < 0 ? "" : ", oid:" + oid));
+	    "setObject txn:" + txn + (oidSet ? ", oid:" + oid : ""));
     }
 
     /** {@inheritDoc} */
@@ -1358,6 +1366,35 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	return "DataStoreImpl[directory=\"" + directory + "\"]";
     }
 
+    /**
+     * Returns the next available object ID, and reserves the specified number
+     * of IDs.
+     *
+     * @param	count the number of IDs to reserve
+     * @return	the next available object ID
+     */
+    public long allocateObjects(int count) {
+	logger.log(Level.FINE, "allocateObjects count:{0}", count);
+	Exception exception;
+	try {
+	    long result = getNextId(
+		DataStoreHeader.NEXT_OBJ_ID_KEY, count);
+	    if (logger.isLoggable(Level.FINE)) {
+		logger.log(Level.FINE,
+			   "allocateObjects count:{0,number,#} " +
+			   "returns oid:{1,number,#}",
+			   count, result);
+	    }
+	    return result;
+	} catch (DatabaseException e) {
+	    exception = e;
+	} catch (RuntimeException e) {
+	    exception = e;
+	}
+	throw convertException(
+	    null, Level.FINE, exception, "allocateObjects count:" + count);
+    }
+
     /* -- Protected methods -- */
 
     /**
@@ -1374,35 +1411,6 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
     }
 
     /**
-     * Returns the next available object ID, and reserves the specified number
-     * of IDs.
-     *
-     * @param	count the number of IDs to reserve
-     * @return	the next available object ID
-     */
-    protected long allocateObjects(int count) {
-	logger.log(Level.FINEST, "allocateObjects count:{0}", count);
-	Exception exception;
-	try {
-	    long result = getNextId(
-		DataStoreHeader.NEXT_OBJ_ID_KEY, count);
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(Level.FINEST,
-			   "allocateObjects count:{0,number,#} " +
-			   "returns oid:{1,number,#}",
-			   count, result);
-	    }
-	    return result;
-	} catch (DatabaseException e) {
-	    exception = e;
-	} catch (RuntimeException e) {
-	    exception = e;
-	}
-	throw convertException(
-	    null, Level.FINEST, exception, "allocateObjects count:" + count);
-    }
-
-    /**
      * Returns the next available transaction ID, and reserves the specified
      * number of IDs.
      *
@@ -1410,34 +1418,24 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
      * @return	the next available transaction ID
      */
     protected long getNextTxnId(int count) {
-	logger.log(Level.FINEST, "getNextTxnId count:{0}", count);
 	Exception exception;
 	try {
-	    long result = getNextId(
-		DataStoreHeader.NEXT_TXN_ID_KEY, count);
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(Level.FINEST,
-			   "getNextTxnId count:{0,number,#} " +
-			   "returns tid:{1,number,#}",
-			   count, result);
-	    }
-	    return result;
+	    return getNextId(DataStoreHeader.NEXT_TXN_ID_KEY, count);
 	} catch (DatabaseException e) {
 	    exception = e;
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
 	throw convertException(
-	    null, Level.FINEST, exception, "getNextTxnId count:" + count);
+	    null, Level.FINE, exception, "getNextTxnId count:" + count);
     }
 
     /**
      * Explicitly joins a new transaction.
      *
-     * @param	txn the transacction to join
+     * @param	txn the transaction to join
      */
     protected void joinNewTransaction(Transaction txn) {
-	logger.log(Level.FINEST, "joinNewTransaction txn:{0}", txn);
 	Exception exception;
 	try {
 	    joinTransaction(txn, true);
@@ -1448,7 +1446,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	    exception = e;
 	}
 	throw convertException(
-	    txn, Level.FINEST, exception, "joinNewTransaction txn:" + txn);
+	    txn, Level.FINER, exception, "joinNewTransaction txn:" + txn);
     }
 
     /* -- Private methods -- */
@@ -1478,8 +1476,8 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	} else if (txnInfo.prepared) {
 	    throw new IllegalStateException(
 		"Transaction has been prepared");
-	} else if (txnTimedOut(txn)) {
-	    throw new TransactionTimeoutException("Transaction has timed out");
+	} else {
+	    checkTxnTimeout(txn);
 	}
 	txnInfo.countOp(op);
 	return txnInfo;
@@ -1535,11 +1533,8 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	} else if (notAborting) {
 	    if (getTxnCount() < 0) {
 		throw new IllegalStateException("DataStore is shutting down");
-	    } else if (txn.getCreationTime() + txnTimeout <
-		       System.currentTimeMillis())
-	    {
-		throw new TransactionTimeoutException(
-		    "Transaction has timed out");
+	    } else {
+		checkTxnTimeout(txn);
 	    }
 	}
 	return txnInfo;
@@ -1586,6 +1581,10 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 		e);
 	    logger.logThrow(Level.SEVERE, error, "{0} throws", operation);
 	    throw error;
+	} else if (e instanceof TransactionTimeoutException) {
+	    /* Include the operation in the message */
+	    re = new TransactionTimeoutException(
+		operation + " failed: " + e.getMessage());
 	} else if (e instanceof DatabaseException) {
 	    re = new DataStoreException(
 		operation + " failed: " + e.getMessage(), e);
@@ -1681,8 +1680,14 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	}
     }
 
-    /** Checks if the transaction has timed out. */
-    private boolean txnTimedOut(Transaction txn) {
-	return txn.getCreationTime() + txnTimeout < System.currentTimeMillis();
+    /**
+     * Throws a TransactionTimeoutException if the transaction has timed out.
+     */
+    private void checkTxnTimeout(Transaction txn) {
+	long duration = System.currentTimeMillis() - txn.getCreationTime();
+	if (duration > txnTimeout) {
+	    throw new TransactionTimeoutException(
+		"Transaction timed out after " + duration + " ms");
+	}
     }
 }

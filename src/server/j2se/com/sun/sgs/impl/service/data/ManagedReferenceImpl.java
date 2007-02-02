@@ -10,7 +10,6 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.math.BigInteger;
-import java.util.Iterator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -442,12 +441,13 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 	}
     }
 
-    /**
-     * Flushes all references.  Returns information about any objects found to
-     * be modified, or null if none were modified.
-     */
-    static FlushInfo flushModifiedObjects(Context context) {
-	return context.refs.flushModifiedObjects();
+    /** Saves all object modifications to the data store. */
+    static void flushAll(Context context) {
+	FlushInfo info = context.refs.flushModifiedObjects();
+	if (info != null) {
+	    context.store.setObjects(
+		context.txn, info.getOids(), info.getDataArray());
+	}
     }
 
     /**

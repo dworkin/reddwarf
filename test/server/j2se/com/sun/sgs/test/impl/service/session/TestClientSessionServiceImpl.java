@@ -477,6 +477,7 @@ public class TestClientSessionServiceImpl extends TestCase {
      */
     private DataServiceImpl createDataService(
 	DummyComponentRegistry registry)
+	throws Exception
     {
 	File dir = new File(dbDirectory);
 	if (!dir.exists()) {

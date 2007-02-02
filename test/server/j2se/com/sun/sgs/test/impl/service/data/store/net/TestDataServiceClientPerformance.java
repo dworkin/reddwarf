@@ -6,16 +6,18 @@ import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
 import com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.DataService;
-import com.sun.sgs.test.impl.service.data.TestPerformance;
+import com.sun.sgs.test.impl.service.data.TestDataServicePerformance;
 import java.util.Properties;
 
-public class TestDataServiceClientPerformance extends TestPerformance {
+public class TestDataServiceClientPerformance
+    extends TestDataServicePerformance
+{
     private static boolean externalServer =
-	Boolean.getBoolean("test.externalServer");
+	Boolean.getBoolean("test.external.server");
     private static String serverHost =
-	System.getProperty("test.serverHost", "localhost");
+	System.getProperty("test.server.host", "localhost");
     private static int serverPort =
-	Integer.getInteger("test.serverPort", 54321);
+	Integer.getInteger("test.server.port", 54321);
     
     /** The name of the DataStoreClient class. */
     private static final String DataStoreClientClassName =
@@ -60,10 +62,11 @@ public class TestDataServiceClientPerformance extends TestPerformance {
 	    server = serverImpl;
 	    serverPort = serverImpl.getPort();
 	}
-	props.setProperty(DataStoreClientClassName + ".host", serverHost);
-	props.setProperty(DataStoreClientClassName + ".port",
+	props.setProperty(DataStoreClientClassName + ".server.host",
+			  serverHost);
+	props.setProperty(DataStoreClientClassName + ".server.port",
 			  String.valueOf(serverPort));
-	props.setProperty(DataServiceImplClassName + ".dataStoreClass",
+	props.setProperty(DataServiceImplClassName + ".data.store.class",
 			    DataStoreClientClassName);
 	return new DataServiceImpl(props, componentRegistry);
     }

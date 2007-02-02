@@ -1,20 +1,21 @@
 package com.sun.sgs.impl.service.data;
 
 /**
- * Stores information about objects that have been modified and need their data
- * stored.
+ * Stores information about managed objects that has been modified and need
+ * their data stored.
  */
 final class FlushInfo {
+
     /** Space to allocate for buffering results. */
     private static final int BUFFER = 50;
 
-    /** The object IDs of modified objects. */
+    /** The object IDs of the modified objects. */
     private long[] oids = new long[BUFFER];
 
     /** The associated data. */
     private byte[][] dataArray = new byte[BUFFER][];
 
-    /** The number of modified objects collected. */
+    /** The number of modified objects. */
     private int count = 0;
 
     /** Creates an instance. */

@@ -41,10 +41,8 @@ class DataStoreProtocol implements DataStoreServer {
 
     /** Creates an instance using the specified streams. */
     DataStoreProtocol(InputStream in, OutputStream out) {
-	this.in = new DataInputStream(
-	    new BufferedInputStream(in));
-	this.out = new DataOutputStream(
-	    new BufferedOutputStream(out));
+	this.in = new DataInputStream(new BufferedInputStream(in));
+	this.out = new DataOutputStream(new BufferedOutputStream(out));
     }
 
     /** Dispatches a single method call to the server. */
@@ -426,7 +424,7 @@ class DataStoreProtocol implements DataStoreServer {
     /* -- Other methods -- */
 
     /**
-     * Flush output, read the success value, and throw an exception if the the
+     * Flush output, read the success value, and throw an exception if the
      * method call failed.
      */
     private void checkResult() throws IOException {
@@ -445,7 +443,6 @@ class DataStoreProtocol implements DataStoreServer {
 		= exceptionClass.getConstructor(String.class);
 	    exception = constructor.newInstance(message);
 	} catch (Exception e) {
-	    e.printStackTrace();
 	    IOException ioe = new IOException(
 		"Problem deserializing exception: " + e);
 	    ioe.initCause(e);

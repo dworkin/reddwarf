@@ -47,17 +47,31 @@ import java.util.logging.Logger;
  *	com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl.port
  *	</code> <br>
  *      <i>Default:</i> <code>54321</code> <br>
- *	The network port for running the server. <p>
- * </ul>
+ *	The network port for running the server. This value must
+ *	be greater than or equal to <code>0</code> and no greater than
+ *	<code>65535</code>.  If the value specified is <code>0</code>, then an
+ *	anonymous port will be chosen.  The value chosen will be logged, and
+ *	can also be accessed with the {@link #getPort getPort} method. <p>
+ * </ul> <p>
+ *
+ * In addition to any logging performed by the <code>DataStoreImpl</code>
+ * class, this class uses the {@link Logger} named
+ * <code>com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl</code> to
+ * log information at the following levels: <p>
+ *
+ * <ul>
+ * <li> {@link Level#SEVERE SEVERE} - problems starting the server from {@link
+ *	#main main} 
+ * <li> {@link Level#INFO INFO} - starting the server from <code>main</code>,
+ *	actual port if anonymous port was requested
+ * <li> {@link Level#CONFIG CONFIG} - server properties
+ * <li> {@link Level#FINE FINE} - allocation transaction IDs, problems
+ *	unexporting the server, reaping expired transactions, problems
+ *	the specified transaction ID
+ * <li> {@link Level#FINER FINER} - create transactions
+ * </ul> <p>
  */
 public class DataStoreServerImpl implements DataStoreServer {
-
-    /** The property that specifies the transaction timeout in milliseconds. */
-    private static final String TXN_TIMEOUT_PROPERTY =
-	"com.sun.sgs.txnTimeout";
-
-    /** The default transaction timeout in milliseconds. */
-    private static final long DEFAULT_TXN_TIMEOUT = 1000;
 
     /** The name of this class. */
     private static final String CLASSNAME =
@@ -66,6 +80,13 @@ public class DataStoreServerImpl implements DataStoreServer {
     /** The logger for this class. */
     static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
+
+    /** The property that specifies the transaction timeout in milliseconds. */
+    private static final String TXN_TIMEOUT_PROPERTY =
+	"com.sun.sgs.txnTimeout";
+
+    /** The default transaction timeout in milliseconds. */
+    private static final long DEFAULT_TXN_TIMEOUT = 1000;
 
     /**
      * The property that specifies the delay in milliseconds between attempts
@@ -126,7 +147,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 	private final long creationTime;
 
 	/**
-	 * Whether this transaction is in use.  Synchronized on the
+	 * Whether this transaction is in use.  Synchronize on the
 	 * TxnTable.lock field when accessing this field.
 	 */
 	boolean inUse;
@@ -192,7 +213,9 @@ public class DataStoreServerImpl implements DataStoreServer {
 
     /**
      * An implementation of TxnInfoTable that uses a sorted map keyed on
-     * transaction IDs.
+     * transaction IDs, and that requires all transactions to be joined
+     * explicitly.  Since transaction IDs are allocated in order, the
+     * transaction IDs will order the transactions by creation time.
      */
     private static class TxnTable<T> implements TxnInfoTable<T> {
 
@@ -267,11 +290,13 @@ public class DataStoreServerImpl implements DataStoreServer {
 	public T get(Transaction txn) {
 	    if (txn instanceof Txn) {
 		long tid = ((Txn) txn).getTid();
+		Entry<T> entry;
 		synchronized (lock) {
-		    Entry<T> entry = table.get(tid);
-		    if (entry != null) {
-			return entry.info;
-		    }
+		    entry = table.get(tid);
+		}
+		if (entry != null) {
+		    assert entry.txn.inUse;
+		    return entry.info;
 		}
 	    }
 	    throw new TransactionNotActiveException(
@@ -305,8 +330,8 @@ public class DataStoreServerImpl implements DataStoreServer {
     }
 
     /**
-     * Customize DataStoreImpl to use a different transaction table, to create
-     * transactions explicitly, and to allocate blocks of objects.
+     * Customize DataStoreImpl to use a different transaction table and to
+     * create transactions explicitly.
      */
     private class CustomDataStoreImpl extends DataStoreImpl {
 
@@ -338,26 +363,26 @@ public class DataStoreServerImpl implements DataStoreServer {
 
 	/** Creates a new transaction. */
 	long createTransaction() {
+	    logger.log(Level.FINER, "createTransaction");
 	    long tid;
 	    synchronized (tidLock) {
 		if (nextTxnId > lastTxnId) {
+		    logger.log(Level.FINE, "Allocate more transaction IDs");
 		    nextTxnId = getNextTxnId(TXN_ALLOCATION_BLOCK_SIZE);
 		    lastTxnId = nextTxnId + TXN_ALLOCATION_BLOCK_SIZE - 1;
 		}
 		tid = nextTxnId++;
 	    }
 	    joinNewTransaction(new Txn(tid));
+	    logger.log(Level.FINER,
+		       "createTransaction returns tid:{0,number,#}",
+		       tid);
 	    return tid;
-	}
-
-	/* Make this method accessible to the containing class. */
-	protected long allocateObjects(int count) {
-	    return super.allocateObjects(count);
 	}
     }
 
     /**
-     * Provides for making the server available on the network, and removing
+     * Provides for making the server available on the network, and removing it
      * from the network during shutdown.
      */
     private static class Exporter {
@@ -373,11 +398,12 @@ public class DataStoreServerImpl implements DataStoreServer {
 
 	/**
 	 * Makes the server available on the network on the specified port.  If
-	 * the port is 0, choses an anonymous port.  Returns the actual port on
-	 * which the server is available.
+	 * the port is 0, chooses an anonymous port.  Returns the actual port
+	 * on which the server is available.
 	 */
 	int export(DataStoreServer server, int port) throws IOException {
 	    this.server = server;
+	    assert server != null;
 	    ServerSocketFactory ssf = new ServerSocketFactory();
 	    registry = LocateRegistry.createRegistry(port, null, ssf);
 	    registry.rebind(
@@ -419,6 +445,31 @@ public class DataStoreServerImpl implements DataStoreServer {
     }   
 
     /**
+     * Defines a server socket factory that provides access to the server
+     * socket's local port.
+     */
+    private static class ServerSocketFactory
+	implements RMIServerSocketFactory
+    {
+	/** The last server socket created. */
+	private ServerSocket serverSocket;
+
+	/** Creates an instance. */
+	ServerSocketFactory() { }
+
+	/** {@inheritDoc} */
+	public ServerSocket createServerSocket(int port) throws IOException {
+	    serverSocket = new ServerSocket(port);
+	    return serverSocket;
+	}
+
+	/** Returns the local port of the last server socket created. */
+	int getLocalPort() {
+	    return (serverSocket == null) ? -1 : serverSocket.getLocalPort();
+	}
+    }
+
+    /**
      * An alternative exporter that uses an experimental socket-based facility
      * instead of Java RMI.
      */
@@ -443,31 +494,6 @@ public class DataStoreServerImpl implements DataStoreServer {
 		return false;
 	    }
 	    return true;
-	}
-    }
-
-    /**
-     * Defines a server socket factory that provides access to the server
-     * socket's local port.
-     */
-    private static class ServerSocketFactory
-	implements RMIServerSocketFactory
-    {
-	/** The last server socket created. */
-	private ServerSocket serverSocket;
-
-	/** Creates an instance. */
-	ServerSocketFactory() { }
-
-	/** {@inheritDoc} */
-	public ServerSocket createServerSocket(int port) throws IOException {
-	    serverSocket = new ServerSocket(port);
-	    return serverSocket;
-	}
-
-	/** Returns the local port of the last server socket created. */
-	int getLocalPort() {
-	    return (serverSocket == null) ? -1 : serverSocket.getLocalPort();
 	}
     }
 
@@ -510,8 +536,17 @@ public class DataStoreServerImpl implements DataStoreServer {
 	    TXN_TIMEOUT_PROPERTY, DEFAULT_TXN_TIMEOUT);
 	int requestedPort = wrappedProps.getIntProperty(
 	    PORT_PROPERTY, DEFAULT_PORT);
+	if (requestedPort < 0 || requestedPort > 65535) {
+	    throw new IllegalArgumentException(
+		"The " + PORT_PROPERTY + " property value must be " +
+		"greater than or equal to 0 and less than 65535: " +
+		requestedPort);
+	}
 	exporter = noRmi ? new SocketExporter() : new Exporter();
 	port = exporter.export(this, requestedPort);
+	if (requestedPort == 0) {
+	    logger.log(Level.INFO, "Server is using port {0}", port);
+	}
 	long reapDelay = wrappedProps.getLongProperty(
 	    REAP_DELAY_PROPERTY, DEFAULT_REAP_DELAY);
 	executor = Executors.newSingleThreadScheduledExecutor();
@@ -522,7 +557,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 			reapExpiredTransactions();
 		    } catch (Throwable t) {
 			logger.logThrow(
-			    Level.WARNING, t,
+			    Level.FINE, t,
 			    "Problem reaping expired transactions");
 		    }
 		}
@@ -694,7 +729,7 @@ public class DataStoreServerImpl implements DataStoreServer {
     }
 
     /**
-     * Returns the port being used for the RMI registry and the server.
+     * Returns the port being used for the server.
      *
      * @return	the port
      */
@@ -714,9 +749,9 @@ public class DataStoreServerImpl implements DataStoreServer {
     /* -- Package access and private methods -- */
 
     /**
-     * Find expired transactions that are expired and not in use, and tell the
-     * data store to abort them.  The data store needs this nudging to notice
-     * that it can perform the abort.
+     * Find transactions that are expired and not in use, and tell the data
+     * store to abort them.  The data store needs this nudging to notice that
+     * it can perform the abort.
      */
     void reapExpiredTransactions() {
 	Collection<Transaction> expired = txnTable.getExpired(txnTimeout);
@@ -734,8 +769,8 @@ public class DataStoreServerImpl implements DataStoreServer {
     }
 
     /**
-     * Returns the transaction for the specified ID, or null if not found, and
-     * throwing TransactionNotActiveException if the transaction is not active.
+     * Returns the transaction for the specified ID, throwing
+     * TransactionNotActiveException if the transaction is not active.
      */
     private Txn getTxn(long tid) {
 	try {

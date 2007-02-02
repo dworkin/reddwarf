@@ -158,8 +158,6 @@ final class DataStoreHeader {
      * @param	increment the amount to increment the stored amount
      * @return	the next available ID
      * @throws	DatabaseException if a problem occurs accessing the database
-     * @see	#NEXT_OBJ_ID_KEY NEXT_OBJ_ID_KEY
-     * @see	#NEXT_TXN_ID_KEY NEXT_TXN_ID_KEY
      */
     static long getNextId(long key,
 			  Database db,

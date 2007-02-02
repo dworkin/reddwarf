@@ -13,56 +13,38 @@ import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyManagedObject;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.util.Properties;
 import java.util.Random;
 import java.util.logging.Level;
-import java.util.logging.LogManager;
 import java.util.logging.Logger;
 import junit.framework.TestCase;
 
-/** Test concurrent operation. */
+/** Test concurrent operation of the data service. */
 @SuppressWarnings("hiding")
-public class TestConcurrent extends TestCase {
+public class TestDataServiceConcurrency extends TestCase {
 
     /** Logger for this test. */
     private static final LoggerWrapper logger =
-	new LoggerWrapper(Logger.getLogger(TestConcurrent.class.getName()));
+	new LoggerWrapper(
+	    Logger.getLogger(TestDataServiceConcurrency.class.getName()));
 
     /** The name of the DataStoreImpl class. */
     private static final String DataStoreImplClass =
 	"com.sun.sgs.impl.service.data.store.DataStoreImpl";
 
     /** The number of operations to perform. */
-    private static final int operations =
-	Integer.getInteger("test.operations", 10000);
+    protected int operations = Integer.getInteger("test.operations", 10000);
 
     /** The maximum number of objects to allocate. */
-    private static final int objects =
-	Integer.getInteger("test.objects", 1000);
+    protected int objects = Integer.getInteger("test.objects", 1000);
 
     /** The number of concurrent threads. */
-    private static final int threads = Integer.getInteger("test.threads", 2);
-
-    /** The logging to do for good performance. */
-    private static final String performanceLogging =
-	".level = WARNING\n" +
-	"handlers = java.util.logging.ConsoleHandler\n" +
-	"java.util.logging.ConsoleHandler.formatter =" +
-	" java.util.logging.SimpleFormatter\n" +
-	"java.util.logging.ConsoleHandler.level = WARNING";
-
-    /** Print test parameters. */
-    static {
-	System.err.println("Parameters: test.operations=" + operations +
-			   ", test.objects=" + objects +
-			   ", test.threads=" + threads);
-    }
+    protected int threads = Integer.getInteger("test.threads", 2);
 
     /** The transaction proxy. */
-    DummyTransactionProxy txnProxy;
+    final DummyTransactionProxy txnProxy = new DummyTransactionProxy();
 
     /** Set when the test passes. */
     protected boolean passed;
@@ -82,28 +64,28 @@ public class TestConcurrent extends TestCase {
     /** The number of threads that are done. */
     private int done;
 
+    /** Properties for creating services. */
     protected Properties props;
 
     /** The service to test. */
     private DataService service;
 
     /** Creates the test. */
-    public TestConcurrent(String name) {
+    public TestDataServiceConcurrency(String name) {
 	super(name);
     }
 
     /** Prints the name of the test case. */
     protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
-	if (System.getProperty("test.logging") == null) {
-	    /* Change logging */
-	    LogManager.getLogManager().readConfiguration(
-		new ByteArrayInputStream(performanceLogging.getBytes()));
-	}
+	System.err.println(
+	    "Parameters:" +
+	    "\n  test.operations=" + operations +
+	    "\n  test.objects=" + objects +
+	    "\n  test.threads=" + threads);
 	props = createProperties(
 	    DataStoreImplClass + ".directory", createDirectory(),
-	    "com.sun.sgs.appName", "TestConcurrent");
-	txnProxy = new DummyTransactionProxy();
+	    "com.sun.sgs.appName", "TestDataServiceConcurrency");
     }
 
     /** Sets passed if the test passes. */
@@ -128,9 +110,6 @@ public class TestConcurrent extends TestCase {
 	if (passed) {
 	    deleteDirectory(directory);
 	}
-	if (System.getProperty("test.logging") == null) {
-	    LogManager.getLogManager().readConfiguration();
-	}
     }
 
     /** Shuts down the service. */
@@ -140,7 +119,7 @@ public class TestConcurrent extends TestCase {
 
     /* -- Tests -- */
 
-    public void testConcurrent() throws Throwable {
+    public void testConcurrency() throws Throwable {
 	DummyComponentRegistry componentRegistry =
 	    new DummyComponentRegistry();
 	service = getDataService(props, componentRegistry);
@@ -351,6 +330,7 @@ public class TestConcurrent extends TestCase {
 	return props;
     }
 
+    /** Returns the data service to test. */
     protected DataService getDataService(
 	Properties props, ComponentRegistry componentRegistry)
 	throws Exception

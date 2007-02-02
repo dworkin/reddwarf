@@ -10,14 +10,12 @@ import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
-import java.util.logging.LogManager;
 import junit.framework.TestCase;
 
 /**
@@ -30,7 +28,7 @@ import junit.framework.TestCase;
  * Operating System: Mac OS X 10.4.8
  * Berkeley DB Version: 4.5.20
  * Java Version: 1.5.0_06
- * Parameters: test.items=400, test.modifyItems=200
+ * Parameters: test.items=400, test.modify.items=200
  * Testcase: testRead
  * Time: 43 ms per transaction
  * Testcase: testReadNoDetectMods
@@ -40,7 +38,7 @@ import junit.framework.TestCase;
  * Testcase: testWriteNoDetectMods
  * Time: 36 ms per transaction
  */
-public class TestPerformance extends TestCase {
+public class TestDataServicePerformance extends TestCase {
 
     /** The name of the DataStoreImpl class. */
     private static final String DataStoreImplClass =
@@ -51,40 +49,25 @@ public class TestPerformance extends TestCase {
 	DataServiceImpl.class.getName();
 
     /** The number of objects to read in a transaction. */
-    private static int items = Integer.getInteger("test.items", 400);
+    protected int items = Integer.getInteger("test.items", 100);
 
     /**
      * The number of objects to modify in a transaction, if doing modification.
      */
-    private static int modifyItems =
-	Integer.getInteger("test.modifyItems", 200);
+    protected int modifyItems = Integer.getInteger("test.modify.items", 50);
 
     /** The number of times to repeat the timing. */
-    private static int repeat = Integer.getInteger("test.repeat", 5);
+    protected int repeat = Integer.getInteger("test.repeat", 5);
 
     /** Whether to flush to disk on transaction commits. */
-    private static boolean testFlush = Boolean.getBoolean("test.flush");
+    protected boolean testFlush = Boolean.getBoolean("test.flush");
 
     /** The number of transactions between logging database statistics. */
-    private static int logStats = Integer.getInteger(
-	"test.logStats", Integer.MAX_VALUE);
-
-    /** Whether to do logging, which is otherwise disabled. */
-    private static boolean doLogging = Boolean.getBoolean("test.doLogging");
-
-    /** The logging to do for good performance. */
-    private static final String performanceLogging =
-	".level = WARNING\n" +
-	"handlers = java.util.logging.ConsoleHandler\n" +
-	"java.util.logging.ConsoleHandler.formatter =" +
-	" java.util.logging.SimpleFormatter\n" +
-	"java.util.logging.ConsoleHandler.level = WARNING";
-
-    /** Whether we've printed the parameters. */
-    private static boolean printedParameters;
+    private int logStats = Integer.getInteger(
+	"test.log.stats", Integer.MAX_VALUE);
 
     /** The number of times to run the test while timing. */
-    protected int count;
+    protected int count = Integer.getInteger("test.count", 60);
 
     /** Set when the test passes. */
     protected boolean passed;
@@ -109,38 +92,25 @@ public class TestPerformance extends TestCase {
     private DataService service;
 
     /** Creates the test. */
-    public TestPerformance(String name) {
+    public TestDataServicePerformance(String name) {
 	super(name);
-	count = Integer.getInteger("test.count", 60);
     }
 
     /**
-     * Prints the test case, initializes the transaction, and disables logging
-     * if necessary.
+     * Prints the test case, initializes the transaction, and sets up the
+     * service properties.
      */
     protected void setUp() throws Exception {
-	maybePrintParameters();
 	System.err.println("Testcase: " + getName());
+	System.err.println("Parameters:" +
+			   "\n  test.count=" + count +
+			   "\n  test.items=" + items +
+			   "\n  test.modify.items=" + modifyItems);
 	createTransaction();
-	if (!doLogging) {
-	    /* Change logging */
-	    LogManager.getLogManager().readConfiguration(
-		new ByteArrayInputStream(performanceLogging.getBytes()));
-	}
 	props = createProperties(
 	    DataStoreImplClass + ".directory", createDirectory(),
-	    "com.sun.sgs.appName", "TestPerformance",
+	    "com.sun.sgs.appName", "TestDataServicePerformance",
 	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
-    }
-
-    private void maybePrintParameters() {
-	if (!printedParameters) {
-	    System.err.println("Parameters:" +
-			       "\n  test.count=" + count +
-			       "\n  test.items=" + items +
-			       "\n  test.modifyItems=" + modifyItems);
-	    printedParameters = true;
-	}
     }
 
     /** Sets passed if the test passes. */
@@ -151,7 +121,7 @@ public class TestPerformance extends TestCase {
 
     /**
      * Deletes the directory if the test passes and the directory was
-     * created, and reinitializes logging.
+     * created.
      */
     protected void tearDown() throws Exception {
 	if (service != null) {
@@ -167,9 +137,6 @@ public class TestPerformance extends TestCase {
 	}
 	if (passed && directory != null) {
 	    deleteDirectory(directory);
-	}
-	if (!doLogging) {
-	    LogManager.getLogManager().readConfiguration();
 	}
     }
 
@@ -212,7 +179,8 @@ public class TestPerformance extends TestCase {
 	    }
 	    long stop = System.currentTimeMillis();
 	    System.err.println(
-		"Time: " + (stop - start) / count + " ms per transaction");
+		"Time: " + (stop - start) / (float) count +
+		" ms per transaction");
 	}
     }
 
@@ -262,7 +230,8 @@ public class TestPerformance extends TestCase {
 	    }
 	    long stop = System.currentTimeMillis();
 	    System.err.println(
-		"Time: " + (stop - start) / count + " ms per transaction");
+		"Time: " + (stop - start) / (float) count +
+		" ms per transaction");
 	}
     }
 
@@ -343,6 +312,7 @@ public class TestPerformance extends TestCase {
 	int next() { return ++count; }
     }
 
+    /** Returns the data service to test. */
     protected DataService getDataService(
 	Properties props, ComponentRegistry componentRegistry)
 	throws Exception

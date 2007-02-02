@@ -10,10 +10,18 @@ import java.net.Socket;
  */
 /* XXX: Use thread pools? */
 class DataStoreServerRemote implements Runnable {
-    /* XXX: 2 hours -- same as RMI default */
+
+    /* XXX: 2 hours -- same as RMI default.  Make configurable? */
+    /** The number of milliseconds before closing an idle connection. */
     private static final int connectionReadTimeout = 2 * 3600 * 1000;
+
+    /** The server socket, or null if closed. */
     ServerSocket serverSocket;
+
+    /** The data store server, for up calls. */
     private final DataStoreServer server;
+
+    /** Creates an instance for the specified server and port. */
     DataStoreServerRemote(DataStoreServer server, int port)
 	throws IOException
     {
@@ -21,15 +29,21 @@ class DataStoreServerRemote implements Runnable {
 	this.server = server;
 	new Thread(this, "DataStoreServerRemote").start();
     }
+
+    /** Shuts down the server. */
     synchronized void shutdown() throws IOException {
 	if (serverSocket != null) {
 	    serverSocket.close();
 	    serverSocket = null;
 	}
     }
+
+    /** Checks if the server is shut down. */
     private synchronized boolean isShutdown() {
 	return serverSocket == null;
     }
+
+    /** Accepts and hands off new connections until shut down. */
     public void run() {
 	while (!isShutdown()) {
 	    try {
@@ -39,11 +53,19 @@ class DataStoreServerRemote implements Runnable {
 	    }
 	}
     }
+
+    /** Handles connections. */
     private class Handler implements Runnable {
+
+	/** The accepted socket. */
 	private final Socket socket;
+
+	/** Creates an instance for an accepted socket. */
 	Handler(Socket socket) {
 	    this.socket = socket;
 	}
+
+	/** Handles requests until an exception occurs. */
 	public void run() {
 	    try {
 		try {

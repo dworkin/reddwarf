@@ -76,7 +76,7 @@ public class TestDataServiceImpl extends TestCase {
     String directory;
 
     /** A transaction proxy. */
-    DummyTransactionProxy txnProxy;
+    DummyTransactionProxy txnProxy = new DummyTransactionProxy();
 
     /** A component registry. */
     DummyComponentRegistry componentRegistry;
@@ -101,14 +101,13 @@ public class TestDataServiceImpl extends TestCase {
      */
     protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
-	txnProxy = new DummyTransactionProxy();
-	createTransaction();
 	componentRegistry = new DummyComponentRegistry();
+	createTransaction();
 	service = getDataServiceImpl();
 	service.configure(componentRegistry, txnProxy);
+	txn.commit();
 	componentRegistry.setComponent(DataManager.class, service);
 	componentRegistry.registerAppContext();
-	txn.commit();
 	createTransaction();
 	dummy = new DummyManagedObject();
 	service.setBinding("dummy", dummy);
@@ -1307,6 +1306,18 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    public void testGetReferenceOldTxn() throws Exception {
+	dummy.setNext(new DummyManagedObject());
+	txn.commit();
+	createTransaction();
+	try {
+	    dummy.getNext();
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	}
+    }
+
     /* -- Test ManagedReference.getForUpdate -- */
 
     public void testGetReferenceUpdateNullType() throws Exception {
@@ -1424,6 +1435,18 @@ public class TestDataServiceImpl extends TestCase {
 	    dummy.getNextForUpdate();
 	    fail("Expected ObjectIOException");
 	} catch (ObjectIOException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testGetReferenceUpdateOldTxn() throws Exception {
+	dummy.setNext(new DummyManagedObject());
+	txn.commit();
+	createTransaction();
+	try {
+	    dummy.getNextForUpdate();
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
 	    System.err.println(e);
 	}
     }
