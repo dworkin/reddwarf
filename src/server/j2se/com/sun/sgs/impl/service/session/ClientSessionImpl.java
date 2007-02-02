@@ -88,6 +88,8 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 
     private boolean disconnectHandled = false;
 
+    private boolean shutdown = false;
+
     /** The sequence number for ordered messages sent from this client. */
     private AtomicLong sequenceNumber = new AtomicLong(0);
 
@@ -123,23 +125,21 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	this.reconnectionKey = generateId(); // create bogus one
 	this.connectionListener = null;
 	this.state = State.DISCONNECTED;
+	this.disconnectHandled = true;
+	this.shutdown = true;
     }
 
     /* -- Implement ClientSession -- */
 
     /** {@inheritDoc} */
     public String getName() {
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST, "getName returns {0}", name);
-	}
+	logger.log(Level.FINEST, "getName returns {0}", name);
 	return name;
     }
     
     /** {@inheritDoc} */
     public byte[] getSessionId() {
-        if (logger.isLoggable(Level.FINEST)) {
-            logger.log(Level.FINEST, "getSessionId returns {0}", sessionId);
-        }
+	logger.log(Level.FINEST, "getSessionId returns {0}", sessionId);
         return sessionId;
     }
 
@@ -153,9 +153,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    currentState == State.CONNECTED ||
 	    currentState == State.RECONNECTING;
 
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST, "isConnected returns {0}", connected);
-	}
+	logger.log(Level.FINEST, "isConnected returns {0}", connected);
 	return connected;
     }
 
@@ -187,16 +185,12 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		throw new IllegalStateException("client session not connected");
 	    }
 	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.logThrow(
-		    Level.FINEST, e, "send message:{0} throws", message);
-	    }
+	    logger.logThrow(
+		Level.FINEST, e, "send message:{0} throws", message);
 	    throw e;
 	}
 	
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST, "send message:{0} returns", message);
-	}
+	logger.log(Level.FINEST, "send message:{0} returns", message);
     }
 
     /** {@inheritDoc} */
@@ -204,9 +198,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	if (getCurrentState() != State.DISCONNECTED) {
 	    getContext().requestDisconnect(this);
 	}
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST, "disconnect returns");
-	}
+	logger.log(Level.FINEST, "disconnect returns");
     }
 
     /* -- Implement SgsClientSession -- */
@@ -216,18 +208,14 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	// TBI: ignore delivery for now...
 	try {
 	    sessionConnection.sendBytes(message);
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(
-		    Level.FINEST, "sendProtocolMessage message:{0} returns",
-		    message);
-	    }
+	    logger.log(
+		Level.FINEST, "sendProtocolMessage message:{0} returns",
+		message);
 	} catch (IOException e) {
-	    if (logger.isLoggable(Level.WARNING)) {
-		logger.logThrow(
-		    Level.WARNING, e,
-		    "sendProtocolMessage handle:{0} throws",
-                    sessionConnection);
-	    }
+	    logger.logThrow(
+		Level.WARNING, e,
+		"sendProtocolMessage handle:{0} throws",
+                sessionConnection);
 	}
     }
 
@@ -393,6 +381,25 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		}});
 	}
     }
+
+    /**
+     * Flags this session as shut down, and closes the connection.
+     */
+    void shutdown() {
+	synchronized (lock) {
+	    if (shutdown == true) {
+		return;
+	    }
+	    shutdown = true;
+	    disconnectHandled = true;
+	    state = State.DISCONNECTED;
+	    try {
+		sessionConnection.close();
+	    } catch (IOException e) {
+		// ignore
+	    }
+	}
+    }
     
     /** Returns the ConnectionListener for this session. */
     ConnectionListener getConnectionListener() {
@@ -423,7 +430,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
      * Listener for connection-related events for this session's
      * Connection.
      */
-    class Listener implements ConnectionListener {
+    private class Listener implements ConnectionListener {
 
 	/** {@inheritDoc} */
 	public void connected(Connection conn) {
@@ -711,7 +718,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	}
     }
 
-    private static class ClientSessionListenerWrapper
+    static class ClientSessionListenerWrapper
 	implements ManagedObject, Serializable
     {
 	private final static long serialVersionUID = 1L;
@@ -747,30 +754,20 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    AppListener appListener =
 		dataService.getServiceBinding(
 		    "com.sun.sgs.app.AppListener", AppListener.class);
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(
-		    Level.FINEST,
-		    "LoginTask.run invoking AppListener.loggedIn session:{0}",
-		    name);
-	    }
+	    logger.log(
+		Level.FINEST,
+		"LoginTask.run invoking AppListener.loggedIn session:{0}",
+		name);
+
 	    ClientSessionListener returnedListener =
 		appListener.loggedIn(ClientSessionImpl.this);
 	    
-	    if (logger.isLoggable(Level.FINEST)) {
+	    if (returnedListener instanceof Serializable) {
 		logger.log(
 		    Level.FINEST,
 		    "LoginTask.run AppListener.loggedIn returned {0}",
 		    returnedListener);
-	    }
-	    
-	    if ((returnedListener == null) ||
-		!(returnedListener instanceof Serializable))
-	    {
-		getContext().addMessageFirst(
-		    ClientSessionImpl.this, getLoginNackMessage(),
-		    Delivery.RELIABLE);
-		getContext().requestDisconnect(ClientSessionImpl.this);
-	    } else {
+
 		listener = new SessionListener(returnedListener);
 		MessageBuffer ack =
 		    new MessageBuffer(
@@ -783,6 +780,18 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		
 		getContext().addMessageFirst(
 		    ClientSessionImpl.this, ack.getBuffer(), Delivery.RELIABLE);
+		
+	    } else {
+		logger.log(
+		    Level.WARNING,
+		    "LoginTask.run AppListener.loggedIn returned " +
+		    "non-serializable listener {0}",
+		    returnedListener);
+		
+		getContext().addMessageFirst(
+		    ClientSessionImpl.this, getLoginNackMessage(),
+		    Delivery.RELIABLE);
+		getContext().requestDisconnect(ClientSessionImpl.this);
 	    }
 	}
     }
