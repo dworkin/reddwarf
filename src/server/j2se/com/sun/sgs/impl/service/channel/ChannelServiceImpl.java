@@ -517,20 +517,16 @@ public class ChannelServiceImpl
 	}
 
 	/** {@inheritDoc} */
-	public void disconnected(SgsClientSession session) {
-	    final byte[] sessionId = session.getSessionId();
+	public void disconnected(final SgsClientSession session) {
 	    nonDurableTaskScheduler.scheduleTask(
 		new KernelRunnable() {
 		    public void run() {
 			Context context = checkContext();
-			SgsClientSession sgsSession =
-			    sessionService.getClientSession(sessionId);
-			Set<Channel> channels = context.removeSession(sgsSession);
+			Set<Channel> channels = context.removeSession(session);
 			for (Channel channel : channels) {
-			    channel.leave(sgsSession);
+			    channel.leave(session);
 			}
 		    }});
-	    
 	}
     }
     
