@@ -9,6 +9,7 @@ import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskReservation;
 
 import com.sun.sgs.test.util.DummyTaskOwner;
+import com.sun.sgs.test.util.ParameterizedNameRunner;
 import com.sun.sgs.test.util.UtilThreadGroup;
 
 import java.util.LinkedList;
@@ -39,9 +40,8 @@ public class TestApplicationSchedulerImpl {
     @Parameterized.Parameters 
         public static LinkedList<String[]> data() {
         LinkedList<String[]> params = new LinkedList<String[]>();
-        String pkg = "com.sun.sgs.impl.kernel.schedule.";
-        params.add(new String [] {pkg + "FIFOApplicationScheduler"});
-        params.add(new String [] {pkg + "WindowApplicationScheduler"});
+        params.add(new String [] {FIFOApplicationScheduler.class.getName()});
+        params.add(new String [] {WindowApplicationScheduler.class.getName()});
         return params;
     }
 

@@ -7,6 +7,7 @@ import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskReservation;
 
 import com.sun.sgs.test.util.DummyTaskOwner;
+import com.sun.sgs.test.util.NameRunner;
 
 import java.util.Collection;
 import java.util.Properties;

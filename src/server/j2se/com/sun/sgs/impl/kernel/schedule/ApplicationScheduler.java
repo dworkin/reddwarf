@@ -55,7 +55,7 @@ interface ApplicationScheduler {
      * method, or a call to <code>getNextTask</code> is made at the same
      * time, the scheduler does not have to provide the next <code>max</code>
      * tasks to one consumer before servicing others. If this behavior is
-     * needed, the caling <code>SystemScheduler</code> needs to synchronize
+     * needed, the calling <code>SystemScheduler</code> needs to synchronize
      * access. The tasks are guaranteed to be in correct order, if the
      * provided <code>Collection</code> is ordered.
      *

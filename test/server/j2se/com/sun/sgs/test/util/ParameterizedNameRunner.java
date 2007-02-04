@@ -1,24 +1,28 @@
 
-package com.sun.sgs.impl.kernel.schedule;
+package com.sun.sgs.test.util;
 
 import org.junit.internal.runners.InitializationError; 
-import org.junit.internal.runners.TestClassRunner;
 
 import org.junit.runner.Description;
 
 import org.junit.runner.notification.RunListener;
 import org.junit.runner.notification.RunNotifier;
 
+import org.junit.runners.Parameterized;
+
 
 /**
  * This is a custom implementation of JUunit4's <code>TestClassRunner</code>
- * that adds support for reporting the name of each test when it starts.
+ * that adds support for reporting the name of each test when it starts. It
+ * subclasses off of <code>Parameterized</code> so that you can have name
+ * reporting in a parameterized test.
  */
-public class NameRunner extends TestClassRunner {
+public class ParameterizedNameRunner extends Parameterized {
 
     private static String testName;
 
-    public NameRunner(Class<?> c) throws InitializationError, Exception {
+    public ParameterizedNameRunner(Class<?> c) throws InitializationError,
+                                                      Exception {
         super(c);
     }
 

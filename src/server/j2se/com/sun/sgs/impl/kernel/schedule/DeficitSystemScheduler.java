@@ -10,6 +10,7 @@ import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskReservation;
 
 import java.util.HashMap;
+import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Queue;
 
@@ -33,7 +34,7 @@ import java.util.logging.Logger;
  * The number of tasks fetched from each applications varies based on the
  * application's deficit. The goal is to keep the number of tasks per
  * application balanced in aggregate, but to allow applications to exceed
- * or fall behing the average on occasion. Note that this class assumes
+ * or fall behind the average on occasion. Note that this class assumes
  * (roughly) equal cost for all tasks.
  */
 class DeficitSystemScheduler implements SystemScheduler {
@@ -48,7 +49,7 @@ class DeficitSystemScheduler implements SystemScheduler {
     private static final int TASKS_PER_ROUND = 120;
 
     // the average, defined as TASKS_PER_ROUND / number-of-applications
-    private int tasksPerApp = TASKS_PER_ROUND;
+    private int tasksPerApp;
 
     // the application schedulers
     private ConcurrentHashMap<KernelAppContext,ApplicationScheduler>
@@ -116,37 +117,40 @@ class DeficitSystemScheduler implements SystemScheduler {
             // no tasks are available, so see if anyone is already trying
             // to re-fill the queue
             if (isBeingFilled.compareAndSet(false, true)) {
-                // keep a count of how many tasks we fetch, and iterate
-                // through the applications, re-caculating each deficit based
-                // on the tasks fetched against the previous deficit and
-                // allocation per-round
-                int filled = 0;
-                for (KernelAppContext context : appSchedulers.keySet()) {
-                    ApplicationScheduler scheduler =
-                        appSchedulers.get(context);
-                    int deficit =
-                        Math.min(appDeficits.get(context), TASKS_PER_ROUND);
-                    int fetched =
-                        scheduler.getNextTasks(currentRoundQueue, deficit);
-                    filled += fetched;
-                    appDeficits.put(context, (deficit - fetched) +
-                                    tasksPerApp);
-                }
-
-                // NOTE: this is here mostly to see if the constant value
-                // needs to be changed, or needs to be dynamic, by looking
-                // to see if we're not getting enough tasks
-                if (logger.isLoggable(Level.CONFIG)) {
-                    if ((filled > 0) && (currentRoundQueue.size() == 0)) {
-                        logger.log(Level.CONFIG, "Deficit Rounds are not " +
-                                   "keeping up; increase size!");
+                try {
+                    // keep a count of how many tasks we fetch, and iterate
+                    // through the applications, re-calculating each deficit
+                    // based on the tasks fetched against the previous deficit
+                    // and allocation per-round
+                    int filled = 0;
+                    for (Entry<KernelAppContext,ApplicationScheduler>
+                             entry : appSchedulers.entrySet()) {
+                        int deficit =
+                            Math.min(appDeficits.get(entry.getKey()),
+                                     TASKS_PER_ROUND);
+                        int fetched =
+                            entry.getValue().getNextTasks(currentRoundQueue,
+                                                          deficit);
+                        filled += fetched;
+                        appDeficits.put(entry.getKey(),
+                                        (deficit - fetched) + tasksPerApp);
                     }
+
+                    // NOTE: this is here mostly to see if the constant value
+                    // needs to be changed, or needs to be dynamic, by looking
+                    // to see if we're not getting enough tasks
+                    if (logger.isLoggable(Level.CONFIG)) {
+                        if ((filled > 0) && (currentRoundQueue.size() == 0)) {
+                            logger.log(Level.CONFIG, "Deficit Rounds are " +
+                                       "not keeping up; increase size!");
+                        }
+                    }
+                } finally {
+                    isBeingFilled.set(false);
                 }
 
-                isBeingFilled.set(false);
+                task = currentRoundQueue.poll();
             }
-
-            task = currentRoundQueue.poll();
         }
         return task;
     }

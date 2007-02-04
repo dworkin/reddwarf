@@ -145,6 +145,7 @@ public class MasterTaskScheduler implements TaskScheduler {
      * Registers an application that will be scheduling tasks.
      *
      * @param context the application's <code>KernelAppContext</code>
+     * @param properties the application's <code>Properties</code>
      */
     public void registerApplication(KernelAppContext context,
                                     Properties properties) {

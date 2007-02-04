@@ -27,7 +27,7 @@ import java.util.logging.Logger;
  * has no ready tasks, the thread moves on to the next application, until
  * a task is available. This means that, in a system with no activity,
  * all consuming threads will continusously spin. In most deployments this
- * should be acceptable, since most schedulers should have at constant
+ * should be acceptable, since most schedulers should have continuous
  * if variable activity.
  *
  * @since 1.0

@@ -26,7 +26,7 @@ class ScheduledTask {
     private InternalRecurringTaskHandle recurringTaskHandle = null;
 
     // identifier that represents a non-recurring task.
-    public static final int NON_RECURRING = -1;
+    static final int NON_RECURRING = -1;
 
     /**
      * Creates an instance of <code>ScheduledTask</code> with all the same
@@ -65,7 +65,8 @@ class ScheduledTask {
      * @param priority the <code>Priority</code> of the task
      * @param startTime the time at which to start in milliseconds since
      *                  January 1, 1970
-     * @param period the delay between recurring executions
+     * @param period the delay between recurring executions, or
+     *               <code>NON_RECURRING</code>
      */
     ScheduledTask(KernelRunnable task, TaskOwner owner, Priority priority,
                   long startTime, long period) {

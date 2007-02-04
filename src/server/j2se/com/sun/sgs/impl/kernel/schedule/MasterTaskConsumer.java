@@ -107,9 +107,9 @@ class MasterTaskConsumer implements Runnable {
         } catch (InterruptedException ie) {
             if (logger.isLoggable(Level.FINE))
                 logger.logThrow(Level.FINE, ie, "Consumer thread finishing");
+        } finally {
+            masterScheduler.notifyThreadLeaving();
         }
-
-        masterScheduler.notifyThreadLeaving();
     }
 
 }

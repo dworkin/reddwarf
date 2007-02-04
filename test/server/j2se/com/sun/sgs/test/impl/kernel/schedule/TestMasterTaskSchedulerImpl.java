@@ -5,7 +5,6 @@ import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.MinimalTestKernel.TestResourceCoordinator;
 
 import com.sun.sgs.impl.kernel.schedule.MasterTaskScheduler;
-import com.sun.sgs.impl.kernel.schedule.NameRunner;
 
 import com.sun.sgs.kernel.KernelAppContext;
 import com.sun.sgs.kernel.KernelRunnable;
@@ -13,6 +12,7 @@ import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskReservation;
 
 import com.sun.sgs.test.util.DummyTaskOwner;
+import com.sun.sgs.test.util.NameRunner;
 
 import java.util.HashSet;
 import java.util.Properties;

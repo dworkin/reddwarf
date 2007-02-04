@@ -11,6 +11,7 @@ import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskReservation;
 
 import com.sun.sgs.test.util.DummyTaskOwner;
+import com.sun.sgs.test.util.ParameterizedNameRunner;
 import com.sun.sgs.test.util.UtilThreadGroup;
 
 import java.lang.reflect.Constructor;
@@ -44,10 +45,9 @@ public class TestSystemSchedulerImpl {
     @Parameterized.Parameters
         public static LinkedList<String[]> data() {
         LinkedList<String[]> params = new LinkedList<String[]>();
-        String pkg = "com.sun.sgs.impl.kernel.schedule.";
-        params.add(new String [] {pkg + "SingleAppSystemScheduler"});
-        params.add(new String [] {pkg + "RoundRobinSystemScheduler"});
-        params.add(new String [] {pkg + "DeficitSystemScheduler"});
+        params.add(new String [] {SingleAppSystemScheduler.class.getName()});
+        params.add(new String [] {RoundRobinSystemScheduler.class.getName()});
+        params.add(new String [] {DeficitSystemScheduler.class.getName()});
         return params;
     }
 
