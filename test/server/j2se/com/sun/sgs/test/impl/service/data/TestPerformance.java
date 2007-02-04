@@ -7,6 +7,7 @@ import com.sun.sgs.app.DataManager;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import java.io.File;
 import java.io.IOException;
@@ -176,7 +177,7 @@ public class TestPerformance extends TestCase {
     private void doTestRead(boolean detectMods) throws Exception {
 	Properties props = createProperties(
 	    DataStoreImplClass + ".directory", createDirectory(),
-	    "com.sun.sgs.appName", "TestPerformance",
+	    StandardProperties.APP_NAME, "TestPerformance",
 	    DataServiceImplClass + ".detectModifications",
 	    String.valueOf(detectMods),
 	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
@@ -227,7 +228,7 @@ public class TestPerformance extends TestCase {
     void doTestWrite(boolean detectMods, boolean flush) throws Exception {
 	Properties props = createProperties(
 	    DataStoreImplClass + ".directory", createDirectory(),
-	    "com.sun.sgs.appName", "TestPerformance",
+	    StandardProperties.APP_NAME, "TestPerformance",
 	    DataServiceImplClass + ".detectModifications",
 	    String.valueOf(detectMods),
 	    DataStoreImplClass + ".flushToDisk", String.valueOf(flush),

@@ -19,7 +19,14 @@ import java.io.Serializable;
  * to directly or indirectly, are stored by the <code>DataManager</code>.  It
  * is up to the application to determine when managed objects are no longer
  * needed and to remove them explicitly from the <code>DataManager</code> using
- * the {@link #removeObject removeObject} method.
+ * the {@link #removeObject removeObject} method. <p>
+ *
+ * Some implementations may need to be notified when managed objects and the
+ * objects they refer to are modified, while other implementations may be
+ * configurable to detect these modifications automatically.  Applications are
+ * always permitted to mark objects that have been modified, and doing so may
+ * produce performance improvements regardless of whether modifications are
+ * detected automatically.
  *
  * @see		ManagedObject
  * @see		ManagedReference
@@ -28,11 +35,11 @@ import java.io.Serializable;
 public interface DataManager {
 
     /**
-     * Obtains the object bound to a name.  Applications need to notify the
-     * system before modifying the object or any of the non-managed objects it
-     * refers to by calling {@link #markForUpdate markForUpdate} or {@link
-     * ManagedReference#getForUpdate ManagedReference.getForUpdate} before
-     * making the modifications.
+     * Obtains the object bound to a name.  For implementations that need to be
+     * notified of object modifications, applications should call {@link
+     * #markForUpdate markForUpdate} or {@link ManagedReference#getForUpdate
+     * ManagedReference.getForUpdate} before modifying the returned object or
+     * any of the non-managed objects it refers to.
      *
      * @param	<T> the type of the object
      * @param	name the name
@@ -125,8 +132,6 @@ public interface DataManager {
 
     /**
      * Notifies the system that an object is going to be modified.
-     * Applications should call this method before modifying the object or any
-     * of the non-managed objects it refers to.
      *
      * @param	object the object
      * @throws	IllegalArgumentException if <code>object</code> does not

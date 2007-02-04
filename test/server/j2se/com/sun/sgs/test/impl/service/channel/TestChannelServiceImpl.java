@@ -12,6 +12,7 @@ import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
@@ -59,13 +60,13 @@ public class TestChannelServiceImpl extends TestCase {
 
     /** Properties for the channel service. */
     private static Properties serviceProps = createProperties(
-	"com.sun.sgs.appName", "TestChannelServiceImpl");
+	StandardProperties.APP_NAME, "TestChannelServiceImpl");
 
     /** Properties for creating the shared database. */
     private static Properties dbProps = createProperties(
 	DataStoreImplClassName + ".directory",
 	dbDirectory,
-	"com.sun.sgs.appName", "TestChannelServiceImpl",
+	StandardProperties.APP_NAME, "TestChannelServiceImpl",
 	DataServiceImplClassName + ".debugCheckInterval", "1");
     
     /**
@@ -517,6 +518,42 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testChannelJoin() throws Exception {
 	String channelName = "joinTest";
+	Channel channel = channelService.createChannel(
+		channelName, new DummyChannelListener(), Delivery.RELIABLE);
+	String[] names = new String[] { "a", "b", "c" };
+	Set<ClientSession> savedSessions = new HashSet<ClientSession>();
+
+	for (String name : names) {
+	    ClientSession session = new DummyClientSession(name);
+	    savedSessions.add(session);
+	    channel.join(session, new DummyChannelListener(channel));
+	}
+	txn.commit();
+	createTransaction();
+	try {
+	    channel = channelService.getChannel(channelName);
+	    Set<ClientSession> sessions = channel.getSessions();
+	    if (sessions.size() != names.length) {
+		fail("Expected " + names.length + " sessions, got " +
+		     sessions.size());
+	    }
+	    
+	    for (ClientSession session : savedSessions) {
+		if (!sessions.contains(session)) {
+		    fail("Expected session: " + session);
+		}
+	    }
+
+	    System.err.println("All sessions joined");
+
+	} finally {
+	    channel.close();
+	    txn.commit();
+	}
+    }
+
+    public void testChannelJoinWithListenerReferringToChannel() throws Exception {
+	String channelName = "joinWithListenerReferringToChannelTest";
 	Channel channel = channelService.createChannel(
 		channelName, new DummyChannelListener(), Delivery.RELIABLE);
 	String[] names = new String[] { "foo", "bar", "baz" };
@@ -1004,6 +1041,16 @@ public class TestChannelServiceImpl extends TestCase {
 	implements Serializable
     {
 	private final static long serialVersionUID = 1L;
+
+	private final Channel channel;
+
+	DummyChannelListener() {
+	    this(null);
+	}
+
+	DummyChannelListener(Channel channel) {
+	    this.channel = channel;
+	}
     }
 
     private static class DummyClientSession

@@ -16,18 +16,25 @@ import java.math.BigInteger;
  * the values of static fields or in other locations not managed by the
  * <code>DataManager</code>.  There is no guarantee that objects only reachable
  * through these external references will continue to be managed by the
- * <code>DataManager</code>.
+ * <code>DataManager</code>. <p>
+ *
+ * Some implementations may need to be notified when managed objects and the
+ * objects they refer to are modified, while other implementations may be
+ * configurable to detect these modifications automatically.  Applications are
+ * always permitted to mark objects that have been modified, and doing so may
+ * produce performance improvements regardless of whether modifications are
+ * detected automatically.
  *
  * @see		DataManager#createReference DataManager.createReference
  */
 public interface ManagedReference {
 
     /**
-     * Obtains the object associated with this reference.  Applications need to
-     * notify the system before modifying the returned object or any of the
-     * non-managed objects it refers to by calling {@link #getForUpdate
-     * getForUpdate} or {@link DataManager#markForUpdate
-     * DataManager.markForUpdate} before making the modifications.
+     * Obtains the object associated with this reference.  For implementations
+     * that need to be notified of object modifications, applications should
+     * call {@link #getForUpdate getForUpdate} or {@link
+     * DataManager#markForUpdate DataManager.markForUpdate} before modifying
+     * the returned object or any of the non-managed objects it refers to.
      *
      * @param	<T> the type of the referenced object
      * @param	type a class representing the type of the referenced object

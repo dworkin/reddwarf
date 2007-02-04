@@ -80,7 +80,7 @@ class AppStartupRunner implements KernelRunnable {
             // ...if it's not, create and then bind the listener
             try {
                 String appClass =
-                    properties.getProperty("com.sun.sgs.appListenerClass");
+                    properties.getProperty(StandardProperties.APP_LISTENER);
                 AppListener listener =
                     (AppListener)(Class.forName(appClass).newInstance());
                 dataService.setServiceBinding(APP_LISTENER_BINDING, listener);
