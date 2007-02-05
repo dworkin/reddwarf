@@ -401,6 +401,13 @@ class Kernel {
      * @throws Exception if there is any problem starting the system
      */
     public static void main(String [] args) throws Exception {
+        // make sure we were given an application to run
+        if (args.length < 1) {
+            logger.log(Level.SEVERE, "No applications were provided: halting");
+            System.out.println("Usage: AppName [AppName ...]");
+            System.exit(0);
+        }
+
         // start by loading from a config file (if one was provided), and
         // then merge in the system properties
         Properties systemProperties = new Properties();
@@ -442,8 +449,30 @@ class Kernel {
                                     systemProperties.getProperty(prop));
             }
 
-            // start the application
-            kernel.startupApplication(appProperties);
+            // make sure that at least the required keys are present, and if
+            // they are then start the application
+            if (appProperties.
+                getProperty(StandardProperties.APP_ROOT) == null) {
+                logger.log(Level.SEVERE, "Missing required property " +
+                           StandardProperties.APP_ROOT + " for application: " +
+                           appName + " ... skipping startup");
+            }
+            else if (appProperties.
+                getProperty(StandardProperties.APP_LISTENER) == null) {
+                logger.log(Level.SEVERE, "Missing required property " +
+                           StandardProperties.APP_LISTENER +
+                           "for application: " + appName +
+                           " ... skipping startup");
+            }
+            else if (appProperties.
+                getProperty(StandardProperties.APP_PORT) == null) {
+                logger.log(Level.SEVERE, "Missing required property " +
+                           StandardProperties.APP_PORT + " for application: " +
+                           appName + " ... skipping startup");
+            } else {
+                // start the application
+                kernel.startupApplication(appProperties);
+            }
         }
     }
 
