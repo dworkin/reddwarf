@@ -34,7 +34,7 @@ class ChatClientSessionListener
     public static final String GLOBAL_CHANNEL_NAME = "Global";
 
     /** The {@link Charset} encoding for client/server messages. */
-    private static final Charset CHARSET_UTF8 = Charset.forName("UTF8");
+    private static final Charset CHARSET_UTF8 = Charset.forName("UTF-8");
 
     /** The prefix commands must start with, "{@value #COMMAND_PREFIX}" */
     private static final String COMMAND_PREFIX = "/";

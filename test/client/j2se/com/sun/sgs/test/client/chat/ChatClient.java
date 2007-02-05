@@ -55,7 +55,7 @@ public class ChatClient extends JFrame
     public static final String GLOBAL_CHANNEL_NAME = "Global";
 
     /** The {@link Charset} encoding for client/server messages. */
-    public static final Charset CHARSET_UTF8 = Charset.forName("UTF8");
+    public static final Charset CHARSET_UTF8 = Charset.forName("UTF-8");
 
     /**
      * a list of clients currently connected to the
