@@ -9,8 +9,9 @@ import com.sun.sgs.kernel.KernelAppContext;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskReservation;
 
-import java.util.HashSet;
 import java.util.Properties;
+
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -38,10 +39,13 @@ class SingleAppSystemScheduler implements SystemScheduler, ProfilingConsumer {
     private ApplicationScheduler appScheduler;
 
     // the set of registered contexts
-    private HashSet<KernelAppContext> registeredContexts;
+    // FIXME: use a concurrent set when we move to 1.6
+    private ConcurrentLinkedQueue<KernelAppContext> registeredContexts;
 
     /**
      * Creates a new instance of <code>SingleAppSystemScheduler</code>.
+     *
+     * @param properties the <code>Properties</code> of the system
      */
     public SingleAppSystemScheduler(Properties properties) {
         logger.log(Level.CONFIG, "Creating a Single App System Scheduler");
@@ -55,7 +59,7 @@ class SingleAppSystemScheduler implements SystemScheduler, ProfilingConsumer {
         if (appScheduler == null)
             appScheduler = new FIFOApplicationScheduler(properties);
 
-        registeredContexts = new HashSet<KernelAppContext>();
+        registeredContexts = new ConcurrentLinkedQueue<KernelAppContext>();
     } 
 
     /**

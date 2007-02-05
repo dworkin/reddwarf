@@ -12,7 +12,6 @@ import com.sun.sgs.kernel.TaskReservation;
 import java.util.HashMap;
 import java.util.Map.Entry;
 import java.util.Properties;
-import java.util.Queue;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;

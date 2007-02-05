@@ -69,6 +69,8 @@ interface ApplicationScheduler {
     /**
      * Reserves a space for a task.
      *
+     * @param task the <code>ScheduledTask</code> to reserve
+     *
      * @return a <code>TaskReservation</code> for the task
      *
      * @throws TaskRejectedException if a reservation cannot be made, or if

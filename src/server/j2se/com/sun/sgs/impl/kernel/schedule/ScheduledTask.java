@@ -3,7 +3,6 @@ package com.sun.sgs.impl.kernel.schedule;
 
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.Priority;
-import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskOwner;
 
 

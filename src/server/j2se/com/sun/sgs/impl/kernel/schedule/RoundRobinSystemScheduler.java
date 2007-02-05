@@ -9,7 +9,6 @@ import com.sun.sgs.kernel.KernelAppContext;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskReservation;
 
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Properties;
 
