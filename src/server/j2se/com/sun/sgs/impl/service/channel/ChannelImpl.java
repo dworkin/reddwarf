@@ -116,6 +116,7 @@ final class ChannelImpl implements Channel, Serializable {
 	    
 	    context.getService(DataService.class).markForUpdate(state);
 	    state.addSession(session, listener);
+	    context.joinChannel(session, this);
 	    int nameSize = MessageBuffer.getSize(state.name);
 	    MessageBuffer buf = new MessageBuffer(3 + nameSize);
 	    buf.putByte(SimpleSgsProtocol.VERSION).
@@ -159,8 +160,8 @@ final class ChannelImpl implements Channel, Serializable {
 	    }
 	    
 	    context.getService(DataService.class).markForUpdate(state);
+	    context.leaveChannel(session, this);
 	    state.removeSession(session);
-	
 	    int nameSize = MessageBuffer.getSize(state.name);
 	    MessageBuffer buf = new MessageBuffer(3 + nameSize);
 	    buf.putByte(SimpleSgsProtocol.VERSION).
@@ -189,9 +190,11 @@ final class ChannelImpl implements Channel, Serializable {
 		return;
 	    }
 	    context.getService(DataService.class).markForUpdate(state);
-	    state.removeAllSessions();
-
 	    final Set<ClientSession> sessions = getSessions();
+	    for (ClientSession session : sessions) {
+		context.leaveChannel(session, this);
+	    }
+	    state.removeAllSessions();
 
 	    int nameSize = MessageBuffer.getSize(state.name);
 	    MessageBuffer buf = new MessageBuffer(3 + nameSize);

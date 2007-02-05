@@ -12,6 +12,7 @@ import com.sun.sgs.app.TaskManager;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
@@ -59,13 +60,13 @@ public class TestChannelServiceImpl extends TestCase {
 
     /** Properties for the channel service. */
     private static Properties serviceProps = createProperties(
-	"com.sun.sgs.appName", "TestChannelServiceImpl");
+	StandardProperties.APP_NAME, "TestChannelServiceImpl");
 
     /** Properties for creating the shared database. */
     private static Properties dbProps = createProperties(
 	DataStoreImplClassName + ".directory",
 	dbDirectory,
-	"com.sun.sgs.appName", "TestChannelServiceImpl",
+	StandardProperties.APP_NAME, "TestChannelServiceImpl",
 	DataServiceImplClassName + ".debugCheckInterval", "1");
     
     /**

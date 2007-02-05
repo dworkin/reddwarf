@@ -7,6 +7,7 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectIOException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.service.DataService;
@@ -66,7 +67,7 @@ public class TestDataServiceImpl extends TestCase {
     /** Properties for creating the shared database. */
     private static Properties dbProps = createProperties(
 	DataStoreImplClassName + ".directory", dbDirectory,
-	"com.sun.sgs.appName", "TestDataServiceImpl",
+	StandardProperties.APP_NAME, "TestDataServiceImpl",
 	DataServiceImplClassName + ".debugCheckInterval", "0");
 
     /** Set when the test passes. */
@@ -175,7 +176,7 @@ public class TestDataServiceImpl extends TestCase {
     public void testConstructorBadDebugCheckInterval() throws Exception {
 	Properties props = createProperties(
 	    DataStoreImplClassName + ".directory", createDirectory(),
-	    "com.sun.sgs.appName", "Foo",
+	    StandardProperties.APP_NAME, "Foo",
 	    DataServiceImplClassName + ".debugCheckInterval", "gorp");
 	try {
 	    new DataServiceImpl(props, componentRegistry);
@@ -186,7 +187,11 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     public void testConstructorNoDirectory() throws Exception {
-	Properties props = createProperties("com.sun.sgs.appName", "Foo");
+        // FIXME: figure out how to specify the directory
+    }
+
+    public void testConstructorNoDirectoryNorRoot() throws Exception {
+	Properties props = createProperties(StandardProperties.APP_NAME, "Foo");
 	try {
 	    new DataServiceImpl(props, componentRegistry);
 	    fail("Expected IllegalArgumentException");
@@ -206,7 +211,7 @@ public class TestDataServiceImpl extends TestCase {
     public void testConfigureNullArgs() throws Exception {
 	Properties props = createProperties(
 	    DataStoreImplClassName + ".directory", createDirectory(),
-	    "com.sun.sgs.appName", "Foo");
+	    StandardProperties.APP_NAME, "Foo");
 	service = new DataServiceImpl(props, componentRegistry);
 	try {
 	    service.configure(null, txnProxy);

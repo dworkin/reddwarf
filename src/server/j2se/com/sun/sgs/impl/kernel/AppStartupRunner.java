@@ -43,10 +43,6 @@ class AppStartupRunner implements KernelRunnable {
     // the kernel that is responsible for the starting application
     private final Kernel kernel;
 
-    // the binding name for the app listener
-    private static final String APP_LISTENER_BINDING =
-        "com.sun.sgs.app.AppListener";
-
     /**
      * Creates an instance of <code>AppStartupRunner</code>.
      *
@@ -74,16 +70,16 @@ class AppStartupRunner implements KernelRunnable {
         DataService dataService = appContext.getService(DataService.class);
         try {
             // test to see if this name if the listener is already bound...
-            dataService.getServiceBinding(APP_LISTENER_BINDING,
+            dataService.getServiceBinding(StandardProperties.APP_LISTENER,
                                           AppListener.class);
         } catch (NameNotBoundException nnbe) {
             // ...if it's not, create and then bind the listener
             try {
                 String appClass =
-                    properties.getProperty("com.sun.sgs.appListenerClass");
+                    properties.getProperty(StandardProperties.APP_LISTENER);
                 AppListener listener =
                     (AppListener)(Class.forName(appClass).newInstance());
-                dataService.setServiceBinding(APP_LISTENER_BINDING, listener);
+                dataService.setServiceBinding(StandardProperties.APP_LISTENER, listener);
 
                 // since we created the listener, we're the first one to
                 // start the app, so we also need to start it up

@@ -7,6 +7,7 @@ import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.auth.NamePasswordCredentials;
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl.Context;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.MessageBuffer;
@@ -349,7 +350,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    }
 	}
 
-	sessionService.disconnected(sessionId);
+	sessionService.disconnected(this);
 
 	if (getCurrentState() != State.DISCONNECTED) {
 	    if (graceful) {
@@ -753,7 +754,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	public void run() {
 	    AppListener appListener =
 		dataService.getServiceBinding(
-		    "com.sun.sgs.app.AppListener", AppListener.class);
+		    StandardProperties.APP_LISTENER, AppListener.class);
 	    logger.log(
 		Level.FINEST,
 		"LoginTask.run invoking AppListener.loggedIn session:{0}",

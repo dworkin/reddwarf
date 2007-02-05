@@ -3,11 +3,14 @@ package com.sun.sgs.impl.service.channel;
 import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ChannelManager;
+import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
+import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameExistsException;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.util.HexDumper;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.MessageBuffer;
@@ -43,11 +46,11 @@ public class ChannelServiceImpl
     implements ChannelManager, Service, NonDurableTransactionParticipant
 {
 
-    /** The property that specifies the application name. */
-    public static final String APP_NAME_PROPERTY = "com.sun.sgs.appName";
-
     /** The name of this class. */
     private static final String CLASSNAME = ChannelServiceImpl.class.getName();
+
+    /** The prefix of each per-session key for its channel membership list. */
+    private static final String SESSION_PREFIX = CLASSNAME + ".session.";
     
     /** The logger for this class. */
     private static final LoggerWrapper logger =
@@ -106,10 +109,10 @@ public class ChannelServiceImpl
 	    if (systemRegistry == null) {
 		throw new NullPointerException("null systemRegistry");
 	    }
-	    appName = properties.getProperty(APP_NAME_PROPERTY);
+	    appName = properties.getProperty(StandardProperties.APP_NAME);
 	    if (appName == null) {
 		throw new IllegalArgumentException(
-		    "The " + APP_NAME_PROPERTY +
+		    "The " + StandardProperties.APP_NAME +
 		    " property must be specified");
 	    }	
 	    protocolMessageListener = new ChannelProtocolMessageListener();
@@ -379,6 +382,10 @@ public class ChannelServiceImpl
 	return context;
     }
 
+    /**
+     * Returns the context associated with the current transaction in
+     * this thread.
+     */
     static Context getContext() {
 	return currentContext.get();
     }
@@ -506,8 +513,21 @@ public class ChannelServiceImpl
 		}
 	    }
 	}
-    }
 
+	/** {@inheritDoc} */
+	public void disconnected(final SgsClientSession session) {
+	    nonDurableTaskScheduler.scheduleTask(
+		new KernelRunnable() {
+		    public void run() {
+			Context context = checkContext();
+			Set<Channel> channels = context.removeSession(session);
+			for (Channel channel : channels) {
+			    channel.leave(session);
+			}
+		    }});
+	}
+    }
+    
     /**
      * Stores information relating to a specific transaction operating on
      * channels.
@@ -525,6 +545,7 @@ public class ChannelServiceImpl
 	/** The transaction. */
 	final Transaction txn;
 
+	/** The channel service. */
 	final ChannelServiceImpl channelService;
 
 	/** Table of all channels, obtained from the data service. */
@@ -606,16 +627,117 @@ public class ChannelServiceImpl
 	    }
 	}
 
+	/**
+	 * Adds {@code channel} to the set of channels for the given
+	 * client {@code session}.  The {@code ChannelSet} for a
+	 * session is bound to a name composed of the channel
+	 * service's class name followed by ".session." followed by
+	 * the hex representation of the session's identifier.
+	 */
+	void joinChannel(ClientSession session, Channel channel) {
+	    String key = getSessionKey(session);
+	    try {
+		ChannelSet set =
+		    dataService.getServiceBinding(key, ChannelSet.class);
+		dataService.markForUpdate(set);
+		set.add(channel);
+	    } catch (NameNotBoundException e) {
+		ChannelSet set = new ChannelSet();
+		set.add(channel);
+		dataService.setServiceBinding(key, set);
+	    }
+	}
+
+	/**
+	 * Removes {@code channel} from the set of channels for the
+	 * given client {@code session}.
+	 */
+	void leaveChannel(ClientSession session, Channel channel) {
+	    String key = getSessionKey(session);
+	    try {
+		ChannelSet set =
+		    dataService.getServiceBinding(key, ChannelSet.class);
+		dataService.markForUpdate(set);
+		set.remove(channel);
+	    } catch (NameNotBoundException e) {
+		// ignore
+	    }
+	}
+
+	/**
+	 * Removes the given {@code session}'s channel set and binding
+	 * from the data store, returning a set containing the
+	 * channels that the session is still a member of.
+	 */
+	private Set<Channel> removeSession(ClientSession session) {
+	    String key = getSessionKey(session);
+	    try {
+		ChannelSet set =
+		    dataService.getServiceBinding(key, ChannelSet.class);
+		Set<Channel> channels = set.removeAll();
+		dataService.removeServiceBinding(key);
+		dataService.removeObject(set);
+		return channels;
+	    } catch (NameNotBoundException e) {
+		return new HashSet<Channel>();
+	    }
+	}
+
+	/**
+	 * Returns a service of the given {@code type}.
+	 */
 	<T extends Service> T getService(Class<T> type) {
 	    return txnProxy.getService(type);
 	}
 
 	/**
-	 * Returns the next sequence number for messages originating from
-	 * this service.
+	 * Returns the next sequence number for messages originating
+	 * from this service.
 	 */
 	long nextSequenceNumber() {
 	    return sequenceNumber.getAndIncrement();
+	}
+	
+    }
+
+    /**
+     * Returns a session key for the given {@code session}.
+     */
+    private static String getSessionKey(ClientSession session) {
+	byte[] sessionId = session.getSessionId();
+	return SESSION_PREFIX + HexDumper.format(sessionId);
+    }
+
+    /**
+     * Contains a set of channels (names) that a session is a member of.
+     */
+    private static class ChannelSet implements ManagedObject, Serializable {
+	private final static long serialVersionUID = 1L;
+
+	private final HashSet<String> set = new HashSet<String>();
+
+	ChannelSet() {
+	}
+
+	void add(Channel channel) {
+	    set.add(channel.getName());
+	}
+
+	void remove(Channel channel) {
+	    set.remove(channel.getName());
+	}
+	
+	Set<Channel> removeAll() {
+	    Set<Channel> channels = new HashSet<Channel>();
+	    for (String name : set) {
+		try {
+		    channels.add(getContext().getChannel(name));
+		} catch (NameNotBoundException e) {
+		    // ignore
+		}
+	    }
+	    set.clear();
+	    return channels;
 	}
     }
     

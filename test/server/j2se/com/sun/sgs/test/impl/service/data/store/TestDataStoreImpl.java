@@ -127,7 +127,11 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
-    public void testConstructorNoDirectory() {
+    public void testConstructorNoDirectory() throws Exception {
+        // FIXME: figure out how to specify the directory
+    }
+
+    public void testConstructorNoDirectoryNorRoot() {
 	Properties props = new Properties();
 	try {
 	    new DataStoreImpl(props);

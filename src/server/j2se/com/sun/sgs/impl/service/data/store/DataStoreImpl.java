@@ -24,6 +24,7 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionTimeoutException;
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.PropertiesWrapper;
 import com.sun.sgs.service.Transaction;
@@ -73,7 +74,7 @@ import java.util.logging.Logger;
  * <li> <i>Key:</i>
  *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl.directory
  *	</code> <br>
- *	<i>Required</i> <br>
+ *	<i>Default:</i> <code>${com.sun.sgs.app.root}"/dsdb"</code> <br>
  *	The directory in which to store database files.  Each instance of
  *	<code>DataStoreImpl</code> requires its own, unique directory. <p>
  *
@@ -162,6 +163,9 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
      * files.
      */
     private static final String DIRECTORY_PROPERTY = CLASSNAME + ".directory";
+
+    /** The default directory for database files from the app root. */
+    private static final String DEFAULT_DIRECTORY = "dsdb";
 
     /**
      * The property that specifies the number of object IDs to allocate at one
@@ -540,9 +544,10 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
      *
      * @param	properties the properties for configuring this instance
      * @throws	DataStoreException if there is a problem with the database
-     * @throws	IllegalArgumentException if the <code>
-     *		com.sun.sgs.impl.service.data.store.directory</code> property
-     *		is not specified, or if the value of the <code>
+     * @throws	IllegalArgumentException if neither
+     *      <code>com.sun.sgs.app.root</code> nor <code>
+     *      com.sun.sgs.impl.service.data.store.DataStoreImpl.directory</code>
+     *      is provided, or the <code>
      *		com.sun.sgs.impl.service.data.store.allocationBlockSize</code>
      *		property is not a valid integer greater than zero
      */
@@ -550,9 +555,14 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	logger.log(
 	    Level.CONFIG, "Creating DataStoreImpl properties:{0}", properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
-	directory = wrappedProps.getProperty(DIRECTORY_PROPERTY);
-	if (directory == null) {
-	    throw new IllegalArgumentException("Directory must be specified");
+	String specifiedDirectory = wrappedProps.getProperty(DIRECTORY_PROPERTY);
+    if (specifiedDirectory != null) {
+        directory = specifiedDirectory;
+    } else {
+        String rootDir = properties.getProperty(StandardProperties.APP_ROOT);
+        if (rootDir == null)
+            throw new IllegalArgumentException("A root directory is needed");
+        directory = rootDir + File.separator + DEFAULT_DIRECTORY;
 	}
 	allocationBlockSize = wrappedProps.getIntProperty(
 	    ALLOCATION_BLOCK_SIZE_PROPERTY, DEFAULT_ALLOCATION_BLOCK_SIZE);

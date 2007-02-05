@@ -5,6 +5,8 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityAuthenticator;
 import com.sun.sgs.auth.IdentityCredentials;
 
+import com.sun.sgs.impl.kernel.StandardProperties;
+
 import com.sun.sgs.kernel.KernelAppContext;
 
 import java.io.File;
@@ -85,7 +87,7 @@ public class NamePasswordAuthenticator implements IdentityAuthenticator
         // get the name of the password file
         String passFile = properties.getProperty(PASSWORD_FILE_PROPERTY);
         if (passFile == null) {
-            String root = properties.getProperty("com.sun.sgs.rootDir");
+            String root = properties.getProperty(StandardProperties.APP_ROOT);
             passFile = root + File.separator + DEFAULT_FILE_NAME;
         }
 
