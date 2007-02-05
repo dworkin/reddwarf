@@ -23,7 +23,7 @@ package com.sun.sgs.impl.kernel;
 public class StandardProperties {
 
     // the root of all the properties
-    private static final String NS = "com.sun.sgs";
+    private static final String NS = "com.sun.sgs.";
 
     /**
      * An optional key specifying a file containing properties. If set,
