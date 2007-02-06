@@ -319,6 +319,8 @@ public class TestConcurrent extends TestCase {
 	for (int i = 0; i < args.length; i += 2) {
 	    props.setProperty(args[i], args[i + 1]);
 	}
+	/* Include system properties and allow them to override */
+	props.putAll(System.getProperties());
 	return props;
     }
 }

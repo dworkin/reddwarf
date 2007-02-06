@@ -24,6 +24,8 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Properties;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -62,7 +64,7 @@ public class MasterTaskScheduler implements TaskScheduler {
 
     // the default system scheduler
     private static final String DEFAULT_SYSTEM_SCHEDULER =
-        "com.sun.sgs.impl.kernel.schedule.SimpleSystemScheduler";
+        "com.sun.sgs.impl.kernel.schedule.SingleAppSystemScheduler";
 
     /**
      * The property used to define the default number of initial consumer
@@ -73,6 +75,9 @@ public class MasterTaskScheduler implements TaskScheduler {
 
     // the default number of initial consumer threads
     private static final String DEFAULT_INITIAL_CONSUMER_THREADS = "4";
+
+    // the actual number of threads we're currently using
+    private AtomicInteger threadCount;
 
     // the default priority for tasks
     private static Priority defaultPriority = Priority.getDefaultPriority();
@@ -92,6 +97,13 @@ public class MasterTaskScheduler implements TaskScheduler {
         throws Exception
     {
         logger.log(Level.CONFIG, "Creating the Master Task Scheduler");
+
+        if (properties == null)
+            throw new NullPointerException("Properties cannot be null");
+        if (resourceCoordinator == null)
+            throw new NullPointerException("Resource Coord cannot be null");
+        if (taskHandler == null)
+            throw new NullPointerException("Task Handler cannot be null");
 
         String systemSchedulerName =
             properties.getProperty(SYSTEM_SCHEDULER_PROPERTY,
@@ -118,11 +130,13 @@ public class MasterTaskScheduler implements TaskScheduler {
         if (logger.isLoggable(Level.CONFIG))
             logger.log(Level.CONFIG, "Using {0} initial consumer threads",
                        startingThreads);
+        threadCount = new AtomicInteger(startingThreads);
 
         // create the initial consuming threads
         for (int i = 0; i < startingThreads; i++) {
             resourceCoordinator.
-                startTask(new MasterTaskConsumer(systemScheduler, taskHandler),
+                startTask(new MasterTaskConsumer(this,
+                                                 systemScheduler, taskHandler),
                           null);
         }
     }
@@ -131,11 +145,19 @@ public class MasterTaskScheduler implements TaskScheduler {
      * Registers an application that will be scheduling tasks.
      *
      * @param context the application's <code>KernelAppContext</code>
+     * @param properties the application's <code>Properties</code>
      */
-    public void registerApplication(KernelAppContext context) {
+    public void registerApplication(KernelAppContext context,
+                                    Properties properties) {
         if (logger.isLoggable(Level.CONFIG))
             logger.log(Level.CONFIG, "Registering application {0}", context);
-        systemScheduler.registerApplication(context);
+
+        if (context == null)
+            throw new NullPointerException("Context cannot be null");
+        if (properties == null)
+            throw new NullPointerException("Properties cannot be null");
+
+        systemScheduler.registerApplication(context, properties);
     }
 
     /**
@@ -148,6 +170,21 @@ public class MasterTaskScheduler implements TaskScheduler {
         // FIXME: lookup or create the reporter and provide to the manager
         // once we start the profiling work and define these interfaces
         logger.log(Level.CONFIG, "Registering profiling manager");
+    }
+
+    /**
+     * Notifies the scheduler that a thread has been interrupted and is
+     * finishing its work.
+     */
+    void notifyThreadLeaving() {
+        // FIXME: we're not yet trying to adapt the number of threads being
+        // used, so we assume that threads are only lost when the system
+        // wants to shutdown...in practice, this should look at some
+        // threshold and see if another consumer needs to be created
+        if (threadCount.getAndDecrement() == 1) {
+            logger.log(Level.CONFIG, "No more threads are consuming tasks");
+            systemScheduler.shutdown();
+        }
     }
 
     /**
@@ -184,6 +221,9 @@ public class MasterTaskScheduler implements TaskScheduler {
      */
     public TaskReservation reserveTasks(Collection<? extends KernelRunnable>
                                         tasks, TaskOwner owner) {
+        if (tasks == null)
+            throw new NullPointerException("Collection cannot be null");
+
         HashSet<TaskReservation> reservations = new HashSet<TaskReservation>();
         try {
             // make sure that all the reservations can be made...
@@ -209,8 +249,8 @@ public class MasterTaskScheduler implements TaskScheduler {
      */
     public void scheduleTask(KernelRunnable task, TaskOwner owner) {
         systemScheduler.
-            addReadyTask(new ScheduledTask(task, owner, defaultPriority,
-                                           System.currentTimeMillis()));
+            addTask(new ScheduledTask(task, owner, defaultPriority,
+                                      System.currentTimeMillis()));
     }
 
     /**
@@ -219,8 +259,8 @@ public class MasterTaskScheduler implements TaskScheduler {
     public void scheduleTask(KernelRunnable task, TaskOwner owner,
                              Priority priority) {
         systemScheduler.
-            addReadyTask(new ScheduledTask(task, owner, priority,
-                                           System.currentTimeMillis()));
+            addTask(new ScheduledTask(task, owner, priority,
+                                      System.currentTimeMillis()));
     }
 
     /**
@@ -229,8 +269,8 @@ public class MasterTaskScheduler implements TaskScheduler {
     public void scheduleTask(KernelRunnable task, TaskOwner owner,
                              long startTime) {
         systemScheduler.
-            addFutureTask(new ScheduledTask(task, owner, defaultPriority,
-                                            startTime));
+            addTask(new ScheduledTask(task, owner, defaultPriority,
+                                      startTime));
     }
 
     /**
@@ -243,6 +283,14 @@ public class MasterTaskScheduler implements TaskScheduler {
         return systemScheduler.
             addRecurringTask(new ScheduledTask(task, owner, defaultPriority,
                                                startTime, period));
+    }
+
+    /**
+     * Note that this should not be exposed yet, since there isn't real
+     * shutdown capability, but this is needed for our tests.
+     */
+    public void shutdown() {
+        systemScheduler.shutdown();
     }
 
     /**
