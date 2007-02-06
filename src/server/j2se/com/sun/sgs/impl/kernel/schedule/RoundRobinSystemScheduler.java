@@ -98,8 +98,11 @@ class RoundRobinSystemScheduler implements SystemScheduler {
         // note that when there are no applications or tasks, this results
         // in threads spinning tightly
         while (task == null) {
-            while (! iter.hasNext())
+            while (! iter.hasNext()) {
+                if (Thread.interrupted())
+                    throw new InterruptedException("Interrupt while spinning");
                 iter = appSchedulers.values().iterator();
+            }
             task = iter.next().getNextTask(false);
         }
         schedulerIter.set(iter);
