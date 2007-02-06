@@ -138,4 +138,8 @@ class FIFOApplicationScheduler
         while (! queue.offer(task));
     }
 
+    public void shutdown() {
+        timedTaskHandler.shutdown();
+    }
+
 }

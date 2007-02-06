@@ -230,6 +230,7 @@ public class TestInternalStructuresImpl {
             return new RecurringTaskHandleImpl(this, task);
         }
         public void notifyCancelled(ScheduledTask task) {}
+        public void shutdown() {}
     }
 
     private static class TimedTaskConsumerImpl implements TimedTaskConsumer {

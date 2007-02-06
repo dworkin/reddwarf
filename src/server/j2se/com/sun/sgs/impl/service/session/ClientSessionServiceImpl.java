@@ -666,11 +666,17 @@ public class ClientSessionServiceImpl
     /**
      * Removes the specified session from the internal session map.
      */
-    void disconnected(byte[] sessionId) {
+    void disconnected(SgsClientSession session) {
 	if (shuttingDown()) {
 	    return;
 	}
-	sessions.remove(new SessionId(sessionId));
+	// Notify session listeners of disconnection
+	for (ProtocolMessageListener serviceListener :
+		 serviceListeners.values())
+	{
+	    serviceListener.disconnected(session);
+	}
+	sessions.remove(new SessionId(session.getSessionId()));
     }
 
     /**
@@ -723,7 +729,6 @@ public class ClientSessionServiceImpl
 		key);
 
 	    final String listenerKey = key;		
-	    final DataService dataSvc = dataService;
 		
 	    nonDurableTaskScheduler.scheduleTaskOnCommit(
 		new KernelRunnable() {
@@ -738,9 +743,9 @@ public class ClientSessionServiceImpl
 			     ((ClientSessionListenerWrapper) obj).get() :
 			     ((ClientSessionListener) obj);
 			listener.disconnected(false);
-			dataSvc.removeServiceBinding(listenerKey);
+			dataService.removeServiceBinding(listenerKey);
 			if (isWrapped) {
-			    dataSvc.removeObject(obj);
+			    dataService.removeObject(obj);
 			}
 		    }});
 	}

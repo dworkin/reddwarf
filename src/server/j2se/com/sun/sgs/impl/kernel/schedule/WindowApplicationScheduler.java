@@ -180,6 +180,10 @@ class WindowApplicationScheduler
         while (! queue.offer(nextElement));
     }
 
+    public void shutdown() {
+        timedTaskHandler.shutdown();
+    }
+
     // Private class used to manage the priority queue
     private class QueueElement implements Comparable<QueueElement> {
         private final long window;

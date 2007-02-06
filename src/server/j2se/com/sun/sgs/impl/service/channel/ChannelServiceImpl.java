@@ -3,7 +3,9 @@ package com.sun.sgs.impl.service.channel;
 import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ChannelManager;
+import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
+import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameExistsException;
 import com.sun.sgs.app.NameNotBoundException;
@@ -46,6 +48,9 @@ public class ChannelServiceImpl
 
     /** The name of this class. */
     private static final String CLASSNAME = ChannelServiceImpl.class.getName();
+
+    /** The prefix of each per-session key for its channel membership list. */
+    private static final String SESSION_PREFIX = CLASSNAME + ".session.";
     
     /** The logger for this class. */
     private static final LoggerWrapper logger =
@@ -199,7 +204,8 @@ public class ChannelServiceImpl
 		throw new NullPointerException("null name");
 	    }
 	    if (listener != null && !(listener instanceof Serializable)) {
-		throw new IllegalArgumentException("listener is not serializable");
+		throw new IllegalArgumentException(
+		    "listener is not serializable");
 	    }
 	    Context context = checkContext();
 	    Channel channel = context.createChannel(name, listener, delivery);
@@ -377,6 +383,10 @@ public class ChannelServiceImpl
 	return context;
     }
 
+    /**
+     * Returns the context associated with the current transaction in
+     * this thread.
+     */
     static Context getContext() {
 	return currentContext.get();
     }
@@ -448,7 +458,14 @@ public class ChannelServiceImpl
                     buf.getLong(); // TODO Check sequence num
 		    short numRecipients = buf.getShort();
 		    if (numRecipients < 0) {
-			// TBD: log error...
+			if (logger.isLoggable(Level.WARNING)) {
+			    logger.log(
+			    	Level.WARNING,
+				"receivedMessage: bad CHANNEL_SEND_REQUEST " +
+				"(negative number of recipients) " +
+				"numRecipents:{0} session:{1}",
+				numRecipients, session);
+			}
 			return;
 		    }
 
@@ -465,7 +482,7 @@ public class ChannelServiceImpl
                     long seq = nextSequenceNumber(session);
 		    byte[] senderId = session.getSessionId();
 
-                    // Immediately forward to receiving clients
+                    // Forward message to receiving clients
 		    nonDurableTaskScheduler.scheduleTask(
                         new ForwardingTask(
                             name, senderId, sessions, channelMessage, seq));
@@ -483,7 +500,7 @@ public class ChannelServiceImpl
 			    Level.SEVERE,
 			    "receivedMessage session:{0} message:{1} " +
 			    "unknown opcode:{2}",
-			    session, message, opcode);
+			    session, HexDumper.format(message), opcode);
 		    }
 		    break;
 		}
@@ -492,7 +509,7 @@ public class ChannelServiceImpl
 		    logger.log(
 			Level.FINEST,
 			"receivedMessage session:{0} message:{1} returns",
-			session, message);
+			session, HexDumper.format(message));
 		}
 		
 	    } catch (RuntimeException e) {
@@ -500,12 +517,25 @@ public class ChannelServiceImpl
 		    logger.logThrow(
 			Level.SEVERE, e,
 			"receivedMessage session:{0} message:{1} throws",
-			session, message);
+			session, HexDumper.format(message));
 		}
 	    }
 	}
-    }
 
+	/** {@inheritDoc} */
+	public void disconnected(final SgsClientSession session) {
+	    nonDurableTaskScheduler.scheduleTask(
+		new KernelRunnable() {
+		    public void run() {
+			Context context = checkContext();
+			Set<Channel> channels = context.removeSession(session);
+			for (Channel channel : channels) {
+			    channel.leave(session);
+			}
+		    }});
+	}
+    }
+    
     /**
      * Stores information relating to a specific transaction operating on
      * channels.
@@ -523,6 +553,7 @@ public class ChannelServiceImpl
 	/** The transaction. */
 	final Transaction txn;
 
+	/** The channel service. */
 	final ChannelServiceImpl channelService;
 
 	/** Table of all channels, obtained from the data service. */
@@ -591,6 +622,8 @@ public class ChannelServiceImpl
 	    return channel;
 	}
 
+	/* -- other methods -- */
+
 	/**
 	 * Removes the channel with the specified name.  This method is
 	 * called when the 'close' method is invoked on a 'ChannelImpl'.
@@ -604,16 +637,116 @@ public class ChannelServiceImpl
 	    }
 	}
 
+	/**
+	 * Adds {@code channel} to the set of channels for the given
+	 * client {@code session}.  The {@code ChannelSet} for a
+	 * session is bound to a name composed of the channel
+	 * service's class name followed by ".session." followed by
+	 * the hex representation of the session's identifier.
+	 */
+	void joinChannel(ClientSession session, Channel channel) {
+	    String key = getSessionKey(session);
+	    try {
+		ChannelSet set =
+		    dataService.getServiceBinding(key, ChannelSet.class);
+		dataService.markForUpdate(set);
+		set.add(channel);
+	    } catch (NameNotBoundException e) {
+		ChannelSet set = new ChannelSet();
+		set.add(channel);
+		dataService.setServiceBinding(key, set);
+	    }
+	}
+
+	/**
+	 * Removes {@code channel} from the set of channels for the
+	 * given client {@code session}.
+	 */
+	void leaveChannel(ClientSession session, Channel channel) {
+	    String key = getSessionKey(session);
+	    try {
+		ChannelSet set =
+		    dataService.getServiceBinding(key, ChannelSet.class);
+		dataService.markForUpdate(set);
+		set.remove(channel);
+	    } catch (NameNotBoundException e) {
+		// ignore
+	    }
+	}
+
+	/**
+	 * Removes the given {@code session}'s channel set and binding
+	 * from the data store, returning a set containing the
+	 * channels that the session is still a member of.
+	 */
+	private Set<Channel> removeSession(ClientSession session) {
+	    String key = getSessionKey(session);
+	    try {
+		ChannelSet set =
+		    dataService.getServiceBinding(key, ChannelSet.class);
+		Set<Channel> channels = set.removeAll();
+		dataService.removeServiceBinding(key);
+		dataService.removeObject(set);
+		return channels;
+	    } catch (NameNotBoundException e) {
+		return new HashSet<Channel>();
+	    }
+	}
+
+	/**
+	 * Returns a service of the given {@code type}.
+	 */
 	<T extends Service> T getService(Class<T> type) {
 	    return txnProxy.getService(type);
 	}
 
 	/**
-	 * Returns the next sequence number for messages originating from
-	 * this service.
+	 * Returns the next sequence number for messages originating
+	 * from this service.
 	 */
 	long nextSequenceNumber() {
 	    return sequenceNumber.getAndIncrement();
+	}
+    }
+
+    /**
+     * Returns a session key for the given {@code session}.
+     */
+    private static String getSessionKey(ClientSession session) {
+	byte[] sessionId = session.getSessionId();
+	return SESSION_PREFIX + HexDumper.format(sessionId);
+    }
+
+    /**
+     * Contains a set of channels (names) that a session is a member of.
+     */
+    private static class ChannelSet implements ManagedObject, Serializable {
+	private final static long serialVersionUID = 1L;
+
+	private final HashSet<String> set = new HashSet<String>();
+
+	ChannelSet() {
+	}
+
+	void add(Channel channel) {
+	    set.add(channel.getName());
+	}
+
+	void remove(Channel channel) {
+	    set.remove(channel.getName());
+	}
+	
+	Set<Channel> removeAll() {
+	    Set<Channel> channels = new HashSet<Channel>();
+	    for (String name : set) {
+		try {
+		    channels.add(getContext().getChannel(name));
+		} catch (NameNotBoundException e) {
+		    // ignore
+		}
+	    }
+	    set.clear();
+	    return channels;
 	}
     }
     
