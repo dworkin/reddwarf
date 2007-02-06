@@ -43,6 +43,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -78,9 +79,19 @@ public class TestClientSessionServiceImpl extends TestCase {
 	"com.sun.sgs.appName", "TestClientSessionServiceImpl",
 	DataServiceImplClassName + ".debugCheckInterval", "1");
 
-    private static String LOGIN_FAILED_MESSAGE = "login failed";
+    private static final String LOGIN_FAILED_MESSAGE = "login failed";
 
-    private final static int WAIT_TIME = 1000;
+    private static final int WAIT_TIME = 1000;
+
+    private static final String RETURN_NULL = "return null";
+
+    private static final String NON_SERIALIZABLE = "non-serializable";
+
+    private static final String THROW_RUNTIME_EXCEPTION =
+	"throw RuntimeException";
+    
+    private static final String LISTENER_PREFIX =
+	"com.sun.sgs.impl.service.session.ClientSessionImpl";
     
     private static Object disconnectedCallbackLock = new Object();
     
@@ -265,29 +276,70 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient();
 	try {
 	    client.connect(port);
-	    client.login("foo", "bar");
+	    client.login("success", "password");
 	} finally {
             client.disconnect(false);
 	}
     }
 
-    public void testLoginRefused() throws Exception {
+    public void testLoggedInReturningNonSerializableClientSessionListener()
+	throws Exception
+    {
 	registerAppListener();
 	DummyClient client = new DummyClient();
 	try {
 	    client.connect(port);
-	    client.login("foo", "bar");
-	    try {
-		client.login("foo", "bar");
-	    } catch (RuntimeException e) {
-		if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
-		    System.err.println("login refused");
-		    return;
-		} else {
-		    fail("unexpected login failure: " + e);
-		}
-	    }
+	    client.login(NON_SERIALIZABLE, "password");
 	    fail("expected login failure");
+	} catch (RuntimeException e) {
+	    if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
+		System.err.println("login refused");
+		return;
+	    } else {
+		fail("unexpected login failure: " + e);
+	    }
+	} finally {
+	    client.disconnect(false);
+	}
+    }
+
+    public void testLoggedInReturningNullClientSessionListener()
+	throws Exception
+    {
+	registerAppListener();
+	DummyClient client = new DummyClient();
+	try {
+	    client.connect(port);
+	    client.login(RETURN_NULL, "bar");
+	    fail("expected login failure");	
+	} catch (RuntimeException e) {
+	    if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
+		System.err.println("login refused");
+		return;
+	    } else {
+		fail("unexpected login failure: " + e);
+	    }
+	} finally {
+	    client.disconnect(false);
+	}
+    }
+    
+    public void testLoggedInThrowingRuntimeException()
+	throws Exception
+    {
+	registerAppListener();
+	DummyClient client = new DummyClient();
+	try {
+	    client.connect(port);
+	    client.login(THROW_RUNTIME_EXCEPTION, "bar");
+	    fail("expected login failure");	
+	} catch (RuntimeException e) {
+	    if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
+		System.err.println("login refused");
+		return;
+	    } else {
+		fail("unexpected login failure: " + e);
+	    }
 	} finally {
 	    client.disconnect(false);
 	}
@@ -327,6 +379,89 @@ public class TestClientSessionServiceImpl extends TestCase {
 	} finally {
 	    client.disconnect(false);
 	}
+    }
+
+    public void testNotifyClientSessionListenerAfterCrash() throws Exception {
+	registerAppListener();
+	DummyClient client = new DummyClient();
+	String name = "testRemoveListener";
+	try {
+	    client.connect(port);
+	    client.login(name, "password");
+	    sessionService.shutdown();
+	    DummyClientSessionListener sessionListener =
+		getClientSessionListener(name);
+	    if (sessionListener == null) {
+		fail("listener is null");
+	    } else {
+		synchronized (disconnectedCallbackLock) {
+		    if (sessionListener.receivedDisconnectedCallback) {
+			fail("shouldn't have received disconnected callback");
+		    }
+		}
+	    }
+	    Set<String> listenerKeys = getClientSessionListenerKeys();
+	    System.err.println("Listener keys: " + listenerKeys);
+	    if (listenerKeys.isEmpty()) {
+		fail("no listener keys");
+	    } else if (listenerKeys.size() > 1) {
+		fail("more than one listener key");
+	    }
+	    sessionService = 
+		new ClientSessionServiceImpl(serviceProps, systemRegistry);
+	    createTransaction();
+	    sessionService.configure(serviceRegistry, txnProxy);
+	    serviceRegistry.setComponent(
+		ClientSessionService.class, sessionService);
+	    txnProxy.setComponent(
+	        ClientSessionService.class, sessionService);
+	    port = sessionService.getListenPort();
+	    txn.commit();
+
+	    sessionListener = getClientSessionListener(name);
+	    if (sessionListener == null) {
+		fail("listener is null!");
+	    } else {
+		synchronized (disconnectedCallbackLock) {
+
+		    if (!sessionListener.receivedDisconnectedCallback) {
+			disconnectedCallbackLock.wait(WAIT_TIME);
+			sessionListener = getClientSessionListener(name);
+		    }
+
+		    if (!sessionListener.receivedDisconnectedCallback) {
+			fail("disconnected callback not invoked");
+		    } else if (sessionListener.graceful) {
+			fail("disconnection was graceful!");
+		    }
+		    System.err.println("disconnect notification successful");
+		}
+	    }
+
+	    if (!getClientSessionListenerKeys().isEmpty()) {
+		fail("listener key not removed!");
+	    }
+	} finally {
+	    client.disconnect(false);
+	}
+    }
+
+    private Set<String> getClientSessionListenerKeys() throws Exception {
+	createTransaction();
+	Set<String> listenerKeys = new HashSet<String>();
+	String key = LISTENER_PREFIX;
+	for (;;) {
+	    key = dataService.nextServiceBoundName(key);
+	    if (key == null ||
+		! key.regionMatches(
+		      0, LISTENER_PREFIX, 0, LISTENER_PREFIX.length()))
+	    {
+		break;
+	    }
+	    listenerKeys.add(key);
+	}
+	txn.commit();
+	return listenerKeys;
     }
 
     private DummyClientSessionListener getClientSessionListener(String name)
@@ -496,7 +631,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    "com.sun.sgs.app.AppListener", appListener);
 	txn.commit();
     }
-
+    
     private DummyAppListener getAppListener() {
 	return (DummyAppListener) dataService.getServiceBinding(
 	    "com.sun.sgs.app.AppListener", AppListener.class);
@@ -840,22 +975,24 @@ public class TestClientSessionServiceImpl extends TestCase {
 
         /** {@inheritDoc} */
 	public ClientSessionListener loggedIn(ClientSession session) {
-	    DummyClientSessionListener listener =
-		new DummyClientSessionListener(session);
-	    ManagedReference listenerRef =
-		txnProxy.getService(DataService.class).
+	    
+	    if (session.getName().equals(RETURN_NULL)) {
+		return null;
+	    } else if (session.getName().equals(NON_SERIALIZABLE)) {
+		return new NonSerializableClientSessionListener();
+	    } else if (session.getName().equals(THROW_RUNTIME_EXCEPTION)) {
+		throw new RuntimeException("loggedIn throwing an exception");
+	    } else {
+		DummyClientSessionListener listener =
+		    new DummyClientSessionListener(session);
+		ManagedReference listenerRef =
+		    txnProxy.getService(DataService.class).
 		    createReference(listener);
-	    for (ClientSession activeSession : sessions.keySet()) {
-		if (session.getName().equals(activeSession.getName())) {
-		    System.err.println(
-			"DummyAppListener.loggedIn: user already logged in:" +
-			session);
-		    return null;
-		}
+		sessions.put(session, listenerRef);
+		System.err.println(
+		    "DummyAppListener.loggedIn: session:" + session);
+		return listener;
 	    }
-	    sessions.put(session, listenerRef);
-	    System.err.println("DummyAppListener.loggedIn: session:" + session);
-	    return listener;
 	}
 
         /** {@inheritDoc} */
@@ -878,6 +1015,18 @@ public class TestClientSessionServiceImpl extends TestCase {
 		}
 	    }
 	    return null;
+	}
+    }
+
+    private static class NonSerializableClientSessionListener
+	implements ClientSessionListener
+    {
+        /** {@inheritDoc} */
+	public void disconnected(boolean graceful) {
+	}
+
+        /** {@inheritDoc} */
+	public void receivedMessage(byte[] message) {
 	}
     }
 

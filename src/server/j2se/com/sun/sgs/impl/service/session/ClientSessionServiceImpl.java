@@ -1,10 +1,14 @@
 package com.sun.sgs.impl.service.session;
 
+import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.Delivery;
+import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.IdentityManager;
 import com.sun.sgs.impl.io.ServerSocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
+import com.sun.sgs.impl.service.session.ClientSessionImpl.
+    ClientSessionListenerWrapper;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.NonDurableTaskScheduler;
 import com.sun.sgs.io.Acceptor;
@@ -195,11 +199,11 @@ public class ClientSessionServiceImpl
 		    throw new IllegalArgumentException("Already configured");
 		}
 		dataService = registry.getComponent(DataService.class);
-		removeListenerBindings();
 		nonDurableTaskScheduler =
 		    new NonDurableTaskScheduler(
 			taskScheduler, proxy.getCurrentOwner(),
 			registry.getComponent(TaskService.class));
+		notifyDisconnectedSessions();
 		ServerSocketEndpoint endpoint =
 		    new ServerSocketEndpoint(
 		        new InetSocketAddress(port), TransportType.RELIABLE);
@@ -249,15 +253,11 @@ public class ClientSessionServiceImpl
      * {@code false}
      */
     public boolean shutdown() {
-	if (logger.isLoggable(Level.FINEST)) {
-	    logger.log(Level.FINEST, "shutdown");
-	}
+	logger.log(Level.FINEST, "shutdown");
 	
 	synchronized (this) {
 	    if (shuttingDown) {
-		if (logger.isLoggable(Level.FINEST)) {
-		    logger.log(Level.FINEST, "shutdown in progress");
-		}
+		logger.log(Level.FINEST, "shutdown in progress");
 		return false;
 	    }
 	    shuttingDown = true;
@@ -266,22 +266,21 @@ public class ClientSessionServiceImpl
 	try {
 	    if (acceptor != null) {
 		acceptor.shutdown();
-		if (logger.isLoggable(Level.FINEST)) {
-		    logger.log(Level.FINEST, "acceptor shutdown");
-		}
+		logger.log(Level.FINEST, "acceptor shutdown");
 	    }
 	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.logThrow(Level.FINEST, e, "shutdown exception occurred");
-	    }
+	    logger.logThrow(Level.FINEST, e, "shutdown exception occurred");
 	    // swallow exception
 	}
 
+	for (ClientSessionImpl session : sessions.values()) {
+	    session.shutdown();
+	}
 	sessions.clear();
 	
 	// TBI: The bindings can only be removed if this is called within a
 	// transaction, so comment out for now...
-	// removeListenerBindings();
+	// notifyDisconnectedSessions();
 
 	return true;
     }
@@ -302,7 +301,7 @@ public class ClientSessionServiceImpl
 
     /* -- Implement AcceptorListener -- */
 
-    class Listener implements AcceptorListener {
+    private class Listener implements AcceptorListener {
 
 	/**
 	 * {@inheritDoc}
@@ -671,11 +670,17 @@ public class ClientSessionServiceImpl
     /**
      * Removes the specified session from the internal session map.
      */
-    void disconnected(byte[] sessionId) {
+    void disconnected(SgsClientSession session) {
 	if (shuttingDown()) {
 	    return;
 	}
-	sessions.remove(new SessionId(sessionId));
+	// Notify session listeners of disconnection
+	for (ProtocolMessageListener serviceListener :
+		 serviceListeners.values())
+	{
+	    serviceListener.disconnected(session);
+	}
+	sessions.remove(new SessionId(session.getSessionId()));
     }
 
     /**
@@ -704,24 +709,49 @@ public class ClientSessionServiceImpl
     }
 
     /**
-     * Removes all ClientSessionListener bindings from the data store.
+     * For each {@code ClientSessionListener} bound in the data
+     * service, schedules a transactional task that a) notifies the
+     * listener that its corresponding session has been forcibly
+     * disconnected, and that b) removes the listener's binding from
+     * the data service.  If the listener was a serializable object
+     * wrapped in a managed {@code ClientSessionListenerWrapper}, the
+     * task removes the wrapper as well.
      */
-    private void removeListenerBindings() {
+    private void notifyDisconnectedSessions() {
+	String key = LISTENER_PREFIX;
 
 	for (;;) {
-	    String listenerKey =
-		dataService.nextServiceBoundName(LISTENER_PREFIX);
-	    if (listenerKey != null && isListenerKey(listenerKey)) {
-		if (logger.isLoggable(Level.FINEST)) {
-		    logger.log(
-			Level.FINEST,
-			"removeListenerBindings removing: {0}",
-			listenerKey);
-		}
-		dataService.removeServiceBinding(listenerKey);
-	    } else {
+	    key = dataService.nextServiceBoundName(key);
+	    
+	    if (key == null || ! isListenerKey(key)) {
 		break;
 	    }
+	    
+	    logger.log(
+		Level.FINEST,
+		"notifyDisconnectedSessions key: {0}",
+		key);
+
+	    final String listenerKey = key;		
+		
+	    nonDurableTaskScheduler.scheduleTaskOnCommit(
+		new KernelRunnable() {
+		    public void run() throws Exception {
+			ManagedObject obj = 
+			    dataService.getServiceBinding(
+				listenerKey, ManagedObject.class);
+			 boolean isWrapped =
+			     obj instanceof ClientSessionListenerWrapper;
+			 ClientSessionListener listener =
+			     isWrapped ?
+			     ((ClientSessionListenerWrapper) obj).get() :
+			     ((ClientSessionListener) obj);
+			listener.disconnected(false);
+			dataService.removeServiceBinding(listenerKey);
+			if (isWrapped) {
+			    dataService.removeObject(obj);
+			}
+		    }});
 	}
     }
 

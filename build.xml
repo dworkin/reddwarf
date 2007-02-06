@@ -33,8 +33,8 @@
 	    value="http://java.sun.com/j2se/1.5/docs/api"/>
   <property name="jdk.package.list" value="etc/jdk5.0_package_list"/>
   <property name="mina.doc.api.url"
-            value="http://mina.apache.org/report/1.0/apidocs"/>
-  <property name="mina.package.list" value="etc/mina1.0_package_list"/>
+            value="http://mina.apache.org/report/1.1/apidocs"/>
+  <property name="mina.package.list" value="etc/mina1.1_package_list"/>
 
   <property name="apidoc.server.zip"
             location="${build.dir}/sgs-server-apidoc.zip"/>
@@ -59,9 +59,7 @@
   <path id="server.classpath">
     <pathelement location="${build.dir}/classes/server"/>
     <pathelement location="${bdb.lib.dir}/db.jar"/>
-    <pathelement location="${lib.dir}/mina-core-1.0.1.jar"/>
-    <pathelement location="${lib.dir}/mina-java5-1.0.1.jar"/>
-    <pathelement location="${lib.dir}/backport-util-concurrent-Java50-3.0.jar"/>
+    <pathelement location="${lib.dir}/mina-core-1.1.jar"/>
     <pathelement location="${lib.dir}/slf4j-jdk14.jar"/>
   </path>
 
@@ -70,9 +68,7 @@
     <pathelement location="${build.dir}/classes/client"/>
     <!-- IO classes are currently under server, but client needs them -->
     <pathelement location="${build.dir}/classes/server"/>
-    <pathelement location="${lib.dir}/mina-core-1.0.1.jar"/>
-    <pathelement location="${lib.dir}/mina-java5-1.0.1.jar"/>
-    <pathelement location="${lib.dir}/backport-util-concurrent-Java50-3.0.jar"/>
+    <pathelement location="${lib.dir}/mina-core-1.1.jar"/>
     <pathelement location="${lib.dir}/slf4j-jdk14.jar"/>
   </path>
 
@@ -359,7 +355,7 @@
       <formatter type="${test.formatter.type}"/>
       <batchtest todir="${build.dir}/test/output">
 	<fileset dir="test/server/j2se"
-		 includes="${test.include}"/>
+	  includes="${test.include}"/>
       </batchtest>
     </junit>
     <fail if="tests.failed" message="Some tests failed"/>
