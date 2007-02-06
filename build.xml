@@ -354,9 +354,8 @@
 	   </assertions> -->
       <formatter type="${test.formatter.type}"/>
       <batchtest todir="${build.dir}/test/output">
-	<fileset dir="test/server/j2se">
-	  <include name="${test.include}"/>
-	</fileset>
+	<fileset dir="test/server/j2se"
+          includes="${test.include}"/>
       </batchtest>
     </junit>
     <fail if="tests.failed" message="Some tests failed"/>

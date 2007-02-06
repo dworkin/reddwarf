@@ -4,6 +4,7 @@ import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.Delivery;
+import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.auth.NamePasswordCredentials;
@@ -238,7 +239,6 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    return
 		name.equals(session.name) &&
 		Arrays.equals(sessionId, session.sessionId);
-            // Note: do not check reconnectionKey for equality
 	}
 	return false;
     }
@@ -671,8 +671,8 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     }
 
     /**
-     * Wrapper for persisting a ClientSessionListener that is either a
-     * ManagedObject or Serializable.
+     * Wrapper for persisting a {@code ClientSessionListener} that is
+     * either a {@code ManagedObject} or {@code Serializable}.
      */
     private class SessionListener {
 
@@ -722,6 +722,9 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	}
     }
 
+    /**
+     * A {@code ManagedObject} wrapper for a {@code ClientSessionListener}.
+     */
     static class ClientSessionListenerWrapper
 	implements ManagedObject, Serializable
     {
@@ -741,18 +744,22 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 
     /**
      * This is a transactional task to notify the application's
-     * AppListener that this session has logged in.
+     * {@code AppListener} that this session has logged in.
      */
     private class LoginTask implements KernelRunnable {
 
 	/**
-	 * Invokes the AppListener's 'loggedIn' callback which returns
-	 * a client session listener, and then queues the appropriate
-	 * acknowledgement to be sent whent this transaction commits.
-	 * If the client session needs to be disconnected (if
-	 * 'loggedIn' returns null or a non-serializable listener),
-	 * then submits a non-transactional task to disconnect the
-	 * client session.
+	 * Invokes the {@code AppListener}'s {@code loggedIn}
+	 * callback, which returns a client session listener, and then
+	 * queues the appropriate acknowledgement to be sent when this
+	 * transaction commits.  If the client session needs to be
+	 * disconnected (if {@code loggedIn} returns a
+	 * non-serializable listener (including{@code null}), or
+	 * throws a non-retryable {@code RuntimeException}, then
+	 * submits a non-transactional task to disconnect the client
+	 * session.  If {@code loggedIn} throws a retryable {@code
+	 * RuntimeException}, then that exception is thrown to the
+	 * caller.
 	 */
 	public void run() {
 	    AppListener appListener =
@@ -763,9 +770,15 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		"LoginTask.run invoking AppListener.loggedIn session:{0}",
 		name);
 
-	    ClientSessionListener returnedListener =
-		appListener.loggedIn(ClientSessionImpl.this);
-	    
+	    ClientSessionListener returnedListener = null;
+	    RuntimeException ex = null;
+
+	    try {
+		returnedListener = appListener.loggedIn(ClientSessionImpl.this);
+	    } catch (RuntimeException e) {
+		ex = e;
+	    }
+		
 	    if (returnedListener instanceof Serializable) {
 		logger.log(
 		    Level.FINEST,
@@ -786,12 +799,22 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		    ClientSessionImpl.this, ack.getBuffer(), Delivery.RELIABLE);
 		
 	    } else {
-		logger.log(
-		    Level.WARNING,
-		    "LoginTask.run AppListener.loggedIn returned " +
-		    "non-serializable listener {0}",
-		    returnedListener);
-		
+		if (ex == null) {
+		    logger.log(
+		        Level.WARNING,
+			"LoginTask.run AppListener.loggedIn returned " +
+			"non-serializable listener {0}",
+			returnedListener);
+		} else if (!(ex instanceof ExceptionRetryStatus) ||
+			   ((ExceptionRetryStatus) ex).shouldRetry() == false) {
+		    logger.logThrow(
+			Level.WARNING, ex,
+			"Invoking loggedIn on AppListener:{0} with " +
+			"session: {1} throws",
+			appListener, ClientSessionImpl.this);
+		} else {
+		    throw ex;
+		}
 		getContext().addMessageFirst(
 		    ClientSessionImpl.this, getLoginNackMessage(),
 		    Delivery.RELIABLE);
@@ -800,6 +823,9 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	}
     }
 
+    /**
+     * Returns a byte array containing a LOGIN_FAILURE protocol message.
+     */
     private static byte[] getLoginNackMessage() {
         int stringSize = MessageBuffer.getSize(LOGIN_REFUSED_REASON);
         MessageBuffer ack =
