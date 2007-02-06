@@ -6,7 +6,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.apache.mina.common.IoConnector;
-import org.apache.mina.filter.executor.ExecutorExecutor;
 import org.apache.mina.transport.socket.nio.DatagramConnector;
 
 import com.sun.sgs.impl.util.LoggerWrapper;
@@ -82,13 +81,12 @@ public class SocketEndpoint extends AbstractSocketEndpoint
      */
     public Connector<SocketAddress> createConnector() {
         IoConnector minaConnector;
-        ExecutorExecutor adapter = new ExecutorExecutor(executor);
         if (transportType.equals(TransportType.RELIABLE)) {
             minaConnector =
                 new org.apache.mina.transport.socket.nio.SocketConnector(
-                    numProcessors, adapter);
+                    numProcessors, executor);
         } else {
-            minaConnector = new DatagramConnector(adapter);
+            minaConnector = new DatagramConnector(executor);
         }
         SocketConnector connector = new SocketConnector(this, minaConnector);
         logger.log(Level.FINE, "returning {0}", connector);

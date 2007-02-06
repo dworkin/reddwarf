@@ -7,6 +7,8 @@ import com.sun.sgs.kernel.KernelAppContext;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskReservation;
 
+import java.util.Properties;
+
 
 /**
  * This interface is used to define top-level schedulers which are used
@@ -23,11 +25,12 @@ interface SystemScheduler {
      * to be scheduled.
      *
      * @param context the application's context
+     * @param properties the <code>Properties</code> for the application
      *
-     * @throws IllegalArgumentException if a scheduler cannot be resolved for
-     *                                  the given context
+     * @throws IllegalArgumentException if the context was already registered
      */
-    public void registerApplication(KernelAppContext context);
+    public void registerApplication(KernelAppContext context,
+                                    Properties properties);
 
     /**
      * Returns the next task to run. This call blocks until a task is
@@ -41,46 +44,33 @@ interface SystemScheduler {
     public ScheduledTask getNextTask() throws InterruptedException;
 
     /**
-     * Used by <code>ApplicationScheduler</code>s to give ready tasks to
-     * <code>SystemScheduler</code>s. These are tasks that should run
-     * as soon as possible, and cannot be cancelled once passed through
-     * this interface.
-     *
-     * @param task the ready <code>ScheduledTask</code>
-     *
-     * @throws InterruptedException if the thread is interrupted while
-     *                              waiting to give this task
-     */
-    public void giveReadyTask(ScheduledTask task) throws InterruptedException;
-
-    /**
      * Reserves a space for a task.
+     *
+     * @param task the <code>ScheduledTask</code> to reserve
      *
      * @return a <code>TaskReservation</code> for the task
      *
-     * @throws TaskRejectedException if a reservation cannot be made
+     * @throws TaskRejectedException if a reservation cannot be made, if
+     *                               the task is recurring, or if the
+     *                               associated context has not been registered
      */
     public TaskReservation reserveTask(ScheduledTask task);
 
     /**
      * Adds a task to the scheduler. This task is ready to execute as soon
-     * as there are available resources.
+     * as there are available resources and its starting time arrives. Note
+     * that while recurring tasks are initially added to the scheduler
+     * via <code>addRecurringTask</code>, each recurrence of that task
+     * (including the first one) is added through this method, though a
+     * unique instance of <code>ScheduledTask</code> must be provided each
+     * time.
      *
      * @param task the <code>ScheduledTask</code> that is ready to run
      *
-     * @throws TaskRejectedException if the task cannot be added
+     * @throws TaskRejectedException if the task cannot be added, or if the
+     *                               associated context has not been registered
      */
-    public void addReadyTask(ScheduledTask task);
-
-    /**
-     * Adds a task to the scheduler. This task is delayed, and supposed to
-     * run at some point in the future.
-     *
-     * @param task the <code>ScheduledTask</code> to run in the future
-     *
-     * @throws TaskRejectedException if the task cannot be added
-     */
-    public void addFutureTask(ScheduledTask task);
+    public void addTask(ScheduledTask task);
 
     /**
      * Adds a task to the scheduler. This task is a recurring task that is
@@ -91,6 +81,9 @@ interface SystemScheduler {
      * @param task the <code>ScheduledTask</code> to run recurringly
      *
      * @return a <code>RecurringTaskHandle</code> that manages the task
+     *
+     * @throws TaskRejectedException if the associated context has not been
+     *                               registered
      */
     public RecurringTaskHandle addRecurringTask(ScheduledTask task);
 

@@ -3,10 +3,13 @@ package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
+import com.sun.sgs.impl.kernel.schedule.MasterTaskScheduler;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionHandle;
 import com.sun.sgs.kernel.KernelAppContext;
 import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.kernel.Manageable;
+import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.test.util.DummyComponentRegistry;
@@ -14,6 +17,8 @@ import com.sun.sgs.test.util.DummyIdentity;
 import com.sun.sgs.test.util.DummyTaskScheduler;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
+import java.util.HashSet;
+import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 
 
@@ -27,6 +32,8 @@ public final class MinimalTestKernel
     // set up the task handler only once
     private static final TaskHandler taskHandler =
         new TaskHandler(new TestTransactionCoordinator());
+    // properties for a master scheduler (not used by default)
+    private static Properties masterSchedulerProperties = null;
     // a map of context state
     private static final ConcurrentHashMap<DummyAbstractKernelAppContext,
                                            ContextState> contextMap =
@@ -37,6 +44,24 @@ public final class MinimalTestKernel
         return proxy;
     }
 
+    /** Gets the single handler used for all tests */
+    public static TaskHandler getTaskHandler() {
+        return taskHandler;
+    }
+
+    /**
+     * Tells the kernel to use a real scheduler instead of the default
+     * <code>DummyTaskScheduler</code>.
+     */
+    public static void useMasterScheduler(Properties p) {
+        masterSchedulerProperties = p;
+    }
+
+    /** Tells the kernel to use the default dummy scheduler */
+    public static void useDummyScheduler() {
+        masterSchedulerProperties = null;
+    }
+
     /** Creates a unique context setup to run tasks */
     public static DummyAbstractKernelAppContext createContext() {
         DummyComponentRegistry systemRegistry = new DummyComponentRegistry();
@@ -45,8 +70,23 @@ public final class MinimalTestKernel
             new DummyAbstractKernelAppContext(serviceRegistry);
 
         serviceRegistry.registerAppContext();
-        systemRegistry.setComponent(TaskScheduler.class,
-                                    new DummyTaskScheduler(context, false));
+
+        TaskScheduler scheduler = null;
+        if (masterSchedulerProperties == null) {
+            scheduler = new DummyTaskScheduler(context, false);
+        } else {
+            TestResourceCoordinator rc = new TestResourceCoordinator();
+            systemRegistry.setComponent(TestResourceCoordinator.class, rc);
+            try {
+                scheduler = new MasterTaskScheduler(masterSchedulerProperties,
+                                                    rc, taskHandler);
+            } catch (Exception e) {
+                throw new IllegalArgumentException("Failed to create " +
+                                                   "master scheduler", e);
+            }
+        }
+        systemRegistry.setComponent(TaskScheduler.class, scheduler);
+
         contextMap.put(context, new ContextState(systemRegistry,
                                                  serviceRegistry));
         return context;
@@ -67,10 +107,17 @@ public final class MinimalTestKernel
     /** Destorys the given context, doing the appropriate shutdown */
     public static void destroyContext(DummyAbstractKernelAppContext context) {
         ContextState contextState = contextMap.remove(context);
-        DummyTaskScheduler scheduler =
-            (DummyTaskScheduler)(contextState.systemRegistry.
-                                 getComponent(TaskScheduler.class));
-        scheduler.shutdown();
+        TaskScheduler scheduler =
+            contextState.systemRegistry.getComponent(TaskScheduler.class);
+
+        if (scheduler instanceof DummyTaskScheduler) {
+            ((DummyTaskScheduler)scheduler).shutdown();
+        } else {
+            TestResourceCoordinator rc = contextState.systemRegistry.
+                getComponent(TestResourceCoordinator.class);
+            rc.shutdown();
+        }
+
         // NOTE: we could also do service shutdown here if we wanted
     }
 
@@ -149,6 +196,22 @@ public final class MinimalTestKernel
                             DummyComponentRegistry serviceRegistry) {
             this.systemRegistry = systemRegistry;
             this.serviceRegistry = serviceRegistry;
+        }
+    }
+
+    /** A dummy, unbounded resource coordinator that can shutdown */
+    public static class TestResourceCoordinator
+        implements ResourceCoordinator
+    {
+        private HashSet<Thread> threadSet = new HashSet<Thread>();
+        public void startTask(Runnable task, Manageable component) {
+            Thread t = new TransactionalTaskThread(task);
+            threadSet.add(t);
+            t.start();
+        }
+        public void shutdown() {
+            for (Thread t : threadSet)
+                t.interrupt();
         }
     }
 
