@@ -22,6 +22,7 @@ import javax.swing.JTextField;
 public class ValidatorDialog extends JDialog
 	implements ActionListener
 {
+    /** The version of the serialized form of this class. */
     private static final long serialVersionUID = 1L;
 
     private final JTextField nameField;

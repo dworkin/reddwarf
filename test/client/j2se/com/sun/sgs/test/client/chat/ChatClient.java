@@ -1,6 +1,7 @@
 package com.sun.sgs.test.client.chat;
 
 import java.awt.BorderLayout;
+import java.awt.Component;
 import java.awt.Container;
 import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
@@ -13,8 +14,13 @@ import java.awt.event.WindowEvent;
 import java.io.IOException;
 import java.net.PasswordAuthentication;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -22,10 +28,13 @@ import java.util.Set;
 import javax.swing.JButton;
 import javax.swing.JDesktopPane;
 import javax.swing.JFrame;
+import javax.swing.JInternalFrame;
 import javax.swing.JLabel;
+import javax.swing.JList;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.ListCellRenderer;
 
 import com.sun.sgs.client.ClientChannel;
 import com.sun.sgs.client.ClientChannelListener;
@@ -40,8 +49,10 @@ import com.sun.sgs.client.simple.SimpleClient;
  * Client (DCC) channel.
  */
 public class ChatClient extends JFrame
-        implements ActionListener, SimpleClientListener, ClientChannelListener
+    implements ActionListener, ListCellRenderer,
+               SimpleClientListener, ClientChannelListener
 {
+    /** The version of the serialized form of this class. */
     private static final long serialVersionUID = 1L;
 
     private final JButton loginButton;
@@ -52,16 +63,13 @@ public class ChatClient extends JFrame
     private final JDesktopPane desktop;
 
     /** The name of the global channel. */
-    public static final String GLOBAL_CHANNEL_NAME = "Global";
+    public static final String GLOBAL_CHANNEL_NAME = "-GLOBAL-";
 
     /** The {@link Charset} encoding for client/server messages. */
-    public static final Charset CHARSET_UTF8 = Charset.forName("UTF-8");
+    public static final Charset MESSAGE_CHARSET = Charset.forName("UTF-8");
 
-    /**
-     * a list of clients currently connected to the
-     * ChatApp on the server.
-     */
-    private final MemberList userList;
+    /**  The list of clients connected to the ChatApp on the server */
+    private final MultiList<SessionId> userList;
 
     /** used for communication with the server */
     private SimpleClient client;
@@ -76,6 +84,12 @@ public class ChatClient extends JFrame
 
     private final Map<SessionId, String> sessionNames =
         new HashMap<SessionId, String>();
+
+    /** A {@code JLabel} that is reused as our ListCellRendererComponent */
+    private final JLabel textLabel = new JLabel();
+
+    /** The user name for this client's session */
+    private String userName;
 
     // === Constructor ==
 
@@ -105,7 +119,7 @@ public class ChatClient extends JFrame
         JPanel eastPanel = new JPanel();
         eastPanel.setLayout(new BorderLayout());
         eastPanel.add(new JLabel("Users"), BorderLayout.NORTH);
-        userList = new MemberList();
+        userList = new MultiList<SessionId>(SessionId.class, this);
         userList.addMouseListener(getDCCMouseListener());
         eastPanel.add(new JScrollPane(userList), BorderLayout.CENTER);
         c.add(eastPanel, BorderLayout.EAST);
@@ -135,10 +149,7 @@ public class ChatClient extends JFrame
         buttonPanel.add(multiDccButton);
 
         addWindowListener(new QuitWindowListener(this));
-        
-        pack();
-        //setSize(800, 600);
-
+        setSize(1000, 720);
         setVisible(true);
     }
     
@@ -177,22 +188,17 @@ public class ChatClient extends JFrame
         return client.getSessionId();
     }
 
-    static byte[] getMessage(byte opcode, byte[] payload) {
-        byte[] message = new byte[1 + payload.length];
-        message[0] = opcode;
-        System.arraycopy(payload, 0, message, 1, payload.length);
-        return message;
-    }
-
     // === Handle main window GUI actions ===
     
     private void doLogin() {
 	setButtonsEnabled(false);
+        String host = System.getProperty("ChatApp.host", "localhost");
+        String port = System.getProperty("ChatApp.port", "2502");
 
         try {
             Properties props = new Properties();
-            props.put("host", "127.0.0.1");
-            props.put("port", "2502");
+            props.put("host", host);
+            props.put("port", port);
             client = new SimpleClient(this);
             client.login(props);
             // TODO: enable the loginButton as a "Cancel Login" action.
@@ -235,7 +241,7 @@ public class ChatClient extends JFrame
     private void doServerMessage() {
 	String message = getUserInput("Enter server message:");
         try {
-            client.send(message.getBytes(CHARSET_UTF8));
+            client.send(message.getBytes(MESSAGE_CHARSET));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -243,38 +249,35 @@ public class ChatClient extends JFrame
 
     private void doMultiDCCMessage() {
 	Set<SessionId> targets = new HashSet<SessionId>();
-        targets.addAll(userList.getSelectedClients());
+        targets.addAll(userList.getAllSelected());
     	if (targets.isEmpty()) {
     	    return;
     	}
-
-        String text = getUserInput("Enter private message:");
-        String message = "/dcc " + text.getBytes();
-        try {
-            dccChannel.send(targets, message.getBytes(CHARSET_UTF8));
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        doDCC(targets);
     }
 
-    void doDCCMessage() {
-	SessionId target = userList.getSelectedClient();
+    private void doSingleDCCMessage() {
+	SessionId target = userList.getSelected();
 	if (target == null) {
 	    return;
 	}
-	String text = getUserInput("Enter private message:");
-        String message = "/dcc " + text.getBytes();
+        doDCC(Collections.singleton(target));
+    }
+
+    private void doDCC(Set<SessionId> targets) {
+        String message = "/dcc " + getUserInput("Enter private message:");
         try {
-            dccChannel.send(target, message.getBytes(CHARSET_UTF8));
+            dccChannel.send(targets, message.getBytes(MESSAGE_CHARSET));
         } catch (IOException e) {
             e.printStackTrace();
         }
+        
     }
 
     void joinChannel(String channelName) {
 	String cmd = "/join " + channelName;
         try {
-            client.send(cmd.getBytes(CHARSET_UTF8));
+            client.send(cmd.getBytes(MESSAGE_CHARSET));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -283,14 +286,56 @@ public class ChatClient extends JFrame
     void leaveChannel(ClientChannel chan) {
 	String cmd = "/leave " + chan.getName();
         try {
-            client.send(cmd.getBytes(CHARSET_UTF8));
+            client.send(cmd.getBytes(MESSAGE_CHARSET));
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
-    
-    static byte[] hexToBytes(String arg) {
-        String hexString = arg.substring(1, arg.length() - 1);
+
+    /**
+     * {@inheritDoc}
+     * <p>
+     * This implementation renders a {@link SessionId} using a name
+     * mapping maintained by the client.
+     */
+    public Component getListCellRendererComponent(JList list, Object value,
+            int index, boolean isSelected, boolean cellHasFocus)
+    {
+        SessionId session = (SessionId) value;
+        String text = formatSession(session);
+        textLabel.setText(text);
+        return textLabel;
+    }
+
+    /** TODO docs */
+    private String formatSession(SessionId session) {
+        return getSessionName(session) + " [" +
+            toHexString(session.toBytes()) + "]";
+    }
+
+    /**
+     * Returns a string constructed with the contents of the byte
+     * array converted to hex format.
+     *
+     * @param bytes a byte array to convert
+     * @return the converted byte array as a hex-formatted string
+     */
+    public static String toHexString(byte[] bytes) {
+        StringBuilder buf = new StringBuilder(2 * bytes.length);
+        for (byte b : bytes) {
+            buf.append(String.format("%02X", b));
+        }
+        return buf.toString();
+    }
+
+    /**
+     * Returns a byte array constructed with the contents of the given
+     * string, which contains a series of byte values in hex format.
+     *
+     * @param hexString a string to convert
+     * @return the byte array corresponding to the hex-formatted string
+     */
+    static byte[] fromHexString(String hexString) {
         byte[] bytes = new byte[hexString.length() / 2];
         for (int i = 0; i < bytes.length; ++i) {
             String hexByte = hexString.substring(2*i, 2*i+2);
@@ -305,21 +350,37 @@ public class ChatClient extends JFrame
 
     private void userLogin(String memberString) {
         System.err.println("userLogin: " + memberString);
-        String[] split = memberString.split(":", 2);
-        String idString = split[0];
-        SessionId session = SessionId.fromBytes(hexToBytes(idString));
-        if (split.length > 1) {
-            String memberName = split[1];
-            sessionNames.put(session, memberName);
+        addUsers(Collections.singleton(memberString));
+    }
+
+    private void addUsers(Collection<String> members) {
+        List<SessionId> sessions = new ArrayList<SessionId>(members.size());
+        for (String member : members) {
+            String[] split = member.split(":", 2);
+            String idString = split[0];
+            SessionId session = SessionId.fromBytes(fromHexString(idString));
+            sessions.add(session);
+            if (split.length > 1) {
+                String memberName = split[1];
+                sessionNames.put(session, memberName);
+            }
         }
-        userList.addClient(session);
+        userList.addItems(sessions);
+        repaint();
     }
 
     private void userLogout(String idString) {
         System.err.println("userLogout: " + idString);
-        SessionId session = SessionId.fromBytes(hexToBytes(idString));
-        userList.removeClient(session);
+        SessionId session = SessionId.fromBytes(fromHexString(idString));
+        userList.removeItem(session);
         sessionNames.remove(session);
+
+        // Remove the user from all our ChatChannelFrames 
+        for (JInternalFrame frame : desktop.getAllFrames()) {
+            if (frame instanceof ChatChannelFrame) {
+                ((ChatChannelFrame) frame).memberLeft(session);
+            }
+        }
     }
 
     // Implement SimpleClientListener
@@ -329,7 +390,9 @@ public class ChatClient extends JFrame
      */
     public void loggedIn() {
         statusMessage.setText("Status: Connected");
-        setTitle("Chat Test Client: " + client.getSessionId());
+        SessionId session = client.getSessionId();
+        sessionNames.put(session, userName);
+        setTitle("Chat Test Client: " + formatSession(session));
         loginButton.setText("Logout");
         loginButton.setActionCommand("logout");
         setButtonsEnabled(true);
@@ -340,12 +403,17 @@ public class ChatClient extends JFrame
      */
     public PasswordAuthentication getPasswordAuthentication() {
         statusMessage.setText("Status: Validating...");
+        PasswordAuthentication auth;
+
         String login = System.getProperty("login");
         if (login == null) {
-            return new ValidatorDialog(this).getPasswordAuthentication();            
+            auth = new ValidatorDialog(this).getPasswordAuthentication();            
+        } else {
+            String[] cred = login.split(":");
+            auth = new PasswordAuthentication(cred[0], cred[1].toCharArray());
         }
-        String[] cred = login.split(":");
-        return new PasswordAuthentication(cred[0], cred[1].toCharArray());
+        userName = auth.getUserName();
+        return auth;
     }
     
     /**
@@ -413,7 +481,7 @@ public class ChatClient extends JFrame
      * Handles the direct {@code /echo} command.
      */
     public void receivedMessage(byte[] message) {
-        String messageString = new String(message, CHARSET_UTF8);
+        String messageString = new String(message, MESSAGE_CHARSET);
         System.err.format("Recv direct: %s\n", messageString);
         String[] args = messageString.split(" ", 2);
         String command = args[0];
@@ -434,7 +502,7 @@ public class ChatClient extends JFrame
             byte[] message)
     {
         try {
-            String messageString = new String(message, CHARSET_UTF8);
+            String messageString = new String(message, MESSAGE_CHARSET);
             System.err.format("Recv on %s from %s: %s\n",
                     channel.getName(), sender, messageString);
             String[] args = messageString.split(" ", 2);
@@ -445,21 +513,32 @@ public class ChatClient extends JFrame
             } else if (command.equals("/left")) {
                 userLogout(args[1]);
             } else if (command.equals("/members")) {
-                String[] members = args[1].split(" ");
-                for (String member : members) {
-                    userLogin(member);
+                List<String> members = Arrays.asList(args[1].split(" "));
+                if (! members.isEmpty()) {
+                    addUsers(members);
                 }
+            } else if (command.equals("/dcc")) {
+                dccReceived(sender, args[1]);
             } else if (command.startsWith("/")) {
                 System.err.format("Unknown command %s\n", command);
             } else {
-                // Display message from another client
-                JOptionPane.showMessageDialog(this,
-                        messageString, "Message from " + sender,
-                        JOptionPane.INFORMATION_MESSAGE);
+                System.err.format("Not a command: %s\n", messageString);
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    /**
+     * Displays a message from another client in a popup window.
+     *
+     * @param sender the sender of the message
+     * @param message the message received
+     */
+    private void dccReceived(SessionId sender, String message) {
+        JOptionPane.showMessageDialog(this,
+            message, "Message from " + formatSession(sender),
+            JOptionPane.INFORMATION_MESSAGE);
     }
 
     /**
@@ -494,7 +573,7 @@ public class ChatClient extends JFrame
     }
 
     /**
-     * Listener that brings up a DCC send dialog when a {@code MemberList}
+     * Listener that brings up a DCC send dialog when a {@code MultiList}
      * is double-clicked.
      */
     static final class DCCMouseListener extends MouseAdapter {
@@ -519,7 +598,7 @@ public class ChatClient extends JFrame
         @Override
         public void mouseClicked(MouseEvent evt) {
             if (evt.getClickCount() == 2) {
-                client.doDCCMessage();
+                client.doSingleDCCMessage();
             }
         }
     }
@@ -560,5 +639,4 @@ public class ChatClient extends JFrame
     public static void main(String[] args) {
         new ChatClient();
     }
-
 }

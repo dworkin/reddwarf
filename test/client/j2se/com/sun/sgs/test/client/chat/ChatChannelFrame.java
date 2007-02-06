@@ -21,8 +21,6 @@ import com.sun.sgs.client.ClientChannel;
 import com.sun.sgs.client.ClientChannelListener;
 import com.sun.sgs.client.SessionId;
 
-import static com.sun.sgs.test.client.chat.ChatClient.*;
-
 /**
  * ChatChannelFrame presents a GUI so that a user can interact with
  * a channel. The users connected to the channel are displayed in a list
@@ -32,12 +30,13 @@ import static com.sun.sgs.test.client.chat.ChatClient.*;
 public class ChatChannelFrame extends JInternalFrame
         implements ActionListener, ClientChannelListener
 {
+    /** The version of the serialized form of this class. */
     private static final long serialVersionUID = 1L;
 
     private final ChatClient myChatClient;
     private final ClientChannel myChannel;
 
-    private final MemberList memberList;
+    private final MultiList<SessionId> multiList;
     private final JTextField inputField;
     private final JTextArea outputArea;
 
@@ -58,9 +57,9 @@ public class ChatChannelFrame extends JInternalFrame
         eastPanel.setLayout(new BorderLayout());
         c.add(eastPanel, BorderLayout.EAST);
         eastPanel.add(new JLabel("Users"), BorderLayout.NORTH);
-        memberList = new MemberList();
-        memberList.addMouseListener(myChatClient.getDCCMouseListener());
-        eastPanel.add(new JScrollPane(memberList), BorderLayout.CENTER);
+        multiList = new MultiList<SessionId>(SessionId.class, client);
+        multiList.addMouseListener(myChatClient.getDCCMouseListener());
+        eastPanel.add(new JScrollPane(multiList), BorderLayout.CENTER);
         JPanel southPanel = new JPanel();
         c.add(southPanel, BorderLayout.SOUTH);
         southPanel.setLayout(new GridLayout(1, 0));
@@ -77,6 +76,10 @@ public class ChatChannelFrame extends JInternalFrame
         setVisible(true);
     }
 
+    void memberLeft(SessionId member) {
+        multiList.removeItem(member);        
+    }
+
     /**
      * {@inheritDoc}
      * <p>
@@ -88,20 +91,24 @@ public class ChatChannelFrame extends JInternalFrame
             byte[] message)
     {
         try {
-            String messageString = new String(message, CHARSET_UTF8);
+            String messageString =
+                new String(message, ChatClient.MESSAGE_CHARSET);
             System.err.format("Recv on %s from %s: %s\n",
                     channel.getName(), sender, messageString);
             String[] args = messageString.split(" ", 2);
             String command = args[0];
 
             if (command.equals("/joined")) {
-                memberList.addClient(SessionId.fromBytes(hexToBytes(args[1])));
+                multiList.addItem(SessionId.fromBytes(
+                    ChatClient.fromHexString(args[1])));
             } else if (command.equals("/left")) {
-                memberList.removeClient(SessionId.fromBytes(hexToBytes(args[1])));
+                memberLeft(SessionId.fromBytes(
+                        ChatClient.fromHexString(args[1])));
             } else if (command.equals("/members")) {
-                String[] members = args[1].split(" ");
+                String[] members = args[1].split("\\s+");
                 for (String member : members) {
-                    memberList.addClient(SessionId.fromBytes(hexToBytes(member)));
+                    multiList.addItem(SessionId.fromBytes(
+                        ChatClient.fromHexString(member)));
                 }
             } else if (command.startsWith("/")) {
                 System.err.format("Unknown command %s\n", command);
@@ -134,7 +141,7 @@ public class ChatChannelFrame extends JInternalFrame
     public void actionPerformed(ActionEvent action) {
         try {
             String message = inputField.getText();
-            byte[] msgBytes = message.getBytes(ChatClient.CHARSET_UTF8);
+            byte[] msgBytes = message.getBytes(ChatClient.MESSAGE_CHARSET);
             myChannel.send(msgBytes);
             // Deliver to our own receivedMessage, since server won't echo.
             receivedMessage(myChannel, myChatClient.getSessionId(), msgBytes);

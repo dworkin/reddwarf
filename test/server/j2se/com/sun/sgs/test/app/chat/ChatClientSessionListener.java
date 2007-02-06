@@ -24,6 +24,7 @@ import com.sun.sgs.app.NameNotBoundException;
 class ChatClientSessionListener
     implements Serializable, ClientSessionListener
 {
+    /** The version of the serialized form of this class. */
     private static final long serialVersionUID = 1L;
 
     /** The logger for this class. */
@@ -31,12 +32,12 @@ class ChatClientSessionListener
         Logger.getLogger(ChatClientSessionListener.class.getName());
 
     /** The name of the global channel. */
-    public static final String GLOBAL_CHANNEL_NAME = "Global";
+    public static final String GLOBAL_CHANNEL_NAME = "-GLOBAL-";
 
     /** The {@link Charset} encoding for client/server messages. */
-    private static final Charset CHARSET_UTF8 = Charset.forName("UTF-8");
+    private static final Charset MESSAGE_CHARSET = Charset.forName("UTF-8");
 
-    /** The prefix commands must start with, "{@value #COMMAND_PREFIX}" */
+    /** The command prefix: "{@value #COMMAND_PREFIX}" */
     private static final String COMMAND_PREFIX = "/";
 
     /** The {@link ClientSession} this listener receives events for. */
@@ -71,17 +72,17 @@ class ChatClientSessionListener
     /** {@inheritDoc} */
     public void receivedMessage(byte[] message) {
         try {
-            String messageString = new String(message, CHARSET_UTF8);
-            
-            // Check for initial slash
+            String messageString = new String(message, MESSAGE_CHARSET);
+
+            // Check that the command begins with a foward-slash
             if (! messageString.startsWith(COMMAND_PREFIX)) {
                 throw new IllegalArgumentException(
                     "Command must start with " + COMMAND_PREFIX);
             }
 
-            // Split at the first space
-            String[] args = messageString.split(" +", 2);
-            
+            // Split at the first run of whitespace, if any
+            String[] args = messageString.split("\\s+", 2);
+
             // Find the ChatCommand enum for this command
             String commandString = args[0].substring(1).toUpperCase();
             ChatCommand command = ChatCommand.valueOf(commandString);
@@ -122,15 +123,19 @@ class ChatClientSessionListener
         }
     }
 
-    /** TODO docs */
-    static String formatHexBytes(byte[] bytes) {
-        StringBuilder s = new StringBuilder(2 + (2 * bytes.length));
-        s.append('[');
+    /**
+     * Returns a string constructed with the contents of the byte
+     * array converted to hex format.
+     *
+     * @param bytes a byte array to convert
+     * @return the converted byte array as a hex-formatted string
+     */
+    public static String toHexString(byte[] bytes) {
+        StringBuilder buf = new StringBuilder(2 * bytes.length);
         for (byte b : bytes) {
-            s.append(String.format("%02X", b));
+            buf.append(String.format("%02X", b));
         }
-        s.append(']');
-        return s.toString();
+        return buf.toString();
     }
 
     /**
@@ -159,12 +164,12 @@ class ChatClientSessionListener
         // Send the membership change first, so the new session doesn't
         // receive its own join message.
         StringBuilder changeMsg = new StringBuilder("/joined ");
-        changeMsg.append(formatHexBytes(session.getSessionId()));
+        changeMsg.append(toHexString(session.getSessionId()));
         if (channelName.equals(GLOBAL_CHANNEL_NAME)) {
             changeMsg.append(':');
             changeMsg.append(session.getName());
         }
-        channel.send(changeMsg.toString().getBytes(CHARSET_UTF8));
+        channel.send(changeMsg.toString().getBytes(MESSAGE_CHARSET));
 
         // Now add the joiner and tell it about all the members on
         // the channel, the joiner included.
@@ -174,13 +179,14 @@ class ChatClientSessionListener
         StringBuilder listMessage = new StringBuilder("/members");
         for (ClientSession member : channel.getSessions()) {
             listMessage.append(' ');
-            listMessage.append(formatHexBytes(member.getSessionId()));
+            listMessage.append(toHexString(member.getSessionId()));
             if (channelName.equals(GLOBAL_CHANNEL_NAME)) {
                 listMessage.append(':');
                 listMessage.append(member.getName());
             }
         }
-        channel.send(session, listMessage.toString().getBytes(CHARSET_UTF8));
+        channel.send(session,
+            listMessage.toString().getBytes(MESSAGE_CHARSET));
     }
 
     /**
@@ -194,7 +200,8 @@ class ChatClientSessionListener
 
         if (logger.isLoggable(Level.FINE)) {
             logger.log(Level.FINE,
-                "Leave " + session + " from " + channelName);
+                    "Leave {0} from {1}",
+                    new Object[] { session, channelName });
         }
 
         ChannelManager channelMgr = AppContext.getChannelManager();
@@ -214,8 +221,8 @@ class ChatClientSessionListener
 
         // Tell the rest of the channel about the removal.
         String changeMessage = "/left " +
-            formatHexBytes(session.getSessionId());
-        channel.send(changeMessage.getBytes(CHARSET_UTF8));
+            toHexString(session.getSessionId());
+        channel.send(changeMessage.getBytes(MESSAGE_CHARSET));
     }
 
     /**
@@ -232,6 +239,6 @@ class ChatClientSessionListener
         }
 
         String reply = "/pong " + contents;
-        session.send(reply.getBytes(CHARSET_UTF8));
+        session.send(reply.getBytes(MESSAGE_CHARSET));
     }
 }
