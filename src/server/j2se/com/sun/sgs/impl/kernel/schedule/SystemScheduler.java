@@ -87,4 +87,9 @@ interface SystemScheduler {
      */
     public RecurringTaskHandle addRecurringTask(ScheduledTask task);
 
+    /**
+     * Testing method.
+     */
+    public void shutdown();
+
 }

@@ -45,15 +45,21 @@ public class TestMasterTaskSchedulerImpl {
     // the resource coordinator used in many tests
     private TestResourceCoordinator resourceCoordinator;
 
+    // the scheduler used in many tests
+    private MasterTaskScheduler masterTaskScheduler;
+
     public TestMasterTaskSchedulerImpl() {}
 
     @Before public void startup() {
         resourceCoordinator = null;
+        masterTaskScheduler = null;
     }
 
     @After public void shutdown() {
         if (resourceCoordinator != null)
             resourceCoordinator.shutdown();
+        if (masterTaskScheduler != null)
+            masterTaskScheduler.shutdown();
     }
 
     /**
@@ -209,8 +215,10 @@ public class TestMasterTaskSchedulerImpl {
 
     private MasterTaskScheduler getScheduler(Properties p) throws Exception {
         resourceCoordinator = new TestResourceCoordinator();
-        return new MasterTaskScheduler(p, resourceCoordinator,
-                                       MinimalTestKernel.getTaskHandler());
+        masterTaskScheduler =
+            new MasterTaskScheduler(p, resourceCoordinator,
+                                    MinimalTestKernel.getTaskHandler());
+        return masterTaskScheduler;
     }
 
     private HashSet<KernelRunnable> getTaskGroup() {

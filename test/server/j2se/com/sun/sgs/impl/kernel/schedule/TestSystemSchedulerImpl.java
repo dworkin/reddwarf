@@ -78,16 +78,20 @@ public class TestSystemSchedulerImpl {
     // the fully-qualified name of the scheduler we're testing
     private String systemSchedulerName;
 
+    // the scheduler used in any given test
+    private SystemScheduler systemScheduler;
+
     public TestSystemSchedulerImpl(String systemSchedulerName) {
         this.systemSchedulerName = systemSchedulerName;
     }
 
     @Before public void setupSingleTest() {
-        // setup for each individual test can happen here
+        systemScheduler = null;
     }
 
     @After public void teardownSingleTest() {
-        // teardown for each individual test can happen here
+        if (systemScheduler != null)
+            systemScheduler.shutdown();
     }
 
     /**
@@ -612,6 +616,7 @@ public class TestSystemSchedulerImpl {
                 (SystemScheduler)(schedulerConstructor.newInstance(p));
             scheduler.registerApplication(testContext, p);
             scheduler.registerApplication(testContext2, p);
+            systemScheduler = scheduler;
             return scheduler;
         } catch (InvocationTargetException e) {
             throw (Exception)(e.getCause());
