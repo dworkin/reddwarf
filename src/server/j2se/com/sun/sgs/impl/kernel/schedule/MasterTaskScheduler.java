@@ -181,7 +181,7 @@ public class MasterTaskScheduler implements TaskScheduler {
         // used, so we assume that threads are only lost when the system
         // wants to shutdown...in practice, this should look at some
         // threshold and see if another consumer needs to be created
-        if (threadCount.getAndDecrement() == 0) {
+        if (threadCount.getAndDecrement() == 1) {
             logger.log(Level.CONFIG, "No more threads are consuming tasks");
             systemScheduler.shutdown();
         }
@@ -283,6 +283,14 @@ public class MasterTaskScheduler implements TaskScheduler {
         return systemScheduler.
             addRecurringTask(new ScheduledTask(task, owner, defaultPriority,
                                                startTime, period));
+    }
+
+    /**
+     * Note that this should not be exposed yet, since there isn't real
+     * shutdown capability, but this is needed for our tests.
+     */
+    public void shutdown() {
+        systemScheduler.shutdown();
     }
 
     /**
