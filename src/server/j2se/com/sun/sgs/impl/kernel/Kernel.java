@@ -123,7 +123,8 @@ class Kernel {
 
             // make sure to register the system as a user of the scheduler,
             // so that all of our events get grouped together
-            scheduler.registerApplication(SystemKernelAppContext.CONTEXT);
+            scheduler.registerApplication(SystemKernelAppContext.CONTEXT,
+                                          systemProperties);
 
             // finally, collect some of the system components to be shared
             // with services as they are created
@@ -274,7 +275,7 @@ class Kernel {
         AppKernelAppContext appContext =
             new AppKernelAppContext(appName, managerComponents);
         try {
-            scheduler.registerApplication(appContext);
+            scheduler.registerApplication(appContext, properties);
         } catch (Exception e) {
             if (logger.isLoggable(Level.SEVERE))
                 logger.logThrow(Level.SEVERE, e,
