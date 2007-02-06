@@ -514,7 +514,7 @@ public class TestApplicationSchedulerImpl {
         int count = 0;
         while (scheduler.getNextTask(false) != null)
             count++;
-        Thread.sleep(50);
+        Thread.sleep(100);
         while (scheduler.getNextTask(false) != null)
             count++;
         assertEquals(1216, count);
