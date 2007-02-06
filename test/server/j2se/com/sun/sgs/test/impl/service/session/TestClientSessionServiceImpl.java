@@ -83,9 +83,12 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     private static final int WAIT_TIME = 1000;
 
-    private static final String REFUSE_ME = "refuse me";
+    private static final String RETURN_NULL = "return null";
 
     private static final String NON_SERIALIZABLE = "non-serializable";
+
+    private static final String THROW_RUNTIME_EXCEPTION =
+	"throw RuntimeException";
     
     private static final String LISTENER_PREFIX =
 	"com.sun.sgs.impl.service.session.ClientSessionImpl";
@@ -307,7 +310,28 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient client = new DummyClient();
 	try {
 	    client.connect(port);
-	    client.login(REFUSE_ME, "bar");
+	    client.login(RETURN_NULL, "bar");
+	    fail("expected login failure");	
+	} catch (RuntimeException e) {
+	    if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
+		System.err.println("login refused");
+		return;
+	    } else {
+		fail("unexpected login failure: " + e);
+	    }
+	} finally {
+	    client.disconnect(false);
+	}
+    }
+    
+    public void testLoggedInThrowingRuntimeException()
+	throws Exception
+    {
+	registerAppListener();
+	DummyClient client = new DummyClient();
+	try {
+	    client.connect(port);
+	    client.login(THROW_RUNTIME_EXCEPTION, "bar");
 	    fail("expected login failure");	
 	} catch (RuntimeException e) {
 	    if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
@@ -951,10 +975,12 @@ public class TestClientSessionServiceImpl extends TestCase {
         /** {@inheritDoc} */
 	public ClientSessionListener loggedIn(ClientSession session) {
 	    
-	    if (session.getName().equals(REFUSE_ME)) {
+	    if (session.getName().equals(RETURN_NULL)) {
 		return null;
 	    } else if (session.getName().equals(NON_SERIALIZABLE)) {
 		return new NonSerializableClientSessionListener();
+	    } else if (session.getName().equals(THROW_RUNTIME_EXCEPTION)) {
+		throw new RuntimeException("loggedIn throwing an exception");
 	    } else {
 		DummyClientSessionListener listener =
 		    new DummyClientSessionListener(session);
