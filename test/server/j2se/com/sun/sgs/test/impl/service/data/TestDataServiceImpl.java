@@ -1305,6 +1305,18 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    public void testGetReferenceOldTxn() throws Exception {
+	dummy.setNext(new DummyManagedObject());
+	txn.commit();
+	createTransaction();
+	try {
+	    dummy.getNext();
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	}
+    }
+
     /* -- Test ManagedReference.getForUpdate -- */
 
     public void testGetReferenceUpdateNullType() throws Exception {
@@ -1422,6 +1434,18 @@ public class TestDataServiceImpl extends TestCase {
 	    dummy.getNextForUpdate();
 	    fail("Expected ObjectIOException");
 	} catch (ObjectIOException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testGetReferenceUpdateOldTxn() throws Exception {
+	dummy.setNext(new DummyManagedObject());
+	txn.commit();
+	createTransaction();
+	try {
+	    dummy.getNextForUpdate();
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
 	    System.err.println(e);
 	}
     }

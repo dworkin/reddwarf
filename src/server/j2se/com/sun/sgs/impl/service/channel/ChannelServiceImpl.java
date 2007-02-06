@@ -531,8 +531,9 @@ public class ChannelServiceImpl
 	private final ChannelTable table;
 
 	/**
-	 * Map of channel name to transient channel impl (for those channels used
-	 * during this context's associated transaction).
+	 * Map of channel name to transient channel impl (for those
+	 * channels used during this context's associated
+	 * transaction).
 	 */
 	private final Map<String,Channel> internalTable =
 	    new HashMap<String,Channel>();
@@ -563,7 +564,8 @@ public class ChannelServiceImpl
 		throw new NameExistsException(name);
 	    }
 
-	    ChannelState channelState = new ChannelState(name, listener, delivery);
+	    ChannelState channelState =
+		new ChannelState(name, listener, delivery);
 	    ManagedReference ref =
 		dataService.createReference(channelState);
 	    dataService.markForUpdate(table);
