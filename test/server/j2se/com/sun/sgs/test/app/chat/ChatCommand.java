@@ -6,7 +6,7 @@ package com.sun.sgs.test.app.chat;
 public enum ChatCommand {
 
     /**
-     * Joins this session to the named channel:
+     * Joins this session to the named channel.
      * <pre>
      *    /join channelName
      * </pre>
@@ -14,7 +14,7 @@ public enum ChatCommand {
     JOIN,
 
     /**
-     * Removes this session from the named channel:
+     * Removes this session from the named channel.
      * <pre>
      *    /leave channelName
      * </pre>
@@ -22,7 +22,7 @@ public enum ChatCommand {
     LEAVE,
 
     /**
-     * Echos the given message back to the sender:
+     * Echos the given message back to the sender.
      * <pre>
      *    /ping message
      * </pre>
@@ -30,7 +30,7 @@ public enum ChatCommand {
     PING,
 
     /**
-     * Forcibly disconnects this session to the named channel:
+     * Forcibly disconnects this session to the named channel.
      * <pre>
      *    /disconnect
      * </pre>
@@ -38,7 +38,7 @@ public enum ChatCommand {
     DISCONNECT,
 
     /**
-     * Join this session to the named channel:
+     * Join this session to the named channel.
      * <pre>
      *    /shutdown
      * </pre>

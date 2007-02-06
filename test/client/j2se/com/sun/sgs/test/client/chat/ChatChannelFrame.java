@@ -58,7 +58,7 @@ public class ChatChannelFrame extends JInternalFrame
         c.add(eastPanel, BorderLayout.EAST);
         eastPanel.add(new JLabel("Users"), BorderLayout.NORTH);
         multiList = new MultiList<SessionId>(SessionId.class, client);
-        multiList.addMouseListener(myChatClient.getDCCMouseListener());
+        multiList.addMouseListener(myChatClient.getPMMouseListener());
         eastPanel.add(new JScrollPane(multiList), BorderLayout.CENTER);
         JPanel southPanel = new JPanel();
         c.add(southPanel, BorderLayout.SOUTH);

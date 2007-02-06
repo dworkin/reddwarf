@@ -19,9 +19,12 @@ import com.sun.sgs.app.NameNotBoundException;
  * {@code ChatApp} application.
  * <p>
  * Note that this {@link ClientSessionListener} has no mutable state, so it
- * doesn't need to implement {@link com.sun.sgs.app.ManagedObject}.
+ * doesn't need to implement {@link com.sun.sgs.app.ManagedObject}.  This
+ * means it will be garbage-collected once its associated session is
+ * {@linkplain ChatClientSessionListener#disconnected disconnected}, so we
+ * don't explicitly have to remove it from the data store.
  */
-class ChatClientSessionListener
+public class ChatClientSessionListener
     implements Serializable, ClientSessionListener
 {
     /** The version of the serialized form of this class. */
@@ -32,7 +35,7 @@ class ChatClientSessionListener
         Logger.getLogger(ChatClientSessionListener.class.getName());
 
     /** The name of the global channel. */
-    public static final String GLOBAL_CHANNEL_NAME = "-GLOBAL-";
+    private static final String GLOBAL_CHANNEL_NAME = "-GLOBAL-";
 
     /** The {@link Charset} encoding for client/server messages. */
     private static final Charset MESSAGE_CHARSET = Charset.forName("UTF-8");
@@ -48,12 +51,11 @@ class ChatClientSessionListener
      * Immediately joins the session to the global notification channel,
      * and sends membership change notifications as appropriate.
      *
-     * @param app the {@code ChatApp} for this session
      * @param session this listener's {@code ClientSession}
      *
      * @see #addToChannel
      */
-    ChatClientSessionListener(ClientSession session) {
+    public ChatClientSessionListener(ClientSession session) {
         this.session = session;
         addToChannel(GLOBAL_CHANNEL_NAME);
     }
@@ -130,7 +132,7 @@ class ChatClientSessionListener
      * @param bytes a byte array to convert
      * @return the converted byte array as a hex-formatted string
      */
-    public static String toHexString(byte[] bytes) {
+    private static String toHexString(byte[] bytes) {
         StringBuilder buf = new StringBuilder(2 * bytes.length);
         for (byte b : bytes) {
             buf.append(String.format("%02X", b));
@@ -229,16 +231,16 @@ class ChatClientSessionListener
      * Echos the given string back to the sending session on the global
      * chat channel.
      *
-     * @param contents the contents to echo
+     * @param message the message to echo
      */
-    private void echo(String contents) {
+    private void echo(String message) {
         if (logger.isLoggable(Level.FINER)) {
             logger.log(Level.FINER,
                 "Echo request from {0}, contents: {1}",
-                new Object[] { session, contents });
+                new Object[] { session, message });
         }
 
-        String reply = "/pong " + contents;
+        String reply = "/pong " + message;
         session.send(reply.getBytes(MESSAGE_CHARSET));
     }
 }

@@ -24,6 +24,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
 import javax.swing.JButton;
 import javax.swing.JDesktopPane;
@@ -43,10 +45,9 @@ import com.sun.sgs.client.simple.SimpleClientListener;
 import com.sun.sgs.client.simple.SimpleClient;
 
 /**
- * The ChatClient implements a simple chat program using a Swing UI,
- * mainly for server channel testing purposes. It allows the user to
- * open arbitrary channels by name, or to use the Direct Client to
- * Client (DCC) channel.
+ * A simple GUI chat client that interacts with an SGS server-side app.
+ * It presents an IRC-like interface, with channels, member lists, and
+ * private (off-channel) messaging.
  */
 public class ChatClient extends JFrame
     implements ActionListener, ListCellRenderer,
@@ -57,7 +58,7 @@ public class ChatClient extends JFrame
 
     private final JButton loginButton;
     private final JButton openChannelButton;
-    private final JButton multiDccButton;
+    private final JButton multiPmButton;
     private final JButton serverSendButton;
     private final JLabel statusMessage;
     private final JDesktopPane desktop;
@@ -68,17 +69,17 @@ public class ChatClient extends JFrame
     /** The {@link Charset} encoding for client/server messages. */
     public static final Charset MESSAGE_CHARSET = Charset.forName("UTF-8");
 
-    /**  The list of clients connected to the ChatApp on the server */
+    /** The list of clients connected to the ChatApp on the server */
     private final MultiList<SessionId> userList;
 
     /** used for communication with the server */
     private SimpleClient client;
     
     /** The listener for double-clicks on a memberlist. */
-    private final MouseListener dccMouseListener;
+    private final MouseListener pmMouseListener;
 
     /** the well-known channel for Direct Client to Client communication */
-    private ClientChannel dccChannel;
+    private ClientChannel pmChannel;
 
     private volatile int quitAttempts = 0;
 
@@ -91,7 +92,7 @@ public class ChatClient extends JFrame
     /** The user name for this client's session */
     private String userName;
 
-    // === Constructor ==
+    // Constructor
 
     /**
      * Construct a ChatClient with the given {@code args}.
@@ -99,7 +100,7 @@ public class ChatClient extends JFrame
     public ChatClient() {
         super();
         
-        dccMouseListener = new DCCMouseListener(this);
+        pmMouseListener = new PMMouseListener(this);
         
         setTitle("Chat Test Client");
         Container c = getContentPane();
@@ -120,7 +121,7 @@ public class ChatClient extends JFrame
         eastPanel.setLayout(new BorderLayout());
         eastPanel.add(new JLabel("Users"), BorderLayout.NORTH);
         userList = new MultiList<SessionId>(SessionId.class, this);
-        userList.addMouseListener(getDCCMouseListener());
+        userList.addMouseListener(getPMMouseListener());
         eastPanel.add(new JScrollPane(userList), BorderLayout.CENTER);
         c.add(eastPanel, BorderLayout.EAST);
 
@@ -139,22 +140,22 @@ public class ChatClient extends JFrame
         serverSendButton.addActionListener(this);
         serverSendButton.setEnabled(false);
 
-        multiDccButton = new JButton("Send Multi-DCC");
-        multiDccButton.addActionListener(this);
-        multiDccButton.setEnabled(false);
+        multiPmButton = new JButton("Send Multi-PM");
+        multiPmButton.addActionListener(this);
+        multiPmButton.setEnabled(false);
 
         buttonPanel.add(loginButton);
         buttonPanel.add(openChannelButton);
         buttonPanel.add(serverSendButton);
-        buttonPanel.add(multiDccButton);
+        buttonPanel.add(multiPmButton);
 
         addWindowListener(new QuitWindowListener(this));
         setSize(1000, 720);
         setVisible(true);
     }
     
-    // === GUI helper methods ===
-    
+    // GUI helper methods
+
     private void setButtonsEnabled(boolean enable) {
         loginButton.setEnabled(enable);
         setSessionButtonsEnabled(enable);
@@ -162,7 +163,7 @@ public class ChatClient extends JFrame
     
     private void setSessionButtonsEnabled(boolean enable) {
         openChannelButton.setEnabled(enable);
-        multiDccButton.setEnabled(enable);
+        multiPmButton.setEnabled(enable);
         serverSendButton.setEnabled(enable);
     }
 
@@ -175,25 +176,25 @@ public class ChatClient extends JFrame
 	}
     }
     
-    MouseListener getDCCMouseListener() {
-        return dccMouseListener;
+    MouseListener getPMMouseListener() {
+        return pmMouseListener;
     }
 
     /**
      * Returns the {@link SessionId} for this client.
      *
-     * @return the {@link SessionId} for this client
+     * @return the {@code SessionId} for this client
      */
     SessionId getSessionId() {
         return client.getSessionId();
     }
 
-    // === Handle main window GUI actions ===
-    
+    // Main window GUI actions
+
     private void doLogin() {
 	setButtonsEnabled(false);
-        String host = System.getProperty("ChatApp.host", "localhost");
-        String port = System.getProperty("ChatApp.port", "2502");
+        String host = System.getProperty("ChatClient.host", "localhost");
+        String port = System.getProperty("ChatClient.port", "2502");
 
         try {
             Properties props = new Properties();
@@ -247,27 +248,34 @@ public class ChatClient extends JFrame
         }
     }
 
-    private void doMultiDCCMessage() {
+    private void doMultiPrivateMessage() {
 	Set<SessionId> targets = new HashSet<SessionId>();
         targets.addAll(userList.getAllSelected());
     	if (targets.isEmpty()) {
     	    return;
     	}
-        doDCC(targets);
+        doPrivateMessage(targets);
     }
 
-    private void doSingleDCCMessage() {
+    private void doSinglePrivateMessage() {
 	SessionId target = userList.getSelected();
 	if (target == null) {
 	    return;
 	}
-        doDCC(Collections.singleton(target));
+        doPrivateMessage(Collections.singleton(target));
     }
 
-    private void doDCC(Set<SessionId> targets) {
-        String message = "/dcc " + getUserInput("Enter private message:");
+    private void doPrivateMessage(Set<SessionId> targets) {
+        String input = getUserInput("Enter private message:");
+
+        if (input.matches("^\\s*$")) {
+            // Ignore empty message
+            return;
+        }
+
+        String message = "/pm " + input;
         try {
-            dccChannel.send(targets, message.getBytes(MESSAGE_CHARSET));
+            pmChannel.send(targets, message.getBytes(MESSAGE_CHARSET));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -307,7 +315,12 @@ public class ChatClient extends JFrame
         return textLabel;
     }
 
-    /** TODO docs */
+    /**
+     * Nicely format a {@link SessionId} for printed display.
+     *
+     * @param session the {@code SessionId} to format
+     * @return the formatted string
+     */
     private String formatSession(SessionId session) {
         return getSessionName(session) + " [" +
             toHexString(session.toBytes()) + "]";
@@ -365,7 +378,7 @@ public class ChatClient extends JFrame
                 sessionNames.put(session, memberName);
             }
         }
-        userList.addItems(sessions);
+        userList.addAll(sessions);
         repaint();
     }
 
@@ -405,9 +418,16 @@ public class ChatClient extends JFrame
         statusMessage.setText("Status: Validating...");
         PasswordAuthentication auth;
 
-        String login = System.getProperty("login");
+        String login = System.getProperty("ChatClient.login");
         if (login == null) {
-            auth = new ValidatorDialog(this).getPasswordAuthentication();            
+            Future<PasswordAuthentication> future =
+                new LoginDialog(this).requestLogin();
+            try {
+                auth = future.get();
+            } catch (Exception e) {
+                e.printStackTrace();
+                return null;
+            }
         } else {
             String[] cred = login.split(":");
             auth = new PasswordAuthentication(cred[0], cred[1].toCharArray());
@@ -415,7 +435,7 @@ public class ChatClient extends JFrame
         userName = auth.getUserName();
         return auth;
     }
-    
+
     /**
      * {@inheritDoc}
      */
@@ -463,7 +483,7 @@ public class ChatClient extends JFrame
     public ClientChannelListener joinedChannel(ClientChannel channel) {
         // ChatClient handles the global channel
         if (channel.getName().equals(GLOBAL_CHANNEL_NAME)) {
-            dccChannel = channel;
+            pmChannel = channel;
             return this;
         }
 
@@ -517,8 +537,8 @@ public class ChatClient extends JFrame
                 if (! members.isEmpty()) {
                     addUsers(members);
                 }
-            } else if (command.equals("/dcc")) {
-                dccReceived(sender, args[1]);
+            } else if (command.equals("/pm")) {
+                pmReceived(sender, args[1]);
             } else if (command.startsWith("/")) {
                 System.err.format("Unknown command %s\n", command);
             } else {
@@ -530,12 +550,12 @@ public class ChatClient extends JFrame
     }
 
     /**
-     * Displays a message from another client in a popup window.
+     * Displays a private message from another client in a popup window.
      *
      * @param sender the sender of the message
      * @param message the message received
      */
-    private void dccReceived(SessionId sender, String message) {
+    private void pmReceived(SessionId sender, String message) {
         JOptionPane.showMessageDialog(this,
             message, "Message from " + formatSession(sender),
             JOptionPane.INFORMATION_MESSAGE);
@@ -564,8 +584,8 @@ public class ChatClient extends JFrame
             doOpenChannel();
         } else if (command.equals("directSend")) {
             doServerMessage();
-        } else if (command.equals("multiDcc")) {
-            doMultiDCCMessage();
+        } else if (command.equals("multiPm")) {
+            doMultiPrivateMessage();
         } else {
             System.err.format("ChatClient: Error, unknown GUI command [%s]\n",
                     command);
@@ -573,32 +593,32 @@ public class ChatClient extends JFrame
     }
 
     /**
-     * Listener that brings up a DCC send dialog when a {@code MultiList}
+     * Listener that brings up a PM send dialog when a {@code MultiList}
      * is double-clicked.
      */
-    static final class DCCMouseListener extends MouseAdapter {
+    static final class PMMouseListener extends MouseAdapter {
         private final ChatClient client;
 
         /**
-         * Creates a new {@code DCCMouseListener} for the given
+         * Creates a new {@code PMMouseListener} for the given
          * {@code ChatClient}.
          *
          * @param client the client to notify when a double-click
-         *        should trigger a DCC dialog.
+         *        should trigger a PM dialog.
          */
-        DCCMouseListener(ChatClient client) {
+        PMMouseListener(ChatClient client) {
             this.client = client;
         }
 
         /**
          * {@inheritDoc}
          * <p>
-         * Brings up a DCC send dialog when a double-click is received.
+         * Brings up a PM send dialog when a double-click is received.
          */
         @Override
         public void mouseClicked(MouseEvent evt) {
             if (evt.getClickCount() == 2) {
-                client.doSingleDCCMessage();
+                client.doSinglePrivateMessage();
             }
         }
     }

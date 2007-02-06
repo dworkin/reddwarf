@@ -3,7 +3,6 @@ package com.sun.sgs.test.client.chat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Set;
 
 import javax.swing.DefaultListModel;
 import javax.swing.JList;
@@ -11,19 +10,27 @@ import javax.swing.ListCellRenderer;
 import javax.swing.ListSelectionModel;
 
 /**
- * Represent multi-item selection lists in the GUI.  Insertion order
- * is maintained.  Each item may appear at most once per {@code MultiList}
- * instance.
+ * GUI component that handles multi-item selection lists.  Insertion order
+ * is maintained, and items in the list must be unique.
  *
  * @param <T> the type of items in the list
  */
 public class MultiList<T> extends JList
 {
+    /** The version of the serialized form of this class. */
     private static final long serialVersionUID = 1L;
 
+    /** The type of items in this {@code MultiList}. */
     private final Class<T> type;
 
-    MultiList(Class<T> type, ListCellRenderer renderer) {
+    /**
+     * Creates a new {@code MultiList} with the specified item type
+     * and item renderer.
+     *
+     * @param type the type of items in the {@code MultiList}
+     * @param renderer the {@code ListCellRenderer} for items in the list
+     */
+    public MultiList(Class<T> type, ListCellRenderer renderer) {
 	super(new DefaultListModel());
 	setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
 	setCellRenderer(renderer);
@@ -41,7 +48,7 @@ public class MultiList<T> extends JList
      *         item
      * @throws NullPointerException if the specified item is {@code null}
      * 
-     * @see Set#add(Object)
+     * @see java.util.Set#add(Object)
      * @see DefaultListModel#addElement(Object)
      */
     public boolean addItem(T item) {
@@ -67,10 +74,9 @@ public class MultiList<T> extends JList
      *         the specified items
      * @throws NullPointerException if any of the items is {@code null}
      * 
-     * @see Set#add(Object)
-     * @see DefaultListModel#addElement(Object)
+     * @see java.util.Set#addAll(Collection)
      */
-    public boolean addItems(Collection<T> items) {
+    public boolean addAll(Collection<? extends T> items) {
         synchronized (this) {
             DefaultListModel model = (DefaultListModel) getModel();
             for (T item : items) {
@@ -97,7 +103,7 @@ public class MultiList<T> extends JList
      * @return {@code true} if this set contained the specified item
      * @throws NullPointerException if the specified item is @{code null}
      * 
-     * @see Set#remove(Object)
+     * @see java.util.Set#remove(Object)
      * @see DefaultListModel#removeElement(Object)
      */
     public boolean removeItem(T item) {

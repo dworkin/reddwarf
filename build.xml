@@ -136,7 +136,8 @@
   <!-- Build the internal server JavaDoc -->
   <target name="javadoc-server" depends="build-server"
 	  description="Builds internal (full) server javadoc">
-    <javadoc sourcepath="src/server/j2se" destdir="${build.dir}/javadoc/server"
+    <javadoc sourcepath="src/server/j2se:test/server/j2se"
+             destdir="${build.dir}/javadoc/server"
              classpathref="server.classpath" packagenames="com.sun.*"
              overview="src/server/j2se/overview.html"
              windowtitle="${project.name}" doctitle="${project.name}"
@@ -164,7 +165,8 @@
   <!-- Build the internal client JavaDoc -->
   <target name="javadoc-client" depends="build-client"
 	  description="Builds internal (full) client javadoc">
-    <javadoc sourcepath="src/client/j2se" destdir="${build.dir}/javadoc/client"
+    <javadoc sourcepath="src/client/j2se:test/client/j2se"
+             destdir="${build.dir}/javadoc/client"
              classpathref="client.classpath" packagenames="com.sun.*"
              overview="src/client/j2se/overview.html"
              windowtitle="${project.name}" doctitle="${project.name}"
