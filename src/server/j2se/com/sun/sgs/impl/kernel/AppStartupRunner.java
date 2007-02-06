@@ -79,7 +79,8 @@ class AppStartupRunner implements KernelRunnable {
                     properties.getProperty(StandardProperties.APP_LISTENER);
                 AppListener listener =
                     (AppListener)(Class.forName(appClass).newInstance());
-                dataService.setServiceBinding(APP_LISTENER_BINDING, listener);
+                dataService.setServiceBinding(StandardProperties.APP_LISTENER,
+                                              listener);
 
                 // since we created the listener, we're the first one to
                 // start the app, so we also need to start it up
