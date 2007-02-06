@@ -9,15 +9,23 @@ import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.impl.service.data.TestDataServiceConcurrency;
 import java.util.Properties;
 
+/**
+ * Test concurrent operation of the data service using a networked data
+ * store.
+ */
 public class TestDataServiceClientConcurrency
     extends TestDataServiceConcurrency
 {
-    private static boolean externalServer =
-	Boolean.getBoolean("test.external.server");
-    private static String serverHost =
-	System.getProperty("test.server.host", "localhost");
-    private static int serverPort =
-	Integer.getInteger("test.server.port", 54321);
+    /**
+     * The name of the host running the DataStoreServer, or null to create one
+     * locally.
+     */
+    private static final String serverHost =
+	System.getProperty("test.server.host");
+
+    /** The network port for the DataStoreServer. */
+    private static final int serverPort =
+	Integer.getInteger("test.server.port", 44530);
     
     /** The name of the DataStoreClient class. */
     private static final String DataStoreClientClassName =
@@ -27,17 +35,22 @@ public class TestDataServiceClientConcurrency
     private static final String DataStoreServerImplClassName =
 	DataStoreServerImpl.class.getName();
 
+    /** The name of the DataServiceImpl class. */
     private static final String DataServiceImplClassName =
 	DataServiceImpl.class.getName();
 
+    /** The data store server. */
     DataStoreServerImpl server;
 
+    /** Creates an instance. */
     public TestDataServiceClientConcurrency(String name) {
 	super(name);
+	/* Reduce the size of the test -- the networked version is slower */
 	operations = Integer.getInteger("test.operations", 5000);
 	objects = Integer.getInteger("test.objects", 500);
     }
 
+    /** Shutdown the server. */
     protected void tearDown() throws Exception {
 	super.tearDown();
 	try {
@@ -53,21 +66,26 @@ public class TestDataServiceClientConcurrency
 	}
     }
 
+    /**
+     * Create a DataService, set any default properties, and start the server,
+     * if needed.
+     */
     protected DataService getDataService(Properties props,
 					 ComponentRegistry componentRegistry)
 	throws Exception
     {
-	if (!externalServer) {
-	    props.setProperty(DataStoreServerImplClassName + ".port",
-			      "0");
+	String host = serverHost;
+	int port = serverPort;
+	if (host == null) {
+	    props.setProperty(DataStoreServerImplClassName + ".port", "0");
 	    DataStoreServerImpl serverImpl = new DataStoreServerImpl(props);
 	    server = serverImpl;
-	    serverPort = serverImpl.getPort();
+	    host = "localhost";
+	    port = serverImpl.getPort();
 	}
-	props.setProperty(DataStoreClientClassName + ".server.host",
-			  serverHost);
+	props.setProperty(DataStoreClientClassName + ".server.host", host);
 	props.setProperty(DataStoreClientClassName + ".server.port",
-			  String.valueOf(serverPort));
+			  String.valueOf(port));
 	props.setProperty(DataServiceImplClassName + ".data.store.class",
 			    DataStoreClientClassName);
 	return new DataServiceImpl(props, componentRegistry);

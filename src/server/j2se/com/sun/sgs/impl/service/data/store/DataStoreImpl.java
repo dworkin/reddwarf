@@ -31,7 +31,6 @@ import com.sun.sgs.service.TransactionParticipant;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.Arrays;
-import java.util.Date;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -82,13 +81,14 @@ import java.util.logging.Logger;
  *	com.sun.sgs.impl.service.data.store.DataStoreImpl.allocationBlockSize
  *	</code> <br>
  *	<i>Default:</i> <code>100</code> <br>
- *	The number of object IDs to allocate at a time.  Object IDs are
- *	allocated in an independent transaction, and are discarded if a
- *	transaction aborts, if a managed object is made reachable within the
- *	data store but is removed from the store before the transaction
- *	commits, or if the program exits before it uses the object IDs it has
- *	allocated.  This number limits the maximum number of object IDs that
- *	would be discarded when the program exits. <p>
+ *	The number of object IDs to allocate at a time.  This value must be
+ *	greater than <code>0</code>.  Object IDs are allocated in an
+ *	independent transaction, and are discarded if a transaction aborts, if
+ *	a managed object is made reachable within the data store but is removed
+ *	from the store before the transaction commits, or if the program exits
+ *	before it uses the object IDs it has allocated.  This number limits the
+ *	maximum number of object IDs that would be discarded when the program
+ *	exits. <p>
  *
  * <li> <i>Key:</i>
  *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl.cacheSize
@@ -309,8 +309,13 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	 * Removes the information associated with the transaction.
 	 *
 	 * @param	txn the transaction
+	 * @return	the previously associated information
+	 * @throws	IllegalStateException if no associated information is
+	 *		found, or if the implementation determines that the
+	 *		specified transaction does not match the current
+	 *		context
 	 */
-	void remove(Transaction txn);
+	T remove(Transaction txn);
 
 	/**
 	 * Sets the information associated with the transaction, which should
@@ -362,8 +367,15 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	    }
 	}
 
-	public void remove(Transaction txn) {
+	public T remove(Transaction txn) {
+	    Entry<T> entry = threadInfo.get();
+	    if (entry == null) {
+		throw new IllegalStateException("Transaction not active");
+	    } else if (!entry.txn.equals(txn)) {
+		throw new IllegalStateException("Wrong transaction");
+	    }
 	    threadInfo.set(null);
+	    return entry.info;
 	}
 
 	public void set(Transaction txn, T info, boolean explicit) {
@@ -1211,7 +1223,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	logger.log(Level.FINER, "prepare txn:{0}", txn);
 	Exception exception;
 	try {
-	    TxnInfo txnInfo = checkTxnNoJoin(txn, true);
+	    TxnInfo txnInfo = checkTxnNoJoin(txn);
 	    if (txnInfo.prepared) {
 		throw new IllegalStateException(
 		    "Transaction has already been prepared");
@@ -1261,7 +1273,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	logger.log(Level.FINER, "commit txn:{0}", txn);
 	Exception exception;
 	try {
-	    TxnInfo txnInfo = checkTxnNoJoin(txn, true);
+	    TxnInfo txnInfo = checkTxnNoJoin(txn);
 	    if (!txnInfo.prepared) {
 		throw new IllegalStateException(
 		    "Transaction has not been prepared");
@@ -1295,7 +1307,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	logger.log(Level.FINER, "prepareAndCommit txn:{0}", txn);
 	Exception exception;
 	try {
-	    TxnInfo txnInfo = checkTxnNoJoin(txn, true);
+	    TxnInfo txnInfo = checkTxnNoJoin(txn);
 	    if (txnInfo.prepared) {
 		throw new IllegalStateException(
 		    "Transaction has already been prepared");
@@ -1330,17 +1342,21 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	logger.log(Level.FINER, "abort txn:{0}", txn);
 	Exception exception;
 	try {
-	    TxnInfo txnInfo = checkTxnNoJoin(txn, false);
-	    /*
-	     * Make sure to clear the transaction information, regardless of
-	     * whether the Berkeley DB commit operation succeeds, since
-	     * Berkeley DB doesn't permit operating on its transaction object
-	     * after commit is called.
-	     */
-	    txnInfoTable.remove(txn);
+	    if (txn == null) {
+		throw new NullPointerException("Transaction must not be null");
+	    }
+	    TxnInfo txnInfo = txnInfoTable.remove(txn);
+	    if (txnInfo == null) {
+		throw new IllegalStateException("Transaction is not active");
+	    }
 	    Ops ops = null;
 	    try {
 		ops = txnInfo.abort();
+		/*
+		 * Check the timeout after performing the abort to insure that
+		 * the Berkeley DB transaction gets aborted now.
+		 */
+		checkTxnTimeout(txn);
 		logger.log(Level.FINER, "abort txn:{0} returns", txn);
 		return;
 	    } finally {
@@ -1519,23 +1535,21 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 
     /**
      * Checks that the correct transaction is in progress, throwing an
-     * exception if the transaction has not been joined.  If notAborting is
-     * true, then checks if the store is shutting down and if the transaction
-     * has timed out.  Does not check the prepared state of the transaction.
+     * exception if the transaction has not been joined.  Checks if the store
+     * is shutting down, and if the transaction has timed out, but does not
+     * check the prepared state of the transaction.
      */
-    private TxnInfo checkTxnNoJoin(Transaction txn, boolean notAborting) {
+    private TxnInfo checkTxnNoJoin(Transaction txn) {
 	if (txn == null) {
 	    throw new NullPointerException("Transaction must not be null");
 	}
 	TxnInfo txnInfo = txnInfoTable.get(txn);
 	if (txnInfo == null) {
 	    throw new IllegalStateException("Transaction is not active");
-	} else if (notAborting) {
-	    if (getTxnCount() < 0) {
-		throw new IllegalStateException("DataStore is shutting down");
-	    } else {
-		checkTxnTimeout(txn);
-	    }
+	} else if (getTxnCount() < 0) {
+	    throw new IllegalStateException("DataStore is shutting down");
+	} else {
+	    checkTxnTimeout(txn);
 	}
 	return txnInfo;
     }

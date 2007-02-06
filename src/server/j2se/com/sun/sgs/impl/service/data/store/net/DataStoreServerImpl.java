@@ -22,6 +22,7 @@ import java.util.TreeMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -46,7 +47,7 @@ import java.util.logging.Logger;
  * <li> <i>Key:</i> <code>
  *	com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl.port
  *	</code> <br>
- *      <i>Default:</i> <code>54321</code> <br>
+ *      <i>Default:</i> <code>44530</code> <br>
  *	The network port for running the server. This value must
  *	be greater than or equal to <code>0</code> and no greater than
  *	<code>65535</code>.  If the value specified is <code>0</code>, then an
@@ -104,7 +105,7 @@ public class DataStoreServerImpl implements DataStoreServer {
     private static final String PORT_PROPERTY = CLASSNAME + ".port";
 
     /** The default value of the port for running the server. */
-    private static final int DEFAULT_PORT = 54321;
+    private static final int DEFAULT_PORT = 44530;
 
     /** The number of transactions to allocate at a time. */
     private static final int TXN_ALLOCATION_BLOCK_SIZE = 100;
@@ -146,14 +147,14 @@ public class DataStoreServerImpl implements DataStoreServer {
 	/** The creation time. */
 	private final long creationTime;
 
-	/**
-	 * Whether this transaction is in use.  Synchronize on the
-	 * TxnTable.lock field when accessing this field.
-	 */
-	boolean inUse;
+	/** Whether this transaction is in use. */
+	private final AtomicBoolean inUse = new AtomicBoolean();
 
 	/** The transaction participant or null. */
 	private TransactionParticipant participant;
+
+	/** Whether the transaction has already started aborting. */
+	private boolean aborting;
 
 	/** Creates an instance with the specified ID. */
 	Txn(long tid) {
@@ -164,6 +165,19 @@ public class DataStoreServerImpl implements DataStoreServer {
 	/** Returns the associated ID as a long. */
 	long getTid() {
 	    return tid;
+	}
+
+	/** Returns whether this transaction is in use. */
+	boolean getInUse() {
+	    return inUse.get();
+	}
+
+	/**
+	 * Sets whether this transaction is in use.  Returns the previous
+	 * value.
+	 */
+	boolean setInUse(boolean inUse) {
+	    return this.inUse.getAndSet(inUse);
 	}
 
 	/* -- Implement Transaction -- */
@@ -185,7 +199,10 @@ public class DataStoreServerImpl implements DataStoreServer {
 	}
 
 	public void abort(Throwable cause) {
-	    participant.abort(this);
+	    if (!aborting) {
+		aborting = true;
+		participant.abort(this);
+	    }
 	}
 
 	/* -- Other methods -- */
@@ -219,10 +236,7 @@ public class DataStoreServerImpl implements DataStoreServer {
      */
     private static class TxnTable<T> implements TxnInfoTable<T> {
 
-	/**
-	 * Synchronize on this object when accessing the table or the inUse
-	 * field of a TxnInfo object.
-	 */
+	/** Synchronize on this object when accessing the table. */
 	private final Object lock = new Object();
 
 	/**
@@ -250,12 +264,17 @@ public class DataStoreServerImpl implements DataStoreServer {
 	 * it in use.
 	 */
 	Txn get(long tid) {
+	    Entry<T> entry;
 	    synchronized (lock) {
-		Entry<T> entry = table.get(tid);
-		if (entry != null) {
-		    entry.txn.inUse = true;
-		    return entry.txn;
+		entry = table.get(tid);
+	    }
+	    if (entry != null) {
+		boolean wasInUse = entry.txn.setInUse(true);
+		if (wasInUse) {
+		    throw new IllegalStateException(
+			"Multiple simultaneous accesses to transaction");
 		}
+		return entry.txn;
 	    }
 	    throw new TransactionNotActiveException(
 		"Transaction is not active");
@@ -263,9 +282,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 
 	/** Marks the transaction as not in use. */
 	void notInUse(Txn txn) {
-	    synchronized (lock) {
-		txn.inUse = false;
-	    }
+	    txn.setInUse(false);
 	}
 
 	/** Returns all expired transactions that are not in use. */
@@ -277,7 +294,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 		    Txn txn = entry.txn;
 		    if (txn.getCreationTime() > last) {
 			break;
-		    } else if (!txn.inUse) {
+		    } else if (!txn.getInUse()) {
 			result.add(txn);
 		    }
 		}
@@ -295,7 +312,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 		    entry = table.get(tid);
 		}
 		if (entry != null) {
-		    assert entry.txn.inUse;
+		    assert entry.txn.getInUse();
 		    return entry.info;
 		}
 	    }
@@ -303,13 +320,21 @@ public class DataStoreServerImpl implements DataStoreServer {
 		"Transaction is not active");
 	}
 
-	public void remove(Transaction txn) {
+	public T remove(Transaction txn) {
 	    if (txn instanceof Txn) {
 		long tid = ((Txn) txn).getTid();
+		Entry<T> entry;
 		synchronized (lock) {
-		    table.remove(tid);
+		    entry = table.remove(tid);
+		}
+		if (entry != null) {
+		    if (!entry.txn.equals(txn)) {
+			throw new IllegalStateException("Wrong transaction");
+		    }
+		    return entry.info;
 		}
 	    }
+	    throw new IllegalStateException("Transaction is not active");
 	}
 
 	public void set(
@@ -759,6 +784,10 @@ public class DataStoreServerImpl implements DataStoreServer {
 	    try {
 		store.abort(txn);
 	    } catch (TransactionNotActiveException e) {
+		/*
+		 * The abort call should fail this way because this is an
+		 * already expired exception.
+		 */
 	    }
 	}
 	int numExpired = expired.size();

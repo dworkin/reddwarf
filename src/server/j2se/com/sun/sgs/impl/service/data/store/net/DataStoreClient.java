@@ -29,7 +29,8 @@ import java.util.logging.Logger;
  *	com.sun.sgs.impl.service.data.store.net.DataStoreClient.allocation.block.size
  *	</code> <br>
  *	<i>Default:</i> <code>100</code> <br>
- *	The number of object IDs to allocate at one time. <p>
+ *	The number of object IDs to allocate at one time.  This value must be
+ *	greater than <code>0</code>. <p>
  *
  *	<i>Key:</i> <code>
  *	com.sun.sgs.impl.service.data.store.net.DataStoreClient.server.host
@@ -40,7 +41,7 @@ import java.util.logging.Logger;
  *	<i>Key:</i> <code>
  *	com.sun.sgs.impl.service.data.store.net.DataStoreClient.server.port
  *	</code> <br>
- *	<i>Default:</i> <code>54321</code>
+ *	<i>Default:</i> <code>44530</code>
  *	The network port for the <code>DataStoreServer</code>.  This value must
  *	be greater than <code>0</code> and no greater than <code>65535</code>.
  *
@@ -85,7 +86,7 @@ public final class DataStoreClient
 	CLASSNAME + ".server.port";
 
     /** The default for the server port. */
-    private static final int DEFAULT_SERVER_PORT = 54321;
+    private static final int DEFAULT_SERVER_PORT = 44530;
 
     /**
      * The number of times to retry attempting to obtain the server after a

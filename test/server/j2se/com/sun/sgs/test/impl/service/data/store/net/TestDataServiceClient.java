@@ -6,13 +6,12 @@ import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
 import com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.DataService;
-import com.sun.sgs.test.impl.service.data.TestDataServicePerformance;
+import com.sun.sgs.test.impl.service.data.TestDataServiceImpl;
 import java.util.Properties;
 
-/** Test the performance of the data service using a networked data store. */
-public class TestDataServiceClientPerformance
-    extends TestDataServicePerformance
-{
+/** Test the DataStoreService using a networked data store. */
+public class TestDataServiceClient extends TestDataServiceImpl {
+
     /**
      * The name of the host running the DataStoreServer, or null to create one
      * locally.
@@ -40,9 +39,8 @@ public class TestDataServiceClientPerformance
     DataStoreServerImpl server;
 
     /** Creates an instance. */
-    public TestDataServiceClientPerformance(String name) {
+    public TestDataServiceClient(String name) {
 	super(name);
-	count = Integer.getInteger("test.count", 20);
     }
 
     /** Shutdown the server. */
@@ -62,13 +60,10 @@ public class TestDataServiceClientPerformance
     }
 
     /**
-     * Create a DataService, setting default properties, and starting the
-     * server if needed.
+     * Create a DataServiceImpl, set any default properties, and start the
+     * server, if needed.
      */
-    protected DataService getDataService(Properties props,
-					 ComponentRegistry componentRegistry)
-	throws Exception
-    {
+    protected DataServiceImpl getDataServiceImpl() throws Exception {
 	String host = serverHost;
 	int port = serverPort;
 	if (host == null) {
@@ -82,7 +77,7 @@ public class TestDataServiceClientPerformance
 	props.setProperty(DataStoreClientClassName + ".server.port",
 			  String.valueOf(port));
 	props.setProperty(DataServiceImplClassName + ".data.store.class",
-			    DataStoreClientClassName);
+			  DataStoreClientClassName);
 	return new DataServiceImpl(props, componentRegistry);
     }
 }
