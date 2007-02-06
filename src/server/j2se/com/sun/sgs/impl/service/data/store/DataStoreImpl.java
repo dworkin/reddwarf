@@ -291,7 +291,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
      *
      * @param	<T> the type of information stored for each transaction
      */
-    public interface TxnInfoTable<T> {
+    protected interface TxnInfoTable<T> {
 
 	/**
 	 * Returns the information associated with the transaction, or null if

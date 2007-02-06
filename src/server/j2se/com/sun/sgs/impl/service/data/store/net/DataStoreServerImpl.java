@@ -2,7 +2,6 @@ package com.sun.sgs.impl.service.data.store.net;
 
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
-import com.sun.sgs.impl.service.data.store.DataStoreImpl.TxnInfoTable;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.PropertiesWrapper;
 import com.sun.sgs.service.Transaction;
@@ -229,25 +228,23 @@ public class DataStoreServerImpl implements DataStoreServer {
     }
 
     /**
-     * An implementation of TxnInfoTable that uses a sorted map keyed on
-     * transaction IDs, and that requires all transactions to be joined
-     * explicitly.  Since transaction IDs are allocated in order, the
+     * A table for storing transactions that uses a sorted map keyed on
+     * transaction IDs.  Since transaction IDs are allocated in order, the
      * transaction IDs will order the transactions by creation time.
      */
-    private static class TxnTable<T> implements TxnInfoTable<T> {
+    private static class TxnTable<T> {
 
 	/** Synchronize on this object when accessing the table. */
-	private final Object lock = new Object();
+	final Object lock = new Object();
 
 	/**
 	 * Maps transaction IDs to transactions and their associated
 	 * information.
 	 */
-	private final SortedMap<Long, Entry<T>> table =
-	    new TreeMap<Long, Entry<T>>();
+	final SortedMap<Long, Entry<T>> table = new TreeMap<Long, Entry<T>>();
 
 	/** Stores a transaction and the associated information. */
-	private static class Entry<T> {
+	static class Entry<T> {
 	    final Txn txn;
 	    final T info;
 	    Entry(Txn txn, T info) {
@@ -260,8 +257,8 @@ public class DataStoreServerImpl implements DataStoreServer {
 	TxnTable() { }
 
 	/**
-	 * Gets the transaction associated with the specified ID, and marks
-	 * it in use.
+	 * Gets the transaction associated with the specified ID, and marks it
+	 * in use.
 	 */
 	Txn get(long tid) {
 	    Entry<T> entry;
@@ -284,7 +281,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 	void notInUse(Txn txn) {
 	    txn.setInUse(false);
 	}
-
+	
 	/** Returns all expired transactions that are not in use. */
 	Collection<Transaction> getExpired(long txnTimeout) {
 	    Collection<Transaction> result = new ArrayList<Transaction>();
@@ -300,57 +297,6 @@ public class DataStoreServerImpl implements DataStoreServer {
 		}
 	    }
 	    return result;
-	}
-
-	/* -- Implement TxnInfoTable -- */
-
-	public T get(Transaction txn) {
-	    if (txn instanceof Txn) {
-		long tid = ((Txn) txn).getTid();
-		Entry<T> entry;
-		synchronized (lock) {
-		    entry = table.get(tid);
-		}
-		if (entry != null) {
-		    assert entry.txn.getInUse();
-		    return entry.info;
-		}
-	    }
-	    throw new TransactionNotActiveException(
-		"Transaction is not active");
-	}
-
-	public T remove(Transaction txn) {
-	    if (txn instanceof Txn) {
-		long tid = ((Txn) txn).getTid();
-		Entry<T> entry;
-		synchronized (lock) {
-		    entry = table.remove(tid);
-		}
-		if (entry != null) {
-		    if (!entry.txn.equals(txn)) {
-			throw new IllegalStateException("Wrong transaction");
-		    }
-		    return entry.info;
-		}
-	    }
-	    throw new IllegalStateException("Transaction is not active");
-	}
-
-	public void set(
-	    Transaction txn, T info, boolean explicit)
-	{
-	    if (!explicit) {
-		throw new IllegalStateException("Implicit join not permitted");
-	    }
-	    if (txn instanceof Txn) {
-		Txn t = (Txn) txn;
-		long tid = t.getTid();
-		Entry<T> newInfo = new Entry<T>(t, info);
-		synchronized (lock) {
-		    table.put(tid, newInfo);
-		}
-	    }
 	}
     }
 
@@ -375,13 +321,82 @@ public class DataStoreServerImpl implements DataStoreServer {
 	 */
 	private long lastTxnId = -1;
 
+	/**
+	 * An implementation of TxnInfoTable that uses TxnTable's map keyed on
+	 * transaction IDs, and that requires all transactions to be joined
+	 * explicitly.
+	 */
+	private class CustomTxnInfoTable<T> extends TxnTable<T>
+	    implements TxnInfoTable<T>
+	{
+	    /** Creates an instance. */
+	    CustomTxnInfoTable() { }
+
+	    /* -- Implement TxnInfoTable -- */
+
+	    public T get(Transaction txn) {
+		if (txn instanceof Txn) {
+		    long tid = ((Txn) txn).getTid();
+		    Entry<T> entry;
+		    synchronized (lock) {
+			entry = table.get(tid);
+		    }
+		    if (entry != null) {
+			assert entry.txn.getInUse();
+			return entry.info;
+		    }
+		}
+		throw new TransactionNotActiveException(
+		    "Transaction is not active");
+	    }
+
+	    public T remove(Transaction txn) {
+		if (txn instanceof Txn) {
+		    long tid = ((Txn) txn).getTid();
+		    Entry<T> entry;
+		    synchronized (lock) {
+			entry = table.remove(tid);
+		    }
+		    if (entry != null) {
+			if (!entry.txn.equals(txn)) {
+			    throw new IllegalStateException(
+				"Wrong transaction");
+			}
+			return entry.info;
+		    }
+		}
+		throw new IllegalStateException("Transaction is not active");
+	    }
+
+	    public void set(
+		Transaction txn, T info, boolean explicit)
+	    {
+		if (!explicit) {
+		    throw new IllegalStateException(
+			"Implicit join not permitted");
+		}
+		if (txn instanceof Txn) {
+		    Txn t = (Txn) txn;
+		    long tid = t.getTid();
+		    Entry<T> newInfo = new Entry<T>(t, info);
+		    synchronized (lock) {
+			table.put(tid, newInfo);
+		    }
+		}
+	    }
+	}
+
 	/** Creates an instance. */
 	CustomDataStoreImpl(Properties properties) {
 	    super(properties);
 	}
 
+	/**
+	 * Create an alternative transaction table, and store it in the
+	 * txnTable field of the containing server.
+	 */
 	protected <T> TxnInfoTable<T> getTxnInfoTable(Class<T> txnInfoType) {
-	    TxnTable<T> table = new TxnTable<T>();
+	    CustomTxnInfoTable<T> table = new CustomTxnInfoTable<T>();
 	    txnTable = table;
 	    return table;
 	}
