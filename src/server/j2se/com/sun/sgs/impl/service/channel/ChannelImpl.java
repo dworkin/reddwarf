@@ -162,13 +162,15 @@ final class ChannelImpl implements Channel, Serializable {
 	    context.getService(DataService.class).markForUpdate(state);
 	    context.leaveChannel(session, this);
 	    state.removeSession(session);
-	    int nameSize = MessageBuffer.getSize(state.name);
-	    MessageBuffer buf = new MessageBuffer(3 + nameSize);
-	    buf.putByte(SimpleSgsProtocol.VERSION).
-		putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
-		putByte(SimpleSgsProtocol.CHANNEL_LEAVE).
-		putString(state.name);
-	    sendProtocolMessageOnCommit(session, buf.getBuffer());
+	    if (session.isConnected()) {
+		int nameSize = MessageBuffer.getSize(state.name);
+		MessageBuffer buf = new MessageBuffer(3 + nameSize);
+		buf.putByte(SimpleSgsProtocol.VERSION).
+		    putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
+		    putByte(SimpleSgsProtocol.CHANNEL_LEAVE).
+		    putString(state.name);
+		sendProtocolMessageOnCommit(session, buf.getBuffer());
+	    }
 	    
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST, "leave session:{0} returns", session);
@@ -248,8 +250,7 @@ final class ChannelImpl implements Channel, Serializable {
                     "message too long: " + message.length + " > " +
                         SimpleSgsProtocol.MAX_MESSAGE_LENGTH);
             }
-	    sendToClients(EMPTY_ID, state.getSessions(), message,
-			  context.nextSequenceNumber());
+	    sendToClients(state.getSessions(), message);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST, "send message:{0} returns", message);
 	    }
@@ -280,8 +281,7 @@ final class ChannelImpl implements Channel, Serializable {
 	
 	    Set<ClientSession> sessions = new HashSet<ClientSession>();
 	    sessions.add(recipient);
-	    sendToClients(EMPTY_ID, sessions, message,
-			  context.nextSequenceNumber());
+	    sendToClients(sessions, message);
 	    
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
@@ -317,8 +317,7 @@ final class ChannelImpl implements Channel, Serializable {
             }
 
 	    if (!recipients.isEmpty()) {
-		sendToClients(EMPTY_ID, recipients, message,
-			      context.nextSequenceNumber());
+		sendToClients(recipients, message);
 	    }
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
@@ -437,11 +436,7 @@ final class ChannelImpl implements Channel, Serializable {
      * message was sent by the specified sender.
      */
     void notifyListeners(byte[] senderId, byte[] message) {
-	checkContext();
-	if (channelClosed) {
-	    throw new IllegalStateException("channel is closed");
-	}
-	
+	checkClosed();
 	ClientSession senderSession =
 	    context.getService(ClientSessionService.class).
 	        getClientSession(senderId);
@@ -467,12 +462,14 @@ final class ChannelImpl implements Channel, Serializable {
     }
 
     /**
-     * Forwards message to recipient sessions.
+     * Forwards message (from client) to recipient sessions.
      */
-    void forwardMessage(final byte[] senderId,
+    void forwardMessage(
+	    final byte[] senderId,
             final Set<byte[]> recipientIds,
             final byte[] message, final long seq)
     {
+	checkClosed();
         // Build the list of recipients
         final Set<ClientSession> recipients;
         if (recipientIds.size() == 0) {
@@ -483,9 +480,10 @@ final class ChannelImpl implements Channel, Serializable {
                 ClientSession session =
                     context.getService(ClientSessionService.class).
 		        getClientSession(sessionId);
-                // Skip the sender and any disconnected sessions
+                // Skip the sender and any disconnected or non-member sessions
                 if ((session != null) &&
-                    (!senderId.equals(session.getSessionId())))
+                    (!senderId.equals(session.getSessionId())) &&
+		    (state.hasSession(session)))
                 {
                     recipients.add(session);
                 }
@@ -497,11 +495,7 @@ final class ChannelImpl implements Channel, Serializable {
          * we don't need to send anything.
          */
         if (recipients.isEmpty()) {
-            if (logger.isLoggable(Level.FINEST)) {
-                logger.log(
-                        Level.FINEST,
-                "no recipients except sender");
-            }
+	    logger.log(Level.FINEST, "no recipients except sender");
             return;
         }
         
@@ -579,25 +573,6 @@ final class ChannelImpl implements Channel, Serializable {
     }
 
     /**
-     * Send a protocol message to the specified session, logging (but
-     * not throwing) any exception.
-     */
-    private void sendProtocolMessage(ClientSession session, byte[] message) {
-	try {
-	    ((SgsClientSession) session).sendProtocolMessage(
-		message, state.delivery);
-	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.logThrow(
-		    Level.FINEST, e,
-		    "sendProtcolMessage session:{0} message:{1} throws",
-		    session, message);
-	    }
-	    // eat exception
-	}
-    }
-    
-    /**
      * Send a protocol message to the specified session when the
      * transaction commits, logging (but not throwing) any exception.
      */
@@ -619,27 +594,28 @@ final class ChannelImpl implements Channel, Serializable {
     }
 
     /**
-     * Sends a channel message with the specified sender, message, and
-     * sequence number to the set of specified clients when this
-     * transaction commits.
+     * When this transaction commits, sends the given {@code message}
+     * from this channel's server to the specified set of client
+     * {@code sessions}.
      */
-    private void sendToClients(byte[] senderId,
-			       Set<ClientSession> sessions,
-			       byte[] message,
-			       long sequenceNumber)
-    {
+    private void sendToClients(Set<ClientSession> sessions, byte[] message) {
+
 	Set<byte[]> clients = new HashSet<byte[]>();
 	for (ClientSession session : sessions) {
 	    clients.add(session.getSessionId());
 	}
 	byte[] protocolMessage =
-	    getChannelMessage(senderId, message, sequenceNumber);
+	    getChannelMessage(EMPTY_ID, message, context.nextSequenceNumber());
 	    
 	for (byte[] sessionId : clients) {
 	    SgsClientSession session = 
 		context.getService(ClientSessionService.class).
 		    getClientSession(sessionId);
-	    if (session != null && session.isConnected()) {
+	    // skip disconnected and non-member sessions
+	    if (session != null &&
+		state.hasSession(session) &&
+		session.isConnected())
+	    {
 		session.sendProtocolMessageOnCommit(
 		    protocolMessage, state.delivery);
 	    }

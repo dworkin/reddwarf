@@ -206,7 +206,8 @@ public class ChannelServiceImpl
 		throw new NullPointerException("null name");
 	    }
 	    if (listener != null && !(listener instanceof Serializable)) {
-		throw new IllegalArgumentException("listener is not serializable");
+		throw new IllegalArgumentException(
+		    "listener is not serializable");
 	    }
 	    Context context = checkContext();
 	    Channel channel = context.createChannel(name, listener, delivery);
@@ -459,7 +460,14 @@ public class ChannelServiceImpl
                     buf.getLong(); // TODO Check sequence num
 		    short numRecipients = buf.getShort();
 		    if (numRecipients < 0) {
-			// TBD: log error...
+			if (logger.isLoggable(Level.WARNING)) {
+			    logger.log(
+			    	Level.WARNING,
+				"receivedMessage: bad CHANNEL_SEND_REQUEST " +
+				"(negative number of recipients) " +
+				"numRecipents:{0} session:{1}",
+				numRecipients, session);
+			}
 			return;
 		    }
 
@@ -476,7 +484,7 @@ public class ChannelServiceImpl
                     long seq = nextSequenceNumber(session);
 		    byte[] senderId = session.getSessionId();
 
-                    // Immediately forward to receiving clients
+                    // Forward message to receiving clients
 		    nonDurableTaskScheduler.scheduleTask(
                         new ForwardingTask(
                             name, senderId, sessions, channelMessage, seq));
@@ -494,7 +502,7 @@ public class ChannelServiceImpl
 			    Level.SEVERE,
 			    "receivedMessage session:{0} message:{1} " +
 			    "unknown opcode:{2}",
-			    session, message, opcode);
+			    session, HexDumper.format(message), opcode);
 		    }
 		    break;
 		}
@@ -503,7 +511,7 @@ public class ChannelServiceImpl
 		    logger.log(
 			Level.FINEST,
 			"receivedMessage session:{0} message:{1} returns",
-			session, message);
+			session, HexDumper.format(message));
 		}
 		
 	    } catch (RuntimeException e) {
@@ -511,7 +519,7 @@ public class ChannelServiceImpl
 		    logger.logThrow(
 			Level.SEVERE, e,
 			"receivedMessage session:{0} message:{1} throws",
-			session, message);
+			session, HexDumper.format(message));
 		}
 	    }
 	}
@@ -616,6 +624,8 @@ public class ChannelServiceImpl
 	    return channel;
 	}
 
+	/* -- other methods -- */
+
 	/**
 	 * Removes the channel with the specified name.  This method is
 	 * called when the 'close' method is invoked on a 'ChannelImpl'.
@@ -679,7 +689,7 @@ public class ChannelServiceImpl
 		Set<Channel> channels = set.removeAll();
 		dataService.removeServiceBinding(key);
 		dataService.removeObject(set);
-		return set.removeAll();
+		return channels;
 	    } catch (NameNotBoundException e) {
 		return new HashSet<Channel>();
 	    }
@@ -699,7 +709,6 @@ public class ChannelServiceImpl
 	long nextSequenceNumber() {
 	    return sequenceNumber.getAndIncrement();
 	}
-	
     }
 
     /**
