@@ -162,11 +162,26 @@ class Kernel {
         String [] authenticatorClassNames =
             properties.getProperty(StandardProperties.AUTHENTICATORS,
                                    DEFAULT_IDENTITY_AUTHENTICATOR).split(":");
-        for (String authenticatorClassName : authenticatorClassNames)
-            authenticators.add(getAuthenticator(authenticatorClassName,
-                                                properties));
-        IdentityManagerImpl appIdentityManager =
-            new IdentityManagerImpl(authenticators);
+        try {
+            for (String authenticatorClassName : authenticatorClassNames)
+                authenticators.add(getAuthenticator(authenticatorClassName,
+                                                    properties));
+        } catch (Exception e) {
+            if (logger.isLoggable(Level.SEVERE))
+                logger.logThrow(Level.SEVERE, e, "Failed to load Identity " +
+                                "Authenticator: {0}", authenticatorClassName);
+            throw e;
+        }
+
+        IdentityManagerImpl appIdentityManager;
+        try {
+            appIdentityManager = new IdentityManagerImpl(authenticators);
+        } catch (Exception e) {
+            if (logger.isLoggable(Level.SEVERE))
+                logger.logThrow(Level.SEVERE, e,
+                                "Failed to created Identity Manager");
+            throw e;
+        }
 
         // now that we have the app's authenticators, create a system
         // registry to use in setting up the services
@@ -178,8 +193,8 @@ class Kernel {
 
         // create the services and their associated managers...call out
         // the standard services, first, because we need to get the
-        // ordering constant and make they're all present, and then handle
-        // any external services
+        // ordering constant and make sure that they're all present, and
+        // then handle any external services
         ArrayList<Service> serviceList = new ArrayList<Service>();
         HashSet<Object> managerSet = new HashSet<Object>();
         ComponentRegistryImpl managerComponents = new ComponentRegistryImpl();

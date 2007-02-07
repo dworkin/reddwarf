@@ -560,8 +560,11 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
         directory = specifiedDirectory;
     } else {
         String rootDir = properties.getProperty(StandardProperties.APP_ROOT);
-        if (rootDir == null)
-            throw new IllegalArgumentException("A root directory is needed");
+        if (rootDir == null) {
+            throw new IllegalArgumentException("A value for the property " +
+                                               StandardProperties.APP_ROOT +
+                                               " must be specified");
+        }
         directory = rootDir + File.separator + DEFAULT_DIRECTORY;
 	}
 	allocationBlockSize = wrappedProps.getIntProperty(
