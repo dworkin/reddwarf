@@ -1,0 +1,5 @@
+# Java logging configuration file
+
+handlers = java.util.logging.ConsoleHandler
+.level = CONFIG
+java.util.logging.ConsoleHandler.level = CONFIG
