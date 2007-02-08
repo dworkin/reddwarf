@@ -6,19 +6,22 @@ package com.sun.sgs.impl.kernel;
  * This class contains the standard property keys that the kernel looks for
  * (and may provide) on startup.
  * <p>
- * Note that when the kernel starts, it is given a list of applications to
- * run. For each application named <code>{NAME}</code>, the kernel will
- * provide any key starting with <code>com.sun.sgs.{NAME}</code> into the
- * namespace <code>com.sun.sgs.app</code> for the scope of the application
- * <code>{NAME}</code>. For instance, for the application <code>MyApp</code>,
- * the value of the key <code>com.sun.sgs.MyApp.foo</code> will be provided
- * to the application <code>MyApp</code> by the key
- * <code>com.sun.sgs.app.foo</code>.
+ * Note that when the kernel starts, it is given a list of application
+ * <code>Properties</code> files, each of which represents a single
+ * application to run. For each application, any of the property keys
+ * identified here (except for <code>CONFIG_FILE</code>) will set the
+ * associated behavior for that application. If no value is provided
+ * for a given key, then the default or system-provided value is used.
+ * Note that some keys are required to have values, specifically
+ * <code>APP_NAME</code>, <code>APP_ROOT</code>, <code>APP_LISTENER</code>,
+ * and <code>APP_PORT</code>.
  * <p>
- * Default values can provided for all applications by using one of the
- * properties specified in this class, and specific application properties
- * can be provided by replacing <code>app</code> with the name of the
- * application in the property key.
+ * Default values can provided for all applications by using any of the
+ * properties specified in this class at the system level (i.e., in a
+ * system config file or as a system property). The one exception is
+ * <code>APP_NAME</code>, which may not be specified at the system level,
+ * and must instead be specified in each application's <code>Properties</code>
+ * configuration file.
  */
 public class StandardProperties {
 
@@ -26,18 +29,16 @@ public class StandardProperties {
     private static final String NS = "com.sun.sgs.";
 
     /**
-     * An optional key specifying a file containing properties. If set,
+     * An optional key specifying a file containing system properties. If set,
      * this must point to the location of a properties file. Each property
      * within that file is provided to the system and all applications. Each
      * property may be overriden by the system properties provided at
-     * startup.
+     * startup, or by an individual application.
      */
     public static final String CONFIG_FILE = NS + "config.file";
 
     /**
-     * An automatically generated key specifying the name of an applcation.
-     * This should not be provided to the kernel, since it will override
-     * any provided value.
+     * A required key specifying the name of an applcation.
      */
     public static final String APP_NAME = NS + "app.name";
     

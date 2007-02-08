@@ -405,15 +405,61 @@ class Kernel {
     }
 
     /**
+     * Helper method for loading properties files.
+     */
+    private static Properties getProperties(String filename) throws Exception {
+        return getProperties(filename, null);
+    }
+
+    /**
+     * Helper method for loading properties files with backing properties.
+     */
+    private static Properties getProperties(String filename,
+                                            Properties backingProperties)
+        throws Exception
+    {
+        try {
+            Properties properties;
+            if (backingProperties == null)
+                properties = new Properties();
+            else
+                properties = new Properties(backingProperties);
+            properties.load(new FileInputStream(filename));
+            return properties;
+        } catch (IOException ioe) {
+            if (logger.isLoggable(Level.SEVERE))
+                logger.logThrow(Level.SEVERE, ioe, "Unable to load " +
+                                "properties file {0}: ", filename);
+            throw ioe;
+        } catch (IllegalArgumentException iae) {
+            if (logger.isLoggable(Level.SEVERE))
+                logger.logThrow(Level.SEVERE, iae, "Illegal data in " +
+                                "properties file {0}: ", filename);
+            throw iae;
+        }
+    }
+
+    /**
      * Main-line method that starts the <code>Kernel</code>. Note that right
      * now there is no management for the stack, so we accept on the
      * command-line the set of applications to run. Once we have management
      * and configration facilities, this command-line list will be removed.
      * <p>
-     * Each arguent on the command-line is considered to be the name of an
-     * application to run. For each application some properties are required.
-     * For required and optional properties, and the correct command-line
-     * formatting, see <code>StandardProperties</code>.
+     * Each arguent on the command-line is a <code>Properties</code> file for
+     * an application to run. For each application some properties are
+     * required to be specified in that file. For required and optional
+     * properties see <code>StandardProperties</code>.
+     * <p>
+     * The order of precedence for properties is as follows. If a value is
+     * provided for a given property key by the application's configuration,
+     * then that value takes precedence over any others. If no value is
+     * provided by the application's configuration, then the system
+     * property value, if specified (typically provided on the command-line
+     * using a "-D" flag) is used. Failing this, the value from the system
+     * config file (if a file is specified) is used. If no value is specified
+     * for a given property in any of these places, then a default is used
+     * or an <code>Exception</code> is thrown (depending on whether a default
+     * value is available).
      * 
      * @param args the names of the applications to run
      *
@@ -423,54 +469,47 @@ class Kernel {
         // make sure we were given an application to run
         if (args.length < 1) {
             logger.log(Level.SEVERE, "No applications were provided: halting");
-            System.out.println("Usage: AppName [AppName ...]");
+            System.out.println("Usage: AppPropertyFile [AppPropertyFile ...]");
             System.exit(0);
         }
 
         // start by loading from a config file (if one was provided), and
         // then merge in the system properties
-        Properties systemProperties = new Properties();
+        Properties systemProperties = null;
         String propertiesFile =
             System.getProperty(StandardProperties.CONFIG_FILE);
-        if (propertiesFile != null) {
-            try {
-                systemProperties.load(new FileInputStream(propertiesFile));
-            } catch (IOException ioe) {
-                if (logger.isLoggable(Level.SEVERE))
-                    logger.logThrow(Level.SEVERE, ioe, "Unable to load " +
-                                    "properties file {0}: ", propertiesFile);
-                throw ioe;
-            } catch (IllegalArgumentException iae) {
-                if (logger.isLoggable(Level.SEVERE))
-                    logger.logThrow(Level.SEVERE, iae, "Illegal data in " +
-                                    "properties file {0}: ", propertiesFile);
-                throw iae;
-            }
-        }
+        if (propertiesFile != null)
+            systemProperties = getProperties(propertiesFile);
+        else
+            systemProperties = new Properties();
         systemProperties.putAll(System.getProperties());
+
+        // make sure that no application name was specified yet
+        if (systemProperties.containsKey(StandardProperties.APP_NAME)) {
+            logger.log(Level.SEVERE, "Key" + StandardProperties.APP_NAME +
+                       " may not be specified in the system properties ");
+            throw new IllegalArgumentException("Application name was " +
+                                               "specified in system " +
+                                               "properties");
+        }
         
         // boot the kernel
         Kernel kernel = new Kernel(systemProperties);
 
         // setup and run each application
-        for (String appName : args) {
-            Properties appProperties = new Properties(systemProperties);
-            appProperties.setProperty(StandardProperties.APP_NAME, appName);
-            
-            // find all properties just for this app
-            final String appPrefix = "com.sun.sgs." + appName + ".";
-            final int len = appPrefix.length();
-            for (Object propObj : systemProperties.keySet()) {
-                String prop = (String)propObj;
-                if (prop.startsWith(appPrefix))
-                    appProperties.
-                        setProperty("com.sun.sgs.app." + prop.substring(len),
-                                    systemProperties.getProperty(prop));
-            }
+        for (String appPropertyFile : args) {
+            Properties appProperties =
+                getProperties(appPropertyFile, systemProperties);
+            String appName =
+                appProperties.getProperty(StandardProperties.APP_NAME);
 
             // make sure that at least the required keys are present, and if
             // they are then start the application
-            if (appProperties.
+            if (appName == null) {
+                logger.log(Level.SEVERE, "Missing required property " +
+                           StandardProperties.APP_NAME + " from config: " +
+                           appPropertyFile + " ... skipping startup");
+            } else if (appProperties.
                 getProperty(StandardProperties.APP_ROOT) == null) {
                 logger.log(Level.SEVERE, "Missing required property " +
                            StandardProperties.APP_ROOT + " for application: " +
@@ -489,7 +528,10 @@ class Kernel {
                            StandardProperties.APP_PORT + " for application: " +
                            appName + " ... skipping startup");
             } else {
-                // start the application
+                // the properties are in order, so startup the application
+                if (logger.isLoggable(Level.CONFIG))
+                    logger.log(Level.CONFIG, "Starting up application: {0}",
+                               appName);
                 kernel.startupApplication(appProperties);
             }
         }
