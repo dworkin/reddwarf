@@ -187,7 +187,16 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     public void testConstructorNoDirectory() throws Exception {
-        // FIXME: figure out how to specify the directory
+        String rootDir = createDirectory();
+        File dataDir = new File(rootDir, "dsdb");
+        if (!dataDir.mkdir()) {
+            throw new RuntimeException("Failed to create sub-dir: " + dataDir);
+        }
+        Properties props = createProperties(
+            StandardProperties.APP_NAME, "Foo",
+            StandardProperties.APP_ROOT, rootDir);
+        new DataServiceImpl(props, componentRegistry);
+        deleteDirectory(dataDir.getPath());
     }
 
     public void testConstructorNoDirectoryNorRoot() throws Exception {

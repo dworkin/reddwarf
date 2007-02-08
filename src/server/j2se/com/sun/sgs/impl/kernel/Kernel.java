@@ -162,15 +162,18 @@ class Kernel {
         String [] authenticatorClassNames =
             properties.getProperty(StandardProperties.AUTHENTICATORS,
                                    DEFAULT_IDENTITY_AUTHENTICATOR).split(":");
-        try {
-            for (String authenticatorClassName : authenticatorClassNames)
+
+        for (String authenticatorClassName : authenticatorClassNames) {
+            try {
                 authenticators.add(getAuthenticator(authenticatorClassName,
                                                     properties));
-        } catch (Exception e) {
-            if (logger.isLoggable(Level.SEVERE))
-                logger.logThrow(Level.SEVERE, e, "Failed to load Identity " +
-                                "Authenticator: {0}", authenticatorClassName);
-            throw e;
+            } catch (Exception e) {
+                if (logger.isLoggable(Level.SEVERE))
+                    logger.logThrow(Level.SEVERE, e, "Failed to load " +
+                                    "IdentityAuthenticator: {0}",
+                                    authenticatorClassName);
+                throw e;
+            }
         }
 
         IdentityManagerImpl appIdentityManager;
@@ -179,7 +182,7 @@ class Kernel {
         } catch (Exception e) {
             if (logger.isLoggable(Level.SEVERE))
                 logger.logThrow(Level.SEVERE, e,
-                                "Failed to created Identity Manager");
+                                "Failed to created IdentityManager");
             throw e;
         }
 
