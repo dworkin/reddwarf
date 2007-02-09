@@ -5,6 +5,7 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionAbortedException;
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.service.DataService;
@@ -113,7 +114,7 @@ public class TestConcurrent extends TestCase {
     public void testConcurrent() throws Throwable {
 	Properties props = createProperties(
 	    DataStoreImplClass + ".directory", createDirectory(),
-	    "com.sun.sgs.appName", "TestConcurrent");
+	    StandardProperties.APP_NAME, "TestConcurrent");
 	DummyComponentRegistry componentRegistry =
 	    new DummyComponentRegistry();
 	service = new DataServiceImpl(props, componentRegistry);

@@ -6,6 +6,7 @@ import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.app.TransactionTimeoutException;
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.DataStoreException;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
@@ -127,7 +128,20 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
-    public void testConstructorNoDirectory() {
+    public void testConstructorNoDirectory() throws Exception {
+        String rootDir = createDirectory();
+        File dataDir = new File(rootDir, "dsdb");
+        if (!dataDir.mkdir()) {
+            throw new RuntimeException("Failed to create sub-dir: " + dataDir);
+        }
+        Properties props = createProperties(
+            StandardProperties.APP_NAME, "Foo",
+            StandardProperties.APP_ROOT, rootDir);
+        new DataStoreImpl(props);
+        deleteDirectory(dataDir.getPath());
+    }
+
+    public void testConstructorNoDirectoryNorRoot() {
 	Properties props = new Properties();
 	try {
 	    new DataStoreImpl(props);
