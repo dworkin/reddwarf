@@ -10,6 +10,7 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameExistsException;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.util.HexDumper;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.MessageBuffer;
@@ -44,9 +45,6 @@ import java.util.logging.Logger;
 public class ChannelServiceImpl
     implements ChannelManager, Service, NonDurableTransactionParticipant
 {
-
-    /** The property that specifies the application name. */
-    public static final String APP_NAME_PROPERTY = "com.sun.sgs.appName";
 
     /** The name of this class. */
     private static final String CLASSNAME = ChannelServiceImpl.class.getName();
@@ -111,10 +109,10 @@ public class ChannelServiceImpl
 	    if (systemRegistry == null) {
 		throw new NullPointerException("null systemRegistry");
 	    }
-	    appName = properties.getProperty(APP_NAME_PROPERTY);
+	    appName = properties.getProperty(StandardProperties.APP_NAME);
 	    if (appName == null) {
 		throw new IllegalArgumentException(
-		    "The " + APP_NAME_PROPERTY +
+		    "The " + StandardProperties.APP_NAME +
 		    " property must be specified");
 	    }	
 	    protocolMessageListener = new ChannelProtocolMessageListener();
