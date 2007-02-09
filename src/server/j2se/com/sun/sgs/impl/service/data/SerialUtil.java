@@ -1,19 +1,26 @@
 package com.sun.sgs.impl.service.data;
 
 import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ObjectIOException;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.NotSerializableException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamClass;
 import java.io.OutputStream;
+import java.io.Serializable;
+import java.lang.reflect.Array;
+import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.Arrays;
+import java.util.IdentityHashMap;
+import java.util.Stack;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -76,6 +83,13 @@ final class SerialUtil {
 	    out.writeObject(object);
 	    out.flush();
 	    return baos.toByteArray();
+	} catch (ObjectIOException e) {
+	    check(object, e);
+	    throw e;
+	} catch (NotSerializableException e) {
+	    check(object, e);
+	    throw new ObjectIOException(
+		"Problem serializing object: " + e.getMessage(), e, false);
 	} catch (IOException e) {
 	    throw new ObjectIOException(
 		"Problem serializing object: " + e.getMessage(), e, false);
@@ -130,25 +144,7 @@ final class SerialUtil {
 		    false);
 	    } else if (object != null) {
 		Class<?> cl = object.getClass();
-		/*
-		 * Check explicitly for instances of inner classes whose
-		 * enclosing instance is a managed object, so that the
-		 * exception can refer to the inner class instance, rather than
-		 * the enclosing one, which isn't really where the problem
-		 * lies.
-		 */
-		if (cl.isMemberClass() &&
-		    !Modifier.isStatic(cl.getModifiers()))
-		{
-		    Class<?> enclosingClass = cl.getEnclosingClass();
-		    if (ManagedObject.class.isAssignableFrom(enclosingClass)) {
-			throw new ObjectIOException(
-			    "Cannot store an instance of an inner class " +
-			    "whose enclosing class implements " +
-			    "ManagedObject: " + object + ", " + cl,
-			    false);
-		    }
-		} else if (cl.isAnonymousClass()) {
+		if (cl.isAnonymousClass()) {
 		    if (logger.isLoggable(Level.FINE)) {
 			logger.log(
 			    Level.FINE,
@@ -209,14 +205,181 @@ final class SerialUtil {
     }
 
     /**
-     * Checks if an object has a particular fingerprint.
+     * Checks if an object has a particular fingerprint.  Returns false if
+     * attempting to compute the fingerprint throws an ObjectIOException.
      *
      * @param	object the object
      * @param	fingerprint the fingerprint
      * @return	whether the object has a matching fingerprint
-     * @throws	ObjectIOException if a problem occurs serializing the object
      */
     static boolean matchingFingerprint(Object object, byte[] fingerprint) {
-	return Arrays.equals(fingerprint(object), fingerprint);
+	try {
+	    return Arrays.equals(fingerprint(object), fingerprint);
+	} catch (ObjectIOException e) {
+	    return false;
+	}
+    }
+
+    /**
+     * Checks an object for references to non-serializable objects and direct
+     * references to managed objects, throwing an exception that contains
+     * debugging information about where the bad reference was found.
+     *
+     * @param	object the object to check
+     * @param	cause the exception that prompted the check, or null
+     * @throws	ObjectIOException if a direct reference to a managed object is
+     *		found
+     */
+    static void check(Object object, Exception cause) {
+	try {
+	    new Check(object, cause).checkObject(object);
+	} catch (ObjectIOException e) {
+	    /* Don't include the nested stack trace from the check itself */
+	    e.fillInStackTrace();
+	    throw e;
+	}
+    }
+
+    /**
+     * Class to check for bad references.  Uses reflection to traverse the
+     * object graph, keeping a stack describing the traversal for use in error
+     * messages.  Although the check performed does not account for
+     * serialization features such as writeReplace, the assumption is that
+     * references to non-serializable objects or direct references to managed
+     * objects will be detected anyway in most cases.
+     */
+    private static class Check {
+
+	/** The top level object being checked. */
+	private final Object topObject;
+
+	/** The thrown exception that prompted the check, or null. */
+	private final Exception cause;
+
+	/** The stack that stores information about object references. */
+	private final DebugStack stack = new DebugStack();
+
+	/** Stores information about objects already seen. */
+	private final IdentityHashMap<Object, Boolean> seen =
+	    new IdentityHashMap<Object, Boolean>();
+
+	/** A version of Stack that formats output appropriately. */
+	private static class DebugStack extends Stack<String> {
+	    /* Silence lint warning */
+	    private static final long serialVersionUID = 1;
+	    DebugStack() { }
+	    public String push(String s) {
+		return super.push((isEmpty() ? "\t-root: " : "\t-") + s);
+	    }
+	    public String toString() {
+		StringBuilder buffer = new StringBuilder();
+		if (!isEmpty()) {
+		    while (true) {
+			buffer.append(pop());
+			if (isEmpty()) {
+			    break;
+			}
+			buffer.append('\n');
+		    }
+		}
+		return buffer.toString();
+	    }
+	}
+
+	/**
+	 * Creates an instance for the specified top level object and cause.
+	 */
+	Check(Object topObject, Exception cause) {
+	    this.topObject = topObject;
+	    this.cause = cause;
+	}
+
+	/** Checks an object for bad references. */
+	private void checkObject(Object object) {
+	    if (object != null &&
+		!(object instanceof ManagedReference) &&
+		!seen.containsKey(object))
+	    {
+		Class<?> cl = object.getClass();
+		if (!(object instanceof Serializable)) {
+		    stack.push("object (class \"" + cl.getName() + "\", " +
+			       object + ")");
+		    throw new ObjectIOException(
+			"Object is not serializable:\n" + stack, cause, false);
+		} else if (object != topObject &&
+			   object instanceof ManagedObject)
+		{
+		    stack.push("object (class \"" + cl.getName() + "\", " +
+			       object + ")");
+		    throw new ObjectIOException(
+			"ManagedObject was not referenced through a " +
+			"ManagedReference:\n" + stack,
+			cause, false);
+		}
+		seen.put(object, Boolean.TRUE);
+		if (cl.isArray()) {
+		    checkArray(object);
+		} else {
+		    checkNonArray(object);
+		}
+	    }
+	}
+
+	/** Checks an array for bad reference. */
+	private void checkArray(Object array) {
+	    Class<?> cl = array.getClass();
+	    Class<?> compCl = cl.getComponentType();
+	    if (!compCl.isPrimitive()) {
+		int len = Array.getLength(array);
+		stack.push("array (class \"" + className(cl) +
+			   "\", size: " + len + ")");
+		for (int i = 0; i < len; i++) {
+		    stack.push("element of array (index: " + i + ")");
+		    checkObject(Array.get(array, i));
+		    stack.pop();
+		}
+		stack.pop();
+	    }
+	}
+
+	/** Checks an non-array for bad reference. */
+	private void checkNonArray(Object object) {
+	    Class<?> cl = object.getClass();
+	    stack.push("object (class \"" + cl.getName() + "\", " + object +
+		       ")");
+	    for ( ; cl != null; cl = cl.getSuperclass()) {
+		for (Field f : cl.getDeclaredFields()) {
+		    if (!Modifier.isStatic(f.getModifiers()) &&
+			!f.getType().isPrimitive())
+		    {
+			stack.push((f.isSynthetic() ? "synthetic " : "") +
+				   "field (class \"" + cl.getName() +
+				   "\", name: \"" + f.getName() +
+				   "\", type: \"" + className(f.getType()) +
+				   "\")");
+			f.setAccessible(true);
+			try {
+			    checkObject(f.get(object));
+			} catch (IllegalAccessException e) {
+			    throw new AssertionError(e);
+			}
+			stack.pop();
+		    }
+		}
+	    }
+	    stack.pop();
+	}
+
+	/** Returns the name of a class, converting array class names. */
+	private static String className(Class cl) {
+	    StringBuilder sb = new StringBuilder();
+	    while (cl.isArray()) {
+		sb.append("[]");
+		cl = cl.getComponentType();
+	    }
+	    String className = cl.getName();
+	    sb.insert(0, className);
+	    return sb.toString();
+	}
     }
 }

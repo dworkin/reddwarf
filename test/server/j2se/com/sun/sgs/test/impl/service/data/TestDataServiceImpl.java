@@ -632,7 +632,66 @@ public class TestDataServiceImpl extends TestCase {
 	    txn.commit();
 	    fail("Expected ObjectIOException");
 	} catch (ObjectIOException e) {
-	    System.err.println(e);
+	    e.printStackTrace();
+	} finally {
+	    txn = null;
+	}
+	createTransaction();
+	dummy.setValue(
+	    new Object[] {
+		null, new Integer(3),
+		new DummyManagedObject[] {
+		    null, new DummyManagedObject()
+		}
+	    });
+	setBinding(app, service, "dummy", dummy);
+	try {
+	    txn.commit();
+	    fail("Expected ObjectIOException");
+	} catch (ObjectIOException e) {
+	    e.printStackTrace();
+	} finally {
+	    txn = null;
+	}
+    }
+
+    public void testSetBindingManagedObjectNotSerializableCommit()
+	throws Exception
+    {
+	testSetBindingManagedObjectNotSerializableCommit(true);
+    }
+    public void testSetServiceBindingManagedObjectNotSerializableCommit()
+	throws Exception
+    {
+	testSetBindingManagedObjectNotSerializableCommit(false);
+    }
+    private void testSetBindingManagedObjectNotSerializableCommit(boolean app)
+	throws Exception
+    {
+	dummy.setValue(Thread.currentThread());
+	setBinding(app, service, "dummy", dummy);
+	try {
+	    txn.commit();
+	    fail("Expected ObjectIOException");
+	} catch (ObjectIOException e) {
+	    e.printStackTrace();
+	} finally {
+	    txn = null;
+	}
+	createTransaction();
+	dummy.setValue(
+	    new Object[] {
+		null, new Integer(3),
+		new Thread[] {
+		    null, Thread.currentThread()
+		}
+	    });
+	setBinding(app, service, "dummy", dummy);
+	try {
+	    txn.commit();
+	    fail("Expected ObjectIOException");
+	} catch (ObjectIOException e) {
+	    e.printStackTrace();
 	} finally {
 	    txn = null;
 	}
