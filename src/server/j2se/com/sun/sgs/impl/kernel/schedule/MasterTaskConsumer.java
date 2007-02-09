@@ -87,9 +87,9 @@ class MasterTaskConsumer implements Runnable {
                             // for optimization
                         } else {
                             if (logger.isLoggable(Level.WARNING))
-                                logger.logThrow(Level.WARNING, e, "dropping" +
-                                                " a failed task that did " +
-                                                "not ask to be re-tried: {0}",
+                                logger.logThrow(Level.WARNING, e, "dropping " +
+                                                "a task that failed with a " +
+                                                "non-retryable exception: {0}",
                                                 task);
                             taskFinished = true;
                         }

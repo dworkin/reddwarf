@@ -445,7 +445,7 @@ class Kernel {
      * command-line the set of applications to run. Once we have management
      * and configration facilities, this command-line list will be removed.
      * <p>
-     * Each arguent on the command-line is a <code>Properties</code> file for
+     * Each argument on the command-line is a <code>Properties</code> file for
      * an application to run. For each application some properties are
      * required to be specified in that file. For required and optional
      * properties see <code>StandardProperties</code>.
@@ -461,7 +461,8 @@ class Kernel {
      * or an <code>Exception</code> is thrown (depending on whether a default
      * value is available).
      * 
-     * @param args the names of the applications to run
+     * @param args filenames for <code>Properties</code> files associated with
+     *             each application to run
      *
      * @throws Exception if there is any problem starting the system
      */

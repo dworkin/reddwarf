@@ -16,7 +16,7 @@ package com.sun.sgs.impl.kernel;
  * <code>APP_NAME</code>, <code>APP_ROOT</code>, <code>APP_LISTENER</code>,
  * and <code>APP_PORT</code>.
  * <p>
- * Default values can provided for all applications by using any of the
+ * Default values can be provided for all applications by using any of the
  * properties specified in this class at the system level (i.e., in a
  * system config file or as a system property). The one exception is
  * <code>APP_NAME</code>, which may not be specified at the system level,
@@ -32,8 +32,8 @@ public class StandardProperties {
      * An optional key specifying a file containing system properties. If set,
      * this must point to the location of a properties file. Each property
      * within that file is provided to the system and all applications. Each
-     * property may be overriden by the system properties provided at
-     * startup, or by an individual application.
+     * property may be overriden by a system property provided at startup, or
+     * by a property for an individual application.
      */
     public static final String CONFIG_FILE = NS + "config.file";
 
