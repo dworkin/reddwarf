@@ -368,9 +368,10 @@
       <fileset dir="${bdb.builds.dir}/sun4/lib"
 	       includes="${solaris-sparc.files}"/>
     </copy>
-    <!-- lib/bdb/windows-x86 -->
-    <copy todir="${build.dir}/sgs/lib/bdb/windows-x86/">
-      <fileset dir="${bdb.builds.dir}/win32/Release" includes="lib*"/>
+    <!-- lib/bdb/win32-x86 -->
+    <copy todir="${build.dir}/sgs/lib/bdb/win32-x86/">
+      <fileset dir="${bdb.builds.dir}/win32/Release"
+	       includes="libdb_java*.dll"/>
     </copy>
   </target>
     

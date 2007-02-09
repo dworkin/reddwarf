@@ -18,7 +18,7 @@ app_names=""
 # Solaris	Intel x86	solaris-x86
 # Solaris	Sparc		solaris-sparc
 # Linux		Intel x86	linux-x86
-# Windows	Intel x86	windows-x86
+# Windows	Intel x86	win32-x86
 #
 platform=unknown
 os=`uname -s`
@@ -49,7 +49,7 @@ case $os in
 	mach=`uname -m`;
 	case $man in
 	    i686)
-		platform=windows-x86;;
+		platform=win32-x86;;
 	esac;;
 esac
 
@@ -67,6 +67,6 @@ set -x
 java -Djava.library.path=lib/bdb/$platform \
      -Djava.util.logging.config.file=sgs.logging \
      -Dcom.sun.sgs.config.file=sgs.config \
-     -cp lib/sgs.jar:$app_classpath \
+     -cp "lib/sgs.jar:$app_classpath" \
      com.sun.sgs.impl.kernel.Kernel \
      $app_names
