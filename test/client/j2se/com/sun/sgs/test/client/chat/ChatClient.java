@@ -12,6 +12,7 @@ import java.awt.event.MouseListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.PasswordAuthentication;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
@@ -24,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 import javax.swing.JButton;
@@ -67,7 +67,7 @@ public class ChatClient extends JFrame
     public static final String GLOBAL_CHANNEL_NAME = "-GLOBAL-";
 
     /** The {@link Charset} encoding for client/server messages. */
-    public static final Charset MESSAGE_CHARSET = Charset.forName("UTF-8");
+    public static final String MESSAGE_CHARSET = "UTF-8";
 
     /** The list of clients connected to the ChatApp on the server */
     private final MultiList<SessionId> userList;
@@ -501,7 +501,7 @@ public class ChatClient extends JFrame
      * Handles the direct {@code /echo} command.
      */
     public void receivedMessage(byte[] message) {
-        String messageString = new String(message, MESSAGE_CHARSET);
+        String messageString = fromMessageBytes(message);
         System.err.format("Recv direct: %s\n", messageString);
         String[] args = messageString.split(" ", 2);
         String command = args[0];
@@ -646,6 +646,24 @@ public class ChatClient extends JFrame
         @Override
         public void windowClosing(WindowEvent e) {
             client.doQuit();
+        }
+    }
+
+    /* TODO doc */
+    static String fromMessageBytes(byte[] bytes) {
+        try {
+            return new String(bytes, MESSAGE_CHARSET);
+        } catch (UnsupportedEncodingException e) {
+            throw new Error("Required charset UTF-8 not found", e);
+        }
+    }
+
+    /* TODO doc */
+    static byte[] toMessageBytes(String s) {
+        try {
+            return s.getBytes(MESSAGE_CHARSET);
+        } catch (UnsupportedEncodingException e) {
+            throw new Error("Required charset UTF-8 not found", e);
         }
     }
 

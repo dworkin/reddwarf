@@ -1,6 +1,7 @@
 package com.sun.sgs.test.app.chat;
 
 import java.io.Serializable;
+import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
 import java.util.logging.Level;
 import java.util.logging.LogRecord;
@@ -38,7 +39,7 @@ public class ChatClientSessionListener
     private static final String GLOBAL_CHANNEL_NAME = "-GLOBAL-";
 
     /** The {@link Charset} encoding for client/server messages. */
-    private static final Charset MESSAGE_CHARSET = Charset.forName("UTF-8");
+    private static final String MESSAGE_CHARSET = "UTF-8";
 
     /** The command prefix: "{@value #COMMAND_PREFIX}" */
     private static final String COMMAND_PREFIX = "/";
@@ -74,7 +75,7 @@ public class ChatClientSessionListener
     /** {@inheritDoc} */
     public void receivedMessage(byte[] message) {
         try {
-            String messageString = new String(message, MESSAGE_CHARSET);
+            String messageString = fromMessageBytes(message);
 
             // Check that the command begins with a foward-slash
             if (! messageString.startsWith(COMMAND_PREFIX)) {
@@ -171,7 +172,7 @@ public class ChatClientSessionListener
             changeMsg.append(':');
             changeMsg.append(session.getName());
         }
-        channel.send(changeMsg.toString().getBytes(MESSAGE_CHARSET));
+        channel.send(toMessageBytes(changeMsg.toString()));
 
         // Now add the joiner and tell it about all the members on
         // the channel, the joiner included.
@@ -187,8 +188,7 @@ public class ChatClientSessionListener
                 listMessage.append(member.getName());
             }
         }
-        channel.send(session,
-            listMessage.toString().getBytes(MESSAGE_CHARSET));
+        channel.send(session, toMessageBytes(listMessage.toString()));
     }
 
     /**
@@ -224,7 +224,7 @@ public class ChatClientSessionListener
         // Tell the rest of the channel about the removal.
         String changeMessage = "/left " +
             toHexString(session.getSessionId());
-        channel.send(changeMessage.getBytes(MESSAGE_CHARSET));
+        channel.send(toMessageBytes(changeMessage));
     }
 
     /**
@@ -241,6 +241,24 @@ public class ChatClientSessionListener
         }
 
         String reply = "/pong " + message;
-        session.send(reply.getBytes(MESSAGE_CHARSET));
+        session.send(toMessageBytes(reply));
+    }
+
+    /* TODO doc */
+    static String fromMessageBytes(byte[] bytes) {
+        try {
+            return new String(bytes, MESSAGE_CHARSET);
+        } catch (UnsupportedEncodingException e) {
+            throw new Error("Required charset UTF-8 not found", e);
+        }
+    }
+
+    /* TODO doc */
+    static byte[] toMessageBytes(String s) {
+        try {
+            return s.getBytes(MESSAGE_CHARSET);
+        } catch (UnsupportedEncodingException e) {
+            throw new Error("Required charset UTF-8 not found", e);
+        }
     }
 }

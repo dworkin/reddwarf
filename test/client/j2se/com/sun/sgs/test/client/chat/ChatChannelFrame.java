@@ -91,8 +91,7 @@ public class ChatChannelFrame extends JInternalFrame
             byte[] message)
     {
         try {
-            String messageString =
-                new String(message, ChatClient.MESSAGE_CHARSET);
+            String messageString = ChatClient.fromMessageBytes(message);
             System.err.format("Recv on %s from %s: %s\n",
                     channel.getName(), sender, messageString);
             String[] args = messageString.split(" ", 2);
@@ -141,7 +140,7 @@ public class ChatChannelFrame extends JInternalFrame
     public void actionPerformed(ActionEvent action) {
         try {
             String message = inputField.getText();
-            byte[] msgBytes = message.getBytes(ChatClient.MESSAGE_CHARSET);
+            byte[] msgBytes = ChatClient.toMessageBytes(message);
             myChannel.send(msgBytes);
             // Deliver to our own receivedMessage, since server won't echo.
             receivedMessage(myChannel, myChatClient.getSessionId(), msgBytes);
@@ -178,5 +177,4 @@ public class ChatChannelFrame extends JInternalFrame
             frame.myChatClient.leaveChannel(frame.myChannel);
         }        
     }
-
 }
