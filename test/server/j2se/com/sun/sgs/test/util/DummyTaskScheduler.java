@@ -86,6 +86,7 @@ public class DummyTaskScheduler implements TaskScheduler {
     public void shutdown() {
         for (Thread thread : threads)
             thread.interrupt();
+        timer.cancel();
     }
 
     /**

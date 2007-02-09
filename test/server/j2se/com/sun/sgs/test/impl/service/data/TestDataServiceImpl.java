@@ -187,7 +187,16 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     public void testConstructorNoDirectory() throws Exception {
-        // FIXME: figure out how to specify the directory
+        String rootDir = createDirectory();
+        Properties props = createProperties(
+            StandardProperties.APP_NAME, "Foo",
+            StandardProperties.APP_ROOT, rootDir);
+        try {
+            new DataServiceImpl(props, componentRegistry);
+            fail("Expected RuntimeException");
+        } catch (RuntimeException e) { // FIXME: which exact exception?
+            System.err.println(e);
+        }
     }
 
     public void testConstructorNoDirectoryNorRoot() throws Exception {

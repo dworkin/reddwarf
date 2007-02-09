@@ -52,6 +52,9 @@ public class NullAuthenticator implements IdentityAuthenticator {
      * of type <code>NamePasswordCredentials</code>, in which case a
      * <code>CredentialException</code> is thrown.
      *
+     * @param credentials the identity's credentials, which must be an
+     *                    instance of <code>NamePasswordCredentials</code>
+     *
      * @return the identity of the given user
      *
      * @throws CredentialException if the wrong type of credentials were

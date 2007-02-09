@@ -166,6 +166,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    }
 	    txn = null;
 	}
+    MinimalTestKernel.destroyContext(appContext);
     }
 
     /* -- Test constructor -- */
