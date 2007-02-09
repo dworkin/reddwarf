@@ -7,12 +7,10 @@ import com.sun.sgs.impl.util.LoggerWrapper;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.NotSerializableException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamClass;
 import java.io.OutputStream;
-import java.io.Serializable;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -86,10 +84,6 @@ final class SerialUtil {
 	} catch (ObjectIOException e) {
 	    check(object, e);
 	    throw e;
-	} catch (NotSerializableException e) {
-	    check(object, e);
-	    throw new ObjectIOException(
-		"Problem serializing object: " + e.getMessage(), e, false);
 	} catch (IOException e) {
 	    throw new ObjectIOException(
 		"Problem serializing object: " + e.getMessage(), e, false);
@@ -221,16 +215,16 @@ final class SerialUtil {
     }
 
     /**
-     * Checks an object for references to non-serializable objects and direct
-     * references to managed objects, throwing an exception that contains
-     * debugging information about where the bad reference was found.
+     * Checks an object for direct references to managed objects, throwing an
+     * exception that contains debugging information about where the bad
+     * reference was found.
      *
      * @param	object the object to check
      * @param	cause the exception that prompted the check, or null
      * @throws	ObjectIOException if a direct reference to a managed object is
      *		found
      */
-    static void check(Object object, Exception cause) {
+    static void check(Object object, ObjectIOException cause) {
 	try {
 	    new Check(object, cause).checkObject(object);
 	} catch (ObjectIOException e) {
@@ -245,8 +239,7 @@ final class SerialUtil {
      * object graph, keeping a stack describing the traversal for use in error
      * messages.  Although the check performed does not account for
      * serialization features such as writeReplace, the assumption is that
-     * references to non-serializable objects or direct references to managed
-     * objects will be detected anyway in most cases.
+     * direct references to managed objects are wrong wherever they are found.
      */
     private static class Check {
 
@@ -254,7 +247,7 @@ final class SerialUtil {
 	private final Object topObject;
 
 	/** The thrown exception that prompted the check, or null. */
-	private final Exception cause;
+	private final ObjectIOException cause;
 
 	/** The stack that stores information about object references. */
 	private final DebugStack stack = new DebugStack();
@@ -289,7 +282,7 @@ final class SerialUtil {
 	/**
 	 * Creates an instance for the specified top level object and cause.
 	 */
-	Check(Object topObject, Exception cause) {
+	Check(Object topObject, ObjectIOException cause) {
 	    this.topObject = topObject;
 	    this.cause = cause;
 	}
@@ -301,14 +294,7 @@ final class SerialUtil {
 		!seen.containsKey(object))
 	    {
 		Class<?> cl = object.getClass();
-		if (!(object instanceof Serializable)) {
-		    stack.push("object (class \"" + cl.getName() + "\", " +
-			       object + ")");
-		    throw new ObjectIOException(
-			"Object is not serializable:\n" + stack, cause, false);
-		} else if (object != topObject &&
-			   object instanceof ManagedObject)
-		{
+		if (object != topObject && object instanceof ManagedObject) {
 		    stack.push("object (class \"" + cl.getName() + "\", " +
 			       object + ")");
 		    throw new ObjectIOException(
