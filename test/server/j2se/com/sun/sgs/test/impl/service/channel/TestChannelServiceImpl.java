@@ -78,8 +78,8 @@ public class TestChannelServiceImpl extends TestCase {
 	DataServiceImpl.class.getName();
 
     /** Directory used for database shared across multiple tests. */
-    private static String dbDirectory =
-	System.getProperty("java.io.tmpdir") + File.separator +
+    private static String DB_DIRECTORY =
+        System.getProperty("java.io.tmpdir") + File.separator +
 	"TestChannelServiceImpl.db";
 
     /** The port for the client session service. */
@@ -93,7 +93,7 @@ public class TestChannelServiceImpl extends TestCase {
     /** Properties for creating the shared database. */
     private static Properties dbProps = createProperties(
 	DataStoreImplClassName + ".directory",
-	dbDirectory,
+        DB_DIRECTORY,
 	StandardProperties.APP_NAME, "TestChannelServiceImpl",
 	DataServiceImplClassName + ".debugCheckInterval", "1");
     
@@ -102,15 +102,6 @@ public class TestChannelServiceImpl extends TestCase {
     private static final String LOGIN_FAILED_MESSAGE = "login failed";
     
     private static Object disconnectedCallbackLock = new Object();
-    
-    /**
-     * Delete the database directory at the start of the test run, but not for
-     * each test.
-     */
-    static {
-	System.err.println("Deleting database directory");
-	deleteDirectory(dbDirectory);
-    }
 
     /** A per-test database directory, or null if not created. */
     private String directory;
@@ -148,7 +139,9 @@ public class TestChannelServiceImpl extends TestCase {
 	appContext = MinimalTestKernel.createContext();
 	systemRegistry = MinimalTestKernel.getSystemRegistry(appContext);
 	serviceRegistry = MinimalTestKernel.getServiceRegistry(appContext);
-	    
+
+        deleteDirectory(DB_DIRECTORY);
+
 	// create services
 	dataService = createDataService(systemRegistry);
 	taskService = new TaskServiceImpl(new Properties(), systemRegistry);
@@ -211,6 +204,7 @@ public class TestChannelServiceImpl extends TestCase {
         if (dataService != null) {
             dataService.shutdown();
         }
+        deleteDirectory(DB_DIRECTORY);
         dataService = null;
         MinimalTestKernel.destroyContext(appContext);
     }
@@ -1292,7 +1286,7 @@ public class TestChannelServiceImpl extends TestCase {
     private DataServiceImpl createDataService(
 	DummyComponentRegistry registry)
     {
-	File dir = new File(dbDirectory);
+	File dir = new File(DB_DIRECTORY);
 	if (!dir.exists()) {
 	    if (!dir.mkdir()) {
 		throw new RuntimeException(
@@ -1520,7 +1514,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    } catch (Exception e) {
 		System.err.println("DummyClient.connect throws: " + e);
 		e.printStackTrace();
-		throw new RuntimeException("DummyClient.connect failed", e);
+		fail("DummyClient.connect failed: " + e.getMessage());
 	    }
 	    synchronized (lock) {
 		try {
@@ -1528,12 +1522,11 @@ public class TestChannelServiceImpl extends TestCase {
 			lock.wait(WAIT_TIME);
 		    }
 		    if (connected != true) {
-			throw new RuntimeException(
- 			    "DummyClient.connect timed out");
+			fail("DummyClient.connect timed out");
 		    }
 		} catch (InterruptedException e) {
-		    throw new RuntimeException(
-			"DummyClient.connect timed out", e);
+                    e.printStackTrace();
+		    fail("DummyClient.connect interrupted: " + e.getMessage());
 		}
 	    }
 	    
@@ -1568,7 +1561,8 @@ public class TestChannelServiceImpl extends TestCase {
 		    try {
 			connection.sendBytes(buf.getBuffer());
 		    } catch (IOException e) {
-			throw new RuntimeException(e);
+                        e.printStackTrace();
+                        fail("Couldn't sendBytes: " + e.getMessage());
 		    }
 		    synchronized (lock) {
 			try {
@@ -1580,8 +1574,8 @@ public class TestChannelServiceImpl extends TestCase {
 				    "DummyClient.disconnect timed out");
 			    }
 			} catch (InterruptedException e) {
-			    throw new RuntimeException(
-				"DummyClient.disconnect timed out", e);
+                            e.printStackTrace();
+                            fail("DummyClient.disconnect interrupted");
 			}
 		    }
 		}
@@ -1591,8 +1585,7 @@ public class TestChannelServiceImpl extends TestCase {
 	void login(String name, String password) {
 	    synchronized (lock) {
 		if (connected == false) {
-		    throw new RuntimeException(
-			"DummyClient.login not connected");
+		    fail("DummyClient.login not connected");
 		}
 	    }
 	    this.name = name;
@@ -1610,7 +1603,8 @@ public class TestChannelServiceImpl extends TestCase {
 	    try {
 		connection.sendBytes(buf.getBuffer());
 	    } catch (IOException e) {
-		throw new RuntimeException(e);
+                e.printStackTrace();
+                fail("Couldn't sendBytes: " + e.getMessage());
 	    }
 	    synchronized (lock) {
 		try {
@@ -1618,15 +1612,14 @@ public class TestChannelServiceImpl extends TestCase {
 			lock.wait(WAIT_TIME);
 		    }
 		    if (loginAck != true) {
-			throw new RuntimeException(
-			    "DummyClient.login timed out");
+			fail("DummyClient.login timed out");
 		    }
 		    if (!loginSuccess) {
 			throw new RuntimeException(LOGIN_FAILED_MESSAGE);
 		    }
 		} catch (InterruptedException e) {
-		    throw new RuntimeException(
-			"DummyClient.login timed out", e);
+                    e.printStackTrace();
+                    fail("DummyClient.login interrupted: " + e.getMessage());
 		}
 	    }
 	}
@@ -1634,8 +1627,7 @@ public class TestChannelServiceImpl extends TestCase {
 	void sendMessage(byte[] message) {
 	    synchronized (lock) {
 		if (!connected || !loginSuccess) {
-		    throw new RuntimeException(
-			"DummyClient.login not connected or loggedIn");
+                    fail("DummyClient.login not connected or loggedIn");
 		}
 	    }
 
@@ -1650,7 +1642,8 @@ public class TestChannelServiceImpl extends TestCase {
 	    try {
 		connection.sendBytes(buf.getBuffer());
 	    } catch (IOException e) {
-		throw new RuntimeException(e);
+                e.printStackTrace();
+                fail("Couldn't sendBytes: " + e.getMessage());
 	    }
 	}
 
@@ -1669,8 +1662,7 @@ public class TestChannelServiceImpl extends TestCase {
 			lock.wait(WAIT_TIME);
 		    }
 		    if (joinAck != true) {
-			throw new RuntimeException(
-			    "DummyClient.join timed out: " + name);
+			fail("DummyClient.join timed out: " + name);
 		    }
 
 		    if (channelName == null ||
@@ -1680,8 +1672,8 @@ public class TestChannelServiceImpl extends TestCase {
 		    }
 		    
 		} catch (InterruptedException e) {
-		    throw new RuntimeException(
-			    "DummyClient.join timed out: " + name, e);
+                    e.printStackTrace();
+		    fail("DummyClient.join interrupted: " + name);
 		}
 	    }
 	}
@@ -1701,8 +1693,7 @@ public class TestChannelServiceImpl extends TestCase {
 			lock.wait(WAIT_TIME);
 		    }
 		    if (leaveAck != true) {
-			throw new RuntimeException(
-			    "DummyClient.leave timed out: " + name);
+			fail("DummyClient.leave timed out: " + name);
 		    }
 
 		    if (channelName == null ||
@@ -1712,8 +1703,8 @@ public class TestChannelServiceImpl extends TestCase {
 		    }
 		    
 		} catch (InterruptedException e) {
-		    throw new RuntimeException(
-			    "DummyClient.leave timed out: " + name, e);
+                    e.printStackTrace();
+		    fail("DummyClient.leave interrupted: " + name);
 		}
 	    }
 	}
@@ -1721,8 +1712,7 @@ public class TestChannelServiceImpl extends TestCase {
 	void logout() {
 	    synchronized (lock) {
 		if (connected == false) {
-		    throw new RuntimeException(
-			"DummyClient.login not connected");
+		    fail("DummyClient.login not connected");
 		}
 	    }
 
@@ -1735,7 +1725,8 @@ public class TestChannelServiceImpl extends TestCase {
 	    try {
 		connection.sendBytes(buf.getBuffer());
 	    } catch (IOException e) {
-		throw new RuntimeException(e);
+                e.printStackTrace();
+		fail("Couldn't sendBytes: " + e.getMessage());
 	    }
 	    synchronized (lock) {
 		try {
@@ -1743,12 +1734,11 @@ public class TestChannelServiceImpl extends TestCase {
 			lock.wait(WAIT_TIME);
 		    }
 		    if (logoutAck != true) {
-			throw new RuntimeException(
-			    "DummyClient.logout timed out");
+			fail("DummyClient.logout timed out");
 		    }
 		} catch (InterruptedException e) {
-		    throw new RuntimeException(
-			"DummyClient.logout timed out", e);
+                    e.printStackTrace();
+		    fail("DummyClient.logout interrupted: " + e.getMessage());
 		}
 	    }
 	    
