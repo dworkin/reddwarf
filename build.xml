@@ -143,10 +143,15 @@
 	  description="Builds internal (full) server javadoc">
     <javadoc sourcepath="src/server/j2se:test/server/j2se"
              destdir="${build.dir}/javadoc/server"
-             classpathref="server.classpath" packagenames="com.sun.*"
+             packagenames="com.sun.*"
              overview="src/server/j2se/overview.html"
              windowtitle="${project.name}" doctitle="${project.name}"
 	     author="no">
+      <classpath>
+        <pathelement location="${build.dir}/test/classes/server"/>
+        <path refid="server.classpath"/>
+          <pathelement location="lib/junit-4.1.jar"/>
+      </classpath>
       <link href="${jdk.doc.api.url}"
 	    offline="true"
 	    packagelistLoc="${jdk.package.list}"/>
@@ -172,10 +177,15 @@
 	  description="Builds internal (full) client javadoc">
     <javadoc sourcepath="src/client/j2se:test/client/j2se"
              destdir="${build.dir}/javadoc/client"
-             classpathref="client.classpath" packagenames="com.sun.*"
+             packagenames="com.sun.*"
              overview="src/client/j2se/overview.html"
              windowtitle="${project.name}" doctitle="${project.name}"
 	     author="no">
+      <classpath>
+        <pathelement location="${build.dir}/test/classes/client"/>
+        <path refid="client.classpath"/>
+          <pathelement location="lib/junit-4.1.jar"/>
+      </classpath>
       <link href="${jdk.doc.api.url}"
 	    offline="true"
 	    packagelistLoc="${jdk.package.list}"/>
