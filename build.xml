@@ -22,13 +22,12 @@
   <property name="javac.compilerargs"
 	    value="-Xlint"/>
 
-  <!-- Values for building the server -->
-  <property name="server.jar" location="${build.dir}/lib/sgs.jar"/>
-
   <!-- Values for the JavaDocs -->
   <property name="project.name" value="Sun Game Server"/>
-  <property name="project.version" value="0.3"/>
-  <property name="project.build" value="January 2007"/>
+  <property name="project.version" value="1.0alpha"/>
+  <tstamp>
+    <format property="project.build" pattern="MMMM-d-yyyy" locale="en"/>
+  </tstamp>
   <property name="jdk.doc.api.url"
 	    value="http://java.sun.com/j2se/1.5/docs/api"/>
   <property name="jdk.package.list" value="etc/jdk5.0_package_list"/>
@@ -53,8 +52,13 @@
   <property name="test.include" value="**/Test*.java"/>
 
   <!-- Directory containing Berkeley DB libraries -->
-  <!-- The caller should make sure to set the bdb.lib.dir property -->
-  
+  <!-- The caller should set the bdb.lib.dir property to a directory
+       containing the full set of JAR and native library files for the
+       current platform -->
+  <!-- The caller should set the bdb.builds.dir property to a directory
+       containing builds of Berkeley DB for all of the platforms if
+       calling the dist-server task. -->
+
   <!-- Server class path -->
   <path id="server.classpath">
     <pathelement location="${build.dir}/classes/server"/>
@@ -75,7 +79,7 @@
   <!-- TARGET DEFINITIONS -->
 
   <!-- Builds everything -->
-  <target name="all" depends="jar, javadoc, checkstyle, test"
+  <target name="all" depends="build, jar, javadoc, dist, test"
 	  description="Builds everything"/>
 
   <!-- Builds a debug version of the complete project -->
@@ -99,7 +103,8 @@
   </target>
 
   <!-- Builds the client -->
-  <target name="build-client" description="Builds client code">
+  <target name="build-client" depends="build-server"
+	  description="Builds client code">
     <mkdir dir="${build.dir}/classes/client"/>
     <depend srcdir="j2se"
 	    destdir="${build.dir}/classes/client"
@@ -150,7 +155,7 @@
             packagelistLoc="${mina.package.list}"/>
       <footer>
         <![CDATA[<font size="-1">Sun Game Server, Version
-        ${project.version}</font>]]>
+        ${project.version}<br/>${project.build}</font>]]>
       </footer>
       <bottom>
         <![CDATA[<font size="-1">Copyright 2007 Sun Microsystems,
@@ -179,7 +184,7 @@
             packagelistLoc="${mina.package.list}"/>
       <footer>
         <![CDATA[<font size="-1">Project Darkstar: Version
-        ${project.version}</font>]]>
+        ${project.version}<br/>${project.build}</font>]]>
       </footer>
       <bottom>
         <![CDATA[<font size="-1">Copyright 2007 Sun Microsystems,
@@ -273,15 +278,109 @@
           includes="sgs-client-apidoc/**"/>
   </target>
 
+  <!-- Builds distribution file -->
+  <target name="dist" depends="dist-client, dist-server, javadoc-api"
+	  description="Builds files for distribution">
+    <copy todir="${build.dir}/sgs/doc/sgs-client-api">
+      <fileset dir="${build.dir}/javadoc/apidoc/sgs-client-apidoc/"/>
+    </copy>
+    <copy todir="${build.dir}/sgs/doc/sgs-api">
+      <fileset dir="${build.dir}/javadoc/apidoc/sgs-server-apidoc/"/>
+    </copy>
+    <tar destfile="${build.dir}/sgs-${project.version}.tar.gz"
+        compression="gzip">
+      <tarfileset dir="${build.dir}" includes="sgs/**" excludes="sgs/sgs.sh"/>
+      <tarfileset dir="${build.dir}" includes="sgs/sgs.sh" mode="755"/>
+    </tar>
+    <zip destfile="${build.dir}/sgs-${project.version}.zip">
+      <zipfileset dir="${build.dir}" includes="sgs/**" excludes="sgs/sgs.sh"/>
+      <zipfileset dir="${build.dir}" includes="sgs/sgs.sh" filemode="755"/>
+    </zip>
+  </target>
+
+  <!-- Builds files for distributing the client -->
+  <target name="dist-client" depends="jar-client">
+    <copy todir="${build.dir}/sgs/lib" file="${build.dir}/lib/sgs-client.jar"/>
+  </target>
+
+  <!-- Builds files for distributing the server -->
+  <target name="dist-server" depends="jar-server, dist-bdb">
+    <copy todir="${build.dir}/sgs">
+      <fileset dir="etc" includes="sgs.*"/>
+    </copy>
+    <chmod file="${build.dir}/sgs/sgs.sh" perm="a+x"/>
+    <copy todir="${build.dir}/sgs/lib">
+      <fileset file="${build.dir}/lib/sgs.jar"/>
+      <fileset dir="lib" includes="mina-core-1.1.jar, slf4j-jdk14.jar"/>
+    </copy>
+  </target>
+
+  <!-- Builds files for distributing Berkeley DB -->
+  <target name="dist-bdb">
+    <fail unless="bdb.builds.dir"
+	  message="The bdb.builds.dir property must be set"/>
+    <copy todir="${build.dir}/sgs/lib/bdb"
+	  file="${bdb.builds.dir}/ppc/lib/db.jar"/>
+    <!-- lib/bdb/macosx-ppc -->
+    <copy todir="${build.dir}/sgs/lib/bdb/macosx-ppc">
+      <fileset dir="${bdb.builds.dir}/ppc/lib">
+        <include name="libdb-?.?.dylib"/>
+        <include name="libdb_java-?.?.jnilib"/>
+      </fileset>
+    </copy>
+    <!-- lib/bdb/solaris-x86 -->
+    <copy todir="${build.dir}/sgs/lib/bdb/solaris-x86">
+      <fileset dir="${bdb.builds.dir}/i86pc/lib">
+        <include name="libdb-?.?.so"/>
+        <include name="libdb_java-?.?.so"/>
+      </fileset>
+    </copy>
+    <!-- lib/bdb/solaris-sparc -->
+    <copy todir="${build.dir}/sgs/lib/bdb/solaris-sparc">
+      <fileset dir="${bdb.builds.dir}/sun4/lib">
+        <include name="libdb-?.?.so"/>
+        <include name="libdb_java-?.?.so"/>
+      </fileset>
+    </copy>
+    <!-- lib/bdb/win32-x86 -->
+    <copy todir="${build.dir}/sgs/lib/bdb/win32-x86/">
+      <fileset dir="${bdb.builds.dir}/win32/Release">
+        <include name="libdb_java??.dll"/>
+      </fileset>
+    </copy>
+  </target>
+
   <!-- Builds the jar files for the project classes -->
-  <target name="jar" depends="jar-server"
+  <target name="jar" depends="jar-client, jar-server"
 	  description="Builds JAR files"/>
 
-  <!-- Builds the server jar file -->
+  <!-- Builds the client JAR file -->
+  <target name="jar-client" depends="build-client"
+	  description="Builds client JAR files">
+    <mkdir dir="${build.dir}/lib"/>
+    <jar destfile="${build.dir}/lib/sgs-client.jar"
+	 basedir="${build.dir}/classes/client">
+      <manifest>
+	<attribute name="Class-Path"
+		   value="mina-core-1.1.jar slf4j-jdk14.jar"/>
+      </manifest>
+    </jar>
+  </target>
+
+  <!-- Builds the server JAR file -->
   <target name="jar-server" depends="build-server"
 	  description="Builds server JAR files">
     <mkdir dir="${build.dir}/lib"/>
-    <jar destfile="${server.jar}" basedir="${build.dir}/classes/server"/>
+    <jar destfile="${build.dir}/lib/sgs.jar"
+	 basedir="${build.dir}/classes/server">
+      <manifest>
+	<attribute name="Main-Class" value="com.sun.sgs.impl.kernel.Kernel"/>
+	<attribute name="Class-Path"
+		   value="bdb/db.jar
+			  mina-core-1.1.jar
+			  slf4j-jdk14.jar"/>
+      </manifest>
+    </jar>
   </target>
 
   <!-- Checks Java coding style -->

@@ -5,8 +5,9 @@
 # classes
 app_classpath=
 
-# Set this variable to a space-separated list of application names
-app_names=""
+# Set this variable to a space-separated list of application
+# configuration files
+app_config_files=""
 
 # Figure out what platform we're running on and set the os and mach
 # variables appropriately.  Here are the supported platforms:
@@ -47,7 +48,7 @@ case $os in
 	esac;;
     CYGWIN*)
 	mach=`uname -m`;
-	case $man in
+	case $mach in
 	    i686)
 		platform=win32-x86;;
 	esac;;
@@ -67,6 +68,6 @@ set -x
 java -Djava.library.path=lib/bdb/$platform \
      -Djava.util.logging.config.file=sgs.logging \
      -Dcom.sun.sgs.config.file=sgs.config \
-     -cp "lib/sgs.jar:$app_classpath" \
-     com.sun.sgs.impl.kernel.Kernel \
-     $app_names
+     -cp "$app_classpath" \
+     -jar lib/sgs.jar \
+     $app_config_files
