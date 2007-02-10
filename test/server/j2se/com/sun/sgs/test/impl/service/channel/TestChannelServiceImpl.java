@@ -1433,13 +1433,13 @@ public class TestChannelServiceImpl extends TestCase {
 	createTransaction();
 	DummyAppListener appListener = new DummyAppListener();
 	dataService.setServiceBinding(
-	    "com.sun.sgs.app.AppListener", appListener);
+            StandardProperties.APP_LISTENER, appListener);
 	txn.commit();
     }
     
     private DummyAppListener getAppListener() {
 	return (DummyAppListener) dataService.getServiceBinding(
-	    "com.sun.sgs.app.AppListener", AppListener.class);
+            StandardProperties.APP_LISTENER, AppListener.class);
     }
 
     /**
