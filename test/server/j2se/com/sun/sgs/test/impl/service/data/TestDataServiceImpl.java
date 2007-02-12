@@ -186,17 +186,24 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    /**
+     * Tests that the {@code DataService} correctly infers the database
+     * subdirectory when only the root directory is provided.
+     *
+     * @throws Exception if an unexpected exception occurs
+     */
     public void testConstructorNoDirectory() throws Exception {
         String rootDir = createDirectory();
+        File dataDir = new File(rootDir, "dsdb");
+        if (!dataDir.mkdir()) {
+            throw new RuntimeException("Failed to create sub-dir: " + dataDir);
+        }
         Properties props = createProperties(
             StandardProperties.APP_NAME, "Foo",
             StandardProperties.APP_ROOT, rootDir);
-        try {
-            new DataServiceImpl(props, componentRegistry);
-            fail("Expected RuntimeException");
-        } catch (RuntimeException e) { // FIXME: which exact exception?
-            System.err.println(e);
-        }
+        DataServiceImpl testSvc = new DataServiceImpl(props, componentRegistry);
+        testSvc.shutdown();
+        deleteDirectory(dataDir.getPath());
     }
 
     public void testConstructorNoDirectoryNorRoot() throws Exception {
@@ -646,7 +653,66 @@ public class TestDataServiceImpl extends TestCase {
 	    txn.commit();
 	    fail("Expected ObjectIOException");
 	} catch (ObjectIOException e) {
-	    System.err.println(e);
+	    e.printStackTrace();
+	} finally {
+	    txn = null;
+	}
+	createTransaction();
+	dummy.setValue(
+	    new Object[] {
+		null, new Integer(3),
+		new DummyManagedObject[] {
+		    null, new DummyManagedObject()
+		}
+	    });
+	setBinding(app, service, "dummy", dummy);
+	try {
+	    txn.commit();
+	    fail("Expected ObjectIOException");
+	} catch (ObjectIOException e) {
+	    e.printStackTrace();
+	} finally {
+	    txn = null;
+	}
+    }
+
+    public void testSetBindingManagedObjectNotSerializableCommit()
+	throws Exception
+    {
+	testSetBindingManagedObjectNotSerializableCommit(true);
+    }
+    public void testSetServiceBindingManagedObjectNotSerializableCommit()
+	throws Exception
+    {
+	testSetBindingManagedObjectNotSerializableCommit(false);
+    }
+    private void testSetBindingManagedObjectNotSerializableCommit(boolean app)
+	throws Exception
+    {
+	dummy.setValue(Thread.currentThread());
+	setBinding(app, service, "dummy", dummy);
+	try {
+	    txn.commit();
+	    fail("Expected ObjectIOException");
+	} catch (ObjectIOException e) {
+	    e.printStackTrace();
+	} finally {
+	    txn = null;
+	}
+	createTransaction();
+	dummy.setValue(
+	    new Object[] {
+		null, new Integer(3),
+		new Thread[] {
+		    null, Thread.currentThread()
+		}
+	    });
+	setBinding(app, service, "dummy", dummy);
+	try {
+	    txn.commit();
+	    fail("Expected ObjectIOException");
+	} catch (ObjectIOException e) {
+	    e.printStackTrace();
 	} finally {
 	    txn = null;
 	}
