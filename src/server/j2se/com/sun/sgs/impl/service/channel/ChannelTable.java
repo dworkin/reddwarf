@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -45,6 +46,14 @@ class ChannelTable implements ManagedObject, Serializable {
      */
     ManagedReference get(String name) {
 	return table.get(name);
+    }
+
+    /**
+     * Returns a collection containing all managed references to
+     * channel state that are in the table.
+     */
+    Collection<ManagedReference> getAll() {
+	return table.values();
     }
 
     /**
