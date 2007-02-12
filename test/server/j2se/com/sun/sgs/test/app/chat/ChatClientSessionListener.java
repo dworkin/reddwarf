@@ -207,7 +207,19 @@ public class ChatClientSessionListener
         }
 
         ChannelManager channelMgr = AppContext.getChannelManager();
-        Channel channel = channelMgr.getChannel(channelName);
+        Channel channel;
+        
+        try {
+            channel = channelMgr.getChannel(channelName);
+        } catch (NameNotBoundException e) {
+            // The channel has been closed, so there's nothing to do.
+            if (logger.isLoggable(Level.FINE)) {
+                logger.log(Level.FINE,
+                        "Leave {0} from {1}: channel is closed",
+                        new Object[] { session, channelName });
+            }
+            return;
+        }
 
         if (session.isConnected()) {
             // Remove the member first, so it doesn't get the membership
