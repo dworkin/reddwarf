@@ -83,8 +83,11 @@ class ServiceConfigRunner implements KernelRunnable {
             logger.log(Level.CONFIG, "{0}: starting service config", appName);
 
         // initialize the services in the correct order, adding them to the
-        // registry as we go
+        // kernel app context as we go
+        AppKernelAppContext appContext =
+            (AppKernelAppContext)(proxy.getCurrentOwner().getContext());
         ComponentRegistryImpl serviceComponents = new ComponentRegistryImpl();
+        appContext.setServices(serviceComponents);
         for (Service service : services) {
             try {
                 service.configure(serviceComponents, proxy);
@@ -102,14 +105,11 @@ class ServiceConfigRunner implements KernelRunnable {
         // is to try booting the application after setting the services
         // available in our context. Boot the app is done by running a
         // special KernelRunnable in a new transaction
-        AppKernelAppContext appContext =
-            (AppKernelAppContext)(proxy.getCurrentOwner().getContext());
         AppStartupRunner startupRunner =
             new AppStartupRunner(appContext, appProperties, kernel);
         TransactionRunner transactionRunner =
             new TransactionRunner(startupRunner);
         try {
-            appContext.setServices(serviceComponents);
             appContext.getService(TaskService.class).
                 scheduleNonDurableTask(transactionRunner);
         } catch (Exception e) {
