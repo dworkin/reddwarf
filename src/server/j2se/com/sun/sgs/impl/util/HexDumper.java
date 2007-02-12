@@ -52,8 +52,12 @@ public final class HexDumper {
      *
      * @param hexString a string to convert
      * @return the byte array corresponding to the hex-formatted string
+     *
+     * @throws NumberFormatException if the {@code String}
+     *         does not contain a parsable series of hex-formatted
+     *         values {@code int}
      */
-    static byte[] fromHexString(String hexString) {
+    public static byte[] fromHexString(String hexString) {
         byte[] bytes = new byte[hexString.length() / 2];
         for (int i = 0; i < bytes.length; ++i) {
             String hexByte = hexString.substring(2*i, 2*i+2);
