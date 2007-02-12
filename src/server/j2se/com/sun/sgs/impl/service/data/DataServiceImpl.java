@@ -5,6 +5,7 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.util.LoggerWrapper;
@@ -31,7 +32,7 @@ import java.util.logging.Logger;
  *
  * <ul>
  *
- * <li> <i>Key:</i> <code>com.sun.sgs.appName</code> <br>
+ * <li> <i>Key:</i> <code>com.sun.sgs.app.name</code> <br>
  *	<i>No default &mdash; required</i> <br>
  *	Specifies the name of the application using this
  *	<code>DataService</code>. <p>
@@ -85,8 +86,6 @@ import java.util.logging.Logger;
 public final class DataServiceImpl
     implements DataService, TransactionParticipant
 {
-    /** The property that specifies the application name. */
-    private static final String APP_NAME_PROPERTY = "com.sun.sgs.appName";
 
     /** The name of this class. */
     private static final String CLASSNAME = DataServiceImpl.class.getName();
@@ -166,7 +165,7 @@ public final class DataServiceImpl
      * @param	properties the properties for configuring this service
      * @param	componentRegistry the registry of configured {@link Service}
      *		instances
-     * @throws	IllegalArgumentException if the <code>com.sun.sgs.appName
+     * @throws	IllegalArgumentException if the <code>com.sun.sgs.app.name
      *		</code> property is not specified, if the value of the
      *		<code>com.sun.sgs.impl.service.data.debugCheckInterval</code>
      *		property is not a valid integer, or if the data store
@@ -183,10 +182,10 @@ public final class DataServiceImpl
 	}
 	try {
 	    PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
-	    appName = wrappedProps.getProperty(APP_NAME_PROPERTY);
+	    appName = wrappedProps.getProperty(StandardProperties.APP_NAME);
 	    if (appName == null) {
 		throw new IllegalArgumentException(
-		    "The " + APP_NAME_PROPERTY +
+		    "The " + StandardProperties.APP_NAME +
 		    " property must be specified");
 	    }
 	    if (componentRegistry == null) {

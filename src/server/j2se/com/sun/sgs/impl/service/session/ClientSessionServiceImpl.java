@@ -7,6 +7,7 @@ import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.IdentityManager;
 import com.sun.sgs.impl.io.ServerSocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.session.ClientSessionImpl.
     ClientSessionListenerWrapper;
 import com.sun.sgs.impl.util.LoggerWrapper;
@@ -43,19 +44,13 @@ import java.util.logging.Logger;
  *
  * <p>Properties should include:
  * <ul>
- * <li>{@code com.sun.sgs.appName}</li>
+ * <li>{@code com.sun.sgs.app.name}</li>
  * <li>{@code com.sun.sgs.app.port}</li>
  * </ul>
  */
 public class ClientSessionServiceImpl
     implements ClientSessionService, NonDurableTransactionParticipant
 {
-
-    /** The property that specifies the application name. */
-    public static final String APP_NAME_PROPERTY = "com.sun.sgs.appName";
-
-    /** The property that specifies the port number. */
-    public static final String PORT_PROPERTY = "com.sun.sgs.app.port";
 
     /** The prefix for ClientSessionListeners bound in the data store. */
     public static final String LISTENER_PREFIX =
@@ -132,17 +127,18 @@ public class ClientSessionServiceImpl
 	    if (systemRegistry == null) {
 		throw new NullPointerException("null systemRegistry");
 	    }
-	    appName = properties.getProperty(APP_NAME_PROPERTY);
+	    appName = properties.getProperty(StandardProperties.APP_NAME);
 	    if (appName == null) {
 		throw new IllegalArgumentException(
-		    "The " + APP_NAME_PROPERTY +
+		    "The " + StandardProperties.APP_NAME +
 		    " property must be specified");
 	    }
 
-	    String portString = properties.getProperty(PORT_PROPERTY);
+	    String portString =
+            properties.getProperty(StandardProperties.APP_PORT);
 	    if (portString == null) {
 		throw new IllegalArgumentException(
-		    "The " + PORT_PROPERTY +
+		    "The " + StandardProperties.APP_PORT +
 		    " property must be specified");
 	    }
 	    port = Integer.parseInt(portString);
