@@ -430,14 +430,43 @@ public class ClientSessionServiceImpl
 	/** If true, indicates the associated transaction is prepared. */
         private boolean prepared = false;
 
+	/** If true, the {@code initialized} method has been invoked
+	 * on this context.
+	 */
+	private boolean initialized = false;
+
 	/**
-	 * Constructs a context with the specified transaction.
+	 * Constructs a context with the specified transaction.  The
+	 * {@code initialize} method must be invoked on this context
+	 * before invoking any other methods.
 	 */
         private Context(Transaction txn) {
             this.txn = txn;
+	}
+
+	/**
+	 * Initializes this context by scheduling this context as a
+	 * task to run.  The task sends all protocol messages enqueued
+	 * during this context's transaction (via the {@code
+	 * addMessage} and {@code addMessageFirst} methods), and
+	 * disconnects any session whose disconnection was requested
+	 * via the {@code requestDisconnect} method.
+	 */
+	private void initialize() {
 	    txnProxy.getService(TaskService.class).
 		scheduleNonDurableTask(this);
+	    initialized = true;
         }
+
+	/**
+	 * Throws {@code IllegalStateException} if this context is not
+	 * initialized.
+	 */
+	private void checkInitialized() {
+	    if (! initialized) {
+		throw new IllegalStateException("context not initialized");
+	    }
+	}
 
 	/**
 	 * Adds a message to be sent to the specified session after
@@ -446,6 +475,7 @@ public class ClientSessionServiceImpl
 	void addMessage(
 	    ClientSessionImpl session, byte[] message, Delivery delivery)
 	{
+	    checkInitialized();
 	    addMessage0(session, message, delivery, false);
 	}
 
@@ -456,6 +486,7 @@ public class ClientSessionServiceImpl
 	void addMessageFirst(
 	    ClientSessionImpl session, byte[] message, Delivery delivery)
 	{
+	    checkInitialized();
 	    addMessage0(session, message, delivery, true);
 	}
 
@@ -465,6 +496,7 @@ public class ClientSessionServiceImpl
 	 * messages are sent.
 	 */
 	void requestDisconnect(ClientSessionImpl session) {
+	    checkInitialized();
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(
@@ -489,6 +521,7 @@ public class ClientSessionServiceImpl
 	    ClientSessionImpl session, byte[] message, Delivery delivery,
 	    boolean isFirst)
 	{
+	    checkInitialized();
 	    try {
 		if (logger.isLoggable(Level.FINEST)) {
 		    logger.log(
@@ -532,6 +565,7 @@ public class ClientSessionServiceImpl
 	}
 	
         private boolean prepare() {
+	    checkInitialized();
 	    checkPrepared();
 	    prepared = true;
             return true;
@@ -558,6 +592,7 @@ public class ClientSessionServiceImpl
 	private static class SessionInfo {
 
 	    private final ClientSessionImpl session;
+	    
 	    /** List of protocol messages to send on commit. */
 	    List<byte[]> messages = new ArrayList<byte[]>();
 
@@ -635,6 +670,7 @@ public class ClientSessionServiceImpl
             context =
                 new Context(txn);
             currentContext.set(context);
+	    context.initialize();
         } else if (!txn.equals(context.txn)) {
             currentContext.set(null);
             throw new IllegalStateException(
@@ -699,7 +735,10 @@ public class ClientSessionServiceImpl
     void scheduleNonTransactionalTaskOnCommit(KernelRunnable task) {
 	nonDurableTaskScheduler.scheduleNonTransactionalTaskOnCommit(task);
     }
-    
+
+    /**
+     * Returns {@code true} if this service is shutting down.
+     */
     private synchronized boolean shuttingDown() {
 	return shuttingDown;
     }
