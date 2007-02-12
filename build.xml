@@ -285,13 +285,10 @@
     <copy todir="${build.dir}/sgs/doc/sgs-api">
       <fileset dir="${build.dir}/javadoc/apidoc/sgs-server-apidoc/"/>
     </copy>
-    <tar destfile="${build.dir}/sgs-${project.version}.tar">
-      <tarfileset dir="${build.dir}" includes="sgs/**" excludes="sgs/sgs.sh"/>
-      <tarfileset dir="${build.dir}" includes="sgs/sgs.sh" mode="777"/>
-    </tar>
-    <zip destfile="${build.dir}/sgs-${project.version}.tar.zip"
-	 basedir="${build.dir}"
-	 includes="sgs-${project.version}.tar"/>
+    <zip destfile="${build.dir}/sgs-${project.version}.zip">
+      <zipfileset dir="${build.dir}" includes="sgs/**" excludes="sgs/sgs.sh"/>
+      <zipfileset dir="${build.dir}" includes="sgs/sgs.sh" filemode="777"/>
+    </zip>
   </target>
 
   <!-- Builds files for distributing the client -->
@@ -318,63 +315,30 @@
     <copy todir="${build.dir}/sgs/lib/bdb"
 	  file="${bdb.builds.dir}/ppc/lib/db.jar"/>
     <!-- lib/bdb/macosx-ppc -->
-    <exec dir="${bdb.builds.dir}/ppc/lib"
-	  executable="ls" logError="true"
-	  outputproperty="macosx-ppc.files">
-      <redirector>
-	<outputfilterchain>
-	  <linecontainsregexp>
-	    <regexp pattern="lib.*[0-9]+[.][0-9]+\.(dylib|jnilib)"/>
-	  </linecontainsregexp>
-	  <tokenfilter delimoutput=" "/>
-	</outputfilterchain>
-      </redirector>	
-    </exec>
     <copy todir="${build.dir}/sgs/lib/bdb/macosx-ppc">
       <fileset dir="${bdb.builds.dir}/ppc/lib"
-	       includes="${macosx-ppc.files}"/>
+	       includes="libdb-?.?.dylib,
+			 libdb_java-?.?.jnilib"/>
     </copy>
     <!-- lib/bdb/solaris-x86 -->
-    <exec dir="${bdb.builds.dir}/i86pc/lib"
-	  executable="ls" logError="true"
-	  outputproperty="solaris-x86.files">
-      <redirector>
-	<outputfilterchain>
-	  <linecontainsregexp>
-	    <regexp pattern="lib.*[0-9]+[.][0-9]+\.so"/>
-	  </linecontainsregexp>
-	  <tokenfilter delimoutput=" "/>
-	</outputfilterchain>
-      </redirector>	
-    </exec>
     <copy todir="${build.dir}/sgs/lib/bdb/solaris-x86">
       <fileset dir="${bdb.builds.dir}/i86pc/lib"
-	       includes="${solaris-x86.files}"/>
+	       includes="libdb-?.?.so,
+			 libdb_java-?.?.so"/>
     </copy>
     <!-- lib/bdb/solaris-sparc -->
-    <exec dir="${bdb.builds.dir}/sun4/lib"
-	  executable="ls" logError="true"
-	  outputproperty="solaris-sparc.files">
-      <redirector>
-	<outputfilterchain>
-	  <linecontainsregexp>
-	    <regexp pattern="lib.*[0-9]+[.][0-9]+\.so"/>
-	  </linecontainsregexp>
-	  <tokenfilter delimoutput=" "/>
-	</outputfilterchain>
-      </redirector>	
-    </exec>
     <copy todir="${build.dir}/sgs/lib/bdb/solaris-sparc">
       <fileset dir="${bdb.builds.dir}/sun4/lib"
-	       includes="${solaris-sparc.files}"/>
+	       includes="libdb-?.?.so,
+			 libdb_java-?.?.so"/>
     </copy>
     <!-- lib/bdb/win32-x86 -->
     <copy todir="${build.dir}/sgs/lib/bdb/win32-x86/">
       <fileset dir="${bdb.builds.dir}/win32/Release"
-	       includes="libdb_java*.dll"/>
+	       includes="libdb_java??.dll"/>
     </copy>
   </target>
-    
+
   <!-- Builds the jar files for the project classes -->
   <target name="jar" depends="jar-client, jar-server"
 	  description="Builds JAR files"/>
