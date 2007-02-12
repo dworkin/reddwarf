@@ -45,7 +45,6 @@ import java.util.logging.Logger;
 public class ChannelServiceImpl
     implements ChannelManager, Service, NonDurableTransactionParticipant
 {
-
     /** The name of this class. */
     private static final String CLASSNAME = ChannelServiceImpl.class.getName();
 
@@ -377,9 +376,8 @@ public class ChannelServiceImpl
 		logger.log(Level.FINER, "join txn:{0}", txn);
 	    }
 	    txn.join(this);
-            context = new Context(txn);
-            currentContext.set(context);
-	    context.initialize();
+	    context = new Context(txn);
+	    currentContext.set(context);
 	} else if (!txn.equals(context.txn)) {
 	    currentContext.set(null);
 	    throw new IllegalStateException(
@@ -563,7 +561,7 @@ public class ChannelServiceImpl
 	final ChannelServiceImpl channelService;
 
 	/** Table of all channels, obtained from the data service. */
-	private ChannelTable table;
+	private final ChannelTable table;
 
 	/**
 	 * Map of channel name to transient channel impl (for those
@@ -580,13 +578,9 @@ public class ChannelServiceImpl
 	    assert txn != null;
 	    this.txn = txn;
 	    this.channelService = ChannelServiceImpl.this;
+	    this.table = dataService.getServiceBinding(
+		ChannelTable.NAME, ChannelTable.class);
 	}
-
-        /** FIXME workaround to avoid throwing exception in constructor */
-        private void initialize() {
-            this.table = dataService.getServiceBinding(
-                ChannelTable.NAME, ChannelTable.class);
-        }
 
 	/* -- ChannelManager methods -- */
 

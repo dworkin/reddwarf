@@ -162,13 +162,15 @@ final class ChannelImpl implements Channel, Serializable {
 	    context.getService(DataService.class).markForUpdate(state);
 	    context.leaveChannel(session, this);
 	    state.removeSession(session);
-	    int nameSize = MessageBuffer.getSize(state.name);
-	    MessageBuffer buf = new MessageBuffer(3 + nameSize);
-	    buf.putByte(SimpleSgsProtocol.VERSION).
-		putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
-		putByte(SimpleSgsProtocol.CHANNEL_LEAVE).
-		putString(state.name);
-	    sendProtocolMessageOnCommit(session, buf.getBuffer());
+	    if (session.isConnected()) {
+		int nameSize = MessageBuffer.getSize(state.name);
+		MessageBuffer buf = new MessageBuffer(3 + nameSize);
+		buf.putByte(SimpleSgsProtocol.VERSION).
+		    putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
+		    putByte(SimpleSgsProtocol.CHANNEL_LEAVE).
+		    putString(state.name);
+		sendProtocolMessageOnCommit(session, buf.getBuffer());
+	    }
 	    
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST, "leave session:{0} returns", session);

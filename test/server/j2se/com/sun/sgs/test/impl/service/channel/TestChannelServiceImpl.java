@@ -78,7 +78,7 @@ public class TestChannelServiceImpl extends TestCase {
 	DataServiceImpl.class.getName();
 
     /** Directory used for database shared across multiple tests. */
-    private static String DB_DIRECTORY =
+    private static final String DB_DIRECTORY =
         System.getProperty("java.io.tmpdir") + File.separator +
 	"TestChannelServiceImpl.db";
 
@@ -97,7 +97,7 @@ public class TestChannelServiceImpl extends TestCase {
 	StandardProperties.APP_NAME, "TestChannelServiceImpl",
 	DataServiceImplClassName + ".debugCheckInterval", "1");
     
-    private static final int WAIT_TIME = 1500;
+    private static final int WAIT_TIME = 3000;
     
     private static final String LOGIN_FAILED_MESSAGE = "login failed";
     

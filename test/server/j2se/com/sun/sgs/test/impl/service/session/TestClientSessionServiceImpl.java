@@ -206,6 +206,7 @@ public class TestClientSessionServiceImpl extends TestCase {
             dataService.shutdown();
         }
         dataService = null;
+        deleteDirectory(dbDirectory);
         MinimalTestKernel.destroyContext(appContext);
     }
  
