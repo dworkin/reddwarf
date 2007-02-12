@@ -431,6 +431,9 @@
   <target name="test" depends="test-server"
 	  description="Compiles and runs tests"/>
 
+  <target name="build-test" depends="-test-server.classes, -test-client.classes"
+          description="Compiles tests"/>
+  
   <!-- Compile and run server tests -->
   <target name="test-server" depends="-test-server.classes"
 	  description="Compiles and runs server tests">

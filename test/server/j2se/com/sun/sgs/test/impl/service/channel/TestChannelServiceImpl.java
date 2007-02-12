@@ -136,11 +136,17 @@ public class TestChannelServiceImpl extends TestCase {
     protected void setUp() throws Exception {
 	passed = false;
 	System.err.println("Testcase: " + getName());
-	appContext = MinimalTestKernel.createContext();
+        setUp(true);
+    }
+
+    protected void setUp(boolean clean) throws Exception {
+        if (clean) {
+            deleteDirectory(DB_DIRECTORY);
+        }
+
+        appContext = MinimalTestKernel.createContext();
 	systemRegistry = MinimalTestKernel.getSystemRegistry(appContext);
 	serviceRegistry = MinimalTestKernel.getServiceRegistry(appContext);
-
-        deleteDirectory(DB_DIRECTORY);
 
 	// create services
 	dataService = createDataService(systemRegistry);
@@ -194,18 +200,36 @@ public class TestChannelServiceImpl extends TestCase {
     
     /** Cleans up the transaction. */
     protected void tearDown() throws Exception {
-	if (txn != null) {
-	    try {
-		txn.abort();
-	    } catch (IllegalStateException e) {
-	    }
-	    txn = null;
-	}
+        tearDown(true);
+    }
+
+    protected void tearDown(boolean clean) throws Exception {
+        if (txn != null) {
+            try {
+                txn.abort();
+            } catch (IllegalStateException e) {
+            }
+            txn = null;
+        }
+        if (channelService != null) {
+            channelService.shutdown();
+            channelService = null;
+        }
+        if (sessionService != null) {
+            sessionService.shutdown();
+            sessionService = null;
+        }
+        if (taskService != null) {
+            taskService.shutdown();
+            taskService = null;
+        }
         if (dataService != null) {
             dataService.shutdown();
+            dataService = null;
         }
-        deleteDirectory(DB_DIRECTORY);
-        dataService = null;
+        if (clean) {
+            deleteDirectory(DB_DIRECTORY);
+        }
         MinimalTestKernel.destroyContext(appContext);
     }
 
@@ -1092,31 +1116,16 @@ public class TestChannelServiceImpl extends TestCase {
 	    group.join(name);
 	    group.checkMembership(name, true);
 	    group.checkChannelSets(true);
-	    sessionService.shutdown();
-	    channelService.shutdown();
 
-	    sessionService = 
-		new ClientSessionServiceImpl(serviceProps, systemRegistry);
-	    channelService =
-		new ChannelServiceImpl(serviceProps, systemRegistry);
-	    
-	    createTransaction();
-	    sessionService.configure(serviceRegistry, txnProxy);
-	    serviceRegistry.setComponent(
-		ClientSessionService.class, sessionService);
-	    txnProxy.setComponent(
-	        ClientSessionService.class, sessionService);
-	    port = sessionService.getListenPort();	
-	    channelService.configure(serviceRegistry, txnProxy);
-	    serviceRegistry.setComponent(ChannelManager.class, channelService);
-    
-	    txn.commit();
-	    
-	    
+            // Simulate "crash"
+            tearDown(false);
+            System.err.println("simulated crash");
+            setUp(false);
+
 	    Thread.sleep(WAIT_TIME); // this is necessary, and unfortunate...
 	    group.checkMembership(name, false);
 	    group.checkChannelSets(false);
-	    
+
 	} catch (RuntimeException e) {
 	    System.err.println("unexpected failure");
 	    e.printStackTrace();
