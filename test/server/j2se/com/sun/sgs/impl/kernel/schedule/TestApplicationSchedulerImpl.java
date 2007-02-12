@@ -57,6 +57,9 @@ public class TestApplicationSchedulerImpl {
     // the fully-qualified name of the scheduler we're testing
     private String appSchedulerName;
 
+    // the scheduler used in any given test
+    private ApplicationScheduler applicationScheduler;
+
     @BeforeClass public static void setupSystem() {
         // class-wide setup can happen here
     }
@@ -70,11 +73,12 @@ public class TestApplicationSchedulerImpl {
     }
 
     @Before public void setupSingleTest() {
-        // setup for each individual test can happen here
+        applicationScheduler = null;
     }
 
     @After public void teardownSingleTest() {
-        // teardown for each individual test can happen here
+        if (applicationScheduler != null)
+            applicationScheduler.shutdown();
     }
 
     /**
@@ -586,10 +590,10 @@ public class TestApplicationSchedulerImpl {
     protected ApplicationScheduler getSchedulerInstance(Properties p)
         throws Exception
     {
-        ApplicationScheduler scheduler = LoaderUtil.getScheduler(p);
-        if (scheduler == null)
+        applicationScheduler = LoaderUtil.getScheduler(p);
+        if (applicationScheduler == null)
             throw new Exception("Couldn't load the app scheduler");
-        return scheduler;
+        return applicationScheduler;
     }
 
     protected static ScheduledTask getNewTask() {

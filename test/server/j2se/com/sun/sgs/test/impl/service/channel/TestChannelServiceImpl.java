@@ -23,6 +23,7 @@ import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
@@ -86,17 +87,16 @@ public class TestChannelServiceImpl extends TestCase {
 
     /** Properties for the channel service and client session service. */
     private static Properties serviceProps = createProperties(
-	"com.sun.sgs.appName", "TestChannelServiceImpl",
-	"com.sun.sgs.app.port", Integer.toString(PORT));
+	StandardProperties.APP_NAME, "TestChannelServiceImpl",
+	StandardProperties.APP_PORT, Integer.toString(PORT));
 
     /** Properties for creating the shared database. */
     private static Properties dbProps = createProperties(
-	DataStoreImplClassName + ".directory",
-	dbDirectory,
-	"com.sun.sgs.appName", "TestChannelServiceImpl",
+	DataStoreImplClassName + ".directory", dbDirectory,
+	StandardProperties.APP_NAME, "TestChannelServiceImpl",
 	DataServiceImplClassName + ".debugCheckInterval", "1");
     
-    private static final int WAIT_TIME = 1500;
+    private static final int WAIT_TIME = 3000;
     
     private static final String LOGIN_FAILED_MESSAGE = "login failed";
     
@@ -208,6 +208,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    txn = null;
 	}
 	deleteDirectory(dbDirectory);
+	//MinimalTestKernel.destroyContext(appContext);
     }
 
     /* -- Test constructor -- */
@@ -1434,7 +1435,7 @@ public class TestChannelServiceImpl extends TestCase {
 	createTransaction();
 	DummyAppListener appListener = new DummyAppListener();
 	dataService.setServiceBinding(
-	    "com.sun.sgs.app.AppListener", appListener);
+	    StandardProperties.APP_LISTENER, appListener);
 	txn.commit();
     }
     

@@ -114,4 +114,8 @@ class SingleAppSystemScheduler implements SystemScheduler, ProfilingConsumer {
         return appScheduler.addRecurringTask(task);
     }
 
+    public void shutdown() {
+        appScheduler.shutdown();
+    }
+
 }
