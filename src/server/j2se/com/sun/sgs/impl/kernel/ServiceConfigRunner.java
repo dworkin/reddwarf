@@ -50,6 +50,9 @@ class ServiceConfigRunner implements KernelRunnable {
     // the properties that are passed to the app on startup
     private final Properties appProperties;
 
+    // the registry that will be used to provide services to the context
+    private ComponentRegistryImpl serviceComponents = null;
+
     /**
      * Creates an instance of <code>ServiceConfigRunner</code>.
      *
@@ -82,12 +85,21 @@ class ServiceConfigRunner implements KernelRunnable {
         if (logger.isLoggable(Level.CONFIG))
             logger.log(Level.CONFIG, "{0}: starting service config", appName);
 
-        // initialize the services in the correct order, adding them to the
-        // kernel app context as we go
         AppKernelAppContext appContext =
             (AppKernelAppContext)(proxy.getCurrentOwner().getContext());
-        ComponentRegistryImpl serviceComponents = new ComponentRegistryImpl();
-        appContext.setServices(serviceComponents);
+
+        // if we haven't run before then setup the registry that will be
+        // used for services, otherwise we were aborted in the past so
+        // just clear the registry
+        if (serviceComponents == null) {
+            serviceComponents = new ComponentRegistryImpl();
+            appContext.setServices(serviceComponents);
+        } else {
+            serviceComponents.clearComponents();
+        }
+
+        // initialize the services in the correct order, adding them to the
+        // registry as we go
         for (Service service : services) {
             try {
                 service.configure(serviceComponents, proxy);
