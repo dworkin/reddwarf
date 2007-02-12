@@ -96,7 +96,7 @@ public class TestChannelServiceImpl extends TestCase {
 	StandardProperties.APP_NAME, "TestChannelServiceImpl",
 	DataServiceImplClassName + ".debugCheckInterval", "1");
     
-    private static final int WAIT_TIME = 3000;
+    private static final int WAIT_TIME = 2000;
     
     private static final String LOGIN_FAILED_MESSAGE = "login failed";
     

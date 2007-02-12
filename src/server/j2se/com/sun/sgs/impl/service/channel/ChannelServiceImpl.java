@@ -378,6 +378,7 @@ public class ChannelServiceImpl
 	    txn.join(this);
 	    context = new Context(txn);
 	    currentContext.set(context);
+	    context.initialize();
 	} else if (!txn.equals(context.txn)) {
 	    currentContext.set(null);
 	    throw new IllegalStateException(
@@ -561,7 +562,7 @@ public class ChannelServiceImpl
 	final ChannelServiceImpl channelService;
 
 	/** Table of all channels, obtained from the data service. */
-	private final ChannelTable table;
+	private ChannelTable table = null;
 
 	/**
 	 * Map of channel name to transient channel impl (for those
@@ -572,12 +573,21 @@ public class ChannelServiceImpl
 	    new HashMap<String,Channel>();
 
 	/**
-	 * Creates an instance of this class with the specified transaction.
+	 * Constructs a context with the specified transaction.  The
+	 * {@code initialize} method must be invoked on this context
+	 * before invoking any other methods.
 	 */
 	private Context(Transaction txn) {
 	    assert txn != null;
 	    this.txn = txn;
 	    this.channelService = ChannelServiceImpl.this;
+	}
+
+	/**
+	 * Initializes this context's channel table to the table
+	 * retrieved from the data store.
+	 */
+	private void initialize() {
 	    this.table = dataService.getServiceBinding(
 		ChannelTable.NAME, ChannelTable.class);
 	}
@@ -593,6 +603,7 @@ public class ChannelServiceImpl
 				      Delivery delivery)
 	{
 	    assert name != null;
+	    checkInitialized();
 	    if (table.get(name) != null) {
 		throw new NameExistsException(name);
 	    }
@@ -613,6 +624,7 @@ public class ChannelServiceImpl
 	 */
 	private Channel getChannel(String name) {
 	    assert name != null;
+	    checkInitialized();
 	    Channel channel = internalTable.get(name);
 	    if (channel == null) {
 		ManagedReference ref = table.get(name);
@@ -628,12 +640,19 @@ public class ChannelServiceImpl
 
 	/* -- other methods -- */
 
+	private void checkInitialized() {
+	    if (table == null) {
+		throw new IllegalStateException("context not initialized");
+	    }
+	}
+	
 	/**
 	 * Removes the channel with the specified name.  This method is
 	 * called when the 'close' method is invoked on a 'ChannelImpl'.
 	 */
 	void removeChannel(String name) {
 	    assert name != null;
+	    checkInitialized();
 	    if (table.get(name) != null) {
 		dataService.markForUpdate(table);
 		table.remove(name);
@@ -649,6 +668,7 @@ public class ChannelServiceImpl
 	 * the hex representation of the session's identifier.
 	 */
 	void joinChannel(ClientSession session, Channel channel) {
+	    checkInitialized();
 	    String key = getSessionKey(session);
 	    try {
 		ChannelSet set =
@@ -667,6 +687,7 @@ public class ChannelServiceImpl
 	 * given client {@code session}.
 	 */
 	void leaveChannel(ClientSession session, Channel channel) {
+	    checkInitialized();
 	    String key = getSessionKey(session);
 	    try {
 		ChannelSet set =
@@ -684,6 +705,7 @@ public class ChannelServiceImpl
 	 * channels that the session is still a member of.
 	 */
 	private Set<Channel> removeSession(ClientSession session) {
+	    checkInitialized();
 	    String key = getSessionKey(session);
 	    try {
 		ChannelSet set =
@@ -704,6 +726,7 @@ public class ChannelServiceImpl
 	 * disconnected) from all channels in the channel table.
 	 */
 	private void removeAllSessionsFromChannels() {
+	    checkInitialized();
 	    for (ManagedReference ref : table.getAll()) {
 		ChannelState channelState = ref.get(ChannelState.class);
 		dataService.markForUpdate(channelState);
@@ -715,6 +738,7 @@ public class ChannelServiceImpl
 	 * Returns a service of the given {@code type}.
 	 */
 	<T extends Service> T getService(Class<T> type) {
+	    checkInitialized();
 	    return txnProxy.getService(type);
 	}
 
@@ -723,6 +747,7 @@ public class ChannelServiceImpl
 	 * from this service.
 	 */
 	long nextSequenceNumber() {
+	    checkInitialized();
 	    return sequenceNumber.getAndIncrement();
 	}
     }
