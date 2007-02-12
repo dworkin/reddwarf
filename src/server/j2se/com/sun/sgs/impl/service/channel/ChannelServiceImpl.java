@@ -45,7 +45,6 @@ import java.util.logging.Logger;
 public class ChannelServiceImpl
     implements ChannelManager, Service, NonDurableTransactionParticipant
 {
-
     /** The name of this class. */
     private static final String CLASSNAME = ChannelServiceImpl.class.getName();
 
@@ -134,7 +133,6 @@ public class ChannelServiceImpl
 	return toString();
     }
 
-
     /** {@inheritDoc} */
     public void configure(ComponentRegistry registry, TransactionProxy proxy) {
 
@@ -163,12 +161,18 @@ public class ChannelServiceImpl
 	    }
 
 	    /*
-	     * Create and store new channel table if one does not already
-	     * exist in the data store.
+	     * Create and store new channel table if one does not
+	     * already exist in the data store.  If one already
+	     * exists, then remove all sessions from all channels
+	     * since all previously stored sessions have been
+	     * disconnected.
 	     */
 	    try {
 		dataService.getServiceBinding(
 		    ChannelTable.NAME, ChannelTable.class);
+		Context context = checkContext();
+		context.removeAllSessionsFromChannels();
+		removeChannelSets();
 	    } catch (NameNotBoundException e) {
 		dataService.setServiceBinding(
 		    ChannelTable.NAME, new ChannelTable());
@@ -694,6 +698,20 @@ public class ChannelServiceImpl
 	}
 
 	/**
+	 * Removes all sessions from all channels.  This method is
+	 * invoked when this service is configured (if a previous
+	 * channel table exists) to remove all sessions (which are now
+	 * disconnected) from all channels in the channel table.
+	 */
+	private void removeAllSessionsFromChannels() {
+	    for (ManagedReference ref : table.getAll()) {
+		ChannelState channelState = ref.get(ChannelState.class);
+		dataService.markForUpdate(channelState);
+		channelState.removeAllSessions();
+	    }
+	}
+
+	/**
 	 * Returns a service of the given {@code type}.
 	 */
 	<T extends Service> T getService(Class<T> type) {
@@ -715,6 +733,15 @@ public class ChannelServiceImpl
     private static String getSessionKey(ClientSession session) {
 	byte[] sessionId = session.getSessionId();
 	return SESSION_PREFIX + HexDumper.format(sessionId);
+    }
+
+    /**
+     * Returns true if the specified {@code key} has the prefix of a
+     * session key.
+     */
+    private static boolean isSessionKey(String key) {
+	return key.regionMatches(
+	    0, SESSION_PREFIX, 0, SESSION_PREFIX.length());
     }
 
     /**
@@ -750,6 +777,61 @@ public class ChannelServiceImpl
 	}
     }
     
+    /**
+     * Removes all channel sets from the data store.  This method is
+     * invoked when this service is configured to schedule a task to
+     * remove any existing channel sets since their corresponding
+     * sessions are disconnected.
+     */
+    private void removeChannelSets() {
+	String key = SESSION_PREFIX;
+	
+	for (;;) {
+	    key = dataService.nextServiceBoundName(key);
+	    
+	    if (key == null || ! isSessionKey(key)) {
+		break;
+	    }
+	    
+	    logger.log(Level.FINEST, "removeChannelSets key: {0}", key);
+
+	    nonDurableTaskScheduler.scheduleTaskOnCommit(
+		new RemoveChannelSetsTask(key));
+	}
+    }
+
+    /**
+     * Task (transactional) for removing all channel sets from data store.
+     */
+    private class RemoveChannelSetsTask implements KernelRunnable {
+
+	private final String key;
+
+	RemoveChannelSetsTask(String key) {
+	    this.key = key;
+	}
+
+	/** {@inheritDoc} */
+	public void run() throws Exception {
+	    try {
+		logger.log(
+		    Level.FINEST, "RemoveChannelSetsTask.run key: {0}", key);
+		ChannelSet set =
+		    dataService.getServiceBinding(key, ChannelSet.class);
+		dataService.removeServiceBinding(key);
+		dataService.removeObject(set);
+		logger.log(
+		    Level.FINEST,
+		    "RemoveChannelSetsTask.run key: {0} returns", key);
+	    } catch (Exception e) {
+		logger.logThrow(
+		    Level.FINEST, e,
+		    "RemoveChannelSetsTask.run key: {0} throws", key);
+		throw e;
+	    }
+	}
+    }
+
     /**
      * Task (transactional) for notifying channel listeners.
      */
