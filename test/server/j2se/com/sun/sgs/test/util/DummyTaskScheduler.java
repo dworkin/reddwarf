@@ -154,7 +154,7 @@ public class DummyTaskScheduler implements TaskScheduler {
      */
     public void scheduleTask(KernelRunnable task, TaskOwner owner,
                              long startTime) {
-        if (startTime < System.currentTimeMillis()) {
+        if (startTime <= System.currentTimeMillis()) {
             // if the time has passed then schedule to run immediately...
             try {
                 queue.put(task);
