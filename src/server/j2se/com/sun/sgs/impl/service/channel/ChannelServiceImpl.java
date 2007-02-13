@@ -757,7 +757,7 @@ public class ChannelServiceImpl
      */
     private static String getSessionKey(ClientSession session) {
 	byte[] sessionId = session.getSessionId();
-	return SESSION_PREFIX + HexDumper.format(sessionId);
+	return SESSION_PREFIX + HexDumper.toHexString(sessionId);
     }
 
     /**

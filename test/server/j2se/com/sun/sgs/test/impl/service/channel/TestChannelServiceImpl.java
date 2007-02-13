@@ -1232,7 +1232,7 @@ public class TestChannelServiceImpl extends TestCase {
 	ChannelServiceImpl.class.getName() + ".session.";
     
     private static String getSessionKey(byte[] sessionId) {
-	return SESSION_PREFIX + HexDumper.format(sessionId);
+	return SESSION_PREFIX + HexDumper.toHexString(sessionId);
     }
 
     /** Deletes the specified directory, if it exists. */
