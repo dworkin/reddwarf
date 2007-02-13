@@ -318,22 +318,22 @@
     <copy todir="${build.dir}/sgs/lib/bdb"
 	  file="${bdb.builds.dir}/ppc/lib/db.jar"/>
     <copy todir="${build.dir}/sgs/lib/bdb/macosx-ppc">
-      <fileset dir="${bdb.builds.dir}/ppc/lib"
+      <fileset dir="${bdb.builds.dir}/macosx-ppc/lib"
 	       includes="libdb-?.?.dylib,
 			 libdb_java-?.?.jnilib"/>
     </copy>
     <copy todir="${build.dir}/sgs/lib/bdb/solaris-x86">
-      <fileset dir="${bdb.builds.dir}/i86pc/lib"
+      <fileset dir="${bdb.builds.dir}/solaris-x86/lib"
 	       includes="libdb-?.?.so,
 			 libdb_java-?.?.so"/>
     </copy>
     <copy todir="${build.dir}/sgs/lib/bdb/solaris-sparc">
-      <fileset dir="${bdb.builds.dir}/sun4/lib"
+      <fileset dir="${bdb.builds.dir}/solaris-sparc/lib"
 	       includes="libdb-?.?.so,
 			 libdb_java-?.?.so"/>
     </copy>
     <copy todir="${build.dir}/sgs/lib/bdb/win32-x86/">
-      <fileset dir="${bdb.builds.dir}/win32/Release"
+      <fileset dir="${bdb.builds.dir}/win32-x86/Release"
 	       includes="libdb_java??.dll"/>
     </copy>
   </target>
