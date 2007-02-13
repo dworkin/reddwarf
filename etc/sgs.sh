@@ -7,11 +7,18 @@
 
 # This script needs to be run from the sgs directory.
 
+if test $# -lt 2; then
+    echo Usage: sgs.sh app_classpath app_config_file...;
+    exit 1;
+fi
+
 # The application classpath
 app_classpath="$1"
 
+shift
+
 # The application configuration files
-app_config_files="${*:2}"
+app_config_files="$*"
 
 # Figure out what platform we're running on and set the platform and
 # pathsep variables appropriately.  Here are the supported platforms:
