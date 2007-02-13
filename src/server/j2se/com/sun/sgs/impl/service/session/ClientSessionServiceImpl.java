@@ -4,6 +4,7 @@ import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityManager;
 import com.sun.sgs.impl.io.ServerSocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
@@ -722,11 +723,26 @@ public class ClientSessionServiceImpl
 	nonDurableTaskScheduler.scheduleTask(task);
     }
 
+    void scheduleTask(KernelRunnable task, Identity ownerIdentity) {
+        nonDurableTaskScheduler.scheduleTask(task, ownerIdentity);
+    }
+
     /**
      * Schedules a non-durable, non-transactional task.
      */
     void scheduleNonTransactionalTask(KernelRunnable task) {
 	nonDurableTaskScheduler.scheduleNonTransactionalTask(task);
+    }
+
+    void scheduleNonTransactionalTask(KernelRunnable task, Identity ownerIdentity) {
+        nonDurableTaskScheduler.scheduleNonTransactionalTask(task, ownerIdentity);
+    }
+
+    /**
+     * Schedules a non-durable, non-transactional task using the task service.
+     */
+    void scheduleTaskOnCommit(KernelRunnable task) {
+        nonDurableTaskScheduler.scheduleTaskOnCommit(task);
     }
 
     /**
@@ -761,7 +777,7 @@ public class ClientSessionServiceImpl
 	    if (key == null || ! isListenerKey(key)) {
 		break;
 	    }
-	    
+
 	    logger.log(
 		Level.FINEST,
 		"notifyDisconnectedSessions key: {0}",
@@ -769,7 +785,7 @@ public class ClientSessionServiceImpl
 
 	    final String listenerKey = key;		
 		
-	    nonDurableTaskScheduler.scheduleTaskOnCommit(
+	    scheduleTaskOnCommit(
 		new KernelRunnable() {
 		    public void run() throws Exception {
 			ManagedObject obj = 

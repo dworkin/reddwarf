@@ -1382,7 +1382,12 @@ public class TestChannelServiceImpl extends TestCase {
 	}
 
 	/* -- Implement SgsClientSession -- */
-	
+
+        /** {@inheritDoc} */
+        public Identity getIdentity() {
+            return new DummyIdentity(name);
+        }
+
         /** {@inheritDoc} */
 	public void sendProtocolMessage(byte[] message, Delivery delivery) {
 	}
@@ -1463,9 +1468,14 @@ public class TestChannelServiceImpl extends TestCase {
     /**
      * Identity returned by the DummyIdentityManager.
      */
-    private static class DummyIdentity implements Identity {
+    private static class DummyIdentity implements Identity, Serializable {
 
-	private final String name;
+        private static final long serialVersionUID = 1L;
+        private final String name;
+
+        DummyIdentity(String name) {
+            this.name = name;
+        }
 
 	DummyIdentity(IdentityCredentials credentials) {
 	    this.name = ((NamePasswordCredentials) credentials).getName();
@@ -1478,6 +1488,20 @@ public class TestChannelServiceImpl extends TestCase {
 	public void notifyLoggedIn() {}
 
 	public void notifyLoggedOut() {}
+        
+        @Override
+        public boolean equals(Object o) {
+            if (this == o)
+                return true;
+            if (! (o instanceof DummyIdentity))
+                return false;
+            return ((DummyIdentity)o).name.equals(name);
+        }
+        
+        @Override
+        public int hashCode() {
+            return name.hashCode();
+        }
     }
 
     /**

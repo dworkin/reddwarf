@@ -490,12 +490,14 @@ public class ChannelServiceImpl
                     // Forward message to receiving clients
 		    nonDurableTaskScheduler.scheduleTask(
                         new ForwardingTask(
-                            name, senderId, sessions, channelMessage, seq));
+                            name, senderId, sessions, channelMessage, seq),
+                            session.getIdentity());
                     
                     // Notify listeners in the app in a transaction
 		    nonDurableTaskScheduler.scheduleTask(
 			new NotifyTask(
-			    name, senderId, channelMessage));
+			    name, senderId, channelMessage),
+                        session.getIdentity());
 		    
 		    break;
 		    
@@ -537,7 +539,8 @@ public class ChannelServiceImpl
 			for (Channel channel : channels) {
 			    channel.leave(session);
 			}
-		    }});
+		    }},
+                session.getIdentity());
 	}
     }
     

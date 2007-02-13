@@ -36,7 +36,7 @@ public class TaskOwnerImpl implements TaskOwner {
         this.context = context;
 
         // cache the hash code as the hash of the identity and the context
-        hash = (identity.toString() + context.toString()).hashCode();
+        hash = identity.hashCode() ^ context.hashCode();
     }
 
     /**
@@ -62,7 +62,11 @@ public class TaskOwnerImpl implements TaskOwner {
      * @return <code>true</code> if the given owner is the same as this
      *         owner, <code>false</code> otherwise
      */
+    @Override
     public boolean equals(Object o) {
+        if (this == o)
+            return true;
+
         if (! (o instanceof TaskOwnerImpl))
             return false;
 
@@ -75,8 +79,16 @@ public class TaskOwnerImpl implements TaskOwner {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int hashCode() {
         return hash;
     }
 
+    /** {@inheritDoc} */
+    @Override
+    public String toString() {
+        return getClass().getName() + '[' +
+            identity.getName() + "]@" +
+            Integer.toHexString(hashCode());
+    }
 }
