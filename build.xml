@@ -276,7 +276,7 @@
           includes="sgs-client-apidoc/**"/>
   </target>
 
-  <!-- Builds distribution file -->
+  <!-- Builds files for distribution -->
   <target name="dist" depends="dist-client, dist-server, javadoc-api"
 	  description="Builds files for distribution">
     <copy todir="${build.dir}/sgs/doc/sgs-client-api">
@@ -291,13 +291,15 @@
     </zip>
   </target>
 
-  <!-- Builds files for distributing the client -->
-  <target name="dist-client" depends="jar-client">
+  <!-- Builds client files for distribution -->
+  <target name="dist-client" depends="jar-client"
+	  description="Builds client files for distribution">
     <copy todir="${build.dir}/sgs/lib" file="${build.dir}/lib/sgs-client.jar"/>
   </target>
 
-  <!-- Builds files for distributing the server -->
-  <target name="dist-server" depends="jar-server, dist-bdb">
+  <!-- Builds server files for distribution -->
+  <target name="dist-server" depends="jar-server, dist-bdb"
+	  description="Builds server files for distribution">
     <copy todir="${build.dir}/sgs">
       <fileset dir="etc" includes="sgs.*"/>
     </copy>
@@ -309,30 +311,27 @@
   </target>
 
   <!-- Builds files for distributing Berkeley DB -->
-  <target name="dist-bdb">
+  <target name="dist-bdb"
+	  description="Builds files for distributing Berkeley DB">
     <fail unless="bdb.builds.dir"
 	  message="The bdb.builds.dir property must be set"/>
     <copy todir="${build.dir}/sgs/lib/bdb"
 	  file="${bdb.builds.dir}/ppc/lib/db.jar"/>
-    <!-- lib/bdb/macosx-ppc -->
     <copy todir="${build.dir}/sgs/lib/bdb/macosx-ppc">
       <fileset dir="${bdb.builds.dir}/ppc/lib"
 	       includes="libdb-?.?.dylib,
 			 libdb_java-?.?.jnilib"/>
     </copy>
-    <!-- lib/bdb/solaris-x86 -->
     <copy todir="${build.dir}/sgs/lib/bdb/solaris-x86">
       <fileset dir="${bdb.builds.dir}/i86pc/lib"
 	       includes="libdb-?.?.so,
 			 libdb_java-?.?.so"/>
     </copy>
-    <!-- lib/bdb/solaris-sparc -->
     <copy todir="${build.dir}/sgs/lib/bdb/solaris-sparc">
       <fileset dir="${bdb.builds.dir}/sun4/lib"
 	       includes="libdb-?.?.so,
 			 libdb_java-?.?.so"/>
     </copy>
-    <!-- lib/bdb/win32-x86 -->
     <copy todir="${build.dir}/sgs/lib/bdb/win32-x86/">
       <fileset dir="${bdb.builds.dir}/win32/Release"
 	       includes="libdb_java??.dll"/>
@@ -345,7 +344,7 @@
 
   <!-- Builds the client JAR file -->
   <target name="jar-client" depends="build-client"
-	  description="Builds client JAR files">
+	  description="Builds the client JAR file">
     <mkdir dir="${build.dir}/lib"/>
     <jar destfile="${build.dir}/lib/sgs-client.jar"
 	 basedir="${build.dir}/classes/client">
