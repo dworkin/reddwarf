@@ -1,15 +1,16 @@
-@rem Windows batch file for starting the SGS server -- run this script
-@rem from the sgs directory
+@rem Windows batch file for starting the SGS server
 
-@rem Set this variable to the semicolon-separated classpath entries
-@rem needed to load application classes
+@rem The first argument is the classpath needed to load application
+@rem classes, using semicolons as the path separator.  The remaining
+@rem arguments are the names of application configuration files.
 
-@set app_classpath=
+@rem This script needs to be run from the sgs directory.
 
-@rem Set this variable to a space-separated list of application
-@rem configuration files
+@rem The application classpath
+@set app_classpath=%0
 
-@set app_config_files=
+@rem The application configuration files
+@set app_config_files=%1 %2 %3 %4 %5 %6 %7 %8 %9
 
 @rem Run the SGS server, specifying the library path, the logging
 @rem configuration file, the SGS configuration file, the classpath, the

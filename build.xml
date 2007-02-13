@@ -287,7 +287,7 @@
     </copy>
     <zip destfile="${build.dir}/sgs-${project.version}.zip">
       <zipfileset dir="${build.dir}" includes="sgs/**" excludes="sgs/sgs.sh"/>
-      <zipfileset dir="${build.dir}" includes="sgs/sgs.sh" filemode="777"/>
+      <zipfileset dir="${build.dir}" includes="sgs/sgs.sh" filemode="755"/>
     </zip>
   </target>
 

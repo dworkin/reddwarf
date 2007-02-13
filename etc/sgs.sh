@@ -1,14 +1,17 @@
 #! /bin/sh
 # Bourne shell script for starting the SGS server
 
-# Set this variable to the classpath entries needed to load application
-# classes.  Note that entries should be separated by the path separator
-# appropriate for current platform.
-app_classpath=
+# The first argument is the classpath needed to load application
+# classes, using the local platform's path separator.  The remaining
+# arguments are the names of application configuration files.
 
-# Set this variable to a space-separated list of application
-# configuration files
-app_config_files=""
+# This script needs to be run from the sgs directory.
+
+# The application classpath
+app_classpath="$1"
+
+# The application configuration files
+app_config_files="${*:2}"
 
 # Figure out what platform we're running on and set the platform and
 # pathsep variables appropriately.  Here are the supported platforms:
