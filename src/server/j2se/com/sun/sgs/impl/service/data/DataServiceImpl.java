@@ -16,7 +16,6 @@ import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.service.TransactionProxy;
 import java.io.Serializable;
-import java.lang.reflect.Constructor;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
@@ -62,8 +61,8 @@ import java.util.logging.Logger;
  *	<i>Default:</i>
  *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl</code> <br>
  *	The name of the class that implements {@link DataStore}.  The class
- *	should be public and should provide a public constructor with a {@link
- *	Properties} parameter.
+ *	should be public, not abstract, and should provide a public constructor
+ *	with a {@link Properties} parameter.
  *
  * </ul> <p>
  *
@@ -221,12 +220,9 @@ public final class DataServiceImpl
 	    if (dataStoreClassName == null) {
 		store = new DataStoreImpl(properties);
 	    } else {
-		Class<? extends DataStore> cl =
-		    Class.forName(dataStoreClassName).asSubclass(
-			DataStore.class);
-		Constructor<? extends DataStore> cons =
-		    cl.getConstructor(Properties.class);
-		store = cons.newInstance(properties);
+		store = wrappedProps.getClassInstanceProperty(
+		    DATA_STORE_CLASS_PROPERTY, DataStore.class,
+		    new Class[] { Properties.class }, properties);
 		logger.log(Level.CONFIG, "Using data store {0}", store);
 	    }
 	} catch (Exception e) {

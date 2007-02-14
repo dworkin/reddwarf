@@ -62,10 +62,6 @@ public class TestDataServicePerformance extends TestCase {
     /** Whether to flush to disk on transaction commits. */
     protected boolean testFlush = Boolean.getBoolean("test.flush");
 
-    /** The number of transactions between logging database statistics. */
-    private int logStats = Integer.getInteger(
-	"test.log.stats", Integer.MAX_VALUE);
-
     /** The number of times to run the test while timing. */
     protected int count = Integer.getInteger("test.count", 60);
 
@@ -106,11 +102,9 @@ public class TestDataServicePerformance extends TestCase {
 			   "\n  test.count=" + count +
 			   "\n  test.items=" + items +
 			   "\n  test.modify.items=" + modifyItems);
-	createTransaction();
 	props = createProperties(
 	    DataStoreImplClass + ".directory", createDirectory(),
-	    "com.sun.sgs.appName", "TestDataServicePerformance",
-	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
+	    "com.sun.sgs.appName", "TestDataServicePerformance");
     }
 
     /** Sets passed if the test passes. */
@@ -159,6 +153,7 @@ public class TestDataServicePerformance extends TestCase {
 	props.setProperty(DataServiceImplClass + ".detectModifications",
 			  String.valueOf(detectMods));
 	service = getDataService(props, componentRegistry);
+	createTransaction();
 	service.configure(componentRegistry, txnProxy);
 	componentRegistry.setComponent(DataManager.class, service);
 	componentRegistry.registerAppContext();
@@ -206,6 +201,7 @@ public class TestDataServicePerformance extends TestCase {
 	props.setProperty(DataStoreImplClass + ".flushToDisk",
 			  String.valueOf(flush));
 	service = getDataService(props, componentRegistry);
+	createTransaction();
 	service.configure(componentRegistry, txnProxy);
 	componentRegistry.setComponent(DataManager.class, service);
 	componentRegistry.registerAppContext();

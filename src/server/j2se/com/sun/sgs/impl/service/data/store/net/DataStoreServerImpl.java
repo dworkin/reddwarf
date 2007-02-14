@@ -1,6 +1,7 @@
 package com.sun.sgs.impl.service.data.store.net;
 
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.PropertiesWrapper;
@@ -21,7 +22,7 @@ import java.util.TreeMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -140,14 +141,26 @@ public class DataStoreServerImpl implements DataStoreServer {
     /** Implement Transactions using a long for the transaction ID. */
     private static class Txn implements Transaction {
 
+	/** The state value for when the transaction is not in use. */
+	private static final int IDLE = 1;
+
+	/** The state value for when the transaction is currently in use. */
+	private static final int IN_USE = 2;
+
+	/**
+	 * The state value for when the transaction is being reaped because it
+	 * is expired.  Once this state is reached, it never changes.
+	 */
+	private static final int REAPING = 3;
+
 	/** The transaction ID. */
 	private final long tid;
 
 	/** The creation time. */
 	private final long creationTime;
 
-	/** Whether this transaction is in use. */
-	private final AtomicBoolean inUse = new AtomicBoolean();
+	/** The current state, one of IDLE, IN_USE, or REAPING. */
+	private final AtomicInteger state = new AtomicInteger(IDLE);
 
 	/** The transaction participant or null. */
 	private TransactionParticipant participant;
@@ -166,17 +179,27 @@ public class DataStoreServerImpl implements DataStoreServer {
 	    return tid;
 	}
 
-	/** Returns whether this transaction is in use. */
-	boolean getInUse() {
-	    return inUse.get();
+	/**
+	 * Sets whether this transaction is in use, doing nothing if the state
+	 * is REAPING.  Returns whether the attempt to set the state was
+	 * successful.  The attempt fails if the state is not REAPING and is
+	 * not the opposite of the requested state.
+	 */
+	boolean setInUse(boolean inUse) {
+	    int expect = inUse ? IDLE : IN_USE;
+	    int update = inUse ? IN_USE : IDLE;
+	    return state.compareAndSet(expect, update) ||
+		state.get() == REAPING;
 	}
 
 	/**
-	 * Sets whether this transaction is in use.  Returns the previous
-	 * value.
+	 * Sets this transaction as being reaped.  Returns whether the attempt
+	 * to set the state was successful.  The attempt fails if the state was
+	 * IN_USE.
 	 */
-	boolean setInUse(boolean inUse) {
-	    return this.inUse.getAndSet(inUse);
+	boolean setReaping() {
+	    boolean success = state.compareAndSet(IDLE, REAPING);
+	    return success || state.get() == REAPING;
 	}
 
 	/* -- Implement Transaction -- */
@@ -234,9 +257,6 @@ public class DataStoreServerImpl implements DataStoreServer {
      */
     private static class TxnTable<T> {
 
-	/** Synchronize on this object when accessing the table. */
-	final Object lock = new Object();
-
 	/**
 	 * Maps transaction IDs to transactions and their associated
 	 * information.
@@ -262,14 +282,14 @@ public class DataStoreServerImpl implements DataStoreServer {
 	 */
 	Txn get(long tid) {
 	    Entry<T> entry;
-	    synchronized (lock) {
+	    synchronized (table) {
 		entry = table.get(tid);
 	    }
 	    if (entry != null) {
-		boolean wasInUse = entry.txn.setInUse(true);
-		if (wasInUse) {
+		if (!entry.txn.setInUse(true)) {
 		    throw new IllegalStateException(
-			"Multiple simultaneous accesses to transaction");
+			"Multiple simultaneous accesses to transaction: " +
+			entry.txn);
 		}
 		return entry.txn;
 	    }
@@ -279,19 +299,30 @@ public class DataStoreServerImpl implements DataStoreServer {
 
 	/** Marks the transaction as not in use. */
 	void notInUse(Txn txn) {
-	    txn.setInUse(false);
+	    boolean ok = txn.setInUse(false);
+	    /*
+	     * Only the single transaction that placed the transaction in-use
+	     * should be setting it not in-use, unless it is marked REAPING,
+	     * which causes the call to always return true.
+	     * -tjb@sun.com (02/14/2007)
+	     */
+	    assert ok : "Clearing transaction in-use flag failed";
 	}
 	
-	/** Returns all expired transactions that are not in use. */
+	/**
+	 * Returns all expired transactions that are not in use, marking their
+	 * states as REAPING.
+	 */
 	Collection<Transaction> getExpired(long txnTimeout) {
 	    Collection<Transaction> result = new ArrayList<Transaction>();
 	    long last = System.currentTimeMillis() - txnTimeout;
-	    synchronized (lock) {
+	    synchronized (table) {
 		for (Entry<?> entry : table.values()) {
 		    Txn txn = entry.txn;
-		    if (txn.getCreationTime() > last) {
+		    if (txn.getCreationTime() >= last) {
 			break;
-		    } else if (!txn.getInUse()) {
+		    }
+		    if (txn.setReaping()) {
 			result.add(txn);
 		    }
 		}
@@ -338,11 +369,10 @@ public class DataStoreServerImpl implements DataStoreServer {
 		if (txn instanceof Txn) {
 		    long tid = ((Txn) txn).getTid();
 		    Entry<T> entry;
-		    synchronized (lock) {
+		    synchronized (table) {
 			entry = table.get(tid);
 		    }
 		    if (entry != null) {
-			assert entry.txn.getInUse();
 			return entry.info;
 		    }
 		}
@@ -354,7 +384,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 		if (txn instanceof Txn) {
 		    long tid = ((Txn) txn).getTid();
 		    Entry<T> entry;
-		    synchronized (lock) {
+		    synchronized (table) {
 			entry = table.remove(tid);
 		    }
 		    if (entry != null) {
@@ -365,7 +395,8 @@ public class DataStoreServerImpl implements DataStoreServer {
 			return entry.info;
 		    }
 		}
-		throw new IllegalStateException("Transaction is not active");
+		throw new TransactionNotActiveException(
+		    "Transaction is not active");
 	    }
 
 	    public void set(
@@ -379,7 +410,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 		    Txn t = (Txn) txn;
 		    long tid = t.getTid();
 		    Entry<T> newInfo = new Entry<T>(t, info);
-		    synchronized (lock) {
+		    synchronized (table) {
 			table.put(tid, newInfo);
 		    }
 		}
@@ -404,20 +435,25 @@ public class DataStoreServerImpl implements DataStoreServer {
 	/** Creates a new transaction. */
 	long createTransaction() {
 	    logger.log(Level.FINER, "createTransaction");
-	    long tid;
-	    synchronized (tidLock) {
-		if (nextTxnId > lastTxnId) {
-		    logger.log(Level.FINE, "Allocate more transaction IDs");
-		    nextTxnId = getNextTxnId(TXN_ALLOCATION_BLOCK_SIZE);
-		    lastTxnId = nextTxnId + TXN_ALLOCATION_BLOCK_SIZE - 1;
+	    try {
+		long tid;
+		synchronized (tidLock) {
+		    if (nextTxnId > lastTxnId) {
+			logger.log(Level.FINE, "Allocate more transaction IDs");
+			nextTxnId = getNextTxnId(TXN_ALLOCATION_BLOCK_SIZE);
+			lastTxnId = nextTxnId + TXN_ALLOCATION_BLOCK_SIZE - 1;
+		    }
+		    tid = nextTxnId++;
 		}
-		tid = nextTxnId++;
+		joinNewTransaction(new Txn(tid));
+		logger.log(Level.FINER,
+			   "createTransaction returns tid:{0,number,#}",
+			   tid);
+		return tid;
+	    } catch (RuntimeException e) {
+		logger.logThrow(Level.FINER, e, "createTransaction throws");
+		throw e;
 	    }
-	    joinNewTransaction(new Txn(tid));
-	    logger.log(Level.FINER,
-		       "createTransaction returns tid:{0,number,#}",
-		       tid);
-	    return tid;
 	}
     }
 
@@ -585,7 +621,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 	exporter = noRmi ? new SocketExporter() : new Exporter();
 	port = exporter.export(this, requestedPort);
 	if (requestedPort == 0) {
-	    logger.log(Level.INFO, "Server is using port {0}", port);
+	    logger.log(Level.INFO, "Server is using port {0,number,#}", port);
 	}
 	long reapDelay = wrappedProps.getLongProperty(
 	    REAP_DELAY_PROPERTY, DEFAULT_REAP_DELAY);
@@ -597,7 +633,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 			reapExpiredTransactions();
 		    } catch (Throwable t) {
 			logger.logThrow(
-			    Level.FINE, t,
+			    Level.WARNING, t,
 			    "Problem reaping expired transactions");
 		    }
 		}
@@ -794,6 +830,17 @@ public class DataStoreServerImpl implements DataStoreServer {
      * it can perform the abort.
      */
     void reapExpiredTransactions() {
+	/*
+	 * Note that a transaction is only marked REAPING if it has expired and
+	 * is not currently in use.  All subsequent operations will notice that
+	 * is expired, either because the transaction has been aborted, or
+	 * because they will perform their own expiration check.  As a result,
+	 * the only database access for that transaction will be to abort.
+	 * Whether the reaper will be the one to perform the abort or another
+	 * request to the server will do it doesn't matter because the abort
+	 * operation atomically removes the transaction from the transaction
+	 * table.  -tjb@sun.com (02/14/2007)
+	 */
 	Collection<Transaction> expired = txnTable.getExpired(txnTimeout);
 	for (Transaction txn : expired) {
 	    try {
@@ -803,6 +850,8 @@ public class DataStoreServerImpl implements DataStoreServer {
 		 * The abort call should fail this way because this is an
 		 * already expired exception.
 		 */
+	    } catch (TransactionTimeoutException e) {
+		/* The transaction already timed out */
 	    }
 	}
 	int numExpired = expired.size();

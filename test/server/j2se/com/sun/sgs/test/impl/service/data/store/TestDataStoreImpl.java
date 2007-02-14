@@ -4,6 +4,7 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionException;
+import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.service.data.store.DataStoreException;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
@@ -482,6 +483,138 @@ public class TestDataStoreImpl extends TestCase {
 	txn.commit();
 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
 	assertTrue(Arrays.equals(newData, store.getObject(txn, id, true)));
+    }
+
+    /* -- Test setObjects -- */
+
+    public void testSetObjectsNullTxn() {
+	long[] ids = { id };
+	byte[][] dataArray = { { 0 } };
+	try {
+	    store.setObjects(null, ids, dataArray);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testSetObjectsBadId() {
+	long[] ids = { -3 };
+	byte[][] dataArray = { { 0 } };
+	try {
+	    store.setObjects(txn, ids, dataArray);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testSetObjectsWrongLengths() {
+	long[] ids = { id };
+	byte[][] dataArray = { { 0 }, { 1 } };
+	try {
+	    store.setObjects(txn, ids, dataArray);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testSetObjectsNullOids() {
+	byte[][] dataArray = { { 0 } };
+	try {
+	    store.setObjects(txn, null, dataArray);
+	    fail("Expected NullArgumentException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testSetObjectsNullDataArray() {
+	long[] ids = { id };
+	try {
+	    store.setObjects(txn, ids, null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testSetObjectsNullData() {
+	long[] ids = { id };
+	byte[][] dataArray = { null };
+	try {
+	    store.setObjects(txn, ids, dataArray);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testSetObjectsEmptyData() throws Exception {
+	long[] ids = { id };
+	byte[][] dataArray = { { } };
+	store.setObjects(txn, ids, dataArray);
+	txn.commit();
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	byte[] result = store.getObject(txn, id, false);
+	assertTrue(result.length == 0);
+    }
+
+    /* -- Unusual states -- */
+    private final Action setObjects = new Action() {
+	void run() {
+	    store.setObjects(txn, new long[] { id }, new byte[][] { { 0 } });
+	}
+    };
+    public void testSetObjectsAborted() throws Exception {
+	testAborted(setObjects);
+    }
+    public void testSetObjectsPreparedReadOnly() throws Exception {
+	testPreparedReadOnly(setObjects);
+    }
+    public void testSetObjectsPreparedModified() throws Exception {
+	testPreparedModified(setObjects);
+    }
+    public void testSetObjectsCommitted() throws Exception {
+	testCommitted(setObjects);
+    }
+    public void testSetObjectsWrongTxn() throws Exception {
+	testWrongTxn(setObjects);
+    }
+    public void testSetObjectsShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(setObjects);
+    }
+    public void testSetObjectsShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(setObjects);
+    }
+    public void testSetObjectsShutdown() throws Exception {
+	testShutdown(setObjects);
+    }
+
+    public void testSetObjectsSuccess() throws Exception {
+	long[] ids = { id, store.createObject(txn) };
+	byte[][] dataArray = { { 1, 2 }, { 3, 4, 5 } };
+	store.setObjects(txn, ids, dataArray);
+	assertFalse(txn.prepare());
+	txn.commit();
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	for (int i = 0; i < ids.length; i++) {
+	    long id = ids[i];
+	    byte[] data = dataArray[i];
+	    byte[] result = store.getObject(txn, id, false);
+	    assertTrue(Arrays.equals(data, result));
+	    byte[] newData = new byte[] { (byte) i };
+	    store.setObjects(txn, new long[] { id }, new byte[][] { newData });
+	    assertTrue(Arrays.equals(newData, store.getObject(txn, id, true)));
+	    txn.abort();
+	    txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	    assertTrue(Arrays.equals(data, store.getObject(txn, id, true)));
+	    store.setObjects(txn, new long[] { id }, new byte[][] { newData });
+	    txn.commit();
+	    txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	    assertTrue(Arrays.equals(newData, store.getObject(txn, id, true)));
+	}
     }
 
     /* -- Test removeObject -- */
@@ -1332,7 +1465,9 @@ public class TestDataStoreImpl extends TestCase {
 	txn.abort();
 	try {
 	    action.run();
-	    fail("Expected IllegalStateException");
+	    fail("Expected exception");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
 	} catch (IllegalStateException e) {
 	    System.err.println(e);
 	} finally {
@@ -1346,7 +1481,9 @@ public class TestDataStoreImpl extends TestCase {
 	txn.prepare();
 	try {
 	    action.run();
-	    fail("Expected IllegalStateException");
+	    fail("Expected exception");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
 	} catch (IllegalStateException e) {
 	    System.err.println(e);
 	}
@@ -1371,7 +1508,9 @@ public class TestDataStoreImpl extends TestCase {
 	txn.commit();
 	try {
 	    action.run();
-	    fail("Expected IllegalStateException");
+	    fail("Expected exception");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
 	} catch (IllegalStateException e) {
 	    System.err.println(e);
 	} finally {
@@ -1438,7 +1577,9 @@ public class TestDataStoreImpl extends TestCase {
 	store.shutdown();
 	try {
 	    action.run();
-	    fail("Expected IllegalStateException");
+	    fail("Expected exception");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
 	} catch (IllegalStateException e) {
 	    System.err.println(e);
 	}

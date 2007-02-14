@@ -3,10 +3,8 @@ package com.sun.sgs.test.impl.service.data.store;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.test.util.DummyTransaction;
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.Properties;
 import junit.framework.TestCase;
 
@@ -56,10 +54,6 @@ public class TestDataStorePerformance extends TestCase {
     /** Whether to flush to disk on transaction commits. */
     protected boolean testFlush = Boolean.getBoolean("test.flush");
 
-    /** The number of transactions between logging database statistics. */
-    private int logStats = Integer.getInteger(
-	"test.logStats", Integer.MAX_VALUE);
-
     /** Set when the test passes. */
     protected boolean passed;
 
@@ -85,8 +79,7 @@ public class TestDataStorePerformance extends TestCase {
 			   "\n  test.item.size=" + itemSize +
 			   "\n  test.modify.items=" + modifyItems);
 	props = createProperties(
-	    DataStoreImplClass + ".directory", createDirectory(),
-	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
+	    DataStoreImplClass + ".directory", createDirectory());
     }
 
     /** Sets passed if the test passes. */

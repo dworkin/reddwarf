@@ -1,5 +1,7 @@
 package com.sun.sgs.impl.service.data.store.net;
 
+import com.sun.sgs.app.TransactionAbortedException;
+import com.sun.sgs.app.TransactionNotActiveException;
 import java.io.IOException;
 import java.rmi.Remote;
 
@@ -28,6 +30,7 @@ public interface DataStoreServer extends Remote {
      * @throws	ObjectNotFoundException if the object is not found
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the transaction is not active
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      * @throws	IOException if a network problem occurs
@@ -48,6 +51,7 @@ public interface DataStoreServer extends Remote {
      * @throws	ObjectNotFoundException if the object is not found
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the transaction is not active
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      * @throws	IOException if a network problem occurs
@@ -66,6 +70,7 @@ public interface DataStoreServer extends Remote {
      *		<code>data</code> is empty
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the transaction is not active
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      * @throws	IOException if a network problem occurs
@@ -79,11 +84,12 @@ public interface DataStoreServer extends Remote {
      *		take place
      * @param	oids the object IDs
      * @param	dataArray the associated data values
-     * @throws	TransactionAbortedException if the transaction was aborted due
-     *		to a lock conflict or timeout
      * @throws	IllegalArgumentException if <code>oids</code> and
      *		<code>data</code> are not the same length, or if
      *		<code>oids</code> contains a value that is negative
+     * @throws	TransactionAbortedException if the transaction was aborted due
+     *		to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the transaction is not active
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
@@ -100,6 +106,7 @@ public interface DataStoreServer extends Remote {
      * @throws	ObjectNotFoundException if the object is not found
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the transaction is not active
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      * @throws	IOException if a network problem occurs
@@ -116,6 +123,7 @@ public interface DataStoreServer extends Remote {
      * @throws	NameNotBoundException if no object ID is bound to the name
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the transaction is not active
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      * @throws	IOException if a network problem occurs
@@ -132,6 +140,7 @@ public interface DataStoreServer extends Remote {
      * @throws	IllegalArgumentException if <code>oid</code> is negative
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the transaction is not active
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      * @throws	IOException if a network problem occurs
@@ -147,6 +156,7 @@ public interface DataStoreServer extends Remote {
      * @throws	NameNotBoundException if the name is not bound
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the transaction is not active
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      * @throws	IOException if a network problem occurs
@@ -167,6 +177,7 @@ public interface DataStoreServer extends Remote {
      *		<code>null</code> if there are no more bound names
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the transaction is not active
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      * @throws	IOException if a network problem occurs

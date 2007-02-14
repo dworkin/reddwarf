@@ -8,6 +8,7 @@ import com.sun.sgs.app.ObjectIOException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
+import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Transaction;
@@ -95,8 +96,8 @@ public class TestDataServiceImpl extends TestCase {
 	    DataStoreImplClassName + ".directory", dbDirectory,
 	    "com.sun.sgs.appName", "TestDataServiceImpl",
 	    DataServiceImplClassName + ".debugCheckInterval", "0");
-	createTransaction();
 	service = getDataServiceImpl();
+	createTransaction();
 	service.configure(componentRegistry, txnProxy);
 	txn.commit();
 	componentRegistry.setComponent(DataManager.class, service);
@@ -183,6 +184,79 @@ public class TestDataServiceImpl extends TestCase {
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
+	}
+    }
+
+    public void testConstructorDataStoreClassNotFound() throws Exception {
+	props.setProperty(
+	    DataServiceImplClassName + ".data.store.class", "AnUnknownClass");
+	try {
+	    new DataServiceImpl(props, componentRegistry);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testConstructorDataStoreClassNotDataStore() throws Exception {
+	props.setProperty(
+	    DataServiceImplClassName + ".data.store.class",
+	    Object.class.getName());
+	try {
+	    new DataServiceImpl(props, componentRegistry);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testConstructorDataStoreClassNoConstructor() throws Exception {
+	props.setProperty(
+	    DataServiceImplClassName + ".data.store.class",
+	    DataStoreNoConstructor.class.getName());
+	try {
+	    new DataServiceImpl(props, componentRegistry);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public static class DataStoreNoConstructor extends DummyDataStore { }
+
+    public void testConstructorDataStoreClassAbstract() throws Exception {
+	props.setProperty(
+	    DataServiceImplClassName + ".data.store.class",
+	    DataStoreAbstract.class.getName());
+	try {
+	    new DataServiceImpl(props, componentRegistry);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public static abstract class DataStoreAbstract extends DummyDataStore {
+	public DataStoreAbstract(Properties props) { }
+    }
+
+    public void testConstructorDataStoreClassConstructorFails()
+	throws Exception
+    {
+	props.setProperty(
+	    DataServiceImplClassName + ".data.store.class",
+	    DataStoreConstructorFails.class.getName());
+	try {
+	    new DataServiceImpl(props, componentRegistry);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public static class DataStoreConstructorFails extends DummyDataStore {
+	public DataStoreConstructorFails(Properties props) {
+	    throw new RuntimeException("Constructor fails");
 	}
     }
 
@@ -2426,5 +2500,26 @@ public class TestDataServiceImpl extends TestCase {
 		start = now;
 	    }
 	}
+    }
+
+    /** A dummy implementation of DataStore. */
+    static class DummyDataStore implements DataStore {
+	public long createObject(Transaction txn) { return 0; }
+	public void markForUpdate(Transaction txn, long oid) { }
+	public byte[] getObject(Transaction txn, long oid, boolean forUpdate) {
+	    return null;
+	}
+	public void setObject(Transaction txn, long oid, byte[] data) { }
+	public void setObjects(
+	    Transaction txn, long[] oids, byte[][] dataArray)
+	{ }
+	public void removeObject(Transaction txn, long oid) { }
+	public long getBinding(Transaction txn, String name) { return 0; }
+	public void setBinding(Transaction txn, String name, long oid) { }
+	public void removeBinding(Transaction txn, String name) { }
+	public String nextBoundName(Transaction txn, String name) {
+	    return null;
+	}
+	public boolean shutdown() { return false; }
     }
 }

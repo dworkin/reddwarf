@@ -2,7 +2,6 @@ package com.sun.sgs.impl.service.data.store;
 
 import com.sleepycat.bind.tuple.LongBinding;
 import com.sleepycat.bind.tuple.StringBinding;
-import com.sleepycat.db.CacheFileStats;
 import com.sleepycat.db.Cursor;
 import com.sleepycat.db.Database;
 import com.sleepycat.db.DatabaseConfig;
@@ -23,6 +22,7 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionConflictException;
+import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.PropertiesWrapper;
@@ -107,12 +107,6 @@ import java.util.logging.Logger;
  *	will be maintained.  Flushing changes to disk avoids data loss but
  *	introduces a significant reduction in performance. <p>
  *
- * <li> <i>Key:</i>
- *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl.logStats</code>
- *	<br>
- *	<i>Default:</i> <code>Integer.MAX_VALUE</code> <br>
- *	The number of transactions between logging database statistics. <p>
- *
  * <li> <i>Key:</i> <code>
  *	com.sun.sgs.impl.service.data.store.DataStoreImpl.logOps
  *	</code> <br>
@@ -196,12 +190,6 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 
     /**
      * The property that specifies the number of transactions between logging
-     * database statistics.
-     */
-    private static final String LOG_STATS_PROPERTY = CLASSNAME + ".logStats";
-
-    /**
-     * The property that specifies the number of transactions between logging
      * tallies of operations performed.
      */
     private static final String LOG_OPS_PROPERTY = CLASSNAME + ".logOps";
@@ -228,9 +216,6 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 
     /** The number of object IDs to allocate at one time. */
     private final int allocationBlockSize;
-
-    /** The number of transactions between logging database statistics. */
-    private final int logStats;
 
     /** The transaction timeout in milliseconds. */
     private final long txnTimeout;
@@ -272,11 +257,6 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
      */
     private long lastObjectId = -1;
 
-    /**
-     * The number of transactions since the database statistics were logged.
-     */
-    private int logStatsCount = 0;
-
     /** Object to synchronize on when accessing txnCount and allOps. */
     private final Object txnCountLock = new Object();
 
@@ -299,6 +279,8 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	 *
 	 * @param	txn the transaction
 	 * @return	the associated information, or null if none is found
+	 * @throws	TransactionNotActive if the implementation determines
+	 *		that the transaction is no longer active
 	 * @throws	IllegalStateException if the implementation determines
 	 *		that the specified transaction does not match the
 	 *		current context
@@ -310,10 +292,10 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	 *
 	 * @param	txn the transaction
 	 * @return	the previously associated information
-	 * @throws	IllegalStateException if no associated information is
-	 *		found, or if the implementation determines that the
-	 *		specified transaction does not match the current
-	 *		context
+	 * @throws	TransactionNotActive if the transaction is not active
+	 * @throws	IllegalStateException if the implementation determines
+	 *		that the specified transaction does not match the
+	 *		current context
 	 */
 	T remove(Transaction txn);
 
@@ -370,7 +352,8 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	public T remove(Transaction txn) {
 	    Entry<T> entry = threadInfo.get();
 	    if (entry == null) {
-		throw new IllegalStateException("Transaction not active");
+		throw new TransactionNotActiveException(
+		    "Transaction not active");
 	    } else if (!entry.txn.equals(txn)) {
 		throw new IllegalStateException("Wrong transaction");
 	    }
@@ -666,8 +649,6 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	    throw new IllegalArgumentException(
 		"The allocation block size must be greater than zero");
 	}
-	logStats = wrappedProps.getIntProperty(
-	    LOG_STATS_PROPERTY, Integer.MAX_VALUE);
 	txnTimeout = wrappedProps.getLongProperty(
 	    TXN_TIMEOUT_PROPERTY, DEFAULT_TXN_TIMEOUT);
 	txnInfoTable = getTxnInfoTable(TxnInfo.class);
@@ -1347,7 +1328,8 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	    }
 	    TxnInfo txnInfo = txnInfoTable.remove(txn);
 	    if (txnInfo == null) {
-		throw new IllegalStateException("Transaction is not active");
+		throw new TransactionNotActiveException(
+		    "Transaction is not active");
 	    }
 	    Ops ops = null;
 	    try {
@@ -1526,10 +1508,6 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	}
 	TxnInfo txnInfo = new TxnInfo(txn, env);
 	txnInfoTable.set(txn, txnInfo, explicit);
-	if (++logStatsCount >= logStats) {
-	    logStatsCount = 0;
-	    logStats(txnInfo);
-	}
 	return txnInfo;
     }
 
@@ -1545,7 +1523,8 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	}
 	TxnInfo txnInfo = txnInfoTable.get(txn);
 	if (txnInfo == null) {
-	    throw new IllegalStateException("Transaction is not active");
+	    throw new TransactionNotActiveException(
+		"Transaction is not active");
 	} else if (getTxnCount() < 0) {
 	    throw new IllegalStateException("DataStore is shutting down");
 	} else {
@@ -1598,7 +1577,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	} else if (e instanceof TransactionTimeoutException) {
 	    /* Include the operation in the message */
 	    re = new TransactionTimeoutException(
-		operation + " failed: " + e.getMessage());
+		operation + " failed: " + e.getMessage(), e);
 	} else if (e instanceof DatabaseException) {
 	    re = new DataStoreException(
 		operation + " failed: " + e.getMessage(), e);
@@ -1614,42 +1593,6 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	}
 	logger.logThrow(Level.FINEST, re, "{0} throws", operation);
 	return re;
-    }
-
-    /** Log statistics for the specified transaction. */
-    private void logStats(TxnInfo txnInfo) throws DatabaseException {
-	if (logger.isLoggable(Level.INFO)) {
-	    StringBuilder allCacheFileStats = new StringBuilder();
-	    boolean first = true;
-	    for (CacheFileStats stats : env.getCacheFileStats(null)) {
-		if (first) {
-		    first = false;
-		} else {
-		    allCacheFileStats.append('\n');
-		}
-		allCacheFileStats.append(stats);
-	    }
-	    logger.log(Level.INFO,
-		       "Berkeley DB statistics:\n" +
-		       "Info database: {0}\n" +
-		       "Oids database: {1}\n" +
-		       "Names database: {2}\n" +
-		       "{3}\n" +
-		       "{4}\n" +
-		       "{5}\n" +
-		       "{6}\n" +
-		       "{7}\n" +
-		       "{8}",
-		       infoDb.getStats(txnInfo.bdbTxn, null),
-		       oidsDb.getStats(txnInfo.bdbTxn, null),
-		       namesDb.getStats(txnInfo.bdbTxn, null),
-		       allCacheFileStats,
-		       env.getCacheStats(null),
-		       env.getLockStats(null),
-		       env.getLogStats(null),
-		       env.getMutexStats(null),
-		       env.getTransactionStats(null));
-	}
     }
 
     /** Returns the current transaction count. */
