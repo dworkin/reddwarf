@@ -22,9 +22,21 @@
   <property name="javac.compilerargs"
 	    value="-Xlint"/>
 
+  <!-- Version information -->
+  <mkdir dir="${build.dir}"/>
+  <echo file="${build.dir}/revision" message="$Rev$"/>
+  <loadfile property="project.revision" srcFile="${build.dir}/revision">
+    <filterchain>
+      <tokenfilter>
+	<replaceregex pattern="\$Rev:(.*)\$" replace="\1"/>
+	<trim/>
+      </tokenfilter>
+    </filterchain>
+  </loadfile>
+  <property name="project.version" value="1.0alpha-${project.revision}"/>
+
   <!-- Values for the JavaDocs -->
   <property name="project.name" value="Sun Game Server"/>
-  <property name="project.version" value="1.0alpha"/>
   <tstamp>
     <format property="project.build" pattern="MMMM-d-yyyy" locale="en"/>
   </tstamp>
@@ -359,6 +371,8 @@
   <target name="jar-server" depends="build-server"
 	  description="Builds server JAR files">
     <mkdir dir="${build.dir}/lib"/>
+    <echo file="${build.dir}/classes/server/com/sun/sgs/sgs.version"
+	  message="${project.version}"/>
     <jar destfile="${build.dir}/lib/sgs.jar"
 	 basedir="${build.dir}/classes/server">
       <manifest>

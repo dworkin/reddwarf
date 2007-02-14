@@ -1,5 +1,5 @@
 # Java logging configuration file
 
 handlers = java.util.logging.ConsoleHandler
-.level = CONFIG
-java.util.logging.ConsoleHandler.level = CONFIG
+.level = INFO
+java.util.logging.ConsoleHandler.level = INFO
