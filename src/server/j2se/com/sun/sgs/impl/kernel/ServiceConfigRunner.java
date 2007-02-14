@@ -50,6 +50,9 @@ class ServiceConfigRunner implements KernelRunnable {
     // the properties that are passed to the app on startup
     private final Properties appProperties;
 
+    // the registry that will be used to provide services to the context
+    private ComponentRegistryImpl serviceComponents = null;
+
     /**
      * Creates an instance of <code>ServiceConfigRunner</code>.
      *
@@ -82,9 +85,21 @@ class ServiceConfigRunner implements KernelRunnable {
         if (logger.isLoggable(Level.CONFIG))
             logger.log(Level.CONFIG, "{0}: starting service config", appName);
 
+        AppKernelAppContext appContext =
+            (AppKernelAppContext)(proxy.getCurrentOwner().getContext());
+
+        // if we haven't run before then setup the registry that will be
+        // used for services, otherwise we were aborted in the past so
+        // just clear the registry
+        if (serviceComponents == null) {
+            serviceComponents = new ComponentRegistryImpl();
+            appContext.setServices(serviceComponents);
+        } else {
+            serviceComponents.clearComponents();
+        }
+
         // initialize the services in the correct order, adding them to the
         // registry as we go
-        ComponentRegistryImpl serviceComponents = new ComponentRegistryImpl();
         for (Service service : services) {
             try {
                 service.configure(serviceComponents, proxy);
@@ -102,14 +117,11 @@ class ServiceConfigRunner implements KernelRunnable {
         // is to try booting the application after setting the services
         // available in our context. Boot the app is done by running a
         // special KernelRunnable in a new transaction
-        AppKernelAppContext appContext =
-            (AppKernelAppContext)(proxy.getCurrentOwner().getContext());
         AppStartupRunner startupRunner =
             new AppStartupRunner(appContext, appProperties, kernel);
         TransactionRunner transactionRunner =
             new TransactionRunner(startupRunner);
         try {
-            appContext.setServices(serviceComponents);
             appContext.getService(TaskService.class).
                 scheduleNonDurableTask(transactionRunner);
         } catch (Exception e) {

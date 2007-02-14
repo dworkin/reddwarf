@@ -186,6 +186,12 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    /**
+     * Tests that the {@code DataService} correctly infers the database
+     * subdirectory when only the root directory is provided.
+     *
+     * @throws Exception if an unexpected exception occurs
+     */
     public void testConstructorNoDirectory() throws Exception {
         String rootDir = createDirectory();
         File dataDir = new File(rootDir, "dsdb");
@@ -195,7 +201,8 @@ public class TestDataServiceImpl extends TestCase {
         Properties props = createProperties(
             StandardProperties.APP_NAME, "Foo",
             StandardProperties.APP_ROOT, rootDir);
-        new DataServiceImpl(props, componentRegistry);
+        DataServiceImpl testSvc = new DataServiceImpl(props, componentRegistry);
+        testSvc.shutdown();
         deleteDirectory(dataDir.getPath());
     }
 
