@@ -374,6 +374,7 @@ public class ClientSessionServiceImpl
             }
             
             return readOnly;
+	    
         } catch (RuntimeException e) {
             if (logger.isLoggable(Level.FINER)) {
                 logger.logThrow(Level.FINER, e, "prepare txn:{0} throws", txn);
@@ -596,11 +597,11 @@ public class ClientSessionServiceImpl
 
     /**
      * Checks the specified transaction, throwing {@code
-     * IllegalStateException} if the current context is null or if the
-     * specified transaction is not equal to the transaction in the
-     * current context.  If the specified transaction does not match
-     * the current context's transaction, then sets the current
-     * context to null.
+     * IllegalStateException} if the current context is {@code null}
+     * or if the specified transaction is not equal to the transaction
+     * in the current context.  If the specified transaction does not
+     * match the current context's transaction, then sets the current
+     * context to (@code null}.
      */
     private void checkTransaction(Transaction txn) {
         if (txn == null) {
