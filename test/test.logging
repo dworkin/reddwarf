@@ -1,7 +1,7 @@
-.level = ALL
+.level = CONFIG
 handlers = java.util.logging.ConsoleHandler
 java.util.logging.ConsoleHandler.formatter = java.util.logging.SimpleFormatter
-java.util.logging.ConsoleHandler.level = CONFIG
+java.util.logging.ConsoleHandler.level = ALL
 
 # Quiet logging from java internals
 sun.awt.level = WARNING
