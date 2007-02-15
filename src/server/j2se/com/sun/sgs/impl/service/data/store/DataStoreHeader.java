@@ -26,7 +26,7 @@ import java.math.BigInteger;
  * objects.
  *
  * Key 4 stores the ID of the next free transaction ID number for the network
- * version to use in allocating transactions
+ * version to use in allocating transactions.
  *
  * Version history:
  *
