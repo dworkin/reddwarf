@@ -7,6 +7,7 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectIOException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
@@ -55,6 +56,12 @@ public class TestDataServiceImpl extends TestCase {
     static {
 	cleanDirectory(dbDirectory);
     }
+
+    /** Properties for creating the shared database. */
+    private static Properties dbProps = createProperties(
+	DataStoreImplClassName + ".directory", dbDirectory,
+	StandardProperties.APP_NAME, "TestDataServiceImpl",
+	DataServiceImplClassName + ".debugCheckInterval", "0");
 
     /** Set when the test passes. */
     protected boolean passed;
@@ -167,7 +174,7 @@ public class TestDataServiceImpl extends TestCase {
     public void testConstructorBadDebugCheckInterval() throws Exception {
 	Properties props = createProperties(
 	    DataStoreImplClassName + ".directory", createDirectory(),
-	    "com.sun.sgs.appName", "Foo",
+	    StandardProperties.APP_NAME, "Foo",
 	    DataServiceImplClassName + ".debugCheckInterval", "gorp");
 	try {
 	    new DataServiceImpl(props, componentRegistry);
@@ -177,8 +184,28 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    /**
+     * Tests that the {@code DataService} correctly infers the database
+     * subdirectory when only the root directory is provided.
+     *
+     * @throws Exception if an unexpected exception occurs
+     */
     public void testConstructorNoDirectory() throws Exception {
-	Properties props = createProperties("com.sun.sgs.appName", "Foo");
+        String rootDir = createDirectory();
+        File dataDir = new File(rootDir, "dsdb");
+        if (!dataDir.mkdir()) {
+            throw new RuntimeException("Failed to create sub-dir: " + dataDir);
+        }
+        Properties props = createProperties(
+            StandardProperties.APP_NAME, "Foo",
+            StandardProperties.APP_ROOT, rootDir);
+        DataServiceImpl testSvc = new DataServiceImpl(props, componentRegistry);
+        testSvc.shutdown();
+        deleteDirectory(dataDir.getPath());
+    }
+
+    public void testConstructorNoDirectoryNorRoot() throws Exception {
+	Properties props = createProperties(StandardProperties.APP_NAME, "Foo");
 	try {
 	    new DataServiceImpl(props, componentRegistry);
 	    fail("Expected IllegalArgumentException");
@@ -271,7 +298,7 @@ public class TestDataServiceImpl extends TestCase {
     public void testConfigureNullArgs() throws Exception {
 	Properties props = createProperties(
 	    DataStoreImplClassName + ".directory", createDirectory(),
-	    "com.sun.sgs.appName", "Foo");
+	    StandardProperties.APP_NAME, "Foo");
 	service = new DataServiceImpl(props, componentRegistry);
 	try {
 	    service.configure(null, txnProxy);
@@ -792,7 +819,66 @@ public class TestDataServiceImpl extends TestCase {
 	    txn.commit();
 	    fail("Expected ObjectIOException");
 	} catch (ObjectIOException e) {
-	    System.err.println(e);
+	    e.printStackTrace();
+	} finally {
+	    txn = null;
+	}
+	createTransaction();
+	dummy.setValue(
+	    new Object[] {
+		null, new Integer(3),
+		new DummyManagedObject[] {
+		    null, new DummyManagedObject()
+		}
+	    });
+	setBinding(app, service, "dummy", dummy);
+	try {
+	    txn.commit();
+	    fail("Expected ObjectIOException");
+	} catch (ObjectIOException e) {
+	    e.printStackTrace();
+	} finally {
+	    txn = null;
+	}
+    }
+
+    public void testSetBindingManagedObjectNotSerializableCommit()
+	throws Exception
+    {
+	testSetBindingManagedObjectNotSerializableCommit(true);
+    }
+    public void testSetServiceBindingManagedObjectNotSerializableCommit()
+	throws Exception
+    {
+	testSetBindingManagedObjectNotSerializableCommit(false);
+    }
+    private void testSetBindingManagedObjectNotSerializableCommit(boolean app)
+	throws Exception
+    {
+	dummy.setValue(Thread.currentThread());
+	setBinding(app, service, "dummy", dummy);
+	try {
+	    txn.commit();
+	    fail("Expected ObjectIOException");
+	} catch (ObjectIOException e) {
+	    e.printStackTrace();
+	} finally {
+	    txn = null;
+	}
+	createTransaction();
+	dummy.setValue(
+	    new Object[] {
+		null, new Integer(3),
+		new Thread[] {
+		    null, Thread.currentThread()
+		}
+	    });
+	setBinding(app, service, "dummy", dummy);
+	try {
+	    txn.commit();
+	    fail("Expected ObjectIOException");
+	} catch (ObjectIOException e) {
+	    e.printStackTrace();
 	} finally {
 	    txn = null;
 	}

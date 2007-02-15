@@ -16,6 +16,7 @@ import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
@@ -69,14 +70,14 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     /** Properties for the session service. */
     private static Properties serviceProps = createProperties(
-	"com.sun.sgs.appName", "TestClientSessionServiceImpl",
-	"com.sun.sgs.app.port", Integer.toString(PORT));
+	StandardProperties.APP_NAME, "TestClientSessionServiceImpl",
+	StandardProperties.APP_PORT, Integer.toString(PORT));
 
     /** Properties for creating the shared database. */
     private static Properties dbProps = createProperties(
 	DataStoreImplClassName + ".directory",
 	dbDirectory,
-	"com.sun.sgs.appName", "TestClientSessionServiceImpl",
+	StandardProperties.APP_NAME, "TestClientSessionServiceImpl",
 	DataServiceImplClassName + ".debugCheckInterval", "1");
 
     private static final String LOGIN_FAILED_MESSAGE = "login failed";
@@ -242,7 +243,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     public void testConstructorNoPort() throws Exception {
 	try {
 	    Properties props =
-		createProperties("com.sun.sgs.appName",
+		createProperties(StandardProperties.APP_NAME,
 				 "TestClientSessionServiceImpl");
 	    new ClientSessionServiceImpl(
 		props, new DummyComponentRegistry());
@@ -628,13 +629,13 @@ public class TestClientSessionServiceImpl extends TestCase {
 	createTransaction();
 	DummyAppListener appListener = new DummyAppListener();
 	dataService.setServiceBinding(
-	    "com.sun.sgs.app.AppListener", appListener);
+	    StandardProperties.APP_LISTENER, appListener);
 	txn.commit();
     }
     
     private DummyAppListener getAppListener() {
 	return (DummyAppListener) dataService.getServiceBinding(
-	    "com.sun.sgs.app.AppListener", AppListener.class);
+	    StandardProperties.APP_LISTENER, AppListener.class);
     }
     
 

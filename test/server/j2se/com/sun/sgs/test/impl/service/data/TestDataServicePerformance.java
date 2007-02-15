@@ -4,6 +4,7 @@ import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.DataService;
@@ -104,7 +105,7 @@ public class TestDataServicePerformance extends TestCase {
 			   "\n  test.modify.items=" + modifyItems);
 	props = createProperties(
 	    DataStoreImplClass + ".directory", createDirectory(),
-	    "com.sun.sgs.appName", "TestDataServicePerformance");
+	    StandardProperties.APP_NAME, "TestDataServicePerformance");
     }
 
     /** Sets passed if the test passes. */

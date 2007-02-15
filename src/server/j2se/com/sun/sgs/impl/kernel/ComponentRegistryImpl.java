@@ -80,4 +80,11 @@ class ComponentRegistryImpl implements ComponentRegistry {
         componentSet.add(component);
     }
 
+    /**
+     * Clears all components from the registry.
+     */
+    void clearComponents() {
+        componentSet.clear();
+    }
+
 }

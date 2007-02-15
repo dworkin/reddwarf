@@ -77,6 +77,10 @@ class TimedTaskHandler {
         return true;
     }
 
+    public void shutdown() {
+        timer.cancel();
+    }
+
     /**
      * Private inner class implementation of <code>TimerTask</code>. This is
      * used to schedule all delayed tasks.

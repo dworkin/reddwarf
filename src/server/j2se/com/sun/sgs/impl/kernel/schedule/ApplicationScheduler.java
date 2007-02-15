@@ -121,4 +121,9 @@ interface ApplicationScheduler {
      */
     public void notifyCancelled(ScheduledTask task);
 
+    /**
+     * Testing method.
+     */
+    public void shutdown();
+
 }

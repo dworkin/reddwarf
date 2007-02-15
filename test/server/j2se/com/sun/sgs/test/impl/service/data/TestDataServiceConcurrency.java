@@ -5,6 +5,7 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionAbortedException;
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
@@ -85,7 +86,7 @@ public class TestDataServiceConcurrency extends TestCase {
 	    "\n  test.threads=" + threads);
 	props = createProperties(
 	    DataStoreImplClass + ".directory", createDirectory(),
-	    "com.sun.sgs.appName", "TestDataServiceConcurrency");
+	    StandardProperties.APP_NAME, "TestDataServiceConcurrency");
     }
 
     /** Sets passed if the test passes. */

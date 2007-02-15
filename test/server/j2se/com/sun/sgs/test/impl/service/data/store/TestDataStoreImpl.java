@@ -5,6 +5,7 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.DataStoreException;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
@@ -110,8 +111,28 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    /**
+     * Tests that the {@code DataStore} correctly infers the database
+     * subdirectory when only the root directory is provided.
+     *
+     * @throws Exception if an unexpected exception occurs
+     */
     public void testConstructorNoDirectory() throws Exception {
-	props.remove(DataStoreImplClassName + ".directory");
+        String rootDir = createDirectory();
+        File dataDir = new File(rootDir, "dsdb");
+        if (!dataDir.mkdir()) {
+            throw new RuntimeException("Failed to create sub-dir: " + dataDir);
+        }
+        Properties props = createProperties(
+            StandardProperties.APP_NAME, "Foo",
+            StandardProperties.APP_ROOT, rootDir);
+        DataStoreImpl testStore = createDataStore(props);
+        testStore.shutdown();
+        deleteDirectory(dataDir.getPath());
+    }
+
+    public void testConstructorNoDirectoryNorRoot() {
+	Properties props = new Properties();
 	try {
 	    createDataStore(props);
 	    fail("Expected IllegalArgumentException");

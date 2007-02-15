@@ -113,6 +113,9 @@ class DeficitSystemScheduler implements SystemScheduler {
         // see if we can get a task, in which case we're done
         ScheduledTask task = currentRoundQueue.poll();
         while (task == null) {
+            if (Thread.interrupted())
+                throw new InterruptedException("Interrupt while spinning");
+
             // no tasks are available, so see if anyone is already trying
             // to re-fill the queue
             if (isBeingFilled.compareAndSet(false, true)) {
@@ -185,6 +188,11 @@ class DeficitSystemScheduler implements SystemScheduler {
         if (scheduler == null)
             throw new TaskRejectedException("Unknown context");
         return scheduler.addRecurringTask(task);
+    }
+
+    public void shutdown() {
+        for (ApplicationScheduler scheduler: appSchedulers.values())
+            scheduler.shutdown();
     }
 
 }

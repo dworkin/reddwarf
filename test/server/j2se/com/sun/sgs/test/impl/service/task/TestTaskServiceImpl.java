@@ -14,6 +14,7 @@ import com.sun.sgs.app.TransactionNotActiveException;
 
 import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
+import com.sun.sgs.impl.kernel.StandardProperties;
 
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 
@@ -787,7 +788,8 @@ public class TestTaskServiceImpl extends TestCase {
         Properties properties = new Properties();
         properties.setProperty("com.sun.sgs.impl.service.data.store." +
                                "DataStoreImpl.directory", directory);
-        properties.setProperty("com.sun.sgs.appName", "TestTaskServiceImpl");
+        properties.setProperty(StandardProperties.APP_NAME,
+                               "TestTaskServiceImpl");
         return new DataServiceImpl(properties, systemRegistry);
     }
 
