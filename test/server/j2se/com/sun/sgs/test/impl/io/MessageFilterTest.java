@@ -1,9 +1,12 @@
 package com.sun.sgs.test.impl.io;
 
+import static org.junit.Assert.fail;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
-import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.After;
 import org.junit.Assert;
@@ -30,7 +33,9 @@ public class MessageFilterTest {
     private final static int SERVER_PORT = 5000;
     private final SocketAddress SERVER_ADDRESS = 
         new InetSocketAddress("", SERVER_PORT);
-    
+
+    private final Semaphore sema = new Semaphore(0, true);
+
     Acceptor<SocketAddress> acceptor;
     Connection connection = null;
     
@@ -42,8 +47,8 @@ public class MessageFilterTest {
     public void init() {
         connection = null;
         acceptor = new ServerSocketEndpoint(
-                new InetSocketAddress(SERVER_PORT),
-               TransportType.RELIABLE).createAcceptor();
+            new InetSocketAddress(SERVER_PORT), TransportType.RELIABLE).
+                createAcceptor();
         
         try {
             acceptor.listen(new AcceptorListener() {
@@ -103,14 +108,15 @@ public class MessageFilterTest {
     @Test
     public void bigMessage() throws IOException {
         Connector<SocketAddress> connector = 
-                    new SocketEndpoint(SERVER_ADDRESS, TransportType.RELIABLE, 
-                            Executors.newCachedThreadPool()).createConnector();
+                new SocketEndpoint(SERVER_ADDRESS, TransportType.RELIABLE).
+                    createConnector();
         
         
         ConnectionListener listener = new ConnectionAdapter() {
             
             int messageSize = 100000;
-            
+
+            @Override
             public void connected(Connection conn) {
                 MessageFilterTest.this.connection = conn;
                 byte[] bigMessage = new byte[messageSize];
@@ -124,28 +130,31 @@ public class MessageFilterTest {
                     ioe.printStackTrace();
                 }
             }
-            
+
+            @Override
             public void bytesReceived(Connection conn, byte[] buffer) {
                 Assert.assertEquals(messageSize, buffer.length);
-                notifyAll();
                 try {
                     conn.close();
                 }
                 catch (IOException ioe) {}
+
+                sema.release();
             }
 
+            @Override
             public void disconnected(Connection conn) {
                 MessageFilterTest.this.connection = null;
             }
         };
-        
+
         connector.connect(listener);
-        
-        synchronized(this) {
-            try {
-                wait(DELAY);
-            }
-            catch (InterruptedException ie) {}
+
+        try {
+            sema.tryAcquire(DELAY, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+            fail("Interrupted!" + e.getMessage());
         }
 
     } 
@@ -163,12 +172,12 @@ public class MessageFilterTest {
         bytesIn = 0;
         final int messageSize = 1000;
         Connector<SocketAddress> connector = 
-                    new SocketEndpoint(SERVER_ADDRESS, TransportType.RELIABLE, 
-                            Executors.newCachedThreadPool()).createConnector();
-        
-        
+                    new SocketEndpoint(SERVER_ADDRESS, TransportType.RELIABLE).
+                        createConnector();
+
         ConnectionListener listener = new ConnectionAdapter() {
-            
+
+            @Override
             public void connected(Connection conn) {
                 MessageFilterTest.this.connection = conn;
                 byte[] message = new byte[messageSize];
@@ -179,26 +188,33 @@ public class MessageFilterTest {
                     ioe.printStackTrace();
                 }
             }
-            
+
+            @Override
             public void bytesReceived(Connection conn, byte[] buffer) {
                 bytesIn += buffer.length;
                 System.err.println("Got " + buffer.length +
                         " bytes, total = " + bytesIn);
+
+                if (bytesIn >= messageSize) {
+                    sema.release();
+                }
             }
 
+            @Override
             public void disconnected(Connection conn) {
                 MessageFilterTest.this.connection = null;
             }
         };
-        
+
         connector.connect(listener);
-        
-        synchronized(this) {
-            try {
-                wait(DELAY);
-            }
-            catch (InterruptedException ie) {}
+
+        try {
+            sema.tryAcquire(DELAY, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+            fail("Interrupted!" + e.getMessage());
         }
+
         Assert.assertEquals(messageSize, bytesIn);
 
     } 

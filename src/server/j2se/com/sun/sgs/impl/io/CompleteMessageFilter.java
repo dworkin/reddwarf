@@ -1,5 +1,11 @@
 package com.sun.sgs.impl.io;
 
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import org.apache.mina.common.ByteBuffer;
+
+import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
 
@@ -27,23 +33,28 @@ import com.sun.sgs.io.ConnectionListener;
  */
 class CompleteMessageFilter {
 
-    /** The offset of the array that is currently being processed. */
-    private int index;
+    /** The logger for this class. */
+    private static final LoggerWrapper logger =
+        new LoggerWrapper(Logger.getLogger(
+            CompleteMessageFilter.class.getName()));
 
-    /**
-     * A partial message still waiting for its remaining data.
-     * The length of the array is the final expected length of the message.
-     */
-    private byte[] partialMessage;
+    /** The default recv processing buffer size. */
+    private static final int DEFAULT_BUFFER_SIZE = 8 * 1024;
 
-    /** The current length of the partial message. */
-    private int partialLength;
+    /** The largest we expect the recv processing buffer size to get. */
+    private static final int MAX_BUFFER_SIZE = 512 * 1024;
+
+    /** The largest message we reasonably expect to recv. */
+    private static final int MAX_MSG_SIZE = 128 * 1024;
+
+    /** The data being processed, or a partial message awaiting more data. */
+    private final ByteBuffer msgBuf;
 
     /**
      * Default constructor.
      */
     CompleteMessageFilter() {
-        // empty
+        msgBuf = ByteBuffer.allocate(DEFAULT_BUFFER_SIZE, false);
     }
 
     /**
@@ -59,7 +70,7 @@ class CompleteMessageFilter {
      * be in one of a number of states each time it is called:
      * <ul>
      * <li>It can be called with a new, incoming packet. In this case, the
-     * length of the message is read as the first int, and that many byte
+     * length of the message is read as the first int, and that many bytes
      * are read from the array and dispatched to the listener. This
      * continues until all the bytes are read from the array. If the array
      * ends in the middle of a message, the remaining bytes are held in a
@@ -71,58 +82,61 @@ class CompleteMessageFilter {
      * </ul>
      * 
      * @param conn the {@link Connection} which received the data
-     * @param message the data to filter and optionally deliver to the
+     * @param buf the data to filter and optionally deliver to the
      *        {@code ConnectionListener} for the given connection
      */
-    void filterReceive(Connection conn, byte[] message) {
-        index = 0;
+    void filterReceive(Connection conn, ByteBuffer buf) {
 
-        ConnectionListener listener = ((SocketConnection) conn).getConnectionListener();
+        logger.log(Level.FINEST,
+            "processing {0,number,#} bytes",
+            buf.remaining());
 
-        // first check to see if we have an incomplete message from the
-        // last time.
-        if (partialMessage != null) {
-            int capacity = partialMessage.length - partialLength;
-            int remaining = Math.min(message.length, capacity);
+        // Append the new data to the buffer
+        msgBuf.expand(buf.remaining());
+        msgBuf.put(buf);
+        msgBuf.flip();
 
-            System.arraycopy(
-                    message, 0, partialMessage, partialLength, remaining);
-            index += remaining;
-            partialLength += remaining;
+        processReceiveBuffer(conn);
+    }
 
-            // the partial message is complete, send it off to the listener
-            // and reset the sizing information.
-            if (partialLength == partialMessage.length) {
-                listener.bytesReceived(conn, partialMessage);
-                partialMessage = null;
-                partialLength = 0;
+    private void processReceiveBuffer(Connection conn) {
+        ConnectionListener listener =
+            ((SocketConnection) conn).getConnectionListener();
+
+        if (msgBuf.remaining() > MAX_BUFFER_SIZE) {
+            logger.log(Level.WARNING,
+                "Recv filter buffer is larger than expected: {0}",
+                msgBuf.remaining());
+        }
+
+        // Process complete messages, if any
+        while (msgBuf.hasRemaining()) {
+            if (! msgBuf.prefixedDataAvailable(4, MAX_MSG_SIZE))
+                break;
+
+            int msgLen = msgBuf.getInt();
+
+            if (msgLen > MAX_MSG_SIZE) {
+                logger.log(Level.WARNING,
+                    "Recv message is larger than expected: {0}",
+                    msgLen);
             }
+
+            byte[] completeMessage = new byte[msgLen];
+            msgBuf.get(completeMessage);
+
+            logger.log(Level.FINER,
+                "dispatching complete message of size {0,number,#}",
+                msgLen);
+
+            listener.bytesReceived(conn, completeMessage);
         }
 
-        // now the next piece of array data is the size of the next message
-        int totalLength = readInt(message);
+        msgBuf.compact();
 
-        // continue to notify the ConnectionListener of complete messages
-        // as they appear in the array. This can be called 0 to n times.
-        while (totalLength > 0 && totalLength <= (message.length - index)) {
-            byte[] nextMessage = new byte[totalLength];
-            System.arraycopy(
-                    message, index, nextMessage, 0, nextMessage.length);
-            listener.bytesReceived(conn, nextMessage);
-
-            index += totalLength;
-            totalLength = readInt(message);
-        }
-
-        // At this point, totalLength is set to the size of the next message
-        // but there was some left over data in the array that will become
-        // the partial message buffer of the next call to filterReceive.
-        if ((message.length - index) > 0) {
-            partialMessage = new byte[totalLength];
-            partialLength = message.length - index;
-            System.arraycopy(
-                    message, index, partialMessage, 0, partialLength);
-        }
+        logger.log(Level.FINEST,
+            "partial message {0,number,#} bytes",
+            msgBuf.position());
     }
 
     /**
@@ -130,40 +144,19 @@ class CompleteMessageFilter {
      * {@code Connection}. The filter may modify the data in any way, and may
      * send it on the underlying connection whole, in pieces, or not at all.
      * <p>
-     * This filter sends the message without modification on
-     * the {@code Connection}.
+     * This implementation prepends the length of the given byte array as
+     * a 4-byte {@code int} in network byte-order, and sends it out on
+     * the underlying MINA {@code IoSession}.
      *
      * @param conn the {@link Connection} on which to send the data
      * @param message the data to filter and optionally send on the
      *        connection represented by the given connection
      */
     void filterSend(Connection conn, byte[] message) {
-        ((SocketConnection) conn).doSend(message);
-    }
-
-    /**
-     * Reads the next four bytes of the given array starting at the current
-     * index and assembles them into a network byte-ordered int. It will
-     * increment the index by four if the read was successful. It will
-     * return zero if not enough bytes remain in the array.
-     *
-     * @param array the array from which to read bytes
-     *
-     * @return the next four bytes as an int, or zero if there aren't enough
-     *         bytes remaining in the array
-     */
-    private int readInt(byte[] array) {
-        if (array.length < (index + 4)) {
-            return 0;
-        }
-        int num =
-              ((array[index]     & 0xFF) << 24) |
-              ((array[index + 1] & 0xFF) << 16) |
-              ((array[index + 2] & 0xFF) <<  8) |
-               (array[index + 3] & 0xFF);
-        
-        index += 4;
-        
-        return num;
+        ByteBuffer buffer = ByteBuffer.allocate(message.length + 4);
+        buffer.putInt(message.length);
+        buffer.put(message);
+        buffer.flip();
+        ((SocketConnection) conn).doSend(buffer);
     }
 }

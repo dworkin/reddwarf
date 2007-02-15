@@ -1,5 +1,6 @@
 package com.sun.sgs.impl.io;
 
+import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -65,7 +66,9 @@ class SocketConnectionListener extends IoHandlerAdapter {
         throws Exception
     {
         SocketConnection conn = (SocketConnection) session.getAttachment();
-        logger.logThrow(Level.FINEST, exception, "exception on {0}", conn);
+        Level level =
+            (exception instanceof IOException) ? Level.FINEST : Level.FINER;
+        logger.logThrow(level, exception, "exception on {0}", conn);
         if (conn == null) {
             return;
         }
@@ -90,12 +93,14 @@ class SocketConnectionListener extends IoHandlerAdapter {
         if (logger.isLoggable(Level.FINEST)) {
             logger.log(Level.FINEST, "recv on {0}: {1}", conn, message);
         }
-
-        ByteBuffer minaBuffer = (ByteBuffer) message;
-
-        byte[] array = new byte[minaBuffer.remaining()];
-        minaBuffer.get(array);
-
-        conn.getFilter().filterReceive(conn, array);
+        
+        ByteBuffer buf = (ByteBuffer) message;
+        try {
+            conn.getFilter().filterReceive(conn, buf);
+        } catch (RuntimeException e) {
+            logger.logThrow(Level.FINER, e,
+                "exception in recv of {0}:", buf);
+            throw e;
+        }
     }
 }
