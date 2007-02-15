@@ -13,6 +13,7 @@ import com.sun.sgs.impl.kernel.schedule.MasterTaskScheduler;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 
 import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.util.Version;
 
 import com.sun.sgs.kernel.ComponentRegistry;
 
@@ -136,7 +137,8 @@ class Kernel {
             throw e;
         }
 
-        logger.log(Level.CONFIG, "The Kernel is ready");
+        logger.log(Level.INFO, "The Kernel is ready, version: {0}",
+		   Version.getVersion());
     }
 
     /**
@@ -400,8 +402,7 @@ class Kernel {
      */
     void applicationReady(AppKernelAppContext context) {
         applications.add(context);
-        if (logger.isLoggable(Level.CONFIG))
-                logger.log(Level.CONFIG, "{0}: application is ready", context);
+        logger.log(Level.INFO, "{0}: application is ready", context);
     }
 
     /**
