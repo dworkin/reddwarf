@@ -363,14 +363,18 @@ public class ClientSessionServiceImpl
     /** {@inheritDoc} */
     public boolean prepare(Transaction txn) throws Exception {
         try {
+	    checkTransaction(txn);
             boolean readOnly = currentContext.get().prepare();
-            handleTransaction(txn, readOnly);
+	    if (readOnly) {
+		currentContext.set(null);
+	    }
             if (logger.isLoggable(Level.FINE)) {
                 logger.log(Level.FINER, "prepare txn:{0} returns {1}",
                            txn, readOnly);
             }
             
             return readOnly;
+	    
         } catch (RuntimeException e) {
             if (logger.isLoggable(Level.FINER)) {
                 logger.logThrow(Level.FINER, e, "prepare txn:{0} throws", txn);
@@ -382,7 +386,9 @@ public class ClientSessionServiceImpl
     /** {@inheritDoc} */
     public void commit(Transaction txn) {
         try {
-            handleTransaction(txn, true);
+	    checkTransaction(txn);
+	    currentContext.get().commit();
+	    currentContext.set(null);
             if (logger.isLoggable(Level.FINER)) {
                 logger.log(Level.FINER, "commit txn:{0} returns", txn);
             }
@@ -404,7 +410,8 @@ public class ClientSessionServiceImpl
     /** {@inheritDoc} */
     public void abort(Transaction txn) {
         try {
-            handleTransaction(txn, true);
+	    checkTransaction(txn);
+	    currentContext.set(null);
             if (logger.isLoggable(Level.FINER)) {
                 logger.log(Level.FINER, "abort txn:{0} returns", txn);
             }
@@ -418,7 +425,7 @@ public class ClientSessionServiceImpl
 
     /* -- Context class to hold transaction state -- */
     
-    static final class Context implements KernelRunnable {
+    static final class Context {
         /** The transaction. */
         private final Transaction txn;
 
@@ -431,14 +438,14 @@ public class ClientSessionServiceImpl
         private boolean prepared = false;
 
 	/**
-	 * Constructs a context with the specified transaction.
+	 * Constructs a context with the specified transaction.  The
+	 * {@code initialize} method must be invoked on this context
+	 * before invoking any other methods.
 	 */
         private Context(Transaction txn) {
             this.txn = txn;
-	    txnProxy.getService(TaskService.class).
-		scheduleNonDurableTask(this);
-        }
-
+	}
+	
 	/**
 	 * Adds a message to be sent to the specified session after
 	 * this transaction commits.
@@ -530,21 +537,27 @@ public class ClientSessionServiceImpl
 		throw new TransactionNotActiveException("Already prepared");
 	    }
 	}
-	
+
         private boolean prepare() {
 	    checkPrepared();
 	    prepared = true;
-            return true;
+            return sessionsInfo.values().isEmpty();
         }
-        
-        /** {@inheritDoc} */
-        public void run() throws Exception {
+
+	/**
+	 * Sends all protocol messages enqueued during this context's
+	 * transaction (via the {@code addMessage} and {@code
+	 * addMessageFirst} methods), and disconnects any session
+	 * whose disconnection was requested via the {@code
+	 * requestDisconnect} method.
+	 */
+	private void commit() {
             if (!prepared) {
-                RuntimeException e =
+                RuntimeException e = 
                     new IllegalStateException("transaction not prepared");
-		if (logger.isLoggable(Level.FINE)) {
+		if (logger.isLoggable(Level.WARNING)) {
 		    logger.logThrow(
-			Level.FINE, e, "Context.run: not yet prepared txn:{0}",
+			Level.FINE, e, "Context.commit: not yet prepared txn:{0}",
 			txn);
 		}
                 throw e;
@@ -558,6 +571,7 @@ public class ClientSessionServiceImpl
 	private static class SessionInfo {
 
 	    private final ClientSessionImpl session;
+	    
 	    /** List of protocol messages to send on commit. */
 	    List<byte[]> messages = new ArrayList<byte[]>();
 
@@ -582,14 +596,14 @@ public class ClientSessionServiceImpl
     /* -- Other methods -- */
 
     /**
-     * Checks the specified transaction, throwing IllegalStateException
-     * if the current context is null or if the specified transaction is
-     * not equal to the transaction in the current context. If
-     * 'nullifyContext' is 'true' or if the specified transaction does
-     * not match the current context's transaction, then sets the
-     * current context to null.
+     * Checks the specified transaction, throwing {@code
+     * IllegalStateException} if the current context is {@code null}
+     * or if the specified transaction is not equal to the transaction
+     * in the current context.  If the specified transaction does not
+     * match the current context's transaction, then sets the current
+     * context to (@code null}.
      */
-    private void handleTransaction(Transaction txn, boolean nullifyContext) {
+    private void checkTransaction(Transaction txn) {
         if (txn == null) {
             throw new NullPointerException("null transaction");
         }
@@ -601,9 +615,6 @@ public class ClientSessionServiceImpl
             currentContext.set(null);
             throw new IllegalStateException(
                 "Wrong transaction: Expected " + context.txn + ", found " + txn);
-        }
-        if (nullifyContext) {
-            currentContext.set(null);
         }
     }
     
@@ -699,7 +710,10 @@ public class ClientSessionServiceImpl
     void scheduleNonTransactionalTaskOnCommit(KernelRunnable task) {
 	nonDurableTaskScheduler.scheduleNonTransactionalTaskOnCommit(task);
     }
-    
+
+    /**
+     * Returns {@code true} if this service is shutting down.
+     */
     private synchronized boolean shuttingDown() {
 	return shuttingDown;
     }
