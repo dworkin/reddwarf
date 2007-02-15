@@ -65,6 +65,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 import junit.framework.TestCase;
 
 public class TestChannelServiceImpl extends TestCase {
@@ -92,12 +93,15 @@ public class TestChannelServiceImpl extends TestCase {
 
     /** Properties for creating the shared database. */
     private static Properties dbProps = createProperties(
-	DataStoreImplClassName + ".directory",
-        DB_DIRECTORY,
+	DataStoreImplClassName + ".directory", DB_DIRECTORY,
 	StandardProperties.APP_NAME, "TestChannelServiceImpl",
 	DataServiceImplClassName + ".debugCheckInterval", "1");
     
-    private static final int WAIT_TIME = 3000;
+    private static final int SESSION_ID_SIZE = 8;
+
+    private static final String CHANNEL_NAME = "three stooges";
+    
+    private static final int WAIT_TIME = 2000;
     
     private static final String LOGIN_FAILED_MESSAGE = "login failed";
     
@@ -1017,12 +1021,11 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     public void testChannelJoinReceivedByClient() throws Exception {
-	String name = "three stooges";
-	createChannel(name);
 	txn.commit();
-	registerAppListener();
-	String[] users = new String[]{"moe", "larry", "curly"};
-	ClientGroup group = new ClientGroup(users);
+	String name = CHANNEL_NAME;
+	ClientGroup group =
+	    createChannelAndClientGroup(name,
+					"moe", "larry", "curly");
 	try {
 	    group.join(name);
 	    group.disconnect(true);
@@ -1036,13 +1039,23 @@ public class TestChannelServiceImpl extends TestCase {
 	}
     }
 
-    public void testChannelLeaveReceivedByClient() throws Exception {
-	String name = "three stooges";
+    private ClientGroup createChannelAndClientGroup(
+	String name, String... users)
+	throws Exception
+    {
+	createTransaction();
 	createChannel(name);
 	txn.commit();
 	registerAppListener();
-	String[] users = new String[]{"moe", "larry", "curly"};
-	ClientGroup group = new ClientGroup(users);
+	return new ClientGroup(users);
+    }
+
+    public void testChannelLeaveReceivedByClient() throws Exception {
+	txn.commit();
+	String name = CHANNEL_NAME;
+	ClientGroup group =
+	    createChannelAndClientGroup(name,
+					"moe", "larry", "curly");
 	try {
 	    group.join(name);
 	    group.leave(name);
@@ -1058,12 +1071,11 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     public void testSessionRemovedFromChannelOnLogout() throws Exception {
-	String name = "three stooges";
-	createChannel(name);
 	txn.commit();
-	registerAppListener();
-	String[] users = new String[]{"moe", "larry", "curly"};
-	ClientGroup group = new ClientGroup(users);
+	String name = CHANNEL_NAME;
+	ClientGroup group =
+	    createChannelAndClientGroup(name,
+					"moe", "larry", "curly");
 	try {
 	    group.join(name);
 	    group.checkMembership(name, true);
@@ -1081,12 +1093,11 @@ public class TestChannelServiceImpl extends TestCase {
     }
     
     public void testChannelSetsRemovedOnLogout() throws Exception {
-	String name = "three stooges";
-	createChannel(name);
 	txn.commit();
-	registerAppListener();
-	String[] users = new String[]{"moe", "larry", "curly"};
-	ClientGroup group = new ClientGroup(users);
+	String name = CHANNEL_NAME;
+	ClientGroup group =
+	    createChannelAndClientGroup(name,
+					"moe", "larry", "curly");
 	try {
 	    group.join(name);
 	    group.checkMembership(name, true);
@@ -1106,12 +1117,11 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     public void testSessionsRemovedOnCrash() throws Exception {
-	String name = "three stooges";
-	createChannel(name);
 	txn.commit();
-	registerAppListener();
-	String[] users = new String[]{"moe", "larry", "curly"};
-	ClientGroup group = new ClientGroup(users);
+	String name = CHANNEL_NAME;
+	ClientGroup group =
+	    createChannelAndClientGroup(name,
+					"moe", "larry", "curly");
 	try {
 	    group.join(name);
 	    group.checkMembership(name, true);
@@ -1136,32 +1146,90 @@ public class TestChannelServiceImpl extends TestCase {
 	
     }
     
+    public void testSendFromSessionToChannel() throws Exception {
+	txn.commit();
+	String name = CHANNEL_NAME;
+	ClientGroup group =
+	    createChannelAndClientGroup(name, "moe", "larry");
+	try {
+	    group.join(name);
+	    DummyClient moe = group.getClient("moe");
+	    DummyClient larry = group.getClient("larry");
+	    int numMessages = 3;
+	    Set<byte[]> recipientIds = new HashSet<byte[]>();
+	    recipientIds.add(larry.getSessionId());
+	    for (int i = 0; i < numMessages; i++) {
+		MessageBuffer buf =
+		    new MessageBuffer(MessageBuffer.getSize("moe") + 4);
+		buf.putString("moe").
+		    putInt(i);
+		moe.sendChannelMessage(name, recipientIds, buf.getBuffer());
+	    }
+
+	    for (int nextNum = 0; nextNum < numMessages; nextNum++) {
+		MessageInfo info = larry.nextChannelMessage();
+		if (info == null) {
+		    fail("got "  + nextNum +
+			 "channel messages, expected " + numMessages);
+		}
+		MessageBuffer buf = new MessageBuffer(info.message);
+		String senderName = buf.getString();
+		int num = buf.getInt();
+		if (!senderName.equals("moe")) {
+		    fail("got sender name " + senderName + ", expected " +
+			 "moe");
+		}
+		if (num != nextNum) {
+		    fail("got number " + num + ", expected " + nextNum);
+		}
+		System.err.println("receiver got message from " + senderName +
+				   " with sequence number " + num);
+	    }
+
+	    if (moe.nextChannelMessage() != null) {
+		fail("sender received channel message");
+	    }
+
+	    
+	} catch (RuntimeException e) {
+	    System.err.println("unexpected failure");
+	    e.printStackTrace();
+	    fail("unexpected failure: " + e);
+	} finally {
+	    group.disconnect(false);
+	}
+    }
+    
     public void testChannelSetsRemovedOnCrash() throws Exception {
+		/*
+	fail("this test needs to be implemented");
+		*/
     }
 
     private class ClientGroup {
 
 	final String[] users;
-	final List<DummyClient> clients = new ArrayList<DummyClient>();
+	final Map<String, DummyClient> clients =
+	    new HashMap<String, DummyClient>();
 
 	ClientGroup(String[] users) {
 	    this.users = users;
 	    for (String user : users) {
 		DummyClient client = new DummyClient();
-		clients.add(client);
+		clients.put(user, client);
 		client.connect(port);
 		client.login(user, "password");
 	    }
 	}
 
 	void join(String name) {
-	    for (DummyClient client : clients) {
+	    for (DummyClient client : clients.values()) {
 		client.join(name);
 	    }
 	}
 
 	void leave(String name) {
-	    for (DummyClient client : clients) {
+	    for (DummyClient client : clients.values()) {
 		client.leave(name);
 	    }
 	}
@@ -1170,7 +1238,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    createTransaction();
 	    Channel channel = channelService.getChannel(name);
 	    Set<ClientSession> sessions = channel.getSessions();
-	    for (DummyClient client : clients) {
+	    for (DummyClient client : clients.values()) {
 
 		ClientSession session =
 		    sessionService.getClientSession(client.sessionId);
@@ -1191,12 +1259,13 @@ public class TestChannelServiceImpl extends TestCase {
 
 	void checkChannelSets(boolean exists) throws Exception {
 	    createTransaction();
-	    for (DummyClient client : clients) {
+	    for (DummyClient client : clients.values()) {
 		String sessionKey = getSessionKey(client.sessionId);
 		try {
-		    dataService.getServiceBinding(sessionKey, ManagedObject.class);
+		    dataService.getServiceBinding(
+			sessionKey, ManagedObject.class);
 		    if (!exists) {
-			fail("ClientGroup.checkChannelSets channel set exists: " +
+			fail("ClientGroup.checkChannelSets set exists: " +
 			     client.name);
 		    }
 		} catch (NameNotBoundException e) {
@@ -1209,18 +1278,12 @@ public class TestChannelServiceImpl extends TestCase {
 	    txn.commit();
 	}
 
-	// This is unused at the moment...
-	DummyClient getClient(byte[] sessionId) {
-	    for (DummyClient client : clients) {
-		if (Arrays.equals(sessionId, client.sessionId)) {
-		    return client;
+	DummyClient getClient(String name) {
+	    return clients.get(name);
 		}
-	    }
-	    return null;
-	}
 	
 	void disconnect(boolean graceful) {
-	    for (DummyClient client : clients) {
+	    for (DummyClient client : clients.values()) {
 		client.disconnect(graceful);
 	    }
 	}
@@ -1525,6 +1588,9 @@ public class TestChannelServiceImpl extends TestCase {
 	private String channelName = null;
 	private String reason;
 	private byte[] reconnectionKey;
+	private final List<MessageInfo> channelMessages =
+	    new ArrayList<MessageInfo>();
+	private final AtomicLong sequenceNumber = new AtomicLong(0);
 
 	
 	DummyClient() {
@@ -1657,26 +1723,100 @@ public class TestChannelServiceImpl extends TestCase {
 	    }
 	}
 
+	/**
+	 * Returns the next sequence number for this session.
+	 */
+	private long nextSequenceNumber() {
+	    return sequenceNumber.getAndIncrement();
+	}
+
+	/**
+	 * Sends a SESSION_MESSAGE.
+	 */
 	void sendMessage(byte[] message) {
-	    synchronized (lock) {
-		if (!connected || !loginSuccess) {
-                    fail("DummyClient.login not connected or loggedIn");
-		}
-	    }
+	    checkLoggedIn();
 
 	    MessageBuffer buf =
 		new MessageBuffer(13 + message.length);
 	    buf.putByte(SimpleSgsProtocol.VERSION).
 		putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
 		putByte(SimpleSgsProtocol.SESSION_MESSAGE).
-		putLong(0).	// TODO sequence number
-		putShort(message.length).
-		putBytes(message);
+		putLong(nextSequenceNumber()).
+		putByteArray(message);
 	    try {
 		connection.sendBytes(buf.getBuffer());
 	    } catch (IOException e) {
                 e.printStackTrace();
                 fail("Couldn't sendBytes: " + e.getMessage());
+	    }
+	}
+
+	/**
+	 * Returns the size that the set of ids will use when put in a
+	 * message buffer.  The returned value accounts for the
+	 * two-byte header for the number of ids in the set.
+	 */
+	private static int getSize(Set<byte[]> ids) {
+	    int size = 2;
+	    for (byte[] id : ids) {
+		size += 2 + id.length;
+	    }
+	    return size;
+	}
+
+	/**
+	 * Sends a CHANNEL_SEND_REQUEST.
+	 */
+	void sendChannelMessage(String name, Set<byte[]> recipientIds,
+				byte[] message) {
+	    checkLoggedIn();
+
+	    MessageBuffer buf =
+		new MessageBuffer(3 + MessageBuffer.getSize(name) + 8 +
+				  getSize(recipientIds) +
+				  2 + message.length);
+	    buf.putByte(SimpleSgsProtocol.VERSION).
+		putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
+		putByte(SimpleSgsProtocol.CHANNEL_SEND_REQUEST).
+		putString(name).
+		putLong(nextSequenceNumber()).
+		putShort(recipientIds.size());
+	    for (byte[] sessionId : recipientIds) {
+		buf.putByteArray(sessionId);
+	    }
+	    buf.putByteArray(message);
+	    try {
+		connection.sendBytes(buf.getBuffer());
+	    } catch (IOException e) {
+		throw new RuntimeException(e);
+	    }
+	}
+
+	MessageInfo nextChannelMessage() {
+	    synchronized (lock) {
+		if (channelMessages.isEmpty()) {
+		    try {
+			lock.wait(WAIT_TIME);
+		    } catch (InterruptedException e) {
+		    }
+		}
+		return
+		    channelMessages.isEmpty() ?
+		    null :
+		    channelMessages.remove(0);
+	    }
+	}
+
+	/**
+	 * Throws a {@code RuntimeException} if this session is not
+	 * logged in.
+	 */
+	private void checkLoggedIn() {
+	    synchronized (lock) {
+		if (!connected || !loginSuccess) {
+		    throw new RuntimeException(
+			"DummyClient.login not connected or loggedIn");
+		}
 	    }
 	}
 
@@ -1902,6 +2042,19 @@ public class TestChannelServiceImpl extends TestCase {
 		    break;
 		}
 
+		case SimpleSgsProtocol.CHANNEL_MESSAGE: {
+		    String name = buf.getString();
+		    long seq = buf.getLong();
+		    byte[] senderId = buf.getByteArray();
+		    byte[] message = buf.getByteArray();
+		    synchronized (lock) {
+			channelMessages.add(
+			    new MessageInfo(name, senderId, message, seq));
+			lock.notifyAll();
+		    }
+		    break;
+		}
+
 		default:
 		    System.err.println(	
 			"processChannelProtocolMessage: unknown op code: " +
@@ -1936,6 +2089,20 @@ public class TestChannelServiceImpl extends TestCase {
 				   "exception:" + exception);
 		exception.printStackTrace();
 	    }
+	}
+    }
+
+    private static class MessageInfo {
+	final String name;
+	final byte[] senderId;
+	final byte[] message;
+	final long seq;
+
+	MessageInfo(String name, byte[] senderId, byte[] message, long seq) {
+	    this.name = name;
+	    this.senderId = senderId;
+	    this.message = message;
+	    this.seq = seq;
 	}
     }
 
