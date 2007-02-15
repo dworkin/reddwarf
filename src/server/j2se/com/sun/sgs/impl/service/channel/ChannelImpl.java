@@ -398,14 +398,9 @@ final class ChannelImpl implements Channel, Serializable {
 	}
 
 	private Object readResolve() throws ObjectStreamException {
-	    try {
-		ChannelManager cm = AppContext.getChannelManager();
-		Channel channel = cm.getChannel(name);
-		return channel;
-	    } catch (RuntimeException e) {
-		throw (InvalidObjectException)
-		    new InvalidObjectException(e.getMessage()).initCause(e);
-	    }
+	    ChannelManager cm = AppContext.getChannelManager();
+	    Channel channel = cm.getChannel(name);
+	    return channel;
 	}
     }
 
