@@ -6,15 +6,13 @@ import java.util.logging.Logger;
 import org.apache.mina.common.ByteBuffer;
 
 import com.sun.sgs.impl.util.LoggerWrapper;
-import com.sun.sgs.io.Connection;
-import com.sun.sgs.io.ConnectionListener;
 
 // TODO move this functionality into protocol decode; we should
 // do framing in the protocol, not the transport. -JM
 
 /**
- * This filter guarantees that only complete messages are delivered to this
- * connection's {@link ConnectionListener}. That is, each call to
+ * This filter guarantees that only complete messages are delivered to its
+ * {@link FilterListener}. That is, each call to
  * {@code sendBytes} by the sender results in exactly one call to
  * {@code bytesReceived} on the receiver's {@code ConnectionListener}.
  * <p>
@@ -81,11 +79,11 @@ class CompleteMessageFilter {
      * otherwise it continues to be held for the next call.</li>
      * </ul>
      * 
-     * @param conn the {@link Connection} which received the data
+     * @param listener the {@code FilterListener} to receive complete messages
      * @param buf the data to filter and optionally deliver to the
-     *        {@code ConnectionListener} for the given connection
+     *        {@code FilterListener}
      */
-    void filterReceive(Connection conn, ByteBuffer buf) {
+    void filterReceive(FilterListener listener, ByteBuffer buf) {
 
         logger.log(Level.FINEST,
             "processing {0,number,#} bytes",
@@ -96,12 +94,10 @@ class CompleteMessageFilter {
         msgBuf.put(buf);
         msgBuf.flip();
 
-        processReceiveBuffer(conn);
+        processReceiveBuffer(listener);
     }
 
-    private void processReceiveBuffer(Connection conn) {
-        ConnectionListener listener =
-            ((SocketConnection) conn).getConnectionListener();
+    private void processReceiveBuffer(FilterListener listener) {
 
         if (msgBuf.remaining() > MAX_BUFFER_SIZE) {
             logger.log(Level.WARNING,
@@ -122,14 +118,14 @@ class CompleteMessageFilter {
                     msgLen);
             }
 
-            byte[] completeMessage = new byte[msgLen];
-            msgBuf.get(completeMessage);
+            ByteBuffer completeMessage =
+                msgBuf.slice().asReadOnlyBuffer().limit(msgLen);
 
             logger.log(Level.FINER,
                 "dispatching complete message of size {0,number,#}",
                 msgLen);
 
-            listener.bytesReceived(conn, completeMessage);
+            listener.filteredMessageReceived(completeMessage);
         }
 
         msgBuf.compact();
@@ -148,15 +144,14 @@ class CompleteMessageFilter {
      * a 4-byte {@code int} in network byte-order, and sends it out on
      * the underlying MINA {@code IoSession}.
      *
-     * @param conn the {@link Connection} on which to send the data
-     * @param message the data to filter and optionally send on the
-     *        connection represented by the given connection
+     * @param listener the {@code FilterListener} on which to send the data
+     * @param message the data to filter and optionally send to the listener
      */
-    void filterSend(Connection conn, byte[] message) {
+    void filterSend(FilterListener listener, byte[] message) {
         ByteBuffer buffer = ByteBuffer.allocate(message.length + 4);
         buffer.putInt(message.length);
         buffer.put(message);
         buffer.flip();
-        ((SocketConnection) conn).doSend(buffer);
+        listener.sendUnfiltered(buffer);
     }
 }

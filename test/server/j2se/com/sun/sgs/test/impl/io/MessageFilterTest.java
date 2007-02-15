@@ -217,7 +217,18 @@ public class MessageFilterTest {
 
         Assert.assertEquals(messageSize, bytesIn);
 
-    } 
+    }
+    
+
+    /**
+     * Tests corner cases in the complete-message filter.
+     *
+     * @throws Exception if an unexpected problem occurs
+     */
+    @Test
+    public void partialMessages() throws Exception {
+        
+    }
     
     private static class ConnectionAdapter implements ConnectionListener {
         /** {@inheritDoc} */

@@ -16,7 +16,7 @@ import com.sun.sgs.io.ConnectionListener;
  * MINA framework.  It uses a {@link IoSession MINA IoSession} to handle the
  * IO transport.
  */
-public class SocketConnection implements Connection {
+public class SocketConnection implements Connection, FilterListener {
 
     /** The logger for this class. */
     private static final LoggerWrapper logger =
@@ -68,6 +68,7 @@ public class SocketConnection implements Connection {
                 "SocketConnection.close: session not connected");
             logger.logThrow(Level.FINE, ioe, ioe.getMessage());
         }
+
         // The filter does the actual work to prepend the length
         filter.filterSend(this, message);
     }
@@ -89,6 +90,30 @@ public class SocketConnection implements Connection {
         session.close();
     }
 
+    // Implement FilterListener
+
+    /**
+     * Dispatches a complete message to this connection's
+     * {@code ConnectionListener}.
+     * 
+     * @param buf a {@code MINA ByteBuffer} containing the message to dispatch
+     */
+    public void filteredMessageReceived(ByteBuffer buf) {
+        byte[] message = new byte[buf.remaining()];
+        buf.get(message);
+        listener.bytesReceived(this, message);
+    }
+
+    /**
+     * Sends the given MINA buffer out on the associated {@code IoSession}.
+     * 
+     * @param buf the {@code MINA ByteBuffer} to send
+     */
+    public void sendUnfiltered(ByteBuffer buf) {
+        logger.log(Level.FINEST, "message = {0}", buf);
+        session.write(buf);
+    }
+
     // specific to SocketConnection
 
     /**
@@ -107,15 +132,5 @@ public class SocketConnection implements Connection {
      */
     CompleteMessageFilter getFilter() {
         return filter;
-    }
-
-    /**
-     * Sends the given MINA buffer out on the associated {@code IoSession}.
-     * 
-     * @param messageBuffer the {@code MINA ByteBuffer} to send
-     */
-    void doSend(ByteBuffer messageBuffer) {
-        logger.log(Level.FINEST, "message = {0}", messageBuffer);
-        session.write(messageBuffer);
     }
 }
