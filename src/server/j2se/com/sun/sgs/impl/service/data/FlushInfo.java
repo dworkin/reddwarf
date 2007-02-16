@@ -6,7 +6,7 @@ package com.sun.sgs.impl.service.data;
  */
 final class FlushInfo {
 
-    /** Space to allocate for buffering results. */
+    /** The amount of additional space to allocate when buffering. */
     private static final int BUFFER = 50;
 
     /** The object IDs of the modified objects. */
