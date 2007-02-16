@@ -12,21 +12,17 @@ import com.sun.sgs.impl.util.LoggerWrapper;
 
 /**
  * This filter guarantees that only complete messages are delivered to its
- * {@link FilterListener}. That is, each call to
- * {@code sendBytes} by the sender results in exactly one call to
- * {@code bytesReceived} on the receiver's {@code ConnectionListener}.
+ * {@link FilterListener}.
  * <p>
  * It prepends the message length on sending, and reads the length of each
- * message on receiving. It will fire the {@code bytesReceived} callback on
- * the {@code ConnectionListener} once for each complete message. If partial
- * messages are received, this filter will hold the partial message until
- * the rest of the message is received, even if the message spans multiple
- * calls to {@code filterReceive}.
+ * message on receiving. If partial the filter will hold the partial message
+ * until the rest of the message is received, even if the message spans
+ * multiple calls to {@code filterReceive}.
  * <p>
  * The {@code filterReceive} portion of this filter is not thread-safe since
  * it retains state information about partial messages. For this reason,
- * each {@code Connection} should have its own instance, and
- * {@code filterReceive} should be called by only one thread.
+ * each source of data should have its own instance, and {@code filterReceive}
+ * should be called by only one thread at a time.
  * {@code filterSend}, however, is thread-safe.
  */
 class CompleteMessageFilter {
@@ -56,29 +52,10 @@ class CompleteMessageFilter {
     }
 
     /**
-     * Invoked as messages are received by the {@code Connection} before
-     * dispatching to its {@code ConnectionListener}. The filter is free to
-     * modify the incoming data in any way, and to invoke
-     * {@link ConnectionListener#bytesReceived} once, multiple times, = or
-     * not at all.
-     * <p>
-     * This implementation will call {@code bytesReceived} on the associated
-     * {@code ConnectionListener} once for each complete message. The size
-     * of a message must be encoded as the first four bytes. This method can
-     * be in one of a number of states each time it is called:
-     * <ul>
-     * <li>It can be called with a new, incoming packet. In this case, the
-     * length of the message is read as the first int, and that many bytes
-     * are read from the array and dispatched to the listener. This
-     * continues until all the bytes are read from the array. If the array
-     * ends in the middle of a message, the remaining bytes are held in a
-     * partial message until the next call.</li>
-     * <li>If there is a message in progress, then the smaller of the rest
-     * of the message, or the length of the array is added to the message.
-     * If the message is complete, it is dispatched to the listener,
-     * otherwise it continues to be held for the next call.</li>
-     * </ul>
-     * 
+     * Processes network data of arbitrary length and dispatches zero or
+     * more complete messages to the given {@code listener}.  If a partial
+     * message remains, it is buffered until more data is received.
+     *
      * @param listener the {@code FilterListener} to receive complete messages
      * @param buf the data to filter and optionally deliver to the
      *        {@code FilterListener}
@@ -118,8 +95,12 @@ class CompleteMessageFilter {
                     msgLen);
             }
 
+            // Get a read-only buffer view on the complete message
             ByteBuffer completeMessage =
                 msgBuf.slice().asReadOnlyBuffer().limit(msgLen);
+
+            // Advance the underlying message buffer
+            msgBuf.skip(msgLen);
 
             logger.log(Level.FINER,
                 "dispatching complete message of size {0,number,#}",
@@ -130,22 +111,21 @@ class CompleteMessageFilter {
 
         msgBuf.compact();
 
-        logger.log(Level.FINEST,
-            "partial message {0,number,#} bytes",
-            msgBuf.position());
+        if (logger.isLoggable(Level.FINEST)) {
+            logger.log(Level.FINEST,
+                "partial message {0,number,#} bytes",
+                msgBuf.position());
+        }
     }
 
     /**
-     * Invoked after a caller has requested data be sent on the associated
-     * {@code Connection}. The filter may modify the data in any way, and may
-     * send it on the underlying connection whole, in pieces, or not at all.
-     * <p>
-     * This implementation prepends the length of the given byte array as
-     * a 4-byte {@code int} in network byte-order, and sends it out on
-     * the underlying MINA {@code IoSession}.
+     * Prepends the length of the given byte array as a 4-byte {@code int}]
+     * in network byte-order, and passes the result to the {@linkplain
+     * FilterListener#sendUnfiltered sendUnfiltered} method of the
+     * given {@code listener}.
      *
      * @param listener the {@code FilterListener} on which to send the data
-     * @param message the data to filter and optionally send to the listener
+     * @param message the data to filter and forward to the listener
      */
     void filterSend(FilterListener listener, byte[] message) {
         ByteBuffer buffer = ByteBuffer.allocate(message.length + 4);
