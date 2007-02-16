@@ -91,11 +91,11 @@
 	  description="Builds everything"/>
 
   <!-- Builds a debug version of the complete project -->
-  <target name="build" depends="build-server,build-client"
+  <target name="build" depends="-build-shared,-build-server,-build-client"
 	  description="Builds code"/>
 
   <!-- Builds the shared code -->
-  <target name="build-shared" description="Builds shared code">
+  <target name="-build-shared">
     <mkdir dir="${build.dir}/classes/shared"/>
     <depend srcdir="j2se"
 	    destdir="${build.dir}/classes/shared"
@@ -109,7 +109,7 @@
   </target>
 
   <!-- Builds the server -->
-  <target name="build-server" description="Builds server code">
+  <target name="-build-server" depends="-build-shared">
     <fail unless="bdb.lib.dir"
 	  message="The bdb.lib.dir property must be set"/>
     <mkdir dir="${build.dir}/classes/server"/>
@@ -125,8 +125,7 @@
   </target>
 
   <!-- Builds the client -->
-  <target name="build-client" depends="build-server"
-	  description="Builds client code">
+  <target name="-build-client" depends="-build-shared">
     <mkdir dir="${build.dir}/classes/client"/>
     <depend srcdir="j2se"
 	    destdir="${build.dir}/classes/client"
@@ -154,15 +153,14 @@
   <target name="javadoc" depends="javadoc-api,javadoc-internal"
 	  description="Builds javadoc"/>
 
-  <target name="javadoc-internal" depends="javadoc-server,javadoc-client"
+  <target name="javadoc-internal" depends="-javadoc-server,-javadoc-client"
 	  description="Builds internal (full) javadoc"/>
 
-  <target name="javadoc-api" depends="javadoc-api-server,javadoc-api-client"
+  <target name="javadoc-api" depends="-javadoc-api-server,-javadoc-api-client"
 	  description="Builds public API javadoc"/>
 
   <!-- Build the internal server JavaDoc -->
-  <target name="javadoc-server"
-	  description="Builds internal (full) server javadoc">
+  <target name="-javadoc-server">
     <javadoc sourcepath="src/server/j2se:test/server/j2se"
              destdir="${build.dir}/javadoc/server"
              packagenames="com.sun.*"
@@ -195,8 +193,7 @@
   </target>
 
   <!-- Build the internal client JavaDoc -->
-  <target name="javadoc-client"
-	  description="Builds internal (full) client javadoc">
+  <target name="-javadoc-client">
     <javadoc sourcepath="src/client/j2se:test/client/j2se"
              destdir="${build.dir}/javadoc/client"
              packagenames="com.sun.*"
@@ -229,8 +226,7 @@
   </target>
 
   <!-- Build the public Application API JavaDoc -->
-  <target name="javadoc-api-server"
-	  description="Builds public server application API javadoc">
+  <target name="-javadoc-api-server">
     <javadoc sourcepath="src/server/j2se"
              destdir="${build.dir}/javadoc/apidoc/sgs-server-apidoc"
              classpathref="server.classpath"
@@ -261,8 +257,7 @@
   </target>
 
   <!-- Build the public Client API JavaDoc -->
-  <target name="javadoc-api-client"
-	  description="Builds public client API javadoc">
+  <target name="-javadoc-api-client">
     <javadoc sourcepath="src/client/j2se"
              destdir="${build.dir}/javadoc/apidoc/sgs-client-apidoc"
              classpathref="client.classpath"
@@ -293,27 +288,25 @@
   </target>
 
   <!-- Builds the API javadoc zip files -->
-  <target name="apidoc" depends="zip-apidoc-server,zip-apidoc-client"
+  <target name="zip-apidoc" depends="-zip-apidoc-server,-zip-apidoc-client"
 	  description="Builds API javadoc zip files"/>
 
   <!-- Builds the app API javadoc zip file -->
-  <target name="zip-apidoc-server" depends="javadoc-api-server"
-	  description="Builds app API javadoc zip file">
+  <target name="-zip-apidoc-server" depends="-javadoc-api-server">
     <zip destfile="${apidoc.server.zip}"
           basedir="${build.dir}/javadoc/apidoc"
           includes="sgs-server-apidoc/**"/>
   </target>
 
   <!-- Builds the client API javadoc zip file -->
-  <target name="zip-apidoc-client" depends="javadoc-api-client"
-	  description="Builds client API javadoc zip file">
+  <target name="-zip-apidoc-client" depends="-javadoc-api-client">
     <zip destfile="${apidoc.client.zip}"
           basedir="${build.dir}/javadoc/apidoc"
           includes="sgs-client-apidoc/**"/>
   </target>
 
   <!-- Builds files for distribution -->
-  <target name="dist" depends="dist-client, dist-server, javadoc-api"
+  <target name="dist" depends="-dist-client, -dist-server, javadoc-api"
 	  description="Builds files for distribution">
     <copy todir="${build.dir}/sgs/doc/sgs-client-api">
       <fileset dir="${build.dir}/javadoc/apidoc/sgs-client-apidoc/"/>
@@ -333,14 +326,12 @@
   </target>
 
   <!-- Builds client files for distribution -->
-  <target name="dist-client" depends="jar-client"
-	  description="Builds client files for distribution">
+  <target name="-dist-client" depends="jar-client">
     <copy todir="${build.dir}/sgs/lib" file="${build.dir}/lib/sgs-client.jar"/>
   </target>
 
   <!-- Builds server files for distribution -->
-  <target name="dist-server" depends="jar-server, dist-bdb"
-	  description="Builds server files for distribution">
+  <target name="-dist-server" depends="jar-server, -dist-bdb">
     <copy todir="${build.dir}/sgs">
       <fileset dir="etc" includes="sgs.*"/>
     </copy>
@@ -352,8 +343,7 @@
   </target>
 
   <!-- Builds files for distributing Berkeley DB -->
-  <target name="dist-bdb"
-	  description="Builds files for distributing Berkeley DB">
+  <target name="-dist-bdb">
     <fail unless="bdb.builds.dir"
 	  message="The bdb.builds.dir property must be set"/>
     <copy todir="${build.dir}/sgs/lib/bdb"
@@ -384,11 +374,12 @@
 	  description="Builds JAR files"/>
 
   <!-- Builds the client JAR file -->
-  <target name="jar-client" depends="build-client"
+  <target name="jar-client" depends="-build-client"
 	  description="Builds the client JAR file">
     <mkdir dir="${build.dir}/lib"/>
-    <jar destfile="${build.dir}/lib/sgs-client.jar"
-	 basedir="${build.dir}/classes/client">
+    <jar destfile="${build.dir}/lib/sgs-client.jar">
+      <fileset dir="${build.dir}/classes/client"/>
+      <fileset dir="${build.dir}/classes/shared"/>
       <manifest>
 	<attribute name="Class-Path"
 		   value="mina-core-1.1.jar slf4j-jdk14.jar"/>
@@ -397,13 +388,14 @@
   </target>
 
   <!-- Builds the server JAR file -->
-  <target name="jar-server" depends="build-server"
+  <target name="jar-server" depends="-build-server"
 	  description="Builds server JAR files">
     <mkdir dir="${build.dir}/lib"/>
     <echo file="${build.dir}/classes/server/com/sun/sgs/sgs.version"
 	  message="${project.version}"/>
-    <jar destfile="${build.dir}/lib/sgs.jar"
-	 basedir="${build.dir}/classes/server">
+    <jar destfile="${build.dir}/lib/sgs.jar">
+      <fileset dir="${build.dir}/classes/server"/>
+      <fileset dir="${build.dir}/classes/shared"/>
       <manifest>
 	<attribute name="Main-Class" value="com.sun.sgs.impl.kernel.Kernel"/>
 	<attribute name="Class-Path"
@@ -416,27 +408,34 @@
 
   <!-- Checks Java coding style -->
   <target name="checkstyle"
-	  depends="checkstyle-client, checkstyle-server"
+	  depends="-checkstyle-client,-checkstyle-server,-checkstyle-shared"
 	  description="Checks Java coding style">
   </target>
 
   <!-- Checks client Java coding style -->
-  <target name="checkstyle-client"
-	  depends="build-client,-checkstyle.init"
-	  description="Checks client Java coding style">
+  <target name="-checkstyle-client"
+	  depends="-build-client,-checkstyle.init">
     <checkstyle config="${neuromancer_checks.xml}"
-		classpath="${build.dir}/classes/client">
+	        classpathref="client.classpath">
       <fileset dir="src/client/j2se"/>
     </checkstyle>
   </target>
 
   <!-- Checks server Java coding style -->
-  <target name="checkstyle-server"
-	  depends="build-server,-checkstyle.init"
-	  description="Checks server Java coding style">
+  <target name="-checkstyle-server"
+	  depends="-build-server,-checkstyle.init">
     <checkstyle config="${neuromancer_checks.xml}"
 		classpathref="server.classpath">
       <fileset dir="src/server/j2se"/>
+    </checkstyle>
+  </target>
+
+  <!-- Checks shared Java coding style -->
+  <target name="-checkstyle-shared"
+	  depends="-build-shared,-checkstyle.init">
+    <checkstyle config="${neuromancer_checks.xml}"
+		classpathref="shared.classpath">
+      <fileset dir="src/shared/j2se"/>
     </checkstyle>
   </target>
 
@@ -452,9 +451,50 @@
   <target name="test" depends="test-server"
 	  description="Compiles and runs tests"/>
 
-  <target name="build-test" depends="-test-server.classes, -test-client.classes"
+  <target name="build-test" depends="-test-shared.classes, -test-server.classes, -test-client.classes"
           description="Compiles tests"/>
-  
+
+  <!-- Compile and run shared tests -->
+  <target name="test-shared" depends="-test-shared.classes"
+	  description="Compiles and runs shared tests">
+    <mkdir dir="${build.dir}/test"/>
+    <delete dir="${build.dir}/test/output"/>
+    <mkdir dir="${build.dir}/test/output"/>
+    <!-- XXX: We'd like to use forkmode="once" here, but that doesn't
+	 seem to work in Ant 1.6.1 -tjb@sun.com (01/13/2006)
+      -->
+    <junit fork="true"
+	   printsummary="on"
+	   showoutput="${test.showoutput}"
+	   tempdir="${build.dir}/test/output"
+	   failureproperty="tests.failed">
+      <jvmarg line="${test.jvm.args}"/>
+      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
+      <sysproperty key="java.io.tmpdir" file="${build.dir}/test/output"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${test.logging}"/>
+      <classpath>
+        <pathelement location="${build.dir}/test/classes/shared"/>
+        <path refid="shared.classpath"/>
+      </classpath>
+      <syspropertyset>
+	<propertyref prefix="test."/>
+	<propertyref prefix="com.sun.sgs."/>
+      </syspropertyset>
+      <!-- XXX: This doesn't work in Ant 1.6.1,
+	   either. -tjb@sun.com (01/13/2006) -->
+      <!-- <assertions>
+	     <enable/>
+	   </assertions> -->
+      <formatter type="${test.formatter.type}"/>
+      <batchtest todir="${build.dir}/test/output">
+	<fileset dir="test/shared/j2se"
+	  includes="${test.include}"/>
+      </batchtest>
+    </junit>
+    <fail if="tests.failed" message="Some tests failed"/>
+  </target>
+
   <!-- Compile and run server tests -->
   <target name="test-server" depends="-test-server.classes"
 	  description="Compiles and runs server tests">
@@ -497,6 +537,23 @@
   </target>
 
   <!-- Compiles tests -->
+  <target name="-test-shared.classes" depends="build">
+    <mkdir dir="${build.dir}/test/classes/shared"/>
+    <depend srcdir="test/shared/j2se"
+	    destdir="${build.dir}/test/classes/shared"
+	    cache="${build.dir}/test/depend"
+	    closure="true"/>
+    <javac srcdir="test/shared/j2se"
+	   destdir="${build.dir}/test/classes/shared"
+	   includeAntRuntime="yes"
+	   debug="on"
+	   source="${javac.source}"
+	   classpathref="shared.classpath"
+	   includes="**/*.java">
+      <compilerarg value="${javac.compilerargs}"/>
+    </javac>
+  </target>
+
   <target name="-test-server.classes" depends="build">
     <mkdir dir="${build.dir}/test/classes/server"/>
     <depend srcdir="test/server/j2se"
@@ -508,7 +565,7 @@
 	   includeAntRuntime="yes"
 	   debug="on"
 	   source="${javac.source}"
-	   classpath="${build.dir}/classes/server"
+	   classpathref="server.classpath"
 	   includes="**/*.java">
       <compilerarg value="${javac.compilerargs}"/>
     </javac>
@@ -532,7 +589,7 @@
   </target>
 
   <!-- Run IO test server -->
-  <target name="io-test-server" depends="-test-server.classes"
+  <target name="io-test-server" depends="-test-shared.classes"
           description="Runs the IO test server">
     <java classname="com.sun.sgs.test.impl.io.ServerTest"
           fork="true">
@@ -541,14 +598,14 @@
       <sysproperty key="java.util.logging.config.file"
 		   file="${test.logging}"/>
       <classpath>
-        <pathelement location="${build.dir}/test/classes/server"/>
-        <path refid="server.classpath"/>
+        <pathelement location="${build.dir}/test/classes/shared"/>
+        <path refid="shared.classpath"/>
       </classpath>
     </java>
   </target>
 
   <!-- Run IO test client -->
-  <target name="io-test-client" depends="-test-server.classes"
+  <target name="io-test-client" depends="-test-shared.classes"
           description="Runs the IO test client">
     <java classname="com.sun.sgs.test.impl.io.ClientTest"
           fork="true">
@@ -557,8 +614,8 @@
       <sysproperty key="java.util.logging.config.file"
 		   file="${test.logging}"/>
       <classpath>
-        <pathelement location="${build.dir}/test/classes/server"/>
-        <path refid="server.classpath"/>
+        <pathelement location="${build.dir}/test/classes/shared"/>
+        <path refid="shared.classpath"/>
       </classpath>
     </java>
   </target>
