@@ -23,16 +23,11 @@
 	    value="-Xlint"/>
 
   <!-- Version information -->
-  <mkdir dir="${build.dir}"/>
-  <echo file="${build.dir}/revision" message="$Rev$"/>
-  <loadfile property="project.revision" srcFile="${build.dir}/revision">
-    <filterchain>
-      <tokenfilter>
-	<replaceregex pattern="\$Rev:(.*)\$" replace="\1"/>
-	<trim/>
-      </tokenfilter>
-    </filterchain>
-  </loadfile>
+  <exec outputproperty="project.revision"
+	executable="svnversion"
+	logError="true">
+    <arg file="."/>
+  </exec>
   <property name="project.version" value="1.0alpha-${project.revision}"/>
 
   <!-- Values for the JavaDocs -->
