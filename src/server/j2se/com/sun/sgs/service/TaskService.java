@@ -2,6 +2,8 @@
 package com.sun.sgs.service;
 
 import com.sun.sgs.app.TaskManager;
+import com.sun.sgs.app.TaskRejectedException;
+import com.sun.sgs.app.TransactionException;
 
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.Priority;

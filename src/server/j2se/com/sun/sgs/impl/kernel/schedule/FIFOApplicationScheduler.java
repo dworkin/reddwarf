@@ -135,9 +135,10 @@ class FIFOApplicationScheduler
      * {@inheritDoc}
      */
     public void timedTaskReady(ScheduledTask task) {
-        while (! queue.offer(task));
+        while (! queue.offer(task)) { /* loop */ }
     }
 
+    /** {@inheritDoc} */
     public void shutdown() {
         timedTaskHandler.shutdown();
     }

@@ -299,11 +299,12 @@ public class MasterTaskScheduler implements TaskScheduler {
      * is accepted. When used or cancelled, it also applies to all tasks.
      */
     private class GroupTaskReservation implements TaskReservation {
-        HashSet<TaskReservation> reservations;
+        private final HashSet<TaskReservation> reservations;
         private boolean finished = false;
-        public GroupTaskReservation(HashSet<TaskReservation> reservations) {
+        GroupTaskReservation(HashSet<TaskReservation> reservations) {
             this.reservations = reservations;
         }
+        /** {@inheritDoc} */
         public void cancel() {
             if (finished)
                 throw new IllegalStateException("cannot cancel reservation");
@@ -311,6 +312,7 @@ public class MasterTaskScheduler implements TaskScheduler {
                 reservation.cancel();
             finished = true;
         }
+        /** {@inheritDoc} */
         public void use() {
             if (finished)
                 throw new IllegalStateException("cannot use reservation");

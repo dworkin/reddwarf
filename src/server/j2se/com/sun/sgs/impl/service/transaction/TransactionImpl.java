@@ -176,6 +176,7 @@ final class TransactionImpl implements Transaction {
      *
      * @return	a string representation of this instance
      */
+    @Override
     public String toString() {
 	return "TransactionImpl[tid:" + tid + "]";
     }
@@ -184,12 +185,14 @@ final class TransactionImpl implements Transaction {
      * Returns <code>true</code> if the argument is an instance of the same
      * class with the same transaction ID.
      *
+     * @param obj the reference object with which to compare
      * @return <code>true</code> if the argument equals this instance,
      *	       otherwise <code>false</code>
      */
-    public boolean equals(Object object) {
-	return (object instanceof TransactionImpl) &&
-	    tid == ((TransactionImpl) object).tid;
+    @Override
+    public boolean equals(Object obj) {
+	return (obj instanceof TransactionImpl) &&
+	    tid == ((TransactionImpl) obj).tid;
     }
 
     /**
@@ -197,6 +200,7 @@ final class TransactionImpl implements Transaction {
      *
      * @return	a hash code value for this object.
      */
+    @Override
     public int hashCode() {
 	return (int) (tid >>> 32) ^ (int) tid;
     }

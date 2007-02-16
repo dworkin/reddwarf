@@ -256,6 +256,7 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 
     /* -- Implement ManagedReference -- */
 
+    /** {@inheritDoc} */
     @SuppressWarnings("fallthrough")
     public <T> T get(Class<T> type) {
 	if (type == null) {
@@ -305,6 +306,7 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 	}
     }
 
+    /** {@inheritDoc} */
     @SuppressWarnings("fallthrough")
     public <T> T getForUpdate(Class<T> type) {
 	if (type == null) {
@@ -355,6 +357,7 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 	}
     }
 
+    /** {@inheritDoc} */
     public BigInteger getId() {
 	if (id == null) {
 	    id = BigInteger.valueOf(oid);
@@ -385,6 +388,8 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 
     /* -- Object methods -- */
 
+    /** {@inheritDoc} */
+    @Override
     public String toString() {
 	return "ManagedReferenceImpl[oid:" + oid + ", state:" + state + "]";
     }

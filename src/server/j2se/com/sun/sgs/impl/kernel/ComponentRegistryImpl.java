@@ -43,6 +43,8 @@ class ComponentRegistryImpl implements ComponentRegistry {
      * Returns a matching component if there is exactly one, otherwise
      * throws an exception.
      *
+     * @param  <T> the type of the component
+     * @param  type a class representing the type of the component
      * @return a single component, if there is exactly one match
      *
      * @throws MissingResourceException if there isn't exactly one match

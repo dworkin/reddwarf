@@ -77,6 +77,9 @@ class TimedTaskHandler {
         return true;
     }
 
+    /**
+     * Testing method. 
+     */
     public void shutdown() {
         timer.cancel();
     }
@@ -88,9 +91,11 @@ class TimedTaskHandler {
     private class TimerTaskImpl extends TimerTask {
         private final ScheduledTask task;
         private boolean cancelled = false;
-        public TimerTaskImpl(ScheduledTask task) {
+        TimerTaskImpl(ScheduledTask task) {
             this.task = task;
         }
+        /** {@inheritDoc} */
+        @Override
         public synchronized boolean cancel() {
             if (! cancelled) {
                 cancelled = true;
@@ -98,9 +103,12 @@ class TimedTaskHandler {
             }
             return false;
         }
+        /** {@inheritDoc} */
+        @Override
         public long scheduledExecutionTime() {
             return task.getStartTime();
         }
+        /** {@inheritDoc} */
         public synchronized void run() {
             if (! cancelled)
                 consumer.timedTaskReady(task);

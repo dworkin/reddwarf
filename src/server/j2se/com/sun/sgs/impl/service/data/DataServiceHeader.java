@@ -59,7 +59,8 @@ final class DataServiceHeader implements ManagedObject, Serializable {
 	}
     }
 
-    /** Returns a string representation of this instance. */
+    /** {@inheritDoc} */
+    @Override
     public String toString() {
 	return "DataServiceHeader[" +
 	    "version:" + serialVersionUID + "." + minorVersion +

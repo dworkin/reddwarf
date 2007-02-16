@@ -213,6 +213,8 @@ public class TaskServiceImpl
     }
 
     /**
+     * {@inheritDoc}
+     * <p>
      * FIXME: This is just a stub implementation right now. It needs to be
      * implemented. It has been added here to support the new shutdown
      * method on <code>Service</code>.
@@ -661,11 +663,11 @@ public class TaskServiceImpl
      * transaction. This is indexed in the local transaction map.
      */
     private class TxnState {
-        public boolean prepared = false;
-        public HashSet<TaskReservation> reservationSet = null;
+        boolean prepared = false;
+        HashSet<TaskReservation> reservationSet = null;
         @SuppressWarnings("hiding")
-        public HashMap<String,RecurringTaskHandle> recurringMap = null;
-        public HashSet<String> cancelledSet = null;
+        HashMap<String,RecurringTaskHandle> recurringMap = null;
+        HashSet<String> cancelledSet = null;
     }
 
     /**
@@ -675,8 +677,8 @@ public class TaskServiceImpl
         private static final long serialVersionUID = 1;
         private Task task = null;
         private ManagedReference taskRef = null;
-        public long startTime;
-        public long period;
+        long startTime;
+        long period;
         private Identity identity;
         /**
          * Creates an instance of <code>PendingTask</code>, handling the
@@ -700,10 +702,15 @@ public class TaskServiceImpl
             this.identity = TaskServiceImpl.transactionProxy.
                 getCurrentOwner().getIdentity();
         }
-        // checks that the underlying task is available, which is only at
-        // question if the task was managed by the application and therefore
-        // could have been removed by the application
-        public boolean isTaskAvailable() {
+        /**
+         * Checks that the underlying task is available, which is only at
+         * question if the task was managed by the application and therefore
+         * could have been removed by the application.
+         *
+         * @return {@code true} if the underlying task is available, otherwise
+         *         {@code false}
+         */
+        boolean isTaskAvailable() {
             if (task != null)
                 return true;
             try {
@@ -737,13 +744,14 @@ public class TaskServiceImpl
     private class TaskRunner implements KernelRunnable {
         private final TaskServiceImpl taskService;
         private final String objName;
-        public TaskRunner(TaskServiceImpl taskService, String objName) {
+        TaskRunner(TaskServiceImpl taskService, String objName) {
             this.taskService = taskService;
             this.objName = objName;
         }
         String getObjName() {
             return objName;
         }
+        /** {@inheritDoc} */
         public void run() throws Exception {
             try {
                 // run the task in a transactional context
@@ -787,6 +795,7 @@ public class TaskServiceImpl
         PeriodicTaskHandleImpl(String objName) {
             this.objName = objName;
         }
+        /** {@inheritDoc} */
         public void cancel() {
             if (cancelled)
                 throw new ObjectNotFoundException("Task has already been " +

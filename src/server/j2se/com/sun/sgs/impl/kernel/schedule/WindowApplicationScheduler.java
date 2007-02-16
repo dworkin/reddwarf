@@ -177,9 +177,10 @@ class WindowApplicationScheduler
         }
 
         nextElement = new QueueElement(scheduledWindow, task);
-        while (! queue.offer(nextElement));
+        while (! queue.offer(nextElement)) { /* loop */ }
     }
 
+    /** {@inheritDoc} */
     public void shutdown() {
         timedTaskHandler.shutdown();
     }
@@ -189,17 +190,18 @@ class WindowApplicationScheduler
         private final long window;
         private final ScheduledTask task;
         private final long timestamp;
-        public QueueElement(long window, ScheduledTask task) {
+        QueueElement(long window, ScheduledTask task) {
             this.window = window;
             this.task = task;
             this.timestamp = task.getStartTime();
         }
-        public long getWindow() {
+        long getWindow() {
             return window;
         }
-        public ScheduledTask getTask() {
+        ScheduledTask getTask() {
             return task;
         }
+        /** {@inheritDoc} */
         public int compareTo(QueueElement other) {
             // if the other window is bigger, then their priority is lower
             if (window < other.window)
@@ -227,8 +229,8 @@ class WindowApplicationScheduler
     // within some delta, but for now there won't be enough users to worry
     // about this case, so this feature isn't implemented
     private class QueueUser {
-        public long nextWindow = 0L;
-        public long lastScheduled;
+        long nextWindow = 0L;
+        long lastScheduled;
     }
 
 }

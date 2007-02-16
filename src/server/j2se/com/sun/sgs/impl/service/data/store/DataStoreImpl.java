@@ -61,27 +61,26 @@ import java.util.logging.Logger;
  * so the inability to resolve prepared transactions should have no effect at
  * present. <p>
  *
- * The {@link #DataStoreImpl constructor} supports the following properties:
+ * The {@linkplain DataStoreImpl#DataStoreImpl(Properties) constructor}
+ * supports the following properties:
  * <p>
  *
  * <ul>
  *
- * <li> <i>Key:</i> <code>com.sun.sgs.txnTimeout</code> <br>
- *	<i>Default:</i> <code>1000</code> <br>
+ * <li> <i>Key:</i> <code>{@value #TXN_TIMEOUT_PROPERTY}</code> <br>
+ *	<i>Default:</i> <code>{@value #DEFAULT_TXN_TIMEOUT}</code> <br>
  *	The maximum amount of time in milliseconds that a transaction will be
  *	permitted to run before it is a candidate for being aborted. <p>
  *
- * <li> <i>Key:</i>
- *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl.directory
- *	</code> <br>
- *	<i>Default:</i> <code>${com.sun.sgs.app.root}"/dsdb"</code> <br>
+ * <li> <i>Key:</i> <code>{@value #DIRECTORY_PROPERTY}</code> <br>
+ *      <i>Default:</i>
+ *      <code>${com.sun.sgs.app.root}/{@value #DEFAULT_DIRECTORY}</code> <br>
  *	The directory in which to store database files.  Each instance of
  *	<code>DataStoreImpl</code> requires its own, unique directory. <p>
  *
- * <li> <i>Key:</i> <code>
- *	com.sun.sgs.impl.service.data.store.DataStoreImpl.allocationBlockSize
- *	</code> <br>
- *	<i>Default:</i> <code>100</code> <br>
+ * <li> <i>Key:</i> <code>{@value #ALLOCATION_BLOCK_SIZE_PROPERTY}</code> <br>
+ *      <i>Default:</i> <code>{@value #DEFAULT_ALLOCATION_BLOCK_SIZE}</code>
+ *      <br>
  *	The number of object IDs to allocate at a time.  Object IDs are
  *	allocated in an independent transaction, and are discarded if a
  *	transaction aborts, if a managed object is made reachable within the
@@ -90,40 +89,32 @@ import java.util.logging.Logger;
  *	allocated.  This number limits the maximum number of object IDs that
  *	would be discarded when the program exits. <p>
  *
- * <li> <i>Key:</i>
- *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl.cacheSize
- *	</code> <br>
- *	<i>Default:</i> <code>1000000</code> <br>
+ * <li> <i>Key:</i> <code>{@value #CACHE_SIZE_PROPERTY}</code> <br>
+ *	<i>Default:</i> <code>{@value #DEFAULT_CACHE_SIZE}</code> <br>
  *	The size in bytes of the Berkeley DB cache.  This value must not be
  *	less than 20000. <p>
  *
- * <li> <i>Key:</i>
- *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl.flushToDisk
- *	</code> <br>
- *	<i>Default:</i> <code>false</code>
+ * <li> <i>Key:</i> <code>{@value #FLUSH_TO_DISK_PROPERTY} </code> <br>
+ *	<i>Default:</i> <code>false</code> <br>
  *	Whether to flush changes to disk when a transaction commits.  If
  *	<code>false</code>, the modifications made in some of the most recent
  *	transactions may be lost if the host crashes, although data integrity
  *	will be maintained.  Flushing changes to disk avoids data loss but
  *	introduces a significant reduction in performance. <p>
  *
- * <li> <i>Key:</i>
- *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl.logStats</code>
- *	<br>
- *	<i>Default:</i> <code>Integer.MAX_VALUE</code> <br>
+ * <li> <i>Key:</i> <code>{@value #LOG_STATS_PROPERTY}</code> <br>
+ *	<i>Default:</i> {@link Integer#MAX_VALUE} <br>
  *	The number of transactions between logging database statistics. <p>
  *
- * <li> <i>Key:</i> <code>
- *	com.sun.sgs.impl.service.data.store.DataStoreImpl.logOps
- *	</code> <br>
- *	<i>Default:</i> <code>100000</code> <br>
+ * <li> <i>Key:</i> <code>{@value #LOG_OPS_PROPERTY}</code> <br>
+ *	<i>Default:</i> <code>{@value #DEFAULT_LOG_OPS}</code> <br>
  *	The number of transactions between logging tallies of operations
  *	performed. <p>
  *
  * </ul> <p>
  *
  * This class uses the {@link Logger} named
- * <code>com.sun.sgs.impl.service.data.DataStoreImpl</code> to log information
+ * <code>{@value #CLASSNAME}</code> to log information
  * at the following logging levels: <p>
  *
  * <ul>
@@ -138,13 +129,13 @@ import java.util.logging.Logger;
  * <li> {@link Level#FINEST FINEST} - Name and object operations
  * </ul> <p>
  *
- * This class also uses the <code>Logger</code> named
- * <code>com.sun.sgs.impl.service.data.DataStoreImpl.ops</code> to log
- * information at the following logging levels: <p>
- *
+ * This class also uses the {@code Logger} named
+ * <code>{@value #OPS_LOGGER_NAME}</code> to log information at the
+ * following logging levels:
+ * <p>
  * <ul>
  * <li> {@link Level#FINE FINE} - Operation tallies
- * </ul> <p>
+ * </ul>
  */
 public final class DataStoreImpl implements DataStore, TransactionParticipant {
 
@@ -219,9 +210,12 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
     static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
 
+    /** The name of the logger for logging tallies of operations. */
+    private static final String OPS_LOGGER_NAME = CLASSNAME + ".ops";
+
     /** The logger for logging tallies of operations. */
     static final LoggerWrapper opsLogger =
-	new LoggerWrapper(Logger.getLogger(CLASSNAME + ".ops"));
+	new LoggerWrapper(Logger.getLogger(OPS_LOGGER_NAME));
 
     /** An empty array returned when Berkeley DB returns null for a value. */
     private static final byte[] NO_BYTES = { };
@@ -521,6 +515,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 
     /** A Berkeley DB message handler that uses logging. */
     private static class LoggingMessageHandler implements MessageHandler {
+        /** {@inheritDoc} */
 	public void message(Environment env, String message) {
 	    logger.log(Level.FINE, "Database message: {0}", message);
 	}
@@ -528,6 +523,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 
     /** A Berkeley DB error handler that uses logging. */
     private static class LoggingErrorHandler implements ErrorHandler {
+        /** {@inheritDoc} */
 	public void error(Environment env, String prefix, String message) {
 	    if (logger.isLoggable(Level.WARNING)) {
 		logger.logThrow(Level.WARNING, new Exception("Stacktrace"),

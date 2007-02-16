@@ -3,6 +3,8 @@ package com.sun.sgs.kernel;
 
 import java.util.Collection;
 
+import com.sun.sgs.app.TaskRejectedException;
+
 
 /**
  * This interface is used to schedule tasks to run. Unlike the

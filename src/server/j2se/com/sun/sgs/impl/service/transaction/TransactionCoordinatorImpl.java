@@ -43,12 +43,15 @@ public final class TransactionCoordinatorImpl
 	    txn = new TransactionImpl(tid);
 	}
 
+        /** {@inheritDoc} */
+        @Override
 	public String toString() {
 	    return "TransactionHandle[txn:" + txn + "]";
 	}
 
 	/* -- Implement TransactionHandle -- */
 
+        /** {@inheritDoc} */
 	public Transaction getTransaction() {
 	    if (txn.isActive()) {
 		return txn;
@@ -58,10 +61,12 @@ public final class TransactionCoordinatorImpl
 	    }
 	}
 
+        /** {@inheritDoc} */
 	public void commit() throws Exception {
 	    txn.commit();
 	}
 
+        /** {@inheritDoc} */
 	public void abort() {
 	    if (txn.isActive()) {
 		txn.abort();

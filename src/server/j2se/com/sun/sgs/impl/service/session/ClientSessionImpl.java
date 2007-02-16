@@ -22,7 +22,6 @@ import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.ProtocolMessageListener;
 import com.sun.sgs.service.SgsClientSession;
 import java.io.IOException;
-import java.io.InvalidObjectException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamException;
@@ -45,7 +44,16 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     
     /** Connection state. */
     private static enum State {
-	CONNECTING, CONNECTED, RECONNECTING, DISCONNECTING, DISCONNECTED
+        /** A connection is in progress */
+	CONNECTING,
+        /** Session is connected */
+        CONNECTED,
+        /** Reconnection is in progress */
+        RECONNECTING,
+        /** Disconnection is in progress */
+        DISCONNECTING, 
+        /** Session is disconnected */
+        DISCONNECTED
     }
 
     /** Random number generator for generating session ids. */

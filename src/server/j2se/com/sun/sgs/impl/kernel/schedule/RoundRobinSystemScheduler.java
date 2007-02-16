@@ -42,6 +42,7 @@ class RoundRobinSystemScheduler implements SystemScheduler {
     // the thread-local iterator
     private ThreadLocal<Iterator<ApplicationScheduler>> schedulerIter =
         new ThreadLocal<Iterator<ApplicationScheduler>>() {
+            @Override
             protected Iterator<ApplicationScheduler> initialValue() {
                 return appSchedulers.values().iterator();
             }
@@ -143,6 +144,7 @@ class RoundRobinSystemScheduler implements SystemScheduler {
         return scheduler.addRecurringTask(task);
     }
 
+    /** {@inheritDoc} */
     public void shutdown() {
         for (ApplicationScheduler scheduler : appSchedulers.values())
             scheduler.shutdown();

@@ -87,14 +87,17 @@ final class Context {
 
 	/* -- Implement Transaction -- */
 
+        /** {@inheritDoc} */
 	public byte[] getId() {
 	    return originalTxn.getId();
 	}
 
+        /** {@inheritDoc} */
 	public long getCreationTime() {
 	    return originalTxn.getCreationTime();
 	}
 
+        /** {@inheritDoc} */
 	public void join(TransactionParticipant participant) {
 	    if (inactive) {
 		throw new IllegalStateException(
@@ -109,25 +112,33 @@ final class Context {
 	    }
 	}
 
+        /** {@inheritDoc} */
 	public void abort() {
 	    originalTxn.abort();
 	}
 
+        /** {@inheritDoc} */
 	public void abort(Throwable cause) {
 	    originalTxn.abort(cause);
 	}
 
 	/* -- Object methods -- */
 
+        /** {@inheritDoc} */
+        @Override
 	public boolean equals(Object object) {
 	    return object instanceof TxnTrampoline &&
 		originalTxn.equals(((TxnTrampoline) object).originalTxn);
 	}
 
+        /** {@inheritDoc} */
+        @Override
 	public int hashCode() {
 	    return originalTxn.hashCode();
 	}
 
+        /** {@inheritDoc} */
+        @Override
 	public String toString() {
 	    return "TxnTrampoline[originalTxn:" + originalTxn + "]";
 	}

@@ -129,7 +129,12 @@ final class SerialUtil {
 		});
 	}
 
-	/** Check for references to managed objects. */
+	/**
+         * {@inheritDoc}
+         * <p> 
+         * Checks for references to managed objects.
+         */
+        @Override
 	protected Object replaceObject(Object object) throws IOException {
 	    if (object != topLevelObject && object instanceof ManagedObject) {
 		throw new ObjectIOException(
@@ -261,9 +266,13 @@ final class SerialUtil {
 	    /* Silence lint warning */
 	    private static final long serialVersionUID = 1;
 	    DebugStack() { }
+            /** {@inheritDoc} */
+            @Override
 	    public String push(String s) {
 		return super.push((isEmpty() ? "\t-root: " : "\t-") + s);
 	    }
+            /** {@inheritDoc} */
+            @Override
 	    public String toString() {
 		StringBuilder buffer = new StringBuilder();
 		if (!isEmpty()) {
@@ -357,13 +366,14 @@ final class SerialUtil {
 	}
 
 	/** Returns the name of a class, converting array class names. */
-	private static String className(Class<?> cl) {
+	private static String className(final Class<?> cl) {
+            Class<?> clazz = cl;
 	    StringBuilder sb = new StringBuilder();
-	    while (cl.isArray()) {
+	    while (clazz.isArray()) {
 		sb.append("[]");
-		cl = cl.getComponentType();
+		clazz = clazz.getComponentType();
 	    }
-	    String className = cl.getName();
+	    String className = clazz.getName();
 	    sb.insert(0, className);
 	    return sb.toString();
 	}

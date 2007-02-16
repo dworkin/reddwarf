@@ -6,7 +6,6 @@ import com.sun.sgs.auth.IdentityAuthenticator;
 import com.sun.sgs.impl.app.profile.ProfilingManager;
 
 import com.sun.sgs.impl.auth.IdentityImpl;
-import com.sun.sgs.impl.auth.NamePasswordAuthenticator;
 
 import com.sun.sgs.impl.kernel.schedule.MasterTaskScheduler;
 
@@ -26,7 +25,6 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 
 import java.util.ArrayList;
-import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.Properties;
 

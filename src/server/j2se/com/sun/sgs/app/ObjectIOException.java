@@ -5,8 +5,8 @@ import java.io.IOException;
 /**
  * Thrown when an operation fails because of an I/O failure when attempting to
  * access a managed object.  Typically the exception returned by the {@link
- * #getCause getCause} method will be the {@link IOException} that caused the
- * failure.
+ * Throwable#getCause getCause} method will be the {@link IOException} that
+ * caused the failure.
  */
 public class ObjectIOException extends RuntimeException
     implements ExceptionRetryStatus

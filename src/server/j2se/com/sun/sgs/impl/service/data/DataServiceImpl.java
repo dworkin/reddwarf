@@ -27,27 +27,26 @@ import java.util.logging.Logger;
  * Provides an implementation of <code>DataService</code> based on {@link
  * DataStoreImpl}. <p>
  *
- * The {@link #DataServiceImpl constructor} supports the following properties:
+ * The {@linkplain DataServiceImpl#DataServiceImpl(Properties,
+ * ComponentRegistry) constructor} supports the following properties:
  * <p>
  *
  * <ul>
  *
- * <li> <i>Key:</i> <code>com.sun.sgs.app.name</code> <br>
+ * <li> <i>Key:</i> <code>{@value StandardProperties#APP_NAME}</code> <br>
  *	<i>No default &mdash; required</i> <br>
  *	Specifies the name of the application using this
  *	<code>DataService</code>. <p>
  *
- * <li> <i>Key:</i> <code>com.sun.sgs.impl.service.data.debugCheckInterval
- *	</code> <br>
- *	<i>Default:</i> <code>Integer.MAX_VALUE</code> <br>
+ * <li> <i>Key:</i> <code>{@value #DEBUG_CHECK_INTERVAL_PROPERTY}</code> <br>
+ *	<i>Default:</i> {@link Integer#MAX_VALUE} <br>
  *	Specifies the number of <code>DataService</code> operations to skip
  *	between checks of the consistency of the managed references table.
  *	Note that the number of operations is measured separately for each
  *	transaction.  This property is intended for use in debugging. <p>
  *
- * <li> <i>Key:</i> <code>com.sun.sgs.impl.service.data.detectModifications
- *	</code> <br>
- *	<i>Default:</i> <code>true</code> <br>
+ * <li> <i>Key:</i> <code>{@value #DETECT_MODIFICATIONS_PROPERTY}</code> <br>
+ *	<i>Default:</i> {@code true} <br>
  *	Specifies whether to automatically detect modifications to managed
  *	objects.  If set to something other than <code>true</code>, then
  *	applications need to call {@link DataManager#markForUpdate
