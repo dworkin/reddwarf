@@ -25,13 +25,13 @@ import java.math.BigInteger;
  * Key 3 stores the ID of the next free ID number to use for allocating new
  * objects.
  *
- * Key 4 stores the ID of the next free ID number for the network version to
- * use in allocating transactions
+ * Key 4 stores the ID of the next free transaction ID number for the network
+ * version to use in allocating transactions.
  *
  * Version history:
  *
  * Version 1.0: Initial version, 11/3/2006
- * Version 2.0: Add NEXT_TXN_ID, 1/19/2007
+ * Version 2.0: Add NEXT_TXN_ID, 2/15/2007
  */
 final class DataStoreHeader {
 
