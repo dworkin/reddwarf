@@ -82,7 +82,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     private static final String LOGIN_FAILED_MESSAGE = "login failed";
 
-    private static final int WAIT_TIME = 3000;
+    private static final int WAIT_TIME = 1000;
 
     private static final String RETURN_NULL = "return null";
 

@@ -545,28 +545,33 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
      * @param	properties the properties for configuring this instance
      * @throws	DataStoreException if there is a problem with the database
      * @throws	IllegalArgumentException if neither
-     *      <code>com.sun.sgs.app.root</code> nor <code>
-     *      com.sun.sgs.impl.service.data.store.DataStoreImpl.directory</code>
-     *      is provided, or the <code>
-     *		com.sun.sgs.impl.service.data.store.allocationBlockSize</code>
-     *		property is not a valid integer greater than zero
+     *		<code>com.sun.sgs.app.root</code> nor <code>
+     *		com.sun.sgs.impl.service.data.store.DataStoreImpl.directory
+     *		</code> is provided, or the <code>
+     *		com.sun.sgs.impl.service.data.store.DataStoreImpl.allocationBlockSize
+     *		</code> property is not a valid integer greater than zero
      */
     public DataStoreImpl(Properties properties) {
 	logger.log(
 	    Level.CONFIG, "Creating DataStoreImpl properties:{0}", properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
-	String specifiedDirectory = wrappedProps.getProperty(DIRECTORY_PROPERTY);
-    if (specifiedDirectory != null) {
-        directory = specifiedDirectory;
-    } else {
-        String rootDir = properties.getProperty(StandardProperties.APP_ROOT);
-        if (rootDir == null) {
-            throw new IllegalArgumentException("A value for the property " +
-                                               StandardProperties.APP_ROOT +
-                                               " must be specified");
-        }
-        directory = rootDir + File.separator + DEFAULT_DIRECTORY;
+	String specifiedDirectory =
+	    wrappedProps.getProperty(DIRECTORY_PROPERTY);
+	if (specifiedDirectory == null) {
+	    String rootDir =
+		properties.getProperty(StandardProperties.APP_ROOT);
+	    if (rootDir == null) {
+		throw new IllegalArgumentException(
+		    "A value for the property " + StandardProperties.APP_ROOT +
+		    " must be specified");
+	    }
+	    specifiedDirectory = rootDir + File.separator + DEFAULT_DIRECTORY;
 	}
+	/*
+	 * Use an absolute path to avoid problems on Windows.
+	 * -tjb@sun.com (02/16/2007)
+	 */
+	directory = new File(specifiedDirectory).getAbsolutePath();
 	allocationBlockSize = wrappedProps.getIntProperty(
 	    ALLOCATION_BLOCK_SIZE_PROPERTY, DEFAULT_ALLOCATION_BLOCK_SIZE);
 	if (allocationBlockSize < 1) {

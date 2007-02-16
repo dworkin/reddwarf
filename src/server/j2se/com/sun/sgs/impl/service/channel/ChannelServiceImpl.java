@@ -257,7 +257,6 @@ public class ChannelServiceImpl
 	}
     }
 
-
     /* -- Implement NonDurableTransactionParticipant -- */
        
     /** {@inheritDoc} */
@@ -304,8 +303,8 @@ public class ChannelServiceImpl
     public void prepareAndCommit(Transaction txn) throws Exception {
         if (!prepare(txn)) {
             commit(txn);
-	    }
-	    }
+        }
+    }
 
     /** {@inheritDoc} */
     public void abort(Transaction txn) {
@@ -334,19 +333,19 @@ public class ChannelServiceImpl
      * context to (@code null}.
      */
     private void checkTransaction(Transaction txn) {
-	if (txn == null) {
-	    throw new NullPointerException("null transaction");
-	}
-	Context context = currentContext.get();
-	if (context == null) {
-	    throw new IllegalStateException("null context");
-	}
-	if (!txn.equals(context.txn)) {
-	    currentContext.set(null);
-	    throw new IllegalStateException(
-		"Wrong transaction: Expected " + context.txn + ", found " + txn);
-	}
-	}
+        if (txn == null) {
+            throw new NullPointerException("null transaction");
+        }
+        Context context = currentContext.get();
+        if (context == null) {
+            throw new IllegalStateException("null context");
+        }
+        if (!txn.equals(context.txn)) {
+            currentContext.set(null);
+            throw new IllegalStateException(
+                "Wrong transaction: Expected " + context.txn + ", found " + txn);
+        }
+    }
 
    /**
      * Obtains information associated with the current transaction,
@@ -463,10 +462,11 @@ public class ChannelServiceImpl
 			    sessions.add(sessionId);
 			}
 		    }
+		    
 		    short msgSize = buf.getShort();
 		    byte[] channelMessage = buf.getBytes(msgSize);
 
-                    MessageQueue queue = getMessageQueue(session);
+		    MessageQueue queue = getMessageQueue(session);
 		    queue.addMessage(name, sessions, channelMessage, seq);
 
 		    break;
@@ -513,7 +513,7 @@ public class ChannelServiceImpl
                 session.getIdentity());
 	}
     }
-    
+
     /**
      * Returns the message queue for the specified {@code session}.
      * If a queue does not already exist, one is created and returned.
@@ -887,7 +887,7 @@ public class ChannelServiceImpl
 
 	/** The sending session's ID (for the messages enqueued). */
 	private final byte[] senderId;
-
+	
 	/** List of messages to send. */
 	private List<MessageInfo> messages =
 	    new ArrayList<MessageInfo>();
@@ -968,12 +968,12 @@ public class ChannelServiceImpl
 	    context.processingQueue(this);
 	    
 	    for (MessageInfo info : processingMessages) {
-                if (logger.isLoggable(Level.FINEST)) {
-                    logger.log(
-                        Level.FINEST,
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(
+		    	Level.FINEST,
 			"processing name:{0}, message:{1}",
 			info.name, HexDumper.format(info.message));
-                }
+		}
 
 		try {
 		    ChannelImpl channel =
@@ -989,19 +989,19 @@ public class ChannelServiceImpl
 			    info.name, HexDumper.format(info.message));
 		    }
 		    
-	    } catch (RuntimeException e) {
-		if (logger.isLoggable(Level.FINER)) {
-		    logger.logThrow(
-			Level.FINER, e,
+		} catch (RuntimeException e) {
+		    if (logger.isLoggable(Level.FINER)) {
+			logger.logThrow(
+                            Level.FINER, e,
 			    "processing name:{0}, message:{1} throws",
 			    info.name, HexDumper.format(info.message));
+		    }
+		    throw e;
 		}
-		throw e;
-	    }
+            }
 	}
     }
-    }
-    
+
     /**
      * Contains information about a channel message to be sent.
      */
@@ -1017,14 +1017,14 @@ public class ChannelServiceImpl
 	final long seq;
 
 	MessageInfo(String name,
-                Set<byte[]> recipientIds,
-                byte[] message,
-                long seq)
+		    Set<byte[]> recipientIds,
+		    byte[] message,
+		    long seq)
         {
             this.name = name;
             this.recipientIds = recipientIds;
             this.message = message;
             this.seq = seq;
         }
-                }
-                }
+    }
+}

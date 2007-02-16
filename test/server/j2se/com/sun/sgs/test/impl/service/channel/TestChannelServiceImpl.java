@@ -1280,7 +1280,7 @@ public class TestChannelServiceImpl extends TestCase {
 
 	DummyClient getClient(String name) {
 	    return clients.get(name);
-		}
+	}
 	
 	void disconnect(boolean graceful) {
 	    for (DummyClient client : clients.values()) {
@@ -1510,13 +1510,13 @@ public class TestChannelServiceImpl extends TestCase {
 	createTransaction();
 	DummyAppListener appListener = new DummyAppListener();
 	dataService.setServiceBinding(
-            StandardProperties.APP_LISTENER, appListener);
+	    StandardProperties.APP_LISTENER, appListener);
 	txn.commit();
     }
     
     private DummyAppListener getAppListener() {
 	return (DummyAppListener) dataService.getServiceBinding(
-            StandardProperties.APP_LISTENER, AppListener.class);
+	    "com.sun.sgs.app.AppListener", AppListener.class);
     }
 
     /**
@@ -2062,7 +2062,7 @@ public class TestChannelServiceImpl extends TestCase {
 		    break;
 		}
 	    }
-	    
+
             /** {@inheritDoc} */
 	    public void connected(Connection conn) {
 		System.err.println("DummyClient.Listener.connected");

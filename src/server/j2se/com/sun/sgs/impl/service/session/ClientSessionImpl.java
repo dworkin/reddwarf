@@ -291,19 +291,13 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	}
 
 	private Object readResolve() throws ObjectStreamException {
-	    try {
-		ClientSessionService service =
-		    ClientSessionServiceImpl.getInstance();
-		ClientSession session = service.getClientSession(sessionId);
-		if (session == null) {
-		    session = new ClientSessionImpl(sessionId, identity);
-		}
-		return session;
-		
-	    } catch (RuntimeException e) {
-		throw (InvalidObjectException)
-		    new InvalidObjectException(e.getMessage()).initCause(e);
+	    ClientSessionService service =
+		ClientSessionServiceImpl.getInstance();
+	    ClientSession session = service.getClientSession(sessionId);
+	    if (session == null) {
+		session = new ClientSessionImpl(sessionId, identity);
 	    }
+	    return session;
 	}
     }
 
