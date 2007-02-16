@@ -64,21 +64,24 @@
        containing builds of Berkeley DB for all of the platforms if
        calling the dist-server task. -->
 
+  <!-- Shared code class path -->
+  <path id="shared.classpath">
+    <pathelement location="${build.dir}/classes/shared"/>
+    <pathelement location="${lib.dir}/mina-core-1.1.jar"/>
+    <pathelement location="${lib.dir}/slf4j-jdk14.jar"/>
+  </path>
+
   <!-- Server class path -->
   <path id="server.classpath">
     <pathelement location="${build.dir}/classes/server"/>
     <pathelement location="${bdb.lib.dir}/db.jar"/>
-    <pathelement location="${lib.dir}/mina-core-1.1.jar"/>
-    <pathelement location="${lib.dir}/slf4j-jdk14.jar"/>
+    <path refid="shared.classpath"/>
   </path>
 
   <!-- Client class path -->
   <path id="client.classpath">
     <pathelement location="${build.dir}/classes/client"/>
-    <!-- IO classes are currently under server, but client needs them -->
-    <pathelement location="${build.dir}/classes/server"/>
-    <pathelement location="${lib.dir}/mina-core-1.1.jar"/>
-    <pathelement location="${lib.dir}/slf4j-jdk14.jar"/>
+    <path refid="shared.classpath"/>
   </path>
 
   <!-- TARGET DEFINITIONS -->
@@ -90,6 +93,20 @@
   <!-- Builds a debug version of the complete project -->
   <target name="build" depends="build-server,build-client"
 	  description="Builds code"/>
+
+  <!-- Builds the shared code -->
+  <target name="build-shared" description="Builds shared code">
+    <mkdir dir="${build.dir}/classes/shared"/>
+    <depend srcdir="j2se"
+	    destdir="${build.dir}/classes/shared"
+	    cache="${build.dir}/depend"
+	    closure="true"/>
+    <javac includeAntRuntime="no" debug="on" deprecation="on"
+           srcdir="src/shared/j2se" destdir="${build.dir}/classes/shared"
+           classpathref="shared.classpath" source="${javac.source}">
+      <compilerarg value="${javac.compilerargs}"/>
+    </javac>
+  </target>
 
   <!-- Builds the server -->
   <target name="build-server" description="Builds server code">
