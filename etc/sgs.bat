@@ -21,7 +21,7 @@
 @set app_config_files=
 
 @rem Set sgshome if it isn't set
-@if not %sgshome%"" == "" (
+@if %sgshome%"" == "" (
 @set sgshome=.
 )
 
@@ -42,10 +42,10 @@
 @rem configuration file, the SGS configuration file, the classpath, the
 @rem main class, and the application configuration files
 :cmdline
-java -Djava.library.path="%sgshome%\lib\bdb\win32-x86" ^
+java -Djava.library.path=%sgshome%\lib\bdb\win32-x86 ^
      -Djava.util.logging.config.file=%sgshome%\sgs.logging ^
      -Dcom.sun.sgs.config.file=%sgshome%\sgs.config ^
-     -cp "%sgshome%\lib\sgs.jar;%app_classpath%" ^
+     -cp %sgshome%\lib\sgs.jar;%app_classpath% ^
      com.sun.sgs.impl.kernel.Kernel ^
      %app_config_files%
 @goto end
