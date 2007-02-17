@@ -24,11 +24,8 @@ import java.util.logging.Logger;
  * a single application being supported, but in practice this may also be
  * useful for supporting multiple applications, depending on the task
  * characteristics of those applications.
- *
- * @since 1.0
- * @author Seth Proctor
  */
-class SingleAppSystemScheduler implements SystemScheduler, ProfilingConsumer {
+class SingleAppSystemScheduler implements SystemScheduler {
 
     // logger for this class
     private static final LoggerWrapper logger =

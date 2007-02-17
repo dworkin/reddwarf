@@ -10,9 +10,6 @@ import com.sun.sgs.kernel.TaskOwner;
 /**
  * This is a simple implementation of <code>TaskOwner</code> that is nothing
  * more than a container for a name and a context.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 public class TaskOwnerImpl implements TaskOwner {
 
@@ -51,6 +48,16 @@ public class TaskOwnerImpl implements TaskOwner {
      */
     public Identity getIdentity() {
         return identity;
+    }
+
+    /**
+     * Provides some diagnostic detail about this owner.
+     *
+     * @return a <code>String</code> representation of the owner.
+     */
+    public String toString() {
+        return "[ id=\"" + identity.getName() + "\" context=" +
+            context.toString() + " ]";
     }
 
     /**

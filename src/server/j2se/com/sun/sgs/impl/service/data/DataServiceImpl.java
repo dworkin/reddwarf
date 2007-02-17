@@ -11,6 +11,8 @@ import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.PropertiesWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.ProfilingConsumer;
+import com.sun.sgs.kernel.ProfilingProducer;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.Transaction;
@@ -84,7 +86,7 @@ import java.util.logging.Logger;
  * </ul>
  */
 public final class DataServiceImpl
-    implements DataService, TransactionParticipant
+    implements DataService, TransactionParticipant, ProfilingProducer
 {
 
     /** The name of this class. */
@@ -585,6 +587,15 @@ public final class DataServiceImpl
 	synchronized (lock) {
 	    this.detectModifications = detectModifications;
 	}
+    }
+
+    /* -- Implement ProfilingProducer -- */
+
+    /**
+     * {@inheritDoc}
+     */
+    public void setProfilingConsumer(ProfilingConsumer profilingConsumer) {
+        ((DataStoreImpl)store).setProfilingConsumer(profilingConsumer);
     }
 
     /* -- Other methods -- */
