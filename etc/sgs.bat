@@ -28,13 +28,13 @@
 @if not %1"" == "" goto :loop
 
 @rem The install directory, or the current directory if not set
-@if %sgshome%"" == "" (
+@if "%sgshome%" == "" (
 @set sgshome=.
 )
 
 @rem The java command
 @set java=java
-@if not %java_home%"" == "" (
+@if not "%java_home%" == "" (
 @set java=%java_home%\bin\java
 )
 
@@ -42,12 +42,12 @@
 @rem configuration file, the SGS configuration file, the classpath, the
 @rem main class, and the application configuration files
 :cmdline
-%java% -Djava.library.path=%sgshome%\lib\bdb\win32-x86 ^
-       -Djava.util.logging.config.file=%sgshome%\sgs-logging.properties ^
-       -Dcom.sun.sgs.config.file=%sgshome%\sgs-config.properties ^
-       -cp %sgshome%\lib\sgs.jar;%app_classpath% ^
-       com.sun.sgs.impl.kernel.Kernel ^
-       %app_config_files%
+"%java%" -Djava.library.path="%sgshome%\lib\bdb\win32-x86" ^
+       	 -Djava.util.logging.config.file="%sgshome%\sgs-logging.properties" ^
+       	 -Dcom.sun.sgs.config.file="%sgshome%\sgs-config.properties" ^
+       	 -cp "%sgshome%\lib\sgs.jar";%app_classpath% ^
+       	 com.sun.sgs.impl.kernel.Kernel ^
+       	 %app_config_files%
 @goto end
 
 :usage
