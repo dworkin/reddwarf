@@ -87,7 +87,7 @@
   <!-- TARGET DEFINITIONS -->
 
   <!-- Builds everything -->
-  <target name="all" depends="build, jar, javadoc, dist, test"
+  <target name="all" depends="build, jar, javadoc, dist, checkstyle, test"
 	  description="Builds everything"/>
 
   <!-- Builds a debug version of the complete project -->
