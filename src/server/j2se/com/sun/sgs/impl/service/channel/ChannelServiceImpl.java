@@ -310,6 +310,7 @@ public class ChannelServiceImpl
     public void abort(Transaction txn) {
 	try {
 	    checkTransaction(txn);
+	    currentContext.get().abort();
 	    currentContext.set(null);
 	    if (logger.isLoggable(Level.FINER)) {
 		logger.log(Level.FINER, "abort txn:{0} returns", txn);
