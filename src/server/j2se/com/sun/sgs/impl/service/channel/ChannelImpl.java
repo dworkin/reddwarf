@@ -398,14 +398,9 @@ final class ChannelImpl implements Channel, Serializable {
 	}
 
 	private Object readResolve() throws ObjectStreamException {
-	    try {
-		ChannelManager cm = AppContext.getChannelManager();
-		Channel channel = cm.getChannel(name);
-		return channel;
-	    } catch (RuntimeException e) {
-		throw (InvalidObjectException)
-		    new InvalidObjectException(e.getMessage()).initCause(e);
-	    }
+	    ChannelManager cm = AppContext.getChannelManager();
+	    Channel channel = cm.getChannel(name);
+	    return channel;
 	}
     }
 
@@ -432,46 +427,25 @@ final class ChannelImpl implements Channel, Serializable {
     }
 
     /**
-     * Notifies the appropriate channel listeners that the specified
-     * message was sent by the specified sender.
+     * Forwards the specified {@code message} from the session with
+     * {@code senderId} to the sessions with {@code recipientId}s, and
+     * then notifies this channel's global channel listener (if any),
+     * and notifies the per-session channel listener (if any).
      */
-    void notifyListeners(byte[] senderId, byte[] message) {
-	checkClosed();
-	ClientSession senderSession =
-	    context.getService(ClientSessionService.class).
-	        getClientSession(senderId);
-	if (senderSession == null) {
-	    /*
-	     * Sending session has disconnected, so return.
-	     */
-	    // TBD: should this notify the channel-wide listener?
-	    return;
-	}
-	
-	// Notify per-channel listener.
-	ChannelListener listener = state.getListener();
-	if (listener != null) {
-	    listener.receivedMessage(this, senderSession, message);
-	}
-
-        // Notify per-session listener.
-        listener = state.getListener(senderSession);
-        if (listener != null) {
-            listener.receivedMessage(this, senderSession, message);
-        }
-    }
-
-    /**
-     * Forwards message (from client) to recipient sessions.
-     */
-    void forwardMessage(
+    void forwardMessageAndNotifyListeners(
 	    final byte[] senderId,
             final Set<byte[]> recipientIds,
             final byte[] message, final long seq)
     {
 	checkClosed();
-        // Build the list of recipients
-        final Set<ClientSession> recipients;
+	
+	// TBD: if the sending session has disconnected, do we still
+	// want to send the message?
+	
+	/*
+	 * Build list of recipients.
+	 */
+        Set<ClientSession> recipients;
         if (recipientIds.size() == 0) {
             recipients = state.getSessionsExcludingId(senderId);
         } else {
@@ -490,54 +464,37 @@ final class ChannelImpl implements Channel, Serializable {
             }
         }
 
-        /*
-         * If there are no connected sessions other than the sender,
-         * we don't need to send anything.
-         */
-        if (recipients.isEmpty()) {
-	    logger.log(Level.FINEST, "no recipients except sender");
-            return;
-        }
-        
-        final Delivery delivery = state.delivery;
-        
-        context.channelService.nonDurableTaskScheduler.
-            scheduleNonTransactionalTaskOnCommit(
-                new KernelRunnable() {
-                    public void run() throws Exception {
-                        forwardToSessions(
-                            senderId, recipients, message, seq, delivery);
-                    }
-                });
-    }
+	/*
+	 * Schedule messages to be sent upon transaction commit.
+	 */
+	if (! recipients.isEmpty()) {
+	    byte[] protocolMessage = getChannelMessage(senderId, message, seq);
 
-    /**
-     * Forward a message to the given recipients.
-     */
-    private void forwardToSessions(
-            byte[] senderId,
-            Set<ClientSession> recipients,
-            byte[] message,
-            long seq,
-            Delivery delivery)
-    {
-        try {
-            byte[] protocolMessage = getChannelMessage(senderId, message, seq);
+	    for (ClientSession session : recipients) {
+		((SgsClientSession) session).sendProtocolMessageOnCommit(
+                    protocolMessage, state.delivery);
+	    }
+	}
 
-            for (ClientSession session : recipients) {
-                ((SgsClientSession) session).sendProtocolMessage(
-                        protocolMessage, delivery);
-            }
+	/*
+	 * Notify channel listeners of channel message.
+	 */
+	ClientSession senderSession =
+	    context.getService(ClientSessionService.class).
+	        getClientSession(senderId);
+	if (senderSession != null) {
+	    // Notify per-channel listener.
+	    ChannelListener listener = state.getListener();
+	    if (listener != null) {
+		listener.receivedMessage(this, senderSession, message);
+	    }
 
-        } catch (RuntimeException e) {
-            if (logger.isLoggable(Level.FINER)) {
-                logger.logThrow(
-                        Level.FINER, e,
-                        "forwardToSessions name:{0}, message:{1} throws",
-                        state.name, HexDumper.format(message));
-            }
-            throw e;
-        }
+	    // Notify per-session listener.
+	    listener = state.getListener(senderSession);
+	    if (listener != null) {
+		listener.receivedMessage(this, senderSession, message);
+	    }
+	}
     }
 
     /**
@@ -565,13 +522,6 @@ final class ChannelImpl implements Channel, Serializable {
         return buf.getBuffer();
     }
     
-    /**
-     * Schedules a non-durable, non-transactional task.
-     */
-    private void scheduleNonTransactionalTask(KernelRunnable task) {
-	context.getService(TaskService.class).scheduleNonDurableTask(task);
-    }
-
     /**
      * Send a protocol message to the specified session when the
      * transaction commits, logging (but not throwing) any exception.
