@@ -10,6 +10,7 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.auth.NamePasswordCredentials;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl.Context;
+import com.sun.sgs.impl.util.HexDumper;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.MessageBuffer;
 import com.sun.sgs.io.Connection;
@@ -249,7 +250,8 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 
     /** {@inheritDoc} */
     public String toString() {
-	return getClass().getName() + "[" + name + "]";
+	return getClass().getName() + "[" + getName() + "]@" +
+            HexDumper.toHexString(sessionId);
     }
     
     /* -- Serialization methods -- */
