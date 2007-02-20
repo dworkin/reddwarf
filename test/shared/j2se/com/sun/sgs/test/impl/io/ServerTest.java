@@ -19,11 +19,13 @@ public class ServerTest implements ConnectionListener {
     private static final String DEFAULT_HOST = "0.0.0.0";
     private static final String DEFAULT_PORT = "5150";
     
-    Acceptor<SocketAddress> acceptor;
+    private Acceptor<SocketAddress> acceptor;
     private int numConnections;
 
+    /** Default constructor */
     public ServerTest() { }
 
+    /** Starts the IO {@code ServerTest} harness. */
     public void start() {
         String host = System.getProperty("host", DEFAULT_HOST);
         String portString = System.getProperty("port", DEFAULT_PORT);
@@ -44,7 +46,7 @@ public class ServerTest implements ConnectionListener {
                  * {@inheritDoc}
                  */
                 public void disconnected() {
-                    // TODO Auto-generated method stub
+                    System.out.println("acceptor shutdown");
                 }
             });
         } catch (IOException ioe) {
@@ -52,18 +54,6 @@ public class ServerTest implements ConnectionListener {
         }
         System.out.println("Listening on " +
                 acceptor.getBoundEndpoint().getAddress());
-    }
-
-    public final static void main(String[] args) {
-        ServerTest server = new ServerTest();
-        synchronized(server) {
-            server.start();
-            try {
-                server.wait();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        }
     }
 
     /** {@inheritDoc} */
@@ -104,4 +94,20 @@ public class ServerTest implements ConnectionListener {
         
     }
 
+    /**
+     * Runs the IO server test.
+     *
+     * @param args the commandline arguments
+     */
+    public final static void main(String[] args) {
+        ServerTest server = new ServerTest();
+        synchronized(server) {
+            server.start();
+            try {
+                server.wait();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
 }
