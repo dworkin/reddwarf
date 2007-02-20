@@ -25,9 +25,7 @@
   <!-- Version information -->
   <exec outputproperty="project.revision"
 	executable="svnversion"
-	logError="true">
-    <arg file="."/>
-  </exec>
+	logError="true"/>
   <property name="project.version" value="1.0alpha-${project.revision}"/>
 
   <!-- Values for the JavaDocs -->
@@ -164,11 +162,11 @@
         ${project.version}<br>${project.build}</font>]]>
       </footer>
       <bottom>
-        <![CDATA[<font size="-1">Copyright 2007 Sun Microsystems,
-        Inc. All rights reserved. Use is subject to license
-        terms.<p>Sun, Sun Microsystems, the Sun Logo, and Java are
-        trademarks or registered trademarks of Sun Microsystems, Inc. in
-        the US and other countries.</font>]]>
+        <![CDATA[<font size="-1">Copyright &copy; 2007 Sun Microsystems,
+        Inc. All rights reserved. <br>THIS PRODUCT CONTAINS CONFIDENTIAL
+        INFORMATION AND TRADE SECRETS OF SUN MICROSYSTEMS, INC. USE,
+        DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT THE PRIOR
+        EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC. </font>]]>
       </bottom>
     </javadoc>
   </target>
@@ -188,15 +186,15 @@
             offline="true"
             packagelistLoc="${mina.package.list}"/>
       <footer>
-        <![CDATA[<font size="-1">Project Darkstar: Version
+        <![CDATA[<font size="-1">Sun Game Server, Version
         ${project.version}<br>${project.build}</font>]]>
       </footer>
       <bottom>
-        <![CDATA[<font size="-1">Copyright 2007 Sun Microsystems,
-        Inc. All rights reserved. Use is subject to license
-        terms.<p>Sun, Sun Microsystems, the Sun Logo, and Java are
-        trademarks or registered trademarks of Sun Microsystems, Inc. in
-        the US and other countries.</font>]]>
+        <![CDATA[<font size="-1">Copyright &copy; 2007 Sun Microsystems,
+        Inc. All rights reserved. <br>THIS PRODUCT CONTAINS CONFIDENTIAL
+        INFORMATION AND TRADE SECRETS OF SUN MICROSYSTEMS, INC. USE,
+        DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT THE PRIOR
+        EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC. </font>]]>
       </bottom>
     </javadoc>
   </target>
@@ -219,15 +217,13 @@
             offline="true"
             packagelistLoc="${mina.package.list}"/>
       <footer>
-        <![CDATA[<font size="-1">Sun Game Server version ${project.version}<br/>${project.build}</font>]]>
+        <![CDATA[<font size="-1">Sun Game Server, Version
+        ${project.version}<br>${project.build}</font>]]>
       </footer>
       <bottom>
-        <![CDATA[<font size="-1">Copyright 2007 Sun Microsystems,
-        Inc. All rights reserved.
-        <p>Sun, Sun Microsystems, the Sun Logo, and Java are
-        trademarks or registered trademarks of Sun Microsystems, Inc. in
-        the US and other countries.
-        <p>THIS PRODUCT CONTAINS CONFIDENTIAL INFORMATION AND TRADE SECRETS OF SUN MICROSYSTEMS, INC. USE, DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT THE PRIOR EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC.</font>]]>
+        <![CDATA[<font size="-1">Copyright &copy; 2007 Sun Microsystems,
+        Inc. All rights reserved. <br>Use is subject to license
+        terms. </font>]]>
       </bottom>
     </javadoc>
   </target>
@@ -250,15 +246,13 @@
             offline="true"
             packagelistLoc="${mina.package.list}"/>
       <footer>
-        <![CDATA[<font size="-1">Sun Game Server version ${project.version}<br/>${project.build}</font>]]>
+        <![CDATA[<font size="-1">Sun Game Server, Version
+        ${project.version}<br>${project.build}</font>]]>
       </footer>
       <bottom>
-        <![CDATA[<font size="-1">Copyright 2007 Sun Microsystems,
-        Inc. All rights reserved.
-        <p>Sun, Sun Microsystems, the Sun Logo, and Java are
-        trademarks or registered trademarks of Sun Microsystems, Inc. in
-        the US and other countries.
-        <p>THIS PRODUCT CONTAINS CONFIDENTIAL INFORMATION AND TRADE SECRETS OF SUN MICROSYSTEMS, INC. USE, DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT THE PRIOR EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC.</font>]]>
+        <![CDATA[<font size="-1">Copyright &copy; 2007 Sun Microsystems,
+        Inc. All rights reserved. <br>Use is subject to license
+        terms. </font>]]>
       </bottom>
     </javadoc>
   </target>
@@ -308,7 +302,7 @@
   <target name="dist-server" depends="jar-server, dist-bdb"
 	  description="Builds server files for distribution">
     <copy todir="${build.dir}/sgs">
-      <fileset dir="etc" includes="sgs.*"/>
+      <fileset dir="etc" includes="sgs.*, sgs-*.properties"/>
     </copy>
     <chmod file="${build.dir}/sgs/sgs.sh" perm="a+x"/>
     <copy todir="${build.dir}/sgs/lib">
@@ -325,22 +319,22 @@
     <copy todir="${build.dir}/sgs/lib/bdb"
 	  file="${bdb.builds.dir}/ppc/lib/db.jar"/>
     <copy todir="${build.dir}/sgs/lib/bdb/macosx-ppc">
-      <fileset dir="${bdb.builds.dir}/macosx-ppc/lib"
+      <fileset dir="${bdb.builds.dir}/ppc/lib"
 	       includes="libdb-?.?.dylib,
 			 libdb_java-?.?.jnilib"/>
     </copy>
     <copy todir="${build.dir}/sgs/lib/bdb/solaris-x86">
-      <fileset dir="${bdb.builds.dir}/solaris-x86/lib"
+      <fileset dir="${bdb.builds.dir}/i86pc/lib"
 	       includes="libdb-?.?.so,
 			 libdb_java-?.?.so"/>
     </copy>
     <copy todir="${build.dir}/sgs/lib/bdb/solaris-sparc">
-      <fileset dir="${bdb.builds.dir}/solaris-sparc/lib"
+      <fileset dir="${bdb.builds.dir}/sun4/lib"
 	       includes="libdb-?.?.so,
 			 libdb_java-?.?.so"/>
     </copy>
     <copy todir="${build.dir}/sgs/lib/bdb/win32-x86/">
-      <fileset dir="${bdb.builds.dir}/win32-x86/Release"
+      <fileset dir="${bdb.builds.dir}/win32/Release"
 	       includes="libdb_java??.dll"/>
     </copy>
   </target>

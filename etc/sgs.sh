@@ -1,6 +1,6 @@
 #! /bin/sh
-# Copyright (c) 2007 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2007 by Sun Microsystems, Inc. All rights reserved.
+# Use is subject to license terms.
 #
 # Bourne shell script for starting the SGS server
 #
@@ -19,22 +19,21 @@ if [ $# -lt 2 ]; then
     exit 1;
 fi
 
-# The application classpath
+# The application classpath, taken from the first argument
 app_classpath="$1"
 
+# The application configuration files, take from the second and
+# following arguments
 shift
-
-# The application configuration files
 app_config_files="$*"
 
 # The install directory, or the current directory if not set
 sgshome="${SGSHOME:=.}"
 
 # The java command
+java=java
 if [ -n "$JAVA_HOME" ]; then
     java=$JAVA_HOME/bin/java;
-else
-    java=java;
 fi
 
 # Figure out what platform we're running on and set the platform and
@@ -107,8 +106,8 @@ set -x
 # configuration file, the SGS configuration file, the classpath, the
 # main class, and the application configuration files
 $java -Djava.library.path=$sgshome/lib/bdb/$platform \
-      -Djava.util.logging.config.file=$sgshome/sgs.logging \
-      -Dcom.sun.sgs.config.file=$sgshome/sgs.config \
+      -Djava.util.logging.config.file=$sgshome/sgs-logging.properties \
+      -Dcom.sun.sgs.config.file=$sgshome/sgs-config.properties \
       -cp "$sgshome/lib/sgs.jar$pathsep$app_classpath" \
       com.sun.sgs.impl.kernel.Kernel \
       $app_config_files
