@@ -15,9 +15,9 @@ import com.sun.sgs.impl.util.LoggerWrapper;
  * {@link FilterListener}.
  * <p>
  * It prepends the message length on sending, and reads the length of each
- * message on receiving. If partial the filter will hold the partial message
- * until the rest of the message is received, even if the message spans
- * multiple calls to {@code filterReceive}.
+ * message on receiving. If the message is partial, the filter will hold the
+ * partial message until the rest of the message is received, even if the
+ * message spans multiple calls to {@code filterReceive}.
  * <p>
  * The {@code filterReceive} portion of this filter is not thread-safe since
  * it retains state information about partial messages. For this reason,
@@ -84,7 +84,7 @@ class CompleteMessageFilter {
 
         // Process complete messages, if any
         while (msgBuf.hasRemaining()) {
-            if (! msgBuf.prefixedDataAvailable(4, MAX_MSG_SIZE))
+            if (msgBuf.remaining() < 4)
                 break;
 
             int msgLen = msgBuf.getInt();
@@ -93,7 +93,11 @@ class CompleteMessageFilter {
                 logger.log(Level.WARNING,
                     "Recv message is larger than expected: {0}",
                     msgLen);
+                // TODO throw an exception?
             }
+
+            if (! msgBuf.prefixedDataAvailable(4))
+                break;
 
             // Get a read-only buffer view on the complete message
             ByteBuffer completeMessage =
