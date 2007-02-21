@@ -662,5 +662,63 @@
       </classpath>
     </java>
   </target>
-  
+
+  <!-- Builds the example code -->
+  <target name="example.classes" depends="build"
+          description="Builds the example code">
+    <mkdir dir="${build.dir}/example/classes"/>
+    <depend srcdir="example"
+            destdir="${build.dir}/example/classes"
+	    cache="${build.dir}/example/depend"
+	    closure="true"/>
+    <javac sourcepath=""
+           destdir="${build.dir}/example/classes"
+	   includeAntRuntime="yes"
+	   debug="on"
+	   source="${javac.source}"
+	   includes="**/*.java">
+      <src>
+        <dirset dir="example" includes="*/src"/>
+      </src>
+      <classpath>
+        <pathelement location="${build.dir}/classes/server"/>
+        <pathelement location="${build.dir}/classes/client"/>
+        <pathelement location="${build.dir}/classes/shared"/>
+      </classpath>
+      <compilerarg value="${javac.compilerargs}"/>
+    </javac>
+  </target>
+
+  <!-- Runs the example ChatApp (server) -->
+  <target name="example.chat.app" depends="example.classes"
+          description="Runs the example ChatApp (server)">
+    <java classname="com.sun.sgs.impl.kernel.Kernel"
+          fork="true">
+      <jvmarg line="${test.jvm.args}"/>
+      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${test.logging}"/>
+      <classpath>
+        <pathelement location="${build.dir}/example/classes"/>
+        <path refid="server.classpath"/>
+      </classpath>
+      <arg value="example/chat/ChatApp.properties"/>
+    </java>
+  </target>
+
+  <!-- Runs the example ChatClient -->
+  <target name="example.chat.client" depends="example.classes"
+          description="Runs the example ChatClient">
+    <java classname="com.sun.sgs.example.chat.client.ChatClient"
+          fork="true">
+      <jvmarg line="${test.jvm.args}"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${test.logging}"/>
+      <classpath>
+        <pathelement location="${build.dir}/example/classes"/>
+        <path refid="client.classpath"/>
+      </classpath>
+    </java>
+  </target>
+
 </project>
