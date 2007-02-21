@@ -96,7 +96,7 @@ class CompleteMessageFilter {
                 // TODO throw an exception?
             }
 
-            if (! msgBuf.prefixedDataAvailable(4))
+            if (msgBuf.remaining() < msgLen)
                 break;
 
             // Get a read-only buffer view on the complete message
