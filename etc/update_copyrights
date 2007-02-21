@@ -1,6 +1,12 @@
 #!/usr/bin/ruby
+# Updates or inserts copyright notices from the file COPYRIGHT.java into
+# the Java files specified on the command line
+#
+# You can update all the Java files by doing:
+#
+#   find .. -name '*.java' -exec update_copyrights {} \;
 
-COPYRIGHT_FILE = "COPYRIGHT"
+COPYRIGHT_FILE = "COPYRIGHT.java"
 
 S_SEEK_COMMENT_START = 1
 S_SEEK_COMMENT_END   = 2
