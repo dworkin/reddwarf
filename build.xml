@@ -692,6 +692,7 @@
   <!-- Runs the example ChatApp (server) -->
   <target name="example.chat.app" depends="example.classes"
           description="Runs the example ChatApp (server)">
+    <mkdir dir="/tmp/ChatApp/dsdb"/>
     <java classname="com.sun.sgs.impl.kernel.Kernel"
           fork="true">
       <jvmarg line="${test.jvm.args}"/>
