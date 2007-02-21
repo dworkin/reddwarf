@@ -660,36 +660,34 @@
     </java>
   </target>
 
-  <!-- Builds the Chat example -->
-  <target name="example.chat.classes" depends="build"
-          description="Builds the Chat example">
-    <mkdir dir="${build.dir}/example/chat/classes"/>
-    <depend srcdir="src/example/chat"
-	    destdir="${build.dir}/example/chat/classes"
-	    cache="${build.dir}/example/chat/depend"
+  <!-- Builds the example code -->
+  <target name="example.classes" depends="build"
+          description="Builds the example code">
+    <mkdir dir="${build.dir}/example/classes"/>
+    <depend srcdir="example"
+            destdir="${build.dir}/example/classes"
+	    cache="${build.dir}/example/depend"
 	    closure="true"/>
-    <javac srcdir="src/example/chat"
-	   destdir="${build.dir}/example/chat/classes"
+    <javac sourcepath=""
+           destdir="${build.dir}/example/classes"
 	   includeAntRuntime="yes"
 	   debug="on"
 	   source="${javac.source}"
-	   classpathref="server.classpath"
-	   includes="com/sun/sgs/example/chat/app/*.java">
-      <compilerarg value="${javac.compilerargs}"/>
-    </javac>
-    <javac srcdir="src/example/chat"
-	   destdir="${build.dir}/example/chat/classes"
-	   includeAntRuntime="yes"
-	   debug="on"
-	   source="${javac.source}"
-	   classpathref="client.classpath"
-	   includes="com/sun/sgs/example/chat/client/*.java">
+	   includes="**/*.java">
+      <src>
+        <dirset dir="example" includes="*/src"/>
+      </src>
+      <classpath>
+        <pathelement location="${build.dir}/classes/server"/>
+        <pathelement location="${build.dir}/classes/client"/>
+        <pathelement location="${build.dir}/classes/shared"/>
+      </classpath>
       <compilerarg value="${javac.compilerargs}"/>
     </javac>
   </target>
 
   <!-- Runs the example ChatApp (server) -->
-  <target name="example.chat.app" depends="example.chat.classes"
+  <target name="example.chat.app" depends="example.classes"
           description="Runs the example ChatApp (server)">
     <java classname="com.sun.sgs.impl.kernel.Kernel"
           fork="true">
@@ -697,15 +695,15 @@
       <sysproperty key="java.util.logging.config.file"
 		   file="${test.logging}"/>
       <classpath>
-        <pathelement location="${build.dir}/example/chat/classes"/>
+        <pathelement location="${build.dir}/example/classes"/>
         <path refid="server.classpath"/>
       </classpath>
-      <arg value="ChatApp.properties"/>
+      <arg value="example/chat/ChatApp.properties"/>
     </java>
   </target>
 
   <!-- Runs the example ChatClient -->
-  <target name="example.chat.client" depends="example.chat.classes"
+  <target name="example.chat.client" depends="example.classes"
           description="Runs the example ChatClient">
     <java classname="com.sun.sgs.example.chat.client.ChatClient"
           fork="true">
@@ -713,7 +711,7 @@
       <sysproperty key="java.util.logging.config.file"
 		   file="${test.logging}"/>
       <classpath>
-        <pathelement location="${build.dir}/example/chat/classes"/>
+        <pathelement location="${build.dir}/example/classes"/>
         <path refid="client.classpath"/>
       </classpath>
     </java>
