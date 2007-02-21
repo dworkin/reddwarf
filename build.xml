@@ -183,7 +183,7 @@
       </footer>
       <bottom>
         <![CDATA[<font size="-1">Copyright &copy; 2007 Sun Microsystems,
-        Inc. All rights reserved. <br>THIS PRODUCT CONTAINS CONFIDENTIAL
+        Inc. All rights reserved<br>THIS PRODUCT CONTAINS CONFIDENTIAL
         INFORMATION AND TRADE SECRETS OF SUN MICROSYSTEMS, INC. USE,
         DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT THE PRIOR
         EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC. </font>]]>
@@ -213,7 +213,7 @@
       </footer>
       <bottom>
         <![CDATA[<font size="-1">Copyright &copy; 2007 Sun Microsystems,
-        Inc. All rights reserved. <br>THIS PRODUCT CONTAINS CONFIDENTIAL
+        Inc. All rights reserved<br>THIS PRODUCT CONTAINS CONFIDENTIAL
         INFORMATION AND TRADE SECRETS OF SUN MICROSYSTEMS, INC. USE,
         DISCLOSURE OR REPRODUCTION IS PROHIBITED WITHOUT THE PRIOR
         EXPRESS WRITTEN PERMISSION OF SUN MICROSYSTEMS, INC. </font>]]>
@@ -244,8 +244,7 @@
       </footer>
       <bottom>
         <![CDATA[<font size="-1">Copyright &copy; 2007 Sun Microsystems,
-        Inc. All rights reserved. <br>Use is subject to license
-        terms. </font>]]>
+        Inc. All rights reserved</font>]]>
       </bottom>
     </javadoc>
   </target>
@@ -273,8 +272,7 @@
       </footer>
       <bottom>
         <![CDATA[<font size="-1">Copyright &copy; 2007 Sun Microsystems,
-        Inc. All rights reserved. <br>Use is subject to license
-        terms. </font>]]>
+        Inc. All rights reserved</font>]]>
       </bottom>
     </javadoc>
   </target>
