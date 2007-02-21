@@ -1,4 +1,4 @@
-package com.sun.sgs.test.client.chat;
+package com.sun.sgs.example.chat.client;
 
 import java.awt.BorderLayout;
 import java.awt.Component;

@@ -1,4 +1,4 @@
-package com.sun.sgs.test.app.chat;
+package com.sun.sgs.example.chat.app;
 
 import java.io.Serializable;
 import java.util.Properties;

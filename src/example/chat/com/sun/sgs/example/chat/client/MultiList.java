@@ -1,4 +1,4 @@
-package com.sun.sgs.test.client.chat;
+package com.sun.sgs.example.chat.client;
 
 import java.util.ArrayList;
 import java.util.Collection;
