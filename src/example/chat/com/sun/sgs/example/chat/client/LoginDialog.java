@@ -66,8 +66,8 @@ public class LoginDialog extends JDialog
         passwordField.addActionListener(this);
         validationPanel.add(passwordField);
 
-        loginFuture = new LoginFuture(this);
-        setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
+        loginFuture = new LoginFuture();
+        setDefaultCloseOperation(WindowConstants.HIDE_ON_CLOSE);
         addWindowListener(new CancelWindowListener(this));
 
         pack();
@@ -99,31 +99,38 @@ public class LoginDialog extends JDialog
 	PasswordAuthentication auth = new PasswordAuthentication(
 	    nameField.getText(), passwordField.getPassword());
 
+        passwordField.setText(null);
+
         if (! loginFuture.set(auth)) {
             // Couldn't set the future, so clear the password ourselves
             char[] passwd = auth.getPassword();
             Arrays.fill(passwd, '\0');
+            dispose();
         }
-        close();
     }
     
     private void close() {
         passwordField.setText(null);
-        setVisible(false);
         getParent().remove(this);
     }
 
     /**
-     * TODO
+     * Cancels this dialog.
+     *
+     * @throws CancellationException if this dialog was already done
+     * @see Future#cancel
      */
     public void cancel() {
         loginFuture.cancel(true);
     }
 
     /**
-     * TODO doc
+     * Represents the future result of the login credentials entered
+     * by the user.
+     *
+     * @see Future
      */
-    private static final class LoginFuture
+    private final class LoginFuture
         implements Future<PasswordAuthentication>
     {
         /**
@@ -138,13 +145,11 @@ public class LoginDialog extends JDialog
         /** Whether this future has been cancelled. */
         private boolean cancelled = false;
 
-        private final ActionListener listener;
-
         /**
          * Constructs a new {@code LoginFuture} for this {@code LoginDialog}.
          */
-        private LoginFuture(ActionListener listener) {
-            this.listener = listener;
+        private LoginFuture() {
+            // empty
         }
 
         /**
@@ -173,9 +178,8 @@ public class LoginDialog extends JDialog
                     return false;
                 }
                 this.passwordAuth = auth;
-                latch.countDown();
-                this.notifyAll();
             }
+            setDone();
             return true;
         }
 
@@ -190,10 +194,17 @@ public class LoginDialog extends JDialog
                 }
 
                 cancelled = true;
-                latch.countDown();
-                this.notifyAll();
-                return true;
             }
+            setDone();
+            return true;
+        }
+
+        /**
+         * Marks this future as done and performs related cleanup.
+         */
+        private void setDone() {
+            latch.countDown();
+            dispose();
         }
 
         /**
@@ -257,7 +268,7 @@ public class LoginDialog extends JDialog
         CancelWindowListener(LoginDialog dialog) {
             this.dialog = dialog;
         }
-        
+
         /**
          * {@inheritDoc}
          */

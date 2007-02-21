@@ -25,7 +25,7 @@ import com.sun.sgs.client.SessionId;
  * ChatChannelFrame presents a GUI so that a user can interact with
  * a channel. The users connected to the channel are displayed in a list
  * on the right side. Messages can be sent on the channel via an input
- * area on the left side.
+ * area on the bottom of the left side.
  */
 public class ChatChannelFrame extends JInternalFrame
         implements ActionListener, ClientChannelListener
@@ -41,7 +41,7 @@ public class ChatChannelFrame extends JInternalFrame
     private final JTextArea outputArea;
 
     /**
-     * Constructs a new ChatChannelFrame as a wrapper around the given
+     * Constructs a new {@code ChatChannelFrame} as a wrapper around the given
      * channel.
      *
      * @param client the parent {@code ChatClient} of this frame.
@@ -70,14 +70,10 @@ public class ChatChannelFrame extends JInternalFrame
         inputField.addActionListener(this);
         setSize(400, 400);
         setClosable(true);
-        setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+        setDefaultCloseOperation(WindowConstants.HIDE_ON_CLOSE);
         addInternalFrameListener(new FrameClosingListener(this));
         setResizable(true);
         setVisible(true);
-    }
-
-    void memberLeft(SessionId member) {
-        multiList.removeItem(member);        
     }
 
     /**
@@ -127,11 +123,21 @@ public class ChatChannelFrame extends JInternalFrame
      * Closes this frame.
      */
     public void leftChannel(ClientChannel channel) {
+        dispose();
         if (getDesktopPane() != null) {
             getDesktopPane().remove(this);
         }
     }
-    
+
+    /**
+     * Updates the channel list when a member leaves.
+     *
+     * @param member the member who left this channel
+     */
+    void memberLeft(SessionId member) {
+        multiList.removeItem(member);        
+    }
+
     /**
      * {@inheritDoc}
      * <p>
@@ -173,6 +179,7 @@ public class ChatChannelFrame extends JInternalFrame
          * <p>
          * Requests that the server remove this client from this channel.
          */
+        @Override
         public void internalFrameClosing(InternalFrameEvent event) {
             frame.myChatClient.leaveChannel(frame.myChannel);
         }        

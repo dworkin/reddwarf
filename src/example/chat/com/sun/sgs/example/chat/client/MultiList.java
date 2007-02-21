@@ -76,7 +76,7 @@ public class MultiList<T> extends JList
      * 
      * @see java.util.Set#addAll(Collection)
      */
-    public boolean addAll(Collection<? extends T> items) {
+    public boolean addAllItems(Collection<? extends T> items) {
         synchronized (this) {
             DefaultListModel model = (DefaultListModel) getModel();
             for (T item : items) {
@@ -115,6 +115,20 @@ public class MultiList<T> extends JList
         }
         repaint();
         return true;
+    }
+
+    /**
+     * Removes all items from this set.
+     * 
+     * @see java.util.Set#clear()
+     * @see DefaultListModel#removeAllElements()
+     */
+    public void removeAllItems() {
+        synchronized (this) {
+            DefaultListModel model = (DefaultListModel) getModel();
+            model.removeAllElements();
+        }
+        repaint();
     }
 
     /**

@@ -63,10 +63,13 @@ public class ChatClient extends JFrame
     private final JLabel statusMessage;
     private final JDesktopPane desktop;
 
-    /** The name of the global channel. */
+    /** The name of the global channel */
     public static final String GLOBAL_CHANNEL_NAME = "-GLOBAL-";
 
-    /** The {@link Charset} encoding for client/server messages. */
+    /** The global channel, also used to send a private message (PM) */
+    private ClientChannel globalChannel;
+
+    /** The {@link Charset} encoding for client/server messages */
     public static final String MESSAGE_CHARSET = "UTF-8";
 
     /** The list of clients connected to the ChatApp on the server */
@@ -75,14 +78,13 @@ public class ChatClient extends JFrame
     /** used for communication with the server */
     private SimpleClient client;
     
-    /** The listener for double-clicks on a memberlist. */
+    /** The listener for double-clicks on a memberlist */
     private final MouseListener pmMouseListener;
 
-    /** the well-known channel for Direct Client to Client communication */
-    private ClientChannel pmChannel;
-
+    /** How many times this client has tried to quit */
     private volatile int quitAttempts = 0;
 
+    /** The mapping between sessions and names */
     private final Map<SessionId, String> sessionNames =
         new HashMap<SessionId, String>();
 
@@ -141,6 +143,7 @@ public class ChatClient extends JFrame
         serverSendButton.setEnabled(false);
 
         multiPmButton = new JButton("Send Multi-PM");
+        multiPmButton.setActionCommand("multiPm");
         multiPmButton.addActionListener(this);
         multiPmButton.setEnabled(false);
 
@@ -275,11 +278,10 @@ public class ChatClient extends JFrame
 
         String message = "/pm " + input;
         try {
-            pmChannel.send(targets, message.getBytes(MESSAGE_CHARSET));
+            globalChannel.send(targets, message.getBytes(MESSAGE_CHARSET));
         } catch (IOException e) {
             e.printStackTrace();
         }
-        
     }
 
     void joinChannel(String channelName) {
@@ -357,6 +359,13 @@ public class ChatClient extends JFrame
         return bytes;
     }
 
+    /**
+     * Returns the user name associated with the given {@link SessionId},
+     * if any.
+     *
+     * @param s the {@code SessionId} whose name to lookup
+     * @return the name associated with this session, or {@code null}
+     */
     String getSessionName(SessionId s) {
         return sessionNames.get(s);
     }
@@ -378,7 +387,8 @@ public class ChatClient extends JFrame
                 sessionNames.put(session, memberName);
             }
         }
-        userList.addAll(sessions);
+        userList.addAllItems(sessions);
+        userList.invalidate();
         repaint();
     }
 
@@ -455,6 +465,28 @@ public class ChatClient extends JFrame
         if (quitAttempts > 0) {
             dispose();
         } else {
+
+            // Reset title bar
+            setTitle("Chat Test Client: [disconnected]");
+            
+            // Reset the global channel
+            globalChannel = null;
+
+            // Close all channel frames
+            for (JInternalFrame frame : desktop.getAllFrames()) {
+                if (frame instanceof ChatChannelFrame) {
+                    frame.dispose();
+                    desktop.remove(frame);
+                }
+            }
+
+            // Clear our member list
+            userList.removeAllItems();
+
+            // Clear the session name map
+            sessionNames.clear();
+
+            // Reset the login button
             loginButton.setText("Login");
             loginButton.setActionCommand("login");
             loginButton.setEnabled(true);
@@ -483,7 +515,7 @@ public class ChatClient extends JFrame
     public ClientChannelListener joinedChannel(ClientChannel channel) {
         // ChatClient handles the global channel
         if (channel.getName().equals(GLOBAL_CHANNEL_NAME)) {
-            pmChannel = channel;
+            globalChannel = channel;
             return this;
         }
 
@@ -498,7 +530,7 @@ public class ChatClient extends JFrame
     /**
      * {@inheritDoc}
      * <p>
-     * Handles the direct {@code /echo} command.
+     * Handles the direct {@code /pong} reply.
      */
     public void receivedMessage(byte[] message) {
         String messageString = fromMessageBytes(message);
@@ -540,7 +572,7 @@ public class ChatClient extends JFrame
             } else if (command.equals("/pm")) {
                 pmReceived(sender, args[1]);
             } else if (command.startsWith("/")) {
-                System.err.format("Unknown command %s\n", command);
+                System.err.format("Unknown command: %s\n", command);
             } else {
                 System.err.format("Not a command: %s\n", messageString);
             }
@@ -649,7 +681,12 @@ public class ChatClient extends JFrame
         }
     }
 
-    /* TODO doc */
+    /**
+     * Decodes the given {@code bytes} into a message string.
+     *
+     * @param bytes the encoded message
+     * @return the decoded message string
+     */
     static String fromMessageBytes(byte[] bytes) {
         try {
             return new String(bytes, MESSAGE_CHARSET);
@@ -658,7 +695,12 @@ public class ChatClient extends JFrame
         }
     }
 
-    /* TODO doc */
+    /**
+     * Encodes the given message string into a byte array.
+     *
+     * @param s the message string to encode
+     * @return the encoded message as a byte array
+     */
     static byte[] toMessageBytes(String s) {
         try {
             return s.getBytes(MESSAGE_CHARSET);

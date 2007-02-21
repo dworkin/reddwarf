@@ -256,7 +256,12 @@ public class ChatClientSessionListener
         session.send(toMessageBytes(reply));
     }
 
-    /* TODO doc */
+    /**
+     * Decodes the given {@code bytes} into a message string.
+     *
+     * @param bytes the encoded message
+     * @return the decoded message string
+     */
     static String fromMessageBytes(byte[] bytes) {
         try {
             return new String(bytes, MESSAGE_CHARSET);
@@ -265,7 +270,12 @@ public class ChatClientSessionListener
         }
     }
 
-    /* TODO doc */
+    /**
+     * Encodes the given message string into a byte array.
+     *
+     * @param s the message string to encode
+     * @return the encoded message as a byte array
+     */
     static byte[] toMessageBytes(String s) {
         try {
             return s.getBytes(MESSAGE_CHARSET);
