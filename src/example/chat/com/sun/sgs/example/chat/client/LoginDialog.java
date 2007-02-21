@@ -34,9 +34,13 @@ public class LoginDialog extends JDialog
     /** The version of the serialized form of this class. */
     private static final long serialVersionUID = 1L;
 
+    /** The text field to accept the user name. */
     private final JTextField nameField;
+
+    /** The password input field. */
     private final JPasswordField passwordField;
 
+    /** The {@code LoginFuture} that gets the login credentials. */
     private final LoginFuture loginFuture;
 
     /**
@@ -47,6 +51,7 @@ public class LoginDialog extends JDialog
      */
     public LoginDialog(Frame parent) {
         super(parent, "Login Dialog", true);
+        setLocationByPlatform(true);
 
         Container c = getContentPane();
         JPanel validationPanel = new JPanel();
@@ -80,11 +85,11 @@ public class LoginDialog extends JDialog
      * dialog was cancelled. This method blocks until the dialog is
      * completed, but may be cancelled by {@link Thread#interrupt()} on the
      * blocked thread.
-     * 
+     *
      * @return a {@code PasswordAuthentication} containing the username and
      *         password supplied by the user, or {@code null} if the dialog
      *         was cancelled
-     * 
+     *
      * @see com.sun.sgs.client.simple.SimpleClientListener#getPasswordAuthentication()
      * @see Thread#interrupt()
      */
@@ -94,6 +99,9 @@ public class LoginDialog extends JDialog
 
     /**
      * {@inheritDoc}
+     * <p>
+     * This implementation sets the {@code LoginFuture} with the credentials
+     * from the user and closes the dialog.
      */
     public void actionPerformed(ActionEvent e) {
 	PasswordAuthentication auth = new PasswordAuthentication(
@@ -108,7 +116,10 @@ public class LoginDialog extends JDialog
             dispose();
         }
     }
-    
+
+    /**
+     * Closes this dialog.
+     */
     private void close() {
         passwordField.setText(null);
         getParent().remove(this);

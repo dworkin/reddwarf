@@ -33,11 +33,19 @@ public class ChatChannelFrame extends JInternalFrame
     /** The version of the serialized form of this class. */
     private static final long serialVersionUID = 1L;
 
+    /** The {@code ChatClient} that is the parent of this frame. */
     private final ChatClient myChatClient;
+
+    /** The {@code ClientChannel} associated with this frame. */
     private final ClientChannel myChannel;
 
+    /** The {@code MultiList} containing this channel's members. */
     private final MultiList<SessionId> multiList;
+
+    /** The input field. */
     private final JTextField inputField;
+
+    /** The output area for channel messages. */
     private final JTextArea outputArea;
 
     /**

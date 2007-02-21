@@ -61,7 +61,12 @@ public class ChatClientSessionListener
         addToChannel(GLOBAL_CHANNEL_NAME);
     }
 
-    /** {@inheritDoc} */
+    /**
+     * {@inheritDoc}
+     * <p>
+     * This implementation sends a broadcast notification to other
+     * sessions to inform them of the disconnected session.
+     */
     public void disconnected(boolean graceful) {
         if (logger.isLoggable(Level.FINE)) {
             String grace = graceful ? "graceful" : "forced";
