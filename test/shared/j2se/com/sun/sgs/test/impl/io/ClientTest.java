@@ -142,7 +142,7 @@ public class ClientTest extends JFrame {
             }
         }
         
-        public void connect(Endpoint<?> endpoint) {
+        void connect(Endpoint<?> endpoint) {
             for (EndpointInfo info : list) {
                 try {
                     info.connect(endpoint);
@@ -152,13 +152,13 @@ public class ClientTest extends JFrame {
             }
         }
         
-        public void disconnect() {
+        void disconnect() {
             for (EndpointInfo info : list) {
                 info.close();
             }
         }
         
-        public void shutdown() {
+        void shutdown() {
             for (EndpointInfo info : list) {
                 if (info.connected) {
                     info.close();
@@ -224,27 +224,27 @@ public class ClientTest extends JFrame {
             status = "Not Connected";
         }
         
-        public int getID() {
+        int getID() {
             return id;
         }
         
-        public int getMessagesOut() {
+        int getMessagesOut() {
             return messagesOut;
         }
         
-        public int getMessagesIn() {
+        int getMessagesIn() {
             return messagesIn;
         }
         
-        public long getBytesIn() {
+        long getBytesIn() {
             return bytesIn;
         }
         
-        public long getBytesOut() {
+        long getBytesOut() {
             return bytesOut;
         }
         
-        public void close() {
+        void close() {
             try {
                 connection.close();
             }
@@ -254,11 +254,11 @@ public class ClientTest extends JFrame {
             
         }
         
-        public void connect(Endpoint<?> endpoint) throws IOException {
+        void connect(Endpoint<?> endpoint) throws IOException {
             endpoint.createConnector().connect(this);
         }
         
-        public String getStatus() {
+        String getStatus() {
             return status;
         }
         
