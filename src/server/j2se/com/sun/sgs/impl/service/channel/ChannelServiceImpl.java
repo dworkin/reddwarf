@@ -310,6 +310,7 @@ public class ChannelServiceImpl
     public void abort(Transaction txn) {
 	try {
 	    checkTransaction(txn);
+	    currentContext.get().abort();
 	    currentContext.set(null);
 	    if (logger.isLoggable(Level.FINER)) {
 		logger.log(Level.FINER, "abort txn:{0} returns", txn);
@@ -468,7 +469,7 @@ public class ChannelServiceImpl
 
 		    MessageQueue queue = getMessageQueue(session);
 		    queue.addMessage(name, sessions, channelMessage, seq);
-		    
+
 		    break;
 		    
 		default:
@@ -772,7 +773,7 @@ public class ChannelServiceImpl
      */
     private static String getSessionKey(ClientSession session) {
 	byte[] sessionId = session.getSessionId();
-	return SESSION_PREFIX + HexDumper.format(sessionId);
+	return SESSION_PREFIX + HexDumper.toHexString(sessionId);
     }
 
     /**
