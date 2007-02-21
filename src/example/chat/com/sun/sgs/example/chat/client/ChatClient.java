@@ -48,6 +48,25 @@ import com.sun.sgs.client.simple.SimpleClient;
  * A simple GUI chat client that interacts with an SGS server-side app.
  * It presents an IRC-like interface, with channels, member lists, and
  * private (off-channel) messaging.
+ * <p>
+ * The {@code ChatClient} understands the following properties:
+ * <ul>
+ * <li><code>{@value #HOST_PROPERTY}</code> <br>
+ *     <i>Default:</i> {@value #DEFAULT_HOST} <br>
+ *     The hostname of the {@code ChatApp} server.<p>
+ *
+ * <li><code>{@value #PORT_PROPERTY}</code> <br>
+ *     <i>Default:</i> {@value #DEFAULT_PORT} <br>
+ *     The port of the {@code ChatApp} server.<p>
+ *
+ *
+ * <li><code>{@value #LOGIN_PROPERTY}</code> <br>
+ *     <i>Default:</i> none; optional <br>
+ *     If specified, the colon separated username and password
+ *     to use as login credentials instead of using a login dialog.
+ *     For example, {@code user:pass}<p>
+ *
+ * </ul>
  */
 public class ChatClient extends JFrame
     implements ActionListener, ListCellRenderer,
@@ -65,6 +84,21 @@ public class ChatClient extends JFrame
 
     /** The name of the global channel */
     public static final String GLOBAL_CHANNEL_NAME = "-GLOBAL-";
+
+    /** The name of the host property */
+    public static final String HOST_PROPERTY = "ChatClient.host";
+
+    /** The default hostname */
+    public static final String DEFAULT_HOST = "localhost";
+
+    /** The name of the port property */
+    public static final String PORT_PROPERTY = "ChatClient.host";
+
+    /** The default port */
+    public static final String DEFAULT_PORT = "2502";
+
+    /** The name of the login property */
+    public static final String LOGIN_PROPERTY = "ChatClient.login";
 
     /** The global channel, also used to send a private message (PM) */
     private ClientChannel globalChannel;
@@ -196,8 +230,8 @@ public class ChatClient extends JFrame
 
     private void doLogin() {
 	setButtonsEnabled(false);
-        String host = System.getProperty("ChatClient.host", "localhost");
-        String port = System.getProperty("ChatClient.port", "2502");
+        String host = System.getProperty(HOST_PROPERTY, DEFAULT_HOST);
+        String port = System.getProperty(PORT_PROPERTY, DEFAULT_PORT);
 
         try {
             Properties props = new Properties();
@@ -428,7 +462,7 @@ public class ChatClient extends JFrame
         statusMessage.setText("Status: Validating...");
         PasswordAuthentication auth;
 
-        String login = System.getProperty("ChatClient.login");
+        String login = System.getProperty(LOGIN_PROPERTY);
         if (login == null) {
             Future<PasswordAuthentication> future =
                 new LoginDialog(this).requestLogin();
