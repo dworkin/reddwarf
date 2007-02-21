@@ -91,7 +91,7 @@
 	  description="Builds everything"/>
 
   <!-- Builds a debug version of the complete project -->
-  <target name="build" depends="-build-shared,-build-server,-build-client"
+  <target name="build" depends="-build-server,-build-client"
 	  description="Builds code"/>
 
   <!-- Builds the shared code -->

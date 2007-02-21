@@ -5,7 +5,6 @@ import java.util.Collection;
 
 import com.sun.sgs.app.TaskRejectedException;
 
-
 /**
  * This interface is used to schedule tasks to run. Unlike the
  * <code>TaskManager</code> interface used by applications, or the

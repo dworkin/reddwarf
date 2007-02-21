@@ -135,8 +135,10 @@ class Kernel {
             throw e;
         }
 
-        logger.log(Level.INFO, "The Kernel is ready, version: {0}",
-		   Version.getVersion());
+	if (logger.isLoggable(Level.INFO)) {
+	    logger.log(Level.INFO, "The Kernel is ready, version: {0}",
+		       Version.getVersion());
+	}
     }
 
     /**
@@ -400,7 +402,8 @@ class Kernel {
      */
     void applicationReady(AppKernelAppContext context) {
         applications.add(context);
-        logger.log(Level.INFO, "{0}: application is ready", context);
+        if (logger.isLoggable(Level.INFO))
+	    logger.log(Level.INFO, "{0}: application is ready", context);
     }
 
     /**

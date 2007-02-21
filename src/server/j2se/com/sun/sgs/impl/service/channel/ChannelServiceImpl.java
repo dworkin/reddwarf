@@ -310,7 +310,7 @@ public class ChannelServiceImpl
     public void abort(Transaction txn) {
 	try {
 	    checkTransaction(txn);
-            // FIXME: should this call currentContext.get().abort() ? -JM
+	    currentContext.get().abort();
 	    currentContext.set(null);
 	    if (logger.isLoggable(Level.FINER)) {
 		logger.log(Level.FINER, "abort txn:{0} returns", txn);
@@ -511,7 +511,7 @@ public class ChannelServiceImpl
 			    channel.leave(session);
 			}
 		    }},
-                session.getIdentity());
+		session.getIdentity());
 	}
     }
 
