@@ -68,7 +68,7 @@ public class DummyProfileRegistrar implements ProfileRegistrar {
         if (instance != null) {
             try {
                 instance.collector.
-                    startTask(task, owner, System.currentTimeMillis());
+                    startTask(task, owner, System.currentTimeMillis(), 0);
                 instance.collector.noteTransactional();
             } catch (Exception e) { e.printStackTrace(); }
         }
