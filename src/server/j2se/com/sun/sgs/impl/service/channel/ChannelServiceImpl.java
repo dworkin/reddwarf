@@ -522,7 +522,7 @@ public class ChannelServiceImpl
 	synchronized (messageQueues) {
 	    MessageQueue queue = messageQueues.get(session);
 	    if (queue == null) {
-		queue = new MessageQueue(session.getSessionId());
+		queue = new MessageQueue(session.getSessionId().getBytes());
 		messageQueues.put(session, queue);
 	    }
 	    return queue;
@@ -772,8 +772,7 @@ public class ChannelServiceImpl
      * Returns a session key for the given {@code session}.
      */
     private static String getSessionKey(ClientSession session) {
-	byte[] sessionId = session.getSessionId();
-	return SESSION_PREFIX + HexDumper.toHexString(sessionId);
+	return SESSION_PREFIX + session.getSessionId().toString();
     }
 
     /**

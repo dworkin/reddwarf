@@ -1,5 +1,6 @@
 package com.sun.sgs.impl.service.session;
 
+import com.sun.sgs.app.ClientSessionId;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
@@ -83,9 +84,9 @@ public class ClientSessionServiceImpl
 	    new HashMap<Byte, ProtocolMessageListener>());
 
     /** A map of current sessions, from session ID to ClientSessionImpl. */
-    private final Map<SessionId, ClientSessionImpl> sessions =
+    private final Map<ClientSessionId, ClientSessionImpl> sessions =
 	Collections.synchronizedMap(
-	    new HashMap<SessionId, ClientSessionImpl>());
+	    new HashMap<ClientSessionId, ClientSessionImpl>());
 
     /** The Acceptor for listening for new connections. */
     private Acceptor<SocketAddress> acceptor;
@@ -292,7 +293,7 @@ public class ClientSessionServiceImpl
 
     /** {@inheritDoc} */
     public SgsClientSession getClientSession(byte[] sessionId) {
-	return sessions.get(new SessionId(sessionId));
+	return sessions.get(new ClientSessionId(sessionId));
     }
 
     /* -- Implement AcceptorListener -- */
@@ -311,7 +312,7 @@ public class ClientSessionServiceImpl
 	    }
 	    ClientSessionImpl session =
 		new ClientSessionImpl(ClientSessionServiceImpl.this);
-	    sessions.put(new SessionId(session.getSessionId()), session);
+	    sessions.put(session.getSessionId(), session);
 	    return session.getConnectionListener();
 	}
 
@@ -321,43 +322,6 @@ public class ClientSessionServiceImpl
 	}
     }
 
-    /* -- Implement wrapper for session ids. -- */
-
-    private final static class SessionId {
-        private final byte[] bytes;
-        
-        SessionId(byte[] bytes) {
-            this.bytes = bytes;
-        }
-        
-        /**
-         * Returns the byte array representation of this session id.
-         *
-         * @return the byte array representation of this session id
-         */
-        public byte[] getBytes() {
-            return bytes;
-        }
-
-        /** {@inheritDoc} */
-        public boolean equals(Object obj) {
-            if (this == obj) {
-                return true;
-            }
-            
-            if (! (obj instanceof SessionId)) {
-                return false;
-            }
-            
-            return Arrays.equals(bytes, ((SessionId) obj).bytes);
-        }
-
-        /** {@inheritDoc} */
-        public int hashCode() {
-            return Arrays.hashCode(bytes);
-        }
-    }
-    
     /* -- Implement NonDurableTransactionParticipant -- */
        
     /** {@inheritDoc} */
@@ -659,7 +623,7 @@ public class ClientSessionServiceImpl
      * Returns the client session service relevant to the current
      * context.
      */
-    synchronized static ClientSessionService getInstance() {
+    public synchronized static ClientSessionService getInstance() {
 	if (txnProxy == null) {
 	    throw new IllegalStateException("Service not configured");
 	} else {
@@ -687,7 +651,7 @@ public class ClientSessionServiceImpl
 	{
 	    serviceListener.disconnected(session);
 	}
-	sessions.remove(new SessionId(session.getSessionId()));
+	sessions.remove(session.getSessionId());
     }
 
     /**

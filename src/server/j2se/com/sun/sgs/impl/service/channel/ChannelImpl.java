@@ -552,7 +552,7 @@ final class ChannelImpl implements Channel, Serializable {
 
 	Set<byte[]> clients = new HashSet<byte[]>();
 	for (ClientSession session : sessions) {
-	    clients.add(session.getSessionId());
+	    clients.add(session.getSessionId().getBytes());
 	}
 	byte[] protocolMessage =
 	    getChannelMessage(EMPTY_ID, message, context.nextSequenceNumber());

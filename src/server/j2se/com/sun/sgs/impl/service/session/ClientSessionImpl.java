@@ -2,6 +2,7 @@ package com.sun.sgs.impl.service.session;
 
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.ClientSession;
+import com.sun.sgs.app.ClientSessionId;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ExceptionRetryStatus;
@@ -142,12 +143,12 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     }
     
     /** {@inheritDoc} */
-    public byte[] getSessionId() {
+    public ClientSessionId getSessionId() {
 	logger.log(Level.FINEST, "getSessionId returns {0}", sessionId);
-        return sessionId;
+        return new ClientSessionId(sessionId);
     }
 
-    /** {@inheritDoc} */
+    /** {@inheritdoc} */
     public boolean isConnected() {
 
 	State currentState = getCurrentState();

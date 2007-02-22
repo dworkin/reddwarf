@@ -47,24 +47,24 @@ public interface ClientSession {
     /**
      * Returns the login name used to authenticate this session.
      *
-     * @return the name used to authenticate this session
+     * @return	the name used to authenticate this session
      *
-     * @throws TransactionException if the operation failed because of
-     * a problem with the current transaction
+     * @throws 	TransactionException if the operation failed because of
+     * 		a problem with the current transaction
      */
     String getName();
 
     /**
-     * Returns a byte array containing the representation of the
-     * session identifier for this session.  The session identifier is
-     * constant for the life of this session.
+     * Returns a {@code ClientSessionId} containing the representation
+     * of the session identifier for this session.  The session
+     * identifier is constant for the life of this session.
      *
-     * @return the representation of the session identifier for this
-     * session
-     * @throws TransactionException if the operation failed because of
-     * a problem with the current transaction
+     * @return 	the {@code ClientSessionId} for this session
+     *
+     * @throws	TransactionException if the operation failed because of
+     * 		a problem with the current transaction
      */
-    byte[] getSessionId();
+    ClientSessionId getSessionId();
 
     /**
      * Sends a message contained in the specified byte array to this
@@ -74,11 +74,11 @@ public interface ClientSession {
      * this method; if the byte array is modified, then this method
      * may have unpredictable results.
      
-     * @param message a message
+     * @param	message a message
      *
-     * @throws IllegalStateException if this session is disconnected
-     * @throws TransactionException if the operation failed because of
-     * a problem with the current transaction
+     * @throws	IllegalStateException if this session is disconnected
+     * @throws	TransactionException if the operation failed because of
+     *		 a problem with the current transaction
      */
     void send(byte[] message);
 
@@ -86,8 +86,8 @@ public interface ClientSession {
      * Forcibly disconnects this client session.  If this session is
      * already disconnected, then no action is taken.
      *
-     * @throws TransactionException if the operation failed because of
-     * a problem with the current transaction
+     * @throws	TransactionException if the operation failed because of
+     *		a problem with the current transaction
      */
     void disconnect();
 
@@ -96,10 +96,10 @@ public interface ClientSession {
      * otherwise returns {@code false}.
      *
      * @return {@code true} if the client is connected,
-     * otherwise returns {@code false}
+     * 		otherwise returns {@code false}
      *
-     * @throws TransactionException if the operation failed because of
-     * a problem with the current transaction
+     * @throws	TransactionException if the operation failed because of
+     * 		a problem with the current transaction
      */
     boolean isConnected();
 }

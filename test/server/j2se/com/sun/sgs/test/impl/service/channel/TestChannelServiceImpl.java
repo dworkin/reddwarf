@@ -6,6 +6,7 @@ import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
+import com.sun.sgs.app.ClientSessionId;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.Delivery;
@@ -1421,8 +1422,8 @@ public class TestChannelServiceImpl extends TestCase {
 	}
 
         /** {@inheritDoc} */
-	public byte[] getSessionId() {
-	    return id;
+	public ClientSessionId getSessionId() {
+	    return new ClientSessionId(id);
 	}
 
         /** {@inheritDoc} */
