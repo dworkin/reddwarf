@@ -117,6 +117,7 @@ public class ProfileCollector {
      * @param task the <code>KernelRunnable</code> that is starting
      * @param owner the <code>TaskOwner</code> of the task
      * @param scheduledStartTime the requested starting time for the task
+     * @param readyCount the number of ready tasks at the scheduler
      *
      * @throws IllegalStateException if a task is already bound to this thread
      */
@@ -142,7 +143,7 @@ public class ProfileCollector {
     public void noteTransactional() {
         ProfileReportImpl profileReport = profileReports.get();
         if (profileReport == null)
-            throw new IllegalStateException("No task is being Profile in " +
+            throw new IllegalStateException("No task is being profiled in " +
                                             "this thread");
         profileReport.transactional = true;
     }
@@ -163,7 +164,7 @@ public class ProfileCollector {
         long stopTime = System.currentTimeMillis();
         ProfileReportImpl profileReport = profileReports.get();
         if (profileReport == null)
-            throw new IllegalStateException("No task is being Profile in " +
+            throw new IllegalStateException("No task is being profiled in " +
                                             "this thread");
         profileReports.set(null);
 

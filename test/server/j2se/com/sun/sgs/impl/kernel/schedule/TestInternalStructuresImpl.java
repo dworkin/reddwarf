@@ -215,6 +215,9 @@ public class TestInternalStructuresImpl {
     private static class DummyApplicationScheduler
         implements ApplicationScheduler
     {
+        public int getReadyCount() {
+            return 0;
+        }
         public ScheduledTask getNextTask(boolean wait)
             throws InterruptedException {
             return null;

@@ -30,7 +30,7 @@ class MasterTaskConsumer implements Runnable {
     // the system scheduler that provides tasks
     private final SystemScheduler scheduler;
 
-    // the collector used to report tasks for profile
+    // the collector used to report tasks for profiling
     private final ProfileCollector profileCollector;
 
     // the task handler used to run each task

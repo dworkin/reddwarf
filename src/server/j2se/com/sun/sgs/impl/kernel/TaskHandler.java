@@ -53,7 +53,7 @@ public final class TaskHandler {
      *                               used to create new transactions
      * @param profileCollector the <code>ProfileCollector</code> used
      *                         to collect profile data,
-     *                         or <code>null</code> if profile is not on
+     *                         or <code>null</code> if profiling is not on
      *
      * @throws IllegalStateException if there already exists an instance
      *                               of <code>TaskHandler</code>

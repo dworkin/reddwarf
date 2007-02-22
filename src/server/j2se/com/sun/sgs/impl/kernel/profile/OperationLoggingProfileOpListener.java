@@ -28,24 +28,29 @@ import java.util.logging.Logger;
  * its state and starts aggregating again. By default the interval is
  * 100000 tasks.
  * <p>
- * This listener reports its finding to a logging stream at a level of
- * <code>FINE</code>. The stream is <code>com.sun.sgs.impl.kernel.profile.
- * OperationLoggingProfileOpListener</code>.
+ * This listener logs its findings at level <code>FINE</code> to the
+ * logger named <code>
+ * com.sun.sgs.impl.kernel.profile.OperationLoggingProfileOpListener</code>.
  * <p>
- * The <code>com.sun.sgs.impl.kernel.profile.OperationLoggingProfileOpListener
- * .logOps</code> property may be used to set the interval between reports.
+ * The <code>
+ * com.sun.sgs.impl.kernel.profile.OperationLoggingProfileOpListener.logOps
+ * </code> property may be used to set the interval between reports.
  */
 public class OperationLoggingProfileOpListener
     implements ProfileOperationListener
 {
 
-    // the name of the cass
+    // the name of the class
     private static final String CLASSNAME =
         OperationLoggingProfileOpListener.class.getName();
 
     // the logger where all data is reported
     static final LoggerWrapper logger =
         new LoggerWrapper(Logger.getLogger(CLASSNAME));
+
+    // the property for setting the operation window, and its default
+    private static final String LOG_OPS_PROPERTY = CLASSNAME + ".logOps";
+    private static final int DEFAULT_LOG_OPS = 100000;
 
     // the number of threads reported as running in the scheduler
     private long threadCount = 0;
@@ -65,10 +70,6 @@ public class OperationLoggingProfileOpListener
 
     // the last time that we logged an aggregated report
     private long lastReport = System.currentTimeMillis();
-
-    // the property for setting the operation window, and its default
-    private static final String LOG_OPS_PROPERTY = CLASSNAME + ".logOps";
-    private static final int DEFAULT_LOG_OPS = 100000;
 
     // the number set as the window size for aggregation
     private int logOps;

@@ -91,26 +91,6 @@
   <target name="build" depends="build-server,build-client"
 	  description="Builds code"/>
 
-
-      
-  <!-- Builds the server -->
-  <target name="build-example" description="Builds example code">
-    <mkdir dir="${build.dir}/classes/example"/>
-    <depend srcdir="j2se"
-	    destdir="${build.dir}/classes/example"
-	    cache="${build.dir}/depend"
-	    closure="true"/>
-    <javac includeAntRuntime="no" debug="on" deprecation="on"
-           srcdir="src/example/j2se" destdir="${build.dir}/classes/server"
-           classpath="${build.dir}/classes/server:${build.dir}/classes/client"
-           source="${javac.source}">
-      <compilerarg value="${javac.compilerargs}"/>
-    </javac>
-  </target>
-
-
-
-
   <!-- Builds the server -->
   <target name="build-server" description="Builds server code">
     <fail unless="bdb.lib.dir"

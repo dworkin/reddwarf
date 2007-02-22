@@ -122,7 +122,6 @@ public class TestPerformance extends TestCase {
      */
     protected void setUp() {
 	System.err.println("Testcase: " + getName());
-	//createTransaction();
 	if (!doLogging) {
 	    /* Disable logging */
 	    for (Enumeration<String> loggerNames =

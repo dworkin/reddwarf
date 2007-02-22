@@ -11,7 +11,11 @@ public interface ProfileConsumer {
 
     /**
      * Registers the named operation with this consumer, such that the
-     * operation can be reported as part of a task's profile.
+     * operation can be reported as part of a task's profile. Note that
+     * registering the same name multiple times on the same conumer will
+     * not produce the same instance of <code>ProfileOperation</code>.
+     * That is, two registrations of the same name will still result in
+     * operations that are reported distinctly.
      *
      * @param name the name of the operation
      *

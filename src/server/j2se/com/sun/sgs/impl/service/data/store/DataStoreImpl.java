@@ -258,9 +258,6 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
     /** The number of currently active transactions. */
     private int txnCount = 0;
 
-    /** The consumer used to report operations, if any */
-    private ProfileConsumer consumer = null;
-
     /* -- The operations -- DataStore API -- */
     private ProfileOperation createObjectOp = null;
     private ProfileOperation markForUpdateOp = null;
@@ -1061,7 +1058,8 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
 
     /** {@inheritDoc} */
     public void setProfileRegistrar(ProfileRegistrar profileRegistrar) {
-        consumer = profileRegistrar.registerProfileProducer(this);
+        ProfileConsumer consumer =
+            profileRegistrar.registerProfileProducer(this);
 
         getBindingOp = consumer.registerOperation("getBinding");
         setBindingOp = consumer.registerOperation("setBinding");

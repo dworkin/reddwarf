@@ -68,7 +68,7 @@ public interface ProfileReport {
     public long getRunningTime();
 
     /**
-     * Returns the number of times this task has been tied. If this is
+     * Returns the number of times this task has been tried. If this is
      * the first time the task has been run, then this method returns 1.
      * 
      * @return the number of times this task has been tried
