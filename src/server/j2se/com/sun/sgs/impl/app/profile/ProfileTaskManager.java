@@ -5,43 +5,41 @@ import com.sun.sgs.app.PeriodicTaskHandle;
 import com.sun.sgs.app.Task;
 import com.sun.sgs.app.TaskManager;
 
-import com.sun.sgs.kernel.ProfiledOperation;
-import com.sun.sgs.kernel.ProfilingConsumer;
-import com.sun.sgs.kernel.ProfilingProducer;
+import com.sun.sgs.kernel.ProfileConsumer;
+import com.sun.sgs.kernel.ProfileOperation;
+import com.sun.sgs.kernel.ProfileProducer;
+import com.sun.sgs.kernel.ProfileRegistrar;
 
 
 /**
  * This is an implementation of <code>TaskManager</code> used to support
  * profiling. It simply calls its backing manager for each manager method
- * after first reporting the call. If no <code>ProfilingConsumer</code> is
- * provided via <code>setProfilingConsumer</code> then this manager does no
+ * after first reporting the call. If no <code>ProfileRegistrar</code> is
+ * provided via <code>setProfileRegistrar</code> then this manager does no
  * reporting, and only calls through to the backing manager. If the backing
- * manager is also an instance of <code>ProfilingProducer</code> then it too
- * will be supplied with the <code>ProfilingConsumer</code> as described in
- * <code>setProfilingConsumer</code>.
+ * manager is also an instance of <code>ProfileProducer</code> then it too
+ * will be supplied with the <code>ProfileRegistrar</code> as described in
+ * <code>setProfileRegistrar</code>.
  * <p>
  * All of the standard Manager methods implemented here are profiled
  * directly.
  */
-public class ProfilingTaskManager implements TaskManager, ProfilingProducer {
+public class ProfileTaskManager implements TaskManager, ProfileProducer {
 
     // the task manager that this manager calls through to
     private final TaskManager backingManager;
 
-    // the reporting interface
-    private ProfilingConsumer consumer = null;
-
     // the operations being profiled
-    private ProfiledOperation scheduleTaskOp = null;
-    private ProfiledOperation scheduleTaskDelayedOp = null;
-    private ProfiledOperation scheduleTaskPeriodicOp = null;
+    private ProfileOperation scheduleTaskOp = null;
+    private ProfileOperation scheduleTaskDelayedOp = null;
+    private ProfileOperation scheduleTaskPeriodicOp = null;
 
     /**
-     * Creates an instance of <code>ProfilingTaskManager</code>.
+     * Creates an instance of <code>ProfileTaskManager</code>.
      *
      * @param backingManager the <code>TaskManager</code> to call through to
      */
-    public ProfilingTaskManager(TaskManager backingManager) {
+    public ProfileTaskManager(TaskManager backingManager) {
         this.backingManager = backingManager;
     }
 
@@ -49,20 +47,14 @@ public class ProfilingTaskManager implements TaskManager, ProfilingProducer {
      * {@inheritDoc}
      * <p>
      * Note that if the backing manager supplied to the constructor is also
-     * an instance of <code>ProfilingProducer</code> then its
-     * <code>setProfilingConsumer</code> will be invoked when this method
-     * is called. The backing manager is provided the same instance of
-     * <code>ProfilingConsumer</code> so reports from the two managers are
-     * considered to come from the same source.
-     *
-     * @throws IllegalStateException if a <code>ProfilingConsumer</code>
-     *                               has already been set
+     * an instance of <code>ProfileProducer</code> then its
+     * <code>setProfileRegistrar</code> will be invoked when this method
+     * is called.
      */
-    public void setProfilingConsumer(ProfilingConsumer profilingConsumer) {
-        if (consumer != null)
-            throw new IllegalStateException("consumer is already set");
-        consumer = profilingConsumer;
- 
+    public void setProfileRegistrar(ProfileRegistrar profileRegistrar) {
+        ProfileConsumer consumer =
+            profileRegistrar.registerProfileProducer(this);
+
         scheduleTaskOp = consumer.registerOperation("scheduleTask");
         scheduleTaskDelayedOp =
             consumer.registerOperation("scheduleDelayedTask");
@@ -70,9 +62,9 @@ public class ProfilingTaskManager implements TaskManager, ProfilingProducer {
             consumer.registerOperation("schedulePeriodicTask");
 
         // call on the backing manager, if it's also profiling
-        if (backingManager instanceof ProfilingProducer)
-            ((ProfilingProducer)backingManager).
-                setProfilingConsumer(consumer);
+        if (backingManager instanceof ProfileProducer)
+            ((ProfileProducer)backingManager).
+                setProfileRegistrar(profileRegistrar);
     }
 
     /**

@@ -56,6 +56,13 @@ class FIFOApplicationScheduler
     /**
      * {@inheritDoc}
      */
+    public int getReadyCount() {
+        return queue.size();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     public ScheduledTask getNextTask(boolean wait)
         throws InterruptedException
     {

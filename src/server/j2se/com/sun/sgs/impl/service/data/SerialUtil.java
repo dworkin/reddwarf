@@ -357,7 +357,7 @@ final class SerialUtil {
 	}
 
 	/** Returns the name of a class, converting array class names. */
-	private static String className(Class cl) {
+	private static String className(Class<?> cl) {
 	    StringBuilder sb = new StringBuilder();
 	    while (cl.isArray()) {
 		sb.append("[]");

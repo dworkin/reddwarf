@@ -5,6 +5,7 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.test.util.DummyComponentRegistry;
+import com.sun.sgs.test.util.DummyProfileRegistrar;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 import com.sun.sgs.impl.kernel.StandardProperties;
@@ -121,7 +122,7 @@ public class TestPerformance extends TestCase {
      */
     protected void setUp() {
 	System.err.println("Testcase: " + getName());
-	createTransaction();
+	//createTransaction();
 	if (!doLogging) {
 	    /* Disable logging */
 	    for (Enumeration<String> loggerNames =
@@ -162,6 +163,7 @@ public class TestPerformance extends TestCase {
 	if (!doLogging) {
 	    LogManager.getLogManager().readConfiguration();
 	}
+        DummyProfileRegistrar.stopProfiling();
     }
 
     /* -- Tests -- */
@@ -182,6 +184,8 @@ public class TestPerformance extends TestCase {
 	    String.valueOf(detectMods),
 	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
 	service = new DataServiceImpl(props, componentRegistry);
+        DummyProfileRegistrar.startProfiling(service);
+        createTransaction();
 	service.configure(componentRegistry, txnProxy);
 	componentRegistry.setComponent(DataManager.class, service);
 	componentRegistry.registerAppContext();
@@ -234,6 +238,8 @@ public class TestPerformance extends TestCase {
 	    DataStoreImplClass + ".flushToDisk", String.valueOf(flush),
 	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
 	service = new DataServiceImpl(props, componentRegistry);
+        DummyProfileRegistrar.startProfiling(service);
+        createTransaction();
 	service.configure(componentRegistry, txnProxy);
 	componentRegistry.setComponent(DataManager.class, service);
 	componentRegistry.registerAppContext();

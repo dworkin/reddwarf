@@ -79,6 +79,18 @@ class SingleAppSystemScheduler implements SystemScheduler {
 
     /**
      * {@inheritDoc}
+     * <p>
+     * Note that, because all applications are lumped into the same
+     * scheduler, this actually reports the same count for any context.
+     */
+    public int getReadyCount(KernelAppContext context) {
+        if (! registeredContexts.contains(context))
+            throw new IllegalArgumentException("Unknown context");
+        return appScheduler.getReadyCount();
+    }
+
+    /**
+     * {@inheritDoc}
      */
     public ScheduledTask getNextTask() throws InterruptedException {
         return appScheduler.getNextTask(true);

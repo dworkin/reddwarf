@@ -1,9 +1,12 @@
 
 package com.sun.sgs.impl.kernel.profile;
 
+import com.sun.sgs.impl.util.PropertiesWrapper;
+
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.ProfiledOperation;
+import com.sun.sgs.kernel.ProfileOperation;
 import com.sun.sgs.kernel.ProfileOperationListener;
+import com.sun.sgs.kernel.ProfileReport;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskOwner;
@@ -32,12 +35,14 @@ import java.util.Properties;
  */
 public class AggregateProfileOpListener implements ProfileOperationListener {
 
-    // NOTE: this will only support 256 operations, which is fine for now
-    // and used to make this faster, but may not be desirable ultimately
+    // NOTE: this only supports MAX_OPS operations, which is fine as long
+    // as the collector will never allow more than this number to be
+    // registered, but when that changes, so too should this code
     private int maxOp = 0;
-    private ProfiledOperation [] registeredOps = new ProfiledOperation[256];
-    private long [] sOpCounts = new long[256];
-    private long [] fOpCounts = new long[256];
+    private ProfileOperation [] registeredOps =
+        new ProfileOperation[ProfileCollector.MAX_OPS];
+    private long [] sOpCounts = new long[ProfileCollector.MAX_OPS];
+    private long [] fOpCounts = new long[ProfileCollector.MAX_OPS];
     
     // the task and time counts for successful and failed tasks
     private volatile long sTaskCount = 0;
@@ -61,6 +66,16 @@ public class AggregateProfileOpListener implements ProfileOperationListener {
     // the handle for the recurring reporting task
     private RecurringTaskHandle handle;
 
+    // the base name for properties
+    private static final String PROP_BASE =
+        AggregateProfileOpListener.class.getName();
+
+    // the supported properties and their default values
+    private static final String PORT_PROPERTY = PROP_BASE + ".reportPort";
+    private static final int DEFAULT_PORT = 43005;
+    private static final String PERIOD_PROPERTY = PROP_BASE + "reportPeriod.";
+    private static final long DEFAULT_PERIOD = 5000;
+
     /**
      * Creates an instance of <code>SnapshotProfileOpListener</code>.
      *
@@ -79,16 +94,13 @@ public class AggregateProfileOpListener implements ProfileOperationListener {
                                       ResourceCoordinator resourceCoord)
         throws IOException
     {
-        int port =
-            Integer.parseInt(properties.
-                             getProperty(getClass().getName() + ".reportPort",
-                                         "43005"));
+        PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
+
+        int port = wrappedProps.getIntProperty(PORT_PROPERTY, DEFAULT_PORT);
         networkReporter = new NetworkReporter(port, resourceCoord);
 
         long reportPeriod =
-            Long.parseLong(properties.
-                           getProperty(getClass().getName() + ".reportPeriod",
-                                       "5000"));
+            wrappedProps.getLongProperty(PERIOD_PROPERTY, DEFAULT_PERIOD);
         handle = taskScheduler.
             scheduleRecurringTask(new AggregatingRunnable(), owner, 
                                   System.currentTimeMillis() + reportPeriod,
@@ -99,7 +111,7 @@ public class AggregateProfileOpListener implements ProfileOperationListener {
     /**
      * {@inheritDoc}
      */
-    public void notifyNewOp(ProfiledOperation op) {
+    public void notifyNewOp(ProfileOperation op) {
         int id = op.getId();
         if (id > maxOp)
             maxOp = id;
@@ -116,30 +128,28 @@ public class AggregateProfileOpListener implements ProfileOperationListener {
     /**
      * {@inheritDoc}
      */
-    public void report(KernelRunnable task, boolean transactional,
-                       TaskOwner owner, long scheduledStartTime,
-                       long actualStartTime, long runningTime,
-                       List<ProfiledOperation> ops, int retryCount,
-                       boolean succeeded) {
-        if (succeeded) {
+    public void report(ProfileReport profileReport) {
+        List<ProfileOperation> ops = profileReport.getReportedOperations();
+        if (profileReport.wasTaskSuccessful()) {
             sTaskCount++;
             sTaskOpCount += ops.size();
-            sRunTime += runningTime;
-            delayTime += (actualStartTime - scheduledStartTime);
-            tryCount += retryCount;
-            for (ProfiledOperation op : ops)
+            sRunTime += profileReport.getRunningTime();
+            delayTime += (profileReport.getActualStartTime() -
+                          profileReport.getScheduledStartTime());
+            tryCount += profileReport.getRetryCount();
+            for (ProfileOperation op : ops)
                 sOpCounts[op.getId()]++;
         } else {
             fTaskCount++;
             fTaskOpCount += ops.size();
-            fRunTime += runningTime;
-            for (ProfiledOperation op : ops)
+            fRunTime += profileReport.getRunningTime();
+            for (ProfileOperation op : ops)
                 fOpCounts[op.getId()]++;
         }
 
-        if (transactional) {
+        if (profileReport.wasTaskTransactional()) {
             tTaskCount++;
-            tRunTime += runningTime;
+            tRunTime += profileReport.getRunningTime();
         }
     }
 
@@ -180,7 +190,7 @@ public class AggregateProfileOpListener implements ProfileOperationListener {
             reportStr += "  TotalTasks=" + totalTasks +
                 "  AvgLength=" + totalAvgLength + "ms\n";
             reportStr += "  Transactional=" + tTaskCount +
-                "   AvgLength" + transactionalAvgLength + "\n";
+                "   AvgLength=" + transactionalAvgLength + "\n";
             reportStr += "  Successful=" + sTaskCount +
                 "  AvgLength=" + avgSuccessfulLength + "ms" +
                 "  AvgStartDelay=" + avgSuccessfulDelay + "ms" +

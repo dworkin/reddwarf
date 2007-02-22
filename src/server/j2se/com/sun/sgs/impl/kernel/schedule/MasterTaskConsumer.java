@@ -5,7 +5,7 @@ import com.sun.sgs.app.ExceptionRetryStatus;
 
 import com.sun.sgs.impl.kernel.TaskHandler;
 
-import com.sun.sgs.impl.kernel.profile.ProfilingCollector;
+import com.sun.sgs.impl.kernel.profile.ProfileCollector;
 
 import com.sun.sgs.impl.util.LoggerWrapper;
 
@@ -30,8 +30,8 @@ class MasterTaskConsumer implements Runnable {
     // the system scheduler that provides tasks
     private final SystemScheduler scheduler;
 
-    // the collector used to report tasks for profiling
-    private final ProfilingCollector profilingCollector;
+    // the collector used to report tasks for profile
+    private final ProfileCollector profileCollector;
 
     // the task handler used to run each task
     private final TaskHandler taskHandler;
@@ -42,20 +42,20 @@ class MasterTaskConsumer implements Runnable {
      * @param masterScheduler the <code>MasterTaskScheduler</code> that
      *                        created this consumer
      * @param scheduler the <code>SystemScheduler</code> that provides tasks
-     * @param profilingCollector the <code>ProfilingCollector</code> that
-     *                           is used to report tasks, or <code>null</code>
-     *                           if tasks should not be reported
+     * @param profileCollector the <code>ProfileCollector</code> that
+     *                         is used to report tasks, or <code>null</code>
+     *                         if tasks should not be reported
      * @param taskHandler the system's <code>TaskHandler</code>
      */
     MasterTaskConsumer(MasterTaskScheduler masterScheduler,
                        SystemScheduler scheduler,
-                       ProfilingCollector profilingCollector,
+                       ProfileCollector profileCollector,
                        TaskHandler taskHandler) {
         logger.log(Level.CONFIG, "Creating a new Master Task Consumer");
 
         this.masterScheduler = masterScheduler;
         this.scheduler = scheduler;
-        this.profilingCollector = profilingCollector;
+        this.profileCollector = profileCollector;
         this.taskHandler = taskHandler;
     }
 
@@ -78,18 +78,21 @@ class MasterTaskConsumer implements Runnable {
                 // run the task to completion
                 while (! taskFinished) {
                     try {
-                        if (profilingCollector != null)
-                            profilingCollector.startTask(task.getTask(),
-                                                         task.getOwner(),
-                                                         task.getStartTime());
+                        if (profileCollector != null)
+                            profileCollector.
+                                startTask(task.getTask(), task.getOwner(),
+                                          task.getStartTime(),
+                                          scheduler.
+                                          getReadyCount(task.getOwner().
+                                                        getContext()));
                         taskHandler.runTaskAsOwner(task.getTask(),
                                                    task.getOwner());
-                        if (profilingCollector != null)
-                            profilingCollector.finishTask(tryCount, true);
+                        if (profileCollector != null)
+                            profileCollector.finishTask(tryCount, true);
                         taskFinished = true;
                     } catch (Exception e) {
-                        if (profilingCollector != null)
-                            profilingCollector.finishTask(tryCount++, false);
+                        if (profileCollector != null)
+                            profileCollector.finishTask(tryCount++, false);
 
                         if ((e instanceof ExceptionRetryStatus) &&
                             (((ExceptionRetryStatus)e).shouldRetry())) {

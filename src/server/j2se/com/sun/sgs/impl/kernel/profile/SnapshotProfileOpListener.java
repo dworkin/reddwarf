@@ -1,9 +1,12 @@
 
 package com.sun.sgs.impl.kernel.profile;
 
+import com.sun.sgs.impl.util.PropertiesWrapper;
+
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.ProfiledOperation;
+import com.sun.sgs.kernel.ProfileOperation;
 import com.sun.sgs.kernel.ProfileOperationListener;
+import com.sun.sgs.kernel.ProfileReport;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskOwner;
@@ -45,6 +48,9 @@ public class SnapshotProfileOpListener implements ProfileOperationListener {
     private volatile long successCount = 0;
     private volatile long totalCount = 0;
 
+    // the total number of ready tasks observed
+    private volatile int readyCount = 0;
+
     // the number of threads running through the scheduler
     private volatile int threadCount;
 
@@ -57,6 +63,16 @@ public class SnapshotProfileOpListener implements ProfileOperationListener {
     // a flag used to make sure that during reporting no one is looking
     // at the data, since it gets cleared after the report is made
     private AtomicBoolean flag;
+
+    // the base name for properties
+    private static final String PROP_BASE =
+        SnapshotProfileOpListener.class.getName();
+
+    // the supported properties and their default values
+    private static final String PORT_PROPERTY = PROP_BASE + ".reportPort";
+    private static final int DEFAULT_PORT = 43007;
+    private static final String PERIOD_PROPERTY = PROP_BASE + "reportPeriod.";
+    private static final long DEFAULT_PERIOD = 10000;
 
     /**
      * Creates an instance of <code>SnapshotProfileOpListener</code>.
@@ -78,18 +94,15 @@ public class SnapshotProfileOpListener implements ProfileOperationListener {
     {
         flag = new AtomicBoolean(false);
 
-        int port =
-            Integer.parseInt(properties.
-                             getProperty(getClass().getName() + ".reportPort",
-                                         "43007"));
+        PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
+
+        int port = wrappedProps.getIntProperty(PORT_PROPERTY, DEFAULT_PORT);
         networkReporter = new NetworkReporter(port, resourceCoord);
 
         long reportPeriod =
-            Long.parseLong(properties.
-                           getProperty(getClass().getName() + ".reportPeriod",
-                                       "10000"));
+            wrappedProps.getLongProperty(PERIOD_PROPERTY, DEFAULT_PERIOD);
         handle = taskScheduler.
-            scheduleRecurringTask(new SnapshotRunnable(), owner, 
+            scheduleRecurringTask(new SnapshotRunnable(reportPeriod), owner, 
                                   System.currentTimeMillis() + reportPeriod,
                                   reportPeriod);
         handle.start();
@@ -98,7 +111,7 @@ public class SnapshotProfileOpListener implements ProfileOperationListener {
     /**
      * {@inheritDoc}
      */
-    public void notifyNewOp(ProfiledOperation op) {
+    public void notifyNewOp(ProfileOperation op) {
         // for now, this is ignored
     }
 
@@ -112,17 +125,14 @@ public class SnapshotProfileOpListener implements ProfileOperationListener {
     /**
      * {@inheritDoc}
      */
-    public void report(KernelRunnable task, boolean transactional,
-                       TaskOwner owner, long scheduledStartTime,
-                       long actualStartTime, long runningTime,
-                       List<ProfiledOperation> ops, int retryCount,
-                       boolean succeeded) {
+    public void report(ProfileReport profileReport) {
         while (! flag.compareAndSet(false, true));
 
         try {
-            if (succeeded)
+            if (profileReport.wasTaskSuccessful())
                 successCount++;
             totalCount++;
+            readyCount += profileReport.getReadyCount();
         } finally {
             flag.set(false);
         }
@@ -140,16 +150,23 @@ public class SnapshotProfileOpListener implements ProfileOperationListener {
      * reports on the collected data.
      */
     private class SnapshotRunnable implements KernelRunnable {
+        private final long reportPeriod;
+        SnapshotRunnable(long reportPeriod) {
+            this.reportPeriod = reportPeriod;
+        }
         public void run() throws Exception {
             while (! flag.compareAndSet(false, true));
 
-            String reportStr = "Snapshot[NotFinished]:\n";
+            String reportStr = "Snapshot[period=" + reportPeriod + "ms]:\n";
             try {
                 reportStr += "  Threads=" + threadCount + "  Tasks=" +
-                    successCount + "/" + totalCount + "\n\n";
+                    successCount + "/" + totalCount + "\n";
+                reportStr += "  AverageQueueSize=" +
+                    ((double)readyCount / (double)totalCount) + " tasks\n\n";
             } finally {
                 successCount = 0;
                 totalCount = 0;
+                readyCount = 0;
                 flag.set(false);
             }
 

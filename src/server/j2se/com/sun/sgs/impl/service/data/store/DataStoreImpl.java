@@ -27,13 +27,14 @@ import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.PropertiesWrapper;
-import com.sun.sgs.kernel.ProfiledOperation;
-import com.sun.sgs.kernel.ProfilingConsumer;
+import com.sun.sgs.kernel.ProfileConsumer;
+import com.sun.sgs.kernel.ProfileOperation;
+import com.sun.sgs.kernel.ProfileProducer;
+import com.sun.sgs.kernel.ProfileRegistrar;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.util.Arrays;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -133,15 +134,9 @@ import java.util.logging.Logger;
  * <li> {@link Level#FINEST FINEST} - Name and object operations
  * </ul> <p>
  *
- * This class also uses the <code>Logger</code> named
- * <code>com.sun.sgs.impl.service.data.DataStoreImpl.ops</code> to log
- * information at the following logging levels: <p>
- *
- * <ul>
- * <li> {@link Level#FINE FINE} - Operation tallies
- * </ul> <p>
  */
-public final class DataStoreImpl implements DataStore, TransactionParticipant {
+public final class DataStoreImpl implements DataStore, TransactionParticipant,
+                                            ProfileProducer {
 
     /** The property that specifies the transaction timeout in milliseconds. */
     private static final String TXN_TIMEOUT_PROPERTY =
@@ -264,27 +259,19 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
     private int txnCount = 0;
 
     /** The consumer used to report operations, if any */
-    private ProfilingConsumer consumer = null;
+    private ProfileConsumer consumer = null;
 
-    /* -- The operations -- DataStore and DataService API -- */
-    /**
-     * XXX: most of these should also be noted at the manager/service
-     * level so that we can turn off low-level reporting and get a
-     * view into what methods the application is calling directly, but
-     * that will affect the way this class is tested, so for now these
-     * operations are left here.
-     * -sp76946@sun.com (02/16/2007)
-     */
-    private ProfiledOperation getBindingOp = null;
-    private ProfiledOperation setBindingOp = null;
-    private ProfiledOperation removeBindingOp = null;
-    private ProfiledOperation nextBoundNameOp = null;
-    private ProfiledOperation removeObjectOp = null;
-    private ProfiledOperation markForUpdateOp = null;
-	private ProfiledOperation createObjectOp = null;
-    private ProfiledOperation getObjectOp = null;
-    private ProfiledOperation getObjectForUpdateOp = null;
-    private ProfiledOperation setObjectOp = null;
+    /* -- The operations -- DataStore API -- */
+    private ProfileOperation createObjectOp = null;
+    private ProfileOperation markForUpdateOp = null;
+    private ProfileOperation getObjectOp = null;
+    private ProfileOperation getObjectForUpdateOp = null;
+    private ProfileOperation setObjectOp = null;
+    private ProfileOperation removeObjectOp = null;
+    private ProfileOperation getBindingOp = null;
+    private ProfileOperation setBindingOp = null;
+    private ProfileOperation removeBindingOp = null;
+    private ProfileOperation nextBoundNameOp = null;
 
     /** Stores transaction information. */
     private static class TxnInfo {
@@ -427,28 +414,33 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
      * @param	properties the properties for configuring this instance
      * @throws	DataStoreException if there is a problem with the database
      * @throws	IllegalArgumentException if neither
-     *      <code>com.sun.sgs.app.root</code> nor <code>
-     *      com.sun.sgs.impl.service.data.store.DataStoreImpl.directory</code>
-     *      is provided, or the <code>
-     *		com.sun.sgs.impl.service.data.store.allocationBlockSize</code>
-     *		property is not a valid integer greater than zero
+     *		<code>com.sun.sgs.app.root</code> nor <code>
+     *		com.sun.sgs.impl.service.data.store.DataStoreImpl.directory
+     *		</code> is provided, or the <code>
+     *		com.sun.sgs.impl.service.data.store.DataStoreImpl.allocationBlockSize
+     *		</code> property is not a valid integer greater than zero
      */
     public DataStoreImpl(Properties properties) {
 	logger.log(
 	    Level.CONFIG, "Creating DataStoreImpl properties:{0}", properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
-	String specifiedDirectory = wrappedProps.getProperty(DIRECTORY_PROPERTY);
-    if (specifiedDirectory != null) {
-        directory = specifiedDirectory;
-    } else {
-        String rootDir = properties.getProperty(StandardProperties.APP_ROOT);
-        if (rootDir == null) {
-            throw new IllegalArgumentException("A value for the property " +
-                                               StandardProperties.APP_ROOT +
-                                               " must be specified");
-        }
-        directory = rootDir + File.separator + DEFAULT_DIRECTORY;
+	String specifiedDirectory =
+	    wrappedProps.getProperty(DIRECTORY_PROPERTY);
+	if (specifiedDirectory == null) {
+	    String rootDir =
+		properties.getProperty(StandardProperties.APP_ROOT);
+	    if (rootDir == null) {
+		throw new IllegalArgumentException(
+		    "A value for the property " + StandardProperties.APP_ROOT +
+		    " must be specified");
+	    }
+	    specifiedDirectory = rootDir + File.separator + DEFAULT_DIRECTORY;
 	}
+	/*
+	 * Use an absolute path to avoid problems on Windows.
+	 * -tjb@sun.com (02/16/2007)
+	 */
+	directory = new File(specifiedDirectory).getAbsolutePath();
 	allocationBlockSize = wrappedProps.getIntProperty(
 	    ALLOCATION_BLOCK_SIZE_PROPERTY, DEFAULT_ALLOCATION_BLOCK_SIZE);
 	if (allocationBlockSize < 1) {
@@ -564,22 +556,6 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	}
     }
 
-    /** Assigns the consumer to use in profiling. */
-    public void setProfilingConsumer(ProfilingConsumer profilingConsumer) {
-        consumer = profilingConsumer;
-        getBindingOp = consumer.registerOperation("getBinding");
-        setBindingOp = consumer.registerOperation("setBinding");
-        removeBindingOp = consumer.registerOperation("removeBinding");
-        nextBoundNameOp = consumer.registerOperation("nextBoundName");
-        removeObjectOp = consumer.registerOperation("removeObject");
-        markForUpdateOp = consumer.registerOperation("markForUpdate");
-        createObjectOp = consumer.registerOperation("createObject");
-        getObjectOp = consumer.registerOperation("getObject");
-        getObjectForUpdateOp =
-            consumer.registerOperation("getObjectForUpdate");
-        setObjectOp = consumer.registerOperation("setObject");
-    }
-
     /* -- Implement DataStore -- */
 
     /** {@inheritDoc} */
@@ -687,7 +663,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 
     /** Implement getObject, without logging. */
     private byte[] getObjectInternal(
-	Transaction txn, long oid, boolean forUpdate, ProfiledOperation op)
+	Transaction txn, long oid, boolean forUpdate, ProfileOperation op)
 	throws DatabaseException
     {
 	checkId(oid);
@@ -1081,6 +1057,25 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
 	    txn, Level.FINER, exception, "abort txn:" + txn);
     }
 
+    /* -- Implements ProfileProducer -- */
+
+    /** {@inheritDoc} */
+    public void setProfileRegistrar(ProfileRegistrar profileRegistrar) {
+        consumer = profileRegistrar.registerProfileProducer(this);
+
+        getBindingOp = consumer.registerOperation("getBinding");
+        setBindingOp = consumer.registerOperation("setBinding");
+        removeBindingOp = consumer.registerOperation("removeBinding");
+        nextBoundNameOp = consumer.registerOperation("nextBoundName");
+        removeObjectOp = consumer.registerOperation("removeObject");
+        markForUpdateOp = consumer.registerOperation("markForUpdate");
+        createObjectOp = consumer.registerOperation("createObject");
+        getObjectOp = consumer.registerOperation("getObject");
+        getObjectForUpdateOp =
+            consumer.registerOperation("getObjectForUpdate");
+        setObjectOp = consumer.registerOperation("setObject");
+    }
+
     /* -- Other public methods -- */
 
     /** {@inheritDoc} */
@@ -1146,7 +1141,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant {
      * in progress.  The op argument, if non-null, specifies the operation
      * being performed under the specified transaction.
      */
-    private TxnInfo checkTxn(Transaction txn, ProfiledOperation op)
+    private TxnInfo checkTxn(Transaction txn, ProfileOperation op)
 	throws DatabaseException
     {
 	if (txn == null) {

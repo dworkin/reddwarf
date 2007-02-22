@@ -2,12 +2,13 @@
 package com.sun.sgs.impl.kernel.profile;
 
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.ProfiledOperation;
+import com.sun.sgs.kernel.ProfileOperation;
 import com.sun.sgs.kernel.ProfileOperationListener;
 import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskOwner;
 
 import java.util.ArrayList;
+import java.util.Collections;
 
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -17,7 +18,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * This is the main aggregation point for profiling data. Instances of
  * this class are used to collect data from arbitrary sources (typically
- * <code>ProfilingConsumer</code>s or the scheduler itself) and keep
+ * <code>ProfileConsumer</code>s or the scheduler itself) and keep
  * track of which tasks are generating which data.
  * <p>
  * This class allows instances of <code>ProfileOperationListener</code> to
@@ -27,13 +28,18 @@ import java.util.concurrent.atomic.AtomicInteger;
  * means that listeners should be efficient in handling reports, since
  * they are blocking all other listeners.
  */
-public class ProfilingCollector {
+public class ProfileCollector {
 
     // the next free operation identifier to use
     private AtomicInteger nextOpId;
 
+    // the maximum number of operations we allow
+    // NOTE: this should become dynamic, but for now we will never
+    // hit this upper-bound
+    static final int MAX_OPS = 256;
+
     // the set of already-allocated operations
-    private ProfiledOperationImpl [] ops;
+    private ProfileOperationImpl [] ops = new ProfileOperationImpl[MAX_OPS];
 
     // the number of threads currently in the scheduler
     private volatile int schedulerThreadCount;
@@ -43,30 +49,27 @@ public class ProfilingCollector {
 
     // thread-local detail about the current task, used to let us
     // aggregate data across all participants in a given task
-    private ThreadLocal<OpCollection> opCollections =
-        new ThreadLocal<OpCollection>() {
-            protected OpCollection initialValue() {
+    private ThreadLocal<ProfileReportImpl> profileReports =
+        new ThreadLocal<ProfileReportImpl>() {
+            protected ProfileReportImpl initialValue() {
                 return null;
             }
         };
 
     // the incoming report queue
-    private LinkedBlockingQueue<OpCollection> queue;
+    private LinkedBlockingQueue<ProfileReportImpl> queue;
 
     /**
-     * Creates an instance of <code>ProfilingCollector</code>.
+     * Creates an instance of <code>ProfileCollector</code>.
      *
      * @param resourceCoordinator a <code>ResourceCoordinator</code> used
      *                            to run collecting and reporting tasks
      */
-    public ProfilingCollector(ResourceCoordinator resourceCoordinator) {
+    public ProfileCollector(ResourceCoordinator resourceCoordinator) {
         nextOpId = new AtomicInteger(0);
-        // NOTE: this limit is fine for now, but may need to be re-considered
-        // if our profiling becomes more wide-spread
-        ops = new ProfiledOperationImpl[256];
         schedulerThreadCount = 0;
         listeners = new ArrayList<ProfileOperationListener>();
-        queue = new LinkedBlockingQueue<OpCollection>();
+        queue = new LinkedBlockingQueue<ProfileReportImpl>();
 
         // start a long-lived task to consume the other end of the queue
         resourceCoordinator.startTask(new CollectorRunnable(), null);
@@ -90,7 +93,7 @@ public class ProfilingCollector {
     /**
      * Notifies the collector that a thread has been added to the scheduler.
      */
-    public synchronized void notifyThreadAdded() {
+    public void notifyThreadAdded() {
         schedulerThreadCount++;
         for (ProfileOperationListener listener : listeners)
             listener.notifyThreadCount(schedulerThreadCount);
@@ -100,7 +103,7 @@ public class ProfilingCollector {
      * Notifies the collector that a thread has been removed from the
      * scheduler.
      */
-    public synchronized void notifyThreadRemoved() {
+    public void notifyThreadRemoved() {
         schedulerThreadCount--;
         for (ProfileOperationListener listener : listeners)
             listener.notifyThreadCount(schedulerThreadCount);
@@ -118,11 +121,13 @@ public class ProfilingCollector {
      * @throws IllegalStateException if a task is already bound to this thread
      */
     public void startTask(KernelRunnable task, TaskOwner owner,
-                          long scheduledStartTime) {
-        if (opCollections.get() != null)
+                          long scheduledStartTime, int readyCount) {
+        if (profileReports.get() != null)
             throw new IllegalStateException("A task is already being " +
                                             "profiled in this thread");
-        opCollections.set(new OpCollection(task, owner, scheduledStartTime));
+        profileReports.set(new ProfileReportImpl(task, owner,
+                                                 scheduledStartTime,
+                                                 readyCount));
     }
 
     /**
@@ -135,11 +140,11 @@ public class ProfilingCollector {
      * @throws IllegalStateException if no task is bound to this thread
      */
     public void noteTransactional() {
-        OpCollection collection = opCollections.get();
-        if (collection == null)
-            throw new IllegalStateException("No task is being profiled in " +
+        ProfileReportImpl profileReport = profileReports.get();
+        if (profileReport == null)
+            throw new IllegalStateException("No task is being Profile in " +
                                             "this thread");
-        collection.transactional = true;
+        profileReport.transactional = true;
     }
 
     /**
@@ -156,70 +161,54 @@ public class ProfilingCollector {
      */
     public void finishTask(int tryCount, boolean taskSucceeded) {
         long stopTime = System.currentTimeMillis();
-        OpCollection collection = opCollections.get();
-        if (collection == null)
-            throw new IllegalStateException("No task is being profiled in " +
+        ProfileReportImpl profileReport = profileReports.get();
+        if (profileReport == null)
+            throw new IllegalStateException("No task is being Profile in " +
                                             "this thread");
-        opCollections.set(null);
+        profileReports.set(null);
 
-        collection.runningTime = stopTime - collection.actualStartTime;
-        collection.tryCount = tryCount;
-        collection.succeeded = taskSucceeded;
+        profileReport.runningTime = stopTime - profileReport.actualStartTime;
+        profileReport.tryCount = tryCount;
+        profileReport.succeeded = taskSucceeded;
 
-        // queue up the collection to be reported to our listeners
-        queue.offer(collection);
+        // queue up the report to be reported to our listeners
+        queue.offer(profileReport);
     }
 
     /**
-     * Package-private method used by <code>ProfilingConsumerImpl</code> to
+     * Package-private method used by <code>ProfileConsumerImpl</code> to
      * handle operation registrations.
      *
      * @param opName the name of the operation
-     * @param producerName the name of the <code>ProfilingProducer</code>
+     * @param producerName the name of the <code>ProfileProducer</code>
      *                     registering this operation
      *
-     * @return a new <code>ProfiledOperation</code> that will report back
+     * @return a new <code>ProfileOperation</code> that will report back
      *         to this collector
+     *
+     * @throws IllegalStateException if no more operations can be registered
      */
-    ProfiledOperation registerOperation(String opName, String producerName) {
+    ProfileOperation registerOperation(String opName, String producerName) {
         int opId = nextOpId.getAndIncrement();
-        ops[opId] = new ProfiledOperationImpl(opName, opId);
+        if (opId >= MAX_OPS) {
+            nextOpId.set(MAX_OPS);
+            throw new IllegalStateException("No more operations may be " +
+                                            "registered in the collector");
+        }
+        ops[opId] = new ProfileOperationImpl(opName, opId);
         for (ProfileOperationListener listener : listeners)
             listener.notifyNewOp(ops[opId]);
         return ops[opId];
     }
 
     /**
-     * A private class for collecting data associated with a single task.
-     */
-    private static class OpCollection {
-        final KernelRunnable task;
-        boolean transactional = false;
-        final TaskOwner owner;
-        final long scheduledStartTime;
-        final long actualStartTime;
-        ArrayList<ProfiledOperation> ops;
-        long runningTime;
-        int tryCount;
-        boolean succeeded;
-        OpCollection(KernelRunnable task, TaskOwner owner,
-                     long scheduledStartTime) {
-            this.task = task;
-            this.owner = owner;
-            this.scheduledStartTime = scheduledStartTime;
-            actualStartTime = System.currentTimeMillis();
-            ops = new ArrayList<ProfiledOperation>();
-        }
-    }
-
-    /**
-     * A private implementation of <code>ProfiledOperation</code> that is
+     * A private implementation of <code>ProfileOperation</code> that is
      * returned from any call to <code>registerOperation</code>.
      */
-    private class ProfiledOperationImpl implements ProfiledOperation {
+    private class ProfileOperationImpl implements ProfileOperation {
         private final String opName;
         private final int opId;
-        public ProfiledOperationImpl(String opName, int opId) {
+        ProfileOperationImpl(String opName, int opId) {
             this.opName = opName;
             this.opId = opId;
         }
@@ -237,18 +226,18 @@ public class ProfilingCollector {
          * outside the scope of a started task.
          */
         public void report() {
-            OpCollection collection = opCollections.get();
-            if (collection == null)
+            ProfileReportImpl profileReport = profileReports.get();
+            if (profileReport == null)
                 throw new IllegalStateException("Cannot report operation " +
                                                 "because no task is active");
-            collection.ops.add(this);
+            profileReport.ops.add(this);
         }
     }
 
     /**
      * Private class that implements the long-running collector and reporter
      * of task data. The task blocks on the queue, and whenever there is a
-     * collection ready notifies all installed listeners.
+     * report ready notifies all installed listeners.
      * <p>
      * NOTE: The commented-out code here may still be useful to make sure
      * that the single-threaded queue keeps up. It was originally used just
@@ -261,9 +250,12 @@ public class ProfilingCollector {
         public void run() {
             try {
                 while (true) {
-                    OpCollection collection = queue.poll();
-                    if (collection == null) {
-                        collection = queue.take();
+                    if (Thread.interrupted())
+                        return;
+
+                    ProfileReportImpl profileReport = queue.poll();
+                    if (profileReport == null) {
+                        profileReport = queue.take();
                     } /*else {
                         queueSize += queue.size();
                         queueSamples++;
@@ -278,15 +270,12 @@ public class ProfilingCollector {
                         "%  ]\n\n";
                      */
 
+                    // make sure that the list can't be modified by a listener
+                    profileReport.ops =
+                        Collections.unmodifiableList(profileReport.ops);
+
                     for (ProfileOperationListener listener : listeners)
-                        listener.report(collection.task,
-                                        collection.transactional,
-                                        collection.owner,
-                                        collection.scheduledStartTime,
-                                        collection.actualStartTime,
-                                        collection.runningTime,
-                                        collection.ops, collection.tryCount,
-                                        collection.succeeded);
+                        listener.report(profileReport);
                 }
             } catch (InterruptedException ie) {}
         }

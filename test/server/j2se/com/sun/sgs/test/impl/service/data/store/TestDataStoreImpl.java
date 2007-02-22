@@ -128,6 +128,12 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
+    /**
+     * Tests that the {@code DataStore} correctly infers the database
+     * subdirectory when only the root directory is provided.
+     *
+     * @throws Exception if an unexpected exception occurs
+     */
     public void testConstructorNoDirectory() throws Exception {
         String rootDir = createDirectory();
         File dataDir = new File(rootDir, "dsdb");
@@ -137,7 +143,8 @@ public class TestDataStoreImpl extends TestCase {
         Properties props = createProperties(
             StandardProperties.APP_NAME, "Foo",
             StandardProperties.APP_ROOT, rootDir);
-        new DataStoreImpl(props);
+        DataStoreImpl testStore = new DataStoreImpl(props);
+        testStore.shutdown();
         deleteDirectory(dataDir.getPath());
     }
 

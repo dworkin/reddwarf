@@ -13,10 +13,11 @@ import java.util.HashSet;
 
 
 /**
- * A very simple utility class used to report on a socket. This allows any
- * number of clients to connect and listen for text. Note that this is
+ * A very simple utility class used to report on a socket. This allows
+ * any number of clients to connect and listen for text encoded in the
+ * platform's default character set encoding. Note that this is
  * intended only as a means for reporting in testing and development
- * systems. In deplopyment, a more robust mechanism should be used.
+ * systems. In deployment, a more robust mechanism should be used.
  */
 public class NetworkReporter {
 
@@ -48,7 +49,7 @@ public class NetworkReporter {
      *
      * @param message the message to send
      */
-    public void report(String message) {
+    public synchronized void report(String message) {
         for (Socket socket : listeners) {
             try {
                 OutputStream stream = socket.getOutputStream();
@@ -73,7 +74,9 @@ public class NetworkReporter {
         public void run() {
             try {
                 while (true) {
-                    listeners.add(serverSocket.accept());
+                    synchronized (this) {
+                        listeners.add(serverSocket.accept());
+                    }
                 }
             } catch (Exception e) {
                 try {

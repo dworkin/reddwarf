@@ -10,17 +10,20 @@ import com.sun.sgs.impl.kernel.TaskOwnerImpl;
 
 import com.sun.sgs.impl.kernel.profile.AggregateProfileOpListener;
 import com.sun.sgs.impl.kernel.profile.AppGraphProfileOpListener;
-import com.sun.sgs.impl.kernel.profile.ProfilingCollector;
-import com.sun.sgs.impl.kernel.profile.ProfilingConsumerImpl;
+import com.sun.sgs.impl.kernel.profile.ProfileCollector;
+import com.sun.sgs.impl.kernel.profile.ProfileConsumerImpl;
 
 import com.sun.sgs.impl.util.LoggerWrapper;
 
 import com.sun.sgs.kernel.KernelAppContext;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.Priority;
-import com.sun.sgs.kernel.ProfiledOperation;
+import com.sun.sgs.kernel.ProfileConsumer;
+import com.sun.sgs.kernel.ProfileOperation;
 import com.sun.sgs.kernel.ProfileOperationListener;
-import com.sun.sgs.kernel.ProfilingProducer;
+import com.sun.sgs.kernel.ProfileProducer;
+import com.sun.sgs.kernel.ProfileRegistrar;
+import com.sun.sgs.kernel.ProfileReport;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskOwner;
@@ -31,7 +34,6 @@ import java.lang.reflect.Constructor;
 
 import java.util.Collection;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Properties;
 
 import java.util.concurrent.atomic.AtomicInteger;
@@ -48,7 +50,7 @@ import java.util.logging.Logger;
  * the real work to its children.
  */
 public class MasterTaskScheduler
-    implements TaskScheduler, ProfileOperationListener {
+    implements ProfileRegistrar, ProfileOperationListener, TaskScheduler {
 
     // logger for this class
     private static final LoggerWrapper logger =
@@ -90,8 +92,8 @@ public class MasterTaskScheduler
     // the default priority for tasks
     private static Priority defaultPriority = Priority.getDefaultPriority();
 
-    // the single collector used for all profiling data
-    private ProfilingCollector profilingCollector;
+    // the single collector used for all profile data
+    private ProfileCollector profileCollector;
 
     /**
      * Creates an instance of <code>MasterTaskScheduler</code>.
@@ -99,7 +101,8 @@ public class MasterTaskScheduler
      * @param properties the system properties
      * @param resourceCoordinator the system's <code>ResourceCoordinator</code>
      * @param taskHandler the system's <code>TaskHandler</code>
-     * @param profilingCollector the system's <code>ProfilingCollector</code>
+     * @param profileCollector the system's <code>ProfileCollector</code>,
+     *                         or <code>null</code> if profiling is disabled
      * @param systemContext the context the system runs in, which is registered
      *                      as the first application using this scheduler
      *
@@ -108,7 +111,7 @@ public class MasterTaskScheduler
     public MasterTaskScheduler(Properties properties,
                                ResourceCoordinator resourceCoordinator,
                                TaskHandler taskHandler,
-                               ProfilingCollector profilingCollector,
+                               ProfileCollector profileCollector,
                                KernelAppContext systemContext)
         throws Exception
     {
@@ -139,7 +142,7 @@ public class MasterTaskScheduler
 
         this.resourceCoordinator = resourceCoordinator;
         this.taskHandler = taskHandler;
-        this.profilingCollector = profilingCollector;
+        this.profileCollector = profileCollector;
 
         int startingThreads =
             Integer.parseInt(properties.
@@ -154,11 +157,11 @@ public class MasterTaskScheduler
         for (int i = 0; i < startingThreads; i++) {
             resourceCoordinator.
                 startTask(new MasterTaskConsumer(this, systemScheduler,
-                                                 profilingCollector,
+                                                 profileCollector,
                                                  taskHandler),
                           null);
-            if (profilingCollector != null)
-                profilingCollector.notifyThreadAdded();
+            if (profileCollector != null)
+                profileCollector.notifyThreadAdded();
         }
 
         // register the system as the first application using the scheduler
@@ -166,10 +169,10 @@ public class MasterTaskScheduler
 
         // finally, add ourselves and optionally the system scheduler,
         // since this is how we will start to manage threads
-        if (profilingCollector != null) {
-            profilingCollector.addListener(this);
+        if (profileCollector != null) {
+            profileCollector.addListener(this);
             if (systemScheduler instanceof ProfileOperationListener)
-                profilingCollector.
+                profileCollector.
                     addListener((ProfileOperationListener)systemScheduler);
         }
     }
@@ -194,20 +197,17 @@ public class MasterTaskScheduler
     }
 
     /**
-     * Registers the given <code>ProfilingProducer</code>, resulting in the
-     * manager being given a <code>ProfilingConsumer</code>.
-     *
-     * @param producer the <code>ProfilingProducer</code> being registered
+     * {@inheritDoc}
      */
-    public void registerProfilingProducer(ProfilingProducer producer) {
-        if (profilingCollector != null) {
+    public ProfileConsumer registerProfileProducer(ProfileProducer producer) {
+        if (profileCollector != null) {
             if (logger.isLoggable(Level.CONFIG))
-                logger.log(Level.CONFIG, "Registering profiling producer {0}",
+                logger.log(Level.CONFIG, "Registering profile producer {0}",
                            producer);
-            ProfilingConsumerImpl consumer =
-                new ProfilingConsumerImpl(producer, profilingCollector);
-            producer.setProfilingConsumer(consumer);
+            return new ProfileConsumerImpl(producer, profileCollector);
         }
+
+        return null;
     }
 
     /**
@@ -221,8 +221,8 @@ public class MasterTaskScheduler
         // threshold and see if another consumer needs to be created
         if (threadCount.decrementAndGet() == 0) {
             logger.log(Level.CONFIG, "No more threads are consuming tasks");
-            if (profilingCollector != null)
-                profilingCollector.notifyThreadRemoved();
+            if (profileCollector != null)
+                profileCollector.notifyThreadRemoved();
             shutdown();
         }
     }
@@ -237,18 +237,14 @@ public class MasterTaskScheduler
     /**
      * {@inheritDoc}
      */
-    public void notifyNewOp(ProfiledOperation op) {
+    public void notifyNewOp(ProfileOperation op) {
         // see comment in notifyThreadLeaving
     }
 
     /**
      * {@inheritDoc}
      */
-    public void report(KernelRunnable task, boolean transactional,
-                       TaskOwner owner, long scheduledStartTime,
-                       long actualStartTime, long runningTime,
-                       List<ProfiledOperation> ops, int retryCount,
-                       boolean succeeded) {
+    public void report(ProfileReport profileReport) {
         // see comment in notifyThreadLeaving
     }
 

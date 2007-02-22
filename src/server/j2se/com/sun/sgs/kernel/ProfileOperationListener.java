@@ -1,16 +1,13 @@
 
 package com.sun.sgs.kernel;
 
-import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.kernel.TaskOwner;
-
 import java.util.List;
 
 
 /**
  * This interface is used to listen for profiling data as reported by the
  * system. Unlike the individual operations provided to
- * <code>ProfilingConsumer</code>, the data provided here is aggregated
+ * <code>ProfileConsumer</code>, the data provided here is aggregated
  * data representing events in the scheduler or collected data about a
  * complete task run through the scheduler.
  * <p>
@@ -35,9 +32,9 @@ public interface ProfileOperationListener {
      * listener will be notified of that operation before any tasks are
      * reported.
      *
-     * @param op a registered <code>ProfiledOperation</code>
+     * @param op a registered <code>ProfileOperation</code>
      */
-    public void notifyNewOp(ProfiledOperation op);
+    public void notifyNewOp(ProfileOperation op);
 
     /**
      * Notifies the listener of the number of threads being used by the
@@ -58,25 +55,9 @@ public interface ProfileOperationListener {
      * <code>actualStartTime</code> will change for each re-try of the
      * same task.
      *
-     * @param task the <code>KernelRunnable</code> that was run
-     * @param transactional whether any part of the task ran transactionally
-     * @param owne the <code>TaskOwner</code> for the task
-     * @param scheduledStartTime the requested starting time for the task in
-     *                           milliseconds since January 1, 1970
-     * @param actualStartTime the actual starting time for the task in
-     *                        milliseconds since January 1, 1970
-     * @param runningTime the length in milliseconds to execute the task
-     * @param ops a <code>List</code> of <code>ProfiledOperation</code>
-     *            representing the ordered set of reported operations
-     * @param retryCount the number of times this task has bee tried
-     * @param succeeded <code>true</code> if this task completed successfully,
-     *                  <code>false</code> if it failed
+     * @param profileReport the <code>ProfileReport</code> for the task
      */
-    public void report(KernelRunnable task, boolean transactional,
-                       TaskOwner owner, long scheduledStartTime,
-                       long actualStartTime, long runningTime,
-                       List<ProfiledOperation> ops, int retryCount,
-                       boolean succeeded);
+    public void report(ProfileReport profileReport);
 
     /**
      * Tells this listener that the system is shutting down.

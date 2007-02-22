@@ -8,15 +8,16 @@ import com.sun.sgs.impl.auth.NamePasswordAuthenticator;
 
 import com.sun.sgs.impl.kernel.schedule.MasterTaskScheduler;
 
-import com.sun.sgs.impl.kernel.profile.ProfilingCollector;
+import com.sun.sgs.impl.kernel.profile.ProfileCollector;
 
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 
 import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.util.Version;
 
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.ProfileOperationListener;
-import com.sun.sgs.kernel.ProfilingProducer;
+import com.sun.sgs.kernel.ProfileProducer;
 import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
@@ -45,12 +46,12 @@ import java.util.logging.Logger;
  * applications configured to run in this system.
  * <p>
  * By default, profiling is not turned on. To enable profiling, the kernel
- * property <code>com.sun.sgs.impl.kernel.Kernel.profiling</code> must
+ * property <code>com.sun.sgs.impl.kernel.Kernel.profile.level</code> must
  * be given the value "on". If no profile listeners are specified, then the
  * default <code>AggregateProfileOpListener</code> and
  * <code>SnapshotProfileOpListener</code> are enabled. To specify that a
  * different set of <code>ProfileOperationListener</code>s should be used,
- * the <code>com.sun.sgs.impl.kernel.Kernel.profilingListeners</code>
+ * the <code>com.sun.sgs.impl.kernel.Kernel.profile.listeners</code>
  * property must be specified with a colon-separated list of fully-qualified
  * classes, each of which implements <code>ProfileOperationListener</code>.
  */
@@ -77,11 +78,11 @@ class Kernel {
     private HashSet<AppKernelAppContext> applications;
 
     // the property for setting profiling levels
-    private static final String PROFILING_PROPERTY =
-        "com.sun.sgs.impl.kernel.Kernel.profiling";
+    private static final String PROFILE_PROPERTY =
+        "com.sun.sgs.impl.kernel.Kernel.profile.level";
     // the property for setting the profile listeners
-    private static final String PROFILING_LISTENERS =
-        "com.sun.sgs.impl.kernel.Kernel.profilingListeners";
+    private static final String PROFILE_LISTENERS =
+        "com.sun.sgs.impl.kernel.Kernel.profile.listeners";
     // the default profile listeners
     private static final String DEFAULT_PROFILE_LISTENERS =
         "com.sun.sgs.impl.kernel.profile.AggregateProfileOpListener:" +
@@ -99,11 +100,11 @@ class Kernel {
 
     // the default managers
     private static final String DEFAULT_CHANNEL_MANAGER =
-        "com.sun.sgs.impl.app.profile.ProfilingChannelManager";
+        "com.sun.sgs.impl.app.profile.ProfileChannelManager";
     private static final String DEFAULT_DATA_MANAGER =
-        "com.sun.sgs.impl.app.profile.ProfilingDataManager";
+        "com.sun.sgs.impl.app.profile.ProfileDataManager";
     private static final String DEFAULT_TASK_MANAGER =
-        "com.sun.sgs.impl.app.profile.ProfilingTaskManager";
+        "com.sun.sgs.impl.app.profile.ProfileTaskManager";
 
     // the default authenticator
     private static final String DEFAULT_IDENTITY_AUTHENTICATOR =
@@ -140,34 +141,34 @@ class Kernel {
 
             // see if we're doing any level of profiling, which for the
             // current version is as simple as "on" or "off"
-            ProfilingCollector profilingCollector = null;
-            String profilingLevel =
-                systemProperties.getProperty(PROFILING_PROPERTY);
-            if (profilingLevel != null) {
-                if (profilingLevel.equals("on")) {
+            ProfileCollector profileCollector = null;
+            String profileLevel =
+                systemProperties.getProperty(PROFILE_PROPERTY);
+            if (profileLevel != null) {
+                if (profileLevel.equals("on")) {
                     logger.log(Level.CONFIG, "System profiling is on");
-                    profilingCollector =
-                        new ProfilingCollector(resourceCoordinator);
-                } else if (! profilingLevel.equals("off")) {
+                    profileCollector =
+                        new ProfileCollector(resourceCoordinator);
+                } else if (! profileLevel.equals("off")) {
                     if (logger.isLoggable(Level.WARNING))
-                        logger.log(Level.WARNING, "Unknown profiling level " +
+                        logger.log(Level.WARNING, "Unknown profile level " +
                                    "{0} ... all profiling will be turned " +
-                                   "off", profilingLevel);
+                                   "off", profileLevel);
                 }
             }
 
             // create the task handler and scheduler
             TaskHandler taskHandler =
-                new TaskHandler(transactionCoordinator, profilingCollector);
+                new TaskHandler(transactionCoordinator, profileCollector);
             MasterTaskScheduler scheduler =
                 new MasterTaskScheduler(systemProperties, resourceCoordinator,
-                                        taskHandler, profilingCollector,
+                                        taskHandler, profileCollector,
                                         SystemKernelAppContext.CONTEXT);
 
             // with the scheduler created, if profiling is on then create
             // the listeners for profiling data
-            if (profilingCollector != null)
-                loadProfileListeners(systemProperties, profilingCollector,
+            if (profileCollector != null)
+                loadProfileListeners(systemProperties, profileCollector,
                                      scheduler, resourceCoordinator);
 
             // finally, collect some of the system components to be shared
@@ -180,7 +181,10 @@ class Kernel {
             throw e;
         }
 
-        logger.log(Level.CONFIG, "The Kernel is ready");
+	if (logger.isLoggable(Level.INFO)) {
+	    logger.log(Level.INFO, "The Kernel is ready, version: {0}",
+		       Version.getVersion());
+	}
     }
 
     /**
@@ -188,12 +192,12 @@ class Kernel {
      * for profiling data.
      */
     private void loadProfileListeners(Properties systemProperties,
-                                      ProfilingCollector profilingCollector,
+                                      ProfileCollector profileCollector,
                                       TaskScheduler taskScheduler,
                                       ResourceCoordinator resourceCoordinator)
     {
         String listenerList =
-            systemProperties.getProperty(PROFILING_LISTENERS,
+            systemProperties.getProperty(PROFILE_LISTENERS,
                                          DEFAULT_PROFILE_LISTENERS);
 
         for (String listenerClassName : listenerList.split(":")) {
@@ -218,7 +222,7 @@ class Kernel {
                                                     resourceCoordinator);
                 ProfileOperationListener listener =
                     (ProfileOperationListener)obj;
-                profilingCollector.addListener(listener);
+                profileCollector.addListener(listener);
             } catch (Exception e) {
                 if (logger.isLoggable(Level.WARNING))
                     logger.logThrow(Level.WARNING, e, "Failed to load " +
@@ -333,9 +337,9 @@ class Kernel {
                 createService(Class.forName(clientSessionServiceClass),
                               properties, systemRegistry);
             serviceList.add(clientSessionService);
-            if (clientSessionService instanceof ProfilingProducer)
-                scheduler.registerProfilingProducer((ProfilingProducer)
-                                                    clientSessionService);
+            if (clientSessionService instanceof ProfileProducer)
+                ((ProfileProducer)clientSessionService).
+                    setProfileRegistrar(scheduler);
 
             setupService(channelServiceClass, serviceList,
                          channelManagerClass, managerSet, properties,
@@ -380,9 +384,8 @@ class Kernel {
 
         // register any profiling managers and fill in the manager registry
         for (Object manager : managerSet) {
-            if (manager instanceof ProfilingProducer)
-                scheduler.
-                    registerProfilingProducer((ProfilingProducer)manager);
+            if (manager instanceof ProfileProducer)
+                ((ProfileProducer)manager).setProfileRegistrar(scheduler);
             managerComponents.addComponent(manager);
         }
 
@@ -500,8 +503,8 @@ class Kernel {
      */
     void applicationReady(AppKernelAppContext context) {
         applications.add(context);
-        if (logger.isLoggable(Level.CONFIG))
-                logger.log(Level.CONFIG, "{0}: application is ready", context);
+        if (logger.isLoggable(Level.INFO))
+	    logger.log(Level.INFO, "{0}: application is ready", context);
     }
 
     /**

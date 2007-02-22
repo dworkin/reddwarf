@@ -5,38 +5,36 @@ import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 
-import com.sun.sgs.kernel.ProfiledOperation;
-import com.sun.sgs.kernel.ProfilingConsumer;
-import com.sun.sgs.kernel.ProfilingProducer;
+import com.sun.sgs.kernel.ProfileConsumer;
+import com.sun.sgs.kernel.ProfileOperation;
+import com.sun.sgs.kernel.ProfileProducer;
+import com.sun.sgs.kernel.ProfileRegistrar;
 
 
 /**
  * This is an implementation of <code>DataManager</code> used to suport
  * profiling. It simply calls its backing manager for each manager method. If
- * no <code>ProfilingConsumer</code> is provided via
- * <code>setProfilingConsumer</code> then this manager does no reporting, and
+ * no <code>ProfileRegistrar</code> is provided via
+ * <code>setProfileRegistrar</code> then this manager does no reporting, and
  * only calls through to the backing manager. If the backing manager is also
- * an instance of <code>ProfilingProducer</code> then it too will be supplied
- * with the <code>ProfilingConsumer</code> as described in
- * <code>setProfilingConsumer</code>.
+ * an instance of <code>ProfileProducer</code> then it too will be supplied
+ * with the <code>ProfileRegistrar</code> as described in
+ * <code>setProfileRegistrar</code>.
  */
-public class ProfilingDataManager implements DataManager, ProfilingProducer {
+public class ProfileDataManager implements DataManager, ProfileProducer {
 
     // the data manager that this manager calls through to
     private final DataManager backingManager;
 
-    // the reporting interface
-    private ProfilingConsumer consumer = null;
-
     // the operations being profiled
-    private ProfiledOperation createReferenceOp = null;
+    private ProfileOperation createReferenceOp = null;
 
     /**
-     * Creates an instance of <code>ProfilingDataManager</code>.
+     * Creates an instance of <code>ProfileDataManager</code>.
      *
      * @param backingManager the <code>DataManager</code> to call through to
      */
-    public ProfilingDataManager(DataManager backingManager) {
+    public ProfileDataManager(DataManager backingManager) {
         this.backingManager = backingManager;
     }
 
@@ -44,26 +42,20 @@ public class ProfilingDataManager implements DataManager, ProfilingProducer {
      * {@inheritDoc}
      * <p>
      * Note that if the backing manager supplied to the constructor is also
-     * an instance of <code>ProfilingProducer</code> then its
-     * <code>setProfilingConsumer</code> will be invoked when this method
-     * is called. The backing manager is provided the same instance of
-     * <code>ProfilingConsumer</code> so reports from the two managers are
-     * considered to come from the same source.
-     *
-     * @throws IllegalStateException if a <code>ProfilingConsumer</code>
-     *                               has already been set
+     * an instance of <code>ProfileProducer</code> then its
+     * <code>setProfileRegistrar</code> will be invoked when this method
+     * is called.
      */
-    public void setProfilingConsumer(ProfilingConsumer profilingConsumer) {
-        if (consumer != null)
-            throw new IllegalStateException("consumer is already set");
-        consumer = profilingConsumer;
+    public void setProfileRegistrar(ProfileRegistrar profileRegistrar) {
+        ProfileConsumer consumer =
+            profileRegistrar.registerProfileProducer(this);
 
         createReferenceOp = consumer.registerOperation("createReference");
 
         // call on the backing manager, if it's also profiling
-        if (backingManager instanceof ProfilingProducer)
-            ((ProfilingProducer)backingManager).
-                setProfilingConsumer(consumer);
+        if (backingManager instanceof ProfileProducer)
+            ((ProfileProducer)backingManager).
+                setProfileRegistrar(profileRegistrar);
     }
 
     /**

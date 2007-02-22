@@ -43,9 +43,14 @@ public interface ClientSessionListener {
      * session's client logged out gracefully; otherwise, the session
      * was either disconnected forcibly by the server or disconnected
      * due to other factors such as communication failure.
+     * <p>
+     * If this listener does not implement {@link ManagedObject}, it will
+     * be removed from the persistent store after this method returns.
+     * Otherwise, this listener will remain in the persistent store until
+     * it is explicitly {@linkplain DataManager#removeObject removed}.
      *
      * @param graceful if {@code true}, the specified client
-     * session logged out gracefully
+     *        session logged out gracefully
      */
     void disconnected(boolean graceful);
 }
