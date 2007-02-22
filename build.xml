@@ -664,19 +664,16 @@
   </target>
 
   <!-- Builds the example code -->
-  <target name="example.classes" depends="build"
+  <target name="example-classes" depends="build"
           description="Builds the example code">
     <mkdir dir="${build.dir}/example/classes"/>
     <depend srcdir="example"
             destdir="${build.dir}/example/classes"
 	    cache="${build.dir}/example/depend"
 	    closure="true"/>
-    <javac sourcepath=""
-           destdir="${build.dir}/example/classes"
-	   includeAntRuntime="yes"
+    <javac destdir="${build.dir}/example/classes"
 	   debug="on"
-	   source="${javac.source}"
-	   includes="**/*.java">
+	   source="${javac.source}">
       <src>
         <dirset dir="example" includes="*/src"/>
       </src>
@@ -690,7 +687,7 @@
   </target>
 
   <!-- Runs the example ChatApp (server) -->
-  <target name="example.chat.app" depends="example.classes"
+  <target name="example-chat-app" depends="example-classes"
           description="Runs the example ChatApp (server)">
     <mkdir dir="/tmp/ChatApp/dsdb"/>
     <java classname="com.sun.sgs.impl.kernel.Kernel"
@@ -708,7 +705,7 @@
   </target>
 
   <!-- Runs the example ChatClient -->
-  <target name="example.chat.client" depends="example.classes"
+  <target name="example-chat-client" depends="example-classes"
           description="Runs the example ChatClient">
     <java classname="com.sun.sgs.example.chat.client.ChatClient"
           fork="true">

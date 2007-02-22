@@ -92,7 +92,7 @@ public class ChatClient extends JFrame
     public static final String DEFAULT_HOST = "localhost";
 
     /** The name of the port property */
-    public static final String PORT_PROPERTY = "ChatClient.host";
+    public static final String PORT_PROPERTY = "ChatClient.port";
 
     /** The default port */
     public static final String DEFAULT_PORT = "2502";
@@ -131,7 +131,7 @@ public class ChatClient extends JFrame
     // Constructor
 
     /**
-     * Construct a ChatClient with the given {@code args}.
+     * Creates a new {@code ChatClient}.
      */
     public ChatClient() {
         super();
@@ -190,7 +190,18 @@ public class ChatClient extends JFrame
         setSize(1000, 720);
         setVisible(true);
     }
-    
+
+    // Main
+
+    /**
+     * Runs a new {@code ChatClient} application.
+     * 
+     * @param args the commandline arguments (not used)
+     */
+    public static void main(String[] args) {
+        new ChatClient();
+    }
+
     // GUI helper methods
 
     private void setButtonsEnabled(boolean enable) {
@@ -278,8 +289,12 @@ public class ChatClient extends JFrame
 
     private void doServerMessage() {
 	String message = getUserInput("Enter server message:");
+
+        if (message == null)
+            return;
+
         try {
-            client.send(message.getBytes(MESSAGE_CHARSET));
+            client.send(toMessageBytes(message));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -305,14 +320,14 @@ public class ChatClient extends JFrame
     private void doPrivateMessage(Set<SessionId> targets) {
         String input = getUserInput("Enter private message:");
 
-        if (input.matches("^\\s*$")) {
+        if ((input == null) || input.matches("^\\s*$")) {
             // Ignore empty message
             return;
         }
 
         String message = "/pm " + input;
         try {
-            globalChannel.send(targets, message.getBytes(MESSAGE_CHARSET));
+            globalChannel.send(targets, toMessageBytes(message));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -321,7 +336,7 @@ public class ChatClient extends JFrame
     void joinChannel(String channelName) {
 	String cmd = "/join " + channelName;
         try {
-            client.send(cmd.getBytes(MESSAGE_CHARSET));
+            client.send(toMessageBytes(cmd));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -330,7 +345,7 @@ public class ChatClient extends JFrame
     void leaveChannel(ClientChannel chan) {
 	String cmd = "/leave " + chan.getName();
         try {
-            client.send(cmd.getBytes(MESSAGE_CHARSET));
+            client.send(toMessageBytes(cmd));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -588,7 +603,7 @@ public class ChatClient extends JFrame
             byte[] message)
     {
         try {
-            String messageString = new String(message, MESSAGE_CHARSET);
+            String messageString = fromMessageBytes(message);
             System.err.format("Recv on %s from %s: %s\n",
                     channel.getName(), sender, messageString);
             String[] args = messageString.split(" ", 2);
@@ -741,16 +756,5 @@ public class ChatClient extends JFrame
         } catch (UnsupportedEncodingException e) {
             throw new Error("Required charset UTF-8 not found", e);
         }
-    }
-
-    // Main
-    
-    /**
-     * Create a new Chat Client with the given {@code args}.
-     * 
-     * @param args the commandline arguments.
-     */
-    public static void main(String[] args) {
-        new ChatClient();
     }
 }

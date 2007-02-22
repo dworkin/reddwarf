@@ -245,8 +245,7 @@ public class ChatClientSessionListener
     }
 
     /**
-     * Echos the given string back to the sending session on the global
-     * chat channel.
+     * Echos the given string back to the sending session as a direct message.
      *
      * @param message the message to echo
      */
@@ -271,7 +270,8 @@ public class ChatClientSessionListener
         try {
             return new String(bytes, MESSAGE_CHARSET);
         } catch (UnsupportedEncodingException e) {
-            throw new Error("Required charset UTF-8 not found", e);
+            throw new Error("Required charset " +
+                MESSAGE_CHARSET + " not found", e);
         }
     }
 
@@ -285,7 +285,8 @@ public class ChatClientSessionListener
         try {
             return s.getBytes(MESSAGE_CHARSET);
         } catch (UnsupportedEncodingException e) {
-            throw new Error("Required charset UTF-8 not found", e);
+            throw new Error("Required charset " +
+                MESSAGE_CHARSET + " not found", e);
         }
     }
 }
