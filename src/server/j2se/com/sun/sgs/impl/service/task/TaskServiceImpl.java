@@ -155,12 +155,15 @@ public class TaskServiceImpl
         ProfileConsumer consumer =
             profileRegistrar.registerProfileProducer(this);
 
-        scheduleNDTaskOp =
-            consumer.registerOperation("scheduleNonDurableTask");
-        scheduleNDTaskDelayedOp =
-            consumer.registerOperation("scheduleNonDurableTaskDelayed");
-        scheduleNDTaskPrioritizedOp =
-            consumer.registerOperation("scheduleNonDurableTaskPrioritized");
+	if (consumer != null) {
+	    scheduleNDTaskOp =
+		consumer.registerOperation("scheduleNonDurableTask");
+	    scheduleNDTaskDelayedOp =
+		consumer.registerOperation("scheduleNonDurableTaskDelayed");
+	    scheduleNDTaskPrioritizedOp =
+		consumer.registerOperation(
+		    "scheduleNonDurableTaskPrioritized");
+	}
     }
 
     /**

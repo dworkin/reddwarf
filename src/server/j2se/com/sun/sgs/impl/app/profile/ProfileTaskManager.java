@@ -58,11 +58,13 @@ public class ProfileTaskManager implements TaskManager, ProfileProducer {
         ProfileConsumer consumer =
             profileRegistrar.registerProfileProducer(this);
 
-        scheduleTaskOp = consumer.registerOperation("scheduleTask");
-        scheduleTaskDelayedOp =
-            consumer.registerOperation("scheduleDelayedTask");
-        scheduleTaskPeriodicOp =
-            consumer.registerOperation("schedulePeriodicTask");
+	if (consumer != null) {
+	    scheduleTaskOp = consumer.registerOperation("scheduleTask");
+	    scheduleTaskDelayedOp =
+		consumer.registerOperation("scheduleDelayedTask");
+	    scheduleTaskPeriodicOp =
+		consumer.registerOperation("schedulePeriodicTask");
+	}
 
         // call on the backing manager, if it's also profiling
         if (backingManager instanceof ProfileProducer)
