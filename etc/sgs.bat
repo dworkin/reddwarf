@@ -1,4 +1,4 @@
-@rem Copyright 2007 by Sun Microsystems, Inc. All rights reserved.
+@rem Copyright 2007 by Sun Microsystems, Inc. All rights reserved
 @rem Use is subject to license terms.
 
 @rem Windows batch file for starting the SGS server
