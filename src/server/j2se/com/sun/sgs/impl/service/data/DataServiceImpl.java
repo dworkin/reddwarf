@@ -11,6 +11,8 @@ import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.PropertiesWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.ProfileProducer;
+import com.sun.sgs.kernel.ProfileRegistrar;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.Transaction;
@@ -84,7 +86,7 @@ import java.util.logging.Logger;
  * </ul>
  */
 public final class DataServiceImpl
-    implements DataService, TransactionParticipant
+    implements DataService, TransactionParticipant, ProfileProducer
 {
 
     /** The name of this class. */
@@ -585,6 +587,16 @@ public final class DataServiceImpl
 	synchronized (lock) {
 	    this.detectModifications = detectModifications;
 	}
+    }
+
+    /* -- Implement ProfileProducer -- */
+
+    /**
+     * {@inheritDoc}
+     */
+    public void setProfileRegistrar(ProfileRegistrar profileRegistrar) {
+        if (store instanceof ProfileProducer)
+            ((ProfileProducer) store).setProfileRegistrar(profileRegistrar);
     }
 
     /* -- Other methods -- */

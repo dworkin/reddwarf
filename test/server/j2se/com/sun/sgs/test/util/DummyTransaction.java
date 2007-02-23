@@ -60,6 +60,7 @@ public class DummyTransaction implements Transaction {
     public DummyTransaction() {
 	usePrepareAndCommit = true;
 	logger.log(Level.FINER, "create {0}", this);
+        DummyProfileRegistrar.startTask();
     }
 
     /**
@@ -80,6 +81,7 @@ public class DummyTransaction implements Transaction {
 	default:
 	    throw new AssertionError();
 	}
+        DummyProfileRegistrar.startTask();
     }
 
     /* -- Implement Transaction -- */
@@ -135,6 +137,7 @@ public class DummyTransaction implements Transaction {
 	    }
 	}
 	state = State.ABORTED;
+        DummyProfileRegistrar.endTask(false);
     }
 
     public synchronized boolean prepare() throws Exception {
@@ -212,6 +215,7 @@ public class DummyTransaction implements Transaction {
 	    }
 	}
 	state = State.COMMITTED;
+        DummyProfileRegistrar.endTask(true);
     }
 
     /* -- Other public methods -- */

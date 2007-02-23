@@ -31,7 +31,7 @@ public final class MinimalTestKernel
         new DummyTransactionProxy();
     // set up the task handler only once
     private static final TaskHandler taskHandler =
-        new TaskHandler(new TestTransactionCoordinator());
+        new TaskHandler(new TestTransactionCoordinator(), null);
     // properties for a master scheduler (not used by default)
     private static Properties masterSchedulerProperties = null;
     // a map of context state
@@ -79,7 +79,8 @@ public final class MinimalTestKernel
             systemRegistry.setComponent(TestResourceCoordinator.class, rc);
             try {
                 scheduler = new MasterTaskScheduler(masterSchedulerProperties,
-                                                    rc, taskHandler);
+                                                    rc, taskHandler, null,
+                                                    context);
             } catch (Exception e) {
                 throw new IllegalArgumentException("Failed to create " +
                                                    "master scheduler", e);
