@@ -109,6 +109,16 @@ class DeficitSystemScheduler implements SystemScheduler {
     /**
      * {@inheritDoc}
      */
+    public int getReadyCount(KernelAppContext context) {
+        ApplicationScheduler scheduler = appSchedulers.get(context);
+        if (scheduler == null)
+            throw new IllegalArgumentException("Unknown context");
+        return scheduler.getReadyCount();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     public ScheduledTask getNextTask() throws InterruptedException {
         // see if we can get a task, in which case we're done
         ScheduledTask task = currentRoundQueue.poll();

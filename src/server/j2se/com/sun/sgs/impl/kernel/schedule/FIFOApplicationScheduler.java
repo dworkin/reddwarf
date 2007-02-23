@@ -23,12 +23,9 @@ import java.util.logging.Logger;
  * is made to support priority, or to provide any degree of fairness
  * between users. This scheduler uses an un-bounded queue. Unless the system
  * runs out of memory, this should always accept any tasks from any user.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 class FIFOApplicationScheduler
-    implements ApplicationScheduler, ProfilingConsumer, TimedTaskConsumer {
+    implements ApplicationScheduler, TimedTaskConsumer {
 
     // logger for this class
     private static final LoggerWrapper logger =
@@ -54,6 +51,13 @@ class FIFOApplicationScheduler
 
         queue = new LinkedBlockingQueue<ScheduledTask>();
         timedTaskHandler = new TimedTaskHandler(this);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int getReadyCount() {
+        return queue.size();
     }
 
     /**
