@@ -84,8 +84,7 @@ public class SocketConnectorTest {
     public void testConnect() throws IOException {
         Connector<SocketAddress> connector =
             new SocketEndpoint(ADDRESS,
-                               TransportType.RELIABLE,
-                               Executors.newCachedThreadPool())
+                               TransportType.RELIABLE)
                 .createConnector();
 
         ConnectionListener listener = new ConnectionAdapter() {

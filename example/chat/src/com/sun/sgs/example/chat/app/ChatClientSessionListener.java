@@ -172,7 +172,7 @@ public class ChatClientSessionListener
         // Send the membership change first, so the new session doesn't
         // receive its own join message.
         StringBuilder changeMsg = new StringBuilder("/joined ");
-        changeMsg.append(toHexString(session.getSessionId()));
+        changeMsg.append(toHexString(session.getSessionId().getBytes()));
         if (channelName.equals(GLOBAL_CHANNEL_NAME)) {
             changeMsg.append(':');
             changeMsg.append(session.getName());
@@ -187,7 +187,7 @@ public class ChatClientSessionListener
         StringBuilder listMessage = new StringBuilder("/members");
         for (ClientSession member : channel.getSessions()) {
             listMessage.append(' ');
-            listMessage.append(toHexString(member.getSessionId()));
+            listMessage.append(toHexString(member.getSessionId().getBytes()));
             if (channelName.equals(GLOBAL_CHANNEL_NAME)) {
                 listMessage.append(':');
                 listMessage.append(member.getName());
@@ -240,7 +240,7 @@ public class ChatClientSessionListener
 
         // Tell the rest of the channel about the removal.
         String changeMessage = "/left " +
-            toHexString(session.getSessionId());
+            toHexString(session.getSessionId().getBytes());
         channel.send(toMessageBytes(changeMessage));
     }
 

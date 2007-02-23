@@ -3,6 +3,7 @@ package com.sun.sgs.test.impl.service.session;
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
+import com.sun.sgs.app.ClientSessionId;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
@@ -61,7 +62,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DataServiceImpl.class.getName();
 
     /** Directory used for database shared across multiple tests. */
-    private static String dbDirectory =
+    private static String DB_DIRECTORY =
 	System.getProperty("java.io.tmpdir") + File.separator +
 	"TestClientSessionServiceImpl.db";
 
@@ -76,7 +77,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     /** Properties for creating the shared database. */
     private static Properties dbProps = createProperties(
 	DataStoreImplClassName + ".directory",
-	dbDirectory,
+	DB_DIRECTORY,
 	StandardProperties.APP_NAME, "TestClientSessionServiceImpl",
 	DataServiceImplClassName + ".debugCheckInterval", "1");
 
@@ -95,18 +96,6 @@ public class TestClientSessionServiceImpl extends TestCase {
 	"com.sun.sgs.impl.service.session.ClientSessionImpl";
     
     private static Object disconnectedCallbackLock = new Object();
-    
-    /**
-     * Delete the database directory at the start of the test run, but not for
-     * each test.
-     */
-    static {
-	System.err.println("Deleting database directory");
-	deleteDirectory(dbDirectory);
-    }
-
-    /** A per-test database directory, or null if not created. */
-    private String directory;
     
     private static DummyTransactionProxy txnProxy =
 	MinimalTestKernel.getTransactionProxy();
@@ -136,8 +125,16 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     /** Creates and configures the session service. */
     protected void setUp() throws Exception {
-	passed = false;
-	System.err.println("Testcase: " + getName());
+        passed = false;
+        System.err.println("Testcase: " + getName());
+        setUp(true);
+    }
+
+    protected void setUp(boolean clean) throws Exception {
+        if (clean) {
+            deleteDirectory(DB_DIRECTORY);
+        }
+
 	appContext = MinimalTestKernel.createContext();
 	systemRegistry = MinimalTestKernel.getSystemRegistry(appContext);
 	serviceRegistry = MinimalTestKernel.getServiceRegistry(appContext);
@@ -194,22 +191,39 @@ public class TestClientSessionServiceImpl extends TestCase {
     
     /** Cleans up the transaction. */
     protected void tearDown() throws Exception {
-	sessionService.shutdown();
-	if (txn != null) {
-	    try {
-		txn.abort();
-	    } catch (IllegalStateException e) {
-	    }
-	    txn = null;
-	}
+        tearDown(true);
+    }
+
+    protected void tearDown(boolean clean) throws Exception {
+        if (txn != null) {
+            try {
+                txn.abort();
+            } catch (IllegalStateException e) {
+            }
+            txn = null;
+        }
+        if (channelService != null) {
+            channelService.shutdown();
+            channelService = null;
+        }
+        if (sessionService != null) {
+            sessionService.shutdown();
+            sessionService = null;
+        }
+        if (taskService != null) {
+            taskService.shutdown();
+            taskService = null;
+        }
         if (dataService != null) {
             dataService.shutdown();
+            dataService = null;
         }
-        dataService = null;
-        deleteDirectory(dbDirectory);
+        if (clean) {
+            deleteDirectory(DB_DIRECTORY);
+        }
         MinimalTestKernel.destroyContext(appContext);
     }
- 
+
     /* -- Test constructor -- */
 
     public void testConstructorNullProperties() {
@@ -389,8 +403,13 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    client.connect(port);
 	    client.login(name, "password");
-	    sessionService.shutdown();
-	    DummyClientSessionListener sessionListener =
+
+            //sessionService.shutdown();
+            tearDown(false);
+            // Simulate "crash"
+            setUp(false);
+
+            DummyClientSessionListener sessionListener =
 		getClientSessionListener(name);
 	    if (sessionListener == null) {
 		fail("listener is null");
@@ -548,7 +567,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		fail("appListener contains no client sessions!");
 	    }
 	    for (ClientSession session : appListener.getSessions()) {
-		if (Arrays.equals(session.getSessionId(), client.getSessionId())) {
+		if (session.getSessionId().equals(client.getSessionId())) {
 		    System.err.println("session IDs match");
 		    txn.commit();
 		    return;
@@ -614,7 +633,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     private DataServiceImpl createDataService(
 	DummyComponentRegistry registry)
     {
-	File dir = new File(dbDirectory);
+	File dir = new File(DB_DIRECTORY);
 	if (!dir.exists()) {
 	    if (!dir.mkdir()) {
 		throw new RuntimeException(
@@ -650,21 +669,40 @@ public class TestClientSessionServiceImpl extends TestCase {
     /**
      * Identity returned by the DummyIdentityManager.
      */
-    private static class DummyIdentity implements Identity {
+    private static class DummyIdentity implements Identity, Serializable {
 
-	private final String name;
+        private static final long serialVersionUID = 1L;
+        private final String name;
 
-	DummyIdentity(IdentityCredentials credentials) {
-	    this.name = ((NamePasswordCredentials) credentials).getName();
-	}
-	
-	public String getName() {
-	    return name;
-	}
+        DummyIdentity(String name) {
+            this.name = name;
+        }
 
-	public void notifyLoggedIn() {}
+        DummyIdentity(IdentityCredentials credentials) {
+            this.name = ((NamePasswordCredentials) credentials).getName();
+        }
+        
+        public String getName() {
+            return name;
+        }
 
-	public void notifyLoggedOut() {}
+        public void notifyLoggedIn() {}
+
+        public void notifyLoggedOut() {}
+        
+        @Override
+        public boolean equals(Object o) {
+            if (this == o)
+                return true;
+            if (! (o instanceof DummyIdentity))
+                return false;
+            return ((DummyIdentity)o).name.equals(name);
+        }
+        
+        @Override
+        public int hashCode() {
+            return name.hashCode();
+        }
     }
 
     /**
@@ -689,8 +727,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient() {
 	}
 
-	byte[] getSessionId() {
-	    return sessionId;
+	ClientSessionId getSessionId() {
+	    return new ClientSessionId(sessionId);
 	}
 
 	void connect(int port) {

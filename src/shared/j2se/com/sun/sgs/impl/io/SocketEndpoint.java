@@ -32,7 +32,7 @@ public class SocketEndpoint extends AbstractSocketEndpoint
      * @param type the type of transport
      */
     public SocketEndpoint(SocketAddress address, TransportType type) {
-        this(address, type, new DaemonExecutor());
+        super(address, type);
     }
 
     /**

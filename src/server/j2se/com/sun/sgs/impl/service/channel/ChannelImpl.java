@@ -9,15 +9,11 @@ import com.sun.sgs.app.Delivery;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
-import com.sun.sgs.service.TaskService;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl.Context;
-import com.sun.sgs.impl.util.HexDumper;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.MessageBuffer;
-import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.service.SgsClientSession;
 import java.io.IOException;
-import java.io.InvalidObjectException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamException;
@@ -552,7 +548,7 @@ final class ChannelImpl implements Channel, Serializable {
 
 	Set<byte[]> clients = new HashSet<byte[]>();
 	for (ClientSession session : sessions) {
-	    clients.add(session.getSessionId());
+	    clients.add(session.getSessionId().getBytes());
 	}
 	byte[] protocolMessage =
 	    getChannelMessage(EMPTY_ID, message, context.nextSequenceNumber());
