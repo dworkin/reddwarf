@@ -9,6 +9,7 @@ import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
+import com.sun.sgs.app.ClientSessionId;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.ClientSessionService;
@@ -433,7 +434,7 @@ final class ChannelImpl implements Channel, Serializable {
      * and notifies the per-session channel listener (if any).
      */
     void forwardMessageAndNotifyListeners(
-	    final byte[] senderId,
+	    final ClientSessionId senderId,
             final Set<byte[]> recipientIds,
             final byte[] message, final long seq)
     {
@@ -468,7 +469,8 @@ final class ChannelImpl implements Channel, Serializable {
 	 * Schedule messages to be sent upon transaction commit.
 	 */
 	if (! recipients.isEmpty()) {
-	    byte[] protocolMessage = getChannelMessage(senderId, message, seq);
+	    byte[] protocolMessage =
+                getChannelMessage(senderId.getBytes(), message, seq);
 
 	    for (ClientSession session : recipients) {
 		((SgsClientSession) session).sendProtocolMessageOnCommit(
@@ -479,9 +481,7 @@ final class ChannelImpl implements Channel, Serializable {
 	/*
 	 * Notify channel listeners of channel message.
 	 */
-	ClientSession senderSession =
-	    context.getService(ClientSessionService.class).
-	        getClientSession(senderId);
+	ClientSession senderSession = senderId.getClientSession();
 	if (senderSession != null) {
 	    // Notify per-channel listener.
 	    ChannelListener listener = state.getListener();

@@ -8,6 +8,7 @@ import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
+import com.sun.sgs.app.ClientSessionId;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
@@ -892,7 +893,7 @@ public class ChannelServiceImpl
     private class MessageQueue implements KernelRunnable {
 
 	/** The sending session's ID (for the messages enqueued). */
-	private final byte[] senderId;
+	private final ClientSessionId senderId;
 
         /** The sending session's identity (for the sending task's owner). */
         private final Identity senderIdentity;
@@ -911,7 +912,7 @@ public class ChannelServiceImpl
 	 * Constructs an instance with the specified {@code senderId}.
 	 */
 	MessageQueue(SgsClientSession sender) {
-	    this.senderId = sender.getSessionId().getBytes();
+	    this.senderId = sender.getSessionId();
             this.senderIdentity = sender.getIdentity();
 	}
 
