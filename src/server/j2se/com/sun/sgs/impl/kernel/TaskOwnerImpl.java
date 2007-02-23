@@ -55,6 +55,7 @@ public class TaskOwnerImpl implements TaskOwner {
      *
      * @return a <code>String</code> representation of the owner.
      */
+    @Override
     public String toString() {
         return "[ id=\"" + identity.getName() + "\" context=" +
             context.toString() + " ]";
@@ -69,6 +70,7 @@ public class TaskOwnerImpl implements TaskOwner {
      * @return <code>true</code> if the given owner is the same as this
      *         owner, <code>false</code> otherwise
      */
+    @Override
     public boolean equals(Object o) {
         if (this == o)
             return true;
@@ -85,8 +87,8 @@ public class TaskOwnerImpl implements TaskOwner {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int hashCode() {
         return hash;
     }
-
 }

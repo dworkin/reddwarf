@@ -5,6 +5,7 @@ import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityManager;
 import com.sun.sgs.impl.io.ServerSocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
@@ -31,7 +32,6 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -622,6 +622,9 @@ public class ClientSessionServiceImpl
     /**
      * Returns the client session service relevant to the current
      * context.
+     *
+     * @return the client session service relevant to the current
+     * context
      */
     public synchronized static ClientSessionService getInstance() {
 	if (txnProxy == null) {
@@ -655,24 +658,33 @@ public class ClientSessionServiceImpl
     }
 
     /**
-     * Schedules a non-durable, transactional task.
+     * Schedules a non-durable, transactional task using the given
+     * {@code Identity} as the owner.
+     * 
+     * @see NonDurableTaskScheduler#scheduleTask(KernelRunnable, Identity)
      */
-    void scheduleTask(KernelRunnable task) {
-	nonDurableTaskScheduler.scheduleTask(task);
+    void scheduleTask(KernelRunnable task, Identity ownerIdentity) {
+        nonDurableTaskScheduler.scheduleTask(task, ownerIdentity);
     }
 
     /**
-     * Schedules a non-durable, non-transactional task.
+     * Schedules a non-durable, non-transactional task using the given
+     * {@code Identity} as the owner.
+     * 
+     * @see NonDurableTaskScheduler#scheduleNonTransactionalTask(KernelRunnable, Identity)
      */
-    void scheduleNonTransactionalTask(KernelRunnable task) {
-	nonDurableTaskScheduler.scheduleNonTransactionalTask(task);
+    void scheduleNonTransactionalTask(KernelRunnable task,
+            Identity ownerIdentity)
+    {
+        nonDurableTaskScheduler.
+            scheduleNonTransactionalTask(task, ownerIdentity);
     }
 
     /**
-     * Schedules a non-durable, non-transactional task using the task service.
+     * Schedules a non-durable, transactional task using the task service.
      */
-    void scheduleNonTransactionalTaskOnCommit(KernelRunnable task) {
-	nonDurableTaskScheduler.scheduleNonTransactionalTaskOnCommit(task);
+    void scheduleTaskOnCommit(KernelRunnable task) {
+        nonDurableTaskScheduler.scheduleTaskOnCommit(task);
     }
 
     /**
@@ -700,7 +712,7 @@ public class ClientSessionServiceImpl
 	    if (key == null || ! isListenerKey(key)) {
 		break;
 	    }
-	    
+
 	    logger.log(
 		Level.FINEST,
 		"notifyDisconnectedSessions key: {0}",
@@ -708,7 +720,7 @@ public class ClientSessionServiceImpl
 
 	    final String listenerKey = key;		
 		
-	    nonDurableTaskScheduler.scheduleTaskOnCommit(
+	    scheduleTaskOnCommit(
 		new KernelRunnable() {
 		    public void run() throws Exception {
 			ManagedObject obj = 
