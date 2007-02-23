@@ -33,7 +33,7 @@ public class TaskOwnerImpl implements TaskOwner {
         this.context = context;
 
         // cache the hash code as the hash of the identity and the context
-        hash = (identity.toString() + context.toString()).hashCode();
+        hash = identity.hashCode() ^ context.hashCode();
     }
 
     /**
@@ -70,6 +70,9 @@ public class TaskOwnerImpl implements TaskOwner {
      *         owner, <code>false</code> otherwise
      */
     public boolean equals(Object o) {
+        if (this == o)
+            return true;
+
         if (! (o instanceof TaskOwnerImpl))
             return false;
 

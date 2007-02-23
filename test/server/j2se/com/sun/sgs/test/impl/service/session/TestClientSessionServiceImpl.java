@@ -3,6 +3,7 @@ package com.sun.sgs.test.impl.service.session;
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
+import com.sun.sgs.app.ClientSessionId;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
@@ -548,7 +549,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		fail("appListener contains no client sessions!");
 	    }
 	    for (ClientSession session : appListener.getSessions()) {
-		if (Arrays.equals(session.getSessionId(), client.getSessionId())) {
+		if (session.getSessionId().equals(client.getSessionId())) {
 		    System.err.println("session IDs match");
 		    txn.commit();
 		    return;
@@ -689,8 +690,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DummyClient() {
 	}
 
-	byte[] getSessionId() {
-	    return sessionId;
+	ClientSessionId getSessionId() {
+	    return new ClientSessionId(sessionId);
 	}
 
 	void connect(int port) {
