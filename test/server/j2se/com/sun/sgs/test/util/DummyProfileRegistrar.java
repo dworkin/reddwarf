@@ -15,27 +15,31 @@ import com.sun.sgs.impl.kernel.profile.ProfileConsumerImpl;
 import java.util.Properties;
 
 
+/** Simple implementation of ProfileRegistrar to support tests. */
 public class DummyProfileRegistrar implements ProfileRegistrar {
 
-    //
+    // the resource coordinator used to run report consuming threads
     private final TestResourceCoordinator coordinator;
 
-    //
+    // the production collector
     private final ProfileCollector collector;
 
-    //
+    // a dummy task that represents all reports
     private static final KernelRunnable task = new KernelRunnable() {
             public void run() throws Exception {}
         };
 
-    //
+    // a dummy owner for all reports
     private static final DummyTaskOwner owner = new DummyTaskOwner();
 
-    //
+    // a single instance that will be non-null if we're profiling
     private static DummyProfileRegistrar instance = null;
 
-    /**  */
-    public DummyProfileRegistrar() {
+    // a lock to ensure shutdown is done correctly
+    private static final Object lockObject = new String("lock");
+
+    /** Creates an instance of DummyProfileRegistrar */
+    private DummyProfileRegistrar() {
         coordinator = new TestResourceCoordinator();
         collector = new ProfileCollector(coordinator);
         OperationLoggingProfileOpListener listener =
@@ -44,45 +48,56 @@ public class DummyProfileRegistrar implements ProfileRegistrar {
         collector.addListener(listener);
     }
 
-    /**  */
+    /** Registers a producer */
     public ProfileConsumer registerProfileProducer(ProfileProducer producer) {
         return new ProfileConsumerImpl(producer, collector);
     }
 
-    /**  */
+    /** Profiles the given producer, starting profiling if not started */
     public static void startProfiling(ProfileProducer producer) {
-        if (instance == null)
-            instance = new DummyProfileRegistrar();
-        producer.setProfileRegistrar(instance);
-    }
-
-    /**  */
-    public static void stopProfiling() {
-        if (instance != null)
-            instance.shutdown();
-        instance = null;
-    }
-
-    /**  */
-    public static void startTask() {
-        if (instance != null) {
-            try {
-                instance.collector.
-                    startTask(task, owner, System.currentTimeMillis(), 0);
-                instance.collector.noteTransactional();
-            } catch (Exception e) { e.printStackTrace(); }
+        synchronized (lockObject) {
+            if (instance == null)
+                instance = new DummyProfileRegistrar();
+            producer.setProfileRegistrar(instance);
         }
     }
 
-    /**  */
-    public static void endTask(boolean committed) {
-        if (instance != null)
-            instance.collector.finishTask(1, committed);
+    /** Stops all profiling */
+    public static void stopProfiling() {
+        synchronized (lockObject) {
+            if (instance != null)
+                instance.shutdown();
+            instance = null;
+        }
     }
 
-    /**  */
+    /** Signals that a single task is starting in the current thread */
+    public static void startTask() {
+        synchronized (lockObject) {
+            if (instance != null) {
+                try {
+                    instance.collector.
+                        startTask(task, owner, System.currentTimeMillis(), 0);
+                    instance.collector.noteTransactional();
+                } catch (Exception e) { e.printStackTrace(); }
+            }
+        }
+    }
+
+    /** Signals that the current thread's task is done */
+    public static void endTask(boolean committed) {
+        synchronized (lockObject) {
+            if (instance != null)
+                instance.collector.finishTask(1, committed);
+        }
+    }
+
+    /** Shuts down the associated resource coordinator */
     public void shutdown() {
-        coordinator.shutdown();
+        synchronized (lockObject) {
+            coordinator.shutdown();
+            instance = null;
+        }
     }
 
 }
