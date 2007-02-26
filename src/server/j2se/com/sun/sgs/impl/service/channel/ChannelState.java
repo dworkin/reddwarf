@@ -6,6 +6,7 @@ package com.sun.sgs.impl.service.channel;
 
 import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ClientSession;
+import com.sun.sgs.app.ClientSessionId;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.impl.util.WrappedSerializable;
@@ -76,7 +77,7 @@ final class ChannelState implements ManagedObject, Serializable {
      * 
      * @param sessionId the sessionId to exclude
      */
-    Set<ClientSession> getSessionsExcludingId(byte[] sessionId) {
+    Set<ClientSession> getSessionsExcludingId(ClientSessionId sessionId) {
 	Set<ClientSession> collection = new HashSet<ClientSession>();
 	for (ClientSession session : listeners.keySet()) {
             try {
