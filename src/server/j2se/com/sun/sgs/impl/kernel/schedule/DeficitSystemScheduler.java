@@ -1,3 +1,6 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
 
 package com.sun.sgs.impl.kernel.schedule;
 
@@ -104,6 +107,16 @@ class DeficitSystemScheduler implements SystemScheduler {
         appSchedulers.put(context, scheduler);
         tasksPerApp = TASKS_PER_ROUND / appSchedulers.size();
         appDeficits.put(context, tasksPerApp);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int getReadyCount(KernelAppContext context) {
+        ApplicationScheduler scheduler = appSchedulers.get(context);
+        if (scheduler == null)
+            throw new IllegalArgumentException("Unknown context");
+        return scheduler.getReadyCount();
     }
 
     /**

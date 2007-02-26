@@ -1,3 +1,7 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.test.util;
 
 import com.sun.sgs.service.NonDurableTransactionParticipant;

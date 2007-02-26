@@ -1,15 +1,21 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.impl.service.channel;
 
 import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
+import com.sun.sgs.app.ClientSessionId;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameExistsException;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.util.HexDumper;
 import com.sun.sgs.impl.util.LoggerWrapper;
@@ -510,7 +516,8 @@ public class ChannelServiceImpl
 			for (Channel channel : channels) {
 			    channel.leave(session);
 			}
-		    }});
+		    }},
+		session.getIdentity());
 	}
     }
 
@@ -522,7 +529,7 @@ public class ChannelServiceImpl
 	synchronized (messageQueues) {
 	    MessageQueue queue = messageQueues.get(session);
 	    if (queue == null) {
-		queue = new MessageQueue(session.getSessionId().getBytes());
+		queue = new MessageQueue(session);
 		messageQueues.put(session, queue);
 	    }
 	    return queue;
@@ -772,7 +779,8 @@ public class ChannelServiceImpl
      * Returns a session key for the given {@code session}.
      */
     private static String getSessionKey(ClientSession session) {
-	return SESSION_PREFIX + session.getSessionId().toString();
+	return SESSION_PREFIX +
+            HexDumper.toHexString(session.getSessionId().getBytes());
     }
 
     /**
@@ -885,8 +893,11 @@ public class ChannelServiceImpl
     private class MessageQueue implements KernelRunnable {
 
 	/** The sending session's ID (for the messages enqueued). */
-	private final byte[] senderId;
-	
+	private final ClientSessionId senderId;
+
+        /** The sending session's identity (for the sending task's owner). */
+        private final Identity senderIdentity;
+
 	/** List of messages to send. */
 	private List<MessageInfo> messages =
 	    new ArrayList<MessageInfo>();
@@ -900,8 +911,9 @@ public class ChannelServiceImpl
 	/**
 	 * Constructs an instance with the specified {@code senderId}.
 	 */
-	MessageQueue(byte[] senderId) {
-	    this.senderId = senderId;
+	MessageQueue(SgsClientSession sender) {
+	    this.senderId = sender.getSessionId();
+            this.senderIdentity = sender.getIdentity();
 	}
 
 	/**
@@ -915,7 +927,7 @@ public class ChannelServiceImpl
 	{
 	    messages.add(new MessageInfo(name, recipientIds, message, seq));
 	    if (! scheduledTask) {
-		nonDurableTaskScheduler.scheduleTask(this);
+		nonDurableTaskScheduler.scheduleTask(this, senderIdentity);
 		scheduledTask = true;
 	    }
 	}
@@ -930,7 +942,7 @@ public class ChannelServiceImpl
 	    if (messages.isEmpty()) {
 		scheduledTask = false;
 	    } else {
-		nonDurableTaskScheduler.scheduleTask(this);
+		nonDurableTaskScheduler.scheduleTask(this, senderIdentity);
 	    }
 	}
 

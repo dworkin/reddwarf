@@ -1,3 +1,6 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
 
 package com.sun.sgs.impl.kernel.schedule;
 
@@ -10,9 +13,6 @@ import com.sun.sgs.kernel.TaskOwner;
  * This package-private class is a simple container class used to represent
  * the main aspects of a task that has been accepted by the scheduler for
  * running.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 class ScheduledTask {
 
@@ -162,6 +162,15 @@ class ScheduledTask {
      */
     InternalRecurringTaskHandle getRecurringTaskHandle() {
         return recurringTaskHandle;
+    }
+
+    /**
+     * Provides some diagnostic detail about this task.
+     *
+     * @return a <code>String</code> representation of the task.
+     */
+    public String toString() {
+        return task.getClass().getName() + "[owner:" + owner.toString() + "]";
     }
 
 }

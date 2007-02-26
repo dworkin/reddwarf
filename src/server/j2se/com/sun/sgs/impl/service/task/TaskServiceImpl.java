@@ -1,3 +1,6 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
 
 package com.sun.sgs.impl.service.task;
 
@@ -19,6 +22,10 @@ import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.Priority;
+import com.sun.sgs.kernel.ProfileConsumer;
+import com.sun.sgs.kernel.ProfileOperation;
+import com.sun.sgs.kernel.ProfileProducer;
+import com.sun.sgs.kernel.ProfileRegistrar;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskReservation;
@@ -54,7 +61,7 @@ import java.util.logging.Logger;
  * @author Seth Proctor
  */
 public class TaskServiceImpl
-    implements TaskService, NonDurableTransactionParticipant
+    implements ProfileProducer, TaskService, NonDurableTransactionParticipant
 {
 
     /**
@@ -108,6 +115,11 @@ public class TaskServiceImpl
     // cases for tasks submitted by this service
     private static Priority defaultPriority = Priority.getDefaultPriority();
 
+    // the profiled operations
+    private ProfileOperation scheduleNDTaskOp = null;
+    private ProfileOperation scheduleNDTaskDelayedOp = null;
+    private ProfileOperation scheduleNDTaskPrioritizedOp = null;
+
     /**
      * Creates an instance of <code>TaskServiceImpl</code>. Note that this
      * service does not currently use any properties.
@@ -134,6 +146,24 @@ public class TaskServiceImpl
      */
     public String getName() {
         return NAME;
+    }
+
+    /**
+     * @{inheritDoc}
+     */
+    public void setProfileRegistrar(ProfileRegistrar profileRegistrar) {
+        ProfileConsumer consumer =
+            profileRegistrar.registerProfileProducer(this);
+
+	if (consumer != null) {
+	    scheduleNDTaskOp =
+		consumer.registerOperation("scheduleNonDurableTask");
+	    scheduleNDTaskDelayedOp =
+		consumer.registerOperation("scheduleNonDurableTaskDelayed");
+	    scheduleNDTaskPrioritizedOp =
+		consumer.registerOperation(
+		    "scheduleNonDurableTaskPrioritized");
+	}
     }
 
     /**
@@ -448,6 +478,8 @@ public class TaskServiceImpl
      * {@inheritDoc}
      */
     public void scheduleNonDurableTask(KernelRunnable task) {
+        if (scheduleNDTaskOp != null)
+            scheduleNDTaskOp.report();
         scheduleTask(task, transactionProxy.getCurrentOwner(), START_NOW,
                      defaultPriority);
     }
@@ -458,6 +490,8 @@ public class TaskServiceImpl
     public void scheduleNonDurableTask(KernelRunnable task, long delay) {
         if (delay < 0)
             throw new IllegalArgumentException("Delay must not be negative");
+        if (scheduleNDTaskDelayedOp != null)
+            scheduleNDTaskDelayedOp.report();
         scheduleTask(task, transactionProxy.getCurrentOwner(),
                      System.currentTimeMillis() + delay, defaultPriority);
     }
@@ -469,6 +503,8 @@ public class TaskServiceImpl
                                        Priority priority) {
         if (priority == null)
             throw new NullPointerException("Priority must not be null");
+        if (scheduleNDTaskPrioritizedOp != null)
+            scheduleNDTaskPrioritizedOp.report();
         scheduleTask(task, transactionProxy.getCurrentOwner(), START_NOW,
                      priority);
     }

@@ -1,13 +1,27 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.service;
 
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
+import com.sun.sgs.auth.Identity;
 
 /**
  * A representation of a {@link ClientSession} used to send protocol
  * messages to a session's client.
  */
 public interface SgsClientSession extends ClientSession {
+    /**
+     * Returns the {@link Identity} used to authenticate this session, or
+     * {@code null} if the session is not authenticated.
+     *
+     * @return the {@code Identity} used to authenticate this session, or
+     *         {@code null} if the session is not authenticated
+     */
+    Identity getIdentity();
+
     /**
      * Sends (with the specified delivery guarantee) the specified
      * protocol message to this session's client.  This method is not

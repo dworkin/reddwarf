@@ -1,3 +1,6 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
 
 package com.sun.sgs.test.impl.kernel.schedule;
 
@@ -73,19 +76,22 @@ public class TestMasterTaskSchedulerImpl {
     @Test (expected=NullPointerException.class)
         public void constructorNullProperties() throws Exception {
         new MasterTaskScheduler(null, new TestResourceCoordinator(),
-                                MinimalTestKernel.getTaskHandler());
+                                MinimalTestKernel.getTaskHandler(),
+                                null, testContext);
     }
 
     @Test (expected=NullPointerException.class)
         public void constructorNullResourceCoordinator() throws Exception {
         new MasterTaskScheduler(new Properties(), null,
-                                MinimalTestKernel.getTaskHandler());
+                                MinimalTestKernel.getTaskHandler(),
+                                null, testContext);
     }
 
     @Test (expected=NullPointerException.class)
         public void constructorNullTaskHandler() throws Exception {
         new MasterTaskScheduler(new Properties(),
-                                new TestResourceCoordinator(), null);
+                                new TestResourceCoordinator(), null,
+                                null, testContext);
     }
 
     @Test public void constructorCustomSystemScheduler() throws Exception {
@@ -109,7 +115,8 @@ public class TestMasterTaskSchedulerImpl {
 
     @Test public void registerValidApp() throws Exception {
         MasterTaskScheduler scheduler = getScheduler();
-        scheduler.registerApplication(testContext, new Properties());
+        scheduler.registerApplication((new DummyTaskOwner()).getContext(),
+                                      new Properties());
     }
 
     @Test (expected=NullPointerException.class)
@@ -121,7 +128,14 @@ public class TestMasterTaskSchedulerImpl {
     @Test (expected=NullPointerException.class)
         public void registerAppNullProperties() throws Exception {
         MasterTaskScheduler scheduler = getScheduler();
-        scheduler.registerApplication(testContext, null);
+        scheduler.registerApplication((new DummyTaskOwner()).getContext(),
+                                      null);
+    }
+
+    @Test (expected=IllegalArgumentException.class)
+        public void registerAppExisting() throws Exception {
+        MasterTaskScheduler scheduler = getScheduler();
+        scheduler.registerApplication(testContext, new Properties());
     }
 
     /**
@@ -130,34 +144,29 @@ public class TestMasterTaskSchedulerImpl {
 
     @Test public void reserveTasksValid() throws Exception {
         MasterTaskScheduler scheduler = getScheduler(0);
-        scheduler.registerApplication(testContext, new Properties());
         scheduler.reserveTasks(getTaskGroup(), testOwner);
     }
 
     @Test (expected=NullPointerException.class)
         public void reserveTasksTasksNull() throws Exception {
         MasterTaskScheduler scheduler = getScheduler(0);
-        scheduler.registerApplication(testContext, new Properties());
         scheduler.reserveTasks(null, testOwner);
     }
 
     @Test (expected=NullPointerException.class)
         public void reserveTasksOwnerNull() throws Exception {
         MasterTaskScheduler scheduler = getScheduler(0);
-        scheduler.registerApplication(testContext, new Properties());
         scheduler.reserveTasks(getTaskGroup(), null);
     }
 
     @Test public void useTasksReservation() throws Exception {
         MasterTaskScheduler scheduler = getScheduler(0);
-        scheduler.registerApplication(testContext, new Properties());
         TaskReservation r = scheduler.reserveTasks(getTaskGroup(), testOwner);
         r.use();
     }
 
     @Test public void cencelTasksReservation() throws Exception {
         MasterTaskScheduler scheduler = getScheduler(0);
-        scheduler.registerApplication(testContext, new Properties());
         TaskReservation r = scheduler.reserveTasks(getTaskGroup(), testOwner);
         r.cancel();
     }
@@ -165,7 +174,6 @@ public class TestMasterTaskSchedulerImpl {
     @Test (expected=IllegalStateException.class)
         public void reuseTasksReservation() throws Exception {
         MasterTaskScheduler scheduler = getScheduler(0);
-        scheduler.registerApplication(testContext, new Properties());
         TaskReservation r = scheduler.reserveTasks(getTaskGroup(), testOwner);
         r.use();
         r.use();
@@ -174,7 +182,6 @@ public class TestMasterTaskSchedulerImpl {
     @Test (expected=IllegalStateException.class)
         public void recancelTasksReservation() throws Exception {
         MasterTaskScheduler scheduler = getScheduler(0);
-        scheduler.registerApplication(testContext, new Properties());
         TaskReservation r = scheduler.reserveTasks(getTaskGroup(), testOwner);
         r.cancel();
         r.cancel();
@@ -183,7 +190,6 @@ public class TestMasterTaskSchedulerImpl {
     @Test (expected=IllegalStateException.class)
         public void useThenCancelTasksReservation() throws Exception {
         MasterTaskScheduler scheduler = getScheduler(0);
-        scheduler.registerApplication(testContext, new Properties());
         TaskReservation r = scheduler.reserveTasks(getTaskGroup(), testOwner);
         r.use();
         r.cancel();
@@ -192,7 +198,6 @@ public class TestMasterTaskSchedulerImpl {
     @Test (expected=IllegalStateException.class)
         public void cancelThenUseTasksReservation() throws Exception {
         MasterTaskScheduler scheduler = getScheduler(0);
-        scheduler.registerApplication(testContext, new Properties());
         TaskReservation r = scheduler.reserveTasks(getTaskGroup(), testOwner);
         r.cancel();
         r.use();
@@ -217,7 +222,8 @@ public class TestMasterTaskSchedulerImpl {
         resourceCoordinator = new TestResourceCoordinator();
         masterTaskScheduler =
             new MasterTaskScheduler(p, resourceCoordinator,
-                                    MinimalTestKernel.getTaskHandler());
+                                    MinimalTestKernel.getTaskHandler(),
+                                    null, testContext);
         return masterTaskScheduler;
     }
 

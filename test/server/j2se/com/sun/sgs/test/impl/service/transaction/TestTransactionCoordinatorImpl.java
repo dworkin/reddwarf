@@ -1,5 +1,10 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.test.impl.service.transaction;
 
+import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.service.Transaction;
@@ -456,6 +461,39 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	assertHandleNotActive(handle);
     }
 
+    public void testCommitAbortedWithRetryableCause() throws Exception {
+	txn.abort(new TransactionAbortedException("Aborted"));
+	try {
+	    handle.commit();
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	    assertTrue(retryable(e));
+	}
+    }
+
+    public void testCommitAbortedWithNonRetryableCause() throws Exception {
+	txn.abort(new IllegalArgumentException());
+	try {
+	    handle.commit();
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	    assertFalse(retryable(e));
+	}
+    }
+
+    public void testCommitAbortedWithNoCause() throws Exception {
+	txn.abort();
+	try {
+	    handle.commit();
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	    assertFalse(retryable(e));
+	}
+    }
+
     /* -- Test TransactionHandle.getTransaction -- */
 
     public void testGetTransactionActive() {
@@ -673,6 +711,45 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	    }
 	}
 	assertHandleNotActive(handle);
+    }
+
+    public void testJoinAbortedWithRetryableCause() throws Exception {
+	DummyTransactionParticipant participant =
+	    new DummyTransactionParticipant();
+	txn.abort(new TransactionAbortedException("Aborted"));
+	try {
+	    txn.join(participant);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	    assertTrue(retryable(e));
+	}
+    }
+
+    public void testJoinAbortedWithNonRetryableCause() throws Exception {
+	DummyTransactionParticipant participant =
+	    new DummyTransactionParticipant();
+	txn.abort(new IllegalArgumentException());
+	try {
+	    txn.join(participant);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	    assertFalse(retryable(e));
+	}
+    }
+
+    public void testJoinAbortedWithNoCause() throws Exception {
+	DummyTransactionParticipant participant =
+	    new DummyTransactionParticipant();
+	txn.abort();
+	try {
+	    txn.join(participant);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	    assertFalse(retryable(e));
+	}
     }
 
     /* -- Test Transaction.abort -- */
@@ -980,6 +1057,39 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	assertHandleNotActive(handle);
     }
 
+    public void testAbortAbortedWithRetryableCause() throws Exception {
+	txn.abort(new TransactionAbortedException("Aborted"));
+	try {
+	    txn.abort();
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	    assertTrue(retryable(e));
+	}
+    }
+
+    public void testAbortAbortedWithNonRetryableCause() throws Exception {
+	txn.abort(new IllegalArgumentException());
+	try {
+	    txn.abort();
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	    assertFalse(retryable(e));
+	}
+    }
+
+    public void testAbortAbortedWithNoCause() throws Exception {
+	txn.abort();
+	try {
+	    txn.abort();
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	    assertFalse(retryable(e));
+	}
+    }
+
     /* -- Test TransactionHandle.abort -- */
 
     public void testHandleAbortActive() {
@@ -1072,5 +1182,11 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	    fail("Transaction was active");
 	} catch (TransactionNotActiveException e) {
 	}
+    }
+
+    /** Checks if the argument is a retryable exception. */
+    private static boolean retryable(Throwable t) {
+	return t instanceof ExceptionRetryStatus &&
+	    ((ExceptionRetryStatus) t).shouldRetry();
     }
 }
