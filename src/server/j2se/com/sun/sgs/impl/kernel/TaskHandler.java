@@ -1,7 +1,12 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
 
 package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.app.TransactionNotActiveException;
+
+import com.sun.sgs.impl.kernel.profile.ProfileCollector;
 
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionHandle;
@@ -30,9 +35,6 @@ import java.util.logging.Logger;
  * trusted components are provided with this reference. Most components
  * outside the kernel will use the <code>TaskScheduler</code> or the
  * <code>TaskService</code> to run tasks.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 public final class TaskHandler {
 
@@ -43,17 +45,24 @@ public final class TaskHandler {
     // the single instance used for creating transactions
     private static TransactionCoordinator transactionCoordinator = null;
 
+    // the single instance used to collect profile data
+    private static ProfileCollector profileCollector = null;
+
     /**
      * Package-private constructor used by the kernel to create the single
      * instance of <code>TaskHandler</code>.
      *
      * @param transactionCoordinator the <code>TransactionCoordinator</code>
      *                               used to create new transactions
+     * @param profileCollector the <code>ProfileCollector</code> used
+     *                         to collect profile data,
+     *                         or <code>null</code> if profiling is not on
      *
      * @throws IllegalStateException if there already exists an instance
      *                               of <code>TaskHandler</code>
      */
-    TaskHandler(TransactionCoordinator transactionCoordinator) {
+    TaskHandler(TransactionCoordinator transactionCoordinator,
+                ProfileCollector profileCollector) {
         if (TaskHandler.transactionCoordinator != null)
             throw new IllegalStateException("an instance already exists");
         if (transactionCoordinator == null)
@@ -62,6 +71,7 @@ public final class TaskHandler {
         logger.log(Level.CONFIG, "Creating the Task Handler");
 
         TaskHandler.transactionCoordinator = transactionCoordinator;
+        TaskHandler.profileCollector = profileCollector;
     }
 
     /**
@@ -115,6 +125,9 @@ public final class TaskHandler {
         TransactionalTaskThread thread =
             (TransactionalTaskThread)(Thread.currentThread());
         thread.setCurrentTransaction(transaction);
+
+        if (profileCollector != null)
+            profileCollector.noteTransactional();
 
         // run the task, watching for any exceptions
 	Throwable throwable;

@@ -1,3 +1,6 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
 
 package com.sun.sgs.impl.kernel.schedule;
 
@@ -17,9 +20,6 @@ import java.util.Collection;
  * ordering the tasks associated with a given application.  All
  * implementations must implement a constructor of the form
  * <code>(java.util.Properties)</code>.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 interface ApplicationScheduler {
 
@@ -28,6 +28,15 @@ interface ApplicationScheduler {
      */
     public final String APPLICATION_SCHEDULER_PROPERTY =
         "com.sun.sgs.ApplicationScheduler";
+
+    /**
+     * Returns the number of tasks that are ready for the scheduler to
+     * run. This does not include any pending or recurring tasks that
+     * have not come time to run.
+     *
+     * @return the number of tasks ready to run
+     */
+    public int getReadyCount();
 
     /**
      * Returns the next task to run. Unlike the <code>getNextTask</code>

@@ -1,3 +1,7 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.test.impl.service.channel;
 
 import com.sun.sgs.app.AppContext;
@@ -6,6 +10,7 @@ import com.sun.sgs.app.Channel;
 import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
+import com.sun.sgs.app.ClientSessionId;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.Delivery;
@@ -79,8 +84,8 @@ public class TestChannelServiceImpl extends TestCase {
 	DataServiceImpl.class.getName();
 
     /** Directory used for database shared across multiple tests. */
-    private static String dbDirectory =
-	System.getProperty("java.io.tmpdir") + File.separator +
+    private static final String DB_DIRECTORY =
+        System.getProperty("java.io.tmpdir") + File.separator +
 	"TestChannelServiceImpl.db";
 
     /** The port for the client session service. */
@@ -93,10 +98,10 @@ public class TestChannelServiceImpl extends TestCase {
 
     /** Properties for creating the shared database. */
     private static Properties dbProps = createProperties(
-	DataStoreImplClassName + ".directory", dbDirectory,
+	DataStoreImplClassName + ".directory", DB_DIRECTORY,
 	StandardProperties.APP_NAME, "TestChannelServiceImpl",
 	DataServiceImplClassName + ".debugCheckInterval", "1");
-
+    
     private static final int SESSION_ID_SIZE = 8;
 
     private static final String CHANNEL_NAME = "three stooges";
@@ -106,15 +111,6 @@ public class TestChannelServiceImpl extends TestCase {
     private static final String LOGIN_FAILED_MESSAGE = "login failed";
     
     private static Object disconnectedCallbackLock = new Object();
-    
-    /**
-     * Delete the database directory at the start of the test run, but not for
-     * each test.
-     */
-    static {
-	System.err.println("Deleting database directory");
-	deleteDirectory(dbDirectory);
-    }
 
     /** A per-test database directory, or null if not created. */
     private String directory;
@@ -149,10 +145,18 @@ public class TestChannelServiceImpl extends TestCase {
     protected void setUp() throws Exception {
 	passed = false;
 	System.err.println("Testcase: " + getName());
-	appContext = MinimalTestKernel.createContext();
+        setUp(true);
+    }
+
+    protected void setUp(boolean clean) throws Exception {
+        if (clean) {
+            deleteDirectory(DB_DIRECTORY);
+        }
+
+        appContext = MinimalTestKernel.createContext();
 	systemRegistry = MinimalTestKernel.getSystemRegistry(appContext);
 	serviceRegistry = MinimalTestKernel.getServiceRegistry(appContext);
-	    
+
 	// create services
 	dataService = createDataService(systemRegistry);
 	taskService = new TaskServiceImpl(new Properties(), systemRegistry);
@@ -205,15 +209,37 @@ public class TestChannelServiceImpl extends TestCase {
     
     /** Cleans up the transaction. */
     protected void tearDown() throws Exception {
-	if (txn != null) {
-	    try {
-		txn.abort();
-	    } catch (IllegalStateException e) {
-	    }
-	    txn = null;
-	}
-	deleteDirectory(dbDirectory);
-	//MinimalTestKernel.destroyContext(appContext);
+        tearDown(true);
+    }
+
+    protected void tearDown(boolean clean) throws Exception {
+        if (txn != null) {
+            try {
+                txn.abort();
+            } catch (IllegalStateException e) {
+            }
+            txn = null;
+        }
+        if (channelService != null) {
+            channelService.shutdown();
+            channelService = null;
+        }
+        if (sessionService != null) {
+            sessionService.shutdown();
+            sessionService = null;
+        }
+        if (taskService != null) {
+            taskService.shutdown();
+            taskService = null;
+        }
+        if (dataService != null) {
+            dataService.shutdown();
+            dataService = null;
+        }
+        if (clean) {
+            deleteDirectory(DB_DIRECTORY);
+        }
+        MinimalTestKernel.destroyContext(appContext);
     }
 
     /* -- Test constructor -- */
@@ -1105,31 +1131,16 @@ public class TestChannelServiceImpl extends TestCase {
 	    group.join(name);
 	    group.checkMembership(name, true);
 	    group.checkChannelSets(true);
-	    sessionService.shutdown();
-	    channelService.shutdown();
 
-	    sessionService = 
-		new ClientSessionServiceImpl(serviceProps, systemRegistry);
-	    channelService =
-		new ChannelServiceImpl(serviceProps, systemRegistry);
-	    
-	    createTransaction();
-	    sessionService.configure(serviceRegistry, txnProxy);
-	    serviceRegistry.setComponent(
-		ClientSessionService.class, sessionService);
-	    txnProxy.setComponent(
-	        ClientSessionService.class, sessionService);
-	    port = sessionService.getListenPort();	
-	    channelService.configure(serviceRegistry, txnProxy);
-	    serviceRegistry.setComponent(ChannelManager.class, channelService);
-    
-	    txn.commit();
-	    
-	    
+            // Simulate "crash"
+            tearDown(false);
+            System.err.println("simulated crash");
+            setUp(false);
+
 	    Thread.sleep(WAIT_TIME); // this is necessary, and unfortunate...
 	    group.checkMembership(name, false);
 	    group.checkChannelSets(false);
-	    
+
 	} catch (RuntimeException e) {
 	    System.err.println("unexpected failure");
 	    e.printStackTrace();
@@ -1139,7 +1150,7 @@ public class TestChannelServiceImpl extends TestCase {
 	}
 	
     }
-
+    
     public void testSendFromSessionToChannel() throws Exception {
 	txn.commit();
 	String name = CHANNEL_NAME;
@@ -1289,7 +1300,7 @@ public class TestChannelServiceImpl extends TestCase {
 	ChannelServiceImpl.class.getName() + ".session.";
     
     private static String getSessionKey(byte[] sessionId) {
-	return SESSION_PREFIX + HexDumper.format(sessionId);
+	return SESSION_PREFIX + HexDumper.toHexString(sessionId);
     }
 
     /** Deletes the specified directory, if it exists. */
@@ -1353,7 +1364,7 @@ public class TestChannelServiceImpl extends TestCase {
 	DummyComponentRegistry registry)
 	throws Exception
     {
-	File dir = new File(dbDirectory);
+	File dir = new File(DB_DIRECTORY);
 	if (!dir.exists()) {
 	    if (!dir.mkdir()) {
 		throw new RuntimeException(
@@ -1422,8 +1433,8 @@ public class TestChannelServiceImpl extends TestCase {
 	}
 
         /** {@inheritDoc} */
-	public byte[] getSessionId() {
-	    return id;
+	public ClientSessionId getSessionId() {
+	    return new ClientSessionId(id);
 	}
 
         /** {@inheritDoc} */
@@ -1440,7 +1451,12 @@ public class TestChannelServiceImpl extends TestCase {
 	}
 
 	/* -- Implement SgsClientSession -- */
-	
+
+        /** {@inheritDoc} */
+        public Identity getIdentity() {
+            return new DummyIdentity(name);
+        }
+
         /** {@inheritDoc} */
 	public void sendProtocolMessage(byte[] message, Delivery delivery) {
 	}
@@ -1521,9 +1537,14 @@ public class TestChannelServiceImpl extends TestCase {
     /**
      * Identity returned by the DummyIdentityManager.
      */
-    private static class DummyIdentity implements Identity {
+    private static class DummyIdentity implements Identity, Serializable {
 
-	private final String name;
+        private static final long serialVersionUID = 1L;
+        private final String name;
+
+        DummyIdentity(String name) {
+            this.name = name;
+        }
 
 	DummyIdentity(IdentityCredentials credentials) {
 	    this.name = ((NamePasswordCredentials) credentials).getName();
@@ -1536,6 +1557,20 @@ public class TestChannelServiceImpl extends TestCase {
 	public void notifyLoggedIn() {}
 
 	public void notifyLoggedOut() {}
+        
+        @Override
+        public boolean equals(Object o) {
+            if (this == o)
+                return true;
+            if (! (o instanceof DummyIdentity))
+                return false;
+            return ((DummyIdentity)o).name.equals(name);
+        }
+        
+        @Override
+        public int hashCode() {
+            return name.hashCode();
+        }
     }
 
     /**

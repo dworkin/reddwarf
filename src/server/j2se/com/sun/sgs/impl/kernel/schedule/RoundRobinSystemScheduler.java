@@ -1,3 +1,6 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
 
 package com.sun.sgs.impl.kernel.schedule;
 
@@ -28,9 +31,6 @@ import java.util.logging.Logger;
  * all consuming threads will continusously spin. In most deployments this
  * should be acceptable, since most schedulers should have continuous
  * if variable activity.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 class RoundRobinSystemScheduler implements SystemScheduler {
 
@@ -86,6 +86,16 @@ class RoundRobinSystemScheduler implements SystemScheduler {
             scheduler = new FIFOApplicationScheduler(properties);
 
         appSchedulers.put(context, scheduler);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int getReadyCount(KernelAppContext context) {
+        ApplicationScheduler scheduler = appSchedulers.get(context);
+        if (scheduler == null)
+            throw new IllegalArgumentException("Unknown context");
+        return scheduler.getReadyCount();
     }
 
     /**

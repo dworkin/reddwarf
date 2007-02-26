@@ -1,8 +1,14 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.impl.service.transaction;
 
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.util.MaybeRetryableIllegalStateException;
+import com.sun.sgs.impl.util.MaybeRetryableTransactionNotActiveException;
 import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
@@ -95,12 +101,7 @@ final class TransactionImpl implements Transaction {
 	if (participant == null) {
 	    throw new NullPointerException("Participant must not be null");
 	} else if (state != State.ACTIVE) {
-	    /*
-	     * FIXME: Should throw TransactionNotActiveException if the
-	     * transaction was aborted, and use the cause to specify the right
-	     * retry state.  -tjb@sun.com (01/17/2007)
-	     */
-	    throw new IllegalStateException(
+	    throw new MaybeRetryableIllegalStateException(
 		"Transaction is not active", getInactiveCause());
 	}
 	if (!participants.contains(participant)) {
@@ -136,12 +137,7 @@ final class TransactionImpl implements Transaction {
 	case ABORTING:
 	    return;
 	case ABORTED:
-	    /*
-	     * FIXME: Should throw TransactionNotActiveException, and use the
-	     * cause to specify the right retry state.  -tjb@sun.com
-	     * (01/17/2007)
-	     */
-	    throw new IllegalStateException(
+	    throw new MaybeRetryableIllegalStateException(
 		"Transaction is not active", abortCause);
 	case COMMITTING:
 	case COMMITTED:
@@ -217,11 +213,7 @@ final class TransactionImpl implements Transaction {
 	assert Thread.currentThread() == owner : "Wrong thread";
 	logger.log(Level.FINER, "commit {0}", this);
 	if (state != State.ACTIVE) {
-	    /*
-	     * FIXME: Should use the cause to specify the right retry state.
-	     * -tjb@sun.com (01/17/2007)
-	     */
-	    throw new TransactionNotActiveException(
+	    throw new MaybeRetryableTransactionNotActiveException(
 		"Transaction is not active", getInactiveCause());
 	}
 	state = State.PREPARING;

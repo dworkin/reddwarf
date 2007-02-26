@@ -1,17 +1,32 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
 
 package com.sun.sgs.impl.kernel.schedule;
 
 import com.sun.sgs.app.TaskRejectedException;
 
-import com.sun.sgs.impl.app.profile.ProfilingManager;
+import com.sun.sgs.impl.auth.IdentityImpl;
 
 import com.sun.sgs.impl.kernel.TaskHandler;
+import com.sun.sgs.impl.kernel.TaskOwnerImpl;
+
+import com.sun.sgs.impl.kernel.profile.AggregateProfileOpListener;
+import com.sun.sgs.impl.kernel.profile.AppGraphProfileOpListener;
+import com.sun.sgs.impl.kernel.profile.ProfileCollector;
+import com.sun.sgs.impl.kernel.profile.ProfileConsumerImpl;
 
 import com.sun.sgs.impl.util.LoggerWrapper;
 
 import com.sun.sgs.kernel.KernelAppContext;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.Priority;
+import com.sun.sgs.kernel.ProfileConsumer;
+import com.sun.sgs.kernel.ProfileOperation;
+import com.sun.sgs.kernel.ProfileOperationListener;
+import com.sun.sgs.kernel.ProfileProducer;
+import com.sun.sgs.kernel.ProfileRegistrar;
+import com.sun.sgs.kernel.ProfileReport;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskOwner;
@@ -36,11 +51,9 @@ import java.util.logging.Logger;
  * passes these on to a <code>SystemScheduler</code>. Essentially, this root
  * scheduler handles basic configuration and marshalling, but leaves all
  * the real work to its children.
- *
- * @since 1.0
- * @author Seth Proctor
  */
-public class MasterTaskScheduler implements TaskScheduler {
+public class MasterTaskScheduler
+    implements ProfileRegistrar, ProfileOperationListener, TaskScheduler {
 
     // logger for this class
     private static final LoggerWrapper logger =
@@ -82,18 +95,27 @@ public class MasterTaskScheduler implements TaskScheduler {
     // the default priority for tasks
     private static Priority defaultPriority = Priority.getDefaultPriority();
 
+    // the single collector used for all profile data
+    private ProfileCollector profileCollector;
+
     /**
      * Creates an instance of <code>MasterTaskScheduler</code>.
      *
      * @param properties the system properties
      * @param resourceCoordinator the system's <code>ResourceCoordinator</code>
      * @param taskHandler the system's <code>TaskHandler</code>
+     * @param profileCollector the system's <code>ProfileCollector</code>,
+     *                         or <code>null</code> if profiling is disabled
+     * @param systemContext the context the system runs in, which is registered
+     *                      as the first application using this scheduler
      *
      * @throws Exception if there are any failures during configuration
      */
     public MasterTaskScheduler(Properties properties,
                                ResourceCoordinator resourceCoordinator,
-                               TaskHandler taskHandler)
+                               TaskHandler taskHandler,
+                               ProfileCollector profileCollector,
+                               KernelAppContext systemContext)
         throws Exception
     {
         logger.log(Level.CONFIG, "Creating the Master Task Scheduler");
@@ -105,6 +127,7 @@ public class MasterTaskScheduler implements TaskScheduler {
         if (taskHandler == null)
             throw new NullPointerException("Task Handler cannot be null");
 
+        // see what system scheduler is going to be used
         String systemSchedulerName =
             properties.getProperty(SYSTEM_SCHEDULER_PROPERTY,
                                    DEFAULT_SYSTEM_SCHEDULER);
@@ -118,10 +141,11 @@ public class MasterTaskScheduler implements TaskScheduler {
             systemSchedulerClass.getConstructor(Properties.class);
         systemScheduler =
             (SystemScheduler)(systemSchedulerConstructor.
-                    newInstance(properties)); 
+                    newInstance(properties));
 
         this.resourceCoordinator = resourceCoordinator;
         this.taskHandler = taskHandler;
+        this.profileCollector = profileCollector;
 
         int startingThreads =
             Integer.parseInt(properties.
@@ -135,9 +159,24 @@ public class MasterTaskScheduler implements TaskScheduler {
         // create the initial consuming threads
         for (int i = 0; i < startingThreads; i++) {
             resourceCoordinator.
-                startTask(new MasterTaskConsumer(this,
-                                                 systemScheduler, taskHandler),
+                startTask(new MasterTaskConsumer(this, systemScheduler,
+                                                 profileCollector,
+                                                 taskHandler),
                           null);
+            if (profileCollector != null)
+                profileCollector.notifyThreadAdded();
+        }
+
+        // register the system as the first application using the scheduler
+        registerApplication(systemContext, properties);
+
+        // finally, add ourselves and optionally the system scheduler,
+        // since this is how we will start to manage threads
+        if (profileCollector != null) {
+            profileCollector.addListener(this);
+            if (systemScheduler instanceof ProfileOperationListener)
+                profileCollector.
+                    addListener((ProfileOperationListener)systemScheduler);
         }
     }
 
@@ -161,15 +200,17 @@ public class MasterTaskScheduler implements TaskScheduler {
     }
 
     /**
-     * Registers the given <code>ProfilingManager</code>, resulting in the
-     * manager being given a <code>ProfileReporter</code>.
-     *
-     * @param manager the <code>ProfilingManager</code> being registered
+     * {@inheritDoc}
      */
-    public void registerProfilingManager(ProfilingManager manager) {
-        // FIXME: lookup or create the reporter and provide to the manager
-        // once we start the profiling work and define these interfaces
-        logger.log(Level.CONFIG, "Registering profiling manager");
+    public ProfileConsumer registerProfileProducer(ProfileProducer producer) {
+        if (profileCollector != null) {
+            if (logger.isLoggable(Level.CONFIG))
+                logger.log(Level.CONFIG, "Registering profile producer {0}",
+                           producer);
+            return new ProfileConsumerImpl(producer, profileCollector);
+        }
+
+        return null;
     }
 
     /**
@@ -177,14 +218,44 @@ public class MasterTaskScheduler implements TaskScheduler {
      * finishing its work.
      */
     void notifyThreadLeaving() {
-        // FIXME: we're not yet trying to adapt the number of threads being
+        // NOTE: we're not yet trying to adapt the number of threads being
         // used, so we assume that threads are only lost when the system
         // wants to shutdown...in practice, this should look at some
         // threshold and see if another consumer needs to be created
-        if (threadCount.getAndDecrement() == 1) {
+        if (threadCount.decrementAndGet() == 0) {
             logger.log(Level.CONFIG, "No more threads are consuming tasks");
-            systemScheduler.shutdown();
+            if (profileCollector != null)
+                profileCollector.notifyThreadRemoved();
+            shutdown();
         }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void notifyThreadCount(int count) {
+        // ignored, since we are the cause of this message
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void notifyNewOp(ProfileOperation op) {
+        // see comment in notifyThreadLeaving
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void report(ProfileReport profileReport) {
+        // see comment in notifyThreadLeaving
+    }
+
+    /**
+     * Tells the scheduler to stop running tasks.
+     */
+    public void shutdown() {
+        systemScheduler.shutdown();
     }
 
     /**
@@ -283,14 +354,6 @@ public class MasterTaskScheduler implements TaskScheduler {
         return systemScheduler.
             addRecurringTask(new ScheduledTask(task, owner, defaultPriority,
                                                startTime, period));
-    }
-
-    /**
-     * Note that this should not be exposed yet, since there isn't real
-     * shutdown capability, but this is needed for our tests.
-     */
-    public void shutdown() {
-        systemScheduler.shutdown();
     }
 
     /**

@@ -1,3 +1,7 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.client.simple;
 
 import java.io.IOException;
@@ -476,7 +480,7 @@ public class SimpleClient implements ServerSession {
                 msg.getLong(); // FIXME sequence number
                 
                 byte[] sidBytes = msg.getByteArray();
-                SessionId sid = (sidBytes == null) ?
+                SessionId sid = (sidBytes.length == 0) ?
                         null : SessionId.fromBytes(sidBytes);
                 
                 channel.receivedMessage(sid, msg.getByteArray());

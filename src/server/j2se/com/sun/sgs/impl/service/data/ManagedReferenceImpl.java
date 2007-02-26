@@ -1,3 +1,7 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.impl.service.data;
 
 import com.sun.sgs.app.ManagedObject;
