@@ -761,7 +761,6 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 	config.setLockTimeout(1000 * txnTimeout);
 	config.setMessageHandler(new LoggingMessageHandler());
         config.setRunRecovery(true);
-	config.setThreaded(true);
         config.setTransactional(true);
 	config.setTxnTimeout(1000 * txnTimeout);
 	config.setTxnWriteNoSync(!flushToDisk);
@@ -968,10 +967,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
 		}
 	    }
 	    txnInfo.modified = true;
-	    if (logger.isLoggable(Level.FINEST)) {
-		logger.log(
-		    Level.FINEST, "setObjects txn:{0} returns", txn, oid);
-	    }
+	    logger.log(Level.FINEST, "setObjects txn:{0} returns", txn);
 	    return;
 	} catch (DatabaseException e) {
 	    exception = e;
@@ -1384,7 +1380,7 @@ public class DataStoreImpl implements DataStore, TransactionParticipant {
      * @return	the next available object ID
      */
     public long allocateObjects(int count) {
-	logger.log(Level.FINE, "allocateObjects count:{0}", count);
+	logger.log(Level.FINE, "allocateObjects count:{0,number,#}", count);
 	Exception exception;
 	try {
 	    long result = getNextId(
