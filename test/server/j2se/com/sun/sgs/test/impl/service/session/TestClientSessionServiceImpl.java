@@ -408,11 +408,18 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client.connect(port);
 	    client.login(name, "password");
 
-            //sessionService.shutdown();
-            tearDown(false);
+	    Set<String> listenerKeys = getClientSessionListenerKeys();
+	    System.err.println("Listener keys: " + listenerKeys);
+	    if (listenerKeys.isEmpty()) {
+		fail("no listener keys");
+	    } else if (listenerKeys.size() > 1) {
+		fail("more than one listener key");
+	    }
+	    
             // Simulate "crash"
+            tearDown(false);
             setUp(false);
-
+	    
             DummyClientSessionListener sessionListener =
 		getClientSessionListener(name);
 	    if (sessionListener == null) {
@@ -424,24 +431,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    }
 		}
 	    }
-	    Set<String> listenerKeys = getClientSessionListenerKeys();
-	    System.err.println("Listener keys: " + listenerKeys);
-	    if (listenerKeys.isEmpty()) {
-		fail("no listener keys");
-	    } else if (listenerKeys.size() > 1) {
-		fail("more than one listener key");
-	    }
-	    sessionService = 
-		new ClientSessionServiceImpl(serviceProps, systemRegistry);
-	    createTransaction();
-	    sessionService.configure(serviceRegistry, txnProxy);
-	    serviceRegistry.setComponent(
-		ClientSessionService.class, sessionService);
-	    txnProxy.setComponent(
-	        ClientSessionService.class, sessionService);
-	    port = sessionService.getListenPort();
-	    txn.commit();
-
+	    
 	    sessionListener = getClientSessionListener(name);
 	    if (sessionListener == null) {
 		fail("listener is null!");
