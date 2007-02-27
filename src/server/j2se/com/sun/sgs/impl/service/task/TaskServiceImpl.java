@@ -149,7 +149,7 @@ public class TaskServiceImpl
     }
 
     /**
-     * @{inheritDoc}
+     * {@inheritDoc}
      */
     public void setProfileRegistrar(ProfileRegistrar profileRegistrar) {
         ProfileConsumer consumer =
