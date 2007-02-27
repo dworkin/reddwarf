@@ -88,7 +88,7 @@ public class NonDurableTaskScheduler {
     public void scheduleNonTransactionalTask(KernelRunnable task,
             Identity identity)
     {
-        if (owner == null) {
+        if (identity == null) {
             scheduleNonTransactionalTask(task);
             return;
         }
