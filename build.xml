@@ -23,10 +23,7 @@
 	    value="-Xlint"/>
 
   <!-- Version information -->
-  <exec outputproperty="project.revision"
-	executable="svnversion"
-	logError="true"/>
-  <property name="project.version" value="1.0RC-rev${project.revision}"/>
+  <property name="project.release" value="1.0RC"/>
 
   <!-- Values for the JavaDocs -->
   <property name="project.name" value="Sun Game Server"/>
@@ -162,7 +159,7 @@
 	  description="Builds public API javadoc"/>
 
   <!-- Build the internal server JavaDoc -->
-  <target name="javadoc-server" depends="build-server"
+  <target name="javadoc-server" depends="build-server, project-version"
 	  description="Builds internal (full) server javadoc">
     <javadoc sourcepath="src/server/j2se:src/shared/j2se"
              destdir="${build.dir}/javadoc/server"
@@ -192,7 +189,7 @@
   </target>
 
   <!-- Build the internal client JavaDoc -->
-  <target name="javadoc-client" depends="build-client"
+  <target name="javadoc-client" depends="build-client, project-version"
 	  description="Builds internal (full) client javadoc">
     <javadoc sourcepath="src/client/j2se"
              destdir="${build.dir}/javadoc/client"
@@ -222,7 +219,7 @@
   </target>
 
   <!-- Build the public Application API JavaDoc -->
-  <target name="javadoc-api-server" depends="build-server"
+  <target name="javadoc-api-server" depends="build-server, project-version"
 	  description="Builds public server application API javadoc">
     <javadoc sourcepath="src/server/j2se"
              destdir="${build.dir}/javadoc/apidoc/sgs-server-apidoc"
@@ -250,7 +247,7 @@
   </target>
 
   <!-- Build the public Client API JavaDoc -->
-  <target name="javadoc-api-client" depends="build-client"
+  <target name="javadoc-api-client" depends="build-client, project-version"
 	  description="Builds public client API javadoc">
     <javadoc sourcepath="src/client/j2se"
              destdir="${build.dir}/javadoc/apidoc/sgs-client-apidoc"
@@ -298,7 +295,8 @@
   </target>
 
   <!-- Builds files for distribution -->
-  <target name="dist" depends="dist-client, dist-server, javadoc-api"
+  <target name="dist"
+	  depends="dist-client, dist-server, javadoc-api, project-version"
 	  description="Builds files for distribution">
     <copy todir="${build.dir}/sgs/doc/sgs-client-api">
       <fileset dir="${build.dir}/javadoc/apidoc/sgs-client-apidoc/"/>
@@ -383,7 +381,7 @@
   </target>
 
   <!-- Builds the server JAR file -->
-  <target name="jar-server" depends="build-server"
+  <target name="jar-server" depends="build-server, project-version"
 	  description="Builds server JAR files">
     <mkdir dir="${build.dir}/lib"/>
     <echo file="${build.dir}/classes/server/com/sun/sgs/sgs.version"
@@ -399,6 +397,42 @@
                           slf4j-jdk14.jar"/>
       </manifest>
     </jar>
+  </target>
+
+  <!-- Sets properties for the project version -->
+  <target name="project-version"
+	  description="Sets properties for the project version">
+    <!-- Set to the latest committed revision -->
+    <exec outputproperty="project.revision"
+	  executable="svn"
+	  logError="true">
+      <arg line="info"/>
+      <redirector>
+	<outputfilterchain>
+	  <tokenfilter>
+	    <containsregex pattern="Last Changed Rev: (.*)" replace="\1"/>
+	  </tokenfilter>
+	</outputfilterchain>
+      </redirector>
+    </exec>
+    <!-- Set to 'M' if the working copy is modified, and include a ':'
+	 if the working copy contains multiple revisions -->
+    <exec outputproperty="project.modified"
+	  executable="svnversion"
+	  logError="true">
+      <redirector>
+	<outputfilterchain>
+	  <tokenfilter>
+	    <containsregex pattern="[^M:]*(:?)[^M:]*(M*)[^M:]*"
+			   replace="\1\2"/>
+	  </tokenfilter>
+	</outputfilterchain>
+      </redirector>
+    </exec>
+    <property
+       name="project.version"
+       value="${project.release}-rev${project.revision}${project.modified}"/>
+    <echo message="${project.version}"/>
   </target>
 
   <!-- Checks Java coding style -->
