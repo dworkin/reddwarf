@@ -402,36 +402,21 @@
   <!-- Sets properties for the project version -->
   <target name="project-version"
 	  description="Sets properties for the project version">
-    <!-- Set to the latest committed revision -->
+    <!-- Use the latest committed revision, the part after the colon -->
     <exec outputproperty="project.revision"
-	  executable="svn"
-	  logError="true">
-      <arg line="info"/>
-      <redirector>
-	<outputfilterchain>
-	  <tokenfilter>
-	    <containsregex pattern="Last Changed Rev: (.*)" replace="\1"/>
-	  </tokenfilter>
-	</outputfilterchain>
-      </redirector>
-    </exec>
-    <!-- Set to 'M' if the working copy is modified, and include a ':'
-	 if the working copy contains multiple revisions -->
-    <exec outputproperty="project.modified"
 	  executable="svnversion"
 	  logError="true">
+      <arg line="-c"/>
       <redirector>
 	<outputfilterchain>
 	  <tokenfilter>
-	    <containsregex pattern="[^M:]*(:?)[^M:]*(M*)[^M:]*"
-			   replace="\1\2"/>
+	    <containsregex pattern="[^:]*:?([^:]*)" replace="\1"/>
 	  </tokenfilter>
 	</outputfilterchain>
       </redirector>
     </exec>
-    <property
-       name="project.version"
-       value="${project.release}-rev${project.revision}${project.modified}"/>
+    <property name="project.version"
+	      value="${project.release}-rev${project.revision}"/>
     <echo message="${project.version}"/>
   </target>
 
