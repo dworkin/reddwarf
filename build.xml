@@ -416,7 +416,7 @@
       </redirector>
     </exec>
     <property name="project.version"
-	      value="${project.release}-rev${project.revision}"/>
+	      value="${project.release}-r${project.revision}"/>
     <echo message="${project.version}"/>
   </target>
 
