@@ -4,7 +4,6 @@
 
 package com.sun.sgs.impl.io;
 
-import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -70,9 +69,7 @@ class SocketConnectionListener extends IoHandlerAdapter {
         throws Exception
     {
         SocketConnection conn = (SocketConnection) session.getAttachment();
-        Level level =
-            (exception instanceof IOException) ? Level.FINEST : Level.FINER;
-        logger.logThrow(level, exception, "exception on {0}", conn);
+        logger.logThrow(Level.FINER, exception, "exception on {0}", conn);
         if (conn == null) {
             return;
         }

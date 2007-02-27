@@ -20,7 +20,7 @@ public interface ProfileProducer {
      * Tells this <code>ProfileProducer</code> where to register to report
      * its profiling data.
      *
-     * @param profileConsumer the <code>ProfileConsumer</code> to use in
+     * @param profileRegistrar the {@code ProfileRegistrar} to use in
      *                        reporting data to the system
      */
     public void setProfileRegistrar(ProfileRegistrar profileRegistrar);

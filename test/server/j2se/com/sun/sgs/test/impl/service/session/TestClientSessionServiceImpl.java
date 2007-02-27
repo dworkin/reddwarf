@@ -90,7 +90,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     private static final String LOGIN_FAILED_MESSAGE = "login failed";
 
-    private static final int WAIT_TIME = 1000;
+    private static final int WAIT_TIME = 5000;
 
     private static final String RETURN_NULL = "return null";
 
@@ -423,19 +423,8 @@ public class TestClientSessionServiceImpl extends TestCase {
             tearDown(false);
             setUp(false);
 	    
-            DummyClientSessionListener sessionListener =
+	    DummyClientSessionListener sessionListener =
 		getClientSessionListener(name);
-	    if (sessionListener == null) {
-		fail("listener is null");
-	    } else {
-		synchronized (disconnectedCallbackLock) {
-		    if (sessionListener.receivedDisconnectedCallback) {
-			fail("shouldn't have received disconnected callback");
-		    }
-		}
-	    }
-	    
-	    sessionListener = getClientSessionListener(name);
 	    if (sessionListener == null) {
 		fail("listener is null!");
 	    } else {
