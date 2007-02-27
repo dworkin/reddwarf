@@ -102,7 +102,7 @@ public class ClientSessionServiceImpl
     private TaskScheduler taskScheduler;
 
     /** The task scheduler for non-durable tasks. */
-    private NonDurableTaskScheduler nonDurableTaskScheduler;
+    NonDurableTaskScheduler nonDurableTaskScheduler;
     
     /** The data service. */
     DataService dataService;

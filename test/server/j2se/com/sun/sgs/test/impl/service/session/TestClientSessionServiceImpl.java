@@ -4,12 +4,14 @@
 
 package com.sun.sgs.test.impl.service.session;
 
+import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionId;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.DataManager;
+import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.TaskManager;
@@ -54,6 +56,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicLong;
 import junit.framework.TestCase;
 
 public class TestClientSessionServiceImpl extends TestCase {
@@ -576,9 +579,72 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
 	
     }
-    
-    public void testClientSessionSend() throws Exception {
+
+    public void testClientSend() throws Exception {
+	sendMessagesAndCheck(5, 5, null);
     }
+
+    public void testClientSendWithListenerThrowingRetryableException()
+	throws Exception
+    {
+	sendMessagesAndCheck(
+	    5, 5, new MaybeRetryException("retryable", true));
+    }
+
+    public void testClientSendWithListenerThrowingNonRetryableException()
+	throws Exception
+    {
+	sendMessagesAndCheck(
+	    5, 4, new MaybeRetryException("non-retryable", false));
+    }
+    
+    private static final Object receivedAllMessagesLock = new Object();
+    private static RuntimeException throwException = null;
+    private static int totalExpectedMessages;
+    
+    private void sendMessagesAndCheck(
+	int numMessages, int expectedMessages, RuntimeException exception)
+	throws Exception
+    {
+	synchronized (receivedAllMessagesLock) {
+	    totalExpectedMessages = expectedMessages;
+	    throwException = exception;
+	}
+	registerAppListener();
+	DummyClient client = new DummyClient();
+	String name = "client";
+	try {
+	    client.connect(port);
+	    client.login(name, "dummypassword");
+	    for (int i = 0; i < numMessages; i++) {
+		MessageBuffer buf = new MessageBuffer(4);
+		buf.putInt(i);
+		client.sendMessage(buf.getBuffer());
+	    }
+	    
+	    synchronized (receivedAllMessagesLock) {
+		DummyClientSessionListener sessionListener =
+		    getClientSessionListener(name);
+		if (sessionListener.messages.size() != totalExpectedMessages) {
+		    try {
+			receivedAllMessagesLock.wait(WAIT_TIME);
+		    } catch (InterruptedException e) {
+		    }
+		}
+		sessionListener = getClientSessionListener(name);
+		int receivedMessages = sessionListener.messages.size();
+		if (receivedMessages != totalExpectedMessages) {
+		    fail("expected " + totalExpectedMessages + ", received " +
+			 receivedMessages);
+		}
+	    }
+		
+	} finally {
+	    client.disconnect(false);
+	}
+    }
+    
+
     /* -- other methods -- */
 
     /** Deletes the specified directory, if it exists. */
@@ -717,6 +783,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	private String reason;
 	private byte[] sessionId;
 	private byte[] reconnectionKey;
+	private final AtomicLong sequenceNumber = new AtomicLong(0);
 	
 	DummyClient() {
 	}
@@ -846,6 +913,46 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    throw new RuntimeException(
 			"DummyClient.login timed out", e);
 		}
+	    }
+	}
+
+	/**
+	 * Throws a {@code RuntimeException} if this session is not
+	 * logged in.
+	 */
+	private void checkLoggedIn() {
+	    synchronized (lock) {
+		if (!connected || !loginSuccess) {
+		    throw new RuntimeException(
+			"DummyClient.login not connected or loggedIn");
+		}
+	    }
+	}
+
+	/**
+	 * Returns the next sequence number for this session.
+	 */
+	private long nextSequenceNumber() {
+	    return sequenceNumber.getAndIncrement();
+	}
+
+	/**
+	 * Sends a SESSION_MESSAGE.
+	 */
+	void sendMessage(byte[] message) {
+	    checkLoggedIn();
+
+	    MessageBuffer buf =
+		new MessageBuffer(13 + message.length);
+	    buf.putByte(SimpleSgsProtocol.VERSION).
+		putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
+		putByte(SimpleSgsProtocol.SESSION_MESSAGE).
+		putLong(nextSequenceNumber()).
+		putByteArray(message);
+	    try {
+		connection.sendBytes(buf.getBuffer());
+	    } catch (IOException e) {
+		throw new RuntimeException(e);
 	    }
 	}
 
@@ -1069,6 +1176,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	private final String name;
 	boolean receivedDisconnectedCallback = false;
 	boolean graceful = false;
+	List<byte[]> messages = new ArrayList<byte[]>();
+	private int seq = -1;
 	
 	private transient final ClientSession session;
 	
@@ -1090,6 +1199,46 @@ public class TestClientSessionServiceImpl extends TestCase {
 
         /** {@inheritDoc} */
 	public void receivedMessage(byte[] message) {
+	    MessageBuffer buf = new MessageBuffer(message);
+	    int num = buf.getInt();
+	    System.err.println("receivedMessage: " + num + 
+			       "\nthrowException: " + throwException);
+	    if (num <= seq) {
+		throw new RuntimeException(
+		    "expected message greater than " + seq + ", got " + num);
+	    }
+	    AppContext.getDataManager().markForUpdate(this);
+	    messages.add(message);
+	    seq = num;
+	    synchronized (receivedAllMessagesLock) {
+		if (throwException != null) {
+		    RuntimeException e = throwException;
+		    throwException = null;
+		    throw e;
+		}
+	    }
+	    if (messages.size() == totalExpectedMessages) {
+		synchronized (receivedAllMessagesLock) {
+		    receivedAllMessagesLock.notifyAll();
+		}
+	    }
 	}
     }
+
+    private static class MaybeRetryException
+	extends RuntimeException implements ExceptionRetryStatus
+    {
+	private static final long serialVersionUID = 1L;
+	private boolean retry;
+
+	public MaybeRetryException(String s, boolean retry) {
+	    super(s);
+	    this.retry = retry;
+	}
+
+	public boolean shouldRetry() {
+	    return retry;
+	}
+    }
+	
 }

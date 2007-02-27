@@ -18,6 +18,7 @@ import com.sun.sgs.impl.service.session.ClientSessionServiceImpl.Context;
 import com.sun.sgs.impl.util.HexDumper;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.MessageBuffer;
+import com.sun.sgs.impl.util.NonDurableTaskQueue;
 import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.kernel.KernelRunnable;
@@ -74,6 +75,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     /** The client session service that created this client session. */
     private final ClientSessionServiceImpl sessionService;
 
+    /** The data service. */
     private final DataService dataService;
     
     /** The Connection for sending messages to the client. */
@@ -100,12 +102,17 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     /** The client session listener for this client session.*/
     private SessionListener listener;
 
+    /** Indicates whether session disconnection has been handled. */
     private boolean disconnectHandled = false;
 
+    /** Indicates whether this session is shut down. */
     private boolean shutdown = false;
 
     /** The sequence number for ordered messages sent from this client. */
     private AtomicLong sequenceNumber = new AtomicLong(0);
+
+    /** The queue of tasks for notifying listeners of received messages. */
+    private NonDurableTaskQueue taskQueue = null;
 
     /**
      * Constructs an instance of this class with the specified handle.
@@ -600,6 +607,11 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 
 		try {
 		    identity = authenticate(name, password);
+		    synchronized (lock) {
+			taskQueue =
+			    new NonDurableTaskQueue(
+				sessionService.nonDurableTaskScheduler, identity);
+		    }
 		    scheduleTask(new LoginTask());
 		} catch (LoginException e) {
 		    scheduleNonTransactionalTask(new KernelRunnable() {
@@ -615,10 +627,18 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		break;
 
 	    case SimpleSgsProtocol.SESSION_MESSAGE:
+		synchronized (lock) {
+		    if (identity == null) {
+			logger.log(
+			    Level.WARNING,
+			    "session message received before login:{0}", this);
+			break;
+		    }
+		}
                 msg.getLong(); // TODO Check sequence num
 		int size = msg.getUnsignedShort();
 		final byte[] clientMessage = msg.getBytes(size);
-		scheduleTask(new KernelRunnable() {
+		taskQueue.addTask(new KernelRunnable() {
 		    public void run() {
 			if (isConnected()) {
 			    listener.get().receivedMessage(clientMessage);
