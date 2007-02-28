@@ -1,3 +1,7 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.impl.client.simple;
 
 import java.util.Arrays;
@@ -19,6 +23,9 @@ public class SimpleSessionId extends SessionId {
      * @param id the byte representation of the session id
      */
     public SimpleSessionId(byte[] id) {
+        if (id == null)
+            throw new NullPointerException("id must not be null");
+
         this.id = id;
     }
 
@@ -55,7 +62,6 @@ public class SimpleSessionId extends SessionId {
      */   
     @Override
     public String toString() {
-        return getClass().getName() + "@" +
-            ((id.length == 0) ? "server" : HexDumper.toHexString(id));
+        return getClass().getName() + "@" + HexDumper.toHexString(id);
     }
 }

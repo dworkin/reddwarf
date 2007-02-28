@@ -1,9 +1,15 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.impl.service.session;
 
+import com.sun.sgs.app.ClientSessionId;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityManager;
 import com.sun.sgs.impl.io.ServerSocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
@@ -30,7 +36,6 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -83,9 +88,9 @@ public class ClientSessionServiceImpl
 	    new HashMap<Byte, ProtocolMessageListener>());
 
     /** A map of current sessions, from session ID to ClientSessionImpl. */
-    private final Map<SessionId, ClientSessionImpl> sessions =
+    private final Map<ClientSessionId, ClientSessionImpl> sessions =
 	Collections.synchronizedMap(
-	    new HashMap<SessionId, ClientSessionImpl>());
+	    new HashMap<ClientSessionId, ClientSessionImpl>());
 
     /** The Acceptor for listening for new connections. */
     private Acceptor<SocketAddress> acceptor;
@@ -97,7 +102,7 @@ public class ClientSessionServiceImpl
     private TaskScheduler taskScheduler;
 
     /** The task scheduler for non-durable tasks. */
-    private NonDurableTaskScheduler nonDurableTaskScheduler;
+    NonDurableTaskScheduler nonDurableTaskScheduler;
     
     /** The data service. */
     DataService dataService;
@@ -209,7 +214,7 @@ public class ClientSessionServiceImpl
 		    if (logger.isLoggable(Level.CONFIG)) {
 			logger.log(
 			    Level.CONFIG,
-			    "configure: listen successful. port:{0}",
+			    "configure: listen successful. port:{0,number,#}",
                             getListenPort());
 		    }
 		} catch (IOException e) {
@@ -292,7 +297,7 @@ public class ClientSessionServiceImpl
 
     /** {@inheritDoc} */
     public SgsClientSession getClientSession(byte[] sessionId) {
-	return sessions.get(new SessionId(sessionId));
+	return sessions.get(new ClientSessionId(sessionId));
     }
 
     /* -- Implement AcceptorListener -- */
@@ -311,7 +316,7 @@ public class ClientSessionServiceImpl
 	    }
 	    ClientSessionImpl session =
 		new ClientSessionImpl(ClientSessionServiceImpl.this);
-	    sessions.put(new SessionId(session.getSessionId()), session);
+	    sessions.put(session.getSessionId(), session);
 	    return session.getConnectionListener();
 	}
 
@@ -321,43 +326,6 @@ public class ClientSessionServiceImpl
 	}
     }
 
-    /* -- Implement wrapper for session ids. -- */
-
-    private final static class SessionId {
-        private final byte[] bytes;
-        
-        SessionId(byte[] bytes) {
-            this.bytes = bytes;
-        }
-        
-        /**
-         * Returns the byte array representation of this session id.
-         *
-         * @return the byte array representation of this session id
-         */
-        public byte[] getBytes() {
-            return bytes;
-        }
-
-        /** {@inheritDoc} */
-        public boolean equals(Object obj) {
-            if (this == obj) {
-                return true;
-            }
-            
-            if (! (obj instanceof SessionId)) {
-                return false;
-            }
-            
-            return Arrays.equals(bytes, ((SessionId) obj).bytes);
-        }
-
-        /** {@inheritDoc} */
-        public int hashCode() {
-            return Arrays.hashCode(bytes);
-        }
-    }
-    
     /* -- Implement NonDurableTransactionParticipant -- */
        
     /** {@inheritDoc} */
@@ -658,8 +626,11 @@ public class ClientSessionServiceImpl
     /**
      * Returns the client session service relevant to the current
      * context.
+     *
+     * @return the client session service relevant to the current
+     * context
      */
-    synchronized static ClientSessionService getInstance() {
+    public synchronized static ClientSessionService getInstance() {
 	if (txnProxy == null) {
 	    throw new IllegalStateException("Service not configured");
 	} else {
@@ -687,28 +658,37 @@ public class ClientSessionServiceImpl
 	{
 	    serviceListener.disconnected(session);
 	}
-	sessions.remove(new SessionId(session.getSessionId()));
+	sessions.remove(session.getSessionId());
     }
 
     /**
-     * Schedules a non-durable, transactional task.
+     * Schedules a non-durable, transactional task using the given
+     * {@code Identity} as the owner.
+     * 
+     * @see NonDurableTaskScheduler#scheduleTask(KernelRunnable, Identity)
      */
-    void scheduleTask(KernelRunnable task) {
-	nonDurableTaskScheduler.scheduleTask(task);
+    void scheduleTask(KernelRunnable task, Identity ownerIdentity) {
+        nonDurableTaskScheduler.scheduleTask(task, ownerIdentity);
     }
 
     /**
-     * Schedules a non-durable, non-transactional task.
+     * Schedules a non-durable, non-transactional task using the given
+     * {@code Identity} as the owner.
+     * 
+     * @see NonDurableTaskScheduler#scheduleNonTransactionalTask(KernelRunnable, Identity)
      */
-    void scheduleNonTransactionalTask(KernelRunnable task) {
-	nonDurableTaskScheduler.scheduleNonTransactionalTask(task);
+    void scheduleNonTransactionalTask(KernelRunnable task,
+            Identity ownerIdentity)
+    {
+        nonDurableTaskScheduler.
+            scheduleNonTransactionalTask(task, ownerIdentity);
     }
 
     /**
-     * Schedules a non-durable, non-transactional task using the task service.
+     * Schedules a non-durable, transactional task using the task service.
      */
-    void scheduleNonTransactionalTaskOnCommit(KernelRunnable task) {
-	nonDurableTaskScheduler.scheduleNonTransactionalTaskOnCommit(task);
+    void scheduleTaskOnCommit(KernelRunnable task) {
+        nonDurableTaskScheduler.scheduleTaskOnCommit(task);
     }
 
     /**
@@ -736,7 +716,7 @@ public class ClientSessionServiceImpl
 	    if (key == null || ! isListenerKey(key)) {
 		break;
 	    }
-	    
+
 	    logger.log(
 		Level.FINEST,
 		"notifyDisconnectedSessions key: {0}",
@@ -744,7 +724,7 @@ public class ClientSessionServiceImpl
 
 	    final String listenerKey = key;		
 		
-	    nonDurableTaskScheduler.scheduleTaskOnCommit(
+	    scheduleTaskOnCommit(
 		new KernelRunnable() {
 		    public void run() throws Exception {
 			ManagedObject obj = 

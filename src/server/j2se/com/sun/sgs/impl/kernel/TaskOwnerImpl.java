@@ -1,3 +1,6 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
 
 package com.sun.sgs.impl.kernel;
 
@@ -10,9 +13,6 @@ import com.sun.sgs.kernel.TaskOwner;
 /**
  * This is a simple implementation of <code>TaskOwner</code> that is nothing
  * more than a container for a name and a context.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 public class TaskOwnerImpl implements TaskOwner {
 
@@ -36,7 +36,7 @@ public class TaskOwnerImpl implements TaskOwner {
         this.context = context;
 
         // cache the hash code as the hash of the identity and the context
-        hash = (identity.toString() + context.toString()).hashCode();
+        hash = identity.hashCode() ^ context.hashCode();
     }
 
     /**
@@ -54,6 +54,17 @@ public class TaskOwnerImpl implements TaskOwner {
     }
 
     /**
+     * Provides some diagnostic detail about this owner.
+     *
+     * @return a <code>String</code> representation of the owner.
+     */
+    @Override
+    public String toString() {
+        return "[ id=\"" + identity.getName() + "\" context=" +
+            context.toString() + " ]";
+    }
+
+    /**
      * Returns <code>true</code> if the object is an instance of
      * <code>TaskOwnerImpl</code> and represents the same owner.
      *
@@ -62,7 +73,11 @@ public class TaskOwnerImpl implements TaskOwner {
      * @return <code>true</code> if the given owner is the same as this
      *         owner, <code>false</code> otherwise
      */
+    @Override
     public boolean equals(Object o) {
+        if (this == o)
+            return true;
+
         if (! (o instanceof TaskOwnerImpl))
             return false;
 
@@ -75,8 +90,8 @@ public class TaskOwnerImpl implements TaskOwner {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int hashCode() {
         return hash;
     }
-
 }

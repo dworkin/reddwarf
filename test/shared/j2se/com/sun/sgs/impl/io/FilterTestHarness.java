@@ -1,3 +1,7 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.impl.io;
 
 import org.apache.mina.common.ByteBuffer;
@@ -11,7 +15,10 @@ public class FilterTestHarness {
     private final CompleteMessageFilter filter;
 
     /** The filter callback for this harness. */
-    private final Callback callback;
+    private final TestingCallback testingCallback;
+
+    /** The exception to throw on the next operation, if any. */
+    private volatile RuntimeException testException;
 
     /**
      * Constructs a new {@code FilterTestHarness} with the given
@@ -21,7 +28,33 @@ public class FilterTestHarness {
      */
     public FilterTestHarness(Callback callback) {
         filter = new CompleteMessageFilter();
-        this.callback = callback;
+        this.testingCallback = new TestingCallback(callback);
+    }
+
+    /**
+     * Sets a {@code RuntimeException} to be thrown on the next complete
+     * message processed by {@link #send send} or {@link #recv recv}.  If the
+     * given exception is {@code null}, clears an exception if one was set.
+     *
+     * @param e the exception to throw on the next complete message
+     *        processed by {@code send} or {@code recv}
+     */
+    public void setExceptionOnNextCompleteMessage(RuntimeException e) {
+        testException = e;
+    }
+
+    /**
+     * Throws the exception set by {@link #setExceptionOnNextOp
+     * setExceptionOnNextOp} and clears it, if one was set.
+     *
+     * @throws RuntimeException if an exception was set
+     */
+    void checkTestException() throws RuntimeException {
+        if (testException != null) {
+            RuntimeException e = testException;
+            testException = null;
+            throw e;
+        }
     }
 
     /**
@@ -33,7 +66,7 @@ public class FilterTestHarness {
      * @param buf the data to add and process
      */
     public void recv(ByteBuffer buf) {
-        filter.filterReceive(callback, buf);
+        filter.filterReceive(testingCallback, buf);
     }
 
     /**
@@ -44,7 +77,7 @@ public class FilterTestHarness {
      * @param bytes the data to process
      */
     public void send(byte[] bytes) {
-        filter.filterSend(callback, bytes);
+        filter.filterSend(testingCallback, bytes);
     }
 
     /**
@@ -57,5 +90,36 @@ public class FilterTestHarness {
 
         /** {@inheritDoc} */
         void sendUnfiltered(ByteBuffer buf);
+    }
+
+    /**
+     * Wraps a {@code FilterListener} to support testing.
+     */
+    final class TestingCallback implements FilterListener {
+
+        /** The wrapped {@code Callback}. */
+        private final Callback callback;
+
+        /**
+         * Constructs a new {@code Callback} wrapper.
+         *
+         * @param callback the {@code Callback} to wrap
+         */
+        TestingCallback(Callback callback) {
+            this.callback = callback;
+        }
+
+        /** {@inheritDoc} */
+        public void filteredMessageReceived(ByteBuffer buf) {
+            checkTestException();
+            callback.filteredMessageReceived(buf);
+            
+        }
+
+        /** {@inheritDoc} */
+        public void sendUnfiltered(ByteBuffer buf) {
+            checkTestException();
+            callback.sendUnfiltered(buf);
+        }
     }
 }

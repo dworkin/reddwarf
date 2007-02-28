@@ -1,3 +1,6 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
 
 package com.sun.sgs.impl.kernel.schedule;
 
@@ -29,9 +32,6 @@ import java.util.logging.Logger;
  * window value. Users submit tasks into increasing window values, and
  * may never submit tasks into windows that have already passed. See
  * SUN070191 for more details.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 class WindowApplicationScheduler
     implements ApplicationScheduler, TimedTaskConsumer {
@@ -64,6 +64,13 @@ class WindowApplicationScheduler
         queue = new PriorityBlockingQueue<QueueElement>();
         userMap = new ConcurrentHashMap<TaskOwner,QueueUser>();
         timedTaskHandler = new TimedTaskHandler(this);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int getReadyCount() {
+        return queue.size();
     }
 
     /**

@@ -1,3 +1,6 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
 
 package com.sun.sgs.impl.kernel.schedule;
 
@@ -14,9 +17,6 @@ import java.util.Properties;
  * This interface is used to define top-level schedulers which are used
  * directly by the <code>MasterScheduler</code>. All implementations must
  * implement a constructor of the form <code>(java.util.Properties)</code>.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 interface SystemScheduler {
 
@@ -31,6 +31,20 @@ interface SystemScheduler {
      */
     public void registerApplication(KernelAppContext context,
                                     Properties properties);
+
+    /**
+     * Returns the number of tasks that are ready for the scheduler
+     * associated with the given application to run. This does not include
+     * any pending or recurring tasks that have not come time to run.
+     *
+     * @param context the <code>KernelAppContext</code> for the application
+     *                count being requested
+     *
+     * @return the number of tasks ready to run
+     *
+     * @throws IllegalArgumentException if the context is unknown
+     */
+    public int getReadyCount(KernelAppContext context);
 
     /**
      * Returns the next task to run. This call blocks until a task is

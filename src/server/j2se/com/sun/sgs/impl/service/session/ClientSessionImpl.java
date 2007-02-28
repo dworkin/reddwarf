@@ -1,7 +1,12 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.impl.service.session;
 
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.ClientSession;
+import com.sun.sgs.app.ClientSessionId;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ExceptionRetryStatus;
@@ -13,6 +18,7 @@ import com.sun.sgs.impl.service.session.ClientSessionServiceImpl.Context;
 import com.sun.sgs.impl.util.HexDumper;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.MessageBuffer;
+import com.sun.sgs.impl.util.NonDurableTaskQueue;
 import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.kernel.KernelRunnable;
@@ -22,7 +28,6 @@ import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.ProtocolMessageListener;
 import com.sun.sgs.service.SgsClientSession;
 import java.io.IOException;
-import java.io.InvalidObjectException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamException;
@@ -45,7 +50,16 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     
     /** Connection state. */
     private static enum State {
-	CONNECTING, CONNECTED, RECONNECTING, DISCONNECTING, DISCONNECTED
+        /** A connection is in progress */
+	CONNECTING,
+        /** Session is connected */
+        CONNECTED,
+        /** Reconnection is in progress */
+        RECONNECTING,
+        /** Disconnection is in progress */
+        DISCONNECTING, 
+        /** Session is disconnected */
+        DISCONNECTED
     }
 
     /** Random number generator for generating session ids. */
@@ -61,6 +75,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     /** The client session service that created this client session. */
     private final ClientSessionServiceImpl sessionService;
 
+    /** The data service. */
     private final DataService dataService;
     
     /** The Connection for sending messages to the client. */
@@ -75,9 +90,6 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     /** The ConnectionListener for receiving messages from the client. */
     private final ConnectionListener connectionListener;
 
-    /** The authenticated name for this session. */
-    private String name;
-
     /** The identity for this session. */
     private Identity identity;
 
@@ -90,12 +102,17 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     /** The client session listener for this client session.*/
     private SessionListener listener;
 
+    /** Indicates whether session disconnection has been handled. */
     private boolean disconnectHandled = false;
 
+    /** Indicates whether this session is shut down. */
     private boolean shutdown = false;
 
     /** The sequence number for ordered messages sent from this client. */
     private AtomicLong sequenceNumber = new AtomicLong(0);
+
+    /** The queue of tasks for notifying listeners of received messages. */
+    private NonDurableTaskQueue taskQueue = null;
 
     /**
      * Constructs an instance of this class with the specified handle.
@@ -119,13 +136,13 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
      * service of the current app context.
      */
     private ClientSessionImpl(
-	String name,
-	byte[] sessionId)
+	byte[] sessionId,
+        Identity identity)
     {
 	this.sessionService = null;
 	this.dataService = null;
-	this.name = name;
 	this.sessionId = sessionId;
+        this.identity = identity;
 	this.reconnectionKey = generateId(); // create bogus one
 	this.connectionListener = null;
 	this.state = State.DISCONNECTED;
@@ -137,17 +154,18 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 
     /** {@inheritDoc} */
     public String getName() {
+        String name = (identity == null) ? null : identity.getName();
 	logger.log(Level.FINEST, "getName returns {0}", name);
 	return name;
     }
     
     /** {@inheritDoc} */
-    public byte[] getSessionId() {
+    public ClientSessionId getSessionId() {
 	logger.log(Level.FINEST, "getSessionId returns {0}", sessionId);
-        return sessionId;
+        return new ClientSessionId(sessionId);
     }
 
-    /** {@inheritDoc} */
+    /** {@inheritdoc} */
     public boolean isConnected() {
 
 	State currentState = getCurrentState();
@@ -208,6 +226,12 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     /* -- Implement SgsClientSession -- */
 
     /** {@inheritDoc} */
+    public Identity getIdentity() {
+        logger.log(Level.FINEST, "getIdentity returns {0}", identity);
+        return identity;
+    }
+
+    /** {@inheritDoc} */
     public void sendProtocolMessage(byte[] message, Delivery delivery) {
 	// TBI: ignore delivery for now...
 	try {
@@ -237,7 +261,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	} else if (obj.getClass() == this.getClass()) {
 	    ClientSessionImpl session = (ClientSessionImpl) obj;
 	    return
-		name.equals(session.name) &&
+		identity.equals(session.identity) &&
 		Arrays.equals(sessionId, session.sessionId);
 	}
 	return false;
@@ -245,7 +269,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 
     /** {@inheritDoc} */
     public int hashCode() {
-	return name.hashCode();
+	return Arrays.hashCode(sessionId);
     }
 
     /** {@inheritDoc} */
@@ -257,7 +281,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     /* -- Serialization methods -- */
 
     private Object writeReplace() {
-	return new External(name, sessionId);
+	return new External(sessionId, identity);
     }
 
     /**
@@ -268,12 +292,12 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 
 	private final static long serialVersionUID = 1L;
 
-	private final String name;
 	private final byte[] sessionId;
+        private final Identity identity;
 
-	External(String name, byte[] sessionId) {
-	    this.name = name;
+	External(byte[] sessionId, Identity identity) {
 	    this.sessionId = sessionId;
+            this.identity = identity;
 	}
 
 	private void writeObject(ObjectOutputStream out) throws IOException {
@@ -291,7 +315,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		ClientSessionServiceImpl.getInstance();
 	    ClientSession session = service.getClientSession(sessionId);
 	    if (session == null) {
-		session = new ClientSessionImpl(name, sessionId);
+		session = new ClientSessionImpl(sessionId, identity);
 	    }
 	    return session;
 	}
@@ -348,6 +372,8 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	}
 
 	sessionService.disconnected(this);
+        
+        // TODO: identity.notifyLoggedOut(); -- is this the right place?
 
 	if (getCurrentState() != State.DISCONNECTED) {
 	    if (graceful) {
@@ -576,11 +602,16 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    switch (opcode) {
 		
 	    case SimpleSgsProtocol.LOGIN_REQUEST:
-		name = msg.getString();
+		String name = msg.getString();
 		String password = msg.getString();
 
 		try {
 		    identity = authenticate(name, password);
+		    synchronized (lock) {
+			taskQueue =
+			    new NonDurableTaskQueue(
+				sessionService.nonDurableTaskScheduler, identity);
+		    }
 		    scheduleTask(new LoginTask());
 		} catch (LoginException e) {
 		    scheduleNonTransactionalTask(new KernelRunnable() {
@@ -596,10 +627,18 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		break;
 
 	    case SimpleSgsProtocol.SESSION_MESSAGE:
+		synchronized (lock) {
+		    if (identity == null) {
+			logger.log(
+			    Level.WARNING,
+			    "session message received before login:{0}", this);
+			break;
+		    }
+		}
                 msg.getLong(); // TODO Check sequence num
 		int size = msg.getUnsignedShort();
 		final byte[] clientMessage = msg.getBytes(size);
-		scheduleTask(new KernelRunnable() {
+		taskQueue.addTask(new KernelRunnable() {
 		    public void run() {
 			if (isConnected()) {
 			    listener.get().receivedMessage(clientMessage);
@@ -646,22 +685,14 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
      * Schedules a non-durable, transactional task.
      */
     private void scheduleTask(KernelRunnable task) {
-	sessionService.scheduleTask(task);
+	sessionService.scheduleTask(task, identity);
     }
 
     /**
      * Schedules a non-durable, non-transactional task.
      */
     private void scheduleNonTransactionalTask(KernelRunnable task) {
-	sessionService.scheduleNonTransactionalTask(task);
-    }
-
-    /**
-     * Schedules a non-durable, non-transactional task when current
-     * transaction commits.
-     */
-    private void scheduleNonTransactionalTaskOnCommit(KernelRunnable task) {
-	sessionService.scheduleNonTransactionalTaskOnCommit(task);
+	sessionService.scheduleNonTransactionalTask(task, identity);
     }
 
     /**
@@ -762,7 +793,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    logger.log(
 		Level.FINEST,
 		"LoginTask.run invoking AppListener.loggedIn session:{0}",
-		name);
+		getName());
 
 	    ClientSessionListener returnedListener = null;
 	    RuntimeException ex = null;
@@ -792,6 +823,9 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		getContext().addMessageFirst(
 		    ClientSessionImpl.this, ack.getBuffer(), Delivery.RELIABLE);
 		
+                // TODO: getContext().notifyLogin();
+                // -- call identity.notifyLoggedIn() on commit.
+
 	    } else {
 		if (ex == null) {
 		    logger.log(
