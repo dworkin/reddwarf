@@ -738,4 +738,20 @@
     </java>
   </target>
 
+  <!-- Builds tutorial jar file -->
+  <target name="jar-tutorial" depends="example-classes"
+          description="Builds tutorial jar file">
+    <mkdir dir="${build.dir}/example/tutorial"/>
+    <jar destfile="${build.dir}/example/tutorial/tutorial.jar">
+      <fileset dir="${build.dir}/example/classes"
+               includes="com/sun/sgs/tutorial/**"/>
+    </jar>
+  </target>
+
+  <target name="dist-tutorial" depends="jar-tutorial"
+          description="Creates the tutorial distribution">
+    <!-- TODO: add the configuration files, create the data dirs,
+         generate and package javadoc, add the pdf files. -->
+  </target>
+
 </project>
