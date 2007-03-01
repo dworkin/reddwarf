@@ -1,3 +1,7 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 /**
  * Lesson 6 of the SGS Application Tutorial.
  * <p>

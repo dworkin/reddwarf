@@ -760,6 +760,9 @@
       <fileset dir="example/tutorial" includes="*.properties"/>
       <fileset file="build/example/tutorial/tutorial.jar"/>
     </copy>
+    <copy todir="${build.dir}/sgs/tutorial/src">
+      <fileset dir="example/tutorial/src" includes="**/*.java"/>
+    </copy>
     <mkdir dir="${build.dir}/sgs/tutorial/data/HelloChannels/dsdb"/>
     <mkdir dir="${build.dir}/sgs/tutorial/data/HelloEcho/dsdb"/>
     <mkdir dir="${build.dir}/sgs/tutorial/data/HelloLogger/dsdb"/>
