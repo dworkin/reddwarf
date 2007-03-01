@@ -327,7 +327,11 @@
   <target name="dist-server" depends="jar-server, dist-bdb"
 	  description="Builds server files for distribution">
     <copy todir="${build.dir}/sgs">
-      <fileset dir="etc" includes="sgs.*, sgs-*.properties"/>
+      <fileset dir="etc"
+	       includes="sgs.*,
+			 sgs-*.properties,
+			 LICENSE.pdf,
+			 THIRDPARTYLICENSE.pdf"/>
     </copy>
     <chmod file="${build.dir}/sgs/sgs.sh" perm="a+x"/>
     <copy todir="${build.dir}/sgs/lib">
