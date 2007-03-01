@@ -1,3 +1,7 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 /**
  * SwordWorld example from the SGS Application Tutorial.
  * <p>
