@@ -182,9 +182,9 @@ public final class MinimalTestKernel
         public void commit() throws Exception {
             txn.commit();
         }
-        public void abort() {
+        public void abort(Throwable cause) {
 	    if (txn.getState() == DummyTransaction.State.ACTIVE) {
-		txn.abort();
+		txn.abort(cause);
 	    } else {
 		throw new TransactionNotActiveException(
 		    "Transaction is not active");
