@@ -8,6 +8,7 @@ import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.TaskRejectedException;
 
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
+import com.sun.sgs.impl.util.LoggerWrapper;
 
 import com.sun.sgs.kernel.KernelAppContext;
 import com.sun.sgs.kernel.KernelRunnable;
@@ -25,6 +26,9 @@ import java.util.TimerTask;
 
 import java.util.concurrent.LinkedBlockingQueue;
 
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 
 /**
  * This implementation of <code>TaskScheduler</code> is provided for testing
@@ -35,6 +39,10 @@ import java.util.concurrent.LinkedBlockingQueue;
  * @author Seth Proctor
  */
 public class DummyTaskScheduler implements TaskScheduler {
+
+    private static final LoggerWrapper logger =
+	new LoggerWrapper(
+ 	    Logger.getLogger(DummyTaskScheduler.class.getName()));
 
     // flag to reject all tasks
     private final boolean rejectTasks;
@@ -320,7 +328,12 @@ public class DummyTaskScheduler implements TaskScheduler {
                         // if the exception didn't specify retry, we're done
                         if ((! (e instanceof ExceptionRetryStatus)) ||
                             (! ((ExceptionRetryStatus)e).shouldRetry()))
+			{
+			    logger.logThrow(Level.WARNING, e, "Not retrying");
                             break;
+			} else {
+			    logger.logThrow(Level.FINE, e, "Retrying");
+			}
                     }
                 }
             }

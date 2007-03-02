@@ -417,10 +417,12 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    shutdown = true;
 	    disconnectHandled = true;
 	    state = State.DISCONNECTED;
-	    try {
-		sessionConnection.close();
-	    } catch (IOException e) {
-		// ignore
+	    if (sessionConnection != null) {
+		try {
+		    sessionConnection.close();
+		} catch (IOException e) {
+		    // ignore
+		}
 	    }
 	}
     }
@@ -610,7 +612,9 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		    synchronized (lock) {
 			taskQueue =
 			    new NonDurableTaskQueue(
-				sessionService.nonDurableTaskScheduler, identity);
+				sessionService.txnProxy,
+				sessionService.nonDurableTaskScheduler,
+				identity);
 		    }
 		    scheduleTask(new LoginTask());
 		} catch (LoginException e) {

@@ -182,10 +182,13 @@ public final class MinimalTestKernel
         public void commit() throws Exception {
             txn.commit();
         }
-        public void abort() {
+        public void abort(Throwable cause) {
 	    if (txn.getState() == DummyTransaction.State.ACTIVE) {
-		txn.abort();
+		txn.abort(cause);
 	    } else {
+		// TODO: Maybe chaeck the exception that caused the
+		// abort in order to throw an exception with the right
+		// retry status.
 		throw new TransactionNotActiveException(
 		    "Transaction is not active");
 	    }

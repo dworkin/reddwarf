@@ -34,7 +34,9 @@ public interface TransactionHandle {
     /**
      * Aborts the transaction associated with this handle.
      *
+     * @param	cause the abort cause, or {@code null}
+     *
      * @throws	TransactionNotActiveException if the transaction is not active
      */
-    void abort();
+    void abort(Throwable cause);
 }
