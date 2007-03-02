@@ -23,7 +23,7 @@
 	    value="-Xlint"/>
 
   <!-- Version information -->
-  <property name="project.release" value="1.0RC"/>
+  <property name="project.release" value="0.9"/>
 
   <!-- Values for the JavaDocs -->
   <property name="project.name" value="Sun Game Server"/>
