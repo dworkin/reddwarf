@@ -241,15 +241,30 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	try {
 	    if (getCurrentState() != State.DISCONNECTED) {
 		sessionConnection.sendBytes(message);
+	    } else {
+		if (logger.isLoggable(Level.WARNING)) {
+		    logger.log(
+		        Level.WARNING,
+			"sendProtocolMessage session:{0} message:{1}, " +
+			"session is disconnected",
+			this, HexDumper.format(message));
+		}
 	    }
-	    logger.log(
-		Level.FINEST, "sendProtocolMessage message:{0} returns",
-		message);
+		    
 	} catch (IOException e) {
-	    logger.logThrow(
-		Level.WARNING, e,
-		"sendProtocolMessage handle:{0} throws",
-                sessionConnection);
+	    if (logger.isLoggable(Level.WARNING)) {
+		logger.logThrow(
+		    Level.WARNING, e,
+		    "sendProtocolMessage session:{0} message:{1} throws",
+		    this, HexDumper.format(message));
+	    }
+	}
+	
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(
+		Level.FINEST,
+		"sendProtocolMessage session:{0} message:{1} returns",
+		this, HexDumper.format(message));
 	}
     }
 
