@@ -799,7 +799,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	    assertEquals(cause, e.getCause());
 	}
 	try {
-	    handle.abort();
+	    handle.abort(null);
 	    fail("Expected TransactionNotActiveException");
 	} catch (TransactionNotActiveException e) {
 	    System.err.println(e);
@@ -1103,7 +1103,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	for (TransactionParticipant participant : participants) {
 	    txn.join(participant);
 	}
-	handle.abort();
+	handle.abort(null);
 	for (DummyTransactionParticipant participant : participants) {
 	    if (!participant.prepareReturnedTrue()) {
 		assertEquals(State.ABORTED, participant.getState());
@@ -1113,7 +1113,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
     }
 
     public void testHandleAbortActiveEmpty() throws Exception {
-	handle.abort();
+	handle.abort(null);
 	assertHandleNotActive(handle);
     }
 
@@ -1121,7 +1121,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	txn.join(new DummyTransactionParticipant());
 	txn.abort();
 	try {
-	    handle.abort();
+	    handle.abort(null);
 	    fail("Expected TransactionNotActiveException");
 	} catch (TransactionNotActiveException e) {
 	    System.err.println(e);
@@ -1132,7 +1132,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	txn.join(new DummyTransactionParticipant());
 	handle.commit();
 	try {
-	    handle.abort();
+	    handle.abort(null);
 	    fail("Expected TransactionNotActiveException");
 	} catch (TransactionNotActiveException e) {
 	    System.err.println(e);
@@ -1153,7 +1153,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 	for (TransactionParticipant participant : participants) {
 	    txn.join(participant);
 	}
-	handle.abort();
+	handle.abort(null);
 	for (DummyTransactionParticipant participant : participants) {
 	    if (!participant.prepareReturnedTrue()) {
 		assertEquals(

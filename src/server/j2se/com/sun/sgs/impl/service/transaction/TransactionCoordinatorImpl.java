@@ -66,9 +66,9 @@ public final class TransactionCoordinatorImpl
 	    txn.commit();
 	}
 
-	public void abort() {
+	public void abort(Throwable cause) {
 	    if (txn.isActive()) {
-		txn.abort();
+		txn.abort(cause);
 	    } else {
 		throw new TransactionNotActiveException(
 		    "No transaction is active", txn.getInactiveCause());

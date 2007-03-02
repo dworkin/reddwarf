@@ -67,7 +67,7 @@ public class ClientSessionServiceImpl
 	    Logger.getLogger(ClientSessionServiceImpl.class.getName()));
 
     /** The transaction proxy for this class. */
-    private static TransactionProxy txnProxy;
+    static TransactionProxy txnProxy;
 
     /** Provides transaction and other information for the current thread. */
     private static final ThreadLocal<Context> currentContext =

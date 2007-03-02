@@ -5,6 +5,8 @@
 package com.sun.sgs.test.util;
 
 import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.util.MaybeRetryableIllegalStateException;
+import com.sun.sgs.impl.util.MaybeRetryableTransactionNotActiveException;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import java.util.HashSet;
@@ -15,12 +17,12 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Provides a simple implementation of Transaction, for testing.
- *
- * If using this class with DummyTransactionProxy, make sure to call
- * DummyTransactionProxy.setCurrentTransaction with the DummyTransaction, so
- * that the proxy's transaction is cleared when the transaction is terminated.
- */
+* Provides a simple implementation of Transaction, for testing.
+*
+* If using this class with DummyTransactionProxy, make sure to call
+* DummyTransactionProxy.setCurrentTransaction with the DummyTransaction, so
+* that the proxy's transaction is cleared when the transaction is terminated.
+*/
 public class DummyTransaction implements Transaction {
 
     /** The logger for this class. */
@@ -52,6 +54,12 @@ public class DummyTransaction implements Transaction {
 
     /** The state of this transaction. */
     private State state = State.ACTIVE;
+
+    /**
+     * The exception that caused the transaction to be aborted, or null if no
+     * cause was provided or if no abort occurred.
+     */
+    private Throwable abortCause = null;
 
     /** The transaction proxy associated with this transaction, if any. */
     DummyTransactionProxy proxy;
@@ -89,7 +97,7 @@ public class DummyTransaction implements Transaction {
     }
 
     /* -- Implement Transaction -- */
-    
+
     public byte[] getId() {
 	return new byte[] {
 	    (byte) (id >>> 56), (byte) (id >>> 48), (byte) (id >>> 40),
@@ -108,7 +116,8 @@ public class DummyTransaction implements Transaction {
 	    throw new NullPointerException("Participant must not be null");
 	}
 	if (state != State.ACTIVE) {
-	    throw new IllegalStateException("Transaction not active");
+	    throw new MaybeRetryableIllegalStateException(
+		"Transaction not active", getInactiveCause());
 	}
 	participants.add(participant);
     }
@@ -118,9 +127,14 @@ public class DummyTransaction implements Transaction {
     }
 
     public synchronized void abort(Throwable cause) {
-	logger.log(Level.FINER, "abort {0}", this);
+	if (logger.isLoggable(Level.FINER)) {
+	    logger.log(Level.FINER, "abort {0} cause:{1}", this, cause);
+	}
 	if (state == State.ABORTING) {
 	    return;
+	} else if (state == State.ABORTED) {
+	    throw new MaybeRetryableIllegalStateException(
+		"Transaction is not active", abortCause);
 	} else if (state != State.ACTIVE &&
 		   state != State.PREPARING &&
 		   state != State.PREPARED)
@@ -129,6 +143,7 @@ public class DummyTransaction implements Transaction {
 		"Transaction not active or preparing");
 	}
 	state = State.ABORTING;
+	abortCause = cause;
 	if (proxy != null) {
 	    proxy.setCurrentTransaction(null);
 	    proxy = null;
@@ -147,6 +162,8 @@ public class DummyTransaction implements Transaction {
     public synchronized boolean prepare() throws Exception {
 	logger.log(Level.FINER, "prepare {0}", this);
 	if (state != State.ACTIVE) {
+	    // TODO: This should be throwing a
+	    // MaybeRetryableIllegalStateException.
 	    throw new IllegalStateException("Transaction not active");
 	}
 	state = State.PREPARING;
@@ -190,7 +207,8 @@ public class DummyTransaction implements Transaction {
 		}
 	    }
 	} else if (state != State.ACTIVE) {
-	    throw new IllegalStateException("Transaction not active");
+	    throw new MaybeRetryableTransactionNotActiveException(
+		"Transaction not active", getInactiveCause());
 	} else if (usePrepareAndCommit && participants.size() == 1) {
 	    state = State.PREPARING;
 	    if (proxy != null) {
@@ -222,7 +240,7 @@ public class DummyTransaction implements Transaction {
         DummyProfileRegistrar.endTask(true);
     }
 
-    /* -- Other public methods -- */
+    /* -- Other methods -- */
 
     /** Returns the current state. */
     public synchronized State getState() {
@@ -231,5 +249,16 @@ public class DummyTransaction implements Transaction {
 
     public String toString() {
 	return "DummyTransaction[tid:" + id + "]";
+    }
+
+    /**
+     * Returns the exception that caused the transaction to be inactive, or
+     * null if the transaction isn't inactive or the cause isn't known.
+     */
+    private Throwable getInactiveCause() {
+	return
+	    (state == State.ABORTING || state == State.ABORTED) ?
+	    abortCause :
+	    null;
     }
 }

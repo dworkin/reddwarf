@@ -85,8 +85,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     private static Properties dbProps = createProperties(
 	DataStoreImplClassName + ".directory",
 	DB_DIRECTORY,
-	StandardProperties.APP_NAME, "TestClientSessionServiceImpl",
-	DataServiceImplClassName + ".debugCheckInterval", "1");
+	StandardProperties.APP_NAME, "TestClientSessionServiceImpl");
 
     private static final String LOGIN_FAILED_MESSAGE = "login failed";
 
@@ -1116,6 +1115,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		ManagedReference listenerRef =
 		    txnProxy.getService(DataService.class).
 		    createReference(listener);
+		AppContext.getDataManager().markForUpdate(this);
 		sessions.put(session, listenerRef);
 		System.err.println(
 		    "DummyAppListener.loggedIn: session:" + session);
@@ -1196,6 +1196,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		throw new RuntimeException(
 		    "expected message greater than " + seq + ", got " + num);
 	    }
+	    AppContext.getDataManager().markForUpdate(this);
 	    messages.add(message);
 	    seq = num;
 	    synchronized (receivedAllMessagesLock) {
