@@ -186,6 +186,9 @@ public final class MinimalTestKernel
 	    if (txn.getState() == DummyTransaction.State.ACTIVE) {
 		txn.abort(cause);
 	    } else {
+		// TODO: Maybe chaeck the exception that caused the
+		// abort in order to throw an exception with the right
+		// retry status.
 		throw new TransactionNotActiveException(
 		    "Transaction is not active");
 	    }

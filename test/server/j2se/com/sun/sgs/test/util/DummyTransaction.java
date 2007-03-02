@@ -1,6 +1,6 @@
 /*
-* Copyright 2007 Sun Microsystems, Inc. All rights reserved
-*/
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
 
 package com.sun.sgs.test.util;
 
@@ -162,6 +162,8 @@ public class DummyTransaction implements Transaction {
     public synchronized boolean prepare() throws Exception {
 	logger.log(Level.FINER, "prepare {0}", this);
 	if (state != State.ACTIVE) {
+	    // TODO: This should be throwing a
+	    // MaybeRetryableIllegalStateException.
 	    throw new IllegalStateException("Transaction not active");
 	}
 	state = State.PREPARING;
