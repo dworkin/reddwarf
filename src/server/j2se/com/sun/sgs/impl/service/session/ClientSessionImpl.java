@@ -118,6 +118,9 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
      * Constructs an instance of this class with the specified handle.
      */
     ClientSessionImpl(ClientSessionServiceImpl sessionService) {
+	if (sessionService == null) {
+	    throw new NullPointerException("sessionService is null");
+	}
 	this.sessionService = sessionService;
         this.dataService = sessionService.dataService;
 	this.connectionListener = new Listener();
@@ -139,8 +142,9 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	byte[] sessionId,
         Identity identity)
     {
-	this.sessionService = null;
-	this.dataService = null;
+	this.sessionService =
+	    (ClientSessionServiceImpl) ClientSessionServiceImpl.getInstance();
+	this.dataService = sessionService.dataService;
 	this.sessionId = sessionId;
         this.identity = identity;
 	this.reconnectionKey = generateId(); // create bogus one
@@ -235,21 +239,40 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     public void sendProtocolMessage(byte[] message, Delivery delivery) {
 	// TBI: ignore delivery for now...
 	try {
-	    sessionConnection.sendBytes(message);
-	    logger.log(
-		Level.FINEST, "sendProtocolMessage message:{0} returns",
-		message);
+	    if (getCurrentState() != State.DISCONNECTED) {
+		sessionConnection.sendBytes(message);
+	    } else {
+		if (logger.isLoggable(Level.WARNING)) {
+		    logger.log(
+		        Level.WARNING,
+			"sendProtocolMessage session:{0} message:{1}, " +
+			"session is disconnected",
+			this, HexDumper.format(message));
+		}
+	    }
+		    
 	} catch (IOException e) {
-	    logger.logThrow(
-		Level.WARNING, e,
-		"sendProtocolMessage handle:{0} throws",
-                sessionConnection);
+	    if (logger.isLoggable(Level.WARNING)) {
+		logger.logThrow(
+		    Level.WARNING, e,
+		    "sendProtocolMessage session:{0} message:{1} throws",
+		    this, HexDumper.format(message));
+	    }
+	}
+	
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(
+		Level.FINEST,
+		"sendProtocolMessage session:{0} message:{1} returns",
+		this, HexDumper.format(message));
 	}
     }
 
     /** {@inheritDoc} */
     public void sendProtocolMessageOnCommit(byte[] message, Delivery delivery) {
-        getContext().addMessage(this, message, delivery);
+	if (getCurrentState() != State.DISCONNECTED) {
+	    getContext().addMessage(this, message, delivery);
+	}
     }
 
     /* -- Implement Object -- */
