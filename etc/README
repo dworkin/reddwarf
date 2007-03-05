@@ -46,7 +46,8 @@ classpath:
 To run the SGS server:
 
 1. Change to the directory containing the SGS installation, or set the
-   SGSHOME environment variable to the installation directory
+   SGSHOME environment variable to the installation directory and
+   include that directory in your path
 
 2. On Windows, type:
 
@@ -57,10 +58,12 @@ To run the SGS server:
    sgs.sh <path to application classes> <path to application config file>
 
    For example, to run the tutorial's HelloWorld example when running on
-   Windows, assuming your working directory is the installation
-   directory, type:
+   Windows, assuming the SGSHOME environment variable is set to the
+   installation directory, that directory is included in your path, and
+   your working directory is the tutorial subdirectory of the
+   installation directory, type:
 
-   sgs tutorial\classes tutorial\HelloWorld.properties
+   sgs tutorial.jar HelloWorld.properties
 
 For more information, please see the tutorials in the tutorial directory
 and the documentation in the docs directory.  Also check the
