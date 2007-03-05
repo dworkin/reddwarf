@@ -1,3 +1,7 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 /**
  * Provides an implementation of {@link
  * com.sun.sgs.impl.service.data.store.DataStore} that supports clients

@@ -61,12 +61,6 @@ public class TestDataServiceImpl extends TestCase {
 	cleanDirectory(dbDirectory);
     }
 
-    /** Properties for creating the shared database. */
-    private static Properties dbProps = createProperties(
-	DataStoreImplClassName + ".directory", dbDirectory,
-	StandardProperties.APP_NAME, "TestDataServiceImpl",
-	DataServiceImplClassName + ".debugCheckInterval", "0");
-
     /** Set when the test passes. */
     protected boolean passed;
 
@@ -105,7 +99,7 @@ public class TestDataServiceImpl extends TestCase {
 	componentRegistry = new DummyComponentRegistry();
 	props = createProperties(
 	    DataStoreImplClassName + ".directory", dbDirectory,
-	    "com.sun.sgs.appName", "TestDataServiceImpl",
+	    StandardProperties.APP_NAME, "TestDataServiceImpl",
 	    DataServiceImplClassName + ".debugCheckInterval", "0");
 	service = getDataServiceImpl();
 	createTransaction();

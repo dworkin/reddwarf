@@ -1,3 +1,7 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.test.impl.service.data;
 
 import com.sun.sgs.app.AppContext;
@@ -9,6 +13,7 @@ import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
+import com.sun.sgs.test.util.DummyProfileRegistrar;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 import java.io.File;
@@ -93,10 +98,7 @@ public class TestDataServicePerformance extends TestCase {
 	super(name);
     }
 
-    /**
-     * Prints the test case, initializes the transaction, and sets up the
-     * service properties.
-     */
+    /** Prints the test case and sets up the service properties. */
     protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
 	System.err.println("Parameters:" +
@@ -154,6 +156,7 @@ public class TestDataServicePerformance extends TestCase {
 	props.setProperty(DataServiceImplClass + ".detectModifications",
 			  String.valueOf(detectMods));
 	service = getDataService(props, componentRegistry);
+        DummyProfileRegistrar.startProfiling(service);
 	createTransaction();
 	service.configure(componentRegistry, txnProxy);
 	componentRegistry.setComponent(DataManager.class, service);
@@ -202,6 +205,7 @@ public class TestDataServicePerformance extends TestCase {
 	props.setProperty(DataStoreImplClass + ".flushToDisk",
 			  String.valueOf(flush));
 	service = getDataService(props, componentRegistry);
+        DummyProfileRegistrar.startProfiling(service);
 	createTransaction();
 	service.configure(componentRegistry, txnProxy);
 	componentRegistry.setComponent(DataManager.class, service);

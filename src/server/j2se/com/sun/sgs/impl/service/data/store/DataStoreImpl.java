@@ -503,8 +503,8 @@ public class DataStoreImpl
      *		com.sun.sgs.impl.service.data.store.DataStoreImpl.directory
      *		</code> is provided, or the <code>
      *		com.sun.sgs.impl.service.data.store.DataStoreImpl.allocationBlockSize
-     *		</code> property is not a valid integer greater than zero, or if the
-     *		value of the <code>
+     *		</code> property is not a valid integer greater than zero, or
+     *		if the value of the <code>
      *		com.sun.sgs.impl.service.data.store.DataStoreImpl.cacheSize
      *		</code> property is not a valid integer greater than or equal
      *		to <code>20000</code>
@@ -1237,18 +1237,18 @@ public class DataStoreImpl
             profileRegistrar.registerProfileProducer(this);
 
 	if (consumer != null) {
-	    getBindingOp = consumer.registerOperation("getBinding");
-	    setBindingOp = consumer.registerOperation("setBinding");
-	    removeBindingOp = consumer.registerOperation("removeBinding");
-	    nextBoundNameOp = consumer.registerOperation("nextBoundName");
-	    removeObjectOp = consumer.registerOperation("removeObject");
-	    markForUpdateOp = consumer.registerOperation("markForUpdate");
 	    createObjectOp = consumer.registerOperation("createObject");
+	    markForUpdateOp = consumer.registerOperation("markForUpdate");
 	    getObjectOp = consumer.registerOperation("getObject");
 	    getObjectForUpdateOp =
 		consumer.registerOperation("getObjectForUpdate");
 	    setObjectOp = consumer.registerOperation("setObject");
 	    setObjectsOp = consumer.registerOperation("setObjects");
+	    removeObjectOp = consumer.registerOperation("removeObject");
+	    getBindingOp = consumer.registerOperation("getBinding");
+	    setBindingOp = consumer.registerOperation("setBinding");
+	    removeBindingOp = consumer.registerOperation("removeBinding");
+	    nextBoundNameOp = consumer.registerOperation("nextBoundName");
 	}
     }
 

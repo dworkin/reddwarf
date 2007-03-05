@@ -1,3 +1,7 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.impl.service.data.store.net;
 
 import java.io.IOException;
@@ -6,8 +10,8 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
- * The client side of an network protocol for implementing DataStoreServer
- * using sockets instead of RMI.
+ * The client side of an experimental network protocol for implementing
+ * DataStoreServer using sockets instead of RMI.
  */
 /*
  * XXX: Limit connections and/or close unused connections?

@@ -1,3 +1,7 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.impl.service.data.store.net;
 
 import java.io.IOException;
@@ -5,8 +9,8 @@ import java.net.ServerSocket;
 import java.net.Socket;
 
 /**
- * The server side of a network protocol for implementing DataStoreServer using
- * sockets instead of RMI.
+ * The server side of an experimental network protocol for implementing
+ * DataStoreServer using sockets instead of RMI.
  */
 /* XXX: Use thread pools? */
 class DataStoreServerRemote implements Runnable {

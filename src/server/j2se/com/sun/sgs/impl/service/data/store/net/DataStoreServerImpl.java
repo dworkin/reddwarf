@@ -1,3 +1,7 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.impl.service.data.store.net;
 
 import com.sun.sgs.app.TransactionNotActiveException;
@@ -27,7 +31,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Provides an implementation of <code>DataStoreServer</code>, using the {@link
+ * Provides an implementation of {@code DataStoreServer}, using the {@link
  * DataStoreImpl} class to support the same database format which that class
  * supports. <p>
  *
@@ -37,33 +41,33 @@ import java.util.logging.Logger;
  *
  * <ul>
  *
- * <li> <i>Key:</i> <code>
- *	com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl.reap.delay
- *	</code> <br>
- *      <i>Default:</i> <code>500</code> <br>
+ * <li> <i>Key:</i> {@code 
+ *	com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl.reap.delay}
+ *	<br>
+ *      <i>Default:</i> {@code 500} <br>
  *	The delay in milliseconds between attempts to reap timed out
  *	transactions. <p>
  *
- * <li> <i>Key:</i> <code>
- *	com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl.port
- *	</code> <br>
- *      <i>Default:</i> <code>44530</code> <br>
- *	The network port for running the server. This value must
- *	be greater than or equal to <code>0</code> and no greater than
- *	<code>65535</code>.  If the value specified is <code>0</code>, then an
- *	anonymous port will be chosen.  The value chosen will be logged, and
- *	can also be accessed with the {@link #getPort getPort} method. <p>
+ * <li> <i>Key:</i> {@code 
+ *	com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl.port}
+ *	<br>
+ *      <i>Default:</i> {@code 44530} <br>
+ *	The network port for running the server. This value must be greater
+ *	than or equal to {@code 0} and no greater than {@code 65535}.  If the
+ *	value specified is {@code 0}, then an anonymous port will be chosen.
+ *	The value chosen will be logged, and can also be accessed with the
+ *	{@link #getPort getPort} method. <p>
  * </ul> <p>
  *
- * In addition to any logging performed by the <code>DataStoreImpl</code>
- * class, this class uses the {@link Logger} named
- * <code>com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl</code> to
- * log information at the following levels: <p>
+ * In addition to any logging performed by the {@code DataStoreImpl} class,
+ * this class uses the {@link Logger} named {@code
+ * com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl} to log
+ * information at the following levels: <p>
  *
  * <ul>
  * <li> {@link Level#SEVERE SEVERE} - problems starting the server from {@link
  *	#main main} 
- * <li> {@link Level#INFO INFO} - starting the server from <code>main</code>,
+ * <li> {@link Level#INFO INFO} - starting the server from {@code main},
  *	actual port if anonymous port was requested
  * <li> {@link Level#CONFIG CONFIG} - server properties
  * <li> {@link Level#FINE FINE} - allocation transaction IDs, problems
@@ -120,23 +124,23 @@ public class DataStoreServerImpl implements DataStoreServer {
     /** Set by main to make sure that the server is reachable. */
     private static DataStoreServerImpl server;
 
-    /** The object used to export the server. */
-    private Exporter exporter;
-
     /** The underlying data store. */
     private final CustomDataStoreImpl store;
 
-    /** Stores information about transactions. */
-    TxnTable<?> txnTable;
-
     /** The transaction timeout in milliseconds. */
     private final long txnTimeout;
+
+    /** The object used to export the server. */
+    private final Exporter exporter;
 
     /** The port for running the server. */
     private final int port;
 
     /** Used to execute the expired transaction reaper. */
     private final ScheduledExecutorService executor;
+
+    /** Stores information about transactions. */
+    TxnTable<?> txnTable;
 
     /** Implement Transactions using a long for the transaction ID. */
     private static class Txn implements Transaction {
@@ -182,8 +186,8 @@ public class DataStoreServerImpl implements DataStoreServer {
 	/**
 	 * Sets whether this transaction is in use, doing nothing if the state
 	 * is REAPING.  Returns whether the attempt to set the state was
-	 * successful.  The attempt fails if the state is not REAPING and is
-	 * not the opposite of the requested state.
+	 * successful.  The attempt succeeds if the state is REAPING or if it
+	 * is the opposite of the requested state.
 	 */
 	boolean setInUse(boolean inUse) {
 	    int expect = inUse ? IDLE : IN_USE;
@@ -399,9 +403,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 		    "Transaction is not active");
 	    }
 
-	    public void set(
-		Transaction txn, T info, boolean explicit)
-	    {
+	    public void set(Transaction txn, T info, boolean explicit) {
 		if (!explicit) {
 		    throw new IllegalStateException(
 			"Implicit join not permitted");
@@ -439,7 +441,8 @@ public class DataStoreServerImpl implements DataStoreServer {
 		long tid;
 		synchronized (tidLock) {
 		    if (nextTxnId > lastTxnId) {
-			logger.log(Level.FINE, "Allocate more transaction IDs");
+			logger.log(
+			    Level.FINE, "Allocate more transaction IDs");
 			nextTxnId = getNextTxnId(TXN_ALLOCATION_BLOCK_SIZE);
 			lastTxnId = nextTxnId + TXN_ALLOCATION_BLOCK_SIZE - 1;
 		    }
@@ -447,8 +450,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 		}
 		joinNewTransaction(new Txn(tid));
 		logger.log(Level.FINER,
-			   "createTransaction returns tid:{0,number,#}",
-			   tid);
+			   "createTransaction returns stid:{0,number,#}", tid);
 		return tid;
 	    } catch (RuntimeException e) {
 		logger.logThrow(Level.FINER, e, "createTransaction throws");
@@ -596,11 +598,11 @@ public class DataStoreServerImpl implements DataStoreServer {
      *
      * @param	properties the properties for configuring this instance
      * @throws	DataStoreException if there is a problem with the database
-     * @throws	IllegalArgumentException if the <code>
-     *		com.sun.sgs.impl.service.data.store.directory</code> property
-     *		is not specified, or if the value of the <code>
-     *		com.sun.sgs.impl.service.data.store.allocationBlockSize</code>
-     *		property is not a valid integer greater than zero
+     * @throws	IllegalArgumentException if the value of the {@code
+     *		com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl.port}
+     *		property is less than {@code 0} or greater than {@code 65535},
+     *		or if thrown by the {@link
+     *		DataStoreImpl#DataStoreImpl DataStoreImpl constructor}
      * @throws	IOException if a network problem occurs
      */
     public DataStoreServerImpl(Properties properties) throws IOException {
@@ -679,9 +681,7 @@ public class DataStoreServerImpl implements DataStoreServer {
     }
 
     /** {@inheritDoc} */
-    public void setObjects(
-	long tid, final long[] oids, final byte[][] dataArray)
-    {
+    public void setObjects(long tid, long[] oids, byte[][] dataArray) {
 	Txn txn = getTxn(tid);
 	try {
 	    store.setObjects(txn, oids, dataArray);
@@ -791,10 +791,10 @@ public class DataStoreServerImpl implements DataStoreServer {
      * Attempts to shut down this server, returning a value that specifies
      * whether the attempt was successful.
      *
-     * @return	<code>true</code> if the shut down was successful, else
-     *		<code>false</code>
-     * @throws	IllegalStateException if the <code>shutdown</code> method has
-     *		already been called and returned <code>true</code>
+     * @return	{@code true} if the shut down was successful, else
+     *		{@code false}
+     * @throws	IllegalStateException if the {@code shutdown} method has
+     *		already been called and returned {@code true}
      */
     public synchronized boolean shutdown() {
 	if (!store.shutdown()) {
@@ -833,13 +833,14 @@ public class DataStoreServerImpl implements DataStoreServer {
 	/*
 	 * Note that a transaction is only marked REAPING if it has expired and
 	 * is not currently in use.  All subsequent operations will notice that
-	 * is expired, either because the transaction has been aborted, or
+	 * it is expired, either because the transaction has been aborted, or
 	 * because they will perform their own expiration check.  As a result,
 	 * the only database access for that transaction will be to abort.
 	 * Whether the reaper will be the one to perform the abort or another
-	 * request to the server will do it doesn't matter because the abort
-	 * operation atomically removes the transaction from the transaction
-	 * table.  -tjb@sun.com (02/14/2007)
+	 * request to the server will do it doesn't matter as far as avoiding
+	 * concurrent access to the transaction because the abort operation
+	 * atomically removes the transaction from the transaction table.
+	 * -tjb@sun.com (02/14/2007)
 	 */
 	Collection<Transaction> expired = txnTable.getExpired(txnTimeout);
 	for (Transaction txn : expired) {

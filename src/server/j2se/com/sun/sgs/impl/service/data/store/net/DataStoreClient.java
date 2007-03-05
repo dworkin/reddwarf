@@ -1,3 +1,7 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.impl.service.data.store.net;
 
 import com.sun.sgs.app.TransactionAbortedException;
@@ -17,39 +21,39 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Provides an implementation of <code>DataStore</code> by communicating over
- * the network to an implementation of {@link DataStoreServer}. <p>
+ * Provides an implementation of {@code DataStore} by communicating over the
+ * network to an implementation of {@link DataStoreServer}. <p>
  *
  * The {@link #DataStoreClient constructor} supports the following properties:
  * <p>
  *
  * <ul>
  *
- * <li> <i>Key:</i> <code>
- *	com.sun.sgs.impl.service.data.store.net.DataStoreClient.allocation.block.size
- *	</code> <br>
- *	<i>Default:</i> <code>100</code> <br>
+ * <li> <i>Key:</i> {@code
+ *	com.sun.sgs.impl.service.data.store.net.DataStoreClient.allocation.block.size}
+ *	<br>
+ *	<i>Default:</i> {@code 100} <br>
  *	The number of object IDs to allocate at one time.  This value must be
- *	greater than <code>0</code>. <p>
+ *	greater than {@code 0}. <p>
  *
- *	<i>Key:</i> <code>
- *	com.sun.sgs.impl.service.data.store.net.DataStoreClient.server.host
- *	</code> <br>
+ *	<i>Key:</i> {@code
+ *	com.sun.sgs.impl.service.data.store.net.DataStoreClient.server.host}
+ *	<br>
  *	<i>No default &mdash; required</i> <br>
- *	The name of the host running the <code>DataStoreServer</code>. <p>
+ *	The name of the host running the {@code DataStoreServer}. <p>
  *
- *	<i>Key:</i> <code>
- *	com.sun.sgs.impl.service.data.store.net.DataStoreClient.server.port
- *	</code> <br>
- *	<i>Default:</i> <code>44530</code>
- *	The network port for the <code>DataStoreServer</code>.  This value must
- *	be greater than <code>0</code> and no greater than <code>65535</code>.
+ *	<i>Key:</i> {@code
+ *	com.sun.sgs.impl.service.data.store.net.DataStoreClient.server.port}
+ *	<br>
+ *	<i>Default:</i> {@code 44530} <br>
+ *	The network port for the {@code DataStoreServer}.  This value must
+ *	be greater than {@code 0} and no greater than {@code 65535}.
  *
  * </ul> <p>
  *
- * This class uses the {@link Logger} named
- * <code>com.sun.sgs.impl.service.data.store.net.DataStoreClient</code> to log
- * information at the following levels: <p>
+ * This class uses the {@link Logger} named {@code
+ * com.sun.sgs.impl.service.data.store.net.DataStoreClient} to log information
+ * at the following levels: <p>
  *
  * <ul>
  * <li> {@link Level#CONFIG CONFIG} - Constructor properties
@@ -175,15 +179,15 @@ public final class DataStoreClient
      * list of supported properties.
      *
      * @param	properties the properties for configuring this instance
-     * @throws	IllegalArgumentException if the <code>
-     *		com.sun.sgs.impl.service.data.store.net.DataStoreClient.server.host
-     *		</code> property is not set, if the value of the <code>
-     *		com.sun.sgs.impl.service.data.store.net.DataStoreClient.allocation.block.size
-     *		</code> property is not a valid integer greater than zero, or
-     *		if the value of the <code>
-     *		com.sun.sgs.impl.service.data.store.net.DataStoreClient.server.port
-     *		</code> property is not a valid integer greater than
-     *		<code>0</code> and not greater than <code>65535</code>
+     * @throws	IllegalArgumentException if the {@code
+     *		com.sun.sgs.impl.service.data.store.net.DataStoreClient.server.host}
+     *		property is not set, if the value of the {@code
+     *		com.sun.sgs.impl.service.data.store.net.DataStoreClient.allocation.block.size}
+     *		property is not a valid integer greater than zero, or if the
+     *		value of the {@code
+     *		com.sun.sgs.impl.service.data.store.net.DataStoreClient.server.port}
+     *		property is not a valid integer greater than {@code 0} and not
+     *		greater than {@code 65535}
      * @throws	IOException if a network problem occurs
      * @throws	NotBoundException if the server is not found in the RMI
      *		registry
@@ -191,8 +195,7 @@ public final class DataStoreClient
     public DataStoreClient(Properties properties)
 	throws IOException, NotBoundException
     {
-	logger.log(Level.CONFIG,
-		   "Creating DataStoreClient properties:{0}",
+	logger.log(Level.CONFIG, "Creating DataStoreClient properties:{0}",
 		   properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 	serverHost = wrappedProps.getProperty(SERVER_HOST_PROPERTY);
@@ -686,8 +689,7 @@ public final class DataStoreClient
 	if (txnInfo == null) {
 	    return joinTransaction(txn);
 	} else if (txnInfo.prepared) {
-	    throw new IllegalStateException(
-		"Transaction has been prepared");
+	    throw new IllegalStateException("Transaction has been prepared");
 	} else if (!txnInfo.txn.equals(txn)) {
 	    throw new IllegalStateException("Wrong transaction");
 	}
@@ -712,11 +714,10 @@ public final class DataStoreClient
 	    joined = true;
 	    tid = server.createTransaction();
 	    if (logger.isLoggable(Level.FINER)) {
-		logger.log(
-		    Level.FINER,
-		    "Created server transaction stid:{0,number,#} " +
-		    "for transaction {1}",
-		    tid, txn);
+		logger.log(Level.FINER,
+			   "Created server transaction stid:{0,number,#} " +
+			   "for transaction {1}",
+			   tid, txn);
 	    }
 	} finally {
 	    if (!joined) {
@@ -792,7 +793,7 @@ public final class DataStoreClient
 	    txnInfo.serverAborted = true;
 	    txnInfo.txn.abort(re);
 	}
-	logger.logThrow(Level.FINEST, re, "{0} throws", operation);
+	logger.logThrow(level, re, "{0} throws", operation);
 	return re;
     }
 
