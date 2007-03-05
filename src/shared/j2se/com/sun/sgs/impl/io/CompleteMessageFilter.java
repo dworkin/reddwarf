@@ -104,7 +104,18 @@ class CompleteMessageFilter {
                 "dispatching complete message of size {0,number,#}",
                 msgLen);
 
-            listener.filteredMessageReceived(completeMessage);
+            try {
+                listener.filteredMessageReceived(completeMessage);
+            } catch (RuntimeException e) {
+                logger.logThrow(Level.WARNING, e,
+                    "Exception in message disptach; dropping message");
+
+                logger.logThrow(Level.FINE, e,
+                    "Exception in message disptach; dropping message {0}",
+                    completeMessage);
+
+                // ignore exception; continue processing the buffer
+            }
         }
 
         msgBuf.compact();
@@ -130,6 +141,8 @@ class CompleteMessageFilter {
         buffer.putInt(message.length);
         buffer.put(message);
         buffer.flip();
+        // Don't worry about the listener throwing an exception, since
+        // this method has no other side effects.
         listener.sendUnfiltered(buffer);
     }
 }

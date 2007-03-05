@@ -112,4 +112,9 @@ abstract class AbstractSocketEndpoint {
         return numProcessors;
     }
 
+    /** {@inheritDoc} */
+    @Override
+    public String toString() {
+        return getClass().getName() + "[" + getAddress() + "]";
+    }
 }
