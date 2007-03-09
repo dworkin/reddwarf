@@ -5,7 +5,7 @@
 package com.sun.sgs.impl.service.data;
 
 /**
- * Stores information about managed objects that has been modified and need
+ * Stores information about managed objects that have been modified and need
  * their data stored.
  */
 final class FlushInfo {

@@ -88,7 +88,7 @@ public class TestDataStoreImpl extends TestCase {
 	    if (txn != null) {
 		txn.abort();
 	    }
-	    if (!passed) {
+	    if (!passed && store != null) {
 		new ShutdownAction().waitForDone();
 	    }
 	} catch (RuntimeException e) {
