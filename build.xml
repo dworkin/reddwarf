@@ -783,7 +783,7 @@
 
   <!-- Runs the data store network server -->
   <target name="test-data-store-network-server" depends="build"
-	  descriptions="Runs the data store network server">
+	  description="Runs the data store network server">
     <property name="test.server.host" value="localhost"/>
     <delete dir="${build.dir}/test/data-store-network-server"/>
     <mkdir dir="${build.dir}/test/data-store-network-server"/>

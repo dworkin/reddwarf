@@ -36,9 +36,12 @@ public class TestDataStoreImpl extends TestCase {
 	DataStoreImpl.class.getName();
 
     /** Directory used for database shared across multiple tests. */
-    protected static String dbDirectory =
+    private static final String dbDirectory =
 	System.getProperty("java.io.tmpdir") + File.separator +
 	"TestDataStoreImpl.db";
+
+    /** An instance of the data store, to test. */
+    static DataStore store;
 
     /** Make sure an empty version of the directory exists. */
     static {
@@ -48,14 +51,8 @@ public class TestDataStoreImpl extends TestCase {
     /** Set when the test passes. */
     protected boolean passed;
 
-    /** A per-test database directory, or null if not created. */
-    private String directory;
-
-    /** Properties for creating the DataStore. */
+    /** Default properties for creating the DataStore. */
     protected Properties props;
-
-    /** An instance of the data store, to test. */
-    DataStore store;
 
     /** An initial, open transaction. */
     DummyTransaction txn;
@@ -72,9 +69,10 @@ public class TestDataStoreImpl extends TestCase {
     protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
-	props = createProperties(
-	    DataStoreImplClassName + ".directory", dbDirectory);
-	store = getDataStore();
+	props = getProperties();
+	if (store == null) {
+	    store = createDataStore();
+	}
 	id = store.createObject(txn);
     }
 
@@ -90,7 +88,7 @@ public class TestDataStoreImpl extends TestCase {
 	    if (txn != null) {
 		txn.abort();
 	    }
-	    if (store != null) {
+	    if (!passed) {
 		new ShutdownAction().waitForDone();
 	    }
 	} catch (RuntimeException e) {
@@ -99,9 +97,12 @@ public class TestDataStoreImpl extends TestCase {
 	    } else {
 		e.printStackTrace();
 	    }
+	} finally {
+	    txn = null;
+	    if (!passed) {
+		store = null;
+	    }
 	}
-	txn = null;
-	store = null;
     }
 
     /* -- Test constructor -- */
@@ -130,12 +131,11 @@ public class TestDataStoreImpl extends TestCase {
         Properties props = createProperties(
             StandardProperties.APP_NAME, "Foo",
             StandardProperties.APP_ROOT, rootDir);
-        DataStoreImpl testStore = createDataStore(props);
+        DataStore testStore = createDataStore(props);
         testStore.shutdown();
-        deleteDirectory(dataDir.getPath());
     }
 
-    public void testConstructorNoDirectoryNorRoot() {
+    public void testConstructorNoDirectoryNorRoot() throws Exception {
 	Properties props = new Properties();
 	try {
 	    createDataStore(props);
@@ -202,8 +202,8 @@ public class TestDataStoreImpl extends TestCase {
             System.err.println("Skipping on " + osName);
             return;
         }
-	props.setProperty(
-	    DataStoreImplClassName + ".directory", createDirectory());
+	String directory = createDirectory();
+	props.setProperty(DataStoreImplClassName + ".directory", directory);
 	new File(directory).setReadOnly();
 	try {
 	    createDataStore(props);
@@ -1340,7 +1340,7 @@ public class TestDataStoreImpl extends TestCase {
 	store.setObject(txn, id, bytes);
 	txn.commit();
 	store.shutdown();
-	store = getDataStore();
+	store = createDataStore();
 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
 	id = store.getBinding(txn, "foo");
 	byte[] value = store.getObject(txn, id, false);
@@ -1417,7 +1417,7 @@ public class TestDataStoreImpl extends TestCase {
 
     /* -- Other methods and classes -- */
 
-    /** Creates a per-test directory. */
+    /** Creates a unique directory. */
     private String createDirectory() throws IOException {
 	File dir = File.createTempFile(getName(), "dbdir");
 	if (!dir.delete()) {
@@ -1427,8 +1427,7 @@ public class TestDataStoreImpl extends TestCase {
 	    throw new RuntimeException(
 		"Failed to create directory: " + dir);
 	}
-	directory = dir.getPath();
-	return directory;
+	return dir.getPath();
     }
 
     /** Insures an empty version of the directory exists. */
@@ -1463,14 +1462,20 @@ public class TestDataStoreImpl extends TestCase {
 	return props;
     }
 
-    /** Gets a DataStore using the default properties. */
-    protected DataStore getDataStore() throws Exception {
+    /** Creates a DataStore using the default properties. */
+    protected DataStore createDataStore() throws Exception {
 	return createDataStore(props);
     }
 
     /** Creates a DataStore using the specified properties. */
     protected DataStore createDataStore(Properties props) throws Exception {
 	return new DataStoreImpl(props);
+    }
+
+    /** Returns the default properties to use for creating data stores. */
+    protected Properties getProperties() throws Exception {
+	return createProperties(
+	    DataStoreImplClassName + ".directory", dbDirectory);
     }
 
     /* -- Support for testing unusual states -- */

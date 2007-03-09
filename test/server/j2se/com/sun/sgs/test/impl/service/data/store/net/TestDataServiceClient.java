@@ -4,12 +4,8 @@
 
 package com.sun.sgs.test.impl.service.data.store.net;
 
-import com.sun.sgs.impl.service.data.DataServiceImpl;
-import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
 import com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl;
-import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.impl.service.data.TestDataServiceImpl;
 import java.util.Properties;
 
@@ -35,23 +31,19 @@ public class TestDataServiceClient extends TestDataServiceImpl {
     private static final String DataStoreServerImplClassName =
 	DataStoreServerImpl.class.getName();
 
-    /** The name of the DataServiceImpl class. */
-    private static final String DataServiceImplClassName =
-	DataServiceImpl.class.getName();
-
     /** The data store server. */
-    DataStoreServerImpl server;
+    private static DataStoreServerImpl server;
 
     /** Creates an instance. */
     public TestDataServiceClient(String name) {
 	super(name);
     }
 
-    /** Shutdown the server. */
-    protected void tearDown() throws Exception {
+    /** Shuts down the server if the test failed. */
+    public void tearDown() throws Exception {
 	super.tearDown();
 	try {
-	    if (server != null) {
+	    if (!passed && server != null) {
 		server.shutdown();
 	    }
 	} catch (RuntimeException e) {
@@ -60,28 +52,43 @@ public class TestDataServiceClient extends TestDataServiceImpl {
 	    } else {
 		e.printStackTrace();
 	    }
+	} finally {
+	    if (!passed) {
+		server = null;
+	    }
 	}
     }
 
-    /**
-     * Create a DataServiceImpl, set any default properties, and start the
-     * server, if needed.
-     */
-    protected DataServiceImpl getDataServiceImpl() throws Exception {
+    /** Adds client and server properties, starting the server if needed. */
+    protected Properties getProperties() throws Exception {
+	Properties props = super.getProperties();
 	String host = serverHost;
 	int port = serverPort;
-	if (host == null) {
+	if (server == null && host == null) {
 	    props.setProperty(DataStoreServerImplClassName + ".port", "0");
-	    DataStoreServerImpl serverImpl = new DataStoreServerImpl(props);
-	    server = serverImpl;
+	    server = new DataStoreServerImpl(props);
+	}
+	if (host == null) {
 	    host = "localhost";
-	    port = serverImpl.getPort();
+	    port = server.getPort();
 	}
 	props.setProperty(DataStoreClientClassName + ".server.host", host);
 	props.setProperty(DataStoreClientClassName + ".server.port",
 			  String.valueOf(port));
 	props.setProperty(DataServiceImplClassName + ".data.store.class",
 			  DataStoreClientClassName);
-	return new DataServiceImpl(props, componentRegistry);
+	return props;
+    }
+
+    /* -- Tests -- */
+
+    /* -- Skip these tests -- they don't apply in the network case -- */
+
+    public void testConstructorNoDirectory() {
+	System.err.println("Skipping");
+    }
+
+    public void testConstructorNoDirectoryNorRoot() {
+	System.err.println("Skipping");
     }
 }

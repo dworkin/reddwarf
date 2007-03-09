@@ -36,6 +36,7 @@ public class TestDataStoreClientPerformance extends TestDataStorePerformance {
     /** Creates an instance. */
     public TestDataStoreClientPerformance(String name) {
 	super(name);
+	count = Integer.getInteger("test.count", 20);
     }
 
     /** Shutdown the server. */

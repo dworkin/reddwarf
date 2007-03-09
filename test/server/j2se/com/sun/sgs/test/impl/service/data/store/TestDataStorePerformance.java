@@ -18,21 +18,25 @@ import junit.framework.TestCase;
  * Performance tests for the DataStoreImpl class.
  *
  * Results -- best times:
- * Date: 11/1/2006
+ * Date: 3/6/2007
  * Hardware: Power Mac G5, 2 2 GHz processors, 2.5 GB memory, HFS+ filesystem
  *	     with logging enabled
  * Operating System: Mac OS X 10.4.8
  * Berkeley DB Version: 4.5.20
- * Java Version: 1.5.0_06
- * Parameters: test.items=400, test.item.size=100, test.modify.items=200
+ * Java Version: 1.5.0_07
+ * Parameters:
+ *   test.items=100
+ *   test.item.size=100
+ *   test.modify.items=50
+ *   test.count=400
  * Testcase: testReadIds
- * Time: 4 ms per transaction
+ * Time: 1.3 ms per transaction
  * Testcase: testWriteIds
- * Time: 7 ms per transaction
+ * Time: 2.2 ms per transaction
  * Testcase: testReadNames
- * Time: 4 ms per transaction
+ * Time: 1.2 ms per transaction
  * Testcase: testWriteNames
- * Time: 7 ms per transaction
+ * Time: 2.0 ms per transaction
  */
 public class TestDataStorePerformance extends TestCase {
 
@@ -52,7 +56,7 @@ public class TestDataStorePerformance extends TestCase {
     protected int modifyItems = Integer.getInteger("test.modify.items", 50);
 
     /** The number of times to run the test while timing. */
-    protected int count = Integer.getInteger("test.count", 100);
+    protected int count = Integer.getInteger("test.count", 400);
 
     /** The number of times to repeat the timing. */
     protected int repeat = Integer.getInteger("test.repeat", 5);
@@ -83,7 +87,8 @@ public class TestDataStorePerformance extends TestCase {
 	System.err.println("Parameters:" +
 			   "\n  test.items=" + items +
 			   "\n  test.item.size=" + itemSize +
-			   "\n  test.modify.items=" + modifyItems);
+			   "\n  test.modify.items=" + modifyItems +
+			   "\n  test.count=" + count);
 	props = createProperties(
 	    DataStoreImplClass + ".directory", createDirectory());
     }

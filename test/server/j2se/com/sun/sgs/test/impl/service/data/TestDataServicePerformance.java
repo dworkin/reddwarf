@@ -11,6 +11,7 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.ProfileProducer;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyProfileRegistrar;
@@ -28,21 +29,24 @@ import junit.framework.TestCase;
  * Performance tests for the DataServiceImpl class.
  *
  * Results -- best times:
- * Date: 1/9/2007
+ * Date: 3/6/2007
  * Hardware: Host freeside, Power Mac G5, 2 2 GHz processors, 2.5 GB memory,
  *	     HFS+ filesystem with logging enabled
  * Operating System: Mac OS X 10.4.8
  * Berkeley DB Version: 4.5.20
- * Java Version: 1.5.0_06
- * Parameters: test.items=400, test.modify.items=200
+ * Java Version: 1.5.0_07
+ * Parameters:
+ *   test.items=100
+ *   test.modify.items=50
+ *   test.count=100
  * Testcase: testRead
- * Time: 43 ms per transaction
+ * Time: 12 ms per transaction
  * Testcase: testReadNoDetectMods
- * Time: 26 ms per transaction
+ * Time: 6.9 ms per transaction
  * Testcase: testWrite
- * Time: 51 ms per transaction
+ * Time: 14 ms per transaction
  * Testcase: testWriteNoDetectMods
- * Time: 36 ms per transaction
+ * Time: 9.4 ms per transaction
  */
 public class TestDataServicePerformance extends TestCase {
 
@@ -62,14 +66,14 @@ public class TestDataServicePerformance extends TestCase {
      */
     protected int modifyItems = Integer.getInteger("test.modify.items", 50);
 
+    /** The number of times to run the test while timing. */
+    protected int count = Integer.getInteger("test.count", 100);
+
     /** The number of times to repeat the timing. */
     protected int repeat = Integer.getInteger("test.repeat", 5);
 
     /** Whether to flush to disk on transaction commits. */
     protected boolean testFlush = Boolean.getBoolean("test.flush");
-
-    /** The number of times to run the test while timing. */
-    protected int count = Integer.getInteger("test.count", 60);
 
     /** Set when the test passes. */
     protected boolean passed;
@@ -102,9 +106,9 @@ public class TestDataServicePerformance extends TestCase {
     protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
 	System.err.println("Parameters:" +
-			   "\n  test.count=" + count +
 			   "\n  test.items=" + items +
-			   "\n  test.modify.items=" + modifyItems);
+			   "\n  test.modify.items=" + modifyItems +
+			   "\n  test.count=" + count);
 	props = createProperties(
 	    DataStoreImplClass + ".directory", createDirectory(),
 	    StandardProperties.APP_NAME, "TestDataServicePerformance");
@@ -156,7 +160,9 @@ public class TestDataServicePerformance extends TestCase {
 	props.setProperty(DataServiceImplClass + ".detectModifications",
 			  String.valueOf(detectMods));
 	service = getDataService(props, componentRegistry);
-        DummyProfileRegistrar.startProfiling(service);
+	if (service instanceof ProfileProducer) {
+	    DummyProfileRegistrar.startProfiling(((ProfileProducer) service));
+	}
 	createTransaction();
 	service.configure(componentRegistry, txnProxy);
 	componentRegistry.setComponent(DataManager.class, service);
@@ -205,7 +211,9 @@ public class TestDataServicePerformance extends TestCase {
 	props.setProperty(DataStoreImplClass + ".flushToDisk",
 			  String.valueOf(flush));
 	service = getDataService(props, componentRegistry);
-        DummyProfileRegistrar.startProfiling(service);
+	if (service instanceof ProfileProducer) {
+	    DummyProfileRegistrar.startProfiling(((ProfileProducer) service));
+	}
 	createTransaction();
 	service.configure(componentRegistry, txnProxy);
 	componentRegistry.setComponent(DataManager.class, service);

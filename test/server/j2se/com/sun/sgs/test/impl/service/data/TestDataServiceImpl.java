@@ -15,6 +15,7 @@ import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
+import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.test.util.DummyComponentRegistry;
@@ -45,13 +46,24 @@ public class TestDataServiceImpl extends TestCase {
 	DataStoreImpl.class.getName();
 
     /** The name of the DataServiceImpl class. */
-    private static final String DataServiceImplClassName =
+    protected static final String DataServiceImplClassName =
 	DataServiceImpl.class.getName();
 
     /** Directory used for database shared across multiple tests. */
-    private static String dbDirectory =
+    private static final String dbDirectory =
 	System.getProperty("java.io.tmpdir") + File.separator +
 	"TestDataServiceImpl.db";
+
+    /** The component registry. */
+    private static final DummyComponentRegistry componentRegistry =
+	new DummyComponentRegistry();
+
+    /** The transaction proxy. */
+    private static final DummyTransactionProxy txnProxy =
+	new DummyTransactionProxy();
+
+    /** An instance of the data service, to test. */
+    static DataServiceImpl service;
 
     /**
      * Delete the database directory at the start of the test run, but not for
@@ -64,26 +76,14 @@ public class TestDataServiceImpl extends TestCase {
     /** Set when the test passes. */
     protected boolean passed;
 
-    /** A per-test database directory, or null if not created. */
-    String directory;
-
-    /** Properties for creating the shared database. */
+    /** Default properties for creating the shared database. */
     protected Properties props;
 
-    /** A transaction proxy. */
-    DummyTransactionProxy txnProxy = new DummyTransactionProxy();
-
-    /** A component registry. */
-    protected DummyComponentRegistry componentRegistry;
-
     /** An initial, open transaction. */
-    DummyTransaction txn;
-
-    /** An instance of the data service, to test. */
-    DataServiceImpl service;
+    private DummyTransaction txn;
 
     /** A managed object. */
-    DummyManagedObject dummy;
+    private DummyManagedObject dummy;
 
     /** Creates the test. */
     public TestDataServiceImpl(String name) {
@@ -91,21 +91,19 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     /**
-     * Prints the test case, initializes the data service, and creates and
-     * binds a managed object.
+     * Prints the test case, initializes the data service if needed, starts a
+     * transaction, and creates and binds a managed object.
      */
     protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
-	componentRegistry = new DummyComponentRegistry();
-	props = createProperties(
-	    DataStoreImplClassName + ".directory", dbDirectory,
-	    StandardProperties.APP_NAME, "TestDataServiceImpl",
-	    DataServiceImplClassName + ".debugCheckInterval", "0");
-	service = getDataServiceImpl();
-	createTransaction();
-	service.configure(componentRegistry, txnProxy);
-	txn.commit();
-	componentRegistry.setComponent(DataManager.class, service);
+	props = getProperties();
+	if (service == null) {
+	    service = createDataServiceImpl();
+	    createTransaction();
+	    service.configure(componentRegistry, txnProxy);
+	    txn.commit();
+	    componentRegistry.setComponent(DataManager.class, service);
+	}
 	componentRegistry.registerAppContext();
 	createTransaction();
 	dummy = new DummyManagedObject();
@@ -119,15 +117,15 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     /**
-     * Deletes the directory if the test passes and the directory was
-     * created, and aborts the current transaction.
+     * Aborts the transaction if non-null, and nulls the service field if the
+     * test failed.
      */
     protected void tearDown() throws Exception {
 	try {
 	    if (txn != null) {
 		txn.abort();
 	    }
-	    if (service != null) {
+	    if (!passed && service != null) {
 		new ShutdownAction().waitForDone();
 	    }
 	} catch (RuntimeException e) {
@@ -136,22 +134,25 @@ public class TestDataServiceImpl extends TestCase {
 	    } else {
 		e.printStackTrace();
 	    }
+	} finally {
+	    txn = null;
+	    if (!passed) {
+		service = null;
+	    }
 	}
-	txn = null;
-	service = null;
     }
 
     /* -- Test constructor -- */
 
     public void testConstructorNullArgs() throws Exception {
 	try {
-	    new DataServiceImpl(null, componentRegistry);
+	    createDataServiceImpl(null, componentRegistry);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
 	}
 	try {
-	    new DataServiceImpl(props, null);
+	    createDataServiceImpl(props, null);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
@@ -159,10 +160,9 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     public void testConstructorNoAppName() throws Exception {
-	Properties props = createProperties(
-	    DataStoreImplClassName + ".directory", createDirectory());
+	props.remove(StandardProperties.APP_NAME);
 	try {
-	    new DataServiceImpl(props, componentRegistry);
+	    createDataServiceImpl(props, componentRegistry);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -170,12 +170,10 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     public void testConstructorBadDebugCheckInterval() throws Exception {
-	Properties props = createProperties(
-	    DataStoreImplClassName + ".directory", createDirectory(),
-	    StandardProperties.APP_NAME, "Foo",
+	props.setProperty(
 	    DataServiceImplClassName + ".debugCheckInterval", "gorp");
 	try {
-	    new DataServiceImpl(props, componentRegistry);
+	    createDataServiceImpl(props, componentRegistry);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -194,18 +192,17 @@ public class TestDataServiceImpl extends TestCase {
         if (!dataDir.mkdir()) {
             throw new RuntimeException("Failed to create sub-dir: " + dataDir);
         }
-        Properties props = createProperties(
-            StandardProperties.APP_NAME, "Foo",
-            StandardProperties.APP_ROOT, rootDir);
-        DataServiceImpl testSvc = new DataServiceImpl(props, componentRegistry);
+	props.remove(DataStoreImplClassName + ".directory");
+	props.setProperty(StandardProperties.APP_ROOT, rootDir);
+	DataServiceImpl testSvc =
+	    createDataServiceImpl(props, componentRegistry);
         testSvc.shutdown();
-        deleteDirectory(dataDir.getPath());
     }
 
     public void testConstructorNoDirectoryNorRoot() throws Exception {
-	Properties props = createProperties(StandardProperties.APP_NAME, "Foo");
+	props.remove(DataStoreImplClassName + ".directory");
 	try {
-	    new DataServiceImpl(props, componentRegistry);
+	    createDataServiceImpl(props, componentRegistry);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -216,7 +213,7 @@ public class TestDataServiceImpl extends TestCase {
 	props.setProperty(
 	    DataServiceImplClassName + ".data.store.class", "AnUnknownClass");
 	try {
-	    new DataServiceImpl(props, componentRegistry);
+	    createDataServiceImpl(props, componentRegistry);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -228,7 +225,7 @@ public class TestDataServiceImpl extends TestCase {
 	    DataServiceImplClassName + ".data.store.class",
 	    Object.class.getName());
 	try {
-	    new DataServiceImpl(props, componentRegistry);
+	    createDataServiceImpl(props, componentRegistry);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -240,7 +237,7 @@ public class TestDataServiceImpl extends TestCase {
 	    DataServiceImplClassName + ".data.store.class",
 	    DataStoreNoConstructor.class.getName());
 	try {
-	    new DataServiceImpl(props, componentRegistry);
+	    createDataServiceImpl(props, componentRegistry);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -254,7 +251,7 @@ public class TestDataServiceImpl extends TestCase {
 	    DataServiceImplClassName + ".data.store.class",
 	    DataStoreAbstract.class.getName());
 	try {
-	    new DataServiceImpl(props, componentRegistry);
+	    createDataServiceImpl(props, componentRegistry);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -272,7 +269,7 @@ public class TestDataServiceImpl extends TestCase {
 	    DataServiceImplClassName + ".data.store.class",
 	    DataStoreConstructorFails.class.getName());
 	try {
-	    new DataServiceImpl(props, componentRegistry);
+	    createDataServiceImpl(props, componentRegistry);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -294,10 +291,10 @@ public class TestDataServiceImpl extends TestCase {
     /* -- Test configure -- */
 
     public void testConfigureNullArgs() throws Exception {
-	Properties props = createProperties(
-	    DataStoreImplClassName + ".directory", createDirectory(),
-	    StandardProperties.APP_NAME, "Foo");
-	service = new DataServiceImpl(props, componentRegistry);
+	txn.commit();
+	txn = null;
+	service.shutdown();
+	service = createDataServiceImpl();
 	try {
 	    service.configure(null, txnProxy);
 	    fail("Expected NullPointerException");
@@ -310,18 +307,20 @@ public class TestDataServiceImpl extends TestCase {
 	} catch (NullPointerException e) {
 	    System.err.println(e);
 	}
+	service = null;
     }
 
     public void testConfigureNoTxn() throws Exception {
 	txn.commit();
 	txn = null;
-	service = getDataServiceImpl();
+	service = createDataServiceImpl();
 	try {
 	    service.configure(componentRegistry, txnProxy);
 	    fail("Expected TransactionNotActiveException");
 	} catch (TransactionNotActiveException e) {
 	    System.err.println(e);
 	}
+	service = null;
     }
 
     public void testConfigureAgain() throws Exception {
@@ -331,11 +330,12 @@ public class TestDataServiceImpl extends TestCase {
 	} catch (IllegalStateException e) {
 	    System.err.println(e);
 	}
+	service = null;
     }
 
     public void testConfigureAborted() throws Exception {
 	txn.commit();
-	service = getDataServiceImpl();
+	service = createDataServiceImpl();
 	createTransaction();
 	service.configure(componentRegistry, txnProxy);
 	txn.abort();
@@ -343,6 +343,7 @@ public class TestDataServiceImpl extends TestCase {
 	service.configure(componentRegistry, txnProxy);
 	txn.commit();
 	txn = null;
+	service = null;
     }
 
     /* -- Test getBinding and getServiceBinding -- */
@@ -888,7 +889,7 @@ public class TestDataServiceImpl extends TestCase {
     public void testSetServiceBindingSuccess() throws Exception {
 	testSetBindingSuccess(false);
     }
-    public void testSetBindingSuccess(boolean app) throws Exception {
+    private void testSetBindingSuccess(boolean app) throws Exception {
 	setBinding(app, service, "dummy", dummy);
 	txn.commit();
 	createTransaction();
@@ -1936,9 +1937,8 @@ public class TestDataServiceImpl extends TestCase {
 	    fail("Expected IllegalStateException");
 	} catch (IllegalStateException e) {
 	    System.err.println(e);
-	} finally {
-	    service = null;
 	}
+	service = null;
     }
 
     public void testShutdownInterrupt() throws Exception {
@@ -1992,7 +1992,7 @@ public class TestDataServiceImpl extends TestCase {
     public void testShutdownRestart() throws Exception {
 	txn.commit();
 	service.shutdown();
-	service = getDataServiceImpl();
+	service = createDataServiceImpl();
 	createTransaction();
 	service.configure(componentRegistry, txnProxy);
 	componentRegistry.setComponent(DataManager.class, service);
@@ -2000,6 +2000,7 @@ public class TestDataServiceImpl extends TestCase {
 	createTransaction();
 	assertEquals(
 	    dummy, service.getBinding("dummy", DummyManagedObject.class));
+	service = null;
     }
 
     /* -- Other tests -- */
@@ -2225,7 +2226,7 @@ public class TestDataServiceImpl extends TestCase {
 
     /* -- Other methods and classes -- */
 
-    /** Creates a per-test directory. */
+    /** Creates a unique directory. */
     String createDirectory() throws IOException {
 	File dir = File.createTempFile(getName(), "dbdir");
 	if (!dir.delete()) {
@@ -2235,8 +2236,7 @@ public class TestDataServiceImpl extends TestCase {
 	    throw new RuntimeException(
 		"Failed to create directory: " + dir);
 	}
-	directory = dir.getPath();
-	return directory;
+	return dir.getPath();
     }
 
     /** Insures an empty version of the directory exists. */
@@ -2271,8 +2271,22 @@ public class TestDataServiceImpl extends TestCase {
 	return props;
     }
 
-    /** Returns a DataServiceImpl for the shared database. */
-    protected DataServiceImpl getDataServiceImpl() throws Exception {
+    /**
+     * Returns a DataServiceImpl for the shared database using the default
+     * properties and the default component registry.
+     */
+    protected DataServiceImpl createDataServiceImpl() throws Exception {
+	return createDataServiceImpl(props, componentRegistry);
+    }
+
+    /**
+     * Returns a DataServiceImpl for the shared database using the specified
+     * properties and component registry.
+     */
+    protected DataServiceImpl createDataServiceImpl(
+	Properties props, ComponentRegistry componentRegistry)
+	throws Exception
+    {
 	File dir = new File(dbDirectory);
 	if (!dir.exists()) {
 	    if (!dir.mkdir()) {
@@ -2281,6 +2295,14 @@ public class TestDataServiceImpl extends TestCase {
 	    }
 	}
 	return new DataServiceImpl(props, componentRegistry);
+    }
+
+    /** Returns the default properties to use for creating data services. */
+    protected Properties getProperties() throws Exception {
+	return createProperties(
+	    DataStoreImplClassName + ".directory", dbDirectory,
+	    StandardProperties.APP_NAME, "TestDataServiceImpl",
+	    DataServiceImplClassName + ".debugCheckInterval", "0");
     }
 
     /** Creates a new transaction. */
@@ -2351,13 +2373,14 @@ public class TestDataServiceImpl extends TestCase {
 	action.setUp();
 	txn.commit();
 	createTransaction();
-	service = getDataServiceImpl();
+	service = createDataServiceImpl();
 	try {
 	    action.run();
 	    fail("Expected IllegalStateException");
 	} catch (IllegalStateException e) {
 	    System.err.println(e);
 	}
+	service = null;
     }
 
     /** Tests running the action while aborting. */
@@ -2478,24 +2501,21 @@ public class TestDataServiceImpl extends TestCase {
     /** Tests running the action with a new transaction while shutting down. */
     private void testShuttingDownNewTxn(Action action) throws Exception {
 	action.setUp();
+	DummyTransaction originalTxn = txn;
+	ShutdownAction shutdownAction = new ShutdownAction();
+	shutdownAction.assertBlocked();
+	createTransaction();
 	try {
-	    DummyTransaction originalTxn = txn;
-	    ShutdownAction shutdownAction = new ShutdownAction();
-	    shutdownAction.assertBlocked();
-	    createTransaction();
-	    try {
-		action.run();
-		fail("Expected IllegalStateException");
-	    } catch (IllegalStateException e) {
-		System.err.println(e);
-	    }
-	    txn.abort();
-	    txn = null;
-	    originalTxn.abort();
-	    shutdownAction.assertResult(true);
-	} finally {
-	    service = null;
+	    action.run();
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
 	}
+	txn.abort();
+	txn = null;
+	originalTxn.abort();
+	shutdownAction.assertResult(true);
+	service = null;
     }
 
     /** Tests running the action after shutdown. */

@@ -33,18 +33,18 @@ public class TestDataStoreClient extends TestDataStoreImpl {
 	DataStoreServerImpl.class.getName();
 
     /** The server. */
-    DataStoreServerImpl server;
+    private static DataStoreServerImpl server;
 
     /** Creates an instance. */
     public TestDataStoreClient(String name) {
 	super(name);
     }
 
-    /** Shutdown the server. */
+    /** Shuts down the server if the test failed. */
     protected void tearDown() throws Exception {
 	super.tearDown();
 	try {
-	    if (server != null) {
+	    if (!passed && server != null) {
 		new ShutdownAction() {
 		    protected boolean shutdown() {
 			return server.shutdown();
@@ -57,27 +57,30 @@ public class TestDataStoreClient extends TestDataStoreImpl {
 	    } else {
 		e.printStackTrace();
 	    }
+	} finally {
+	    if (!passed) {
+		server = null;
+	    }
 	}
     }
 
-    /**
-     * Create a DataStoreClient, set any default properties, and start the
-     * server, if needed.
-     */
-    protected DataStore getDataStore() throws Exception {
+    /** Adds client and server properties, starting the server if needed. */
+    protected Properties getProperties() throws Exception {
+	Properties props = super.getProperties();
 	String host = serverHost;
 	int port = serverPort;
-	if (host == null) {
+	if (server == null && host == null) {
 	    props.setProperty(DataStoreServerImplClassName + ".port", "0");
-	    DataStoreServerImpl serverImpl = new DataStoreServerImpl(props);
-	    server = serverImpl;
+	    server = new DataStoreServerImpl(props);
+	}
+	if (host == null) {
 	    host = "localhost";
-	    port = serverImpl.getPort();
+	    port = server.getPort();
 	}
 	props.setProperty(DataStoreClientClassName + ".server.host", host);
 	props.setProperty(DataStoreClientClassName + ".server.port",
 			  String.valueOf(port));
-	return createDataStore(props);
+	return props;
     }
 
     /** Create a DataStoreClient. */
