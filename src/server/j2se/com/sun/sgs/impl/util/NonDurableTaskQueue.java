@@ -32,9 +32,9 @@ public class NonDurableTaskQueue implements NonDurableTransactionParticipant {
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
     
-    /** Stores the transaction for the current thread. */
-    private static final ThreadLocal<Transaction> currentTransaction =
-	new ThreadLocal<Transaction>();
+    /** Stores transaction-related information for the current thread. */
+    private static final ThreadLocal<Context> currentContext =
+	new ThreadLocal<Context>();
     
     /** The transaction proxy, or null if configure has not been called. */    
     private TransactionProxy txnProxy;
@@ -123,7 +123,7 @@ public class NonDurableTaskQueue implements NonDurableTransactionParticipant {
 	try {
 	    checkTransaction(txn);
 	    removeTask();
-	    currentTransaction.set(null);
+	    currentContext.set(null);
 	    logger.log(Level.FINER, "commit txn:{0} returns", txn);
 	    
 	} catch (RuntimeException e) {
@@ -155,7 +155,7 @@ public class NonDurableTaskQueue implements NonDurableTransactionParticipant {
 		    removeTask();
 		}
 	    }
-	    currentTransaction.set(null);
+	    currentContext.set(null);
 	    logger.log(Level.FINER, "abort txn:{0} returns", txn);
 	    
 	} catch (RuntimeException e) {
@@ -185,7 +185,8 @@ public class NonDurableTaskQueue implements NonDurableTransactionParticipant {
 		    logger.log(Level.WARNING, "task queue unexpectedly empty");
 		    return;
 		}
-		joinTransaction();
+		Context context = joinTransaction();
+		context.setTask(task);
 		logger.log(Level.FINER, "running task:{0}", task);
 		task.run();
 		
@@ -203,6 +204,7 @@ public class NonDurableTaskQueue implements NonDurableTransactionParticipant {
      * next task at the head of the queue.
      */
     private void removeTask() {
+	KernelRunnable processedTask = currentContext.get().task;
 	synchronized (lock) {
 	    // FIXME: The task queue should not be empty when this
 	    // method is called, but comment out assertion below and guard
@@ -211,11 +213,19 @@ public class NonDurableTaskQueue implements NonDurableTransactionParticipant {
 	    // assert ! tasks.isEmpty();
 	    
 	    if (!tasks.isEmpty()) {
-		KernelRunnable task = tasks.remove();
-		logger.log(Level.FINER, "removed task:{0}", task);
+		if (tasks.peek() == processedTask) {
+		    KernelRunnable task = tasks.remove();
+		    logger.log(Level.FINER, "removed task:{0}", task);
+		} else {
+		    logger.log(
+			Level.SEVERE,
+			"unable to remove task:{0}, expected task:{1}",
+			tasks.peek(), processedTask);
+		}
 	    } else {
 		logger.log(Level.WARNING, "task queue unexpectedly empty");
 	    }
+	    
 	    if (tasks.isEmpty()) {
 		processQueueTask = null;
 	    } else {
@@ -251,14 +261,15 @@ public class NonDurableTaskQueue implements NonDurableTransactionParticipant {
         if (txn == null) {
             throw new NullPointerException("null transaction");
         }
-        Transaction currTxn = currentTransaction.get();
-        if (currTxn == null) {
-            throw new IllegalStateException("null current transaction");
+        Context context = currentContext.get();
+        if (context == null) {
+            throw new IllegalStateException("null context");
         }
-        if (!txn.equals(currTxn)) {
-            currentTransaction.set(null);
+        if (!txn.equals(context.txn)) {
+            currentContext.set(null);
             throw new IllegalStateException(
-                "Wrong transaction: Expected " + currTxn + ", found " + txn);
+                "Wrong transaction: Expected " + context.txn +
+		", found " + txn);
         }
     }
     
@@ -268,7 +279,7 @@ public class NonDurableTaskQueue implements NonDurableTransactionParticipant {
      * transaction, and throwing {@code IllegalStateException} if
      * there is a problem with the state of the transaction.
      */
-    private void joinTransaction() {
+    private Context joinTransaction() {
 	Transaction txn;
 	synchronized (lock) {
 	    txn = txnProxy.getCurrentTransaction();
@@ -277,19 +288,50 @@ public class NonDurableTaskQueue implements NonDurableTransactionParticipant {
 	    throw new TransactionNotActiveException(
 		"No transaction is active");
 	}
-	Transaction currTxn = currentTransaction.get();
-	if (currTxn == null) {
+	Context context = currentContext.get();
+	if (context == null) {
 	    if (logger.isLoggable(Level.FINER)) {
 		logger.log(Level.FINER, "join txn:{0}", txn);
 	    }
 	    txn.join(this);
-	    currentTransaction.set(txn);
+	    context = new Context(txn);
+	    currentContext.set(context);
 
-	} else if (!txn.equals(currTxn)) {
-	    currentTransaction.set(null);
+	} else if (!txn.equals(context.txn)) {
+	    currentContext.set(null);
 	    throw new IllegalStateException(
-		"Wrong transaction: Expected " + currTxn +
+		"Wrong transaction: Expected " + context.txn +
 		", found " + txn);
+	}
+	return context;
+    }
+
+    /**
+     * Stores information relating to a specific transaction
+     * processing the head of the task queue.
+     */
+    final class Context {
+
+	/** The transaction. */
+	final Transaction txn;
+
+	/** The task being processed. */
+	KernelRunnable task;
+
+	/**
+	 * Constructs a context with the specified transaction.
+	 */
+	private Context(Transaction txn) {
+	    assert txn != null;
+	    this.txn = txn;
+
+	}
+
+	/**
+	 * Sets the task being processed to the given {@code task}.
+	 */
+	private void setTask(KernelRunnable task) {
+	    this.task = task;
 	}
     }
 }

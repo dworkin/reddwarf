@@ -599,14 +599,28 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		ProtocolMessageListener serviceListener =
 		    sessionService.getProtocolMessageListener(serviceId);
 		if (serviceListener != null) {
+		    synchronized (lock) {
+			if (identity == null) {
+			    if (logger.isLoggable(Level.WARNING)) {
+				logger.log(
+				    Level.WARNING,
+				    "session:{0} received message for " +
+				    "service ID:{1} before successful login",
+				    this, serviceId);
+				return;
+			    }
+			}
+		    }
+		    
 		    serviceListener.receivedMessage(
 			ClientSessionImpl.this, buffer);
+		    
 		} else {
 		    if (logger.isLoggable(Level.SEVERE)) {
 		    	logger.log(
 			    Level.SEVERE,
-			    "Handler.messageReceived unknown service ID:{0}",
-			    serviceId);
+			    "session:{0} unknown service ID:{1}",
+			    this, serviceId);
 		    }
 		}
 		return;
