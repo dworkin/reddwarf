@@ -68,8 +68,10 @@ public interface Transaction {
      * @throws TransactionNotActiveException if the transaction has been
      *                                       aborted
      *
-     * @throws IllegalStateException if the transaction has begun preparation
-     *		                     and has not completed aborting
+     * @throws IllegalStateException if {@link TransactionParticipant#prepare
+     *				     prepare} has been called on any
+     *				     transaction participant and the
+     *				     transaction has not been aborted
      *
      * @throws UnsupportedOperationException if <code>participant</code> does
      *         not implement {@link NonDurableTransactionParticipant} and the
@@ -108,25 +110,25 @@ public interface Transaction {
      * @throws TransactionNotActiveException if the transaction has been
      *					     aborted
      *
-     * @throws IllegalStateException if the transaction has completed
-     *                               preparation and has not begun aborting
+     * @throws IllegalStateException if all transaction participants have been
+     *                               prepared and {@link #abort abort} has not
+     *                               been called
      */
     public void abort(Throwable cause);
 
     /**
-     * Returns information about whether this transaction has begun to be
-     * aborted.
+     * Returns information about whether {@link #abort abort} has been called
+     * on this transaction.
      *
-     * @return {@code true} if this transaction has begun to be aborted, else
-     *	       {@code false}
+     * @return {@code true} if {@code abort} has been called on this
+     *         transaction, else {@code false}
      *
      */
     public boolean isAborted();
 
     /**
-     * Returns the exception that caused this transaction begin aborting, or
-     * {@code null} if this transaction has not begun aborting or the call to
-     * {@link #abort abort} did not supply a cause.
+     * Returns the cause supplied in the first call to {@link #abort abort} on
+     * this transaction, or {@code null} if {@code abort} has not been called.
      *
      * @return the exception that caused the abort or {@code null}
      */
