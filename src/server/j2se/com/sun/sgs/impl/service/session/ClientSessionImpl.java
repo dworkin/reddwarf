@@ -645,8 +645,10 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		String password = msg.getString();
 
 		try {
-		    identity = authenticate(name, password);
+		    Identity authenticatedIdentity =
+			authenticate(name, password);
 		    synchronized (lock) {
+			identity = authenticatedIdentity;
 			taskQueue =
 			    new NonDurableTaskQueue(
 				sessionService.txnProxy,

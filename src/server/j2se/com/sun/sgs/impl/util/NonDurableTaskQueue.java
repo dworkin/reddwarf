@@ -36,8 +36,8 @@ public class NonDurableTaskQueue implements NonDurableTransactionParticipant {
     private static final ThreadLocal<Context> currentContext =
 	new ThreadLocal<Context>();
     
-    /** The transaction proxy, or null if configure has not been called. */    
-    private TransactionProxy txnProxy;
+    /** The transaction proxy. */
+    private final TransactionProxy txnProxy;
     
     /** The task scheduler. */
     private final NonDurableTaskScheduler nonDurableTaskScheduler;
@@ -185,8 +185,7 @@ public class NonDurableTaskQueue implements NonDurableTransactionParticipant {
 		    logger.log(Level.WARNING, "task queue unexpectedly empty");
 		    return;
 		}
-		Context context = joinTransaction();
-		context.setTask(task);
+		Context context = joinTransaction(task);
 		logger.log(Level.FINER, "running task:{0}", task);
 		task.run();
 		
@@ -256,6 +255,8 @@ public class NonDurableTaskQueue implements NonDurableTransactionParticipant {
      * in the current context.  If the specified transaction does not
      * match the current context's transaction, then sets the current
      * context to (@code null}.
+     *
+     * @param	txn	a transaction
      */
     private void checkTransaction(Transaction txn) {
         if (txn == null) {
@@ -278,8 +279,21 @@ public class NonDurableTaskQueue implements NonDurableTransactionParticipant {
      * {@code TransactionNotActiveException} if there is no current
      * transaction, and throwing {@code IllegalStateException} if
      * there is a problem with the state of the transaction.
+     *
+     * If the current transaction is joined, this method creates a
+     * {@code Context} with the current transaction and the given
+     * {@code task}, and then sets the current context object to the
+     * created {@code Context}.
+     *
+     * @param 	task 	the task being processed in this transaction
+     *
+     * @returns	the current context
      */
-    private Context joinTransaction() {
+    private Context joinTransaction(KernelRunnable task) {
+	if (task == null) {
+	    throw new NullPointerException("null task");
+	}
+
 	Transaction txn;
 	synchronized (lock) {
 	    txn = txnProxy.getCurrentTransaction();
@@ -294,7 +308,7 @@ public class NonDurableTaskQueue implements NonDurableTransactionParticipant {
 		logger.log(Level.FINER, "join txn:{0}", txn);
 	    }
 	    txn.join(this);
-	    context = new Context(txn);
+	    context = new Context(txn, task);
 	    currentContext.set(context);
 
 	} else if (!txn.equals(context.txn)) {
@@ -319,18 +333,11 @@ public class NonDurableTaskQueue implements NonDurableTransactionParticipant {
 	KernelRunnable task;
 
 	/**
-	 * Constructs a context with the specified transaction.
+	 * Constructs a context with the specified transaction and task.
 	 */
-	private Context(Transaction txn) {
-	    assert txn != null;
+	private Context(Transaction txn, KernelRunnable task) {
+	    assert txn != null && task != null;
 	    this.txn = txn;
-
-	}
-
-	/**
-	 * Sets the task being processed to the given {@code task}.
-	 */
-	private void setTask(KernelRunnable task) {
 	    this.task = task;
 	}
     }
