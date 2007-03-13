@@ -1,0 +1,76 @@
+Sun Game Server Software Development Kit Version 0.9
+
+INTRODUCTION
+
+The Sun Game Server (SGS) is a system that enables developers to write
+scalable, reliable, persistent and fault-tolerant game server
+applications using simple single-threaded, event-driven code.
+
+This kit contains everything you need to develop game servers that run
+as applications in the SGS environment, and clients that communicate
+with these servers and each other.
+
+In addition to the documents, APIs and examples, this kit contains a
+complete single-system version of the Sun Game Server.  The APIs in this
+version are the same as those that will be included in the full-scale,
+multi-node version of the system, which will be released in the
+future. The current system allows development of games that run on a
+single server. The server system will make use of the multi-threading
+capabilities of that server when they are available.
+
+CONTENTS
+
+The SGS Software Development Kit (SDK) contains the following
+subdirectories:
+
+- doc
+   All the documentation for the SGS except the tutorials
+
+- lib
+   JAR files and native libraries needed to develop for the SGS, and to
+   run the server and client apps
+
+- tutorial
+   Documentation and sample code for the two SGS tutorials
+	
+To develop or run clients, include the following JAR file in your
+classpath:
+
+   lib/sgs-client.jar
+
+To develop server applications, include the following JAR file in your
+classpath:
+
+   lib/sgs.jar
+
+To run the SGS server:
+
+1. Change to the directory containing the SGS installation, or set the
+   SGSHOME environment variable to the installation directory and
+   include that directory in your path
+
+2. On Windows, type:
+
+   sgs <path to application classes> <path to application config file>
+
+   On all other systems, type:
+
+   sgs.sh <path to application classes> <path to application config file>
+
+   For example, to run the tutorial's HelloWorld example when running on
+   Windows, assuming the SGSHOME environment variable is set to the
+   installation directory, that directory is included in your path, and
+   your working directory is the tutorial subdirectory of the
+   installation directory, type:
+
+   sgs tutorial.jar HelloWorld.properties
+
+For more information, please see the tutorials in the tutorial directory
+and the documentation in the docs directory.  Also check the
+http://www.projectdarkstar.com website, which has links to more
+information and to the Project Darkstar forums.
+
+If you cannot find an answer to your question in any of these places,
+please email the Darkstar team at:
+
+   ProjectDarkstar@games.dev.java.net

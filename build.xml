@@ -23,7 +23,7 @@
 	    value="-Xlint"/>
 
   <!-- Version information -->
-  <property name="project.release" value="1.0RC"/>
+  <property name="project.release" value="0.9"/>
 
   <!-- Values for the JavaDocs -->
   <property name="project.name" value="Sun Game Server"/>
@@ -331,7 +331,8 @@
 	       includes="sgs.*,
 			 sgs-*.properties,
 			 LICENSE.pdf,
-			 THIRDPARTYLICENSE.pdf"/>
+			 THIRDPARTYLICENSE.pdf,
+			 README"/>
     </copy>
     <chmod file="${build.dir}/sgs/sgs.sh" perm="a+x"/>
     <copy todir="${build.dir}/sgs/lib">
@@ -778,7 +779,11 @@
     <mkdir dir="${build.dir}/sgs/tutorial/data/HelloUser2/dsdb"/>
     <mkdir dir="${build.dir}/sgs/tutorial/data/HelloWorld/dsdb"/>
     <mkdir dir="${build.dir}/sgs/tutorial/data/SwordWorld/dsdb"/>
-    <!-- TODO: generate and package javadoc, add the pdf files. -->
+    <copy todir="${build.dir}/sgs/tutorial">
+      <fileset dir="doc"
+	       includes="ClientTutorial.pdf, ServerAppTutorial.pdf"/>
+    </copy>
+    <!-- TODO: generate and package javadoc -->
   </target>
 
 </project>
