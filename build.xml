@@ -23,7 +23,7 @@
 	    value="-Xlint"/>
 
   <!-- Version information -->
-  <property name="project.release" value="1.0RC"/>
+  <property name="project.release" value="0.9"/>
 
   <!-- Values for the JavaDocs -->
   <property name="project.name" value="Sun Game Server"/>
@@ -65,7 +65,8 @@
   <path id="shared.classpath">
     <pathelement location="${build.dir}/classes/shared"/>
     <pathelement location="${lib.dir}/mina-core-1.1.jar"/>
-    <pathelement location="${lib.dir}/slf4j-jdk14.jar"/>
+    <pathelement location="${lib.dir}/slf4j-jdk14-1.2.jar"/>
+    <pathelement location="${lib.dir}/slf4j-api-1.2.jar"/>
   </path>
 
   <!-- Server class path -->
@@ -296,7 +297,8 @@
 
   <!-- Builds files for distribution -->
   <target name="dist"
-	  depends="dist-client, dist-server, javadoc-api, project-version"
+	  depends="dist-client, dist-server, dist-tutorial, javadoc-api,
+		   project-version"
 	  description="Builds files for distribution">
     <copy todir="${build.dir}/sgs/doc/sgs-client-api">
       <fileset dir="${build.dir}/javadoc/apidoc/sgs-client-apidoc/"/>
@@ -325,12 +327,17 @@
   <target name="dist-server" depends="jar-server, dist-bdb"
 	  description="Builds server files for distribution">
     <copy todir="${build.dir}/sgs">
-      <fileset dir="etc" includes="sgs.*, sgs-*.properties"/>
+      <fileset dir="etc"
+	       includes="sgs.*,
+			 sgs-*.properties,
+			 LICENSE.pdf,
+			 THIRDPARTYLICENSE.pdf,
+			 README"/>
     </copy>
     <chmod file="${build.dir}/sgs/sgs.sh" perm="a+x"/>
     <copy todir="${build.dir}/sgs/lib">
       <fileset file="${build.dir}/lib/sgs.jar"/>
-      <fileset dir="lib" includes="mina-core-1.1.jar, slf4j-jdk14.jar"/>
+      <fileset dir="lib" includes="mina-*.jar, slf4j-*.jar"/>
     </copy>
   </target>
 
@@ -363,7 +370,7 @@
   </target>
 
   <!-- Builds the jar files for the project classes -->
-  <target name="jar" depends="jar-client, jar-server"
+  <target name="jar" depends="jar-client, jar-server, jar-tutorial"
 	  description="Builds JAR files"/>
 
   <!-- Builds the client JAR file -->
@@ -375,7 +382,9 @@
       <fileset dir="${build.dir}/classes/shared"/>
       <manifest>
         <attribute name="Class-Path"
-                   value="mina-core-1.1.jar slf4j-jdk14.jar"/>
+		   value="mina-core-1.1.jar
+			  slf4j-jdk14-1.2.jar
+			  slf4j-api-1.2.jar"/>
       </manifest>
     </jar>
   </target>
@@ -394,7 +403,8 @@
         <attribute name="Class-Path"
                    value="bdb/db.jar
                           mina-core-1.1.jar
-                          slf4j-jdk14.jar"/>
+                          slf4j-jdk14-1.2.jar
+			  slf4j-api-1.2.jar"/>
       </manifest>
     </jar>
   </target>
@@ -736,6 +746,44 @@
         <path refid="client.classpath"/>
       </classpath>
     </java>
+  </target>
+
+  <!-- Builds tutorial jar file -->
+  <target name="jar-tutorial" depends="example-classes"
+          description="Builds tutorial jar file">
+    <mkdir dir="${build.dir}/example/tutorial"/>
+    <jar destfile="${build.dir}/example/tutorial/tutorial.jar">
+      <fileset dir="${build.dir}/example/classes"
+               includes="com/sun/sgs/tutorial/**"/>
+    </jar>
+  </target>
+
+  <!-- Creates the tutorial distribution -->
+  <target name="dist-tutorial" depends="jar-tutorial"
+          description="Creates the tutorial distribution">
+    <copy todir="${build.dir}/sgs/tutorial">
+      <fileset dir="example/tutorial" includes="*.properties"/>
+      <fileset file="build/example/tutorial/tutorial.jar"/>
+    </copy>
+    <copy todir="${build.dir}/sgs/tutorial/src">
+      <fileset dir="example/tutorial/src" includes="**/*.java"/>
+    </copy>
+    <mkdir dir="${build.dir}/sgs/tutorial/data/HelloChannels/dsdb"/>
+    <mkdir dir="${build.dir}/sgs/tutorial/data/HelloEcho/dsdb"/>
+    <mkdir dir="${build.dir}/sgs/tutorial/data/HelloLogger/dsdb"/>
+    <mkdir dir="${build.dir}/sgs/tutorial/data/HelloPersistence/dsdb"/>
+    <mkdir dir="${build.dir}/sgs/tutorial/data/HelloPersistence2/dsdb"/>
+    <mkdir dir="${build.dir}/sgs/tutorial/data/HelloPersistence3/dsdb"/>
+    <mkdir dir="${build.dir}/sgs/tutorial/data/HelloTimer/dsdb"/>
+    <mkdir dir="${build.dir}/sgs/tutorial/data/HelloUser/dsdb"/>
+    <mkdir dir="${build.dir}/sgs/tutorial/data/HelloUser2/dsdb"/>
+    <mkdir dir="${build.dir}/sgs/tutorial/data/HelloWorld/dsdb"/>
+    <mkdir dir="${build.dir}/sgs/tutorial/data/SwordWorld/dsdb"/>
+    <copy todir="${build.dir}/sgs/tutorial">
+      <fileset dir="doc"
+	       includes="ClientTutorial.pdf, ServerAppTutorial.pdf"/>
+    </copy>
+    <!-- TODO: generate and package javadoc -->
   </target>
 
 </project>

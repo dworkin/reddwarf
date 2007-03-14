@@ -18,6 +18,7 @@ import com.sun.sgs.impl.service.session.ClientSessionServiceImpl.Context;
 import com.sun.sgs.impl.util.HexDumper;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.MessageBuffer;
+import com.sun.sgs.impl.util.NonDurableTaskQueue;
 import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.kernel.KernelRunnable;
@@ -74,6 +75,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     /** The client session service that created this client session. */
     private final ClientSessionServiceImpl sessionService;
 
+    /** The data service. */
     private final DataService dataService;
     
     /** The Connection for sending messages to the client. */
@@ -100,17 +102,25 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     /** The client session listener for this client session.*/
     private SessionListener listener;
 
+    /** Indicates whether session disconnection has been handled. */
     private boolean disconnectHandled = false;
 
+    /** Indicates whether this session is shut down. */
     private boolean shutdown = false;
 
     /** The sequence number for ordered messages sent from this client. */
     private AtomicLong sequenceNumber = new AtomicLong(0);
 
+    /** The queue of tasks for notifying listeners of received messages. */
+    private NonDurableTaskQueue taskQueue = null;
+
     /**
      * Constructs an instance of this class with the specified handle.
      */
     ClientSessionImpl(ClientSessionServiceImpl sessionService) {
+	if (sessionService == null) {
+	    throw new NullPointerException("sessionService is null");
+	}
 	this.sessionService = sessionService;
         this.dataService = sessionService.dataService;
 	this.connectionListener = new Listener();
@@ -132,8 +142,9 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	byte[] sessionId,
         Identity identity)
     {
-	this.sessionService = null;
-	this.dataService = null;
+	this.sessionService =
+	    (ClientSessionServiceImpl) ClientSessionServiceImpl.getInstance();
+	this.dataService = sessionService.dataService;
 	this.sessionId = sessionId;
         this.identity = identity;
 	this.reconnectionKey = generateId(); // create bogus one
@@ -158,7 +169,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
         return new ClientSessionId(sessionId);
     }
 
-    /** {@inheritDoc} */
+    /** {@inheritdoc} */
     public boolean isConnected() {
 
 	State currentState = getCurrentState();
@@ -228,21 +239,40 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     public void sendProtocolMessage(byte[] message, Delivery delivery) {
 	// TBI: ignore delivery for now...
 	try {
-	    sessionConnection.sendBytes(message);
-	    logger.log(
-		Level.FINEST, "sendProtocolMessage message:{0} returns",
-		message);
+	    if (getCurrentState() != State.DISCONNECTED) {
+		sessionConnection.sendBytes(message);
+	    } else {
+		if (logger.isLoggable(Level.WARNING)) {
+		    logger.log(
+		        Level.WARNING,
+			"sendProtocolMessage session:{0} message:{1}, " +
+			"session is disconnected",
+			this, HexDumper.format(message));
+		}
+	    }
+		    
 	} catch (IOException e) {
-	    logger.logThrow(
-		Level.WARNING, e,
-		"sendProtocolMessage handle:{0} throws",
-                sessionConnection);
+	    if (logger.isLoggable(Level.WARNING)) {
+		logger.logThrow(
+		    Level.WARNING, e,
+		    "sendProtocolMessage session:{0} message:{1} throws",
+		    this, HexDumper.format(message));
+	    }
+	}
+	
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(
+		Level.FINEST,
+		"sendProtocolMessage session:{0} message:{1} returns",
+		this, HexDumper.format(message));
 	}
     }
 
     /** {@inheritDoc} */
     public void sendProtocolMessageOnCommit(byte[] message, Delivery delivery) {
-        getContext().addMessage(this, message, delivery);
+	if (getCurrentState() != State.DISCONNECTED) {
+	    getContext().addMessage(this, message, delivery);
+	}
     }
 
     /* -- Implement Object -- */
@@ -410,10 +440,12 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    shutdown = true;
 	    disconnectHandled = true;
 	    state = State.DISCONNECTED;
-	    try {
-		sessionConnection.close();
-	    } catch (IOException e) {
-		// ignore
+	    if (sessionConnection != null) {
+		try {
+		    sessionConnection.close();
+		} catch (IOException e) {
+		    // ignore
+		}
 	    }
 	}
     }
@@ -567,14 +599,28 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		ProtocolMessageListener serviceListener =
 		    sessionService.getProtocolMessageListener(serviceId);
 		if (serviceListener != null) {
+		    synchronized (lock) {
+			if (identity == null) {
+			    if (logger.isLoggable(Level.WARNING)) {
+				logger.log(
+				    Level.WARNING,
+				    "session:{0} received message for " +
+				    "service ID:{1} before successful login",
+				    this, serviceId);
+				return;
+			    }
+			}
+		    }
+		    
 		    serviceListener.receivedMessage(
 			ClientSessionImpl.this, buffer);
+		    
 		} else {
 		    if (logger.isLoggable(Level.SEVERE)) {
 		    	logger.log(
 			    Level.SEVERE,
-			    "Handler.messageReceived unknown service ID:{0}",
-			    serviceId);
+			    "session:{0} unknown service ID:{1}",
+			    this, serviceId);
 		    }
 		}
 		return;
@@ -599,7 +645,16 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		String password = msg.getString();
 
 		try {
-		    identity = authenticate(name, password);
+		    Identity authenticatedIdentity =
+			authenticate(name, password);
+		    synchronized (lock) {
+			identity = authenticatedIdentity;
+			taskQueue =
+			    new NonDurableTaskQueue(
+				sessionService.txnProxy,
+				sessionService.nonDurableTaskScheduler,
+				identity);
+		    }
 		    scheduleTask(new LoginTask());
 		} catch (LoginException e) {
 		    scheduleNonTransactionalTask(new KernelRunnable() {
@@ -615,10 +670,18 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		break;
 
 	    case SimpleSgsProtocol.SESSION_MESSAGE:
+		synchronized (lock) {
+		    if (identity == null) {
+			logger.log(
+			    Level.WARNING,
+			    "session message received before login:{0}", this);
+			break;
+		    }
+		}
                 msg.getLong(); // TODO Check sequence num
 		int size = msg.getUnsignedShort();
 		final byte[] clientMessage = msg.getBytes(size);
-		scheduleTask(new KernelRunnable() {
+		taskQueue.addTask(new KernelRunnable() {
 		    public void run() {
 			if (isConnected()) {
 			    listener.get().receivedMessage(clientMessage);
