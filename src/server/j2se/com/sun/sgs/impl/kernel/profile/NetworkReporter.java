@@ -9,8 +9,8 @@ import com.sun.sgs.kernel.ResourceCoordinator;
 import java.io.IOException;
 import java.io.OutputStream;
 
-import java.net.Socket;
 import java.net.ServerSocket;
+import java.net.Socket;
 
 import java.util.HashSet;
 
@@ -81,7 +81,7 @@ public class NetworkReporter {
                         listeners.add(serverSocket.accept());
                     }
                 }
-            } catch (Exception e) {
+            } catch (IOException e) {
                 try {
                     serverSocket.close();
                 } catch (IOException ioe) {}

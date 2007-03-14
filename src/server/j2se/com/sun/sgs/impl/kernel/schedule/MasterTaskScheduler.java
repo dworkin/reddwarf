@@ -6,13 +6,8 @@ package com.sun.sgs.impl.kernel.schedule;
 
 import com.sun.sgs.app.TaskRejectedException;
 
-import com.sun.sgs.impl.auth.IdentityImpl;
-
 import com.sun.sgs.impl.kernel.TaskHandler;
-import com.sun.sgs.impl.kernel.TaskOwnerImpl;
 
-import com.sun.sgs.impl.kernel.profile.AggregateProfileOpListener;
-import com.sun.sgs.impl.kernel.profile.AppGraphProfileOpListener;
 import com.sun.sgs.impl.kernel.profile.ProfileCollector;
 import com.sun.sgs.impl.kernel.profile.ProfileConsumerImpl;
 
@@ -62,12 +57,6 @@ public class MasterTaskScheduler
 
     // the scheduler used for this system
     private final SystemScheduler systemScheduler;
-
-    // the system's resource coordinator
-    private final ResourceCoordinator resourceCoordinator;
-
-    // the task handler used to run tasks
-    private final TaskHandler taskHandler;
 
     /**
      * The property used to define the system scheduler.
@@ -143,8 +132,6 @@ public class MasterTaskScheduler
             (SystemScheduler)(systemSchedulerConstructor.
                     newInstance(properties));
 
-        this.resourceCoordinator = resourceCoordinator;
-        this.taskHandler = taskHandler;
         this.profileCollector = profileCollector;
 
         int startingThreads =
@@ -252,7 +239,7 @@ public class MasterTaskScheduler
     }
 
     /**
-     * Tells the scheduler to stop running tasks.
+     * {@inheritDoc}
      */
     public void shutdown() {
         systemScheduler.shutdown();
@@ -361,12 +348,13 @@ public class MasterTaskScheduler
      * reservation is made for a group, they are all accpeted or none of them
      * is accepted. When used or cancelled, it also applies to all tasks.
      */
-    private class GroupTaskReservation implements TaskReservation {
-        HashSet<TaskReservation> reservations;
+    private static class GroupTaskReservation implements TaskReservation {
+        private HashSet<TaskReservation> reservations;
         private boolean finished = false;
-        public GroupTaskReservation(HashSet<TaskReservation> reservations) {
+        GroupTaskReservation(HashSet<TaskReservation> reservations) {
             this.reservations = reservations;
         }
+        /** @{inheritDoc} */
         public void cancel() {
             if (finished)
                 throw new IllegalStateException("cannot cancel reservation");
@@ -374,6 +362,7 @@ public class MasterTaskScheduler
                 reservation.cancel();
             finished = true;
         }
+        /** @{inheritDoc} */
         public void use() {
             if (finished)
                 throw new IllegalStateException("cannot use reservation");
