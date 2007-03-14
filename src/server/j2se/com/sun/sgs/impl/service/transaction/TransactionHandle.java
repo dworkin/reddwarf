@@ -4,39 +4,48 @@
 
 package com.sun.sgs.impl.service.transaction;
 
+import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.service.Transaction;
+import com.sun.sgs.service.TransactionParticipant;
 
 /** Defines an interface for managing a transaction. */
 public interface TransactionHandle {
 
     /**
-     * Returns the active transaction associated with this handle.
+     * Returns the transaction associated with this handle.
      *
      * @return	the transaction
-     * @throws	TransactionNotActiveException if the transaction associated 
-     *		with this handle is not active
      */
     Transaction getTransaction();
 
     /**
-     * Prepares and commits the transaction associated with this handle.
+     * Prepares and commits the transaction associated with this handle. <p>
      *
-     * @throws	TransactionNotActiveException if the transaction is not active
-     * @throws	TransactionAbortedException if the transaction was aborted
-     *		during preparation without an exception being thrown
-     * @throws	Exception if any participant throws an exception while
-     *		preparing the transaction
+     * If the transaction has been aborted, or when preparing a transaction
+     * participant aborts the transaction without throwing an exception, then
+     * the exception thrown will have as its cause the value provided in the
+     * first call to {@link Transaction#abort abort} on the transaction, if
+     * any.  If the cause implements {@link ExceptionRetryStatus}, then the
+     * exception thrown will, too, and its {@link
+     * ExceptionRetryStatus#shouldRetry shouldRetry} method will return the
+     * value returned by calling that method on the cause.  If no cause was
+     * supplied, then {@code shouldRetry} will either not implement {@code
+     * ExceptionRetryStatus} or its {@code shouldRetry} method will return
+     * {@code false}.
+     *
+     * @throws	TransactionNotActiveException if the transaction has been
+     *		aborted
+     * @throws	TransactionAbortedException if a call to {@link
+     *		TransactionParticipant#prepare prepare} on a transaction
+     *		participant causes the transaction to be aborted but does not
+     *		throw an exception
+     * @throws	IllegalStateException if {@code prepare} has been called on any
+     *		transaction participant and {@link Transaction#abort abort} has
+     *		not been called on the transaction
+     * @throws	Exception any exception thrown when calling {@code prepare} on
+     *		a participant
      */
     void commit() throws Exception;
-
-    /**
-     * Aborts the transaction associated with this handle.
-     *
-     * @param	cause the abort cause, or {@code null}
-     *
-     * @throws	TransactionNotActiveException if the transaction is not active
-     */
-    void abort(Throwable cause);
 }

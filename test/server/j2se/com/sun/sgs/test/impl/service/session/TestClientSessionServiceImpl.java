@@ -203,7 +203,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     protected void tearDown(boolean clean) throws Exception {
         if (txn != null) {
             try {
-                txn.abort();
+                txn.abort(null);
             } catch (IllegalStateException e) {
             }
             txn = null;
