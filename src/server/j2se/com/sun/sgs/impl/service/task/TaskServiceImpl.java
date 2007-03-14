@@ -1,3 +1,6 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
 
 package com.sun.sgs.impl.service.task;
 
@@ -146,18 +149,21 @@ public class TaskServiceImpl
     }
 
     /**
-     * @{inheritDoc}
+     * {@inheritDoc}
      */
     public void setProfileRegistrar(ProfileRegistrar profileRegistrar) {
         ProfileConsumer consumer =
             profileRegistrar.registerProfileProducer(this);
 
-        scheduleNDTaskOp =
-            consumer.registerOperation("scheduleNonDurableTask");
-        scheduleNDTaskDelayedOp =
-            consumer.registerOperation("scheduleNonDurableTaskDelayed");
-        scheduleNDTaskPrioritizedOp =
-            consumer.registerOperation("scheduleNonDurableTaskPrioritized");
+	if (consumer != null) {
+	    scheduleNDTaskOp =
+		consumer.registerOperation("scheduleNonDurableTask");
+	    scheduleNDTaskDelayedOp =
+		consumer.registerOperation("scheduleNonDurableTaskDelayed");
+	    scheduleNDTaskPrioritizedOp =
+		consumer.registerOperation(
+		    "scheduleNonDurableTaskPrioritized");
+	}
     }
 
     /**

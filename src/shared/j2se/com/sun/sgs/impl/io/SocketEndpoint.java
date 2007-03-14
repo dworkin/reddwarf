@@ -1,3 +1,7 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.impl.io;
 
 import java.net.SocketAddress;
@@ -32,7 +36,7 @@ public class SocketEndpoint extends AbstractSocketEndpoint
      * @param type the type of transport
      */
     public SocketEndpoint(SocketAddress address, TransportType type) {
-        this(address, type, new DaemonExecutor());
+        super(address, type);
     }
 
     /**

@@ -23,10 +23,7 @@
 	    value="-Xlint"/>
 
   <!-- Version information -->
-  <exec outputproperty="project.revision"
-	executable="svnversion"
-	logError="true"/>
-  <property name="project.version" value="1.0alpha-${project.revision}"/>
+  <property name="project.release" value="0.9"/>
 
   <!-- Values for the JavaDocs -->
   <property name="project.name" value="Sun Game Server"/>
@@ -68,7 +65,8 @@
   <path id="shared.classpath">
     <pathelement location="${build.dir}/classes/shared"/>
     <pathelement location="${lib.dir}/mina-core-1.1.jar"/>
-    <pathelement location="${lib.dir}/slf4j-jdk14.jar"/>
+    <pathelement location="${lib.dir}/slf4j-jdk14-1.2.jar"/>
+    <pathelement location="${lib.dir}/slf4j-api-1.2.jar"/>
   </path>
 
   <!-- Server class path -->
@@ -162,7 +160,7 @@
 	  description="Builds public API javadoc"/>
 
   <!-- Build the internal server JavaDoc -->
-  <target name="javadoc-server" depends="build-server"
+  <target name="javadoc-server" depends="build-server, project-version"
 	  description="Builds internal (full) server javadoc">
     <javadoc sourcepath="src/server/j2se:src/shared/j2se"
              destdir="${build.dir}/javadoc/server"
@@ -192,7 +190,7 @@
   </target>
 
   <!-- Build the internal client JavaDoc -->
-  <target name="javadoc-client" depends="build-client"
+  <target name="javadoc-client" depends="build-client, project-version"
 	  description="Builds internal (full) client javadoc">
     <javadoc sourcepath="src/client/j2se"
              destdir="${build.dir}/javadoc/client"
@@ -222,7 +220,7 @@
   </target>
 
   <!-- Build the public Application API JavaDoc -->
-  <target name="javadoc-api-server" depends="build-server"
+  <target name="javadoc-api-server" depends="build-server, project-version"
 	  description="Builds public server application API javadoc">
     <javadoc sourcepath="src/server/j2se"
              destdir="${build.dir}/javadoc/apidoc/sgs-server-apidoc"
@@ -250,7 +248,7 @@
   </target>
 
   <!-- Build the public Client API JavaDoc -->
-  <target name="javadoc-api-client" depends="build-client"
+  <target name="javadoc-api-client" depends="build-client, project-version"
 	  description="Builds public client API javadoc">
     <javadoc sourcepath="src/client/j2se"
              destdir="${build.dir}/javadoc/apidoc/sgs-client-apidoc"
@@ -298,7 +296,9 @@
   </target>
 
   <!-- Builds files for distribution -->
-  <target name="dist" depends="dist-client, dist-server, javadoc-api"
+  <target name="dist"
+	  depends="dist-client, dist-server, dist-tutorial, javadoc-api,
+		   project-version"
 	  description="Builds files for distribution">
     <copy todir="${build.dir}/sgs/doc/sgs-client-api">
       <fileset dir="${build.dir}/javadoc/apidoc/sgs-client-apidoc/"/>
@@ -327,12 +327,17 @@
   <target name="dist-server" depends="jar-server, dist-bdb"
 	  description="Builds server files for distribution">
     <copy todir="${build.dir}/sgs">
-      <fileset dir="etc" includes="sgs.*, sgs-*.properties"/>
+      <fileset dir="etc"
+	       includes="sgs.*,
+			 sgs-*.properties,
+			 LICENSE.pdf,
+			 THIRDPARTYLICENSE.pdf,
+			 README"/>
     </copy>
     <chmod file="${build.dir}/sgs/sgs.sh" perm="a+x"/>
     <copy todir="${build.dir}/sgs/lib">
       <fileset file="${build.dir}/lib/sgs.jar"/>
-      <fileset dir="lib" includes="mina-core-1.1.jar, slf4j-jdk14.jar"/>
+      <fileset dir="lib" includes="mina-*.jar, slf4j-*.jar"/>
     </copy>
   </target>
 
@@ -365,7 +370,7 @@
   </target>
 
   <!-- Builds the jar files for the project classes -->
-  <target name="jar" depends="jar-client, jar-server"
+  <target name="jar" depends="jar-client, jar-server, jar-tutorial"
 	  description="Builds JAR files"/>
 
   <!-- Builds the client JAR file -->
@@ -377,13 +382,15 @@
       <fileset dir="${build.dir}/classes/shared"/>
       <manifest>
         <attribute name="Class-Path"
-                   value="mina-core-1.1.jar slf4j-jdk14.jar"/>
+		   value="mina-core-1.1.jar
+			  slf4j-jdk14-1.2.jar
+			  slf4j-api-1.2.jar"/>
       </manifest>
     </jar>
   </target>
 
   <!-- Builds the server JAR file -->
-  <target name="jar-server" depends="build-server"
+  <target name="jar-server" depends="build-server, project-version"
 	  description="Builds server JAR files">
     <mkdir dir="${build.dir}/lib"/>
     <echo file="${build.dir}/classes/server/com/sun/sgs/sgs.version"
@@ -396,9 +403,31 @@
         <attribute name="Class-Path"
                    value="bdb/db.jar
                           mina-core-1.1.jar
-                          slf4j-jdk14.jar"/>
+                          slf4j-jdk14-1.2.jar
+			  slf4j-api-1.2.jar"/>
       </manifest>
     </jar>
+  </target>
+
+  <!-- Sets properties for the project version -->
+  <target name="project-version"
+	  description="Sets properties for the project version">
+    <!-- Use the latest committed revision, the part after the colon -->
+    <exec outputproperty="project.revision"
+	  executable="svnversion"
+	  logError="true">
+      <arg line="-c"/>
+      <redirector>
+	<outputfilterchain>
+	  <tokenfilter>
+	    <containsregex pattern="[^:]*:?([^:]*)" replace="\1"/>
+	  </tokenfilter>
+	</outputfilterchain>
+      </redirector>
+    </exec>
+    <property name="project.version"
+	      value="${project.release}-r${project.revision}"/>
+    <echo message="${project.version}"/>
   </target>
 
   <!-- Checks Java coding style -->
@@ -662,5 +691,99 @@
       </classpath>
     </java>
   </target>
-  
+
+  <!-- Builds the example code -->
+  <target name="example-classes" depends="build"
+          description="Builds the example code">
+    <mkdir dir="${build.dir}/example/classes"/>
+    <depend srcdir="example"
+            destdir="${build.dir}/example/classes"
+	    cache="${build.dir}/example/depend"
+	    closure="true"/>
+    <javac destdir="${build.dir}/example/classes"
+	   debug="on"
+	   source="${javac.source}">
+      <src>
+        <dirset dir="example" includes="*/src"/>
+      </src>
+      <classpath>
+        <pathelement location="${build.dir}/classes/server"/>
+        <pathelement location="${build.dir}/classes/client"/>
+        <pathelement location="${build.dir}/classes/shared"/>
+      </classpath>
+      <compilerarg value="${javac.compilerargs}"/>
+    </javac>
+  </target>
+
+  <!-- Runs the example ChatApp (server) -->
+  <target name="example-chat-app" depends="example-classes"
+          description="Runs the example ChatApp (server)">
+    <mkdir dir="/tmp/ChatApp/dsdb"/>
+    <java classname="com.sun.sgs.impl.kernel.Kernel"
+          fork="true">
+      <jvmarg line="${test.jvm.args}"/>
+      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${test.logging}"/>
+      <classpath>
+        <pathelement location="${build.dir}/example/classes"/>
+        <path refid="server.classpath"/>
+      </classpath>
+      <arg value="example/chat/ChatApp.properties"/>
+    </java>
+  </target>
+
+  <!-- Runs the example ChatClient -->
+  <target name="example-chat-client" depends="example-classes"
+          description="Runs the example ChatClient">
+    <java classname="com.sun.sgs.example.chat.client.ChatClient"
+          fork="true">
+      <jvmarg line="${test.jvm.args}"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${test.logging}"/>
+      <classpath>
+        <pathelement location="${build.dir}/example/classes"/>
+        <path refid="client.classpath"/>
+      </classpath>
+    </java>
+  </target>
+
+  <!-- Builds tutorial jar file -->
+  <target name="jar-tutorial" depends="example-classes"
+          description="Builds tutorial jar file">
+    <mkdir dir="${build.dir}/example/tutorial"/>
+    <jar destfile="${build.dir}/example/tutorial/tutorial.jar">
+      <fileset dir="${build.dir}/example/classes"
+               includes="com/sun/sgs/tutorial/**"/>
+    </jar>
+  </target>
+
+  <!-- Creates the tutorial distribution -->
+  <target name="dist-tutorial" depends="jar-tutorial"
+          description="Creates the tutorial distribution">
+    <copy todir="${build.dir}/sgs/tutorial">
+      <fileset dir="example/tutorial" includes="*.properties"/>
+      <fileset file="build/example/tutorial/tutorial.jar"/>
+    </copy>
+    <copy todir="${build.dir}/sgs/tutorial/src">
+      <fileset dir="example/tutorial/src" includes="**/*.java"/>
+    </copy>
+    <mkdir dir="${build.dir}/sgs/tutorial/data/HelloChannels/dsdb"/>
+    <mkdir dir="${build.dir}/sgs/tutorial/data/HelloEcho/dsdb"/>
+    <mkdir dir="${build.dir}/sgs/tutorial/data/HelloLogger/dsdb"/>
+    <mkdir dir="${build.dir}/sgs/tutorial/data/HelloPersistence/dsdb"/>
+    <mkdir dir="${build.dir}/sgs/tutorial/data/HelloPersistence2/dsdb"/>
+    <mkdir dir="${build.dir}/sgs/tutorial/data/HelloPersistence3/dsdb"/>
+    <mkdir dir="${build.dir}/sgs/tutorial/data/HelloTimer/dsdb"/>
+    <mkdir dir="${build.dir}/sgs/tutorial/data/HelloUser/dsdb"/>
+    <mkdir dir="${build.dir}/sgs/tutorial/data/HelloUser2/dsdb"/>
+    <mkdir dir="${build.dir}/sgs/tutorial/data/HelloWorld/dsdb"/>
+    <mkdir dir="${build.dir}/sgs/tutorial/data/SwordWorld/dsdb"/>
+    <copy todir="${build.dir}/sgs/tutorial">
+      <fileset dir="doc"
+	       includes="ClientTutorial.pdf, ServerAppTutorial.pdf"/>
+    </copy>
+    <!-- TODO: generate and package javadoc -->
+  </target>
+
 </project>

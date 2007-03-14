@@ -1,3 +1,7 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.impl.service.data.store;
 
 import com.sleepycat.bind.tuple.LongBinding;
@@ -1061,17 +1065,19 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
         ProfileConsumer consumer =
             profileRegistrar.registerProfileProducer(this);
 
-        getBindingOp = consumer.registerOperation("getBinding");
-        setBindingOp = consumer.registerOperation("setBinding");
-        removeBindingOp = consumer.registerOperation("removeBinding");
-        nextBoundNameOp = consumer.registerOperation("nextBoundName");
-        removeObjectOp = consumer.registerOperation("removeObject");
-        markForUpdateOp = consumer.registerOperation("markForUpdate");
-        createObjectOp = consumer.registerOperation("createObject");
-        getObjectOp = consumer.registerOperation("getObject");
-        getObjectForUpdateOp =
-            consumer.registerOperation("getObjectForUpdate");
-        setObjectOp = consumer.registerOperation("setObject");
+	if (consumer != null) {
+	    getBindingOp = consumer.registerOperation("getBinding");
+	    setBindingOp = consumer.registerOperation("setBinding");
+	    removeBindingOp = consumer.registerOperation("removeBinding");
+	    nextBoundNameOp = consumer.registerOperation("nextBoundName");
+	    removeObjectOp = consumer.registerOperation("removeObject");
+	    markForUpdateOp = consumer.registerOperation("markForUpdate");
+	    createObjectOp = consumer.registerOperation("createObject");
+	    getObjectOp = consumer.registerOperation("getObject");
+	    getObjectForUpdateOp =
+		consumer.registerOperation("getObjectForUpdate");
+	    setObjectOp = consumer.registerOperation("setObject");
+	}
     }
 
     /* -- Other public methods -- */

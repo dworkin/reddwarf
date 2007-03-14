@@ -1,3 +1,7 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.test.impl.io;
 
 import java.util.ArrayList;
@@ -252,6 +256,87 @@ public class MessageFilterTest
         assertEquals(1, receivedMessages.size());
 
         assertEquals(0, receivedMessages.get(0).length);
+    }
+
+    /** Tests handling of exceptions during dispatch. */
+    public void testReceiveHandlingException() {
+        int len = 1000;
+        byte[] expected = getByteSequence(len);
+        ByteBuffer buf = ByteBuffer.allocate(len + 4 , false);
+        buf.putInt(len);
+        buf.put(expected);
+        buf = buf.asReadOnlyBuffer();
+        buf.flip();
+
+        assertEquals(0, sentMessages.size());
+        assertEquals(0, receivedMessages.size());
+
+        RuntimeException expectedEx =
+            new RuntimeException("Dummy exception for testing filter recv");
+
+        harness.setExceptionOnNextCompleteMessage(expectedEx);
+
+        // This recv will fail to process the message
+        harness.recv(buf);
+        assertEquals(0, sentMessages.size());
+        assertEquals(0, receivedMessages.size());
+
+        // Send a second message, expecting the first to have been dropped.
+        buf.rewind();
+        harness.recv(buf);
+
+        assertEquals(0, sentMessages.size());
+        assertEquals(1, receivedMessages.size());
+    }
+
+    /** Tests handling of exceptions during dispatch. */
+    public void testReceiveHandlingExceptionPartial() {
+        int len1 = 400;
+        int len2 = 600;
+        int len = len1 + len2;
+        byte[] expected = getByteSequence(len);
+        ByteBuffer buf = ByteBuffer.allocate(len + 4 , false);
+        buf.putInt(len);
+        buf.put(expected);
+        buf = buf.asReadOnlyBuffer();
+        buf.flip();
+
+        assertEquals(0, sentMessages.size());
+        assertEquals(0, receivedMessages.size());
+
+        ByteBuffer part1 = buf.slice().limit(len1 + 4);
+
+        ByteBuffer part2 = ByteBuffer.allocate(len2 + len2 + 4, false);
+        buf.rewind();
+        buf.skip(len1 + 4);
+        part2.put(buf);
+        buf.rewind();
+        buf.skip(len1 + 4);
+        part2.putInt(len2);
+        part2.put(buf);
+        part2.flip();
+
+        assertEquals(0, sentMessages.size());
+        assertEquals(0, receivedMessages.size());
+
+        harness.recv(part1);
+
+        assertEquals(0, sentMessages.size());
+        assertEquals(0, receivedMessages.size());
+
+        RuntimeException expectedEx =
+            new RuntimeException("Dummy exception for testing filter recv");
+
+        harness.setExceptionOnNextCompleteMessage(expectedEx);
+
+        // This recv should process the second message.
+        harness.recv(part2);
+
+        assertEquals(0, sentMessages.size());
+        assertEquals(1, receivedMessages.size());
+
+        byte[] actual = receivedMessages.get(0);
+        assertEquals(len2, actual.length);
     }
 
     /** Tests that the send filter correctly prepends the message length. */

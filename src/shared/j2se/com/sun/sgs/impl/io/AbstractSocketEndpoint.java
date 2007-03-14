@@ -1,7 +1,12 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.impl.io;
 
 import java.net.SocketAddress;
 import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 abstract class AbstractSocketEndpoint {
 
@@ -16,6 +21,24 @@ abstract class AbstractSocketEndpoint {
 
     /** A MINA configuration parameter whose value may affect performance. */
     protected final int numProcessors;
+
+    /** The default {@code Executor} for IO threads. */
+    private static final Executor defaultExecutor =
+        Executors.newCachedThreadPool(new DaemonThreadFactory());
+
+    /**
+     * Constructs an {@code AbstractSocketEndpoint} with the given
+     * {@link TransportType}. This is the simplest way to create an
+     * {@code AbstractSocketEndpoint}. The returned endpoint will use 
+     * a cached pool of daemon threads as necessary for processing events.
+     *
+     * @param address the socket address to encapsulate
+     * @param type the type of transport
+     */
+    protected AbstractSocketEndpoint(SocketAddress address, TransportType type)
+    {
+        this(address, type, defaultExecutor, 1);
+    }
 
     /**
      * Constructs an {@code AbstractSocketEndpoint} with the given
@@ -89,4 +112,9 @@ abstract class AbstractSocketEndpoint {
         return numProcessors;
     }
 
+    /** {@inheritDoc} */
+    @Override
+    public String toString() {
+        return getClass().getName() + "[" + getAddress() + "]";
+    }
 }

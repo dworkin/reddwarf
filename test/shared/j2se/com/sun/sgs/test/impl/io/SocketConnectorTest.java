@@ -1,3 +1,7 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.test.impl.io;
 
 import java.io.IOException;
@@ -84,8 +88,7 @@ public class SocketConnectorTest {
     public void testConnect() throws IOException {
         Connector<SocketAddress> connector =
             new SocketEndpoint(ADDRESS,
-                               TransportType.RELIABLE,
-                               Executors.newCachedThreadPool())
+                               TransportType.RELIABLE)
                 .createConnector();
 
         ConnectionListener listener = new ConnectionAdapter() {

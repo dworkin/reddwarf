@@ -1,13 +1,21 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.test.impl.service.session;
 
+import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
+import com.sun.sgs.app.ClientSessionId;
 import com.sun.sgs.app.ClientSessionListener;
 import com.sun.sgs.app.DataManager;
+import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.TaskManager;
+import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityCredentials;
 import com.sun.sgs.auth.IdentityManager;
@@ -49,6 +57,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicLong;
 import junit.framework.TestCase;
 
 public class TestClientSessionServiceImpl extends TestCase {
@@ -61,7 +70,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	DataServiceImpl.class.getName();
 
     /** Directory used for database shared across multiple tests. */
-    private static String dbDirectory =
+    private static String DB_DIRECTORY =
 	System.getProperty("java.io.tmpdir") + File.separator +
 	"TestClientSessionServiceImpl.db";
 
@@ -76,13 +85,12 @@ public class TestClientSessionServiceImpl extends TestCase {
     /** Properties for creating the shared database. */
     private static Properties dbProps = createProperties(
 	DataStoreImplClassName + ".directory",
-	dbDirectory,
-	StandardProperties.APP_NAME, "TestClientSessionServiceImpl",
-	DataServiceImplClassName + ".debugCheckInterval", "1");
+	DB_DIRECTORY,
+	StandardProperties.APP_NAME, "TestClientSessionServiceImpl");
 
     private static final String LOGIN_FAILED_MESSAGE = "login failed";
 
-    private static final int WAIT_TIME = 1000;
+    private static final int WAIT_TIME = 5000;
 
     private static final String RETURN_NULL = "return null";
 
@@ -95,18 +103,6 @@ public class TestClientSessionServiceImpl extends TestCase {
 	"com.sun.sgs.impl.service.session.ClientSessionImpl";
     
     private static Object disconnectedCallbackLock = new Object();
-    
-    /**
-     * Delete the database directory at the start of the test run, but not for
-     * each test.
-     */
-    static {
-	System.err.println("Deleting database directory");
-	deleteDirectory(dbDirectory);
-    }
-
-    /** A per-test database directory, or null if not created. */
-    private String directory;
     
     private static DummyTransactionProxy txnProxy =
 	MinimalTestKernel.getTransactionProxy();
@@ -136,8 +132,16 @@ public class TestClientSessionServiceImpl extends TestCase {
 
     /** Creates and configures the session service. */
     protected void setUp() throws Exception {
-	passed = false;
-	System.err.println("Testcase: " + getName());
+        passed = false;
+        System.err.println("Testcase: " + getName());
+        setUp(true);
+    }
+
+    protected void setUp(boolean clean) throws Exception {
+        if (clean) {
+            deleteDirectory(DB_DIRECTORY);
+        }
+
 	appContext = MinimalTestKernel.createContext();
 	systemRegistry = MinimalTestKernel.getSystemRegistry(appContext);
 	serviceRegistry = MinimalTestKernel.getServiceRegistry(appContext);
@@ -182,7 +186,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	channelService.configure(serviceRegistry, txnProxy);
 	serviceRegistry.setComponent(ChannelManager.class, channelService);
 	
-	txn.commit();
+	commitTransaction();
 	createTransaction();
     }
 
@@ -194,22 +198,39 @@ public class TestClientSessionServiceImpl extends TestCase {
     
     /** Cleans up the transaction. */
     protected void tearDown() throws Exception {
-	sessionService.shutdown();
-	if (txn != null) {
-	    try {
-		txn.abort();
-	    } catch (IllegalStateException e) {
-	    }
-	    txn = null;
-	}
+        tearDown(true);
+    }
+
+    protected void tearDown(boolean clean) throws Exception {
+        if (txn != null) {
+            try {
+                txn.abort();
+            } catch (IllegalStateException e) {
+            }
+            txn = null;
+        }
+        if (channelService != null) {
+            channelService.shutdown();
+            channelService = null;
+        }
+        if (sessionService != null) {
+            sessionService.shutdown();
+            sessionService = null;
+        }
+        if (taskService != null) {
+            taskService.shutdown();
+            taskService = null;
+        }
         if (dataService != null) {
             dataService.shutdown();
+            dataService = null;
         }
-        dataService = null;
-        deleteDirectory(dbDirectory);
+        if (clean) {
+            deleteDirectory(DB_DIRECTORY);
+        }
         MinimalTestKernel.destroyContext(appContext);
     }
- 
+
     /* -- Test constructor -- */
 
     public void testConstructorNullProperties() {
@@ -389,18 +410,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	try {
 	    client.connect(port);
 	    client.login(name, "password");
-	    sessionService.shutdown();
-	    DummyClientSessionListener sessionListener =
-		getClientSessionListener(name);
-	    if (sessionListener == null) {
-		fail("listener is null");
-	    } else {
-		synchronized (disconnectedCallbackLock) {
-		    if (sessionListener.receivedDisconnectedCallback) {
-			fail("shouldn't have received disconnected callback");
-		    }
-		}
-	    }
+
 	    Set<String> listenerKeys = getClientSessionListenerKeys();
 	    System.err.println("Listener keys: " + listenerKeys);
 	    if (listenerKeys.isEmpty()) {
@@ -408,18 +418,13 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    } else if (listenerKeys.size() > 1) {
 		fail("more than one listener key");
 	    }
-	    sessionService = 
-		new ClientSessionServiceImpl(serviceProps, systemRegistry);
-	    createTransaction();
-	    sessionService.configure(serviceRegistry, txnProxy);
-	    serviceRegistry.setComponent(
-		ClientSessionService.class, sessionService);
-	    txnProxy.setComponent(
-	        ClientSessionService.class, sessionService);
-	    port = sessionService.getListenPort();
-	    txn.commit();
-
-	    sessionListener = getClientSessionListener(name);
+	    
+            // Simulate "crash"
+            tearDown(false);
+            setUp(false);
+	    
+	    DummyClientSessionListener sessionListener =
+		getClientSessionListener(name);
 	    if (sessionListener == null) {
 		fail("listener is null!");
 	    } else {
@@ -461,7 +466,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    }
 	    listenerKeys.add(key);
 	}
-	txn.commit();
+	commitTransaction();
 	return listenerKeys;
     }
 
@@ -471,7 +476,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	createTransaction();
 	DummyClientSessionListener sessionListener =
 	    getAppListener().getClientSessionListener(name);
-	txn.commit();
+	commitTransaction();
 	return sessionListener;
     }
 
@@ -493,7 +498,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    for (ClientSession session : appListener.getSessions()) {
 		if (session.isConnected() == true) {
 		    System.err.println("session is connected");
-		    txn.commit();
+		    commitTransaction();
 		    return;
 		} else {
 		    fail("Expected connected session: " + session);
@@ -521,7 +526,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    for (ClientSession session : appListener.getSessions()) {
 		if (session.getName().equals(name)) {
 		    System.err.println("names match");
-		    txn.commit();
+		    commitTransaction();
 		    return;
 		} else {
 		    fail("Expected session name: " + name +
@@ -548,9 +553,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 		fail("appListener contains no client sessions!");
 	    }
 	    for (ClientSession session : appListener.getSessions()) {
-		if (Arrays.equals(session.getSessionId(), client.getSessionId())) {
+		if (session.getSessionId().equals(client.getSessionId())) {
 		    System.err.println("session IDs match");
-		    txn.commit();
+		    commitTransaction();
 		    return;
 		} else {
 		    fail("Expected session id: " + client.getSessionId() +
@@ -563,9 +568,74 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
 	
     }
-    
-    public void testClientSessionSend() throws Exception {
+
+    public void testClientSend() throws Exception {
+	sendMessagesAndCheck(5, 5, null);
     }
+
+    public void testClientSendWithListenerThrowingRetryableException()
+	throws Exception
+    {
+	sendMessagesAndCheck(
+	    5, 5, new MaybeRetryException("retryable", true));
+    }
+
+    public void testClientSendWithListenerThrowingNonRetryableException()
+	throws Exception
+    {
+	sendMessagesAndCheck(
+	    5, 4, new MaybeRetryException("non-retryable", false));
+    }
+    
+    private static final Object receivedAllMessagesLock = new Object();
+    private static RuntimeException throwException = null;
+    private static int totalExpectedMessages;
+    
+    private void sendMessagesAndCheck(
+	int numMessages, int expectedMessages, RuntimeException exception)
+	throws Exception
+    {
+	synchronized (receivedAllMessagesLock) {
+	    totalExpectedMessages = expectedMessages;
+	    throwException = exception;
+	}
+	registerAppListener();
+	DummyClient client = new DummyClient();
+	String name = "client";
+	try {
+	    client.connect(port);
+	    client.login(name, "dummypassword");
+	    for (int i = 0; i < numMessages; i++) {
+		MessageBuffer buf = new MessageBuffer(4);
+		buf.putInt(i);
+		client.sendMessage(buf.getBuffer());
+	    }
+	    
+	    DummyClientSessionListener sessionListener =
+		getClientSessionListener(name);
+	    synchronized (receivedAllMessagesLock) {
+		if (sessionListener.messages.size() != totalExpectedMessages) {
+		    try {
+			receivedAllMessagesLock.wait(WAIT_TIME);
+		    } catch (InterruptedException e) {
+		    }
+		}
+	    }
+	    sessionListener = getClientSessionListener(name);
+	    synchronized (receivedAllMessagesLock) {
+		int receivedMessages = sessionListener.messages.size();
+		if (receivedMessages != totalExpectedMessages) {
+		    fail("expected " + totalExpectedMessages + ", received " +
+			 receivedMessages);
+		}
+	    }
+		
+	} finally {
+	    client.disconnect(false);
+	}
+    }
+    
+
     /* -- other methods -- */
 
     /** Deletes the specified directory, if it exists. */
@@ -589,9 +659,22 @@ public class TestClientSessionServiceImpl extends TestCase {
      * current transaction.
      */
     private DummyTransaction createTransaction() {
-	txn = new DummyTransaction();
-	txnProxy.setCurrentTransaction(txn);
+	if (txn == null) {
+	    txn = new DummyTransaction();
+	    txnProxy.setCurrentTransaction(txn);
+	}
 	return txn;
+    }
+
+    private void commitTransaction() throws Exception {
+	if (txn != null) {
+	    txn.commit();
+	    txn = null;
+	    txnProxy.setCurrentTransaction(null);
+	} else {
+	    throw new TransactionNotActiveException(
+		"txn:" + txn + " already committed");
+	}
     }
     
     
@@ -614,7 +697,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     private DataServiceImpl createDataService(
 	DummyComponentRegistry registry)
     {
-	File dir = new File(dbDirectory);
+	File dir = new File(DB_DIRECTORY);
 	if (!dir.exists()) {
 	    if (!dir.mkdir()) {
 		throw new RuntimeException(
@@ -625,11 +708,12 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     private void registerAppListener() throws Exception {
+	
 	createTransaction();
 	DummyAppListener appListener = new DummyAppListener();
 	dataService.setServiceBinding(
 	    StandardProperties.APP_LISTENER, appListener);
-	txn.commit();
+	commitTransaction();
     }
     
     private DummyAppListener getAppListener() {
@@ -650,21 +734,40 @@ public class TestClientSessionServiceImpl extends TestCase {
     /**
      * Identity returned by the DummyIdentityManager.
      */
-    private static class DummyIdentity implements Identity {
+    private static class DummyIdentity implements Identity, Serializable {
 
-	private final String name;
+        private static final long serialVersionUID = 1L;
+        private final String name;
 
-	DummyIdentity(IdentityCredentials credentials) {
-	    this.name = ((NamePasswordCredentials) credentials).getName();
-	}
-	
-	public String getName() {
-	    return name;
-	}
+        DummyIdentity(String name) {
+            this.name = name;
+        }
 
-	public void notifyLoggedIn() {}
+        DummyIdentity(IdentityCredentials credentials) {
+            this.name = ((NamePasswordCredentials) credentials).getName();
+        }
+        
+        public String getName() {
+            return name;
+        }
 
-	public void notifyLoggedOut() {}
+        public void notifyLoggedIn() {}
+
+        public void notifyLoggedOut() {}
+        
+        @Override
+        public boolean equals(Object o) {
+            if (this == o)
+                return true;
+            if (! (o instanceof DummyIdentity))
+                return false;
+            return ((DummyIdentity)o).name.equals(name);
+        }
+        
+        @Override
+        public int hashCode() {
+            return name.hashCode();
+        }
     }
 
     /**
@@ -685,12 +788,13 @@ public class TestClientSessionServiceImpl extends TestCase {
 	private String reason;
 	private byte[] sessionId;
 	private byte[] reconnectionKey;
+	private final AtomicLong sequenceNumber = new AtomicLong(0);
 	
 	DummyClient() {
 	}
 
-	byte[] getSessionId() {
-	    return sessionId;
+	ClientSessionId getSessionId() {
+	    return new ClientSessionId(sessionId);
 	}
 
 	void connect(int port) {
@@ -814,6 +918,46 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    throw new RuntimeException(
 			"DummyClient.login timed out", e);
 		}
+	    }
+	}
+
+	/**
+	 * Throws a {@code RuntimeException} if this session is not
+	 * logged in.
+	 */
+	private void checkLoggedIn() {
+	    synchronized (lock) {
+		if (!connected || !loginSuccess) {
+		    throw new RuntimeException(
+			"DummyClient.login not connected or loggedIn");
+		}
+	    }
+	}
+
+	/**
+	 * Returns the next sequence number for this session.
+	 */
+	private long nextSequenceNumber() {
+	    return sequenceNumber.getAndIncrement();
+	}
+
+	/**
+	 * Sends a SESSION_MESSAGE.
+	 */
+	void sendMessage(byte[] message) {
+	    checkLoggedIn();
+
+	    MessageBuffer buf =
+		new MessageBuffer(13 + message.length);
+	    buf.putByte(SimpleSgsProtocol.VERSION).
+		putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
+		putByte(SimpleSgsProtocol.SESSION_MESSAGE).
+		putLong(nextSequenceNumber()).
+		putByteArray(message);
+	    try {
+		connection.sendBytes(buf.getBuffer());
+	    } catch (IOException e) {
+		throw new RuntimeException(e);
 	    }
 	}
 
@@ -988,6 +1132,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		ManagedReference listenerRef =
 		    txnProxy.getService(DataService.class).
 		    createReference(listener);
+		AppContext.getDataManager().markForUpdate(this);
 		sessions.put(session, listenerRef);
 		System.err.println(
 		    "DummyAppListener.loggedIn: session:" + session);
@@ -1037,6 +1182,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	private final String name;
 	boolean receivedDisconnectedCallback = false;
 	boolean graceful = false;
+	List<byte[]> messages = new ArrayList<byte[]>();
+	private int seq = -1;
 	
 	private transient final ClientSession session;
 	
@@ -1058,6 +1205,46 @@ public class TestClientSessionServiceImpl extends TestCase {
 
         /** {@inheritDoc} */
 	public void receivedMessage(byte[] message) {
+	    MessageBuffer buf = new MessageBuffer(message);
+	    int num = buf.getInt();
+	    System.err.println("receivedMessage: " + num + 
+			       "\nthrowException: " + throwException);
+	    if (num <= seq) {
+		throw new RuntimeException(
+		    "expected message greater than " + seq + ", got " + num);
+	    }
+	    AppContext.getDataManager().markForUpdate(this);
+	    messages.add(message);
+	    seq = num;
+	    synchronized (receivedAllMessagesLock) {
+		if (throwException != null) {
+		    RuntimeException e = throwException;
+		    throwException = null;
+		    throw e;
+		}
+	    }
+	    if (messages.size() == totalExpectedMessages) {
+		synchronized (receivedAllMessagesLock) {
+		    receivedAllMessagesLock.notifyAll();
+		}
+	    }
 	}
     }
+
+    private static class MaybeRetryException
+	extends RuntimeException implements ExceptionRetryStatus
+    {
+	private static final long serialVersionUID = 1L;
+	private boolean retry;
+
+	public MaybeRetryException(String s, boolean retry) {
+	    super(s);
+	    this.retry = retry;
+	}
+
+	public boolean shouldRetry() {
+	    return retry;
+	}
+    }
+	
 }

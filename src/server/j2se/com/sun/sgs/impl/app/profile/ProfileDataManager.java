@@ -1,3 +1,6 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
 
 package com.sun.sgs.impl.app.profile;
 
@@ -50,7 +53,9 @@ public class ProfileDataManager implements DataManager, ProfileProducer {
         ProfileConsumer consumer =
             profileRegistrar.registerProfileProducer(this);
 
-        createReferenceOp = consumer.registerOperation("createReference");
+	if (consumer != null) {
+	    createReferenceOp = consumer.registerOperation("createReference");
+	}
 
         // call on the backing manager, if it's also profiling
         if (backingManager instanceof ProfileProducer)

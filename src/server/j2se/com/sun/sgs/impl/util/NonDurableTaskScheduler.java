@@ -1,5 +1,11 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.impl.util;
 
+import com.sun.sgs.auth.Identity;
+import com.sun.sgs.impl.kernel.TaskOwnerImpl;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
@@ -44,7 +50,20 @@ public class NonDurableTaskScheduler {
      * @param task a task
      */
     public void scheduleTask(KernelRunnable task) {
-	taskScheduler.scheduleTask(new TransactionRunner(task), owner);
+	scheduleNonTransactionalTask(new TransactionRunner(task));
+    }
+
+    /**
+     * Schedules a non-durable, transactional task using the task
+     * scheduler specified during construction and a task owner
+     * created from the given {@code Identity}.  If the given identity
+     * is null, uses the task owner specified during construction.
+     *
+     * @param task a task
+     * @param identity an identity
+     */
+    public void scheduleTask(KernelRunnable task, Identity identity) {
+        scheduleNonTransactionalTask(new TransactionRunner(task), identity);
     }
 
     /**
@@ -55,6 +74,27 @@ public class NonDurableTaskScheduler {
      */
     public void scheduleNonTransactionalTask(KernelRunnable task) {
 	taskScheduler.scheduleTask(task, owner);
+    }
+
+    /**
+     * Schedules a non-durable, non-transactional task using the task
+     * scheduler specified during construction and a task owner
+     * created from the given {@code Identity}.  If the given identity
+     * is null, uses the task owner specified during construction.
+     *
+     * @param task a task
+     * @param identity an identity
+     */
+    public void scheduleNonTransactionalTask(KernelRunnable task,
+            Identity identity)
+    {
+        if (identity == null) {
+            scheduleNonTransactionalTask(task);
+            return;
+        }
+
+        taskScheduler.scheduleTask(task,
+                new TaskOwnerImpl(identity, owner.getContext()));
     }
 
     /**
@@ -77,5 +117,3 @@ public class NonDurableTaskScheduler {
 	taskService.scheduleNonDurableTask(task);
     }
 }
-
-    

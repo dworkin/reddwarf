@@ -1,3 +1,7 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.impl.util;
 
 /**
@@ -22,10 +26,10 @@ public final class HexDumper {
         StringBuilder buf = new StringBuilder((3 * bytes.length) + 1);
         buf.append('[');
         // First element
-        buf.append(String.format("%02X", bytes[i++]));
+        buf.append(String.format("%02x", bytes[i++]));
         // Remaining elements
         while (i < bytes.length) {
-            buf.append(String.format(" %02X", bytes[i++]));
+            buf.append(String.format(" %02x", bytes[i++]));
         }
         buf.append(']');
         return buf.toString();
@@ -41,7 +45,7 @@ public final class HexDumper {
     public static String toHexString(byte[] bytes) {
         StringBuilder buf = new StringBuilder(2 * bytes.length);
         for (byte b : bytes) {
-            buf.append(String.format("%02X", b));
+            buf.append(String.format("%02x", b));
         }
         return buf.toString();
     }

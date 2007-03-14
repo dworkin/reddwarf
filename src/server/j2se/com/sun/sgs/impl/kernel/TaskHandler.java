@@ -1,3 +1,6 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
 
 package com.sun.sgs.impl.kernel;
 
@@ -149,7 +152,7 @@ public final class TaskHandler {
 	// the task or the commit failed -- make sure that the transaction is
 	// aborted
 	try {
-	    handle.abort();
+	    handle.abort(throwable);
 	} catch (TransactionNotActiveException tnae) {
 	    // this isn't a problem, since it just means that some
 	    // participant aborted the transaction before throwing the

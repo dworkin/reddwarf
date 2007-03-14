@@ -1,3 +1,7 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.impl.io;
 
 import java.util.logging.Level;
@@ -38,9 +42,6 @@ class CompleteMessageFilter {
     /** The largest we expect the recv processing buffer size to get. */
     private static final int MAX_BUFFER_SIZE = 512 * 1024;
 
-    /** The largest message we reasonably expect to recv. */
-    private static final int MAX_MSG_SIZE = 128 * 1024;
-
     /** The data being processed, or a partial message awaiting more data. */
     private final ByteBuffer msgBuf;
 
@@ -78,7 +79,7 @@ class CompleteMessageFilter {
 
         if (msgBuf.remaining() > MAX_BUFFER_SIZE) {
             logger.log(Level.WARNING,
-                "Recv filter buffer is larger than expected: {0}",
+                "Recv filter buffer is larger than expected: {0,number,#}",
                 msgBuf.remaining());
         }
 
@@ -87,17 +88,10 @@ class CompleteMessageFilter {
             if (msgBuf.remaining() < 4)
                 break;
 
-            int msgLen = msgBuf.getInt();
-
-            if (msgLen > MAX_MSG_SIZE) {
-                logger.log(Level.WARNING,
-                    "Recv message is larger than expected: {0}",
-                    msgLen);
-                // TODO throw an exception?
-            }
-
-            if (msgBuf.remaining() < msgLen)
+            if (! msgBuf.prefixedDataAvailable(4))
                 break;
+
+            int msgLen = msgBuf.getInt();
 
             // Get a read-only buffer view on the complete message
             ByteBuffer completeMessage =
@@ -110,7 +104,18 @@ class CompleteMessageFilter {
                 "dispatching complete message of size {0,number,#}",
                 msgLen);
 
-            listener.filteredMessageReceived(completeMessage);
+            try {
+                listener.filteredMessageReceived(completeMessage);
+            } catch (RuntimeException e) {
+                logger.logThrow(Level.WARNING, e,
+                    "Exception in message disptach; dropping message");
+
+                logger.logThrow(Level.FINE, e,
+                    "Exception in message disptach; dropping message {0}",
+                    completeMessage);
+
+                // ignore exception; continue processing the buffer
+            }
         }
 
         msgBuf.compact();
@@ -136,6 +141,8 @@ class CompleteMessageFilter {
         buffer.putInt(message.length);
         buffer.put(message);
         buffer.flip();
+        // Don't worry about the listener throwing an exception, since
+        // this method has no other side effects.
         listener.sendUnfiltered(buffer);
     }
 }

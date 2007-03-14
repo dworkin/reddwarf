@@ -1,3 +1,7 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
 package com.sun.sgs.impl.service.transaction;
 
 import com.sun.sgs.app.TransactionAbortedException;
@@ -285,7 +289,10 @@ final class TransactionImpl implements Transaction {
      * null if the transaction isn't inactive or the cause isn't known.
      */
     Throwable getInactiveCause() {
-	return state == State.ABORTED ? abortCause : null;
+	return
+	    (state == State.ABORTING || state == State.ABORTED) ?
+	    abortCause :
+	    null;
     }
 
     /** Returns a byte array that represents the specified long. */
