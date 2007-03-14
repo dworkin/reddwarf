@@ -19,32 +19,20 @@ import java.util.Properties;
  */
 public class SimpleApp implements AppListener, Serializable {
     private static final long serialVersionUID = 1;
-    private static class MyClientSessionListener
-	implements ClientSessionListener, Serializable
-    {
-	private static final long serialVersionUID = 1;
-	MyClientSessionListener() { }
-	public void receivedMessage(byte[] message) { }
-	public void disconnected(boolean graceful) { }
-    }
     private static class MyTask implements ManagedObject, Serializable, Task {
 	private static final long serialVersionUID = 1;
-	private final String appName;
-	MyTask(String appName) {
-	    this.appName = appName;
-	}
+	private int count = 0;
+	MyTask() { }
 	public void run() {
-	    System.out.println("SimpleApp.MyTask.run appName:" + appName);
+	    count++;
+	    System.out.println("count=" + count);
 	}
     }
     public ClientSessionListener loggedIn(ClientSession session) {
-	System.out.println("SimpleApp.loggedIn(" + session + ")");
-	return new MyClientSessionListener();
+	return null;
     }
     public void initialize(Properties props) {
-	System.out.println("SimpleApp.initialize(" + props + ")");
-	String appName = props.getProperty("com.sun.sgs.app.name");
 	TaskManager taskManager = AppContext.getTaskManager();
-	taskManager.schedulePeriodicTask(new MyTask(appName), 0, 2000);
+	taskManager.schedulePeriodicTask(new MyTask(), 0, 2000);
     }
 }
