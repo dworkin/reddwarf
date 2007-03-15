@@ -544,7 +544,13 @@ class Kernel {
             throw iae;
         } finally {
             if (inputStream != null)
-                inputStream.close();
+                try {
+                    inputStream.close();
+                } catch (IOException e) {
+                    if (logger.isLoggable(Level.CONFIG))
+                        logger.logThrow(Level.CONFIG, e, "failed to close "+
+                                        "property file {0}", filename);
+                }
         }
     }
 
