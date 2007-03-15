@@ -474,6 +474,60 @@
       <ant dir="${checkstyle.dir}" target="checkjars" inheritAll="false"/>
   </target>
 
+  <!-- Checks for bugs using FindBugs (http://findbugs.sourceforge.net) -->
+  <target name="findbugs"
+	  depends="findbugs-client, findbugs-server, findbugs-shared"
+	  description="Checks for bugs using FindBugs"/>
+
+  <!-- Checks for bugs in the client -->
+  <target name="findbugs-client" depends="build-client, -findbugs.init"
+	  description="Checks for bugs in the client">
+    <findbugs home="${findbugs.dir}" jvmargs="-Xmx384m" effort="max"
+	      reportLevel="low" output="emacs">
+      <sourcePath path="src/client/j2se"/>
+      <class location="${build.dir}/classes/client"/>
+      <auxClasspath>
+	<path refid="shared.classpath"/>
+      </auxClasspath>
+    </findbugs>
+  </target>
+
+  <!-- Checks for bugs in the server -->
+  <target name="findbugs-server" depends="build-server, -findbugs.init"
+	  description="Checks for bugs in the server">
+    <findbugs home="${findbugs.dir}" jvmargs="-Xmx384m" effort="max"
+	      reportLevel="low" output="emacs">
+      <sourcePath path="src/server/j2se"/>
+      <class location="${build.dir}/classes/server"/>
+      <auxClasspath>
+	<path refid="shared.classpath"/>
+	<pathelement location="${bdb.lib.dir}/db.jar"/>
+      </auxClasspath>
+    </findbugs>
+  </target>
+
+  <!-- Checks for bugs in shared code -->
+  <target name="findbugs-shared" depends="-build-shared, -findbugs.init"
+	  description="Checks for bugs in shared code">
+    <findbugs home="${findbugs.dir}" jvmargs="-Xmx384m" effort="max"
+	      reportLevel="low" output="emacs">
+      <sourcePath path="src/shared/j2se"/>
+      <class location="${build.dir}/classes/shared"/>
+      <auxClasspath>
+	<path refid="shared.classpath"/>
+      </auxClasspath>
+    </findbugs>
+  </target>
+
+  <!-- Defines the findbugs task -->
+  <target name="-findbugs.init">
+    <fail unless="findbugs.dir"
+	  message="The findbugs.dir property must be set to a directory containing the FindBugs installation"/>
+    <taskdef name="findbugs"
+	     classname="edu.umd.cs.findbugs.anttask.FindBugsTask"
+	     classpath="${findbugs.dir}/lib/findbugs-ant.jar"/>
+  </target>
+
   <!-- Compile and run tests -->
   <target name="test" depends="test-server"
 	  description="Compiles and runs tests"/>
