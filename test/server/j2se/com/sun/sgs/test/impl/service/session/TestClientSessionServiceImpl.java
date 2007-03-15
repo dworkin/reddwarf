@@ -15,6 +15,7 @@ import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.TaskManager;
+import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityCredentials;
 import com.sun.sgs.auth.IdentityManager;
@@ -85,8 +86,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     private static Properties dbProps = createProperties(
 	DataStoreImplClassName + ".directory",
 	DB_DIRECTORY,
-	StandardProperties.APP_NAME, "TestClientSessionServiceImpl",
-	DataServiceImplClassName + ".debugCheckInterval", "1");
+	StandardProperties.APP_NAME, "TestClientSessionServiceImpl");
 
     private static final String LOGIN_FAILED_MESSAGE = "login failed";
 
@@ -186,7 +186,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	channelService.configure(serviceRegistry, txnProxy);
 	serviceRegistry.setComponent(ChannelManager.class, channelService);
 	
-	txn.commit();
+	commitTransaction();
 	createTransaction();
     }
 
@@ -466,7 +466,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    }
 	    listenerKeys.add(key);
 	}
-	txn.commit();
+	commitTransaction();
 	return listenerKeys;
     }
 
@@ -476,7 +476,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	createTransaction();
 	DummyClientSessionListener sessionListener =
 	    getAppListener().getClientSessionListener(name);
-	txn.commit();
+	commitTransaction();
 	return sessionListener;
     }
 
@@ -498,7 +498,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    for (ClientSession session : appListener.getSessions()) {
 		if (session.isConnected() == true) {
 		    System.err.println("session is connected");
-		    txn.commit();
+		    commitTransaction();
 		    return;
 		} else {
 		    fail("Expected connected session: " + session);
@@ -526,7 +526,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    for (ClientSession session : appListener.getSessions()) {
 		if (session.getName().equals(name)) {
 		    System.err.println("names match");
-		    txn.commit();
+		    commitTransaction();
 		    return;
 		} else {
 		    fail("Expected session name: " + name +
@@ -555,7 +555,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    for (ClientSession session : appListener.getSessions()) {
 		if (session.getSessionId().equals(client.getSessionId())) {
 		    System.err.println("session IDs match");
-		    txn.commit();
+		    commitTransaction();
 		    return;
 		} else {
 		    fail("Expected session id: " + client.getSessionId() +
@@ -611,16 +611,18 @@ public class TestClientSessionServiceImpl extends TestCase {
 		client.sendMessage(buf.getBuffer());
 	    }
 	    
+	    DummyClientSessionListener sessionListener =
+		getClientSessionListener(name);
 	    synchronized (receivedAllMessagesLock) {
-		DummyClientSessionListener sessionListener =
-		    getClientSessionListener(name);
 		if (sessionListener.messages.size() != totalExpectedMessages) {
 		    try {
 			receivedAllMessagesLock.wait(WAIT_TIME);
 		    } catch (InterruptedException e) {
 		    }
 		}
-		sessionListener = getClientSessionListener(name);
+	    }
+	    sessionListener = getClientSessionListener(name);
+	    synchronized (receivedAllMessagesLock) {
 		int receivedMessages = sessionListener.messages.size();
 		if (receivedMessages != totalExpectedMessages) {
 		    fail("expected " + totalExpectedMessages + ", received " +
@@ -657,9 +659,22 @@ public class TestClientSessionServiceImpl extends TestCase {
      * current transaction.
      */
     private DummyTransaction createTransaction() {
-	txn = new DummyTransaction();
-	txnProxy.setCurrentTransaction(txn);
+	if (txn == null) {
+	    txn = new DummyTransaction();
+	    txnProxy.setCurrentTransaction(txn);
+	}
 	return txn;
+    }
+
+    private void commitTransaction() throws Exception {
+	if (txn != null) {
+	    txn.commit();
+	    txn = null;
+	    txnProxy.setCurrentTransaction(null);
+	} else {
+	    throw new TransactionNotActiveException(
+		"txn:" + txn + " already committed");
+	}
     }
     
     
@@ -693,11 +708,12 @@ public class TestClientSessionServiceImpl extends TestCase {
     }
 
     private void registerAppListener() throws Exception {
+	
 	createTransaction();
 	DummyAppListener appListener = new DummyAppListener();
 	dataService.setServiceBinding(
 	    StandardProperties.APP_LISTENER, appListener);
-	txn.commit();
+	commitTransaction();
     }
     
     private DummyAppListener getAppListener() {
@@ -1116,6 +1132,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		ManagedReference listenerRef =
 		    txnProxy.getService(DataService.class).
 		    createReference(listener);
+		AppContext.getDataManager().markForUpdate(this);
 		sessions.put(session, listenerRef);
 		System.err.println(
 		    "DummyAppListener.loggedIn: session:" + session);
@@ -1196,6 +1213,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 		throw new RuntimeException(
 		    "expected message greater than " + seq + ", got " + num);
 	    }
+	    AppContext.getDataManager().markForUpdate(this);
 	    messages.add(message);
 	    seq = num;
 	    synchronized (receivedAllMessagesLock) {

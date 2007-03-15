@@ -429,14 +429,12 @@ final class ChannelImpl implements Channel, Serializable {
 
     /**
      * Forwards the specified {@code message} from the session with
-     * {@code senderId} to the sessions with {@code recipientId}s, and
-     * then notifies this channel's global channel listener (if any),
-     * and notifies the per-session channel listener (if any).
+     * {@code senderId} to the sessions with {@code recipientId}s.
      */
-    void forwardMessageAndNotifyListeners(
-	    final ClientSessionId senderId,
-            final Set<byte[]> recipientIds,
-            final byte[] message, final long seq)
+    void forwardMessage(
+	    ClientSessionId senderId,
+	    Set<byte[]> recipientIds,
+	    byte[] message, final long seq)
     {
 	checkClosed();
 	
@@ -477,6 +475,16 @@ final class ChannelImpl implements Channel, Serializable {
                     protocolMessage, state.delivery);
 	    }
 	}
+    }
+
+    /**
+     * Notifies this channel's global channel listener (if any), and
+     * notifies the per-session channel listener (if any) that the
+     * specified {@code message} was sent by the client session with
+     * the specified {@code senderId}.
+     */
+    void notifyListeners(ClientSessionId senderId, byte[] message) {
+	checkClosed();
 
 	/*
 	 * Notify channel listeners of channel message.

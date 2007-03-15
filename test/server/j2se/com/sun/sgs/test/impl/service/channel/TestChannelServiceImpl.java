@@ -99,8 +99,7 @@ public class TestChannelServiceImpl extends TestCase {
     /** Properties for creating the shared database. */
     private static Properties dbProps = createProperties(
 	DataStoreImplClassName + ".directory", DB_DIRECTORY,
-	StandardProperties.APP_NAME, "TestChannelServiceImpl",
-	DataServiceImplClassName + ".debugCheckInterval", "1");
+	StandardProperties.APP_NAME, "TestChannelServiceImpl");
     
     private static final int SESSION_ID_SIZE = 8;
 
