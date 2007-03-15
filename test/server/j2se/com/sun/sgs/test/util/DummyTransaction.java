@@ -157,7 +157,7 @@ public class DummyTransaction implements Transaction {
     }
 
     public synchronized boolean isAborted() {
-	return state == State.ABORTED;
+	return state == State.ABORTED || state == State.ABORTING;
     }
 
     public synchronized Throwable getAbortCause() {
@@ -169,8 +169,6 @@ public class DummyTransaction implements Transaction {
     public synchronized boolean prepare() throws Exception {
 	logger.log(Level.FINER, "prepare {0}", this);
 	if (state != State.ACTIVE) {
-	    // TODO: This should be throwing a
-	    // MaybeRetryableIllegalStateException.
 	    throw new IllegalStateException("Transaction not active");
 	}
 	state = State.PREPARING;
