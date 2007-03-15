@@ -434,8 +434,8 @@ public class TestTaskHandler extends TestCase {
     /* -- Other methods and classes -- */
 
     /**
-     * Calls TaskHandler.runTransactionalTask with the specified task within
-     * the proper thread context.
+     * Calls TaskHandler.runTransactionalTask with the specified task from
+     * within a TransactionalTaskThread.
      */
     private static void runTransactionalTask(final KernelRunnable task)
 	throws Exception

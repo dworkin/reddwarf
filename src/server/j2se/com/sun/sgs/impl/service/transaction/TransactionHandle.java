@@ -39,8 +39,8 @@ public interface TransactionHandle {
      *		aborted
      * @throws	TransactionAbortedException if a call to {@link
      *		TransactionParticipant#prepare prepare} on a transaction
-     *		participant causes the transaction to be aborted but does not
-     *		throw an exception
+     *		participant aborts the transaction but does not throw an
+     *		exception
      * @throws	IllegalStateException if {@code prepare} has been called on any
      *		transaction participant and {@link Transaction#abort abort} has
      *		not been called on the transaction

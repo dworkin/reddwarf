@@ -972,14 +972,15 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 
     public void testAbortAborted() throws Exception {
 	txn.join(new DummyTransactionParticipant());
-	txn.abort(null);
+	Exception cause = new Exception("Abort cause");
+	txn.abort(cause);
 	try {
-	    txn.abort(null);
+	    txn.abort(new Exception("Another"));
 	    fail("Expected TransactionNotActiveException");
 	} catch (TransactionNotActiveException e) {
 	    System.err.println(e);
 	}
-	assertAborted(null);
+	assertAborted(cause);
     }
 
     public void testAbortPreparing() throws Exception {
@@ -1184,7 +1185,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
     public void testAbortCommitted() throws Exception {
 	txn.join(new DummyTransactionParticipant());
 	handle.commit();
-	assertNotAborted();
+	assertCommitted();
 	try {
 	    txn.abort(null);
 	    fail("Expected IllegalStateException");

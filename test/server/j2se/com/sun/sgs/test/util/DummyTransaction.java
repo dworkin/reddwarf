@@ -118,7 +118,7 @@ public class DummyTransaction implements Transaction {
 		"Transaction not active", abortCause);
 	} else if (state != State.ACTIVE) {
 	    throw new IllegalStateException(
-		"Transaction is not active: " + state);
+		"Transaction not active: " + state);
 	}
 	participants.add(participant);
     }

@@ -143,7 +143,7 @@ public class NonDurableTaskQueue implements NonDurableTransactionParticipant {
     public void abort(Transaction txn) {
 	try {
 	    checkTransaction(txn);
-	    if (!txn.isAborted()) {
+	    if (! txn.isAborted()) {
 		logger.log(
 		    Level.SEVERE, "Transaction is not aborted: {0}", txn);
 	    } else if (! isRetryable(txn.getAbortCause())) {
