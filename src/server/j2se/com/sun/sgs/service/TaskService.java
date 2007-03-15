@@ -5,6 +5,8 @@
 package com.sun.sgs.service;
 
 import com.sun.sgs.app.TaskManager;
+import com.sun.sgs.app.TaskRejectedException;
+import com.sun.sgs.app.TransactionException;
 
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.Priority;
@@ -20,9 +22,6 @@ import com.sun.sgs.kernel.Priority;
  * transactional context for their task by using a
  * <code>TransactionRunner</code>). All tasks scheduled will be owned by the
  * current task's owner.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 public interface TaskService extends TaskManager, Service {
 

@@ -17,7 +17,6 @@ import com.sun.sgs.kernel.TaskScheduler;
 
 import java.io.IOException;
 
-import java.util.List;
 import java.util.Properties;
 
 import java.util.concurrent.atomic.AtomicBoolean;
