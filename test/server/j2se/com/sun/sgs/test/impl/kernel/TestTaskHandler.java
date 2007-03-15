@@ -7,63 +7,35 @@ package com.sun.sgs.test.impl.kernel;
 import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.impl.kernel.EmptyKernelAppContext;
+import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.TaskHandler;
-import com.sun.sgs.impl.kernel.profile.ProfileCollector;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
+import com.sun.sgs.impl.service.transaction.TransactionHandle;
+import com.sun.sgs.kernel.KernelAppContext;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
+import com.sun.sgs.service.TransactionRunner;
 import com.sun.sgs.test.util.DummyTransactionParticipant;
-import java.lang.reflect.Constructor;
+import com.sun.sgs.test.util.DummyTransactionProxy;
 import junit.framework.TestCase;
 
 /** Test the TaskHandler class. */
 public class TestTaskHandler extends TestCase {
 
-    /** The TransactionalTaskThread(Runnable) constructor */
-    private static Constructor<? extends Thread> txnTaskThreadConstructor;
-    static {
-	try {
-	    txnTaskThreadConstructor =
-		Class.forName(
-		    "com.sun.sgs.impl.kernel.TransactionalTaskThread")
-		.asSubclass(Thread.class)
-		.getDeclaredConstructor(Runnable.class);
-	    txnTaskThreadConstructor.setAccessible(true);
-	} catch (Exception e) {
-	    throw new ExceptionInInitializerError(e);
-	}
-    }
+    /** A dummy kernel app context. */
+    private static final KernelAppContext kernelAppContext =
+	new EmptyKernelAppContext("TestTaskHandler");
 
-    /* Specify the transaction coordinator and profile collector */
-    static {
-	try {
-	    Constructor<TaskHandler> constructor =
-		TaskHandler.class.getDeclaredConstructor(
-		    TransactionCoordinator.class, ProfileCollector.class);
-	    constructor.setAccessible(true);
-	    constructor.newInstance(
-		new TransactionCoordinatorImpl(System.getProperties()), null);
-	} catch (Exception e) {
-	    throw new ExceptionInInitializerError(e);
-	}
-    }
+    /** The transaction coordinator. */
+    static final MyTransactionCoordinator txnCoordinator =
+	new MyTransactionCoordinator();
 
     /** The transaction proxy for obtaining the current transaction. */
-    private static final TransactionProxy txnProxy;
-    static {
-	try {
-	    Constructor<? extends TransactionProxy> constructor =
-		Class.forName("com.sun.sgs.impl.kernel.TransactionProxyImpl")
-		.asSubclass(TransactionProxy.class)
-		.getDeclaredConstructor();
-	    constructor.setAccessible(true);
-	    txnProxy = constructor.newInstance();
-	} catch (Exception e) {
-	    throw new ExceptionInInitializerError(e);
-	}
-    }
+    private static final TransactionProxy txnProxy =
+	new MyTransactionProxy();
 
     /** Creates the test. */
     public TestTaskHandler(String name) {
@@ -440,12 +412,7 @@ public class TestTaskHandler extends TestCase {
     private static void runTransactionalTask(final KernelRunnable task)
 	throws Exception
     {
-	runInTxnTaskThread(
-	    new KernelRunnable() {
-		public void run() throws Exception {
-		    TaskHandler.runTransactionalTask(task);
-		}
-	    });
+	runInTxnTaskThread(new TransactionRunner(task));
     }
 
     /**
@@ -476,14 +443,24 @@ public class TestTaskHandler extends TestCase {
 	throws Exception
     {
 	RunnableKernelRunnable runnable = new RunnableKernelRunnable(task);
-	Thread thread = txnTaskThreadConstructor.newInstance(runnable);
-	thread.start();
-	thread.join(60000);
+	/* Use our transaction coordinator ... */
+	MinimalTestKernel.setTransactionCoordinator(txnCoordinator);
+	try {
+	    Thread thread = MinimalTestKernel.createThread(
+		runnable, kernelAppContext);
+	    thread.start();
+	    thread.join(60000);
+	} finally {
+	    /* ... and then switch back to the default. */
+	    MinimalTestKernel.setTransactionCoordinator(null);
+	}
 	Throwable exception = runnable.getException();
-	if (exception instanceof Exception) {
-	    throw (Exception) exception;
-	} else {
-	    throw (Error) exception;
+	if (exception != null) {
+	    if (exception instanceof Exception) {
+		throw (Exception) exception;
+	    } else {
+		throw (Error) exception;
+	    }
 	}
     }
 
@@ -491,5 +468,31 @@ public class TestTaskHandler extends TestCase {
     private static boolean isRetryable(Throwable t) {
 	return (t instanceof ExceptionRetryStatus) &&
 	    ((ExceptionRetryStatus) t).shouldRetry();
+    }
+
+    /**
+     * Define a transaction coordinator that uses the standard one and keeps
+     * track of the last transaction.
+     */
+    private static class MyTransactionCoordinator
+	implements TransactionCoordinator
+    {
+	private final TransactionCoordinator txnCoordinator =
+	    new TransactionCoordinatorImpl(System.getProperties());
+	Transaction txn;
+	MyTransactionCoordinator() { }
+	public TransactionHandle createTransaction() {
+	    TransactionHandle handle = txnCoordinator.createTransaction();
+	    txn = handle.getTransaction();
+	    return handle;
+	}
+    }
+
+    /** Return the last transaction created by the transaction coordinator. */
+    private static class MyTransactionProxy extends DummyTransactionProxy {
+	MyTransactionProxy() { }
+	public Transaction getCurrentTransaction() {
+	    return txnCoordinator.txn;
+	}
     }
 }
