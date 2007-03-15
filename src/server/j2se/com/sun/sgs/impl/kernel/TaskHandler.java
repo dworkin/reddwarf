@@ -164,6 +164,7 @@ public final class TaskHandler {
 	if (throwable instanceof Exception) {
 	    throw (Exception) throwable;
 	} else {
+            if (throwable instanceof Error)
 	    throw (Error) throwable;
 	}
     }

@@ -19,11 +19,8 @@ import com.sun.sgs.kernel.TaskScheduler;
 import java.io.IOException;
 
 import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Map.Entry;
 import java.util.Properties;
-import java.util.TreeMap;
 
 
 /**
@@ -177,7 +174,7 @@ public class AppGraphProfileOpListener implements ProfileOperationListener {
     /**
      * Private class that represents a single node in an application graph.
      */
-    private class Node {
+    private static class Node {
         // the application who's graph this node is part of
         private final AppInfo owningApp;
         // the observed transitions from this node
