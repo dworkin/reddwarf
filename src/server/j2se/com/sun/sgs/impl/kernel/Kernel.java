@@ -7,11 +7,10 @@ package com.sun.sgs.impl.kernel;
 import com.sun.sgs.auth.IdentityAuthenticator;
 
 import com.sun.sgs.impl.auth.IdentityImpl;
-import com.sun.sgs.impl.auth.NamePasswordAuthenticator;
-
-import com.sun.sgs.impl.kernel.schedule.MasterTaskScheduler;
 
 import com.sun.sgs.impl.kernel.profile.ProfileCollector;
+
+import com.sun.sgs.impl.kernel.schedule.MasterTaskScheduler;
 
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 
@@ -34,7 +33,6 @@ import java.io.IOException;
 import java.lang.reflect.Constructor;
 
 import java.util.ArrayList;
-import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.Properties;
 
@@ -524,13 +522,15 @@ class Kernel {
                                             Properties backingProperties)
         throws Exception
     {
+        FileInputStream inputStream = null;
         try {
             Properties properties;
             if (backingProperties == null)
                 properties = new Properties();
             else
                 properties = new Properties(backingProperties);
-            properties.load(new FileInputStream(filename));
+            inputStream = new FileInputStream(filename);
+            properties.load(inputStream);
             return properties;
         } catch (IOException ioe) {
             if (logger.isLoggable(Level.SEVERE))
@@ -542,6 +542,15 @@ class Kernel {
                 logger.logThrow(Level.SEVERE, iae, "Illegal data in " +
                                 "properties file {0}: ", filename);
             throw iae;
+        } finally {
+            if (inputStream != null)
+                try {
+                    inputStream.close();
+                } catch (IOException e) {
+                    if (logger.isLoggable(Level.CONFIG))
+                        logger.logThrow(Level.CONFIG, e, "failed to close "+
+                                        "property file {0}", filename);
+                }
         }
     }
 

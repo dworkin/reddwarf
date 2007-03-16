@@ -7,9 +7,6 @@ package com.sun.sgs.kernel;
 
 /**
  * The priority descriptions for the system.
- *
- * @since 1.0
- * @author David Jurgens
  */
 public enum Priority {
 
@@ -17,7 +14,9 @@ public enum Priority {
      * The highest priority for tasks.
      */
     HIGH        (256) {
+        /** {@inheritDoc} */
         public Priority higher() { return HIGH; }
+        /** {@inheritDoc} */
         public Priority lower()  { return MEDIUM_HIGH; }
     },
 
@@ -25,7 +24,9 @@ public enum Priority {
      * A medium high priority for tasks.
      */
     MEDIUM_HIGH (192) { 
+        /** {@inheritDoc} */
         public Priority higher() { return HIGH; }
+        /** {@inheritDoc} */
         public Priority lower()  { return MEDIUM; }
     },
 
@@ -33,7 +34,9 @@ public enum Priority {
      * The default priority for tasks.
      */
     MEDIUM      (128) {
+        /** {@inheritDoc} */
         public Priority higher() { return MEDIUM_HIGH; }
+        /** {@inheritDoc} */
         public Priority lower()  { return MEDIUM_LOW; }
     },
 
@@ -41,7 +44,9 @@ public enum Priority {
      * A medium low priority for tasks.
      */
     MEDIUM_LOW  (64) {
+        /** {@inheritDoc} */
         public Priority higher() { return MEDIUM; }
+        /** {@inheritDoc} */
         public Priority lower()  { return LOW; }
     },
 
@@ -49,7 +54,9 @@ public enum Priority {
      * The lowest priority for tasks.
      */
     LOW         (16) {
+        /** {@inheritDoc} */
         public Priority higher() { return MEDIUM_LOW; }
+        /** {@inheritDoc} */
         public Priority lower()  { return LOW; }
     };
 

@@ -27,9 +27,6 @@ import java.util.logging.Logger;
  * runnable is typically scheduled by <code>ServiceConfigRunner</code>.
  * <p>
  * This runnable must be run in a transactional context.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 class AppStartupRunner implements KernelRunnable {
 
@@ -88,7 +85,7 @@ class AppStartupRunner implements KernelRunnable {
                 // since we created the listener, we're the first one to
                 // start the app, so we also need to start it up
                 listener.initialize(properties);
-            } catch (Exception e) {
+            } catch (RuntimeException e) {
                 if (logger.isLoggable(Level.SEVERE))
                     logger.logThrow(Level.SEVERE, e,
                                     "{0}: could not start application",

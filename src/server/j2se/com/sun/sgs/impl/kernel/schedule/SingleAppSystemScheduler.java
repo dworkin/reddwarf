@@ -126,6 +126,9 @@ class SingleAppSystemScheduler implements SystemScheduler {
         return appScheduler.addRecurringTask(task);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public void shutdown() {
         appScheduler.shutdown();
     }
