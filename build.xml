@@ -42,9 +42,6 @@
   <property name="apidoc.client.zip"
             location="${build.dir}/sgs-client-apidoc.zip"/>
 
-  <!-- Values for programming style checks -->
-  <import file="${checkstyle.dir}/checkstyle_task.xml" optional="true"/>
-
   <!-- Values for testing -->
   <property name="test.logging" location="test/test.logging"/>
   <property name="test.assertions" value="-enableassertions"/>
@@ -440,7 +437,7 @@
   <target name="checkstyle-client"
 	  depends="build-client,-checkstyle.init"
 	  description="Checks client Java coding style">
-    <checkstyle config="${neuromancer_checks.xml}"
+    <checkstyle config="etc/checkstyle/darkstar_checks.xml"
 	        classpathref="client.classpath">
       <fileset dir="src/client/j2se"/>
     </checkstyle>
@@ -450,7 +447,7 @@
   <target name="checkstyle-server"
 	  depends="build-server,-checkstyle.init"
 	  description="Checks server Java coding style">
-    <checkstyle config="${neuromancer_checks.xml}"
+    <checkstyle config="etc/checkstyle/darkstar_checks.xml"
 		classpathref="server.classpath">
       <fileset dir="src/server/j2se"/>
     </checkstyle>
@@ -460,18 +457,28 @@
   <target name="checkstyle-shared"
 	  depends="-build-shared,-checkstyle.init"
 	  description="Checks shared Java coding style">
-    <checkstyle config="${neuromancer_checks.xml}"
+    <checkstyle config="etc/checkstyle/darkstar_checks.xml"
 		classpathref="shared.classpath">
       <fileset dir="src/shared/j2se"/>
     </checkstyle>
   </target>
 
-  <!-- Verify checkstyle.dir is set, calculate checkstyle.includes, and
-       build the checkjars target in checkstyle.dir. -->
+  <!-- Verify checkstyle.jar is set, build local checkstyle classes,
+       and define the checkstyle task. -->
   <target name="-checkstyle.init">
-      <fail unless="checkstyle.dir"
-	    message="The checkstyle.dir property must be set to a directory containing the checkstyle subproject"/>
-      <ant dir="${checkstyle.dir}" target="checkjars" inheritAll="false"/>
+      <fail unless="checkstyle.jar"
+	    message="The checkstyle.jar property must be set to the location of the checkstyle-all JAR file"/>
+      <mkdir dir="${build.dir}/classes/checkstyle"/>
+      <depend srcdir="etc/checkstyle" destdir="${build.dir}/classes/checkstyle"
+	      cache="${build.dir}/depend" closure="true"/>
+      <javac srcdir="etc/checkstyle" destdir="${build.dir}/classes/checkstyle"
+	     classpath="${checkstyle.jar}" includeAntRuntime="no"
+	     debug="${build.debug}" debuglevel="${build.debug.level}"
+	     source="${javac.source}">
+	<compilerarg line="${javac.compilerargs}"/>
+      </javac>
+      <taskdef resource="checkstyletask.properties"
+	       classpath="${build.dir}/classes/checkstyle:${checkstyle.jar}"/>
   </target>
 
   <!-- Checks for bugs using FindBugs (http://findbugs.sourceforge.net) -->
