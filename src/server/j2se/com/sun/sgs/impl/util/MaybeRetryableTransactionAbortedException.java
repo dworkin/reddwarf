@@ -5,15 +5,15 @@
 package com.sun.sgs.impl.util;
 
 import com.sun.sgs.app.ExceptionRetryStatus;
+import com.sun.sgs.app.TransactionAbortedException;
 
 /**
- * A subclass of <code>IllegalStateException</code> that implements
- * <code>ExceptionRetryStatus</code>, and whose {@link #shouldRetry
+ * A subclass of {@code TransactionAbortedException} whose {@link #shouldRetry
  * shouldRetry} method determines its value based on the cause specified in the
  * constructor.
  */
-public class MaybeRetryableIllegalStateException extends IllegalStateException
-    implements ExceptionRetryStatus
+public class MaybeRetryableTransactionAbortedException
+    extends TransactionAbortedException
 {
     /** The version of the serialized form. */
     private static final long serialVersionUID = 1;
@@ -25,7 +25,7 @@ public class MaybeRetryableIllegalStateException extends IllegalStateException
      * @param	message the detail message or <code>null</code>
      * @param	cause the cause or <code>null</code>
      */
-    public MaybeRetryableIllegalStateException(
+    public MaybeRetryableTransactionAbortedException(
 	String message, Throwable cause)
     {
 	super(message, cause);
@@ -34,14 +34,14 @@ public class MaybeRetryableIllegalStateException extends IllegalStateException
     /**
      * {@inheritDoc} <p>
      *
-     * This implementation returns <code>true</code> if the <code>cause</code>
-     * specified in the constructor implements {@link ExceptionRetryStatus},
-     * and calling {@link ExceptionRetryStatus#shouldRetry shouldRetry} on the
-     * <code>cause</code> returns <code>true</code>.
+     * This implementation returns {@code true} if the {@code cause} specified
+     * in the constructor implements {@link ExceptionRetryStatus}, and calling
+     * {@link ExceptionRetryStatus#shouldRetry shouldRetry} on the {@code
+     * cause} returns {@code true}.
      */
     public boolean shouldRetry() {
 	Throwable cause = getCause();
-	return getCause() instanceof ExceptionRetryStatus &&
+	return cause instanceof ExceptionRetryStatus &&
 	    ((ExceptionRetryStatus) cause).shouldRetry();
     }
 }

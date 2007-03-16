@@ -5,7 +5,6 @@
 package com.sun.sgs.test.util;
 
 import com.sun.sgs.impl.util.LoggerWrapper;
-import com.sun.sgs.impl.util.MaybeRetryableIllegalStateException;
 import com.sun.sgs.impl.util.MaybeRetryableTransactionNotActiveException;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
@@ -114,16 +113,14 @@ public class DummyTransaction implements Transaction {
 	}
 	if (participant == null) {
 	    throw new NullPointerException("Participant must not be null");
-	}
-	if (state != State.ACTIVE) {
-	    throw new MaybeRetryableIllegalStateException(
-		"Transaction not active", getInactiveCause());
+	} else if (state == State.ABORTED) {
+	    throw new MaybeRetryableTransactionNotActiveException(
+		"Transaction not active", abortCause);
+	} else if (state != State.ACTIVE) {
+	    throw new IllegalStateException(
+		"Transaction not active: " + state);
 	}
 	participants.add(participant);
-    }
-
-    public synchronized void abort() {
-	abort(null);
     }
 
     public synchronized void abort(Throwable cause) {
@@ -133,14 +130,14 @@ public class DummyTransaction implements Transaction {
 	if (state == State.ABORTING) {
 	    return;
 	} else if (state == State.ABORTED) {
-	    throw new MaybeRetryableIllegalStateException(
+	    throw new MaybeRetryableTransactionNotActiveException(
 		"Transaction is not active", abortCause);
 	} else if (state != State.ACTIVE &&
 		   state != State.PREPARING &&
 		   state != State.PREPARED)
 	{
 	    throw new IllegalStateException(
-		"Transaction not active or preparing");
+		"Transaction is not active: " + state);
 	}
 	state = State.ABORTING;
 	abortCause = cause;
@@ -159,11 +156,19 @@ public class DummyTransaction implements Transaction {
         DummyProfileRegistrar.endTask(false);
     }
 
+    public synchronized boolean isAborted() {
+	return state == State.ABORTED || state == State.ABORTING;
+    }
+
+    public synchronized Throwable getAbortCause() {
+	return abortCause;
+    }
+
+    /* -- Other methods -- */
+
     public synchronized boolean prepare() throws Exception {
 	logger.log(Level.FINER, "prepare {0}", this);
 	if (state != State.ACTIVE) {
-	    // TODO: This should be throwing a
-	    // MaybeRetryableIllegalStateException.
 	    throw new IllegalStateException("Transaction not active");
 	}
 	state = State.PREPARING;
@@ -206,9 +211,12 @@ public class DummyTransaction implements Transaction {
 		    logger.logThrow(Level.WARNING, e, "Commit failed");
 		}
 	    }
-	} else if (state != State.ACTIVE) {
+	} else if (state == State.ABORTED) {
 	    throw new MaybeRetryableTransactionNotActiveException(
-		"Transaction not active", getInactiveCause());
+		"Transaction not active", abortCause);
+	} else if (state != State.ACTIVE) {
+	    throw new IllegalStateException(
+		"Transaction not active: " + state);
 	} else if (usePrepareAndCommit && participants.size() == 1) {
 	    state = State.PREPARING;
 	    if (proxy != null) {
@@ -240,8 +248,6 @@ public class DummyTransaction implements Transaction {
         DummyProfileRegistrar.endTask(true);
     }
 
-    /* -- Other methods -- */
-
     /** Returns the current state. */
     public synchronized State getState() {
 	return state;
@@ -249,16 +255,5 @@ public class DummyTransaction implements Transaction {
 
     public String toString() {
 	return "DummyTransaction[tid:" + id + "]";
-    }
-
-    /**
-     * Returns the exception that caused the transaction to be inactive, or
-     * null if the transaction isn't inactive or the cause isn't known.
-     */
-    private Throwable getInactiveCause() {
-	return
-	    (state == State.ABORTING || state == State.ABORTED) ?
-	    abortCause :
-	    null;
     }
 }
