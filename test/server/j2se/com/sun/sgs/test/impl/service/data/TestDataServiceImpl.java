@@ -1933,6 +1933,33 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    public void testModifiedNotSerializable() throws Exception {
+	txn.commit();
+	createTransaction();
+	dummy = service.getBinding("dummy", DummyManagedObject.class);
+	dummy.value = Thread.currentThread();
+	try {
+	    txn.commit();
+	    fail("Expected ObjectIOException");
+	} catch (ObjectIOException e) {
+	    System.err.println(e);
+	} finally {
+	    txn = null;
+	}
+    }
+
+    public void testNotSerializableAfterDeserialize() throws Exception {
+	dummy.value = new SerializationFailsAfterDeserialize();
+	txn.commit();
+	createTransaction();
+	try {
+	    service.getBinding("dummy", DummyManagedObject.class);
+	    fail("Expected ObjectIOException");
+	} catch (ObjectIOException e) {
+	    System.err.println(e);
+	}
+    }
+
     /* -- App and service binding methods -- */
 
     <T> T getBinding(
@@ -2043,6 +2070,29 @@ public class TestDataServiceImpl extends TestCase {
 	    throws IOException
 	{
 	    throw new IOException("Serialization fails");
+	}
+    }
+
+    /**
+     * A serializable object that fails during serialization after
+     * deserialization.
+     */
+    static class SerializationFailsAfterDeserialize implements Serializable {
+        private static final long serialVersionUID = 1L;
+	private transient boolean deserialized;
+	private void writeObject(ObjectOutputStream out)
+	    throws IOException
+	{
+	    if (deserialized) {
+		throw new IOException(
+		    "Serialization fails after deserialization");
+	    }
+	}
+	private void readObject(ObjectInputStream in)
+	    throws IOException, ClassNotFoundException
+	{
+	    in.defaultReadObject();
+	    deserialized = true;
 	}
     }
 

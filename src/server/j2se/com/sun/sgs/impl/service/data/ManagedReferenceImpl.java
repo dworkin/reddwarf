@@ -280,15 +280,16 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 	    }
 	    switch (state) {
 	    case EMPTY:
-		object = deserialize(
+		ManagedObject tempObject = deserialize(
 		    context.store.getObject(context.txn, oid, false));
 		if (context.detectModifications) {
-		    fingerprint = SerialUtil.fingerprint(object);
+		    fingerprint = SerialUtil.fingerprint(tempObject);
 		    state = State.MAYBE_MODIFIED;
 		} else {
 		    state = State.NOT_MODIFIED;
 		}
 		/* Do after creating fingerprint, in case that fails */
+		object = tempObject;
 		context.refs.registerObject(this);
 		break;
 	    case NEW:
