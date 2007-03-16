@@ -184,29 +184,33 @@ class WindowApplicationScheduler
         }
 
         nextElement = new QueueElement(scheduledWindow, task);
-        while (! queue.offer(nextElement));
+        while (! queue.offer(nextElement)) { /* spin */ }
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public void shutdown() {
         timedTaskHandler.shutdown();
     }
 
     // Private class used to manage the priority queue
-    private class QueueElement implements Comparable<QueueElement> {
+    private static class QueueElement implements Comparable<QueueElement> {
         private final long window;
         private final ScheduledTask task;
         private final long timestamp;
-        public QueueElement(long window, ScheduledTask task) {
+        QueueElement(long window, ScheduledTask task) {
             this.window = window;
             this.task = task;
             this.timestamp = task.getStartTime();
         }
-        public long getWindow() {
+        long getWindow() {
             return window;
         }
-        public ScheduledTask getTask() {
+        ScheduledTask getTask() {
             return task;
         }
+        /** {@inheritDoc} */
         public int compareTo(QueueElement other) {
             // if the other window is bigger, then their priority is lower
             if (window < other.window)
@@ -225,6 +229,16 @@ class WindowApplicationScheduler
             // just say they've got the same priority
             return 0;
         }
+        /** {@inheritDoc} */
+        public boolean equals(Object o) {
+            if ((o == null) || (! (o instanceof QueueElement)))
+                return false;
+
+            QueueElement other = (QueueElement)o;
+
+            return ((window == other.window) &&
+                    (timestamp == other.timestamp));
+        }
     }
 
     // NOTE: for this first-pass implementation, we're not using any
@@ -233,9 +247,9 @@ class WindowApplicationScheduler
     // kick off a thread to reap any users that haven't been scheduled
     // within some delta, but for now there won't be enough users to worry
     // about this case, so this feature isn't implemented
-    private class QueueUser {
-        public long nextWindow = 0L;
-        public long lastScheduled;
+    private static class QueueUser {
+        long nextWindow = 0L;
+        long lastScheduled;
     }
 
 }

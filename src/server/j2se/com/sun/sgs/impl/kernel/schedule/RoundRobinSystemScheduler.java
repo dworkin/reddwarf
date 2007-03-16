@@ -153,6 +153,9 @@ class RoundRobinSystemScheduler implements SystemScheduler {
         return scheduler.addRecurringTask(task);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     public void shutdown() {
         for (ApplicationScheduler scheduler : appSchedulers.values())
             scheduler.shutdown();
