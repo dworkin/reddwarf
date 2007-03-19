@@ -7,7 +7,7 @@ package com.sun.sgs.impl.service.transaction;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.util.LoggerWrapper;
-import com.sun.sgs.impl.util.MaybeRetryableIllegalStateException;
+import com.sun.sgs.impl.util.MaybeRetryableTransactionAbortedException;
 import com.sun.sgs.impl.util.MaybeRetryableTransactionNotActiveException;
 import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
@@ -100,9 +100,12 @@ final class TransactionImpl implements Transaction {
 	}
 	if (participant == null) {
 	    throw new NullPointerException("Participant must not be null");
+	} else if (state == State.ABORTED) {
+	    throw new MaybeRetryableTransactionNotActiveException(
+		"Transaction is not active", abortCause);
 	} else if (state != State.ACTIVE) {
-	    throw new MaybeRetryableIllegalStateException(
-		"Transaction is not active", getInactiveCause());
+	    throw new IllegalStateException(
+		"Transaction is not active: " + state);
 	}
 	if (!participants.contains(participant)) {
 	    if (participant instanceof NonDurableTransactionParticipant) {
@@ -122,11 +125,6 @@ final class TransactionImpl implements Transaction {
     }
 
     /** {@inheritDoc} */
-    public void abort() {
-	abort(null);
-    }
-
-    /** {@inheritDoc} */
     public void abort(Throwable cause) {
 	assert Thread.currentThread() == owner : "Wrong thread";
 	logger.log(Level.FINER, "abort {0}", this);
@@ -137,15 +135,17 @@ final class TransactionImpl implements Transaction {
 	case ABORTING:
 	    return;
 	case ABORTED:
-	    throw new MaybeRetryableIllegalStateException(
+	    throw new MaybeRetryableTransactionNotActiveException(
 		"Transaction is not active", abortCause);
 	case COMMITTING:
 	case COMMITTED:
-	    throw new IllegalStateException("Transaction is not active");
+	    throw new IllegalStateException(
+		"Transaction is not active: " + state);
 	default:
 	    throw new AssertionError();
 	}
 	state = State.ABORTING;
+	abortCause = cause;
 	for (TransactionParticipant participant : participants) {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST, "abort {0} participant:{1}",
@@ -153,7 +153,7 @@ final class TransactionImpl implements Transaction {
 	    }
 	    try {
 		participant.abort(this);
-	    } catch (Exception e) {
+	    } catch (RuntimeException e) {
 		if (logger.isLoggable(Level.WARNING)) {
 		    logger.logThrow(
 			Level.WARNING, e, "abort {0} participant:{1} failed",
@@ -162,7 +162,16 @@ final class TransactionImpl implements Transaction {
 	    }
 	}
 	state = State.ABORTED;
-	abortCause = cause;
+    }
+
+    /** {@inheritDoc} */
+    public boolean isAborted() {
+	return state == State.ABORTED || state == State.ABORTING;
+    }
+
+    /** {@inheritDoc} */
+    public Throwable getAbortCause() {
+	return abortCause;
     }
 
     /* -- Object methods -- */
@@ -202,19 +211,28 @@ final class TransactionImpl implements Transaction {
     /**
      * Commits this transaction
      *
-     * @throws	TransactionNotActiveException if the transaction is not active
-     * @throws	TransactionAbortedException if the transaction was aborted
-     *		during preparation without an exception being thrown
-     * @throws	Exception if any participant throws an exception while
-     *		preparing the transaction
+     * @throws	TransactionNotActiveException if the transaction has been
+     *		aborted
+     * @throws	TransactionAbortedException if a call to {@link
+     *		TransactionParticipant#prepare prepare} on a transaction
+     *		participant aborts the transaction but does not throw an
+     *		exception
+     * @throws	IllegalStateException if {@code prepare} has been called on any
+     *		transaction participant and {@link Transaction#abort abort} has
+     *		not been called on the transaction
+     * @throws	Exception any exception thrown when calling {@code prepare} on
+     *		a participant
      * @see	TransactionHandle#commit TransactionHandle.commit
      */
     void commit() throws Exception {
 	assert Thread.currentThread() == owner : "Wrong thread";
 	logger.log(Level.FINER, "commit {0}", this);
-	if (state != State.ACTIVE) {
+	if (state == State.ABORTED) {
 	    throw new MaybeRetryableTransactionNotActiveException(
-		"Transaction is not active", getInactiveCause());
+		"Transaction is not active", abortCause);
+	} else if (state != State.ACTIVE) {
+	    throw new IllegalStateException(
+		"Transaction is not active: " + state);
 	}
 	state = State.PREPARING;
 	for (Iterator<TransactionParticipant> iter = participants.iterator();
@@ -255,8 +273,8 @@ final class TransactionImpl implements Transaction {
 		throw e;
 	    }
 	    if (state == State.ABORTED) {
-		throw new TransactionAbortedException(
-		    "Transaction was aborted");
+		throw new MaybeRetryableTransactionAbortedException(
+		    "Transaction has been aborted", abortCause);
 	    }
 	}
 	state = State.COMMITTING;
@@ -267,7 +285,7 @@ final class TransactionImpl implements Transaction {
 	    }
 	    try {
 		participant.commit(this);
-	    } catch (Exception e) {
+	    } catch (RuntimeException e) {
 		if (logger.isLoggable(Level.WARNING)) {
 		    logger.logThrow(
 			Level.WARNING, e, "commit {0} participant:{1} failed",
@@ -276,23 +294,6 @@ final class TransactionImpl implements Transaction {
 	    }
 	}
 	state = State.COMMITTED;
-    }
-
-    /** Returns whether this transaction is currently active. */
-    boolean isActive() {
-	assert Thread.currentThread() == owner : "Wrong thread";
-	return state == State.ACTIVE;
-    }
-
-    /**
-     * Returns the exception that caused the transaction to be inactive, or
-     * null if the transaction isn't inactive or the cause isn't known.
-     */
-    Throwable getInactiveCause() {
-	return
-	    (state == State.ABORTING || state == State.ABORTED) ?
-	    abortCause :
-	    null;
     }
 
     /** Returns a byte array that represents the specified long. */

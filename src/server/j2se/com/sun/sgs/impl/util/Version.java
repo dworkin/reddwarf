@@ -6,6 +6,7 @@ package com.sun.sgs.impl.util;
 
 import com.sun.sgs.impl.util.LoggerWrapper;
 import java.io.BufferedReader;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -45,7 +46,11 @@ public final class Version {
 		BufferedReader reader =
 		    new BufferedReader(new InputStreamReader(in));
 		try {
-		    version = reader.readLine().trim();
+		    String line = reader.readLine();
+		    if (line == null) {
+			throw new EOFException("Unexpected end of file");
+		    }
+		    version = line.trim();
 		} catch (Exception e) {
 		    logger.logThrow(
 			Level.WARNING, e, "Problem getting version");
