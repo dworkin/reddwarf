@@ -422,16 +422,6 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
 	 * -tjb@sun.com (02/16/2007)
 	 */
 	directory = new File(specifiedDirectory).getAbsolutePath();
-	File directoryFile = new File(directory);
-	if (!directoryFile.exists()) {
-	    boolean ok = directoryFile.mkdirs();
-	    if (ok) {
-		logger.log(Level.CONFIG, "Created directory: {0}", directory);
-	    } else {
-		throw new DataStoreException(
-		    "Problem creating directory: " + directory);
-	    }
-	}
 	allocationBlockSize = wrappedProps.getIntProperty(
 	    ALLOCATION_BLOCK_SIZE_PROPERTY, DEFAULT_ALLOCATION_BLOCK_SIZE);
 	if (allocationBlockSize < 1) {

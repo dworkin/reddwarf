@@ -187,14 +187,16 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
-    public void testConstructorNonexistentDirectory() throws Exception {
-	File root = File.createTempFile("root", "dir");
-	assertTrue(root.delete());
+    public void testConstructorNonexistentDirectory() {
 	Properties props = createProperties(
 	    DataStoreImplClassName + ".directory",
-	    root.getPath() + File.separator + "dsdb");
-	DataStoreImpl store = new DataStoreImpl(props);
-	store.shutdown();
+	    "/this-is-a-non-existent-directory/yup");
+	try {
+	    new DataStoreImpl(props);
+	    fail("Expected DataStoreException");
+	} catch (DataStoreException e) {
+	    System.err.println(e);	    
+	}
     }
 
     public void testConstructorDirectoryIsFile() throws Exception {
