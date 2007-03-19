@@ -1900,7 +1900,7 @@ public class TestDataServiceImpl extends TestCase {
 			System.err.println(finalI + " txn2: " + e);
 			exception2 = e;
 			if (txn2 != null) {
-			    txn2.abort();
+			    txn2.abort(null);
 			}
 		    }
 		}
