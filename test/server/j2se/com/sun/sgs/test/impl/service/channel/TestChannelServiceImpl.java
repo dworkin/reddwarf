@@ -214,7 +214,7 @@ public class TestChannelServiceImpl extends TestCase {
     protected void tearDown(boolean clean) throws Exception {
         if (txn != null) {
             try {
-                txn.abort();
+                txn.abort(null);
             } catch (IllegalStateException e) {
             }
             txn = null;
@@ -347,7 +347,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testCreateChannelAndAbort() {
 	createChannel("foo");
-	txn.abort();
+	txn.abort(null);
 	createTransaction();
 	try {
 	    channelService.getChannel("foo");

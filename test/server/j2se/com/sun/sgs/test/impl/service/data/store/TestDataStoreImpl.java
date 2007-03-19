@@ -9,6 +9,7 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionException;
+import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.DataStoreException;
@@ -102,7 +103,7 @@ public class TestDataStoreImpl extends TestCase {
     protected void tearDown() throws Exception {
 	try {
 	    if (txn != null) {
-		txn.abort();
+		txn.abort(null);
 	    }
 	    if (store != null) {
 		new ShutdownAction().waitForDone();
@@ -165,7 +166,7 @@ public class TestDataStoreImpl extends TestCase {
     public void testConstructorBadAllocationBlockSize() {
 	Properties props = createProperties(
 	    DataStoreImplClassName + ".directory", "foo",
-	    DataStoreImplClassName + ".allocationBlockSize", "gorp");
+	    DataStoreImplClassName + ".allocation.block.size", "gorp");
 	try {
 	    new DataStoreImpl(props);
 	    fail("Expected IllegalArgumentException");
@@ -177,7 +178,7 @@ public class TestDataStoreImpl extends TestCase {
     public void testConstructorNegativeAllocationBlockSize() {
 	Properties props = createProperties(
 	    DataStoreImplClassName + ".directory", "foo",
-	    DataStoreImplClassName + ".allocationBlockSize", "-3");
+	    DataStoreImplClassName + ".allocation.block.size", "-3");
 	try {
 	    new DataStoreImpl(props);
 	    fail("Expected IllegalArgumentException");
@@ -451,7 +452,7 @@ public class TestDataStoreImpl extends TestCase {
 	byte[] newData = new byte[] { 3 };
 	store.setObject(txn, id, newData);
 	assertTrue(Arrays.equals(newData, store.getObject(txn, id, true)));
-	txn.abort();
+	txn.abort(null);
 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
 	assertTrue(Arrays.equals(data, store.getObject(txn, id, true)));
 	store.setObject(txn, id, newData);
@@ -509,7 +510,7 @@ public class TestDataStoreImpl extends TestCase {
 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
 	store.removeObject(txn, id);
 	assertFalse(txn.prepare());
-	txn.abort();
+	txn.abort(null);
 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
 	store.removeObject(txn, id);
 	try {
@@ -636,7 +637,7 @@ public class TestDataStoreImpl extends TestCase {
 	assertEquals(id, store.getBinding(txn, "foo"));
 	store.setBinding(txn, "foo", newId);
 	assertEquals(newId, store.getBinding(txn, "foo"));
-	txn.abort();
+	txn.abort(null);
 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
 	assertEquals(id, store.getBinding(txn, "foo"));
     }
@@ -691,7 +692,7 @@ public class TestDataStoreImpl extends TestCase {
 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
 	store.removeBinding(txn, "foo");
 	assertFalse(txn.prepare());
-	txn.abort();
+	txn.abort(null);
 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
 	assertEquals(id, store.getBinding(txn, "foo"));
 	store.removeBinding(txn, "foo");
@@ -785,7 +786,7 @@ public class TestDataStoreImpl extends TestCase {
 	assertEquals("name-2", store.nextBoundName(txn, null));
 	store.removeBinding(txn, "name-2");
 	assertNull(store.nextBoundName(txn, null));
-	txn.abort();
+	txn.abort(null);
 	txn = new DummyTransaction();
 	assertEquals("name-1", store.nextBoundName(txn, null));
     }
@@ -822,6 +823,9 @@ public class TestDataStoreImpl extends TestCase {
 		    /* Aborting a prepared, modified transaction is OK. */
 		    action();
 		}
+		Class<?> getAbortedTestExceptionType() {
+		    return IllegalStateException.class;
+		}
 	    };
 	}
     }
@@ -852,6 +856,9 @@ public class TestDataStoreImpl extends TestCase {
 		    assertTrue(participant.prepare(txn));
 		    txn = null;
 		}
+		Class<?> getAbortedTestExceptionType() {
+		    return IllegalStateException.class;
+		}
 	    };
 	}
     }
@@ -881,6 +888,9 @@ public class TestDataStoreImpl extends TestCase {
 		void action() throws Exception {
 		    participant.prepareAndCommit(txn);
 		    txn = null;
+		}
+		Class<?> getAbortedTestExceptionType() {
+		    return IllegalStateException.class;
 		}
 	    };
 	}
@@ -924,6 +934,9 @@ public class TestDataStoreImpl extends TestCase {
 		    /* Committing a prepared, modified transaction is OK. */
 		    super.shuttingDownExistingTxnTest();
 		}
+		Class<?> getAbortedTestExceptionType() {
+		    return IllegalStateException.class;
+		}
 	    };
 	}
     }
@@ -931,7 +944,7 @@ public class TestDataStoreImpl extends TestCase {
     /* -- Test shutdown -- */
 
     public void testShutdownAgain() throws Exception {
-	txn.abort();
+	txn.abort(null);
 	txn = null;
 	store.shutdown();
 	ShutdownAction action = new ShutdownAction();
@@ -963,7 +976,7 @@ public class TestDataStoreImpl extends TestCase {
 	action1.interrupt();
 	action1.assertResult(false);
 	action2.assertBlocked();
-	txn.abort();
+	txn.abort(null);
 	action2.assertResult(true);
 	txn = null;
 	store = null;
@@ -974,7 +987,7 @@ public class TestDataStoreImpl extends TestCase {
 	action1.assertBlocked();
 	ShutdownAction action2 = new ShutdownAction();
 	action2.assertBlocked();
-	txn.abort();
+	txn.abort(null);
 	boolean result1;
 	try {
 	    result1 = action1.waitForDone();
@@ -1043,7 +1056,7 @@ public class TestDataStoreImpl extends TestCase {
 			System.err.println(finalI + " txn2: " + e);
 			exception2 = e;
 			if (txn2 != null) {
-			    txn2.abort();
+			    txn2.abort(null);
 			}
 		    }
 		}
@@ -1195,15 +1208,25 @@ public class TestDataStoreImpl extends TestCase {
 
 	/** Runs the test for the aborted case. */
 	void abortedTest() throws Exception {
-	    txn.abort();
+	    txn.abort(null);
 	    try {
 		action();
-		fail("Expected IllegalStateException");
-	    } catch (IllegalStateException e) {
-		System.err.println(e);
+		fail("Expected exception");
+	    } catch (Exception e) {
+		Class<?> expectedType = getAbortedTestExceptionType();
+		if (expectedType.isInstance(e)) {
+		    System.err.println(e);
+		} else {
+		    fail("Expected " + expectedType + ": " + e);
+		}
 	    } finally {
 		txn = null;
 	    }
+	}
+
+	/** Returns the type of exception expected by abortedTest. */
+	Class<?> getAbortedTestExceptionType() {
+	    return TransactionNotActiveException.class;
 	}
 
 	/** Runs the test for the prepared returns read-only case. */
@@ -1253,7 +1276,7 @@ public class TestDataStoreImpl extends TestCase {
 	    } catch (IllegalStateException e) {
 		System.err.println(e);
 	    } finally {
-		originalTxn.abort();
+		originalTxn.abort(null);
 	    }
 	}
 
@@ -1284,16 +1307,16 @@ public class TestDataStoreImpl extends TestCase {
 	    } catch (IllegalStateException e) {
 		System.err.println(e);
 	    }
-	    txn.abort();
+	    txn.abort(null);
 	    txn = null;
-	    originalTxn.abort();
+	    originalTxn.abort(null);
 	    shutdownAction.assertResult(true);
 	    store = null;
 	}
 
 	/** Runs the test for the shutdown case. */
 	void shutdownTest() throws Exception {
-	    txn.abort();
+	    txn.abort(null);
 	    store.shutdown();
 	    try {
 		action();
