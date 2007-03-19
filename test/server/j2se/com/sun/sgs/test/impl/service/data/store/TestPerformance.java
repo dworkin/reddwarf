@@ -74,10 +74,6 @@ public class TestPerformance extends TestCase {
     /** Whether to flush to disk on transaction commits. */
     private static boolean testFlush = Boolean.getBoolean("test.flush");
 
-    /** The number of transactions between logging database statistics. */
-    private static int logStats = Integer.getInteger(
-	"test.logStats", Integer.MAX_VALUE);
-
     /** Whether to do logging, which is otherwise disabled. */
     private static boolean doLogging = Boolean.getBoolean("test.doLogging");
 
@@ -150,8 +146,7 @@ public class TestPerformance extends TestCase {
 
     public void testReadIds() throws Exception {
 	Properties props = createProperties(
-	    DataStoreImplClass + ".directory", createDirectory(),
-	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
+	    DataStoreImplClass + ".directory", createDirectory());
 	byte[] data = new byte[itemSize];
 	data[0] = 1;
 	store = new DataStoreImpl(props);
@@ -197,8 +192,7 @@ public class TestPerformance extends TestCase {
     void testWriteIdsInternal(boolean flush) throws Exception {
 	Properties props = createProperties(
 	    DataStoreImplClass + ".directory", createDirectory(),
-	    DataStoreImplClass + ".logStats", String.valueOf(logStats),
-	    DataStoreImplClass + ".flushToDisk", String.valueOf(flush));
+	    DataStoreImplClass + ".flush.to.disk", String.valueOf(flush));
 	byte[] data = new byte[itemSize];
 	data[0] = 1;
 	store = new DataStoreImpl(props);
@@ -233,8 +227,7 @@ public class TestPerformance extends TestCase {
 
     public void testReadNames() throws Exception {
 	Properties props = createProperties(
-	    DataStoreImplClass + ".directory", createDirectory(),
-	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
+	    DataStoreImplClass + ".directory", createDirectory());
 	store = new DataStoreImpl(props);
         if (store instanceof ProfileProducer)
             DummyProfileRegistrar.startProfiling((ProfileProducer)store);
@@ -260,8 +253,7 @@ public class TestPerformance extends TestCase {
 
     public void testWriteNames() throws Exception {
 	Properties props = createProperties(
-	    DataStoreImplClass + ".directory", createDirectory(),
-	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
+	    DataStoreImplClass + ".directory", createDirectory());
 	store = new DataStoreImpl(props);
         if (store instanceof ProfileProducer)
             DummyProfileRegistrar.startProfiling((ProfileProducer)store);
