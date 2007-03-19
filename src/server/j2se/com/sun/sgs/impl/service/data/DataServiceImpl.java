@@ -174,9 +174,9 @@ public final class DataServiceImpl
      * @param	componentRegistry the registry of configured {@link Service}
      *		instances
      * @throws	IllegalArgumentException if the <code>com.sun.sgs.app.name
-     *		</code> property is not specified, if the value of the
-     *		<code>com.sun.sgs.impl.service.data.debug.check.interval</code>
-     *		property is not a valid integer, or if the data store
+     *		</code> property is not specified, if the value of the <code>
+     *		com.sun.sgs.impl.service.data.DataServiceImpl.debug.check.interval
+     *		</code> property is not a valid integer, or if the data store
      *		constructor detects an illegal property value
      */
     public DataServiceImpl(
