@@ -4,7 +4,6 @@
 
 package com.sun.sgs.impl.service.transaction;
 
-import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
 import java.util.Properties;
@@ -54,25 +53,11 @@ public final class TransactionCoordinatorImpl
 	/* -- Implement TransactionHandle -- */
 
 	public Transaction getTransaction() {
-	    if (txn.isActive()) {
-		return txn;
-	    } else {
-		throw new TransactionNotActiveException(
-		    "No transaction is active", txn.getInactiveCause());
-	    }
+	    return txn;
 	}
 
 	public void commit() throws Exception {
 	    txn.commit();
-	}
-
-	public void abort(Throwable cause) {
-	    if (txn.isActive()) {
-		txn.abort(cause);
-	    } else {
-		throw new TransactionNotActiveException(
-		    "No transaction is active", txn.getInactiveCause());
-	    }
 	}
     }
 

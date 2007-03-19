@@ -154,11 +154,29 @@ public final class MinimalTestKernel
     }
 
     /**
-     * A basic implementation of TransactionCoordinator that uses the
-     * DummyTransactions used by the tests.
+     * Arranges to use the specified transaction coordinator for creating
+     * transactions, using the default coordinator if the value is null.
+     *
+     * @param txnCoordinator the coordinator or null
+     */
+    public static void setTransactionCoordinator(
+	TransactionCoordinator txnCoordinator)
+    {
+	TestTransactionCoordinator.txnCoordinator = txnCoordinator;
+    }
+
+    /**
+     * A basic implementation of TransactionCoordinator that by default uses
+     * the DummyTransactions used by the tests, but can also delegate to
+     * another transaction coordinator supplied to the
+     * setTransactionCoordinator method.
      */
     static class TestTransactionCoordinator implements TransactionCoordinator {
+        static TransactionCoordinator txnCoordinator;
         public TransactionHandle createTransaction() {
+            if (txnCoordinator != null) {
+                return txnCoordinator.createTransaction();
+            }
             DummyTransaction txn = new DummyTransaction();
             proxy.setCurrentTransaction(txn);
             return new TestTransactionHandle(txn);

@@ -130,7 +130,7 @@ public class TestDataServiceImpl extends TestCase {
     protected void tearDown() throws Exception {
 	try {
 	    if (txn != null) {
-		txn.abort();
+		txn.abort(null);
 	    }
 	    if (service != null) {
 		new ShutdownAction().waitForDone();
@@ -273,7 +273,7 @@ public class TestDataServiceImpl extends TestCase {
 	service = getDataServiceImpl();
 	createTransaction();
 	service.configure(componentRegistry, txnProxy);
-	txn.abort();
+	txn.abort(null);
 	createTransaction();
 	service.configure(componentRegistry, txnProxy);
 	txn.commit();
@@ -737,7 +737,7 @@ public class TestDataServiceImpl extends TestCase {
 	    getBinding(app, service, "dummy", DummyManagedObject.class));
 	DummyManagedObject dummy2 = new DummyManagedObject();
 	setBinding(app, service, "dummy", dummy2);
-	txn.abort();
+	txn.abort(null);
 	createTransaction();
 	assertEquals(
 	    dummy,
@@ -869,7 +869,7 @@ public class TestDataServiceImpl extends TestCase {
     private void testRemoveBindingSuccess(boolean app) {
 	setBinding(app, service, "dummy", dummy);
 	removeBinding(app, service, "dummy");
-	txn.abort();
+	txn.abort(null);
 	createTransaction();
 	removeBinding(app, service, "dummy");	
 	try {
@@ -889,7 +889,7 @@ public class TestDataServiceImpl extends TestCase {
 	DummyManagedObject serviceResult =
 	    service.getServiceBinding("dummy", DummyManagedObject.class);
 	assertEquals(serviceDummy, serviceResult);
-	txn.abort();
+	txn.abort(null);
 	createTransaction();
 	service.removeServiceBinding("dummy");
 	DummyManagedObject result =
@@ -980,7 +980,7 @@ public class TestDataServiceImpl extends TestCase {
 	assertEquals("zzz-2", nextBoundName(app, service, "zzz-1"));
 	assertNull(nextBoundName(app, service, "zzz-2"));
 	assertNull(nextBoundName(app, service, "zzz-2"));
-	txn.abort();
+	txn.abort(null);
 	createTransaction();
 	removeBinding(app, service, "zzz-2");
 	assertEquals("zzz-1", nextBoundName(app, service, "zzz-"));
@@ -1200,7 +1200,7 @@ public class TestDataServiceImpl extends TestCase {
 		} catch (Exception e) {
 		    fail("Unexpected exception: " + e);
 		} finally {
-		    txn2.abort();
+		    txn2.abort(null);
 		}
 	    }
 	};
@@ -1347,7 +1347,7 @@ public class TestDataServiceImpl extends TestCase {
 		    }
 		    /* Expect TransactionNotActiveException */
 		    void shutdownTest() throws Exception {
-			txn.abort();
+			txn.abort(null);
 			service.shutdown();
 			try {
 			    action();
@@ -1480,7 +1480,7 @@ public class TestDataServiceImpl extends TestCase {
 		    }
 		    /* Expect TransactionNotActiveException */
 		    void shutdownTest() throws Exception {
-			txn.abort();
+			txn.abort(null);
 			service.shutdown();
 			try {
 			    action();
@@ -1557,7 +1557,7 @@ public class TestDataServiceImpl extends TestCase {
 		} catch (Exception e) {
 		    fail("Unexpected exception: " + e);
 		} finally {
-		    txn2.abort();
+		    txn2.abort(null);
 		}
 	    }
 	};
@@ -1607,7 +1607,7 @@ public class TestDataServiceImpl extends TestCase {
     /* -- Test shutdown -- */
 
     public void testShutdownAgain() throws Exception {
-	txn.abort();
+	txn.abort(null);
 	txn = null;
 	service.shutdown();
 	ShutdownAction action = new ShutdownAction();
@@ -1639,7 +1639,7 @@ public class TestDataServiceImpl extends TestCase {
 	action1.interrupt();
 	action1.assertResult(false);
 	action2.assertBlocked();
-	txn.abort();
+	txn.abort(null);
 	action2.assertResult(true);
 	txn = null;
 	service = null;
@@ -1650,7 +1650,7 @@ public class TestDataServiceImpl extends TestCase {
 	action1.assertBlocked();
 	ShutdownAction action2 = new ShutdownAction();
 	action2.assertBlocked();
-	txn.abort();
+	txn.abort(null);
 	boolean result1;
 	try {
 	    result1 = action1.waitForDone();
@@ -1702,11 +1702,11 @@ public class TestDataServiceImpl extends TestCase {
 	txn = new DummyTransaction(UsePrepareAndCommit.NO);
 	txnProxy.setCurrentTransaction(txn);
 	service.removeObject(dummy);
-	txn.abort();
+	txn.abort(null);
 	txn = new DummyTransaction(UsePrepareAndCommit.YES);
 	txnProxy.setCurrentTransaction(txn);
 	service.removeObject(dummy);
-	txn.abort();
+	txn.abort(null);
 	txn = null;
     }
 
@@ -1729,11 +1729,11 @@ public class TestDataServiceImpl extends TestCase {
 	txn = new DummyTransaction(UsePrepareAndCommit.NO);
 	txnProxy.setCurrentTransaction(txn);
 	service.getBinding("dummy", DummyManagedObject.class);
-	txn.abort();
+	txn.abort(null);
 	txn = new DummyTransaction(UsePrepareAndCommit.YES);
 	txnProxy.setCurrentTransaction(txn);
 	service.getBinding("dummy", DummyManagedObject.class);
-	txn.abort();
+	txn.abort(null);
 	createTransaction();
 	service.getBinding("dummy", DummyManagedObject.class);
     }
@@ -2102,14 +2102,14 @@ public class TestDataServiceImpl extends TestCase {
 	    }
 	    Participant participant = new Participant();
 	    txn.join(participant);
-	    txn.abort();
+	    txn.abort(null);
 	    txn = null;
 	    assertTrue("Action should throw", participant.ok);
 	}
 
 	/** Runs the test for the aborted case. */
 	private void abortedTest() {
-	    txn.abort();
+	    txn.abort(null);
 	    try {
 		action();
 		fail("Expected TransactionNotActiveException");
@@ -2208,9 +2208,9 @@ public class TestDataServiceImpl extends TestCase {
 		} catch (IllegalStateException e) {
 		    System.err.println(e);
 		}
-		txn.abort();
+		txn.abort(null);
 		txn = null;
-		originalTxn.abort();
+		originalTxn.abort(null);
 		shutdownAction.assertResult(true);
 	    } finally {
 		service = null;
@@ -2219,7 +2219,7 @@ public class TestDataServiceImpl extends TestCase {
 
 	/** Runs the test for the shutdown case. */
 	void shutdownTest() throws Exception {
-	    txn.abort();
+	    txn.abort(null);
 	    service.shutdown();
 	    try {
 		action();

@@ -212,11 +212,11 @@ public class TestConcurrent extends TestCase {
 			}
 		    }
 		}
-		txn.abort();
+		txn.abort(null);
 		threadDone(aborts);
 	    } catch (Throwable t) {
 		try {
-		    txn.abort();
+		    txn.abort(null);
 		} catch (RuntimeException e) {
 		}
 		threadFailed(t);
