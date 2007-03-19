@@ -166,7 +166,7 @@ public class TestDataStoreImpl extends TestCase {
     public void testConstructorBadAllocationBlockSize() {
 	Properties props = createProperties(
 	    DataStoreImplClassName + ".directory", "foo",
-	    DataStoreImplClassName + ".allocationBlockSize", "gorp");
+	    DataStoreImplClassName + ".allocation.block.size", "gorp");
 	try {
 	    new DataStoreImpl(props);
 	    fail("Expected IllegalArgumentException");
@@ -178,7 +178,7 @@ public class TestDataStoreImpl extends TestCase {
     public void testConstructorNegativeAllocationBlockSize() {
 	Properties props = createProperties(
 	    DataStoreImplClassName + ".directory", "foo",
-	    DataStoreImplClassName + ".allocationBlockSize", "-3");
+	    DataStoreImplClassName + ".allocation.block.size", "-3");
 	try {
 	    new DataStoreImpl(props);
 	    fail("Expected IllegalArgumentException");
@@ -187,16 +187,14 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
-    public void testConstructorNonexistentDirectory() {
+    public void testConstructorNonexistentDirectory() throws Exception {
+	File root = File.createTempFile("root", "dir");
+	assertTrue(root.delete());
 	Properties props = createProperties(
 	    DataStoreImplClassName + ".directory",
-	    "/this-is-a-non-existent-directory/yup");
-	try {
-	    new DataStoreImpl(props);
-	    fail("Expected DataStoreException");
-	} catch (DataStoreException e) {
-	    System.err.println(e);	    
-	}
+	    root.getPath() + File.separator + "dsdb");
+	DataStoreImpl store = new DataStoreImpl(props);
+	store.shutdown();
     }
 
     public void testConstructorDirectoryIsFile() throws Exception {

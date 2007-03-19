@@ -72,7 +72,7 @@ public class TestDataServiceImpl extends TestCase {
     private static Properties dbProps = createProperties(
 	DataStoreImplClassName + ".directory", dbDirectory,
 	StandardProperties.APP_NAME, "TestDataServiceImpl",
-	DataServiceImplClassName + ".debugCheckInterval", "0");
+	DataServiceImplClassName + ".debug.check.interval", "0");
 
     /** Set when the test passes. */
     private boolean passed;
@@ -181,7 +181,7 @@ public class TestDataServiceImpl extends TestCase {
 	Properties props = createProperties(
 	    DataStoreImplClassName + ".directory", createDirectory(),
 	    StandardProperties.APP_NAME, "Foo",
-	    DataServiceImplClassName + ".debugCheckInterval", "gorp");
+	    DataServiceImplClassName + ".debug.check.interval", "gorp");
 	try {
 	    new DataServiceImpl(props, componentRegistry);
 	    fail("Expected IllegalArgumentException");
