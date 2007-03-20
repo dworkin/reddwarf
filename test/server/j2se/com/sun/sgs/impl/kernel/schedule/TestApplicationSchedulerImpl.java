@@ -11,6 +11,7 @@ import com.sun.sgs.kernel.Priority;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskReservation;
 
+import com.sun.sgs.test.util.DummyKernelRunnable;
 import com.sun.sgs.test.util.DummyTaskOwner;
 import com.sun.sgs.test.util.ParameterizedNameRunner;
 import com.sun.sgs.test.util.UtilThreadGroup;
@@ -53,12 +54,8 @@ public class TestApplicationSchedulerImpl {
 
     // a basic, recurring task that shouldn't be run but can be used for tests
     private static final ScheduledTask recurringTestTask =
-        new ScheduledTask(new KernelRunnable() {
-                public String getBaseTaskType() {
-                    return getClass().getName();
-                }
-                public void run() throws Exception {}
-            }, new DummyTaskOwner(), Priority.getDefaultPriority(), 0, 100);
+        new ScheduledTask(new DummyKernelRunnable(), new DummyTaskOwner(),
+                          Priority.getDefaultPriority(), 0, 100);
 
     // the fully-qualified name of the scheduler we're testing
     private String appSchedulerName;
@@ -608,12 +605,9 @@ public class TestApplicationSchedulerImpl {
 
     protected static ScheduledTask getNewTask(long delay) {
         long time = System.currentTimeMillis() + delay;
-        return new ScheduledTask(new KernelRunnable() {
-                public String getBaseTaskType() {
-                    return getClass().getName();
-                }
-                public void run() throws Exception {}
-            }, new DummyTaskOwner(), Priority.getDefaultPriority(), time);
+        return new ScheduledTask(new DummyKernelRunnable(),
+                                 new DummyTaskOwner(),
+                                 Priority.getDefaultPriority(), time);
     }
 
     /**

@@ -12,14 +12,14 @@ package com.sun.sgs.kernel;
 public interface KernelRunnable {
 
     /**
-     * Returns the type of the base task that is run by this
+     * Returns the fully qualified type of the base task that is run by this
      * <code>KernelRunnable</code>. Many types of runnables, for instance
      * <code>TransactionRunner</code>, wrap around other instances of
      * <code>KernelRunnable</code> or <code>Task</code>. This method
      * provides the type of the base task that is being wrapped by any
      * number of <code>KernelRunnable</code>s, where a given task that
      * wraps another task will return that other task's base type
-     * such that any wrapping task can be querried and will return the
+     * such that any wrapping task can be queried and will return the
      * same base task type.
      *
      * @return the fully-qualified name of the base task class type

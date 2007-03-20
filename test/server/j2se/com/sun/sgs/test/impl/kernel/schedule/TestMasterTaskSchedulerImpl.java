@@ -14,6 +14,7 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskReservation;
 
+import com.sun.sgs.test.util.DummyKernelRunnable;
 import com.sun.sgs.test.util.DummyTaskOwner;
 import com.sun.sgs.test.util.NameRunner;
 
@@ -229,18 +230,8 @@ public class TestMasterTaskSchedulerImpl {
 
     private HashSet<KernelRunnable> getTaskGroup() {
         HashSet<KernelRunnable> set = new HashSet<KernelRunnable>();
-        set.add(new KernelRunnable() {
-                public String getBaseTaskType() {
-                    return getClass().getName();
-                }
-                public void run() throws Exception {}
-            });
-        set.add(new KernelRunnable() {
-                public String getBaseTaskType() {
-                    return getClass().getName();
-                }
-                public void run() throws Exception {}
-            });
+        set.add(new DummyKernelRunnable());
+        set.add(new DummyKernelRunnable());
         return set;
     }
 

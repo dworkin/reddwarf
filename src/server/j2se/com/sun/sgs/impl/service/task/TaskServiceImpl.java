@@ -192,7 +192,7 @@ public class TaskServiceImpl
         while ((name != null) && (name.startsWith(DS_PENDING_SPACE))) {
             PendingTask task =
                 dataService.getServiceBinding(name, PendingTask.class);
-            TaskRunner runner = new TaskRunner(name, task.getTaskType());
+            TaskRunner runner = new TaskRunner(name, task.getBaseTaskType());
             TaskOwner owner =
                 new TaskOwnerImpl(task.identity, transactionProxy.
                                   getCurrentOwner().getContext());
@@ -536,7 +536,7 @@ public class TaskServiceImpl
         if (logger.isLoggable(Level.FINEST))
             logger.log(Level.FINEST, "created pending task {0}", objName);
 
-        return new TaskRunner(objName, ptask.getTaskType());
+        return new TaskRunner(objName, ptask.getBaseTaskType());
     }
 
     /**
@@ -639,15 +639,7 @@ public class TaskServiceImpl
             return;
         
         TransactionRunner transactionRunner =
-            new TransactionRunner(new KernelRunnable() {
-                    public String getBaseTaskType() {
-                        return getClass().getName();
-                    }
-                    public void run() throws Exception {
-                        fetchPendingTask(objName);
-                    }
-                });
-
+            new TransactionRunner(new NonRetryCleanupRunnable(objName));
         try {
             taskScheduler.scheduleTask(transactionRunner,
                                        transactionProxy.getCurrentOwner());
@@ -657,6 +649,25 @@ public class TaskServiceImpl
                                 "task to remove non-retried task {0}: " +
                                 "giving up", objName);
             throw tre;
+        }
+    }
+
+    /**
+     * Private helper runnable that cleans up after a non-retried task. See
+     * block comment above in notifyNonRetry for more detail.
+     */
+    private class NonRetryCleanupRunnable implements KernelRunnable {
+        private final String objName;
+        NonRetryCleanupRunnable(String objName) {
+            this.objName = objName;
+        }
+        /** {@inheritDoc} */
+        public String getBaseTaskType() {
+            return NonRetryCleanupRunnable.class.getName();
+        }
+        /** {@inheritDoc} */
+        public void run() throws Exception {
+            fetchPendingTask(objName);
         }
     }
 
@@ -747,7 +758,7 @@ public class TaskServiceImpl
          * Provides the name of the type of the task that is contained in
          * this pending task.
          */
-        String getTaskType() {
+        String getBaseTaskType() {
             return taskType;
         }
         /**
