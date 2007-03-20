@@ -10,6 +10,7 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectIOException;
 import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
@@ -72,7 +73,7 @@ public class TestDataServiceImpl extends TestCase {
     private static Properties dbProps = createProperties(
 	DataStoreImplClassName + ".directory", dbDirectory,
 	StandardProperties.APP_NAME, "TestDataServiceImpl",
-	DataServiceImplClassName + ".debugCheckInterval", "0");
+	DataServiceImplClassName + ".debug.check.interval", "0");
 
     /** Set when the test passes. */
     private boolean passed;
@@ -181,7 +182,7 @@ public class TestDataServiceImpl extends TestCase {
 	Properties props = createProperties(
 	    DataStoreImplClassName + ".directory", createDirectory(),
 	    StandardProperties.APP_NAME, "Foo",
-	    DataServiceImplClassName + ".debugCheckInterval", "gorp");
+	    DataServiceImplClassName + ".debug.check.interval", "gorp");
 	try {
 	    new DataServiceImpl(props, componentRegistry);
 	    fail("Expected IllegalArgumentException");
@@ -1868,6 +1869,97 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    public void testDeadlock() throws Exception {
+	service.setBinding("dummy2", new DummyManagedObject());
+	txn.commit();
+	for (int i = 0; i < 5; i++) {
+	    createTransaction();
+	    dummy = service.getBinding("dummy", DummyManagedObject.class);
+	    final Semaphore flag = new Semaphore(1);
+	    flag.acquire();
+	    final int finalI = i;
+	    class MyRunnable implements Runnable {
+		Exception exception2;
+		public void run() {
+		    DummyTransaction txn2 = null;
+		    try {
+			txn2 = new DummyTransaction(
+			    UsePrepareAndCommit.ARBITRARY);
+			txnProxy.setCurrentTransaction(txn2);
+			componentRegistry.registerAppContext();
+			service.getBinding("dummy2", DummyManagedObject.class);
+			flag.release();
+			service.getBinding("dummy", DummyManagedObject.class)
+			    .setValue(finalI);
+			System.err.println(finalI + " txn2: commit");
+			txn2.commit();
+		    } catch (TransactionAbortedException e) {
+			System.err.println(finalI + " txn2: " + e);
+			exception2 = e;
+		    } catch (Exception e) {
+			System.err.println(finalI + " txn2: " + e);
+			exception2 = e;
+			if (txn2 != null) {
+			    txn2.abort(null);
+			}
+		    }
+		}
+	    }
+	    MyRunnable myRunnable = new MyRunnable();
+	    Thread thread = new Thread(myRunnable);
+	    thread.start();
+	    Thread.sleep(i * 500);
+	    flag.acquire();
+	    TransactionAbortedException exception = null;
+	    try {
+		service.getBinding("dummy2", DummyManagedObject.class)
+		    .setValue(i);
+		System.err.println(i + " txn1: commit");
+		txn.commit();
+	    } catch (TransactionAbortedException e) {
+		System.err.println(i + " txn1: " + e);
+		exception = e;
+	    }
+	    thread.join();
+	    if (myRunnable.exception2 != null &&
+		!(myRunnable.exception2
+		  instanceof TransactionAbortedException))
+	    {
+		throw myRunnable.exception2;
+	    } else if (exception == null && myRunnable.exception2 == null) {
+		fail("Expected TransactionAbortedException");
+	    }
+	    txn = null;
+	}
+    }
+
+    public void testModifiedNotSerializable() throws Exception {
+	txn.commit();
+	createTransaction();
+	dummy = service.getBinding("dummy", DummyManagedObject.class);
+	dummy.value = Thread.currentThread();
+	try {
+	    txn.commit();
+	    fail("Expected ObjectIOException");
+	} catch (ObjectIOException e) {
+	    System.err.println(e);
+	} finally {
+	    txn = null;
+	}
+    }
+
+    public void testNotSerializableAfterDeserialize() throws Exception {
+	dummy.value = new SerializationFailsAfterDeserialize();
+	txn.commit();
+	createTransaction();
+	try {
+	    service.getBinding("dummy", DummyManagedObject.class);
+	    fail("Expected ObjectIOException");
+	} catch (ObjectIOException e) {
+	    System.err.println(e);
+	}
+    }
+
     /* -- App and service binding methods -- */
 
     <T> T getBinding(
@@ -1978,6 +2070,29 @@ public class TestDataServiceImpl extends TestCase {
 	    throws IOException
 	{
 	    throw new IOException("Serialization fails");
+	}
+    }
+
+    /**
+     * A serializable object that fails during serialization after
+     * deserialization.
+     */
+    static class SerializationFailsAfterDeserialize implements Serializable {
+        private static final long serialVersionUID = 1L;
+	private transient boolean deserialized;
+	private void writeObject(ObjectOutputStream out)
+	    throws IOException
+	{
+	    if (deserialized) {
+		throw new IOException(
+		    "Serialization fails after deserialization");
+	    }
+	}
+	private void readObject(ObjectInputStream in)
+	    throws IOException, ClassNotFoundException
+	{
+	    in.defaultReadObject();
+	    deserialized = true;
 	}
     }
 

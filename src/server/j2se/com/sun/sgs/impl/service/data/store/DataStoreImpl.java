@@ -6,7 +6,6 @@ package com.sun.sgs.impl.service.data.store;
 
 import com.sleepycat.bind.tuple.LongBinding;
 import com.sleepycat.bind.tuple.StringBinding;
-import com.sleepycat.db.CacheFileStats;
 import com.sleepycat.db.Cursor;
 import com.sleepycat.db.Database;
 import com.sleepycat.db.DatabaseConfig;
@@ -73,7 +72,7 @@ import java.util.logging.Logger;
  *
  * <ul>
  *
- * <li> <i>Key:</i> <code>com.sun.sgs.txnTimeout</code> <br>
+ * <li> <i>Key:</i> <code>com.sun.sgs.txn.timeout</code> <br>
  *	<i>Default:</i> <code>1000</code> <br>
  *	The maximum amount of time in milliseconds that a transaction will be
  *	permitted to run before it is a candidate for being aborted. <p>
@@ -86,7 +85,7 @@ import java.util.logging.Logger;
  *	<code>DataStoreImpl</code> requires its own, unique directory. <p>
  *
  * <li> <i>Key:</i> <code>
- *	com.sun.sgs.impl.service.data.store.DataStoreImpl.allocationBlockSize
+ *	com.sun.sgs.impl.service.data.store.DataStoreImpl.allocation.block.size
  *	</code> <br>
  *	<i>Default:</i> <code>100</code> <br>
  *	The number of object IDs to allocate at a time.  Object IDs are
@@ -98,14 +97,14 @@ import java.util.logging.Logger;
  *	would be discarded when the program exits. <p>
  *
  * <li> <i>Key:</i>
- *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl.cacheSize
+ *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl.cache.size
  *	</code> <br>
  *	<i>Default:</i> <code>1000000</code> <br>
  *	The size in bytes of the Berkeley DB cache.  This value must not be
  *	less than 20000. <p>
  *
  * <li> <i>Key:</i>
- *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl.flushToDisk
+ *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl.flush.to.disk
  *	</code> <br>
  *	<i>Default:</i> <code>false</code>
  *	Whether to flush changes to disk when a transaction commits.  If
@@ -113,12 +112,6 @@ import java.util.logging.Logger;
  *	transactions may be lost if the host crashes, although data integrity
  *	will be maintained.  Flushing changes to disk avoids data loss but
  *	introduces a significant reduction in performance. <p>
- *
- * <li> <i>Key:</i>
- *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl.logStats</code>
- *	<br>
- *	<i>Default:</i> <code>Integer.MAX_VALUE</code> <br>
- *	The number of transactions between logging database statistics. <p>
  *
  * </ul> <p>
  *
@@ -144,7 +137,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
 
     /** The property that specifies the transaction timeout in milliseconds. */
     private static final String TXN_TIMEOUT_PROPERTY =
-	"com.sun.sgs.txnTimeout";
+	"com.sun.sgs.txn.timeout";
 
     /** The default transaction timeout in milliseconds. */
     private static final long DEFAULT_TXN_TIMEOUT = 1000;
@@ -166,7 +159,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
      * time.
      */
     private static final String ALLOCATION_BLOCK_SIZE_PROPERTY =
-	CLASSNAME + ".allocationBlockSize";
+	CLASSNAME + ".allocation.block.size";
 
     /** The default for the number of object IDs to allocate at one time. */
     private static final int DEFAULT_ALLOCATION_BLOCK_SIZE = 100;
@@ -174,7 +167,8 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
     /**
      * The property that specifies the size in bytes of the Berkeley DB cache.
      */
-    private static final String CACHE_SIZE_PROPERTY = CLASSNAME + ".cacheSize";
+    private static final String CACHE_SIZE_PROPERTY =
+	CLASSNAME + ".cache.size";
 
     /** The minimum cache size, as specified by Berkeley DB */
     private static final long MIN_CACHE_SIZE = 20000;
@@ -189,13 +183,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
      * although integrity will be maintained.
      */
     private static final String FLUSH_TO_DISK_PROPERTY =
-	CLASSNAME + ".flushToDisk";
-
-    /**
-     * The property that specifies the number of transactions between logging
-     * database statistics.
-     */
-    private static final String LOG_STATS_PROPERTY = CLASSNAME + ".logStats";
+	CLASSNAME + ".flush.to.disk";
 
     /** The logger for this class. */
     static final LoggerWrapper logger =
@@ -209,9 +197,6 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
 
     /** The number of object IDs to allocate at one time. */
     private final int allocationBlockSize;
-
-    /** The number of transactions between logging database statistics. */
-    private final int logStats;
 
     /** The Berkeley DB environment. */
     private final Environment env;
@@ -250,11 +235,6 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
      * to obtain more IDs from the database.
      */
     private long lastObjectId = -1;
-
-    /**
-     * The number of transactions since the database statistics were logged.
-     */
-    private int logStatsCount = 0;
 
     /** Object to synchronize on when accessing txnCount and allOps. */
     private final Object txnCountLock = new Object();
@@ -418,7 +398,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
      *		<code>com.sun.sgs.app.root</code> nor <code>
      *		com.sun.sgs.impl.service.data.store.DataStoreImpl.directory
      *		</code> is provided, or the <code>
-     *		com.sun.sgs.impl.service.data.store.DataStoreImpl.allocationBlockSize
+     *		com.sun.sgs.impl.service.data.store.DataStoreImpl.allocation.block.size
      *		</code> property is not a valid integer greater than zero
      */
     public DataStoreImpl(Properties properties) {
@@ -448,8 +428,6 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
 	    throw new IllegalArgumentException(
 		"The allocation block size must be greater than zero");
 	}
-	logStats = wrappedProps.getIntProperty(
-	    LOG_STATS_PROPERTY, Integer.MAX_VALUE);
 	com.sleepycat.db.Transaction bdbTxn = null;
 	boolean done = false;
 	try {
@@ -1170,10 +1148,6 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
 	    }
 	    txnInfo = new TxnInfo(txn, env);
 	    threadTxnInfo.set(txnInfo);
-	    if (++logStatsCount >= logStats) {
-		logStatsCount = 0;
-		logStats(txnInfo);
-	    }
 	} else if (!txnInfo.txn.equals(txn)) {
 	    throw new IllegalStateException("Wrong transaction");
 	} else if (txnInfo.prepared) {
@@ -1247,8 +1221,10 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
 	} else if (e instanceof DatabaseException) {
 	    re = new DataStoreException(
 		operation + " failed: " + e.getMessage(), e);
-	} else {
+	} else if (e instanceof RuntimeException) {
 	    re = (RuntimeException) e;
+	} else {
+	    throw new DataStoreException("Unexpected exception: " + e, e);
 	}
 	/*
 	 * If we're throwing an exception saying that the transaction was
@@ -1259,42 +1235,6 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
 	}
 	logger.logThrow(Level.FINEST, re, "{0} throws", operation);
 	return re;
-    }
-
-    /** Log statistics for the specified transaction. */
-    private void logStats(TxnInfo txnInfo) throws DatabaseException {
-	if (logger.isLoggable(Level.INFO)) {
-	    StringBuilder allCacheFileStats = new StringBuilder();
-	    boolean first = true;
-	    for (CacheFileStats stats : env.getCacheFileStats(null)) {
-		if (first) {
-		    first = false;
-		} else {
-		    allCacheFileStats.append('\n');
-		}
-		allCacheFileStats.append(stats);
-	    }
-	    logger.log(Level.INFO,
-		       "Berkeley DB statistics:\n" +
-		       "Info database: {0}\n" +
-		       "Oids database: {1}\n" +
-		       "Names database: {2}\n" +
-		       "{3}\n" +
-		       "{4}\n" +
-		       "{5}\n" +
-		       "{6}\n" +
-		       "{7}\n" +
-		       "{8}",
-		       info.getStats(txnInfo.bdbTxn, null),
-		       oids.getStats(txnInfo.bdbTxn, null),
-		       names.getStats(txnInfo.bdbTxn, null),
-		       allCacheFileStats,
-		       env.getCacheStats(null),
-		       env.getLockStats(null),
-		       env.getLogStats(null),
-		       env.getMutexStats(null),
-		       env.getTransactionStats(null));
-	}
     }
 
     /** Returns the current transaction count. */

@@ -166,7 +166,7 @@ public class TestDataStoreImpl extends TestCase {
     public void testConstructorBadAllocationBlockSize() {
 	Properties props = createProperties(
 	    DataStoreImplClassName + ".directory", "foo",
-	    DataStoreImplClassName + ".allocationBlockSize", "gorp");
+	    DataStoreImplClassName + ".allocation.block.size", "gorp");
 	try {
 	    new DataStoreImpl(props);
 	    fail("Expected IllegalArgumentException");
@@ -178,7 +178,7 @@ public class TestDataStoreImpl extends TestCase {
     public void testConstructorNegativeAllocationBlockSize() {
 	Properties props = createProperties(
 	    DataStoreImplClassName + ".directory", "foo",
-	    DataStoreImplClassName + ".allocationBlockSize", "-3");
+	    DataStoreImplClassName + ".allocation.block.size", "-3");
 	try {
 	    new DataStoreImpl(props);
 	    fail("Expected IllegalArgumentException");
