@@ -122,7 +122,7 @@ public class AppGraphProfileOpListener implements ProfileOperationListener {
         Node currentNode = userMap.get(owner);
 
         // calculate the task's fingerprint
-        String fingerprint = profileReport.getTask().getClass().getName();
+        String fingerprint = profileReport.getTask().getBaseTaskType();
         for (ProfileOperation op : profileReport.getReportedOperations())
             fingerprint += "." + op.getId();
 
@@ -217,6 +217,9 @@ public class AppGraphProfileOpListener implements ProfileOperationListener {
      * reports on the collected data.
      */
     private class AppGraphRunnable implements KernelRunnable {
+        public String getBaseTaskType() {
+            return AppGraphRunnable.class.getName();
+        }
         public void run() throws Exception {
             double allRight = 0;
             double allTransitions = 0;

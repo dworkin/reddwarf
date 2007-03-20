@@ -37,6 +37,9 @@ public class TestInternalStructuresImpl {
     // a basic KernelRunnable that does nothing
     private static final KernelRunnable testRunnable =
         new KernelRunnable() {
+            public String getBaseTaskType() {
+                return getClass().getName();
+            }
             public void run() throws Exception {}
         };
 

@@ -517,6 +517,9 @@ public class ChannelServiceImpl
 	public void disconnected(final SgsClientSession session) {
 	    nonDurableTaskScheduler.scheduleTask(
 		new KernelRunnable() {
+		    public String getBaseTaskType() {
+		        return getClass().getName();
+		    }
 		    public void run() {
 			Context context = checkContext();
 			Set<Channel> channels = context.removeSession(session);
@@ -834,12 +837,16 @@ public class ChannelServiceImpl
      * Task (transactional) for removing all channel sets from data store.
      */
     private class RemoveChannelSetsTask implements KernelRunnable {
-
 	private final String key;
 
 	RemoveChannelSetsTask(String key) {
 	    this.key = key;
 	}
+
+        /** {@inheritDoc} */
+        public String getBaseTaskType() {
+            return RemoveChannelSetsTask.class.getName();
+        }
 
 	/** {@inheritDoc} */
 	public void run() throws Exception {
@@ -879,6 +886,11 @@ public class ChannelServiceImpl
 	    this.senderId = senderId;
 	    this.message = message;
 	}
+
+        /** {@inheritDoc} */
+        public String getBaseTaskType() {
+            return NotifyTask.class.getName();
+        }
 
         /** {@inheritDoc} */
 	public void run() {
@@ -928,6 +940,11 @@ public class ChannelServiceImpl
             this.recipientIds = recipientIds;
             this.message = message;
             this.seq = seq;
+        }
+
+        /** {@inheritDoc} */
+        public String getBaseTaskType() {
+            return ForwardingTask.class.getName();
         }
 
         /** {@inheritDoc} */

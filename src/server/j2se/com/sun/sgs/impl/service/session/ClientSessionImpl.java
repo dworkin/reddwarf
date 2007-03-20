@@ -422,6 +422,9 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 
 	if (listener != null) {
 	    scheduleTask(new KernelRunnable() {
+		public String getBaseTaskType() {
+		    return getClass().getName();
+		}
 		public void run() throws IOException {
 		    listener.get().disconnected(graceful);
 		    listener.remove();
@@ -522,6 +525,9 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 
 		if (!disconnectHandled) {
 		    scheduleNonTransactionalTask(new KernelRunnable() {
+			public String getBaseTaskType() {
+			    return getClass().getName();
+			}
 			public void run() {
 			    handleDisconnect(false);
 			}});
@@ -658,6 +664,9 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		    scheduleTask(new LoginTask());
 		} catch (LoginException e) {
 		    scheduleNonTransactionalTask(new KernelRunnable() {
+			public String getBaseTaskType() {
+			    return getClass().getName();
+			}
 			public void run() {
 			    sendProtocolMessage(getLoginNackMessage(),
 						Delivery.RELIABLE);
@@ -682,6 +691,9 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		int size = msg.getUnsignedShort();
 		final byte[] clientMessage = msg.getBytes(size);
 		taskQueue.addTask(new KernelRunnable() {
+			public String getBaseTaskType() {
+			    return getClass().getName();
+			}
 		    public void run() {
 			if (isConnected()) {
 			    listener.get().receivedMessage(clientMessage);
@@ -691,6 +703,9 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 
 	    case SimpleSgsProtocol.LOGOUT_REQUEST:
 	        scheduleNonTransactionalTask(new KernelRunnable() {
+			    public String getBaseTaskType() {
+			        return getClass().getName();
+			    }
 	            public void run() {
 	                handleDisconnect(isConnected());
 	            }});
@@ -705,6 +720,9 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		}
 
 		scheduleNonTransactionalTask(new KernelRunnable() {
+			public String getBaseTaskType() {
+			    return getClass().getName();
+			}
 		    public void run() {
 			handleDisconnect(false);
 		    }});
@@ -815,6 +833,13 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
      * {@code AppListener} that this session has logged in.
      */
     private class LoginTask implements KernelRunnable {
+
+        /**
+         * {@inheritDoc}
+         */
+        public String getBaseTaskType() {
+            return LoginTask.class.getName();
+        }
 
 	/**
 	 * Invokes the {@code AppListener}'s {@code loggedIn}

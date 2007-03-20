@@ -62,6 +62,9 @@ public class TestTaskHandler extends TestCase {
     public void testRunTransactionalTaskThrowsError() throws Exception {
 	final Error error = new Error("Task throws error");
 	KernelRunnable task = new KernelRunnable() {
+	    public String getBaseTaskType() {
+	        return getClass().getName();
+	    }
 	    public void run() {
 		throw error;
 	    }
@@ -78,6 +81,9 @@ public class TestTaskHandler extends TestCase {
     public void testRunTransactionalTaskThrowsException() throws Exception {
 	final Exception exception = new Exception("Task throws exception");
 	KernelRunnable task = new KernelRunnable() {
+	    public String getBaseTaskType() {
+	        return getClass().getName();
+	    }
 	    public void run() throws Exception {
 		throw exception;
 	    }
@@ -93,6 +99,9 @@ public class TestTaskHandler extends TestCase {
     /** Task aborts the transaction without supplying a cause. */
     public void testRunTransactionalTaskAbortsNoCause() throws Exception {
 	KernelRunnable task = new KernelRunnable() {
+	    public String getBaseTaskType() {
+	        return getClass().getName();
+	    }
 	    public void run() {
 		txnProxy.getCurrentTransaction().abort(null);
 	    }
@@ -112,6 +121,9 @@ public class TestTaskHandler extends TestCase {
     {
 	final Exception cause = new Exception("Abort cause");
 	KernelRunnable task = new KernelRunnable() {
+	    public String getBaseTaskType() {
+	        return getClass().getName();
+	    }
 	    public void run() {
 		txnProxy.getCurrentTransaction().abort(cause);
 	    }
@@ -131,6 +143,9 @@ public class TestTaskHandler extends TestCase {
     {
 	final Exception cause = new TransactionAbortedException("Abort cause");
 	KernelRunnable task = new KernelRunnable() {
+	    public String getBaseTaskType() {
+	        return getClass().getName();
+	    }
 	    public void run() {
 		txnProxy.getCurrentTransaction().abort(cause);
 	    }
@@ -148,6 +163,9 @@ public class TestTaskHandler extends TestCase {
     public void testRunTransactionalTaskAbortsThrowCause() throws Exception {
 	final Exception cause = new Exception("Abort cause");
 	KernelRunnable task = new KernelRunnable() {
+	    public String getBaseTaskType() {
+	        return getClass().getName();
+	    }
 	    public void run() throws Exception {
 		txnProxy.getCurrentTransaction().abort(cause);
 		throw cause;
@@ -170,6 +188,9 @@ public class TestTaskHandler extends TestCase {
     {
 	final Exception exception = new Exception("Task throws exception");
 	KernelRunnable task = new KernelRunnable() {
+	    public String getBaseTaskType() {
+	        return getClass().getName();
+	    }
 	    public void run() throws Exception {
 		txnProxy.getCurrentTransaction().abort(null);
 		throw exception;
@@ -192,6 +213,9 @@ public class TestTaskHandler extends TestCase {
     {
 	final Exception exception = new Exception("Task throws exception");
 	KernelRunnable task = new KernelRunnable() {
+	    public String getBaseTaskType() {
+	        return getClass().getName();
+	    }
 	    public void run() throws Exception {
 		txnProxy.getCurrentTransaction().abort(
 		    new Exception("Abort cause"));
@@ -210,6 +234,9 @@ public class TestTaskHandler extends TestCase {
     public void testRunTransactionalTaskAbortsTwice() throws Exception {
 	final Exception cause = new Exception("Abort cause");
 	KernelRunnable task = new KernelRunnable() {
+	    public String getBaseTaskType() {
+	        return getClass().getName();
+	    }
 	    public void run() throws Exception {
 		txnProxy.getCurrentTransaction().abort(cause);
 		txnProxy.getCurrentTransaction().abort(new Exception());
@@ -229,6 +256,9 @@ public class TestTaskHandler extends TestCase {
     {
 	final Exception exception = new Exception();
 	KernelRunnable task = new KernelRunnable() {
+	    public String getBaseTaskType() {
+	        return getClass().getName();
+	    }
 	    public void run() throws Exception {
 		txnProxy.getCurrentTransaction().join(
 		    new DummyTransactionParticipant() {
@@ -253,6 +283,9 @@ public class TestTaskHandler extends TestCase {
 	throws Exception
     {
 	KernelRunnable task = new KernelRunnable() {
+	    public String getBaseTaskType() {
+	        return getClass().getName();
+	    }
 	    public void run() throws Exception {
 		txnProxy.getCurrentTransaction().join(
 		    new DummyTransactionParticipant() {
@@ -277,6 +310,9 @@ public class TestTaskHandler extends TestCase {
     {
 	final Exception cause = new Exception("Abort cause");
 	KernelRunnable task = new KernelRunnable() {
+	    public String getBaseTaskType() {
+	        return getClass().getName();
+	    }
 	    public void run() throws Exception {
 		txnProxy.getCurrentTransaction().join(
 		    new DummyTransactionParticipant() {
@@ -301,6 +337,9 @@ public class TestTaskHandler extends TestCase {
     {
 	final Exception cause = new TransactionAbortedException("Abort cause");
 	KernelRunnable task = new KernelRunnable() {
+	    public String getBaseTaskType() {
+	        return getClass().getName();
+	    }
 	    public void run() throws Exception {
 		txnProxy.getCurrentTransaction().join(
 		    new DummyTransactionParticipant() {
@@ -325,6 +364,9 @@ public class TestTaskHandler extends TestCase {
     {
 	final Exception cause = new Exception("Abort cause");
 	KernelRunnable task = new KernelRunnable() {
+	    public String getBaseTaskType() {
+	        return getClass().getName();
+	    }
 	    public void run() throws Exception {
 		txnProxy.getCurrentTransaction().join(
 		    new DummyTransactionParticipant() {
@@ -354,6 +396,9 @@ public class TestTaskHandler extends TestCase {
     {
 	final Exception exception = new Exception("Prepare throws exception");
 	KernelRunnable task = new KernelRunnable() {
+	    public String getBaseTaskType() {
+	        return getClass().getName();
+	    }
 	    public void run() throws Exception {
 		txnProxy.getCurrentTransaction().join(
 		    new DummyTransactionParticipant() {
@@ -383,6 +428,9 @@ public class TestTaskHandler extends TestCase {
     {
 	final Exception exception = new Exception("Prepare throws exception");
 	KernelRunnable task = new KernelRunnable() {
+	    public String getBaseTaskType() {
+	        return getClass().getName();
+	    }
 	    public void run() throws Exception {
 		txnProxy.getCurrentTransaction().join(
 		    new DummyTransactionParticipant() {

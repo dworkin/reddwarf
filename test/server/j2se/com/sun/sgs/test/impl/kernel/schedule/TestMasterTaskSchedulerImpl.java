@@ -230,9 +230,15 @@ public class TestMasterTaskSchedulerImpl {
     private HashSet<KernelRunnable> getTaskGroup() {
         HashSet<KernelRunnable> set = new HashSet<KernelRunnable>();
         set.add(new KernelRunnable() {
+                public String getBaseTaskType() {
+                    return getClass().getName();
+                }
                 public void run() throws Exception {}
             });
         set.add(new KernelRunnable() {
+                public String getBaseTaskType() {
+                    return getClass().getName();
+                }
                 public void run() throws Exception {}
             });
         return set;

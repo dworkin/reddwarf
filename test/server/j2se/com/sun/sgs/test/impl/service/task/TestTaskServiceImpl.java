@@ -705,6 +705,9 @@ public class TestTaskServiceImpl extends TestCase {
     public void testScheduleNonDurableTaskNegativeTime() {
         txn = createTransaction();
         KernelRunnable r = new KernelRunnable() {
+                public String getBaseTaskType() {
+                    return getClass().getName();
+                }
                 public void run() throws Exception {}
             };
         try {
@@ -889,6 +892,9 @@ public class TestTaskServiceImpl extends TestCase {
         private Counter counter;
         public KernelRunnableImpl(Counter counter) {
             this.counter = counter;
+        }
+        public String getBaseTaskType() {
+            return getClass().getName();
         }
         public void run() throws Exception {
             synchronized (counter) {

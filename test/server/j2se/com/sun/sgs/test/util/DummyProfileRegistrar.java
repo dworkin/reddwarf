@@ -29,6 +29,9 @@ public class DummyProfileRegistrar implements ProfileRegistrar {
 
     // a dummy task that represents all reports
     private static final KernelRunnable task = new KernelRunnable() {
+            public String getBaseTaskType() {
+                return getClass().getName();
+            }
             public void run() throws Exception {}
         };
 

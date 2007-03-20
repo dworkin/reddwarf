@@ -167,6 +167,17 @@ public class NonDurableTaskQueue implements NonDurableTransactionParticipant {
      */
     private class ProcessQueueTask implements KernelRunnable {
 
+        /** {@inheritDoc} */
+        public String getBaseTaskType() {
+            synchronized (lock) {
+                KernelRunnable nextTask = tasks.peek();
+                if (nextTask != null) {
+                    return nextTask.getBaseTaskType();
+                }
+                return ProcessQueueTask.class.getName();
+            }
+        }
+
 	/** {@inheritDoc} */
 	public void run() throws Exception {
 

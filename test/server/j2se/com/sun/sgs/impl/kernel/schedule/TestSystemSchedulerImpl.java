@@ -75,6 +75,9 @@ public class TestSystemSchedulerImpl {
     // a basic, recurring task that shouldn't be run but can be used for tests
     private static final ScheduledTask recurringTestTask =
         new ScheduledTask(new KernelRunnable() {
+                public String getBaseTaskType() {
+                    return getClass().getName();
+                }
                 public void run() throws Exception {}
             }, testOwner, Priority.getDefaultPriority(), 0, 100);
 
@@ -641,6 +644,9 @@ public class TestSystemSchedulerImpl {
     protected static ScheduledTask getNewTask(long delay, TaskOwner owner) {
         long time = System.currentTimeMillis() + delay;
         return new ScheduledTask(new KernelRunnable() {
+                public String getBaseTaskType() {
+                    return getClass().getName();
+                }
                 public void run() throws Exception {}
             }, owner, Priority.getDefaultPriority(), time);
     }
