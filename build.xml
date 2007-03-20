@@ -350,6 +350,11 @@
 	       includes="libdb-?.?.dylib,
 			 libdb_java-?.?.jnilib"/>
     </copy>
+    <copy todir="${build.dir}/sgs/lib/bdb/macosx-x86">
+      <fileset dir="${bdb.builds.dir}/macosx-i386/lib"
+	       includes="libdb-?.?.dylib,
+			 libdb_java-?.?.jnilib"/>
+    </copy>
     <copy todir="${build.dir}/sgs/lib/bdb/solaris-x86">
       <fileset dir="${bdb.builds.dir}/i86pc/lib"
 	       includes="libdb-?.?.so,
@@ -357,6 +362,11 @@
     </copy>
     <copy todir="${build.dir}/sgs/lib/bdb/solaris-sparc">
       <fileset dir="${bdb.builds.dir}/sun4/lib"
+	       includes="libdb-?.?.so,
+			 libdb_java-?.?.so"/>
+    </copy>
+    <copy todir="${build.dir}/sgs/lib/bdb/linux-x86">
+      <fileset dir="${bdb.builds.dir}/linux-x86/lib"
 	       includes="libdb-?.?.so,
 			 libdb_java-?.?.so"/>
     </copy>
