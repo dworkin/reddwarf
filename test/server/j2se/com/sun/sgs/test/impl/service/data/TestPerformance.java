@@ -83,10 +83,6 @@ public class TestPerformance extends TestCase {
     /** Whether to flush to disk on transaction commits. */
     private static boolean testFlush = Boolean.getBoolean("test.flush");
 
-    /** The number of transactions between logging database statistics. */
-    private static int logStats = Integer.getInteger(
-	"test.logStats", Integer.MAX_VALUE);
-
     /** Whether to do logging, which is otherwise disabled. */
     private static boolean doLogging = Boolean.getBoolean("test.doLogging");
 
@@ -183,9 +179,8 @@ public class TestPerformance extends TestCase {
 	Properties props = createProperties(
 	    DataStoreImplClass + ".directory", createDirectory(),
 	    StandardProperties.APP_NAME, "TestPerformance",
-	    DataServiceImplClass + ".detectModifications",
-	    String.valueOf(detectMods),
-	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
+	    DataServiceImplClass + ".detect.modifications",
+	    String.valueOf(detectMods));
 	service = new DataServiceImpl(props, componentRegistry);
         DummyProfileRegistrar.startProfiling(service);
         createTransaction();
@@ -236,10 +231,9 @@ public class TestPerformance extends TestCase {
 	Properties props = createProperties(
 	    DataStoreImplClass + ".directory", createDirectory(),
 	    StandardProperties.APP_NAME, "TestPerformance",
-	    DataServiceImplClass + ".detectModifications",
+	    DataServiceImplClass + ".detect.modifications",
 	    String.valueOf(detectMods),
-	    DataStoreImplClass + ".flushToDisk", String.valueOf(flush),
-	    DataStoreImplClass + ".logStats", String.valueOf(logStats));
+	    DataStoreImplClass + ".flush.to.disk", String.valueOf(flush));
 	service = new DataServiceImpl(props, componentRegistry);
         DummyProfileRegistrar.startProfiling(service);
         createTransaction();

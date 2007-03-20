@@ -44,7 +44,8 @@ import java.util.logging.Logger;
  *	Specifies the name of the application using this
  *	<code>DataService</code>. <p>
  *
- * <li> <i>Key:</i> <code>com.sun.sgs.impl.service.data.debugCheckInterval
+ * <li> <i>Key:</i> <code>
+ *	com.sun.sgs.impl.service.data.DataServiceImpl.debug.check.interval
  *	</code> <br>
  *	<i>Default:</i> <code>Integer.MAX_VALUE</code> <br>
  *	Specifies the number of <code>DataService</code> operations to skip
@@ -52,7 +53,8 @@ import java.util.logging.Logger;
  *	Note that the number of operations is measured separately for each
  *	transaction.  This property is intended for use in debugging. <p>
  *
- * <li> <i>Key:</i> <code>com.sun.sgs.impl.service.data.detectModifications
+ * <li> <i>Key:</i> <code>
+ *	com.sun.sgs.impl.service.data.DataServiceImpl.detect.modifications
  *	</code> <br>
  *	<i>Default:</i> <code>true</code> <br>
  *	Specifies whether to automatically detect modifications to managed
@@ -102,14 +104,14 @@ public final class DataServiceImpl
      * checks of the consistency of the managed references table.
      */
     private static final String DEBUG_CHECK_INTERVAL_PROPERTY =
-	CLASSNAME + ".debugCheckInterval";
+	CLASSNAME + ".debug.check.interval";
 
     /**
      * The property that specifies whether to automatically detect
      * modifications to objects.
      */
     private static final String DETECT_MODIFICATIONS_PROPERTY =
-	CLASSNAME + ".detectModifications";
+	CLASSNAME + ".detect.modifications";
 
     /** The logger for this class. */
     private static final LoggerWrapper logger =
@@ -147,7 +149,7 @@ public final class DataServiceImpl
     private State state = State.UNINITIALIZED;
 
     /** The transaction proxy, or null if configure has not been called. */
-    TransactionProxy txnProxy;
+    TransactionProxy txnProxy = null;
 
     /**
      * A list of operations to run on abort, and clear on commit, or null if
@@ -173,9 +175,9 @@ public final class DataServiceImpl
      * @param	componentRegistry the registry of configured {@link Service}
      *		instances
      * @throws	IllegalArgumentException if the <code>com.sun.sgs.app.name
-     *		</code> property is not specified, if the value of the
-     *		<code>com.sun.sgs.impl.service.data.debugCheckInterval</code>
-     *		property is not a valid integer, or if the data store
+     *		</code> property is not specified, if the value of the <code>
+     *		com.sun.sgs.impl.service.data.DataServiceImpl.debug.check.interval
+     *		</code> property is not a valid integer, or if the data store
      *		constructor detects an illegal property value
      */
     public DataServiceImpl(

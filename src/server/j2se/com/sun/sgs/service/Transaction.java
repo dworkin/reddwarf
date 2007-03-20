@@ -4,6 +4,8 @@
 
 package com.sun.sgs.service;
 
+import com.sun.sgs.app.ExceptionRetryStatus;
+import com.sun.sgs.app.TransactionNotActiveException;
 
 /**
  * This interface represents a single transaction. It is used by
@@ -19,9 +21,6 @@ package com.sun.sgs.service;
  * <code>equals</code> and <code>hashCode</code>. Two
  * <code>Transaction</code>s are equal if and only if they represent
  * the same transaction.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 public interface Transaction {
 
@@ -46,26 +45,33 @@ public interface Transaction {
      */
     public long getCreationTime();
 
-    /*
-     * FIXME: The join and abort methods should probably throw
-     * TransactionNotActiveException if the transaction has been aborted,
-     * rather than IllegalStateException, because this situation can occur if
-     * an application catches a TransactionAbortedException and attempts to
-     * continue.  -tjb@sun.com (01/17/2007)
-     */
-
     /**
      * Tells the <code>Transaction</code> that the given
      * <code>TransactionParticipant</code> is participating in the
      * transaction. A <code>TransactionParticipant</code> is allowed to
      * join a <code>Transaction</code> more than once, but will only
      * be registered as a single participant.
+     * <p>
+     * If the transaction has been aborted, then the exception thrown will have
+     * as its cause the value provided in the first call to {@link #abort
+     * abort}, if any.  If the cause implements {@link ExceptionRetryStatus},
+     * then the exception thrown will, too, and its {@link
+     * ExceptionRetryStatus#shouldRetry shouldRetry} method will return the
+     * value returned by calling that method on the cause.  If no cause was
+     * supplied, then the exception will either not implement {@code
+     * ExceptionRetryStatus} or its {@code shouldRetry} method will return
+     * {@code false}.
      *
      * @param participant the <code>TransactionParticipant</code> joining
      *                    the transaction
      *
-     * @throws IllegalStateException if the transaction has begun preparation
-     *                               or aborting
+     * @throws TransactionNotActiveException if the transaction has been
+     *                                       aborted
+     *
+     * @throws IllegalStateException if {@link TransactionParticipant#prepare
+     *				     prepare} has been called on any
+     *				     transaction participant and the
+     *				     transaction has not been aborted
      *
      * @throws UnsupportedOperationException if <code>participant</code> does
      *         not implement {@link NonDurableTransactionParticipant} and the
@@ -73,22 +79,6 @@ public interface Transaction {
      *         participant
      */
     public void join(TransactionParticipant participant);
-
-    /**
-     * Aborts the transaction. This notifies all participants that the
-     * transaction has aborted, and invalidates all future use of
-     * this transaction. The caller should always follow a call to
-     * <code>abort</code> by throwing an exception that details why
-     * the transaction was aborted. This is needed not only to
-     * communicate the cause of the abort and whether to retry the
-     * exception, but also because the application code associated with
-     * this transaction will continue to execute normally unless an
-     * exception is raised.
-     *
-     * @throws IllegalStateException if the transaction has completed
-     *                               preparation or aborting
-     */
-    public void abort();
 
     /**
      * Aborts the transaction, optionally supplying the exception that caused
@@ -102,11 +92,45 @@ public interface Transaction {
      * raised. Supplying the cause to this method allows future calls to the
      * transaction to include the cause to explain why the transaction is no
      * longer active.
+     * <p>
+     * If the transaction has been aborted, then the exception thrown will have
+     * as its cause the value provided in the first call to {@link #abort
+     * abort}, if any.  If the cause implements {@link ExceptionRetryStatus},
+     * then the exception thrown will, too, and its {@link
+     * ExceptionRetryStatus#shouldRetry shouldRetry} method will return the
+     * value returned by calling that method on the cause.  If no cause was
+     * supplied, then the exception will either not implement {@code
+     * ExceptionRetryStatus} or its {@code shouldRetry} method will return
+     * {@code false}.
      *
      * @param cause the exception that caused the abort, or <code>null</code>
-     * @throws IllegalStateException if the transaction has completed
-     *                               preparation or aborting
+     *		    if the cause is not known or the abort was not caused by an
+     *		    exception
+     *
+     * @throws TransactionNotActiveException if the transaction has been
+     *					     aborted
+     *
+     * @throws IllegalStateException if all transaction participants have been
+     *                               prepared and {@link #abort abort} has not
+     *                               been called
      */
     public void abort(Throwable cause);
 
+    /**
+     * Returns information about whether {@link #abort abort} has been called
+     * on this transaction.
+     *
+     * @return {@code true} if {@code abort} has been called on this
+     *         transaction, else {@code false}
+     *
+     */
+    public boolean isAborted();
+
+    /**
+     * Returns the cause supplied in the first call to {@link #abort abort} on
+     * this transaction, or {@code null} if {@code abort} has not been called.
+     *
+     * @return the exception that caused the abort or {@code null}
+     */
+    public Throwable getAbortCause();
 }

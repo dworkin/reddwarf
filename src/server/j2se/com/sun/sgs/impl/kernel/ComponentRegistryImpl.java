@@ -16,9 +16,6 @@ import java.util.Set;
  * to startup and configure the system and individual applications. It
  * can have any objects added to it, but components cannot be removed. This
  * implementation is not thread-safe.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 class ComponentRegistryImpl implements ComponentRegistry {
 
@@ -45,6 +42,9 @@ class ComponentRegistryImpl implements ComponentRegistry {
     /**
      * Returns a matching component if there is exactly one, otherwise
      * throws an exception.
+     *
+     * @param <T> the type of the component
+     * @param type a <code>Class</code> representing the type of the component
      *
      * @return a single component, if there is exactly one match
      *

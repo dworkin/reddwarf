@@ -7,17 +7,13 @@ package com.sun.sgs.impl.kernel.profile;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.PropertiesWrapper;
 
-import com.sun.sgs.kernel.KernelAppContext;
-import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.ProfileOperation;
 import com.sun.sgs.kernel.ProfileOperationListener;
 import com.sun.sgs.kernel.ProfileReport;
-import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 
-import java.util.List;
 import java.util.Properties;
 
 import java.util.logging.Level;

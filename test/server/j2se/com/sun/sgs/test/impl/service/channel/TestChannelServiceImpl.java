@@ -99,8 +99,7 @@ public class TestChannelServiceImpl extends TestCase {
     /** Properties for creating the shared database. */
     private static Properties dbProps = createProperties(
 	DataStoreImplClassName + ".directory", DB_DIRECTORY,
-	StandardProperties.APP_NAME, "TestChannelServiceImpl",
-	DataServiceImplClassName + ".debugCheckInterval", "1");
+	StandardProperties.APP_NAME, "TestChannelServiceImpl");
     
     private static final int SESSION_ID_SIZE = 8;
 
@@ -215,7 +214,7 @@ public class TestChannelServiceImpl extends TestCase {
     protected void tearDown(boolean clean) throws Exception {
         if (txn != null) {
             try {
-                txn.abort();
+                txn.abort(null);
             } catch (IllegalStateException e) {
             }
             txn = null;
@@ -348,7 +347,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testCreateChannelAndAbort() {
 	createChannel("foo");
-	txn.abort();
+	txn.abort(null);
 	createTransaction();
 	try {
 	    channelService.getChannel("foo");
