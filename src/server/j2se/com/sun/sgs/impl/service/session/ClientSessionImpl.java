@@ -421,7 +421,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	}
 
 	if (listener != null) {
-	    scheduleTask(new BaseKernelRunnable() {
+	    scheduleTask(new AbstractKernelRunnable() {
 		public void run() throws IOException {
 		    listener.get().disconnected(graceful);
 		    listener.remove();
@@ -521,7 +521,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		}
 
 		if (!disconnectHandled) {
-		    scheduleNonTransactionalTask(new BaseKernelRunnable() {
+		    scheduleNonTransactionalTask(new AbstractKernelRunnable() {
 			public void run() {
 			    handleDisconnect(false);
 			}});
@@ -657,7 +657,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		    }
 		    scheduleTask(new LoginTask());
 		} catch (LoginException e) {
-		    scheduleNonTransactionalTask(new BaseKernelRunnable() {
+		    scheduleNonTransactionalTask(new AbstractKernelRunnable() {
 			public void run() {
 			    sendProtocolMessage(getLoginNackMessage(),
 						Delivery.RELIABLE);
@@ -681,7 +681,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
                 msg.getLong(); // TODO Check sequence num
 		int size = msg.getUnsignedShort();
 		final byte[] clientMessage = msg.getBytes(size);
-		taskQueue.addTask(new BaseKernelRunnable() {
+		taskQueue.addTask(new AbstractKernelRunnable() {
 		    public void run() {
 			if (isConnected()) {
 			    listener.get().receivedMessage(clientMessage);
@@ -690,7 +690,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		break;
 
 	    case SimpleSgsProtocol.LOGOUT_REQUEST:
-	        scheduleNonTransactionalTask(new BaseKernelRunnable() {
+	        scheduleNonTransactionalTask(new AbstractKernelRunnable() {
 	            public void run() {
 	                handleDisconnect(isConnected());
 	            }});
@@ -704,7 +704,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 			opcode);
 		}
 
-		scheduleNonTransactionalTask(new BaseKernelRunnable() {
+		scheduleNonTransactionalTask(new AbstractKernelRunnable() {
 		    public void run() {
 			handleDisconnect(false);
 		    }});

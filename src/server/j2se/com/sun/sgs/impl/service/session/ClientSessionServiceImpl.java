@@ -725,7 +725,7 @@ public class ClientSessionServiceImpl
 	    final String listenerKey = key;		
 		
 	    scheduleTaskOnCommit(
-		new BaseKernelRunnable() {
+		new AbstractKernelRunnable() {
 		    public void run() throws Exception {
 			ManagedObject obj = 
 			    dataService.getServiceBinding(

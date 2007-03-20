@@ -9,7 +9,7 @@ import com.sun.sgs.kernel.KernelRunnable;
  * of <code>KernelRunnable</code> to return the name of the class that
  * extends this class.
  */
-abstract class BaseKernelRunnable implements KernelRunnable {
+abstract class AbstractKernelRunnable implements KernelRunnable {
 
     /**
      * Returns the name of the extending class.

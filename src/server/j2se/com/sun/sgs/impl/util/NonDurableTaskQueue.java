@@ -173,10 +173,9 @@ public class NonDurableTaskQueue implements NonDurableTransactionParticipant {
             synchronized (lock) {
                 nextTask = tasks.peek();
             }
-            if (nextTask != null) {
-                return nextTask.getBaseTaskType();
-            }
-            return ProcessQueueTask.class.getName();
+            return nextTask != null ?
+                nextTask.getBaseTaskType() :
+                ProcessQueueTask.class.getName();
         }
 
 	/** {@inheritDoc} */
