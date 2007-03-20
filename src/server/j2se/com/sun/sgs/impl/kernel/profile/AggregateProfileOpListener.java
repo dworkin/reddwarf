@@ -168,6 +168,9 @@ public class AggregateProfileOpListener implements ProfileOperationListener {
      * reports on the collected data.
      */
     private class AggregatingRunnable implements KernelRunnable {
+        public String getBaseTaskType() {
+            return AggregatingRunnable.class.getName();
+        }
         public void run() throws Exception {
             // calculate totals across categories
             long totalTasks = sTaskCount + fTaskCount;

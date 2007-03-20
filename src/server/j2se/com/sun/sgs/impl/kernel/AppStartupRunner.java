@@ -30,9 +30,12 @@ import java.util.logging.Logger;
  */
 class AppStartupRunner implements KernelRunnable {
 
+    // the type of this class
+    private static final String BASE_TYPE = AppStartupRunner.class.getName();
+
     // logger for this class
     private static final LoggerWrapper logger =
-        new LoggerWrapper(Logger.getLogger(AppStartupRunner.class.getName()));
+        new LoggerWrapper(Logger.getLogger(BASE_TYPE));
 
     // the context in which this will run
     private final AppKernelAppContext appContext;
@@ -56,6 +59,13 @@ class AppStartupRunner implements KernelRunnable {
         this.appContext = appContext;
         this.properties = properties;
         this.kernel = kernel;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String getBaseTaskType() {
+        return BASE_TYPE;
     }
 
     /**

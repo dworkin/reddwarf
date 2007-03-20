@@ -156,6 +156,9 @@ public class SnapshotProfileOpListener implements ProfileOperationListener {
         SnapshotRunnable(long reportPeriod) {
             this.reportPeriod = reportPeriod;
         }
+        public String getBaseTaskType() {
+            return SnapshotRunnable.class.getName();
+        }
         public void run() throws Exception {
             while (! flag.compareAndSet(false, true));
 
