@@ -180,7 +180,7 @@ final class Context {
     }
 
     /** Obtains the reference associated with the specified ID. */
-    private ManagedReferenceImpl getReference(long oid) {
+    ManagedReferenceImpl getReference(long oid) {
 	return ManagedReferenceImpl.getReference(this, oid);
     }
 

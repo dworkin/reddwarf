@@ -1297,6 +1297,83 @@ public class TestDataServiceImpl extends TestCase {
 	    service.createReference(x).equals(service.createReference(y)));
     }
 
+    /* -- Test createReferenceForId -- */
+
+    public void testCreateReferenceForIdNullId() throws Exception {
+	try {
+	    service.createReferenceForId(null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testCreateReferenceForIdTooSmallId() throws Exception {
+	BigInteger id = new BigInteger("-1");
+	try {
+	    service.createReferenceForId(id);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+	service.createReferenceForId(BigInteger.ZERO);
+    }
+
+    public void testCreateReferenceForIdTooBigId() throws Exception {
+	BigInteger maxLong = new BigInteger(String.valueOf(Long.MAX_VALUE));
+	BigInteger id = maxLong.add(BigInteger.ONE);
+	try {
+	    service.createReferenceForId(id);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+	service.createReferenceForId(maxLong);
+    }
+
+    static {
+	for (UnusualState state : UnusualState.values()) {
+	    new UnusualStateTest("testCreateReference", state) {
+		private BigInteger id;
+		protected void setUp() throws Exception {
+		    super.setUp();
+		    id = service.createReference(dummy).getId();
+		}
+		void action() {
+		    service.createReferenceForId(id);
+		}
+	    };
+	}
+    }
+
+    public void testCreateReferenceForIdSuccess() throws Exception {
+	BigInteger id = service.createReference(dummy).getId();
+	ManagedReference ref = service.createReferenceForId(id);
+	assertSame(dummy, ref.get(DummyManagedObject.class));
+	txn.commit();
+	createTransaction();
+	ref = service.createReferenceForId(id);
+	dummy = ref.get(DummyManagedObject.class);
+	assertSame(
+	    dummy, service.getBinding("dummy", DummyManagedObject.class));
+	service.removeObject(dummy);
+	try {
+	    ref.get(DummyManagedObject.class);
+	    fail("Expected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	    System.err.println(e);
+	}
+	txn.commit();
+	createTransaction();
+	ref = service.createReferenceForId(id);
+	try {
+	    ref.get(DummyManagedObject.class);
+	    fail("Expected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	    System.err.println(e);
+	}
+    }
+
     /* -- Test ManagedReference.get -- */
 
     public void testGetReferenceNullType() throws Exception {
