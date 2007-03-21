@@ -23,7 +23,7 @@
 	    value="-Xlint"/>
 
   <!-- Version information -->
-  <property name="project.release" value="0.9"/>
+  <property name="project.release" value="0.9.1"/>
 
   <!-- Values for the JavaDocs -->
   <property name="project.name" value="Sun Game Server"/>
@@ -309,8 +309,10 @@
       <tarfileset dir="${build.dir}" includes="sgs/sgs.sh" mode="755"/>
     </tar> -->
     <zip destfile="${build.dir}/sgs-${project.version}.zip">
-      <zipfileset dir="${build.dir}" includes="sgs/**" excludes="sgs/sgs.sh"/>
-      <zipfileset dir="${build.dir}" includes="sgs/sgs.sh" filemode="755"/>
+      <zipfileset dir="${build.dir}/sgs" includes="**" excludes="sgs.sh"
+		  prefix="sgs-${project.version}"/>
+      <zipfileset dir="${build.dir}/sgs" includes="sgs.sh" filemode="755"
+		  prefix="sgs-${project.version}"/>
     </zip>
   </target>
 
@@ -328,8 +330,12 @@
 	       includes="sgs.*,
 			 sgs-*.properties,
 			 LICENSE.pdf,
-			 THIRDPARTYLICENSE.pdf,
-			 README"/>
+			 THIRDPARTYLICENSE.pdf"/>
+    </copy>
+    <copy file="etc/README" todir="${build.dir}/sgs">
+      <filterset>
+	<filter token="VERSION" value="${project.version}"/>
+      </filterset>
     </copy>
     <chmod file="${build.dir}/sgs/sgs.sh" perm="a+x"/>
     <copy todir="${build.dir}/sgs/lib">
@@ -344,24 +350,24 @@
     <fail unless="bdb.builds.dir"
 	  message="The bdb.builds.dir property must be set"/>
     <copy todir="${build.dir}/sgs/lib/bdb"
-	  file="${bdb.builds.dir}/ppc/lib/db.jar"/>
+	  file="${bdb.builds.dir}/macosx-ppc/lib/db.jar"/>
     <copy todir="${build.dir}/sgs/lib/bdb/macosx-ppc">
-      <fileset dir="${bdb.builds.dir}/ppc/lib"
+      <fileset dir="${bdb.builds.dir}/macosx-ppc/lib"
 	       includes="libdb-?.?.dylib,
 			 libdb_java-?.?.jnilib"/>
     </copy>
     <copy todir="${build.dir}/sgs/lib/bdb/macosx-x86">
-      <fileset dir="${bdb.builds.dir}/macosx-i386/lib"
+      <fileset dir="${bdb.builds.dir}/macosx-x86/lib"
 	       includes="libdb-?.?.dylib,
 			 libdb_java-?.?.jnilib"/>
     </copy>
     <copy todir="${build.dir}/sgs/lib/bdb/solaris-x86">
-      <fileset dir="${bdb.builds.dir}/i86pc/lib"
+      <fileset dir="${bdb.builds.dir}/solaris-x86/lib"
 	       includes="libdb-?.?.so,
 			 libdb_java-?.?.so"/>
     </copy>
     <copy todir="${build.dir}/sgs/lib/bdb/solaris-sparc">
-      <fileset dir="${bdb.builds.dir}/sun4/lib"
+      <fileset dir="${bdb.builds.dir}/solaris-sparc/lib"
 	       includes="libdb-?.?.so,
 			 libdb_java-?.?.so"/>
     </copy>
@@ -371,7 +377,7 @@
 			 libdb_java-?.?.so"/>
     </copy>
     <copy todir="${build.dir}/sgs/lib/bdb/win32-x86/">
-      <fileset dir="${bdb.builds.dir}/win32/Release"
+      <fileset dir="${bdb.builds.dir}/win32-x86/Release"
 	       includes="libdb_java??.dll"/>
     </copy>
   </target>
