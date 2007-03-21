@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<nodeSet version="1.0">
-    <view uin="Vuobnmjds7xj3qtb61zle">
-        <property name="$metaclass" value="Package Diagram"/>
-        <property name="$defaultDiagram" value="true"/>
-        <property name="$defaultDiagram" value=""/>
-        <property name="@__options" value="toolbar.group.Tools.expanded = true&#10;toolbar.buttonRunCount = 2&#10;toolbar.group.#DEFAULT.expanded = true&#10;toolbar.group.system.expanded = true&#10;scrollX = 0&#10;scrollY = 0&#10;zoomFactor = 1.0&#10;"/>
-    </view>
-</nodeSet>
