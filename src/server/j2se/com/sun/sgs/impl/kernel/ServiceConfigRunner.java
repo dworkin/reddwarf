@@ -33,10 +33,13 @@ import java.util.logging.Logger;
  */
 class ServiceConfigRunner implements KernelRunnable {
 
+    // the base type of this class
+    private static final String BASE_TYPE =
+        ServiceConfigRunner.class.getName();
+
     // logger for this class
     private final static LoggerWrapper logger =
-        new LoggerWrapper(Logger.getLogger(ServiceConfigRunner.
-                                           class.getName()));
+        new LoggerWrapper(Logger.getLogger(BASE_TYPE));
 
     // the reference back to the kernel
     private final Kernel kernel;
@@ -75,6 +78,13 @@ class ServiceConfigRunner implements KernelRunnable {
         this.proxy = proxy;
         this.appName = appName;
         this.appProperties = appProperties;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String getBaseTaskType() {
+        return BASE_TYPE;
     }
 
     /**

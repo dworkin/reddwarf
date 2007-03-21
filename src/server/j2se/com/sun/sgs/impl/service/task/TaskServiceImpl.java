@@ -192,7 +192,7 @@ public class TaskServiceImpl
         while ((name != null) && (name.startsWith(DS_PENDING_SPACE))) {
             PendingTask task =
                 dataService.getServiceBinding(name, PendingTask.class);
-            TaskRunner runner = new TaskRunner(name);
+            TaskRunner runner = new TaskRunner(name, task.getBaseTaskType());
             TaskOwner owner =
                 new TaskOwnerImpl(task.identity, transactionProxy.
                                   getCurrentOwner().getContext());
@@ -536,7 +536,7 @@ public class TaskServiceImpl
         if (logger.isLoggable(Level.FINEST))
             logger.log(Level.FINEST, "created pending task {0}", objName);
 
-        return new TaskRunner(objName);
+        return new TaskRunner(objName, ptask.getBaseTaskType());
     }
 
     /**
@@ -639,12 +639,7 @@ public class TaskServiceImpl
             return;
         
         TransactionRunner transactionRunner =
-            new TransactionRunner(new KernelRunnable() {
-                public void run() throws Exception {
-                    fetchPendingTask(objName);
-                }
-            });
-
+            new TransactionRunner(new NonRetryCleanupRunnable(objName));
         try {
             taskScheduler.scheduleTask(transactionRunner,
                                        transactionProxy.getCurrentOwner());
@@ -654,6 +649,25 @@ public class TaskServiceImpl
                                 "task to remove non-retried task {0}: " +
                                 "giving up", objName);
             throw tre;
+        }
+    }
+
+    /**
+     * Private helper runnable that cleans up after a non-retried task. See
+     * block comment above in notifyNonRetry for more detail.
+     */
+    private class NonRetryCleanupRunnable implements KernelRunnable {
+        private final String objName;
+        NonRetryCleanupRunnable(String objName) {
+            this.objName = objName;
+        }
+        /** {@inheritDoc} */
+        public String getBaseTaskType() {
+            return NonRetryCleanupRunnable.class.getName();
+        }
+        /** {@inheritDoc} */
+        public void run() throws Exception {
+            fetchPendingTask(objName);
         }
     }
 
@@ -713,6 +727,7 @@ public class TaskServiceImpl
         private static final long serialVersionUID = 1;
         private Task task = null;
         private ManagedReference taskRef = null;
+        private final String taskType;
         long startTime;
         long period;
         private Identity identity;
@@ -733,10 +748,18 @@ public class TaskServiceImpl
             else
                 this.task = task;
 
+            this.taskType = task.getClass().getName();
             this.startTime = startTime;
             this.period = period;
             this.identity = TaskServiceImpl.transactionProxy.
                 getCurrentOwner().getIdentity();
+        }
+        /**
+         * Provides the name of the type of the task that is contained in
+         * this pending task.
+         */
+        String getBaseTaskType() {
+            return taskType;
         }
         /**
          * Checks that the underlying task is available, which is only at
@@ -777,17 +800,26 @@ public class TaskServiceImpl
      */
     private class TaskRunner implements KernelRunnable {
         private final String objName;
-        TaskRunner(String objName) {
+        private final String objTaskType;
+        TaskRunner(String objName, String objTaskType) {
             this.objName = objName;
+            this.objTaskType = objTaskType;
         }
         String getObjName() {
             return objName;
+        }
+        /** {@inheritDoc} */
+        public String getBaseTaskType() {
+            return objTaskType;
         }
         /** {@inheritDoc} */
         public void run() throws Exception {
             try {
                 // run the task in a transactional context
                 (new TransactionRunner(new KernelRunnable() {
+                        public String getBaseTaskType() {
+                            return objTaskType;
+                        }
                         public void run() throws Exception {
                             PendingTask ptask = fetchPendingTask(objName);
                             if (logger.isLoggable(Level.FINEST))

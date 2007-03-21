@@ -144,6 +144,9 @@ public final class MinimalTestKernel
                 public void run() {
                     try {
                         taskHandler.runTaskAsOwner(new KernelRunnable() {
+                                public String getBaseTaskType() {
+                                    return runnable.getClass().getName();
+                                }
                                 public void run() throws Exception {
                                     runnable.run();
                                 }
