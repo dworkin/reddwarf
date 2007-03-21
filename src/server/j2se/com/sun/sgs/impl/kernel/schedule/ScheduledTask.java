@@ -170,7 +170,7 @@ class ScheduledTask {
      * @return a <code>String</code> representation of the task.
      */
     public String toString() {
-        return task.getClass().getName() + "[owner:" + owner.toString() + "]";
+        return task.getBaseTaskType() + "[owner:" + owner.toString() + "]";
     }
 
 }

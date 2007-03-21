@@ -23,6 +23,7 @@ import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.service.TransactionProxy;
 import java.io.Serializable;
+import java.math.BigInteger;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Properties;
@@ -364,6 +365,29 @@ public final class DataServiceImpl
     /** {@inheritDoc} */
     public String nextServiceBoundName(String name) {
 	return nextBoundNameInternal(name, true);
+    }
+
+    /** {@inheritDoc} */
+    public ManagedReference createReferenceForId(BigInteger id) {
+	try {
+	    if (id == null) {
+		throw new NullPointerException("The id must not be null");
+	    } else if (id.bitLength() > 63 || id.signum() < 0) {
+		throw new IllegalArgumentException("The id is invalid: " + id);
+	    }
+	    ManagedReference result =
+		getContext().getReference(id.longValue());
+	    if (logger.isLoggable(Level.FINEST)) {
+		logger.log(Level.FINEST,
+			   "createReferenceForId id:{0} returns {1}",
+			   id, result);
+	    }
+	    return result;
+	} catch (RuntimeException e) {
+	    logger.logThrow(
+		Level.FINEST, e, "createReferenceForId id:{0} throws", id);
+	    throw e;
+	}
     }
 
     /* -- Implement TransactionParticipant -- */
