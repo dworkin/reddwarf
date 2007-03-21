@@ -1,109 +1,29 @@
 /*
- Copyright (c) 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa
- Clara, California 95054, U.S.A. All rights reserved.
- 
- Sun Microsystems, Inc. has intellectual property rights relating to
- technology embodied in the product that is described in this document.
- In particular, and without limitation, these intellectual property rights
- may include one or more of the U.S. patents listed at
- http://www.sun.com/patents and one or more additional patents or pending
- patent applications in the U.S. and in other countries.
- 
- U.S. Government Rights - Commercial software. Government users are subject
- to the Sun Microsystems, Inc. standard license agreement and applicable
- provisions of the FAR and its supplements.
- 
- This distribution may include materials developed by third parties.
- 
- Sun, Sun Microsystems, the Sun logo and Java are trademarks or registered
- trademarks of Sun Microsystems, Inc. in the U.S. and other countries.
- 
- UNIX is a registered trademark in the U.S. and other countries, exclusively
- licensed through X/Open Company, Ltd.
- 
- Products covered by and information contained in this service manual are
- controlled by U.S. Export Control laws and may be subject to the export
- or import laws in other countries. Nuclear, missile, chemical biological
- weapons or nuclear maritime end uses or end users, whether direct or
- indirect, are strictly prohibited. Export or reexport to countries subject
- to U.S. embargo or to entities identified on U.S. export exclusion lists,
- including, but not limited to, the denied persons and specially designated
- nationals lists is strictly prohibited.
- 
- DOCUMENTATION IS PROVIDED "AS IS" AND ALL EXPRESS OR IMPLIED CONDITIONS,
- REPRESENTATIONS AND WARRANTIES, INCLUDING ANY IMPLIED WARRANTY OF
- MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE OR NON-INFRINGEMENT,
- ARE DISCLAIMED, EXCEPT TO THE EXTENT THAT SUCH DISCLAIMERS ARE HELD TO BE
- LEGALLY INVALID.
- 
- Copyright © 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
- California 95054, Etats-Unis. Tous droits réservés.
- 
- Sun Microsystems, Inc. détient les droits de propriété intellectuels
- relatifs à la technologie incorporée dans le produit qui est décrit dans
- ce document. En particulier, et ce sans limitation, ces droits de
- propriété intellectuelle peuvent inclure un ou plus des brevets américains
- listés à l'adresse http://www.sun.com/patents et un ou les brevets
- supplémentaires ou les applications de brevet en attente aux Etats -
- Unis et dans les autres pays.
- 
- Cette distribution peut comprendre des composants développés par des
- tierces parties.
- 
- Sun, Sun Microsystems, le logo Sun et Java sont des marques de fabrique
- ou des marques déposées de Sun Microsystems, Inc. aux Etats-Unis et dans
- d'autres pays.
- 
- UNIX est une marque déposée aux Etats-Unis et dans d'autres pays et
- licenciée exlusivement par X/Open Company, Ltd.
- 
- see above Les produits qui font l'objet de ce manuel d'entretien et les
- informations qu'il contient sont regis par la legislation americaine en
- matiere de controle des exportations et peuvent etre soumis au droit
- d'autres pays dans le domaine des exportations et importations.
- Les utilisations finales, ou utilisateurs finaux, pour des armes
- nucleaires, des missiles, des armes biologiques et chimiques ou du
- nucleaire maritime, directement ou indirectement, sont strictement
- interdites. Les exportations ou reexportations vers des pays sous embargo
- des Etats-Unis, ou vers des entites figurant sur les listes d'exclusion
- d'exportation americaines, y compris, mais de maniere non exclusive, la
- liste de personnes qui font objet d'un ordre de ne pas participer, d'une
- facon directe ou indirecte, aux exportations des produits ou des services
- qui sont regi par la legislation americaine en matiere de controle des
- exportations et la liste de ressortissants specifiquement designes, sont
- rigoureusement interdites.
- 
- LA DOCUMENTATION EST FOURNIE "EN L'ETAT" ET TOUTES AUTRES CONDITIONS,
- DECLARATIONS ET GARANTIES EXPRESSES OU TACITES SONT FORMELLEMENT EXCLUES,
- DANS LA MESURE AUTORISEE PAR LA LOI APPLICABLE, Y COMPRIS NOTAMMENT TOUTE
- GARANTIE IMPLICITE RELATIVE A LA QUALITE MARCHANDE, A L'APTITUDE A UNE
- UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
-*/
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
 
-package com.sun.gi.apps.hack.server;
+package com.sun.sgs.example.hack.server;
 
-import com.sun.gi.logic.GLOReference;
-import com.sun.gi.logic.SimTask;
+import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.ManagedReference;
 
-import com.sun.gi.apps.hack.server.level.LevelBoard.ActionResult;
+import com.sun.sgs.example.hack.server.level.LevelBoard.ActionResult;
 
-import com.sun.gi.apps.hack.share.CharacterStats;
+import com.sun.sgs.example.hack.share.CharacterStats;
 
-import java.lang.reflect.Method;
+import java.io.Serializable;
 
 
 /**
  * This is an implementation of <code>Character</code> used by all
  * <code>Player</code>s.
- *
- * @since 1.0
- * @author Seth Proctor
  */
-public class PlayerCharacter implements Character
-{
+public class PlayerCharacter implements Character, Serializable {
+
+    private static final long serialVersionUID = 1;
 
     // a reference to the player that owns this character
-    private GLOReference<Player> playerRef;
+    private ManagedReference playerRef;
 
     // the id of this character
     private int id;
@@ -119,9 +39,8 @@ public class PlayerCharacter implements Character
      * @param id the identifier for this character
      * @param stats the statistics for this character
      */
-    public PlayerCharacter(GLOReference<Player> playerRef, int id,
-                           CharacterStats stats) {
-        this.playerRef = playerRef;
+    public PlayerCharacter(Player player, int id, CharacterStats stats) {
+        playerRef = AppContext.getDataManager().createReference(player);
         this.id = id;
         this.stats = stats;
     }
@@ -160,14 +79,13 @@ public class PlayerCharacter implements Character
      */
     public void notifyStatsChanged() {
         // send the player our updated stats...
-        SimTask task = SimTask.getCurrent();
-        Player player = playerRef.peek(task);
-        player.sendCharacter(task, this);
+        Player player = playerRef.get(Player.class);
+        player.sendCharacter(this);
 
         // ...and check to see if we're still alive
         if (stats.getHitPoints() == 0) {
             // we were killed, so send a message...
-            player.sendTextMessage(task, "you died.");
+            player.sendTextMessage("you died.");
 
             // ...remove ourself directly from the level, so there's no
             // confusion about interacting with us before we get called
@@ -179,16 +97,11 @@ public class PlayerCharacter implements Character
 
             // NOTE: we could add some message screen here, if we wanted
 
-            // ...and finally, queue up a leaveGame message to get us back to
-            // the lobby
-            try {
-                GLOReference<Lobby> lobbyRef = task.findGLO(Lobby.IDENTIFIER);
-                Method method =
-                    Player.class.getMethod("moveToGame", GLOReference.class);
-                task.queueTask(playerRef, method, new Object [] {lobbyRef});
-            } catch (NoSuchMethodException nsme) {
-                throw new IllegalStateException(nsme.getMessage());
-            }
+            // finally, throw the players into the lobby
+            Game lobby = AppContext.getDataManager().
+                getBinding(Lobby.IDENTIFIER, Lobby.class);
+            AppContext.getTaskManager().
+                scheduleTask(new MoveGameTask(player, lobby));
         }
     }
 
@@ -212,12 +125,11 @@ public class PlayerCharacter implements Character
         int previousHP = stats.getHitPoints();
         if (character.collidedInto(this)) {
             // our stats were effected, so see if we lost any hit points
-            SimTask task = SimTask.getCurrent();
-            Player player = playerRef.peek(task);
+            Player player = playerRef.get(Player.class);
             int lostHP = previousHP - stats.getHitPoints();
             if (lostHP > 0)
-                player.sendTextMessage(task, character.getName() +
-                                       " hit you for " + lostHP + "HP");
+                player.sendTextMessage(character.getName() + " hit you for " +
+                                       lostHP + "HP");
 
             // do the general stat notify routine
             notifyStatsChanged();
@@ -251,8 +163,7 @@ public class PlayerCharacter implements Character
      * @param message the message to send
      */
     public void sendMessage(String message) {
-        SimTask task = SimTask.getCurrent();
-        playerRef.peek(task).sendTextMessage(task, message);
+        playerRef.get(Player.class).sendTextMessage(message);
     }
 
 }

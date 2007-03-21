@@ -1,96 +1,20 @@
 /*
- Copyright (c) 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa
- Clara, California 95054, U.S.A. All rights reserved.
- 
- Sun Microsystems, Inc. has intellectual property rights relating to
- technology embodied in the product that is described in this document.
- In particular, and without limitation, these intellectual property rights
- may include one or more of the U.S. patents listed at
- http://www.sun.com/patents and one or more additional patents or pending
- patent applications in the U.S. and in other countries.
- 
- U.S. Government Rights - Commercial software. Government users are subject
- to the Sun Microsystems, Inc. standard license agreement and applicable
- provisions of the FAR and its supplements.
- 
- This distribution may include materials developed by third parties.
- 
- Sun, Sun Microsystems, the Sun logo and Java are trademarks or registered
- trademarks of Sun Microsystems, Inc. in the U.S. and other countries.
- 
- UNIX is a registered trademark in the U.S. and other countries, exclusively
- licensed through X/Open Company, Ltd.
- 
- Products covered by and information contained in this service manual are
- controlled by U.S. Export Control laws and may be subject to the export
- or import laws in other countries. Nuclear, missile, chemical biological
- weapons or nuclear maritime end uses or end users, whether direct or
- indirect, are strictly prohibited. Export or reexport to countries subject
- to U.S. embargo or to entities identified on U.S. export exclusion lists,
- including, but not limited to, the denied persons and specially designated
- nationals lists is strictly prohibited.
- 
- DOCUMENTATION IS PROVIDED "AS IS" AND ALL EXPRESS OR IMPLIED CONDITIONS,
- REPRESENTATIONS AND WARRANTIES, INCLUDING ANY IMPLIED WARRANTY OF
- MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE OR NON-INFRINGEMENT,
- ARE DISCLAIMED, EXCEPT TO THE EXTENT THAT SUCH DISCLAIMERS ARE HELD TO BE
- LEGALLY INVALID.
- 
- Copyright © 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
- California 95054, Etats-Unis. Tous droits réservés.
- 
- Sun Microsystems, Inc. détient les droits de propriété intellectuels
- relatifs à la technologie incorporée dans le produit qui est décrit dans
- ce document. En particulier, et ce sans limitation, ces droits de
- propriété intellectuelle peuvent inclure un ou plus des brevets américains
- listés à l'adresse http://www.sun.com/patents et un ou les brevets
- supplémentaires ou les applications de brevet en attente aux Etats -
- Unis et dans les autres pays.
- 
- Cette distribution peut comprendre des composants développés par des
- tierces parties.
- 
- Sun, Sun Microsystems, le logo Sun et Java sont des marques de fabrique
- ou des marques déposées de Sun Microsystems, Inc. aux Etats-Unis et dans
- d'autres pays.
- 
- UNIX est une marque déposée aux Etats-Unis et dans d'autres pays et
- licenciée exlusivement par X/Open Company, Ltd.
- 
- see above Les produits qui font l'objet de ce manuel d'entretien et les
- informations qu'il contient sont regis par la legislation americaine en
- matiere de controle des exportations et peuvent etre soumis au droit
- d'autres pays dans le domaine des exportations et importations.
- Les utilisations finales, ou utilisateurs finaux, pour des armes
- nucleaires, des missiles, des armes biologiques et chimiques ou du
- nucleaire maritime, directement ou indirectement, sont strictement
- interdites. Les exportations ou reexportations vers des pays sous embargo
- des Etats-Unis, ou vers des entites figurant sur les listes d'exclusion
- d'exportation americaines, y compris, mais de maniere non exclusive, la
- liste de personnes qui font objet d'un ordre de ne pas participer, d'une
- facon directe ou indirecte, aux exportations des produits ou des services
- qui sont regi par la legislation americaine en matiere de controle des
- exportations et la liste de ressortissants specifiquement designes, sont
- rigoureusement interdites.
- 
- LA DOCUMENTATION EST FOURNIE "EN L'ETAT" ET TOUTES AUTRES CONDITIONS,
- DECLARATIONS ET GARANTIES EXPRESSES OU TACITES SONT FORMELLEMENT EXCLUES,
- DANS LA MESURE AUTORISEE PAR LA LOI APPLICABLE, Y COMPRIS NOTAMMENT TOUTE
- GARANTIE IMPLICITE RELATIVE A LA QUALITE MARCHANDE, A L'APTITUDE A UNE
- UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
-*/
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
 
-package com.sun.gi.apps.hack.server;
+package com.sun.sgs.example.hack.server;
 
-import com.sun.gi.comm.routing.ChannelID;
-import com.sun.gi.comm.routing.UserID;
+import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.Channel;
+import com.sun.sgs.app.ClientSession;
+import com.sun.sgs.app.ClientSessionId;
 
-import com.sun.gi.logic.SimTask;
+import com.sun.sgs.example.hack.share.Board;
+import com.sun.sgs.example.hack.share.BoardSpace;
+import com.sun.sgs.example.hack.share.CharacterStats;
+import com.sun.sgs.example.hack.share.GameMembershipDetail;
 
-import com.sun.gi.apps.hack.share.Board;
-import com.sun.gi.apps.hack.share.BoardSpace;
-import com.sun.gi.apps.hack.share.CharacterStats;
-import com.sun.gi.apps.hack.share.GameMembershipDetail;
+import com.sun.sgs.impl.util.HexDumper;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -112,12 +36,8 @@ import java.util.HashSet;
  * <p>
  * FIXME: All the messages codes are fixed numbers. This should actually be
  * using some enumeration.
- *
- * @since 1.0
- * @author Seth Proctor
  */
-public class Messages
-{
+public class Messages {
 
     /**
      * Generic method to send data to a set of users on a given channel.
@@ -127,10 +47,18 @@ public class Messages
      * @param channel the channel to send the message on
      * @param users the set of users to send to
      */
-    public static void sendToClient(SimTask task, ByteBuffer data,
-                                    ChannelID channel, UserID [] users) {
-        for (UserID uid : users)
-            task.sendData(channel, uid, data, true);
+    public static void sendToClient(ByteBuffer data, Channel channel,
+                                    ClientSession [] users) {
+        /*for (UserId uid : users)
+            task.sendData(channel, uid, data, true);*/
+        // FIXME: Actually send the message here
+        HashSet<ClientSession> recipients = new HashSet<ClientSession>();
+        for (ClientSession session : users)
+            recipients.add(session);
+        data.rewind();
+        byte [] bytes = new byte[data.remaining()];
+        data.get(bytes);
+        channel.send(recipients, bytes);
     }
 
     /**
@@ -143,8 +71,8 @@ public class Messages
      * @param channel the channel to send the message on
      * @param users the set of users to send to
      */
-    public static void sendToClient(SimTask task, int command, Object data,
-                                    ChannelID channel, UserID [] users) {
+    public static void sendToClient(int command, Object data, Channel channel,
+                                    ClientSession [] users) {
         // get the bytes
         byte [] bytes = encodeObject(data);
         
@@ -154,7 +82,7 @@ public class Messages
         bb.put(bytes);
 
         // send to the client
-        sendToClient(task, bb, channel, users);
+        sendToClient(bb, channel, users);
     }
 
     /**
@@ -175,6 +103,34 @@ public class Messages
     }
 
     /**
+     *
+     */
+    private static void sendChannelNotice(byte [] session, Channel channel,
+                                          boolean joining) {
+        byte [] message = new byte[session.length + 1];
+        message[0] = joining ? (byte)8 : (byte)9;
+        for (int i = 0; i < session.length; i++)
+            message[i+1] = session[i];
+        channel.send(message);
+    }
+
+    /**
+     *
+     */
+    public static void sendPlayerJoined(ClientSession session,
+                                        Channel channel) {
+        sendChannelNotice(session.getSessionId().getBytes(), channel, true);
+    }
+
+    /**
+     *
+     */
+    public static void sendPlayerLeft(ClientSession session,
+                                      Channel channel) {
+        sendChannelNotice(session.getSessionId().getBytes(), channel, false);
+    }
+
+    /**
      * Sends uid-to-name mapping. This bulk version is typically used when
      * a player first joins a game, though it may be used at any point.
      *
@@ -183,9 +139,12 @@ public class Messages
      * @param channel the channel to send the message on
      * @param uid the user to send to
      */
-    public static void sendUidMap(SimTask task, Map<UserID,String> uidMap,
-                                  ChannelID channel, UserID uid) {
-        sendToClient(task, 0, uidMap, channel, new UserID [] {uid});
+    public static void sendUidMap(Map<ClientSession,String> uidMap,
+                                  Channel channel, ClientSession uid) {
+        Map<String,String> map = new HashMap<String,String>();
+        for (ClientSession session : uidMap.keySet())
+            map.put(HexDumper.toHexString(session.getSessionId().getBytes()), uidMap.get(session));
+        sendToClient(0, map, channel, new ClientSession [] {uid});
     }
 
     /**
@@ -197,11 +156,12 @@ public class Messages
      * @param channel the channel to send the message on
      * @param users the users to send to
      */
-    public static void sendUidMap(SimTask task, UserID uid, String name,
-                                  ChannelID channel, UserID [] users) {
-        Map<UserID,String> map = new HashMap<UserID,String>();
-        map.put(uid,name);
-        sendToClient(task, 0, map, channel, users);
+    public static void sendUidMap(ClientSession uid, String name,
+                                  Channel channel, ClientSession [] users) {
+        Map<String,String> map = new HashMap<String,String>();
+        ClientSessionId csid = uid.getSessionId();
+        map.put(HexDumper.toHexString(csid.getBytes()),name);
+        sendToClient(0, map, channel, users);
     }
 
 
@@ -219,12 +179,11 @@ public class Messages
      * @param channel the channel to send the message on
      * @param uid the users to send to
      */
-    public static void sendLobbyWelcome(SimTask task,
-                                        Collection<GameMembershipDetail> games,
-                                        ChannelID channel, UserID uid) {
-        UserID [] uids = new UserID[] {uid};
+    public static void sendLobbyWelcome(Collection<GameMembershipDetail> games,
+                                        Channel channel, ClientSession uid) {
+        ClientSession [] uids = new ClientSession[] {uid};
 
-        sendToClient(task, 1, games, channel, uids);
+        sendToClient(1, games, channel, uids);
     }
 
     /**
@@ -237,16 +196,16 @@ public class Messages
      * @param channel the channel to send the message on
      * @param users the users to send to
      */
-    public static void sendGameCountChanged(SimTask task, String name,
-                                            int count, ChannelID channel,
-                                            UserID [] users) {
+    public static void sendGameCountChanged(String name, int count,
+                                            Channel channel,
+                                            ClientSession [] users) {
         ByteBuffer bb = ByteBuffer.allocate(5 + name.length());
 
         bb.put((byte)2);
         bb.putInt(count);
         bb.put(name.getBytes());
 
-        sendToClient(task, bb, channel, users);
+        sendToClient(bb, channel, users);
     }
 
     /**
@@ -257,14 +216,14 @@ public class Messages
      * @param channel the channel to send the message on
      * @param users the users to send to
      */
-    public static void sendGameAdded(SimTask task, String name,
-                                     ChannelID channel, UserID [] users) {
+    public static void sendGameAdded(String name, Channel channel,
+                                     ClientSession [] users) {
         ByteBuffer bb = ByteBuffer.allocate(1 + name.length());
 
         bb.put((byte)3);
         bb.put(name.getBytes());
 
-        sendToClient(task, bb, channel, users);
+        sendToClient(bb, channel, users);
     }
 
     /**
@@ -275,14 +234,14 @@ public class Messages
      * @param channel the channel to send the message on
      * @param users the users to send to
      */
-    public static void sendGameRemoved(SimTask task, String name,
-                                       ChannelID channel, UserID [] users) {
+    public static void sendGameRemoved(String name, Channel channel,
+                                       ClientSession [] users) {
         ByteBuffer bb = ByteBuffer.allocate(1 + name.length());
 
         bb.put((byte)4);
         bb.put(name.getBytes());
 
-        sendToClient(task, bb, channel, users);
+        sendToClient(bb, channel, users);
     }
 
     /**
@@ -293,10 +252,10 @@ public class Messages
      * @param channel the channel to send the message on
      * @param uid the user to send to
      */
-    public static void sendPlayerCharacters(SimTask task,
-                                            Collection<CharacterStats> stats,
-                                            ChannelID channel, UserID uid) {
-        sendToClient(task, 5, stats, channel, new UserID [] {uid});
+    public static void sendPlayerCharacters(Collection<CharacterStats> stats,
+                                            Channel channel,
+                                            ClientSession uid) {
+        sendToClient(5, stats, channel, new ClientSession [] {uid});
     }
 
     /**
@@ -312,8 +271,8 @@ public class Messages
      * @param channel the channel to send the message on
      * @param uid the user to send to
      */
-    public static void sendSpriteMap(SimTask task, SpriteMap spriteMap,
-                                     ChannelID channel, UserID uid) {
+    public static void sendSpriteMap(SpriteMap spriteMap, Channel channel,
+                                     ClientSession uid) {
         // get the bytes
         byte [] bytes = encodeObject(spriteMap.getSpriteMap());
         ByteBuffer bb = ByteBuffer.allocate(bytes.length + 5);
@@ -322,7 +281,7 @@ public class Messages
         bb.putInt(spriteMap.getSpriteSize());
         bb.put(bytes);
 
-        sendToClient(task, bb, channel, new UserID [] {uid});
+        sendToClient(bb, channel, new ClientSession [] {uid});
     }
     
     /**
@@ -333,9 +292,9 @@ public class Messages
      * @param channel the channel to send the message on
      * @param uid the user to send to
      */
-    public static void sendBoard(SimTask task, Board board, ChannelID channel,
-                                 UserID uid) {
-        sendToClient(task, 2, board, channel, new UserID [] {uid});
+    public static void sendBoard(Board board, Channel channel,
+                                 ClientSession uid) {
+        sendToClient(2, board, channel, new ClientSession [] {uid});
     }
 
     /**
@@ -346,9 +305,9 @@ public class Messages
      * @param channel the channel to send the message on
      * @param users the users to send to
      */
-    public static void sendUpdate(SimTask task, Collection<BoardSpace> spaces,
-                                  ChannelID channel, UserID [] users) {
-        sendToClient(task, 3, spaces, channel, users);
+    public static void sendUpdate(Collection<BoardSpace> spaces,
+                                  Channel channel, ClientSession [] users) {
+        sendToClient(3, spaces, channel, users);
     }
 
     /**
@@ -360,14 +319,14 @@ public class Messages
      * @param channel the channel to send the message on
      * @param uid the user to send to
      */
-    public static void sendTextMessage(SimTask task, String message,
-                                       ChannelID channel, UserID uid) {
+    public static void sendTextMessage(String message, Channel channel,
+                                       ClientSession uid) {
         ByteBuffer bb = ByteBuffer.allocate(message.length() + 1);
 
         bb.put((byte)4);
         bb.put(message.getBytes());
 
-        sendToClient(task, bb, channel, new UserID [] {uid});
+        sendToClient(bb, channel, new ClientSession [] {uid});
     }
 
     /**
@@ -383,9 +342,8 @@ public class Messages
      * @param channel the channel to send the message on
      * @param uid the user to send to
      */
-    public static void sendCharacter(SimTask task, int id,
-                                     CharacterStats stats, ChannelID channel,
-                                     UserID uid) {
+    public static void sendCharacter(int id, CharacterStats stats,
+                                     Channel channel, ClientSession uid) {
         byte [] bytes = encodeObject(stats);
         ByteBuffer bb = ByteBuffer.allocate(bytes.length + 5);
 
@@ -393,7 +351,7 @@ public class Messages
         bb.putInt(id);
         bb.put(bytes);
 
-        sendToClient(task, bb, channel, new UserID [] {uid});
+        sendToClient(bb, channel, new ClientSession [] {uid});
     }
 
 }

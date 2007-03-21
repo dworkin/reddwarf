@@ -1,101 +1,25 @@
 /*
- Copyright (c) 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa
- Clara, California 95054, U.S.A. All rights reserved.
- 
- Sun Microsystems, Inc. has intellectual property rights relating to
- technology embodied in the product that is described in this document.
- In particular, and without limitation, these intellectual property rights
- may include one or more of the U.S. patents listed at
- http://www.sun.com/patents and one or more additional patents or pending
- patent applications in the U.S. and in other countries.
- 
- U.S. Government Rights - Commercial software. Government users are subject
- to the Sun Microsystems, Inc. standard license agreement and applicable
- provisions of the FAR and its supplements.
- 
- This distribution may include materials developed by third parties.
- 
- Sun, Sun Microsystems, the Sun logo and Java are trademarks or registered
- trademarks of Sun Microsystems, Inc. in the U.S. and other countries.
- 
- UNIX is a registered trademark in the U.S. and other countries, exclusively
- licensed through X/Open Company, Ltd.
- 
- Products covered by and information contained in this service manual are
- controlled by U.S. Export Control laws and may be subject to the export
- or import laws in other countries. Nuclear, missile, chemical biological
- weapons or nuclear maritime end uses or end users, whether direct or
- indirect, are strictly prohibited. Export or reexport to countries subject
- to U.S. embargo or to entities identified on U.S. export exclusion lists,
- including, but not limited to, the denied persons and specially designated
- nationals lists is strictly prohibited.
- 
- DOCUMENTATION IS PROVIDED "AS IS" AND ALL EXPRESS OR IMPLIED CONDITIONS,
- REPRESENTATIONS AND WARRANTIES, INCLUDING ANY IMPLIED WARRANTY OF
- MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE OR NON-INFRINGEMENT,
- ARE DISCLAIMED, EXCEPT TO THE EXTENT THAT SUCH DISCLAIMERS ARE HELD TO BE
- LEGALLY INVALID.
- 
- Copyright © 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
- California 95054, Etats-Unis. Tous droits réservés.
- 
- Sun Microsystems, Inc. détient les droits de propriété intellectuels
- relatifs à la technologie incorporée dans le produit qui est décrit dans
- ce document. En particulier, et ce sans limitation, ces droits de
- propriété intellectuelle peuvent inclure un ou plus des brevets américains
- listés à l'adresse http://www.sun.com/patents et un ou les brevets
- supplémentaires ou les applications de brevet en attente aux Etats -
- Unis et dans les autres pays.
- 
- Cette distribution peut comprendre des composants développés par des
- tierces parties.
- 
- Sun, Sun Microsystems, le logo Sun et Java sont des marques de fabrique
- ou des marques déposées de Sun Microsystems, Inc. aux Etats-Unis et dans
- d'autres pays.
- 
- UNIX est une marque déposée aux Etats-Unis et dans d'autres pays et
- licenciée exlusivement par X/Open Company, Ltd.
- 
- see above Les produits qui font l'objet de ce manuel d'entretien et les
- informations qu'il contient sont regis par la legislation americaine en
- matiere de controle des exportations et peuvent etre soumis au droit
- d'autres pays dans le domaine des exportations et importations.
- Les utilisations finales, ou utilisateurs finaux, pour des armes
- nucleaires, des missiles, des armes biologiques et chimiques ou du
- nucleaire maritime, directement ou indirectement, sont strictement
- interdites. Les exportations ou reexportations vers des pays sous embargo
- des Etats-Unis, ou vers des entites figurant sur les listes d'exclusion
- d'exportation americaines, y compris, mais de maniere non exclusive, la
- liste de personnes qui font objet d'un ordre de ne pas participer, d'une
- facon directe ou indirecte, aux exportations des produits ou des services
- qui sont regi par la legislation americaine en matiere de controle des
- exportations et la liste de ressortissants specifiquement designes, sont
- rigoureusement interdites.
- 
- LA DOCUMENTATION EST FOURNIE "EN L'ETAT" ET TOUTES AUTRES CONDITIONS,
- DECLARATIONS ET GARANTIES EXPRESSES OU TACITES SONT FORMELLEMENT EXCLUES,
- DANS LA MESURE AUTORISEE PAR LA LOI APPLICABLE, Y COMPRIS NOTAMMENT TOUTE
- GARANTIE IMPLICITE RELATIVE A LA QUALITE MARCHANDE, A L'APTITUDE A UNE
- UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
-*/
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
 
-package com.sun.gi.apps.hack.server;
+package com.sun.sgs.example.hack.server;
 
-import com.sun.gi.comm.routing.ChannelID;
-import com.sun.gi.comm.routing.UserID;
+import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.Channel;
+import com.sun.sgs.app.ClientSession;
+import com.sun.sgs.app.ClientSessionListener;
+import com.sun.sgs.app.DataManager;
+import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.app.NameNotBoundException;
 
-import com.sun.gi.logic.GLOReference;
-import com.sun.gi.logic.SimTask;
-import com.sun.gi.logic.SimUserDataListener;
+import com.sun.sgs.example.hack.server.level.Level;
 
-import com.sun.gi.apps.hack.server.level.Level;
+import com.sun.sgs.example.hack.share.Board;
+import com.sun.sgs.example.hack.share.BoardSpace;
+import com.sun.sgs.example.hack.share.CharacterStats;
 
-import com.sun.gi.apps.hack.share.Board;
-import com.sun.gi.apps.hack.share.BoardSpace;
-import com.sun.gi.apps.hack.share.CharacterStats;
-
-import java.nio.ByteBuffer;
+import java.io.Serializable;
 
 import java.util.Collection;
 
@@ -114,12 +38,11 @@ import java.util.Collection;
  * than some general processing logic. This model helps distribute
  * synchronization and also protect against a player trying to disrupt
  * the system.
- *
- * @since 1.0
- * @author Seth Proctor
  */
-public class Player implements SimUserDataListener
-{
+public class Player
+    implements ClientSessionListener, ManagedObject, Serializable {
+
+    private static final long serialVersionUID = 1;
 
     /**
      * The standard namespace prefix for all players.
@@ -133,20 +56,17 @@ public class Player implements SimUserDataListener
     private String name;
 
     // the uid currently assigned to this player
-    private UserID currentUid;
-
-    // a reference to this player glo
-    private GLOReference<Player> selfRef = null;
+    private ClientSession currentSession;
 
     // the channel that this player is currently using
-    private ChannelID channel;
+    private Channel channel;
 
     // the game the user is currently playing, and its message handler
-    private GLOReference<? extends Game> gameRef;
+    private ManagedReference gameRef;
     private MessageHandler messageHandler = null;
 
     // this player's character manager
-    private GLOReference<PlayerCharacterManager> characterManagerRef;
+    private ManagedReference characterManagerRef;
 
     /**
      * Creates a <code>Player</code> instance.
@@ -156,8 +76,10 @@ public class Player implements SimUserDataListener
     private Player(String name) {
         playing = false;
         channel = null;
-        currentUid = null;
+        currentSession = null;
         this.name = name;
+        characterManagerRef = AppContext.getDataManager().
+            createReference(new PlayerCharacterManager(this));
     }
 
     /**
@@ -169,30 +91,19 @@ public class Player implements SimUserDataListener
      *
      * @return a reference to the <code>Player</code> with the given name
      */
-    public static GLOReference<Player> getInstance(String name) {
-        SimTask task = SimTask.getCurrent();
+    public static Player getInstance(String name) {
+        DataManager dataManager = AppContext.getDataManager();
 
         // try to lookup the existing Player
-        GLOReference<Player> playerRef = task.findGLO(NAME_PREFIX + name);
-
-        // if it didn't already exist, then let's create it
-        if (playerRef == null) {
-            playerRef = task.createGLO(new Player(name), NAME_PREFIX + name);
-            playerRef.get(task).setupCharacterManager(playerRef);
+        Player player = null;
+        try {
+            player = dataManager.getBinding(NAME_PREFIX + name, Player.class);
+        } catch (NameNotBoundException e) {
+            player = new Player(name);
+            dataManager.setBinding(NAME_PREFIX + name, player);
         }
 
-        return playerRef;
-    }
-
-    /**
-     * FIXME: right now, most of this is just for testing, and will be
-     * removed when we can do character creation on the client
-     */
-    private void setupCharacterManager(GLOReference<Player> ref) {
-        characterManagerRef =
-            SimTask.getCurrent().createGLO(new PlayerCharacterManager(ref));
-        characterManagerRef.get(SimTask.getCurrent()).
-            setRef(characterManagerRef);        
+        return player;
     }
 
     /**
@@ -221,8 +132,8 @@ public class Player implements SimUserDataListener
      *
      * @return the character manager
      */
-    public GLOReference<PlayerCharacterManager> getCharacterManager() {
-        return characterManagerRef;
+    public PlayerCharacterManager getCharacterManager() {
+        return characterManagerRef.get(PlayerCharacterManager.class);
     }
 
     /**
@@ -233,8 +144,9 @@ public class Player implements SimUserDataListener
      *
      * @param uid the player's user identifier
      */
-    public void setCurrentUid(UserID uid) {
-        this.currentUid = uid;
+    public void setCurrentSession(ClientSession session) {
+        AppContext.getDataManager().markForUpdate(this);
+        this.currentSession = session;
     }
 
     /**
@@ -245,20 +157,8 @@ public class Player implements SimUserDataListener
      * @return the current user identifier, or null if the player is not
      *         currently playing
      */
-    public UserID getCurrentUid() {
-        return currentUid;
-    }
-
-    /**
-     * Returns a reference that points back to this <code>Player</code>.
-     *
-     * @return a reference to this player
-     */
-    public GLOReference<Player> getReference() {
-        if (selfRef == null)
-            selfRef = SimTask.getCurrent().findGLO("player:" + name);
-
-        return selfRef;
+    public ClientSession getCurrentSession() {
+        return currentSession;
     }
 
     /**
@@ -276,32 +176,32 @@ public class Player implements SimUserDataListener
      * @param gameRef a reference to the new <code>Game</code>, or null
      *                if the player is only being removed from a game
      */
-    public void moveToGame(GLOReference<? extends Game> gameRef) {
-        SimTask task = SimTask.getCurrent();
-        
+    public void moveToGame(Game game) {
+        AppContext.getDataManager().markForUpdate(this);
+
         // if we were previously playing a game, leave it
         if (isPlaying()) {
-            this.gameRef.get(task).leave(this);
-            characterManagerRef.get(task).setCurrentLevel(null);
+            gameRef.getForUpdate(Game.class).leave(this);
+            characterManagerRef.getForUpdate(PlayerCharacterManager.class).
+                setCurrentLevel(null);
             playing = false;
         }
 
         // if we got moved into a valid game, then make the migration
-        if (gameRef != null) {
+        if (game != null) {
             playing = true;
 
             // keep track of the new game...
-            this.gameRef = gameRef;
+            gameRef = AppContext.getDataManager().createReference(game);
 
             // ...and handle joining the new game
-            Game game = gameRef.get(task);
             messageHandler = game.createMessageHandler();
             game.join(this);
         }
 
         // if we're no longer playing, then our user id is no longer valid
         if (! playing)
-            this.currentUid = null;
+            this.currentSession = null;
     }
 
     /**
@@ -311,13 +211,13 @@ public class Player implements SimUserDataListener
      * checking when leaving dungeons).
      */
     public void leaveCurrentLevel() {
-        SimTask task = SimTask.getCurrent();
-        CharacterManager cm = characterManagerRef.get(task);
-        GLOReference<? extends Level> levelRef = cm.getCurrentLevel();
+        PlayerCharacterManager pcm =
+            characterManagerRef.get(PlayerCharacterManager.class);
+        Level level = pcm.getCurrentLevel();
 
-        if (levelRef != null) {
-            levelRef.get(task).removeCharacter(cm.getReference());
-            cm.setCurrentLevel(null);
+        if (level != null) {
+            level.removeCharacter(pcm);
+            pcm.setCurrentLevel(null);
         }
     }
     
@@ -327,25 +227,10 @@ public class Player implements SimUserDataListener
      * the player is never on more than one channel.
      *
      * @param cid the new channel
-     * @param uid the user id, which is always this <code>Player</code>'s
-     *            current uid
      */
-    public void userJoinedChannel(ChannelID cid, UserID uid) {
-        this.channel = cid;
-    }
-
-    /**
-     * Called when the player leaves a channel. In this system, the player
-     * leaves a channel each time they leave a game, and is always joined
-     * into another channel unless they are logging out.
-     * 
-     * @param cid the channel being left
-     * @param uid the user id, which is always this <code>Player</code>'s
-     *            current uid
-     */
-    public void userLeftChannel(ChannelID cid, UserID uid) {
-        // we just ignore this message, since we're always part of exactly
-        // one channel, so we don't need to consume this message
+    public void userJoinedChannel(Channel newChannel) {
+        AppContext.getDataManager().markForUpdate(this);
+        channel = newChannel;
     }
 
     /**
@@ -365,37 +250,15 @@ public class Player implements SimUserDataListener
      *            current uid
      * @param data the message
      */
-    public void userDataReceived(UserID uid, ByteBuffer data) {
-        // due to a temporary bug in the system, if we get requeued due to
-        // a DeadlockException, our data buffer is in the wrong place, so
-        // we rewind it here to be safe
-        data.rewind();
-
+    public void receivedMessage(byte [] message) {
         // call the message handler to interpret the message ... note that the
         // proxy model here means that we're blocking the player, and not the
         // game itself, while we're handling the message
-        messageHandler.handleMessage(this, data);
+        messageHandler.handleMessage(this, message);
     }
 
-    /**
-     * Called when messages arrive on the channel from the client.
-     * <p>
-     * Note that this method only gets called when the client sends messages
-     * via the <code>ClientChannel</code> inteface (either broadcast or
-     * direct messages), and only then if we're eavesdropping on the channel.
-     * Because this would require many locks be taken on this
-     * <code>Player</code> (the <code>ClientChannel</code> interface in this
-     * game is used for chat messages), and because we don't care about
-     * the client's cross talk from the server point of view, we don't
-     * eavesdrop on the channel, so this method is never called. See this
-     * class' implementation of <code>userDataReceived</code> for details
-     * on how we handle messages sent directly from the client.
-     */
-    public void dataArrivedFromChannel(ChannelID id, UserID from,
-                                       ByteBuffer data) {
-        // this method is never called
-
-        // NOTE: see comment in userDataReceived about rewinding the data
+    public void disconnected(boolean graceful) {
+        moveToGame(null);
     }
 
     /**
@@ -404,8 +267,8 @@ public class Player implements SimUserDataListener
      * @param task the task for this action
      * @param board the <code>Board</code> to send
      */
-    public void sendBoard(SimTask task, Board board) {
-        Messages.sendBoard(task, board, channel, currentUid);
+    public void sendBoard(Board board) {
+        Messages.sendBoard(board, channel, currentSession);
     }
 
     /**
@@ -414,9 +277,9 @@ public class Player implements SimUserDataListener
      * @param task the task for this action
      * @param updates the updates to send
      */
-    public void sendUpdate(SimTask task, Collection<BoardSpace> updates) {
-        Messages.sendUpdate(task, updates, channel,
-                            new UserID [] {currentUid});
+    public void sendUpdate(Collection<BoardSpace> updates) {
+        Messages.sendUpdate(updates, channel,
+                            new ClientSession [] {currentSession});
     }
 
     /**
@@ -425,9 +288,9 @@ public class Player implements SimUserDataListener
      * @param task the task for this action
      * @param character the character who's statistics will be sent
      */
-    public void sendCharacter(SimTask task, PlayerCharacter character) {
-        Messages.sendCharacter(task, character.getID(),
-                               character.getStatistics(), channel, currentUid);
+    public void sendCharacter(PlayerCharacter character) {
+        Messages.sendCharacter(character.getID(), character.getStatistics(),
+                               channel, currentSession);
     }
 
     /**
@@ -437,8 +300,8 @@ public class Player implements SimUserDataListener
      * @param id the character's identifier
      * @param stats the character statistics
      */
-    public void sendCharacterStats(SimTask task, int id, CharacterStats stats) {
-        Messages.sendCharacter(task, id, stats, channel, currentUid);
+    public void sendCharacterStats(int id, CharacterStats stats) {
+        Messages.sendCharacter(id, stats, channel, currentSession);
     }
 
     /**
@@ -448,8 +311,8 @@ public class Player implements SimUserDataListener
      * @param task the task for this action
      * @param message the message to send
      */
-    public void sendTextMessage(SimTask task, String message) {
-        Messages.sendTextMessage(task, message, channel, currentUid);
+    public void sendTextMessage(String message) {
+        Messages.sendTextMessage(message, channel, currentSession);
     }
 
 }

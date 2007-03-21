@@ -1,101 +1,25 @@
 /*
- Copyright (c) 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa
- Clara, California 95054, U.S.A. All rights reserved.
- 
- Sun Microsystems, Inc. has intellectual property rights relating to
- technology embodied in the product that is described in this document.
- In particular, and without limitation, these intellectual property rights
- may include one or more of the U.S. patents listed at
- http://www.sun.com/patents and one or more additional patents or pending
- patent applications in the U.S. and in other countries.
- 
- U.S. Government Rights - Commercial software. Government users are subject
- to the Sun Microsystems, Inc. standard license agreement and applicable
- provisions of the FAR and its supplements.
- 
- This distribution may include materials developed by third parties.
- 
- Sun, Sun Microsystems, the Sun logo and Java are trademarks or registered
- trademarks of Sun Microsystems, Inc. in the U.S. and other countries.
- 
- UNIX is a registered trademark in the U.S. and other countries, exclusively
- licensed through X/Open Company, Ltd.
- 
- Products covered by and information contained in this service manual are
- controlled by U.S. Export Control laws and may be subject to the export
- or import laws in other countries. Nuclear, missile, chemical biological
- weapons or nuclear maritime end uses or end users, whether direct or
- indirect, are strictly prohibited. Export or reexport to countries subject
- to U.S. embargo or to entities identified on U.S. export exclusion lists,
- including, but not limited to, the denied persons and specially designated
- nationals lists is strictly prohibited.
- 
- DOCUMENTATION IS PROVIDED "AS IS" AND ALL EXPRESS OR IMPLIED CONDITIONS,
- REPRESENTATIONS AND WARRANTIES, INCLUDING ANY IMPLIED WARRANTY OF
- MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE OR NON-INFRINGEMENT,
- ARE DISCLAIMED, EXCEPT TO THE EXTENT THAT SUCH DISCLAIMERS ARE HELD TO BE
- LEGALLY INVALID.
- 
- Copyright © 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
- California 95054, Etats-Unis. Tous droits réservés.
- 
- Sun Microsystems, Inc. détient les droits de propriété intellectuels
- relatifs à la technologie incorporée dans le produit qui est décrit dans
- ce document. En particulier, et ce sans limitation, ces droits de
- propriété intellectuelle peuvent inclure un ou plus des brevets américains
- listés à l'adresse http://www.sun.com/patents et un ou les brevets
- supplémentaires ou les applications de brevet en attente aux Etats -
- Unis et dans les autres pays.
- 
- Cette distribution peut comprendre des composants développés par des
- tierces parties.
- 
- Sun, Sun Microsystems, le logo Sun et Java sont des marques de fabrique
- ou des marques déposées de Sun Microsystems, Inc. aux Etats-Unis et dans
- d'autres pays.
- 
- UNIX est une marque déposée aux Etats-Unis et dans d'autres pays et
- licenciée exlusivement par X/Open Company, Ltd.
- 
- see above Les produits qui font l'objet de ce manuel d'entretien et les
- informations qu'il contient sont regis par la legislation americaine en
- matiere de controle des exportations et peuvent etre soumis au droit
- d'autres pays dans le domaine des exportations et importations.
- Les utilisations finales, ou utilisateurs finaux, pour des armes
- nucleaires, des missiles, des armes biologiques et chimiques ou du
- nucleaire maritime, directement ou indirectement, sont strictement
- interdites. Les exportations ou reexportations vers des pays sous embargo
- des Etats-Unis, ou vers des entites figurant sur les listes d'exclusion
- d'exportation americaines, y compris, mais de maniere non exclusive, la
- liste de personnes qui font objet d'un ordre de ne pas participer, d'une
- facon directe ou indirecte, aux exportations des produits ou des services
- qui sont regi par la legislation americaine en matiere de controle des
- exportations et la liste de ressortissants specifiquement designes, sont
- rigoureusement interdites.
- 
- LA DOCUMENTATION EST FOURNIE "EN L'ETAT" ET TOUTES AUTRES CONDITIONS,
- DECLARATIONS ET GARANTIES EXPRESSES OU TACITES SONT FORMELLEMENT EXCLUES,
- DANS LA MESURE AUTORISEE PAR LA LOI APPLICABLE, Y COMPRIS NOTAMMENT TOUTE
- GARANTIE IMPLICITE RELATIVE A LA QUALITE MARCHANDE, A L'APTITUDE A UNE
- UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
-*/
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
 
-package com.sun.gi.apps.hack.server.level;
+package com.sun.sgs.example.hack.server.level;
 
-import com.sun.gi.logic.GLOReference;
-import com.sun.gi.logic.SimTask;
+import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.ManagedReference;
 
-import com.sun.gi.apps.hack.server.CharacterManager;
-import com.sun.gi.apps.hack.server.Game;
-import com.sun.gi.apps.hack.server.Item;
-import com.sun.gi.apps.hack.server.NSidedDie;
+import com.sun.sgs.example.hack.server.CharacterManager;
+import com.sun.sgs.example.hack.server.Game;
+import com.sun.sgs.example.hack.server.Item;
+import com.sun.sgs.example.hack.server.NSidedDie;
 
-import com.sun.gi.apps.hack.server.level.LevelBoard.ActionResult;
+import com.sun.sgs.example.hack.server.level.LevelBoard.ActionResult;
 
-import com.sun.gi.apps.hack.share.SnapshotBoard;
-import com.sun.gi.apps.hack.share.Board;
-import com.sun.gi.apps.hack.share.BoardSpace;
-import com.sun.gi.apps.hack.share.KeyMessages;
+import com.sun.sgs.example.hack.share.SnapshotBoard;
+import com.sun.sgs.example.hack.share.Board;
+import com.sun.sgs.example.hack.share.BoardSpace;
+import com.sun.sgs.example.hack.share.KeyMessages;
+
+import java.io.Serializable;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -106,15 +30,10 @@ import java.util.logging.Logger;
  * This is a simple implementation of <code>Level</code> that doesn't try to
  * do anything fancy with managing the internal state. It uses a
  * <code>LevelBoard</code> to track eveything on the level,
- *
- * @since 1.0
- * @author Seth Proctor
  */
-public class SimpleLevel implements Level
-{
+public class SimpleLevel implements Level, Serializable {
 
-    // a reference to ourself, which we'll get lazily
-    private GLOReference<? extends Level> selfRef = null;
+    private static final long serialVersionUID = 1;
 
     // our name
     private String name;
@@ -123,7 +42,7 @@ public class SimpleLevel implements Level
     private String game;
 
     // the characters currently in this level
-    private HashSet<GLOReference<? extends CharacterManager>> characters;
+    private HashSet<ManagedReference> characterRefs;
 
     // the dimentsion of this level
     private int levelWidth;
@@ -143,7 +62,7 @@ public class SimpleLevel implements Level
         this.game = gameName;
 
         // create a new set for our characters
-        characters = new HashSet<GLOReference<? extends CharacterManager>>();
+        characterRefs = new HashSet<ManagedReference>();
     }
 
     /**
@@ -154,26 +73,12 @@ public class SimpleLevel implements Level
      * @param board the <code>Board</code> used by this <code>Level</code>
      */
     public void setBoard(LevelBoard board) {
+        AppContext.getDataManager().markForUpdate(this);
+
         this.board = board;
 
         levelWidth = board.getWidth();
         levelHeight = board.getHeight();
-    }
-
-    /**
-     * Private helper that provides a reference to ourselves. Since we can't
-     * get this in the constructor (we're not registered as a GLO at that
-     * point), we provide a lazy-assignment accessor here. All code in this
-     * class should use this method rather than accessing the reference
-     * directly.
-     * <p>
-     * FIXME: this should actually be handled by a getInstance method
-     */
-    private GLOReference<? extends Level> getSelfRef() {
-        if (selfRef == null)
-            selfRef = SimTask.getCurrent().findGLO(Game.NAME_PREFIX + name);
-
-        return selfRef;
     }
 
     /**
@@ -191,7 +96,7 @@ public class SimpleLevel implements Level
      * @param mgrRef a reference to the <code>CharacterManager</code> who's
      *               <code>Character</code> is joining this <code>Level</code>
      */
-    public void addCharacter(GLOReference<? extends CharacterManager> mgrRef) {
+    public void addCharacter(CharacterManager mgr) {
         int x, y;
 
         do {
@@ -200,9 +105,9 @@ public class SimpleLevel implements Level
             y = NSidedDie.rollNSided(levelHeight) - 1;
 
             // loop until we find a space to successfully add the character
-        } while (! (board.testMove(x, y, mgrRef)));
+        } while (! (board.testMove(x, y, mgr)));
 
-        addCharacter(mgrRef, x, y);
+        addCharacter(mgr, x, y);
     }
 
     /**
@@ -219,22 +124,22 @@ public class SimpleLevel implements Level
      * 
      * @return true upon success, otherwise false.
      */
-    public boolean addCharacter(GLOReference<? extends CharacterManager> mgrRef,
-                             int startX, int startY) {
+    public boolean addCharacter(CharacterManager mgr, int startX, int startY) {
         // let the manager know what level it's on, and where on that
         // level it starts
-        CharacterManager mgr = mgrRef.get(SimTask.getCurrent());
-        mgr.setCurrentLevel(getSelfRef());
+        mgr.setCurrentLevel(this);
         mgr.setLevelPosition(startX, startY);
 
-        if (! board.addCharacterAt(startX, startY, mgrRef)) {
+        if (! board.addCharacterAt(startX, startY, mgr)) {
             mgr.setCurrentLevel(null);
             mgr.setLevelPosition(-1, -1);
             return false;
         }
 
+        AppContext.getDataManager().markForUpdate(this);
+
         // keep track of the character
-        characters.add(mgrRef);
+        characterRefs.add(AppContext.getDataManager().createReference(mgr));
 
         // now we need to send the board and position to the character
         mgr.sendBoard(getBoardSnapshot());
@@ -255,19 +160,19 @@ public class SimpleLevel implements Level
      * @param mgrRef a reference to the <code>CharacterManager</code> who's
      *               <code>Character</code> is joining this <code>Level</code>
      */
-    public void removeCharacter(GLOReference<? extends CharacterManager>
-                                mgrRef) {
+    public void removeCharacter(CharacterManager mgr) {
         // figure out where the character is now
-        CharacterManager mgr = mgrRef.peek(SimTask.getCurrent());
         int x = mgr.getLevelXPos();
         int y = mgr.getLevelYPos();
 
         // make sure that the character is actually on this level...it might
         // not be, for instance, if we're doing a sanity-check of someone
         // who has already left (eg, a player who logged out)
-        if (characters.remove(mgrRef)) {
+        if (characterRefs.remove(AppContext.getDataManager().
+                                 createReference(mgr))) {
+            AppContext.getDataManager().markForUpdate(this);
             // remove them from the board, and notify everyone
-            if (board.removeCharacterAt(x, y, mgrRef))
+            if (board.removeCharacterAt(x, y, mgr))
                 sendUpdate(new BoardSpace(x, y, board.getAt(x, y)));
         }
     }
@@ -277,11 +182,11 @@ public class SimpleLevel implements Level
      *
      * @param itemRef a reference to the <code>Item</code>
      */
-    public void addItem(GLOReference<? extends Item> itemRef) {
+    public void addItem(Item item) {
         // FIXME: how should I actually pick this spot?
         int x = NSidedDie.rollNSided(levelWidth) - 1;
         int y = NSidedDie.rollNSided(levelHeight) - 1;
-        addItem(itemRef, x, y);
+        addItem(item, x, y);
     }
 
     /**
@@ -291,9 +196,8 @@ public class SimpleLevel implements Level
      * @param startX the starting x-coordinate
      * @param startY the starting y-coordinate
      */
-    public void addItem(GLOReference<? extends Item> itemRef, int startX,
-                        int startY) {
-        board.addItemAt(startX, startY, itemRef);
+    public void addItem(Item item, int startX, int startY) {
+        board.addItemAt(startX, startY, item);
     }
 
     /**
@@ -353,7 +257,7 @@ public class SimpleLevel implements Level
         // if the move resulted in the character leaving the board, then we
         // remove the character and notify everyone
         if (result == ActionResult.CHARACTER_LEFT) {
-            leaveLevel(mgr);
+            leaveLevel(mgr, origX, origY);
             return false;
         }
 
@@ -393,7 +297,7 @@ public class SimpleLevel implements Level
         // if the move resulted in the character leaving the board, then we
         // remove the character and notify everyone
         if (result == ActionResult.CHARACTER_LEFT) {
-            leaveLevel(mgr);
+            leaveLevel(mgr, x, y);
             return false;
         }
 
@@ -422,9 +326,8 @@ public class SimpleLevel implements Level
      * @param updates the spaces being updated
      */
     private void sendUpdates(Set<BoardSpace> updates) {
-        SimTask task = SimTask.getCurrent();
-        for (GLOReference<? extends CharacterManager> mgrRef : characters)
-            mgrRef.peek(task).sendUpdate(updates);
+        for (ManagedReference mgrRef : characterRefs)
+            mgrRef.get(CharacterManager.class).sendUpdate(updates);
     }
 
     /**
@@ -433,11 +336,11 @@ public class SimpleLevel implements Level
      *
      * @param mgr the character that is leaving
      */
-    private void leaveLevel(CharacterManager mgr) {
+    private void leaveLevel(CharacterManager mgr, int x, int y) {
         // make sure we have this player by trying to remove it
-        if (characters.remove(mgr.getReference())) {
-            int x = mgr.getLevelXPos();
-            int y = mgr.getLevelYPos();
+        if (characterRefs.remove(AppContext.getDataManager().
+                                 createReference(mgr))) {
+            AppContext.getDataManager().markForUpdate(this);
             sendUpdate(new BoardSpace(x, y, board.getAt(x, y)));
         }
     }

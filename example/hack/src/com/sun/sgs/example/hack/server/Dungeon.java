@@ -1,97 +1,20 @@
 /*
- Copyright (c) 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa
- Clara, California 95054, U.S.A. All rights reserved.
- 
- Sun Microsystems, Inc. has intellectual property rights relating to
- technology embodied in the product that is described in this document.
- In particular, and without limitation, these intellectual property rights
- may include one or more of the U.S. patents listed at
- http://www.sun.com/patents and one or more additional patents or pending
- patent applications in the U.S. and in other countries.
- 
- U.S. Government Rights - Commercial software. Government users are subject
- to the Sun Microsystems, Inc. standard license agreement and applicable
- provisions of the FAR and its supplements.
- 
- This distribution may include materials developed by third parties.
- 
- Sun, Sun Microsystems, the Sun logo and Java are trademarks or registered
- trademarks of Sun Microsystems, Inc. in the U.S. and other countries.
- 
- UNIX is a registered trademark in the U.S. and other countries, exclusively
- licensed through X/Open Company, Ltd.
- 
- Products covered by and information contained in this service manual are
- controlled by U.S. Export Control laws and may be subject to the export
- or import laws in other countries. Nuclear, missile, chemical biological
- weapons or nuclear maritime end uses or end users, whether direct or
- indirect, are strictly prohibited. Export or reexport to countries subject
- to U.S. embargo or to entities identified on U.S. export exclusion lists,
- including, but not limited to, the denied persons and specially designated
- nationals lists is strictly prohibited.
- 
- DOCUMENTATION IS PROVIDED "AS IS" AND ALL EXPRESS OR IMPLIED CONDITIONS,
- REPRESENTATIONS AND WARRANTIES, INCLUDING ANY IMPLIED WARRANTY OF
- MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE OR NON-INFRINGEMENT,
- ARE DISCLAIMED, EXCEPT TO THE EXTENT THAT SUCH DISCLAIMERS ARE HELD TO BE
- LEGALLY INVALID.
- 
- Copyright © 2006 Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
- California 95054, Etats-Unis. Tous droits réservés.
- 
- Sun Microsystems, Inc. détient les droits de propriété intellectuels
- relatifs à la technologie incorporée dans le produit qui est décrit dans
- ce document. En particulier, et ce sans limitation, ces droits de
- propriété intellectuelle peuvent inclure un ou plus des brevets américains
- listés à l'adresse http://www.sun.com/patents et un ou les brevets
- supplémentaires ou les applications de brevet en attente aux Etats -
- Unis et dans les autres pays.
- 
- Cette distribution peut comprendre des composants développés par des
- tierces parties.
- 
- Sun, Sun Microsystems, le logo Sun et Java sont des marques de fabrique
- ou des marques déposées de Sun Microsystems, Inc. aux Etats-Unis et dans
- d'autres pays.
- 
- UNIX est une marque déposée aux Etats-Unis et dans d'autres pays et
- licenciée exlusivement par X/Open Company, Ltd.
- 
- see above Les produits qui font l'objet de ce manuel d'entretien et les
- informations qu'il contient sont regis par la legislation americaine en
- matiere de controle des exportations et peuvent etre soumis au droit
- d'autres pays dans le domaine des exportations et importations.
- Les utilisations finales, ou utilisateurs finaux, pour des armes
- nucleaires, des missiles, des armes biologiques et chimiques ou du
- nucleaire maritime, directement ou indirectement, sont strictement
- interdites. Les exportations ou reexportations vers des pays sous embargo
- des Etats-Unis, ou vers des entites figurant sur les listes d'exclusion
- d'exportation americaines, y compris, mais de maniere non exclusive, la
- liste de personnes qui font objet d'un ordre de ne pas participer, d'une
- facon directe ou indirecte, aux exportations des produits ou des services
- qui sont regi par la legislation americaine en matiere de controle des
- exportations et la liste de ressortissants specifiquement designes, sont
- rigoureusement interdites.
- 
- LA DOCUMENTATION EST FOURNIE "EN L'ETAT" ET TOUTES AUTRES CONDITIONS,
- DECLARATIONS ET GARANTIES EXPRESSES OU TACITES SONT FORMELLEMENT EXCLUES,
- DANS LA MESURE AUTORISEE PAR LA LOI APPLICABLE, Y COMPRIS NOTAMMENT TOUTE
- GARANTIE IMPLICITE RELATIVE A LA QUALITE MARCHANDE, A L'APTITUDE A UNE
- UTILISATION PARTICULIERE OU A L'ABSENCE DE CONTREFACON.
-*/
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
 
-package com.sun.gi.apps.hack.server;
+package com.sun.sgs.example.hack.server;
 
-import com.sun.gi.comm.routing.ChannelID;
-import com.sun.gi.comm.routing.UserID;
+import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.DataManager;
+import com.sun.sgs.app.Channel;
+import com.sun.sgs.app.ClientSession;
+import com.sun.sgs.app.Delivery;
+import com.sun.sgs.app.ManagedReference;
 
-import com.sun.gi.logic.GLOReference;
-import com.sun.gi.logic.SimTask;
+import com.sun.sgs.example.hack.share.Board;
+import com.sun.sgs.example.hack.share.GameMembershipDetail;
 
-import com.sun.gi.apps.hack.share.Board;
-import com.sun.gi.apps.hack.share.GameMembershipDetail;
-
-import java.lang.reflect.Method;
+import java.io.Serializable;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -101,18 +24,13 @@ import java.util.Map;
  * This implementation of <code>Game</code> is what players actually play
  * with. This represents the named games that a client sees in the lobby, and
  * manages interaction with boards and artificial intelligence.
- *
- * @since 1.0
- * @author Seth Proctor
  */
-public class Dungeon implements Game
-{
+public class Dungeon implements Game, Serializable {
 
-    // a reference to ourself, which we'll get lazily
-    private GLOReference<Dungeon> selfRef = null;
+    private static final long serialVersionUID = 1;
 
     // the channel used for all players currently in this dungeon
-    private ChannelID channel;
+    private Channel channel;
 
     // the name of this particular dungeon
     private String name;
@@ -121,13 +39,13 @@ public class Dungeon implements Game
     private int spriteMapId;
 
     // a reference to the game change manager
-    private GLOReference<GameChangeManager> gcmRef;
+    private ManagedReference gcmRef;
 
     // the connection into the dungeon
-    private GLOReference<GameConnector> connectorRef;
+    private ManagedReference connectorRef;
 
     // the set of players in the lobby, mapping from uid to account name
-    private HashMap<UserID,String> playerMap;
+    private HashMap<ClientSession,String> playerMap;
 
     /**
      * Creates a new instance of a <code>Dungeon</code>.
@@ -137,36 +55,26 @@ public class Dungeon implements Game
      * @param spriteMapId the sprite map used by this dungeon
      * @param connectorRef the entry <code>Connector</code>
      */
-    public Dungeon(SimTask task, String name, int spriteMapId,
-                   GLOReference<GameConnector> connectorRef) {
+    public Dungeon(String name, int spriteMapId, GameConnector connector) {
         this.name = name;
         this.spriteMapId = spriteMapId;
-        this.connectorRef = connectorRef;
+
+        DataManager dataManager = AppContext.getDataManager();
+        connectorRef = dataManager.createReference(connector);
 
         // create a channel for all clients in this dungeon, but lock it so
         // that we control who can enter and leave the channel
-        channel = task.openChannel(NAME_PREFIX + name);
-        task.lock(channel, true);
+        channel = AppContext.getChannelManager().
+            createChannel(NAME_PREFIX + name, null, Delivery.RELIABLE);
 
         // initialize the player list
-        playerMap = new HashMap<UserID,String>();
+        playerMap = new HashMap<ClientSession,String>();
 
         // get a reference to the membership change manager
-        gcmRef = task.findGLO(GameChangeManager.IDENTIFIER);
-    }
-
-    /**
-     * Private helper that provides a reference to ourselves. Since we can't
-     * get this in the constructor (we're not registered as a GLO at that
-     * point), we provide a lazy-assignment accessor here. All code in this
-     * class should use this method rather than accessing the reference
-     * directly.
-     */
-    private GLOReference<Dungeon> getSelfRef() {
-        if (selfRef == null)
-            selfRef = SimTask.getCurrent().findGLO(NAME_PREFIX + getName());
-
-        return selfRef;
+        gcmRef = dataManager.
+            createReference(dataManager.
+                            getBinding(GameChangeManager.IDENTIFIER,
+                                       GameChangeManager.class));
     }
 
     /**
@@ -175,41 +83,45 @@ public class Dungeon implements Game
      * @param player the <code>Player</code> that is joining
      */
     public void join(Player player) {
-        SimTask task = SimTask.getCurrent();
+        DataManager dataManager = AppContext.getDataManager();
+        dataManager.markForUpdate(this);
 
         // update all existing members about the new uid's name
-        UserID uid = player.getCurrentUid();
+        ClientSession session = player.getCurrentSession();
         String playerName = player.getName();
-        UserID [] users = playerMap.keySet().
-            toArray(new UserID[playerMap.size()]);
-        Messages.sendUidMap(task, uid, playerName, channel, users);
+        ClientSession [] users = playerMap.keySet().
+            toArray(new ClientSession[playerMap.size()]);
+        Messages.sendUidMap(session, playerName, channel, users);
 
         // add the player to the dungeon channel and the local map
-        task.join(uid, channel);
-        playerMap.put(uid, playerName);
+        channel.join(session, null);
+        playerMap.put(session, playerName);
 
         // update the player about all uid to name mappings on the channel
-        Messages.sendUidMap(task, playerMap, channel, uid);
+        Messages.sendUidMap(playerMap, channel, session);
 
         // notify the manager that our membership count changed
-        sendCountChanged(task);
+        sendCountChanged();
 
         // notify the client of the sprites we're using
-        GLOReference<SpriteMap> spriteMapRef =
-            task.findGLO(SpriteMap.NAME_PREFIX + spriteMapId);
-        Messages.sendSpriteMap(task, spriteMapRef.peek(task), channel, uid);
+        SpriteMap spriteMap =
+            dataManager.getBinding(SpriteMap.NAME_PREFIX + spriteMapId,
+                                   SpriteMap.class);
+        Messages.sendSpriteMap(spriteMap, channel, session);
+
+        Messages.sendPlayerJoined(player.getCurrentSession(), channel);
 
         // finally, throw the player into the game through the starting
         // connection point ... the only problem is that the channel info
         // won't be there when we try to send a board (because we still have
         // the lock on the Player, so its userJoinedChannel method can't
         // have been called yet), so set the channel directly
-        player.userJoinedChannel(channel, uid);
+        player.userJoinedChannel(channel);
         PlayerCharacter pc =
             (PlayerCharacter)(player.getCharacterManager().
-                              peek(task).getCurrentCharacter());
-        player.sendCharacter(task, pc);
-        connectorRef.get(task).
+                              getCurrentCharacter());
+        player.sendCharacter(pc);
+        connectorRef.get(GameConnector.class).
             enteredConnection(player.getCharacterManager());
     }
 
@@ -219,12 +131,14 @@ public class Dungeon implements Game
      * @param player the <code>Player</code> that is leaving
      */
     public void leave(Player player) {
-        SimTask task = SimTask.getCurrent();
+        AppContext.getDataManager().markForUpdate(this);
+
+        Messages.sendPlayerLeft(player.getCurrentSession(), channel);
 
         // remove the player from the dungeon channel and the player map
-        UserID uid = player.getCurrentUid();
-        task.leave(uid, channel);
-        playerMap.remove(uid);
+        ClientSession session = player.getCurrentSession();
+        channel.leave(player.getCurrentSession());
+        playerMap.remove(session);
 
         // just to be paranoid, we should make sure that they're out of
         // their current level...for instance, if we got called because the
@@ -232,17 +146,17 @@ public class Dungeon implements Game
         player.leaveCurrentLevel();
 
         // notify the manager that our membership count changed
-        sendCountChanged(task);
+        sendCountChanged();
     }
 
     /**
      * Private helper that notifies the membership manager of an updated
      * membership count for this game.
      */
-    private void sendCountChanged(SimTask task) {
+    private void sendCountChanged() {
         GameMembershipDetail detail =
                 new GameMembershipDetail(getName(), numPlayers());
-        gcmRef.get(task).notifyMembershipChanged(detail);
+        gcmRef.get(GameChangeManager.class).notifyMembershipChanged(detail);
 
         // FIXME: we used to do the following, but the classloader bug got
         // tripped...now that classloading is fixed, should we go back
@@ -268,7 +182,7 @@ public class Dungeon implements Game
      * @return a <code>DungeonMessageHandler</code>
      */
     public MessageHandler createMessageHandler() {
-        return new DungeonMessageHandler(getSelfRef());
+        return new DungeonMessageHandler(this);
     }
 
     /**
