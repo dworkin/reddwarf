@@ -6,6 +6,7 @@ package com.sun.sgs.impl.service.data;
 
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.impl.service.data.store.DataStore;
+import com.sun.sgs.impl.util.MaybeRetryableTransactionNotActiveException;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.service.TransactionProxy;
@@ -100,7 +101,10 @@ final class Context {
 	}
 
 	public void join(TransactionParticipant participant) {
-	    if (inactive) {
+	    if (originalTxn.isAborted()) {
+		throw new MaybeRetryableTransactionNotActiveException(
+		    "Transaction is not active", originalTxn.getAbortCause());
+	    } else if (inactive) {
 		throw new IllegalStateException(
 		    "Attempt to join a transaction that is not active");
 	    } else if (participant == null) {
@@ -113,12 +117,16 @@ final class Context {
 	    }
 	}
 
-	public void abort() {
-	    originalTxn.abort();
-	}
-
 	public void abort(Throwable cause) {
 	    originalTxn.abort(cause);
+	}
+
+	public boolean isAborted() {
+	    return originalTxn.isAborted();
+	}
+
+	public Throwable getAbortCause() {
+	    return originalTxn.getAbortCause();
 	}
 
 	/* -- Object methods -- */
@@ -172,7 +180,7 @@ final class Context {
     }
 
     /** Obtains the reference associated with the specified ID. */
-    private ManagedReferenceImpl getReference(long oid) {
+    ManagedReferenceImpl getReference(long oid) {
 	return ManagedReferenceImpl.getReference(this, oid);
     }
 

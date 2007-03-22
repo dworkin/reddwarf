@@ -22,7 +22,7 @@ public interface ProfileConsumer {
      *
      * @param name the name of the operation
      *
-     * @return an instance of <cpde>ProfileOperation</code>
+     * @return an instance of <code>ProfileOperation</code>
      */
     public ProfileOperation registerOperation(String name);
 

@@ -23,7 +23,7 @@
 	    value="-Xlint"/>
 
   <!-- Version information -->
-  <property name="project.release" value="0.9"/>
+  <property name="project.release" value="0.9.1"/>
 
   <!-- Values for the JavaDocs -->
   <property name="project.name" value="Sun Game Server"/>
@@ -41,9 +41,6 @@
             location="${build.dir}/sgs-server-apidoc.zip"/>
   <property name="apidoc.client.zip"
             location="${build.dir}/sgs-client-apidoc.zip"/>
-
-  <!-- Values for programming style checks -->
-  <import file="${checkstyle.dir}/checkstyle_task.xml" optional="true"/>
 
   <!-- Values for testing -->
   <property name="test.logging" location="test/test.logging"/>
@@ -312,8 +309,10 @@
       <tarfileset dir="${build.dir}" includes="sgs/sgs.sh" mode="755"/>
     </tar> -->
     <zip destfile="${build.dir}/sgs-${project.version}.zip">
-      <zipfileset dir="${build.dir}" includes="sgs/**" excludes="sgs/sgs.sh"/>
-      <zipfileset dir="${build.dir}" includes="sgs/sgs.sh" filemode="755"/>
+      <zipfileset dir="${build.dir}/sgs" includes="**" excludes="sgs.sh"
+		  prefix="sgs-${project.version}"/>
+      <zipfileset dir="${build.dir}/sgs" includes="sgs.sh" filemode="755"
+		  prefix="sgs-${project.version}"/>
     </zip>
   </target>
 
@@ -331,8 +330,12 @@
 	       includes="sgs.*,
 			 sgs-*.properties,
 			 LICENSE.pdf,
-			 THIRDPARTYLICENSE.pdf,
-			 README"/>
+			 THIRDPARTYLICENSE.pdf"/>
+    </copy>
+    <copy file="etc/README" todir="${build.dir}/sgs">
+      <filterset>
+	<filter token="VERSION" value="${project.version}"/>
+      </filterset>
     </copy>
     <chmod file="${build.dir}/sgs/sgs.sh" perm="a+x"/>
     <copy todir="${build.dir}/sgs/lib">
@@ -347,24 +350,39 @@
     <fail unless="bdb.builds.dir"
 	  message="The bdb.builds.dir property must be set"/>
     <copy todir="${build.dir}/sgs/lib/bdb"
-	  file="${bdb.builds.dir}/ppc/lib/db.jar"/>
+	  file="${bdb.builds.dir}/macosx-ppc/lib/db.jar"/>
     <copy todir="${build.dir}/sgs/lib/bdb/macosx-ppc">
-      <fileset dir="${bdb.builds.dir}/ppc/lib"
+      <fileset dir="${bdb.builds.dir}/macosx-ppc/lib"
+	       includes="libdb-?.?.dylib,
+			 libdb_java-?.?.jnilib"/>
+    </copy>
+    <copy todir="${build.dir}/sgs/lib/bdb/macosx-x86">
+      <fileset dir="${bdb.builds.dir}/macosx-x86/lib"
 	       includes="libdb-?.?.dylib,
 			 libdb_java-?.?.jnilib"/>
     </copy>
     <copy todir="${build.dir}/sgs/lib/bdb/solaris-x86">
-      <fileset dir="${bdb.builds.dir}/i86pc/lib"
+      <fileset dir="${bdb.builds.dir}/solaris-x86/lib"
 	       includes="libdb-?.?.so,
 			 libdb_java-?.?.so"/>
     </copy>
     <copy todir="${build.dir}/sgs/lib/bdb/solaris-sparc">
-      <fileset dir="${bdb.builds.dir}/sun4/lib"
+      <fileset dir="${bdb.builds.dir}/solaris-sparc/lib"
+	       includes="libdb-?.?.so,
+			 libdb_java-?.?.so"/>
+    </copy>
+    <copy todir="${build.dir}/sgs/lib/bdb/linux-x86">
+      <fileset dir="${bdb.builds.dir}/linux-x86/lib"
+	       includes="libdb-?.?.so,
+			 libdb_java-?.?.so"/>
+    </copy>
+    <copy todir="${build.dir}/sgs/lib/bdb/linux-x86_64">
+      <fileset dir="${bdb.builds.dir}/linux-x86_64/lib"
 	       includes="libdb-?.?.so,
 			 libdb_java-?.?.so"/>
     </copy>
     <copy todir="${build.dir}/sgs/lib/bdb/win32-x86/">
-      <fileset dir="${bdb.builds.dir}/win32/Release"
+      <fileset dir="${bdb.builds.dir}/win32-x86/Release"
 	       includes="libdb_java??.dll"/>
     </copy>
   </target>
@@ -440,7 +458,7 @@
   <target name="checkstyle-client"
 	  depends="build-client,-checkstyle.init"
 	  description="Checks client Java coding style">
-    <checkstyle config="${neuromancer_checks.xml}"
+    <checkstyle config="etc/checkstyle/darkstar_checks.xml"
 	        classpathref="client.classpath">
       <fileset dir="src/client/j2se"/>
     </checkstyle>
@@ -450,7 +468,7 @@
   <target name="checkstyle-server"
 	  depends="build-server,-checkstyle.init"
 	  description="Checks server Java coding style">
-    <checkstyle config="${neuromancer_checks.xml}"
+    <checkstyle config="etc/checkstyle/darkstar_checks.xml"
 		classpathref="server.classpath">
       <fileset dir="src/server/j2se"/>
     </checkstyle>
@@ -460,18 +478,28 @@
   <target name="checkstyle-shared"
 	  depends="-build-shared,-checkstyle.init"
 	  description="Checks shared Java coding style">
-    <checkstyle config="${neuromancer_checks.xml}"
+    <checkstyle config="etc/checkstyle/darkstar_checks.xml"
 		classpathref="shared.classpath">
       <fileset dir="src/shared/j2se"/>
     </checkstyle>
   </target>
 
-  <!-- Verify checkstyle.dir is set, calculate checkstyle.includes, and
-       build the checkjars target in checkstyle.dir. -->
+  <!-- Verify checkstyle.jar is set, build local checkstyle classes,
+       and define the checkstyle task. -->
   <target name="-checkstyle.init">
-      <fail unless="checkstyle.dir"
-	    message="The checkstyle.dir property must be set to a directory containing the checkstyle subproject"/>
-      <ant dir="${checkstyle.dir}" target="checkjars" inheritAll="false"/>
+      <fail unless="checkstyle.jar"
+	    message="The checkstyle.jar property must be set to the location of the checkstyle-all JAR file"/>
+      <mkdir dir="${build.dir}/classes/checkstyle"/>
+      <depend srcdir="etc/checkstyle" destdir="${build.dir}/classes/checkstyle"
+	      cache="${build.dir}/depend" closure="true"/>
+      <javac srcdir="etc/checkstyle" destdir="${build.dir}/classes/checkstyle"
+	     classpath="${checkstyle.jar}" includeAntRuntime="no"
+	     debug="${build.debug}" debuglevel="${build.debug.level}"
+	     source="${javac.source}">
+	<compilerarg line="${javac.compilerargs}"/>
+      </javac>
+      <taskdef resource="checkstyletask.properties"
+	       classpath="${build.dir}/classes/checkstyle:${checkstyle.jar}"/>
   </target>
 
   <!-- Checks for bugs using FindBugs (http://findbugs.sourceforge.net) -->

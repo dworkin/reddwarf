@@ -19,11 +19,8 @@ import com.sun.sgs.kernel.TaskScheduler;
 import java.io.IOException;
 
 import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Map.Entry;
 import java.util.Properties;
-import java.util.TreeMap;
 
 
 /**
@@ -125,7 +122,7 @@ public class AppGraphProfileOpListener implements ProfileOperationListener {
         Node currentNode = userMap.get(owner);
 
         // calculate the task's fingerprint
-        String fingerprint = profileReport.getTask().getClass().getName();
+        String fingerprint = profileReport.getTask().getBaseTaskType();
         for (ProfileOperation op : profileReport.getReportedOperations())
             fingerprint += "." + op.getId();
 
@@ -177,7 +174,7 @@ public class AppGraphProfileOpListener implements ProfileOperationListener {
     /**
      * Private class that represents a single node in an application graph.
      */
-    private class Node {
+    private static class Node {
         // the application who's graph this node is part of
         private final AppInfo owningApp;
         // the observed transitions from this node
@@ -220,6 +217,9 @@ public class AppGraphProfileOpListener implements ProfileOperationListener {
      * reports on the collected data.
      */
     private class AppGraphRunnable implements KernelRunnable {
+        public String getBaseTaskType() {
+            return AppGraphRunnable.class.getName();
+        }
         public void run() throws Exception {
             double allRight = 0;
             double allTransitions = 0;

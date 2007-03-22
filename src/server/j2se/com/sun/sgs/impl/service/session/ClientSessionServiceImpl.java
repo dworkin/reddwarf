@@ -16,6 +16,7 @@ import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.session.ClientSessionImpl.
     ClientSessionListenerWrapper;
+import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.NonDurableTaskScheduler;
 import com.sun.sgs.io.Acceptor;
@@ -725,7 +726,7 @@ public class ClientSessionServiceImpl
 	    final String listenerKey = key;		
 		
 	    scheduleTaskOnCommit(
-		new KernelRunnable() {
+		new AbstractKernelRunnable() {
 		    public void run() throws Exception {
 			ManagedObject obj = 
 			    dataService.getServiceBinding(

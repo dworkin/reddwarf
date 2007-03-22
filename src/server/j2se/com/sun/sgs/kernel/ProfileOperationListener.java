@@ -4,8 +4,6 @@
 
 package com.sun.sgs.kernel;
 
-import java.util.List;
-
 
 /**
  * This interface is used to listen for profiling data as reported by the

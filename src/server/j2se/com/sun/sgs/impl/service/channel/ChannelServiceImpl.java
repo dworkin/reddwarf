@@ -16,6 +16,7 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.HexDumper;
 import com.sun.sgs.impl.util.LoggerWrapper;
@@ -23,7 +24,6 @@ import com.sun.sgs.impl.util.MessageBuffer;
 import com.sun.sgs.impl.util.NonDurableTaskQueue;
 import com.sun.sgs.impl.util.NonDurableTaskScheduler;
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.ClientSessionService;
@@ -509,7 +509,7 @@ public class ChannelServiceImpl
 	/** {@inheritDoc} */
 	public void disconnected(final SgsClientSession session) {
 	    nonDurableTaskScheduler.scheduleTask(
-		new KernelRunnable() {
+		new AbstractKernelRunnable() {
 		    public void run() {
 			Context context = checkContext();
 			Set<Channel> channels = context.removeSession(session);
@@ -803,7 +803,7 @@ public class ChannelServiceImpl
     /**
      * Task (transactional) for notifying channel listeners.
      */
-    private final class NotifyTask implements KernelRunnable {
+    private final class NotifyTask extends AbstractKernelRunnable {
 
 	private final String name;
 	private final ClientSessionId senderId;
@@ -847,7 +847,7 @@ public class ChannelServiceImpl
      * Task (transactional) for computing the membership info needed
      * to forward a message to a channel.
      */
-    private final class ForwardingTask implements KernelRunnable {
+    private final class ForwardingTask extends AbstractKernelRunnable {
 
         private final String name;
         private final ClientSessionId senderId;

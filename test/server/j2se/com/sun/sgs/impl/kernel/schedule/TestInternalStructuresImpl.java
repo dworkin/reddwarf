@@ -9,6 +9,7 @@ import com.sun.sgs.kernel.Priority;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskReservation;
 
+import com.sun.sgs.test.util.DummyKernelRunnable;
 import com.sun.sgs.test.util.DummyTaskOwner;
 import com.sun.sgs.test.util.NameRunner;
 
@@ -36,9 +37,7 @@ public class TestInternalStructuresImpl {
 
     // a basic KernelRunnable that does nothing
     private static final KernelRunnable testRunnable =
-        new KernelRunnable() {
-            public void run() throws Exception {}
-        };
+        new DummyKernelRunnable();
 
     // a basic task that shouldn't be run but can be used for tests
     private static final ScheduledTask testTask =

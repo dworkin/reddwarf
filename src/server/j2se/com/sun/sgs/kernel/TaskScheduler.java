@@ -4,6 +4,8 @@
 
 package com.sun.sgs.kernel;
 
+import com.sun.sgs.app.TaskRejectedException;
+
 import java.util.Collection;
 
 
@@ -40,9 +42,6 @@ import java.util.Collection;
  * Tasks run on the <code>TaskScheduler</code> are expected to be short-lived
  * (on the order of 10s of milliseconds). To run a long-lived task, see
  * <code>ResourceCoordinator</code>.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 public interface TaskScheduler
 {

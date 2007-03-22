@@ -15,6 +15,7 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.auth.NamePasswordCredentials;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl.Context;
+import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.HexDumper;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.MessageBuffer;
@@ -423,7 +424,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    // 'notifyLoggedIn' callback.  Also, this notification may
 	    // also happen even though 'notifyLoggedIn' was not invoked.
 	    // Are these behaviors okay?  -- ann (3/19/07)
-	    sessionService.scheduleTask(new KernelRunnable() {
+	    sessionService.scheduleTask(new AbstractKernelRunnable() {
 		    public void run() {
 			thisIdentity.notifyLoggedOut();
 		    }}, thisIdentity);
@@ -452,7 +453,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	}
 
 	if (listener != null) {
-	    scheduleTask(new KernelRunnable() {
+	    scheduleTask(new AbstractKernelRunnable() {
 		public void run() throws IOException {
 		    listener.get().disconnected(graceful);
 		    listener.remove();
@@ -552,7 +553,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		}
 
 		if (!disconnectHandled) {
-		    scheduleNonTransactionalTask(new KernelRunnable() {
+		    scheduleNonTransactionalTask(new AbstractKernelRunnable() {
 			public void run() {
 			    handleDisconnect(false);
 			}});
@@ -694,7 +695,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		    }
 		    scheduleTask(new LoginTask());
 		} catch (LoginException e) {
-		    scheduleNonTransactionalTask(new KernelRunnable() {
+		    scheduleNonTransactionalTask(new AbstractKernelRunnable() {
 			public void run() {
 			    sendProtocolMessage(getLoginNackMessage(),
 						Delivery.RELIABLE);
@@ -716,7 +717,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
                 msg.getLong(); // TODO Check sequence num
 		int size = msg.getUnsignedShort();
 		final byte[] clientMessage = msg.getBytes(size);
-		taskQueue.addTask(new KernelRunnable() {
+		taskQueue.addTask(new AbstractKernelRunnable() {
 		    public void run() {
 			if (isConnected()) {
 			    listener.get().receivedMessage(clientMessage);
@@ -725,7 +726,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		break;
 
 	    case SimpleSgsProtocol.LOGOUT_REQUEST:
-	        scheduleNonTransactionalTask(new KernelRunnable() {
+	        scheduleNonTransactionalTask(new AbstractKernelRunnable() {
 	            public void run() {
 	                handleDisconnect(isConnected());
 	            }});
@@ -739,7 +740,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 			opcode);
 		}
 
-		scheduleNonTransactionalTask(new KernelRunnable() {
+		scheduleNonTransactionalTask(new AbstractKernelRunnable() {
 		    public void run() {
 			handleDisconnect(false);
 		    }});
@@ -849,7 +850,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
      * This is a transactional task to notify the application's
      * {@code AppListener} that this session has logged in.
      */
-    private class LoginTask implements KernelRunnable {
+    private class LoginTask extends AbstractKernelRunnable {
 
 	/**
 	 * Invokes the {@code AppListener}'s {@code loggedIn}
@@ -909,7 +910,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		    ClientSessionImpl.this, ack.getBuffer(), Delivery.RELIABLE);
 
 		final Identity thisIdentity = getIdentity();
-		sessionService.scheduleTaskOnCommit(new KernelRunnable() {
+		sessionService.scheduleTaskOnCommit(new AbstractKernelRunnable() {
 		    public void run() {
 			logger.log(
 			    Level.FINE,

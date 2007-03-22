@@ -152,11 +152,11 @@ public final class TaskHandler {
 	// the task or the commit failed -- make sure that the transaction is
 	// aborted
 	try {
-	    handle.abort(throwable);
+	    transaction.abort(throwable);
 	} catch (TransactionNotActiveException tnae) {
-	    // this isn't a problem, since it just means that some
-	    // participant aborted the transaction before throwing the
-	    // original exception
+	    // this isn't a problem, since it just means that either some
+	    // participant aborted the transaction before throwing the original
+	    // exception, or preparation of a participant failed
 	    logger.log(Level.FINEST, "Transaction was already aborted");
 	}
 
@@ -164,6 +164,7 @@ public final class TaskHandler {
 	if (throwable instanceof Exception) {
 	    throw (Exception) throwable;
 	} else {
+            if (throwable instanceof Error)
 	    throw (Error) throwable;
 	}
     }

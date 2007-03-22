@@ -17,7 +17,6 @@ import com.sun.sgs.kernel.TaskScheduler;
 
 import java.io.IOException;
 
-import java.util.List;
 import java.util.Properties;
 
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -156,6 +155,9 @@ public class SnapshotProfileOpListener implements ProfileOperationListener {
         private final long reportPeriod;
         SnapshotRunnable(long reportPeriod) {
             this.reportPeriod = reportPeriod;
+        }
+        public String getBaseTaskType() {
+            return SnapshotRunnable.class.getName();
         }
         public void run() throws Exception {
             while (! flag.compareAndSet(false, true));

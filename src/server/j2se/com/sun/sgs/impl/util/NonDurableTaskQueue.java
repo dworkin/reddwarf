@@ -143,17 +143,11 @@ public class NonDurableTaskQueue implements NonDurableTransactionParticipant {
     public void abort(Transaction txn) {
 	try {
 	    checkTransaction(txn);
-
-	    // FIXME: This is a hack to find out why the transaction
-	    // aborted.  It should be replaced by a way to inspect a
-	    // transaction's state. - ann (3/1/07)
-	    try {
-		txn.join(this);
-		logger.log(Level.SEVERE, "joining aborted txn:{0} succeeded", txn);
-	    } catch (Exception e) {
-		if (! isRetryable(e)) {
-		    removeTask();
-		}
+	    if (! txn.isAborted()) {
+		logger.log(
+		    Level.SEVERE, "Transaction is not aborted: {0}", txn);
+	    } else if (! isRetryable(txn.getAbortCause())) {
+		removeTask();
 	    }
 	    currentContext.set(null);
 	    logger.log(Level.FINER, "abort txn:{0} returns", txn);
@@ -172,6 +166,17 @@ public class NonDurableTaskQueue implements NonDurableTransactionParticipant {
      * the queue.
      */
     private class ProcessQueueTask implements KernelRunnable {
+
+        /** {@inheritDoc} */
+        public String getBaseTaskType() {
+            KernelRunnable nextTask = null;
+            synchronized (lock) {
+                nextTask = tasks.peek();
+            }
+            return nextTask != null ?
+                nextTask.getBaseTaskType() :
+                ProcessQueueTask.class.getName();
+        }
 
 	/** {@inheritDoc} */
 	public void run() throws Exception {

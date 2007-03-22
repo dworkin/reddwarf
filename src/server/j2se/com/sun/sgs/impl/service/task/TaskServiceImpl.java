@@ -56,9 +56,6 @@ import java.util.logging.Logger;
  * single node. It handles persisting tasks and keeping track of which tasks
  * have not yet run to completion, so that in the event of a system failure
  * the tasks can be run on re-start.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 public class TaskServiceImpl
     implements ProfileProducer, TaskService, NonDurableTransactionParticipant
@@ -195,7 +192,7 @@ public class TaskServiceImpl
         while ((name != null) && (name.startsWith(DS_PENDING_SPACE))) {
             PendingTask task =
                 dataService.getServiceBinding(name, PendingTask.class);
-            TaskRunner runner = new TaskRunner(this, name);
+            TaskRunner runner = new TaskRunner(name, task.getBaseTaskType());
             TaskOwner owner =
                 new TaskOwnerImpl(task.identity, transactionProxy.
                                   getCurrentOwner().getContext());
@@ -243,6 +240,8 @@ public class TaskServiceImpl
     }
 
     /**
+     * {@inheritDoc}
+     * <p>
      * FIXME: This is just a stub implementation right now. It needs to be
      * implemented. It has been added here to support the new shutdown
      * method on <code>Service</code>.
@@ -341,9 +340,13 @@ public class TaskServiceImpl
 
         // finally, cancel the cancelled periodic tasks and remove them
         // from the local map
-        if (txnState.cancelledSet != null)
-            for (String objName : txnState.cancelledSet)
-                recurringMap.remove(objName).cancel();
+        if (txnState.cancelledSet != null) {
+            for (String objName : txnState.cancelledSet) {
+                RecurringTaskHandle handle = recurringMap.remove(objName);
+                if (handle != null)
+                    handle.cancel();
+            }
+        }
 
         if (logger.isLoggable(Level.FINER))
             logger.log(Level.FINER, "commit txn:{0} succeeded", txn);
@@ -533,7 +536,7 @@ public class TaskServiceImpl
         if (logger.isLoggable(Level.FINEST))
             logger.log(Level.FINEST, "created pending task {0}", objName);
 
-        return new TaskRunner(this, objName);
+        return new TaskRunner(objName, ptask.getBaseTaskType());
     }
 
     /**
@@ -636,12 +639,7 @@ public class TaskServiceImpl
             return;
         
         TransactionRunner transactionRunner =
-            new TransactionRunner(new KernelRunnable() {
-                public void run() throws Exception {
-                    fetchPendingTask(objName);
-                }
-            });
-
+            new TransactionRunner(new NonRetryCleanupRunnable(objName));
         try {
             taskScheduler.scheduleTask(transactionRunner,
                                        transactionProxy.getCurrentOwner());
@@ -651,6 +649,25 @@ public class TaskServiceImpl
                                 "task to remove non-retried task {0}: " +
                                 "giving up", objName);
             throw tre;
+        }
+    }
+
+    /**
+     * Private helper runnable that cleans up after a non-retried task. See
+     * block comment above in notifyNonRetry for more detail.
+     */
+    private class NonRetryCleanupRunnable implements KernelRunnable {
+        private final String objName;
+        NonRetryCleanupRunnable(String objName) {
+            this.objName = objName;
+        }
+        /** {@inheritDoc} */
+        public String getBaseTaskType() {
+            return NonRetryCleanupRunnable.class.getName();
+        }
+        /** {@inheritDoc} */
+        public void run() throws Exception {
+            fetchPendingTask(objName);
         }
     }
 
@@ -696,12 +713,11 @@ public class TaskServiceImpl
      * Inner class that is used to track state associated with a single
      * transaction. This is indexed in the local transaction map.
      */
-    private class TxnState {
-        public boolean prepared = false;
-        public HashSet<TaskReservation> reservationSet = null;
-        @SuppressWarnings("hiding")
-        public HashMap<String,RecurringTaskHandle> recurringMap = null;
-        public HashSet<String> cancelledSet = null;
+    private static class TxnState {
+        boolean prepared = false;
+        HashSet<TaskReservation> reservationSet = null;
+        HashMap<String,RecurringTaskHandle> recurringMap = null;
+        HashSet<String> cancelledSet = null;
     }
 
     /**
@@ -711,8 +727,9 @@ public class TaskServiceImpl
         private static final long serialVersionUID = 1;
         private Task task = null;
         private ManagedReference taskRef = null;
-        public long startTime;
-        public long period;
+        private final String taskType;
+        long startTime;
+        long period;
         private Identity identity;
         /**
          * Creates an instance of <code>PendingTask</code>, handling the
@@ -731,15 +748,25 @@ public class TaskServiceImpl
             else
                 this.task = task;
 
+            this.taskType = task.getClass().getName();
             this.startTime = startTime;
             this.period = period;
             this.identity = TaskServiceImpl.transactionProxy.
                 getCurrentOwner().getIdentity();
         }
-        // checks that the underlying task is available, which is only at
-        // question if the task was managed by the application and therefore
-        // could have been removed by the application
-        public boolean isTaskAvailable() {
+        /**
+         * Provides the name of the type of the task that is contained in
+         * this pending task.
+         */
+        String getBaseTaskType() {
+            return taskType;
+        }
+        /**
+         * Checks that the underlying task is available, which is only at
+         * question if the task was managed by the application and therefore
+         * could have been removed by the application
+         */
+        boolean isTaskAvailable() {
             if (task != null)
                 return true;
             try {
@@ -750,6 +777,7 @@ public class TaskServiceImpl
                 return false;
             }
         }
+        /** {@inheritDoc} */
         void run() throws Exception {
             Task runTask = null;
             try {
@@ -771,22 +799,29 @@ public class TaskServiceImpl
      * run the <code>Task</code>s scheduled by the application.
      */
     private class TaskRunner implements KernelRunnable {
-        private final TaskServiceImpl taskService;
         private final String objName;
-        public TaskRunner(TaskServiceImpl taskService, String objName) {
-            this.taskService = taskService;
+        private final String objTaskType;
+        TaskRunner(String objName, String objTaskType) {
             this.objName = objName;
+            this.objTaskType = objTaskType;
         }
         String getObjName() {
             return objName;
         }
+        /** {@inheritDoc} */
+        public String getBaseTaskType() {
+            return objTaskType;
+        }
+        /** {@inheritDoc} */
         public void run() throws Exception {
             try {
                 // run the task in a transactional context
                 (new TransactionRunner(new KernelRunnable() {
+                        public String getBaseTaskType() {
+                            return objTaskType;
+                        }
                         public void run() throws Exception {
-                            PendingTask ptask =
-                                taskService.fetchPendingTask(objName);
+                            PendingTask ptask = fetchPendingTask(objName);
                             if (logger.isLoggable(Level.FINEST))
                                 logger.log(Level.FINEST, "running task {0} " +
                                            "scheduled to run at {1}",
@@ -801,7 +836,7 @@ public class TaskServiceImpl
                 // notify the service
                 if ((! (e instanceof ExceptionRetryStatus)) ||
                     (! ((ExceptionRetryStatus)e).shouldRetry()))
-                    taskService.notifyNonRetry(objName);
+                    notifyNonRetry(objName);
                 throw e;
             }
         }
@@ -823,6 +858,7 @@ public class TaskServiceImpl
         PeriodicTaskHandleImpl(String objName) {
             this.objName = objName;
         }
+        /** {@inheritDoc} */
         public void cancel() {
             if (cancelled)
                 throw new ObjectNotFoundException("Task has already been " +
