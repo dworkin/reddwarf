@@ -72,7 +72,7 @@ public final class BoundNamesUtil {
     /* -- other classes -- */
 
     /**
-     * An {@code Iterable} that is a conatiner for a {@code
+     * An {@code Iterable} that is a container for a {@code
      * BoundNamesIterator}.
      */
     private static class BoundNamesIterable implements Iterable<String> {
