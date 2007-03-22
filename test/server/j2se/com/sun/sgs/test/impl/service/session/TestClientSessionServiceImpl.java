@@ -117,7 +117,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     private ClientSessionServiceImpl sessionService;
     private TaskServiceImpl taskService;
     private DummyTaskScheduler taskScheduler;
-    private DummyIdentityManager identityManager;
+    private static DummyIdentityManager identityManager;
 
     /** The listen port for the client session service. */
     private int port;
@@ -296,9 +296,28 @@ public class TestClientSessionServiceImpl extends TestCase {
     public void testLoginSuccess() throws Exception {
 	registerAppListener();
 	DummyClient client = new DummyClient();
+	String name = "success";
 	try {
 	    client.connect(port);
-	    client.login("success", "password");
+	    client.login(name, "password");
+	} finally {
+            client.disconnect(false);
+	}
+    }
+    
+    public void testLoginSuccessAndNotifyLoggedInCallback() throws Exception {
+	registerAppListener();
+	DummyClient client = new DummyClient();
+	String name = "success";
+	try {
+	    client.connect(port);
+	    client.login(name, "password");
+	    if (identityManager.getNotifyLoggedIn(name)) {
+		System.err.println(
+		    "notifyLoggedIn invoked for identity: " + name);
+	    } else {
+		fail("notifyLoggedIn not invoked for identity: " + name);
+	    }
 	} finally {
             client.disconnect(false);
 	}
@@ -316,6 +335,10 @@ public class TestClientSessionServiceImpl extends TestCase {
 	} catch (RuntimeException e) {
 	    if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
 		System.err.println("login refused");
+		if (identityManager.getNotifyLoggedIn(NON_SERIALIZABLE)) {
+		    fail("unexpected notifyLoggedIn invoked on identity: " +
+			 NON_SERIALIZABLE);
+		}
 		return;
 	    } else {
 		fail("unexpected login failure: " + e);
@@ -337,6 +360,10 @@ public class TestClientSessionServiceImpl extends TestCase {
 	} catch (RuntimeException e) {
 	    if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
 		System.err.println("login refused");
+		if (identityManager.getNotifyLoggedIn(NON_SERIALIZABLE)) {
+		    fail("unexpected notifyLoggedIn invoked on identity: " +
+			 NON_SERIALIZABLE);
+		}
 		return;
 	    } else {
 		fail("unexpected login failure: " + e);
@@ -358,6 +385,10 @@ public class TestClientSessionServiceImpl extends TestCase {
 	} catch (RuntimeException e) {
 	    if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
 		System.err.println("login refused");
+		if (identityManager.getNotifyLoggedIn(NON_SERIALIZABLE)) {
+		    fail("unexpected notifyLoggedIn invoked on identity: " +
+			 NON_SERIALIZABLE);
+		}
 		return;
 	    } else {
 		fail("unexpected login failure: " + e);
@@ -402,6 +433,32 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client.disconnect(false);
 	}
     }
+
+    public void testLogoutAndNotifyLoggedOutCallback() throws Exception {
+	registerAppListener();
+	DummyClient client = new DummyClient();
+	String name = "logout";
+	try {
+	    client.connect(port);
+	    client.login(name, "password");
+	    client.logout();
+	    if (identityManager.getNotifyLoggedIn(name)) {
+		System.err.println(
+		    "notifyLoggedIn invoked for identity: " + name);
+	    } else {
+		fail("notifyLoggedIn not invoked for identity: " + name);
+	    }
+	    if (identityManager.getNotifyLoggedOut(name)) {
+		System.err.println(
+		    "notifyLoggedOut invoked for identity: " + name);
+	    } else {
+		fail("notifyLoggedOut not invoked for identity: " + name);
+	    }
+	} finally {
+            client.disconnect(false);
+	}
+    }
+
 
     public void testNotifyClientSessionListenerAfterCrash() throws Exception {
 	registerAppListener();
@@ -707,6 +764,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	return new DataServiceImpl(dbProps, registry);
     }
 
+    /**
+     * Registers an AppListener within a transaction.
+     */
     private void registerAppListener() throws Exception {
 	
 	createTransaction();
@@ -726,8 +786,68 @@ public class TestClientSessionServiceImpl extends TestCase {
      * Dummy identity manager for testing purposes.
      */
     private static class DummyIdentityManager implements IdentityManager {
+	private final Map<String, IdentityInfo> identities =
+	    Collections.synchronizedMap(new HashMap<String, IdentityInfo>());
+	
 	public Identity authenticateIdentity(IdentityCredentials credentials) {
-	    return new DummyIdentity(credentials);
+	    DummyIdentity identity = new DummyIdentity(credentials);
+	    identities.put(identity.getName(), new IdentityInfo());
+	    return identity;
+	}
+	
+	private void notifyLoggedIn(String name) {
+	    IdentityInfo info = identities.get(name);
+	    synchronized (info.loggedInLock) {
+		info.loggedIn = true;
+		info.loggedInLock.notifyAll();
+	    }
+	}
+
+	private void notifyLoggedOut(String name) {
+	    IdentityInfo info = identities.get(name);
+	    synchronized (info.loggedOutLock) {
+		info.loggedOut = true;
+		info.loggedOutLock.notifyAll();
+	    }
+	}
+
+	private boolean getNotifyLoggedIn(String name) {
+	    IdentityInfo info = identities.get(name);
+	    if (info == null) {
+		return false;
+	    }
+	    synchronized (info.loggedInLock) {
+		if (info.loggedIn != true) {
+		    try {
+			info.loggedInLock.wait(WAIT_TIME);
+		    } catch (InterruptedException e) {
+		    }
+		}
+		return info.loggedIn;
+	    }
+	}
+	
+	private boolean getNotifyLoggedOut(String name) {
+	    IdentityInfo info = identities.get(name);
+	    if (info == null) {
+		return false;
+	    }
+	    synchronized (info.loggedOutLock) {
+		if (info.loggedOut != true) {
+		    try {
+			info.loggedOutLock.wait(WAIT_TIME);
+		    } catch (InterruptedException e) {
+		    }
+		}
+		return info.loggedOut;
+	    }
+	}
+	
+	private static class IdentityInfo {
+	    private final Object loggedInLock = new Object();
+	    private final Object loggedOutLock = new Object();
+	    private boolean loggedIn = false;
+	    private boolean loggedOut = false;
 	}
     }
     
@@ -751,9 +871,15 @@ public class TestClientSessionServiceImpl extends TestCase {
             return name;
         }
 
-        public void notifyLoggedIn() {}
+        public void notifyLoggedIn() {
+	    //System.err.println("notifyLoggedIn: " + name);
+	    identityManager.notifyLoggedIn(name);
+	}
 
-        public void notifyLoggedOut() {}
+        public void notifyLoggedOut() {
+	    //System.err.println("notifyLoggedOut: " + name);
+	    identityManager.notifyLoggedOut(name);
+	}
         
         @Override
         public boolean equals(Object o) {
@@ -761,7 +887,7 @@ public class TestClientSessionServiceImpl extends TestCase {
                 return true;
             if (! (o instanceof DummyIdentity))
                 return false;
-            return ((DummyIdentity)o).name.equals(name);
+            return ((DummyIdentity) o).name.equals(name);
         }
         
         @Override
