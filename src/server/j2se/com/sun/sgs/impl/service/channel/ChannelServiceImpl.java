@@ -39,6 +39,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -178,8 +179,7 @@ public class ChannelServiceImpl
 	     * Remove all sessions from all channels since all
 	     * previously stored sessions have been disconnected.
 	     */
-	    Context context = checkContext();
-	    context.removeAllSessionsFromChannels();
+	    removeAllSessionsFromChannels();
 	    removeChannelSets();
 	    
 	    sessionService.registerProtocolMessageListener(
@@ -701,25 +701,6 @@ public class ChannelServiceImpl
 	}
 
 	/**
-	 * Removes all sessions from all channels.  This method is
-	 * invoked when this service is configured (if a previous
-	 * channel table exists) to remove all sessions (which are now
-	 * disconnected) from all channels in the channel table.
-	 */
-	private void removeAllSessionsFromChannels() {
-	    Set<String> keys =
-		BoundNamesUtil.getServiceBoundNames(
- 		    dataService, CHANNEL_PREFIX);
-
-	    for (String key : keys) {
-		ChannelState channelState =
-		    dataService.getServiceBinding(key, ChannelState.class);
-		dataService.markForUpdate(channelState);
-		channelState.removeAllSessions();
-	    }
-	}
-	
-	/**
 	 * Returns a service of the given {@code type}.
 	 */
 	<T extends Service> T getService(Class<T> type) {
@@ -785,54 +766,40 @@ public class ChannelServiceImpl
     
     /**
      * Removes all channel sets from the data store.  This method is
-     * invoked when this service is configured to schedule a task to
-     * remove any existing channel sets since their corresponding
-     * sessions are disconnected.
+     * invoked when this service is configured to remove any existing
+     * channel sets since their corresponding sessions are
+     * disconnected.
      */
     private void removeChannelSets() {
-	Set<String> keys =
-	    BoundNamesUtil.getServiceBoundNames(dataService, SESSION_PREFIX);
+	Iterator<String> iter =
+	    BoundNamesUtil.getServiceBoundNamesIterator(
+		dataService, SESSION_PREFIX);
 
-	for (String key : keys) {
-	    logger.log(Level.FINEST, "removeChannelSets key: {0}", key);
-
-	    nonDurableTaskScheduler.scheduleTaskOnCommit(
-		new RemoveChannelSetsTask(key));
+	while (iter.hasNext()) {
+	    String key = iter.next();
+	    ChannelSet set =
+		dataService.getServiceBinding(key, ChannelSet.class);
+	    dataService.removeObject(set);
+	    iter.remove();
 	}
     }
 
     /**
-     * Task (transactional) for removing all channel sets from data store.
+     * Removes all sessions from all channels.  This method is invoked
+     * when this service is configured to remove all sessions (which
+     * are now disconnected) from all channels in the channel table.
      */
-    private class RemoveChannelSetsTask implements KernelRunnable {
-
-	private final String key;
-
-	RemoveChannelSetsTask(String key) {
-	    this.key = key;
-	}
-
-	/** {@inheritDoc} */
-	public void run() throws Exception {
-	    try {
-		logger.log(
-		    Level.FINEST, "RemoveChannelSetsTask.run key: {0}", key);
-		ChannelSet set =
-		    dataService.getServiceBinding(key, ChannelSet.class);
-		dataService.removeServiceBinding(key);
-		dataService.removeObject(set);
-		logger.log(
-		    Level.FINEST,
-		    "RemoveChannelSetsTask.run key: {0} returns", key);
-	    } catch (Exception e) {
-		logger.logThrow(
-		    Level.FINEST, e,
-		    "RemoveChannelSetsTask.run key: {0} throws", key);
-		throw e;
-	    }
+    private void removeAllSessionsFromChannels() {
+	for (String key : BoundNamesUtil.getServiceBoundNamesIterable(
+ 				dataService, CHANNEL_PREFIX))
+	{
+	    ChannelState state =
+		dataService.getServiceBinding(key, ChannelState.class);
+	    dataService.markForUpdate(state);
+	    state.removeAllSessions();
 	}
     }
-
+	
     /**
      * Task (transactional) for notifying channel listeners.
      */
