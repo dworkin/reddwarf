@@ -11,7 +11,7 @@ import java.util.Set;
  * A utility class for obtaining an iterator for a set of bound names
  * (matching a prefix) in a data service.
  */
-final public class BoundNamesUtil {
+public final class BoundNamesUtil {
 
     /** Prevents instantiation. */
     private BoundNamesUtil() {}
@@ -20,7 +20,7 @@ final public class BoundNamesUtil {
      * Returns an {@code Iterable} that can be used to obtain an
      * {@code Iterator} for the set of service bound names matching
      * the specified {@code prefix} in the specified {@code
-     * dataService}.
+     * dataService}.  The returned {@code Iterable} is not serializable.
      *
      * <p>The {@code iterator} method of the returned {@code Iterable}
      * returns the result of invoking {@link
@@ -43,7 +43,7 @@ final public class BoundNamesUtil {
     /**
      * Returns an {@code Iterator} for the set of service bound names
      * matching the specified {@code prefix} in the specified {@code
-     * dataService}.
+     * dataService}.  The returned {@code Iterator} is not serializable.
      *
      * <p>The {@code remove} method of the returned iterator removes
      * the binding of the last name returned by {@code next} by
@@ -102,7 +102,8 @@ final public class BoundNamesUtil {
 	private String key;
 	/** The key returned by {@code next}, or null. */
 	private String keyReturnedByNext;
-	
+	/** The name fetched in the {@code hasNext} method, which
+	 * is only valid if {@code hasNext} returns {@code true}. */
 	private String nextName;
 	
 	BoundNamesIterator(DataService dataService, String prefix) {
