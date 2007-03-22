@@ -376,6 +376,11 @@
 	       includes="libdb-?.?.so,
 			 libdb_java-?.?.so"/>
     </copy>
+    <copy todir="${build.dir}/sgs/lib/bdb/linux-x86_64">
+      <fileset dir="${bdb.builds.dir}/linux-x86_64/lib"
+	       includes="libdb-?.?.so,
+			 libdb_java-?.?.so"/>
+    </copy>
     <copy todir="${build.dir}/sgs/lib/bdb/win32-x86/">
       <fileset dir="${bdb.builds.dir}/win32-x86/Release"
 	       includes="libdb_java??.dll"/>
