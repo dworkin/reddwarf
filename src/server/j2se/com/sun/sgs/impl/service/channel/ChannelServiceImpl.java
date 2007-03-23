@@ -11,19 +11,19 @@ import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionId;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
-import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameExistsException;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.impl.util.AbstractKernelRunnable;
+import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.HexDumper;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.MessageBuffer;
 import com.sun.sgs.impl.util.NonDurableTaskQueue;
 import com.sun.sgs.impl.util.NonDurableTaskScheduler;
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.ClientSessionService;
@@ -39,6 +39,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -57,8 +58,11 @@ public class ChannelServiceImpl
     /** The name of this class. */
     private static final String CLASSNAME = ChannelServiceImpl.class.getName();
 
-    /** The prefix of each per-session key for its channel membership list. */
+    /** The prefix of a session key which maps to its channel membership. */
     private static final String SESSION_PREFIX = CLASSNAME + ".session.";
+    
+    /** The prefix of a channel key which maps to its channel state. */
+    private static final String CHANNEL_PREFIX = CLASSNAME + ".channel.";
     
     /** The logger for this class. */
     private static final LoggerWrapper logger =
@@ -172,22 +176,12 @@ public class ChannelServiceImpl
 	    }
 
 	    /*
-	     * Create and store new channel table if one does not
-	     * already exist in the data store.  If one already
-	     * exists, then remove all sessions from all channels
-	     * since all previously stored sessions have been
-	     * disconnected.
+	     * Remove all sessions from all channels since all
+	     * previously stored sessions have been disconnected.
 	     */
-	    try {
-		dataService.getServiceBinding(
-		    ChannelTable.NAME, ChannelTable.class);
-		Context context = checkContext();
-		context.removeAllSessionsFromChannels();
-		removeChannelSets();
-	    } catch (NameNotBoundException e) {
-		dataService.setServiceBinding(
-		    ChannelTable.NAME, new ChannelTable());
-	    }
+	    removeAllSessionsFromChannels();
+	    removeChannelSets();
+	    
 	    sessionService.registerProtocolMessageListener(
 		SimpleSgsProtocol.CHANNEL_SERVICE, protocolMessageListener);
 	    
@@ -380,7 +374,6 @@ public class ChannelServiceImpl
 	    txn.join(this);
 	    context = new Context(txn);
 	    currentContext.set(context);
-	    context.initialize();
 	} else if (!txn.equals(context.txn)) {
 	    currentContext.set(null);
 	    throw new IllegalStateException(
@@ -516,10 +509,7 @@ public class ChannelServiceImpl
 	/** {@inheritDoc} */
 	public void disconnected(final SgsClientSession session) {
 	    nonDurableTaskScheduler.scheduleTask(
-		new KernelRunnable() {
-		    public String getBaseTaskType() {
-		        return getClass().getName();
-		    }
+		new AbstractKernelRunnable() {
 		    public void run() {
 			Context context = checkContext();
 			Set<Channel> channels = context.removeSession(session);
@@ -566,12 +556,6 @@ public class ChannelServiceImpl
 	/** The transaction. */
 	final Transaction txn;
 
-	/** The channel service. */
-	final ChannelServiceImpl channelService;
-
-	/** Table of all channels, obtained from the data service. */
-	private ChannelTable table = null;
-
 	/**
 	 * Map of channel name to transient channel impl (for those
 	 * channels used during this context's associated
@@ -581,66 +565,58 @@ public class ChannelServiceImpl
 	    new HashMap<String,Channel>();
 
 	/**
-	 * Constructs a context with the specified transaction.  The
-	 * {@code initialize} method must be invoked on this context
-	 * before invoking any other methods.
+	 * Constructs a context with the specified transaction. 
 	 */
 	private Context(Transaction txn) {
 	    assert txn != null;
 	    this.txn = txn;
-	    this.channelService = ChannelServiceImpl.this;
-	}
-
-	/**
-	 * Initializes this context's channel table to the table
-	 * retrieved from the data store.
-	 */
-	private void initialize() {
-	    this.table = dataService.getServiceBinding(
-		ChannelTable.NAME, ChannelTable.class);
 	}
 
 	/* -- ChannelManager methods -- */
 
 	/**
-	 * Creates a channel with the specified name, listener, and
-	 * delivery requirement.
+	 * Creates a channel with the specified {@code name}, {@code
+	 * listener}, and {@code delivery} requirement.  The channel's
+	 * state is bound to a name composed of the channel service's
+	 * class name followed by ".channel." followed by the channel
+	 * name.
 	 */
 	private Channel createChannel(String name,
 				      ChannelListener listener,
 				      Delivery delivery)
 	{
 	    assert name != null;
-	    checkInitialized();
-	    if (table.get(name) != null) {
+	    String key = getChannelKey(name);
+	    try {
+		dataService.getServiceBinding(key, ChannelState.class);
 		throw new NameExistsException(name);
+	    } catch (NameNotBoundException e) {
 	    }
-
-	    ChannelState channelState =
-		new ChannelState(name, listener, delivery);
-	    ManagedReference ref =
-		dataService.createReference(channelState);
-	    dataService.markForUpdate(table);
-	    table.put(name, ref);
-	    Channel channel = new ChannelImpl(this, channelState);
+	    
+	    ChannelState state = new ChannelState(name, listener, delivery);
+	    dataService.setServiceBinding(key, state);
+	    Channel channel = new ChannelImpl(this, state);
 	    internalTable.put(name, channel);
 	    return channel;
 	}
 
 	/**
-	 * Returns a channel with the specified name.
+	 * Returns a channel with the specified {@code  name}.
 	 */
 	private Channel getChannel(String name) {
 	    assert name != null;
-	    checkInitialized();
 	    Channel channel = internalTable.get(name);
 	    if (channel == null) {
-		ManagedReference ref = table.get(name);
-		if (ref == null) {
+		ChannelState state;
+		try {
+		    state =
+		    	dataService.getServiceBinding(
+			    getChannelKey(name), ChannelState.class);
+		} catch (NameNotBoundException e) {
 		    throw new NameNotBoundException(name);
 		}
-		ChannelState channelState = ref.get(ChannelState.class);
-		channel = new ChannelImpl(this, channelState);
+		
+		channel = new ChannelImpl(this, state);
 		internalTable.put(name, channel);
 	    }
 	    return channel;
@@ -648,23 +624,23 @@ public class ChannelServiceImpl
 
 	/* -- other methods -- */
 
-	private void checkInitialized() {
-	    if (table == null) {
-		throw new IllegalStateException("context not initialized");
-	    }
-	}
-	
 	/**
-	 * Removes the channel with the specified name.  This method is
-	 * called when the 'close' method is invoked on a 'ChannelImpl'.
+	 * Removes the channel with the specified {@code name}.  This
+	 * method is called when the {@code close} method is invoked on a
+	 * {@code ChannelImpl}.
 	 */
 	void removeChannel(String name) {
 	    assert name != null;
-	    checkInitialized();
-	    if (table.get(name) != null) {
-		dataService.markForUpdate(table);
-		table.remove(name);
+	    try {
+		String key = getChannelKey(name);
+		ChannelState state =
+		    dataService.getServiceBinding(key, ChannelState.class);
+		dataService.removeServiceBinding(key);
+		dataService.removeObject(state);
 		internalTable.remove(name);
+		
+	    } catch (NameNotBoundException e) {
+		// already removed
 	    }
 	}
 
@@ -676,7 +652,6 @@ public class ChannelServiceImpl
 	 * the hex representation of the session's identifier.
 	 */
 	void joinChannel(ClientSession session, Channel channel) {
-	    checkInitialized();
 	    String key = getSessionKey(session);
 	    try {
 		ChannelSet set =
@@ -695,7 +670,6 @@ public class ChannelServiceImpl
 	 * given client {@code session}.
 	 */
 	void leaveChannel(ClientSession session, Channel channel) {
-	    checkInitialized();
 	    String key = getSessionKey(session);
 	    try {
 		ChannelSet set =
@@ -713,7 +687,6 @@ public class ChannelServiceImpl
 	 * channels that the session is still a member of.
 	 */
 	private Set<Channel> removeSession(ClientSession session) {
-	    checkInitialized();
 	    String key = getSessionKey(session);
 	    try {
 		ChannelSet set =
@@ -728,25 +701,9 @@ public class ChannelServiceImpl
 	}
 
 	/**
-	 * Removes all sessions from all channels.  This method is
-	 * invoked when this service is configured (if a previous
-	 * channel table exists) to remove all sessions (which are now
-	 * disconnected) from all channels in the channel table.
-	 */
-	private void removeAllSessionsFromChannels() {
-	    checkInitialized();
-	    for (ManagedReference ref : table.getAll()) {
-		ChannelState channelState = ref.get(ChannelState.class);
-		dataService.markForUpdate(channelState);
-		channelState.removeAllSessions();
-	    }
-	}
-	
-	/**
 	 * Returns a service of the given {@code type}.
 	 */
 	<T extends Service> T getService(Class<T> type) {
-	    checkInitialized();
 	    return txnProxy.getService(type);
 	}
 
@@ -755,7 +712,6 @@ public class ChannelServiceImpl
 	 * from this service.
 	 */
 	long nextSequenceNumber() {
-	    checkInitialized();
 	    return sequenceNumber.getAndIncrement();
 	}
     }
@@ -769,12 +725,10 @@ public class ChannelServiceImpl
     }
 
     /**
-     * Returns true if the specified {@code key} has the prefix of a
-     * session key.
+     * Returns a channel key for the given channel {@code name}.
      */
-    private static boolean isSessionKey(String key) {
-	return key.regionMatches(
-	    0, SESSION_PREFIX, 0, SESSION_PREFIX.length());
+    private static String getChannelKey(String name) {
+	return CHANNEL_PREFIX + name;
     }
 
     /**
@@ -812,67 +766,44 @@ public class ChannelServiceImpl
     
     /**
      * Removes all channel sets from the data store.  This method is
-     * invoked when this service is configured to schedule a task to
-     * remove any existing channel sets since their corresponding
-     * sessions are disconnected.
+     * invoked when this service is configured to remove any existing
+     * channel sets since their corresponding sessions are
+     * disconnected.
      */
     private void removeChannelSets() {
-	String key = SESSION_PREFIX;
-	
-	for (;;) {
-	    key = dataService.nextServiceBoundName(key);
-	    
-	    if (key == null || ! isSessionKey(key)) {
-		break;
-	    }
-	    
-	    logger.log(Level.FINEST, "removeChannelSets key: {0}", key);
+	Iterator<String> iter =
+	    BoundNamesUtil.getServiceBoundNamesIterator(
+		dataService, SESSION_PREFIX);
 
-	    nonDurableTaskScheduler.scheduleTaskOnCommit(
-		new RemoveChannelSetsTask(key));
+	while (iter.hasNext()) {
+	    String key = iter.next();
+	    ChannelSet set =
+		dataService.getServiceBinding(key, ChannelSet.class);
+	    dataService.removeObject(set);
+	    iter.remove();
 	}
     }
 
     /**
-     * Task (transactional) for removing all channel sets from data store.
+     * Removes all sessions from all channels.  This method is invoked
+     * when this service is configured to remove all sessions (which
+     * are now disconnected) from all channels in the channel table.
      */
-    private class RemoveChannelSetsTask implements KernelRunnable {
-	private final String key;
-
-	RemoveChannelSetsTask(String key) {
-	    this.key = key;
-	}
-
-        /** {@inheritDoc} */
-        public String getBaseTaskType() {
-            return RemoveChannelSetsTask.class.getName();
-        }
-
-	/** {@inheritDoc} */
-	public void run() throws Exception {
-	    try {
-		logger.log(
-		    Level.FINEST, "RemoveChannelSetsTask.run key: {0}", key);
-		ChannelSet set =
-		    dataService.getServiceBinding(key, ChannelSet.class);
-		dataService.removeServiceBinding(key);
-		dataService.removeObject(set);
-		logger.log(
-		    Level.FINEST,
-		    "RemoveChannelSetsTask.run key: {0} returns", key);
-	    } catch (Exception e) {
-		logger.logThrow(
-		    Level.FINEST, e,
-		    "RemoveChannelSetsTask.run key: {0} throws", key);
-		throw e;
-	    }
+    private void removeAllSessionsFromChannels() {
+	for (String key : BoundNamesUtil.getServiceBoundNamesIterable(
+ 				dataService, CHANNEL_PREFIX))
+	{
+	    ChannelState state =
+		dataService.getServiceBinding(key, ChannelState.class);
+	    dataService.markForUpdate(state);
+	    state.removeAllSessions();
 	}
     }
-
+	
     /**
      * Task (transactional) for notifying channel listeners.
      */
-    private final class NotifyTask implements KernelRunnable {
+    private final class NotifyTask extends AbstractKernelRunnable {
 
 	private final String name;
 	private final ClientSessionId senderId;
@@ -886,11 +817,6 @@ public class ChannelServiceImpl
 	    this.senderId = senderId;
 	    this.message = message;
 	}
-
-        /** {@inheritDoc} */
-        public String getBaseTaskType() {
-            return NotifyTask.class.getName();
-        }
 
         /** {@inheritDoc} */
 	public void run() {
@@ -921,7 +847,7 @@ public class ChannelServiceImpl
      * Task (transactional) for computing the membership info needed
      * to forward a message to a channel.
      */
-    private final class ForwardingTask implements KernelRunnable {
+    private final class ForwardingTask extends AbstractKernelRunnable {
 
         private final String name;
         private final ClientSessionId senderId;
@@ -940,11 +866,6 @@ public class ChannelServiceImpl
             this.recipientIds = recipientIds;
             this.message = message;
             this.seq = seq;
-        }
-
-        /** {@inheritDoc} */
-        public String getBaseTaskType() {
-            return ForwardingTask.class.getName();
         }
 
         /** {@inheritDoc} */

@@ -46,6 +46,7 @@ fi
 # Solaris	Intel x86	solaris-x86	:
 # Solaris	Sparc		solaris-sparc	:
 # Linux		Intel x86	linux-x86	:
+# Linux		Intel x86_64	linux-x86_64	:
 # Windows	Intel x86	win32-x86	;
 #
 platform=unknown
@@ -81,6 +82,8 @@ case $os in
 	case $mach in
 	    i686)
 		platform=linux-x86;;
+	    x86_64)
+		platform=linux-x86_64;;
 	    *)
 		echo Unknown hardware: $mach;
 		exit 1;
