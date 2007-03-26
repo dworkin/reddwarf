@@ -472,7 +472,7 @@ final class ChannelImpl implements Channel, Serializable {
                     "sendProtcolMessageOnCommit session:{0} message:{1} throws",
                     session, message);
             }
-            // eat exception
+	    throw e;
         }
     }
 
@@ -483,25 +483,14 @@ final class ChannelImpl implements Channel, Serializable {
      */
     private void sendToClients(Set<ClientSession> sessions, byte[] message) {
 
-	Set<byte[]> clients = new HashSet<byte[]>();
-	for (ClientSession session : sessions) {
-	    clients.add(session.getSessionId().getBytes());
-	}
 	byte[] protocolMessage =
 	    ChannelServiceImpl.getChannelMessage(
 		state.name, EMPTY_ID, message, context.nextSequenceNumber());
 	    
-	for (byte[] sessionId : clients) {
-	    SgsClientSession session = 
-		ClientSessionServiceImpl.getInstance().
-		    getClientSession(sessionId);
+	for (ClientSession session : sessions) {
 	    // skip disconnected and non-member sessions
-	    if (session != null &&
-		state.hasSession(session) &&
-		session.isConnected())
-	    {
-		session.sendProtocolMessageOnCommit(
-		    protocolMessage, state.delivery);
+	    if (state.hasSession(session) && session.isConnected()) {
+		sendProtocolMessageOnCommit(session, protocolMessage);
 	    }
 	}
     }
