@@ -12,7 +12,10 @@ import java.net.Socket;
  * The server side of an experimental network protocol for implementing
  * DataStoreServer using sockets instead of RMI.
  */
-/* XXX: Use thread pools? */
+/*
+ * XXX: Use thread pools?
+ * XXX: Reap idle connections?
+ */
 class DataStoreServerRemote implements Runnable {
 
     /* XXX: 2 hours -- same as RMI default.  Make configurable? */
@@ -74,6 +77,10 @@ class DataStoreServerRemote implements Runnable {
 	    try {
 		try {
 		    socket.setTcpNoDelay(true);
+		} catch (Exception e) {
+		}
+		try {
+		    socket.setKeepAlive(true);
 		} catch (Exception e) {
 		}
 		if (connectionReadTimeout > 0) {

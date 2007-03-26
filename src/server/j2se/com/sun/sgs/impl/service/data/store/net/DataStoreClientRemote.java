@@ -15,6 +15,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  */
 /*
  * XXX: Limit connections and/or close unused connections?
+ * XXX: Reap the handler queue?
  * XXX: Close and not return sockets on IOException?
  * FIXME: Send or check version information on initial connection
  */
@@ -45,6 +46,10 @@ class DataStoreClientRemote implements DataStoreServer {
 	Socket socket = new Socket(host, port);
 	try {
 	    socket.setTcpNoDelay(true);
+	} catch (Exception e) {
+	}
+	try {
+	    socket.setKeepAlive(true);
 	} catch (Exception e) {
 	}
 	return new DataStoreProtocol(

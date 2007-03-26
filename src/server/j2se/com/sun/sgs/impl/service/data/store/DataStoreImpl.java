@@ -297,9 +297,8 @@ public class DataStoreImpl
 	 *
 	 * @param	txn the transaction
 	 * @param	info the associated information
-	 * @param	explicit whether the transaction was joined explicitly
 	 */
-	void set(Transaction txn, T info, boolean explicit);
+	void set(Transaction txn, T info);
     }
 
     /**
@@ -353,7 +352,7 @@ public class DataStoreImpl
 	    return entry.info;
 	}
 
-	public void set(Transaction txn, T info, boolean explicit) {
+	public void set(Transaction txn, T info) {
 	    threadInfo.set(new Entry<T>(txn, info));
 	}
     }
@@ -427,13 +426,19 @@ public class DataStoreImpl
 	    } else {
 		boolean matchesLast = name.equals(lastCursorKey);
 		if (!matchesLast) {
+		    /*
+		     * The name specified was not the last key returned, so
+		     * search for the specified name
+		     */
 		    StringBinding.stringToEntry(name, key);
 		    OperationStatus status =
 			cursor.getSearchKeyRange(key, value, null);
 		    lastCursorKey = getNextBoundNameResult(name, status, key);
+		    /* Record if we found an exact match */
 		    matchesLast = name.equals(lastCursorKey);
 		}
 		if (matchesLast) {
+		    /* The last key was an exact match, so find the next one */
 		    OperationStatus status = cursor.getNext(key, value, null);
 		    lastCursorKey = getNextBoundNameResult(name, status, key);
 		}
@@ -1090,13 +1095,18 @@ public class DataStoreImpl
 		    "Transaction has already been prepared");
 	    }
 	    if (txnInfo.modified) {
-		byte[] oid = txn.getId();
+		byte[] tid = txn.getId();
 		/*
 		 * Berkeley DB requires transaction IDs to be at least 128
 		 * bytes long.  -tjb@sun.com (11/07/2006)
 		 */
 		byte[] gid = new byte[128];
-		System.arraycopy(oid, 0, gid, 128 - oid.length, oid.length);
+		/*
+		 * The current transaction implementation uses 8 byte
+		 * transaction IDs.  -tjb@sun.com (03/22/2007)
+		 */
+		assert tid.length < 128 : "Transaction ID is too long";
+		System.arraycopy(tid, 0, gid, 128 - tid.length, tid.length);
 		txnInfo.prepare(gid);
 		txnInfo.prepared = true;
 	    } else {
@@ -1335,7 +1345,7 @@ public class DataStoreImpl
     protected void joinNewTransaction(Transaction txn) {
 	Exception exception;
 	try {
-	    joinTransaction(txn, true);
+	    joinTransaction(txn);
 	    return;
 	} catch (DatabaseException e) {
 	    exception = e;
@@ -1369,28 +1379,24 @@ public class DataStoreImpl
 	}
 	TxnInfo txnInfo = txnInfoTable.get(txn);
 	if (txnInfo == null) {
-	    return joinTransaction(txn, false);
+	    return joinTransaction(txn);
 	} else if (txnInfo.prepared) {
 	    throw new IllegalStateException(
 		"Transaction has been prepared");
 	} else {
 	    checkTxnTimeout(txn);
 	}
-        if (op != null)
+        if (op != null) {
             op.report();
+	}
 	return txnInfo;
     }
 
     /**
      * Joins the specified transaction, checking first to see if the data store
-     * is currently shutting down, and returning the new TxnInfo.  The explicit
-     * parameter specifies whether there was an explicit request to join the
-     * transaction, or it is being joined during the first operation called for
-     * that transaction.
+     * is currently shutting down, and returning the new TxnInfo.
      */
-    private TxnInfo joinTransaction(Transaction txn, boolean explicit)
-	throws DatabaseException
-    {
+    private TxnInfo joinTransaction(Transaction txn) throws DatabaseException {
 	synchronized (txnCountLock) {
 	    if (txnCount < 0) {
 		throw new IllegalStateException("Service is shut down");
@@ -1407,7 +1413,7 @@ public class DataStoreImpl
 	    }
 	}
 	TxnInfo txnInfo = new TxnInfo(txn, env);
-	txnInfoTable.set(txn, txnInfo, explicit);
+	txnInfoTable.set(txn, txnInfo);
 	return txnInfo;
     }
 

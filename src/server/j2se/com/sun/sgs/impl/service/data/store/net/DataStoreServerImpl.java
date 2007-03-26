@@ -20,6 +20,8 @@ import java.rmi.server.RMIServerSocketFactory;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Iterator;
+import java.util.NoSuchElementException;
 import java.util.Properties;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -163,6 +165,9 @@ public class DataStoreServerImpl implements DataStoreServer {
 	/** The creation time. */
 	private final long creationTime;
 
+	/** The information associated with this transaction, or null. */
+	private Object txnInfo;
+
 	/** The current state, one of IDLE, IN_USE, or REAPING. */
 	private final AtomicInteger state = new AtomicInteger(IDLE);
 
@@ -181,6 +186,19 @@ public class DataStoreServerImpl implements DataStoreServer {
 	/** Returns the associated ID as a long. */
 	long getTid() {
 	    return tid;
+	}
+
+	/**
+	 * Returns the information associated with this transaction, or
+	 * null.
+	 */
+	Object getTxnInfo() {
+	    return txnInfo;
+	}
+
+	/** Sets the information associated with this transaction. */
+	void setTxnInfo(Object txnInfo) {
+	    this.txnInfo = txnInfo;
 	}
 
 	/**
@@ -265,17 +283,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 	 * Maps transaction IDs to transactions and their associated
 	 * information.
 	 */
-	final SortedMap<Long, Entry<T>> table = new TreeMap<Long, Entry<T>>();
-
-	/** Stores a transaction and the associated information. */
-	static class Entry<T> {
-	    final Txn txn;
-	    final T info;
-	    Entry(Txn txn, T info) {
-		this.txn = txn;
-		this.info = info;
-	    }
-	}
+	final SortedMap<Long, Txn> table = new TreeMap<Long, Txn>();
 
 	/** Creates an instance. */
 	TxnTable() { }
@@ -285,17 +293,17 @@ public class DataStoreServerImpl implements DataStoreServer {
 	 * in use.
 	 */
 	Txn get(long tid) {
-	    Entry<T> entry;
+	    Txn txn;
 	    synchronized (table) {
-		entry = table.get(tid);
+		txn = table.get(tid);
 	    }
-	    if (entry != null) {
-		if (!entry.txn.setInUse(true)) {
+	    if (txn != null) {
+		if (!txn.setInUse(true)) {
 		    throw new IllegalStateException(
 			"Multiple simultaneous accesses to transaction: " +
-			entry.txn);
+			txn);
 		}
-		return entry.txn;
+		return txn;
 	    }
 	    throw new TransactionNotActiveException(
 		"Transaction is not active");
@@ -320,14 +328,37 @@ public class DataStoreServerImpl implements DataStoreServer {
 	Collection<Transaction> getExpired(long txnTimeout) {
 	    Collection<Transaction> result = new ArrayList<Transaction>();
 	    long last = System.currentTimeMillis() - txnTimeout;
-	    synchronized (table) {
-		for (Entry<?> entry : table.values()) {
-		    Txn txn = entry.txn;
+	    Long nextId;
+	    /* Get the first key */
+	    try {
+		synchronized (table) {
+		    nextId = table.firstKey();
+		}
+	    } catch (NoSuchElementException e) {
+		nextId = null;
+	    }
+	    /* Loop while there is another potentially expired entry */
+	    while (nextId != null) {
+		Txn txn;
+		synchronized (table) {
+		    txn = table.get(nextId);
+		}
+		if (txn != null) {
 		    if (txn.getCreationTime() >= last) {
 			break;
 		    }
 		    if (txn.setReaping()) {
 			result.add(txn);
+		    }
+		}
+		/* Search for the next entry */
+		Long startingId = Long.valueOf(nextId + 1);
+		nextId = null;
+		synchronized (table) {
+		    Iterator<Long> iter =
+			table.tailMap(startingId).keySet().iterator();
+		    if (iter.hasNext()) {
+			nextId = iter.next();
 		    }
 		}
 	    }
@@ -358,8 +389,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 
 	/**
 	 * An implementation of TxnInfoTable that uses TxnTable's map keyed on
-	 * transaction IDs, and that requires all transactions to be joined
-	 * explicitly.
+	 * transaction IDs.
 	 */
 	private class CustomTxnInfoTable<T> extends TxnTable<T>
 	    implements TxnInfoTable<T>
@@ -370,51 +400,46 @@ public class DataStoreServerImpl implements DataStoreServer {
 	    /* -- Implement TxnInfoTable -- */
 
 	    public T get(Transaction txn) {
-		if (txn instanceof Txn) {
-		    long tid = ((Txn) txn).getTid();
-		    Entry<T> entry;
-		    synchronized (table) {
-			entry = table.get(tid);
-		    }
-		    if (entry != null) {
-			return entry.info;
-		    }
+		assert txn instanceof Txn;
+		Txn t = (Txn) txn;
+		/* All transactions will have information of the right type */
+		@SuppressWarnings("unchecked")
+		    T info = (T) t.getTxnInfo();
+		if (info != null) {
+		    return info;
 		}
 		throw new TransactionNotActiveException(
 		    "Transaction is not active");
 	    }
 
 	    public T remove(Transaction txn) {
-		if (txn instanceof Txn) {
-		    long tid = ((Txn) txn).getTid();
-		    Entry<T> entry;
-		    synchronized (table) {
-			entry = table.remove(tid);
+		assert txn instanceof Txn;
+		Txn t = (Txn) txn;
+		@SuppressWarnings("unchecked")
+		    T info = (T) t.getTxnInfo();
+		t.setTxnInfo(null);
+		long tid = t.getTid();
+		Txn t2;
+		synchronized (table) {
+		    t2 = table.remove(tid);
+		}
+		if (t2 != null) {
+		    if (!t2.equals(t)) {
+			throw new IllegalStateException("Wrong transaction");
 		    }
-		    if (entry != null) {
-			if (!entry.txn.equals(txn)) {
-			    throw new IllegalStateException(
-				"Wrong transaction");
-			}
-			return entry.info;
-		    }
+		    return info;
 		}
 		throw new TransactionNotActiveException(
 		    "Transaction is not active");
 	    }
 
-	    public void set(Transaction txn, T info, boolean explicit) {
-		if (!explicit) {
-		    throw new IllegalStateException(
-			"Implicit join not permitted");
-		}
-		if (txn instanceof Txn) {
-		    Txn t = (Txn) txn;
-		    long tid = t.getTid();
-		    Entry<T> newInfo = new Entry<T>(t, info);
-		    synchronized (table) {
-			table.put(tid, newInfo);
-		    }
+	    public void set(Transaction txn, T info) {
+		assert txn instanceof Txn;
+		Txn t = (Txn) txn;
+		t.setTxnInfo(info);
+		long tid = t.getTid();
+		synchronized (table) {
+		    table.put(tid, t);
 		}
 	    }
 	}

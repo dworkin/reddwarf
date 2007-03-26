@@ -688,10 +688,12 @@ public final class DataStoreClient
 	TxnInfo txnInfo = threadTxnInfo.get();
 	if (txnInfo == null) {
 	    return joinTransaction(txn);
+	} else if (!txnInfo.txn.equals(txn)) {
+	    throw new IllegalStateException(
+		"Wrong transaction: Found " + txnInfo.txn +
+		", expected " + txn);
 	} else if (txnInfo.prepared) {
 	    throw new IllegalStateException("Transaction has been prepared");
-	} else if (!txnInfo.txn.equals(txn)) {
-	    throw new IllegalStateException("Wrong transaction");
 	}
 	return txnInfo;
     }
