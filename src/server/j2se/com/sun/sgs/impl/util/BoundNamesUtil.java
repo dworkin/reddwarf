@@ -1,5 +1,6 @@
 package com.sun.sgs.impl.util;
 
+import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.service.DataService;
 import java.util.HashSet;
@@ -20,7 +21,9 @@ public final class BoundNamesUtil {
      * Returns an {@code Iterable} that can be used to obtain an
      * {@code Iterator} for the set of service bound names matching
      * the specified {@code prefix} in the specified {@code
-     * dataService}.  The returned {@code Iterable} is not serializable.
+     * dataService}.  Only names starting with the specified prefix and
+     * containing additional characters after the prefix will be
+     * returned. The returned {@code Iterable} is not serializable.
      *
      * <p>The {@code iterator} method of the returned {@code Iterable}
      * returns the result of invoking {@link
@@ -31,19 +34,23 @@ public final class BoundNamesUtil {
      * @param	prefix the prefix of service bound names
      * @return 	an {@code Iterable} for the set of service bound names
      * 		matching the {@code prefix}
-     * @see #getServiceBoundNamesIterator
+     * @see	#getServiceBoundNamesIterator
      */
     public static Iterable<String> getServiceBoundNamesIterable(
 	DataService dataService, String prefix)
     {
-	return new BoundNamesIterable(
-	    new BoundNamesIterator(dataService, prefix));
+	if (dataService == null || prefix == null) {
+	    throw new NullPointerException("null argument");
+	}
+	return new BoundNamesIterable(dataService, prefix);
     }
 
     /**
      * Returns an {@code Iterator} for the set of service bound names
      * matching the specified {@code prefix} in the specified {@code
-     * dataService}.  The returned {@code Iterator} is not serializable.
+     * dataService}.   Only names starting with the specified prefix and
+     * containing additional characters after the prefix will be
+     * returned.  The returned {@code Iterator} is not serializable.
      *
      * <p>The {@code remove} method of the returned iterator removes
      * the binding of the last name returned by {@code next} by
@@ -66,6 +73,9 @@ public final class BoundNamesUtil {
     public static Iterator<String> getServiceBoundNamesIterator(
 	DataService dataService, String prefix)
     {
+	if (dataService == null || prefix == null) {
+	    throw new NullPointerException("null argument");
+	}
 	return new BoundNamesIterator(dataService, prefix);
     }
 
@@ -77,14 +87,20 @@ public final class BoundNamesUtil {
      */
     private static class BoundNamesIterable implements Iterable<String> {
 
-	private final Iterator<String> iter;
+	/** The data service. */
+	private final DataService dataService;
+	/** The prefix for service bound names. */
+	private final String prefix;
 
-	BoundNamesIterable(Iterator<String> iter) {
-	    this.iter = iter;
+	BoundNamesIterable(DataService dataService, String prefix) {
+	    this.dataService = dataService;
+	    this.prefix = prefix;
 	}
 
 	/** {@inheritDoc} */
-	public Iterator<String> iterator() { return iter; }
+	public Iterator<String> iterator() {
+	    return new BoundNamesIterator(dataService, prefix);
+	}
     }
 
     /**
@@ -107,9 +123,6 @@ public final class BoundNamesUtil {
 	private String nextName;
 	
 	BoundNamesIterator(DataService dataService, String prefix) {
-	    if (dataService == null || prefix == null) {
-		throw new NullPointerException("null argument");
-	    }
 	    this.dataService = dataService;
 	    this.prefix = prefix;
 	    this.key = prefix;
