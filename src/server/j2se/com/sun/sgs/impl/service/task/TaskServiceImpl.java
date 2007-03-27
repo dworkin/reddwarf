@@ -777,7 +777,11 @@ public class TaskServiceImpl
                 return false;
             }
         }
-        /** {@inheritDoc} */
+        /**
+         * Runs this {@code PendingTask}'s underlying task.
+         *
+         * @throws Exception if the underlying task throws an exception
+         */
         void run() throws Exception {
             Task runTask = null;
             try {

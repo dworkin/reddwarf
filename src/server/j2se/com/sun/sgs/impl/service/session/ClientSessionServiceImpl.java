@@ -85,7 +85,7 @@ public class ClientSessionServiceImpl
     /** The port number for accepting connections. */
     private final int port;
 
-    /** The listener for accpeted connections. */
+    /** The listener for accepted connections. */
     private final AcceptorListener acceptorListener = new Listener();
 
     /** The registered service listeners. */
