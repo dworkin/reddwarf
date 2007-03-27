@@ -8,6 +8,9 @@ import java.net.SocketAddress;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
+import org.apache.mina.common.ByteBuffer;
+import org.apache.mina.common.SimpleByteBufferAllocator;
+
 abstract class AbstractSocketEndpoint {
 
     /** The socket address this endpoint encapsulates. */
@@ -25,6 +28,15 @@ abstract class AbstractSocketEndpoint {
     /** The default {@code Executor} for IO threads. */
     private static final Executor defaultExecutor =
         Executors.newCachedThreadPool(new DaemonThreadFactory());
+
+    // Set default MINA ByteBuffer policies
+    static {
+        // Don't use timed-expiration buffer pools; just allocate new ones
+        ByteBuffer.setAllocator(new SimpleByteBufferAllocator());
+
+        // Use heap buffers instead of direct buffers
+        ByteBuffer.setUseDirectBuffers(false);
+    }
 
     /**
      * Constructs an {@code AbstractSocketEndpoint} with the given
