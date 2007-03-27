@@ -6,7 +6,6 @@ package com.sun.sgs.impl.service.channel;
 
 import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ClientSession;
-import com.sun.sgs.app.ClientSessionId;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.impl.util.WrappedSerializable;
@@ -36,10 +35,13 @@ final class ChannelState implements ManagedObject, Serializable {
     /** The delivery requirement for messages sent on this channel. */
     final Delivery delivery;
 
+    /** The set of client sessions joined to this channel. */
+    private final Set<ClientSession> sessions = new HashSet<ClientSession>();
+
     /**
      * A map whose keys are the client sessions joined to this channel
-     * and whose values are per-session ChannelListeners (null values
-     * allowed).
+     * which have a listener, and whose values are per-session
+     * ChannelListener for that session (null values *not* allowed).
      */
     private final
 	Map<ClientSession, WrappedSerializable<ChannelListener>> listeners =
@@ -63,11 +65,7 @@ final class ChannelState implements ManagedObject, Serializable {
      * the channel represented by this state.
      */
     Set<ClientSession> getSessions() {
-	Set<ClientSession> collection = new HashSet<ClientSession>();
-	for (ClientSession session : listeners.keySet()) {
-	    collection.add(session);
-	}
-	return collection;
+	return new HashSet<ClientSession>(sessions);
     }
 
     /**
@@ -76,7 +74,7 @@ final class ChannelState implements ManagedObject, Serializable {
      * listener for any member session.
      */
     boolean hasChannelListeners() {
-	return channelListener != null || !listeners.values().isEmpty();
+	return channelListener != null || !listeners.isEmpty();
     }
     
     /* -- Implement Object -- */
@@ -105,20 +103,19 @@ final class ChannelState implements ManagedObject, Serializable {
     /* -- other methods -- */
 
     boolean hasSession(ClientSession session) {
-	return listeners.containsKey(session);
+	return sessions.contains(session);
     }
 
     boolean hasSessions() {
-	return !listeners.isEmpty();
+	return !sessions.isEmpty();
     }
 
     void addSession(ClientSession session, ChannelListener listener) {
-	WrappedSerializable<ChannelListener> wrappedListener =
-	    listener != null ?
-	    new WrappedSerializable<ChannelListener>(listener) :
-	    null;
-	
-	listeners.put(session, wrappedListener);
+	sessions.add(session);
+	if (listener != null) {
+	    listeners.put(
+		session, new WrappedSerializable<ChannelListener>(listener));
+	}
     }
 
     void removeSession(ClientSession session) {
@@ -127,17 +124,17 @@ final class ChannelState implements ManagedObject, Serializable {
 	if (listener != null) {
 	    listener.remove();
 	}
+	sessions.remove(session);
     }
 
     void removeAllSessions() {
 	for (WrappedSerializable<ChannelListener> listener :
 	     listeners.values())
 	{
-	    if (listener != null) {
-		listener.remove();
-	    }
+	    listener.remove();
 	}
 	listeners.clear();
+	sessions.clear();
     }
 
     void removeAll() {
