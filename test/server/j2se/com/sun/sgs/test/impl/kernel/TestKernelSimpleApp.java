@@ -50,7 +50,7 @@ public class TestKernelSimpleApp extends TestCase {
 	out.close();
 	/* Run the Kernel */
 	ProcessBuilder pb = new ProcessBuilder(
-	    "java",
+            System.getProperty("java.home") + "/bin/java",
 	    "-cp", System.getProperty("java.class.path"),
 	    "-Djava.util.logging.config.file=" + logging,
 	    "-Djava.library.path=" + System.getProperty("java.library.path"),
