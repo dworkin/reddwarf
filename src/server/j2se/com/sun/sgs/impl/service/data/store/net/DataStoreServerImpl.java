@@ -20,6 +20,7 @@ import java.rmi.server.RMIServerSocketFactory;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Properties;
@@ -283,7 +284,8 @@ public class DataStoreServerImpl implements DataStoreServer {
 	 * Maps transaction IDs to transactions and their associated
 	 * information.
 	 */
-	final SortedMap<Long, Txn> table = new TreeMap<Long, Txn>();
+	final SortedMap<Long, Txn> table =
+	    Collections.synchronizedSortedMap(new TreeMap<Long, Txn>());
 
 	/** Creates an instance. */
 	TxnTable() { }
@@ -293,10 +295,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 	 * in use.
 	 */
 	Txn get(long tid) {
-	    Txn txn;
-	    synchronized (table) {
-		txn = table.get(tid);
-	    }
+	    Txn txn = table.get(tid);
 	    if (txn != null) {
 		if (!txn.setInUse(true)) {
 		    throw new IllegalStateException(
@@ -331,18 +330,13 @@ public class DataStoreServerImpl implements DataStoreServer {
 	    Long nextId;
 	    /* Get the first key */
 	    try {
-		synchronized (table) {
-		    nextId = table.firstKey();
-		}
+		nextId = table.firstKey();
 	    } catch (NoSuchElementException e) {
 		nextId = null;
 	    }
 	    /* Loop while there is another potentially expired entry */
 	    while (nextId != null) {
-		Txn txn;
-		synchronized (table) {
-		    txn = table.get(nextId);
-		}
+		Txn txn = table.get(nextId);
 		if (txn != null) {
 		    if (txn.getCreationTime() >= last) {
 			break;
@@ -419,10 +413,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 		    T info = (T) t.getTxnInfo();
 		t.setTxnInfo(null);
 		long tid = t.getTid();
-		Txn t2;
-		synchronized (table) {
-		    t2 = table.remove(tid);
-		}
+		Txn t2 = table.remove(tid);
 		if (t2 != null) {
 		    if (!t2.equals(t)) {
 			throw new IllegalStateException("Wrong transaction");
@@ -437,10 +428,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 		assert txn instanceof Txn;
 		Txn t = (Txn) txn;
 		t.setTxnInfo(info);
-		long tid = t.getTid();
-		synchronized (table) {
-		    table.put(tid, t);
-		}
+		table.put(t.getTid(), t);
 	    }
 	}
 
