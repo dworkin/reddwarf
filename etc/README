@@ -34,6 +34,29 @@ subdirectories:
 - tutorial
    Documentation and sample code for the two SGS tutorials
 	
+SUPPORTED PLATFORMS
+
+The SDK has been tested on the following operating systems and
+processors:
+
+- Solaris 10 on SPARC processors and AMD 64-bit processors
+- Windows XP SP2 on 32-bit processors
+- Redhat Linux EL4 on 32-bit processors
+- Mac OS X 10.4 on PowerPC and Intel processors
+
+The SDK requires Java(tm) 2 Platform Standard Edition 5.0 or greater.
+
+It has been tested with version 1.5.0_11 of the J2SE(tm) Runtime
+Environment 5.0 on Solaris, Windows, and Linux platforms, and version
+1.5.0_07 on Mac OS X platforms.
+
+The SDK requires Berkeley DB version 4.5.20.  The distribution includes
+builds of version 4.5.20 for all supported platforms.  Berkeley DB is
+highly portable; you can obtain and compile it for unsupported
+platforms.
+
+DEVELOPING AND RUNNING
+
 To develop or run clients, include the following JAR file in your
 classpath:
 
@@ -66,10 +89,18 @@ To run the SGS server:
 
    sgs tutorial.jar HelloWorld.properties
 
+KNOWN ISSUES
+
+This version of the SDK only supports single node operation.
+
+MORE INFORMATION
+
 For more information, please see the tutorials in the tutorial directory
 and the documentation in the docs directory.  Also check the
 http://www.projectdarkstar.com website, which has links to more
 information and to the Project Darkstar forums.
+
+See the CHANGELOG file for a list of changes.
 
 If you cannot find an answer to your question in any of these places,
 please email the Darkstar team at:

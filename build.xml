@@ -24,6 +24,8 @@
 
   <!-- Version information -->
   <property name="project.release" value="0.9.1"/>
+  <!-- Set to true when building an external release -->
+  <property name="external.release" value="false"/>
 
   <!-- Values for the JavaDocs -->
   <property name="project.name" value="Sun Game Server"/>
@@ -329,6 +331,7 @@
       <fileset dir="etc"
 	       includes="sgs.*,
 			 sgs-*.properties,
+			 CHANGELOG,
 			 LICENSE.pdf,
 			 THIRDPARTYLICENSE.pdf"/>
     </copy>
@@ -443,8 +446,11 @@
 	</outputfilterchain>
       </redirector>
     </exec>
+    <condition property="release.suffix" value=".internal" else="">
+      <isfalse value="${external.release}"/>
+    </condition>
     <property name="project.version"
-	      value="${project.release}-r${project.revision}"/>
+	      value="${project.release}${release.suffix}-r${project.revision}"/>
     <echo message="${project.version}"/>
   </target>
 
