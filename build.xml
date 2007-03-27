@@ -62,8 +62,8 @@
   <path id="shared.classpath">
     <pathelement location="${build.dir}/classes/shared"/>
     <pathelement location="${lib.dir}/mina-core-1.1.jar"/>
-    <pathelement location="${lib.dir}/slf4j-jdk14-1.2.jar"/>
-    <pathelement location="${lib.dir}/slf4j-api-1.2.jar"/>
+    <pathelement location="${lib.dir}/slf4j-jdk14-1.3.0.jar"/>
+    <pathelement location="${lib.dir}/slf4j-api-1.3.0.jar"/>
   </path>
 
   <!-- Server class path -->
@@ -401,8 +401,8 @@
       <manifest>
         <attribute name="Class-Path"
 		   value="mina-core-1.1.jar
-			  slf4j-jdk14-1.2.jar
-			  slf4j-api-1.2.jar"/>
+			  slf4j-jdk14-1.3.0.jar
+			  slf4j-api-1.3.0.jar"/>
       </manifest>
     </jar>
   </target>
@@ -421,8 +421,8 @@
         <attribute name="Class-Path"
                    value="bdb/db.jar
                           mina-core-1.1.jar
-                          slf4j-jdk14-1.2.jar
-			  slf4j-api-1.2.jar"/>
+                          slf4j-jdk14-1.3.0.jar
+			  slf4j-api-1.3.0.jar"/>
       </manifest>
     </jar>
   </target>
@@ -557,7 +557,7 @@
   </target>
 
   <!-- Compile and run tests -->
-  <target name="test" depends="test-server"
+  <target name="test" depends="test-shared, test-server"
 	  description="Compiles and runs tests"/>
 
   <!-- Compile and run shared tests -->
