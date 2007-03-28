@@ -305,15 +305,13 @@
     <copy todir="${build.dir}/sgs/doc/sgs-api">
       <fileset dir="${build.dir}/javadoc/apidoc/sgs-server-apidoc/"/>
     </copy>
-    <!-- <tar destfile="${build.dir}/sgs-${project.version}.tar.gz"
-        compression="gzip">
-      <tarfileset dir="${build.dir}" includes="sgs/**" excludes="sgs/sgs.sh"/>
-      <tarfileset dir="${build.dir}" includes="sgs/sgs.sh" mode="755"/>
-    </tar> -->
     <zip destfile="${build.dir}/sgs-${project.version}.zip">
-      <zipfileset dir="${build.dir}/sgs" includes="**" excludes="sgs.sh"
+      <zipfileset dir="${build.dir}/sgs" includes="**"
+		  excludes="sgs.sh, lib/bdb/win32-x86/*"
 		  prefix="sgs-${project.version}"/>
-      <zipfileset dir="${build.dir}/sgs" includes="sgs.sh" filemode="755"
+      <zipfileset dir="${build.dir}/sgs"
+		  includes="sgs.sh, lib/bdb/win32-x86/*"
+		  filemode="755"
 		  prefix="sgs-${project.version}"/>
     </zip>
   </target>
