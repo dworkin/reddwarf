@@ -171,7 +171,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
         return new ClientSessionId(sessionId);
     }
 
-    /** {@inheritdoc} */
+    /** {@inheritDoc} */
     public boolean isConnected() {
 
 	State currentState = getCurrentState();

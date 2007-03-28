@@ -119,8 +119,8 @@ class SocketConnector implements Connector<SocketAddress>
          * If a connection is in progress, but not yet connected,
          * cancel the pending connection.
          * 
-         * @throw IllegalStateException if this connection attempt has
-         *        already completed or been cancelled
+         * @throws IllegalStateException if this connection attempt has
+         *         already completed or been cancelled
          */
         void cancel() {
             synchronized (this) {
