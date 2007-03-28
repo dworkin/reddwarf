@@ -11,19 +11,19 @@ import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionId;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
-import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameExistsException;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.impl.util.AbstractKernelRunnable;
+import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.HexDumper;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.MessageBuffer;
 import com.sun.sgs.impl.util.NonDurableTaskQueue;
 import com.sun.sgs.impl.util.NonDurableTaskScheduler;
 import com.sun.sgs.kernel.ComponentRegistry;
-import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.ClientSessionService;
@@ -37,8 +37,11 @@ import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -54,11 +57,17 @@ import java.util.logging.Logger;
 public class ChannelServiceImpl
     implements ChannelManager, Service, NonDurableTransactionParticipant
 {
+    /** The state of a transaction in a context. */
+    private static enum State { ACTIVE, PREPARED, COMMITTED, ABORTED };
+	
     /** The name of this class. */
     private static final String CLASSNAME = ChannelServiceImpl.class.getName();
 
-    /** The prefix of each per-session key for its channel membership list. */
+    /** The prefix of a session key which maps to its channel membership. */
     private static final String SESSION_PREFIX = CLASSNAME + ".session.";
+    
+    /** The prefix of a channel key which maps to its channel state. */
+    private static final String CHANNEL_PREFIX = CLASSNAME + ".channel.";
     
     /** The logger for this class. */
     private static final LoggerWrapper logger =
@@ -68,6 +77,9 @@ public class ChannelServiceImpl
     private static final ThreadLocal<Context> currentContext =
 	new ThreadLocal<Context>();
     
+    /** List of contexts that have been prepared (non-readonly) or commited. */
+    private final List<Context> contextList = new LinkedList<Context>();
+
     /** The name of this application. */
     private final String appName;
 
@@ -101,6 +113,11 @@ public class ChannelServiceImpl
     /** The sequence number for channel messages originating from the server. */
     private AtomicLong sequenceNumber = new AtomicLong(0);
 
+    /** A map of channel name to cached channel state, valid as of the
+     * last transaction commit. */
+    private Map<String, CachedChannelState> channelStateCache =
+	Collections.synchronizedMap(new HashMap<String, CachedChannelState>());
+    
     /**
      * Constructs an instance of this class with the specified properties.
      *
@@ -172,22 +189,12 @@ public class ChannelServiceImpl
 	    }
 
 	    /*
-	     * Create and store new channel table if one does not
-	     * already exist in the data store.  If one already
-	     * exists, then remove all sessions from all channels
-	     * since all previously stored sessions have been
-	     * disconnected.
+	     * Remove all sessions from all channels since all
+	     * previously stored sessions have been disconnected.
 	     */
-	    try {
-		dataService.getServiceBinding(
-		    ChannelTable.NAME, ChannelTable.class);
-		Context context = checkContext();
-		context.removeAllSessionsFromChannels();
-		removeChannelSets();
-	    } catch (NameNotBoundException e) {
-		dataService.setServiceBinding(
-		    ChannelTable.NAME, new ChannelTable());
-	    }
+	    removeAllSessionsFromChannels();
+	    removeChannelSets();
+	    
 	    sessionService.registerProtocolMessageListener(
 		SimpleSgsProtocol.CHANNEL_SERVICE, protocolMessageListener);
 	    
@@ -270,7 +277,7 @@ public class ChannelServiceImpl
     public boolean prepare(Transaction txn) throws Exception {
 	try {
 	    checkTransaction(txn);
-            boolean readOnly = true;
+            boolean readOnly = currentContext.get().prepare();
 	    if (readOnly) {
 		currentContext.set(null);
 	    }
@@ -293,6 +300,7 @@ public class ChannelServiceImpl
     public void commit(Transaction txn) {
 	try {
 	    checkTransaction(txn);
+	    currentContext.get().commit();
 	    currentContext.set(null);
 	    if (logger.isLoggable(Level.FINER)) {
 		logger.log(Level.FINER, "commit txn:{0} returns", txn);
@@ -316,6 +324,7 @@ public class ChannelServiceImpl
     public void abort(Transaction txn) {
 	try {
 	    checkTransaction(txn);
+	    currentContext.get().abort();
 	    currentContext.set(null);
 	    if (logger.isLoggable(Level.FINER)) {
 		logger.log(Level.FINER, "abort txn:{0} returns", txn);
@@ -328,6 +337,29 @@ public class ChannelServiceImpl
 	}
     }
 
+    /**
+     * Iterates through the context list, in order, to flush any
+     * committed changes.  During iteration, this method invokes
+     * {@code flush} on the {@code Context} returned by {@code next}.
+     * Iteration ceases when either a context's {@code flush} method
+     * returns {@code false} (indicating that the transaction
+     * associated with the context has not yet committed) or when
+     * there are no more contexts in the context list.
+     */
+    private void flushContexts() {
+	synchronized (contextList) {
+	    Iterator<Context> iter = contextList.iterator();
+	    while (iter.hasNext()) {
+		Context context = iter.next();
+		if (context.flush()) {
+		    iter.remove();
+		} else {
+		    break;
+		}
+	    }
+	}
+    }
+    
     /* -- other methods -- */
 
     /**
@@ -380,7 +412,6 @@ public class ChannelServiceImpl
 	    txn.join(this);
 	    context = new Context(txn);
 	    currentContext.set(context);
-	    context.initialize();
 	} else if (!txn.equals(context.txn)) {
 	    currentContext.set(null);
 	    throw new IllegalStateException(
@@ -439,50 +470,13 @@ public class ChannelServiceImpl
 		/*
 		 * Handle op code.
 		 */
-		
 		byte opcode = buf.getByte();
 
 		switch (opcode) {
 		    
 		case SimpleSgsProtocol.CHANNEL_SEND_REQUEST:
-		    String name = buf.getString();
-                    long seq = buf.getLong(); // TODO Check sequence num
-		    short numRecipients = buf.getShort();
-		    if (numRecipients < 0) {
-			if (logger.isLoggable(Level.WARNING)) {
-			    logger.log(
-			    	Level.WARNING,
-				"receivedMessage: bad CHANNEL_SEND_REQUEST " +
-				"(negative number of recipients) " +
-				"numRecipents:{0} session:{1}",
-				numRecipients, session);
-			}
-			return;
-		    }
 
-		    Set<byte[]> sessions = new HashSet<byte[]>();
-		    if (numRecipients > 0) {
-			for (int i = 0; i < numRecipients; i++) {
-			    short idLength = buf.getShort();
-			    byte[] sessionId = buf.getBytes(idLength);
-			    sessions.add(sessionId);
-			}
-		    }
-		    
-		    ClientSessionId senderId = session.getSessionId();
-		    short msgSize = buf.getShort();
-		    byte[] channelMessage = buf.getBytes(msgSize);
-
-		    NonDurableTaskQueue queue = getTaskQueue(session);
-                    // Forward message to receiving clients
-		    queue.addTask(
-                        new ForwardingTask(
-                            name, senderId, sessions, channelMessage, seq));
-                    
-                    // Notify listeners in the app in a transaction
-		    queue.addTask(
-			new NotifyTask(
-			    name, senderId, channelMessage));
+		    handleChannelSendRequest(session, buf);
 		    break;
 		    
 		default:
@@ -516,10 +510,7 @@ public class ChannelServiceImpl
 	/** {@inheritDoc} */
 	public void disconnected(final SgsClientSession session) {
 	    nonDurableTaskScheduler.scheduleTask(
-		new KernelRunnable() {
-		    public String getBaseTaskType() {
-		        return getClass().getName();
-		    }
+		new AbstractKernelRunnable() {
 		    public void run() {
 			Context context = checkContext();
 			Set<Channel> channels = context.removeSession(session);
@@ -531,6 +522,84 @@ public class ChannelServiceImpl
 	}
     }
 
+    /**
+     * Handles a CHANNEL_SEND_REQUEST protocol message (in the given
+     * {@code buf} and sent by the given {@code sender}), forwarding
+     * the channel message (encapsulated in {@code buf}) to the
+     * appropriate recipients.  When this method is invoked, the
+     * specified message buffer's current position points to the
+     * channel name of the protocol message.  The operation code has
+     * already been processed by the caller.
+     */
+    private void handleChannelSendRequest(
+	SgsClientSession sender, MessageBuffer buf)
+    {
+	String name = buf.getString();
+	CachedChannelState cachedState = channelStateCache.get(name);
+	if (cachedState == null) {
+	    // TBD: is this the right logging level?
+	    logger.log(
+		Level.WARNING,
+		"non-existent channel:{0}, dropping message", name);
+	    return;
+	}
+	long seq = buf.getLong(); // TODO Check sequence num
+	short numRecipients = buf.getShort();
+	if (numRecipients < 0) {
+	    if (logger.isLoggable(Level.WARNING)) {
+		logger.log(
+		    Level.WARNING,
+		    "bad CHANNEL_SEND_REQUEST " +
+		    "(negative number of recipients) " +
+		    "numRecipents:{0} session:{1}",
+		    numRecipients, sender);
+	    }
+	    return;
+	}
+
+	Set<ClientSession> recipients = new HashSet<ClientSession>();
+	if (numRecipients == 0) {
+	    // Recipients are all member sessions
+	    recipients = cachedState.sessions;
+	} else {
+	    // Look up recipient sessions and check for channel membership
+	    for (int i = 0; i < numRecipients; i++) {
+		byte[] recipientId = buf.getByteArray();
+		SgsClientSession recipient =
+		    sessionService.getClientSession(recipientId);
+		if (recipient != null && cachedState.hasSession(recipient)) {
+		    recipients.add(recipient);
+		}
+	    }
+	}
+
+	ClientSessionId senderId = sender.getSessionId();
+	byte[] channelMessage = buf.getByteArray();
+	byte[] protocolMessage =
+	    getChannelMessage(name, senderId.getBytes(), channelMessage, seq);
+	
+	if (logger.isLoggable(Level.FINEST)) {
+	    logger.log(
+		Level.FINEST,
+		"name:{0}, message:{1}",
+		name, HexDumper.format(channelMessage));
+	}
+
+	for (ClientSession session : recipients) {
+	    // Send channel protocol message, skipping the sender
+	    if (! senderId.equals(session.getSessionId())) {
+		((SgsClientSession) session).sendProtocolMessage(
+		    protocolMessage, cachedState.delivery);
+	    }
+        }
+
+	if (cachedState.hasChannelListeners) {
+	    NonDurableTaskQueue queue = getTaskQueue(sender);
+	    // Notify listeners in the app in a transaction
+	    queue.addTask(new NotifyTask(name, senderId, channelMessage));
+	}
+    }
+    
     /**
      * Returns the task queue for the specified {@code session}.
      * If a queue does not already exist, one is created and returned.
@@ -566,105 +635,185 @@ public class ChannelServiceImpl
 	/** The transaction. */
 	final Transaction txn;
 
-	/** The channel service. */
-	final ChannelServiceImpl channelService;
-
-	/** Table of all channels, obtained from the data service. */
-	private ChannelTable table = null;
+	/** The transaction state. */
+	private State txnState = State.ACTIVE;
 
 	/**
 	 * Map of channel name to transient channel impl (for those
 	 * channels used during this context's associated
 	 * transaction).
 	 */
-	private final Map<String,Channel> internalTable =
-	    new HashMap<String,Channel>();
+	private final Map<String, ChannelImpl> internalTable =
+	    new HashMap<String, ChannelImpl>();
 
 	/**
-	 * Constructs a context with the specified transaction.  The
-	 * {@code initialize} method must be invoked on this context
-	 * before invoking any other methods.
+	 * Constructs a context with the specified transaction. 
 	 */
 	private Context(Transaction txn) {
 	    assert txn != null;
 	    this.txn = txn;
-	    this.channelService = ChannelServiceImpl.this;
-	}
-
-	/**
-	 * Initializes this context's channel table to the table
-	 * retrieved from the data store.
-	 */
-	private void initialize() {
-	    this.table = dataService.getServiceBinding(
-		ChannelTable.NAME, ChannelTable.class);
 	}
 
 	/* -- ChannelManager methods -- */
 
 	/**
-	 * Creates a channel with the specified name, listener, and
-	 * delivery requirement.
+	 * Creates a channel with the specified {@code name}, {@code
+	 * listener}, and {@code delivery} requirement.  The channel's
+	 * state is bound to a name composed of the channel service's
+	 * class name followed by ".channel." followed by the channel
+	 * name.
 	 */
 	private Channel createChannel(String name,
 				      ChannelListener listener,
 				      Delivery delivery)
 	{
 	    assert name != null;
-	    checkInitialized();
-	    if (table.get(name) != null) {
+	    String key = getChannelKey(name);
+	    try {
+		dataService.getServiceBinding(key, ChannelState.class);
 		throw new NameExistsException(name);
+	    } catch (NameNotBoundException e) {
 	    }
-
+	    
 	    ChannelState channelState =
 		new ChannelState(name, listener, delivery);
-	    ManagedReference ref =
-		dataService.createReference(channelState);
-	    dataService.markForUpdate(table);
-	    table.put(name, ref);
-	    Channel channel = new ChannelImpl(this, channelState);
+	    dataService.setServiceBinding(key, channelState);
+	    ChannelImpl channel = new ChannelImpl(this, channelState);
 	    internalTable.put(name, channel);
 	    return channel;
 	}
 
 	/**
-	 * Returns a channel with the specified name.
+	 * Returns a channel with the specified {@code  name}.
 	 */
 	private Channel getChannel(String name) {
 	    assert name != null;
-	    checkInitialized();
-	    Channel channel = internalTable.get(name);
+	    ChannelImpl channel = internalTable.get(name);
 	    if (channel == null) {
-		ManagedReference ref = table.get(name);
-		if (ref == null) {
+		ChannelState channelState;
+		try {
+		    channelState =
+		    	dataService.getServiceBinding(
+			    getChannelKey(name), ChannelState.class);
+		} catch (NameNotBoundException e) {
 		    throw new NameNotBoundException(name);
 		}
-		ChannelState channelState = ref.get(ChannelState.class);
-		channel = new ChannelImpl(this, channelState);
+		channel =  new ChannelImpl(this, channelState);
 		internalTable.put(name, channel);
+	    } else if (channel.isClosed) {
+		throw new NameNotBoundException(name);
 	    }
 	    return channel;
 	}
 
-	/* -- other methods -- */
+	/* -- transaction participant methods -- */
 
-	private void checkInitialized() {
-	    if (table == null) {
-		throw new IllegalStateException("context not initialized");
+	/**
+	 * Throws a {@code TransactionNotActiveException} if this
+	 * transaction is prepared.
+	 */
+	private void checkPrepared() {
+	    if (txnState == State.PREPARED) {
+		throw new TransactionNotActiveException("Already prepared");
 	    }
 	}
 	
 	/**
-	 * Removes the channel with the specified name.  This method is
-	 * called when the 'close' method is invoked on a 'ChannelImpl'.
+	 * Marks this transaction as prepared, and if there are
+	 * pending changes, adds this context to the context list and
+	 * returns {@code false}.  Otherwise, if there are no pending
+	 * changes returns {@code true} indicating readonly status.
+	 */
+        private boolean prepare() {
+	    checkPrepared();
+	    txnState = State.PREPARED;
+	    boolean readOnly = internalTable.isEmpty();
+	    if (! readOnly) {
+		synchronized (contextList) {
+		    contextList.add(this);
+		}
+	    }
+            return readOnly;
+        }
+
+	/**
+	 * Marks this transaction as aborted, removes the context from
+	 * the context list containing pending updates, and flushes
+	 * all committed contexts preceding prepared ones.
+	 */
+	private void abort() {
+	    txnState = State.ABORTED;
+	    synchronized (contextList) {
+		contextList.remove(this);
+	    }
+	    flushContexts();
+	}
+
+	/**
+	 * Marks this transaction as committed and flushes all
+	 * committed contexts preceding prepared ones.
+	 */
+	private void commit() {
+            if (txnState != State.PREPARED) {
+                RuntimeException e = 
+                    new IllegalStateException("transaction not prepared");
+		if (logger.isLoggable(Level.WARNING)) {
+		    logger.logThrow(
+			Level.FINE, e, "Context.commit: not yet prepared txn:{0}",
+			txn);
+		}
+                throw e;
+            }
+
+	    txnState = State.COMMITTED;
+	    flushContexts();
+        }
+
+	/**
+	 * If the context is committed, flushes channel state updates
+	 * to the channel state cache and returns true; otherwise
+	 * returns false.
+	 */
+	private boolean flush() {
+	    if (txnState == State.COMMITTED) {
+		for (Map.Entry<String, ChannelImpl> entry :
+			 internalTable.entrySet())
+		{
+		    String name = entry.getKey();
+		    ChannelImpl channel = entry.getValue();
+		    if (channel.isClosed) {
+			channelStateCache.remove(name);
+		    } else {
+			channelStateCache.put(
+			    name,
+			    new CachedChannelState(channel));
+		    }
+		}
+		return true;
+	    } else {
+		return false;
+	    }
+	}
+	
+
+	/* -- other methods -- */
+
+	/**
+	 * Removes the channel with the specified {@code name}.  This
+	 * method is called when the {@code close} method is invoked on a
+	 * {@code ChannelImpl}.
 	 */
 	void removeChannel(String name) {
 	    assert name != null;
-	    checkInitialized();
-	    if (table.get(name) != null) {
-		dataService.markForUpdate(table);
-		table.remove(name);
-		internalTable.remove(name);
+	    try {
+		String key = getChannelKey(name);
+		ChannelState channelState =
+		    dataService.getServiceBinding(key, ChannelState.class);
+		dataService.removeServiceBinding(key);
+		dataService.removeObject(channelState);
+		
+	    } catch (NameNotBoundException e) {
+		// already removed
 	    }
 	}
 
@@ -676,7 +825,6 @@ public class ChannelServiceImpl
 	 * the hex representation of the session's identifier.
 	 */
 	void joinChannel(ClientSession session, Channel channel) {
-	    checkInitialized();
 	    String key = getSessionKey(session);
 	    try {
 		ChannelSet set =
@@ -695,7 +843,6 @@ public class ChannelServiceImpl
 	 * given client {@code session}.
 	 */
 	void leaveChannel(ClientSession session, Channel channel) {
-	    checkInitialized();
 	    String key = getSessionKey(session);
 	    try {
 		ChannelSet set =
@@ -713,7 +860,6 @@ public class ChannelServiceImpl
 	 * channels that the session is still a member of.
 	 */
 	private Set<Channel> removeSession(ClientSession session) {
-	    checkInitialized();
 	    String key = getSessionKey(session);
 	    try {
 		ChannelSet set =
@@ -728,25 +874,9 @@ public class ChannelServiceImpl
 	}
 
 	/**
-	 * Removes all sessions from all channels.  This method is
-	 * invoked when this service is configured (if a previous
-	 * channel table exists) to remove all sessions (which are now
-	 * disconnected) from all channels in the channel table.
-	 */
-	private void removeAllSessionsFromChannels() {
-	    checkInitialized();
-	    for (ManagedReference ref : table.getAll()) {
-		ChannelState channelState = ref.get(ChannelState.class);
-		dataService.markForUpdate(channelState);
-		channelState.removeAllSessions();
-	    }
-	}
-	
-	/**
 	 * Returns a service of the given {@code type}.
 	 */
 	<T extends Service> T getService(Class<T> type) {
-	    checkInitialized();
 	    return txnProxy.getService(type);
 	}
 
@@ -755,7 +885,6 @@ public class ChannelServiceImpl
 	 * from this service.
 	 */
 	long nextSequenceNumber() {
-	    checkInitialized();
 	    return sequenceNumber.getAndIncrement();
 	}
     }
@@ -769,12 +898,10 @@ public class ChannelServiceImpl
     }
 
     /**
-     * Returns true if the specified {@code key} has the prefix of a
-     * session key.
+     * Returns a channel key for the given channel {@code name}.
      */
-    private static boolean isSessionKey(String key) {
-	return key.regionMatches(
-	    0, SESSION_PREFIX, 0, SESSION_PREFIX.length());
+    private static String getChannelKey(String name) {
+	return CHANNEL_PREFIX + name;
     }
 
     /**
@@ -812,67 +939,44 @@ public class ChannelServiceImpl
     
     /**
      * Removes all channel sets from the data store.  This method is
-     * invoked when this service is configured to schedule a task to
-     * remove any existing channel sets since their corresponding
-     * sessions are disconnected.
+     * invoked when this service is configured to remove any existing
+     * channel sets since their corresponding sessions are
+     * disconnected.
      */
     private void removeChannelSets() {
-	String key = SESSION_PREFIX;
-	
-	for (;;) {
-	    key = dataService.nextServiceBoundName(key);
-	    
-	    if (key == null || ! isSessionKey(key)) {
-		break;
-	    }
-	    
-	    logger.log(Level.FINEST, "removeChannelSets key: {0}", key);
+	Iterator<String> iter =
+	    BoundNamesUtil.getServiceBoundNamesIterator(
+		dataService, SESSION_PREFIX);
 
-	    nonDurableTaskScheduler.scheduleTaskOnCommit(
-		new RemoveChannelSetsTask(key));
+	while (iter.hasNext()) {
+	    String key = iter.next();
+	    ChannelSet set =
+		dataService.getServiceBinding(key, ChannelSet.class);
+	    dataService.removeObject(set);
+	    iter.remove();
 	}
     }
 
     /**
-     * Task (transactional) for removing all channel sets from data store.
+     * Removes all sessions from all channels.  This method is invoked
+     * when this service is configured to remove all sessions (which
+     * are now disconnected) from all channels in the channel table.
      */
-    private class RemoveChannelSetsTask implements KernelRunnable {
-	private final String key;
-
-	RemoveChannelSetsTask(String key) {
-	    this.key = key;
-	}
-
-        /** {@inheritDoc} */
-        public String getBaseTaskType() {
-            return RemoveChannelSetsTask.class.getName();
-        }
-
-	/** {@inheritDoc} */
-	public void run() throws Exception {
-	    try {
-		logger.log(
-		    Level.FINEST, "RemoveChannelSetsTask.run key: {0}", key);
-		ChannelSet set =
-		    dataService.getServiceBinding(key, ChannelSet.class);
-		dataService.removeServiceBinding(key);
-		dataService.removeObject(set);
-		logger.log(
-		    Level.FINEST,
-		    "RemoveChannelSetsTask.run key: {0} returns", key);
-	    } catch (Exception e) {
-		logger.logThrow(
-		    Level.FINEST, e,
-		    "RemoveChannelSetsTask.run key: {0} throws", key);
-		throw e;
-	    }
+    private void removeAllSessionsFromChannels() {
+	for (String key : BoundNamesUtil.getServiceBoundNamesIterable(
+ 				dataService, CHANNEL_PREFIX))
+	{
+	    ChannelState channelState =
+		dataService.getServiceBinding(key, ChannelState.class);
+	    dataService.markForUpdate(channelState);
+	    channelState.removeAllSessions();
 	}
     }
-
+	
     /**
      * Task (transactional) for notifying channel listeners.
      */
-    private final class NotifyTask implements KernelRunnable {
+    private final class NotifyTask extends AbstractKernelRunnable {
 
 	private final String name;
 	private final ClientSessionId senderId;
@@ -886,11 +990,6 @@ public class ChannelServiceImpl
 	    this.senderId = senderId;
 	    this.message = message;
 	}
-
-        /** {@inheritDoc} */
-        public String getBaseTaskType() {
-            return NotifyTask.class.getName();
-        }
 
         /** {@inheritDoc} */
 	public void run() {
@@ -918,57 +1017,48 @@ public class ChannelServiceImpl
     }
     
     /**
-     * Task (transactional) for computing the membership info needed
-     * to forward a message to a channel.
+     * Contains cached channel state, stored in the {@code channelStateCache}
+     * map when a committed context is flushed.
      */
-    private final class ForwardingTask implements KernelRunnable {
+    private static class CachedChannelState {
 
-        private final String name;
-        private final ClientSessionId senderId;
-        private final Set<byte[]> recipientIds;
-        private final byte[] message;
-        private final long seq;
+	private final Set<ClientSession> sessions;
+	private final boolean hasChannelListeners;
+	private final Delivery delivery;
 
-        ForwardingTask(String name,
-                ClientSessionId senderId,
-                Set<byte[]> recipientIds,
-                byte[] message,
-                long seq)
-        {
-            this.name = name;
-            this.senderId = senderId;
-            this.recipientIds = recipientIds;
-            this.message = message;
-            this.seq = seq;
-        }
+	CachedChannelState(ChannelImpl channelImpl) {
+	    this.sessions = channelImpl.state.getSessions();
+	    this.hasChannelListeners = channelImpl.state.hasChannelListeners();
+	    this.delivery = channelImpl.state.delivery;
+	}
 
-        /** {@inheritDoc} */
-        public String getBaseTaskType() {
-            return ForwardingTask.class.getName();
-        }
+	boolean hasSession(ClientSession session) {
+	    return sessions.contains(session);
+	}
+    }
 
-        /** {@inheritDoc} */
-        public void run() {
-            try {
-                if (logger.isLoggable(Level.FINEST)) {
-                    logger.log(
-                        Level.FINEST,
-                        "name:{0}, message:{1}",
-                        name, HexDumper.format(message));
-                }
-                Context context = checkContext();
-                ChannelImpl channel = (ChannelImpl) context.getChannel(name);
-                channel.forwardMessage(senderId, recipientIds, message, seq);
+    /**
+     * Returns a MessageBuffer containing a CHANNEL_MESSAGE protocol
+     * message with this channel's name, and the specified sender,
+     * message, and sequence number.
+     */
+    static byte[] getChannelMessage(
+	String name, byte[] senderId, byte[] message, long sequenceNumber)
+    {
+        int nameLen = MessageBuffer.getSize(name);
+        MessageBuffer buf =
+            new MessageBuffer(15 + nameLen + senderId.length +
+                    message.length);
+        buf.putByte(SimpleSgsProtocol.VERSION).
+            putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
+            putByte(SimpleSgsProtocol.CHANNEL_MESSAGE).
+            putString(name).
+            putLong(sequenceNumber).
+            putShort(senderId.length).
+            putBytes(senderId).
+            putShort(message.length).
+            putBytes(message);
 
-            } catch (RuntimeException e) {
-                if (logger.isLoggable(Level.FINER)) {
-                    logger.logThrow(
-                        Level.FINER, e,
-                        "name:{0}, message:{1} throws",
-                        name, HexDumper.format(message));
-                }
-                throw e;
-            }
-        }
+        return buf.getBuffer();
     }
 }

@@ -24,6 +24,8 @@
 
   <!-- Version information -->
   <property name="project.release" value="0.9.1"/>
+  <!-- Set to true when building an external release -->
+  <property name="external.release" value="false"/>
 
   <!-- Values for the JavaDocs -->
   <property name="project.name" value="Sun Game Server"/>
@@ -62,8 +64,8 @@
   <path id="shared.classpath">
     <pathelement location="${build.dir}/classes/shared"/>
     <pathelement location="${lib.dir}/mina-core-1.1.jar"/>
-    <pathelement location="${lib.dir}/slf4j-jdk14-1.2.jar"/>
-    <pathelement location="${lib.dir}/slf4j-api-1.2.jar"/>
+    <pathelement location="${lib.dir}/slf4j-jdk14-1.3.0.jar"/>
+    <pathelement location="${lib.dir}/slf4j-api-1.3.0.jar"/>
   </path>
 
   <!-- Server class path -->
@@ -303,15 +305,13 @@
     <copy todir="${build.dir}/sgs/doc/sgs-api">
       <fileset dir="${build.dir}/javadoc/apidoc/sgs-server-apidoc/"/>
     </copy>
-    <!-- <tar destfile="${build.dir}/sgs-${project.version}.tar.gz"
-        compression="gzip">
-      <tarfileset dir="${build.dir}" includes="sgs/**" excludes="sgs/sgs.sh"/>
-      <tarfileset dir="${build.dir}" includes="sgs/sgs.sh" mode="755"/>
-    </tar> -->
     <zip destfile="${build.dir}/sgs-${project.version}.zip">
-      <zipfileset dir="${build.dir}/sgs" includes="**" excludes="sgs.sh"
+      <zipfileset dir="${build.dir}/sgs" includes="**"
+		  excludes="sgs.sh, lib/bdb/win32-x86/*"
 		  prefix="sgs-${project.version}"/>
-      <zipfileset dir="${build.dir}/sgs" includes="sgs.sh" filemode="755"
+      <zipfileset dir="${build.dir}/sgs"
+		  includes="sgs.sh, lib/bdb/win32-x86/*"
+		  filemode="755"
 		  prefix="sgs-${project.version}"/>
     </zip>
   </target>
@@ -329,6 +329,7 @@
       <fileset dir="etc"
 	       includes="sgs.*,
 			 sgs-*.properties,
+			 CHANGELOG,
 			 LICENSE.pdf,
 			 THIRDPARTYLICENSE.pdf"/>
     </copy>
@@ -376,6 +377,11 @@
 	       includes="libdb-?.?.so,
 			 libdb_java-?.?.so"/>
     </copy>
+    <copy todir="${build.dir}/sgs/lib/bdb/linux-x86_64">
+      <fileset dir="${bdb.builds.dir}/linux-x86_64/lib"
+	       includes="libdb-?.?.so,
+			 libdb_java-?.?.so"/>
+    </copy>
     <copy todir="${build.dir}/sgs/lib/bdb/win32-x86/">
       <fileset dir="${bdb.builds.dir}/win32-x86/Release"
 	       includes="libdb_java??.dll"/>
@@ -396,8 +402,8 @@
       <manifest>
         <attribute name="Class-Path"
 		   value="mina-core-1.1.jar
-			  slf4j-jdk14-1.2.jar
-			  slf4j-api-1.2.jar"/>
+			  slf4j-jdk14-1.3.0.jar
+			  slf4j-api-1.3.0.jar"/>
       </manifest>
     </jar>
   </target>
@@ -416,8 +422,8 @@
         <attribute name="Class-Path"
                    value="bdb/db.jar
                           mina-core-1.1.jar
-                          slf4j-jdk14-1.2.jar
-			  slf4j-api-1.2.jar"/>
+                          slf4j-jdk14-1.3.0.jar
+			  slf4j-api-1.3.0.jar"/>
       </manifest>
     </jar>
   </target>
@@ -438,8 +444,11 @@
 	</outputfilterchain>
       </redirector>
     </exec>
+    <condition property="release.suffix" value=".internal" else="">
+      <isfalse value="${external.release}"/>
+    </condition>
     <property name="project.version"
-	      value="${project.release}-r${project.revision}"/>
+	      value="${project.release}${release.suffix}-r${project.revision}"/>
     <echo message="${project.version}"/>
   </target>
 
@@ -552,7 +561,7 @@
   </target>
 
   <!-- Compile and run tests -->
-  <target name="test" depends="test-server"
+  <target name="test" depends="test-shared, test-server"
 	  description="Compiles and runs tests"/>
 
   <!-- Compile and run shared tests -->

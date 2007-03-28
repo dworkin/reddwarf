@@ -16,6 +16,7 @@ import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.session.ClientSessionImpl.
     ClientSessionListenerWrapper;
+import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.LoggerWrapper;
 import com.sun.sgs.impl.util.NonDurableTaskScheduler;
 import com.sun.sgs.io.Acceptor;
@@ -38,6 +39,8 @@ import java.net.SocketAddress;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;   
 import java.util.Properties;
@@ -57,6 +60,9 @@ public class ClientSessionServiceImpl
     implements ClientSessionService, NonDurableTransactionParticipant
 {
 
+    /** The state of a transaction in a context. */
+    private static enum State { ACTIVE, PREPARED, COMMITTED, ABORTED };
+	
     /** The prefix for ClientSessionListeners bound in the data store. */
     public static final String LISTENER_PREFIX =
 	ClientSessionImpl.class.getName();
@@ -79,7 +85,7 @@ public class ClientSessionServiceImpl
     /** The port number for accepting connections. */
     private final int port;
 
-    /** The listener for accpeted connections. */
+    /** The listener for accepted connections. */
     private final AcceptorListener acceptorListener = new Listener();
 
     /** The registered service listeners. */
@@ -92,12 +98,15 @@ public class ClientSessionServiceImpl
 	Collections.synchronizedMap(
 	    new HashMap<ClientSessionId, ClientSessionImpl>());
 
+    /** List of contexts that have been prepared (non-readonly) or commited. */
+    private final List<Context> contextList = new LinkedList<Context>();
+
     /** The Acceptor for listening for new connections. */
     private Acceptor<SocketAddress> acceptor;
 
     /** Synchronize on this object before accessing the registry. */
     private final Object lock = new Object();
-    
+
     /** The task scheduler. */
     private TaskScheduler taskScheduler;
 
@@ -379,6 +388,7 @@ public class ClientSessionServiceImpl
     public void abort(Transaction txn) {
         try {
 	    checkTransaction(txn);
+	    currentContext.get().abort();
 	    currentContext.set(null);
             if (logger.isLoggable(Level.FINER)) {
                 logger.log(Level.FINER, "abort txn:{0} returns", txn);
@@ -391,24 +401,46 @@ public class ClientSessionServiceImpl
         }
     }
 
+    /**
+     * Iterates through the context list, in order, to flush any
+     * committed changes.  During iteration, this method invokes
+     * {@code flush} on the {@code Context} returned by {@code next}.
+     * Iteration ceases when either a context's {@code flush} method
+     * returns {@code false} (indicating that the transaction
+     * associated with the context has not yet committed) or when
+     * there are no more contexts in the context list.
+     */
+    private void flushContexts() {
+	synchronized (contextList) {
+	    Iterator<Context> iter = contextList.iterator();
+	    while (iter.hasNext()) {
+		Context context = iter.next();
+		if (context.flush()) {
+		    iter.remove();
+		} else {
+		    break;
+		}
+	    }
+	}
+    }
+
     /* -- Context class to hold transaction state -- */
     
-    static final class Context {
+    final class Context {
+
         /** The transaction. */
         private final Transaction txn;
 
 	/** Map of client sessions to an object containing a list of
-	 * messages to send when transaction commits. */
-        private final Map<ClientSessionImpl, SessionInfo> sessionsInfo =
-	    new HashMap<ClientSessionImpl, SessionInfo>();
+	 * updates to make upon transaction commit. */
+        private final Map<ClientSessionImpl, Updates> sessionUpdates =
+	    new HashMap<ClientSessionImpl, Updates>();
 
-	/** If true, indicates the associated transaction is prepared. */
-        private boolean prepared = false;
+	/** The transaction's state. */
+        private State state = State.ACTIVE;
 
 	/**
-	 * Constructs a context with the specified transaction.  The
-	 * {@code initialize} method must be invoked on this context
-	 * before invoking any other methods.
+	 * Constructs a context with the specified transaction.
 	 */
         private Context(Transaction txn) {
             this.txn = txn;
@@ -448,7 +480,7 @@ public class ClientSessionServiceImpl
 		}
 		checkPrepared();
 
-		getSessionInfo(session).disconnect = true;
+		getUpdates(session).disconnect = true;
 		
 	    } catch (RuntimeException e) {
                 if (logger.isLoggable(Level.FINE)) {
@@ -473,11 +505,11 @@ public class ClientSessionServiceImpl
 		}
 		checkPrepared();
 
-		SessionInfo info = getSessionInfo(session);
+		Updates updates = getUpdates(session);
 		if (isFirst) {
-		    info.messages.add(0, message);
+		    updates.messages.add(0, message);
 		} else {
-		    info.messages.add(message);
+		    updates.messages.add(message);
 		}
 	    
 	    } catch (RuntimeException e) {
@@ -490,37 +522,63 @@ public class ClientSessionServiceImpl
             }
 	}
 
-	private SessionInfo getSessionInfo(ClientSessionImpl session) {
+	private Updates getUpdates(ClientSessionImpl session) {
 
-	    SessionInfo info = sessionsInfo.get(session);
-	    if (info == null) {
-		info = new SessionInfo(session);
-		sessionsInfo.put(session, info);
+	    Updates updates = sessionUpdates.get(session);
+	    if (updates == null) {
+		updates = new Updates(session);
+		sessionUpdates.put(session, updates);
 	    }
-	    return info;
+	    return updates;
 	}
-
+	
+	/**
+	 * Throws a {@code TransactionNotActiveException} if this
+	 * transaction is prepared.
+	 */
 	private void checkPrepared() {
-	    if (prepared) {
+	    if (state == State.PREPARED) {
 		throw new TransactionNotActiveException("Already prepared");
 	    }
 	}
-
+	
+	/**
+	 * Marks this transaction as prepared, and if there are
+	 * pending changes, adds this context to the context list and
+	 * returns {@code false}.  Otherwise, if there are no pending
+	 * changes returns {@code true} indicating readonly status.
+	 */
         private boolean prepare() {
 	    checkPrepared();
-	    prepared = true;
-            return sessionsInfo.values().isEmpty();
+	    state = State.PREPARED;
+	    boolean readOnly = sessionUpdates.values().isEmpty();
+	    if (! readOnly) {
+		synchronized (contextList) {
+		    contextList.add(this);
+		}
+	    }
+            return readOnly;
         }
 
 	/**
-	 * Sends all protocol messages enqueued during this context's
-	 * transaction (via the {@code addMessage} and {@code
-	 * addMessageFirst} methods), and disconnects any session
-	 * whose disconnection was requested via the {@code
-	 * requestDisconnect} method.
+	 * Marks this transaction as aborted, removes the context from
+	 * the context list containing pending updates, and flushes
+	 * all committed contexts preceding prepared ones.
+	 */
+	private void abort() {
+	    state = State.ABORTED;
+	    synchronized (contextList) {
+		contextList.remove(this);
+	    }
+	    flushContexts();
+	}
+
+	/**
+	 * Marks this transaction as committed and flushes all
+	 * committed contexts preceding prepared ones.
 	 */
 	private void commit() {
-            if (!prepared) {
+            if (state != State.PREPARED) {
                 RuntimeException e = 
                     new IllegalStateException("transaction not prepared");
 		if (logger.isLoggable(Level.WARNING)) {
@@ -530,33 +588,54 @@ public class ClientSessionServiceImpl
 		}
                 throw e;
             }
-	    
-            for (SessionInfo info : sessionsInfo.values()) {
-		info.sendProtocolMessages();
-            }
+
+	    state = State.COMMITTED;
+	    flushContexts();
         }
 
-	private static class SessionInfo {
-
-	    private final ClientSessionImpl session;
-	    
-	    /** List of protocol messages to send on commit. */
-	    List<byte[]> messages = new ArrayList<byte[]>();
-
-	    /** If true, disconnect after sending messages. */
-	    boolean disconnect = false;
-
-	    SessionInfo(ClientSessionImpl session) {
-		this.session = session;
-	    }
-
-	    private void sendProtocolMessages() {
-                for (byte[] message : messages) {
-                   session.sendProtocolMessage(message, Delivery.RELIABLE);
-                }
-		if (disconnect) {
-		    session.handleDisconnect(false);
+	/**
+	 * Sends all protocol messages enqueued during this context's
+	 * transaction (via the {@code addMessage} and {@code
+	 * addMessageFirst} methods), and disconnects any session
+	 * whose disconnection was requested via the {@code
+	 * requestDisconnect} method.
+	 */
+	private boolean flush() {
+	    if (state == State.COMMITTED) {
+		for (Updates updates : sessionUpdates.values()) {
+		    updates.flush();
 		}
+		return true;
+	    } else {
+		return false;
+	    }
+	}
+    }
+    
+    /**
+     * Contains pending changes for a given client session.
+     */
+    private static class Updates {
+
+	/** The client session. */
+	private final ClientSessionImpl session;
+	
+	/** List of protocol messages to send on commit. */
+	List<byte[]> messages = new ArrayList<byte[]>();
+
+	/** If true, disconnect after sending messages. */
+	boolean disconnect = false;
+
+	Updates(ClientSessionImpl session) {
+	    this.session = session;
+	}
+
+	private void flush() {
+	    for (byte[] message : messages) {
+		session.sendProtocolMessage(message, Delivery.RELIABLE);
+	    }
+	    if (disconnect) {
+		session.handleDisconnect(false);
 	    }
 	}
     }
