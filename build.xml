@@ -834,6 +834,48 @@
     </java>
   </target>
 
+  <!-- Runs the example HackApp (server) -->
+  <target name="example-hack-app" depends="example-classes"
+          description="Runs the example HackApp (server)">
+    <mkdir dir="/tmp/HackApp/dsdb"/>
+    <copy todir="/tmp/HackApp/gameData">
+      <fileset dir="example/hack/gameData"/>
+    </copy>
+    <java classname="com.sun.sgs.impl.kernel.Kernel"
+          fork="true">
+      <jvmarg line="${test.jvm.args}"/>
+      <jvmarg line="-server"/>
+      <!--<sysproperty key="com.sun.management.jmxremote" value=""/>-->
+      <sysproperty key="com.sun.sgs.config.file"
+           file="example/hack/System.properties"/>
+      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${test.logging}"/>
+      <classpath>
+        <pathelement location="${build.dir}/example/classes"/>
+        <path refid="server.classpath"/>
+      </classpath>
+      <arg value="example/hack/HackApp.properties"/>
+    </java>
+  </target>
+
+  <!-- Runs the example HackClient (GUI client) -->
+  <target name="example-hack-client" depends="example-classes"
+          description="Runs the example HackClient">
+    <java classname="com.sun.sgs.example.hack.client.Client"
+          fork="true">
+      <jvmarg line="${test.jvm.args}"/>
+      <sysproperty key="host" value="localhost"/>
+      <sysproperty key="port" value="4458"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${test.logging}"/>
+      <classpath>
+        <pathelement location="${build.dir}/example/classes"/>
+        <path refid="client.classpath"/>
+      </classpath>
+    </java>
+  </target>
+
   <!-- Builds tutorial jar file -->
   <target name="jar-tutorial" depends="example-classes"
           description="Builds tutorial jar file">
