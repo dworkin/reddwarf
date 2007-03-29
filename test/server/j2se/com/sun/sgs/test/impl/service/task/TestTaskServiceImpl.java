@@ -31,6 +31,7 @@ import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TaskService;
 
 import com.sun.sgs.test.util.DummyComponentRegistry;
+import com.sun.sgs.test.util.DummyKernelRunnable;
 import com.sun.sgs.test.util.DummyTaskScheduler;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
@@ -126,7 +127,7 @@ public class TestTaskServiceImpl extends TestCase {
         if ((txn != null) &&
             (txn.getState() == DummyTransaction.State.ACTIVE)) {
             System.err.println("had to abort txn for test: " + getName());
-            txn.abort();
+            txn.abort(null);
         }
 
         // FIXME: This should move into the Minimal Kernel, where Services
@@ -191,7 +192,7 @@ public class TestTaskServiceImpl extends TestCase {
         } catch (NullPointerException e) {
             System.err.println(e);
         }
-        txn.abort();
+        txn.abort(null);
         txn = createTransaction();
         try {
             service.configure(serviceRegistry, null);
@@ -199,7 +200,7 @@ public class TestTaskServiceImpl extends TestCase {
         } catch (NullPointerException e) {
             System.err.println(e);
         }
-        txn.abort();
+        txn.abort(null);
     }
 
     public void testConfigureNoTxn() {
@@ -221,7 +222,7 @@ public class TestTaskServiceImpl extends TestCase {
         } catch (IllegalStateException e) {
             System.err.println(e);
         }
-        txn.abort();
+        txn.abort(null);
     }
 
     public void testConfigureAborted() throws Exception {
@@ -229,7 +230,7 @@ public class TestTaskServiceImpl extends TestCase {
             new TaskServiceImpl(new Properties(), systemRegistry);
         txn = createTransaction();
         service.configure(serviceRegistry, txnProxy);
-        txn.abort();
+        txn.abort(null);
         txn = createTransaction();
         try {
             service.configure(serviceRegistry, txnProxy);
@@ -249,7 +250,7 @@ public class TestTaskServiceImpl extends TestCase {
         } catch (MissingResourceException e) {
             System.err.println(e);
         }
-        txn.abort();
+        txn.abort(null);
     }
 
     public void testConfigurePendingSingleTasks() throws Exception {
@@ -291,7 +292,7 @@ public class TestTaskServiceImpl extends TestCase {
         } catch (NullPointerException e) {
             System.err.println(e);
         }
-        txn.abort();
+        txn.abort(null);
     }
 
     public void testScheduleTaskNotSerializable() {
@@ -315,7 +316,7 @@ public class TestTaskServiceImpl extends TestCase {
         } catch (IllegalArgumentException e) {
             System.err.println(e);
         }
-        txn.abort();
+        txn.abort(null);
     }
 
     public void testScheduleTaskNotManagedObject() {
@@ -336,7 +337,7 @@ public class TestTaskServiceImpl extends TestCase {
         } catch (Exception e) {
              fail("Did not expect Exception: " + e);
         }
-        txn.abort();
+        txn.abort(null);
     }
 
     public void testScheduleTaskIsManagedObject() {
@@ -357,7 +358,7 @@ public class TestTaskServiceImpl extends TestCase {
         } catch (Exception e) {
              fail("Did not expect Exception: " + e);
         }
-        txn.abort();
+        txn.abort(null);
     }
 
     public void testScheduleNegativeTime() {
@@ -381,7 +382,7 @@ public class TestTaskServiceImpl extends TestCase {
         } catch (IllegalArgumentException e) {
             System.err.println(e);
         }
-        txn.abort();
+        txn.abort(null);
     }
 
     public void testScheduleTaskNoTransaction() {
@@ -434,7 +435,7 @@ public class TestTaskServiceImpl extends TestCase {
         } catch (TaskRejectedException e) {
             System.err.println(e);
         }
-        txn.abort();
+        txn.abort(null);
     }
 
     public void testRunImmediateTasks() throws Exception {
@@ -448,7 +449,7 @@ public class TestTaskServiceImpl extends TestCase {
         Thread.sleep(500);
         txn = createTransaction();
         assertCounterClear("Some immediate tasks did not run");
-        txn.abort();
+        txn.abort(null);
     }
 
     public void testRunNonRetriedTasks() throws Exception {
@@ -463,7 +464,7 @@ public class TestTaskServiceImpl extends TestCase {
         String name = dataService.nextServiceBoundName(PENDING_NS);
         if ((name != null) && (name.startsWith(PENDING_NS)))
             fail("Non-retried task didn't get removed from the pending set");
-        txn.abort();
+        txn.abort(null);
 
         clearPendingTasksInStore();
         txn = createTransaction();
@@ -474,7 +475,7 @@ public class TestTaskServiceImpl extends TestCase {
         name = dataService.nextServiceBoundName(PENDING_NS);
         if ((name != null) && (name.startsWith(PENDING_NS)))
             fail("Non-retried task didn't get removed from the pending set");
-        txn.abort();
+        txn.abort(null);
     }
 
     public void testRunPendingTasks() throws Exception {
@@ -488,7 +489,7 @@ public class TestTaskServiceImpl extends TestCase {
         Thread.sleep(500);
         txn = createTransaction();
         assertCounterClear("Some pending tasks did not run");
-        txn.abort();
+        txn.abort(null);
     }
 
     public void testRunPeriodicTasks() throws Exception {
@@ -553,7 +554,7 @@ public class TestTaskServiceImpl extends TestCase {
         Thread.sleep(800);
         txn = createTransaction();
         assertCounterClear("Basic cancel of periodic tasks failed");
-        txn.abort();
+        txn.abort(null);
     }
 
     public void testCancelPeriodicTasksTxnCommitted() throws Exception {
@@ -572,14 +573,14 @@ public class TestTaskServiceImpl extends TestCase {
         Thread.sleep(300);
         txn = createTransaction();
         assertCounterClear("Cancel outside of transaction took effect");
-        txn.abort();
+        txn.abort(null);
     }
 
     public void testCancelPeriodicTasksTxnAborted() throws Exception {
         txn = createTransaction();
         PeriodicTaskHandle handle =
             taskService.schedulePeriodicTask(new ManagedTask(), 200L, 500L);
-        txn.abort();
+        txn.abort(null);
         try {
             handle.cancel();
             fail("Expected TransactionNotActiveException");
@@ -659,7 +660,7 @@ public class TestTaskServiceImpl extends TestCase {
         Thread.sleep(800);
         txn = createTransaction();
         assertCounterClear("TaskRemoved cancel of periodic tasks failed");
-        txn.abort();
+        txn.abort(null);
     }
 
     /**
@@ -699,21 +700,19 @@ public class TestTaskServiceImpl extends TestCase {
         } catch (NullPointerException e) {
             System.err.println(e);
         }
-        txn.abort();
+        txn.abort(null);
     }
 
     public void testScheduleNonDurableTaskNegativeTime() {
         txn = createTransaction();
-        KernelRunnable r = new KernelRunnable() {
-                public void run() throws Exception {}
-            };
+        KernelRunnable r = new DummyKernelRunnable();
         try {
             taskService.scheduleNonDurableTask(r, -1L);
             fail("Expected IllegalArgumentException");
         } catch (IllegalArgumentException e) {
             System.err.println(e);
         }
-        txn.abort();
+        txn.abort(null);
     }
 
     public void testScheduleNonDurableTaskNoTransaction() {
@@ -891,6 +890,9 @@ public class TestTaskServiceImpl extends TestCase {
         private Counter counter;
         public KernelRunnableImpl(Counter counter) {
             this.counter = counter;
+        }
+        public String getBaseTaskType() {
+            return getClass().getName();
         }
         public void run() throws Exception {
             synchronized (counter) {

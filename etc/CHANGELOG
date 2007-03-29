@@ -1,0 +1,9 @@
+Version 0.9.1:
+- Fix a bug that could cause channel messages to be delivered
+  out-of-order
+- Improve channel message delivery performance
+- Include native libraries for Mac OS X and Linux with x86 processors
+- Improve debugging output for deadlocks
+
+Version 0.9:
+- First release with new API and architecture

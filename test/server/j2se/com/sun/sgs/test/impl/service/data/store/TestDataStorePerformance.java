@@ -168,7 +168,7 @@ public class TestDataStorePerformance extends TestCase {
 
     void testWriteIdsInternal(boolean flush) throws Exception {
 	props.setProperty(
-	    DataStoreImplClass + ".flushToDisk", String.valueOf(flush));
+	    DataStoreImplClass + ".flush.to.disk", String.valueOf(flush));
 	byte[] data = new byte[itemSize];
 	data[0] = 1;
 	store = getDataStore();

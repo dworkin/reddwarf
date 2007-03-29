@@ -157,7 +157,7 @@ public class TestDataServicePerformance extends TestCase {
     }
 
     private void doTestRead(boolean detectMods) throws Exception {
-	props.setProperty(DataServiceImplClass + ".detectModifications",
+	props.setProperty(DataServiceImplClass + ".detect.modifications",
 			  String.valueOf(detectMods));
 	service = getDataService(props, componentRegistry);
 	if (service instanceof ProfileProducer) {
@@ -206,9 +206,9 @@ public class TestDataServicePerformance extends TestCase {
     }
 
     void doTestWrite(boolean detectMods, boolean flush) throws Exception {
-	props.setProperty(DataServiceImplClass + ".detectModifications",
+	props.setProperty(DataServiceImplClass + ".detect.modifications",
 			  String.valueOf(detectMods));
-	props.setProperty(DataStoreImplClass + ".flushToDisk",
+	props.setProperty(DataStoreImplClass + ".flush.to.disk",
 			  String.valueOf(flush));
 	service = getDataService(props, componentRegistry);
 	if (service instanceof ProfileProducer) {

@@ -137,7 +137,7 @@ class CompleteMessageFilter {
      * @param message the data to filter and forward to the listener
      */
     void filterSend(FilterListener listener, byte[] message) {
-        ByteBuffer buffer = ByteBuffer.allocate(message.length + 4);
+        ByteBuffer buffer = ByteBuffer.allocate(message.length + 4, false);
         buffer.putInt(message.length);
         buffer.put(message);
         buffer.flip();

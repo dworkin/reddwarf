@@ -1,0 +1,41 @@
+#
+# This file describes all the dungeons in the server, and all of the
+# sprite map files used by those dungeons. The only requirement is that
+# a sprite map must be loaded before any dungeon that uses that map.
+#
+# SpriteMap ID SPRITE_SIZE FILENAME
+# Dungeon NAME SPRITEMAP_ID FILENAME (NAME may be quoted to include whitespace)
+#
+SpriteMap 0 24 "gameData/standard.png"
+#SpriteMap 1 40 "gameData/sc.png"
+Dungeon SimpleDungeon1 0 "gameData/SimpleDungeon"
+Dungeon SimpleDungeon2 0 "gameData/SimpleDungeon"
+Dungeon SimpleDungeon3 0 "gameData/SimpleDungeon"
+Dungeon SimpleDungeon4 0 "gameData/SimpleDungeon"
+Dungeon SimpleDungeon5 0 "gameData/SimpleDungeon"
+Dungeon SimpleDungeon6 0 "gameData/SimpleDungeon"
+Dungeon SimpleDungeon7 0 "gameData/SimpleDungeon"
+Dungeon SimpleDungeon8 0 "gameData/SimpleDungeon"
+Dungeon SimpleDungeon9 0 "gameData/SimpleDungeon"
+Dungeon SimpleDungeon10 0 "gameData/SimpleDungeon"
+Dungeon SimpleDungeon11 0 "gameData/SimpleDungeon"
+Dungeon SimpleDungeon12 0 "gameData/SimpleDungeon"
+Dungeon SimpleDungeon13 0 "gameData/SimpleDungeon"
+Dungeon SimpleDungeon14 0 "gameData/SimpleDungeon"
+Dungeon SimpleDungeon15 0 "gameData/SimpleDungeon"
+Dungeon SimpleDungeon16 0 "gameData/SimpleDungeon"
+Dungeon SimpleDungeon17 0 "gameData/SimpleDungeon"
+Dungeon SimpleDungeon18 0 "gameData/SimpleDungeon"
+Dungeon SimpleDungeon19 0 "gameData/SimpleDungeon"
+Dungeon SimpleDungeon20 0 "gameData/SimpleDungeon"
+Dungeon SimpleDungeon21 0 "gameData/SimpleDungeon"
+Dungeon SimpleDungeon22 0 "gameData/SimpleDungeon"
+Dungeon SimpleDungeon23 0 "gameData/SimpleDungeon"
+Dungeon SimpleDungeon24 0 "gameData/SimpleDungeon"
+Dungeon SimpleDungeon25 0 "gameData/SimpleDungeon"
+Dungeon SimpleDungeon26 0 "gameData/SimpleDungeon"
+Dungeon SimpleDungeon27 0 "gameData/SimpleDungeon"
+Dungeon SimpleDungeon28 0 "gameData/SimpleDungeon"
+Dungeon SimpleDungeon29 0 "gameData/SimpleDungeon"
+Dungeon SimpleDungeon30 0 "gameData/SimpleDungeon"
+#Dungeon "Secret Collect" 1 "gameData/SecretCollect"

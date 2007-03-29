@@ -10,6 +10,7 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectIOException;
 import com.sun.sgs.app.ObjectNotFoundException;
+import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
@@ -123,7 +124,7 @@ public class TestDataServiceImpl extends TestCase {
     protected void tearDown() throws Exception {
 	try {
 	    if (txn != null) {
-		txn.abort();
+		txn.abort(null);
 	    }
 	    if (!passed && service != null) {
 		new ShutdownAction().waitForDone();
@@ -171,7 +172,7 @@ public class TestDataServiceImpl extends TestCase {
 
     public void testConstructorBadDebugCheckInterval() throws Exception {
 	props.setProperty(
-	    DataServiceImplClassName + ".debugCheckInterval", "gorp");
+	    DataServiceImplClassName + ".debug.check.interval", "gorp");
 	try {
 	    createDataServiceImpl(props, componentRegistry);
 	    fail("Expected IllegalArgumentException");
@@ -338,7 +339,7 @@ public class TestDataServiceImpl extends TestCase {
 	service = createDataServiceImpl();
 	createTransaction();
 	service.configure(componentRegistry, txnProxy);
-	txn.abort();
+	txn.abort(null);
 	createTransaction();
 	service.configure(componentRegistry, txnProxy);
 	txn.commit();
@@ -898,7 +899,7 @@ public class TestDataServiceImpl extends TestCase {
 	    getBinding(app, service, "dummy", DummyManagedObject.class));
 	DummyManagedObject dummy2 = new DummyManagedObject();
 	setBinding(app, service, "dummy", dummy2);
-	txn.abort();
+	txn.abort(null);
 	createTransaction();
 	assertEquals(
 	    dummy,
@@ -1071,7 +1072,7 @@ public class TestDataServiceImpl extends TestCase {
     private void testRemoveBindingSuccess(boolean app) {
 	setBinding(app, service, "dummy", dummy);
 	removeBinding(app, service, "dummy");
-	txn.abort();
+	txn.abort(null);
 	createTransaction();
 	removeBinding(app, service, "dummy");	
 	try {
@@ -1091,7 +1092,7 @@ public class TestDataServiceImpl extends TestCase {
 	DummyManagedObject serviceResult =
 	    service.getServiceBinding("dummy", DummyManagedObject.class);
 	assertEquals(serviceDummy, serviceResult);
-	txn.abort();
+	txn.abort(null);
 	createTransaction();
 	service.removeServiceBinding("dummy");
 	DummyManagedObject result =
@@ -1223,7 +1224,7 @@ public class TestDataServiceImpl extends TestCase {
 	assertEquals("zzz-2", nextBoundName(app, service, "zzz-1"));
 	assertNull(nextBoundName(app, service, "zzz-2"));
 	assertNull(nextBoundName(app, service, "zzz-2"));
-	txn.abort();
+	txn.abort(null);
 	createTransaction();
 	removeBinding(app, service, "zzz-2");
 	assertEquals("zzz-1", nextBoundName(app, service, "zzz-"));
@@ -1487,7 +1488,7 @@ public class TestDataServiceImpl extends TestCase {
 		} catch (Exception e) {
 		    fail("Unexpected exception: " + e);
 		} finally {
-		    txn2.abort();
+		    txn2.abort(null);
 		}
 	    }
 	};
@@ -1605,6 +1606,104 @@ public class TestDataServiceImpl extends TestCase {
 	    service.createReference(x).equals(service.createReference(y)));
     }
 
+    /* -- Test createReferenceForId -- */
+
+    public void testCreateReferenceForIdNullId() throws Exception {
+	try {
+	    service.createReferenceForId(null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testCreateReferenceForIdTooSmallId() throws Exception {
+	BigInteger id = new BigInteger("-1");
+	try {
+	    service.createReferenceForId(id);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+	service.createReferenceForId(BigInteger.ZERO);
+    }
+
+    public void testCreateReferenceForIdTooBigId() throws Exception {
+	BigInteger maxLong = new BigInteger(String.valueOf(Long.MAX_VALUE));
+	BigInteger id = maxLong.add(BigInteger.ONE);
+	try {
+	    service.createReferenceForId(id);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+	service.createReferenceForId(maxLong);
+    }
+
+    /* -- Unusual states -- */
+    private final Action createReferenceForId = new Action() {
+	private BigInteger id;
+	void setUp() { id = service.createReference(dummy).getId(); }
+	void run() { service.createReferenceForId(id); }
+    };
+    public void testCreateReferenceForIdUninitialized() throws Exception {
+	testUninitialized(createReferenceForId);
+    }
+    public void testCreateReferenceForIdAborting() throws Exception {
+	testAborting(createReferenceForId);
+    }
+    public void testCreateReferenceForIdAborted() throws Exception {
+	testAborted(createReferenceForId);
+    }
+    public void testCreateReferenceForIdPreparing() throws Exception {
+	testPreparing(createReferenceForId);
+    }
+    public void testCreateReferenceForIdCommitting() throws Exception {
+	testCommitting(createReferenceForId);
+    }
+    public void testCreateReferenceForIdCommitted() throws Exception {
+	testCommitted(createReferenceForId);
+    }
+    public void testCreateReferenceForIdShuttingDownExistingTxn()
+	throws Exception
+    {
+	testShuttingDownExistingTxn(createReferenceForId);
+    }
+    public void testCreateReferenceForIdShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(createReferenceForId);
+    }
+    public void testCreateReferenceForIdShutdown() throws Exception {
+	testShutdown(createReferenceForId);
+    }
+
+    public void testCreateReferenceForIdSuccess() throws Exception {
+	BigInteger id = service.createReference(dummy).getId();
+	ManagedReference ref = service.createReferenceForId(id);
+	assertSame(dummy, ref.get(DummyManagedObject.class));
+	txn.commit();
+	createTransaction();
+	ref = service.createReferenceForId(id);
+	dummy = ref.get(DummyManagedObject.class);
+	assertSame(
+	    dummy, service.getBinding("dummy", DummyManagedObject.class));
+	service.removeObject(dummy);
+	try {
+	    ref.get(DummyManagedObject.class);
+	    fail("Expected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	    System.err.println(e);
+	}
+	txn.commit();
+	createTransaction();
+	ref = service.createReferenceForId(id);
+	try {
+	    ref.get(DummyManagedObject.class);
+	    fail("Expected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	    System.err.println(e);
+	}
+    }
+
     /* -- Test ManagedReference.get -- */
 
     public void testGetReferenceNullType() throws Exception {
@@ -1665,7 +1764,7 @@ public class TestDataServiceImpl extends TestCase {
     public void testGetReferenceShutdown() throws Exception {
 	/* Expect TransactionNotActiveException */
 	getReference.setUp();
-	txn.abort();
+	txn.abort(null);
 	service.shutdown();
 	try {
 	    getReference.run();
@@ -1805,7 +1904,7 @@ public class TestDataServiceImpl extends TestCase {
     public void testGetReferenceUpdateShutdown() throws Exception {
 	/* Expect TransactionNotActiveException */
 	getReferenceUpdate.setUp();
-	txn.abort();
+	txn.abort(null);
 	service.shutdown();
 	try {
 	    getReferenceUpdate.run();
@@ -1878,7 +1977,7 @@ public class TestDataServiceImpl extends TestCase {
 		} catch (Exception e) {
 		    fail("Unexpected exception: " + e);
 		} finally {
-		    txn2.abort();
+		    txn2.abort(null);
 		}
 	    }
 	};
@@ -1928,7 +2027,7 @@ public class TestDataServiceImpl extends TestCase {
     /* -- Test shutdown -- */
 
     public void testShutdownAgain() throws Exception {
-	txn.abort();
+	txn.abort(null);
 	txn = null;
 	service.shutdown();
 	ShutdownAction action = new ShutdownAction();
@@ -1959,7 +2058,7 @@ public class TestDataServiceImpl extends TestCase {
 	action1.interrupt();
 	action1.assertResult(false);
 	action2.assertBlocked();
-	txn.abort();
+	txn.abort(null);
 	action2.assertResult(true);
 	txn = null;
 	service = null;
@@ -1970,7 +2069,7 @@ public class TestDataServiceImpl extends TestCase {
 	action1.assertBlocked();
 	ShutdownAction action2 = new ShutdownAction();
 	action2.assertBlocked();
-	txn.abort();
+	txn.abort(null);
 	boolean result1;
 	try {
 	    result1 = action1.waitForDone();
@@ -2023,11 +2122,11 @@ public class TestDataServiceImpl extends TestCase {
 	txn = new DummyTransaction(UsePrepareAndCommit.NO);
 	txnProxy.setCurrentTransaction(txn);
 	service.removeObject(dummy);
-	txn.abort();
+	txn.abort(null);
 	txn = new DummyTransaction(UsePrepareAndCommit.YES);
 	txnProxy.setCurrentTransaction(txn);
 	service.removeObject(dummy);
-	txn.abort();
+	txn.abort(null);
 	txn = null;
     }
 
@@ -2050,11 +2149,11 @@ public class TestDataServiceImpl extends TestCase {
 	txn = new DummyTransaction(UsePrepareAndCommit.NO);
 	txnProxy.setCurrentTransaction(txn);
 	service.getBinding("dummy", DummyManagedObject.class);
-	txn.abort();
+	txn.abort(null);
 	txn = new DummyTransaction(UsePrepareAndCommit.YES);
 	txnProxy.setCurrentTransaction(txn);
 	service.getBinding("dummy", DummyManagedObject.class);
-	txn.abort();
+	txn.abort(null);
 	createTransaction();
 	service.getBinding("dummy", DummyManagedObject.class);
     }
@@ -2189,6 +2288,97 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
+    public void testDeadlock() throws Exception {
+	service.setBinding("dummy2", new DummyManagedObject());
+	txn.commit();
+	for (int i = 0; i < 5; i++) {
+	    createTransaction();
+	    dummy = service.getBinding("dummy", DummyManagedObject.class);
+	    final Semaphore flag = new Semaphore(1);
+	    flag.acquire();
+	    final int finalI = i;
+	    class MyRunnable implements Runnable {
+		Exception exception2;
+		public void run() {
+		    DummyTransaction txn2 = null;
+		    try {
+			txn2 = new DummyTransaction(
+			    UsePrepareAndCommit.ARBITRARY);
+			txnProxy.setCurrentTransaction(txn2);
+			componentRegistry.registerAppContext();
+			service.getBinding("dummy2", DummyManagedObject.class);
+			flag.release();
+			service.getBinding("dummy", DummyManagedObject.class)
+			    .setValue(finalI);
+			System.err.println(finalI + " txn2: commit");
+			txn2.commit();
+		    } catch (TransactionAbortedException e) {
+			System.err.println(finalI + " txn2: " + e);
+			exception2 = e;
+		    } catch (Exception e) {
+			System.err.println(finalI + " txn2: " + e);
+			exception2 = e;
+			if (txn2 != null) {
+			    txn2.abort(null);
+			}
+		    }
+		}
+	    }
+	    MyRunnable myRunnable = new MyRunnable();
+	    Thread thread = new Thread(myRunnable);
+	    thread.start();
+	    Thread.sleep(i * 500);
+	    flag.acquire();
+	    TransactionAbortedException exception = null;
+	    try {
+		service.getBinding("dummy2", DummyManagedObject.class)
+		    .setValue(i);
+		System.err.println(i + " txn1: commit");
+		txn.commit();
+	    } catch (TransactionAbortedException e) {
+		System.err.println(i + " txn1: " + e);
+		exception = e;
+	    }
+	    thread.join();
+	    if (myRunnable.exception2 != null &&
+		!(myRunnable.exception2
+		  instanceof TransactionAbortedException))
+	    {
+		throw myRunnable.exception2;
+	    } else if (exception == null && myRunnable.exception2 == null) {
+		fail("Expected TransactionAbortedException");
+	    }
+	    txn = null;
+	}
+    }
+
+    public void testModifiedNotSerializable() throws Exception {
+	txn.commit();
+	createTransaction();
+	dummy = service.getBinding("dummy", DummyManagedObject.class);
+	dummy.value = Thread.currentThread();
+	try {
+	    txn.commit();
+	    fail("Expected ObjectIOException");
+	} catch (ObjectIOException e) {
+	    System.err.println(e);
+	} finally {
+	    txn = null;
+	}
+    }
+
+    public void testNotSerializableAfterDeserialize() throws Exception {
+	dummy.value = new SerializationFailsAfterDeserialize();
+	txn.commit();
+	createTransaction();
+	try {
+	    service.getBinding("dummy", DummyManagedObject.class);
+	    fail("Expected ObjectIOException");
+	} catch (ObjectIOException e) {
+	    System.err.println(e);
+	}
+    }
+
     /* -- App and service binding methods -- */
 
     <T> T getBinding(
@@ -2302,7 +2492,7 @@ public class TestDataServiceImpl extends TestCase {
 	return createProperties(
 	    DataStoreImplClassName + ".directory", dbDirectory,
 	    StandardProperties.APP_NAME, "TestDataServiceImpl",
-	    DataServiceImplClassName + ".debugCheckInterval", "0");
+	    DataServiceImplClassName + ".debug.check.interval", "0");
     }
 
     /** Creates a new transaction. */
@@ -2324,6 +2514,29 @@ public class TestDataServiceImpl extends TestCase {
 	    throws IOException
 	{
 	    throw new IOException("Serialization fails");
+	}
+    }
+
+    /**
+     * A serializable object that fails during serialization after
+     * deserialization.
+     */
+    static class SerializationFailsAfterDeserialize implements Serializable {
+        private static final long serialVersionUID = 1L;
+	private transient boolean deserialized;
+	private void writeObject(ObjectOutputStream out)
+	    throws IOException
+	{
+	    if (deserialized) {
+		throw new IOException(
+		    "Serialization fails after deserialization");
+	    }
+	}
+	private void readObject(ObjectInputStream in)
+	    throws IOException, ClassNotFoundException
+	{
+	    in.defaultReadObject();
+	    deserialized = true;
 	}
     }
 
@@ -2399,7 +2612,7 @@ public class TestDataServiceImpl extends TestCase {
 	}
 	Participant participant = new Participant();
 	txn.join(participant);
-	txn.abort();
+	txn.abort(null);
 	txn = null;
 	assertTrue("Action should throw", participant.ok);
     }
@@ -2407,7 +2620,7 @@ public class TestDataServiceImpl extends TestCase {
     /** Tests running the action after abort. */
     private void testAborted(Action action) {
 	action.setUp();
-	txn.abort();
+	txn.abort(null);
 	try {
 	    action.run();
 	    fail("Expected TransactionNotActiveException");
@@ -2511,9 +2724,9 @@ public class TestDataServiceImpl extends TestCase {
 	} catch (IllegalStateException e) {
 	    System.err.println(e);
 	}
-	txn.abort();
+	txn.abort(null);
 	txn = null;
-	originalTxn.abort();
+	originalTxn.abort(null);
 	shutdownAction.assertResult(true);
 	service = null;
     }
@@ -2521,7 +2734,7 @@ public class TestDataServiceImpl extends TestCase {
     /** Tests running the action after shutdown. */
     void testShutdown(Action action) {
 	action.setUp();
-	txn.abort();
+	txn.abort(null);
 	service.shutdown();
 	try {
 	    action.run();

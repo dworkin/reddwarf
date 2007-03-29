@@ -39,16 +39,12 @@ import com.sun.sgs.impl.util.MessageBuffer;
 import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.io.Connector;
-import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
-import com.sun.sgs.service.ProtocolMessageListener;
 import com.sun.sgs.service.SgsClientSession;
 import com.sun.sgs.service.TaskService;
-import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.test.util.DummyComponentRegistry;
-import com.sun.sgs.test.util.DummyTaskScheduler;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 import java.io.ByteArrayInputStream;
@@ -79,10 +75,6 @@ public class TestChannelServiceImpl extends TestCase {
     private static final String DataStoreImplClassName =
 	DataStoreImpl.class.getName();
 
-    /** The name of the DataServiceImpl class. */
-    private static final String DataServiceImplClassName =
-	DataServiceImpl.class.getName();
-
     /** Directory used for database shared across multiple tests. */
     private static final String DB_DIRECTORY =
         System.getProperty("java.io.tmpdir") + File.separator +
@@ -99,10 +91,7 @@ public class TestChannelServiceImpl extends TestCase {
     /** Properties for creating the shared database. */
     private static Properties dbProps = createProperties(
 	DataStoreImplClassName + ".directory", DB_DIRECTORY,
-	StandardProperties.APP_NAME, "TestChannelServiceImpl",
-	DataServiceImplClassName + ".debugCheckInterval", "1");
-    
-    private static final int SESSION_ID_SIZE = 8;
+	StandardProperties.APP_NAME, "TestChannelServiceImpl");
 
     private static final String CHANNEL_NAME = "three stooges";
     
@@ -111,9 +100,6 @@ public class TestChannelServiceImpl extends TestCase {
     private static final String LOGIN_FAILED_MESSAGE = "login failed";
     
     private static Object disconnectedCallbackLock = new Object();
-
-    /** A per-test database directory, or null if not created. */
-    private String directory;
     
     private static DummyTransactionProxy txnProxy =
 	MinimalTestKernel.getTransactionProxy();
@@ -127,7 +113,6 @@ public class TestChannelServiceImpl extends TestCase {
     private ChannelServiceImpl channelService;
     private ClientSessionServiceImpl sessionService;
     private TaskServiceImpl taskService;
-    private DummyTaskScheduler taskScheduler;
     private DummyIdentityManager identityManager;
     
     /** The listen port for the client session service. */
@@ -215,10 +200,16 @@ public class TestChannelServiceImpl extends TestCase {
     protected void tearDown(boolean clean) throws Exception {
         if (txn != null) {
             try {
-                txn.abort();
-            } catch (IllegalStateException e) {
+                txn.abort(null);
+            } catch (RuntimeException e) {
+                if ((! clean) || passed) {
+                    // ignore
+                } else {
+                    e.printStackTrace();
+                }
+            } finally {
+                txn = null;
             }
-            txn = null;
         }
         if (channelService != null) {
             channelService.shutdown();
@@ -348,7 +339,7 @@ public class TestChannelServiceImpl extends TestCase {
 
     public void testCreateChannelAndAbort() {
 	createChannel("foo");
-	txn.abort();
+	txn.abort(null);
 	createTransaction();
 	try {
 	    channelService.getChannel("foo");
@@ -1227,15 +1218,15 @@ public class TestChannelServiceImpl extends TestCase {
 	    }
 	}
 
-	void join(String name) {
+	void join(String channelName) {
 	    for (DummyClient client : clients.values()) {
-		client.join(name);
+		client.join(channelName);
 	    }
 	}
 
-	void leave(String name) {
+	void leave(String channelName) {
 	    for (DummyClient client : clients.values()) {
-		client.leave(name);
+		client.leave(channelName);
 	    }
 	}
 
@@ -1393,20 +1384,23 @@ public class TestChannelServiceImpl extends TestCase {
     {
 	private final static long serialVersionUID = 1L;
 
-	private final Channel channel;
+	private final Channel expectedChannel;
 
 	DummyChannelListener() {
 	    this(null);
 	}
 
 	DummyChannelListener(Channel channel) {
-	    this.channel = channel;
+	    expectedChannel = channel;
 	}
 	
         /** {@inheritDoc} */
 	public void receivedMessage(
 	    Channel channel, ClientSession session, byte[] message)
 	{
+            if (expectedChannel != null) {
+                assertEquals(expectedChannel, channel);
+            }
 	}
     }
 
@@ -1580,7 +1574,6 @@ public class TestChannelServiceImpl extends TestCase {
 
 	String name;
 	byte[] sessionId;
-	private String password;
 	private Connector<SocketAddress> connector;
 	private ConnectionListener listener;
 	private Connection connection;
@@ -1591,6 +1584,7 @@ public class TestChannelServiceImpl extends TestCase {
 	private boolean logoutAck = false;
 	private boolean joinAck = false;
 	private boolean leaveAck = false;
+        private boolean awaitGraceful = false;
 	private String channelName = null;
 	private String reason;
 	private byte[] reconnectionKey;
@@ -1640,71 +1634,44 @@ public class TestChannelServiceImpl extends TestCase {
 
 	void disconnect(boolean graceful) {
 	    System.err.println("DummyClient.disconnect: " + graceful);
-	    if (!graceful) {
-		synchronized (lock) {
-		    if (connected == false) {
-			return;
-		    }
-		    connected = false;
-		    try {
-			connection.close();
-		    } catch (IOException e) {
-			System.err.println(
-			    "DummyClient.disconnect exception:" + e);
-		    }
-		    lock.notifyAll();
-		}
-	    } else {
-		synchronized (lock) {
-		    if (connected == false) {
-			return;
-		    }
-		    MessageBuffer buf = new MessageBuffer(3);
-		    buf.putByte(SimpleSgsProtocol.VERSION).
-			putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-			putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
-		    logoutAck = false;
-		    try {
-			connection.sendBytes(buf.getBuffer());
-		    } catch (IOException e) {
-			throw new RuntimeException(e);
-		    }
-		    synchronized (lock) {
-			try {
-			    if (logoutAck == false) {
-				lock.wait(WAIT_TIME);
-			    }
-			    if (logoutAck != true) {
-				throw new RuntimeException(
-				    "DummyClient.disconnect timed out");
-			    }
-			} catch (InterruptedException e) {
-			    throw new RuntimeException(
-				"DummyClient.disconnect timed out", e);
-			}
-		    }
-		}
-	    }
+
+            if (graceful) {
+	        logout();
+                return;
+            }
+
+            synchronized (lock) {
+                if (connected == false) {
+                    return;
+                }
+                try {
+                    connection.close();
+                } catch (IOException e) {
+                    System.err.println(
+                        "DummyClient.disconnect exception:" + e);
+                    connected = false;
+                    lock.notifyAll();
+                }
+            }
 	}
 
-	void login(String name, String password) {
+	void login(String user, String pass) {
 	    synchronized (lock) {
 		if (connected == false) {
 		    throw new RuntimeException(
 			"DummyClient.login not connected");
 		}
 	    }
-	    this.name = name;
-	    this.password = password;
+	    this.name = user;
 
 	    MessageBuffer buf =
-		new MessageBuffer(3 + MessageBuffer.getSize(name) +
-				  MessageBuffer.getSize(password));
+		new MessageBuffer(3 + MessageBuffer.getSize(user) +
+				  MessageBuffer.getSize(pass));
 	    buf.putByte(SimpleSgsProtocol.VERSION).
 		putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
 		putByte(SimpleSgsProtocol.LOGIN_REQUEST).
-		putString(name).
-		putString(password);
+		putString(user).
+		putString(pass);
 	    loginAck = false;
 	    try {
 		connection.sendBytes(buf.getBuffer());
@@ -1773,22 +1740,22 @@ public class TestChannelServiceImpl extends TestCase {
 	/**
 	 * Sends a CHANNEL_SEND_REQUEST.
 	 */
-	void sendChannelMessage(String name, Set<byte[]> recipientIds,
+	void sendChannelMessage(String channelToSend, Set<byte[]> recipientIds,
 				byte[] message) {
 	    checkLoggedIn();
 
 	    MessageBuffer buf =
-		new MessageBuffer(3 + MessageBuffer.getSize(name) + 8 +
+		new MessageBuffer(3 + MessageBuffer.getSize(channelToSend) + 8 +
 				  getSize(recipientIds) +
 				  2 + message.length);
 	    buf.putByte(SimpleSgsProtocol.VERSION).
 		putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
 		putByte(SimpleSgsProtocol.CHANNEL_SEND_REQUEST).
-		putString(name).
+		putString(channelToSend).
 		putLong(nextSequenceNumber()).
 		putShort(recipientIds.size());
-	    for (byte[] sessionId : recipientIds) {
-		buf.putByteArray(sessionId);
+	    for (byte[] recipientId : recipientIds) {
+		buf.putByteArray(recipientId);
 	    }
 	    buf.putByteArray(message);
 	    try {
@@ -1826,12 +1793,12 @@ public class TestChannelServiceImpl extends TestCase {
 	    }
 	}
 
-	void join(String name) {
+	void join(String channelToJoin) {
 	    String action = "join";
 	    MessageBuffer buf =
 		new MessageBuffer(MessageBuffer.getSize(action) +
-				  MessageBuffer.getSize(name));
-	    buf.putString(action).putString(name);
+				  MessageBuffer.getSize(channelToJoin));
+	    buf.putString(action).putString(channelToJoin);
 	    sendMessage(buf.getBuffer());
 	    joinAck = false;
 	    channelName = null;
@@ -1842,28 +1809,28 @@ public class TestChannelServiceImpl extends TestCase {
 		    }
 		    if (joinAck != true) {
 			throw new RuntimeException(
-			    "DummyClient.join timed out: " + name);
+			    "DummyClient.join timed out: " + channelToJoin);
 		    }
 
 		    if (channelName == null ||
-			!name.equals(channelName)) {
-			fail("DummyClient.leave expected channel " + name +
+			!channelToJoin.equals(channelName)) {
+			fail("DummyClient.leave expected channel " + channelToJoin +
 			     ", got " + channelName);
 		    }
 		    
 		} catch (InterruptedException e) {
 		    throw new RuntimeException(
-			    "DummyClient.join timed out: " + name, e);
+			    "DummyClient.join timed out: " + channelToJoin, e);
 		}
 	    }
 	}
 	    
-	void leave(String name) {
+	void leave(String channelToLeave) {
 	    String action = "leave";
 	    MessageBuffer buf =
 		new MessageBuffer(MessageBuffer.getSize(action) +
-				  MessageBuffer.getSize(name));
-	    buf.putString(action).putString(name);
+				  MessageBuffer.getSize(channelToLeave));
+	    buf.putString(action).putString(channelToLeave);
 	    sendMessage(buf.getBuffer());
 	    leaveAck = false;
 	    channelName = null;
@@ -1874,56 +1841,53 @@ public class TestChannelServiceImpl extends TestCase {
 		    }
 		    if (leaveAck != true) {
 			throw new RuntimeException(
-			    "DummyClient.leave timed out: " + name);
+			    "DummyClient.leave timed out: " + channelToLeave);
 		    }
 
 		    if (channelName == null ||
-			!name.equals(channelName)) {
-			fail("DummyClient.leave expected channel " + name +
+			!channelToLeave.equals(channelName)) {
+			fail("DummyClient.leave expected channel " + channelToLeave +
 			     ", got " + channelName);
 		    }
 		    
 		} catch (InterruptedException e) {
 		    throw new RuntimeException(
-			    "DummyClient.leave timed out: " + name, e);
+			    "DummyClient.leave timed out: " + channelToLeave, e);
 		}
 	    }
 	}
 	
 	void logout() {
-	    synchronized (lock) {
-		if (connected == false) {
-		    throw new RuntimeException(
-			"DummyClient.login not connected");
-		}
-	    }
-
-	    MessageBuffer buf = new MessageBuffer(3);
-	    buf.putByte(SimpleSgsProtocol.VERSION).
-		putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-		putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
-	    logoutAck = false;
-
-	    try {
-		connection.sendBytes(buf.getBuffer());
-	    } catch (IOException e) {
-		throw new RuntimeException(e);
-	    }
-	    synchronized (lock) {
-		try {
-		    if (logoutAck == false) {
-			lock.wait(WAIT_TIME);
-		    }
-		    if (logoutAck != true) {
-			throw new RuntimeException(
-			    "DummyClient.logout timed out");
-		    }
-		} catch (InterruptedException e) {
-		    throw new RuntimeException(
-			"DummyClient.logout timed out", e);
-		}
-	    }
-	    
+            synchronized (lock) {
+                if (connected == false) {
+                    return;
+                }
+                MessageBuffer buf = new MessageBuffer(3);
+                buf.putByte(SimpleSgsProtocol.VERSION).
+                putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
+                putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
+                logoutAck = false;
+                awaitGraceful = true;
+                try {
+                    connection.sendBytes(buf.getBuffer());
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+                synchronized (lock) {
+                    try {
+                        if (logoutAck == false) {
+                            lock.wait(WAIT_TIME);
+                        }
+                        if (logoutAck != true) {
+                            throw new RuntimeException(
+                                "DummyClient.disconnect timed out");
+                        }
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(
+                            "DummyClient.disconnect timed out", e);
+                    }
+                }
+            }
 	}
 
 	private class Listener implements ConnectionListener {
@@ -2001,7 +1965,7 @@ public class TestChannelServiceImpl extends TestCase {
 		    synchronized (lock) {
 			logoutAck = true;
 			System.err.println("logout succeeded: " + name);
-			lock.notifyAll();
+                        // let disconnect do the lock notification
 		    }
 		    break;
 
@@ -2030,35 +1994,35 @@ public class TestChannelServiceImpl extends TestCase {
 		switch (opcode) {
 
 		case SimpleSgsProtocol.CHANNEL_JOIN: {
-		    String name = buf.getString();
+		    String channelToJoin = buf.getString();
 		    synchronized (lock) {
 			joinAck = true;
-			channelName = name;
-			System.err.println("join succeeded: " + name);
+			channelName = channelToJoin;
+			System.err.println("join succeeded: " + channelToJoin);
 			lock.notifyAll();
 		    }
 		    break;
 		}
 		    
 		case SimpleSgsProtocol.CHANNEL_LEAVE: {
-		    String name = buf.getString();
+		    String channelToLeave = buf.getString();
 		    synchronized (lock) {
 			leaveAck = true;
-			channelName = name;
-			System.err.println("leave succeeded: " + name);
+			channelName = channelToLeave;
+			System.err.println("leave succeeded: " + channelToLeave);
 			lock.notifyAll();
 		    }
 		    break;
 		}
 
 		case SimpleSgsProtocol.CHANNEL_MESSAGE: {
-		    String name = buf.getString();
+		    String channelMessageFrom = buf.getString();
 		    long seq = buf.getLong();
 		    byte[] senderId = buf.getByteArray();
 		    byte[] message = buf.getByteArray();
 		    synchronized (lock) {
 			channelMessages.add(
-			    new MessageInfo(name, senderId, message, seq));
+			    new MessageInfo(channelMessageFrom, senderId, message, seq));
 			lock.notifyAll();
 		    }
 		    break;
@@ -2090,6 +2054,14 @@ public class TestChannelServiceImpl extends TestCase {
 
             /** {@inheritDoc} */
 	    public void disconnected(Connection conn) {
+                synchronized (lock) {
+                    if (awaitGraceful) {
+                        // Hack since client might not get last msg
+                        logoutAck = true;
+                    }
+                    connected = false;
+                    lock.notifyAll();
+                }
 	    }
 	    
             /** {@inheritDoc} */
@@ -2165,7 +2137,7 @@ public class TestChannelServiceImpl extends TestCase {
 	private final static long serialVersionUID = 1L;
 	private final String name;
 	boolean receivedDisconnectedCallback = false;
-	boolean graceful = false;
+	boolean wasGracefulDisconnect = false;
 	
 	private final ClientSession session;
 	
@@ -2180,7 +2152,7 @@ public class TestChannelServiceImpl extends TestCase {
 			       "] disconnected invoked with " + graceful);
 	    synchronized (disconnectedCallbackLock) {
 		receivedDisconnectedCallback = true;
-		this.graceful = graceful;
+		this.wasGracefulDisconnect = graceful;
 		disconnectedCallbackLock.notifyAll();
 	    }
 	}

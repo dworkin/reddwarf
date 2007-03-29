@@ -73,7 +73,7 @@ import java.util.logging.Logger;
  *
  * <ul>
  *
- * <li> <i>Key:</i> <code>com.sun.sgs.txnTimeout</code> <br>
+ * <li> <i>Key:</i> <code>com.sun.sgs.txn.timeout</code> <br>
  *	<i>Default:</i> <code>1000</code> <br>
  *	The maximum amount of time in milliseconds that a transaction will be
  *	permitted to run before it is a candidate for being aborted. <p>
@@ -86,7 +86,7 @@ import java.util.logging.Logger;
  *	<code>DataStoreImpl</code> requires its own, unique directory. <p>
  *
  * <li> <i>Key:</i> <code>
- *	com.sun.sgs.impl.service.data.store.DataStoreImpl.allocationBlockSize
+ *	com.sun.sgs.impl.service.data.store.DataStoreImpl.allocation.block.size
  *	</code> <br>
  *	<i>Default:</i> <code>100</code> <br>
  *	The number of object IDs to allocate at a time.  This value must be
@@ -99,14 +99,14 @@ import java.util.logging.Logger;
  *	exits. <p>
  *
  * <li> <i>Key:</i>
- *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl.cacheSize
+ *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl.cache.size
  *	</code> <br>
  *	<i>Default:</i> <code>1000000</code> <br>
  *	The size in bytes of the Berkeley DB cache.  This value must not be
  *	less than 20000. <p>
  *
  * <li> <i>Key:</i>
- *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl.flushToDisk
+ *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl.flush.to.disk
  *	</code> <br>
  *	<i>Default:</i> <code>false</code>
  *	Whether to flush changes to disk when a transaction commits.  If
@@ -139,7 +139,7 @@ public class DataStoreImpl
 {
     /** The property that specifies the transaction timeout in milliseconds. */
     private static final String TXN_TIMEOUT_PROPERTY =
-	"com.sun.sgs.txnTimeout";
+	"com.sun.sgs.txn.timeout";
 
     /** The default transaction timeout in milliseconds. */
     private static final long DEFAULT_TXN_TIMEOUT = 1000;
@@ -161,7 +161,7 @@ public class DataStoreImpl
      * time.
      */
     private static final String ALLOCATION_BLOCK_SIZE_PROPERTY =
-	CLASSNAME + ".allocationBlockSize";
+	CLASSNAME + ".allocation.block.size";
 
     /** The default for the number of object IDs to allocate at one time. */
     private static final int DEFAULT_ALLOCATION_BLOCK_SIZE = 100;
@@ -169,7 +169,8 @@ public class DataStoreImpl
     /**
      * The property that specifies the size in bytes of the Berkeley DB cache.
      */
-    private static final String CACHE_SIZE_PROPERTY = CLASSNAME + ".cacheSize";
+    private static final String CACHE_SIZE_PROPERTY =
+	CLASSNAME + ".cache.size";
 
     /** The minimum cache size, as specified by Berkeley DB */
     private static final long MIN_CACHE_SIZE = 20000;
@@ -184,7 +185,7 @@ public class DataStoreImpl
      * although integrity will be maintained.
      */
     private static final String FLUSH_TO_DISK_PROPERTY =
-	CLASSNAME + ".flushToDisk";
+	CLASSNAME + ".flush.to.disk";
 
     /** The logger for this class. */
     static final LoggerWrapper logger =
@@ -507,7 +508,7 @@ public class DataStoreImpl
      *		<code>com.sun.sgs.app.root</code> nor <code>
      *		com.sun.sgs.impl.service.data.store.DataStoreImpl.directory
      *		</code> is provided, or the <code>
-     *		com.sun.sgs.impl.service.data.store.DataStoreImpl.allocationBlockSize
+     *		com.sun.sgs.impl.service.data.store.DataStoreImpl.allocation.block.size
      *		</code> property is not a valid integer greater than zero, or
      *		if the value of the <code>
      *		com.sun.sgs.impl.service.data.store.DataStoreImpl.cacheSize
@@ -1487,8 +1488,10 @@ public class DataStoreImpl
 	} else if (e instanceof DatabaseException) {
 	    re = new DataStoreException(
 		operation + " failed: " + e.getMessage(), e);
-	} else {
+	} else if (e instanceof RuntimeException) {
 	    re = (RuntimeException) e;
+	} else {
+	    throw new DataStoreException("Unexpected exception: " + e, e);
 	}
 	/*
 	 * If we're throwing an exception saying that the transaction was

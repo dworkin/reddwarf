@@ -36,6 +36,16 @@ public class TransactionRunner implements KernelRunnable {
     }
 
     /**
+     * Returns the base type of the task that is run transactionally by
+     * this <code>TransactionRunner</code>.
+     *
+     * @return the base type of the wrapped task
+     */
+    public String getBaseTaskType() {
+        return transactionalTask.getBaseTaskType();
+    }
+
+    /**
      * Runs this <code>TransactionRunner</code>, which in turn runs its
      * <code>KernelRunnable</code> in a transactional context.
      *

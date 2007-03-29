@@ -12,6 +12,7 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionException;
 import java.io.DataInput;
 import java.io.Serializable;
+import java.math.BigInteger;
 
 /**
  * Provides facilities for services to manage access to shared, persistent
@@ -105,4 +106,22 @@ public interface DataService extends DataManager, Service {
      *		problem with the current transaction
      */
     String nextServiceBoundName(String name);
+
+    /**
+     * Creates a managed reference for the object with the specified
+     * identifier, which should have been obtained from a call to {@link
+     * ManagedReference#getId ManagedReference.getId}.  Callers should make
+     * sure that the associated object is reachable from an existing name
+     * binding.  This method does not check to see whether the associated
+     * object has been removed.
+     *
+     * @param	id the identifier
+     * @return	the managed reference
+     * @throws	IllegalArgumentException if the implementation is able to
+     *		determine that {@code id} was not returned by a call to {@code
+     *		ManagedReference.getId}
+     * @throws	TransactionException if the operation failed because of a
+     *		problem with the current transaction
+     */
+    ManagedReference createReferenceForId(BigInteger id);
 }

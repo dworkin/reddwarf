@@ -15,6 +15,7 @@ import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.TaskManager;
+import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.auth.IdentityCredentials;
 import com.sun.sgs.auth.IdentityManager;
@@ -116,7 +117,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     private ClientSessionServiceImpl sessionService;
     private TaskServiceImpl taskService;
     private DummyTaskScheduler taskScheduler;
-    private DummyIdentityManager identityManager;
+    private static DummyIdentityManager identityManager;
 
     /** The listen port for the client session service. */
     private int port;
@@ -185,7 +186,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	channelService.configure(serviceRegistry, txnProxy);
 	serviceRegistry.setComponent(ChannelManager.class, channelService);
 	
-	txn.commit();
+	commitTransaction();
 	createTransaction();
     }
 
@@ -203,7 +204,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     protected void tearDown(boolean clean) throws Exception {
         if (txn != null) {
             try {
-                txn.abort();
+                txn.abort(null);
             } catch (IllegalStateException e) {
             }
             txn = null;
@@ -295,9 +296,28 @@ public class TestClientSessionServiceImpl extends TestCase {
     public void testLoginSuccess() throws Exception {
 	registerAppListener();
 	DummyClient client = new DummyClient();
+	String name = "success";
 	try {
 	    client.connect(port);
-	    client.login("success", "password");
+	    client.login(name, "password");
+	} finally {
+            client.disconnect(false);
+	}
+    }
+    
+    public void testLoginSuccessAndNotifyLoggedInCallback() throws Exception {
+	registerAppListener();
+	DummyClient client = new DummyClient();
+	String name = "success";
+	try {
+	    client.connect(port);
+	    client.login(name, "password");
+	    if (identityManager.getNotifyLoggedIn(name)) {
+		System.err.println(
+		    "notifyLoggedIn invoked for identity: " + name);
+	    } else {
+		fail("notifyLoggedIn not invoked for identity: " + name);
+	    }
 	} finally {
             client.disconnect(false);
 	}
@@ -315,6 +335,10 @@ public class TestClientSessionServiceImpl extends TestCase {
 	} catch (RuntimeException e) {
 	    if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
 		System.err.println("login refused");
+		if (identityManager.getNotifyLoggedIn(NON_SERIALIZABLE)) {
+		    fail("unexpected notifyLoggedIn invoked on identity: " +
+			 NON_SERIALIZABLE);
+		}
 		return;
 	    } else {
 		fail("unexpected login failure: " + e);
@@ -336,6 +360,10 @@ public class TestClientSessionServiceImpl extends TestCase {
 	} catch (RuntimeException e) {
 	    if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
 		System.err.println("login refused");
+		if (identityManager.getNotifyLoggedIn(NON_SERIALIZABLE)) {
+		    fail("unexpected notifyLoggedIn invoked on identity: " +
+			 NON_SERIALIZABLE);
+		}
 		return;
 	    } else {
 		fail("unexpected login failure: " + e);
@@ -357,6 +385,10 @@ public class TestClientSessionServiceImpl extends TestCase {
 	} catch (RuntimeException e) {
 	    if (e.getMessage().equals(LOGIN_FAILED_MESSAGE)) {
 		System.err.println("login refused");
+		if (identityManager.getNotifyLoggedIn(NON_SERIALIZABLE)) {
+		    fail("unexpected notifyLoggedIn invoked on identity: " +
+			 NON_SERIALIZABLE);
+		}
 		return;
 	    } else {
 		fail("unexpected login failure: " + e);
@@ -401,6 +433,32 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    client.disconnect(false);
 	}
     }
+
+    public void testLogoutAndNotifyLoggedOutCallback() throws Exception {
+	registerAppListener();
+	DummyClient client = new DummyClient();
+	String name = "logout";
+	try {
+	    client.connect(port);
+	    client.login(name, "password");
+	    client.logout();
+	    if (identityManager.getNotifyLoggedIn(name)) {
+		System.err.println(
+		    "notifyLoggedIn invoked for identity: " + name);
+	    } else {
+		fail("notifyLoggedIn not invoked for identity: " + name);
+	    }
+	    if (identityManager.getNotifyLoggedOut(name)) {
+		System.err.println(
+		    "notifyLoggedOut invoked for identity: " + name);
+	    } else {
+		fail("notifyLoggedOut not invoked for identity: " + name);
+	    }
+	} finally {
+            client.disconnect(false);
+	}
+    }
+
 
     public void testNotifyClientSessionListenerAfterCrash() throws Exception {
 	registerAppListener();
@@ -465,7 +523,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    }
 	    listenerKeys.add(key);
 	}
-	txn.commit();
+	commitTransaction();
 	return listenerKeys;
     }
 
@@ -475,7 +533,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	createTransaction();
 	DummyClientSessionListener sessionListener =
 	    getAppListener().getClientSessionListener(name);
-	txn.commit();
+	commitTransaction();
 	return sessionListener;
     }
 
@@ -497,7 +555,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    for (ClientSession session : appListener.getSessions()) {
 		if (session.isConnected() == true) {
 		    System.err.println("session is connected");
-		    txn.commit();
+		    commitTransaction();
 		    return;
 		} else {
 		    fail("Expected connected session: " + session);
@@ -525,7 +583,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    for (ClientSession session : appListener.getSessions()) {
 		if (session.getName().equals(name)) {
 		    System.err.println("names match");
-		    txn.commit();
+		    commitTransaction();
 		    return;
 		} else {
 		    fail("Expected session name: " + name +
@@ -554,7 +612,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    for (ClientSession session : appListener.getSessions()) {
 		if (session.getSessionId().equals(client.getSessionId())) {
 		    System.err.println("session IDs match");
-		    txn.commit();
+		    commitTransaction();
 		    return;
 		} else {
 		    fail("Expected session id: " + client.getSessionId() +
@@ -610,16 +668,18 @@ public class TestClientSessionServiceImpl extends TestCase {
 		client.sendMessage(buf.getBuffer());
 	    }
 	    
+	    DummyClientSessionListener sessionListener =
+		getClientSessionListener(name);
 	    synchronized (receivedAllMessagesLock) {
-		DummyClientSessionListener sessionListener =
-		    getClientSessionListener(name);
 		if (sessionListener.messages.size() != totalExpectedMessages) {
 		    try {
 			receivedAllMessagesLock.wait(WAIT_TIME);
 		    } catch (InterruptedException e) {
 		    }
 		}
-		sessionListener = getClientSessionListener(name);
+	    }
+	    sessionListener = getClientSessionListener(name);
+	    synchronized (receivedAllMessagesLock) {
 		int receivedMessages = sessionListener.messages.size();
 		if (receivedMessages != totalExpectedMessages) {
 		    fail("expected " + totalExpectedMessages + ", received " +
@@ -656,9 +716,22 @@ public class TestClientSessionServiceImpl extends TestCase {
      * current transaction.
      */
     private DummyTransaction createTransaction() {
-	txn = new DummyTransaction();
-	txnProxy.setCurrentTransaction(txn);
+	if (txn == null) {
+	    txn = new DummyTransaction();
+	    txnProxy.setCurrentTransaction(txn);
+	}
 	return txn;
+    }
+
+    private void commitTransaction() throws Exception {
+	if (txn != null) {
+	    txn.commit();
+	    txn = null;
+	    txnProxy.setCurrentTransaction(null);
+	} else {
+	    throw new TransactionNotActiveException(
+		"txn:" + txn + " already committed");
+	}
     }
     
     
@@ -692,12 +765,16 @@ public class TestClientSessionServiceImpl extends TestCase {
 	return new DataServiceImpl(dbProps, registry);
     }
 
+    /**
+     * Registers an AppListener within a transaction.
+     */
     private void registerAppListener() throws Exception {
+	
 	createTransaction();
 	DummyAppListener appListener = new DummyAppListener();
 	dataService.setServiceBinding(
 	    StandardProperties.APP_LISTENER, appListener);
-	txn.commit();
+	commitTransaction();
     }
     
     private DummyAppListener getAppListener() {
@@ -710,8 +787,68 @@ public class TestClientSessionServiceImpl extends TestCase {
      * Dummy identity manager for testing purposes.
      */
     private static class DummyIdentityManager implements IdentityManager {
+	private final Map<String, IdentityInfo> identities =
+	    Collections.synchronizedMap(new HashMap<String, IdentityInfo>());
+	
 	public Identity authenticateIdentity(IdentityCredentials credentials) {
-	    return new DummyIdentity(credentials);
+	    DummyIdentity identity = new DummyIdentity(credentials);
+	    identities.put(identity.getName(), new IdentityInfo());
+	    return identity;
+	}
+	
+	private void notifyLoggedIn(String name) {
+	    IdentityInfo info = identities.get(name);
+	    synchronized (info.loggedInLock) {
+		info.loggedIn = true;
+		info.loggedInLock.notifyAll();
+	    }
+	}
+
+	private void notifyLoggedOut(String name) {
+	    IdentityInfo info = identities.get(name);
+	    synchronized (info.loggedOutLock) {
+		info.loggedOut = true;
+		info.loggedOutLock.notifyAll();
+	    }
+	}
+
+	private boolean getNotifyLoggedIn(String name) {
+	    IdentityInfo info = identities.get(name);
+	    if (info == null) {
+		return false;
+	    }
+	    synchronized (info.loggedInLock) {
+		if (info.loggedIn != true) {
+		    try {
+			info.loggedInLock.wait(WAIT_TIME);
+		    } catch (InterruptedException e) {
+		    }
+		}
+		return info.loggedIn;
+	    }
+	}
+	
+	private boolean getNotifyLoggedOut(String name) {
+	    IdentityInfo info = identities.get(name);
+	    if (info == null) {
+		return false;
+	    }
+	    synchronized (info.loggedOutLock) {
+		if (info.loggedOut != true) {
+		    try {
+			info.loggedOutLock.wait(WAIT_TIME);
+		    } catch (InterruptedException e) {
+		    }
+		}
+		return info.loggedOut;
+	    }
+	}
+	
+	private static class IdentityInfo {
+	    private final Object loggedInLock = new Object();
+	    private final Object loggedOutLock = new Object();
+	    private boolean loggedIn = false;
+	    private boolean loggedOut = false;
 	}
     }
     
@@ -735,9 +872,15 @@ public class TestClientSessionServiceImpl extends TestCase {
             return name;
         }
 
-        public void notifyLoggedIn() {}
+        public void notifyLoggedIn() {
+	    //System.err.println("notifyLoggedIn: " + name);
+	    identityManager.notifyLoggedIn(name);
+	}
 
-        public void notifyLoggedOut() {}
+        public void notifyLoggedOut() {
+	    //System.err.println("notifyLoggedOut: " + name);
+	    identityManager.notifyLoggedOut(name);
+	}
         
         @Override
         public boolean equals(Object o) {
@@ -745,7 +888,7 @@ public class TestClientSessionServiceImpl extends TestCase {
                 return true;
             if (! (o instanceof DummyIdentity))
                 return false;
-            return ((DummyIdentity)o).name.equals(name);
+            return ((DummyIdentity) o).name.equals(name);
         }
         
         @Override
@@ -769,6 +912,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	private boolean loginAck = false;
 	private boolean loginSuccess = false;
 	private boolean logoutAck = false;
+        private boolean awaitGraceful = false;
 	private String reason;
 	private byte[] sessionId;
 	private byte[] reconnectionKey;
@@ -814,52 +958,26 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
 
 	void disconnect(boolean graceful) {
-	    System.err.println("DummyClient.disconnect: " + graceful);
-	    if (!graceful) {
-		synchronized (lock) {
-		    if (connected == false) {
-			return;
-		    }
-		    connected = false;
-		    try {
-			connection.close();
-		    } catch (IOException e) {
-			System.err.println(
-			    "DummyClient.disconnect exception:" + e);
-		    }
-		    lock.notifyAll();
-		}
-	    } else {
-		synchronized (lock) {
-		    if (connected == false) {
-			return;
-		    }
-		    MessageBuffer buf = new MessageBuffer(3);
-		    buf.putByte(SimpleSgsProtocol.VERSION).
-			putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-			putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
-		    logoutAck = false;
-		    try {
-			connection.sendBytes(buf.getBuffer());
-		    } catch (IOException e) {
-			throw new RuntimeException(e);
-		    }
-		    synchronized (lock) {
-			try {
-			    if (logoutAck == false) {
-				lock.wait(WAIT_TIME);
-			    }
-			    if (logoutAck != true) {
-				throw new RuntimeException(
-				    "DummyClient.disconnect timed out");
-			    }
-			} catch (InterruptedException e) {
-			    throw new RuntimeException(
-				"DummyClient.disconnect timed out", e);
-			}
-		    }
-		}
-	    }
+            System.err.println("DummyClient.disconnect: " + graceful);
+
+            if (graceful) {
+                logout();
+                return;
+            }
+
+            synchronized (lock) {
+                if (connected == false) {
+                    return;
+                }
+                try {
+                    connection.close();
+                } catch (IOException e) {
+                    System.err.println(
+                        "DummyClient.disconnect exception:" + e);
+                    connected = false;
+                    lock.notifyAll();
+                }
+            }
 	}
 
 	void login(String name, String password) {
@@ -946,39 +1064,36 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
 
 	void logout() {
-	    synchronized (lock) {
-		if (connected == false) {
-		    throw new RuntimeException(
-			"DummyClient.login not connected");
-		}
-	    }
-
-	    MessageBuffer buf = new MessageBuffer(3);
-	    buf.putByte(SimpleSgsProtocol.VERSION).
-		putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-		putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
-	    logoutAck = false;
-
-	    try {
-		connection.sendBytes(buf.getBuffer());
-	    } catch (IOException e) {
-		throw new RuntimeException(e);
-	    }
-	    synchronized (lock) {
-		try {
-		    if (logoutAck == false) {
-			lock.wait(WAIT_TIME);
-		    }
-		    if (logoutAck != true) {
-			throw new RuntimeException(
-			    "DummyClient.logout timed out");
-		    }
-		} catch (InterruptedException e) {
-		    throw new RuntimeException(
-			"DummyClient.logout timed out", e);
-		}
-	    }
-	    
+            synchronized (lock) {
+                if (connected == false) {
+                    return;
+                }
+                MessageBuffer buf = new MessageBuffer(3);
+                buf.putByte(SimpleSgsProtocol.VERSION).
+                putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
+                putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
+                logoutAck = false;
+                awaitGraceful = true;
+                try {
+                    connection.sendBytes(buf.getBuffer());
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+                synchronized (lock) {
+                    try {
+                        if (logoutAck == false) {
+                            lock.wait(WAIT_TIME);
+                        }
+                        if (logoutAck != true) {
+                            throw new RuntimeException(
+                                "DummyClient.disconnect timed out");
+                        }
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(
+                            "DummyClient.disconnect timed out", e);
+                    }
+                }
+            }
 	}
 
 	private class Listener implements ConnectionListener {
@@ -1040,11 +1155,11 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    break;
 
 		case SimpleSgsProtocol.LOGOUT_SUCCESS:
-		    synchronized (lock) {
-			logoutAck = true;
-			System.err.println("logout succeeded: " + name);
-			lock.notifyAll();
-		    }
+                    synchronized (lock) {
+                        logoutAck = true;
+                        System.err.println("logout succeeded: " + name);
+                        // let disconnect do the lock notification
+                    }
 		    break;
 
 		case SimpleSgsProtocol.SESSION_MESSAGE:
@@ -1082,6 +1197,14 @@ public class TestClientSessionServiceImpl extends TestCase {
 
             /** {@inheritDoc} */
 	    public void disconnected(Connection conn) {
+                synchronized (lock) {
+                    if (awaitGraceful) {
+                        // Hack since client might not get last msg
+                        logoutAck = true;
+                    }
+                    connected = false;
+                    lock.notifyAll();
+                }
 	    }
 	    
             /** {@inheritDoc} */

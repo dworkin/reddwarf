@@ -12,9 +12,6 @@ import java.util.TimerTask;
 /**
  * Package-private utility class that handles timers for tasks that are
  * scheduled to run in the future.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 class TimedTaskHandler {
 
@@ -80,6 +77,9 @@ class TimedTaskHandler {
         return true;
     }
 
+    /**
+     * Testing method.
+     */
     public void shutdown() {
         timer.cancel();
     }
@@ -91,9 +91,10 @@ class TimedTaskHandler {
     private class TimerTaskImpl extends TimerTask {
         private final ScheduledTask task;
         private boolean cancelled = false;
-        public TimerTaskImpl(ScheduledTask task) {
+        TimerTaskImpl(ScheduledTask task) {
             this.task = task;
         }
+        /** {@inheritDoc} */
         public synchronized boolean cancel() {
             if (! cancelled) {
                 cancelled = true;
@@ -101,9 +102,11 @@ class TimedTaskHandler {
             }
             return false;
         }
+        /** {@inheritDoc} */
         public long scheduledExecutionTime() {
             return task.getStartTime();
         }
+        /** {@inheritDoc} */
         public synchronized void run() {
             if (! cancelled)
                 consumer.timedTaskReady(task);

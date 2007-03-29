@@ -178,6 +178,12 @@ public class DataStoreServerImpl implements DataStoreServer {
 	/** Whether the transaction has already started aborting. */
 	private boolean aborting;
 
+	/**
+	 * The exception that caused the transaction to be aborted, or null if
+	 * no cause was provided or if no abort occurred.
+	 */
+	private Throwable abortCause = null;
+
 	/** Creates an instance with the specified ID. */
 	Txn(long tid) {
 	    this.tid = tid;
@@ -239,15 +245,20 @@ public class DataStoreServerImpl implements DataStoreServer {
 	    this.participant = participant;
 	}
 
-	public void abort() {
-	    abort(null);
-	}
-
 	public void abort(Throwable cause) {
 	    if (!aborting) {
 		aborting = true;
+		abortCause = cause;
 		participant.abort(this);
 	    }
+	}
+
+	public boolean isAborted() {
+	    return aborting;
+	}
+
+	public Throwable getAbortCause() {
+	    return abortCause;
 	}
 
 	/* -- Other methods -- */
