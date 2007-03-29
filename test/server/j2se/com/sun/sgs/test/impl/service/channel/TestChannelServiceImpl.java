@@ -2136,7 +2136,7 @@ public class TestChannelServiceImpl extends TestCase {
 	private final static long serialVersionUID = 1L;
 	private final String name;
 	boolean receivedDisconnectedCallback = false;
-	boolean wasDisconnectGraceful = false;
+	boolean wasGracefulDisconnect = false;
 	
 	private final ClientSession session;
 	
@@ -2151,7 +2151,7 @@ public class TestChannelServiceImpl extends TestCase {
 			       "] disconnected invoked with " + graceful);
 	    synchronized (disconnectedCallbackLock) {
 		receivedDisconnectedCallback = true;
-		this.wasDisconnectGraceful = graceful;
+		this.wasGracefulDisconnect = graceful;
 		disconnectedCallbackLock.notifyAll();
 	    }
 	}
