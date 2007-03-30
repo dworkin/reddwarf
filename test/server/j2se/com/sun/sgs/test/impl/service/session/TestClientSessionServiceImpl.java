@@ -193,6 +193,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     /** Sets passed if the test passes. */
     protected void runTest() throws Throwable {
 	super.runTest();
+        Thread.sleep(100);
 	passed = true;
     }
     
@@ -912,6 +913,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	private boolean loginSuccess = false;
 	private boolean logoutAck = false;
         private boolean awaitGraceful = false;
+        private boolean awaitLoginFailure = false;
 	private String reason;
 	private byte[] sessionId;
 	private byte[] reconnectionKey;
@@ -1197,9 +1199,15 @@ public class TestClientSessionServiceImpl extends TestCase {
             /** {@inheritDoc} */
 	    public void disconnected(Connection conn) {
                 synchronized (lock) {
+                    // Hack since client might not get last msg
                     if (awaitGraceful) {
-                        // Hack since client might not get last msg
+                        // Pretend they logged out gracefully
                         logoutAck = true;
+                    } else if (! loginAck) {
+                        // Pretend they got a login failure message
+                        loginAck = true;
+                        loginSuccess = false;
+                        reason = "disconnected before login ack";
                     }
                     connected = false;
                     lock.notifyAll();

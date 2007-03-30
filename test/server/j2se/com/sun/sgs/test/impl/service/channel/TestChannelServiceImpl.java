@@ -189,6 +189,7 @@ public class TestChannelServiceImpl extends TestCase {
     /** Sets passed if the test passes. */
     protected void runTest() throws Throwable {
 	super.runTest();
+        Thread.sleep(100);
 	passed = true;
     }
     
@@ -1239,14 +1240,16 @@ public class TestChannelServiceImpl extends TestCase {
 		ClientSession session =
 		    sessionService.getClientSession(client.sessionId);
 
-		if (sessions.contains(session)) {
+		if (session != null && sessions.contains(session)) {
 		    if (!isMember) {
 			fail("ClientGroup.checkMembership session: " +
 			     session.getName() + " is a member of " + name);
 		    }
 		} else if (isMember) {
-			fail("ClientGroup.checkMembership session: " +
-			     session.getName() + " is not a member of " + name);
+                    String sessionName =
+                        (session == null) ? "null" : session.getName();
+                    fail("ClientGroup.checkMembership session: " +
+                        sessionName + " is not a member of " + name);
 		}
 	    }
 
