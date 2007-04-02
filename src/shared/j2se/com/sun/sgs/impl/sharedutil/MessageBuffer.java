@@ -2,7 +2,7 @@
  * Copyright 2007 Sun Microsystems, Inc. All rights reserved
  */
 
-package com.sun.sgs.impl.util;
+package com.sun.sgs.impl.sharedutil;
 
 import java.io.UTFDataFormatException;
 

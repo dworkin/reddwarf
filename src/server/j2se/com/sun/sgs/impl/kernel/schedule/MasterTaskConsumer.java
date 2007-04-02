@@ -10,7 +10,7 @@ import com.sun.sgs.impl.kernel.TaskHandler;
 
 import com.sun.sgs.impl.kernel.profile.ProfileCollector;
 
-import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
