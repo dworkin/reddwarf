@@ -2,8 +2,9 @@
  * Copyright 2007 Sun Microsystems, Inc. All rights reserved
  */
 
-package com.sun.sgs.impl.sharedutil;
+package com.sun.sgs.impl.util;
 
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
 import java.io.BufferedReader;
 import java.io.EOFException;
