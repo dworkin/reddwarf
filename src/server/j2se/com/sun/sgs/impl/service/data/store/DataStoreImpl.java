@@ -285,8 +285,8 @@ public class DataStoreImpl
 	 *
 	 * @param	txn the transaction
 	 * @return	the previously associated information
-	 * @throws	TransactionNotActive if the transaction is not active
-	 * @throws	IllegalStateException if the implementation determines
+	 * @throws	IllegalStateException if the transaction is not active,
+	 *		or if the implementation determines
 	 *		that the specified transaction does not match the
 	 *		current context
 	 */
@@ -344,8 +344,7 @@ public class DataStoreImpl
 	public T remove(Transaction txn) {
 	    Entry<T> entry = threadInfo.get();
 	    if (entry == null) {
-		throw new TransactionNotActiveException(
-		    "Transaction not active");
+		throw new IllegalStateException("Transaction not active");
 	    } else if (!entry.txn.equals(txn)) {
 		throw new IllegalStateException("Wrong transaction");
 	    }
@@ -1216,8 +1215,7 @@ public class DataStoreImpl
 	    }
 	    TxnInfo txnInfo = txnInfoTable.remove(txn);
 	    if (txnInfo == null) {
-		throw new TransactionNotActiveException(
-		    "Transaction is not active");
+		throw new IllegalStateException("Transaction is not active");
 	    }
 	    try {
 		txnInfo.abort();
@@ -1430,8 +1428,7 @@ public class DataStoreImpl
 	}
 	TxnInfo txnInfo = txnInfoTable.get(txn);
 	if (txnInfo == null) {
-	    throw new TransactionNotActiveException(
-		"Transaction is not active");
+	    throw new IllegalStateException("Transaction is not active");
 	} else if (getTxnCount() < 0) {
 	    throw new IllegalStateException("DataStore is shutting down");
 	} else {

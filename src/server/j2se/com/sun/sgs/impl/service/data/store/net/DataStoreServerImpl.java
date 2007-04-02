@@ -91,7 +91,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 
     /** The property that specifies the transaction timeout in milliseconds. */
     private static final String TXN_TIMEOUT_PROPERTY =
-	"com.sun.sgs.txnTimeout";
+	"com.sun.sgs.txn.timeout";
 
     /** The default transaction timeout in milliseconds. */
     private static final long DEFAULT_TXN_TIMEOUT = 1000;
@@ -422,13 +422,13 @@ public class DataStoreServerImpl implements DataStoreServer {
 		Txn t = (Txn) txn;
 		@SuppressWarnings("unchecked")
 		    T info = (T) t.getTxnInfo();
-		t.setTxnInfo(null);
 		long tid = t.getTid();
 		Txn t2 = table.remove(tid);
 		if (t2 != null) {
 		    if (!t2.equals(t)) {
 			throw new IllegalStateException("Wrong transaction");
 		    }
+		    t.setTxnInfo(null);
 		    return info;
 		}
 		throw new TransactionNotActiveException(

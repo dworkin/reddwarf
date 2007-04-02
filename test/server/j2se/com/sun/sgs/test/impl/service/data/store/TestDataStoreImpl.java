@@ -1185,12 +1185,12 @@ public class TestDataStoreImpl extends TestCase {
     public void testPrepareAndCommitAborted() throws Exception {
 	testAborted(prepareAndCommit, IllegalStateException.class);
     }
-    public void testPrepareAndCommitPrepareAndCommitdReadOnly()
+    public void testPrepareAndCommitPrepareAndCommitReadOnly()
 	throws Exception
     {
 	testPreparedReadOnly(prepareAndCommit);
     }
-    public void testPrepareAndCommitPrepareAndCommitdModified()
+    public void testPrepareAndCommitPrepareAndCommitModified()
 	throws Exception
     {
 	testPreparedModified(prepareAndCommit);
