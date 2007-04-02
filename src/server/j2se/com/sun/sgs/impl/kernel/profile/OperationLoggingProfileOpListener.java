@@ -5,7 +5,7 @@
 package com.sun.sgs.impl.kernel.profile;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-import com.sun.sgs.impl.util.PropertiesWrapper;
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
 import com.sun.sgs.kernel.ProfileOperation;
 import com.sun.sgs.kernel.ProfileOperationListener;

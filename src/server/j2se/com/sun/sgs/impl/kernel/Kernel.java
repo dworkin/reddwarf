@@ -14,8 +14,8 @@ import com.sun.sgs.impl.kernel.schedule.MasterTaskScheduler;
 
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.Version;
 
-import com.sun.sgs.impl.util.Version;
 
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.ProfileOperationListener;

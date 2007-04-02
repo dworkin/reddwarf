@@ -13,7 +13,7 @@ import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-import com.sun.sgs.impl.util.PropertiesWrapper;
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.ProfileProducer;
 import com.sun.sgs.kernel.ProfileRegistrar;
