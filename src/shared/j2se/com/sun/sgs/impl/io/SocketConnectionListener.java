@@ -12,7 +12,7 @@ import org.apache.mina.common.IoHandler;
 import org.apache.mina.common.IoHandlerAdapter;
 import org.apache.mina.common.IoSession;
 
-import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.io.Acceptor;
 import com.sun.sgs.io.Connector;
 import com.sun.sgs.io.Connection;

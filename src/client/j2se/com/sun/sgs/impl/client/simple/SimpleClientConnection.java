@@ -10,8 +10,8 @@ import java.util.logging.Logger;
 
 import com.sun.sgs.impl.client.comm.ClientConnection;
 import com.sun.sgs.impl.client.comm.ClientConnectionListener;
-import com.sun.sgs.impl.util.HexDumper;
-import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.HexDumper;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
 

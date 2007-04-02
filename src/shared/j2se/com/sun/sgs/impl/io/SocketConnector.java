@@ -11,7 +11,7 @@ import java.util.logging.Logger;
 import org.apache.mina.common.IoConnector;
 import org.apache.mina.common.IoSession;
 
-import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.io.Endpoint;
 import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.io.Connector;

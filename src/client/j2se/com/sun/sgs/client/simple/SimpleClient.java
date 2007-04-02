@@ -22,8 +22,8 @@ import com.sun.sgs.client.SessionId;
 import com.sun.sgs.impl.client.comm.ClientConnection;
 import com.sun.sgs.impl.client.comm.ClientConnectionListener;
 import com.sun.sgs.impl.client.comm.ClientConnector;
-import com.sun.sgs.impl.util.LoggerWrapper;
-import com.sun.sgs.impl.util.MessageBuffer;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 
 /**
