@@ -248,12 +248,11 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    if (getCurrentState() != State.DISCONNECTED) {
 		sessionConnection.sendBytes(message);
 	    } else {
-		if (logger.isLoggable(Level.WARNING)) {
+		if (logger.isLoggable(Level.FINER)) {
 		    logger.log(
-		        Level.WARNING,
-			"sendProtocolMessage session:{0} message:{1}, " +
-			"session is disconnected",
-			this, HexDumper.format(message));
+		        Level.FINER,
+			"sendProtocolMessage session:{0} " +
+			"session is disconnected", this);
 		}
 	    }
 		    
@@ -261,8 +260,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    if (logger.isLoggable(Level.WARNING)) {
 		logger.logThrow(
 		    Level.WARNING, e,
-		    "sendProtocolMessage session:{0} message:{1} throws",
-		    this, HexDumper.format(message));
+		    "sendProtocolMessage session:{0} throws", this);
 	    }
 	}
 	
