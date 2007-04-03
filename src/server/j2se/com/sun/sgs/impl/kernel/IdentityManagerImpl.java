@@ -9,7 +9,7 @@ import com.sun.sgs.auth.IdentityAuthenticator;
 import com.sun.sgs.auth.IdentityCredentials;
 import com.sun.sgs.auth.IdentityManager;
 
-import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
 import java.util.ArrayList;
 import java.util.HashMap;

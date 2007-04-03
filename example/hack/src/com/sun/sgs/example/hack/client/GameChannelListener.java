@@ -13,7 +13,7 @@ import com.sun.sgs.client.ClientChannel;
 import com.sun.sgs.client.ClientChannelListener;
 import com.sun.sgs.client.SessionId;
 
-import com.sun.sgs.impl.util.HexDumper;
+import com.sun.sgs.impl.sharedutil.HexDumper;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;

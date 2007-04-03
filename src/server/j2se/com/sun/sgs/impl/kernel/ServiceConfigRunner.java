@@ -4,7 +4,7 @@
 
 package com.sun.sgs.impl.kernel;
 
-import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
 import com.sun.sgs.kernel.KernelRunnable;
 

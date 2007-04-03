@@ -10,8 +10,8 @@ import java.net.SocketAddress;
 
 import com.sun.sgs.impl.io.ServerSocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
-import com.sun.sgs.impl.util.HexDumper;
-import com.sun.sgs.impl.util.MessageBuffer;
+import com.sun.sgs.impl.sharedutil.HexDumper;
+import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.io.AcceptorListener;
 import com.sun.sgs.io.Acceptor;
 import com.sun.sgs.io.Connection;

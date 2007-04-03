@@ -15,10 +15,10 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.auth.NamePasswordCredentials;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl.Context;
+import com.sun.sgs.impl.sharedutil.HexDumper;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
-import com.sun.sgs.impl.util.HexDumper;
-import com.sun.sgs.impl.util.LoggerWrapper;
-import com.sun.sgs.impl.util.MessageBuffer;
 import com.sun.sgs.impl.util.NonDurableTaskQueue;
 import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
@@ -248,12 +248,11 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    if (getCurrentState() != State.DISCONNECTED) {
 		sessionConnection.sendBytes(message);
 	    } else {
-		if (logger.isLoggable(Level.WARNING)) {
+		if (logger.isLoggable(Level.FINER)) {
 		    logger.log(
-		        Level.WARNING,
-			"sendProtocolMessage session:{0} message:{1}, " +
-			"session is disconnected",
-			this, HexDumper.format(message));
+		        Level.FINER,
+			"sendProtocolMessage session:{0} " +
+			"session is disconnected", this);
 		}
 	    }
 		    
@@ -261,8 +260,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    if (logger.isLoggable(Level.WARNING)) {
 		logger.logThrow(
 		    Level.WARNING, e,
-		    "sendProtocolMessage session:{0} message:{1} throws",
-		    this, HexDumper.format(message));
+		    "sendProtocolMessage session:{0} throws", this);
 	    }
 	}
 	

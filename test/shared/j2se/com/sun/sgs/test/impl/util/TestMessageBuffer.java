@@ -4,7 +4,8 @@
 
 package com.sun.sgs.test.impl.util;
 
-import com.sun.sgs.impl.util.MessageBuffer;
+import com.sun.sgs.impl.sharedutil.MessageBuffer;
+
 import junit.framework.TestCase;
 
 public class TestMessageBuffer extends TestCase {

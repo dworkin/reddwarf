@@ -5,7 +5,7 @@
 package com.sun.sgs.app;
 
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
-import com.sun.sgs.impl.util.HexDumper;
+import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.service.ClientSessionService;
 import java.io.Serializable;
 import java.util.Arrays;

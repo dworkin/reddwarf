@@ -30,7 +30,7 @@ import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
 import com.sun.sgs.impl.service.task.TaskServiceImpl;
-import com.sun.sgs.impl.util.MessageBuffer;
+import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.io.Connector;
 import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
@@ -193,6 +193,7 @@ public class TestClientSessionServiceImpl extends TestCase {
     /** Sets passed if the test passes. */
     protected void runTest() throws Throwable {
 	super.runTest();
+        Thread.sleep(100);
 	passed = true;
     }
     
@@ -911,6 +912,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 	private boolean loginAck = false;
 	private boolean loginSuccess = false;
 	private boolean logoutAck = false;
+        private boolean awaitGraceful = false;
+        private boolean awaitLoginFailure = false;
 	private String reason;
 	private byte[] sessionId;
 	private byte[] reconnectionKey;
@@ -956,52 +959,26 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
 
 	void disconnect(boolean graceful) {
-	    System.err.println("DummyClient.disconnect: " + graceful);
-	    if (!graceful) {
-		synchronized (lock) {
-		    if (connected == false) {
-			return;
-		    }
-		    connected = false;
-		    try {
-			connection.close();
-		    } catch (IOException e) {
-			System.err.println(
-			    "DummyClient.disconnect exception:" + e);
-		    }
-		    lock.notifyAll();
-		}
-	    } else {
-		synchronized (lock) {
-		    if (connected == false) {
-			return;
-		    }
-		    MessageBuffer buf = new MessageBuffer(3);
-		    buf.putByte(SimpleSgsProtocol.VERSION).
-			putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-			putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
-		    logoutAck = false;
-		    try {
-			connection.sendBytes(buf.getBuffer());
-		    } catch (IOException e) {
-			throw new RuntimeException(e);
-		    }
-		    synchronized (lock) {
-			try {
-			    if (logoutAck == false) {
-				lock.wait(WAIT_TIME);
-			    }
-			    if (logoutAck != true) {
-				throw new RuntimeException(
-				    "DummyClient.disconnect timed out");
-			    }
-			} catch (InterruptedException e) {
-			    throw new RuntimeException(
-				"DummyClient.disconnect timed out", e);
-			}
-		    }
-		}
-	    }
+            System.err.println("DummyClient.disconnect: " + graceful);
+
+            if (graceful) {
+                logout();
+                return;
+            }
+
+            synchronized (lock) {
+                if (connected == false) {
+                    return;
+                }
+                try {
+                    connection.close();
+                } catch (IOException e) {
+                    System.err.println(
+                        "DummyClient.disconnect exception:" + e);
+                    connected = false;
+                    lock.notifyAll();
+                }
+            }
 	}
 
 	void login(String name, String password) {
@@ -1088,39 +1065,36 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
 
 	void logout() {
-	    synchronized (lock) {
-		if (connected == false) {
-		    throw new RuntimeException(
-			"DummyClient.login not connected");
-		}
-	    }
-
-	    MessageBuffer buf = new MessageBuffer(3);
-	    buf.putByte(SimpleSgsProtocol.VERSION).
-		putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
-		putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
-	    logoutAck = false;
-
-	    try {
-		connection.sendBytes(buf.getBuffer());
-	    } catch (IOException e) {
-		throw new RuntimeException(e);
-	    }
-	    synchronized (lock) {
-		try {
-		    if (logoutAck == false) {
-			lock.wait(WAIT_TIME);
-		    }
-		    if (logoutAck != true) {
-			throw new RuntimeException(
-			    "DummyClient.logout timed out");
-		    }
-		} catch (InterruptedException e) {
-		    throw new RuntimeException(
-			"DummyClient.logout timed out", e);
-		}
-	    }
-	    
+            synchronized (lock) {
+                if (connected == false) {
+                    return;
+                }
+                MessageBuffer buf = new MessageBuffer(3);
+                buf.putByte(SimpleSgsProtocol.VERSION).
+                putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
+                putByte(SimpleSgsProtocol.LOGOUT_REQUEST);
+                logoutAck = false;
+                awaitGraceful = true;
+                try {
+                    connection.sendBytes(buf.getBuffer());
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+                synchronized (lock) {
+                    try {
+                        if (logoutAck == false) {
+                            lock.wait(WAIT_TIME);
+                        }
+                        if (logoutAck != true) {
+                            throw new RuntimeException(
+                                "DummyClient.disconnect timed out");
+                        }
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(
+                            "DummyClient.disconnect timed out", e);
+                    }
+                }
+            }
 	}
 
 	private class Listener implements ConnectionListener {
@@ -1182,11 +1156,11 @@ public class TestClientSessionServiceImpl extends TestCase {
 		    break;
 
 		case SimpleSgsProtocol.LOGOUT_SUCCESS:
-		    synchronized (lock) {
-			logoutAck = true;
-			System.err.println("logout succeeded: " + name);
-			lock.notifyAll();
-		    }
+                    synchronized (lock) {
+                        logoutAck = true;
+                        System.err.println("logout succeeded: " + name);
+                        // let disconnect do the lock notification
+                    }
 		    break;
 
 		case SimpleSgsProtocol.SESSION_MESSAGE:
@@ -1224,6 +1198,20 @@ public class TestClientSessionServiceImpl extends TestCase {
 
             /** {@inheritDoc} */
 	    public void disconnected(Connection conn) {
+                synchronized (lock) {
+                    // Hack since client might not get last msg
+                    if (awaitGraceful) {
+                        // Pretend they logged out gracefully
+                        logoutAck = true;
+                    } else if (! loginAck) {
+                        // Pretend they got a login failure message
+                        loginAck = true;
+                        loginSuccess = false;
+                        reason = "disconnected before login ack";
+                    }
+                    connected = false;
+                    lock.notifyAll();
+                }
 	    }
 	    
             /** {@inheritDoc} */

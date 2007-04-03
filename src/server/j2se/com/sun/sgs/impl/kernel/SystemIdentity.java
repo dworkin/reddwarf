@@ -6,7 +6,7 @@ package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.auth.Identity;
 
-import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
