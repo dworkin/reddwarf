@@ -11,106 +11,86 @@ import com.sun.sgs.test.util.DummyProfileRegistrar;
 import com.sun.sgs.test.util.DummyTransaction;
 import java.io.File;
 import java.io.IOException;
-import java.util.Enumeration;
 import java.util.Properties;
-import java.util.logging.Level;
-import java.util.logging.LogManager;
-import java.util.logging.Logger;
-import junit.framework.Test;
 import junit.framework.TestCase;
-import junit.framework.TestSuite;
 
 /**
- * Performance tests for the DataServiceImpl class.
+ * Performance tests for the DataStoreImpl class.
  *
  * Results -- best times:
- * Date: 11/1/2006
+ * Date: 3/6/2007
  * Hardware: Power Mac G5, 2 2 GHz processors, 2.5 GB memory, HFS+ filesystem
  *	     with logging enabled
  * Operating System: Mac OS X 10.4.8
  * Berkeley DB Version: 4.5.20
- * Java Version: 1.5.0_06
- * Parameters: test.items=400, test.itemSize=100, test.modifyItems=200
+ * Java Version: 1.5.0_07
+ * Parameters:
+ *   test.items=100
+ *   test.item.size=100
+ *   test.modify.items=50
+ *   test.count=400
  * Testcase: testReadIds
- * Time: 4 ms per transaction
+ * Time: 1.3 ms per transaction
  * Testcase: testWriteIds
- * Time: 7 ms per transaction
+ * Time: 2.2 ms per transaction
  * Testcase: testReadNames
- * Time: 4 ms per transaction
+ * Time: 1.2 ms per transaction
  * Testcase: testWriteNames
- * Time: 7 ms per transaction
+ * Time: 2.0 ms per transaction
  */
-public class TestPerformance extends TestCase {
-
-    /** The test suite, to use for adding additional tests. */
-    private static final TestSuite suite =
-	new TestSuite(TestPerformance.class);
-
-    /** Provides the test suite to the test runner. */
-    public static Test suite() { return suite; }
+public class TestDataStorePerformance extends TestCase {
 
     /** The name of the DataStoreImpl class. */
     private static final String DataStoreImplClass =
 	DataStoreImpl.class.getName();
 
     /** The number of objects to read in a transaction. */
-    private static int items = Integer.getInteger("test.items", 400);
+    protected int items = Integer.getInteger("test.items", 100);
 
     /** The size in bytes of each object. */
-    private static int itemSize = Integer.getInteger("test.itemSize", 100);
+    protected int itemSize = Integer.getInteger("test.item.size", 100);
 
     /**
      * The number of objects to modify in a transaction, if doing modification.
      */
-    private static int modifyItems =
-	Integer.getInteger("test.modifyItems", 200);
+    protected int modifyItems = Integer.getInteger("test.modify.items", 50);
 
     /** The number of times to run the test while timing. */
-    private static int count = Integer.getInteger("test.count", 100);
+    protected int count = Integer.getInteger("test.count", 400);
 
     /** The number of times to repeat the timing. */
-    private static int repeat = Integer.getInteger("test.repeat", 5);
+    protected int repeat = Integer.getInteger("test.repeat", 5);
 
     /** Whether to flush to disk on transaction commits. */
-    private static boolean testFlush = Boolean.getBoolean("test.flush");
-
-    /** Whether to do logging, which is otherwise disabled. */
-    private static boolean doLogging = Boolean.getBoolean("test.doLogging");
-
-    /** Print test parameters. */
-    static {
-	System.err.println("Parameters: test.items=" + items +
-			   ", test.itemSize=" + itemSize +
-			   ", test.modifyItems=" + modifyItems);
-    }
+    protected boolean testFlush = Boolean.getBoolean("test.flush");
 
     /** Set when the test passes. */
-    private boolean passed;
+    protected boolean passed;
 
     /** A per-test database directory, or null if not created. */
     private String directory;
+
+    /** Properties for creating the DataStore. */
+    protected Properties props;
 
     /** The store to test. */
     private DataStore store;
 
     /** Creates the test. */
-    public TestPerformance(String name) {
+    public TestDataStorePerformance(String name) {
 	super(name);
     }
 
-    /** Prints the test case and disables logging if necessary. */
-    protected void setUp() {
+    /** Prints the test case and sets up data store properties. */
+    protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
-	if (!doLogging) {
-	    /* Disable logging */
-	    for (Enumeration<String> loggerNames =
-		     LogManager.getLogManager().getLoggerNames();
-		 loggerNames.hasMoreElements(); )
-	    {
-		String loggerName = loggerNames.nextElement();
-		Logger.getLogger(loggerName).setLevel(Level.WARNING);
-	    }
-	}
+	System.err.println("Parameters:" +
+			   "\n  test.items=" + items +
+			   "\n  test.item.size=" + itemSize +
+			   "\n  test.modify.items=" + modifyItems +
+			   "\n  test.count=" + count);
+	props = createProperties(
+	    DataStoreImplClass + ".directory", createDirectory());
     }
 
     /** Sets passed if the test passes. */
@@ -121,11 +101,11 @@ public class TestPerformance extends TestCase {
 
     /**
      * Deletes the directory if the test passes and the directory was
-     * created, and reinitializes logging.
+     * created.
      */
     protected void tearDown() throws Exception {
 	try {
-	    store.shutdown();
+	    shutdown();
 	} catch (RuntimeException e) {
 	    if (passed) {
 		throw e;
@@ -136,22 +116,21 @@ public class TestPerformance extends TestCase {
 	if (passed && directory != null) {
 	    deleteDirectory(directory);
 	}
-	if (!doLogging) {
-	    LogManager.getLogManager().readConfiguration();
-	}
-        DummyProfileRegistrar.stopProfiling();
+    }
+
+    /** Shuts down the store. */
+    protected boolean shutdown() {
+	return store == null || store.shutdown();
     }
 
     /* -- Tests -- */
 
     public void testReadIds() throws Exception {
-	Properties props = createProperties(
-	    DataStoreImplClass + ".directory", createDirectory());
 	byte[] data = new byte[itemSize];
 	data[0] = 1;
-	store = new DataStoreImpl(props);
+	store = getDataStore();
         if (store instanceof ProfileProducer)
-            DummyProfileRegistrar.startProfiling((ProfileProducer)store);
+            DummyProfileRegistrar.startProfiling((ProfileProducer) store);
 	DummyTransaction txn = new DummyTransaction();
 	long[] ids = new long[items];
 	for (int i = 0; i < items; i++) {
@@ -170,7 +149,8 @@ public class TestPerformance extends TestCase {
 	    }
 	    long stop = System.currentTimeMillis();
 	    System.err.println(
-		"Time: " + (stop - start) / count + " ms per transaction");
+		"Time: " + (stop - start) / (float) count +
+		" ms per transaction");
 	}
     }
 
@@ -178,26 +158,22 @@ public class TestPerformance extends TestCase {
 	testWriteIdsInternal(false);
     }	
 
-    static {
-	if (testFlush) {
-	    suite.addTest(
-		new TestPerformance("testWriteIdsFlush") {
-		    protected void runTest() throws Exception {
-			testWriteIdsInternal(true);
-		    }
-		});
+    public void testWriteIdsFlush() throws Exception {
+	if (!testFlush) {
+	    System.err.println("Skipping");
+	    return;
 	}
+	testWriteIdsInternal(true);
     }
 
     void testWriteIdsInternal(boolean flush) throws Exception {
-	Properties props = createProperties(
-	    DataStoreImplClass + ".directory", createDirectory(),
+	props.setProperty(
 	    DataStoreImplClass + ".flush.to.disk", String.valueOf(flush));
 	byte[] data = new byte[itemSize];
 	data[0] = 1;
-	store = new DataStoreImpl(props);
+	store = getDataStore();
         if (store instanceof ProfileProducer)
-            DummyProfileRegistrar.startProfiling((ProfileProducer)store);
+            DummyProfileRegistrar.startProfiling((ProfileProducer) store);
 	DummyTransaction txn = new DummyTransaction();
 	long[] ids = new long[items];
 	for (int i = 0; i < items; i++) {
@@ -221,16 +197,15 @@ public class TestPerformance extends TestCase {
 	    }
 	    long stop = System.currentTimeMillis();
 	    System.err.println(
-		"Time: " + (stop - start) / count + " ms per transaction");
+		"Time: " + (stop - start) / (float) count +
+		" ms per transaction");
 	}
     }
 
     public void testReadNames() throws Exception {
-	Properties props = createProperties(
-	    DataStoreImplClass + ".directory", createDirectory());
-	store = new DataStoreImpl(props);
+	store = getDataStore();
         if (store instanceof ProfileProducer)
-            DummyProfileRegistrar.startProfiling((ProfileProducer)store);
+            DummyProfileRegistrar.startProfiling((ProfileProducer) store);
 	DummyTransaction txn = new DummyTransaction();
 	for (int i = 0; i < items; i++) {
 	    store.setBinding(txn, "name" + i, i);
@@ -247,16 +222,15 @@ public class TestPerformance extends TestCase {
 	    }
 	    long stop = System.currentTimeMillis();
 	    System.err.println(
-		"Time: " + (stop - start) / count + " ms per transaction");
+		"Time: " + (stop - start) / (float) count +
+		" ms per transaction");
 	}
     }
 
     public void testWriteNames() throws Exception {
-	Properties props = createProperties(
-	    DataStoreImplClass + ".directory", createDirectory());
-	store = new DataStoreImpl(props);
+	store = getDataStore();
         if (store instanceof ProfileProducer)
-            DummyProfileRegistrar.startProfiling((ProfileProducer)store);
+            DummyProfileRegistrar.startProfiling((ProfileProducer) store);
 	DummyTransaction txn = new DummyTransaction();
 	for (int i = 0; i < items; i++) {
 	    store.setBinding(txn, "name" + i, i);
@@ -277,11 +251,17 @@ public class TestPerformance extends TestCase {
 	    }
 	    long stop = System.currentTimeMillis();
 	    System.err.println(
-		"Time: " + (stop - start) / count + " ms per transaction");
+		"Time: " + (stop - start) / (float) count +
+		" ms per transaction");
 	}
     }
 
     /* -- Other methods -- */
+
+    /** Gets a DataStore using the default properties. */
+    protected DataStore getDataStore() throws Exception {
+	return new DataStoreImpl(props);
+    }
 
     /** Creates a per-test directory. */
     private String createDirectory() throws IOException {
