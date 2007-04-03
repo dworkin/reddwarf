@@ -11,7 +11,7 @@ import com.sun.sgs.example.hack.share.BoardSpace;
 import com.sun.sgs.example.hack.share.CharacterStats;
 import com.sun.sgs.example.hack.share.KeyMessages;
 
-import com.sun.sgs.impl.util.HexDumper;
+import com.sun.sgs.impl.sharedutil.HexDumper;
 
 import java.awt.Image;
 

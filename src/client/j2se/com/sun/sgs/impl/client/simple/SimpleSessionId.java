@@ -7,7 +7,7 @@ package com.sun.sgs.impl.client.simple;
 import java.util.Arrays;
 
 import com.sun.sgs.client.SessionId;
-import com.sun.sgs.impl.util.HexDumper;
+import com.sun.sgs.impl.sharedutil.HexDumper;
 
 /**
  * A simple implementation of a SessionId that wraps a byte array.

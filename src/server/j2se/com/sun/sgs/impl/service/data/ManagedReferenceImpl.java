@@ -9,7 +9,8 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ObjectIOException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
-import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;

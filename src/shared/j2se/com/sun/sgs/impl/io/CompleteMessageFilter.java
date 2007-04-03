@@ -9,7 +9,7 @@ import java.util.logging.Logger;
 
 import org.apache.mina.common.ByteBuffer;
 
-import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
 // TODO move this functionality into protocol decode; we should
 // do framing in the protocol, not the transport. -JM

@@ -13,7 +13,7 @@ import java.util.logging.Logger;
 import org.apache.mina.common.IoAcceptor;
 import org.apache.mina.common.IoSession;
 
-import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.io.ServerEndpoint;
 import com.sun.sgs.io.AcceptorListener;
 import com.sun.sgs.io.Acceptor;

@@ -6,7 +6,7 @@ package com.sun.sgs.impl.service.transaction;
 
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
-import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.MaybeRetryableTransactionAbortedException;
 import com.sun.sgs.impl.util.MaybeRetryableTransactionNotActiveException;
 import com.sun.sgs.service.NonDurableTransactionParticipant;
