@@ -286,9 +286,8 @@ public class DataStoreImpl
 	 * @param	txn the transaction
 	 * @return	the previously associated information
 	 * @throws	IllegalStateException if the transaction is not active,
-	 *		or if the implementation determines
-	 *		that the specified transaction does not match the
-	 *		current context
+	 *		or if the implementation determines that the specified
+	 *		transaction does not match the current context
 	 */
 	T remove(Transaction txn);
 
@@ -510,7 +509,7 @@ public class DataStoreImpl
      *		com.sun.sgs.impl.service.data.store.DataStoreImpl.allocation.block.size
      *		</code> property is not a valid integer greater than zero, or
      *		if the value of the <code>
-     *		com.sun.sgs.impl.service.data.store.DataStoreImpl.cacheSize
+     *		com.sun.sgs.impl.service.data.store.DataStoreImpl.cache.size
      *		</code> property is not a valid integer greater than or equal
      *		to <code>20000</code>
      */

@@ -9,7 +9,6 @@ import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.app.TransactionNotActiveException;
-import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.DataStoreException;
 import com.sun.sgs.impl.service.data.store.DataStore;
