@@ -65,6 +65,15 @@ import java.util.logging.Logger;
  *	that the modifications are recorded by the
  *	<code>DataService</code>. <p>
  *
+ * <li> <i>Key:</i> <code>
+ *	com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class
+ *	</code> <br>
+ *	<i>Default:</i>
+ *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl</code> <br>
+ *	The name of the class that implements {@link DataStore}.  The class
+ *	should be public, not abstract, and should provide a public constructor
+ *	with a {@link Properties} parameter.
+ *
  * </ul> <p>
  *
  * The constructor also passes the properties to the {@link DataStoreImpl}
@@ -112,6 +121,13 @@ public final class DataServiceImpl
      */
     private static final String DETECT_MODIFICATIONS_PROPERTY =
 	CLASSNAME + ".detect.modifications";
+
+    /**
+     * The property that specifies the name of the class that implements
+     * DataStore.
+     */
+    private static final String DATA_STORE_CLASS_PROPERTY =
+	CLASSNAME + ".data.store.class";
 
     /** The logger for this class. */
     private static final LoggerWrapper logger =
@@ -179,9 +195,11 @@ public final class DataServiceImpl
      *		com.sun.sgs.impl.service.data.DataServiceImpl.debug.check.interval
      *		</code> property is not a valid integer, or if the data store
      *		constructor detects an illegal property value
+     * @throws	Exception if a problem occurs creating the service
      */
     public DataServiceImpl(
 	Properties properties, ComponentRegistry componentRegistry)
+	throws Exception
     {
 	if (logger.isLoggable(Level.CONFIG)) {
 	    logger.log(Level.CONFIG,
@@ -205,8 +223,17 @@ public final class DataServiceImpl
 		DEBUG_CHECK_INTERVAL_PROPERTY, Integer.MAX_VALUE);
 	    detectModifications = wrappedProps.getBooleanProperty(
 		DETECT_MODIFICATIONS_PROPERTY, Boolean.TRUE);
-	    store = new DataStoreImpl(properties);
-	} catch (RuntimeException e) {
+	    String dataStoreClassName = wrappedProps.getProperty(
+		DATA_STORE_CLASS_PROPERTY);
+	    if (dataStoreClassName == null) {
+		store = new DataStoreImpl(properties);
+	    } else {
+		store = wrappedProps.getClassInstanceProperty(
+		    DATA_STORE_CLASS_PROPERTY, DataStore.class,
+		    new Class[] { Properties.class }, properties);
+		logger.log(Level.CONFIG, "Using data store {0}", store);
+	    }
+	} catch (Exception e) {
 	    logger.logThrow(
 		Level.SEVERE, e, "DataService initialization failed");
 	    throw e;

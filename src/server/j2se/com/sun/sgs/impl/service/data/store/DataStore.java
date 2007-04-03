@@ -7,6 +7,7 @@ package com.sun.sgs.impl.service.data.store;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionAbortedException;
+import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.service.Transaction;
 
@@ -30,6 +31,7 @@ public interface DataStore {
      * @return	the new object ID
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the transaction is not active
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
@@ -47,6 +49,7 @@ public interface DataStore {
      * @throws	ObjectNotFoundException if the object is not found
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the transaction is not active
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
@@ -67,6 +70,7 @@ public interface DataStore {
      * @throws	ObjectNotFoundException if the object is not found
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the transaction is not active
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
@@ -78,14 +82,31 @@ public interface DataStore {
      * @param	txn the transaction under which the operation should take place
      * @param	oid the object ID
      * @param	data the data
-     * @throws	IllegalArgumentException if <code>oid</code> is negative, or if
-     *		<code>data</code> is empty
+     * @throws	IllegalArgumentException if <code>oid</code> is negative
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the transaction is not active
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
     void setObject(Transaction txn, long oid, byte[] data);
+
+    /** 
+     * Specifies data to associate with a series of object IDs.
+     *
+     * @param	txn the transaction under which the operation should take place
+     * @param	oids the object IDs
+     * @param	dataArray the associated data values
+     * @throws	IllegalArgumentException if <code>oids</code> and
+     *		<code>data</code> are not the same length, or if
+     *		<code>oids</code> contains a value that is negative
+     * @throws	TransactionAbortedException if the transaction was aborted due
+     *		to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the transaction is not active
+     * @throws	IllegalStateException if the operation failed because of a
+     *		problem with the current transaction
+     */
+    void setObjects(Transaction txn, long[] oids, byte[][] dataArray);
 
     /**
      * Removes the object with the specified object ID.  The implementation
@@ -99,6 +120,7 @@ public interface DataStore {
      * @throws	ObjectNotFoundException if the object is not found
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the transaction is not active
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
@@ -113,6 +135,7 @@ public interface DataStore {
      * @throws	NameNotBoundException if no object ID is bound to the name
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the transaction is not active
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
@@ -127,6 +150,7 @@ public interface DataStore {
      * @throws	IllegalArgumentException if <code>oid</code> is negative
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the transaction is not active
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
@@ -140,6 +164,7 @@ public interface DataStore {
      * @throws	NameNotBoundException if the name is not bound
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the transaction is not active
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
@@ -158,6 +183,7 @@ public interface DataStore {
      *		<code>null</code> if there are no more bound names
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the transaction is not active
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
