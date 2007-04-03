@@ -43,10 +43,10 @@ public final class CompactId {
 
     /**
      * Constructs an instance with the specified {@code id}.  The
-     * {@code id} is stored in ts canonical form, with all leading
+     * {@code id} is stored in its canonical form, with all leading
      * zero bytes stripped.
      *
-     * @param	id a byte array containing an id
+     * @param	id a byte array containing an ID
      *
      * @throws	IllegalArgumentException if {@code id} is empty or
      *		if the {@code id} length exceeds the maximum length
@@ -65,10 +65,10 @@ public final class CompactId {
     }
 
     /**
-     * Constructs an instance with the specified {@code id} and {@code
-     * externalForm}.  This constructor is only used by the {@code
-     * fromExternalForm} method to construct an instance with a known,
-     * valid ID and external form.
+     * Constructs an instance with the specified {@code id} with
+     * external form {@code ext}.  This constructor is only used by
+     * the {@code fromExternalForm} method to construct an instance
+     * with a known, valid ID and external form.
      */
     private CompactId(byte[] id, byte[] ext) {
 	canonicalId = id;
@@ -204,7 +204,7 @@ public final class CompactId {
      *
      * @param 	buf a message buffer containing the external format of
      *		a {@code CompactId}
-     * @return	the {@code CompactId} constructed from the external format
+     * @return	a {@code CompactId} constructed from the external format
      *		in the given message buffer
      * @throws 	IllegalArgumentException if the external format
      * 		contained in the message buffer is malformed or unsupported
