@@ -52,6 +52,9 @@ public class TestDataServiceConcurrency extends TestCase {
     protected boolean avoidConflicts =
 	Boolean.getBoolean("test.avoid.conflicts");
 
+    /** The number of times to repeat the timing. */
+    protected int repeat = Integer.getInteger("test.repeat", 2);
+
     /** The transaction proxy. */
     final DummyTransactionProxy txnProxy = new DummyTransactionProxy();
 
@@ -139,33 +142,37 @@ public class TestDataServiceConcurrency extends TestCase {
 	componentRegistry.setComponent(DataManager.class, service);
 	componentRegistry.registerAppContext();
 	txn.commit();
-	long start = System.currentTimeMillis();
-	for (int i = 0; i < threads; i++) {
-	    new OperationThread(i, service, txnProxy);
-	}
-	while (true) {
-	    synchronized (this) {
-		if (failure != null || done >= threads) {
-		    break;
-		}
-		try {
-		    wait();
-		} catch (InterruptedException e) {
-		    failure = e;
-		    break;
+	for (int r = 0; r < repeat; r++) {
+	    aborts = 0;
+	    done = 0;
+	    long start = System.currentTimeMillis();
+	    for (int i = 0; i < threads; i++) {
+		new OperationThread(i, service, txnProxy);
+	    }
+	    while (true) {
+		synchronized (this) {
+		    if (failure != null || done >= threads) {
+			break;
+		    }
+		    try {
+			wait();
+		    } catch (InterruptedException e) {
+			failure = e;
+			break;
+		    }
 		}
 	    }
+	    long stop = System.currentTimeMillis();
+	    if (failure != null) {
+		throw failure;
+	    }
+	    long ms = stop - start;
+	    double s = (stop - start) / 1000.0d;
+	    System.err.println(
+		"Time: " + ms + " ms\n" +
+		"Aborts: " + aborts + "\n" +
+		"Ops per second: " + Math.round((threads * operations) / s));
 	}
-	long stop = System.currentTimeMillis();
-	if (failure != null) {
-	    throw failure;
-	}
-	long ms = stop - start;
-	double s = (stop - start) / 1000.0d;
-	System.err.println(
-	    "Time: " + ms + " ms\n" +
-	    "Aborts: " + aborts + "\n" +
-	    "Ops per second: " + Math.round((threads * operations) / s));
     }
 
     /* -- Other methods and classes -- */
