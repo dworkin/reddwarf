@@ -11,7 +11,7 @@ import java.util.logging.Logger;
 import org.apache.mina.common.IoConnector;
 import org.apache.mina.common.IoSession;
 
-import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.io.Endpoint;
 import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.io.Connector;
@@ -119,8 +119,8 @@ class SocketConnector implements Connector<SocketAddress>
          * If a connection is in progress, but not yet connected,
          * cancel the pending connection.
          * 
-         * @throw IllegalStateException if this connection attempt has
-         *        already completed or been cancelled
+         * @throws IllegalStateException if this connection attempt has
+         *         already completed or been cancelled
          */
         void cancel() {
             synchronized (this) {

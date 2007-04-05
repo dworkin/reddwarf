@@ -17,7 +17,7 @@ import com.sun.sgs.auth.Identity;
 
 import com.sun.sgs.impl.kernel.TaskOwnerImpl;
 
-import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.KernelRunnable;
@@ -777,7 +777,11 @@ public class TaskServiceImpl
                 return false;
             }
         }
-        /** {@inheritDoc} */
+        /**
+         * Runs this {@code PendingTask}'s underlying task.
+         *
+         * @throws Exception if the underlying task throws an exception
+         */
         void run() throws Exception {
             Task runTask = null;
             try {

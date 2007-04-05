@@ -4,7 +4,7 @@
 
 package com.sun.sgs.test.util;
 
-import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.MaybeRetryableTransactionNotActiveException;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;

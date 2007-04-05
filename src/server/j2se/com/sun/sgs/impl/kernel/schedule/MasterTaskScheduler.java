@@ -11,7 +11,7 @@ import com.sun.sgs.impl.kernel.TaskHandler;
 import com.sun.sgs.impl.kernel.profile.ProfileCollector;
 import com.sun.sgs.impl.kernel.profile.ProfileConsumerImpl;
 
-import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
 import com.sun.sgs.kernel.KernelAppContext;
 import com.sun.sgs.kernel.KernelRunnable;
