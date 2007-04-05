@@ -2,7 +2,7 @@
  * Copyright 2007 Sun Microsystems, Inc. All rights reserved
  */
 
-package com.sun.sgs.test.impl.util;
+package com.sun.sgs.test.impl.sharedutil;
 
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 
