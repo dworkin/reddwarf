@@ -776,7 +776,9 @@ public class TestTaskServiceImpl extends TestCase {
         return txn;
     }
 
-    private DataServiceImpl createDataService(String directory) {
+    private DataServiceImpl createDataService(String directory)
+	throws Exception
+    {
         File dir = new File(directory);
         if (! dir.exists()) {
             if (! dir.mkdir()) {

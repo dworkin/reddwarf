@@ -1356,6 +1356,7 @@ public class TestChannelServiceImpl extends TestCase {
      */
     private DataServiceImpl createDataService(
 	DummyComponentRegistry registry)
+	throws Exception
     {
 	File dir = new File(DB_DIRECTORY);
 	if (!dir.exists()) {

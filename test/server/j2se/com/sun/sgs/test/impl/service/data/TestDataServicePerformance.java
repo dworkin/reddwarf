@@ -5,57 +5,50 @@
 package com.sun.sgs.test.impl.service.data;
 
 import com.sun.sgs.app.AppContext;
+import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
-import com.sun.sgs.app.DataManager;
+import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.impl.service.data.DataServiceImpl;
+import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.ProfileProducer;
+import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyProfileRegistrar;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
-import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.service.data.DataServiceImpl;
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Enumeration;
 import java.util.List;
 import java.util.Properties;
-import java.util.logging.Level;
-import java.util.logging.LogManager;
-import java.util.logging.Logger;
-import junit.framework.Test;
 import junit.framework.TestCase;
-import junit.framework.TestSuite;
 
 /**
  * Performance tests for the DataServiceImpl class.
  *
  * Results -- best times:
- * Date: 1/9/2007
+ * Date: 3/6/2007
  * Hardware: Host freeside, Power Mac G5, 2 2 GHz processors, 2.5 GB memory,
  *	     HFS+ filesystem with logging enabled
  * Operating System: Mac OS X 10.4.8
  * Berkeley DB Version: 4.5.20
- * Java Version: 1.5.0_06
- * Parameters: test.items=400, test.modifyItems=200
+ * Java Version: 1.5.0_07
+ * Parameters:
+ *   test.items=100
+ *   test.modify.items=50
+ *   test.count=100
  * Testcase: testRead
- * Time: 43 ms per transaction
+ * Time: 12 ms per transaction
  * Testcase: testReadNoDetectMods
- * Time: 26 ms per transaction
+ * Time: 6.9 ms per transaction
  * Testcase: testWrite
- * Time: 51 ms per transaction
+ * Time: 14 ms per transaction
  * Testcase: testWriteNoDetectMods
- * Time: 36 ms per transaction
+ * Time: 9.4 ms per transaction
  */
-public class TestPerformance extends TestCase {
-
-    /** The test suite, to use for adding additional tests. */
-    private static final TestSuite suite =
-	new TestSuite(TestPerformance.class);
-
-    /** Provides the test suite to the test runner. */
-    public static Test suite() { return suite; }
+public class TestDataServicePerformance extends TestCase {
 
     /** The name of the DataStoreImpl class. */
     private static final String DataStoreImplClass =
@@ -66,37 +59,30 @@ public class TestPerformance extends TestCase {
 	DataServiceImpl.class.getName();
 
     /** The number of objects to read in a transaction. */
-    private static int items = Integer.getInteger("test.items", 400);
+    protected int items = Integer.getInteger("test.items", 100);
 
     /**
      * The number of objects to modify in a transaction, if doing modification.
      */
-    private static int modifyItems =
-	Integer.getInteger("test.modifyItems", 200);
+    protected int modifyItems = Integer.getInteger("test.modify.items", 50);
 
     /** The number of times to run the test while timing. */
-    private static int count = Integer.getInteger("test.count", 60);
+    protected int count = Integer.getInteger("test.count", 100);
 
     /** The number of times to repeat the timing. */
-    private static int repeat = Integer.getInteger("test.repeat", 5);
+    protected int repeat = Integer.getInteger("test.repeat", 5);
 
     /** Whether to flush to disk on transaction commits. */
-    private static boolean testFlush = Boolean.getBoolean("test.flush");
-
-    /** Whether to do logging, which is otherwise disabled. */
-    private static boolean doLogging = Boolean.getBoolean("test.doLogging");
-
-    /** Print test parameters. */
-    static {
-	System.err.println("Parameters: test.items=" + items +
-			   ", test.modifyItems=" + modifyItems);
-    }
+    protected boolean testFlush = Boolean.getBoolean("test.flush");
 
     /** Set when the test passes. */
-    private boolean passed;
+    protected boolean passed;
 
     /** A per-test database directory, or null if not created. */
     private String directory;
+
+    /** Properties for creating services. */
+    protected Properties props;
 
     /** A transaction proxy. */
     private DummyTransactionProxy txnProxy = new DummyTransactionProxy();
@@ -109,29 +95,23 @@ public class TestPerformance extends TestCase {
     private DummyTransaction txn;
 
     /** The service to test. */
-    private DataServiceImpl service;
+    private DataService service;
 
     /** Creates the test. */
-    public TestPerformance(String name) {
+    public TestDataServicePerformance(String name) {
 	super(name);
     }
 
-    /**
-     * Prints the test case, initializes the transaction, and disables logging
-     * if necessary.
-     */
-    protected void setUp() {
+    /** Prints the test case and sets up the service properties. */
+    protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
-	if (!doLogging) {
-	    /* Disable logging */
-	    for (Enumeration<String> loggerNames =
-		     LogManager.getLogManager().getLoggerNames();
-		 loggerNames.hasMoreElements(); )
-	    {
-		String loggerName = loggerNames.nextElement();
-		Logger.getLogger(loggerName).setLevel(Level.WARNING);
-	    }
-	}
+	System.err.println("Parameters:" +
+			   "\n  test.items=" + items +
+			   "\n  test.modify.items=" + modifyItems +
+			   "\n  test.count=" + count);
+	props = createProperties(
+	    DataStoreImplClass + ".directory", createDirectory(),
+	    StandardProperties.APP_NAME, "TestDataServicePerformance");
     }
 
     /** Sets passed if the test passes. */
@@ -142,12 +122,12 @@ public class TestPerformance extends TestCase {
 
     /**
      * Deletes the directory if the test passes and the directory was
-     * created, and reinitializes logging.
+     * created.
      */
     protected void tearDown() throws Exception {
 	if (service != null) {
 	    try {
-		service.shutdown();
+		shutdown();
 	    } catch (RuntimeException e) {
 		if (passed) {
 		    throw e;
@@ -159,10 +139,11 @@ public class TestPerformance extends TestCase {
 	if (passed && directory != null) {
 	    deleteDirectory(directory);
 	}
-	if (!doLogging) {
-	    LogManager.getLogManager().readConfiguration();
-	}
-        DummyProfileRegistrar.stopProfiling();
+    }
+
+    /** Shuts down the service. */
+    protected boolean shutdown() {
+	return service.shutdown();
     }
 
     /* -- Tests -- */
@@ -176,14 +157,13 @@ public class TestPerformance extends TestCase {
     }
 
     private void doTestRead(boolean detectMods) throws Exception {
-	Properties props = createProperties(
-	    DataStoreImplClass + ".directory", createDirectory(),
-	    StandardProperties.APP_NAME, "TestPerformance",
-	    DataServiceImplClass + ".detect.modifications",
-	    String.valueOf(detectMods));
-	service = new DataServiceImpl(props, componentRegistry);
-        DummyProfileRegistrar.startProfiling(service);
-        createTransaction();
+	props.setProperty(DataServiceImplClass + ".detect.modifications",
+			  String.valueOf(detectMods));
+	service = getDataService(props, componentRegistry);
+	if (service instanceof ProfileProducer) {
+	    DummyProfileRegistrar.startProfiling(((ProfileProducer) service));
+	}
+	createTransaction();
 	service.configure(componentRegistry, txnProxy);
 	componentRegistry.setComponent(DataManager.class, service);
 	componentRegistry.registerAppContext();
@@ -204,7 +184,8 @@ public class TestPerformance extends TestCase {
 	    }
 	    long stop = System.currentTimeMillis();
 	    System.err.println(
-		"Time: " + (stop - start) / count + " ms per transaction");
+		"Time: " + (stop - start) / (float) count +
+		" ms per transaction");
 	}
     }
 
@@ -216,27 +197,24 @@ public class TestPerformance extends TestCase {
 	doTestWrite(false, false);
     }
 
-    static {
-	if (testFlush) {
-	    suite.addTest(
-		new TestPerformance("testWriteFlush") {
-		    protected void runTest() throws Exception {
-			doTestWrite(false, true);
-		    }
-		});
+    public void testWriteFlush() throws Exception {
+	if (!testFlush) {
+	    System.err.println("Skipping");
+	    return;
 	}
+	doTestWrite(false, true);
     }
 
     void doTestWrite(boolean detectMods, boolean flush) throws Exception {
-	Properties props = createProperties(
-	    DataStoreImplClass + ".directory", createDirectory(),
-	    StandardProperties.APP_NAME, "TestPerformance",
-	    DataServiceImplClass + ".detect.modifications",
-	    String.valueOf(detectMods),
-	    DataStoreImplClass + ".flush.to.disk", String.valueOf(flush));
-	service = new DataServiceImpl(props, componentRegistry);
-        DummyProfileRegistrar.startProfiling(service);
-        createTransaction();
+	props.setProperty(DataServiceImplClass + ".detect.modifications",
+			  String.valueOf(detectMods));
+	props.setProperty(DataStoreImplClass + ".flush.to.disk",
+			  String.valueOf(flush));
+	service = getDataService(props, componentRegistry);
+	if (service instanceof ProfileProducer) {
+	    DummyProfileRegistrar.startProfiling(((ProfileProducer) service));
+	}
+	createTransaction();
 	service.configure(componentRegistry, txnProxy);
 	componentRegistry.setComponent(DataManager.class, service);
 	componentRegistry.registerAppContext();
@@ -261,7 +239,8 @@ public class TestPerformance extends TestCase {
 	    }
 	    long stop = System.currentTimeMillis();
 	    System.err.println(
-		"Time: " + (stop - start) / count + " ms per transaction");
+		"Time: " + (stop - start) / (float) count +
+		" ms per transaction");
 	}
     }
 
@@ -340,5 +319,13 @@ public class TestPerformance extends TestCase {
         private int count;
 	Counter() { }
 	int next() { return ++count; }
+    }
+
+    /** Returns the data service to test. */
+    protected DataService getDataService(
+	Properties props, ComponentRegistry componentRegistry)
+	throws Exception
+    {
+	return new DataServiceImpl(props, componentRegistry);
     }
 }

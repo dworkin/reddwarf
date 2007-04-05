@@ -12,6 +12,7 @@ import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyManagedObject;
@@ -25,41 +26,33 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import junit.framework.TestCase;
 
-/** Test concurrent operation. */
+/** Test concurrent operation of the data service. */
 @SuppressWarnings("hiding")
-public class TestConcurrent extends TestCase {
+public class TestDataServiceConcurrency extends TestCase {
 
     /** Logger for this test. */
     private static final LoggerWrapper logger =
-	new LoggerWrapper(Logger.getLogger(TestConcurrent.class.getName()));
+	new LoggerWrapper(
+	    Logger.getLogger(TestDataServiceConcurrency.class.getName()));
 
     /** The name of the DataStoreImpl class. */
     private static final String DataStoreImplClass =
 	"com.sun.sgs.impl.service.data.store.DataStoreImpl";
 
     /** The number of operations to perform. */
-    private static final int operations =
-	Integer.getInteger("test.operations", 10000);
+    protected int operations = Integer.getInteger("test.operations", 10000);
 
     /** The maximum number of objects to allocate. */
-    private static final int objects =
-	Integer.getInteger("test.objects", 1000);
+    protected int objects = Integer.getInteger("test.objects", 1000);
 
     /** The number of concurrent threads. */
-    private static final int threads = Integer.getInteger("test.threads", 2);
-
-    /** Print test parameters. */
-    static {
-	System.err.println("Parameters: test.operations=" + operations +
-			   ", test.objects=" + objects +
-			   ", test.threads=" + threads);
-    }
+    protected int threads = Integer.getInteger("test.threads", 2);
 
     /** The transaction proxy. */
     final DummyTransactionProxy txnProxy = new DummyTransactionProxy();
 
     /** Set when the test passes. */
-    private boolean passed;
+    protected boolean passed;
 
     /** A per-test database directory. */
     private String directory = System.getProperty("test.directory");
@@ -76,17 +69,28 @@ public class TestConcurrent extends TestCase {
     /** The number of threads that are done. */
     private int done;
 
+    /** Properties for creating services. */
+    protected Properties props;
+
     /** The service to test. */
-    private DataServiceImpl service;
+    private DataService service;
 
     /** Creates the test. */
-    public TestConcurrent(String name) {
+    public TestDataServiceConcurrency(String name) {
 	super(name);
     }
 
     /** Prints the name of the test case. */
-    protected void setUp() {
+    protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
+	System.err.println(
+	    "Parameters:" +
+	    "\n  test.operations=" + operations +
+	    "\n  test.objects=" + objects +
+	    "\n  test.threads=" + threads);
+	props = createProperties(
+	    DataStoreImplClass + ".directory", createDirectory(),
+	    StandardProperties.APP_NAME, "TestDataServiceConcurrency");
     }
 
     /** Sets passed if the test passes. */
@@ -99,7 +103,7 @@ public class TestConcurrent extends TestCase {
     protected void tearDown() throws Exception {
 	if (service != null) {
 	    try {
-		service.shutdown();
+		shutdown();
 	    } catch (RuntimeException e) {
 		if (passed) {
 		    throw e;
@@ -113,15 +117,17 @@ public class TestConcurrent extends TestCase {
 	}
     }
 
+    /** Shuts down the service. */
+    protected boolean shutdown() {
+	return service.shutdown();
+    }
+
     /* -- Tests -- */
 
-    public void testConcurrent() throws Throwable {
-	Properties props = createProperties(
-	    DataStoreImplClass + ".directory", createDirectory(),
-	    StandardProperties.APP_NAME, "TestConcurrent");
+    public void testConcurrency() throws Throwable {
 	DummyComponentRegistry componentRegistry =
 	    new DummyComponentRegistry();
-	service = new DataServiceImpl(props, componentRegistry);
+	service = getDataService(props, componentRegistry);
 	DummyTransaction txn = new DummyTransaction();
 	txnProxy.setCurrentTransaction(txn);
 	service.configure(componentRegistry, txnProxy);
@@ -327,5 +333,13 @@ public class TestConcurrent extends TestCase {
 	/* Include system properties and allow them to override */
 	props.putAll(System.getProperties());
 	return props;
+    }
+
+    /** Returns the data service to test. */
+    protected DataService getDataService(
+	Properties props, ComponentRegistry componentRegistry)
+	throws Exception
+    {
+	return new DataServiceImpl(props, componentRegistry);
     }
 }

@@ -7,10 +7,8 @@ package com.sun.sgs.test.impl.service.data.store;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionAbortedException;
-import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.app.TransactionNotActiveException;
-import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.DataStoreException;
 import com.sun.sgs.impl.service.data.store.DataStore;
@@ -23,9 +21,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Properties;
 import java.util.concurrent.Semaphore;
-import junit.framework.Test;
 import junit.framework.TestCase;
-import junit.framework.TestSuite;
 
 /*
  * XXX: Test recovery of prepared transactions after a crash
@@ -35,45 +31,31 @@ import junit.framework.TestSuite;
 /** Test the DataStoreImpl class */
 public class TestDataStoreImpl extends TestCase {
 
-    /** The test suite, to use for adding additional tests. */
-    private static final TestSuite suite =
-	new TestSuite(TestDataStoreImpl.class);
-
-    /** Provides the test suite to the test runner. */
-    public static Test suite() { return suite; }
-
     /** The name of the DataStoreImpl class. */
     private static final String DataStoreImplClassName =
 	DataStoreImpl.class.getName();
 
     /** Directory used for database shared across multiple tests. */
-    private static String dbDirectory =
+    private static final String dbDirectory =
 	System.getProperty("java.io.tmpdir") + File.separator +
 	"TestDataStoreImpl.db";
 
-    /**
-     * Delete the database directory at the start of the test run, but not for
-     * each test.
-     */
+    /** An instance of the data store, to test. */
+    static DataStore store;
+
+    /** Make sure an empty version of the directory exists. */
     static {
-	deleteDirectory(dbDirectory);
+	cleanDirectory(dbDirectory);
     }
 
-    /** Properties for creating the shared database. */
-    private static Properties dbProps = createProperties(
-	DataStoreImplClassName + ".directory", dbDirectory);
-
     /** Set when the test passes. */
-    private boolean passed;
+    protected boolean passed;
 
-    /** A per-test database directory, or null if not created. */
-    private String directory;
-
-    /** An instance of the data store, to test. */
-    DataStore store;
+    /** Default properties for creating the DataStore. */
+    protected Properties props;
 
     /** An initial, open transaction. */
-    DummyTransaction txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+    DummyTransaction txn;
 
     /** The object ID of a newly created object. */
     long id;
@@ -84,9 +66,13 @@ public class TestDataStoreImpl extends TestCase {
     }
 
     /** Prints the test case, and creates the data store and an object. */
-    protected void setUp() {
+    protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
-	store = getDataStoreImpl();
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	props = getProperties();
+	if (store == null) {
+	    store = createDataStore();
+	}
 	id = store.createObject(txn);
     }
 
@@ -96,16 +82,13 @@ public class TestDataStoreImpl extends TestCase {
 	passed = true;
     }
 
-    /**
-     * Deletes the directory if the test passes and the directory was
-     * created.
-     */
+    /** Abort the current transaction, if non-null, and shutdown the store. */
     protected void tearDown() throws Exception {
 	try {
 	    if (txn != null) {
 		txn.abort(null);
 	    }
-	    if (store != null) {
+	    if (!passed && store != null) {
 		new ShutdownAction().waitForDone();
 	    }
 	} catch (RuntimeException e) {
@@ -114,19 +97,19 @@ public class TestDataStoreImpl extends TestCase {
 	    } else {
 		e.printStackTrace();
 	    }
-	}
-	txn = null;
-	store = null;
-	if (passed && directory != null) {
-	    deleteDirectory(directory);
+	} finally {
+	    txn = null;
+	    if (!passed) {
+		store = null;
+	    }
 	}
     }
 
     /* -- Test constructor -- */
 
-    public void testConstructorNullArg() {
+    public void testConstructorNullArg() throws Exception {
 	try {
-	    new DataStoreImpl(null);
+	    createDataStore(null);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
@@ -148,51 +131,48 @@ public class TestDataStoreImpl extends TestCase {
         Properties props = createProperties(
             StandardProperties.APP_NAME, "Foo",
             StandardProperties.APP_ROOT, rootDir);
-        DataStoreImpl testStore = new DataStoreImpl(props);
+        DataStore testStore = createDataStore(props);
         testStore.shutdown();
-        deleteDirectory(dataDir.getPath());
     }
 
-    public void testConstructorNoDirectoryNorRoot() {
+    public void testConstructorNoDirectoryNorRoot() throws Exception {
 	Properties props = new Properties();
 	try {
-	    new DataStoreImpl(props);
+	    createDataStore(props);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
 	}
     }
 
-    public void testConstructorBadAllocationBlockSize() {
-	Properties props = createProperties(
-	    DataStoreImplClassName + ".directory", "foo",
+    public void testConstructorBadAllocationBlockSize() throws Exception {
+	props.setProperty(
 	    DataStoreImplClassName + ".allocation.block.size", "gorp");
 	try {
-	    new DataStoreImpl(props);
+	    createDataStore(props);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
 	}
     }
 
-    public void testConstructorNegativeAllocationBlockSize() {
-	Properties props = createProperties(
-	    DataStoreImplClassName + ".directory", "foo",
+    public void testConstructorNegativeAllocationBlockSize() throws Exception {
+	props.setProperty(
 	    DataStoreImplClassName + ".allocation.block.size", "-3");
 	try {
-	    new DataStoreImpl(props);
+	    createDataStore(props);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
 	}
     }
 
-    public void testConstructorNonexistentDirectory() {
-	Properties props = createProperties(
+    public void testConstructorNonexistentDirectory() throws Exception {
+	props.setProperty(
 	    DataStoreImplClassName + ".directory",
 	    "/this-is-a-non-existent-directory/yup");
 	try {
-	    new DataStoreImpl(props);
+	    createDataStore(props);
 	    fail("Expected DataStoreException");
 	} catch (DataStoreException e) {
 	    System.err.println(e);	    
@@ -201,11 +181,11 @@ public class TestDataStoreImpl extends TestCase {
 
     public void testConstructorDirectoryIsFile() throws Exception {
 	String file = File.createTempFile("existing", "db").getPath();
-	Properties props = createProperties(
+	props.setProperty(
 	    DataStoreImplClassName + ".directory",
 	    file);
 	try {
-	    new DataStoreImpl(props);
+	    createDataStore(props);
 	    fail("Expected DataStoreException");
 	} catch (DataStoreException e) {
 	    System.err.println(e);
@@ -222,12 +202,11 @@ public class TestDataStoreImpl extends TestCase {
             System.err.println("Skipping on " + osName);
             return;
         }
-	Properties props = createProperties(
-	    DataStoreImplClassName + ".directory",
-	    createDirectory());
+	String directory = createDirectory();
+	props.setProperty(DataStoreImplClassName + ".directory", directory);
 	new File(directory).setReadOnly();
 	try {
-	    new DataStoreImpl(props);
+	    createDataStore(props);
 	    fail("Expected DataStoreException");
 	} catch (DataStoreException e) {
 	    System.err.println(e);
@@ -245,14 +224,33 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
-    static {
-	for (UnusualState state : UnusualState.values()) {
-	    new UnusualStateTest("testCreateObject", state) {
-		void action() {
-		    store.createObject(txn);
-		}
-	    };
-	}
+    /* -- Unusual states -- */
+    private final Action createObject = new Action() {
+	void run() { store.createObject(txn); };
+    };
+    public void testCreateObjectAborted() throws Exception {
+	testAborted(createObject);
+    }
+    public void testCreateObjectPreparedReadOnly() throws Exception {
+	testPreparedReadOnly(createObject);
+    }
+    public void testCreateObjectPreparedModified() throws Exception {
+	testPreparedModified(createObject);
+    }
+    public void testCreateObjectCommitted() throws Exception {
+	testCommitted(createObject);
+    }
+    public void testCreateObjectWrongTxn() throws Exception {
+	testWrongTxn(createObject);
+    }
+    public void testCreateObjectShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(createObject);
+    }
+    public void testCreateObjectShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(createObject);
+    }
+    public void testCreateObjectShutdown() throws Exception {
+	testShutdown(createObject);
     }
 
     public void testCreateObjectSuccess() throws Exception {
@@ -310,18 +308,34 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
-    static {
-	for (UnusualState state : UnusualState.values()) {
-	    new UnusualStateTest("testMarkForUpdate", state) {
-		protected void setUp() {
-		    super.setUp();
-		    store.setObject(txn, id, new byte[] { 0 });
-		}
-		void action() {
-		    store.markForUpdate(txn, id);
-		}
-	    };
-	}
+    /* -- Unusual states -- */
+    private final Action markForUpdate = new Action() {
+	void setUp() { store.setObject(txn, id, new byte[] { 0 }); }
+	void run() { store.markForUpdate(txn, id); }
+    };
+    public void testMarkForUpdateAborted() throws Exception {
+	testAborted(markForUpdate);
+    }
+    public void testMarkForUpdatePreparedReadOnly() throws Exception {
+	testPreparedReadOnly(markForUpdate);
+    }
+    public void testMarkForUpdatePreparedModified() throws Exception {
+	testPreparedModified(markForUpdate);
+    }
+    public void testMarkForUpdateCommitted() throws Exception {
+	testCommitted(markForUpdate);
+    }
+    public void testMarkForUpdateWrongTxn() throws Exception {
+	testWrongTxn(markForUpdate);
+    }
+    public void testMarkForUpdateShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(markForUpdate);
+    }
+    public void testMarkForUpdateShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(markForUpdate);
+    }
+    public void testMarkForUpdateShutdown() throws Exception {
+	testShutdown(markForUpdate);
     }
 
     public void testMarkForUpdateSuccess() throws Exception {
@@ -364,18 +378,34 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
-    static {
-	for (UnusualState state : UnusualState.values()) {
-	    new UnusualStateTest("testGetObject", state) {
-		protected void setUp() {
-		    super.setUp();
-		    store.setObject(txn, id, new byte[] { 0 });
-		}
-		void action() {
-		    store.getObject(txn, id, false);
-		}
-	    };
-	}
+    /* -- Unusual states -- */
+    private final Action getObject = new Action() {
+	void setUp() { store.setObject(txn, id, new byte[] { 0 }); }
+	void run() { store.getObject(txn, id, false); };
+    };
+    public void testGetObjectAborted() throws Exception {
+	testAborted(getObject);
+    }
+    public void testGetObjectPreparedReadOnly() throws Exception {
+	testPreparedReadOnly(getObject);
+    }
+    public void testGetObjectPreparedModified() throws Exception {
+	testPreparedModified(getObject);
+    }
+    public void testGetObjectCommitted() throws Exception {
+	testCommitted(getObject);
+    }
+    public void testGetObjectWrongTxn() throws Exception {
+	testWrongTxn(getObject);
+    }
+    public void testGetObjectShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(getObject);
+    }
+    public void testGetObjectShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(getObject);
+    }
+    public void testGetObjectShutdown() throws Exception {
+	testShutdown(getObject);
     }
 
     public void testGetObjectSuccess() throws Exception {
@@ -431,14 +461,33 @@ public class TestDataStoreImpl extends TestCase {
 	assertTrue(result.length == 0);
     }
 
-    static {
-	for (UnusualState state : UnusualState.values()) {
-	    new UnusualStateTest("testSetObject", state) {
-		void action() {
-		    store.setObject(txn, id, new byte[] { 0 });
-		}
-	    };
-	}
+    /* -- Unusual states -- */
+    private final Action setObject = new Action() {
+	void run() { store.setObject(txn, id, new byte[] { 0 }); }
+    };
+    public void testSetObjectAborted() throws Exception {
+	testAborted(setObject);
+    }
+    public void testSetObjectPreparedReadOnly() throws Exception {
+	testPreparedReadOnly(setObject);
+    }
+    public void testSetObjectPreparedModified() throws Exception {
+	testPreparedModified(setObject);
+    }
+    public void testSetObjectCommitted() throws Exception {
+	testCommitted(setObject);
+    }
+    public void testSetObjectWrongTxn() throws Exception {
+	testWrongTxn(setObject);
+    }
+    public void testSetObjectShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(setObject);
+    }
+    public void testSetObjectShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(setObject);
+    }
+    public void testSetObjectShutdown() throws Exception {
+	testShutdown(setObject);
     }
 
     public void testSetObjectSuccess() throws Exception {
@@ -459,6 +508,138 @@ public class TestDataStoreImpl extends TestCase {
 	txn.commit();
 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
 	assertTrue(Arrays.equals(newData, store.getObject(txn, id, true)));
+    }
+
+    /* -- Test setObjects -- */
+
+    public void testSetObjectsNullTxn() {
+	long[] ids = { id };
+	byte[][] dataArray = { { 0 } };
+	try {
+	    store.setObjects(null, ids, dataArray);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testSetObjectsBadId() {
+	long[] ids = { -3 };
+	byte[][] dataArray = { { 0 } };
+	try {
+	    store.setObjects(txn, ids, dataArray);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testSetObjectsWrongLengths() {
+	long[] ids = { id };
+	byte[][] dataArray = { { 0 }, { 1 } };
+	try {
+	    store.setObjects(txn, ids, dataArray);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testSetObjectsNullOids() {
+	byte[][] dataArray = { { 0 } };
+	try {
+	    store.setObjects(txn, null, dataArray);
+	    fail("Expected NullArgumentException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testSetObjectsNullDataArray() {
+	long[] ids = { id };
+	try {
+	    store.setObjects(txn, ids, null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testSetObjectsNullData() {
+	long[] ids = { id };
+	byte[][] dataArray = { null };
+	try {
+	    store.setObjects(txn, ids, dataArray);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testSetObjectsEmptyData() throws Exception {
+	long[] ids = { id };
+	byte[][] dataArray = { { } };
+	store.setObjects(txn, ids, dataArray);
+	txn.commit();
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	byte[] result = store.getObject(txn, id, false);
+	assertTrue(result.length == 0);
+    }
+
+    /* -- Unusual states -- */
+    private final Action setObjects = new Action() {
+	void run() {
+	    store.setObjects(txn, new long[] { id }, new byte[][] { { 0 } });
+	}
+    };
+    public void testSetObjectsAborted() throws Exception {
+	testAborted(setObjects);
+    }
+    public void testSetObjectsPreparedReadOnly() throws Exception {
+	testPreparedReadOnly(setObjects);
+    }
+    public void testSetObjectsPreparedModified() throws Exception {
+	testPreparedModified(setObjects);
+    }
+    public void testSetObjectsCommitted() throws Exception {
+	testCommitted(setObjects);
+    }
+    public void testSetObjectsWrongTxn() throws Exception {
+	testWrongTxn(setObjects);
+    }
+    public void testSetObjectsShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(setObjects);
+    }
+    public void testSetObjectsShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(setObjects);
+    }
+    public void testSetObjectsShutdown() throws Exception {
+	testShutdown(setObjects);
+    }
+
+    public void testSetObjectsSuccess() throws Exception {
+	long[] ids = { id, store.createObject(txn) };
+	byte[][] dataArray = { { 1, 2 }, { 3, 4, 5 } };
+	store.setObjects(txn, ids, dataArray);
+	assertFalse(txn.prepare());
+	txn.commit();
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	for (int i = 0; i < ids.length; i++) {
+	    long id = ids[i];
+	    byte[] data = dataArray[i];
+	    byte[] result = store.getObject(txn, id, false);
+	    assertTrue(Arrays.equals(data, result));
+	    byte[] newData = new byte[] { (byte) i };
+	    store.setObjects(txn, new long[] { id }, new byte[][] { newData });
+	    assertTrue(Arrays.equals(newData, store.getObject(txn, id, true)));
+	    txn.abort(null);
+	    txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	    assertTrue(Arrays.equals(data, store.getObject(txn, id, true)));
+	    store.setObjects(txn, new long[] { id }, new byte[][] { newData });
+	    txn.commit();
+	    txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	    assertTrue(Arrays.equals(newData, store.getObject(txn, id, true)));
+	}
     }
 
     /* -- Test removeObject -- */
@@ -490,18 +671,34 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
-    static {
-	for (UnusualState state : UnusualState.values()) {
-	    new UnusualStateTest("testRemoveObject", state) {
-		protected void setUp() {
-		    super.setUp();
-		    store.setObject(txn, id, new byte[] { 0 });
-		}
-		void action() {
-		    store.removeObject(txn, id);
-		}
-	    };
-	}
+    /* -- Unusual states -- */
+    private final Action removeObject = new Action() {
+	void setUp() { store.setObject(txn, id, new byte[] { 0 }); }
+	void run() { store.removeObject(txn, id); }
+    };
+    public void testRemoveObjectAborted() throws Exception {
+	testAborted(removeObject);
+    }
+    public void testRemoveObjectPreparedReadOnly() throws Exception {
+	testPreparedReadOnly(removeObject);
+    }
+    public void testRemoveObjectPreparedModified() throws Exception {
+	testPreparedModified(removeObject);
+    }
+    public void testRemoveObjectCommitted() throws Exception {
+	testCommitted(removeObject);
+    }
+    public void testRemoveObjectWrongTxn() throws Exception {
+	testWrongTxn(removeObject);
+    }
+    public void testRemoveObjectShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(removeObject);
+    }
+    public void testRemoveObjectShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(removeObject);
+    }
+    public void testRemoveObjectShutdown() throws Exception {
+	testShutdown(removeObject);
     }
 
     public void testRemoveObjectSuccess() throws Exception {
@@ -573,18 +770,34 @@ public class TestDataStoreImpl extends TestCase {
 	assertEquals(id, result);
     }
 
-    static {
-	for (UnusualState state : UnusualState.values()) {
-	    new UnusualStateTest("testGetBinding", state) {
-		protected void setUp() {
-		    super.setUp();
-		    store.setBinding(txn, "foo", id);
-		}
-		void action() {
-		    store.getBinding(txn, "foo");
-		}
-	    };
-	}
+    /* -- Unusual states -- */
+    private final Action getBinding = new Action() {
+	void setUp() { store.setBinding(txn, "foo", id); }
+	void run() { store.getBinding(txn, "foo"); }
+    };
+    public void testGetBindingAborted() throws Exception {
+	testAborted(getBinding);
+    }
+    public void testGetBindingPreparedReadOnly() throws Exception {
+	testPreparedReadOnly(getBinding);
+    }
+    public void testGetBindingPreparedModified() throws Exception {
+	testPreparedModified(getBinding);
+    }
+    public void testGetBindingCommitted() throws Exception {
+	testCommitted(getBinding);
+    }
+    public void testGetBindingWrongTxn() throws Exception {
+	testWrongTxn(getBinding);
+    }
+    public void testGetBindingShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(getBinding);
+    }
+    public void testGetBindingShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(getBinding);
+    }
+    public void testGetBindingShutdown() throws Exception {
+	testShutdown(getBinding);
     }
 
     public void testGetBindingSuccess() throws Exception {
@@ -617,14 +830,33 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
-    static {
-	for (UnusualState state : UnusualState.values()) {
-	    new UnusualStateTest("testSetBinding", state) {
-		void action() {
-		    store.setBinding(txn, "foo", id);
-		}
-	    };
-	}
+    /* -- Unusual states -- */
+    private final Action setBinding = new Action() {
+	void run() { store.setBinding(txn, "foo", id); }
+    };
+    public void testSetBindingAborted() throws Exception {
+	testAborted(setBinding);
+    }
+    public void testSetBindingPreparedReadOnly() throws Exception {
+	testPreparedReadOnly(setBinding);
+    }
+    public void testSetBindingPreparedModified() throws Exception {
+	testPreparedModified(setBinding);
+    }
+    public void testSetBindingCommitted() throws Exception {
+	testCommitted(setBinding);
+    }
+    public void testSetBindingWrongTxn() throws Exception {
+	testWrongTxn(setBinding);
+    }
+    public void testSetBindingShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(setBinding);
+    }
+    public void testSetBindingShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(setBinding);
+    }
+    public void testSetBindingShutdown() throws Exception {
+	testShutdown(setBinding);
     }
 
     public void testSetBindingSuccess() throws Exception {
@@ -671,18 +903,34 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
-    static {
-	for (UnusualState state : UnusualState.values()) {
-	    new UnusualStateTest("testRemoveBinding", state) {
-		protected void setUp() {
-		    super.setUp();
-		    store.setBinding(txn, "foo", id);
-		}
-		void action() {
-		    store.removeBinding(txn, "foo");
-		}
-	    };
-	}
+    /* -- Unusual states -- */
+    private final Action removeBinding = new Action() {
+	void setUp() { store.setBinding(txn, "foo", id); }
+	void run() { store.removeBinding(txn, "foo"); }
+    };
+    public void testRemoveBindingAborted() throws Exception {
+	testAborted(removeBinding);
+    }
+    public void testRemoveBindingPreparedReadOnly() throws Exception {
+	testPreparedReadOnly(removeBinding);
+    }
+    public void testRemoveBindingPreparedModified() throws Exception {
+	testPreparedModified(removeBinding);
+    }
+    public void testRemoveBindingCommitted() throws Exception {
+	testCommitted(removeBinding);
+    }
+    public void testRemoveBindingWrongTxn() throws Exception {
+	testWrongTxn(removeBinding);
+    }
+    public void testRemoveBindingShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(removeBinding);
+    }
+    public void testRemoveBindingShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(removeBinding);
+    }
+    public void testRemoveBindingShutdown() throws Exception {
+	testShutdown(removeBinding);
     }
 
     public void testRemoveBindingSuccess() throws Exception {
@@ -724,20 +972,39 @@ public class TestDataStoreImpl extends TestCase {
     }
 
     public void testNextBoundNameEmpty() {
-	assertNull(store.nextBoundName(txn, ""));
+	assertEquals(null, store.nextBoundName(txn, ""));
 	store.setBinding(txn, "", id);
 	assertEquals("", store.nextBoundName(txn, null));
 	assertEquals(null, store.nextBoundName(txn, ""));
     }
 
-    static {
-	for (UnusualState state : UnusualState.values()) {
-	    new UnusualStateTest("testNextBoundName", state) {
-		void action() {
-		    store.nextBoundName(txn, null);
-		}
-	    };
-	}
+    /* -- Unusual states -- */
+    private final Action nextBoundName = new Action() {
+	void run() { store.nextBoundName(txn, null); }
+    };
+    public void testNextBoundNameAborted() throws Exception {
+	testAborted(nextBoundName);
+    }
+    public void testNextBoundNamePreparedReadOnly() throws Exception {
+	testPreparedReadOnly(nextBoundName);
+    }
+    public void testNextBoundNamePreparedModified() throws Exception {
+	testPreparedModified(nextBoundName);
+    }
+    public void testNextBoundNameCommitted() throws Exception {
+	testCommitted(nextBoundName);
+    }
+    public void testNextBoundNameWrongTxn() throws Exception {
+	testWrongTxn(nextBoundName);
+    }
+    public void testNextBoundNameShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(nextBoundName);
+    }
+    public void testNextBoundNameShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(nextBoundName);
+    }
+    public void testNextBoundNameShutdown() throws Exception {
+	testShutdown(nextBoundName);
     }
 
     public void testNextBoundNameSuccess() throws Exception {
@@ -805,29 +1072,42 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
-    static {
-	for (UnusualState state : UnusualState.values()) {
-	    new UnusualStateTest("testAbort", state) {
-		TransactionParticipant participant;
-		protected void setUp() {
-		    super.setUp();
-		    participant = txn.participants.iterator().next();
-		}
-		void action() throws Exception {
-		    participant.abort(txn);
-		    txn = null;
-		}
-		void preparedModifiedTest() throws Exception {
-		    store.setObject(txn, id, new byte[] { 0 });
-		    txn.prepare();
-		    /* Aborting a prepared, modified transaction is OK. */
-		    action();
-		}
-		Class<?> getAbortedTestExceptionType() {
-		    return IllegalStateException.class;
-		}
-	    };
+    /* -- Unusual states -- */
+    private final Action abort = new Action() {
+	TransactionParticipant participant;
+	void setUp() { participant = txn.participants.iterator().next(); }
+	void run() {
+	    participant.abort(txn);
+	    txn = null;
 	}
+    };
+    public void testAbortAborted() throws Exception {
+	testAborted(abort, IllegalStateException.class);
+    }
+    public void testAbortPreparedReadOnly() throws Exception {
+	testPreparedReadOnly(abort);
+    }
+    public void testAbortPreparedModified() throws Exception {
+	abort.setUp();
+	store.setObject(txn, id, new byte[] { 0 });
+	txn.prepare();
+	/* Aborting a prepared, modified transaction is OK. */
+	abort.run();
+    }
+    public void testAbortCommitted() throws Exception {
+	testCommitted(abort);
+    }
+    public void testAbortWrongTxn() throws Exception {
+	testWrongTxn(abort);
+    }
+    public void testAbortShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(abort);
+    }
+    public void testAbortShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(abort);
+    }
+    public void testAbortShutdown() throws Exception {
+	testShutdown(abort);
     }
 
     /* -- Test prepare -- */
@@ -844,23 +1124,38 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
-    static {
-	for (UnusualState state : UnusualState.values()) {
-	    new UnusualStateTest("testPrepare", state) {
-		TransactionParticipant participant;
-		protected void setUp() {
-		    super.setUp();
-		    participant = txn.participants.iterator().next();
-		}
-		void action() throws Exception {
-		    assertTrue(participant.prepare(txn));
-		    txn = null;
-		}
-		Class<?> getAbortedTestExceptionType() {
-		    return IllegalStateException.class;
-		}
-	    };
+    /* -- Unusual states -- */
+    private final Action prepare = new Action() {
+	private TransactionParticipant participant;
+	void setUp() { participant = txn.participants.iterator().next(); }
+	void run() throws Exception {
+	    assertTrue(participant.prepare(txn));
+	    txn = null;
 	}
+    };
+    public void testPrepareAborted() throws Exception {
+	testAborted(prepare, IllegalStateException.class);
+    }
+    public void testPreparePreparedReadOnly() throws Exception {
+	testPreparedReadOnly(prepare);
+    }
+    public void testPreparePreparedModified() throws Exception {
+	testPreparedModified(prepare);
+    }
+    public void testPrepareCommitted() throws Exception {
+	testCommitted(prepare);
+    }
+    public void testPrepareWrongTxn() throws Exception {
+	testWrongTxn(prepare);
+    }
+    public void testPrepareShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(prepare);
+    }
+    public void testPrepareShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(prepare);
+    }
+    public void testPrepareShutdown() throws Exception {
+	testShutdown(prepare);
     }
 
     /* -- Test prepareAndCommit -- */
@@ -877,23 +1172,44 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
-    static {
-	for (UnusualState state : UnusualState.values()) {
-	    new UnusualStateTest("testPrepareAndCommit", state) {
-		TransactionParticipant participant;
-		protected void setUp() {
-		    super.setUp();
-		    participant = txn.participants.iterator().next();
-		}
-		void action() throws Exception {
-		    participant.prepareAndCommit(txn);
-		    txn = null;
-		}
-		Class<?> getAbortedTestExceptionType() {
-		    return IllegalStateException.class;
-		}
-	    };
+    /* -- Unusual states -- */
+    private final Action prepareAndCommit = new Action() {
+	private TransactionParticipant participant;
+	void setUp() { participant = txn.participants.iterator().next(); }
+	void run() throws Exception {
+	    participant.prepareAndCommit(txn);
+	    txn = null;
 	}
+    };
+    public void testPrepareAndCommitAborted() throws Exception {
+	testAborted(prepareAndCommit, IllegalStateException.class);
+    }
+    public void testPrepareAndCommitPrepareAndCommitReadOnly()
+	throws Exception
+    {
+	testPreparedReadOnly(prepareAndCommit);
+    }
+    public void testPrepareAndCommitPrepareAndCommitModified()
+	throws Exception
+    {
+	testPreparedModified(prepareAndCommit);
+    }
+    public void testPrepareAndCommitCommitted() throws Exception {
+	testCommitted(prepareAndCommit);
+    }
+    public void testPrepareAndCommitWrongTxn() throws Exception {
+	testWrongTxn(prepareAndCommit);
+    }
+    public void testPrepareAndCommitShuttingDownExistingTxn()
+	throws Exception
+    {
+	testShuttingDownExistingTxn(prepareAndCommit);
+    }
+    public void testPrepareAndCommitShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(prepareAndCommit);
+    }
+    public void testPrepareAndCommitShutdown() throws Exception {
+	testShutdown(prepareAndCommit);
     }
 
     /* -- Test commit -- */
@@ -910,35 +1226,47 @@ public class TestDataStoreImpl extends TestCase {
 	}
     }
 
-    static {
-	for (UnusualState state : UnusualState.values()) {
-	    new UnusualStateTest("testCommit", state) {
-		TransactionParticipant participant;
-		protected void setUp() {
-		    super.setUp();
-		    participant = txn.participants.iterator().next();
-		}
-		void action() throws Exception {
-		    participant.commit(txn);
-		    txn = null;
-		}
-		void preparedModifiedTest() throws Exception {
-		    store.setObject(txn, id, new byte[] { 0 });
-		    assertFalse(txn.prepare());
-		    /* Committing a prepared, modified transaction is OK. */
-		    action();
-		}
-		void shuttingDownExistingTxnTest() throws Exception {
-		    store.setObject(txn, id, new byte[] { 0 });
-		    assertFalse(participant.prepare(txn));
-		    /* Committing a prepared, modified transaction is OK. */
-		    super.shuttingDownExistingTxnTest();
-		}
-		Class<?> getAbortedTestExceptionType() {
-		    return IllegalStateException.class;
-		}
-	    };
+    /* -- Unusual states -- */
+    class CommitAction extends Action {
+	private TransactionParticipant participant;
+	void setUp() { participant = txn.participants.iterator().next(); }
+	void run() throws Exception {
+	    participant.commit(txn);
+	    txn = null;
 	}
+    }
+    private final CommitAction commit = new CommitAction();
+    public void testCommitAborted() throws Exception {
+	testAborted(commit, IllegalStateException.class);
+    }
+    public void testCommitPreparedReadOnly() throws Exception {
+	testPreparedReadOnly(commit);
+    }
+    public void testCommitPreparedModified() throws Exception {
+	commit.setUp();
+	store.setObject(txn, id, new byte[] { 0 });
+	assertFalse(txn.prepare());
+	/* Committing a prepared, modified transaction is OK. */
+	commit.run();
+    }
+    public void testCommitCommitted() throws Exception {
+	testCommitted(commit);
+    }
+    public void testCommitWrongTxn() throws Exception {
+	testWrongTxn(commit);
+    }
+    public void testCommitShuttingDownExistingTxn() throws Exception {
+	commit.setUp();
+	store.setObject(txn, id, new byte[] { 0 });
+	assertFalse(txn.prepare());
+	/* Committing a prepared, modified transaction is OK. */
+	testShuttingDownExistingTxn(commit);
+    }
+    public void testCommitShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(commit);
+    }
+    public void testCommitShutdown() throws Exception {
+	testShutdown(commit);
     }
 
     /* -- Test shutdown -- */
@@ -1012,7 +1340,7 @@ public class TestDataStoreImpl extends TestCase {
 	store.setObject(txn, id, bytes);
 	txn.commit();
 	store.shutdown();
-	store = getDataStoreImpl();
+	store = createDataStore();
 	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
 	id = store.getBinding(txn, "foo");
 	byte[] value = store.getObject(txn, id, false);
@@ -1024,7 +1352,6 @@ public class TestDataStoreImpl extends TestCase {
     public void testDeadlock() throws Exception {
 	for (int i = 0; i < 5; i++) {
 	    if (i > 0) {
-		store = getDataStoreImpl();
 		txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
 	    }
 	    final long id = store.createObject(txn);
@@ -1062,7 +1389,7 @@ public class TestDataStoreImpl extends TestCase {
 		}
 	    }
 	    MyRunnable myRunnable = new MyRunnable();
-	    Thread thread = new Thread(myRunnable);
+	    Thread thread = new Thread(myRunnable, "testDeadlockThread");
 	    thread.start();
 	    Thread.sleep(i * 500);
 	    flag.acquire();
@@ -1078,13 +1405,11 @@ public class TestDataStoreImpl extends TestCase {
 	    thread.join();
 	    if (myRunnable.exception2 != null &&
 		!(myRunnable.exception2
-		  instanceof TransactionConflictException ||
-		  myRunnable.exception2
-		  instanceof TransactionTimeoutException))
+		  instanceof TransactionAbortedException))
 	    {
 		throw myRunnable.exception2;
 	    } else if (exception == null && myRunnable.exception2 == null) {
-		fail("Expected TransactionConflictException");
+		fail("Expected TransactionAbortedException");
 	    }
 	    txn = null;
 	}
@@ -1092,7 +1417,7 @@ public class TestDataStoreImpl extends TestCase {
 
     /* -- Other methods and classes -- */
 
-    /** Creates a per-test directory. */
+    /** Creates a unique directory. */
     private String createDirectory() throws IOException {
 	File dir = File.createTempFile(getName(), "dbdir");
 	if (!dir.delete()) {
@@ -1102,12 +1427,11 @@ public class TestDataStoreImpl extends TestCase {
 	    throw new RuntimeException(
 		"Failed to create directory: " + dir);
 	}
-	directory = dir.getPath();
-	return directory;
+	return dir.getPath();
     }
 
-    /** Deletes the specified directory, if it exists. */
-    private static void deleteDirectory(String directory) {
+    /** Insures an empty version of the directory exists. */
+    private static void cleanDirectory(String directory) {
 	File dir = new File(directory);
 	if (dir.exists()) {
 	    for (File f : dir.listFiles()) {
@@ -1119,6 +1443,10 @@ public class TestDataStoreImpl extends TestCase {
 		throw new RuntimeException(
 		    "Failed to delete directory: " + dir);
 	    }
+	}
+	if (!dir.mkdir()) {
+	    throw new RuntimeException(
+		"Failed to create directory: " + dir);
 	}
     }
 
@@ -1134,216 +1462,188 @@ public class TestDataStoreImpl extends TestCase {
 	return props;
     }
 
-    /** Returns a DataStoreImpl for the shared database. */
-    private DataStoreImpl getDataStoreImpl() {
-	File dir = new File(dbDirectory);
-	if (!dir.exists()) {
-	    if (!dir.mkdir()) {
-		throw new RuntimeException(
-		    "Problem creating directory: " + dir);
-	    }
-	}
-	return new DataStoreImpl(dbProps);
+    /** Creates a DataStore using the default properties. */
+    protected DataStore createDataStore() throws Exception {
+	return createDataStore(props);
     }
 
-    /** The set of unusual states */
-    static enum UnusualState {
-	Aborted, PreparedReadOnly, PreparedModified, Committed,
-	WrongTxn, ShuttingDownExistingTxn, ShuttingDownNewTxn, Shutdown
+    /** Creates a DataStore using the specified properties. */
+    protected DataStore createDataStore(Properties props) throws Exception {
+	return new DataStoreImpl(props);
     }
 
-    /** Defines a abstract class for testing unusual states. */
-    static abstract class UnusualStateTest extends TestDataStoreImpl {
+    /** Returns the default properties to use for creating data stores. */
+    protected Properties getProperties() throws Exception {
+	return createProperties(
+	    DataStoreImplClassName + ".directory", dbDirectory);
+    }
 
-	/** The state to test. */
-	private final UnusualState state;
+    /* -- Support for testing unusual states -- */
 
-	/**
-	 * Creates an instance with the specified generic name to test the
-	 * specified unusual state, and adds this test to the test suite.
-	 */
-	UnusualStateTest(String name, UnusualState state) {
-	    super(name + state);
-	    this.state = state;
-	    suite.addTest(this);
-	}
+    /**
+     * An action, with an optional setup step, to be run in the context of an
+     * unusual state.
+     */
+    abstract class Action {
+	void setUp() throws Exception { };
+	abstract void run() throws Exception;
+    }
 
-	/**
-	 * Subclasses should implement this method to define the action that
-	 * should be tested in an unusual state.
-	 */
-	abstract void action() throws Exception;
+    /** Tests running the action after abort. */
+    void testAborted(Action action) throws Exception {
+	testAborted(action, TransactionNotActiveException.class);
+    }
 
-	/** Runs the test for the unusual state. */
-	protected void runTest() throws Exception {
-	    switch (state) {
-	    case Aborted:
-		abortedTest();
-		break;
-	    case PreparedReadOnly:
-		preparedReadOnlyTest();
-		break;
-	    case PreparedModified:
-		preparedModifiedTest();
-		break;
-	    case Committed:
-		committedTest();
-		break;
-	    case WrongTxn:
-		wrongTxnTest();
-		break;
-	    case ShuttingDownExistingTxn:
-		shuttingDownExistingTxnTest();
-		break;
-	    case ShuttingDownNewTxn:
-		shuttingDownNewTxnTest();
-		break;
-	    case Shutdown:
-		shutdownTest();
-		break;
-	    default:
-		throw new AssertionError();
-	    }
-	}
-
-	/** Runs the test for the aborted case. */
-	void abortedTest() throws Exception {
-	    txn.abort(null);
-	    try {
-		action();
-		fail("Expected exception");
-	    } catch (Exception e) {
-		Class<?> expectedType = getAbortedTestExceptionType();
-		if (expectedType.isInstance(e)) {
-		    System.err.println(e);
-		} else {
-		    fail("Expected " + expectedType + ": " + e);
-		}
-	    } finally {
-		txn = null;
-	    }
-	}
-
-	/** Returns the type of exception expected by abortedTest. */
-	Class<?> getAbortedTestExceptionType() {
-	    return TransactionNotActiveException.class;
-	}
-
-	/** Runs the test for the prepared returns read-only case. */
-	void preparedReadOnlyTest() throws Exception {
-	    txn.prepare();
-	    try {
-		action();
-		fail("Expected IllegalStateException");
-	    } catch (IllegalStateException e) {
+    /**
+     * Tests running the action after abort, and expecting to get the
+     * specified exception type.
+     */
+    void testAborted(Action action, Class<? extends Exception> exceptionType)
+	throws Exception
+    {
+	action.setUp();
+	txn.abort(null);
+	try {
+	    action.run();
+	    fail("Expected exception");
+	} catch (Exception e) {
+	    if (exceptionType.isInstance(e)) {
 		System.err.println(e);
+	    } else {
+		fail("Expected " + exceptionType + ": " + e);
 	    }
-	}
-
-	/** Runs the test for the prepared returns modified case. */
-	void preparedModifiedTest() throws Exception {
-	    store.setObject(txn, id, new byte[] { 0 });
-	    txn.prepare();
-	    try {
-		action();
-		fail("Expected IllegalStateException");
-	    } catch (IllegalStateException e) {
-		System.err.println(e);
-	    }
-	}
-
-	/** Runs the test for the committed case. */
-	void committedTest() throws Exception {
-	    txn.commit();
-	    try {
-		action();
-		fail("Expected IllegalStateException");
-	    } catch (IllegalStateException e) {
-		System.err.println(e);
-	    } finally {
-		txn = null;
-	    }
-	}
-
-	/** Runs the test for the wrong transaction case. */
-	void wrongTxnTest() throws Exception {
-	    store.createObject(txn);
-	    DummyTransaction originalTxn = txn;
-	    txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
-	    try {
-		action();
-		fail("Expected IllegalStateException");
-	    } catch (IllegalStateException e) {
-		System.err.println(e);
-	    } finally {
-		originalTxn.abort(null);
-	    }
-	}
-
-	/**
-	 * Runs the test for the existing transaction while shutting down case.
-	 */
-	void shuttingDownExistingTxnTest() throws Exception {
-	    ShutdownAction shutdownAction = new ShutdownAction();
-	    shutdownAction.assertBlocked();
-	    action();
-	    if (txn != null) {
-		txn.commit();
-		txn = null;
-	    }
-	    shutdownAction.assertResult(true);
-	    store = null;
-	}
-
-	/** Runs the test for the new transaction while shutting down case. */
-	void shuttingDownNewTxnTest() throws Exception {
-	    DummyTransaction originalTxn = txn;
-	    ShutdownAction shutdownAction = new ShutdownAction();
-	    shutdownAction.assertBlocked();
-	    txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
-	    try {
-		action();
-		fail("Expected IllegalStateException");
-	    } catch (IllegalStateException e) {
-		System.err.println(e);
-	    }
-	    txn.abort(null);
+	} finally {
 	    txn = null;
+	}
+    }
+
+    /** Tests running the action after prepare returns read-only. */
+    void testPreparedReadOnly(Action action) throws Exception {
+	action.setUp();
+	txn.prepare();
+	try {
+	    action.run();
+	    fail("Expected exception");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
+    /** Tests running the action after prepare returns modified. */
+    void testPreparedModified(Action action) throws Exception {
+	action.setUp();
+	store.setObject(txn, id, new byte[] { 0 });
+	txn.prepare();
+	try {
+	    action.run();
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
+    /** Tests running the action after commit. */
+    void testCommitted(Action action) throws Exception {
+	action.setUp();
+	txn.commit();
+	try {
+	    action.run();
+	    fail("Expected exception");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	} finally {
+	    txn = null;
+	}
+    }
+
+    /** Tests running the action in the wrong transaction. */
+    void testWrongTxn(Action action) throws Exception {
+	action.setUp();
+	store.createObject(txn);
+	DummyTransaction originalTxn = txn;
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	try {
+	    action.run();
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	} finally {
 	    originalTxn.abort(null);
-	    shutdownAction.assertResult(true);
-	    store = null;
 	}
+    }
 
-	/** Runs the test for the shutdown case. */
-	void shutdownTest() throws Exception {
-	    txn.abort(null);
-	    store.shutdown();
-	    try {
-		action();
-		fail("Expected IllegalStateException");
-	    } catch (IllegalStateException e) {
-		System.err.println(e);
-	    }
+    /**
+     * Tests running the action in an existing transaction while shutting down.
+     */
+    void testShuttingDownExistingTxn(Action action) throws Exception {
+	action.setUp();
+	ShutdownAction shutdownAction = new ShutdownAction();
+	shutdownAction.assertBlocked();
+	action.run();
+	if (txn != null) {
+	    txn.commit();
 	    txn = null;
-	    store = null;
 	}
+	shutdownAction.assertResult(true);
+	store = null;
+    }
+
+    /** Tests running the action in a new transaction while shutting down. */
+    void testShuttingDownNewTxn(Action action) throws Exception {
+	action.setUp();
+	DummyTransaction originalTxn = txn;
+	ShutdownAction shutdownAction = new ShutdownAction();
+	shutdownAction.assertBlocked();
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	try {
+	    action.run();
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+	txn.abort(null);
+	txn = null;
+	originalTxn.abort(null);
+	shutdownAction.assertResult(true);
+	store = null;
+    }
+
+    /** Tests running the action after shutdown. */
+    void testShutdown(Action action) throws Exception {
+	action.setUp();
+	txn.abort(null);
+	store.shutdown();
+	try {
+	    action.run();
+	    fail("Expected exception");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+	txn = null;
+	store = null;
     }
 
     /** Use this thread to control a call to shutdown that may block. */
-    class ShutdownAction extends Thread {
+    protected class ShutdownAction extends Thread {
 	private boolean done;
 	private Throwable exception;
 	private boolean result;
 
 	/** Creates an instance of this class and starts the thread. */
-	ShutdownAction() {
+	protected ShutdownAction() {
 	    start();
 	}
 
 	/** Performs the shutdown and collects the results. */
 	public void run() {
 	    try {
-		result = store.shutdown();
+		result = shutdown();
 	    } catch (Throwable t) {
 		exception = t;
 	    }
@@ -1353,15 +1653,19 @@ public class TestDataStoreImpl extends TestCase {
 	    }
 	}
 
+	protected boolean shutdown() {
+	    return store.shutdown();
+	}
+
 	/** Asserts that the shutdown call is blocked. */
-	synchronized void assertBlocked() throws InterruptedException {
+	public synchronized void assertBlocked() throws InterruptedException {
 	    Thread.sleep(5);
 	    assertEquals("Expected no exception", null, exception);
 	    assertFalse("Expected shutdown to be blocked", done);
 	}
 	
 	/** Waits a while for the shutdown call to complete. */
-	synchronized boolean waitForDone() throws Exception {
+	public synchronized boolean waitForDone() throws Exception {
 	    waitForDoneInternal();
 	    if (!done) {
 		return false;
@@ -1378,7 +1682,7 @@ public class TestDataStoreImpl extends TestCase {
 	 * Asserts that the shutdown call has completed with the specified
 	 * result.
 	 */
-	synchronized void assertResult(boolean expectedResult)
+	public synchronized void assertResult(boolean expectedResult)
 	    throws InterruptedException
 	{
 	    waitForDoneInternal();
