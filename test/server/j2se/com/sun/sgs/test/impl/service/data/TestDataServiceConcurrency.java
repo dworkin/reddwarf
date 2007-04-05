@@ -48,6 +48,10 @@ public class TestDataServiceConcurrency extends TestCase {
     /** The number of concurrent threads. */
     protected int threads = Integer.getInteger("test.threads", 2);
 
+    /** Whether to avoid concurrency conflicts between threads. */
+    protected boolean avoidConflicts =
+	Boolean.getBoolean("test.avoid.conflicts");
+
     /** The transaction proxy. */
     final DummyTransactionProxy txnProxy = new DummyTransactionProxy();
 
@@ -87,7 +91,8 @@ public class TestDataServiceConcurrency extends TestCase {
 	    "Parameters:" +
 	    "\n  test.operations=" + operations +
 	    "\n  test.objects=" + objects +
-	    "\n  test.threads=" + threads);
+	    "\n  test.threads=" + threads +
+	    "\n  test.avoid.conflicts=" + avoidConflicts);
 	props = createProperties(
 	    DataStoreImplClass + ".directory", createDirectory(),
 	    StandardProperties.APP_NAME, "TestDataServiceConcurrency");
@@ -185,6 +190,7 @@ public class TestDataServiceConcurrency extends TestCase {
     class OperationThread extends Thread {
 	private final DataService service;
 	private final DummyTransactionProxy txnProxy;
+	private final int id;
 	private final Random random = new Random();
 	private DummyTransaction txn;
 	private int aborts;
@@ -195,6 +201,7 @@ public class TestDataServiceConcurrency extends TestCase {
 	    super("OperationThread" + id);
 	    this.service = service;
 	    this.txnProxy = txnProxy;
+	    this.id = id;
 	    start();
 	}
 
@@ -236,7 +243,10 @@ public class TestDataServiceConcurrency extends TestCase {
 		t.commit();
 		createTxn();
 	    }
-	    String name = "obj-" + (1 + random.nextInt(objects * threads));
+	    int num = (avoidConflicts)
+		? 1 + (id * objects) + random.nextInt(objects)
+		: 1 + random.nextInt(objects * threads);
+	    String name = "obj-" + num;
 	    switch (random.nextInt(6)) {
 	    case 0:
 		try {
