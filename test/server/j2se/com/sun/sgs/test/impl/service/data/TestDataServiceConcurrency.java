@@ -48,12 +48,8 @@ public class TestDataServiceConcurrency extends TestCase {
     /** The number of concurrent threads. */
     protected int threads = Integer.getInteger("test.threads", 2);
 
-    /** Whether to avoid concurrency conflicts between threads. */
-    protected boolean avoidConflicts =
-	Boolean.getBoolean("test.avoid.conflicts");
-
     /** The number of times to repeat the timing. */
-    protected int repeat = Integer.getInteger("test.repeat", 2);
+    protected int repeat = Integer.getInteger("test.repeat", 1);
 
     /** The transaction proxy. */
     final DummyTransactionProxy txnProxy = new DummyTransactionProxy();
@@ -94,8 +90,7 @@ public class TestDataServiceConcurrency extends TestCase {
 	    "Parameters:" +
 	    "\n  test.operations=" + operations +
 	    "\n  test.objects=" + objects +
-	    "\n  test.threads=" + threads +
-	    "\n  test.avoid.conflicts=" + avoidConflicts);
+	    "\n  test.threads=" + threads);
 	props = createProperties(
 	    DataStoreImplClass + ".directory", createDirectory(),
 	    StandardProperties.APP_NAME, "TestDataServiceConcurrency");
@@ -250,9 +245,7 @@ public class TestDataServiceConcurrency extends TestCase {
 		t.commit();
 		createTxn();
 	    }
-	    int num = (avoidConflicts)
-		? 1 + (id * objects) + random.nextInt(objects)
-		: 1 + random.nextInt(objects * threads);
+	    int num = 1 + (id * objects) + random.nextInt(objects);
 	    String name = "obj-" + num;
 	    switch (random.nextInt(6)) {
 	    case 0:
