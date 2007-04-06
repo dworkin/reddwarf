@@ -25,10 +25,10 @@ import java.util.Arrays;
  *
  * <p>If the first byte has the following format:
  * <ul><li>1100<i>nnnn</i></li></ul> then, the ID is contained in
- * the next {@code 8 +  <i>nnnn</i>} bytes.
+ * the next {@code 8 +  nnnn} bytes.
  *
  * <p>The maximum length of an ID is 23 bytes (if the first byte of
- * the external form has the value {@code 11001111}.
+ * the external form has the value {@code 11001111}).
  */
 public final class CompactId {
 

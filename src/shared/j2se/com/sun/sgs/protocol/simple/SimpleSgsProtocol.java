@@ -28,8 +28,10 @@ import java.io.DataInput;
  * <li> (unsigned short) number of bytes of modified UTF-8 encoded String
  * <li> (byte[]) String encoded in modified UTF-8 as described
  * in {@link DataInput}
+ * </ul>
   * <p>
  * A {@code CompactId} is encoded as follows:
+ * <ul>
  * <p>The first byte of the ID's external form contains a length field
  * of variable size.  If the first two bits of the length byte are not
  * #b11, then the size of the ID is indicated as follows:
@@ -41,8 +43,9 @@ import java.io.DataInput;
  * </ul>
  *
  * <p>If the first byte has the following format:
- * <ul><li>1100<i>nnnn</i></li></ul> then, the ID is contained in
- * the next {@code 8 +  <i>nnnn</i>} bytes.
+ * <ul><li>1100<i>nnnn</i></li></ul> <p>then, the ID is contained in
+ * the next {@code 8 + nnnn} bytes.
+ * </ul>
  * </ul>
  */
 public interface SimpleSgsProtocol {
