@@ -5,9 +5,6 @@
 package com.sun.sgs.test.impl.service.data;
 
 import com.sun.sgs.app.DataManager;
-import com.sun.sgs.app.ManagedObject;
-import com.sun.sgs.app.NameNotBoundException;
-import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
@@ -42,8 +39,11 @@ public class TestDataServiceConcurrency extends TestCase {
     /** The number of operations to perform. */
     protected int operations = Integer.getInteger("test.operations", 10000);
 
-    /** The maximum number of objects to allocate. */
+    /** The maximum number of objects to allocate per thread. */
     protected int objects = Integer.getInteger("test.objects", 1000);
+
+    /** The number of objects to allocate as a buffer between threads. */
+    final int objectsBuffer = 100;
 
     /** The number of concurrent threads. */
     protected int threads = Integer.getInteger("test.threads", 2);
@@ -137,6 +137,22 @@ public class TestDataServiceConcurrency extends TestCase {
 	componentRegistry.setComponent(DataManager.class, service);
 	componentRegistry.registerAppContext();
 	txn.commit();
+	int perThread = objects + objectsBuffer;
+	for (int t = 0; t < threads; t++) {
+	    txn = new DummyTransaction();
+	    txnProxy.setCurrentTransaction(txn);
+	    int start = t * perThread;
+	    for (int i = 0; i < perThread; i++) {
+		if (i > 0 && i % 100 == 0) {
+		    txn.commit();
+		    txn = new DummyTransaction();
+		    txnProxy.setCurrentTransaction(txn);
+		}
+		service.setBinding(
+		    getObjectName(start + i), new DummyManagedObject());
+	    }
+	    txn.commit();
+	}
 	for (int r = 0; r < repeat; r++) {
 	    aborts = 0;
 	    done = 0;
@@ -245,49 +261,16 @@ public class TestDataServiceConcurrency extends TestCase {
 		t.commit();
 		createTxn();
 	    }
-	    int num = 1 + (id * objects) + random.nextInt(objects);
-	    String name = "obj-" + num;
-	    switch (random.nextInt(6)) {
-	    case 0:
-		try {
-		    service.getBinding(name, Object.class);
-		} catch (NameNotBoundException e) {
-		} catch (ObjectNotFoundException e) {
-		}
-		break;
-	    case 1:
-		service.setBinding(name, new DummyManagedObject());
-		break;
-	    case 2:
-		try {
-		    service.removeBinding(name);
-		} catch (NameNotBoundException e) {
-		}
-		break;
-	    case 3:
-		/* Add 3 so we can include null, obj-0, and obj-N+1 */
-		int r = random.nextInt(objects + 3);
-		name = (r == 0) ? null : "obj-" + (r - 1);
-		service.nextBoundName(name);
-		break;
-	    case 4:
-		try {
-		    service.removeObject(
-			service.getBinding(name, ManagedObject.class));
-		} catch (NameNotBoundException e) {
-		} catch (ObjectNotFoundException e) {
-		}
-		break;
-	    case 5:
-		try {
-		    service.markForUpdate(
-			service.getBinding(name, ManagedObject.class));
-		} catch (NameNotBoundException e) {
-		} catch (ObjectNotFoundException e) {
-		}
-		break;
-	    default:
-		throw new AssertionError();
+	    int start = id * (objects + objectsBuffer);
+	    String name1 = getObjectName(start + random.nextInt(objects));
+	    DummyManagedObject obj1 =
+		service.getBinding(name1, DummyManagedObject.class);
+	    String name2 = getObjectName(start + random.nextInt(objects));
+	    DummyManagedObject obj2 =
+		service.getBinding(name2, DummyManagedObject.class);
+	    if (random.nextInt(4) == 0) {
+		service.setBinding(name1, obj2);
+		service.setBinding(name2, obj1);
 	    }
 	}
 
@@ -351,5 +334,10 @@ public class TestDataServiceConcurrency extends TestCase {
 	throws Exception
     {
 	return new DataServiceImpl(props, componentRegistry);
+    }
+
+    /** Returns the binding name to use for the i'th object. */
+    private static String getObjectName(int i) {
+	return String.format("obj-%08d", i);
     }
 }
