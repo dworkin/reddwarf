@@ -6,6 +6,7 @@ package com.sun.sgs.impl.service.transaction;
 
 import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
+import com.sun.sgs.kernel.ProfileCollector;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -34,6 +35,9 @@ public final class TransactionCoordinatorImpl
     /** The next transaction ID. */
     private AtomicLong nextTid = new AtomicLong(1);
 
+    /** The optional collector for reporting participant details. */
+    private final ProfileCollector collector;
+
     /** An implementation of TransactionHandle. */
     private static final class TransactionHandleImpl
 	implements TransactionHandle
@@ -41,9 +45,9 @@ public final class TransactionCoordinatorImpl
 	/** The transaction. */
 	private final TransactionImpl txn;
 
-	/** Creates a transaction with the specified ID. */
-	TransactionHandleImpl(long tid) {
-	    txn = new TransactionImpl(tid);
+	/** Creates a transaction with the specified ID and collector. */
+	TransactionHandleImpl(long tid, ProfileCollector collector) {
+	    txn = new TransactionImpl(tid, collector);
 	}
 
 	public String toString() {
@@ -66,15 +70,20 @@ public final class TransactionCoordinatorImpl
      * properties.  No properties are currently supported.
      *
      * @param	properties the properties for configuring this service
+     * @param	colector the <code>ProfileCollector</code> used to report
+     *       	participant detail or <code>null</code> if profiling is
+     *       	disabled
      */
-    public TransactionCoordinatorImpl(Properties properties) {
+    public TransactionCoordinatorImpl(Properties properties,
+				      ProfileCollector collector) {
 	if (properties == null) {
 	    throw new NullPointerException("Properties must not be null");
 	}
+	this.collector = collector;
     }
 
     /** {@inheritDoc} */
     public TransactionHandle createTransaction() {
-	return new TransactionHandleImpl(nextTid.getAndIncrement());
+	return new TransactionHandleImpl(nextTid.getAndIncrement(), collector);
     }
 }

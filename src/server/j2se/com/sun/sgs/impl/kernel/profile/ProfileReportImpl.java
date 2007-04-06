@@ -6,11 +6,14 @@ package com.sun.sgs.impl.kernel.profile;
 
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.ProfileOperation;
+import com.sun.sgs.kernel.ProfileParticipantDetail;
 import com.sun.sgs.kernel.ProfileReport;
 import com.sun.sgs.kernel.TaskOwner;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 
 /**
@@ -25,12 +28,14 @@ class ProfileReportImpl implements ProfileReport {
     final int readyCount;
     final long actualStartTime;
 
-    // the other fields, set directly by the ProfileCollector
+    // the other fields, set directly by the ProfileCollectorImpl
     boolean transactional = false;
     boolean succeeded = false;
     long runningTime = 0;
     int tryCount = 0;
     List<ProfileOperation> ops = new ArrayList<ProfileOperation>();
+    Set<ProfileParticipantDetail> participants =
+        new HashSet<ProfileParticipantDetail>();
 
     /**
      * Creates an instance of <code>ProfileReportImpl</code> with the
@@ -70,6 +75,13 @@ class ProfileReportImpl implements ProfileReport {
      */
     public boolean wasTaskTransactional() {
         return transactional;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Set<ProfileParticipantDetail> getParticipantDetail() {
+        return participants;
     }
 
     /**

@@ -7,7 +7,7 @@ package com.sun.sgs.test.impl.service.data.store;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.kernel.ProfileProducer;
-import com.sun.sgs.test.util.DummyProfileRegistrar;
+import com.sun.sgs.test.util.DummyProfileCoordinator;
 import com.sun.sgs.test.util.DummyTransaction;
 import java.io.File;
 import java.io.IOException;
@@ -130,7 +130,7 @@ public class TestDataStorePerformance extends TestCase {
 	data[0] = 1;
 	store = getDataStore();
         if (store instanceof ProfileProducer)
-            DummyProfileRegistrar.startProfiling((ProfileProducer) store);
+            DummyProfileCoordinator.startProfiling((ProfileProducer) store);
 	DummyTransaction txn = new DummyTransaction();
 	long[] ids = new long[items];
 	for (int i = 0; i < items; i++) {
@@ -173,7 +173,7 @@ public class TestDataStorePerformance extends TestCase {
 	data[0] = 1;
 	store = getDataStore();
         if (store instanceof ProfileProducer)
-            DummyProfileRegistrar.startProfiling((ProfileProducer) store);
+            DummyProfileCoordinator.startProfiling((ProfileProducer) store);
 	DummyTransaction txn = new DummyTransaction();
 	long[] ids = new long[items];
 	for (int i = 0; i < items; i++) {
@@ -205,7 +205,7 @@ public class TestDataStorePerformance extends TestCase {
     public void testReadNames() throws Exception {
 	store = getDataStore();
         if (store instanceof ProfileProducer)
-            DummyProfileRegistrar.startProfiling((ProfileProducer) store);
+            DummyProfileCoordinator.startProfiling((ProfileProducer) store);
 	DummyTransaction txn = new DummyTransaction();
 	for (int i = 0; i < items; i++) {
 	    store.setBinding(txn, "name" + i, i);
@@ -230,7 +230,7 @@ public class TestDataStorePerformance extends TestCase {
     public void testWriteNames() throws Exception {
 	store = getDataStore();
         if (store instanceof ProfileProducer)
-            DummyProfileRegistrar.startProfiling((ProfileProducer) store);
+            DummyProfileCoordinator.startProfiling((ProfileProducer) store);
 	DummyTransaction txn = new DummyTransaction();
 	for (int i = 0; i < items; i++) {
 	    store.setBinding(txn, "name" + i, i);

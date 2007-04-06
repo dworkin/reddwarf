@@ -14,22 +14,22 @@ import com.sun.sgs.kernel.ProfileProducer;
  * with a <code>ProfileProducer</code> and reports all data to a
  * backing <code>ProfileCollector</code>.
  */
-public class ProfileConsumerImpl implements ProfileConsumer {
+class ProfileConsumerImpl implements ProfileConsumer {
 
     // the name of the associated consumer
     private final String producerName;
 
     // the collector that aggregates our data
-    private final ProfileCollector profileCollector;
+    private final ProfileCollectorImpl profileCollector;
 
     /**
      * Creates an instance of <code>ProfileConsumerImpl</code>.
      *
      * @param profileProducer the associated <code>ProfileProducer</code>
-     * @param profileCollector the backing <code>ProfileCollector</code>
+     * @param profileCollector the backing <code>ProfileCollectorImpl</code>
      */
-    public ProfileConsumerImpl(ProfileProducer profileProducer,
-                               ProfileCollector profileCollector) {
+    ProfileConsumerImpl(ProfileProducer profileProducer,
+                        ProfileCollectorImpl profileCollector) {
         if (profileProducer == null)
             throw new NullPointerException("The producer must not be null");
         if (profileCollector == null)

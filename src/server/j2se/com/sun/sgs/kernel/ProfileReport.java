@@ -5,6 +5,7 @@
 package com.sun.sgs.kernel;
 
 import java.util.List;
+import java.util.Set;
 
 
 /**
@@ -34,6 +35,14 @@ public interface ProfileReport {
      *         <code>false</code> otherwise
      */
     public boolean wasTaskTransactional();
+
+    /**
+     * Returns detail about each participant in the transaction, or an empty
+     * <code>Set</code> if the task was not transactional.
+     *
+     * @return a <code>Set</code> of </code>ProfileParticipantDetail</code>
+     */
+    public Set<ProfileParticipantDetail> getParticipantDetail();
 
     /**
      * Returns whether the task successfully ran to completion. If this
