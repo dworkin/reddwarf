@@ -202,8 +202,13 @@ public final class CompactId {
      * message buffer.
      *
      * @param	buf a message buffer
+     * @throws	IllegalArgumentException if the message buffer size is
+     *		insufficient
      */
     public void putCompactId(MessageBuffer buf) {
+	if (buf.capacity() - buf.position() < externalForm.length) {
+	    throw new IllegalArgumentException("buffer size insufficient");
+	}
 	buf.putBytes(externalForm);
     }
 
