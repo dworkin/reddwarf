@@ -11,11 +11,14 @@ import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionId;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.NameExistsException;
 import com.sun.sgs.app.NameNotBoundException;
+import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
@@ -36,6 +39,7 @@ import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import java.io.Serializable;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -115,8 +119,9 @@ public class ChannelServiceImpl
 
     /** A map of channel name to cached channel state, valid as of the
      * last transaction commit. */
-    private Map<String, CachedChannelState> channelStateCache =
-	Collections.synchronizedMap(new HashMap<String, CachedChannelState>());
+    private Map<CompactId, CachedChannelState> channelStateCache =
+	Collections.synchronizedMap(
+	    new HashMap<CompactId, CachedChannelState>());
     
     /**
      * Constructs an instance of this class with the specified properties.
@@ -528,19 +533,19 @@ public class ChannelServiceImpl
      * the channel message (encapsulated in {@code buf}) to the
      * appropriate recipients.  When this method is invoked, the
      * specified message buffer's current position points to the
-     * channel name of the protocol message.  The operation code has
+     * channel ID in the protocol message.  The operation code has
      * already been processed by the caller.
      */
     private void handleChannelSendRequest(
 	SgsClientSession sender, MessageBuffer buf)
     {
-	String name = buf.getString();
-	CachedChannelState cachedState = channelStateCache.get(name);
+	CompactId channelId = CompactId.getCompactId(buf);
+	CachedChannelState cachedState = channelStateCache.get(channelId);
 	if (cachedState == null) {
 	    // TBD: is this the right logging level?
 	    logger.log(
 		Level.WARNING,
-		"non-existent channel:{0}, dropping message", name);
+		"non-existent channel:{0}, dropping message", channelId);
 	    return;
 	}
 	long seq = buf.getLong(); // TODO Check sequence num
@@ -576,13 +581,14 @@ public class ChannelServiceImpl
 	ClientSessionId senderId = sender.getSessionId();
 	byte[] channelMessage = buf.getByteArray();
 	byte[] protocolMessage =
-	    getChannelMessage(name, senderId.getBytes(), channelMessage, seq);
+	    getChannelMessage(channelId, senderId.getBytes(),
+			      channelMessage, seq);
 	
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(
 		Level.FINEST,
 		"name:{0}, message:{1}",
-		name, HexDumper.format(channelMessage));
+		cachedState.name, HexDumper.format(channelMessage));
 	}
 
 	for (ClientSession session : recipients) {
@@ -596,7 +602,9 @@ public class ChannelServiceImpl
 	if (cachedState.hasChannelListeners) {
 	    NonDurableTaskQueue queue = getTaskQueue(sender);
 	    // Notify listeners in the app in a transaction
-	    queue.addTask(new NotifyTask(name, senderId, channelMessage));
+	    queue.addTask(
+		new NotifyTask(cachedState.name, channelId,
+			       senderId, channelMessage));
 	}
     }
     
@@ -676,7 +684,7 @@ public class ChannelServiceImpl
 	    }
 	    
 	    ChannelState channelState =
-		new ChannelState(name, listener, delivery);
+		new ChannelState(name, listener, delivery, dataService);
 	    dataService.setServiceBinding(key, channelState);
 	    ChannelImpl channel = new ChannelImpl(this, channelState);
 	    internalTable.put(name, channel);
@@ -684,7 +692,11 @@ public class ChannelServiceImpl
 	}
 
 	/**
-	 * Returns a channel with the specified {@code  name}.
+	 * Returns a channel with the specified {@code name}.  If the
+	 * channel is already present in the internal channel table
+	 * for this transaction, then the channel is returned;
+	 * otherwise, this method gets the channel's state by looking
+	 * up the service binding for the channel.
 	 */
 	private Channel getChannel(String name) {
 	    assert name != null;
@@ -699,6 +711,35 @@ public class ChannelServiceImpl
 		    throw new NameNotBoundException(name);
 		}
 		channel =  new ChannelImpl(this, channelState);
+		internalTable.put(name, channel);
+	    } else if (channel.isClosed) {
+		throw new NameNotBoundException(name);
+	    }
+	    return channel;
+	}
+
+	/**
+	 * Returns a channel with the specified {@code name} and
+	 * {@code channelId}.  If the channel is already present in the
+	 * internal channel table for this transaction, then the
+	 * channel is returned; otherwise, this method uses the {@code
+	 * channelId} as a {@code ManagedReference} ID to the
+	 * channel's state.
+	 */
+	private Channel getChannel(String name, CompactId channelId) {
+	    assert channelId != null;
+	    ChannelImpl channel = internalTable.get(name);
+	    if (channel == null) {
+		ChannelState channelState;
+		try {
+		    BigInteger refId = new BigInteger(channelId.getId());
+		    ManagedReference stateRef =
+			dataService.createReferenceForId(refId);
+		    channelState = stateRef.get(ChannelState.class);
+		} catch (ObjectNotFoundException e) {
+		    throw new NameNotBoundException(name);
+		}
+		channel = new ChannelImpl(this, channelState);
 		internalTable.put(name, channel);
 	    } else if (channel.isClosed) {
 		throw new NameNotBoundException(name);
@@ -782,10 +823,10 @@ public class ChannelServiceImpl
 		    String name = entry.getKey();
 		    ChannelImpl channel = entry.getValue();
 		    if (channel.isClosed) {
-			channelStateCache.remove(name);
+			channelStateCache.remove(channel.state.id);
 		    } else {
 			channelStateCache.put(
-			    name,
+			    channel.state.id,
 			    new CachedChannelState(channel));
 		    }
 		}
@@ -979,14 +1020,17 @@ public class ChannelServiceImpl
     private final class NotifyTask extends AbstractKernelRunnable {
 
 	private final String name;
+	private final CompactId id;
 	private final ClientSessionId senderId;
 	private final byte[] message;
 
         NotifyTask(String name,
+		   CompactId id,
 		   ClientSessionId senderId,
 		   byte[] message)
 	{
 	    this.name = name;
+	    this.id = id;
 	    this.senderId = senderId;
 	    this.message = message;
 	}
@@ -1001,7 +1045,8 @@ public class ChannelServiceImpl
                         name, HexDumper.format(message));
                 }
 		Context context = checkContext();
-		ChannelImpl channel = (ChannelImpl) context.getChannel(name);
+		ChannelImpl channel =
+		    (ChannelImpl) context.getChannel(name, id);
 		channel.notifyListeners(senderId, message);
 
 	    } catch (RuntimeException e) {
@@ -1022,11 +1067,13 @@ public class ChannelServiceImpl
      */
     private static class CachedChannelState {
 
+	private final String name;
 	private final Set<ClientSession> sessions;
 	private final boolean hasChannelListeners;
 	private final Delivery delivery;
 
 	CachedChannelState(ChannelImpl channelImpl) {
+	    this.name = channelImpl.state.name;
 	    this.sessions = channelImpl.state.getSessions();
 	    this.hasChannelListeners = channelImpl.state.hasChannelListeners();
 	    this.delivery = channelImpl.state.delivery;
@@ -1043,21 +1090,18 @@ public class ChannelServiceImpl
      * message, and sequence number.
      */
     static byte[] getChannelMessage(
-	String name, byte[] senderId, byte[] message, long sequenceNumber)
+	CompactId channelId, byte[] senderId, byte[] message, long sequenceNumber)
     {
-        int nameLen = MessageBuffer.getSize(name);
         MessageBuffer buf =
-            new MessageBuffer(15 + nameLen + senderId.length +
-                    message.length);
+            new MessageBuffer(15 + channelId.getExternalFormByteCount() +
+			      senderId.length + message.length);
         buf.putByte(SimpleSgsProtocol.VERSION).
             putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
             putByte(SimpleSgsProtocol.CHANNEL_MESSAGE).
-            putString(name).
+            putBytes(channelId.getExternalForm()).
             putLong(sequenceNumber).
-            putShort(senderId.length).
-            putBytes(senderId).
-            putShort(message.length).
-            putBytes(message);
+            putByteArray(senderId).
+	    putByteArray(message);
 
         return buf.getBuffer();
     }

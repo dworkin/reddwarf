@@ -34,6 +34,7 @@ import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
 import com.sun.sgs.impl.service.task.TaskServiceImpl;
+import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.io.Connection;
@@ -1152,6 +1153,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    group.join(name);
 	    DummyClient moe = group.getClient("moe");
 	    DummyClient larry = group.getClient("larry");
+	    CompactId channelId = moe.channelNameToId.get(CHANNEL_NAME);
 	    int numMessages = 3;
 	    Set<byte[]> recipientIds = new HashSet<byte[]>();
 	    recipientIds.add(larry.getSessionId());
@@ -1160,7 +1162,7 @@ public class TestChannelServiceImpl extends TestCase {
 		    new MessageBuffer(MessageBuffer.getSize("moe") + 4);
 		buf.putString("moe").
 		    putInt(i);
-		moe.sendChannelMessage(name, recipientIds, buf.getBuffer());
+		moe.sendChannelMessage(channelId, recipientIds, buf.getBuffer());
 	    }
 
 	    for (int nextNum = 0; nextNum < numMessages; nextNum++) {
@@ -1168,6 +1170,10 @@ public class TestChannelServiceImpl extends TestCase {
 		if (info == null) {
 		    fail("got "  + nextNum +
 			 "channel messages, expected " + numMessages);
+		}
+		if (! info.channelId.equals(channelId)) {
+		    fail("got channelId: " + info.channelId + ", expected " +
+			 channelId);
 		}
 		MessageBuffer buf = new MessageBuffer(info.message);
 		String senderName = buf.getString();
@@ -1588,7 +1594,12 @@ public class TestChannelServiceImpl extends TestCase {
 	private boolean joinAck = false;
 	private boolean leaveAck = false;
         private boolean awaitGraceful = false;
-	private String channelName = null;
+	private Map<CompactId, String> channelIdToName =
+	    new HashMap<CompactId, String>();
+	private Map<String, CompactId> channelNameToId =
+	    new HashMap<String, CompactId>();
+	//private String channelName = null;
+	//private CompactId channelId = null;
 	private String reason;
 	private byte[] reconnectionKey;
 	private final List<MessageInfo> channelMessages =
@@ -1743,18 +1754,18 @@ public class TestChannelServiceImpl extends TestCase {
 	/**
 	 * Sends a CHANNEL_SEND_REQUEST.
 	 */
-	void sendChannelMessage(String channelToSend, Set<byte[]> recipientIds,
+	void sendChannelMessage(CompactId channelToSend, Set<byte[]> recipientIds,
 				byte[] message) {
 	    checkLoggedIn();
 
 	    MessageBuffer buf =
-		new MessageBuffer(3 + MessageBuffer.getSize(channelToSend) + 8 +
+		new MessageBuffer(3 + channelToSend.getExternalFormByteCount() + 8 +
 				  getSize(recipientIds) +
 				  2 + message.length);
 	    buf.putByte(SimpleSgsProtocol.VERSION).
 		putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
 		putByte(SimpleSgsProtocol.CHANNEL_SEND_REQUEST).
-		putString(channelToSend).
+		putBytes(channelToSend.getExternalForm()).
 		putLong(nextSequenceNumber()).
 		putShort(recipientIds.size());
 	    for (byte[] recipientId : recipientIds) {
@@ -1804,7 +1815,6 @@ public class TestChannelServiceImpl extends TestCase {
 	    buf.putString(action).putString(channelToJoin);
 	    sendMessage(buf.getBuffer());
 	    joinAck = false;
-	    channelName = null;
 	    synchronized (lock) {
 		try {
 		    if (joinAck == false) {
@@ -1815,10 +1825,9 @@ public class TestChannelServiceImpl extends TestCase {
 			    "DummyClient.join timed out: " + channelToJoin);
 		    }
 
-		    if (channelName == null ||
-			!channelToJoin.equals(channelName)) {
-			fail("DummyClient.leave expected channel " + channelToJoin +
-			     ", got " + channelName);
+		    if (! channelNameToId.containsKey(channelToJoin)) {
+			fail("DummyClient.join not joined: " +
+			     channelToJoin);
 		    }
 		    
 		} catch (InterruptedException e) {
@@ -1836,7 +1845,6 @@ public class TestChannelServiceImpl extends TestCase {
 	    buf.putString(action).putString(channelToLeave);
 	    sendMessage(buf.getBuffer());
 	    leaveAck = false;
-	    channelName = null;
 	    synchronized (lock) {
 		try {
 		    if (leaveAck == false) {
@@ -1847,10 +1855,9 @@ public class TestChannelServiceImpl extends TestCase {
 			    "DummyClient.leave timed out: " + channelToLeave);
 		    }
 
-		    if (channelName == null ||
-			!channelToLeave.equals(channelName)) {
-			fail("DummyClient.leave expected channel " + channelToLeave +
-			     ", got " + channelName);
+		    if (channelNameToId.containsKey(channelToLeave)) {
+			fail("DummyClient.leave still joined: " +
+			     channelToLeave);
 		    }
 		    
 		} catch (InterruptedException e) {
@@ -1997,35 +2004,38 @@ public class TestChannelServiceImpl extends TestCase {
 		switch (opcode) {
 
 		case SimpleSgsProtocol.CHANNEL_JOIN: {
-		    String channelToJoin = buf.getString();
+		    String channelName = buf.getString();
+		    CompactId channelId = CompactId.getCompactId(buf);
 		    synchronized (lock) {
 			joinAck = true;
-			channelName = channelToJoin;
-			System.err.println("join succeeded: " + channelToJoin);
+			channelIdToName.put(channelId, channelName);
+			channelNameToId.put(channelName, channelId);
+			System.err.println("join succeeded: " + channelName);
 			lock.notifyAll();
 		    }
 		    break;
 		}
 		    
 		case SimpleSgsProtocol.CHANNEL_LEAVE: {
-		    String channelToLeave = buf.getString();
+		    CompactId channelId = CompactId.getCompactId(buf);
 		    synchronized (lock) {
 			leaveAck = true;
-			channelName = channelToLeave;
-			System.err.println("leave succeeded: " + channelToLeave);
+			String channelName = channelIdToName.remove(channelId);
+			channelNameToId.remove(channelName);
+			System.err.println("leave succeeded: " + channelName);
 			lock.notifyAll();
 		    }
 		    break;
 		}
 
 		case SimpleSgsProtocol.CHANNEL_MESSAGE: {
-		    String channelMessageFrom = buf.getString();
+		    CompactId channelId = CompactId.getCompactId(buf);
 		    long seq = buf.getLong();
 		    byte[] senderId = buf.getByteArray();
 		    byte[] message = buf.getByteArray();
 		    synchronized (lock) {
 			channelMessages.add(
-			    new MessageInfo(channelMessageFrom, senderId, message, seq));
+			    new MessageInfo(channelId, senderId, message, seq));
 			lock.notifyAll();
 		    }
 		    break;
@@ -2077,13 +2087,13 @@ public class TestChannelServiceImpl extends TestCase {
     }
 
     private static class MessageInfo {
-	final String name;
+	final CompactId channelId;
 	final byte[] senderId;
 	final byte[] message;
 	final long seq;
 
-	MessageInfo(String name, byte[] senderId, byte[] message, long seq) {
-	    this.name = name;
+	MessageInfo(CompactId channelId, byte[] senderId, byte[] message, long seq) {
+	    this.channelId = channelId;
 	    this.senderId = senderId;
 	    this.message = message;
 	    this.seq = seq;

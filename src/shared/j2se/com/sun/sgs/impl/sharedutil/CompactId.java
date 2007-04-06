@@ -95,6 +95,15 @@ public final class CompactId {
     public byte[] getExternalForm() {
 	return externalForm;
     }
+    
+    /**
+     * Returns the length, in bytes, of the external form for this instance.
+     *
+     * @return the length, in bytes, of the external form for this instance
+     */
+    public int getExternalFormByteCount() {
+	return externalForm.length;
+    }
 
     /**
      * Constructs a {@code CompactId} from the specified {@code externalForm}.
