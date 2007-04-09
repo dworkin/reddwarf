@@ -19,22 +19,22 @@ class ProfileParticipantDetailImpl implements ProfileParticipantDetail {
 
     // whether the participant successfully prepared, and how long it took
     // regardless of success
-    boolean prepared = false;
-    long prepareTime = 0;
+    private boolean prepared = false;
+    private long prepareTime = 0;
 
     // the result from preparation
-    boolean readOnly = false;
+    private boolean readOnly = false;
 
-    // whether the participant succesfully committed, and how long it took
+    // whether the participant successfully committed, and how long it took
     // if the participant committed
-    boolean committed = false;
-    long commitTime = 0;
+    private boolean committed = false;
+    private long commitTime = 0;
 
     // whether prepareAndCommit was called on this participant
-    boolean committedDirectly = false;
+    private boolean committedDirectly = false;
 
     // if the participant was aborted, how long it took to abort
-    long abortTime = 0;
+    private long abortTime = 0;
 
     /**
      * Creates an instance of <code>ProfileParticipantDetailImpl</code> for
@@ -101,6 +101,62 @@ class ProfileParticipantDetailImpl implements ProfileParticipantDetail {
      */
     public long getAbortTime() {
         return abortTime;
+    }
+
+    /**
+     * Sets the detail as associated with a participant that has been
+     * prepared successfully. If <code>readOnlyParticipant</code> is
+     * <code>true</code> then none of the other mutator methods should
+     * be called after calling <code>setPrepared</code>.
+     *
+     * @param time the time in milliseconds that the participant spent
+     *             preparing
+     * @param readOnlyParticipant whether preparation ended with the
+     *                            participant voting read-only
+     */
+    void setPrepared(long time, boolean readOnlyParticipant) {
+	prepareTime = time;
+	prepared = true;
+	readOnly = readOnlyParticipant;
+    }
+
+    /**
+     * Sets the detail as associated with a participant that has been
+     * committed successfully. None of the other mutator methods should be
+     * called after calling <code>setCommitted</code>.
+     *
+     * @param time the time in milliseconds that the participant spent
+     *             committing
+     */
+    void setCommitted(long time) {
+	committed = true;
+	commitTime = time;
+    }
+
+    /**
+     * Sets the detail as associated with a participant that has been
+     * directly committed successfully. None of the other mutator methods
+     * should be called after calling <code>setCommittedDirectly</code>.
+     *
+     * @param time the time in milliseconds that the participant spent
+     *             preparing and committing
+     */
+    void setCommittedDirectly(long time) {
+	setPrepared(time, false);
+	setCommitted(time);
+	committedDirectly = true;
+    }
+
+    /**
+     * Sets the detail as associated with a participant that has been
+     * aborted. None of the other mutator methods should be called after
+     * calling <code>setAborted</code>.
+     *
+     * @param time the time in milliseconds that the participant spent
+     *             aborting
+     */
+    void setAborted(long time) {
+	abortTime = time;
     }
 
 }

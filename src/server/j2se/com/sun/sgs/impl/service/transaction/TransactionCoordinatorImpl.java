@@ -70,7 +70,7 @@ public final class TransactionCoordinatorImpl
      * properties.  No properties are currently supported.
      *
      * @param	properties the properties for configuring this service
-     * @param	colector the <code>ProfileCollector</code> used to report
+     * @param	collector the <code>ProfileCollector</code> used to report
      *       	participant detail or <code>null</code> if profiling is
      *       	disabled
      */

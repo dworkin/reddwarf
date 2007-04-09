@@ -186,7 +186,7 @@ final class TransactionImpl implements Transaction {
 		long finishTime = System.currentTimeMillis();
 		ProfileParticipantDetailImpl detail =
 		    detailMap.get(participant.getClass().getName());
-		detail.abortTime = finishTime - startTime;
+		detail.setAborted(finishTime - startTime);
 		collector.addParticipant(detail);
 	    }
 	}
@@ -278,13 +278,13 @@ final class TransactionImpl implements Transaction {
 		if (iter.hasNext()) {
 		    boolean readOnly = participant.prepare(this);
 		    if (collector != null) {
-			detail.prepareTime =
-			    System.currentTimeMillis() - startTime;
-			detail.prepared = true;
-			detail.readOnly = readOnly;
+			detail.setPrepared(System.currentTimeMillis() -
+					   startTime, readOnly);
 		    }
 		    if (readOnly) {
 			iter.remove();
+			if (collector != null)
+			    collector.addParticipant(detail);
 		    }
 		    if (logger.isLoggable(Level.FINEST)) {
 			logger.log(Level.FINEST,
@@ -294,12 +294,9 @@ final class TransactionImpl implements Transaction {
 		} else {
 		    participant.prepareAndCommit(this);
 		    if (collector != null) {
-			detail.prepareTime =
-			    System.currentTimeMillis() - startTime;
-			detail.commitTime = detail.prepareTime;
-			detail.prepared = true;
-			detail.committed = true;
-			detail.committedDirectly = true;
+			detail.
+			    setCommittedDirectly(System.currentTimeMillis() -
+						 startTime);
 			collector.addParticipant(detail);
 		    }
 		    iter.remove();
@@ -340,8 +337,8 @@ final class TransactionImpl implements Transaction {
 	    try {
 		participant.commit(this);
 		if (collector != null) {
-		    detail.commitTime = System.currentTimeMillis() - startTime;
-		    detail.committed = true;
+		    detail.setCommitted(System.currentTimeMillis() -
+					startTime);
 		    collector.addParticipant(detail);
 		}
 	    } catch (RuntimeException e) {

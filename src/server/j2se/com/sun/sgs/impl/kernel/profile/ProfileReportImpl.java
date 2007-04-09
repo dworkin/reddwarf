@@ -80,7 +80,7 @@ class ProfileReportImpl implements ProfileReport {
     /**
      * {@inheritDoc}
      */
-    public Set<ProfileParticipantDetail> getParticipantDetail() {
+    public Set<ProfileParticipantDetail> getParticipantDetails() {
         return participants;
     }
 

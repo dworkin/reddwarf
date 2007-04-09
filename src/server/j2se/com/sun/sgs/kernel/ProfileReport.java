@@ -42,7 +42,7 @@ public interface ProfileReport {
      *
      * @return a <code>Set</code> of </code>ProfileParticipantDetail</code>
      */
-    public Set<ProfileParticipantDetail> getParticipantDetail();
+    public Set<ProfileParticipantDetail> getParticipantDetails();
 
     /**
      * Returns whether the task successfully ran to completion. If this

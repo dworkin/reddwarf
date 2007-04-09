@@ -20,6 +20,7 @@ import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.Version;
 
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.ProfileCollector;
 import com.sun.sgs.kernel.ProfileOperationListener;
 import com.sun.sgs.kernel.ProfileProducer;
 import com.sun.sgs.kernel.ResourceCoordinator;
@@ -207,7 +208,7 @@ class Kernel {
      * for profiling data.
      */
     private void loadProfileListeners(Properties systemProperties,
-                                      ProfileCollectorImpl profileCollector,
+                                      ProfileCollector profileCollector,
                                       TaskScheduler taskScheduler,
                                       ResourceCoordinator resourceCoordinator)
     {
@@ -404,7 +405,7 @@ class Kernel {
             throw e;
         }
 
-        // register any profiling managers and fill in the manager registry,
+        // register any profiling managers and fill in the manager registry
         for (Object manager : managerSet) {
             if (profileRegistrar != null) {
                 if (manager instanceof ProfileProducer)

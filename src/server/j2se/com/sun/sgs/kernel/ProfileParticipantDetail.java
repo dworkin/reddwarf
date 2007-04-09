@@ -28,7 +28,7 @@ public interface ProfileParticipantDetail {
     public boolean wasPrepared();
 
     /**
-     * Returns the vote that the participant returned from prepartion. If
+     * Returns the vote that the participant returned from preparation. If
      * <code>wasPrepared</code> is <code>false</code>, then this method's
      * return value has no meaning and will always return <code>false</code>.
      *
@@ -47,11 +47,11 @@ public interface ProfileParticipantDetail {
 
     /**
      * Returns whether this participant was called to prepare and commit in
-     * one step (via <code>TransactionParticipant.preareAndCommit</code>).
+     * one step (via <code>TransactionParticipant.prepareAndCommit</code>).
      * If this returns <code>true</code> then both <code>getPrepareTime</code>
      * and <code>getCommitTime</code> will return the same value, as they
      * represent the same work. If the return from <code>wasCommitted</code>
-     * is <code>false</code> then the call to <code>preareAndCommit</code>
+     * is <code>false</code> then the call to <code>prepareAndCommit</code>
      * failed.
      *
      * @return <code>true</code> if this participant was called directly to

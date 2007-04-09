@@ -88,7 +88,8 @@ public class MasterTaskScheduler
      * @param properties the system properties
      * @param resourceCoordinator the system's <code>ResourceCoordinator</code>
      * @param taskHandler the system's <code>TaskHandler</code>
-     * @param profileCollector the collector used for profiling data
+     * @param profileCollector the collector used for profiling data, or
+     *                         <code>null</code> if profiling is disabled
      * @param systemContext the context the system runs in, which is registered
      *                      as the first application using this scheduler
      *

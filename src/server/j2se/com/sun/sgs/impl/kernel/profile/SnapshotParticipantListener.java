@@ -27,18 +27,18 @@ import java.util.Properties;
 
 /**
  * This implementation of <code>ProfileOperationListener</code> takes
- * snapshots at fixed intervals. It provides a very simple of transactional
- * participants that were active over the last interval. By default the time
- * interval is 5 seconds.
+ * snapshots at fixed intervals. It provides a very simple view of
+ * transactional participants that were active over the last interval. By
+ * default the time interval is 5 seconds.
  * <p>
  * This listener reports its findings on a server socket. Any number of
  * users may connect to that socket to watch the reports. The default
  * port used is 43012.
  * <p>
  * The <code>com.sun.sgs.impl.kernel.profile.SnapshotParticipantListener</code>
- * root is used for all properties in this class. The <code>reportPort</code>
+ * root is used for all properties in this class. The <code>report.port</code>
  * key is used to specify an alternate port on which to report profiling
- * data. The <code>reportPeriod</code> key is used to specify the length of
+ * data. The <code>report.period</code> key is used to specify the length of
  * time, in milliseconds, between reports.
  */
 public class SnapshotParticipantListener implements ProfileOperationListener {
@@ -63,7 +63,7 @@ public class SnapshotParticipantListener implements ProfileOperationListener {
     private HashMap<String,ParticipantCounts> participantMap;
 
     // the number of transactional tasks from the current snapshot window
-    private volatile int taskCount = 0;
+    private int taskCount = 0;
 
     // a simple formatter used to make decimal numbers easier to read
     static final DecimalFormat df = new DecimalFormat();
@@ -128,7 +128,7 @@ public class SnapshotParticipantListener implements ProfileOperationListener {
 	    synchronized (participantMap) {
 		taskCount++;
 		for (ProfileParticipantDetail detail :
-			 profileReport.getParticipantDetail()) {
+			 profileReport.getParticipantDetails()) {
 		    ParticipantCounts counts =
 			participantMap.get(detail.getParticipantName());
 		    if (counts == null) {
