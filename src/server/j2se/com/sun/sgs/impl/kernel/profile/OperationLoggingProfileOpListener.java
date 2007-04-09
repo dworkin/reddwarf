@@ -59,8 +59,8 @@ public class OperationLoggingProfileOpListener
     // registered, but when that changes, so too should this code
     private int maxOp = 0;
     private ProfileOperation [] registeredOps =
-        new ProfileOperation[ProfileCollector.MAX_OPS];
-    private long [] opCounts = new long[ProfileCollector.MAX_OPS];
+        new ProfileOperation[ProfileCollectorImpl.MAX_OPS];
+    private long [] opCounts = new long[ProfileCollectorImpl.MAX_OPS];
 
     // the commit/abort total counts, and the reported running time total
     private long commitCount = 0;

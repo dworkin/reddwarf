@@ -5,8 +5,10 @@
 package com.sun.sgs.impl.kernel.profile;
 
 import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.kernel.ProfileCollector;
 import com.sun.sgs.kernel.ProfileOperation;
 import com.sun.sgs.kernel.ProfileOperationListener;
+import com.sun.sgs.kernel.ProfileParticipantDetail;
 import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskOwner;
 
@@ -19,19 +21,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 
 /**
- * This is the main aggregation point for profiling data. Instances of
- * this class are used to collect data from arbitrary sources (typically
- * <code>ProfileConsumer</code>s or the scheduler itself) and keep
- * track of which tasks are generating which data.
- * <p>
- * This class allows instances of <code>ProfileOperationListener</code> to
- * register as listeners for reported data. All reporting to these
- * listeners is done in a single thread. This means that listeners do
- * not need to worry about being called from multiple threads. It also
- * means that listeners should be efficient in handling reports, since
- * they are blocking all other listeners.
+ * This is the implementation of <code>ProfileCollector</code> used by the
+ * kernel to collect and report profiling data. It uses a single thread to
+ * consume and report profiling data.
  */
-public class ProfileCollector {
+public class ProfileCollectorImpl implements ProfileCollector {
 
     // the next free operation identifier to use
     private AtomicInteger nextOpId;
@@ -63,12 +57,12 @@ public class ProfileCollector {
     private LinkedBlockingQueue<ProfileReportImpl> queue;
 
     /**
-     * Creates an instance of <code>ProfileCollector</code>.
+     * Creates an instance of <code>ProfileCollectorImpl</code>.
      *
      * @param resourceCoordinator a <code>ResourceCoordinator</code> used
      *                            to run collecting and reporting tasks
      */
-    public ProfileCollector(ResourceCoordinator resourceCoordinator) {
+    public ProfileCollectorImpl(ResourceCoordinator resourceCoordinator) {
         nextOpId = new AtomicInteger(0);
         schedulerThreadCount = 0;
         listeners = new ArrayList<ProfileOperationListener>();
@@ -79,12 +73,7 @@ public class ProfileCollector {
     }
 
     /**
-     * Adds a <code>ProfileOperationListener</code> as a listener for
-     * profiling data reports. The listener is immediately updated on
-     * the current set of operations and the number of scheduler
-     * threads.
-     *
-     * @param listener the <code>ProfileOperationListener</code> to add
+     * {@inheritDoc}
      */
     public void addListener(ProfileOperationListener listener) {
         listeners.add(listener);
@@ -94,7 +83,7 @@ public class ProfileCollector {
     }
 
     /**
-     * Notifies the collector that a thread has been added to the scheduler.
+     * {@inheritDoc}
      */
     public void notifyThreadAdded() {
         schedulerThreadCount++;
@@ -103,8 +92,7 @@ public class ProfileCollector {
     }
 
     /**
-     * Notifies the collector that a thread has been removed from the
-     * scheduler.
+     * {@inheritDoc}
      */
     public void notifyThreadRemoved() {
         schedulerThreadCount--;
@@ -113,16 +101,7 @@ public class ProfileCollector {
     }
 
     /**
-     * Tells the collector that a new task is starting in the context of
-     * the calling thread. Any previous task must have been cleared from the
-     * context of this thread via a call to <code>finishTask</code>.
-     *
-     * @param task the <code>KernelRunnable</code> that is starting
-     * @param owner the <code>TaskOwner</code> of the task
-     * @param scheduledStartTime the requested starting time for the task
-     * @param readyCount the number of ready tasks at the scheduler
-     *
-     * @throws IllegalStateException if a task is already bound to this thread
+     * {@inheritDoc}
      */
     public void startTask(KernelRunnable task, TaskOwner owner,
                           long scheduledStartTime, int readyCount) {
@@ -135,13 +114,7 @@ public class ProfileCollector {
     }
 
     /**
-     * Tells the collector that the current task associated with the calling
-     * thread (as associated by a call to <code>startTask</code>) is
-     * transactional. This does not mean that all operations of the task
-     * are transactional, but that at least some of the task is run in a
-     * transactional context.
-     *
-     * @throws IllegalStateException if no task is bound to this thread
+     * {@inheritDoc}
      */
     public void noteTransactional() {
         ProfileReportImpl profileReport = profileReports.get();
@@ -152,16 +125,21 @@ public class ProfileCollector {
     }
 
     /**
-     * Tells the collector that the current task associated with the calling
-     * thread (as associated by a call to <code>startTask</code>) is now
-     * finished.
-     *
-     * @param tryCount the number of times that the task has tried to run
-     * @param taskSucceeded <code>true</code> if the task ran to completion,
-     *                      <code>false</code> if the task failed and is
-     *                      going to be re-tried or dropped
-     *
-     * @throws IllegalStateException if no task is bound to this thread
+     * {@inheritDoc}
+     */
+    public void addParticipant(ProfileParticipantDetail participantDetail) {
+        ProfileReportImpl profileReport = profileReports.get();
+        if (profileReport == null)
+            throw new IllegalStateException("No task is being profiled in " +
+                                            "this thread");
+        if (! profileReport.transactional)
+            throw new IllegalStateException("Participants cannot be added " +
+                                            "to a non-transactional task");
+        profileReport.participants.add(participantDetail);
+    }
+
+    /**
+     * {@inheritDoc}
      */
     public void finishTask(int tryCount, boolean taskSucceeded) {
         long stopTime = System.currentTimeMillis();
@@ -274,9 +252,13 @@ public class ProfileCollector {
                         "%  ]\n\n";
                      */
 
-                    // make sure that the list can't be modified by a listener
+                    // make sure that the collections can't be modified by
+                    // a listener
                     profileReport.ops =
                         Collections.unmodifiableList(profileReport.ops);
+                    profileReport.participants =
+                        Collections.
+                        unmodifiableSet(profileReport.participants);
 
                     for (ProfileOperationListener listener : listeners)
                         listener.report(profileReport);

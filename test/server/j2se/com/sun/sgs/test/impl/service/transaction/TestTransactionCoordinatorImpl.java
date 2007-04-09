@@ -26,7 +26,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 
     /** The instance to test. */
     private final TransactionCoordinator coordinator =
-	new TransactionCoordinatorImpl(new Properties());
+	new TransactionCoordinatorImpl(new Properties(), null);
     
     /** The handle to test. */
     private TransactionHandle handle;
@@ -50,7 +50,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 
     public void testConstructorNullProperties() {
 	try {
-	    new TransactionCoordinatorImpl(null);
+	    new TransactionCoordinatorImpl(null, null);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
