@@ -479,7 +479,7 @@ public class TestTaskHandler extends TestCase {
 	implements TransactionCoordinator
     {
 	private final TransactionCoordinator txnCoordinator =
-	    new TransactionCoordinatorImpl(System.getProperties());
+	    new TransactionCoordinatorImpl(System.getProperties(), null);
 	Transaction txn;
 	MyTransactionCoordinator() { }
 	public TransactionHandle createTransaction() {

@@ -8,9 +8,9 @@ import com.sun.sgs.app.ExceptionRetryStatus;
 
 import com.sun.sgs.impl.kernel.TaskHandler;
 
-import com.sun.sgs.impl.kernel.profile.ProfileCollector;
-
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+
+import com.sun.sgs.kernel.ProfileCollector;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
