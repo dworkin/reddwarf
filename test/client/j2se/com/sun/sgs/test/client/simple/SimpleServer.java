@@ -10,6 +10,7 @@ import java.net.SocketAddress;
 
 import com.sun.sgs.impl.io.ServerSocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
+import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.io.AcceptorListener;
@@ -34,6 +35,7 @@ public class SimpleServer implements ConnectionListener {
     private long sequenceNumber;
 
     final String TEST_CHANNEL_NAME = "Test Channel";
+    final CompactId TEST_CHANNEL_ID = new CompactId(new byte[] { 0x22 });
 
     /**
      * Construct a new SimpleServer to accept incoming connections.
@@ -188,12 +190,15 @@ public class SimpleServer implements ConnectionListener {
             if (serverMessage.equals("Join Channel")) {
                 MessageBuffer reply =
                     new MessageBuffer(3 +
-                        MessageBuffer.getSize(TEST_CHANNEL_NAME));
+                        MessageBuffer.getSize(TEST_CHANNEL_NAME) +
+			TEST_CHANNEL_ID.getExternalFormByteCount());
 
                 reply.putByte(SimpleSgsProtocol.VERSION).
                       putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
                       putByte(SimpleSgsProtocol.CHANNEL_JOIN).
-                      putString(TEST_CHANNEL_NAME);
+                      putString(TEST_CHANNEL_NAME).
+		      putBytes(TEST_CHANNEL_ID.getExternalForm());
+
                 
                 sendMessage(conn, reply.getBuffer());
 
@@ -201,34 +206,35 @@ public class SimpleServer implements ConnectionListener {
             } else if (serverMessage.equals("Leave Channel")) {
                 MessageBuffer reply =
                     new MessageBuffer(3 +
-                        MessageBuffer.getSize(TEST_CHANNEL_NAME));
+			TEST_CHANNEL_ID.getExternalFormByteCount());
 
                 reply.putByte(SimpleSgsProtocol.VERSION).
                       putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
                       putByte(SimpleSgsProtocol.CHANNEL_LEAVE).
-                      putString(TEST_CHANNEL_NAME);
+		      putBytes(TEST_CHANNEL_ID.getExternalForm());
                 
                 sendMessage(conn, reply.getBuffer());
             }
         } else if (command == CHANNEL_SEND_REQUEST) {
             assert service == CHANNEL_SERVICE;
-            String channelName = msg.getString();
+            CompactId channelId = CompactId.getCompactId(msg);
             msg.getLong(); // FIXME sequence number
             int numRecipients = msg.getShort();
             String messageStr = msg.getString();
-            System.out.println("Channel Message " + channelName
+            System.out.println("Channel Message " + channelId
                     + " num recipients " + numRecipients + " message "
                     + messageStr);
 
             // Reply with a channel-leave message, for this test.
             MessageBuffer reply =
                 new MessageBuffer(3 +
-                    MessageBuffer.getSize(TEST_CHANNEL_NAME));
+		  TEST_CHANNEL_ID.getExternalFormByteCount());
+
 
             reply.putByte(SimpleSgsProtocol.VERSION).
                   putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
                   putByte(SimpleSgsProtocol.CHANNEL_LEAVE).
-                  putString(TEST_CHANNEL_NAME);
+		  putBytes(TEST_CHANNEL_ID.getExternalForm());
             
             sendMessage(conn, reply.getBuffer());
         } else if (command == LOGOUT_REQUEST) {
@@ -270,7 +276,7 @@ public class SimpleServer implements ConnectionListener {
         long seq = sequenceNumber % 3 == 0 ? 2 : sequenceNumber;
         
         int msgLen = 3 +
-            MessageBuffer.getSize(TEST_CHANNEL_NAME) +
+            TEST_CHANNEL_ID.getExternalFormByteCount() +
             8 +
             2 +
             MessageBuffer.getSize(chanMessage);
@@ -279,7 +285,7 @@ public class SimpleServer implements ConnectionListener {
         msg.putByte(SimpleSgsProtocol.VERSION).
             putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
             putByte(SimpleSgsProtocol.CHANNEL_MESSAGE).
-            putString(TEST_CHANNEL_NAME).
+            putBytes(TEST_CHANNEL_ID.getExternalForm()).
             putLong(seq).
             putShort(0).
             putString(chanMessage);

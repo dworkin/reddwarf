@@ -22,6 +22,7 @@ import com.sun.sgs.client.SessionId;
 import com.sun.sgs.impl.client.comm.ClientConnection;
 import com.sun.sgs.impl.client.comm.ClientConnectionListener;
 import com.sun.sgs.impl.client.comm.ClientConnector;
+import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
@@ -63,8 +64,8 @@ public class SimpleClient implements ServerSession {
         new SimpleClientConnectionListener();
 
     /** The map of channels this client is a member of */
-    private final ConcurrentHashMap<String, SimpleClientChannel> channels =
-        new ConcurrentHashMap<String, SimpleClientChannel>();
+    private final ConcurrentHashMap<CompactId, SimpleClientChannel> channels =
+        new ConcurrentHashMap<CompactId, SimpleClientChannel>();
 
     /** The listener for this simple client. */
     private final SimpleClientListener clientListener;
@@ -439,9 +440,10 @@ public class SimpleClient implements ServerSession {
             case SimpleSgsProtocol.CHANNEL_JOIN: {
                 logger.log(Level.FINER, "Channel join");
                 String channelName = msg.getString();
+		CompactId channelId = CompactId.getCompactId(msg);
                 SimpleClientChannel channel =
-                    new SimpleClientChannel(channelName);
-                if (channels.putIfAbsent(channelName, channel) == null) {
+                    new SimpleClientChannel(channelName, channelId);
+                if (channels.putIfAbsent(channelId, channel) == null) {
                     channel.joined();
                 } else {
                     logger.log(Level.FINE,
@@ -453,27 +455,27 @@ public class SimpleClient implements ServerSession {
 
             case SimpleSgsProtocol.CHANNEL_LEAVE: {
                 logger.log(Level.FINER, "Channel leave");
-                String channelName = msg.getString();
+                CompactId channelId = CompactId.getCompactId(msg);
                 SimpleClientChannel channel =
-                    channels.remove(channelName);
+                    channels.remove(channelId);
                 if (channel != null) {
                     channel.left();
                 } else {
                     logger.log(Level.FINE,
                         "Cannot leave channel {0}: not a member",
-                        channelName);
+                        channelId);
                 }
                 break;
             }
 
             case SimpleSgsProtocol.CHANNEL_MESSAGE:
                 logger.log(Level.FINEST, "Channel recv");
-                String channelName = msg.getString();
-                SimpleClientChannel channel = channels.get(channelName);
+                CompactId channelId = CompactId.getCompactId(msg);
+                SimpleClientChannel channel = channels.get(channelId);
                 if (channel == null) {
                     logger.log(Level.FINE,
                         "Ignore message on channel {0}: not a member",
-                        channelName);
+                        channelId);
                     return;
                 }
 
@@ -532,11 +534,13 @@ public class SimpleClient implements ServerSession {
     final class SimpleClientChannel implements ClientChannel {
 
         private final String name;
+	private final CompactId id;
         private volatile boolean joined;
         private ClientChannelListener listener;
 
-        SimpleClientChannel(String name) {
+        SimpleClientChannel(String name, CompactId id) {
             this.name = name;
+	    this.id = id;
         }
 
         // Implement ClientChannel
@@ -628,14 +632,14 @@ public class SimpleClient implements ServerSession {
             
             MessageBuffer msg =
                 new MessageBuffer(3 +
-                    MessageBuffer.getSize(name) +
+		    id.getExternalFormByteCount() +
                     8 +
                     2 + totalSessionLength +
                     2 + message.length);
             msg.putByte(SimpleSgsProtocol.VERSION).
                 putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
                 putByte(SimpleSgsProtocol.CHANNEL_SEND_REQUEST).
-                putString(name).
+                putBytes(id.getExternalForm()).
                 putLong(sequenceNumber.getAndIncrement());
             if (recipients == null) {
                 msg.putShort(0);
