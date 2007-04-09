@@ -73,7 +73,7 @@ public class ProfileCollectorImpl implements ProfileCollector {
     }
 
     /**
-     * {@inherhitDoc}
+     * {@inheritDoc}
      */
     public void addListener(ProfileOperationListener listener) {
         listeners.add(listener);
@@ -83,7 +83,7 @@ public class ProfileCollectorImpl implements ProfileCollector {
     }
 
     /**
-     * {@inherhitDoc}
+     * {@inheritDoc}
      */
     public void notifyThreadAdded() {
         schedulerThreadCount++;
@@ -92,7 +92,7 @@ public class ProfileCollectorImpl implements ProfileCollector {
     }
 
     /**
-     * {@inherhitDoc}
+     * {@inheritDoc}
      */
     public void notifyThreadRemoved() {
         schedulerThreadCount--;
@@ -101,7 +101,7 @@ public class ProfileCollectorImpl implements ProfileCollector {
     }
 
     /**
-     * {@inherhitDoc}
+     * {@inheritDoc}
      */
     public void startTask(KernelRunnable task, TaskOwner owner,
                           long scheduledStartTime, int readyCount) {
@@ -114,7 +114,7 @@ public class ProfileCollectorImpl implements ProfileCollector {
     }
 
     /**
-     * {@inherhitDoc}
+     * {@inheritDoc}
      */
     public void noteTransactional() {
         ProfileReportImpl profileReport = profileReports.get();
@@ -125,7 +125,7 @@ public class ProfileCollectorImpl implements ProfileCollector {
     }
 
     /**
-     * {@inherhitDoc}
+     * {@inheritDoc}
      */
     public void addParticipant(ProfileParticipantDetail participantDetail) {
         ProfileReportImpl profileReport = profileReports.get();
@@ -139,7 +139,7 @@ public class ProfileCollectorImpl implements ProfileCollector {
     }
 
     /**
-     * {@inherhitDoc}
+     * {@inheritDoc}
      */
     public void finishTask(int tryCount, boolean taskSucceeded) {
         long stopTime = System.currentTimeMillis();

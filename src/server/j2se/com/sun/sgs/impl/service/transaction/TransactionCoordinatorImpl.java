@@ -4,9 +4,9 @@
 
 package com.sun.sgs.impl.service.transaction;
 
+import com.sun.sgs.kernel.ProfileCollector;
 import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
-import com.sun.sgs.kernel.ProfileCollector;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicLong;
 

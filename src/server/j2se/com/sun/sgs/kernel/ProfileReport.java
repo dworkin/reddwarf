@@ -40,7 +40,7 @@ public interface ProfileReport {
      * Returns detail about each participant in the transaction, or an empty
      * <code>Set</code> if the task was not transactional.
      *
-     * @return a <code>Set</code> of </code>ProfileParticipantDetail</code>
+     * @return a <code>Set</code> of <code>ProfileParticipantDetail</code>
      */
     public Set<ProfileParticipantDetail> getParticipantDetails();
 

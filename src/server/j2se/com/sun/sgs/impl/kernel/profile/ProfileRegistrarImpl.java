@@ -16,7 +16,7 @@ import java.util.logging.Logger;
 
 /**
  * This is a simple implementation of <code>ProfileRegistrar</code> used by
- * the kernel to handle registering <code>ProfileProducer<code>s that end
+ * the kernel to handle registering <code>ProfileProducer</code>s that end
  * up reporting to a single <code>ProfileCollectorImpl</code>.
  */
 public class ProfileRegistrarImpl implements ProfileRegistrar {
