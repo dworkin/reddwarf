@@ -32,11 +32,10 @@ final class ChannelState implements ManagedObject, Serializable {
     /** The name of this channel. */
     final String name;
 
-    /** The ManagedReference for this instance. */
-    private final ManagedReference thisRef;
+    /** The ID from a managed reference to this instance. */
+    private final byte[] idBytes;
 
-    /** The channel ID for this instance, constructed from a managed
-     * reference to this instance. */
+    /** The channel ID for this instance, constructed from {@code idBytes}. */
     transient CompactId id;
 
     /** The listener for this channel, or null. */
@@ -70,8 +69,9 @@ final class ChannelState implements ManagedObject, Serializable {
 	    new WrappedSerializable<ChannelListener>(listener) :
 	    null;
 	this.delivery = delivery;
-	this.thisRef = dataService.createReference(this);
-	this.id = new CompactId(thisRef.getId().toByteArray());
+	ManagedReference ref = dataService.createReference(this);
+	idBytes = ref.getId().toByteArray();
+	id = new CompactId(idBytes);
     }
 
     /**
@@ -187,6 +187,6 @@ final class ChannelState implements ManagedObject, Serializable {
 	throws IOException, ClassNotFoundException
     {
 	in.defaultReadObject();
-	id = new CompactId(thisRef.getId().toByteArray());
+	id = new CompactId(idBytes);
     }
 }

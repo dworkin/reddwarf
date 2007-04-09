@@ -817,11 +817,7 @@ public class ChannelServiceImpl
 	 */
 	private boolean flush() {
 	    if (txnState == State.COMMITTED) {
-		for (Map.Entry<String, ChannelImpl> entry :
-			 internalTable.entrySet())
-		{
-		    String name = entry.getKey();
-		    ChannelImpl channel = entry.getValue();
+		for (ChannelImpl channel : internalTable.values()) {
 		    if (channel.isClosed) {
 			channelStateCache.remove(channel.state.id);
 		    } else {
@@ -835,7 +831,6 @@ public class ChannelServiceImpl
 		return false;
 	    }
 	}
-	
 
 	/* -- other methods -- */
 
