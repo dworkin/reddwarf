@@ -8,7 +8,7 @@ import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.TaskRejectedException;
 
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
-import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
 import com.sun.sgs.kernel.KernelAppContext;
 import com.sun.sgs.kernel.KernelRunnable;

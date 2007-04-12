@@ -4,7 +4,7 @@
 
 package com.sun.sgs.impl.kernel.profile;
 
-import com.sun.sgs.impl.util.PropertiesWrapper;
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.ProfileOperation;
@@ -43,9 +43,9 @@ public class AggregateProfileOpListener implements ProfileOperationListener {
     // registered, but when that changes, so too should this code
     private int maxOp = 0;
     private ProfileOperation [] registeredOps =
-        new ProfileOperation[ProfileCollector.MAX_OPS];
-    private long [] sOpCounts = new long[ProfileCollector.MAX_OPS];
-    private long [] fOpCounts = new long[ProfileCollector.MAX_OPS];
+        new ProfileOperation[ProfileCollectorImpl.MAX_OPS];
+    private long [] sOpCounts = new long[ProfileCollectorImpl.MAX_OPS];
+    private long [] fOpCounts = new long[ProfileCollectorImpl.MAX_OPS];
     
     // the task and time counts for successful and failed tasks
     private volatile long sTaskCount = 0;

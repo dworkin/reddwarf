@@ -4,7 +4,7 @@
 
 package com.sun.sgs.test.util;
 
-import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.MaybeRetryableTransactionNotActiveException;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
@@ -71,7 +71,7 @@ public class DummyTransaction implements Transaction {
     public DummyTransaction() {
 	usePrepareAndCommit = true;
 	logger.log(Level.FINER, "create {0}", this);
-        DummyProfileRegistrar.startTask();
+        DummyProfileCoordinator.startTask();
     }
 
     /**
@@ -92,7 +92,7 @@ public class DummyTransaction implements Transaction {
 	default:
 	    throw new AssertionError();
 	}
-        DummyProfileRegistrar.startTask();
+        DummyProfileCoordinator.startTask();
     }
 
     /* -- Implement Transaction -- */
@@ -153,7 +153,7 @@ public class DummyTransaction implements Transaction {
 	    }
 	}
 	state = State.ABORTED;
-        DummyProfileRegistrar.endTask(false);
+        DummyProfileCoordinator.endTask(false);
     }
 
     public synchronized boolean isAborted() {
@@ -245,7 +245,7 @@ public class DummyTransaction implements Transaction {
 	    }
 	}
 	state = State.COMMITTED;
-        DummyProfileRegistrar.endTask(true);
+        DummyProfileCoordinator.endTask(true);
     }
 
     /** Returns the current state. */

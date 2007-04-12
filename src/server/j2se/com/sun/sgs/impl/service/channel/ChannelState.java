@@ -8,7 +8,10 @@ import com.sun.sgs.app.ChannelListener;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.app.ManagedObject;
+import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.impl.util.WrappedSerializable;
+import com.sun.sgs.impl.sharedutil.CompactId;
+import com.sun.sgs.service.DataService;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -28,6 +31,12 @@ final class ChannelState implements ManagedObject, Serializable {
     
     /** The name of this channel. */
     final String name;
+
+    /** The ID from a managed reference to this instance. */
+    private final byte[] idBytes;
+
+    /** The channel ID for this instance, constructed from {@code idBytes}. */
+    transient CompactId id;
 
     /** The listener for this channel, or null. */
     private WrappedSerializable<ChannelListener> channelListener;
@@ -51,13 +60,18 @@ final class ChannelState implements ManagedObject, Serializable {
      * Constructs an instance of this class with the specified name,
      * listener, and delivery requirement.
      */
-    ChannelState(String name, ChannelListener listener, Delivery delivery) {
+    ChannelState(String name, ChannelListener listener, Delivery delivery,
+		 DataService dataService)
+    {
 	this.name = name;
 	this.channelListener =
 	    listener != null ?
 	    new WrappedSerializable<ChannelListener>(listener) :
 	    null;
 	this.delivery = delivery;
+	ManagedReference ref = dataService.createReference(this);
+	idBytes = ref.getId().toByteArray();
+	id = new CompactId(idBytes);
     }
 
     /**
@@ -173,5 +187,6 @@ final class ChannelState implements ManagedObject, Serializable {
 	throws IOException, ClassNotFoundException
     {
 	in.defaultReadObject();
+	id = new CompactId(idBytes);
     }
 }

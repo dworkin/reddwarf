@@ -7,7 +7,7 @@ package com.sun.sgs.impl.kernel;
 import com.sun.sgs.app.AppListener;
 import com.sun.sgs.app.NameNotBoundException;
 
-import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
 import com.sun.sgs.kernel.KernelRunnable;
 

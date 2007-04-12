@@ -12,7 +12,7 @@ import java.util.logging.Logger;
 import org.apache.mina.common.IoAcceptor;
 import org.apache.mina.transport.socket.nio.DatagramAcceptor;
 
-import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.io.Acceptor;
 import com.sun.sgs.io.ServerEndpoint;
 

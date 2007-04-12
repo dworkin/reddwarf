@@ -96,11 +96,22 @@ final class ReferenceTable {
 	}
     }
 
-    /** Saves all object modifications to the data store. */
-    void flushChanges() {
+    /**
+     * Flushes all references.  Returns information about any objects found to
+     * be modified, or null if none were modified.
+     */
+    FlushInfo flushModifiedObjects() {
+	FlushInfo flushInfo = null;
 	for (ManagedReferenceImpl ref : oids.values()) {
-	    ref.flush();
+	    byte[] data = ref.flush();
+	    if (data != null) {
+		if (flushInfo == null) {
+		    flushInfo = new FlushInfo();
+		}
+		flushInfo.add(ref.oid, data);
+	    }
 	}
+	return flushInfo;
     }
 
     /**

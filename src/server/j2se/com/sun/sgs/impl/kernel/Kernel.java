@@ -8,16 +8,19 @@ import com.sun.sgs.auth.IdentityAuthenticator;
 
 import com.sun.sgs.impl.auth.IdentityImpl;
 
-import com.sun.sgs.impl.kernel.profile.ProfileCollector;
+import com.sun.sgs.impl.kernel.profile.ProfileCollectorImpl;
+import com.sun.sgs.impl.kernel.profile.ProfileRegistrarImpl;
 
 import com.sun.sgs.impl.kernel.schedule.MasterTaskScheduler;
 
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 
-import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+
 import com.sun.sgs.impl.util.Version;
 
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.ProfileCollector;
 import com.sun.sgs.kernel.ProfileOperationListener;
 import com.sun.sgs.kernel.ProfileProducer;
 import com.sun.sgs.kernel.ResourceCoordinator;
@@ -75,6 +78,9 @@ class Kernel {
     // the proxy used by all transactional components
     private final TransactionProxyImpl transactionProxy;
 
+    // the registration point for producers of profiling data
+    private final ProfileRegistrarImpl profileRegistrar;
+
     // the set of applications that are running in this kernel
     private HashSet<AppKernelAppContext> applications;
 
@@ -87,7 +93,8 @@ class Kernel {
     // the default profile listeners
     private static final String DEFAULT_PROFILE_LISTENERS =
         "com.sun.sgs.impl.kernel.profile.AggregateProfileOpListener:" +
-        "com.sun.sgs.impl.kernel.profile.SnapshotProfileOpListener";
+        "com.sun.sgs.impl.kernel.profile.SnapshotProfileOpListener:" +
+	"com.sun.sgs.impl.kernel.profile.SnapshotParticipantListener";
 
     // the default services
     private static final String DEFAULT_CHANNEL_SERVICE =
@@ -131,32 +138,40 @@ class Kernel {
 
         // setup the system components
         try {
-            // create the transaction proxy and coordinator
-            transactionProxy = new TransactionProxyImpl();
-            TransactionCoordinatorImpl transactionCoordinator =
-                new TransactionCoordinatorImpl(systemProperties);
-
             // create the resource coordinator
             ResourceCoordinatorImpl resourceCoordinator =
                 new ResourceCoordinatorImpl(systemProperties);
 
             // see if we're doing any level of profiling, which for the
             // current version is as simple as "on" or "off"
-            ProfileCollector profileCollector = null;
+            ProfileCollectorImpl profileCollector = null;
             String profileLevel =
                 systemProperties.getProperty(PROFILE_PROPERTY);
             if (profileLevel != null) {
                 if (profileLevel.equals("on")) {
                     logger.log(Level.CONFIG, "System profiling is on");
                     profileCollector =
-                        new ProfileCollector(resourceCoordinator);
-                } else if (! profileLevel.equals("off")) {
-                    if (logger.isLoggable(Level.WARNING))
-                        logger.log(Level.WARNING, "Unknown profile level " +
-                                   "{0} ... all profiling will be turned " +
-                                   "off", profileLevel);
+                        new ProfileCollectorImpl(resourceCoordinator);
+                    profileRegistrar =
+                        new ProfileRegistrarImpl(profileCollector);
+                } else {
+                    profileRegistrar = null;
+                    if (! profileLevel.equals("off")) {
+                        if (logger.isLoggable(Level.WARNING))
+                            logger.log(Level.WARNING, "Unknown profile " +
+                                       "level {0} ... all profiling will be " +
+                                       "turned off", profileLevel);
+                    }
                 }
+            } else {
+                profileRegistrar = null;
             }
+
+            // create the transaction proxy and coordinator
+            transactionProxy = new TransactionProxyImpl();
+            TransactionCoordinatorImpl transactionCoordinator =
+                new TransactionCoordinatorImpl(systemProperties,
+                                               profileCollector);
 
             // create the task handler and scheduler
             TaskHandler taskHandler =
@@ -232,6 +247,11 @@ class Kernel {
                                     listenerClassName);
             }
         }
+
+        // finally, register the scheduler as a listener too
+        if (taskScheduler instanceof ProfileOperationListener)
+            profileCollector.
+                addListener((ProfileOperationListener)taskScheduler);
     }
 
     /**
@@ -338,9 +358,11 @@ class Kernel {
                 createService(Class.forName(clientSessionServiceClass),
                               properties, systemRegistry);
             serviceList.add(clientSessionService);
-            if (clientSessionService instanceof ProfileProducer)
-                ((ProfileProducer)clientSessionService).
-                    setProfileRegistrar(scheduler);
+            if (clientSessionService instanceof ProfileProducer) {
+                if (profileRegistrar != null)
+                    ((ProfileProducer)clientSessionService).
+                        setProfileRegistrar(profileRegistrar);
+            }
 
             setupService(channelServiceClass, serviceList,
                          channelManagerClass, managerSet, properties,
@@ -385,8 +407,11 @@ class Kernel {
 
         // register any profiling managers and fill in the manager registry
         for (Object manager : managerSet) {
-            if (manager instanceof ProfileProducer)
-                ((ProfileProducer)manager).setProfileRegistrar(scheduler);
+            if (profileRegistrar != null) {
+                if (manager instanceof ProfileProducer)
+                    ((ProfileProducer)manager).
+                        setProfileRegistrar(profileRegistrar);
+            }
             managerComponents.addComponent(manager);
         }
 
