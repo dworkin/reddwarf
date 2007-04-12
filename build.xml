@@ -294,6 +294,21 @@
           includes="sgs-client-apidoc/**"/>
   </target>
 
+  <!-- Creates a source distribution -->
+  <target name="source-dist" depends="project-version"
+	  description="Creates a source distribution">
+    <delete dir="${build.dir}/sgs-src"/>
+    <exec executable="svn" failOnError="true" logError="true">
+      <arg value="export"/>
+      <arg file="."/>
+      <arg file="${build.dir}/sgs-src"/>
+    </exec>
+    <zip destfile="${build.dir}/sgs-src-${project.version}.zip">
+      <zipfileset dir="${build.dir}/sgs-src"
+		  prefix="sgs-src-${project.version}"/>
+    </zip>
+  </target>
+
   <!-- Builds files for distribution -->
   <target name="dist"
 	  depends="dist-client, dist-server, dist-tutorial, javadoc-api,
