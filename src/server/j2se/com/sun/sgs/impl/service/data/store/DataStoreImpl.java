@@ -828,8 +828,6 @@ public class DataStoreImpl
 	Exception exception;
 	long oid = -1;
 	boolean oidSet = false;
-	long byteCount = 0;
-	long objectCount = 0;
 	try {
 	    TxnInfo txnInfo = checkTxn(txn, setObjectsOp);
 	    int len = oids.length;
@@ -850,7 +848,6 @@ public class DataStoreImpl
 		checkId(oid);
 		byte[] data = dataArray[i];
 		if (data == null) {
-		    reportWrittenDetail(byteCount, objectCount);
 		    throw new NullPointerException(
 			"The data must not be null");
 		}
@@ -859,26 +856,23 @@ public class DataStoreImpl
 		OperationStatus status =
 		    oidsDb.put(txnInfo.bdbTxn, key, value);
 		if (status != OperationStatus.SUCCESS) {
-		    reportWrittenDetail(byteCount, objectCount);
 		    throw new DataStoreException(
 			"setObjects txn: " + txn + ", oid:" + oid +
 			" failed: " + status);
 		}
 		if (writtenBytesCounter != null) {
-		    byteCount += data.length;
-		    objectCount++;
+		    writtenBytesCounter.incrementCount(data.length);
+		    writtenObjectsCounter.incrementCount();
 		}
 	    }
 	    txnInfo.modified = true;
 	    logger.log(Level.FINEST, "setObjects txn:{0} returns", txn);
-	    reportWrittenDetail(byteCount, objectCount);
 	    return;
 	} catch (DatabaseException e) {
 	    exception = e;
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	reportWrittenDetail(byteCount, objectCount);
 	throw convertException(
 	    txn, Level.FINEST, exception,
 	    "setObject txn:" + txn + (oidSet ? ", oid:" + oid : ""));
@@ -1582,19 +1576,6 @@ public class DataStoreImpl
 	if (duration > txnTimeout) {
 	    throw new TransactionTimeoutException(
 		"Transaction timed out after " + duration + " ms");
-	}
-    }
-
-    /**
-     * Reports profiling detail on multiple written objects if profiling is
-     * enabled and if any objects were written.
-     */
-    private void reportWrittenDetail(long bytesWritten, long objectsWritten) {
-	if (writtenBytesCounter != null) {
-	    if (objectsWritten > 0) {
-		writtenBytesCounter.incrementCount(bytesWritten);
-		writtenObjectsCounter.incrementCount(objectsWritten);
-	    }
 	}
     }
 }

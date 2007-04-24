@@ -26,7 +26,7 @@ public interface ProfileCounter {
      * Returns whether this is a task-local counter.
      *
      * @return <code>true</code> if this counter is task-local,
-     *         <code>false</code if this counter is aggregated
+     *         <code>false</code> if this counter is aggregated
      */
     public boolean isTaskLocal();
 
