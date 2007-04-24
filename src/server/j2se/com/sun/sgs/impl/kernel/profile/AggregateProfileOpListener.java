@@ -268,14 +268,4 @@ public class AggregateProfileOpListener implements ProfileOperationListener {
         }
     }
 
-    /**
-     * Private helper method that formats the counter values.
-     */
-    private String formatCounters(Map<String,Long> counterMap) {
-	String str = "";
-	for (Entry<String,Long> entry : counterMap.entrySet())
-	    str += "  " + entry.getKey() + "=" + entry.getValue() + "\n";
-	return str;
-    }
-
 }
