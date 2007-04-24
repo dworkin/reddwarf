@@ -32,6 +32,7 @@ import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.ProfileConsumer;
+import com.sun.sgs.kernel.ProfileCounter;
 import com.sun.sgs.kernel.ProfileOperation;
 import com.sun.sgs.kernel.ProfileProducer;
 import com.sun.sgs.kernel.ProfileRegistrar;
@@ -258,6 +259,15 @@ public class DataStoreImpl
     private ProfileOperation setBindingOp = null;
     private ProfileOperation removeBindingOp = null;
     private ProfileOperation nextBoundNameOp = null;
+
+    /**
+     * The counters used for profile reporting, which track the bytes read
+     * and written within a task, and how many objects were read and written
+     */
+    private ProfileCounter readBytesCounter = null;
+    private ProfileCounter readObjectsCounter = null;
+    private ProfileCounter writtenBytesCounter = null;
+    private ProfileCounter writtenObjectsCounter = null;
 
     /**
      * Records information about all active transactions.
@@ -761,6 +771,11 @@ public class DataStoreImpl
 					 " failed: " + status);
 	}
 	byte[] result = value.getData();
+	if (readBytesCounter != null) {
+	    if (result != null)
+		readBytesCounter.incrementCount(result.length);
+	    readObjectsCounter.incrementCount();
+	}
 	/* Berkeley DB returns null if the data is empty. */
 	return result != null ? result : NO_BYTES;
     }
@@ -786,6 +801,10 @@ public class DataStoreImpl
 		throw new DataStoreException(
 		    "setObject txn: " + txn + ", oid:" + oid + " failed: " +
 		    status);
+	    }
+	    if (writtenBytesCounter != null) {
+		writtenBytesCounter.incrementCount(data.length);
+		writtenObjectsCounter.incrementCount();
 	    }
 	    txnInfo.modified = true;
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -840,6 +859,10 @@ public class DataStoreImpl
 		    throw new DataStoreException(
 			"setObjects txn: " + txn + ", oid:" + oid +
 			" failed: " + status);
+		}
+		if (writtenBytesCounter != null) {
+		    writtenBytesCounter.incrementCount(data.length);
+		    writtenObjectsCounter.incrementCount();
 		}
 	    }
 	    txnInfo.modified = true;
@@ -1244,20 +1267,24 @@ public class DataStoreImpl
         ProfileConsumer consumer =
             profileRegistrar.registerProfileProducer(this);
 
-	if (consumer != null) {
-	    createObjectOp = consumer.registerOperation("createObject");
-	    markForUpdateOp = consumer.registerOperation("markForUpdate");
-	    getObjectOp = consumer.registerOperation("getObject");
-	    getObjectForUpdateOp =
-		consumer.registerOperation("getObjectForUpdate");
-	    setObjectOp = consumer.registerOperation("setObject");
-	    setObjectsOp = consumer.registerOperation("setObjects");
-	    removeObjectOp = consumer.registerOperation("removeObject");
-	    getBindingOp = consumer.registerOperation("getBinding");
-	    setBindingOp = consumer.registerOperation("setBinding");
-	    removeBindingOp = consumer.registerOperation("removeBinding");
-	    nextBoundNameOp = consumer.registerOperation("nextBoundName");
-	}
+	createObjectOp = consumer.registerOperation("createObject");
+	markForUpdateOp = consumer.registerOperation("markForUpdate");
+	getObjectOp = consumer.registerOperation("getObject");
+	getObjectForUpdateOp =
+	    consumer.registerOperation("getObjectForUpdate");
+	setObjectOp = consumer.registerOperation("setObject");
+	setObjectsOp = consumer.registerOperation("setObjects");
+	removeObjectOp = consumer.registerOperation("removeObject");
+	getBindingOp = consumer.registerOperation("getBinding");
+	setBindingOp = consumer.registerOperation("setBinding");
+	removeBindingOp = consumer.registerOperation("removeBinding");
+	nextBoundNameOp = consumer.registerOperation("nextBoundName");
+
+	readBytesCounter = consumer.registerCounter("readBytes", true);
+	readObjectsCounter = consumer.registerCounter("readObjects", true);
+	writtenBytesCounter = consumer.registerCounter("writtenBytes", true);
+	writtenObjectsCounter =
+	    consumer.registerCounter("writtenObjects", true);
     }
 
     /* -- Other public methods -- */
