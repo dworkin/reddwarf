@@ -32,6 +32,7 @@ import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.ProfileConsumer;
+import com.sun.sgs.kernel.ProfileCounter;
 import com.sun.sgs.kernel.ProfileOperation;
 import com.sun.sgs.kernel.ProfileProducer;
 import com.sun.sgs.kernel.ProfileRegistrar;
@@ -258,6 +259,15 @@ public class DataStoreImpl
     private ProfileOperation setBindingOp = null;
     private ProfileOperation removeBindingOp = null;
     private ProfileOperation nextBoundNameOp = null;
+
+    /**
+     * The counters used for profile reporting, which track the bytes read
+     * and written within a task, and how many objects were read and written
+     */
+    private ProfileCounter readBytesCounter = null;
+    private ProfileCounter readObjectsCounter = null;
+    private ProfileCounter writtenBytesCounter = null;
+    private ProfileCounter writtenObjectsCounter = null;
 
     /**
      * Records information about all active transactions.
@@ -761,6 +771,11 @@ public class DataStoreImpl
 					 " failed: " + status);
 	}
 	byte[] result = value.getData();
+	if (readBytesCounter != null) {
+	    if (result != null)
+		readBytesCounter.incrementCount(result.length);
+	    readObjectsCounter.incrementCount();
+	}
 	/* Berkeley DB returns null if the data is empty. */
 	return result != null ? result : NO_BYTES;
     }
@@ -787,6 +802,10 @@ public class DataStoreImpl
 		    "setObject txn: " + txn + ", oid:" + oid + " failed: " +
 		    status);
 	    }
+	    if (writtenBytesCounter != null) {
+		writtenBytesCounter.incrementCount(data.length);
+		writtenObjectsCounter.incrementCount();
+	    }
 	    txnInfo.modified = true;
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
@@ -809,6 +828,8 @@ public class DataStoreImpl
 	Exception exception;
 	long oid = -1;
 	boolean oidSet = false;
+	long byteCount = 0;
+	long objectCount = 0;
 	try {
 	    TxnInfo txnInfo = checkTxn(txn, setObjectsOp);
 	    int len = oids.length;
@@ -829,6 +850,7 @@ public class DataStoreImpl
 		checkId(oid);
 		byte[] data = dataArray[i];
 		if (data == null) {
+		    reportWrittenDetail(byteCount, objectCount);
 		    throw new NullPointerException(
 			"The data must not be null");
 		}
@@ -837,19 +859,26 @@ public class DataStoreImpl
 		OperationStatus status =
 		    oidsDb.put(txnInfo.bdbTxn, key, value);
 		if (status != OperationStatus.SUCCESS) {
+		    reportWrittenDetail(byteCount, objectCount);
 		    throw new DataStoreException(
 			"setObjects txn: " + txn + ", oid:" + oid +
 			" failed: " + status);
 		}
+		if (writtenBytesCounter != null) {
+		    byteCount += data.length;
+		    objectCount++;
+		}
 	    }
 	    txnInfo.modified = true;
 	    logger.log(Level.FINEST, "setObjects txn:{0} returns", txn);
+	    reportWrittenDetail(byteCount, objectCount);
 	    return;
 	} catch (DatabaseException e) {
 	    exception = e;
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
+	reportWrittenDetail(byteCount, objectCount);
 	throw convertException(
 	    txn, Level.FINEST, exception,
 	    "setObject txn:" + txn + (oidSet ? ", oid:" + oid : ""));
@@ -1244,20 +1273,24 @@ public class DataStoreImpl
         ProfileConsumer consumer =
             profileRegistrar.registerProfileProducer(this);
 
-	if (consumer != null) {
-	    createObjectOp = consumer.registerOperation("createObject");
-	    markForUpdateOp = consumer.registerOperation("markForUpdate");
-	    getObjectOp = consumer.registerOperation("getObject");
-	    getObjectForUpdateOp =
-		consumer.registerOperation("getObjectForUpdate");
-	    setObjectOp = consumer.registerOperation("setObject");
-	    setObjectsOp = consumer.registerOperation("setObjects");
-	    removeObjectOp = consumer.registerOperation("removeObject");
-	    getBindingOp = consumer.registerOperation("getBinding");
-	    setBindingOp = consumer.registerOperation("setBinding");
-	    removeBindingOp = consumer.registerOperation("removeBinding");
-	    nextBoundNameOp = consumer.registerOperation("nextBoundName");
-	}
+	createObjectOp = consumer.registerOperation("createObject");
+	markForUpdateOp = consumer.registerOperation("markForUpdate");
+	getObjectOp = consumer.registerOperation("getObject");
+	getObjectForUpdateOp =
+	    consumer.registerOperation("getObjectForUpdate");
+	setObjectOp = consumer.registerOperation("setObject");
+	setObjectsOp = consumer.registerOperation("setObjects");
+	removeObjectOp = consumer.registerOperation("removeObject");
+	getBindingOp = consumer.registerOperation("getBinding");
+	setBindingOp = consumer.registerOperation("setBinding");
+	removeBindingOp = consumer.registerOperation("removeBinding");
+	nextBoundNameOp = consumer.registerOperation("nextBoundName");
+
+	readBytesCounter = consumer.registerCounter("readBytes", true);
+	readObjectsCounter = consumer.registerCounter("readObjects", true);
+	writtenBytesCounter = consumer.registerCounter("writtenBytes", true);
+	writtenObjectsCounter =
+	    consumer.registerCounter("writtenObjects", true);
     }
 
     /* -- Other public methods -- */
@@ -1549,6 +1582,19 @@ public class DataStoreImpl
 	if (duration > txnTimeout) {
 	    throw new TransactionTimeoutException(
 		"Transaction timed out after " + duration + " ms");
+	}
+    }
+
+    /**
+     * Reports profiling detail on multiple written objects if profiling is
+     * enabled and if any objects were written.
+     */
+    private void reportWrittenDetail(long bytesWritten, long objectsWritten) {
+	if (writtenBytesCounter != null) {
+	    if (objectsWritten > 0) {
+		writtenBytesCounter.incrementCount(bytesWritten);
+		writtenObjectsCounter.incrementCount(objectsWritten);
+	    }
 	}
     }
 }
