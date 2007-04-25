@@ -36,6 +36,9 @@ public class TestDataServiceConcurrency extends TestCase {
     private static final String DataStoreImplClass =
 	"com.sun.sgs.impl.service.data.store.DataStoreImpl";
 
+    /** Whether to only perform read-only operations during the test. */
+    static final boolean readOnly = Boolean.getBoolean("test.read.only");
+
     /** The number of operations to perform. */
     protected int operations = Integer.getInteger("test.operations", 10000);
 
@@ -43,7 +46,7 @@ public class TestDataServiceConcurrency extends TestCase {
     protected int objects = Integer.getInteger("test.objects", 1000);
 
     /** The number of objects to allocate as a buffer between threads. */
-    final int objectsBuffer = 100;
+    final int objectsBuffer = 500;
 
     /** The number of concurrent threads. */
     protected int threads = Integer.getInteger("test.threads", 2);
@@ -268,7 +271,7 @@ public class TestDataServiceConcurrency extends TestCase {
 	    String name2 = getObjectName(start + random.nextInt(objects));
 	    DummyManagedObject obj2 =
 		service.getBinding(name2, DummyManagedObject.class);
-	    if (random.nextInt(4) == 0) {
+	    if (!readOnly && random.nextInt(4) == 0) {
 		service.setBinding(name1, obj2);
 		service.setBinding(name2, obj1);
 	    }
