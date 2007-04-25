@@ -6,14 +6,12 @@ package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.app.TransactionNotActiveException;
 
-import com.sun.sgs.impl.kernel.profile.ProfileCollector;
-
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionHandle;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
-
 import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.kernel.ProfileCollector;
 import com.sun.sgs.kernel.TaskOwner;
 
 import com.sun.sgs.service.Transaction;

@@ -25,10 +25,10 @@ import java.util.Arrays;
  *
  * <p>If the first byte has the following format:
  * <ul><li>1100<i>nnnn</i></li></ul> then, the ID is contained in
- * the next {@code 8 +  <i>nnnn</i>} bytes.
+ * the next {@code 8 +  nnnn} bytes.
  *
  * <p>The maximum length of an ID is 23 bytes (if the first byte of
- * the external form has the value {@code 11001111}.
+ * the external form has the value {@code 11001111}).
  */
 public final class CompactId {
 
@@ -94,6 +94,15 @@ public final class CompactId {
      */
     public byte[] getExternalForm() {
 	return externalForm;
+    }
+    
+    /**
+     * Returns the length, in bytes, of the external form for this instance.
+     *
+     * @return the length, in bytes, of the external form for this instance
+     */
+    public int getExternalFormByteCount() {
+	return externalForm.length;
     }
 
     /**
@@ -193,8 +202,13 @@ public final class CompactId {
      * message buffer.
      *
      * @param	buf a message buffer
+     * @throws	IllegalArgumentException if the message buffer size is
+     *		insufficient
      */
     public void putCompactId(MessageBuffer buf) {
+	if (buf.capacity() - buf.position() < externalForm.length) {
+	    throw new IllegalArgumentException("buffer size insufficient");
+	}
 	buf.putBytes(externalForm);
     }
 

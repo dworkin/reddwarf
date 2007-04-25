@@ -118,12 +118,14 @@ final class ChannelImpl implements Channel, Serializable {
 	    context.getService(DataService.class).markForUpdate(state);
 	    state.addSession(session, listener);
 	    context.joinChannel(session, this);
-	    int nameSize = MessageBuffer.getSize(state.name);
-	    MessageBuffer buf = new MessageBuffer(3 + nameSize);
+	    MessageBuffer buf =
+		new MessageBuffer(3 + MessageBuffer.getSize(state.name) +
+				  state.id.getExternalFormByteCount());
 	    buf.putByte(SimpleSgsProtocol.VERSION).
 		putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
 		putByte(SimpleSgsProtocol.CHANNEL_JOIN).
-		putString(state.name);
+		putString(state.name).
+		putBytes(state.id.getExternalForm());
 	    sendProtocolMessageOnCommit(session, buf.getBuffer());
 	    
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -164,12 +166,12 @@ final class ChannelImpl implements Channel, Serializable {
 	    context.leaveChannel(session, this);
 	    state.removeSession(session);
 	    if (session.isConnected()) {
-		int nameSize = MessageBuffer.getSize(state.name);
-		MessageBuffer buf = new MessageBuffer(3 + nameSize);
+		MessageBuffer buf =
+		    new MessageBuffer(3 + state.id.getExternalFormByteCount());
 		buf.putByte(SimpleSgsProtocol.VERSION).
 		    putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
 		    putByte(SimpleSgsProtocol.CHANNEL_LEAVE).
-		    putString(state.name);
+		    putBytes(state.id.getExternalForm());
 		sendProtocolMessageOnCommit(session, buf.getBuffer());
 	    }
 	    
@@ -199,12 +201,12 @@ final class ChannelImpl implements Channel, Serializable {
 	    }
 	    state.removeAllSessions();
 
-	    int nameSize = MessageBuffer.getSize(state.name);
-	    MessageBuffer buf = new MessageBuffer(3 + nameSize);
+	    MessageBuffer buf =
+		new MessageBuffer(3 + state.id.getExternalFormByteCount());
 	    buf.putByte(SimpleSgsProtocol.VERSION).
 		putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
 		putByte(SimpleSgsProtocol.CHANNEL_LEAVE).
-		putString(state.name);
+		putBytes(state.id.getExternalForm());
 	    byte[] message = buf.getBuffer();
 		    
 	    for (ClientSession session : sessions) {
@@ -485,7 +487,7 @@ final class ChannelImpl implements Channel, Serializable {
 
 	byte[] protocolMessage =
 	    ChannelServiceImpl.getChannelMessage(
-		state.name, EMPTY_ID, message, context.nextSequenceNumber());
+		state.id, EMPTY_ID, message, context.nextSequenceNumber());
 	    
 	for (ClientSession session : sessions) {
 	    // skip disconnected and non-member sessions

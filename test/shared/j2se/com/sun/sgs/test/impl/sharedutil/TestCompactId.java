@@ -170,6 +170,35 @@ public class TestCompactId extends TestCase {
 	}
     }
 
+    public void testPutCompactIdNullBuffer() {
+	try {
+	    new CompactId(new byte[]{ 0x33 }).putCompactId(null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testPutCompactIdBufferTooSmall() {
+	CompactId id = new CompactId(
+		new byte[]{ (byte) 0xca, (byte) 0xfe,
+			    (byte) 0xba, (byte) 0xbe });
+	for (int i = 1; i < 8; i++) {
+	    try {
+		id.putCompactId(new MessageBuffer(i));
+		fail("Expected IllegalArgumentException");
+	    } catch (IllegalArgumentException e) {
+		System.err.println(e);
+	    }
+	}
+	try {
+	    id.putCompactId(new MessageBuffer(8));
+	} catch (Exception e) {
+	    e.printStackTrace();
+	    fail("Unexpected exception" + e);
+	}
+    }
+
     public void testGetCompactIdNullBuffer() {
 	try {
 	    CompactId.getCompactId(null);
@@ -218,7 +247,7 @@ public class TestCompactId extends TestCase {
 	int byteCount = CompactId.getExternalFormByteCount((byte) length);
 	
 	if (byteCount != expectedCount) {
-	    fail("Epected byte count of " + expectedCount +
+	    fail("Expected byte count of " + expectedCount +
 		 ", got " + byteCount);
 	}
     }

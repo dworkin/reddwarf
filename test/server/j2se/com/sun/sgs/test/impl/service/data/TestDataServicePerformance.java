@@ -14,7 +14,7 @@ import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.ProfileProducer;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
-import com.sun.sgs.test.util.DummyProfileRegistrar;
+import com.sun.sgs.test.util.DummyProfileCoordinator;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 import java.io.File;
@@ -161,7 +161,7 @@ public class TestDataServicePerformance extends TestCase {
 			  String.valueOf(detectMods));
 	service = getDataService(props, componentRegistry);
 	if (service instanceof ProfileProducer) {
-	    DummyProfileRegistrar.startProfiling(((ProfileProducer) service));
+	    DummyProfileCoordinator.startProfiling(((ProfileProducer) service));
 	}
 	createTransaction();
 	service.configure(componentRegistry, txnProxy);
@@ -212,7 +212,7 @@ public class TestDataServicePerformance extends TestCase {
 			  String.valueOf(flush));
 	service = getDataService(props, componentRegistry);
 	if (service instanceof ProfileProducer) {
-	    DummyProfileRegistrar.startProfiling(((ProfileProducer) service));
+	    DummyProfileCoordinator.startProfiling(((ProfileProducer) service));
 	}
 	createTransaction();
 	service.configure(componentRegistry, txnProxy);
