@@ -5,17 +5,16 @@
 package com.sun.sgs.test.impl.service.data;
 
 import com.sun.sgs.app.DataManager;
-import com.sun.sgs.app.ManagedObject;
-import com.sun.sgs.app.NameNotBoundException;
-import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.ProfileProducer;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyManagedObject;
+import com.sun.sgs.test.util.DummyProfileCoordinator;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 import java.io.File;
@@ -39,14 +38,50 @@ public class TestDataServiceConcurrency extends TestCase {
     private static final String DataStoreImplClass =
 	"com.sun.sgs.impl.service.data.store.DataStoreImpl";
 
+    /**
+     * The types of operations to perform.  Each value includes the operations
+     * for the earlier values.
+     */
+    static enum WhichOperations {
+	/** Get bindings and objects. */
+	GET(1),
+	/** Set bindings to existing objects. */
+	SET(2),
+	/** Modify existing objects. */
+	MODIFY(3),
+	/** Create new objects. */
+	CREATE(4);
+	final int value;
+	WhichOperations(int value) {
+	    this.value = value;
+	}
+    }
+
+    /** Which operations to perform. */
+    protected WhichOperations whichOperations =
+	WhichOperations.valueOf(
+	    System.getProperty("test.which.operations", "MODIFY"));
+
     /** The number of operations to perform. */
     protected int operations = Integer.getInteger("test.operations", 10000);
 
-    /** The maximum number of objects to allocate. */
+    /** The maximum number of objects to allocate per thread. */
     protected int objects = Integer.getInteger("test.objects", 1000);
 
-    /** The number of concurrent threads. */
+    /**
+     * The number of objects to allocate as a buffer between objects allocated
+     * by different threads.
+     */
+    protected int objectsBuffer = 500;
+
+    /** The initial number of concurrent threads. */
     protected int threads = Integer.getInteger("test.threads", 2);
+
+    /** The maximum number of concurrent threads. */
+    protected int maxThreads = Integer.getInteger("test.max.threads", threads);
+
+    /** The number of times to repeat each timing. */
+    protected int repeat = Integer.getInteger("test.repeat", 1);
 
     /** The transaction proxy. */
     final DummyTransactionProxy txnProxy = new DummyTransactionProxy();
@@ -85,9 +120,13 @@ public class TestDataServiceConcurrency extends TestCase {
 	System.err.println("Testcase: " + getName());
 	System.err.println(
 	    "Parameters:" +
+	    "\n  test.which.operations=" + whichOperations +
 	    "\n  test.operations=" + operations +
 	    "\n  test.objects=" + objects +
-	    "\n  test.threads=" + threads);
+	    "\n  test.threads=" + threads +
+	    (maxThreads != threads ?
+	     "\n  test.max.threads=" + maxThreads : "") +
+	    (repeat != 1 ? "\n  test.repeat=" + repeat : ""));
 	props = createProperties(
 	    DataStoreImplClass + ".directory", createDirectory(),
 	    StandardProperties.APP_NAME, "TestDataServiceConcurrency");
@@ -128,12 +167,53 @@ public class TestDataServiceConcurrency extends TestCase {
 	DummyComponentRegistry componentRegistry =
 	    new DummyComponentRegistry();
 	service = getDataService(props, componentRegistry);
+	if (service instanceof ProfileProducer) {
+	    DummyProfileCoordinator.startProfiling(
+		((ProfileProducer) service));
+	}
 	DummyTransaction txn = new DummyTransaction();
 	txnProxy.setCurrentTransaction(txn);
 	service.configure(componentRegistry, txnProxy);
 	componentRegistry.setComponent(DataManager.class, service);
 	componentRegistry.registerAppContext();
 	txn.commit();
+	int perThread = objects + objectsBuffer;
+	/* Create objects */
+	for (int t = 0; t < maxThreads; t++) {
+	    txn = new DummyTransaction();
+	    txnProxy.setCurrentTransaction(txn);
+	    int start = t * perThread;
+	    for (int i = 0; i < perThread; i++) {
+		if (i > 0 && i % 100 == 0) {
+		    txn.commit();
+		    txn = new DummyTransaction();
+		    txnProxy.setCurrentTransaction(txn);
+		}
+		service.setBinding(
+		    getObjectName(start + i), new ModifiableObject());
+	    }
+	    txn.commit();
+	}
+	/* Warm up */
+	if (repeat != 1) {
+	    System.err.println("Warmup:");
+	    runOperations(1);
+	}
+	/* Test */
+	for (int t = threads; t <= maxThreads; t++) {
+	    System.err.println("Threads: " + t);
+	    for (int r = 0; r < repeat; r++) {
+		runOperations(t);
+	    }
+	}
+    }
+
+    /* -- Other methods and classes -- */
+
+    /** Perform operations in the specified number of threads. */
+    private void runOperations(int threads) throws Throwable {
+	aborts = 0;
+	done = 0;
 	long start = System.currentTimeMillis();
 	for (int i = 0; i < threads; i++) {
 	    new OperationThread(i, service, txnProxy);
@@ -163,8 +243,6 @@ public class TestDataServiceConcurrency extends TestCase {
 	    "Ops per second: " + Math.round((threads * operations) / s));
     }
 
-    /* -- Other methods and classes -- */
-
     /**
      * Notes that a thread has completed successfully, and records the number
      * of aborts that occurred in the thread.
@@ -185,6 +263,7 @@ public class TestDataServiceConcurrency extends TestCase {
     class OperationThread extends Thread {
 	private final DataService service;
 	private final DummyTransactionProxy txnProxy;
+	private final int id;
 	private final Random random = new Random();
 	private DummyTransaction txn;
 	private int aborts;
@@ -195,6 +274,7 @@ public class TestDataServiceConcurrency extends TestCase {
 	    super("OperationThread" + id);
 	    this.service = service;
 	    this.txnProxy = txnProxy;
+	    this.id = id;
 	    start();
 	}
 
@@ -236,45 +316,31 @@ public class TestDataServiceConcurrency extends TestCase {
 		t.commit();
 		createTxn();
 	    }
-	    String name = "obj-" + (1 + random.nextInt(objects * threads));
-	    switch (random.nextInt(6)) {
+	    int start = id * (objects + objectsBuffer);
+	    String name = getObjectName(start + random.nextInt(objects));
+	    switch (random.nextInt(whichOperations.value)) {
 	    case 0:
-		try {
-		    service.getBinding(name, Object.class);
-		} catch (NameNotBoundException e) {
-		} catch (ObjectNotFoundException e) {
-		}
+		/* Get binding */
+		service.getBinding(name, Object.class);
 		break;
 	    case 1:
-		service.setBinding(name, new DummyManagedObject());
+		/* Set bindings */
+		ModifiableObject obj =
+		    service.getBinding(name, ModifiableObject.class);
+		String name2 = getObjectName(start + random.nextInt(objects));
+		ModifiableObject obj2 =
+		    service.getBinding(name2, ModifiableObject.class);
+		service.setBinding(name, obj2);
+		service.setBinding(name2, obj);
 		break;
 	    case 2:
-		try {
-		    service.removeBinding(name);
-		} catch (NameNotBoundException e) {
-		}
+		/* Modify object */
+		service.getBinding(name, ModifiableObject.class)
+		    .incrementNumber();
 		break;
 	    case 3:
-		/* Add 3 so we can include null, obj-0, and obj-N+1 */
-		int r = random.nextInt(objects + 3);
-		name = (r == 0) ? null : "obj-" + (r - 1);
-		service.nextBoundName(name);
-		break;
-	    case 4:
-		try {
-		    service.removeObject(
-			service.getBinding(name, ManagedObject.class));
-		} catch (NameNotBoundException e) {
-		} catch (ObjectNotFoundException e) {
-		}
-		break;
-	    case 5:
-		try {
-		    service.markForUpdate(
-			service.getBinding(name, ManagedObject.class));
-		} catch (NameNotBoundException e) {
-		} catch (ObjectNotFoundException e) {
-		}
+		/* Create object */
+		service.setBinding(name, new ModifiableObject());
 		break;
 	    default:
 		throw new AssertionError();
@@ -341,5 +407,23 @@ public class TestDataServiceConcurrency extends TestCase {
 	throws Exception
     {
 	return new DataServiceImpl(props, componentRegistry);
+    }
+
+    /** Returns the binding name to use for the i'th object. */
+    private static String getObjectName(int i) {
+	return String.format("obj-%08d", i);
+    }
+
+    /** A managed object with a modify method. */
+    static class ModifiableObject extends DummyManagedObject {
+	private static final long serialVersionUID = 1;
+	private int number = 0;
+	public ModifiableObject() { }
+	public int getNumber() {
+	    return number;
+	}
+	public void incrementNumber() {
+	    number++;
+	}
     }
 }
