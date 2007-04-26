@@ -342,6 +342,8 @@ public class TestDataServiceConcurrency extends TestCase {
 		/* Create object */
 		service.setBinding(name, new ModifiableObject());
 		break;
+	    default:
+		throw new AssertionError();
 	    }
 	}
 
