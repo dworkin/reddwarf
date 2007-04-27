@@ -38,6 +38,20 @@ public interface Connector<T> {
     void connect(ConnectionListener listener) throws IOException;
 
     /**
+     * Returns {@code true} if this connector is connected, otherwise
+     * returns {@code false}.
+     *
+     * @return	{@code true} if this connector is connected
+     */
+    boolean isConnected();
+
+    /**
+     *
+     *
+     */
+    boolean waitForConnect(long timeoutMillis);
+
+    /**
      * Returns the {@link Endpoint} for this {@code Connector}.
      *
      * @return the {@code Endpoint} for this {@code Connector}

@@ -8,6 +8,7 @@ import java.net.SocketAddress;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.apache.mina.common.ConnectFuture;
 import org.apache.mina.common.IoConnector;
 import org.apache.mina.common.IoSession;
 
@@ -35,6 +36,8 @@ class SocketConnector implements Connector<SocketAddress>
     private ConnectorConnListner connListener = null;
 
     private final SocketEndpoint endpoint;
+
+    private ConnectFuture connectFuture;
 
     /**
      * Constructs a {@code SocketConnector} using the given
@@ -70,7 +73,31 @@ class SocketConnector implements Connector<SocketAddress>
             connListener = new ConnectorConnListner(listener);
         }
         logger.log(Level.FINE, "connecting to {0}", endpoint);
-        connector.connect(endpoint.getAddress(), connListener);
+        connectFuture = connector.connect(endpoint.getAddress(), connListener);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public synchronized boolean isConnected() {
+	return connectFuture != null && connectFuture.isConnected();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean waitForConnect(long timeoutMillis) {
+	ConnectFuture future;
+	synchronized (this) {
+	    future = connectFuture;
+	}
+	if (future == null) {
+	    throw new IllegalStateException("No connection in progress");
+	}
+	if (! future.isConnected()) {
+	    future.join(timeoutMillis);
+	}
+	return future.isReady();
     }
 
     /**

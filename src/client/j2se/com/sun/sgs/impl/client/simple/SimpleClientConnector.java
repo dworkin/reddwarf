@@ -14,6 +14,7 @@ import com.sun.sgs.impl.client.comm.ClientConnector;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
 import com.sun.sgs.io.Connector;
+import com.sun.sgs.impl.sharedutil.MessageBuffer;
 
 /**
  * A basic implementation of a {@code ClientConnector} which uses an 
@@ -21,7 +22,11 @@ import com.sun.sgs.io.Connector;
  */
 class SimpleClientConnector extends ClientConnector {
     
+    private final long DEFAULT_CONNECT_TIMEOUT = 5000; 
+    
     private final Connector<SocketAddress> connector;
+    private final long connectTimeout;
+    private Thread connectionWatchdog;
     
     SimpleClientConnector(Properties properties) {
         
@@ -38,6 +43,13 @@ class SimpleClientConnector extends ClientConnector {
         if (port < 0 || port > 65535) {
             throw new IllegalArgumentException("Bad port number: " + port);
         }
+
+	String timeoutStr = properties.getProperty("connectTimeout");
+	if (timeoutStr == null) {
+	    connectTimeout = DEFAULT_CONNECT_TIMEOUT;
+	} else {
+	    connectTimeout = Long.parseLong(timeoutStr);
+	}
         
         // TODO only RELIABLE supported for now.
         TransportType transportType = TransportType.RELIABLE;
@@ -67,6 +79,36 @@ class SimpleClientConnector extends ClientConnector {
             new SimpleClientConnection(connectionListener);
         
         connector.connect(connection);
+	connectionWatchdog = new ConnectionWatchdogThread(connectionListener);
+	connectionWatchdog.start();
     }
 
+    private class ConnectionWatchdogThread extends Thread {
+
+	private final ClientConnectionListener listener;
+
+	ConnectionWatchdogThread(ClientConnectionListener listener) {
+	    super("ConnectionWatchdogThread-" +
+		  connector.getEndpoint().toString());
+	    this.listener = listener;
+	    setDaemon(true);
+	}
+
+	public void run() {
+
+	    try {
+		connector.waitForConnect(connectTimeout);
+		if (!connector.isConnected()) {
+		    String reason = "Unable to connect to server";
+		    MessageBuffer buf =
+			new MessageBuffer(MessageBuffer.getSize(reason));
+		    buf.putString(reason);
+		    listener.disconnected(false, buf.getBuffer());
+		    connector.shutdown();
+		}
+	    } catch (Exception e) {
+		// log exception
+	    }
+	}
+    }
 }
