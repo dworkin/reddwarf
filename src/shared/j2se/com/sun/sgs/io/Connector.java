@@ -50,8 +50,11 @@ public interface Connector<T> {
      * @return	{@code true} if the connect attempt completed
      * @throws	IllegalStateException if no connect attempt is in progress
      * @throws	InterruptedException if the waiting thread is interrupted
+     * @throws	IOException if the implementation determines that the connect
+     *		attempt failed with an {@code IOException}
      */
-    boolean waitForConnect(long timeout) throws InterruptedException;
+    boolean waitForConnect(long timeout)
+	throws IOException, InterruptedException;
 
     /**
      * Returns {@code true} if this connector is connected, otherwise

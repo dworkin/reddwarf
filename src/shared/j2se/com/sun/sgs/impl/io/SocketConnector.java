@@ -4,6 +4,7 @@
 
 package com.sun.sgs.impl.io;
 
+import java.io.IOException;
 import java.net.SocketAddress;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -11,6 +12,7 @@ import java.util.logging.Logger;
 import org.apache.mina.common.ConnectFuture;
 import org.apache.mina.common.IoConnector;
 import org.apache.mina.common.IoSession;
+import org.apache.mina.common.RuntimeIOException;
 
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.io.Endpoint;
@@ -73,20 +75,31 @@ class SocketConnector implements Connector<SocketAddress>
             connListener = new ConnectorConnListner(listener);
         }
         logger.log(Level.FINE, "connecting to {0}", endpoint);
-        connectFuture = connector.connect(endpoint.getAddress(), connListener);
+        ConnectFuture future =
+	    connector.connect(endpoint.getAddress(), connListener);
+	synchronized (this) {
+	    connectFuture = future;
+	}
     }
 
     /**
      * {@inheritDoc}
      */
-    public synchronized boolean isConnected() {
-	return connectFuture != null && connectFuture.isConnected();
+    public boolean isConnected() {
+	synchronized (this) {
+	    if (connectFuture == null) {
+		return false;
+	    }
+	}
+	return connectFuture.isConnected();
     }
 
     /**
      * {@inheritDoc}
      */
-    public boolean waitForConnect(long timeout) throws InterruptedException {
+    public boolean waitForConnect(long timeout)
+	throws IOException, InterruptedException
+    {
 	ConnectFuture future;
 	synchronized (this) {
 	    future = connectFuture;
@@ -96,6 +109,17 @@ class SocketConnector implements Connector<SocketAddress>
 	}
 	if (! future.isConnected()) {
 	    future.join(timeout);
+	}
+
+	if (future.isReady()) {
+	    try {
+		future.getSession();
+	    } catch (RuntimeIOException e) {
+		Throwable t = e.getCause();
+		if (t instanceof IOException) {
+		    throw (IOException) t;
+		}
+	    }
 	}
 	return future.isReady();
     }

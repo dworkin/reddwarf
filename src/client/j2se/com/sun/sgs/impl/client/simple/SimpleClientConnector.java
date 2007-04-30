@@ -13,12 +13,33 @@ import com.sun.sgs.impl.client.comm.ClientConnectionListener;
 import com.sun.sgs.impl.client.comm.ClientConnector;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
-import com.sun.sgs.io.Connector;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import com.sun.sgs.io.Connector;
 
 /**
  * A basic implementation of a {@code ClientConnector} which uses an 
- * {@code Connector} to establish connections.
+ * {@code Connector} to establish connections. <p>
+ *
+ * The {@link #SimpleClientConnector constructor} supports the
+ * following properties: <p>
+ *
+ * <ul>
+ *
+ * <li> <i>Key:</i> {@code host} <br>
+ *	<i>No default &mdash; required</i> <br>
+ *	Specifies the server host. <p>
+ *
+ * <li> <i>Key:</i> {@code port} <br>
+ *	<i>No default &mdash; required</i> <br>
+ *	Specifies the server port. <p>
+ *
+ * <li> <i>Key:</i> {@code connectTimeout} <br>
+ *	<i>Default:</i> {@code 5000} <br>
+ *	Specifies the timeout (in milliseconds) for a connect attempt
+ *	to the server. <p>
+ *
+ * </ul> <p>
  */
 class SimpleClientConnector extends ClientConnector {
     
@@ -28,7 +49,6 @@ class SimpleClientConnector extends ClientConnector {
     
     private final Connector<SocketAddress> connector;
     private final long connectTimeout;
-    private final String connectFailureMessage;
     private Thread connectWatchdog;
     
     SimpleClientConnector(Properties properties) {
@@ -47,16 +67,10 @@ class SimpleClientConnector extends ClientConnector {
             throw new IllegalArgumentException("Bad port number: " + port);
         }
 
-	String timeoutStr = properties.getProperty("connectTimeout");
-	if (timeoutStr == null) {
-	    connectTimeout = DEFAULT_CONNECT_TIMEOUT;
-	} else {
-	    connectTimeout = Long.parseLong(timeoutStr);
-	}
-	connectFailureMessage =
-	    properties.getProperty(
-		"connectFailureMessage", DEFAULT_CONNECT_FAILURE_MESSAGE);
-        
+	PropertiesWrapper wrappedProperties = new PropertiesWrapper(properties);
+	connectTimeout =
+	    wrappedProperties.getLongProperty(
+		"connectTimeout", DEFAULT_CONNECT_TIMEOUT);
         // TODO only RELIABLE supported for now.
         TransportType transportType = TransportType.RELIABLE;
 
@@ -103,20 +117,30 @@ class SimpleClientConnector extends ClientConnector {
 	public void run() {
 
 	    boolean connectComplete = false;
+	    String connectFailureMessage = null;
 	    try {
 		connectComplete = connector.waitForConnect(connectTimeout);
+	    } catch (IOException e) {
+		connectFailureMessage = e.getMessage();
 	    } catch (InterruptedException e) {
 		// ignore
 	    }
 	    try {
 		if (! connector.isConnected()) {
-		    String reason = connectFailureMessage;
+		    String reason =
+			connectFailureMessage != null ?
+			connectFailureMessage :
+			DEFAULT_CONNECT_FAILURE_MESSAGE;
 		    MessageBuffer buf =
 			new MessageBuffer(MessageBuffer.getSize(reason));
 		    buf.putString(reason);
 		    listener.disconnected(false, buf.getBuffer());
 		    if (! connectComplete) {
-			connector.shutdown();
+			try {
+			    connector.shutdown();
+			} catch (IllegalStateException e) {
+			    // ignore; connect attempt may have completed
+			}
 		    }
 		}
 	    } catch (Exception e) {

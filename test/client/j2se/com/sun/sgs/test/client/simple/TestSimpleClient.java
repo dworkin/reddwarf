@@ -9,7 +9,6 @@ import com.sun.sgs.client.ClientChannelListener;
 import com.sun.sgs.client.simple.SimpleClient;
 import com.sun.sgs.client.simple.SimpleClientListener;
 
-import java.net.InetAddress;
 import java.net.PasswordAuthentication;
 import java.util.Properties;
 import junit.framework.TestCase;
@@ -27,8 +26,7 @@ public class TestSimpleClient extends TestCase {
 	    createProperties(
 		"host", "localhost",
 		"port", Integer.toString(5382),
-		"connectTimeout", Long.toString(timeout),
-		"connectFailureMessage", connectFailureMessage);
+		"connectTimeout", Long.toString(timeout));
 	client.login(props);
 	try {
 	    Thread.sleep(timeout * 2);
@@ -36,11 +34,13 @@ public class TestSimpleClient extends TestCase {
 	}
 	if (listener.disconnectReason == null) {
 	    fail("Didn't receive disconnected callback");
-	} else if (! listener.disconnectReason.equals(connectFailureMessage)) {
-	    fail("Expected disconnect reason: " + connectFailureMessage +
-		 ", got: " + listener.disconnectReason);
 	}
+
+	System.err.println("reason: " + listener.disconnectReason);
     }
+
+    // TBD: it would be good to have a test that exercises
+    // the timeout expiration.
 
     private class DummySimpleClientListener implements SimpleClientListener {
 
