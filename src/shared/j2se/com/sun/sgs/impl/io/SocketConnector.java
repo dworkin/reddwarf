@@ -111,7 +111,8 @@ class SocketConnector implements Connector<SocketAddress>
 	    future.join(timeout);
 	}
 
-	if (future.isReady()) {
+	boolean ready = future.isReady();
+	if (ready) {
 	    try {
 		future.getSession();
 	    } catch (RuntimeIOException e) {
@@ -121,7 +122,7 @@ class SocketConnector implements Connector<SocketAddress>
 		}
 	    }
 	}
-	return future.isReady();
+	return ready;
     }
 
     /**
