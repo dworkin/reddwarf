@@ -38,18 +38,28 @@ public interface Connector<T> {
     void connect(ConnectionListener listener) throws IOException;
 
     /**
+     * Waits for the connect attempt, initated by invoking the {@link
+     * #connect connect} method, to complete with the given {@code
+     * timeout} (specified in milliseconds), and returns {@code true}
+     * if the connect attempt completed.
+     *
+     * <p>Use the {@link #isConnected isConnected} method on this
+     * instance to determine if the connect attempt was successful.
+     *
+     * @param	timeout the wait timeout
+     * @return	{@code true} if the connect attempt completed
+     * @throws	IllegalStateException if no connect attempt is in progress
+     * @throws	InterruptedException if the waiting thread is interrupted
+     */
+    boolean waitForConnect(long timeout) throws InterruptedException;
+
+    /**
      * Returns {@code true} if this connector is connected, otherwise
      * returns {@code false}.
      *
      * @return	{@code true} if this connector is connected
      */
     boolean isConnected();
-
-    /**
-     *
-     *
-     */
-    boolean waitForConnect(long timeoutMillis);
 
     /**
      * Returns the {@link Endpoint} for this {@code Connector}.

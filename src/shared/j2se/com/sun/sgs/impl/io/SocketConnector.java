@@ -86,16 +86,16 @@ class SocketConnector implements Connector<SocketAddress>
     /**
      * {@inheritDoc}
      */
-    public boolean waitForConnect(long timeoutMillis) {
+    public boolean waitForConnect(long timeout) throws InterruptedException {
 	ConnectFuture future;
 	synchronized (this) {
 	    future = connectFuture;
 	}
 	if (future == null) {
-	    throw new IllegalStateException("No connection in progress");
+	    throw new IllegalStateException("No connect attempt in progress");
 	}
 	if (! future.isConnected()) {
-	    future.join(timeoutMillis);
+	    future.join(timeout);
 	}
 	return future.isReady();
     }

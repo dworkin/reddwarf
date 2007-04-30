@@ -22,11 +22,14 @@ import com.sun.sgs.impl.sharedutil.MessageBuffer;
  */
 class SimpleClientConnector extends ClientConnector {
     
-    private final long DEFAULT_CONNECT_TIMEOUT = 5000; 
+    private final long DEFAULT_CONNECT_TIMEOUT = 5000;
+    private final String DEFAULT_CONNECT_FAILURE_MESSAGE =
+	"Unable to connect to server";
     
     private final Connector<SocketAddress> connector;
     private final long connectTimeout;
-    private Thread connectionWatchdog;
+    private final String connectFailureMessage;
+    private Thread connectWatchdog;
     
     SimpleClientConnector(Properties properties) {
         
@@ -50,6 +53,9 @@ class SimpleClientConnector extends ClientConnector {
 	} else {
 	    connectTimeout = Long.parseLong(timeoutStr);
 	}
+	connectFailureMessage =
+	    properties.getProperty(
+		"connectFailureMessage", DEFAULT_CONNECT_FAILURE_MESSAGE);
         
         // TODO only RELIABLE supported for now.
         TransportType transportType = TransportType.RELIABLE;
@@ -79,16 +85,16 @@ class SimpleClientConnector extends ClientConnector {
             new SimpleClientConnection(connectionListener);
         
         connector.connect(connection);
-	connectionWatchdog = new ConnectionWatchdogThread(connectionListener);
-	connectionWatchdog.start();
+	connectWatchdog = new ConnectWatchdogThread(connectionListener);
+	connectWatchdog.start();
     }
 
-    private class ConnectionWatchdogThread extends Thread {
+    private class ConnectWatchdogThread extends Thread {
 
 	private final ClientConnectionListener listener;
 
-	ConnectionWatchdogThread(ClientConnectionListener listener) {
-	    super("ConnectionWatchdogThread-" +
+	ConnectWatchdogThread(ClientConnectionListener listener) {
+	    super("ConnectWatchdogThread-" +
 		  connector.getEndpoint().toString());
 	    this.listener = listener;
 	    setDaemon(true);
@@ -96,18 +102,25 @@ class SimpleClientConnector extends ClientConnector {
 
 	public void run() {
 
+	    boolean connectComplete = false;
 	    try {
-		connector.waitForConnect(connectTimeout);
-		if (!connector.isConnected()) {
-		    String reason = "Unable to connect to server";
+		connectComplete = connector.waitForConnect(connectTimeout);
+	    } catch (InterruptedException e) {
+		// ignore
+	    }
+	    try {
+		if (! connector.isConnected()) {
+		    String reason = connectFailureMessage;
 		    MessageBuffer buf =
 			new MessageBuffer(MessageBuffer.getSize(reason));
 		    buf.putString(reason);
 		    listener.disconnected(false, buf.getBuffer());
-		    connector.shutdown();
+		    if (! connectComplete) {
+			connector.shutdown();
+		    }
 		}
 	    } catch (Exception e) {
-		// log exception
+		// TBD: log exception
 	    }
 	}
     }
