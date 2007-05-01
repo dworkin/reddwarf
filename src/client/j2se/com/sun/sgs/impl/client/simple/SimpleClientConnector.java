@@ -13,15 +13,43 @@ import com.sun.sgs.impl.client.comm.ClientConnectionListener;
 import com.sun.sgs.impl.client.comm.ClientConnector;
 import com.sun.sgs.impl.io.SocketEndpoint;
 import com.sun.sgs.impl.io.TransportType;
+import com.sun.sgs.impl.sharedutil.MessageBuffer;
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.io.Connector;
 
 /**
  * A basic implementation of a {@code ClientConnector} which uses an 
- * {@code Connector} to establish connections.
+ * {@code Connector} to establish connections. <p>
+ *
+ * The {@link #SimpleClientConnector constructor} supports the
+ * following properties: <p>
+ *
+ * <ul>
+ *
+ * <li> <i>Key:</i> {@code host} <br>
+ *	<i>No default &mdash; required</i> <br>
+ *	Specifies the server host. <p>
+ *
+ * <li> <i>Key:</i> {@code port} <br>
+ *	<i>No default &mdash; required</i> <br>
+ *	Specifies the server port. <p>
+ *
+ * <li> <i>Key:</i> {@code connectTimeout} <br>
+ *	<i>Default:</i> {@code 5000} <br>
+ *	Specifies the timeout (in milliseconds) for a connect attempt
+ *	to the server. <p>
+ *
+ * </ul> <p>
  */
 class SimpleClientConnector extends ClientConnector {
     
+    private final long DEFAULT_CONNECT_TIMEOUT = 5000;
+    private final String DEFAULT_CONNECT_FAILURE_MESSAGE =
+	"Unable to connect to server";
+    
     private final Connector<SocketAddress> connector;
+    private final long connectTimeout;
+    private Thread connectWatchdog;
     
     SimpleClientConnector(Properties properties) {
         
@@ -38,7 +66,11 @@ class SimpleClientConnector extends ClientConnector {
         if (port < 0 || port > 65535) {
             throw new IllegalArgumentException("Bad port number: " + port);
         }
-        
+
+	PropertiesWrapper wrappedProperties = new PropertiesWrapper(properties);
+	connectTimeout =
+	    wrappedProperties.getLongProperty(
+		"connectTimeout", DEFAULT_CONNECT_TIMEOUT);
         // TODO only RELIABLE supported for now.
         TransportType transportType = TransportType.RELIABLE;
 
@@ -67,6 +99,53 @@ class SimpleClientConnector extends ClientConnector {
             new SimpleClientConnection(connectionListener);
         
         connector.connect(connection);
+	connectWatchdog = new ConnectWatchdogThread(connectionListener);
+	connectWatchdog.start();
     }
 
+    private class ConnectWatchdogThread extends Thread {
+
+	private final ClientConnectionListener listener;
+
+	ConnectWatchdogThread(ClientConnectionListener listener) {
+	    super("ConnectWatchdogThread-" +
+		  connector.getEndpoint().toString());
+	    this.listener = listener;
+	    setDaemon(true);
+	}
+
+	public void run() {
+
+	    boolean connectComplete = false;
+	    String connectFailureMessage = null;
+	    try {
+		connectComplete = connector.waitForConnect(connectTimeout);
+	    } catch (IOException e) {
+		connectFailureMessage = e.getMessage();
+	    } catch (InterruptedException e) {
+		// ignore
+	    }
+	    try {
+		if (! connector.isConnected()) {
+		    String reason =
+			connectFailureMessage != null ?
+			connectFailureMessage :
+			DEFAULT_CONNECT_FAILURE_MESSAGE;
+		    MessageBuffer buf =
+			new MessageBuffer(MessageBuffer.getSize(reason));
+		    buf.putString(reason);
+		    listener.disconnected(false, buf.getBuffer());
+		    if (! connectComplete) {
+			try {
+			    connector.shutdown();
+			} catch (IllegalStateException e) {
+			    // ignore; connect attempt may have completed
+			}
+		    }
+		}
+	    } catch (Exception e) {
+		// TBD: log exception
+	    }
+	}
+    }
 }
