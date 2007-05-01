@@ -576,7 +576,7 @@
   </target>
 
   <!-- Compile and run tests -->
-  <target name="test" depends="test-shared, test-server"
+  <target name="test" depends="test-shared, test-server, test-client"
 	  description="Compiles and runs tests"/>
 
   <!-- Compile and run shared tests -->
@@ -655,6 +655,47 @@
       <formatter type="${test.formatter.type}"/>
       <batchtest todir="${build.dir}/test/output">
 	<fileset dir="test/server/j2se"
+	  includes="${test.include}"/>
+      </batchtest>
+    </junit>
+    <fail if="tests.failed" message="Some tests failed"/>
+  </target>
+
+  <!-- Compile and run shared tests -->
+  <target name="test-client" depends="-test-client.classes"
+	  description="Compiles and runs client tests">
+    <mkdir dir="${build.dir}/test"/>
+    <delete dir="${build.dir}/test/output"/>
+    <mkdir dir="${build.dir}/test/output"/>
+    <!-- XXX: We'd like to use forkmode="once" here, but that doesn't
+	 seem to work in Ant 1.6.1 -tjb@sun.com (01/13/2006)
+      -->
+    <junit fork="true"
+	   printsummary="on"
+	   showoutput="${test.showoutput}"
+	   tempdir="${build.dir}/test/output"
+	   failureproperty="tests.failed">
+      <jvmarg line="${test.jvm.args}"/>
+      <sysproperty key="java.library.path" file="${bdb.lib.dir}"/>
+      <sysproperty key="java.io.tmpdir" file="${build.dir}/test/output"/>
+      <sysproperty key="java.util.logging.config.file"
+		   file="${test.logging}"/>
+      <classpath>
+        <pathelement location="${build.dir}/test/classes/client"/>
+        <path refid="client.classpath"/>
+      </classpath>
+      <syspropertyset>
+	<propertyref prefix="test."/>
+	<propertyref prefix="com.sun.sgs."/>
+      </syspropertyset>
+      <!-- XXX: This doesn't work in Ant 1.6.1,
+	   either. -tjb@sun.com (01/13/2006) -->
+      <!-- <assertions>
+	     <enable/>
+	   </assertions> -->
+      <formatter type="${test.formatter.type}"/>
+      <batchtest todir="${build.dir}/test/output">
+	<fileset dir="test/client/j2se"
 	  includes="${test.include}"/>
       </batchtest>
     </junit>

@@ -6,6 +6,7 @@ package com.sun.sgs.impl.kernel.profile;
 
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.ProfileCollector;
+import com.sun.sgs.kernel.ProfileCounter;
 import com.sun.sgs.kernel.ProfileOperation;
 import com.sun.sgs.kernel.ProfileOperationListener;
 import com.sun.sgs.kernel.ProfileParticipantDetail;
@@ -18,6 +19,7 @@ import java.util.Collections;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 
 /**
@@ -213,6 +215,95 @@ public class ProfileCollectorImpl implements ProfileCollector {
                 throw new IllegalStateException("Cannot report operation " +
                                                 "because no task is active");
             profileReport.ops.add(this);
+        }
+    }
+
+    /**
+     * Package-private method used by <code>ProfileConsumerImpl</code> to
+     * handle counter registrations.
+     *
+     * @param counterName the name of the counter
+     * @param producerName the name of the <code>ProfileProducer</code>
+     *                     registering this counter
+     * @param taskLocal <code>true</code> if this counter is local to tasks,
+     *                  <code>false</code> otherwise
+     *
+     * @return a new <code>ProfileCounter</code> that will report back
+     *         to this collector
+     */
+    ProfileCounter registerCounter(String counterName, String producerName,
+                                   boolean taskLocal) {
+        if (taskLocal)
+            return new TaskLocalProfileCounter(counterName);
+        else
+            return new AggregateProfileCounter(counterName);
+    }
+
+    /**
+     * A private implementation of <code>ProfileCounter</code> that is
+     * returned from any call to <code>registerCounter</code>.
+     */
+    private abstract class AbstractProfileCounter implements ProfileCounter {
+        private final String name;
+        private final boolean taskLocal;
+        AbstractProfileCounter(String name, boolean taskLocal) {
+            this.name = name;
+            this.taskLocal = taskLocal;
+        }
+        public String getCounterName() {
+            return name;
+        }
+        public boolean isTaskLocal() {
+            return taskLocal;
+        }
+        protected ProfileReportImpl getReport() {
+            ProfileReportImpl profileReport = profileReports.get();
+            if (profileReport == null)
+                throw new IllegalStateException("Cannot report operation " +
+                                                "because no task is active");
+            return profileReport;
+        }
+    }
+
+    /**
+     * The concrete implementation of <code>AbstractProfileCounter</code> used
+     * for counters that aggregate across tasks.
+     */
+    private class AggregateProfileCounter extends AbstractProfileCounter {
+        private AtomicLong count;
+        AggregateProfileCounter(String name) {
+            super(name, false);
+            count = new AtomicLong();
+        }
+        public void incrementCount() {
+            getReport().updateAggregateCounter(getCounterName(),
+                                               count.incrementAndGet());
+        }
+        public void incrementCount(long value) {
+            if (value < 0)
+                throw new IllegalArgumentException("Increment value must be " +
+                                                   "greater than zero");
+            getReport().updateAggregateCounter(getCounterName(),
+                                               count.addAndGet(value));
+        }
+    }
+
+    /**
+     * The concrete implementation of <code>AbstractProfileCounter</code> used
+     * for counters that are local to tasks.
+     */
+    private class TaskLocalProfileCounter extends AbstractProfileCounter {
+        TaskLocalProfileCounter(String name) {
+            super(name, true);
+        }
+        public void incrementCount() {
+            getReport().incrementTaskCounter(getCounterName(), 1L);
+        }
+        public void incrementCount(long value) {
+            if (value < 0)
+                throw new IllegalArgumentException("Increment value must be " +
+                                                   "greater than zero");
+            getReport().incrementTaskCounter(getCounterName(), value);
         }
     }
 

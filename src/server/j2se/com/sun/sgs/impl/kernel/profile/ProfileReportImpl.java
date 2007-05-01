@@ -11,8 +11,10 @@ import com.sun.sgs.kernel.ProfileReport;
 import com.sun.sgs.kernel.TaskOwner;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 
@@ -37,6 +39,10 @@ class ProfileReportImpl implements ProfileReport {
     Set<ProfileParticipantDetail> participants =
         new HashSet<ProfileParticipantDetail>();
 
+    // counters that are updated through methods on this class
+    Map<String,Long> aggCounters = null;
+    Map<String,Long> taskCounters = null;
+
     /**
      * Creates an instance of <code>ProfileReportImpl</code> with the
      * actual starting time being set to the current time.
@@ -54,6 +60,39 @@ class ProfileReportImpl implements ProfileReport {
         this.scheduledStartTime = scheduledStartTime;
         this.readyCount = readyCount;
         this.actualStartTime = System.currentTimeMillis();
+    }
+
+    /**
+     * Package-private method used to update aggregate counters that were
+     * changed during this task.
+     *
+     * @param counter the name of the counter
+     * @param value the new value of this counter
+     */
+    void updateAggregateCounter(String counter, long value) {
+        if (aggCounters == null)
+            aggCounters = new HashMap<String,Long>();
+        aggCounters.put(counter, value);
+    }
+
+    /**
+     * Package-private method used to increment task-local counters
+     * that were changed during this task. If this counter hasn't had a
+     * value reported yet for this task, then the provided value is
+     * set as the current value for the counter.
+     *
+     * @param counter the name of the counter
+     * @param value the amount to increment the counter
+     */
+    void incrementTaskCounter(String counter, long value) {
+        long currentValue = 0;
+        if (taskCounters == null) {
+            taskCounters = new HashMap<String,Long>();
+        } else {
+            if (taskCounters.containsKey(counter))
+                currentValue = taskCounters.get(counter);
+        }
+        taskCounters.put(counter, currentValue + value);
     }
 
     /**
@@ -124,6 +163,20 @@ class ProfileReportImpl implements ProfileReport {
      */
     public List<ProfileOperation> getReportedOperations() {
         return ops;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Map<String,Long> getUpdatedAggregateCounters() {
+        return aggCounters;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Map<String,Long> getUpdatedTaskCounters() {
+        return taskCounters;
     }
 
     /**
