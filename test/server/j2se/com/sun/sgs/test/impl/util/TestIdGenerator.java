@@ -1,0 +1,334 @@
+/*
+ * Copyright 2007 Sun Microsystems, Inc. All rights reserved
+ */
+
+package com.sun.sgs.test.impl.util;
+
+import com.sun.sgs.app.DataManager;
+import com.sun.sgs.app.TaskManager;
+import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.impl.kernel.DummyAbstractKernelAppContext;
+import com.sun.sgs.impl.kernel.MinimalTestKernel;
+import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.impl.service.data.DataServiceImpl;
+import com.sun.sgs.impl.service.data.store.DataStoreImpl;
+import com.sun.sgs.impl.service.task.TaskServiceImpl;
+import com.sun.sgs.impl.sharedutil.HexDumper;
+import com.sun.sgs.impl.sharedutil.MessageBuffer;
+import com.sun.sgs.impl.util.IdGenerator;
+import com.sun.sgs.impl.util.NonDurableTaskScheduler;
+import com.sun.sgs.kernel.TaskScheduler;
+import com.sun.sgs.service.DataService;
+import com.sun.sgs.service.TaskService;
+import com.sun.sgs.test.util.DummyComponentRegistry;
+import com.sun.sgs.test.util.DummyTransaction;
+import com.sun.sgs.test.util.DummyTransactionProxy;
+import java.io.File;
+import java.io.IOException;
+import java.io.Serializable;
+import java.util.Properties;
+import junit.framework.TestCase;
+
+
+public class TestIdGenerator extends TestCase {
+    /** The name of the DataServiceImpl class. */
+    private static final String DataStoreImplClassName =
+	DataStoreImpl.class.getName();
+
+    /** The name of the DataServiceImpl class. */
+    private static final String DataServiceImplClassName =
+	DataServiceImpl.class.getName();
+
+    /** Directory used for database shared across multiple tests. */
+    private static String DB_DIRECTORY =
+	System.getProperty("java.io.tmpdir") + File.separator +
+	"TestClientSessionServiceImpl.db";
+
+    /** Properties for creating the shared database. */
+    private static Properties dbProps = createProperties(
+	DataStoreImplClassName + ".directory",
+	DB_DIRECTORY,
+	StandardProperties.APP_NAME, "TestClientSessionServiceImpl");
+
+
+    private static final int WAIT_TIME = 5000;
+
+    private static DummyTransactionProxy txnProxy =
+	MinimalTestKernel.getTransactionProxy();
+
+    private DummyAbstractKernelAppContext appContext;
+    private DummyComponentRegistry systemRegistry;
+    private DummyComponentRegistry serviceRegistry;
+    private DummyTransaction txn;
+    
+    private DataServiceImpl dataService;
+    private TaskServiceImpl taskService;
+    private TaskScheduler taskScheduler;
+    private NonDurableTaskScheduler nonDurableTaskScheduler;
+
+
+    /** True if test passes. */
+    private boolean passed;
+
+    /** Constructs a test instance. */
+    public TestIdGenerator(String name) {
+	super(name);
+    }
+
+    /** Creates and configures the session service. */
+    protected void setUp() throws Exception {
+        passed = false;
+        System.err.println("Testcase: " + getName());
+        setUp(true);
+    }
+
+    protected void setUp(boolean clean) throws Exception {
+        if (clean) {
+            deleteDirectory(DB_DIRECTORY);
+        }
+
+	appContext = MinimalTestKernel.createContext();
+	systemRegistry = MinimalTestKernel.getSystemRegistry(appContext);
+	serviceRegistry = MinimalTestKernel.getServiceRegistry(appContext);
+	    
+	// create services
+	dataService = createDataService(systemRegistry);
+	taskService = new TaskServiceImpl(new Properties(), systemRegistry);
+	taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
+
+	createTransaction();
+
+	// configure data service
+        dataService.configure(serviceRegistry, txnProxy);
+        txnProxy.setComponent(DataService.class, dataService);
+        txnProxy.setComponent(DataServiceImpl.class, dataService);
+        serviceRegistry.setComponent(DataManager.class, dataService);
+        serviceRegistry.setComponent(DataService.class, dataService);
+        serviceRegistry.setComponent(DataServiceImpl.class, dataService);
+
+	// configure task service
+        taskService.configure(serviceRegistry, txnProxy);
+        txnProxy.setComponent(TaskService.class, taskService);
+        txnProxy.setComponent(TaskServiceImpl.class, taskService);
+        serviceRegistry.setComponent(TaskManager.class, taskService);
+        serviceRegistry.setComponent(TaskService.class, taskService);
+        serviceRegistry.setComponent(TaskServiceImpl.class, taskService);
+	//serviceRegistry.registerAppContext();
+	nonDurableTaskScheduler = createNonDurableTaskScheduler();
+
+	commitTransaction();
+	createTransaction();
+    }
+
+    /** Sets passed if the test passes. */
+    protected void runTest() throws Throwable {
+	super.runTest();
+        Thread.sleep(100);
+	passed = true;
+    }
+    
+    /** Cleans up the transaction. */
+    protected void tearDown() throws Exception {
+        tearDown(true);
+    }
+
+    protected void tearDown(boolean clean) throws Exception {
+        if (txn != null) {
+            try {
+                txn.abort(null);
+            } catch (IllegalStateException e) {
+            }
+            txn = null;
+        }
+        if (taskService != null) {
+            taskService.shutdown();
+            taskService = null;
+        }
+        if (dataService != null) {
+            dataService.shutdown();
+            dataService = null;
+        }
+        if (clean) {
+            deleteDirectory(DB_DIRECTORY);
+        }
+        MinimalTestKernel.destroyContext(appContext);
+    }
+
+    /* -- Tests -- */
+
+    public void testConstructorNullName() {
+	try {
+	    new IdGenerator(null, IdGenerator.MIN_BLOCK_SIZE,
+			    txnProxy, nonDurableTaskScheduler);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testConstructorEmptyName() {
+	try {
+	    new IdGenerator("", IdGenerator.MIN_BLOCK_SIZE,
+			    txnProxy, nonDurableTaskScheduler);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testConstructorBadBlockSize() {
+	try {
+	    new IdGenerator("foo", IdGenerator.MIN_BLOCK_SIZE-1,
+			    txnProxy, nonDurableTaskScheduler);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testConstructorNullProxy() {
+	try {
+	    new IdGenerator("foo", IdGenerator.MIN_BLOCK_SIZE,
+			    null, nonDurableTaskScheduler);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+	
+    public void testConstructorNullTaskScheduler() {
+	try {
+	    new IdGenerator("foo", IdGenerator.MIN_BLOCK_SIZE,
+			    txnProxy, null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testNextNoTransaction() throws Exception {
+	commitTransaction();
+	doNextTest(IdGenerator.MIN_BLOCK_SIZE, 4);
+    }
+
+    public void testNextWithTransaction() throws Exception {
+	doNextTest(IdGenerator.MIN_BLOCK_SIZE, 4);
+    }
+
+    public void testNextBytesNoTransaction() throws Exception {
+	commitTransaction();
+	doNextBytesTest(1024, 8);
+    }
+
+    public void testNextBytesWithTransaction() throws Exception {
+	doNextBytesTest(1024, 8);
+    }
+
+    private void doNextTest(int blockSize, int iterations) throws Exception {
+	IdGenerator generator =
+	    new IdGenerator("generator", blockSize,
+			    txnProxy, nonDurableTaskScheduler);
+	long nextId = 1;
+	for (int i = 0; i < blockSize * iterations; i++, nextId++) {
+	    long generatedId = generator.next();
+	    System.err.println("id: " + generatedId);
+	    if (generatedId != nextId) {
+		fail("Generated ID: " + generatedId + ", expected: " + nextId);
+	    }
+	}
+    }
+    
+    private void doNextBytesTest(int blockSize, int iterations) throws Exception {
+	IdGenerator generator =
+	    new IdGenerator("generator", blockSize,
+			    txnProxy, nonDurableTaskScheduler);
+	long nextId = 1;
+	for (int i = 0; i < blockSize * iterations; i++, nextId++) {
+	    byte[] generatedIdBytes = generator.nextBytes();
+	    MessageBuffer buf = new MessageBuffer(8);
+	    buf.putBytes(generatedIdBytes);
+	    buf.rewind();
+	    long generatedId = buf.getLong();
+	    if (generatedId != nextId) {
+		fail("Generated ID: " + generatedId + ", expected: " + nextId);
+	    }
+	}
+    }
+    
+    /* -- other methods -- */
+
+    /** Creates a property list with the specified keys and values. */
+    private static Properties createProperties(String... args) {
+	Properties props = new Properties();
+	if (args.length % 2 != 0) {
+	    throw new RuntimeException("Odd number of arguments");
+	}
+	for (int i = 0; i < args.length; i += 2) {
+	    props.setProperty(args[i], args[i + 1]);
+	}
+	return props;
+    }
+ 
+    /**
+     * Creates a new transaction, and sets transaction proxy's
+     * current transaction.
+     */
+    private DummyTransaction createTransaction() {
+	if (txn == null) {
+	    txn = new DummyTransaction();
+	    txnProxy.setCurrentTransaction(txn);
+	}
+	return txn;
+    }
+
+    private void commitTransaction() throws Exception {
+	if (txn != null) {
+	    txn.commit();
+	    txn = null;
+	    txnProxy.setCurrentTransaction(null);
+	} else {
+	    throw new TransactionNotActiveException(
+		"txn:" + txn + " already committed");
+	}
+    }
+    
+    /** Deletes the specified directory, if it exists. */
+    static void deleteDirectory(String directory) {
+	File dir = new File(directory);
+	if (dir.exists()) {
+	    for (File f : dir.listFiles()) {
+		if (!f.delete()) {
+		    throw new RuntimeException("Failed to delete file: " + f);
+		}
+	    }
+	    if (!dir.delete()) {
+		throw new RuntimeException(
+		    "Failed to delete directory: " + dir);
+	    }
+	}
+    }
+
+    /**
+     * Creates a new data service.  If the database directory does
+     * not exist, one is created.
+     */
+    private DataServiceImpl createDataService(
+	DummyComponentRegistry registry)
+	throws Exception
+    {
+	File dir = new File(DB_DIRECTORY);
+	if (!dir.exists()) {
+	    if (!dir.mkdir()) {
+		throw new RuntimeException(
+		    "Problem creating directory: " + dir);
+	    }
+	}
+	return new DataServiceImpl(dbProps, registry);
+    }
+
+
+    private NonDurableTaskScheduler createNonDurableTaskScheduler() {
+	return new NonDurableTaskScheduler(
+	    taskScheduler, txnProxy.getCurrentOwner(), taskService);
+    }
+}

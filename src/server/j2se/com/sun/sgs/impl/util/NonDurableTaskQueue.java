@@ -190,7 +190,7 @@ public class NonDurableTaskQueue implements NonDurableTransactionParticipant {
 		    logger.log(Level.WARNING, "task queue unexpectedly empty");
 		    return;
 		}
-		Context context = joinTransaction(task);
+		joinTransaction(task);
 		logger.log(Level.FINER, "running task:{0}", task);
 		task.run();
 		
@@ -238,6 +238,7 @@ public class NonDurableTaskQueue implements NonDurableTransactionParticipant {
 	    }
 	}
     }
+    
     /**
      * Returns {@code true} if the given {@code Throwable} is a
      * "retryable" exception, meaning that it implements {@code
@@ -335,7 +336,7 @@ public class NonDurableTaskQueue implements NonDurableTransactionParticipant {
 	final Transaction txn;
 
 	/** The task being processed. */
-	KernelRunnable task;
+	final KernelRunnable task;
 
 	/**
 	 * Constructs a context with the specified transaction and task.

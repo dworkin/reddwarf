@@ -34,7 +34,10 @@ public class SimpleServer implements ConnectionListener {
 
     private long sequenceNumber;
 
+    private static final CompactId SERVER_ID = new CompactId(new byte[]{0});
+    
     final String TEST_CHANNEL_NAME = "Test Channel";
+    
     final CompactId TEST_CHANNEL_ID = new CompactId(new byte[] { 0x22 });
 
     /**
@@ -151,24 +154,26 @@ public class SimpleServer implements ConnectionListener {
 
             MessageBuffer reply;
             if (password.equals("guest")) {
-                
+
                 byte[] sessionIdBytes = new byte[] {
                     (byte)0xda, 0x2c, 0x57, (byte)0xa2,
                     0x01, 0x02, 0x03, 0x04 
                 };
+		CompactId sessionId = new CompactId(sessionIdBytes);
                 byte[] reconnectKeyBytes = new byte[] {
                     0x1a, 0x1b, 0x1c, 0x1d, 0x30, 0x31, 0x32, 0x33 
                 };
+		CompactId reconnectKey = new CompactId(reconnectKeyBytes);
 
                 reply =
                     new MessageBuffer(3 +
-                        2 + sessionIdBytes.length +
-                        2 + reconnectKeyBytes.length);
+			sessionId.getExternalFormByteCount() +
+			reconnectKey.getExternalFormByteCount());
                 reply.putByte(SimpleSgsProtocol.VERSION).
                       putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
                       putByte(SimpleSgsProtocol.LOGIN_SUCCESS).
-                      putByteArray(sessionIdBytes).
-                      putByteArray(reconnectKeyBytes);
+		      putBytes(sessionId.getExternalForm()).
+		      putBytes(reconnectKey.getExternalForm());
             } else {
                 String reason = "Bad password";
                 reply =
@@ -278,7 +283,7 @@ public class SimpleServer implements ConnectionListener {
         int msgLen = 3 +
             TEST_CHANNEL_ID.getExternalFormByteCount() +
             8 +
-            2 +
+            SERVER_ID.getExternalFormByteCount() +
             MessageBuffer.getSize(chanMessage);
         
         MessageBuffer msg = new MessageBuffer(msgLen);
@@ -287,7 +292,7 @@ public class SimpleServer implements ConnectionListener {
             putByte(SimpleSgsProtocol.CHANNEL_MESSAGE).
             putBytes(TEST_CHANNEL_ID.getExternalForm()).
             putLong(seq).
-            putShort(0).
+            putBytes(SERVER_ID.getExternalForm()).
             putString(chanMessage);
 
         sendMessage(conn, msg.getBuffer());

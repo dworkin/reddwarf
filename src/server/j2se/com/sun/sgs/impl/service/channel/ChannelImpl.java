@@ -13,6 +13,7 @@ import com.sun.sgs.app.ClientSessionId;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl.Context;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
+import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
@@ -43,7 +44,7 @@ final class ChannelImpl implements Channel, Serializable {
 	new LoggerWrapper(
 	    Logger.getLogger(ChannelImpl.class.getName()));
 
-    private final static byte[] EMPTY_ID = new byte[0];
+    private final static CompactId SERVER_ID = new CompactId(new byte[]{0});
 
     /** Transaction-related context information. */
     private final Context context;
@@ -487,7 +488,7 @@ final class ChannelImpl implements Channel, Serializable {
 
 	byte[] protocolMessage =
 	    ChannelServiceImpl.getChannelMessage(
-		state.id, EMPTY_ID, message, context.nextSequenceNumber());
+		state.id, SERVER_ID, message, context.nextSequenceNumber());
 	    
 	for (ClientSession session : sessions) {
 	    // skip disconnected and non-member sessions

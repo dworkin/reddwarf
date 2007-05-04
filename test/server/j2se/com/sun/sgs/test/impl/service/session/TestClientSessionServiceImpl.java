@@ -30,6 +30,7 @@ import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
 import com.sun.sgs.impl.service.task.TaskServiceImpl;
+import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.io.Connector;
 import com.sun.sgs.io.Connection;
@@ -39,7 +40,6 @@ import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
-import com.sun.sgs.test.util.DummyTaskScheduler;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 import java.io.File;
@@ -116,7 +116,6 @@ public class TestClientSessionServiceImpl extends TestCase {
     private ChannelServiceImpl channelService;
     private ClientSessionServiceImpl sessionService;
     private TaskServiceImpl taskService;
-    private DummyTaskScheduler taskScheduler;
     private static DummyIdentityManager identityManager;
 
     /** The listen port for the client session service. */
@@ -184,7 +183,9 @@ public class TestClientSessionServiceImpl extends TestCase {
 	
 	// configure channel service
 	channelService.configure(serviceRegistry, txnProxy);
+	txnProxy.setComponent(ChannelServiceImpl.class, channelService);
 	serviceRegistry.setComponent(ChannelManager.class, channelService);
+	serviceRegistry.setComponent(ChannelServiceImpl.class, channelService);
 	
 	commitTransaction();
 	createTransaction();
@@ -916,15 +917,15 @@ public class TestClientSessionServiceImpl extends TestCase {
         private boolean awaitGraceful = false;
         private boolean awaitLoginFailure = false;
 	private String reason;
-	private byte[] sessionId;
-	private byte[] reconnectionKey;
+	private CompactId sessionId;
+	private CompactId reconnectionKey;
 	private final AtomicLong sequenceNumber = new AtomicLong(0);
 	
 	DummyClient() {
 	}
 
 	ClientSessionId getSessionId() {
-	    return new ClientSessionId(sessionId);
+	    return new ClientSessionId(sessionId.getId());
 	}
 
 	void connect(int port) {
@@ -1135,8 +1136,8 @@ public class TestClientSessionServiceImpl extends TestCase {
 		switch (opcode) {
 
 		case SimpleSgsProtocol.LOGIN_SUCCESS:
-		    sessionId = buf.getBytes(buf.getUnsignedShort());
-		    reconnectionKey = buf.getBytes(buf.getUnsignedShort());
+		    sessionId = CompactId.getCompactId(buf);
+		    reconnectionKey = CompactId.getCompactId(buf);
 		    synchronized (lock) {
 			loginAck = true;
 			loginSuccess = true;
