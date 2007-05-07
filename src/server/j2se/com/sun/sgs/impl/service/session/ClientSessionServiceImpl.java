@@ -253,6 +253,8 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 		if (this.acceptor != null) {
 		    throw new IllegalArgumentException("Already configured");
 		}
+		(new ConfigureServiceTransactionParticipant(txnProxy)).
+		    joinTransaction();
 		participant = new TransactionParticipant(txnProxy);
 		dataService = registry.getComponent(DataService.class);
 		nonDurableTaskScheduler =
@@ -397,6 +399,81 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	}
     }
 
+    /* -- Implement transaction participant/context for 'configure' -- */
+
+    private class ConfigureServiceTransactionParticipant
+	extends AbstractNonDurableTransactionParticipant
+		<ConfigureServiceTransactionContext>
+    {
+	ConfigureServiceTransactionParticipant(TransactionProxy txnProxy) {
+	    super(txnProxy);
+	}
+	
+	/** {@inheritDoc} */
+	public ConfigureServiceTransactionContext
+	    newContext(Transaction txn)
+	{
+	    return new ConfigureServiceTransactionContext(this, txn);
+	}
+    }
+
+    private final class ConfigureServiceTransactionContext
+	extends AbstractTransactionContext
+    {
+	/**
+	 * Constructs a context with the specified transaction.
+	 */
+        private ConfigureServiceTransactionContext(
+	    AbstractNonDurableTransactionParticipant participant,
+	    Transaction txn)
+	{
+	    super(participant, txn);
+	}
+
+	/** {@inheritDoc} */
+        public boolean prepare() {
+	    return false;
+	}
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * Performs cleanup in the case that the transaction invoking
+	 * the service's {@code configure} method aborts.
+	 */
+	public void abort(boolean retryable) {
+	    synchronized (lock) {
+		try {
+		    if (acceptor != null) {
+			acceptor.shutdown();
+		    }
+		} catch (Exception e) {
+		    // ignore exception shutting down acceptor
+		    logger.logThrow(
+			Level.FINEST, e, " exception shutting down acceptor");
+		} finally {
+		    acceptor = null;
+		}
+		
+		for (ClientSessionImpl session : sessions.values()) {
+		    try {
+			session.shutdown();
+		    } catch (Exception e) {
+			// ignore exception shutting down session
+			logger.logThrow(
+			    Level.FINEST, e,
+			    " exception shutting down session");
+		    }
+		}
+		sessions.clear();
+	    }
+	}
+
+	/** {@inheritDoc} */
+	public void commit() {
+        }
+    }
+	
     /* -- Implement AbstractNonDurableTransactionParticipant -- */
 
     private class TransactionParticipant
@@ -411,7 +488,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	    return new Context(this, txn);
 	}
     }
-	
+
     /**
      * Iterates through the context list, in order, to flush any
      * committed changes.  During iteration, this method invokes

@@ -75,12 +75,12 @@ public class TestClientSessionServiceImpl extends TestCase {
 	"TestClientSessionServiceImpl.db";
 
     /** The port for the client session service. */
-    private static int PORT = 0;
+    private static int PORT = 2468;
 
     /** Properties for the session service. */
     private static Properties serviceProps = createProperties(
 	StandardProperties.APP_NAME, "TestClientSessionServiceImpl",
-	StandardProperties.APP_PORT, Integer.toString(PORT));
+	StandardProperties.APP_PORT, Integer.toString(0));
 
     /** Properties for creating the shared database. */
     private static Properties dbProps = createProperties(
@@ -276,6 +276,21 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    System.err.println(e);
 	}
     }
+
+    public void testConfigureAbortConfigure() throws Exception {
+	Properties testServiceProps = createProperties(
+	    StandardProperties.APP_NAME, "TestClientSessionServiceImpl",
+	    StandardProperties.APP_PORT, Integer.toString(PORT));
+	ClientSessionServiceImpl cssi =
+	    new ClientSessionServiceImpl(testServiceProps, systemRegistry);
+	cssi.configure(serviceRegistry, txnProxy);
+	abortTransaction(null);
+	Thread.sleep(WAIT_TIME); // wait for port to unbind
+	createTransaction();
+	cssi.configure(serviceRegistry, txnProxy);
+	commitTransaction();
+    }
+    
 
     /* -- Test connecting, logging in, logging out with server -- */
 
@@ -725,14 +740,23 @@ public class TestClientSessionServiceImpl extends TestCase {
 	return txn;
     }
 
+    private void abortTransaction(Exception e) {
+	if (txn != null) {
+	    txn.abort(e);
+	    txn = null;
+	    txnProxy.setCurrentTransaction(null);
+	} else {
+	    throw new TransactionNotActiveException("txn:" + txn);
+	}
+    }
+
     private void commitTransaction() throws Exception {
 	if (txn != null) {
 	    txn.commit();
 	    txn = null;
 	    txnProxy.setCurrentTransaction(null);
 	} else {
-	    throw new TransactionNotActiveException(
-		"txn:" + txn + " already committed");
+	    throw new TransactionNotActiveException("txn:" + txn);
 	}
     }
     
