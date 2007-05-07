@@ -251,7 +251,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	    
 	    synchronized (lock) {
 		if (this.acceptor != null) {
-		    throw new IllegalArgumentException("Already configured");
+		    throw new IllegalStateException("Already configured");
 		}
 		(new ConfigureServiceTransactionParticipant(txnProxy)).
 		    joinTransaction();

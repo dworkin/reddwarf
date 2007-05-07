@@ -277,6 +277,39 @@ public class TestClientSessionServiceImpl extends TestCase {
 	}
     }
 
+    /* -- Test configure -- */
+
+    public void testConfigureNullRegistry() {
+	ClientSessionServiceImpl cssi =
+	    new ClientSessionServiceImpl(serviceProps, systemRegistry);
+	try {
+            cssi.configure(null, new DummyTransactionProxy());
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+    
+    public void testConfigureNullTransactionProxy() {
+	ClientSessionServiceImpl cssi =
+	    new ClientSessionServiceImpl(serviceProps, systemRegistry);
+	try {
+            cssi.configure(new DummyComponentRegistry(), null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testConfigureTwice() {
+	try {
+	    sessionService.configure(new DummyComponentRegistry(), txnProxy);
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+    }
+
     public void testConfigureAbortConfigure() throws Exception {
 	Properties testServiceProps = createProperties(
 	    StandardProperties.APP_NAME, "TestClientSessionServiceImpl",
@@ -289,6 +322,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	createTransaction();
 	cssi.configure(serviceRegistry, txnProxy);
 	commitTransaction();
+	System.err.println("configure after abort succeeded");
     }
     
 
