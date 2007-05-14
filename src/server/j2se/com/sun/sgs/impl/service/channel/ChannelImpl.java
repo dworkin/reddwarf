@@ -12,7 +12,6 @@ import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionId;
 import com.sun.sgs.app.Delivery;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl.Context;
-import com.sun.sgs.impl.service.session.ClientSessionServiceImpl;
 import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;

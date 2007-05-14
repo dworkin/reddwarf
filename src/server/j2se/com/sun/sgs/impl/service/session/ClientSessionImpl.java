@@ -35,9 +35,7 @@ import java.io.ObjectOutputStream;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.security.SecureRandom;
-import java.util.Arrays;
 import java.util.Random;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -181,7 +179,7 @@ public class ClientSessionImpl implements SgsClientSession, Serializable {
      * Returns the client session ID for this client session in {@code
      * CompactId} format.
      *
-     * @return the client session ID as a (@code CompactId}
+     * @return the client session ID as a {@code CompactId}
      */
     public CompactId getCompactSessionId() {
 	return sessionId;

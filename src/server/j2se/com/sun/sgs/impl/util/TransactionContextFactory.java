@@ -9,6 +9,7 @@ import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
+import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.service.TransactionProxy;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -19,15 +20,12 @@ import java.util.logging.Logger;
  *
  * @param	<T> a type of transaction context
  */
-public abstract class
-    AbstractNonDurableTransactionParticipant <T extends TransactionContext>
-    implements NonDurableTransactionParticipant
-{
+public abstract class TransactionContextFactory<T extends TransactionContext> {
     /** The logger for this class. */
     private static final LoggerWrapper logger =
 	new LoggerWrapper(
 	    Logger.getLogger(
-		AbstractNonDurableTransactionParticipant.class.getName()));
+		TransactionContextFactory.class.getName()));
     
     /** Provides transaction and other information for the current thread. */
     private final ThreadLocal<T> currentContext = new ThreadLocal<T>();
@@ -41,9 +39,7 @@ public abstract class
      *
      * @param	txnProxy the transaction proxy
      */
-    protected AbstractNonDurableTransactionParticipant(
-	TransactionProxy txnProxy)
-    {
+    protected TransactionContextFactory(TransactionProxy txnProxy) {
 	if (txnProxy ==  null) {
 	    throw new NullPointerException("null txnProxy");
 	}
@@ -53,10 +49,11 @@ public abstract class
    /**
      * If this participant has not yet joined the current transaction,
      * joins the transaction and creates a new context by invoking
-     * {@link #newContext newContext} passing the current transaction,
-     * and sets that context as the current context for the current
-     * thread.  Otherwise, if this participant has already joined the
-     * current transaction, returns the current transaction context.
+     * {@link #createContext createContext} passing the current
+     * transaction, and sets that context as the current context for
+     * the current thread.  Otherwise, if this participant has already
+     * joined the current transaction, returns the current transaction
+     * context.
      *
      * @return 	the context for the current transaction
      * @throws	TransactionNotActiveException if no transaction is active
@@ -74,8 +71,8 @@ public abstract class
             if (logger.isLoggable(Level.FINER)) {
                 logger.log(Level.FINER, "join txn:{0}", txn);
             }
-            txn.join(this);
-            context = newContext(txn);
+            txn.join(createParticipant());
+            context = createContext(txn);
             currentContext.set(context);
         } else if (!txn.equals(context.getTransaction())) {
             currentContext.set(null);
@@ -139,90 +136,117 @@ public abstract class
      *
      * @return	a new transaction context
      */
-    protected abstract T newContext(Transaction txn);
-    
-    /* -- Implement NonDurableTransactionParticipant -- */
-       
-    /** {@inheritDoc} */
-    public boolean prepare(Transaction txn) throws Exception {
-        try {
-	    checkTransaction(txn);
-            boolean readOnly = currentContext.get().prepare();
-	    if (readOnly) {
-		currentContext.set(null);
-	    }
-            if (logger.isLoggable(Level.FINE)) {
-                logger.log(Level.FINER, "prepare txn:{0} returns {1}",
-                           txn, readOnly);
-            }
-            
-            return readOnly;
-	    
-        } catch (RuntimeException e) {
-            if (logger.isLoggable(Level.FINER)) {
-                logger.logThrow(Level.FINER, e, "prepare txn:{0} throws", txn);
-            }
-            throw e;
-        }
-    }
-
-    /** {@inheritDoc} */
-    public void commit(Transaction txn) {
-        try {
-	    checkTransaction(txn);
-	    currentContext.get().commit();
-	    currentContext.set(null);
-            if (logger.isLoggable(Level.FINER)) {
-                logger.log(Level.FINER, "commit txn:{0} returns", txn);
-            }
-        } catch (RuntimeException e) {
-            if (logger.isLoggable(Level.FINER)) {
-                logger.logThrow(Level.FINER, e, "commit txn:{0} throws", txn);
-            }
-            throw e;
-        }
-    }
-
-    /** {@inheritDoc} */
-    public void prepareAndCommit(Transaction txn) throws Exception {
-        if (!prepare(txn)) {
-            commit(txn);
-        }
-    }
-
-    /** {@inheritDoc} */
-    public void abort(Transaction txn) {
-        try {
-	    checkTransaction(txn);
-	    currentContext.get().abort(isRetryable(txn.getAbortCause()));
-	    currentContext.set(null);
-            if (logger.isLoggable(Level.FINER)) {
-                logger.log(Level.FINER, "abort txn:{0} returns", txn);
-            }
-        } catch (RuntimeException e) {
-            if (logger.isLoggable(Level.FINER)) {
-                logger.logThrow(Level.FINER, e, "abort txn:{0} throws", txn);
-            }
-            throw e;
-        }
-    }
+    protected abstract T createContext(Transaction txn);
 
     /**
-     * Returns {@code true} if the given {@code Throwable} is a
-     * "retryable" exception, meaning that it implements {@code
-     * ExceptionRetryStatus}, and invoking its {@link
-     * ExceptionRetryStatus#shouldRetry shouldRetry} method returns
-     * {@code true}.
+     * Returns a new transaction participant that operates on the
+     * currently active transaction context. <p>
      *
-     * @param	t   a throwable
+     * The default implementation of this method returns a transaction
+     * participant that implements {@link
+     * NonDurableTransactionParticipant}.
      *
-     * @return	{@code true} if the given {@code Throwable} is
-     *		retryable, and {@code false} otherwise
+     * @return	a transaction participant
      */
-    public static boolean isRetryable(Throwable t) {
-	return
-	    t instanceof ExceptionRetryStatus &&
-	    ((ExceptionRetryStatus) t).shouldRetry();
+    protected TransactionParticipant createParticipant() {
+	return new Participant();
+    }
+    
+    /* -- Implement NonDurableTransactionParticipant -- */
+
+    private class Participant implements NonDurableTransactionParticipant {
+
+	/** {@inheritDoc} */
+	public boolean prepare(Transaction txn) throws Exception {
+	    try {
+		T context = checkTransaction(txn);
+		if (context.isPrepared()) {
+		    throw new TransactionNotActiveException("Already prepared");
+		}
+		boolean readOnly = context.prepare();
+		if (readOnly) {
+		    currentContext.set(null);
+		}
+		if (logger.isLoggable(Level.FINE)) {
+		    logger.log(Level.FINER, "prepare txn:{0} returns {1}",
+			       txn, readOnly);
+		}
+            
+		return readOnly;
+	    
+	    } catch (Exception e) {
+		if (logger.isLoggable(Level.FINER)) {
+		    logger.logThrow(Level.FINER, e,
+				    "prepare txn:{0} throws", txn);
+		}
+		throw e;
+	    }
+	}
+
+	/** {@inheritDoc} */
+	public void commit(Transaction txn) {
+	    try {
+		T context = checkTransaction(txn);
+		if (! context.isPrepared()) {
+		    RuntimeException e = 
+			new IllegalStateException("transaction not prepared");
+		    if (logger.isLoggable(Level.WARNING)) {
+			logger.logThrow(
+			    Level.FINE, e,
+			    "commit: not yet prepared txn:{0}",
+			    txn);
+		    }
+		    throw e;
+		}
+		context.commit();
+		currentContext.set(null);
+		logger.log(Level.FINER, "commit txn:{0} returns", txn);
+
+	    } catch (RuntimeException e) {
+		if (logger.isLoggable(Level.FINER)) {
+		    logger.logThrow(Level.FINER, e,
+				    "commit txn:{0} throws", txn);
+		}
+		throw e;
+	    }
+	}
+
+	/** {@inheritDoc} */
+	public void prepareAndCommit(Transaction txn) throws Exception {
+	    try {
+		T context = checkTransaction(txn);
+		if (context.isPrepared()) {
+		    throw new TransactionNotActiveException("Already prepared");
+		}
+		context.prepareAndCommit();
+		currentContext.set(null);
+		logger.log(Level.FINER, "prepareAndCommit txn:{0} returns",
+			   txn);
+	    
+	    } catch (Exception e) {
+		if (logger.isLoggable(Level.FINER)) {
+		    logger.logThrow(Level.FINER, e,
+				    "prepare txn:{0} throws", txn);
+		}
+		throw e;
+	    }
+	}
+
+	/** {@inheritDoc} */
+	public void abort(Transaction txn) {
+	    try {
+		T context = checkTransaction(txn);
+		context.abort(isRetryable(txn.getAbortCause()));
+		currentContext.set(null);
+		logger.log(Level.FINER, "abort txn:{0} returns", txn);
+
+	    } catch (RuntimeException e) {
+		if (logger.isLoggable(Level.FINER)) {
+		    logger.logThrow(Level.FINER, e, "abort txn:{0} throws", txn);
+		}
+		throw e;
+	    }
+	}
     }
 
     /* -- Other methods -- */
@@ -236,8 +260,9 @@ public abstract class
      * context to {@code null}.
      *
      * @param	txn a transaction
+     * @return	the current transaction context
      */
-    private void checkTransaction(Transaction txn) {
+    private T checkTransaction(Transaction txn) {
         if (txn == null) {
             throw new NullPointerException("null transaction");
         }
@@ -251,5 +276,24 @@ public abstract class
                 "Wrong transaction: Expected " + context.getTransaction() +
 		", found " + txn);
         }
+	return context;
+    }
+    
+    /**
+     * Returns {@code true} if the given {@code Throwable} is a
+     * "retryable" exception, meaning that it implements {@code
+     * ExceptionRetryStatus}, and invoking its {@link
+     * ExceptionRetryStatus#shouldRetry shouldRetry} method returns
+     * {@code true}.
+     *
+     * @param	t   a throwable
+     *
+     * @return	{@code true} if the given {@code Throwable} is
+     *		retryable, and {@code false} otherwise
+     */
+    private static boolean isRetryable(Throwable t) {
+	return
+	    t instanceof ExceptionRetryStatus &&
+	    ((ExceptionRetryStatus) t).shouldRetry();
     }
 }

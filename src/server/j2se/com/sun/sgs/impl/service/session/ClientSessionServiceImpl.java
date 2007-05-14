@@ -19,12 +19,11 @@ import com.sun.sgs.impl.service.session.ClientSessionImpl.
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
-import com.sun.sgs.impl.util.AbstractNonDurableTransactionParticipant;
-import com.sun.sgs.impl.util.AbstractTransactionContext;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.IdGenerator;
 import com.sun.sgs.impl.util.NonDurableTaskScheduler;
-import com.sun.sgs.impl.util.TransactionContext.State;
+import com.sun.sgs.impl.util.TransactionContext;
+import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.io.Acceptor;
 import com.sun.sgs.io.AcceptorListener;
 import com.sun.sgs.io.ConnectionListener;
@@ -69,11 +68,11 @@ import java.util.logging.Logger;
  *	Specifies the TCP port to listen for client connections. <p>
  *
  * <li> <i>Key:</i>
- * 	{@code com.sun.sgs.impl.service.ClientSessionServiceImpl.idBlockSize}
+ * 	{@code com.sun.sgs.impl.service.ClientSessionServiceImpl.id.block.size}
  *	<br>
  *	<i>Default:</i> {@code 256} <br>
  *	Specifies the block size to use when reserving session IDs.  Must be
- *	&gt; {@link IdGenerator.MIN_BLOCK_SIZE}. <p>
+ *	&gt; {@link IdGenerator#MIN_BLOCK_SIZE}. <p>
  *
  * </ul> <p>
  */
@@ -139,8 +138,8 @@ public class ClientSessionServiceImpl implements ClientSessionService {
     /** The task scheduler for non-durable tasks. */
     NonDurableTaskScheduler nonDurableTaskScheduler;
 
-    /** The transaction participant. */
-    private AbstractNonDurableTransactionParticipant<Context> participant;
+    /** The transaction context factory. */
+    private TransactionContextFactory<Context> contextFactory;
     
     /** The data service. */
     DataService dataService;
@@ -201,7 +200,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 		new PropertiesWrapper(properties);
 	    idBlockSize =
 		wrappedProperties.getIntProperty(
- 		    CLASSNAME + ".idBlockSize", ID_GENERATOR_BLOCK_SIZE);
+ 		    CLASSNAME + ".id.block.size", ID_GENERATOR_BLOCK_SIZE);
 	    if (idBlockSize < IdGenerator.MIN_BLOCK_SIZE) {
 		throw new IllegalArgumentException(
 		    "idBlockSize must be > " + IdGenerator.MIN_BLOCK_SIZE);
@@ -253,9 +252,9 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 		if (this.acceptor != null) {
 		    throw new IllegalStateException("Already configured");
 		}
-		(new ConfigureServiceTransactionParticipant(txnProxy)).
+		(new ConfigureServiceContextFactory(txnProxy)).
 		    joinTransaction();
-		participant = new TransactionParticipant(txnProxy);
+		contextFactory = new ContextFactory(txnProxy);
 		dataService = registry.getComponent(DataService.class);
 		nonDurableTaskScheduler =
 		    new NonDurableTaskScheduler(
@@ -401,40 +400,32 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 
     /* -- Implement transaction participant/context for 'configure' -- */
 
-    private class ConfigureServiceTransactionParticipant
-	extends AbstractNonDurableTransactionParticipant
+    private class ConfigureServiceContextFactory
+	extends TransactionContextFactory
 		<ConfigureServiceTransactionContext>
     {
-	ConfigureServiceTransactionParticipant(TransactionProxy txnProxy) {
+	ConfigureServiceContextFactory(TransactionProxy txnProxy) {
 	    super(txnProxy);
 	}
 	
 	/** {@inheritDoc} */
 	public ConfigureServiceTransactionContext
-	    newContext(Transaction txn)
+	    createContext(Transaction txn)
 	{
-	    return new ConfigureServiceTransactionContext(this, txn);
+	    return new ConfigureServiceTransactionContext(txn);
 	}
     }
 
     private final class ConfigureServiceTransactionContext
-	extends AbstractTransactionContext
+	extends TransactionContext
     {
 	/**
 	 * Constructs a context with the specified transaction.
 	 */
-        private ConfigureServiceTransactionContext(
-	    AbstractNonDurableTransactionParticipant participant,
-	    Transaction txn)
-	{
-	    super(participant, txn);
+        private ConfigureServiceTransactionContext(Transaction txn) {
+	    super(txn);
 	}
-
-	/** {@inheritDoc} */
-        public boolean prepare() {
-	    return false;
-	}
-
+	
 	/**
 	 * {@inheritDoc}
 	 *
@@ -474,18 +465,16 @@ public class ClientSessionServiceImpl implements ClientSessionService {
         }
     }
 	
-    /* -- Implement AbstractNonDurableTransactionParticipant -- */
+    /* -- Implement TransactionContextFactory -- */
 
-    private class TransactionParticipant
-	extends AbstractNonDurableTransactionParticipant<Context>
-    {
-	TransactionParticipant(TransactionProxy txnProxy) {
+    private class ContextFactory extends TransactionContextFactory<Context> {
+	ContextFactory(TransactionProxy txnProxy) {
 	    super(txnProxy);
 	}
 
 	/** {@inheritDoc} */
-	public Context newContext(Transaction txn) {
-	    return new Context(this, txn);
+	public Context createContext(Transaction txn) {
+	    return new Context(txn);
 	}
     }
 
@@ -514,23 +503,18 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 
     /* -- Context class to hold transaction state -- */
     
-    final class Context extends AbstractTransactionContext {
+    final class Context extends TransactionContext {
 
 	/** Map of client sessions to an object containing a list of
 	 * updates to make upon transaction commit. */
         private final Map<ClientSessionImpl, Updates> sessionUpdates =
 	    new HashMap<ClientSessionImpl, Updates>();
 
-	/** The transaction's state. */
-        private State state = State.ACTIVE;
-
 	/**
 	 * Constructs a context with the specified transaction.
 	 */
-        private Context(AbstractNonDurableTransactionParticipant participant,
-			Transaction txn)
-	{
-	    super(participant, txn);
+        private Context(Transaction txn) {
+	    super(txn);
 	}
 
 	/**
@@ -624,7 +608,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	 * transaction is prepared.
 	 */
 	private void checkPrepared() {
-	    if (state == State.PREPARED) {
+	    if (isPrepared) {
 		throw new TransactionNotActiveException("Already prepared");
 	    }
 	}
@@ -636,8 +620,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	 * changes returns {@code true} indicating readonly status.
 	 */
         public boolean prepare() {
-	    checkPrepared();
-	    state = State.PREPARED;
+	    isPrepared = true;
 	    boolean readOnly = sessionUpdates.values().isEmpty();
 	    if (! readOnly) {
 		synchronized (contextList) {
@@ -653,7 +636,6 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	 * all committed contexts preceding prepared ones.
 	 */
 	public void abort(boolean retryable) {
-	    state = State.ABORTED;
 	    synchronized (contextList) {
 		contextList.remove(this);
 	    }
@@ -665,18 +647,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	 * committed contexts preceding prepared ones.
 	 */
 	public void commit() {
-            if (state != State.PREPARED) {
-                RuntimeException e = 
-                    new IllegalStateException("transaction not prepared");
-		if (logger.isLoggable(Level.WARNING)) {
-		    logger.logThrow(
-			Level.FINE, e, "Context.commit: not yet prepared txn:{0}",
-			txn);
-		}
-                throw e;
-            }
-
-	    state = State.COMMITTED;
+	    isCommitted = true;
 	    flushContexts();
         }
 
@@ -688,7 +659,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	 * requestDisconnect} method.
 	 */
 	private boolean flush() {
-	    if (state == State.COMMITTED) {
+	    if (isCommitted) {
 		for (Updates updates : sessionUpdates.values()) {
 		    updates.flush();
 		}
@@ -737,7 +708,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
      * has not been configured with a transaction proxy.
      */
     Context checkContext() {
-	return participant.joinTransaction();
+	return contextFactory.joinTransaction();
     }
 
     /**

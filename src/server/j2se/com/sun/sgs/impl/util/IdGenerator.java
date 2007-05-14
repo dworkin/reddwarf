@@ -4,10 +4,8 @@
 
 package com.sun.sgs.impl.util;
 
-import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.NameNotBoundException;
-import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
@@ -21,14 +19,11 @@ public class IdGenerator {
     /** The minimum number of IDs to reserve. */
     public static int MIN_BLOCK_SIZE = 8;
 
-    /** The time to wait for an ID block to be reserved. */
-    private static int WAIT_TIME = 300;
-    
     private final String name;
     private final int blockSize;
     private final TransactionProxy txnProxy;
     private final NonDurableTaskScheduler scheduler;
-    private final TransactionParticipant participant;
+    private final TransactionContextFactory<Context> contextFactory;
     private final Object lock = new Object();
     private ReserveIdBlockTask reserveTask = null;
     private long nextId = 1;
@@ -67,7 +62,7 @@ public class IdGenerator {
 	this.blockSize = blockSize;
 	this.scheduler = scheduler;
 	this.txnProxy = proxy;
-	this.participant = new TransactionParticipant(proxy);
+	this.contextFactory = new ContextFactory(proxy);
     }
 
     /**
@@ -90,7 +85,7 @@ public class IdGenerator {
 		    reserveTask = new ReserveIdBlockTask();
 		    scheduler.scheduleTask(reserveTask);
 		} else {
-		    lock.wait(WAIT_TIME);
+		    lock.wait();
 		}
 	    }
 	    return nextId++;
@@ -98,11 +93,13 @@ public class IdGenerator {
     }
 
     /**
-     * Returns the next ID in a byte array in network byte order This
+     * Returns the next ID in a byte array in network byte order.  This
      * is equivalent to invoking {@link #next next} and storing the
      * result in a byte array in network byte order.
      *
      * @return	the next ID in a byte array
+     * @throws	InterruptedException if this method is interrupted
+     *		while waiting for the task to reserve a block of IDs
      */
     public byte[] nextBytes() throws InterruptedException {
 	long id = next();
@@ -117,20 +114,18 @@ public class IdGenerator {
     /* -- Other classes -- */
 
     
-    private class TransactionParticipant
-	extends AbstractNonDurableTransactionParticipant<Context>
-    {
-	TransactionParticipant(TransactionProxy txnProxy) {
+    private class ContextFactory extends TransactionContextFactory<Context> {
+	ContextFactory(TransactionProxy txnProxy) {
 	    super(txnProxy);
 	}
 	
 	/** {@inheritDoc} */
-	public Context newContext(Transaction txn) {
-	    return new Context(this, txn);
+	public Context createContext(Transaction txn) {
+	    return new Context(txn);
 	}
     }
 
-    private final class Context extends AbstractTransactionContext {
+    private final class Context extends TransactionContext {
 	
 	private long firstId;
 	private long lastId;
@@ -138,15 +133,9 @@ public class IdGenerator {
 	/**
 	 * Constructs a context with the specified participant and transaction.
 	 */
-        private Context(AbstractNonDurableTransactionParticipant participant,
-			Transaction txn)
-	{
-	    super(participant, txn);
+        private Context(Transaction txn) {
+	    super(txn);
 	}
-
-        public boolean prepare() {
-	    return false;
-        }
 
 	public void abort(boolean retryable) {
 	    synchronized (lock) {
@@ -174,7 +163,7 @@ public class IdGenerator {
 
 	/** {@inheritDoc} */
 	public void run() {
-	    Context context = participant.joinTransaction();
+	    Context context = contextFactory.joinTransaction();
 	    DataService dataService = txnProxy.getService(DataService.class);
 	    State state;
 	    try {

@@ -16,7 +16,6 @@ import com.sun.sgs.app.NameExistsException;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
-import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.session.ClientSessionImpl;
 import com.sun.sgs.impl.sharedutil.CompactId;
@@ -24,18 +23,16 @@ import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
-import com.sun.sgs.impl.util.AbstractNonDurableTransactionParticipant;
-import com.sun.sgs.impl.util.AbstractTransactionContext;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.NonDurableTaskQueue;
 import com.sun.sgs.impl.util.NonDurableTaskScheduler;
-import com.sun.sgs.impl.util.TransactionContext.State;
+import com.sun.sgs.impl.util.TransactionContext;
+import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
-import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.ProtocolMessageListener;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.SgsClientSession;
@@ -44,7 +41,6 @@ import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import java.io.Serializable;
 import java.math.BigInteger;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -114,8 +110,8 @@ public class ChannelServiceImpl implements ChannelManager, Service {
     /** The task scheduler for non-durable tasks. */
     NonDurableTaskScheduler nonDurableTaskScheduler;
 
-    /** The transaction participant. */
-    private AbstractNonDurableTransactionParticipant<Context> participant;
+    /** The transaction context factory. */
+    private TransactionContextFactory<Context> contextFactory;
     
     /** Map (with weak keys) of client sessions to queues, each containing
      * tasks to forward channel messages sent by the session (the key).
@@ -197,10 +193,10 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	    }
 
 	    synchronized (lock) {
-		if (participant != null) {
+		if (contextFactory != null) {
 		    throw new IllegalStateException("Already configured");
 		}
-		participant = new TransactionParticipant(txnProxy);
+		contextFactory = new ContextFactory(txnProxy);
 		dataService = registry.getComponent(DataService.class);
 		sessionService =
 		    registry.getComponent(ClientSessionService.class);
@@ -252,7 +248,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 		throw new IllegalArgumentException(
 		    "listener is not serializable");
 	    }
-	    Context context = participant.joinTransaction();
+	    Context context = contextFactory.joinTransaction();
 	    Channel channel = context.createChannel(name, listener, delivery);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
@@ -276,7 +272,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	    if (name == null) {
 		throw new NullPointerException("null name");
 	    }
-	    Context context = participant.joinTransaction();
+	    Context context = contextFactory.joinTransaction();
 	    Channel channel = context.getChannel(name);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
@@ -294,17 +290,15 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	}
     }
 
-    /* -- Implement AbstractNonDurableTransactionParticipant -- */
+    /* -- Implement TransactionContextFactory -- */
        
-    private class TransactionParticipant
-	extends AbstractNonDurableTransactionParticipant<Context>
-    {
-	TransactionParticipant(TransactionProxy txnProxy) {
+    private class ContextFactory extends TransactionContextFactory<Context> {
+	ContextFactory(TransactionProxy txnProxy) {
 	    super(txnProxy);
 	}
 	
-	public Context newContext(Transaction txn) {
-	    return new Context(this, txn);
+	public Context createContext(Transaction txn) {
+	    return new Context(txn);
 	}
     }
 
@@ -338,7 +332,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
      * TransactionNotActiveException if it isn't.
      */
     static void checkContext(Context context) {
-	getInstance().participant.checkContext(context);
+	getInstance().contextFactory.checkContext(context);
     }
 
     /**
@@ -428,7 +422,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 		new AbstractKernelRunnable() {
 		    public void run() {
 			Context context =
-			    getInstance().participant.joinTransaction();
+			    getInstance().contextFactory.joinTransaction();
 			Set<Channel> channels = context.removeSession(session);
 			for (Channel channel : channels) {
 			    channel.leave(session);
@@ -550,10 +544,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
      * (respectively) must be called on the context so that the proper
      * channel instances are used.
      */
-    final class Context extends AbstractTransactionContext {
-
-	/** The transaction state. */
-	private State txnState = State.ACTIVE;
+    final class Context extends TransactionContext {
 
 	/**
 	 * Map of channel name to transient channel impl (for those
@@ -566,10 +557,8 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	/**
 	 * Constructs a context with the specified transaction. 
 	 */
-	private Context(AbstractNonDurableTransactionParticipant participant,
-			Transaction txn)
-	{
-	    super(participant, txn);
+	private Context(Transaction txn) {
+	    super(txn);
 	}
 
 	/* -- ChannelManager methods -- */
@@ -664,7 +653,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	 * transaction is prepared.
 	 */
 	private void checkPrepared() {
-	    if (txnState == State.PREPARED) {
+	    if (isPrepared) {
 		throw new TransactionNotActiveException("Already prepared");
 	    }
 	}
@@ -676,8 +665,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	 * changes returns {@code true} indicating readonly status.
 	 */
         public boolean prepare() {
-	    checkPrepared();
-	    txnState = State.PREPARED;
+	    isPrepared = true;
 	    boolean readOnly = internalTable.isEmpty();
 	    if (! readOnly) {
 		synchronized (contextList) {
@@ -693,7 +681,6 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	 * all committed contexts preceding prepared ones.
 	 */
 	public void abort(boolean retryable) {
-	    txnState = State.ABORTED;
 	    synchronized (contextList) {
 		contextList.remove(this);
 	    }
@@ -705,18 +692,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	 * committed contexts preceding prepared ones.
 	 */
 	public void commit() {
-            if (txnState != State.PREPARED) {
-                RuntimeException e = 
-                    new IllegalStateException("transaction not prepared");
-		if (logger.isLoggable(Level.WARNING)) {
-		    logger.logThrow(
-			Level.FINE, e, "Context.commit: not yet prepared txn:{0}",
-			txn);
-		}
-                throw e;
-            }
-
-	    txnState = State.COMMITTED;
+	    isCommitted = true;
 	    flushContexts();
         }
 
@@ -726,7 +702,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	 * returns false.
 	 */
 	private boolean flush() {
-	    if (txnState == State.COMMITTED) {
+	    if (isCommitted) {
 		for (ChannelImpl channel : internalTable.values()) {
 		    if (channel.isClosed) {
 			channelStateCache.remove(channel.state.id);
@@ -871,7 +847,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
 	
 	Set<Channel> removeAll() {
 	    Set<Channel> channels = new HashSet<Channel>();
-	    Context context = getInstance().participant.getContext();
+	    Context context = getInstance().contextFactory.getContext();
 	    for (String name : set) {
 		try {
 		    channels.add(context.getChannel(name));
@@ -950,7 +926,7 @@ public class ChannelServiceImpl implements ChannelManager, Service {
                         "NotifyTask.run name:{0}, message:{1}",
                         name, HexDumper.format(message));
                 }
-		Context context = participant.joinTransaction();
+		Context context = contextFactory.joinTransaction();
 		ChannelImpl channel =
 		    (ChannelImpl) context.getChannel(name, channelId);
 		channel.notifyListeners(senderId, message);

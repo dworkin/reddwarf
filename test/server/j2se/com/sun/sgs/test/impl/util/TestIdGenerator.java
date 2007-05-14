@@ -13,7 +13,6 @@ import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.task.TaskServiceImpl;
-import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
 import com.sun.sgs.impl.util.IdGenerator;
 import com.sun.sgs.impl.util.NonDurableTaskScheduler;
@@ -24,8 +23,6 @@ import com.sun.sgs.test.util.DummyComponentRegistry;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
 import java.io.File;
-import java.io.IOException;
-import java.io.Serializable;
 import java.util.Properties;
 import junit.framework.TestCase;
 
@@ -67,9 +64,6 @@ public class TestIdGenerator extends TestCase {
     private NonDurableTaskScheduler nonDurableTaskScheduler;
 
 
-    /** True if test passes. */
-    private boolean passed;
-
     /** Constructs a test instance. */
     public TestIdGenerator(String name) {
 	super(name);
@@ -77,7 +71,6 @@ public class TestIdGenerator extends TestCase {
 
     /** Creates and configures the session service. */
     protected void setUp() throws Exception {
-        passed = false;
         System.err.println("Testcase: " + getName());
         setUp(true);
     }
@@ -124,7 +117,6 @@ public class TestIdGenerator extends TestCase {
     protected void runTest() throws Throwable {
 	super.runTest();
         Thread.sleep(100);
-	passed = true;
     }
     
     /** Cleans up the transaction. */
