@@ -5,6 +5,7 @@
 package com.sun.sgs.impl.kernel.profile;
 
 import com.sun.sgs.kernel.ProfileConsumer;
+import com.sun.sgs.kernel.ProfileCounter;
 import com.sun.sgs.kernel.ProfileOperation;
 import com.sun.sgs.kernel.ProfileProducer;
 
@@ -46,6 +47,13 @@ class ProfileConsumerImpl implements ProfileConsumer {
      */
     public ProfileOperation registerOperation(String name) {
         return profileCollector.registerOperation(name, producerName);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public ProfileCounter registerCounter(String name, boolean taskLocal) {
+        return profileCollector.registerCounter(name, producerName, taskLocal);
     }
 
 }

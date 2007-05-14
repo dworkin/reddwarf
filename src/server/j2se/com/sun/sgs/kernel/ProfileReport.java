@@ -5,6 +5,7 @@
 package com.sun.sgs.kernel;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 
@@ -96,6 +97,31 @@ public interface ProfileReport {
      *         representing the ordered set of reported operations
      */
     public List<ProfileOperation> getReportedOperations();
+
+    /**
+     * Returns the updated values of the aggregate counters that were updated
+     * during the running of the task. If no aggregate counters were updated,
+     * then <code>null</code> is returned. The <code>Map</code> is a mapping
+     * from counter name to counter value. Note that the reported values are
+     * the values observed during the running of the task, not the value
+     * (which may have changed) at the time this report is provided to any
+     * listeners.
+     *
+     * @return a <code>Map</code> from counter name to observed value, or
+     *         <code>null</code> if no aggregate counters were updated
+     */
+    public Map<String,Long> getUpdatedAggregateCounters();
+
+    /**
+     * Returns the values of the task-local counters that were updated
+     * during the running of the task. If no task-local counters were updated,
+     * then <code>null</code> is returned. The <code>Map</code> is a mapping
+     * from counter name to counter value.
+     *
+     * @return a <code>Map</code> from counter name to observed value, or
+     *         <code>null</code> if no task-local counters were updated
+     */
+    public Map<String,Long> getUpdatedTaskCounters();
 
     /**
      * Returns the number of tasks in the same context as this report's task
