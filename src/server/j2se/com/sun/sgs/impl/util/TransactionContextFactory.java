@@ -33,6 +33,12 @@ public abstract class TransactionContextFactory<T extends TransactionContext> {
     /** The transaction proxy. */
     private final TransactionProxy txnProxy;
 
+    /** Lock for access to the participant field. */
+    private final Object lock = new Object();
+
+    /** The transaction participant. */
+    private TransactionParticipant participant;
+
     /**
      * Constructs an instance of this class with the given {@code
      * txnProxy}.
@@ -149,7 +155,12 @@ public abstract class TransactionContextFactory<T extends TransactionContext> {
      * @return	a transaction participant
      */
     protected TransactionParticipant createParticipant() {
-	return new Participant();
+	synchronized (lock) {
+	    if (participant == null) {
+		participant = new Participant();
+	    }
+	}
+	return participant;
     }
     
     /* -- Implement NonDurableTransactionParticipant -- */
@@ -192,7 +203,7 @@ public abstract class TransactionContextFactory<T extends TransactionContext> {
 			new IllegalStateException("transaction not prepared");
 		    if (logger.isLoggable(Level.WARNING)) {
 			logger.logThrow(
-			    Level.FINE, e,
+			    Level.WARNING, e,
 			    "commit: not yet prepared txn:{0}",
 			    txn);
 		    }
@@ -226,7 +237,7 @@ public abstract class TransactionContextFactory<T extends TransactionContext> {
 	    } catch (Exception e) {
 		if (logger.isLoggable(Level.FINER)) {
 		    logger.logThrow(Level.FINER, e,
-				    "prepare txn:{0} throws", txn);
+				    "prepareAndCommit txn:{0} throws", txn);
 		}
 		throw e;
 	    }

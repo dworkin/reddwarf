@@ -462,6 +462,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 
 	/** {@inheritDoc} */
 	public void commit() {
+	    isCommitted = true;
         }
     }
 	

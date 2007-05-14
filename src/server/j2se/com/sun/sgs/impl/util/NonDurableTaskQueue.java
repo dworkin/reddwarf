@@ -133,14 +133,18 @@ public class NonDurableTaskQueue {
 
 	/** {@inheritDoc} */
 	public void commit() {
+	    if (task != null) {
+		removeTask(task);
+	    }
 	    isCommitted = true;
-	    removeTask(task);
 	}
 
 	/** {@inheritDoc} */
 	public void abort(boolean isRetryable) {
 	    if (! isRetryable) {
-		removeTask(task);
+		if (task != null) {
+		    removeTask(task);
+		}
 	    }
 	}
     }

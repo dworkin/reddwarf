@@ -131,7 +131,7 @@ public class IdGenerator {
 	private long lastId;
 
 	/**
-	 * Constructs a context with the specified participant and transaction.
+	 * Constructs a context with the specified transaction.
 	 */
         private Context(Transaction txn) {
 	    super(txn);
