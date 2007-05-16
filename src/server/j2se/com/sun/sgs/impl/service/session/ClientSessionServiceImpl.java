@@ -17,8 +17,13 @@ import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.session.ClientSessionImpl.
     ClientSessionListenerWrapper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.AbstractKernelRunnable;
+import com.sun.sgs.impl.util.BoundNamesUtil;
+import com.sun.sgs.impl.util.IdGenerator;
 import com.sun.sgs.impl.util.NonDurableTaskScheduler;
+import com.sun.sgs.impl.util.TransactionContext;
+import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.io.Acceptor;
 import com.sun.sgs.io.AcceptorListener;
 import com.sun.sgs.io.ConnectionListener;
@@ -27,7 +32,6 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
-import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.ProtocolMessageListener;
 import com.sun.sgs.service.SgsClientSession;
 import com.sun.sgs.service.TaskService;
@@ -48,30 +52,51 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Manages client sessions.
+ * Manages client sessions. <p>
  *
- * <p>Properties should include:
+ * The {@link #ClientSessionServiceImpl constructor} supports the
+ * following properties: <p>
+ *
  * <ul>
- * <li>{@code com.sun.sgs.app.name}</li>
- * <li>{@code com.sun.sgs.app.port}</li>
- * </ul>
+ *
+ * <li> <i>Key:</i> {@code com.sun.sgs.app.name} <br>
+ *	<i>No default &mdash; required</i> <br>
+ *	Specifies the application name. <p>
+ *
+ * <li> <i>Key:</i> {@code com.sun.sgs.app.port} <br>
+ *	<i>No default &mdash; required</i> <br>
+ *	Specifies the TCP port to listen for client connections. <p>
+ *
+ * <li> <i>Key:</i>
+ * 	{@code com.sun.sgs.impl.service.ClientSessionServiceImpl.id.block.size}
+ *	<br>
+ *	<i>Default:</i> {@code 256} <br>
+ *	Specifies the block size to use when reserving session IDs.  Must be
+ *	&gt; {@link IdGenerator#MIN_BLOCK_SIZE}. <p>
+ *
+ * </ul> <p>
  */
-public class ClientSessionServiceImpl
-    implements ClientSessionService, NonDurableTransactionParticipant
-{
+public class ClientSessionServiceImpl implements ClientSessionService {
 
-    /** The state of a transaction in a context. */
-    private static enum State { ACTIVE, PREPARED, COMMITTED, ABORTED };
-	
     /** The prefix for ClientSessionListeners bound in the data store. */
     public static final String LISTENER_PREFIX =
 	ClientSessionImpl.class.getName();
+
+    /** The name of this class. */
+    private static final String CLASSNAME =
+	ClientSessionServiceImpl.class.getName();
     
     /** The logger for this class. */
     private static final LoggerWrapper logger =
-	new LoggerWrapper(
-	    Logger.getLogger(ClientSessionServiceImpl.class.getName()));
+	new LoggerWrapper(Logger.getLogger(CLASSNAME));
 
+    /** The name of the IdGenerator. */
+    private static final String ID_GENERATOR_NAME =
+	CLASSNAME + ".generator";
+
+    /** The default block size for the IdGenerator. */
+    private static final int ID_GENERATOR_BLOCK_SIZE = 256;
+    
     /** The transaction proxy for this class. */
     static TransactionProxy txnProxy;
 
@@ -112,12 +137,21 @@ public class ClientSessionServiceImpl
 
     /** The task scheduler for non-durable tasks. */
     NonDurableTaskScheduler nonDurableTaskScheduler;
+
+    /** The transaction context factory. */
+    private TransactionContextFactory<Context> contextFactory;
     
     /** The data service. */
     DataService dataService;
 
     /** The identity manager. */
     IdentityManager identityManager;
+
+    /** The ID block size for the IdGenerator. */
+    private int idBlockSize;
+    
+    /** The IdGenerator. */
+    private IdGenerator idGenerator;
 
     /** If true, this service is shutting down; initially, false. */
     private boolean shuttingDown = false;
@@ -160,6 +194,16 @@ public class ClientSessionServiceImpl
 	    if (port < 0) {
 		throw new IllegalArgumentException(
 		    "Port number can't be negative: " + port);
+	    }
+
+	    PropertiesWrapper wrappedProperties =
+		new PropertiesWrapper(properties);
+	    idBlockSize =
+		wrappedProperties.getIntProperty(
+ 		    CLASSNAME + ".id.block.size", ID_GENERATOR_BLOCK_SIZE);
+	    if (idBlockSize < IdGenerator.MIN_BLOCK_SIZE) {
+		throw new IllegalArgumentException(
+		    "idBlockSize must be > " + IdGenerator.MIN_BLOCK_SIZE);
 	    }
 
 	    taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
@@ -206,14 +250,22 @@ public class ClientSessionServiceImpl
 	    
 	    synchronized (lock) {
 		if (this.acceptor != null) {
-		    throw new IllegalArgumentException("Already configured");
+		    throw new IllegalStateException("Already configured");
 		}
+		(new ConfigureServiceContextFactory(txnProxy)).
+		    joinTransaction();
+		contextFactory = new ContextFactory(txnProxy);
 		dataService = registry.getComponent(DataService.class);
 		nonDurableTaskScheduler =
 		    new NonDurableTaskScheduler(
 			taskScheduler, proxy.getCurrentOwner(),
 			registry.getComponent(TaskService.class));
 		notifyDisconnectedSessions();
+		idGenerator =
+		    new IdGenerator(ID_GENERATOR_NAME,
+				    idBlockSize,
+				    txnProxy,
+				    nonDurableTaskScheduler);
 		ServerSocketEndpoint endpoint =
 		    new ServerSocketEndpoint(
 		        new InetSocketAddress(port), TransportType.RELIABLE);
@@ -323,82 +375,108 @@ public class ClientSessionServiceImpl
 	    if (shuttingDown()) {
 		return null;
 	    }
+	    byte[] nextId;
+	    try {
+		nextId = idGenerator.nextBytes();
+	    } catch (InterruptedException e) {
+		// This shouldn't happen; noone should be interrupting
+		// this thread.
+		return null;
+	    }
 	    ClientSessionImpl session =
-		new ClientSessionImpl(ClientSessionServiceImpl.this);
+		new ClientSessionImpl(ClientSessionServiceImpl.this, nextId);
 	    sessions.put(session.getSessionId(), session);
 	    return session.getConnectionListener();
 	}
 
         /** {@inheritDoc} */
 	public void disconnected() {
-	    // TBI...
+	    logger.log(
+	        Level.SEVERE,
+		"The acceptor has become disconnected from port: {0}", port);
+	    // TBD: take other actions, such as restarting acceptor?
 	}
     }
 
-    /* -- Implement NonDurableTransactionParticipant -- */
-       
-    /** {@inheritDoc} */
-    public boolean prepare(Transaction txn) throws Exception {
-        try {
-	    checkTransaction(txn);
-            boolean readOnly = currentContext.get().prepare();
-	    if (readOnly) {
-		currentContext.set(null);
+    /* -- Implement transaction participant/context for 'configure' -- */
+
+    private class ConfigureServiceContextFactory
+	extends TransactionContextFactory
+		<ConfigureServiceTransactionContext>
+    {
+	ConfigureServiceContextFactory(TransactionProxy txnProxy) {
+	    super(txnProxy);
+	}
+	
+	/** {@inheritDoc} */
+	public ConfigureServiceTransactionContext
+	    createContext(Transaction txn)
+	{
+	    return new ConfigureServiceTransactionContext(txn);
+	}
+    }
+
+    private final class ConfigureServiceTransactionContext
+	extends TransactionContext
+    {
+	/**
+	 * Constructs a context with the specified transaction.
+	 */
+        private ConfigureServiceTransactionContext(Transaction txn) {
+	    super(txn);
+	}
+	
+	/**
+	 * {@inheritDoc}
+	 *
+	 * Performs cleanup in the case that the transaction invoking
+	 * the service's {@code configure} method aborts.
+	 */
+	public void abort(boolean retryable) {
+	    synchronized (lock) {
+		try {
+		    if (acceptor != null) {
+			acceptor.shutdown();
+		    }
+		} catch (Exception e) {
+		    // ignore exception shutting down acceptor
+		    logger.logThrow(
+			Level.FINEST, e, " exception shutting down acceptor");
+		} finally {
+		    acceptor = null;
+		}
+		
+		for (ClientSessionImpl session : sessions.values()) {
+		    try {
+			session.shutdown();
+		    } catch (Exception e) {
+			// ignore exception shutting down session
+			logger.logThrow(
+			    Level.FINEST, e,
+			    " exception shutting down session");
+		    }
+		}
+		sessions.clear();
 	    }
-            if (logger.isLoggable(Level.FINE)) {
-                logger.log(Level.FINER, "prepare txn:{0} returns {1}",
-                           txn, readOnly);
-            }
-            
-            return readOnly;
-	    
-        } catch (RuntimeException e) {
-            if (logger.isLoggable(Level.FINER)) {
-                logger.logThrow(Level.FINER, e, "prepare txn:{0} throws", txn);
-            }
-            throw e;
+	}
+
+	/** {@inheritDoc} */
+	public void commit() {
+	    isCommitted = true;
         }
     }
+	
+    /* -- Implement TransactionContextFactory -- */
 
-    /** {@inheritDoc} */
-    public void commit(Transaction txn) {
-        try {
-	    checkTransaction(txn);
-	    currentContext.get().commit();
-	    currentContext.set(null);
-            if (logger.isLoggable(Level.FINER)) {
-                logger.log(Level.FINER, "commit txn:{0} returns", txn);
-            }
-        } catch (RuntimeException e) {
-            if (logger.isLoggable(Level.FINER)) {
-                logger.logThrow(Level.FINER, e, "commit txn:{0} throws", txn);
-            }
-            throw e;
-        }
-    }
+    private class ContextFactory extends TransactionContextFactory<Context> {
+	ContextFactory(TransactionProxy txnProxy) {
+	    super(txnProxy);
+	}
 
-    /** {@inheritDoc} */
-    public void prepareAndCommit(Transaction txn) throws Exception {
-        if (!prepare(txn)) {
-            commit(txn);
-        }
-    }
-
-    /** {@inheritDoc} */
-    public void abort(Transaction txn) {
-        try {
-	    checkTransaction(txn);
-	    currentContext.get().abort();
-	    currentContext.set(null);
-            if (logger.isLoggable(Level.FINER)) {
-                logger.log(Level.FINER, "abort txn:{0} returns", txn);
-            }
-        } catch (RuntimeException e) {
-            if (logger.isLoggable(Level.FINER)) {
-                logger.logThrow(Level.FINER, e, "abort txn:{0} throws", txn);
-            }
-            throw e;
-        }
+	/** {@inheritDoc} */
+	public Context createContext(Transaction txn) {
+	    return new Context(txn);
+	}
     }
 
     /**
@@ -411,6 +489,11 @@ public class ClientSessionServiceImpl
      * there are no more contexts in the context list.
      */
     private void flushContexts() {
+	// FIXME: This method is called during commit and shouldn't
+	// flush contexts here (since the 'flush' method sends
+	// protocol messages and possibly disconnects sessions).
+	// Instead the flushing of committed contexts should happen in
+	// another thread.  -- ann (5/16/07)
 	synchronized (contextList) {
 	    Iterator<Context> iter = contextList.iterator();
 	    while (iter.hasNext()) {
@@ -426,26 +509,20 @@ public class ClientSessionServiceImpl
 
     /* -- Context class to hold transaction state -- */
     
-    final class Context {
-
-        /** The transaction. */
-        private final Transaction txn;
+    final class Context extends TransactionContext {
 
 	/** Map of client sessions to an object containing a list of
 	 * updates to make upon transaction commit. */
         private final Map<ClientSessionImpl, Updates> sessionUpdates =
 	    new HashMap<ClientSessionImpl, Updates>();
 
-	/** The transaction's state. */
-        private State state = State.ACTIVE;
-
 	/**
 	 * Constructs a context with the specified transaction.
 	 */
         private Context(Transaction txn) {
-            this.txn = txn;
+	    super(txn);
 	}
-	
+
 	/**
 	 * Adds a message to be sent to the specified session after
 	 * this transaction commits.
@@ -537,7 +614,7 @@ public class ClientSessionServiceImpl
 	 * transaction is prepared.
 	 */
 	private void checkPrepared() {
-	    if (state == State.PREPARED) {
+	    if (isPrepared) {
 		throw new TransactionNotActiveException("Already prepared");
 	    }
 	}
@@ -548,9 +625,8 @@ public class ClientSessionServiceImpl
 	 * returns {@code false}.  Otherwise, if there are no pending
 	 * changes returns {@code true} indicating readonly status.
 	 */
-        private boolean prepare() {
-	    checkPrepared();
-	    state = State.PREPARED;
+        public boolean prepare() {
+	    isPrepared = true;
 	    boolean readOnly = sessionUpdates.values().isEmpty();
 	    if (! readOnly) {
 		synchronized (contextList) {
@@ -565,8 +641,7 @@ public class ClientSessionServiceImpl
 	 * the context list containing pending updates, and flushes
 	 * all committed contexts preceding prepared ones.
 	 */
-	private void abort() {
-	    state = State.ABORTED;
+	public void abort(boolean retryable) {
 	    synchronized (contextList) {
 		contextList.remove(this);
 	    }
@@ -577,19 +652,8 @@ public class ClientSessionServiceImpl
 	 * Marks this transaction as committed and flushes all
 	 * committed contexts preceding prepared ones.
 	 */
-	private void commit() {
-            if (state != State.PREPARED) {
-                RuntimeException e = 
-                    new IllegalStateException("transaction not prepared");
-		if (logger.isLoggable(Level.WARNING)) {
-		    logger.logThrow(
-			Level.FINE, e, "Context.commit: not yet prepared txn:{0}",
-			txn);
-		}
-                throw e;
-            }
-
-	    state = State.COMMITTED;
+	public void commit() {
+	    isCommitted = true;
 	    flushContexts();
         }
 
@@ -601,7 +665,7 @@ public class ClientSessionServiceImpl
 	 * requestDisconnect} method.
 	 */
 	private boolean flush() {
-	    if (state == State.COMMITTED) {
+	    if (isCommitted) {
 		for (Updates updates : sessionUpdates.values()) {
 		    updates.flush();
 		}
@@ -642,29 +706,6 @@ public class ClientSessionServiceImpl
     
     /* -- Other methods -- */
 
-    /**
-     * Checks the specified transaction, throwing {@code
-     * IllegalStateException} if the current context is {@code null}
-     * or if the specified transaction is not equal to the transaction
-     * in the current context.  If the specified transaction does not
-     * match the current context's transaction, then sets the current
-     * context to (@code null}.
-     */
-    private void checkTransaction(Transaction txn) {
-        if (txn == null) {
-            throw new NullPointerException("null transaction");
-        }
-        Context context = currentContext.get();
-        if (context == null) {
-            throw new IllegalStateException("null context");
-        }
-        if (!txn.equals(context.txn)) {
-            currentContext.set(null);
-            throw new IllegalStateException(
-                "Wrong transaction: Expected " + context.txn + ", found " + txn);
-        }
-    }
-    
    /**
      * Obtains information associated with the current transaction,
      * throwing TransactionNotActiveException if there is no current
@@ -673,35 +714,9 @@ public class ClientSessionServiceImpl
      * has not been configured with a transaction proxy.
      */
     Context checkContext() {
-        Transaction txn;
-        synchronized (lock) {
-            if (txnProxy == null) {
-                throw new IllegalStateException("Not configured");
-            }
-            txn = txnProxy.getCurrentTransaction();
-        }
-        if (txn == null) {
-            throw new TransactionNotActiveException(
-                "No transaction is active");
-        }
-        Context context = currentContext.get();
-        if (context == null) {
-            if (logger.isLoggable(Level.FINER)) {
-                logger.log(Level.FINER, "join txn:{0}", txn);
-            }
-            txn.join(this);
-            context =
-                new Context(txn);
-            currentContext.set(context);
-        } else if (!txn.equals(context.txn)) {
-            currentContext.set(null);
-            throw new IllegalStateException(
-                "Wrong transaction: Expected " + context.txn +
-                ", found " + txn);
-        }
-        return context;
+	return contextFactory.joinTransaction();
     }
-    
+
     /**
      * Returns the client session service relevant to the current
      * context.
@@ -787,15 +802,10 @@ public class ClientSessionServiceImpl
      * task removes the wrapper as well.
      */
     private void notifyDisconnectedSessions() {
-	String key = LISTENER_PREFIX;
-
-	for (;;) {
-	    key = dataService.nextServiceBoundName(key);
-	    
-	    if (key == null || ! isListenerKey(key)) {
-		break;
-	    }
-
+	
+	for (String key : BoundNamesUtil.getServiceBoundNamesIterable(
+ 				dataService, LISTENER_PREFIX))
+	{
 	    logger.log(
 		Level.FINEST,
 		"notifyDisconnectedSessions key: {0}",
@@ -822,14 +832,5 @@ public class ClientSessionServiceImpl
 			}
 		    }});
 	}
-    }
-
-    /**
-     * Returns true if the specified key has the prefix of a
-     * ClientSessionListener key.
-     */
-    private static boolean isListenerKey(String key) {
-	return key.regionMatches(
-	    0, LISTENER_PREFIX, 0, LISTENER_PREFIX.length());
     }
 }

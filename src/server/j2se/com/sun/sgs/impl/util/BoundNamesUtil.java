@@ -3,10 +3,8 @@ package com.sun.sgs.impl.util;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.service.DataService;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
-import java.util.Set;
 
 /**
  * A utility class for obtaining an iterator for a set of bound names
