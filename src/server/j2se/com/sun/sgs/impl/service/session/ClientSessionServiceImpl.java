@@ -489,6 +489,11 @@ public class ClientSessionServiceImpl implements ClientSessionService {
      * there are no more contexts in the context list.
      */
     private void flushContexts() {
+	// FIXME: This method is called during commit and shouldn't
+	// flush contexts here (since the 'flush' method sends
+	// protocol messages and possibly disconnects sessions).
+	// Instead the flushing of committed contexts should happen in
+	// another thread.  -- ann (5/16/07)
 	synchronized (contextList) {
 	    Iterator<Context> iter = contextList.iterator();
 	    while (iter.hasNext()) {
