@@ -46,7 +46,6 @@ import java.io.DataInput;
  * <ul><li>1100<i>nnnn</i></li></ul> <p>then, the ID is contained in
  * the next {@code 8 + nnnn} bytes.
  * </ul>
- * </ul>
  */
 public interface SimpleSgsProtocol {
     
@@ -77,8 +76,8 @@ public interface SimpleSgsProtocol {
     /**
      * Login success (login request acknowledgment).
      * <ul>
-     * <li> (ByteArray) sessionId
-     * <li> (ByteArray) reconnectionKey
+     * <li> (CompactId) sessionId
+     * <li> (CompactId) reconnectionKey
      * </ul>
      */
     final byte LOGIN_SUCCESS = 0x11;
@@ -94,7 +93,7 @@ public interface SimpleSgsProtocol {
     /**
      * Reconnection request.
      * <ul>
-     * <li> (ByteArray) reconnectionKey
+     * <li> (CompactId) reconnectionKey
      * </ul>
      */
     final byte RECONNECT_REQUEST = 0x20;
@@ -102,7 +101,7 @@ public interface SimpleSgsProtocol {
     /**
      * Reconnect success (reconnection request acknowledgment).
      * <ul>
-     * <li> (ByteArray) reconnectionKey
+     * <li> (CompactId) reconnectionKey
      * </ul>
      */
     final byte RECONNECT_SUCCESS = 0x21;
@@ -163,7 +162,7 @@ public interface SimpleSgsProtocol {
      * <li> (short) number of recipients (0 = all)
      * <li> If number of recipients &gt; 0, for each recipient:
      * <ul>
-     * <li> (ByteArray) sessionId
+     * <li> (CompactId) sessionId
      * </ul>
      * <li> (ByteArray) message
      * </ul>
@@ -175,7 +174,8 @@ public interface SimpleSgsProtocol {
      * <ul>
      * <li> (CompactId) channel ID
      * <li> (long) sequence number
-     * <li> (ByteArray) sender's sessionId (zero-length if sent by server)
+     * <li> (CompactId) sender's sessionId
+     *		(canonical CompactId of zero if sent by server)
      * <li> (ByteArray) message
      * </ul>
      */

@@ -15,6 +15,7 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.auth.NamePasswordCredentials;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl.Context;
+import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.MessageBuffer;
@@ -34,7 +35,6 @@ import java.io.ObjectOutputStream;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.security.SecureRandom;
-import java.util.Arrays;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
@@ -44,7 +44,7 @@ import javax.security.auth.login.LoginException;
 /**
  * Implements a client session.
  */
-class ClientSessionImpl implements SgsClientSession, Serializable {
+public class ClientSessionImpl implements SgsClientSession, Serializable {
 
     /** The serialVersionUID for this class. */
     private final static long serialVersionUID = 1L;
@@ -65,7 +65,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 
     /** Random number generator for generating session ids. */
     private static final Random random = new Random(getSeed());
-
+    
     /** The logger for this class. */
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(ClientSessionImpl.class.getName()));
@@ -83,10 +83,10 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     private Connection sessionConnection;
 
     /** The session id. */
-    private final byte[] sessionId;
+    private final CompactId sessionId;
 
     /** The reconnection key. */
-    private final byte[] reconnectionKey;
+    private final CompactId reconnectionKey;
 
     /** The ConnectionListener for receiving messages from the client. */
     private final ConnectionListener connectionListener;
@@ -116,17 +116,21 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     private NonDurableTaskQueue taskQueue = null;
 
     /**
-     * Constructs an instance of this class with the specified handle.
+     * Constructs an instance of this class with the specified {@code
+     * sessionService} and session {@code id}.
+     *
+     * @param	sessionService the service that created this instance
+     * @param	id the session ID for this instance
      */
-    ClientSessionImpl(ClientSessionServiceImpl sessionService) {
+    ClientSessionImpl(ClientSessionServiceImpl sessionService, byte[] id) {
 	if (sessionService == null) {
 	    throw new NullPointerException("sessionService is null");
 	}
 	this.sessionService = sessionService;
         this.dataService = sessionService.dataService;
 	this.connectionListener = new Listener();
-	this.sessionId = generateId();
-	this.reconnectionKey = generateId();
+	this.sessionId = new CompactId(id);
+	this.reconnectionKey = sessionId; // not used yet
     }
 
     /**
@@ -140,7 +144,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
      * service of the current app context.
      */
     private ClientSessionImpl(
-	byte[] sessionId,
+	CompactId sessionId,
         Identity identity)
     {
 	this.sessionService =
@@ -148,7 +152,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	this.dataService = sessionService.dataService;
 	this.sessionId = sessionId;
         this.identity = identity;
-	this.reconnectionKey = generateId(); // create bogus one
+	this.reconnectionKey = sessionId; // not used yet
 	this.connectionListener = null;
 	this.state = State.DISCONNECTED;
 	this.disconnectHandled = true;
@@ -168,7 +172,17 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     /** {@inheritDoc} */
     public ClientSessionId getSessionId() {
 	logger.log(Level.FINEST, "getSessionId returns {0}", sessionId);
-        return new ClientSessionId(sessionId);
+        return new ClientSessionId(sessionId.getId());
+    }
+
+    /**
+     * Returns the client session ID for this client session in {@code
+     * CompactId} format.
+     *
+     * @return the client session ID as a {@code CompactId}
+     */
+    public CompactId getCompactSessionId() {
+	return sessionId;
     }
 
     /** {@inheritDoc} */
@@ -289,7 +303,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    ClientSessionImpl session = (ClientSessionImpl) obj;
 	    return
 		areEqualIdentities(getIdentity(), session.getIdentity()) &&
-		Arrays.equals(sessionId, session.sessionId);
+		sessionId.equals(session.sessionId);
 	}
 	return false;
     }
@@ -311,13 +325,12 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     
     /** {@inheritDoc} */
     public int hashCode() {
-	return Arrays.hashCode(sessionId);
+	return sessionId.hashCode();
     }
 
     /** {@inheritDoc} */
     public String toString() {
-	return getClass().getName() + "[" + getName() + "]@" +
-            HexDumper.toHexString(sessionId);
+	return getClass().getName() + "[" + getName() + "]@" + sessionId;
     }
     
     /* -- Serialization methods -- */
@@ -334,11 +347,11 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 
 	private final static long serialVersionUID = 1L;
 
-	private final byte[] sessionId;
+	private final byte[] idBytes;
         private final Identity identity;
 
-	External(byte[] sessionId, Identity identity) {
-	    this.sessionId = sessionId;
+	External(CompactId sessionId, Identity identity) {
+	    this.idBytes = sessionId.getId();
             this.identity = identity;
 	}
 
@@ -355,8 +368,9 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	private Object readResolve() throws ObjectStreamException {
 	    ClientSessionService service =
 		ClientSessionServiceImpl.getInstance();
-	    ClientSession session = service.getClientSession(sessionId);
+	    ClientSession session = service.getClientSession(idBytes);
 	    if (session == null) {
+		CompactId sessionId = new CompactId(idBytes);
 		session = new ClientSessionImpl(sessionId, identity);
 	    }
 	    return session;
@@ -494,13 +508,6 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    seed += b & 0xff;
 	}
 	return seed;
-    }
-
-    /** Returns an 8-byte random id. */
-    private static byte[] generateId() {
-	byte[] id = new byte[8];
-	random.nextBytes(id);
-	return id;
     }
 
     /* -- ConnectionListener implementation -- */
@@ -897,12 +904,13 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		listener = new SessionListener(returnedListener);
 		MessageBuffer ack =
 		    new MessageBuffer(
-			7 + sessionId.length + reconnectionKey.length);
+			3 + sessionId.getExternalFormByteCount() +
+			reconnectionKey.getExternalFormByteCount());
 		ack.putByte(SimpleSgsProtocol.VERSION).
 		    putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
 		    putByte(SimpleSgsProtocol.LOGIN_SUCCESS).
-		    putShort(sessionId.length). putBytes(sessionId).
-		    putShort(reconnectionKey.length).putBytes(reconnectionKey);
+		    putBytes(sessionId.getExternalForm()).
+		    putBytes(reconnectionKey.getExternalForm());
 		
 		getContext().addMessageFirst(
 		    ClientSessionImpl.this, ack.getBuffer(), Delivery.RELIABLE);

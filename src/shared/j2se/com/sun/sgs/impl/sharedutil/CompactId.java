@@ -111,6 +111,9 @@ public final class CompactId {
      * @param	externalForm a byte array containing the external form
      *		of a {@code CompactId}
      *
+     * @return	a {@code CompactId} constructed from the specified
+     *		{@code externalForm} 
+     *
      * @throws 	IllegalArgumentException if {@code externalForm} is empty,
      * 		if {@code externalForm} has a different number of bytes
      * 		than is specified by its length field, if {@code
@@ -168,6 +171,8 @@ public final class CompactId {
      * the given {@code lengthByte}.  The returned byte count includes
      * the given byte in the count.
      *
+     * @param	lengthByte the first byte of the external form which
+     *		contains byte count information
      * @return	the byte count of a {@code CompactId}'s external form
      * 		indicated by {@code lengthByte}
      * @throws	IllegalArgumentException if the given {@code lengthByte}
