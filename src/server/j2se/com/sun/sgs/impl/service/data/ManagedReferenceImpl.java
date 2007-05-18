@@ -284,7 +284,8 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 		ManagedObject tempObject = deserialize(
 		    context.store.getObject(context.txn, oid, false));
 		if (context.detectModifications) {
-		    fingerprint = SerialUtil.fingerprint(tempObject);
+		    fingerprint = SerialUtil.fingerprint(
+			tempObject, context.classSerial);
 		    state = State.MAYBE_MODIFIED;
 		} else {
 		    state = State.NOT_MODIFIED;
@@ -487,12 +488,15 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 	    break;
 	case NEW:
 	case MODIFIED:
-	    result = SerialUtil.serialize(object);
+	    result = SerialUtil.serialize(object, context.classSerial);
 	    context.refs.unregisterObject(object);
 	    break;
 	case MAYBE_MODIFIED:
-	    if (!SerialUtil.matchingFingerprint(object, fingerprint)) {
-		result = SerialUtil.serialize(object);
+	    if (!SerialUtil.matchingFingerprint(
+		    object, fingerprint, context.classSerial))
+	    {
+		result = SerialUtil.serialize(
+		    object, context.classSerial);
 	    }
 	    /* Fall through */
 	case NOT_MODIFIED:
@@ -538,7 +542,7 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
      * the return value is not null.
      */
     private ManagedObject deserialize(byte[] data) {
-	Object obj =  SerialUtil.deserialize(data);
+	Object obj =  SerialUtil.deserialize(data, context.classSerial);
 	if (obj == null) {
 	    throw new ObjectIOException(
 		"Managed object must not deserialize to null", false);

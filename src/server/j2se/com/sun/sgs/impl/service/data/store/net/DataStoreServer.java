@@ -6,6 +6,7 @@ package com.sun.sgs.impl.service.data.store.net;
 
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.impl.service.data.store.ClassInfoNotFoundException;
 import java.io.IOException;
 import java.rmi.Remote;
 
@@ -186,6 +187,45 @@ public interface DataStoreServer extends Remote {
      * @throws	IOException if a network problem occurs
      */
     String nextBoundName(long tid, String name) throws IOException;
+
+    /**
+     * Returns the class ID that should be used to represent classes with the
+     * specified class information.  Obtains an existing ID for the class
+     * information if present; otherwise, stores the information and returns
+     * the new ID associated with it.  Class IDs are always greater than {code
+     * 1}.
+     *
+     * @param	tid the ID of the transaction under which the operation should
+     *		take place
+     * @param	classInfo the class information
+     * @return	the associated class ID
+     * @throws	TransactionAbortedException if the transaction was aborted due
+     *		to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the transaction is not active
+     * @throws	IllegalStateException if the operation failed because of a
+     *		problem with the current transaction
+     * @throws	IOException if a network problem occurs
+     */
+    int getClassId(long tid, byte[] classInfo) throws IOException;
+
+    /**
+     * Returns the class information associated with the specified class ID.
+     *
+     * @param	tid the ID of the transaction under which the operation should
+     *		take place
+     * @param	classId the class ID
+     * @return	the associated class information
+     * @throws	IllegalArgumentException if {@code classId} is less than {@code
+     *		1}
+     * @throws	ClassInfoNotFoundException if the ID is not found
+     * @throws	TransactionAbortedException if the transaction was aborted due
+     *		to a lock conflict or timeout
+     * @throws	IllegalStateException if the operation failed because of a
+     *		problem with the transaction
+     * @throws	IOException if a network problem occurs
+     */
+    byte[] getClassInfo(long tid, int classId)
+	throws ClassInfoNotFoundException, IOException;
 
     /** 
      * Creates a new transaction and returns the associated ID.

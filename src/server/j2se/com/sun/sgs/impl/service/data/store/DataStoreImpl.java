@@ -4,8 +4,11 @@
 
 package com.sun.sgs.impl.service.data.store;
 
+import com.sleepycat.bind.tuple.IntegerBinding;
 import com.sleepycat.bind.tuple.LongBinding;
 import com.sleepycat.bind.tuple.StringBinding;
+import com.sleepycat.bind.tuple.TupleInput;
+import com.sleepycat.bind.tuple.TupleOutput;
 import com.sleepycat.db.Cursor;
 import com.sleepycat.db.Database;
 import com.sleepycat.db.DatabaseConfig;
@@ -26,7 +29,6 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionConflictException;
-import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -40,6 +42,9 @@ import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.security.DigestException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -188,6 +193,16 @@ public class DataStoreImpl
     private static final String FLUSH_TO_DISK_PROPERTY =
 	CLASSNAME + ".flush.to.disk";
 
+    /** The first byte stored in class hash keys. */
+    private static final byte CLASS_HASH = 1;
+
+    /**
+     * The first byte value stored in class ID keys.  This value should be
+     * greater than CLASS_HASH, to insure that class ID keys come after class
+     * hash ones.
+     */
+    private static final byte CLASS_ID = 2;
+
     /** The logger for this class. */
     static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
@@ -216,6 +231,9 @@ public class DataStoreImpl
      * concurrency conflicts between the object ID and other data.
      */
     private final Database infoDb;
+
+    /** The Berkeley DB database that stores class information. */
+    private final Database classesDb;
 
     /** The Berkeley DB database that maps object IDs to object bytes. */
     private final Database oidsDb;
@@ -247,6 +265,12 @@ public class DataStoreImpl
     /** The number of currently active transactions. */
     private int txnCount = 0;
 
+    /** A message digest or null if the instance is already in use. */
+    private MessageDigest messageDigest;
+
+    /** Synchronize on this object when getting or setting messageDigest. */
+    private final Object messageDigestLock = new Object();
+
     /* -- The operations -- DataStore API -- */
     private ProfileOperation createObjectOp = null;
     private ProfileOperation markForUpdateOp = null;
@@ -259,6 +283,8 @@ public class DataStoreImpl
     private ProfileOperation setBindingOp = null;
     private ProfileOperation removeBindingOp = null;
     private ProfileOperation nextBoundNameOp = null;
+    private ProfileOperation getClassIdOp = null;
+    private ProfileOperation getClassInfoOp = null;
 
     /**
      * The counters used for profile reporting, which track the bytes read
@@ -506,6 +532,14 @@ public class DataStoreImpl
     }
 
     /**
+     * Stores information about the databases that constitute the data
+     * store.
+     */
+    private static class Databases {
+	private Database info, classes, oids, names;
+    }
+
+    /**
      * Creates an instance of this class configured with the specified
      * properties.  See the {@link DataStoreImpl class documentation} for a
      * list of supported properties.
@@ -558,52 +592,11 @@ public class DataStoreImpl
 	try {
 	    env = getEnvironment(properties);
 	    bdbTxn = env.beginTransaction(null, null);
-	    DatabaseConfig createConfig = new DatabaseConfig();
-	    createConfig.setType(DatabaseType.BTREE);
-	    createConfig.setAllowCreate(true);
-	    boolean create = false;
-	    String infoFileName = directory + File.separator + "info";
-	    Database infoTmp;
-	    try {
-		infoTmp = env.openDatabase(bdbTxn, infoFileName, null, null);
-		int minorVersion = DataStoreHeader.verify(infoTmp, bdbTxn);
-		if (logger.isLoggable(Level.CONFIG)) {
-		    logger.log(Level.CONFIG, "Found existing header {0}",
-			       DataStoreHeader.headerString(minorVersion));
-		}
-	    } catch (FileNotFoundException e) {
-		try {
-		    infoTmp = env.openDatabase(
-			bdbTxn, infoFileName, null, createConfig);
-		} catch (FileNotFoundException e2) {
-		    throw new DataStoreException(
-			"Problem creating database: " + e2.getMessage(),
-			e2);
-		}
-		DataStoreHeader.create(infoTmp, bdbTxn);
-		if (logger.isLoggable(Level.CONFIG)) {
-		    logger.log(Level.CONFIG, "Created new header {0}",
-			       DataStoreHeader.headerString());
-		}
-		create = true;
-	    }
-	    infoDb = infoTmp;
-	    try {
-		oidsDb = env.openDatabase(
-		    bdbTxn, directory + File.separator + "oids", null,
-		    create ? createConfig : null);
-	    } catch (FileNotFoundException e) {
-		throw new DataStoreException(
-		    "Oids database not found: " + e.getMessage(), e);
-	    }
-	    try {
-		namesDb = env.openDatabase(
-		    bdbTxn, directory + File.separator + "names", null,
-		    create ? createConfig : null);
-	    } catch (FileNotFoundException e) {
-		throw new DataStoreException(
-		    "Names database not found: " + e.getMessage(), e);
-	    }
+	    Databases dbs = getDatabases(bdbTxn);
+	    infoDb = dbs.info;
+	    classesDb = dbs.classes;
+	    oidsDb = dbs.oids;
+	    namesDb = dbs.names;
 	    done = true;
 	    bdbTxn.commit();
 	} catch (DatabaseException e) {
@@ -656,6 +649,68 @@ public class DataStoreImpl
 	    throw new DataStoreException(
 		"DataStore directory does not exist: " + directory);
 	}
+    }
+
+    /**
+     * Opens or creates the Berkeley DB databases associated with this data
+     * store.
+     */
+    private Databases getDatabases(com.sleepycat.db.Transaction bdbTxn)
+	throws DatabaseException
+    {
+	Databases dbs = new Databases();
+	DatabaseConfig createConfig = new DatabaseConfig();
+	createConfig.setType(DatabaseType.BTREE);
+	createConfig.setAllowCreate(true);
+	boolean create = false;
+	String infoFileName = directory + File.separator + "info";
+	try {
+	    dbs.info = env.openDatabase(bdbTxn, infoFileName, null, null);
+	    int minorVersion = DataStoreHeader.verify(dbs.info, bdbTxn);
+	    if (logger.isLoggable(Level.CONFIG)) {
+		logger.log(Level.CONFIG, "Found existing header {0}",
+			   DataStoreHeader.headerString(minorVersion));
+	    }
+	} catch (FileNotFoundException e) {
+	    try {
+		dbs.info = env.openDatabase(
+		    bdbTxn, infoFileName, null, createConfig);
+	    } catch (FileNotFoundException e2) {
+		throw new DataStoreException(
+		    "Problem creating database: " + e2.getMessage(), e2);
+	    }
+	    DataStoreHeader.create(dbs.info, bdbTxn);
+	    if (logger.isLoggable(Level.CONFIG)) {
+		logger.log(Level.CONFIG, "Created new header {0}",
+			   DataStoreHeader.headerString());
+	    }
+	    create = true;
+	}
+	try {
+	    dbs.classes = env.openDatabase(
+		bdbTxn, directory + File.separator + "classes", null,
+		create ? createConfig : null);
+	} catch (FileNotFoundException e) {
+	    throw new DataStoreException(
+		"Classes database not found: " + e.getMessage(), e);
+	}
+	try {
+	    dbs.oids = env.openDatabase(
+		bdbTxn, directory + File.separator + "oids", null,
+		create ? createConfig : null);
+	} catch (FileNotFoundException e) {
+	    throw new DataStoreException(
+		"Oids database not found: " + e.getMessage(), e);
+	}
+	try {
+	    dbs.names = env.openDatabase(
+		bdbTxn, directory + File.separator + "names", null,
+		create ? createConfig : null);
+	} catch (FileNotFoundException e) {
+	    throw new DataStoreException(
+		"Names database not found: " + e.getMessage(), e);
+	}
+	return dbs;
     }
 
     /* -- Implement DataStore -- */
@@ -1088,6 +1143,7 @@ public class DataStoreImpl
 		boolean ok = (txnCount == 0);
 		if (ok) {
 		    infoDb.close();
+		    classesDb.close();
 		    oidsDb.close();
 		    namesDb.close();
 		    env.close();
@@ -1102,6 +1158,218 @@ public class DataStoreImpl
 	    exception = e;
 	}
 	throw convertException(null, Level.FINER, exception, "shutdown");
+    }
+
+    /** {@inheritDoc} */
+    public int getClassId(Transaction txn, byte[] classInfo) {
+	logger.log(Level.FINER, "getClassId txn:{0}", txn);
+	String operation = "getClassId txn:" + txn;
+	Exception exception;
+	boolean done = false;
+	com.sleepycat.db.Transaction bdbTxn = null;
+	try {
+	    if (classInfo == null) {
+		throw new NullPointerException(
+		    "The classInfo argument must not be null");
+	    }
+	    checkTxn(txn, getClassIdOp);
+	    DatabaseEntry hashKey = getKeyFromClassInfo(classInfo);
+	    DatabaseEntry hashValue = new DatabaseEntry();
+	    int result;
+	    bdbTxn = env.beginTransaction(null, null);
+	    try {
+		if (get(classesDb, bdbTxn, hashKey, hashValue, operation)) {
+		    result = IntegerBinding.entryToInt(hashValue);
+		} else {
+		    Cursor cursor = classesDb.openCursor(bdbTxn, null);
+		    try {
+			DatabaseEntry idKey = new DatabaseEntry();
+			DatabaseEntry idValue = new DatabaseEntry();
+			OperationStatus status =
+			    cursor.getLast(idKey, idValue, null);
+			if (status == OperationStatus.SUCCESS) {
+			    result = getClassIdFromKey(idKey) + 1;
+			} else if (status == OperationStatus.NOTFOUND) {
+			    result = 1;
+			} else {
+			    throw new DataStoreException(
+				operation + " failed: " + status);
+			}
+			idKey = getKeyFromClassId(result);
+			idValue = new DatabaseEntry(classInfo);
+			status = cursor.putNoOverwrite(idKey, idValue);
+			if (status != OperationStatus.SUCCESS) {
+			    throw new DataStoreException(
+				operation + " failed: " + status);
+			}
+		    } finally {
+			cursor.close();
+		    }
+		    IntegerBinding.intToEntry(result, hashValue);
+		    putNoOverwrite(
+			classesDb, bdbTxn, hashKey, hashValue, operation);
+		}
+		done = true;
+		bdbTxn.commit();
+	    } finally {
+		if (!done) {
+		    bdbTxn.abort();
+		}
+	    }
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.log(Level.FINER, "getClass txn:{0} returns {1}",
+			   txn, result);
+	    }
+	    return result;
+	} catch (DatabaseException e) {
+	    exception = e;
+	} catch (RuntimeException e) {
+	    exception = e;
+	}
+	throw convertException(txn, Level.FINER, exception, operation);
+    }
+
+    private int getClassIdFromKey(DatabaseEntry key) {
+	TupleInput in = new TupleInput(key.getData());
+	byte first = in.readByte();
+	assert first == CLASS_ID;
+	return in.readInt();
+    }
+
+    private DatabaseEntry getKeyFromClassId(int classId) {
+	TupleOutput out = new TupleOutput(new byte[5]);
+	out.writeByte(CLASS_ID);
+	out.writeInt(classId);
+	return new DatabaseEntry(out.getBufferBytes());
+    }
+
+    private DatabaseEntry getKeyFromClassInfo(byte[] classInfo) {
+	byte[] keyBytes = new byte[1 + 20];
+	keyBytes[0] = CLASS_HASH;
+	MessageDigest md = getMessageDigest();
+	try {
+	    md.update(classInfo);
+	    int numBytes = md.digest(keyBytes, 1, 20);
+	    assert numBytes == 20;
+	    return new DatabaseEntry(keyBytes);
+	} catch (DigestException e) {
+	    throw new AssertionError(e);
+	} finally {
+	    returnMessageDigest(md);
+	}
+    }
+
+    private MessageDigest getMessageDigest() {
+	synchronized (messageDigestLock) {
+	    if (messageDigest != null) {
+		MessageDigest result = messageDigest;
+		messageDigest = null;
+		return result;
+	    }
+	}
+	try {
+	    return MessageDigest.getInstance("SHA-1");
+	} catch (NoSuchAlgorithmException e) {
+	    throw new AssertionError(e);
+	}
+    }
+
+    private void returnMessageDigest(MessageDigest md) {
+	synchronized (messageDigestLock) {
+	    if (messageDigest == null) {
+		messageDigest = md;
+	    }
+	}
+    }
+
+    private static boolean get(Database db,
+			       com.sleepycat.db.Transaction bdbTxn,
+			       DatabaseEntry key,
+			       DatabaseEntry value,
+			       String operation)
+	throws DatabaseException
+    {
+	OperationStatus status = db.get(bdbTxn, key, value, null);
+	if (status == OperationStatus.SUCCESS) {
+	    return true;
+	} else if (status == OperationStatus.NOTFOUND) {
+	    return false;
+	} else {
+	    throw new DataStoreException(
+		operation + ": Problem reading item: " + status);
+	}
+    }
+
+    private static void putNoOverwrite(Database db,
+				       com.sleepycat.db.Transaction bdbTxn,
+				       DatabaseEntry key,
+				       DatabaseEntry value,
+				       String operation)
+	throws DatabaseException
+    {
+	OperationStatus status = db.putNoOverwrite(bdbTxn, key, value);
+	if (status != OperationStatus.SUCCESS) {
+	    throw new DataStoreException(
+		operation + ": Problem writing item: " + status);
+	}
+    }
+
+    /** {@inheritDoc} */
+    public byte[] getClassInfo(Transaction txn, int classId)
+	throws ClassInfoNotFoundException
+    {
+	if (logger.isLoggable(Level.FINER)) {
+	    logger.log(Level.FINER,
+		       "getClassInfo txn:{0}, classId:{1,number,#}",
+		       txn, classId);
+	}
+	String operation = "getClassInfo txn:" + txn + ", classId:" + classId;
+	Exception exception;
+	try {
+	    checkTxn(txn, getClassInfoOp);
+	    if (classId < 1) {
+		throw new IllegalArgumentException(
+		    "The classId argument must greater than 0");
+	    }
+	    DatabaseEntry key = getKeyFromClassId(classId);
+	    DatabaseEntry value = new DatabaseEntry();
+	    boolean found;
+	    boolean done = false;
+	    com.sleepycat.db.Transaction bdbTxn =
+		env.beginTransaction(null, null);
+	    try {
+		found = get(classesDb, bdbTxn, key, value, operation);
+		done = true;
+		bdbTxn.commit();
+	    } finally {
+		if (!done) {
+		    bdbTxn.abort();
+		}
+	    }
+	    if (found) {
+		byte[] result = value.getData();
+		if (result == null) {
+		    result = NO_BYTES;
+		}
+		logger.log(Level.FINER,
+			   "getClassInfo txn:{0} classId:{1,number,#} returns",
+		    txn, classId);
+		return result;
+	    } else {
+		ClassInfoNotFoundException e =
+		    new ClassInfoNotFoundException(
+			"No information found for class ID " + classId);
+		if (logger.isLoggable(Level.FINER)) {
+		    logger.logThrow(Level.FINER, e, operation + " throws");
+		}
+		throw e;
+	    }
+	} catch (DatabaseException e) {
+	    exception = e;
+	} catch (RuntimeException e) {
+	    exception = e;
+	}
+	throw convertException(txn, Level.FINER, exception, operation);
     }
 
     /* -- Implement TransactionParticipant -- */
@@ -1279,6 +1547,8 @@ public class DataStoreImpl
 	setBindingOp = consumer.registerOperation("setBinding");
 	removeBindingOp = consumer.registerOperation("removeBinding");
 	nextBoundNameOp = consumer.registerOperation("nextBoundName");
+	getClassIdOp = consumer.registerOperation("getClassId");
+	getClassInfoOp = consumer.registerOperation("getClassInfo");
 
 	readBytesCounter = consumer.registerCounter("readBytes", true);
 	readObjectsCounter = consumer.registerCounter("readObjects", true);

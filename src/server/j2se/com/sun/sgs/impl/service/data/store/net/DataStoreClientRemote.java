@@ -159,6 +159,24 @@ class DataStoreClientRemote implements DataStoreServer {
 	}
     }
 
+    public int getClassId(long tid, byte[] classInfo) throws IOException {
+	DataStoreProtocol h = getHandler();
+	try {
+	    return h.getClassId(tid, classInfo);
+	} finally {
+	    returnHandler(h);
+	}
+    }
+
+    public byte[] getClassInfo(long tid, int classId) throws IOException {
+	DataStoreProtocol h = getHandler();
+	try {
+	    return h.getClassInfo(tid, classId);
+	} finally {
+	    returnHandler(h);
+	}
+    }
+
     public long createTransaction() throws IOException {
 	DataStoreProtocol h = getHandler();
 	try {

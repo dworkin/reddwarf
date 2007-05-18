@@ -182,6 +182,9 @@ public final class DataServiceImpl
     /** Whether to detect object modifications automatically. */
     private boolean detectModifications;
 
+    /** Table that stores information about classes used in serialization. */
+    private final ClassesTable classesTable;
+
     /**
      * Creates an instance of this class configured with the specified
      * properties and services.  See the {@link DataServiceImpl class
@@ -233,6 +236,7 @@ public final class DataServiceImpl
 		    new Class[] { Properties.class }, properties);
 		logger.log(Level.CONFIG, "Using data store {0}", store);
 	    }
+	    classesTable = new ClassesTable(store);
 	} catch (Exception e) {
 	    logger.logThrow(
 		Level.SEVERE, e, "DataService initialization failed");
@@ -739,7 +743,8 @@ public final class DataServiceImpl
 	    logger.log(Level.FINER, "join txn:{0}", txn);
 	    txn.join(this);
 	    context = new Context(
-		store, txn, txnProxy, debugCheckInterval, detectModifications);
+		store, txn, txnProxy, debugCheckInterval, detectModifications,
+		classesTable);
 	    currentContext.set(context);
 	} else {
 	    context.checkTxn(txn);
