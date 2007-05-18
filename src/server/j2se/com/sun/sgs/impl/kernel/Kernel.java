@@ -28,7 +28,6 @@ import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 
 import com.sun.sgs.service.Service;
-import com.sun.sgs.service.TransactionRunner;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -432,12 +431,12 @@ class Kernel {
         ServiceConfigRunner configRunner =
             new ServiceConfigRunner(this, serviceList, transactionProxy,
                                     appName, properties);
-        TransactionRunner transactionRunner =
-            new TransactionRunner(configRunner);
+        UnboundedTransactionRunner unboundedTransactionRunner =
+            new UnboundedTransactionRunner(configRunner);
         IdentityImpl appIdentity = new IdentityImpl("app:" + appName);
         TaskOwnerImpl owner = new TaskOwnerImpl(appIdentity, appContext);
         try {
-            scheduler.scheduleTask(transactionRunner, owner);
+            scheduler.scheduleTask(unboundedTransactionRunner, owner);
         } catch (Exception e) {
             if (logger.isLoggable(Level.SEVERE))
                 logger.logThrow(Level.SEVERE, e,

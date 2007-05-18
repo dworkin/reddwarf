@@ -49,6 +49,9 @@ final class TransactionImpl implements Transaction {
     /** The time the transaction was created. */
     private final long creationTime;
 
+    /** The length of time that this transaction is allowed to run.*/
+    private final long timeout;
+
     /** The thread associated with this transaction. */
     private final Thread owner;
 
@@ -79,8 +82,9 @@ final class TransactionImpl implements Transaction {
     private final HashMap<String,ProfileParticipantDetailImpl> detailMap;
 
     /** Creates an instance with the specified transaction ID and collector. */
-    TransactionImpl(long tid, ProfileCollector collector) {
+    TransactionImpl(long tid, long timeout, ProfileCollector collector) {
 	this.tid = tid;
+	this.timeout = timeout;
 	this.collector = collector;
 	creationTime = System.currentTimeMillis();
 	owner = Thread.currentThread();
@@ -103,6 +107,11 @@ final class TransactionImpl implements Transaction {
     /** {@inheritDoc} */
     public long getCreationTime() {
 	return creationTime;
+    }
+
+    /** {@inheritDoc} */
+    public long getTimeout() {
+	return timeout;
     }
 
     /** {@inheritDoc} */

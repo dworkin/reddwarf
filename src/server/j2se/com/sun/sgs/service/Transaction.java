@@ -46,6 +46,14 @@ public interface Transaction {
     public long getCreationTime();
 
     /**
+     * Returns the length of time in milliseconds that this
+     * <code>Transaction</code> is allowed to run before it should timeout.
+     *
+     * @return the timeout length
+     */
+    public long getTimeout();
+
+    /**
      * Tells the <code>Transaction</code> that the given
      * <code>TransactionParticipant</code> is participating in the
      * transaction. A <code>TransactionParticipant</code> is allowed to
