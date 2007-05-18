@@ -746,6 +746,9 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 		if (! contextQueue.isEmpty()) {
 		    Iterator<Context> iter = contextQueue.iterator();
 		    while (iter.hasNext()) {
+			if (Thread.currentThread().isInterrupted()) {
+			    return;
+			}
 			Context context = iter.next();
 			if (context.flush()) {
 			    iter.remove();
