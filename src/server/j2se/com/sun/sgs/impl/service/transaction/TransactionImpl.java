@@ -123,7 +123,7 @@ final class TransactionImpl implements Transaction {
 	long runningTime = System.currentTimeMillis() - getCreationTime();
 	if (runningTime > getTimeout())
 	    throw new TransactionTimeoutException("transaction timed out: " +
-						  runningTime + "ms");
+						  runningTime + " ms");
     }
 
     /** {@inheritDoc} */
