@@ -4,6 +4,7 @@
 
 package com.sun.sgs.impl.service.transaction;
 
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.ProfileCollector;
 import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
@@ -27,7 +28,14 @@ import java.util.concurrent.atomic.AtomicLong;
  *
  * The <code>Transaction</code> instances created by this class are not
  * synchronized; methods on those instances should only be called from a single
- * thread.
+ * thread. <p>
+ *
+ * The default timeout for bounded transactions created by this class is
+ * 100ms. The default timeout for unbounded transactions created by this class
+ * is Long.MAX_VALUE. These defaults may be overridden using the properties
+ * <code>TransactionCoordinator.TXN_TIMEOUT_PROPERTY</code> and
+ * <code>TransactionCoordinator.TXN_UNBOUNDED_TIMEOUT_PROPERTY</code>
+ * respectively.
  */
 public final class TransactionCoordinatorImpl
     implements TransactionCoordinator
@@ -38,6 +46,14 @@ public final class TransactionCoordinatorImpl
     /** The optional collector for reporting participant details. */
     private final ProfileCollector collector;
 
+    /** The value and default for bounded timeout. */
+    private final long boundedTimeout;
+    private static final long BOUNDED_TIMEOUT_DEFAULT = 100L;
+
+    /** The value and default for unbounded timeout. */
+    private final long unboundedTimeout;
+    private static final long UNBOUNDED_TIMEOUT_DEFAULT = Long.MAX_VALUE;
+
     /** An implementation of TransactionHandle. */
     private static final class TransactionHandleImpl
 	implements TransactionHandle
@@ -45,9 +61,13 @@ public final class TransactionCoordinatorImpl
 	/** The transaction. */
 	private final TransactionImpl txn;
 
-	/** Creates a transaction with the specified ID and collector. */
-	TransactionHandleImpl(long tid, ProfileCollector collector) {
-	    txn = new TransactionImpl(tid, collector);
+	/**
+	 * Creates a transaction with the specified ID, timeout, and
+	 * collector.
+	 */
+	TransactionHandleImpl(long tid, long timeout,
+			      ProfileCollector collector) {
+	    txn = new TransactionImpl(tid, timeout, collector);
 	}
 
 	public String toString() {
@@ -80,10 +100,25 @@ public final class TransactionCoordinatorImpl
 	    throw new NullPointerException("Properties must not be null");
 	}
 	this.collector = collector;
+
+	PropertiesWrapper props = new PropertiesWrapper(properties);
+	this.boundedTimeout =
+	    props.getLongProperty(TransactionCoordinator.TXN_TIMEOUT_PROPERTY,
+				  BOUNDED_TIMEOUT_DEFAULT);
+	this.unboundedTimeout =
+	    props.getLongProperty(TransactionCoordinator.
+				  TXN_UNBOUNDED_TIMEOUT_PROPERTY,
+				  UNBOUNDED_TIMEOUT_DEFAULT);
     }
 
     /** {@inheritDoc} */
-    public TransactionHandle createTransaction() {
-	return new TransactionHandleImpl(nextTid.getAndIncrement(), collector);
+    public TransactionHandle createTransaction(boolean unbounded) {
+	if (unbounded) {
+	    return new TransactionHandleImpl(nextTid.getAndIncrement(),
+					     unboundedTimeout, collector);
+	} else {
+	    return new TransactionHandleImpl(nextTid.getAndIncrement(),
+					     boundedTimeout, collector);
+	}
     }
 }

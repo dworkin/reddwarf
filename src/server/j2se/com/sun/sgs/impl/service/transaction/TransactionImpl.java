@@ -6,6 +6,7 @@ package com.sun.sgs.impl.service.transaction;
 
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.MaybeRetryableTransactionAbortedException;
 import com.sun.sgs.impl.util.MaybeRetryableTransactionNotActiveException;
@@ -49,6 +50,9 @@ final class TransactionImpl implements Transaction {
     /** The time the transaction was created. */
     private final long creationTime;
 
+    /** The length of time that this transaction is allowed to run.*/
+    private final long timeout;
+
     /** The thread associated with this transaction. */
     private final Thread owner;
 
@@ -78,9 +82,13 @@ final class TransactionImpl implements Transaction {
     /** Collected profiling data on each participant. */
     private final HashMap<String,ProfileParticipantDetailImpl> detailMap;
 
-    /** Creates an instance with the specified transaction ID and collector. */
-    TransactionImpl(long tid, ProfileCollector collector) {
+    /**
+     * Creates an instance with the specified transaction ID, timeout, and
+     * collector.
+     */
+    TransactionImpl(long tid, long timeout, ProfileCollector collector) {
 	this.tid = tid;
+	this.timeout = timeout;
 	this.collector = collector;
 	creationTime = System.currentTimeMillis();
 	owner = Thread.currentThread();
@@ -103,6 +111,19 @@ final class TransactionImpl implements Transaction {
     /** {@inheritDoc} */
     public long getCreationTime() {
 	return creationTime;
+    }
+
+    /** {@inheritDoc} */
+    public long getTimeout() {
+	return timeout;
+    }
+
+    /** {@inheritDoc} */
+    public void checkTimeout() {
+	long runningTime = System.currentTimeMillis() - getCreationTime();
+	if (runningTime > getTimeout())
+	    throw new TransactionTimeoutException("transaction timed out: " +
+						  runningTime + " ms");
     }
 
     /** {@inheritDoc} */

@@ -181,7 +181,9 @@ public class TestChannelServiceImpl extends TestCase {
 	
 	// configure channel service
 	channelService.configure(serviceRegistry, txnProxy);
+	txnProxy.setComponent(ChannelServiceImpl.class, channelService);
 	serviceRegistry.setComponent(ChannelManager.class, channelService);
+	serviceRegistry.setComponent(ChannelServiceImpl.class, channelService);
 	
 	txn.commit();
 	createTransaction();
@@ -1155,8 +1157,8 @@ public class TestChannelServiceImpl extends TestCase {
 	    DummyClient larry = group.getClient("larry");
 	    CompactId channelId = moe.channelNameToId.get(CHANNEL_NAME);
 	    int numMessages = 3;
-	    Set<byte[]> recipientIds = new HashSet<byte[]>();
-	    recipientIds.add(larry.getSessionId());
+	    Set<CompactId> recipientIds = new HashSet<CompactId>();
+	    recipientIds.add(larry.sessionId);
 	    for (int i = 0; i < numMessages; i++) {
 		MessageBuffer buf =
 		    new MessageBuffer(MessageBuffer.getSize("moe") + 4);
@@ -1244,7 +1246,7 @@ public class TestChannelServiceImpl extends TestCase {
 	    for (DummyClient client : clients.values()) {
 
 		ClientSession session =
-		    sessionService.getClientSession(client.sessionId);
+		    sessionService.getClientSession(client.getSessionId());
 
 		if (session != null && sessions.contains(session)) {
 		    if (!isMember) {
@@ -1265,7 +1267,7 @@ public class TestChannelServiceImpl extends TestCase {
 	void checkChannelSets(boolean exists) throws Exception {
 	    createTransaction();
 	    for (DummyClient client : clients.values()) {
-		String sessionKey = getSessionKey(client.sessionId);
+		String sessionKey = getSessionKey(client.getSessionId());
 		try {
 		    dataService.getServiceBinding(
 			sessionKey, ManagedObject.class);
@@ -1582,7 +1584,7 @@ public class TestChannelServiceImpl extends TestCase {
     private static class DummyClient {
 
 	String name;
-	byte[] sessionId;
+	CompactId sessionId;
 	private Connector<SocketAddress> connector;
 	private ConnectionListener listener;
 	private Connection connection;
@@ -1601,7 +1603,7 @@ public class TestChannelServiceImpl extends TestCase {
 	//private String channelName = null;
 	//private CompactId channelId = null;
 	private String reason;
-	private byte[] reconnectionKey;
+	private CompactId reconnectionKey;
 	private final List<MessageInfo> channelMessages =
 	    new ArrayList<MessageInfo>();
 	private final AtomicLong sequenceNumber = new AtomicLong(0);
@@ -1611,7 +1613,7 @@ public class TestChannelServiceImpl extends TestCase {
 	}
 
 	byte[] getSessionId() {
-	    return sessionId;
+	    return sessionId.getId();
 	}
 
 	void connect(int port) {
@@ -1739,28 +1741,17 @@ public class TestChannelServiceImpl extends TestCase {
 	}
 
 	/**
-	 * Returns the size that the set of ids will use when put in a
-	 * message buffer.  The returned value accounts for the
-	 * two-byte header for the number of ids in the set.
-	 */
-	private static int getSize(Set<byte[]> ids) {
-	    int size = 2;
-	    for (byte[] id : ids) {
-		size += 2 + id.length;
-	    }
-	    return size;
-	}
-
-	/**
 	 * Sends a CHANNEL_SEND_REQUEST.
 	 */
-	void sendChannelMessage(CompactId channelToSend, Set<byte[]> recipientIds,
+	void sendChannelMessage(CompactId channelToSend,
+				Set<CompactId> recipientIds,
 				byte[] message) {
 	    checkLoggedIn();
 
+	    
 	    MessageBuffer buf =
-		new MessageBuffer(3 + channelToSend.getExternalFormByteCount() + 8 +
-				  getSize(recipientIds) +
+		new MessageBuffer(3 + channelToSend.getExternalFormByteCount() +
+				  8 + 2 + getSize(recipientIds) +
 				  2 + message.length);
 	    buf.putByte(SimpleSgsProtocol.VERSION).
 		putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
@@ -1768,8 +1759,8 @@ public class TestChannelServiceImpl extends TestCase {
 		putBytes(channelToSend.getExternalForm()).
 		putLong(nextSequenceNumber()).
 		putShort(recipientIds.size());
-	    for (byte[] recipientId : recipientIds) {
-		buf.putByteArray(recipientId);
+	    for (CompactId recipientId : recipientIds) {
+		recipientId.putCompactId(buf);
 	    }
 	    buf.putByteArray(message);
 	    try {
@@ -1792,6 +1783,14 @@ public class TestChannelServiceImpl extends TestCase {
 		    null :
 		    channelMessages.remove(0);
 	    }
+	}
+
+	private int getSize(Set<CompactId> ids) {
+	    int size = 0;
+	    for (CompactId id : ids) {
+		size += id.getExternalFormByteCount();
+	    }
+	    return size;
 	}
 
 	/**
@@ -1950,8 +1949,8 @@ public class TestChannelServiceImpl extends TestCase {
 		switch (opcode) {
 
 		case SimpleSgsProtocol.LOGIN_SUCCESS:
-		    sessionId = buf.getBytes(buf.getUnsignedShort());
-		    reconnectionKey = buf.getBytes(buf.getUnsignedShort());
+		    sessionId = CompactId.getCompactId(buf);
+		    reconnectionKey = CompactId.getCompactId(buf);
 		    synchronized (lock) {
 			loginAck = true;
 			loginSuccess = true;
@@ -2031,7 +2030,7 @@ public class TestChannelServiceImpl extends TestCase {
 		case SimpleSgsProtocol.CHANNEL_MESSAGE: {
 		    CompactId channelId = CompactId.getCompactId(buf);
 		    long seq = buf.getLong();
-		    byte[] senderId = buf.getByteArray();
+		    CompactId senderId = CompactId.getCompactId(buf);
 		    byte[] message = buf.getByteArray();
 		    synchronized (lock) {
 			channelMessages.add(
@@ -2088,11 +2087,12 @@ public class TestChannelServiceImpl extends TestCase {
 
     private static class MessageInfo {
 	final CompactId channelId;
-	final byte[] senderId;
+	final CompactId senderId;
 	final byte[] message;
 	final long seq;
 
-	MessageInfo(CompactId channelId, byte[] senderId, byte[] message, long seq) {
+	MessageInfo(CompactId channelId, CompactId senderId,
+		    byte[] message, long seq) {
 	    this.channelId = channelId;
 	    this.senderId = senderId;
 	    this.message = message;

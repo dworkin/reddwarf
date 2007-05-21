@@ -16,8 +16,8 @@ import com.sun.sgs.app.NameExistsException;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
-import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.impl.service.session.ClientSessionImpl;
 import com.sun.sgs.impl.sharedutil.CompactId;
 import com.sun.sgs.impl.sharedutil.HexDumper;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -26,12 +26,13 @@ import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.BoundNamesUtil;
 import com.sun.sgs.impl.util.NonDurableTaskQueue;
 import com.sun.sgs.impl.util.NonDurableTaskScheduler;
+import com.sun.sgs.impl.util.TransactionContext;
+import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
 import com.sun.sgs.service.ClientSessionService;
 import com.sun.sgs.service.DataService;
-import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.ProtocolMessageListener;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.SgsClientSession;
@@ -40,7 +41,6 @@ import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import java.io.Serializable;
 import java.math.BigInteger;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -56,14 +56,20 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Simple ChannelService implementation.
+ * Simple ChannelService implementation. <p>
+ * 
+ * The {@link #ChannelServiceImpl constructor} supports the
+ * following properties: <p>
+ *
+ * <ul>
+ *
+ * <li> <i>Key:</i> {@code com.sun.sgs.app.name} <br>
+ *	<i>No default &mdash; required</i> <br>
+ *	Specifies the application name. <p>
+ *
+ * </ul> <p>
  */
-public class ChannelServiceImpl
-    implements ChannelManager, Service, NonDurableTransactionParticipant
-{
-    /** The state of a transaction in a context. */
-    private static enum State { ACTIVE, PREPARED, COMMITTED, ABORTED };
-	
+public class ChannelServiceImpl implements ChannelManager, Service {
     /** The name of this class. */
     private static final String CLASSNAME = ChannelServiceImpl.class.getName();
 
@@ -77,10 +83,6 @@ public class ChannelServiceImpl
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
 
-    /** Provides transaction and other information for the current thread. */
-    private static final ThreadLocal<Context> currentContext =
-	new ThreadLocal<Context>();
-    
     /** List of contexts that have been prepared (non-readonly) or commited. */
     private final List<Context> contextList = new LinkedList<Context>();
 
@@ -94,7 +96,7 @@ public class ChannelServiceImpl
     private final ProtocolMessageListener protocolMessageListener;
     
     /** The transaction proxy, or null if configure has not been called. */    
-    private TransactionProxy txnProxy;
+    private static TransactionProxy txnProxy;
 
     /** The data service. */
     private DataService dataService;
@@ -108,6 +110,9 @@ public class ChannelServiceImpl
     /** The task scheduler for non-durable tasks. */
     NonDurableTaskScheduler nonDurableTaskScheduler;
 
+    /** The transaction context factory. */
+    private TransactionContextFactory<Context> contextFactory;
+    
     /** Map (with weak keys) of client sessions to queues, each containing
      * tasks to forward channel messages sent by the session (the key).
      */
@@ -179,29 +184,38 @@ public class ChannelServiceImpl
 	    } else if (proxy == null) {
 		throw new NullPointerException("null transaction proxy");
 	    }
+	    synchronized (ChannelServiceImpl.class) {
+		if (ChannelServiceImpl.txnProxy == null) {
+		    ChannelServiceImpl.txnProxy = proxy;
+		} else {
+		    assert ChannelServiceImpl.txnProxy == proxy;
+		}
+	    }
+
 	    synchronized (lock) {
-		if (txnProxy != null) {
+		if (contextFactory != null) {
 		    throw new IllegalStateException("Already configured");
 		}
-		txnProxy = proxy;
+		contextFactory = new ContextFactory(txnProxy);
 		dataService = registry.getComponent(DataService.class);
 		sessionService =
 		    registry.getComponent(ClientSessionService.class);
 		nonDurableTaskScheduler =
 		    new NonDurableTaskScheduler(
-			taskScheduler, proxy.getCurrentOwner(),
+		    	taskScheduler, proxy.getCurrentOwner(),
 			registry.getComponent(TaskService.class));
-	    }
 
-	    /*
-	     * Remove all sessions from all channels since all
-	     * previously stored sessions have been disconnected.
-	     */
-	    removeAllSessionsFromChannels();
-	    removeChannelSets();
-	    
-	    sessionService.registerProtocolMessageListener(
-		SimpleSgsProtocol.CHANNEL_SERVICE, protocolMessageListener);
+		/*
+		 * Remove all sessions from all channels since all
+		 * previously stored sessions have been disconnected.
+		 */
+		removeAllSessionsFromChannels();
+		removeChannelSets();
+		
+		sessionService.registerProtocolMessageListener(
+		    SimpleSgsProtocol.CHANNEL_SERVICE,
+		    protocolMessageListener);
+	    }
 	    
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
@@ -234,7 +248,7 @@ public class ChannelServiceImpl
 		throw new IllegalArgumentException(
 		    "listener is not serializable");
 	    }
-	    Context context = checkContext();
+	    Context context = contextFactory.joinTransaction();
 	    Channel channel = context.createChannel(name, listener, delivery);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
@@ -258,7 +272,7 @@ public class ChannelServiceImpl
 	    if (name == null) {
 		throw new NullPointerException("null name");
 	    }
-	    Context context = checkContext();
+	    Context context = contextFactory.joinTransaction();
 	    Channel channel = context.getChannel(name);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(
@@ -276,69 +290,15 @@ public class ChannelServiceImpl
 	}
     }
 
-    /* -- Implement NonDurableTransactionParticipant -- */
+    /* -- Implement TransactionContextFactory -- */
        
-    /** {@inheritDoc} */
-    public boolean prepare(Transaction txn) throws Exception {
-	try {
-	    checkTransaction(txn);
-            boolean readOnly = currentContext.get().prepare();
-	    if (readOnly) {
-		currentContext.set(null);
-	    }
-	    if (logger.isLoggable(Level.FINE)) {
-		logger.log(Level.FINER, "prepare txn:{0} returns {1}",
-			   txn, readOnly);
-	    }
-	    
-	    return readOnly;
-	    
-	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.FINER)) {
-		logger.logThrow(Level.FINER, e, "prepare txn:{0} throws", txn);
-	    }
-	    throw e;
+    private class ContextFactory extends TransactionContextFactory<Context> {
+	ContextFactory(TransactionProxy txnProxy) {
+	    super(txnProxy);
 	}
-    }
-
-    /** {@inheritDoc} */
-    public void commit(Transaction txn) {
-	try {
-	    checkTransaction(txn);
-	    currentContext.get().commit();
-	    currentContext.set(null);
-	    if (logger.isLoggable(Level.FINER)) {
-		logger.log(Level.FINER, "commit txn:{0} returns", txn);
-	    }
-	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.FINER)) {
-		logger.logThrow(Level.FINER, e, "commit txn:{0} throws", txn);
-	    }
-	    throw e;
-	}
-    }
-
-    /** {@inheritDoc} */
-    public void prepareAndCommit(Transaction txn) throws Exception {
-        if (!prepare(txn)) {
-            commit(txn);
-        }
-    }
-
-    /** {@inheritDoc} */
-    public void abort(Transaction txn) {
-	try {
-	    checkTransaction(txn);
-	    currentContext.get().abort();
-	    currentContext.set(null);
-	    if (logger.isLoggable(Level.FINER)) {
-		logger.log(Level.FINER, "abort txn:{0} returns", txn);
-	    }
-	} catch (RuntimeException e) {
-	    if (logger.isLoggable(Level.FINER)) {
-		logger.logThrow(Level.FINER, e, "abort txn:{0} throws", txn);
-	    }
-	    throw e;
+	
+	public Context createContext(Transaction txn) {
+	    return new Context(txn);
 	}
     }
 
@@ -368,83 +328,27 @@ public class ChannelServiceImpl
     /* -- other methods -- */
 
     /**
-     * Checks the specified transaction, throwing {@code
-     * IllegalStateException} if the current context is {@code null}
-     * or if the specified transaction is not equal to the transaction
-     * in the current context.  If the specified transaction does not
-     * match the current context's transaction, then sets the current
-     * context to (@code null}.
-     */
-    private void checkTransaction(Transaction txn) {
-        if (txn == null) {
-            throw new NullPointerException("null transaction");
-        }
-        Context context = currentContext.get();
-        if (context == null) {
-            throw new IllegalStateException("null context");
-        }
-        if (!txn.equals(context.txn)) {
-            currentContext.set(null);
-            throw new IllegalStateException(
-                "Wrong transaction: Expected " + context.txn + ", found " + txn);
-        }
-    }
-
-   /**
-     * Obtains information associated with the current transaction,
-     * throwing a TransactionNotActiveException exception if there is
-     * no current transaction, and throwing IllegalStateException if
-     * there is a problem with the state of the transaction or if this
-     * service has not been configured with a transaction proxy.
-     */
-    private Context checkContext() {
-	Transaction txn;
-	synchronized (lock) {
-	    if (txnProxy == null) {
-		throw new IllegalStateException("Not configured");
-	    }
-	    txn = txnProxy.getCurrentTransaction();
-	}
-	if (txn == null) {
-	    throw new TransactionNotActiveException(
-		"No transaction is active");
-	}
-	Context context = currentContext.get();
-	if (context == null) {
-	    if (logger.isLoggable(Level.FINER)) {
-		logger.log(Level.FINER, "join txn:{0}", txn);
-	    }
-	    txn.join(this);
-	    context = new Context(txn);
-	    currentContext.set(context);
-	} else if (!txn.equals(context.txn)) {
-	    currentContext.set(null);
-	    throw new IllegalStateException(
-		"Wrong transaction: Expected " + context.txn +
-		", found " + txn);
-	}
-	return context;
-    }
-
-    /**
-     * Returns the context associated with the current transaction in
-     * this thread.
-     */
-    static Context getContext() {
-	return currentContext.get();
-    }
-
-    /**
      * Checks that the specified context is currently active, throwing
      * TransactionNotActiveException if it isn't.
      */
     static void checkContext(Context context) {
-	if (context != currentContext.get()) {
-	    throw new TransactionNotActiveException(
-		"No transaction is active");
-	}
+	getInstance().contextFactory.checkContext(context);
     }
 
+    /**
+     * Returns the channel service relevant to the current context.
+     *
+     * @return the channel service relevant to the current
+     * context
+     */
+    private synchronized static ChannelServiceImpl getInstance() {
+	if (txnProxy == null) {
+	    throw new IllegalStateException("Service not configured");
+	} else {
+	    return txnProxy.getService(ChannelServiceImpl.class);
+	}
+    }
+    
     /* -- Implement ProtocolMessageListener -- */
 
     private final class ChannelProtocolMessageListener
@@ -517,7 +421,8 @@ public class ChannelServiceImpl
 	    nonDurableTaskScheduler.scheduleTask(
 		new AbstractKernelRunnable() {
 		    public void run() {
-			Context context = checkContext();
+			Context context =
+			    getInstance().contextFactory.joinTransaction();
 			Set<Channel> channels = context.removeSession(session);
 			for (Channel channel : channels) {
 			    channel.leave(session);
@@ -569,20 +474,20 @@ public class ChannelServiceImpl
 	} else {
 	    // Look up recipient sessions and check for channel membership
 	    for (int i = 0; i < numRecipients; i++) {
-		byte[] recipientId = buf.getByteArray();
+		CompactId recipientId = CompactId.getCompactId(buf);
 		SgsClientSession recipient =
-		    sessionService.getClientSession(recipientId);
+		    sessionService.getClientSession(recipientId.getId());
 		if (recipient != null && cachedState.hasSession(recipient)) {
 		    recipients.add(recipient);
 		}
 	    }
 	}
 
-	ClientSessionId senderId = sender.getSessionId();
 	byte[] channelMessage = buf.getByteArray();
 	byte[] protocolMessage =
-	    getChannelMessage(channelId, senderId.getBytes(),
-			      channelMessage, seq);
+	    getChannelMessage(
+		channelId, ((ClientSessionImpl) sender).getCompactSessionId(),
+		channelMessage, seq);
 	
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(
@@ -591,6 +496,7 @@ public class ChannelServiceImpl
 		cachedState.name, HexDumper.format(channelMessage));
 	}
 
+	ClientSessionId senderId = sender.getSessionId();
 	for (ClientSession session : recipients) {
 	    // Send channel protocol message, skipping the sender
 	    if (! senderId.equals(session.getSessionId())) {
@@ -638,13 +544,7 @@ public class ChannelServiceImpl
      * (respectively) must be called on the context so that the proper
      * channel instances are used.
      */
-    final class Context {
-
-	/** The transaction. */
-	final Transaction txn;
-
-	/** The transaction state. */
-	private State txnState = State.ACTIVE;
+    final class Context extends TransactionContext {
 
 	/**
 	 * Map of channel name to transient channel impl (for those
@@ -658,8 +558,7 @@ public class ChannelServiceImpl
 	 * Constructs a context with the specified transaction. 
 	 */
 	private Context(Transaction txn) {
-	    assert txn != null;
-	    this.txn = txn;
+	    super(txn);
 	}
 
 	/* -- ChannelManager methods -- */
@@ -754,7 +653,7 @@ public class ChannelServiceImpl
 	 * transaction is prepared.
 	 */
 	private void checkPrepared() {
-	    if (txnState == State.PREPARED) {
+	    if (isPrepared) {
 		throw new TransactionNotActiveException("Already prepared");
 	    }
 	}
@@ -765,9 +664,8 @@ public class ChannelServiceImpl
 	 * returns {@code false}.  Otherwise, if there are no pending
 	 * changes returns {@code true} indicating readonly status.
 	 */
-        private boolean prepare() {
-	    checkPrepared();
-	    txnState = State.PREPARED;
+        public boolean prepare() {
+	    isPrepared = true;
 	    boolean readOnly = internalTable.isEmpty();
 	    if (! readOnly) {
 		synchronized (contextList) {
@@ -782,8 +680,7 @@ public class ChannelServiceImpl
 	 * the context list containing pending updates, and flushes
 	 * all committed contexts preceding prepared ones.
 	 */
-	private void abort() {
-	    txnState = State.ABORTED;
+	public void abort(boolean retryable) {
 	    synchronized (contextList) {
 		contextList.remove(this);
 	    }
@@ -794,19 +691,8 @@ public class ChannelServiceImpl
 	 * Marks this transaction as committed and flushes all
 	 * committed contexts preceding prepared ones.
 	 */
-	private void commit() {
-            if (txnState != State.PREPARED) {
-                RuntimeException e = 
-                    new IllegalStateException("transaction not prepared");
-		if (logger.isLoggable(Level.WARNING)) {
-		    logger.logThrow(
-			Level.FINE, e, "Context.commit: not yet prepared txn:{0}",
-			txn);
-		}
-                throw e;
-            }
-
-	    txnState = State.COMMITTED;
+	public void commit() {
+	    isCommitted = true;
 	    flushContexts();
         }
 
@@ -816,7 +702,7 @@ public class ChannelServiceImpl
 	 * returns false.
 	 */
 	private boolean flush() {
-	    if (txnState == State.COMMITTED) {
+	    if (isCommitted) {
 		for (ChannelImpl channel : internalTable.values()) {
 		    if (channel.isClosed) {
 			channelStateCache.remove(channel.state.id);
@@ -961,9 +847,10 @@ public class ChannelServiceImpl
 	
 	Set<Channel> removeAll() {
 	    Set<Channel> channels = new HashSet<Channel>();
+	    Context context = getInstance().contextFactory.getContext();
 	    for (String name : set) {
 		try {
-		    channels.add(getContext().getChannel(name));
+		    channels.add(context.getChannel(name));
 		} catch (NameNotBoundException e) {
 		    // ignore
 		}
@@ -1015,17 +902,17 @@ public class ChannelServiceImpl
     private final class NotifyTask extends AbstractKernelRunnable {
 
 	private final String name;
-	private final CompactId id;
+	private final CompactId channelId;
 	private final ClientSessionId senderId;
 	private final byte[] message;
 
         NotifyTask(String name,
-		   CompactId id,
+		   CompactId channelId,
 		   ClientSessionId senderId,
 		   byte[] message)
 	{
 	    this.name = name;
-	    this.id = id;
+	    this.channelId = channelId;
 	    this.senderId = senderId;
 	    this.message = message;
 	}
@@ -1039,9 +926,9 @@ public class ChannelServiceImpl
                         "NotifyTask.run name:{0}, message:{1}",
                         name, HexDumper.format(message));
                 }
-		Context context = checkContext();
+		Context context = contextFactory.joinTransaction();
 		ChannelImpl channel =
-		    (ChannelImpl) context.getChannel(name, id);
+		    (ChannelImpl) context.getChannel(name, channelId);
 		channel.notifyListeners(senderId, message);
 
 	    } catch (RuntimeException e) {
@@ -1085,17 +972,19 @@ public class ChannelServiceImpl
      * message, and sequence number.
      */
     static byte[] getChannelMessage(
-	CompactId channelId, byte[] senderId, byte[] message, long sequenceNumber)
+	CompactId channelId, CompactId senderId,
+	byte[] message, long sequenceNumber)
     {
         MessageBuffer buf =
-            new MessageBuffer(15 + channelId.getExternalFormByteCount() +
-			      senderId.length + message.length);
+            new MessageBuffer(13 + channelId.getExternalFormByteCount() +
+			      senderId.getExternalFormByteCount() +
+			      message.length);
         buf.putByte(SimpleSgsProtocol.VERSION).
             putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
             putByte(SimpleSgsProtocol.CHANNEL_MESSAGE).
             putBytes(channelId.getExternalForm()).
             putLong(sequenceNumber).
-            putByteArray(senderId).
+            putBytes(senderId.getExternalForm()).
 	    putByteArray(message);
 
         return buf.getBuffer();

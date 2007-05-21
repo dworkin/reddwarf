@@ -167,6 +167,9 @@ public class DataStoreServerImpl implements DataStoreServer {
 	/** The creation time. */
 	private final long creationTime;
 
+	/** The timeout value. */
+	private final long timeout;
+
 	/** The information associated with this transaction, or null. */
 	private Object txnInfo;
 
@@ -185,9 +188,10 @@ public class DataStoreServerImpl implements DataStoreServer {
 	 */
 	private Throwable abortCause = null;
 
-	/** Creates an instance with the specified ID. */
-	Txn(long tid) {
+	/** Creates an instance with the specified ID and timeout. */
+	Txn(long tid, long timeout) {
 	    this.tid = tid;
+	    this.timeout = timeout;
 	    creationTime = System.currentTimeMillis();
 	}
 
@@ -240,6 +244,17 @@ public class DataStoreServerImpl implements DataStoreServer {
 
 	public long getCreationTime() {
 	    return creationTime;
+	}
+
+	public long getTimeout() {
+	    return timeout;
+	}
+
+	public void checkTimeout() {
+	    long runningTime = System.currentTimeMillis() - getCreationTime();
+	    if (runningTime > getTimeout())
+		throw new TransactionTimeoutException("transaction timed out: "
+						      + runningTime + " ms");
 	}
 
 	public void join(TransactionParticipant participant) {
@@ -473,7 +488,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 		    }
 		    tid = nextTxnId++;
 		}
-		joinNewTransaction(new Txn(tid));
+		joinNewTransaction(new Txn(tid, txnTimeout));
 		logger.log(Level.FINER,
 			   "createTransaction returns stid:{0,number,#}", tid);
 		return tid;

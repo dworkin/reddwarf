@@ -106,6 +106,14 @@ final class Context {
 	    return originalTxn.getCreationTime();
 	}
 
+	public long getTimeout() {
+	    return originalTxn.getTimeout();
+	}
+
+	public void checkTimeout() {
+	    originalTxn.checkTimeout();
+	}
+
 	public void join(TransactionParticipant participant) {
 	    if (originalTxn.isAborted()) {
 		throw new MaybeRetryableTransactionNotActiveException(
