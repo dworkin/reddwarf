@@ -55,7 +55,7 @@ public abstract class TransactionContext {
 
     /**
      * Prepares state for the transaction associated with this
-     * context, sets the {@isPrepared} flag to {@code true}, and if
+     * context, sets the {@code isPrepared} flag to {@code true}, and if
      * this context's state is not read-only, commits this context's
      * state.  This method should also set the {@code isCommitted}
      * flag to {@code true}.<p>
