@@ -7,6 +7,7 @@ package com.sun.sgs.impl.service.data;
 import com.sun.sgs.app.ObjectIOException;
 import com.sun.sgs.impl.service.data.store.ClassInfoNotFoundException;
 import com.sun.sgs.impl.service.data.store.DataStore;
+import com.sun.sgs.impl.util.Int30;
 import com.sun.sgs.service.Transaction;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -23,18 +24,33 @@ import java.util.WeakHashMap;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-/** Manages information about serialization class descriptors. */
+/**
+ * Manages information about class descriptors used to serialize managed
+ * objects.
+ */
 final class ClassesTable {
 
     /*
-     * TBD: Maybe use futures to have only one simultaneous request for a
-     * particular class.  -tjb@sun.com (05/18/2007)
+     * TBD: Maybe use futures to avoid simultaneous requests for the same
+     * class?  -tjb@sun.com (05/21/2007)
      */
 
     /** The data store used to store class information. */
     private final DataStore store;
 
-    /** Maps class IDs to class descriptors. */
+    /*
+     * Note that using concurrent maps turned out to be too inefficient to be
+     * useful.  Because the maps are likely to quickly include all of the
+     * entries needed for steady state operation, supporting fast concurrent
+     * reads via a shared read lock seems like a better approach than
+     * permitting concurrent modifications.  -tjb@sun.com (05/18/2007)
+     */
+
+    /**
+     * Maps class IDs to class descriptors.  Use soft references to the
+     * descriptors since they are still useful if unreferenced, but can be
+     * reconstructed if needed.
+     */
     private final Map<Integer, SoftReference<ObjectStreamClass>> classDescMap =
 	new HashMap<Integer, SoftReference<ObjectStreamClass>>();
 
@@ -42,23 +58,31 @@ final class ClassesTable {
     private final ReferenceQueue<ObjectStreamClass> refQueue =
 	new ReferenceQueue<ObjectStreamClass>();
 
-    /** Maps class descriptors to class IDs. */
+    /**
+     * Maps class descriptors to class IDs.  Use weak references to the
+     * descriptors since they are compared by identity, and so are not useful
+     * if no longer referenced.
+     */
     private final Map<ObjectStreamClass, Integer> classIdMap =
 	new WeakHashMap<ObjectStreamClass, Integer>();
 
     /** Lock this lock when accessing classDescMap and classIdMap. */
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
 
-    /** A soft reference holder for ObjectStreamClass objects. */
-    private static class SoftValue extends SoftReference<ObjectStreamClass> {
-
+    /**
+     * A soft reference holder for class descriptor objects stored in
+     * classDescMap.
+     */
+    private static class ClassDescRef
+	extends SoftReference<ObjectStreamClass>
+    {
 	/** The associated class ID key. */
 	private final Integer classId;
 
 	/** Creates an instance of this class. */
-	SoftValue(Integer classId,
-		  ObjectStreamClass classDesc,
-		  ReferenceQueue<ObjectStreamClass> queue)
+	ClassDescRef(Integer classId,
+		     ObjectStreamClass classDesc,
+		     ReferenceQueue<ObjectStreamClass> queue)
 	{
 	    super(classDesc, queue);
 	    this.classId = classId;
@@ -71,14 +95,14 @@ final class ClassesTable {
 	static void processQueue(ReferenceQueue<ObjectStreamClass> queue,
 				 Map<Integer, ?> map)
 	{
-	    SoftValue sv;
+	    ClassDescRef ref;
 	    /*
 	     * Reference queues don't provide a way to specify that the queue
 	     * contains a particular subclass of reference, so the unchecked
 	     * assignment can't be avoided.  -tjb@sun.com (05/18/2007)
 	     */
-	    while ((sv = (SoftValue) (Object) queue.poll()) != null) {
-		map.remove(sv.classId);
+	    while ((ref = (ClassDescRef) (Object) queue.poll()) != null) {
+		map.remove(ref.classId);
 	    }
 	}
     }
@@ -129,6 +153,11 @@ final class ClassesTable {
 	    lock.readLock().unlock();
 	}
 	int classId = store.getClassId(txn, getClassInfo(classDesc));
+	if (classId > Int30.MAX_VALUE) {
+	    throw new IllegalStateException(
+		"Allocating more than " + Int30.MAX_VALUE +
+		" classes is not supported");
+	}
 	updateMaps(classId, classDesc);
 	return classId;
     }
@@ -136,19 +165,20 @@ final class ClassesTable {
     /**
      * Updates the maps to refer to the specified class ID and class
      * descriptor.  Returns the descriptor that ends up mapped to the class ID,
-     * which may be different from the one passed in.
+     * which may be different from the one passed in if another one was
+     * obtained concurrently.
      */
     private ObjectStreamClass updateMaps(Integer classId,
 					 ObjectStreamClass classDesc)
     {
 	lock.writeLock().lock();
 	try {
-	    SoftValue.processQueue(refQueue, classDescMap);
+	    ClassDescRef.processQueue(refQueue, classDescMap);
 	    SoftReference<ObjectStreamClass> ref = classDescMap.get(classId);
 	    ObjectStreamClass existing = (ref != null) ? ref.get() : null;
 	    if (existing == null) {
 		classDescMap.put(
-		    classId, new SoftValue(classId, classDesc, refQueue));
+		    classId, new ClassDescRef(classId, classDesc, refQueue));
 	    }
 	    if (!classIdMap.containsKey(classDesc)) {
 		classIdMap.put(classDesc, classId);
@@ -181,19 +211,18 @@ final class ClassesTable {
 	} finally {
 	    lock.readLock().unlock();
 	}
-	ObjectStreamClass classDesc;
 	try {
-	    classDesc = getClassDesc(store.getClassInfo(txn, classId));
+	    return updateMaps(
+		classId, getClassDesc(store.getClassInfo(txn, classId)));
 	} catch (ClassInfoNotFoundException e) {
 	    throw new ObjectIOException(
 		"Problem deserializing class descriptor: " + e.getMessage(),
 		e, false);
 	}
-	return updateMaps(classId, classDesc);
     }
 
     /**
-     * Convert a class descriptor into a byte array.
+     * Converts a class descriptor into its serialized form.
      *
      * @param	classDesc the class descriptor
      * @return	the class information
@@ -223,7 +252,7 @@ final class ClassesTable {
     }
 
     /**
-     * Converts byte array information for a class into a class descriptor.
+     * Converts a class descriptor's serialized form into the descriptor.
      *
      * @param	classInfo the class information
      * @return	the class descriptor

@@ -21,7 +21,6 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
-import java.util.Arrays;
 import java.util.IdentityHashMap;
 import java.util.Stack;
 import java.util.logging.Level;
@@ -39,14 +38,14 @@ final class SerialUtil {
     };
 
     /**
-     * The initial byte used in place of the initial 4 bytes of serial output
+     * The initial byte to use in place of the initial 4 bytes of serial output
      * using serialization protocol version 2.
      */
     private static final byte SERIAL_PROTOCOL_2 = 1;
 
     /**
-     * The initial byte used in place of the initial 4 bytes of serial output
-     * used with serialization protocols other than version 2.
+     * The initial byte to use for serial output other than serialization
+     * protocol version 2.
      */
     private static final byte SERIAL_PROTOCOL_OTHER = 2;
 
@@ -92,8 +91,8 @@ final class SerialUtil {
     }
 
     /**
-     * Defines an ObjectInputStream whose reading of class descriptors can be
-     * customized.
+     * Defines an ObjectInputStream whose reading of class descriptors is
+     * customized by an instance of ClassSerialization.
      */
     private static final class CustomClassDescriptorObjectInputStream
 	extends ObjectInputStream
@@ -301,62 +300,6 @@ final class SerialUtil {
 		}
 	    }
 	    return object;
-	}
-    }
-
-    /**
-     * Obtains a fingerprint that uniquely identifies the serialized data of
-     * the object.
-     *
-     * @param	object the object
-     * @param	classSerial controls writing of class descriptors
-     * @return	the fingerprint
-     * @throws	ObjectIOException if a problem occurs serializing the object
-     */
-    static byte[] fingerprint(Object object, ClassSerialization classSerial) {
-	/*
-	 * TBD: Maybe use a message digest if the fingerprint gets long.
-	 * -tjb@sun.com (11/16/2006)
-	 */
-	ObjectOutputStream out = null;
-	try {
-	    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-	    out = new CustomClassDescriptorObjectOutputStream(
-		baos, classSerial);
-	    out.writeObject(object);
-	    out.flush();
-	    return baos.toByteArray();
-	} catch (IOException e) {
-	    throw new ObjectIOException(
-		"Problem serializing object: " + e.getMessage(), e, false);
-	} finally {
-	    if (out != null) {
-		try {
-		    out.close();
-		} catch (IOException e) {
-		}
-	    }
-	}
-    }
-
-    /**
-     * Checks if an object has a particular fingerprint.  Returns false if
-     * attempting to compute the fingerprint throws an ObjectIOException.
-     *
-     * @param	object the object
-     * @param	fingerprint the fingerprint
-     * @param	classSerial controls writing of class descriptors
-     * @return	whether the object has a matching fingerprint
-     */
-    static boolean matchingFingerprint(Object object,
-				       byte[] fingerprint,
-				       ClassSerialization classSerial)
-    {
-	try {
-	    return Arrays.equals(
-		fingerprint(object, classSerial), fingerprint);
-	} catch (ObjectIOException e) {
-	    return false;
 	}
     }
 

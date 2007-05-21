@@ -201,11 +201,10 @@ public interface DataStore {
     boolean shutdown();
 
     /**
-     * Returns the class ID that should be used to represent classes with the
-     * specified class information.  Obtains an existing ID for the class
-     * information if present; otherwise, stores the information and returns
-     * the new ID associated with it.  Class IDs are always greater than {code
-     * 1}.
+     * Returns the class ID to represent classes with the specified class
+     * information.  Obtains an existing ID for the class information if
+     * present; otherwise, stores the information and returns the new ID
+     * associated with it.  Class IDs are always greater than {code 0}.
      *
      * @param	txn the transaction under which the operation should take place
      * @param	classInfo the class information
@@ -224,8 +223,8 @@ public interface DataStore {
      * @param	txn the transaction under which the operation should take place
      * @param	classId the class ID
      * @return	the associated class information
-     * @throws	IllegalArgumentException if {@code classId} is less than {@code
-     *		1}
+     * @throws	IllegalArgumentException if {@code classId} is not greater than
+     *		{@code 0}
      * @throws	ClassInfoNotFoundException if the ID is not found
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout

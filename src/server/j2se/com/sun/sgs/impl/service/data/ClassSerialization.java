@@ -4,19 +4,19 @@
 
 package com.sun.sgs.impl.service.data;
 
+import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamClass;
-import java.io.IOException;
 
-/** Controls how serialization should serialize class descriptors. */
+/** Controls how to serialize class descriptors. */
 interface ClassSerialization {
 
     /**
      * Writes a class descriptor to an object output stream.
      *
      * @param	classDesc the class descriptor
-     * @param	out the stream
+     * @param	out the object output stream
      * @throws	IOException if an I/O error occurs
      */
     void writeClassDescriptor(

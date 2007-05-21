@@ -2,12 +2,13 @@
  * Copyright 2007 Sun Microsystems, Inc. All rights reserved
  */
 
-package com.sun.sgs.test.impl.service.data;
+package com.sun.sgs.test.impl.util;
 
-import com.sun.sgs.impl.service.data.Int30;
+import com.sun.sgs.impl.util.Int30;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Arrays;
 import junit.framework.TestCase;
@@ -53,6 +54,24 @@ public class TestInt30 extends TestCase {
 	}
     }
 
+    public void testReadEOF() throws Exception {
+	byte[][] tests = {
+	    { },
+	    { 0x44 },
+	    { (byte) 0x81, (byte) 0xff },
+	    { (byte) 0xcf, 0x12, 0x34 }
+	};
+	for (byte[] bytes : tests) {
+	    InputStream in = new ByteArrayInputStream(bytes);
+	    try {
+		Int30.read(in);
+		fail("Expected IOException");
+	    } catch (IOException e) {
+		System.err.println(e);
+	    }
+	}
+    }
+
     public void testValues() throws Exception {
 	testValue(0, (byte) 0);
 	testValue(1, (byte) 1);
@@ -73,6 +92,8 @@ public class TestInt30 extends TestCase {
 		  (byte) 0xc1, (byte) 0x23, (byte) 0x45, (byte) 0x67);
 	testValue(0x3456789a,
 		  (byte) 0xf4, (byte) 0x56, (byte) 0x78, (byte) 0x9a);
+	testValue(0x3fffffff,
+		  (byte) 0xff, (byte) 0xff, (byte) 0xff, (byte) 0xff);
     }
 
     /* -- Other methods -- */

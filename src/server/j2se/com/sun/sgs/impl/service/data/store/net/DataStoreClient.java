@@ -7,8 +7,8 @@ package com.sun.sgs.impl.service.data.store.net;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
-import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.ClassInfoNotFoundException;
+import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.service.Transaction;
@@ -539,8 +539,7 @@ public final class DataStoreClient
 	    int result = server.getClassId(txnInfo.tid, classInfo);
 	    if (logger.isLoggable(Level.FINER)) {
 		logger.log(Level.FINER,
-			   "getClassId txn:{0} returns {1}",
-			   txn, result);
+			   "getClassId txn:{0} returns {1}", txn, result);
 	    }
 	    return result;
 	} catch (IOException e) {
@@ -548,8 +547,8 @@ public final class DataStoreClient
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	throw convertException(txnInfo, Level.FINER, exception,
-			       "getClassId txn:" + txn);
+	throw convertException(
+	    txnInfo, Level.FINER, exception, "getClassId txn:" + txn);
     }
 
     /** {@inheritDoc} */

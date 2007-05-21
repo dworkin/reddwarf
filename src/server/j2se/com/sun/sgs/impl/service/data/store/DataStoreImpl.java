@@ -193,22 +193,15 @@ public class DataStoreImpl
     private static final String FLUSH_TO_DISK_PROPERTY =
 	CLASSNAME + ".flush.to.disk";
 
-    /** The first byte stored in class hash keys. */
-    private static final byte CLASS_HASH = 1;
-
-    /**
-     * The first byte value stored in class ID keys.  This value should be
-     * greater than CLASS_HASH, to insure that class ID keys come after class
-     * hash ones.
-     */
-    private static final byte CLASS_ID = 2;
-
     /** The logger for this class. */
     static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
 
     /** An empty array returned when Berkeley DB returns null for a value. */
     private static final byte[] NO_BYTES = { };
+
+    /** The number of bytes in a SHA-1 message digest. */
+    private static final int SHA1_SIZE = 20;
 
     /** The directory in which to store database files. */
     private final String directory;
@@ -1165,18 +1158,18 @@ public class DataStoreImpl
 	logger.log(Level.FINER, "getClassId txn:{0}", txn);
 	String operation = "getClassId txn:" + txn;
 	Exception exception;
-	boolean done = false;
-	com.sleepycat.db.Transaction bdbTxn = null;
 	try {
+	    checkTxn(txn, getClassIdOp);
 	    if (classInfo == null) {
 		throw new NullPointerException(
 		    "The classInfo argument must not be null");
 	    }
-	    checkTxn(txn, getClassIdOp);
 	    DatabaseEntry hashKey = getKeyFromClassInfo(classInfo);
 	    DatabaseEntry hashValue = new DatabaseEntry();
 	    int result;
-	    bdbTxn = env.beginTransaction(null, null);
+	    boolean done = false;
+	    com.sleepycat.db.Transaction bdbTxn =
+		env.beginTransaction(null, null);
 	    try {
 		if (get(classesDb, bdbTxn, hashKey, hashValue, operation)) {
 		    result = IntegerBinding.entryToInt(hashValue);
@@ -1187,21 +1180,12 @@ public class DataStoreImpl
 			DatabaseEntry idValue = new DatabaseEntry();
 			OperationStatus status =
 			    cursor.getLast(idKey, idValue, null);
-			if (status == OperationStatus.SUCCESS) {
-			    result = getClassIdFromKey(idKey) + 1;
-			} else if (status == OperationStatus.NOTFOUND) {
-			    result = 1;
-			} else {
-			    throw new DataStoreException(
-				operation + " failed: " + status);
-			}
-			idKey = getKeyFromClassId(result);
-			idValue = new DatabaseEntry(classInfo);
-			status = cursor.putNoOverwrite(idKey, idValue);
-			if (status != OperationStatus.SUCCESS) {
-			    throw new DataStoreException(
-				operation + " failed: " + status);
-			}
+			result = checkStatusFound(status, operation)
+			    ? getClassIdFromKey(idKey) + 1 : 1;
+			getKeyFromClassId(result, idKey);
+			idValue.setData(classInfo);
+			checkStatus(
+			    cursor.putNoOverwrite(idKey, idValue), operation);
 		    } finally {
 			cursor.close();
 		    }
@@ -1217,7 +1201,7 @@ public class DataStoreImpl
 		}
 	    }
 	    if (logger.isLoggable(Level.FINER)) {
-		logger.log(Level.FINER, "getClass txn:{0} returns {1}",
+		logger.log(Level.FINER, "getClassId txn:{0} returns {1}",
 			   txn, result);
 	    }
 	    return result;
@@ -1227,91 +1211,6 @@ public class DataStoreImpl
 	    exception = e;
 	}
 	throw convertException(txn, Level.FINER, exception, operation);
-    }
-
-    private int getClassIdFromKey(DatabaseEntry key) {
-	TupleInput in = new TupleInput(key.getData());
-	byte first = in.readByte();
-	assert first == CLASS_ID;
-	return in.readInt();
-    }
-
-    private DatabaseEntry getKeyFromClassId(int classId) {
-	TupleOutput out = new TupleOutput(new byte[5]);
-	out.writeByte(CLASS_ID);
-	out.writeInt(classId);
-	return new DatabaseEntry(out.getBufferBytes());
-    }
-
-    private DatabaseEntry getKeyFromClassInfo(byte[] classInfo) {
-	byte[] keyBytes = new byte[1 + 20];
-	keyBytes[0] = CLASS_HASH;
-	MessageDigest md = getMessageDigest();
-	try {
-	    md.update(classInfo);
-	    int numBytes = md.digest(keyBytes, 1, 20);
-	    assert numBytes == 20;
-	    return new DatabaseEntry(keyBytes);
-	} catch (DigestException e) {
-	    throw new AssertionError(e);
-	} finally {
-	    returnMessageDigest(md);
-	}
-    }
-
-    private MessageDigest getMessageDigest() {
-	synchronized (messageDigestLock) {
-	    if (messageDigest != null) {
-		MessageDigest result = messageDigest;
-		messageDigest = null;
-		return result;
-	    }
-	}
-	try {
-	    return MessageDigest.getInstance("SHA-1");
-	} catch (NoSuchAlgorithmException e) {
-	    throw new AssertionError(e);
-	}
-    }
-
-    private void returnMessageDigest(MessageDigest md) {
-	synchronized (messageDigestLock) {
-	    if (messageDigest == null) {
-		messageDigest = md;
-	    }
-	}
-    }
-
-    private static boolean get(Database db,
-			       com.sleepycat.db.Transaction bdbTxn,
-			       DatabaseEntry key,
-			       DatabaseEntry value,
-			       String operation)
-	throws DatabaseException
-    {
-	OperationStatus status = db.get(bdbTxn, key, value, null);
-	if (status == OperationStatus.SUCCESS) {
-	    return true;
-	} else if (status == OperationStatus.NOTFOUND) {
-	    return false;
-	} else {
-	    throw new DataStoreException(
-		operation + ": Problem reading item: " + status);
-	}
-    }
-
-    private static void putNoOverwrite(Database db,
-				       com.sleepycat.db.Transaction bdbTxn,
-				       DatabaseEntry key,
-				       DatabaseEntry value,
-				       String operation)
-	throws DatabaseException
-    {
-	OperationStatus status = db.putNoOverwrite(bdbTxn, key, value);
-	if (status != OperationStatus.SUCCESS) {
-	    throw new DataStoreException(
-		operation + ": Problem writing item: " + status);
-	}
     }
 
     /** {@inheritDoc} */
@@ -1331,7 +1230,8 @@ public class DataStoreImpl
 		throw new IllegalArgumentException(
 		    "The classId argument must greater than 0");
 	    }
-	    DatabaseEntry key = getKeyFromClassId(classId);
+	    DatabaseEntry key = new DatabaseEntry();
+	    getKeyFromClassId(classId, key);
 	    DatabaseEntry value = new DatabaseEntry();
 	    boolean found;
 	    boolean done = false;
@@ -1353,7 +1253,7 @@ public class DataStoreImpl
 		}
 		logger.log(Level.FINER,
 			   "getClassInfo txn:{0} classId:{1,number,#} returns",
-		    txn, classId);
+			   txn, classId);
 		return result;
 	    } else {
 		ClassInfoNotFoundException e =
@@ -1848,4 +1748,112 @@ public class DataStoreImpl
 		"Transaction timed out after " + duration + " ms");
 	}
     }
+
+    /** Converts a database entry key to a class ID. */
+    private static int getClassIdFromKey(DatabaseEntry key) {
+	TupleInput in = new TupleInput(key.getData());
+	byte first = in.readByte();
+	assert first == DataStoreHeader.CLASS_ID_PREFIX;
+	return in.readInt();
+    }
+
+    /** Converts a class ID to a database entry key. */
+    private static void getKeyFromClassId(int classId, DatabaseEntry key) {
+	TupleOutput out = new TupleOutput(new byte[5]);
+	out.writeByte(DataStoreHeader.CLASS_ID_PREFIX);
+	out.writeInt(classId);
+	key.setData(out.getBufferBytes());
+    }
+
+    /** Converts class information to a database entry key. */
+    private DatabaseEntry getKeyFromClassInfo(byte[] classInfo) {
+	byte[] keyBytes = new byte[1 + SHA1_SIZE];
+	keyBytes[0] = DataStoreHeader.CLASS_HASH_PREFIX;
+	MessageDigest md = getMessageDigest();
+	try {
+	    md.update(classInfo);
+	    int numBytes = md.digest(keyBytes, 1, SHA1_SIZE);
+	    assert numBytes == SHA1_SIZE;
+	    return new DatabaseEntry(keyBytes);
+	} catch (DigestException e) {
+	    throw new AssertionError(e);
+	} finally {
+	    returnMessageDigest(md);
+	}
+    }
+
+    /** Gets a MessageDigest. */
+    private MessageDigest getMessageDigest() {
+	synchronized (messageDigestLock) {
+	    if (messageDigest != null) {
+		MessageDigest result = messageDigest;
+		messageDigest = null;
+		return result;
+	    }
+	}
+	try {
+	    return MessageDigest.getInstance("SHA-1");
+	} catch (NoSuchAlgorithmException e) {
+	    throw new AssertionError(e);
+	}
+    }
+
+    /** Returns a MessageDigest that is no longer being used. */
+    private void returnMessageDigest(MessageDigest md) {
+	synchronized (messageDigestLock) {
+	    if (messageDigest == null) {
+		messageDigest = md;
+	    }
+	}
+    }
+
+    /** Gets a value from the database, returning whether it was found. */
+    private static boolean get(Database db,
+			       com.sleepycat.db.Transaction bdbTxn,
+			       DatabaseEntry key,
+			       DatabaseEntry value,
+			       String operation)
+	throws DatabaseException
+    {
+	return checkStatusFound(
+	    db.get(bdbTxn, key, value, null), operation);
+    }
+
+    /**
+     * Puts a value into the database, throwing an exception if the key was
+     * already present.
+     */
+    private static void putNoOverwrite(Database db,
+				       com.sleepycat.db.Transaction bdbTxn,
+				       DatabaseEntry key,
+				       DatabaseEntry value,
+				       String operation)
+	throws DatabaseException
+    {
+	checkStatus(db.putNoOverwrite(bdbTxn, key, value), operation);
+    }
+
+    /**
+     * Checks that the status was SUCCESS or NOTFOUND, returning true for
+     * SUCCESS.
+     */
+    private static boolean checkStatusFound(OperationStatus status,
+					    String operation)
+    {
+	if (status == OperationStatus.NOTFOUND) {
+	    return false;
+	} else {
+	    checkStatus(status, operation);
+	    return true;
+	}
+    }
+
+    /** Checks that the status was SUCCESS. */
+    private static void checkStatus(OperationStatus status,
+				    String operation)
+    {
+	if (status != OperationStatus.SUCCESS) {
+	    throw new DataStoreException(operation + " failed: " + status);
+	}
+    }	
 }
