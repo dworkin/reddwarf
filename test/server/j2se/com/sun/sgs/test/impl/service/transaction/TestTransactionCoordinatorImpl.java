@@ -42,7 +42,7 @@ public class TestTransactionCoordinatorImpl extends TestCase {
     /** Prints the test case, sets handle and txn */
     protected void setUp() {
 	System.err.println("Testcase: " + getName());
-	handle = coordinator.createTransaction();
+	handle = coordinator.createTransaction(true);
 	txn = handle.getTransaction();
     }
 
@@ -603,7 +603,8 @@ public class TestTransactionCoordinatorImpl extends TestCase {
 
     public void testGetId() {
 	txn.abort(null);
-	Transaction txn2 = coordinator.createTransaction().getTransaction();
+	Transaction txn2 = coordinator.createTransaction(true).
+	    getTransaction();
 	assertNotNull(txn.getId());
 	assertNotNull(txn2.getId());
 	assertFalse(Arrays.equals(txn.getId(), txn2.getId()));
@@ -614,15 +615,37 @@ public class TestTransactionCoordinatorImpl extends TestCase {
     public void testGetCreationTime() throws Exception {
 	long now = System.currentTimeMillis();
 	Thread.sleep(50);
-	Transaction txn1 = coordinator.createTransaction().getTransaction();
+	Transaction txn1 = coordinator.createTransaction(true).
+	    getTransaction();
 	Thread.sleep(50);
-	Transaction txn2 = coordinator.createTransaction().getTransaction();
+	Transaction txn2 = coordinator.createTransaction(true).
+	    getTransaction();
 	assertTrue("Transaction creation time is too early: " +
             txn1.getCreationTime(),
             now < txn1.getCreationTime());
 	assertTrue("Transaction creation times out-of-order: " +
             txn1.getCreationTime() + " vs " + txn2.getCreationTime(),
             txn1.getCreationTime() < txn2.getCreationTime());
+    }
+
+    /*  -- Test Transaction.getTimeout -- */
+
+    public void testGetTimeout() {
+	Properties p = new Properties();
+	p.setProperty(TransactionCoordinator.TXN_TIMEOUT_PROPERTY, "5000");
+	p.setProperty(TransactionCoordinator.TXN_UNBOUNDED_TIMEOUT_PROPERTY,
+		      "100000");
+	TransactionCoordinator coordinator =
+	    new TransactionCoordinatorImpl(p, null);
+	Transaction txn = coordinator.createTransaction(false).
+	    getTransaction();
+	assertTrue("Incorrect bounded Transaction timeout: " +
+		   txn.getTimeout(),
+		   txn.getTimeout() == 5000);
+	txn = coordinator.createTransaction(true).getTransaction();
+	assertTrue("Incorrect unbounded Transaction timeout: " +
+		   txn.getTimeout(),
+		   txn.getTimeout() == 100000);
     }
 
     /* -- Test Transaction.join -- */
@@ -1266,7 +1289,8 @@ public class TestTransactionCoordinatorImpl extends TestCase {
     /* -- Test equals -- */
 
     public void testEquals() throws Exception {
-	Transaction txn2 = coordinator.createTransaction().getTransaction();
+	Transaction txn2 = coordinator.createTransaction(true).
+	    getTransaction();
 	assertFalse(txn.equals(null));
 	assertTrue(txn.equals(txn));
 	assertFalse(txn.equals(txn2));

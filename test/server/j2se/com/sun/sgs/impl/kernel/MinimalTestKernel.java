@@ -176,9 +176,9 @@ public final class MinimalTestKernel
      */
     static class TestTransactionCoordinator implements TransactionCoordinator {
         static TransactionCoordinator txnCoordinator;
-        public TransactionHandle createTransaction() {
+        public TransactionHandle createTransaction(boolean unbounded) {
             if (txnCoordinator != null) {
-                return txnCoordinator.createTransaction();
+                return txnCoordinator.createTransaction(unbounded);
             }
             DummyTransaction txn = new DummyTransaction();
             proxy.setCurrentTransaction(txn);
