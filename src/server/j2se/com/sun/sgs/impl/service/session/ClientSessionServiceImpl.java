@@ -44,10 +44,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;   
 import java.util.Properties;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -123,8 +124,15 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	Collections.synchronizedMap(
 	    new HashMap<ClientSessionId, ClientSessionImpl>());
 
-    /** List of contexts that have been prepared (non-readonly) or commited. */
-    private final List<Context> contextList = new LinkedList<Context>();
+    /** Queue of contexts that are prepared (non-readonly) or committed. */
+    private final Queue<Context> contextQueue =
+	new ConcurrentLinkedQueue<Context>();
+
+    /** Thread for flushing committed contexts. */
+    private final Thread flushContextsThread = new FlushContextsThread();
+    
+    /** Lock for notifying the thread that flushes commmitted contexts. */
+    private final Object flushContextsLock = new Object();
 
     /** The Acceptor for listening for new connections. */
     private Acceptor<SocketAddress> acceptor;
@@ -209,6 +217,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	    taskScheduler = systemRegistry.getComponent(TaskScheduler.class);
 	    identityManager =
 		systemRegistry.getComponent(IdentityManager.class);
+	    flushContextsThread.start();
 
 	} catch (RuntimeException e) {
 	    if (logger.isLoggable(Level.CONFIG)) {
@@ -339,11 +348,9 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	    session.shutdown();
 	}
 	sessions.clear();
-	
-	// TBI: The bindings can only be removed if this is called within a
-	// transaction, so comment out for now...
-	// notifyDisconnectedSessions();
 
+	flushContextsThread.interrupt();
+	
 	return true;
     }
 
@@ -479,34 +486,6 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	}
     }
 
-    /**
-     * Iterates through the context list, in order, to flush any
-     * committed changes.  During iteration, this method invokes
-     * {@code flush} on the {@code Context} returned by {@code next}.
-     * Iteration ceases when either a context's {@code flush} method
-     * returns {@code false} (indicating that the transaction
-     * associated with the context has not yet committed) or when
-     * there are no more contexts in the context list.
-     */
-    private void flushContexts() {
-	// FIXME: This method is called during commit and shouldn't
-	// flush contexts here (since the 'flush' method sends
-	// protocol messages and possibly disconnects sessions).
-	// Instead the flushing of committed contexts should happen in
-	// another thread.  -- ann (5/16/07)
-	synchronized (contextList) {
-	    Iterator<Context> iter = contextList.iterator();
-	    while (iter.hasNext()) {
-		Context context = iter.next();
-		if (context.flush()) {
-		    iter.remove();
-		} else {
-		    break;
-		}
-	    }
-	}
-    }
-
     /* -- Context class to hold transaction state -- */
     
     final class Context extends TransactionContext {
@@ -621,7 +600,7 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	
 	/**
 	 * Marks this transaction as prepared, and if there are
-	 * pending changes, adds this context to the context list and
+	 * pending changes, adds this context to the context queue and
 	 * returns {@code false}.  Otherwise, if there are no pending
 	 * changes returns {@code true} indicating readonly status.
 	 */
@@ -629,34 +608,41 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	    isPrepared = true;
 	    boolean readOnly = sessionUpdates.values().isEmpty();
 	    if (! readOnly) {
-		synchronized (contextList) {
-		    contextList.add(this);
-		}
+		contextQueue.add(this);
 	    }
             return readOnly;
         }
 
 	/**
-	 * Marks this transaction as aborted, removes the context from
-	 * the context list containing pending updates, and flushes
-	 * all committed contexts preceding prepared ones.
+	 * Removes the context from the context queue containing
+	 * pending updates, and checks for flushing committed contexts.
 	 */
 	public void abort(boolean retryable) {
-	    synchronized (contextList) {
-		contextList.remove(this);
-	    }
-	    flushContexts();
+	    contextQueue.remove(this);
+	    checkFlush();
 	}
 
 	/**
-	 * Marks this transaction as committed and flushes all
-	 * committed contexts preceding prepared ones.
+	 * Marks this transaction as committed, and checks for
+	 * flushing committed contexts.
 	 */
 	public void commit() {
 	    isCommitted = true;
-	    flushContexts();
+	    checkFlush();
         }
 
+	/**
+	 * If the first context in the context queue is committed,
+	 * wakes up the thread to process committed contexts in queue.
+	 */
+	private void checkFlush() {
+	    if (contextQueue.peek().isCommitted) {
+		synchronized (flushContextsLock) {
+		    flushContextsLock.notify();
+		}
+	    }
+	}
+	
 	/**
 	 * Sends all protocol messages enqueued during this context's
 	 * transaction (via the {@code addMessage} and {@code
@@ -665,7 +651,9 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	 * requestDisconnect} method.
 	 */
 	private boolean flush() {
-	    if (isCommitted) {
+	    if (shuttingDown()) {
+		return false;
+	    } else if (isCommitted) {
 		for (Updates updates : sessionUpdates.values()) {
 		    updates.flush();
 		}
@@ -700,6 +688,75 @@ public class ClientSessionServiceImpl implements ClientSessionService {
 	    }
 	    if (disconnect) {
 		session.handleDisconnect(false);
+	    }
+	}
+    }
+
+    /**
+     * Thread to process the context queue, in order, to flush any
+     * committed changes.
+     */
+    private class FlushContextsThread extends Thread {
+
+	/**
+	 * Constructs an instance of this class as a daemon thread.
+	 */
+	public FlushContextsThread() {
+	    super(CLASSNAME + "$FlushContextsThread");
+	    setDaemon(true);
+	}
+	
+	/**
+	 * Processes the context queue, in order, to flush any
+	 * committed changes.  This thread waits to be notified that a
+	 * committed context is at the head of the queue, then
+	 * iterates through the context queue invoking {@code flush}
+	 * on the {@code Context} returned by {@code next}.  Iteration
+	 * ceases when either a context's {@code flush} method returns
+	 * {@code false} (indicating that the transaction associated
+	 * with the context has not yet committed) or when there are
+	 * no more contexts in the context queue.
+	 */
+	public void run() {
+	    
+	    for (;;) {
+		
+		if (shuttingDown()) {
+		    return;
+		}
+
+		/*
+		 * Wait for a non-empty context queue, returning if
+		 * this thread is interrupted.
+		 */
+		if (contextQueue.isEmpty()) {
+		    synchronized (flushContextsLock) {
+			try {
+			    flushContextsLock.wait();
+			} catch (InterruptedException e) {
+			    return;
+			}
+		    }
+		}
+
+		/*
+		 * Remove committed contexts from head of context
+		 * queue, and enqueue them to be flushed.
+		 */
+		if (! contextQueue.isEmpty()) {
+		    Iterator<Context> iter = contextQueue.iterator();
+		    while (iter.hasNext()) {
+			if (Thread.currentThread().isInterrupted()) {
+			    return;
+			}
+			Context context = iter.next();
+			if (context.flush()) {
+			    iter.remove();
+			} else {
+			    break;
+			}
+		    }
+		}
 	    }
 	}
     }
