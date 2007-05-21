@@ -6,6 +6,7 @@ package com.sun.sgs.impl.service.transaction;
 
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.MaybeRetryableTransactionAbortedException;
 import com.sun.sgs.impl.util.MaybeRetryableTransactionNotActiveException;
@@ -81,7 +82,10 @@ final class TransactionImpl implements Transaction {
     /** Collected profiling data on each participant. */
     private final HashMap<String,ProfileParticipantDetailImpl> detailMap;
 
-    /** Creates an instance with the specified transaction ID and collector. */
+    /**
+     * Creates an instance with the specified transaction ID, timeout, and
+     * collector.
+     */
     TransactionImpl(long tid, long timeout, ProfileCollector collector) {
 	this.tid = tid;
 	this.timeout = timeout;
@@ -112,6 +116,14 @@ final class TransactionImpl implements Transaction {
     /** {@inheritDoc} */
     public long getTimeout() {
 	return timeout;
+    }
+
+    /** {@inheritDoc} */
+    public void checkTimeout() {
+	long runningTime = System.currentTimeMillis() - getCreationTime();
+	if (runningTime > getTimeout())
+	    throw new TransactionTimeoutException("transaction timed out: " +
+						  runningTime + "ms");
     }
 
     /** {@inheritDoc} */

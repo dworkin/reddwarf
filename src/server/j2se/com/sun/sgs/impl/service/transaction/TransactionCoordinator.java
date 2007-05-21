@@ -16,8 +16,7 @@ public interface TransactionCoordinator {
 	"com.sun.sgs.txn.timeout.unbounded";
 
     /**
-     * Creates a handle to a transaction with either a bounded or unbounded
-     * timeout value.
+     * Creates a new transaction, and returns a handle for managing it.
      * 
      * @param unbounded <code>true</code> if this transaction's timeout is
      *                  unbounded, <code>false</code> otherwise

@@ -17,11 +17,6 @@ import com.sun.sgs.service.Transaction;
  * so that only select consumers can actually access or change the
  * current transaction. Most users interact with the current transaction
  * through <code>TransactionProxy</code>.
- * <p>
- * Note that this is where transaction timeout checking is handled. If we
- * decide to allow for pluggable <code>TransactionCoordinator</code>s then
- * we might want to move the functionality there, and simply invoke the
- * check from here.
  */
 final class TransactionalTaskThread extends TaskThread {
 
@@ -52,11 +47,9 @@ final class TransactionalTaskThread extends TaskThread {
     Transaction getCurrentTransaction() {
         if (currentTransaction == null)
             throw new TransactionNotActiveException("no current transaction");
-	long runningTime =
-	    System.currentTimeMillis() - currentTransaction.getCreationTime();
-	if (runningTime > currentTransaction.getTimeout())
-	    throw new TransactionTimeoutException("transaction timed out: " +
-						  runningTime + "ms");
+
+	currentTransaction.checkTimeout();
+
         return currentTransaction;
     }
 

@@ -108,6 +108,8 @@ public class DummyTransaction implements Transaction {
 
     public long getTimeout() { return Long.MAX_VALUE; }
 
+    public void checkTimeout() { }
+
     public synchronized void join(TransactionParticipant participant) {
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(
