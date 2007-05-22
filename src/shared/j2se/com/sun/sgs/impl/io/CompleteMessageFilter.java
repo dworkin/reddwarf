@@ -9,7 +9,7 @@ import java.util.logging.Logger;
 
 import org.apache.mina.common.ByteBuffer;
 
-import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
 // TODO move this functionality into protocol decode; we should
 // do framing in the protocol, not the transport. -JM
@@ -137,7 +137,7 @@ class CompleteMessageFilter {
      * @param message the data to filter and forward to the listener
      */
     void filterSend(FilterListener listener, byte[] message) {
-        ByteBuffer buffer = ByteBuffer.allocate(message.length + 4);
+        ByteBuffer buffer = ByteBuffer.allocate(message.length + 4, false);
         buffer.putInt(message.length);
         buffer.put(message);
         buffer.flip();

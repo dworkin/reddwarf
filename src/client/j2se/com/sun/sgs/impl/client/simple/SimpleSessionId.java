@@ -7,7 +7,8 @@ package com.sun.sgs.impl.client.simple;
 import java.util.Arrays;
 
 import com.sun.sgs.client.SessionId;
-import com.sun.sgs.impl.util.HexDumper;
+import com.sun.sgs.impl.sharedutil.CompactId;
+import com.sun.sgs.impl.sharedutil.HexDumper;
 
 /**
  * A simple implementation of a SessionId that wraps a byte array.
@@ -16,6 +17,8 @@ public class SimpleSessionId extends SessionId {
 
     /** The byte array representation of the session identifier. */
     private final byte[] id;
+    /** The {@code CompactId} for this session ID. */
+    private final CompactId compactId;
 
     /**
      * Construct a new {@code SimpleSessionId} from the given byte array.
@@ -25,8 +28,8 @@ public class SimpleSessionId extends SessionId {
     public SimpleSessionId(byte[] id) {
         if (id == null)
             throw new NullPointerException("id must not be null");
-
-        this.id = id;
+	this.compactId = new CompactId(id);
+        this.id = compactId.getId();
     }
 
     /**
@@ -63,5 +66,14 @@ public class SimpleSessionId extends SessionId {
     @Override
     public String toString() {
         return getClass().getName() + "@" + HexDumper.toHexString(id);
+    }
+
+    /**
+     * Returns the {@code CompactId} for this instance.
+     *
+     * @return the {@code CompactId} for this instance
+     */
+    public CompactId getCompactId() {
+	return compactId;
     }
 }

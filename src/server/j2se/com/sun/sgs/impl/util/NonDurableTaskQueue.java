@@ -4,12 +4,9 @@
 
 package com.sun.sgs.impl.util;
 
-import com.sun.sgs.app.ExceptionRetryStatus;
-import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.auth.Identity;
-import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.kernel.KernelRunnable;
-import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import java.util.LinkedList;
@@ -22,7 +19,7 @@ import java.util.logging.Logger;
  * run in succession.  Tasks are added to the queue from a
  * non-transactional context.  This implementation is thread-safe.
  */
-public class NonDurableTaskQueue implements NonDurableTransactionParticipant {
+public class NonDurableTaskQueue {
 
     /** The name of this class. */
     private static final String CLASSNAME =
@@ -32,12 +29,11 @@ public class NonDurableTaskQueue implements NonDurableTransactionParticipant {
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
     
-    /** Stores transaction-related information for the current thread. */
-    private static final ThreadLocal<Context> currentContext =
-	new ThreadLocal<Context>();
-    
     /** The transaction proxy. */
     private final TransactionProxy txnProxy;
+    
+    /** The transaction context factory. */
+    private final TransactionContextFactory<Context> contextFactory;
     
     /** The task scheduler. */
     private final NonDurableTaskScheduler nonDurableTaskScheduler;
@@ -72,6 +68,7 @@ public class NonDurableTaskQueue implements NonDurableTransactionParticipant {
 	    throw new NullPointerException("null argument");
 	}
 	this.txnProxy = proxy;
+	this.contextFactory = new ContextFactory(txnProxy);
 	this.nonDurableTaskScheduler = scheduler;
 	this.identity = identity;
     }
@@ -99,65 +96,59 @@ public class NonDurableTaskQueue implements NonDurableTransactionParticipant {
 	}
     }
 
-    /* -- Implement NonDurableTransactionParticipant -- */
+    /* -- Other classes and methods -- */
        
-    /** {@inheritDoc} */
-    public boolean prepare(Transaction txn) throws Exception {
-	try {
-	    checkTransaction(txn);
-	    boolean readOnly = false;
-	    if (logger.isLoggable(Level.FINE)) {
-		logger.log(Level.FINER, "prepare txn:{0} returns {1}",
-			   txn, readOnly);
+    private class ContextFactory extends TransactionContextFactory<Context> {
+	ContextFactory(TransactionProxy txnProxy) {
+	    super(txnProxy);
+	}
+	
+	public Context createContext(Transaction txn) {
+	    return new Context(txn);
+	}
+    }
+
+    /**
+     * Stores information relating to a specific transaction
+     * processing the head of the task queue.
+     */
+    private final class Context extends TransactionContext {
+
+	/** The task being processed. */
+	private KernelRunnable task;
+
+	/**
+	 * Constructs a context with the specified transaction.
+	 */
+	Context(Transaction txn) {
+	    super(txn);
+	}
+
+	/**
+	 * Sets this context's task to the given {@code task}.
+	 */
+	private void setTask(KernelRunnable task) {
+	    this.task = task;
+	}
+
+	/** {@inheritDoc} */
+	public void commit() {
+	    if (task != null) {
+		removeTask(task);
 	    }
-	    return readOnly;
-	    
-	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINER, e, "prepare txn:{0} throws", txn);
-	    throw e;
+	    isCommitted = true;
 	}
-    }
 
-    /** {@inheritDoc} */
-    public void commit(Transaction txn) {
-	try {
-	    checkTransaction(txn);
-	    removeTask();
-	    currentContext.set(null);
-	    logger.log(Level.FINER, "commit txn:{0} returns", txn);
-	    
-	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINER, e, "commit txn:{0} throws", txn);
-	    throw e;
-	}
-    }
-
-    /** {@inheritDoc} */
-    public void prepareAndCommit(Transaction txn) throws Exception {
-        if (!prepare(txn)) {
-            commit(txn);
-        }
-    }
-
-    /** {@inheritDoc} */
-    public void abort(Transaction txn) {
-	try {
-	    checkTransaction(txn);
-	    if (! txn.isAborted()) {
-		logger.log(
-		    Level.SEVERE, "Transaction is not aborted: {0}", txn);
-	    } else if (! isRetryable(txn.getAbortCause())) {
-		removeTask();
+	/** {@inheritDoc} */
+	public void abort(boolean isRetryable) {
+	    if (! isRetryable) {
+		if (task != null) {
+		    removeTask(task);
+		}
 	    }
-	    currentContext.set(null);
-	    logger.log(Level.FINER, "abort txn:{0} returns", txn);
-	    
-	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINER, e, "abort txn:{0} throws", txn);
-	    throw e;
 	}
     }
-
+    
     /**
      * Task for processing the head of the task queue.
      *
@@ -166,6 +157,17 @@ public class NonDurableTaskQueue implements NonDurableTransactionParticipant {
      * the queue.
      */
     private class ProcessQueueTask implements KernelRunnable {
+
+        /** {@inheritDoc} */
+        public String getBaseTaskType() {
+            KernelRunnable nextTask = null;
+            synchronized (lock) {
+                nextTask = tasks.peek();
+            }
+            return nextTask != null ?
+                nextTask.getBaseTaskType() :
+                ProcessQueueTask.class.getName();
+        }
 
 	/** {@inheritDoc} */
 	public void run() throws Exception {
@@ -179,7 +181,8 @@ public class NonDurableTaskQueue implements NonDurableTransactionParticipant {
 		    logger.log(Level.WARNING, "task queue unexpectedly empty");
 		    return;
 		}
-		Context context = joinTransaction(task);
+		Context context = contextFactory.joinTransaction();
+		context.setTask(task);
 		logger.log(Level.FINER, "running task:{0}", task);
 		task.run();
 		
@@ -194,10 +197,10 @@ public class NonDurableTaskQueue implements NonDurableTransactionParticipant {
      * Removes the processed task from the head of the queue, and, if
      * after task removal the task queue is non-empty, then
      * reschedules another {@code ProcessQueueTask} to process the
-     * next task at the head of the queue.
+     * next task at the head of the queue.  The task at the head of
+     * the queue should match the specified {@code processedTask}.
      */
-    private void removeTask() {
-	KernelRunnable processedTask = currentContext.get().task;
+    private void removeTask(KernelRunnable processedTask) {
 	synchronized (lock) {
 	    // FIXME: The task queue should not be empty when this
 	    // method is called, but comment out assertion below and guard
@@ -225,114 +228,6 @@ public class NonDurableTaskQueue implements NonDurableTransactionParticipant {
 		nonDurableTaskScheduler.scheduleTask(
 		    processQueueTask, identity);
 	    }
-	}
-    }
-    /**
-     * Returns {@code true} if the given {@code Throwable} is a
-     * "retryable" exception, meaning that it implements {@code
-     * ExceptionRetryStatus}, and invoking its {@link
-     * ExceptionRetryStatus#shouldRetry shouldRetry} method returns
-     * {@code true}.
-     *
-     * @param	t   a throwable
-     */
-    private static boolean isRetryable(Throwable t) {
-	return
-	    t instanceof ExceptionRetryStatus &&
-	    ((ExceptionRetryStatus) t).shouldRetry();
-    }
-
-    /**
-     * Checks the specified transaction, throwing {@code
-     * IllegalStateException} if the current context is {@code null}
-     * or if the specified transaction is not equal to the transaction
-     * in the current context.  If the specified transaction does not
-     * match the current context's transaction, then sets the current
-     * context to (@code null}.
-     *
-     * @param	txn	a transaction
-     */
-    private void checkTransaction(Transaction txn) {
-        if (txn == null) {
-            throw new NullPointerException("null transaction");
-        }
-        Context context = currentContext.get();
-        if (context == null) {
-            throw new IllegalStateException("null context");
-        }
-        if (!txn.equals(context.txn)) {
-            currentContext.set(null);
-            throw new IllegalStateException(
-                "Wrong transaction: Expected " + context.txn +
-		", found " + txn);
-        }
-    }
-    
-   /**
-     * Joins the current transaction if not already joined, throwing a
-     * {@code TransactionNotActiveException} if there is no current
-     * transaction, and throwing {@code IllegalStateException} if
-     * there is a problem with the state of the transaction.
-     *
-     * If the current transaction is joined, this method creates a
-     * {@code Context} with the current transaction and the given
-     * {@code task}, and then sets the current context object to the
-     * created {@code Context}.
-     *
-     * @param 	task 	the task being processed in this transaction
-     *
-     * @returns	the current context
-     */
-    private Context joinTransaction(KernelRunnable task) {
-	if (task == null) {
-	    throw new NullPointerException("null task");
-	}
-
-	Transaction txn;
-	synchronized (lock) {
-	    txn = txnProxy.getCurrentTransaction();
-	}
-	if (txn == null) {
-	    throw new TransactionNotActiveException(
-		"No transaction is active");
-	}
-	Context context = currentContext.get();
-	if (context == null) {
-	    if (logger.isLoggable(Level.FINER)) {
-		logger.log(Level.FINER, "join txn:{0}", txn);
-	    }
-	    txn.join(this);
-	    context = new Context(txn, task);
-	    currentContext.set(context);
-
-	} else if (!txn.equals(context.txn)) {
-	    currentContext.set(null);
-	    throw new IllegalStateException(
-		"Wrong transaction: Expected " + context.txn +
-		", found " + txn);
-	}
-	return context;
-    }
-
-    /**
-     * Stores information relating to a specific transaction
-     * processing the head of the task queue.
-     */
-    final class Context {
-
-	/** The transaction. */
-	final Transaction txn;
-
-	/** The task being processed. */
-	KernelRunnable task;
-
-	/**
-	 * Constructs a context with the specified transaction and task.
-	 */
-	private Context(Transaction txn, KernelRunnable task) {
-	    assert txn != null && task != null;
-	    this.txn = txn;
-	    this.task = task;
 	}
     }
 }

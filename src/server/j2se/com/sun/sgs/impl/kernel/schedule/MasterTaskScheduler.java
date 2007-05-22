@@ -8,19 +8,14 @@ import com.sun.sgs.app.TaskRejectedException;
 
 import com.sun.sgs.impl.kernel.TaskHandler;
 
-import com.sun.sgs.impl.kernel.profile.ProfileCollector;
-import com.sun.sgs.impl.kernel.profile.ProfileConsumerImpl;
-
-import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
 import com.sun.sgs.kernel.KernelAppContext;
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.Priority;
-import com.sun.sgs.kernel.ProfileConsumer;
+import com.sun.sgs.kernel.ProfileCollector;
 import com.sun.sgs.kernel.ProfileOperation;
 import com.sun.sgs.kernel.ProfileOperationListener;
-import com.sun.sgs.kernel.ProfileProducer;
-import com.sun.sgs.kernel.ProfileRegistrar;
 import com.sun.sgs.kernel.ProfileReport;
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.ResourceCoordinator;
@@ -48,7 +43,7 @@ import java.util.logging.Logger;
  * the real work to its children.
  */
 public class MasterTaskScheduler
-    implements ProfileRegistrar, ProfileOperationListener, TaskScheduler {
+    implements ProfileOperationListener, TaskScheduler {
 
     // logger for this class
     private static final LoggerWrapper logger =
@@ -84,8 +79,8 @@ public class MasterTaskScheduler
     // the default priority for tasks
     private static Priority defaultPriority = Priority.getDefaultPriority();
 
-    // the single collector used for all profile data
-    private ProfileCollector profileCollector;
+    // the collector used for reporting profiling data
+    private final ProfileCollector profileCollector;
 
     /**
      * Creates an instance of <code>MasterTaskScheduler</code>.
@@ -93,8 +88,8 @@ public class MasterTaskScheduler
      * @param properties the system properties
      * @param resourceCoordinator the system's <code>ResourceCoordinator</code>
      * @param taskHandler the system's <code>TaskHandler</code>
-     * @param profileCollector the system's <code>ProfileCollector</code>,
-     *                         or <code>null</code> if profiling is disabled
+     * @param profileCollector the collector used for profiling data, or
+     *                         <code>null</code> if profiling is disabled
      * @param systemContext the context the system runs in, which is registered
      *                      as the first application using this scheduler
      *
@@ -132,8 +127,6 @@ public class MasterTaskScheduler
             (SystemScheduler)(systemSchedulerConstructor.
                     newInstance(properties));
 
-        this.profileCollector = profileCollector;
-
         int startingThreads =
             Integer.parseInt(properties.
                     getProperty(INITIAL_CONSUMER_THREADS_PROPERTY,
@@ -142,6 +135,8 @@ public class MasterTaskScheduler
             logger.log(Level.CONFIG, "Using {0} initial consumer threads",
                        startingThreads);
         threadCount = new AtomicInteger(startingThreads);
+
+        this.profileCollector = profileCollector;
 
         // create the initial consuming threads
         for (int i = 0; i < startingThreads; i++) {
@@ -156,15 +151,6 @@ public class MasterTaskScheduler
 
         // register the system as the first application using the scheduler
         registerApplication(systemContext, properties);
-
-        // finally, add ourselves and optionally the system scheduler,
-        // since this is how we will start to manage threads
-        if (profileCollector != null) {
-            profileCollector.addListener(this);
-            if (systemScheduler instanceof ProfileOperationListener)
-                profileCollector.
-                    addListener((ProfileOperationListener)systemScheduler);
-        }
     }
 
     /**
@@ -184,20 +170,6 @@ public class MasterTaskScheduler
             throw new NullPointerException("Properties cannot be null");
 
         systemScheduler.registerApplication(context, properties);
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public ProfileConsumer registerProfileProducer(ProfileProducer producer) {
-        if (profileCollector != null) {
-            if (logger.isLoggable(Level.CONFIG))
-                logger.log(Level.CONFIG, "Registering profile producer {0}",
-                           producer);
-            return new ProfileConsumerImpl(producer, profileCollector);
-        }
-
-        return null;
     }
 
     /**

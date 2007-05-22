@@ -6,7 +6,7 @@ package com.sun.sgs.impl.kernel.schedule;
 
 import com.sun.sgs.app.TaskRejectedException;
 
-import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
 import com.sun.sgs.kernel.RecurringTaskHandle;
 import com.sun.sgs.kernel.TaskOwner;

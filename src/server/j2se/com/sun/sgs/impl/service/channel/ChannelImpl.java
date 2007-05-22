@@ -11,12 +11,12 @@ import com.sun.sgs.app.ChannelManager;
 import com.sun.sgs.app.ClientSession;
 import com.sun.sgs.app.ClientSessionId;
 import com.sun.sgs.app.Delivery;
-import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
-import com.sun.sgs.service.ClientSessionService;
-import com.sun.sgs.service.DataService;
 import com.sun.sgs.impl.service.channel.ChannelServiceImpl.Context;
-import com.sun.sgs.impl.util.LoggerWrapper;
-import com.sun.sgs.impl.util.MessageBuffer;
+import com.sun.sgs.impl.sharedutil.CompactId;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.MessageBuffer;
+import com.sun.sgs.protocol.simple.SimpleSgsProtocol;
+import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.SgsClientSession;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -43,16 +43,16 @@ final class ChannelImpl implements Channel, Serializable {
 	new LoggerWrapper(
 	    Logger.getLogger(ChannelImpl.class.getName()));
 
-    private final static byte[] EMPTY_ID = new byte[0];
+    private final static CompactId SERVER_ID = new CompactId(new byte[]{0});
 
     /** Transaction-related context information. */
     private final Context context;
 
     /** Persistent channel state. */
-    private final ChannelState state;
+    final ChannelState state;
 
     /** Flag that is 'true' if this channel is closed. */
-    private boolean channelClosed = false;
+    boolean isClosed = false;
 
     /**
      * Constructs an instance of this class with the specified context
@@ -118,12 +118,14 @@ final class ChannelImpl implements Channel, Serializable {
 	    context.getService(DataService.class).markForUpdate(state);
 	    state.addSession(session, listener);
 	    context.joinChannel(session, this);
-	    int nameSize = MessageBuffer.getSize(state.name);
-	    MessageBuffer buf = new MessageBuffer(3 + nameSize);
+	    MessageBuffer buf =
+		new MessageBuffer(3 + MessageBuffer.getSize(state.name) +
+				  state.id.getExternalFormByteCount());
 	    buf.putByte(SimpleSgsProtocol.VERSION).
 		putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
 		putByte(SimpleSgsProtocol.CHANNEL_JOIN).
-		putString(state.name);
+		putString(state.name).
+		putBytes(state.id.getExternalForm());
 	    sendProtocolMessageOnCommit(session, buf.getBuffer());
 	    
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -164,12 +166,12 @@ final class ChannelImpl implements Channel, Serializable {
 	    context.leaveChannel(session, this);
 	    state.removeSession(session);
 	    if (session.isConnected()) {
-		int nameSize = MessageBuffer.getSize(state.name);
-		MessageBuffer buf = new MessageBuffer(3 + nameSize);
+		MessageBuffer buf =
+		    new MessageBuffer(3 + state.id.getExternalFormByteCount());
 		buf.putByte(SimpleSgsProtocol.VERSION).
 		    putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
 		    putByte(SimpleSgsProtocol.CHANNEL_LEAVE).
-		    putString(state.name);
+		    putBytes(state.id.getExternalForm());
 		sendProtocolMessageOnCommit(session, buf.getBuffer());
 	    }
 	    
@@ -199,12 +201,12 @@ final class ChannelImpl implements Channel, Serializable {
 	    }
 	    state.removeAllSessions();
 
-	    int nameSize = MessageBuffer.getSize(state.name);
-	    MessageBuffer buf = new MessageBuffer(3 + nameSize);
+	    MessageBuffer buf =
+		new MessageBuffer(3 + state.id.getExternalFormByteCount());
 	    buf.putByte(SimpleSgsProtocol.VERSION).
 		putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
 		putByte(SimpleSgsProtocol.CHANNEL_LEAVE).
-		putString(state.name);
+		putBytes(state.id.getExternalForm());
 	    byte[] message = buf.getBuffer();
 		    
 	    for (ClientSession session : sessions) {
@@ -339,11 +341,11 @@ final class ChannelImpl implements Channel, Serializable {
     /** {@inheritDoc} */
     public void close() {
 	checkContext();
-	if (!channelClosed) {
+	if (!isClosed) {
 	    leaveAll();
 	    state.removeAll();
 	    context.removeChannel(state.name);
-	    channelClosed = true;
+	    isClosed = true;
 	}
 	
 	logger.log(Level.FINEST, "close returns");
@@ -422,58 +424,8 @@ final class ChannelImpl implements Channel, Serializable {
      */
     private void checkClosed() {
 	checkContext();
-	if (channelClosed) {
+	if (isClosed) {
 	    throw new IllegalStateException("channel is closed");
-	}
-    }
-
-    /**
-     * Forwards the specified {@code message} from the session with
-     * {@code senderId} to the sessions with {@code recipientId}s.
-     */
-    void forwardMessage(
-	    ClientSessionId senderId,
-	    Set<byte[]> recipientIds,
-	    byte[] message, final long seq)
-    {
-	checkClosed();
-	
-	// TBD: if the sending session has disconnected, do we still
-	// want to send the message?
-	
-	/*
-	 * Build list of recipients.
-	 */
-        Set<ClientSession> recipients;
-        if (recipientIds.size() == 0) {
-            recipients = state.getSessionsExcludingId(senderId);
-        } else {
-            recipients = new HashSet<ClientSession>();
-            for (byte[] sessionId : recipientIds) {
-                ClientSession session =
-                    context.getService(ClientSessionService.class).
-		        getClientSession(sessionId);
-                // Skip the sender and any disconnected or non-member sessions
-                if ((session != null) &&
-                    (!senderId.equals(session.getSessionId())) &&
-		    (state.hasSession(session)))
-                {
-                    recipients.add(session);
-                }
-            }
-        }
-
-	/*
-	 * Schedule messages to be sent upon transaction commit.
-	 */
-	if (! recipients.isEmpty()) {
-	    byte[] protocolMessage =
-                getChannelMessage(senderId.getBytes(), message, seq);
-
-	    for (ClientSession session : recipients) {
-		((SgsClientSession) session).sendProtocolMessageOnCommit(
-                    protocolMessage, state.delivery);
-	    }
 	}
     }
 
@@ -506,31 +458,6 @@ final class ChannelImpl implements Channel, Serializable {
     }
 
     /**
-     * Returns a MessageBuffer containing a CHANNEL_MESSAGE protocol
-     * message with this channel's name, and the specified sender,
-     * message, and sequence number.
-     */
-    private byte[] getChannelMessage(
-	byte[] senderId, byte[] message, long sequenceNumber)
-    {
-        int nameLen = MessageBuffer.getSize(state.name);
-        MessageBuffer buf =
-            new MessageBuffer(15 + nameLen + senderId.length +
-                    message.length);
-        buf.putByte(SimpleSgsProtocol.VERSION).
-            putByte(SimpleSgsProtocol.CHANNEL_SERVICE).
-            putByte(SimpleSgsProtocol.CHANNEL_MESSAGE).
-            putString(state.name).
-            putLong(sequenceNumber).
-            putShort(senderId.length).
-            putBytes(senderId).
-            putShort(message.length).
-            putBytes(message);
-
-        return buf.getBuffer();
-    }
-    
-    /**
      * Send a protocol message to the specified session when the
      * transaction commits, logging (but not throwing) any exception.
      */
@@ -547,7 +474,7 @@ final class ChannelImpl implements Channel, Serializable {
                     "sendProtcolMessageOnCommit session:{0} message:{1} throws",
                     session, message);
             }
-            // eat exception
+	    throw e;
         }
     }
 
@@ -558,24 +485,14 @@ final class ChannelImpl implements Channel, Serializable {
      */
     private void sendToClients(Set<ClientSession> sessions, byte[] message) {
 
-	Set<byte[]> clients = new HashSet<byte[]>();
-	for (ClientSession session : sessions) {
-	    clients.add(session.getSessionId().getBytes());
-	}
 	byte[] protocolMessage =
-	    getChannelMessage(EMPTY_ID, message, context.nextSequenceNumber());
+	    ChannelServiceImpl.getChannelMessage(
+		state.id, SERVER_ID, message, context.nextSequenceNumber());
 	    
-	for (byte[] sessionId : clients) {
-	    SgsClientSession session = 
-		context.getService(ClientSessionService.class).
-		    getClientSession(sessionId);
+	for (ClientSession session : sessions) {
 	    // skip disconnected and non-member sessions
-	    if (session != null &&
-		state.hasSession(session) &&
-		session.isConnected())
-	    {
-		session.sendProtocolMessageOnCommit(
-		    protocolMessage, state.delivery);
+	    if (state.hasSession(session) && session.isConnected()) {
+		sendProtocolMessageOnCommit(session, protocolMessage);
 	    }
 	}
     }

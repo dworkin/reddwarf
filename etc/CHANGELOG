@@ -1,0 +1,17 @@
+Version 0.9.2:
+- Fix a bug that caused clients not to receive a disconnected callback
+  if the initial server connection failed
+- Use a compact format for channel identifiers
+- Implement an initial multi-node version of the DataService
+- Update profiling to include information about transaction
+  participants, and to include object and byte counts
+
+Version 0.9.1:
+- Fix a bug that could cause channel messages to be delivered
+  out-of-order
+- Improve channel message delivery performance
+- Include native libraries for Mac OS X and Linux with x86 processors
+- Improve debugging output for deadlocks
+
+Version 0.9:
+- First release with new API and architecture

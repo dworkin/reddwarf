@@ -100,6 +100,14 @@ final class Context {
 	    return originalTxn.getCreationTime();
 	}
 
+	public long getTimeout() {
+	    return originalTxn.getTimeout();
+	}
+
+	public void checkTimeout() {
+	    originalTxn.checkTimeout();
+	}
+
 	public void join(TransactionParticipant participant) {
 	    if (originalTxn.isAborted()) {
 		throw new MaybeRetryableTransactionNotActiveException(
@@ -180,7 +188,7 @@ final class Context {
     }
 
     /** Obtains the reference associated with the specified ID. */
-    private ManagedReferenceImpl getReference(long oid) {
+    ManagedReferenceImpl getReference(long oid) {
 	return ManagedReferenceImpl.getReference(this, oid);
     }
 

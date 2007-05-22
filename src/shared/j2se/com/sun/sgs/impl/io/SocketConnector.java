@@ -4,14 +4,17 @@
 
 package com.sun.sgs.impl.io;
 
+import java.io.IOException;
 import java.net.SocketAddress;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.apache.mina.common.ConnectFuture;
 import org.apache.mina.common.IoConnector;
 import org.apache.mina.common.IoSession;
+import org.apache.mina.common.RuntimeIOException;
 
-import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.io.Endpoint;
 import com.sun.sgs.io.ConnectionListener;
 import com.sun.sgs.io.Connector;
@@ -35,6 +38,8 @@ class SocketConnector implements Connector<SocketAddress>
     private ConnectorConnListner connListener = null;
 
     private final SocketEndpoint endpoint;
+
+    private ConnectFuture connectFuture;
 
     /**
      * Constructs a {@code SocketConnector} using the given
@@ -70,7 +75,54 @@ class SocketConnector implements Connector<SocketAddress>
             connListener = new ConnectorConnListner(listener);
         }
         logger.log(Level.FINE, "connecting to {0}", endpoint);
-        connector.connect(endpoint.getAddress(), connListener);
+        ConnectFuture future =
+	    connector.connect(endpoint.getAddress(), connListener);
+	synchronized (this) {
+	    connectFuture = future;
+	}
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean isConnected() {
+	synchronized (this) {
+	    if (connectFuture == null) {
+		return false;
+	    }
+	}
+	return connectFuture.isConnected();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean waitForConnect(long timeout)
+	throws IOException, InterruptedException
+    {
+	ConnectFuture future;
+	synchronized (this) {
+	    future = connectFuture;
+	}
+	if (future == null) {
+	    throw new IllegalStateException("No connect attempt in progress");
+	}
+	if (! future.isConnected()) {
+	    future.join(timeout);
+	}
+
+	boolean ready = future.isReady();
+	if (ready) {
+	    try {
+		future.getSession();
+	    } catch (RuntimeIOException e) {
+		Throwable t = e.getCause();
+		if (t instanceof IOException) {
+		    throw (IOException) t;
+		}
+	    }
+	}
+	return ready;
     }
 
     /**
@@ -119,8 +171,8 @@ class SocketConnector implements Connector<SocketAddress>
          * If a connection is in progress, but not yet connected,
          * cancel the pending connection.
          * 
-         * @throw IllegalStateException if this connection attempt has
-         *        already completed or been cancelled
+         * @throws IllegalStateException if this connection attempt has
+         *         already completed or been cancelled
          */
         void cancel() {
             synchronized (this) {

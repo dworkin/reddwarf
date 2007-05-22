@@ -29,6 +29,23 @@ import java.io.DataInput;
  * <li> (byte[]) String encoded in modified UTF-8 as described
  * in {@link DataInput}
  * </ul>
+  * <p>
+ * A {@code CompactId} is encoded as follows:
+ * <ul>
+ * <p>The first byte of the ID's external form contains a length field
+ * of variable size.  If the first two bits of the length byte are not
+ * #b11, then the size of the ID is indicated as follows:
+ *
+ * <ul>
+ * <li>#b00: 14 bit ID (2 bytes total)</li>
+ * <li>#b01: 30 bit ID (4 bytes total)</li>
+ * <li>#b10: 62 bit ID (8 bytes total)</li>
+ * </ul>
+ *
+ * <p>If the first byte has the following format:
+ * <ul><li>1100<i>nnnn</i></li></ul> <p>then, the ID is contained in
+ * the next {@code 8 + nnnn} bytes.
+ * </ul>
  */
 public interface SimpleSgsProtocol {
     
@@ -59,8 +76,8 @@ public interface SimpleSgsProtocol {
     /**
      * Login success (login request acknowledgment).
      * <ul>
-     * <li> (ByteArray) sessionId
-     * <li> (ByteArray) reconnectionKey
+     * <li> (CompactId) sessionId
+     * <li> (CompactId) reconnectionKey
      * </ul>
      */
     final byte LOGIN_SUCCESS = 0x11;
@@ -76,7 +93,7 @@ public interface SimpleSgsProtocol {
     /**
      * Reconnection request.
      * <ul>
-     * <li> (ByteArray) reconnectionKey
+     * <li> (CompactId) reconnectionKey
      * </ul>
      */
     final byte RECONNECT_REQUEST = 0x20;
@@ -84,7 +101,7 @@ public interface SimpleSgsProtocol {
     /**
      * Reconnect success (reconnection request acknowledgment).
      * <ul>
-     * <li> (ByteArray) reconnectionKey
+     * <li> (CompactId) reconnectionKey
      * </ul>
      */
     final byte RECONNECT_SUCCESS = 0x21;
@@ -124,6 +141,7 @@ public interface SimpleSgsProtocol {
      * Channel join.
      * <ul>
      * <li> (String) channel name
+     * <li> (CompactId) channel ID
      * </ul>
      */
     final byte CHANNEL_JOIN = 0x50;
@@ -131,7 +149,7 @@ public interface SimpleSgsProtocol {
     /**
      * Channel leave.
      * <ul>
-     * <li> (String) channel name
+     * <li> (CompactId) channel ID
      * </ul>
      */
     final byte CHANNEL_LEAVE = 0x52;
@@ -139,12 +157,12 @@ public interface SimpleSgsProtocol {
     /**
      * Channel send request.
      * <ul>
-     * <li> (String) channel name
+     * <li> (CompactId) channel ID
      * <li> (long) sequence number
      * <li> (short) number of recipients (0 = all)
-     * <li> If number of recipients > 0, for each recipient:
+     * <li> If number of recipients &gt; 0, for each recipient:
      * <ul>
-     * <li> (ByteArray) sessionId
+     * <li> (CompactId) sessionId
      * </ul>
      * <li> (ByteArray) message
      * </ul>
@@ -154,9 +172,10 @@ public interface SimpleSgsProtocol {
     /**
      * Channel message (to recipient on channel).
      * <ul>
-     * <li> (String) channel name
+     * <li> (CompactId) channel ID
      * <li> (long) sequence number
-     * <li> (ByteArray) sender's sessionId (zero-length if sent by server)
+     * <li> (CompactId) sender's sessionId
+     *		(canonical CompactId of zero if sent by server)
      * <li> (ByteArray) message
      * </ul>
      */

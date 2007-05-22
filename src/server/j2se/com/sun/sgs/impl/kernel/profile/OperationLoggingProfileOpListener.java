@@ -4,8 +4,8 @@
 
 package com.sun.sgs.impl.kernel.profile;
 
-import com.sun.sgs.impl.util.LoggerWrapper;
-import com.sun.sgs.impl.util.PropertiesWrapper;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
 import com.sun.sgs.kernel.ProfileOperation;
 import com.sun.sgs.kernel.ProfileOperationListener;
@@ -14,6 +14,9 @@ import com.sun.sgs.kernel.ResourceCoordinator;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.kernel.TaskScheduler;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Properties;
 
 import java.util.logging.Level;
@@ -59,8 +62,8 @@ public class OperationLoggingProfileOpListener
     // registered, but when that changes, so too should this code
     private int maxOp = 0;
     private ProfileOperation [] registeredOps =
-        new ProfileOperation[ProfileCollector.MAX_OPS];
-    private long [] opCounts = new long[ProfileCollector.MAX_OPS];
+        new ProfileOperation[ProfileCollectorImpl.MAX_OPS];
+    private long [] opCounts = new long[ProfileCollectorImpl.MAX_OPS];
 
     // the commit/abort total counts, and the reported running time total
     private long commitCount = 0;
@@ -72,6 +75,10 @@ public class OperationLoggingProfileOpListener
 
     // the number set as the window size for aggregation
     private int logOps;
+
+    // a mapping from local counters to their aggregated counts for the
+    // current snapshot
+    private Map<String,Long> localCounters;
 
     /**
      * Creates an instance of <code>OperationLoggingProfileOpListener</code>.
@@ -91,6 +98,7 @@ public class OperationLoggingProfileOpListener
     {
         logOps = (new PropertiesWrapper(properties)).
             getIntProperty(LOG_OPS_PROPERTY, DEFAULT_LOG_OPS);
+	localCounters = new HashMap<String,Long>();
     }
 
     /**
@@ -124,6 +132,17 @@ public class OperationLoggingProfileOpListener
         for (ProfileOperation op : profileReport.getReportedOperations())
             opCounts[op.getId()]++;
 
+	Map<String,Long> counterMap = profileReport.getUpdatedTaskCounters();
+	if (counterMap != null) {
+	    for (Entry<String,Long> entry : counterMap.entrySet()) {
+		String key = entry.getKey();
+		long value = 0;
+		if (localCounters.containsKey(key))
+		    value = localCounters.get(key);
+		localCounters.put(key, entry.getValue() + value);
+	    }
+	}
+
         if ((commitCount + abortCount) >= logOps) {
             if (logger.isLoggable(Level.FINE)) {
                 long now = System.currentTimeMillis();
@@ -136,12 +155,21 @@ public class OperationLoggingProfileOpListener
                     opCounts[i] = 0;
                 }
 
+		String counterTally = "";
+		if (! localCounters.isEmpty()) {
+		    counterTally += "[task counters]\n";
+		    for (Entry<String,Long> entry : localCounters.entrySet())
+			counterTally += "  " + entry.getKey() + ": " +
+			    entry.getValue() + "\n";
+		}
+
                 logger.log(Level.FINE, "Operations [logOps=" + logOps +"]:\n" +
                            "  succeeded: " + commitCount +
                            "  failed:" + abortCount + "\n" +
                            "  elapsed time: " + (now - lastReport) + " ms\n" +
                            "  running time: " + totalRunningTime + " ms " +
-                           "[threads=" + threadCount + "]\n" + opCountTally);
+                           "[threads=" + threadCount + "]\n" + opCountTally +
+			   "\n" + counterTally);
             } else {
                 for (int i = 0; i < maxOp; i++)
                     opCounts[i] = 0;
@@ -150,6 +178,7 @@ public class OperationLoggingProfileOpListener
             commitCount = 0;
             abortCount = 0;
             totalRunningTime = 0;
+	    localCounters.clear();
             lastReport = System.currentTimeMillis();
         }
     }

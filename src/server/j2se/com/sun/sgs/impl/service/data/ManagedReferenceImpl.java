@@ -9,7 +9,8 @@ import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ObjectIOException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
-import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
@@ -204,8 +205,11 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 	    state = State.REMOVED_EMPTY;
 	    break;
 	case MAYBE_MODIFIED:
+	    /* Call store before modifying fields, in case the call fails */
+	    context.store.removeObject(context.txn, oid);
 	    fingerprint = null;
-	    /* Fall through */
+	    state = State.REMOVED_FETCHED;
+	    break;
 	case NOT_MODIFIED:
 	case MODIFIED:
 	    context.store.removeObject(context.txn, oid);
@@ -238,8 +242,10 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 	    state = State.MODIFIED;
 	    break;
 	case MAYBE_MODIFIED:
+	    context.store.markForUpdate(context.txn, oid);
 	    fingerprint = null;
-	    /* Fall through */
+	    state = State.MODIFIED;
+	    break;
 	case NOT_MODIFIED:
 	    context.store.markForUpdate(context.txn, oid);
 	    state = State.MODIFIED;
@@ -275,15 +281,17 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 	    }
 	    switch (state) {
 	    case EMPTY:
-		object = deserialize(
+		ManagedObject tempObject = deserialize(
 		    context.store.getObject(context.txn, oid, false));
-		context.refs.registerObject(this);
 		if (context.detectModifications) {
-		    fingerprint = SerialUtil.fingerprint(object);
+		    fingerprint = SerialUtil.fingerprint(tempObject);
 		    state = State.MAYBE_MODIFIED;
 		} else {
 		    state = State.NOT_MODIFIED;
 		}
+		/* Do after creating fingerprint, in case that fails */
+		object = tempObject;
+		context.refs.registerObject(this);
 		break;
 	    case NEW:
 	    case NOT_MODIFIED:
@@ -330,8 +338,10 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 		state = State.MODIFIED;
 		break;
 	    case MAYBE_MODIFIED:
+		context.store.markForUpdate(context.txn, oid);
 		fingerprint = null;
-		/* Fall through */
+		state = State.MODIFIED;
+		break;
 	    case NOT_MODIFIED:
 		context.store.markForUpdate(context.txn, oid);
 		state = State.MODIFIED;
@@ -457,29 +467,32 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 
     /** Saves all object modifications to the data store. */
     static void flushAll(Context context) {
-	context.refs.flushChanges();
+	FlushInfo info = context.refs.flushModifiedObjects();
+	if (info != null) {
+	    context.store.setObjects(
+		context.txn, info.getOids(), info.getDataArray());
+	}
     }
 
     /**
-     * Stores any modifications to the data store, and changes the state to
-     * FLUSHED.
+     * Returns any modifications that need to be stored to the data store, or
+     * null if there are none, and changes the state to FLUSHED.
      */
     @SuppressWarnings("fallthrough")
-    void flush() {
+    byte[] flush() {
+	byte[] result = null;
 	switch (state) {
 	case EMPTY:
 	case REMOVED_EMPTY:
 	    break;
 	case NEW:
 	case MODIFIED:
- 	    context.store.setObject(
-		context.txn, oid, SerialUtil.serialize(object));
+	    result = SerialUtil.serialize(object);
 	    context.refs.unregisterObject(object);
 	    break;
 	case MAYBE_MODIFIED:
 	    if (!SerialUtil.matchingFingerprint(object, fingerprint)) {
-		context.store.setObject(
-		    context.txn, oid, SerialUtil.serialize(object));
+		result = SerialUtil.serialize(object);
 	    }
 	    /* Fall through */
 	case NOT_MODIFIED:
@@ -494,6 +507,7 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 	object = null;
 	fingerprint = null;
 	state = State.FLUSHED;
+	return result;
     }
 
     /**
