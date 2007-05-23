@@ -10,6 +10,7 @@ import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.service.Transaction;
+import java.io.ObjectStreamClass;
 
 /**
  * Defines the interface to the underlying persistence mechanism that {@link
@@ -204,7 +205,10 @@ public interface DataStore {
      * Returns the class ID to represent classes with the specified class
      * information.  Obtains an existing ID for the class information if
      * present; otherwise, stores the information and returns the new ID
-     * associated with it.  Class IDs are always greater than {code 0}.
+     * associated with it.  Class IDs are always greater than {@code 0}.  The
+     * class information is the serialized form of the {@link
+     * ObjectStreamClass} instance that serialization uses to represent the
+     * class.
      *
      * @param	txn the transaction under which the operation should take place
      * @param	classInfo the class information
@@ -219,6 +223,9 @@ public interface DataStore {
 
     /**
      * Returns the class information associated with the specified class ID.
+     * The class information is the serialized form of the {@link
+     * ObjectStreamClass} instance that serialization uses to represent the
+     * class.
      *
      * @param	txn the transaction under which the operation should take place
      * @param	classId the class ID

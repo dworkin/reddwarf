@@ -258,11 +258,17 @@ public class DataStoreImpl
     /** The number of currently active transactions. */
     private int txnCount = 0;
 
-    /** A message digest or null if the instance is already in use. */
-    private MessageDigest messageDigest;
-
-    /** Synchronize on this object when getting or setting messageDigest. */
-    private final Object messageDigestLock = new Object();
+    /** A message digest for use by the current thread. */
+    private ThreadLocal<MessageDigest> messageDigest =
+	new ThreadLocal<MessageDigest>() {
+	    protected MessageDigest initialValue() {
+		try {
+		    return MessageDigest.getInstance("SHA-1");
+		} catch (NoSuchAlgorithmException e) {
+		    throw new AssertionError(e);
+		}
+	    }
+        };
 
     /* -- The operations -- DataStore API -- */
     private ProfileOperation createObjectOp = null;
@@ -1168,6 +1174,16 @@ public class DataStoreImpl
 	    DatabaseEntry hashValue = new DatabaseEntry();
 	    int result;
 	    boolean done = false;
+	    /*
+	     * Use a separate transaction when obtaining the class ID so that
+	     * the ID will be available for other transactions to use right
+	     * away.  This approach means that the class info will be
+	     * registered even if the main transaction fails.  If any
+	     * transaction wants to register a new class, though, it's very
+	     * likely that the class will be needed, even if that transaction
+	     * aborts, so it makes sense to commit this operation separately to
+	     * improve concurrency.  -tjb@sun.com (05/23/2007)
+	     */
 	    com.sleepycat.db.Transaction bdbTxn =
 		env.beginTransaction(null, null);
 	    try {
@@ -1769,7 +1785,7 @@ public class DataStoreImpl
     private DatabaseEntry getKeyFromClassInfo(byte[] classInfo) {
 	byte[] keyBytes = new byte[1 + SHA1_SIZE];
 	keyBytes[0] = DataStoreHeader.CLASS_HASH_PREFIX;
-	MessageDigest md = getMessageDigest();
+	MessageDigest md = messageDigest.get();
 	try {
 	    md.update(classInfo);
 	    int numBytes = md.digest(keyBytes, 1, SHA1_SIZE);
@@ -1777,33 +1793,6 @@ public class DataStoreImpl
 	    return new DatabaseEntry(keyBytes);
 	} catch (DigestException e) {
 	    throw new AssertionError(e);
-	} finally {
-	    returnMessageDigest(md);
-	}
-    }
-
-    /** Gets a MessageDigest. */
-    private MessageDigest getMessageDigest() {
-	synchronized (messageDigestLock) {
-	    if (messageDigest != null) {
-		MessageDigest result = messageDigest;
-		messageDigest = null;
-		return result;
-	    }
-	}
-	try {
-	    return MessageDigest.getInstance("SHA-1");
-	} catch (NoSuchAlgorithmException e) {
-	    throw new AssertionError(e);
-	}
-    }
-
-    /** Returns a MessageDigest that is no longer being used. */
-    private void returnMessageDigest(MessageDigest md) {
-	synchronized (messageDigestLock) {
-	    if (messageDigest == null) {
-		messageDigest = md;
-	    }
 	}
     }
 

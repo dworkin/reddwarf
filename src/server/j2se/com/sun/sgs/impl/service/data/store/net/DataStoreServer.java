@@ -8,6 +8,7 @@ import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.service.data.store.ClassInfoNotFoundException;
 import java.io.IOException;
+import java.io.ObjectStreamClass;
 import java.rmi.Remote;
 
 /** Defines the network interface for the data store server. */
@@ -192,7 +193,10 @@ public interface DataStoreServer extends Remote {
      * Returns the class ID to represent classes with the specified class
      * information.  Obtains an existing ID for the class information if
      * present; otherwise, stores the information and returns the new ID
-     * associated with it.  Class IDs are always greater than {code 0}.
+     * associated with it.  Class IDs are always greater than {@code 0}.  The
+     * class information is the serialized form of the {@link
+     * ObjectStreamClass} instance that serialization uses to represent the
+     * class.
      *
      * @param	tid the ID of the transaction under which the operation should
      *		take place
@@ -209,6 +213,9 @@ public interface DataStoreServer extends Remote {
 
     /**
      * Returns the class information associated with the specified class ID.
+     * The class information is the serialized form of the {@link
+     * ObjectStreamClass} instance that serialization uses to represent the
+     * class.
      *
      * @param	tid the ID of the transaction under which the operation should
      *		take place

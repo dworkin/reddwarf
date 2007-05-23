@@ -9,8 +9,8 @@ import java.net.ServerSocket;
 import java.net.Socket;
 
 /**
- * The server side of an experimental network protocol for implementing
- * DataStoreServer using sockets instead of RMI.
+ * The server side of an experimental network protocol, not currently used, for
+ * implementing DataStoreServer using sockets instead of RMI.
  */
 /*
  * XXX: Use thread pools?

@@ -14,8 +14,9 @@ import java.io.OutputStream;
 import java.lang.reflect.Constructor;
 
 /**
- * Defines an experimental network protocol used to transfer DataStoreServer
- * methods over input and output streams, to use instead of RMI.
+ * Defines an experimental network protocol, not currently used, used to
+ * transfer DataStoreServer methods over input and output streams, to use
+ * instead of RMI.
  *
  * RFE: Modify failure() to send the server-side stack trace, and checkResult()
  * to append it to the thrown exception's stack trace.  This would be useful

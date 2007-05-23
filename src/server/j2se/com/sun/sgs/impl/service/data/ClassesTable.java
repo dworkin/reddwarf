@@ -26,7 +26,9 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * Manages information about class descriptors used to serialize managed
- * objects.
+ * objects.  This class caches information about class descriptors and class
+ * IDs that it obtains from the data store.  The cache is filled on demand, and
+ * uses soft and weak references, so it can be cleared by the GC as needed.
  */
 final class ClassesTable {
 
@@ -141,6 +143,13 @@ final class ClassesTable {
      * @return	the class ID
      * @throws	ObjectIOException if a problem occurs serializing the class
      *		descriptor
+     * @throws	TransactionAbortedException if the data store was consulted and
+     *		the transaction was aborted due to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the data store was consulted
+     *		and the transaction is not active
+     * @throws	IllegalStateException if the data store was consulted and the
+     *		operation failed because of a problem with the current
+     *		transaction
      */
     private int getClassId(Transaction txn, ObjectStreamClass classDesc) {
 	lock.readLock().lock();
@@ -197,6 +206,13 @@ final class ClassesTable {
      * @return	the class descriptor
      * @throws	ObjectIOException if a problem occurs deserializing the class
      *		descriptor, including if the class ID is not found
+     * @throws	TransactionAbortedException if the data store was consulted and
+     *		the transaction was aborted due to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the data store was consulted
+     *		and the transaction is not active
+     * @throws	IllegalStateException if the data store was consulted and the
+     *		operation failed because of a problem with the current
+     *		transaction
      */
     private ObjectStreamClass getClassDesc(Transaction txn, int classId) {
 	lock.readLock().lock();

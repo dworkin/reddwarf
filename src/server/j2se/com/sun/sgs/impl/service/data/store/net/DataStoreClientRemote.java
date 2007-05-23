@@ -10,8 +10,8 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
- * The client side of an experimental network protocol for implementing
- * DataStoreServer using sockets instead of RMI.
+ * The client side of an experimental network protocol, not currently used, for
+ * implementing DataStoreServer using sockets instead of RMI.
  */
 /*
  * XXX: Limit connections and/or close unused connections?
