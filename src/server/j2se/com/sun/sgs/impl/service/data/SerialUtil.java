@@ -8,10 +8,10 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.app.ObjectIOException;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.ObjectStreamClass;
@@ -21,7 +21,6 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
-import java.util.Arrays;
 import java.util.IdentityHashMap;
 import java.util.Stack;
 import java.util.logging.Level;
@@ -29,6 +28,26 @@ import java.util.logging.Logger;
 
 /** Defines serialization utilities.  This class cannot be instantiated. */
 final class SerialUtil {
+
+    /**
+     * The first 4 bytes of output streams created by serialization protocol
+     * version 2.
+     */
+    private static final byte[] SERIAL_PROTOCOL_2_HEADER = {
+	(byte) 0xac, (byte) 0xed, 0x00, 0x05
+    };
+
+    /**
+     * The initial byte to use in place of the initial 4 bytes of serial output
+     * using serialization protocol version 2.
+     */
+    private static final byte SERIAL_PROTOCOL_2 = 1;
+
+    /**
+     * The initial byte to use for serial output other than serialization
+     * protocol version 2.
+     */
+    private static final byte SERIAL_PROTOCOL_OTHER = 2;
 
     /** The logger for this class. */
     private static final LoggerWrapper logger =
@@ -43,13 +62,15 @@ final class SerialUtil {
      * Converts serialized data into an object.
      *
      * @param	data the serialized data
+     * @param	classSerial controls reading of class descriptors
      * @return	the object
      * @throws	ObjectIOException if a problem occurs deserializing the object
      */
-    static Object deserialize(byte[] data) {
+    static Object deserialize(byte[] data, ClassSerialization classSerial) {
 	ObjectInputStream in = null;
 	try {
-	    in = new ObjectInputStream(new ByteArrayInputStream(data));
+	    in = new CustomClassDescriptorObjectInputStream(
+		new CompressByteArrayInputStream(data), classSerial);
 	    return in.readObject();
 	} catch (ClassNotFoundException e) {
 	    throw new ObjectIOException(
@@ -70,19 +91,77 @@ final class SerialUtil {
     }
 
     /**
+     * Defines an ObjectInputStream whose reading of class descriptors is
+     * customized by an instance of ClassSerialization.
+     */
+    private static final class CustomClassDescriptorObjectInputStream
+	extends ObjectInputStream
+    {
+	private final ClassSerialization classSerial;
+	CustomClassDescriptorObjectInputStream(InputStream in,
+					       ClassSerialization classSerial)
+	    throws IOException
+	{
+	    super(in);
+	    this.classSerial = classSerial;
+	}
+	protected ObjectStreamClass readClassDescriptor()
+	    throws ClassNotFoundException, IOException
+	{
+	    return classSerial.readClassDescriptor(this);
+	}
+    }
+
+    /**
+     * Defines an input stream that obtains its data from a byte array, like
+     * ByteArrayInputStream, and decompresses the start of the stream based on
+     * its first byte.  Assumes that the first byte will either be
+     * SERIAL_PROTOCOL_2 or SERIAL_PROTOCOL_OTHER.  If the value is
+     * SERIAL_PROTOCOL_2, then that byte is replaced with
+     * SERIAL_PROTOCOL_2_HEADER.  If it is SERIAL_PROTOCOL_OTHER, then the real
+     * header is expected to follow.
+     */
+    private static final class CompressByteArrayInputStream
+	extends ByteArrayInputStream
+    {
+	CompressByteArrayInputStream(byte[] bytes) throws IOException {
+	    super(getBytes(bytes));
+	}
+	private static byte[] getBytes(byte[] bytes) throws IOException {
+	    int b = (bytes.length > 0) ? bytes[0] : -1;
+	    if (b == SERIAL_PROTOCOL_2) {
+		byte[] result = new byte[bytes.length + 3];
+		System.arraycopy(SERIAL_PROTOCOL_2_HEADER, 0, result, 0, 4);
+		System.arraycopy(bytes, 1, result, 4, bytes.length - 1);
+		return result;
+	    } else if (b == SERIAL_PROTOCOL_OTHER) {
+		byte[] result = new byte[bytes.length - 1];
+		System.arraycopy(bytes, 1, result, 0, bytes.length - 1);
+		return result;
+	    } else {
+		throw new IOException("Unexpected initial byte: " + b);
+	    }
+	}
+    }
+
+    /**
      * Converts an managed object into serialized data.
      *
      * @param	object the object
+     * @param	classSerial controls writing of class descriptors
      * @return	the serialized data
      * @throws	ObjectIOException if a problem occurs serializing the object
      *		and, in particular, if a <code>ManagedObject</code> is
      *		referenced without an intervening <code>ManagedReference</code>
      */
-    static byte[] serialize(ManagedObject object) {
+    static byte[] serialize(ManagedObject object,
+			    ClassSerialization classSerial)
+    {
 	ObjectOutputStream out = null;
 	try {
-	    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-	    out = new CheckReferencesObjectOutputStream(baos, object);
+	    ByteArrayOutputStream baos = new CompressByteArrayOutputStream();
+	    out = new CheckReferencesObjectOutputStream(
+		baos, object, classSerial);
 	    out.writeObject(object);
 	    out.flush();
 	    return baos.toByteArray();
@@ -103,6 +182,65 @@ final class SerialUtil {
     }
 
     /**
+     * Defines a ByteArrayOutputStream that compresses the first 4 bytes if
+     * they match the standard values for a serialization stream.  If those
+     * bytes match SERIAL_PROTOCOL_2_HEADER, replaces them with
+     * SERIAL_PROTOCOL_2.  Otherwise, prepends SERIAL_PROTOCOL_OTHER.
+     */
+    private static final class CompressByteArrayOutputStream
+	extends ByteArrayOutputStream
+    {
+	CompressByteArrayOutputStream() { }
+	public byte[] toByteArray() {
+	    byte[] newbuf;
+	    if (startsWith(SERIAL_PROTOCOL_2_HEADER)) {
+		newbuf = new byte[count - 3];
+		newbuf[0] = SERIAL_PROTOCOL_2;
+		System.arraycopy(buf, 4, newbuf, 1, count - 4);
+	    } else {
+		newbuf = new byte[count + 1];
+		newbuf[0] = SERIAL_PROTOCOL_OTHER;
+		System.arraycopy(buf, 0, newbuf, 1, count);
+	    }
+	    return newbuf;
+	}
+	private boolean startsWith(byte[] prefix) {
+	    if (count < prefix.length) {
+		return false;
+	    }
+	    for (int i = 0; i < prefix.length; i++) {
+		if (buf[i] != prefix[i]) {
+		    return false;
+		}
+	    }
+	    return true;
+	}
+    }
+
+    /**
+     * Defines an ObjectOutputStream whose writing of class descriptors can be
+     * customized.
+     */
+    private static class CustomClassDescriptorObjectOutputStream
+	extends ObjectOutputStream
+    {
+	private final ClassSerialization classSerial;
+
+	CustomClassDescriptorObjectOutputStream(OutputStream out,
+						ClassSerialization classSerial)
+	    throws IOException
+	{
+	    super(out);
+	    this.classSerial = classSerial;
+	}
+	protected void writeClassDescriptor(ObjectStreamClass desc)
+	    throws IOException
+	{
+	    classSerial.writeClassDescriptor(desc, this);
+	}
+    }	
+
+    /**
      * Define an ObjectOutputStream that checks for references to
      * ManagedObjects not made through ManagedReferences.  Note that this
      * stream will not be able to detect direct references to the top level
@@ -110,7 +248,7 @@ final class SerialUtil {
      * inner class instance.
      */
     private static final class CheckReferencesObjectOutputStream
-	extends ObjectOutputStream
+	extends CustomClassDescriptorObjectOutputStream
     {
 	/** The top level managed object being serialized. */
 	private final ManagedObject topLevelObject;
@@ -119,11 +257,12 @@ final class SerialUtil {
 	 * Creates an instance that writes to a stream for a managed object
 	 * being serialized.
 	 */
-	CheckReferencesObjectOutputStream(
-	    OutputStream out, ManagedObject topLevelObject)
+	CheckReferencesObjectOutputStream(OutputStream out,
+					  ManagedObject topLevelObject,
+					  ClassSerialization classSerial)
 	    throws IOException
 	{
-	    super(out);
+	    super(out, classSerial);
 	    this.topLevelObject = topLevelObject;
 	    AccessController.doPrivileged(
 		new PrivilegedAction<Void>() {
@@ -161,61 +300,6 @@ final class SerialUtil {
 		}
 	    }
 	    return object;
-	}
-    }
-
-    /**
-     * Obtains a fingerprint that uniquely identifies the serialized data of
-     * the object.
-     *
-     * @param	object the object
-     * @return	the fingerprint
-     * @throws	ObjectIOException if a problem occurs serializing the object
-     */
-    static byte[] fingerprint(Object object) {
-	/*
-	 * TBD: Maybe use a message digest if the fingerprint gets long.
-	 * -tjb@sun.com (11/16/2006)
-	 */
-	ObjectOutputStream out = null;
-	try {
-	    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-	    out = new ObjectOutputStream(baos) {
-		protected void writeClassDescriptor(ObjectStreamClass desc)
-		    throws IOException
-		{
-		    writeObject(desc.getName());
-		}
-	    };
-	    out.writeObject(object);
-	    out.flush();
-	    return baos.toByteArray();
-	} catch (IOException e) {
-	    throw new ObjectIOException(
-		"Problem serializing object: " + e.getMessage(), e, false);
-	} finally {
-	    if (out != null) {
-		try {
-		    out.close();
-		} catch (IOException e) {
-		}
-	    }
-	}
-    }
-
-    /**
-     * Checks if an object has a particular fingerprint.  Returns false if
-     * attempting to compute the fingerprint throws an ObjectIOException.
-     *
-     * @param	object the object
-     * @param	fingerprint the fingerprint
-     * @return	whether the object has a matching fingerprint
-     */
-    static boolean matchingFingerprint(Object object, byte[] fingerprint) {
-	try {
-	    return Arrays.equals(fingerprint(object), fingerprint);
-	} catch (ObjectIOException e) {
-	    return false;
 	}
     }
 
