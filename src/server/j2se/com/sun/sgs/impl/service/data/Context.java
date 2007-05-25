@@ -10,6 +10,8 @@ import com.sun.sgs.impl.util.MaybeRetryableTransactionNotActiveException;
 import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
+import java.util.LinkedList;
+import java.util.List;
 
 /** Stores information for a specific transaction. */
 final class Context extends TransactionContext {
@@ -51,6 +53,12 @@ final class Context extends TransactionContext {
      * part of the ManagedReferenceImpl class.
      */
     final ReferenceTable refs = new ReferenceTable();
+
+    /**
+     * A list of operations to run after abort, or null if there are no abort
+     * actions.
+     */
+    private List<Runnable> abortActions = null;
 
     /** Creates an instance of this class. */
     Context(DataStore store,
@@ -240,6 +248,11 @@ final class Context extends TransactionContext {
 	if (storeParticipant != null) {
 	    storeParticipant.abort(txn);
 	}
+	if (abortActions != null) {
+	    for (Runnable action : abortActions) {
+		action.run();
+	    }
+	}
     }
 
     /* -- Other methods -- */
@@ -254,5 +267,16 @@ final class Context extends TransactionContext {
 	    count = 0;
 	    ManagedReferenceImpl.checkAllState(this);
 	}
+    }
+
+    /**
+     * Adds an action to be performed on abort, to roll back transient state
+     * changes.
+     */
+    void addAbortAction(Runnable action) {
+	if (abortActions == null) {
+	    abortActions = new LinkedList<Runnable>();
+	}
+	abortActions.add(action);
     }
 }

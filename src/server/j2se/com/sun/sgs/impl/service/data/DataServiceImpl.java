@@ -14,7 +14,6 @@ import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
-import com.sun.sgs.impl.util.OnAbort;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.ProfileProducer;
@@ -114,6 +113,7 @@ import java.util.logging.Logger;
  * </ul>
  */
 public final class DataServiceImpl implements DataService, ProfileProducer {
+
     /** The name of this class. */
     private static final String CLASSNAME = DataServiceImpl.class.getName();
 
@@ -325,14 +325,21 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 		    "Service is already configured");
 	    }
 	    state = State.RUNNING;
-	    new OnAbort(proxy) {
-		protected void onAbort(boolean retryable) {
-		    synchronized (stateLock) {
-			state = State.UNINITIALIZED;
-		    }
+	    boolean addedAbortAction = false;
+	    try {
+		contextFactory = new ContextFactory(proxy);
+		contextFactory.joinTransaction().addAbortAction(
+		    new Runnable() {
+			public void run() {
+			    state = State.UNINITIALIZED;
+			}
+		    });
+		addedAbortAction = true;
+	    } finally {
+		if (!addedAbortAction) {
+		    state = State.UNINITIALIZED;
 		}
-	    };
-	    contextFactory = new ContextFactory(proxy);
+	    }
 	    DataServiceHeader header;
 	    try {
 		header = getServiceBinding(

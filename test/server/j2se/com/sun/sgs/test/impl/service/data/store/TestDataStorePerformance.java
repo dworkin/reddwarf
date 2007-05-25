@@ -113,9 +113,6 @@ public class TestDataStorePerformance extends TestCase {
 		e.printStackTrace();
 	    }
 	}
-	if (passed && directory != null) {
-	    deleteDirectory(directory);
-	}
     }
 
     /** Shuts down the store. */
@@ -275,22 +272,6 @@ public class TestDataStorePerformance extends TestCase {
 	}
 	directory = dir.getPath();
 	return directory;
-    }
-
-    /** Deletes the specified directory, if it exists. */
-    private static void deleteDirectory(String directory) {
-	File dir = new File(directory);
-	if (dir.exists()) {
-	    for (File f : dir.listFiles()) {
-		if (!f.delete()) {
-		    throw new RuntimeException("Failed to delete file: " + f);
-		}
-	    }
-	    if (!dir.delete()) {
-		throw new RuntimeException(
-		    "Failed to delete directory: " + dir);
-	    }
-	}
     }
 
     /** Creates a property list with the specified keys and values. */
