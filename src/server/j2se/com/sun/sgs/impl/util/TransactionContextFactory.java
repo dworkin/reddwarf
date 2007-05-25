@@ -142,8 +142,8 @@ public abstract class TransactionContextFactory<T extends TransactionContext> {
 	} else if (context != threadContext) {
 	    throw new TransactionNotActiveException(
                 "Wrong transaction: Expected " +
-		threadContext.getTransaction() + ", found " +
-		context.getTransaction());
+		context.getTransaction() + ", found " +
+		threadContext.getTransaction());
 	}
     }
 

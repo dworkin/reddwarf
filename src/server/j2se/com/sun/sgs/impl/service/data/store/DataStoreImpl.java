@@ -97,7 +97,7 @@ import java.util.logging.Logger;
  *
  * <li> <i>Key:</i> {@code
  *	com.sun.sgs.impl.service.data.store.DataStoreImpl.checkpoint.size} <br>
- *	<i>Default:</i> {@code 100000} </br>
+ *	<i>Default:</i> {@code 100000} <br>
  *	The number of bytes that needs to have been written since the last
  *	checkpoint operation was performed to require another checkpoint. <p>
  *
@@ -138,10 +138,9 @@ import java.util.logging.Logger;
  *	will be maintained.  Flushing changes to disk avoids data loss but
  *	introduces a significant reduction in performance. <p>
  *
- * <li> <i>Key:</i>
- *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl.remove.logs
- *	</code> <br>
- *	<i>Default:</i> <code>false</code>
+ * <li> <i>Key:</i> {@code
+ *	com.sun.sgs.impl.service.data.store.DataStoreImpl.remove.logs} <br>
+ *	<i>Default:</i> <code>false</code> <br>
  *	Whether to automatically remove database log files that are no longer
  *	needed.  Note that automatic log file removal is likely to make
  *	catastrophic recovery of the database impossible, because log files
@@ -520,7 +519,7 @@ public class DataStoreImpl
 	    DatabaseEntry value = new DatabaseEntry();
 	    if (name == null) {
 		OperationStatus status = cursor.getFirst(key, value, null);
-		lastCursorKey = getNextBoundNameResult(name, status, key);
+		lastCursorKey = getNextBoundNameResult(null, status, key);
 	    } else {
 		boolean matchesLast = name.equals(lastCursorKey);
 		if (!matchesLast) {
@@ -1803,6 +1802,7 @@ public class DataStoreImpl
 	    try {
 		txn.abort(re);
 	    } catch (TransactionAbortedException e2) {
+		/* Throw the original exception, for better error reporting */
 	    }
 	}
 	logger.logThrow(Level.FINEST, re, "{0} throws", operation);

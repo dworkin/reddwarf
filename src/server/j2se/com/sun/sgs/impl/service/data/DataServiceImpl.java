@@ -296,7 +296,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 		logger.log(Level.CONFIG, "Using data store {0}", store);
 	    }
 	    classesTable = new ClassesTable(store);
-	} catch (Exception e) {
+	} catch (RuntimeException e) {
 	    logger.logThrow(
 		Level.SEVERE, e, "DataService initialization failed");
 	    throw e;
@@ -764,8 +764,8 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 
     /**
      * Checks that the specified context is currently active.  Throws
-     * TransactionNotActiveException if there is no current transaction.
-     * Otherwise, returns true if the current transaction matches the argument.
+     * TransactionNotActiveException if there is no current transaction or if
+     * the current transaction doesn't match the context.
      */
     static void checkContext(Context context) {
 	getInstance().getContextFactory().checkContext(context);

@@ -847,7 +847,11 @@ public final class DataStoreClient
 	 */
 	if (re instanceof TransactionAbortedException && txnInfo != null) {
 	    txnInfo.serverAborted = true;
-	    txnInfo.txn.abort(re);
+	    try {
+		txnInfo.txn.abort(re);
+	    } catch (TransactionAbortedException e2) {
+		/* Throw the original exception, for better error reporting */
+	    }
 	}
 	logger.logThrow(level, re, "{0} throws", operation);
 	return re;
