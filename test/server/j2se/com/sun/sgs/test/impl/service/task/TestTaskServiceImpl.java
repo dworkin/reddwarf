@@ -101,12 +101,12 @@ public class TestTaskServiceImpl extends TestCase {
         // NOTE: this could be factored into some other utility class if it
         // seems valuable to do so
         txn = createTransaction();
-        dataService.configure(serviceRegistry, txnProxy);
         txnProxy.setComponent(DataService.class, dataService);
         txnProxy.setComponent(DataServiceImpl.class, dataService);
         serviceRegistry.setComponent(DataManager.class, dataService);
         serviceRegistry.setComponent(DataService.class, dataService);
         serviceRegistry.setComponent(DataServiceImpl.class, dataService);
+        dataService.configure(serviceRegistry, txnProxy);
         taskService.configure(serviceRegistry, txnProxy);
         txnProxy.setComponent(TaskService.class, taskService);
         txnProxy.setComponent(TaskServiceImpl.class, taskService);
@@ -511,7 +511,7 @@ public class TestTaskServiceImpl extends TestCase {
         while ((name != null) && (name.startsWith("runHandle."))) {
             ManagedHandle mHandle =
                 dataService.getBinding(name, ManagedHandle.class);
-            mHandle.handle.cancel();
+            mHandle.cancel();
             dataService.removeObject(mHandle);
             dataService.removeBinding(name);
             name = dataService.nextBoundName(name);
@@ -544,7 +544,7 @@ public class TestTaskServiceImpl extends TestCase {
             dataService.getBinding("TestTaskServiceImpl.handle",
                                    ManagedHandle.class);
         try {
-            mHandle.handle.cancel();
+            mHandle.cancel();
         } catch (Exception e) {
             fail("Did not expect Exception: " + e);
         }
@@ -614,11 +614,11 @@ public class TestTaskServiceImpl extends TestCase {
         ManagedHandle mHandle =
             dataService.getBinding("TestTaskServiceImpl.handle",
                                    ManagedHandle.class);
-        mHandle.handle.cancel();
+        mHandle.cancel();
         txn.commit();
         txn = createTransaction();
         try {
-            mHandle.handle.cancel();
+            mHandle.cancel();
             fail("Expected ObjectNotFoundException");
         } catch (ObjectNotFoundException e) {
             System.err.println(e);
@@ -649,7 +649,7 @@ public class TestTaskServiceImpl extends TestCase {
             dataService.getBinding("TestTaskServiceImpl.handle",
                                    ManagedHandle.class);
         try {
-            mHandle.handle.cancel();
+            mHandle.cancel();
         } catch (ObjectNotFoundException e) {
             fail("Did not exxpect ObjectNotFoundException");
         }
@@ -820,7 +820,6 @@ public class TestTaskServiceImpl extends TestCase {
 
     private Counter getClearedCounter() {
         Counter counter = dataService.getBinding("counter", Counter.class);
-        dataService.markForUpdate(counter);
         counter.clear();
         return counter;
     }
@@ -838,9 +837,21 @@ public class TestTaskServiceImpl extends TestCase {
     public static class Counter implements ManagedObject, Serializable {
         private static final long serialVersionUID = 1;
         private int count = 0;
-        public void clear() { count = 0; }
-        public void increment() { count++; }
-        public void decrement() { count--; }
+        public void clear() {
+	    AppContext.getDataManager().markForUpdate(this);
+	    count = 0;
+	}
+        public void increment() {
+	    AppContext.getDataManager().markForUpdate(this);
+	    count++;
+	}
+        public void decrement() {
+	    try {
+		AppContext.getDataManager().markForUpdate(this);
+	    } catch (TransactionNotActiveException e) {
+	    }
+	    count--;
+	}
         public boolean isZero() { return count == 0; }
     }
 
@@ -907,10 +918,14 @@ public class TestTaskServiceImpl extends TestCase {
 
     public static class ManagedHandle implements ManagedObject, Serializable {
         private static final long serialVersionUID = 1;
-        public PeriodicTaskHandle handle;
+        private final PeriodicTaskHandle handle;
         public ManagedHandle(PeriodicTaskHandle handle) {
             this.handle = handle;
         }
+	public void cancel() {
+	    AppContext.getDataManager().markForUpdate(this);
+	    handle.cancel();
+	}
     }
 
 }

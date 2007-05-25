@@ -99,11 +99,10 @@ public class TestDataServiceImpl extends TestCase {
 	System.err.println("Testcase: " + getName());
 	props = getProperties();
 	if (service == null) {
-	    service = createDataServiceImpl();
+	    service = getDataServiceImpl();
 	    createTransaction();
 	    service.configure(componentRegistry, txnProxy);
 	    txn.commit();
-	    componentRegistry.setComponent(DataManager.class, service);
 	}
 	componentRegistry.registerAppContext();
 	createTransaction();
@@ -295,7 +294,7 @@ public class TestDataServiceImpl extends TestCase {
 	txn.commit();
 	txn = null;
 	service.shutdown();
-	service = createDataServiceImpl();
+	service = getDataServiceImpl();
 	try {
 	    service.configure(null, txnProxy);
 	    fail("Expected NullPointerException");
@@ -314,7 +313,7 @@ public class TestDataServiceImpl extends TestCase {
     public void testConfigureNoTxn() throws Exception {
 	txn.commit();
 	txn = null;
-	service = createDataServiceImpl();
+	service = getDataServiceImpl();
 	try {
 	    service.configure(componentRegistry, txnProxy);
 	    fail("Expected TransactionNotActiveException");
@@ -336,7 +335,7 @@ public class TestDataServiceImpl extends TestCase {
 
     public void testConfigureAborted() throws Exception {
 	txn.commit();
-	service = createDataServiceImpl();
+	service = getDataServiceImpl();
 	createTransaction();
 	service.configure(componentRegistry, txnProxy);
 	txn.abort(null);
@@ -1762,18 +1761,7 @@ public class TestDataServiceImpl extends TestCase {
     }
     /* Can't get a reference as the first operation in a new transaction */
     public void testGetReferenceShutdown() throws Exception {
-	/* Expect TransactionNotActiveException */
-	getReference.setUp();
-	txn.abort(null);
-	service.shutdown();
-	try {
-	    getReference.run();
-	    fail("Expected TransactionNotActiveException");
-	} catch (TransactionNotActiveException e) {
-	    System.err.println(e);
-	}
-	txn = null;
-	service = null;
+	testShutdown(getReference);
     }
 
     public void testGetReferenceDeserializationFails() throws Exception {
@@ -1902,18 +1890,7 @@ public class TestDataServiceImpl extends TestCase {
     }
     /* Can't get a reference as the first operation in a new transaction */
     public void testGetReferenceUpdateShutdown() throws Exception {
-	/* Expect TransactionNotActiveException */
-	getReferenceUpdate.setUp();
-	txn.abort(null);
-	service.shutdown();
-	try {
-	    getReferenceUpdate.run();
-	    fail("Expected TransactionNotActiveException");
-	} catch (TransactionNotActiveException e) {
-	    System.err.println(e);
-	}
-	txn = null;
-	service = null;
+	testShutdown(getReferenceUpdate);
     }
 
     public void testGetReferenceUpdateDeserializationFails() throws Exception {
@@ -2091,7 +2068,7 @@ public class TestDataServiceImpl extends TestCase {
     public void testShutdownRestart() throws Exception {
 	txn.commit();
 	service.shutdown();
-	service = createDataServiceImpl();
+	service = getDataServiceImpl();
 	createTransaction();
 	service.configure(componentRegistry, txnProxy);
 	componentRegistry.setComponent(DataManager.class, service);
@@ -2487,6 +2464,20 @@ public class TestDataServiceImpl extends TestCase {
 	return new DataServiceImpl(props, componentRegistry);
     }
 
+    /**
+     * Returns a DataServiceImpl that has been registered with the component
+     * registry, but not configured.
+     */
+    private DataServiceImpl getDataServiceImpl() throws Exception {
+	DataServiceImpl service = createDataServiceImpl();
+	componentRegistry.setComponent(DataManager.class, service);
+	componentRegistry.setComponent(DataService.class, service);
+	componentRegistry.setComponent(DataServiceImpl.class, service);
+	txnProxy.setComponent(DataService.class, service);
+	txnProxy.setComponent(DataServiceImpl.class, service);
+	return service;
+    }
+
     /** Returns the default properties to use for creating data services. */
     protected Properties getProperties() throws Exception {
 	return createProperties(
@@ -2586,7 +2577,7 @@ public class TestDataServiceImpl extends TestCase {
 	action.setUp();
 	txn.commit();
 	createTransaction();
-	service = createDataServiceImpl();
+	service = getDataServiceImpl();
 	try {
 	    action.run();
 	    fail("Expected IllegalStateException");
@@ -2712,21 +2703,32 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     /** Tests running the action with a new transaction while shutting down. */
-    private void testShuttingDownNewTxn(Action action) throws Exception {
+    private void testShuttingDownNewTxn(final Action action) throws Exception {
+	txn.commit();
+	createTransaction();
+	service.createReference(new DummyManagedObject());
 	action.setUp();
-	DummyTransaction originalTxn = txn;
 	ShutdownAction shutdownAction = new ShutdownAction();
 	shutdownAction.assertBlocked();
-	createTransaction();
-	try {
-	    action.run();
-	    fail("Expected IllegalStateException");
-	} catch (IllegalStateException e) {
-	    System.err.println(e);
-	}
+	ThreadAction threadAction = new ThreadAction<Void>() {
+	    protected Void action() {
+		DummyTransaction txn = new DummyTransaction(
+		    UsePrepareAndCommit.ARBITRARY);
+		txnProxy.setCurrentTransaction(txn);
+		try {
+		    action.run();
+		    fail("Expected IllegalStateException");
+		} catch (IllegalStateException e) {
+		    assertEquals("Service is shutting down", e.getMessage());
+		} finally {
+		    txn.abort(null);
+		}
+		return null;
+	    }
+	};
+	threadAction.assertDone();
 	txn.abort(null);
 	txn = null;
-	originalTxn.abort(null);
 	shutdownAction.assertResult(true);
 	service = null;
     }
@@ -2746,21 +2748,52 @@ public class TestDataServiceImpl extends TestCase {
 	service = null;
     }
 
-    /** Use this thread to control a call to shutdown that may block. */
-    class ShutdownAction extends Thread {
-	private boolean done;
-	private Throwable exception;
-	private boolean result;
+    /**
+     * A utility class for running an operation in a separate thread and
+     * insuring that it either completes or blocks.
+     *
+     * @param	<T> the return type of the operation
+     */
+    abstract static class ThreadAction<T> extends Thread {
 
-	/** Creates an instance of this class and starts the thread. */
-	ShutdownAction() {
+	/**
+	 * The number of milliseconds to wait to see if an operation is
+	 * blocked.
+	 */
+	private static final long BLOCKED = 5;
+
+	/**
+	 * The number of milliseconds to wait to see if an operation will
+	 * complete.
+	 */
+	private static final long COMPLETED = 2000;
+
+	/** Set to true when the operation is complete. */
+	private boolean done = false;
+
+	/**
+	 * Set when the operation is complete to the exception thrown by the
+	 * operation or null if no exception was thrown.
+	 */
+	private Throwable exception;
+
+	/**
+	 * Set to the result of the operation when the operation is complete.
+	 */
+	private T result;
+
+	/**
+	 * Creates an instance of this class and starts the operation in a
+	 * separate thread.
+	 */
+	ThreadAction() {
 	    start();
 	}
 
-	/** Performs the shutdown and collects the results. */
+	/** Performs the operation and collects the results. */
 	public void run() {
 	    try {
-		result = service.shutdown();
+		result = action();
 	    } catch (Throwable t) {
 		exception = t;
 	    }
@@ -2770,20 +2803,37 @@ public class TestDataServiceImpl extends TestCase {
 	    }
 	}
 
-	/** Asserts that the shutdown call is blocked. */
+	/**
+	 * The operation to be performed.
+	 *
+	 * @return	the result of the operation
+	 * @throws	Exception if the operation fails
+	 */
+	abstract T action() throws Exception;
+
+	/**
+	 * Asserts that the operation is blocked.
+	 *
+	 * @throws	InterruptedException if the operation is interrupted
+	 */
 	synchronized void assertBlocked() throws InterruptedException {
-	    Thread.sleep(5);
+	    Thread.sleep(BLOCKED);
 	    assertEquals("Expected no exception", null, exception);
-	    assertFalse("Expected shutdown to be blocked", done);
+	    assertFalse("Expected operation to be blocked", done);
 	}
 	
-	/** Waits a while for the shutdown call to complete. */
+	/**
+	 * Waits for the operation to complete.
+	 *
+	 * @return	whether the operation completed
+	 * @throws	Exception if the operation failed
+	 */
 	synchronized boolean waitForDone() throws Exception {
 	    waitForDoneInternal();
 	    if (!done) {
 		return false;
 	    } else if (exception == null) {
-		return result;
+		return true;
 	    } else if (exception instanceof Exception) {
 		throw (Exception) exception;
 	    } else {
@@ -2792,23 +2842,40 @@ public class TestDataServiceImpl extends TestCase {
 	}
 
 	/**
-	 * Asserts that the shutdown call has completed with the specified
-	 * result.
+	 * Asserts that the operation completed with the specified result.
+	 *
+	 * @param	expectedResult the expected result
+	 * @throws	Exception if the operation failed
 	 */
-	synchronized void assertResult(boolean expectedResult)
-	    throws InterruptedException
+	synchronized void assertResult(Object expectedResult)
+	    throws Exception
 	{
-	    waitForDoneInternal();
-	    assertTrue("Expected shutdown to be done", done);
+	    assertDone();
 	    assertEquals("Unexpected result", expectedResult, result);
-	    assertEquals("Expected no exception", null, exception);
 	}
 
-	/** Wait until done, but give up after a while. */
+	/**
+	 * Asserts that the operation completed.
+	 *
+	 * @throws	Exception if the operation failed
+	 */
+	synchronized void assertDone() throws Exception {
+	    waitForDoneInternal();
+	    assertTrue("Expected operation to be done", done);
+	    if (exception != null) {
+		if (exception instanceof Exception) {
+		    throw (Exception) exception;
+		} else {
+		    throw (Error) exception;
+		}
+	    }
+	}
+
+	/** Wait for the operation to complete. */
 	private synchronized void waitForDoneInternal()
 	    throws InterruptedException
 	{
-	    long wait = 2000;
+	    long wait = COMPLETED;
 	    long start = System.currentTimeMillis();
 	    while (!done && wait > 0) {
 		wait(wait);
@@ -2816,6 +2883,14 @@ public class TestDataServiceImpl extends TestCase {
 		wait -= (now - start);
 		start = now;
 	    }
+	}
+    }
+
+    /** Use this thread to control a call to shutdown that may block. */
+    class ShutdownAction extends ThreadAction<Boolean> {
+	ShutdownAction() { }
+	protected Boolean action() throws Exception {
+	    return service.shutdown();
 	}
     }
 

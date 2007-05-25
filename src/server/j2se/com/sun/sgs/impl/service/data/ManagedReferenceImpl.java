@@ -10,7 +10,6 @@ import com.sun.sgs.app.ObjectIOException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-
 import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
@@ -33,6 +32,15 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
     private static final LoggerWrapper logger =
 	new LoggerWrapper(
 	    Logger.getLogger(ManagedReferenceImpl.class.getName()));
+
+    /**
+     * The logger for messages about managed objects that are modified but for
+     * which markForUpdate was not called.
+     */
+    private static final LoggerWrapper debugDetectLogger =
+	new LoggerWrapper(
+	    Logger.getLogger(
+		DataServiceImpl.class.getName() + ".detect.modifications"));
 
     /**
      * The possible states of a reference.
@@ -273,12 +281,7 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 		"The type argument must not be null");
 	}
 	try {
-	    if (!DataServiceImpl.checkContext(context)) {
-		throw new TransactionNotActiveException(
-		    "Attempt to obtain the object associated with a " +
-		    "managed reference that was created in another " +
-		    "transaction");
-	    }
+	    DataServiceImpl.checkContext(context);
 	    switch (state) {
 	    case EMPTY:
 		ManagedObject tempObject = deserialize(
@@ -311,6 +314,11 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 		logger.log(Level.FINEST, "get {0} returns {1}", this, object);
 	    }
 	    return type.cast(object);
+	} catch (TransactionNotActiveException e) {
+	    throw new TransactionNotActiveException(
+		"Attempt to obtain the object associated with a managed " +
+		"reference that was created in another transaction",
+		e);
 	} catch (RuntimeException e) {
 	    logger.logThrow(Level.FINEST, e, "get {0} throws", this);
 	    throw e;
@@ -324,12 +332,7 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 		"The type argument must not be null");
 	}
 	try {
-	    if (!DataServiceImpl.checkContext(context)) {
-		throw new TransactionNotActiveException(
-		    "Attempt to obtain the object associated with a " +
-		    "managed reference that was created in another " +
-		    "transaction");
-	    }
+	    DataServiceImpl.checkContext(context);
 	    switch (state) {
 	    case EMPTY:
 		object = deserialize(
@@ -363,6 +366,11 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 			   this, object);
 	    }
 	    return type.cast(object);
+	} catch (TransactionNotActiveException e) {
+	    throw new TransactionNotActiveException(
+		"Attempt to obtain the object associated with a managed " +
+		"reference that was created in another transaction",
+		e);
 	} catch (RuntimeException e) {
 	    logger.logThrow(Level.FINEST, e, "getForUpdate {0} throws", this);
 	    throw e;
@@ -493,6 +501,9 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 	case MAYBE_MODIFIED:
 	    if (!SerialUtil.matchingFingerprint(object, fingerprint)) {
 		result = SerialUtil.serialize(object);
+		debugDetectLogger.log(
+		    Level.FINEST,
+		    "Modified object was not marked for update: {0}", object);
 	    }
 	    /* Fall through */
 	case NOT_MODIFIED:

@@ -4,8 +4,12 @@
 
 package com.sun.sgs.impl.service.data.store;
 
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import com.sleepycat.bind.tuple.LongBinding;
 import com.sleepycat.bind.tuple.StringBinding;
+import com.sleepycat.db.CheckpointConfig;
 import com.sleepycat.db.Cursor;
 import com.sleepycat.db.Database;
 import com.sleepycat.db.DatabaseConfig;
@@ -26,7 +30,6 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionConflictException;
-import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
@@ -79,6 +82,19 @@ import java.util.logging.Logger;
  *	The maximum amount of time in milliseconds that a transaction will be
  *	permitted to run before it is a candidate for being aborted. <p>
  *
+ * <li> <i>Key:</i> {@code
+ *	com.sun.sgs.impl.service.data.store.DataStoreImpl.checkpoint.interval}
+ *	<br>
+ *	<i>Default:</i> {@code 60000} <br>
+ *	The interval in milliseconds between checkpoint operations that flush
+ *	changes from the database log to the database. <p>
+ *
+ * <li> <i>Key:</i> {@code
+ *	com.sun.sgs.impl.service.data.store.DataStoreImpl.checkpoint.size} <br>
+ *	<i>Default:</i> {@code 100000} </br>
+ *	The number of bytes that needs to have been written since the last
+ *	checkpoint operation was performed to require another checkpoint. <p>
+ *
  * <li> <i>Key:</i>
  *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl.directory
  *	</code> <br>
@@ -115,6 +131,15 @@ import java.util.logging.Logger;
  *	transactions may be lost if the host crashes, although data integrity
  *	will be maintained.  Flushing changes to disk avoids data loss but
  *	introduces a significant reduction in performance. <p>
+ *
+ * <li> <i>Key:</i>
+ *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl.remove.logs
+ *	</code> <br>
+ *	<i>Default:</i> <code>false</code>
+ *	Whether to automatically remove database log files that are no longer
+ *	needed.  Note that automatic log file removal is likely to make
+ *	catastrophic recovery of the database impossible, because log files
+ *	that may be needed will not have been backed up. <p>
  *
  * </ul> <p>
  *
@@ -180,6 +205,32 @@ public class DataStoreImpl
     private static final long DEFAULT_CACHE_SIZE = 1000000L;
 
     /**
+     * The property that specifies the time in milliseconds between
+     * checkpoints.
+     */
+    private static final String CHECKPOINT_INTERVAL_PROPERTY =
+	CLASSNAME + ".checkpoint.interval";
+
+    /** The default checkpoint interval. */
+    private static final long DEFAULT_CHECKPOINT_INTERVAL = 60000;
+
+    /**
+     * The property that specifies how many bytes need to be modified before
+     * performing a checkpoint.
+     */
+    private static final String CHECKPOINT_SIZE_PROPERTY =
+	CLASSNAME + ".checkpoint.size";
+
+    /** The default checkpoint size. */
+    private static final long DEFAULT_CHECKPOINT_SIZE = 100000;
+
+    /**
+     * The property that specifies whether to automatically remove log files.
+     */
+    private static final String REMOVE_LOGS_PROPERTY =
+	CLASSNAME + ".remove.logs";
+
+    /**
      * The property that specifies whether to flush changes to disk on
      * transaction boundaries.  The property is set to false by default.  If
      * false, some recent transactions may be lost in the event of a crash,
@@ -200,6 +251,15 @@ public class DataStoreImpl
 
     /** The number of object IDs to allocate at one time. */
     private final int allocationBlockSize;
+
+    /** The interval between checkpoints in milliseconds. */
+    private final long checkpointInterval;
+
+    /**
+     * The number of bytes that need to be written in order to perform a
+     * checkpoint.
+     */
+    private final long checkpointSize;
 
     /** The transaction timeout in milliseconds. */
     private final long txnTimeout;
@@ -222,6 +282,9 @@ public class DataStoreImpl
 
     /** The Berkeley DB database that maps name bindings to object IDs. */
     private final Database namesDb;
+
+    /** Used to execute the checkpoint thread. */
+    private final ScheduledExecutorService executor;
 
     /**
      * Object to synchronize on when accessing nextObjectId and
@@ -505,6 +568,23 @@ public class DataStoreImpl
 	}
     }
 
+    /** A runnable that performs a periodic database checkpoint. */
+    private static class CheckpointRunnable implements Runnable {
+	private final Environment env;
+	private final CheckpointConfig config = new CheckpointConfig();
+	CheckpointRunnable(Environment env, long size) {
+	    this.env = env;
+	    config.setKBytes((int) (size / 1000));
+	}
+	public void run() {
+	    try {
+		env.checkpoint(config);
+	    } catch (Throwable e) {
+		logger.logThrow(Level.WARNING, e, "Checkpoint failed");
+	    }
+	}
+    }
+
     /**
      * Creates an instance of this class configured with the specified
      * properties.  See the {@link DataStoreImpl class documentation} for a
@@ -552,6 +632,10 @@ public class DataStoreImpl
 	}
 	txnTimeout = wrappedProps.getLongProperty(
 	    TXN_TIMEOUT_PROPERTY, DEFAULT_TXN_TIMEOUT);
+	checkpointInterval = wrappedProps.getLongProperty(
+	    CHECKPOINT_INTERVAL_PROPERTY, DEFAULT_CHECKPOINT_INTERVAL);
+	checkpointSize = wrappedProps.getLongProperty(
+	    CHECKPOINT_SIZE_PROPERTY, DEFAULT_CHECKPOINT_SIZE);
 	txnInfoTable = getTxnInfoTable(TxnInfo.class);
 	com.sleepycat.db.Transaction bdbTxn = null;
 	boolean done = false;
@@ -604,6 +688,10 @@ public class DataStoreImpl
 		throw new DataStoreException(
 		    "Names database not found: " + e.getMessage(), e);
 	    }
+	    executor = Executors.newSingleThreadScheduledExecutor();
+	    executor.scheduleAtFixedRate(
+		new CheckpointRunnable(env, checkpointSize),
+		checkpointInterval, checkpointInterval, TimeUnit.MILLISECONDS);
 	    done = true;
 	    bdbTxn.commit();
 	} catch (DatabaseException e) {
@@ -636,6 +724,8 @@ public class DataStoreImpl
 	    throw new IllegalArgumentException(
 		"The cache size must not be less than " + MIN_CACHE_SIZE);
 	}
+	boolean removeLogs = wrappedProps.getBooleanProperty(
+	    REMOVE_LOGS_PROPERTY, false);
         EnvironmentConfig config = new EnvironmentConfig();
         config.setAllowCreate(true);
 	config.setCacheSize(cacheSize);
@@ -645,6 +735,7 @@ public class DataStoreImpl
         config.setInitializeLogging(true);
         config.setLockDetectMode(LockDetectMode.YOUNGEST);
 	config.setLockTimeout(1000 * txnTimeout);
+	config.setLogAutoRemove(removeLogs);
 	config.setMessageHandler(new LoggingMessageHandler());
         config.setRunRecovery(true);
         config.setTransactional(true);
@@ -1087,6 +1178,7 @@ public class DataStoreImpl
 		}
 		boolean ok = (txnCount == 0);
 		if (ok) {
+		    executor.shutdownNow();
 		    infoDb.close();
 		    oidsDb.close();
 		    namesDb.close();
@@ -1521,7 +1613,10 @@ public class DataStoreImpl
 	 * aborted, then make sure to abort the transaction now.
 	 */
 	if (re instanceof TransactionAbortedException && txn != null) {
-	    txn.abort(re);
+	    try {
+		txn.abort(re);
+	    } catch (TransactionAbortedException e2) {
+	    }
 	}
 	logger.logThrow(Level.FINEST, re, "{0} throws", operation);
 	return re;

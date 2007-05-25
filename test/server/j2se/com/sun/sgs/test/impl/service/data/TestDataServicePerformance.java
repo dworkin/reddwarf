@@ -10,7 +10,6 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
-import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.kernel.ProfileProducer;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
@@ -58,6 +57,10 @@ public class TestDataServicePerformance extends TestCase {
     private static final String DataServiceImplClass =
 	DataServiceImpl.class.getName();
 
+    /** A transaction proxy. */
+    private static DummyTransactionProxy txnProxy =
+	new DummyTransactionProxy();
+
     /** The number of objects to read in a transaction. */
     protected int items = Integer.getInteger("test.items", 100);
 
@@ -83,9 +86,6 @@ public class TestDataServicePerformance extends TestCase {
 
     /** Properties for creating services. */
     protected Properties props;
-
-    /** A transaction proxy. */
-    private DummyTransactionProxy txnProxy = new DummyTransactionProxy();
 
     /** A component registry. */
     private DummyComponentRegistry componentRegistry =
@@ -165,7 +165,6 @@ public class TestDataServicePerformance extends TestCase {
 	}
 	createTransaction();
 	service.configure(componentRegistry, txnProxy);
-	componentRegistry.setComponent(DataManager.class, service);
 	componentRegistry.registerAppContext();
 	txn.commit();
 	createTransaction();
@@ -216,7 +215,6 @@ public class TestDataServicePerformance extends TestCase {
 	}
 	createTransaction();
 	service.configure(componentRegistry, txnProxy);
-	componentRegistry.setComponent(DataManager.class, service);
 	componentRegistry.registerAppContext();
 	txn.commit();
 	createTransaction();
@@ -323,9 +321,16 @@ public class TestDataServicePerformance extends TestCase {
 
     /** Returns the data service to test. */
     protected DataService getDataService(
-	Properties props, ComponentRegistry componentRegistry)
+	Properties props, DummyComponentRegistry componentRegistry)
 	throws Exception
     {
-	return new DataServiceImpl(props, componentRegistry);
+	DataServiceImpl service =
+	    new DataServiceImpl(props, componentRegistry);
+	componentRegistry.setComponent(DataManager.class, service);
+	componentRegistry.setComponent(DataService.class, service);
+	componentRegistry.setComponent(DataServiceImpl.class, service);
+	txnProxy.setComponent(DataService.class, service);
+	txnProxy.setComponent(DataServiceImpl.class, service);
+	return service;
     }
 }
