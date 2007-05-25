@@ -14,6 +14,7 @@ import java.io.InvalidObjectException;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.math.BigInteger;
+import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -46,9 +47,9 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
      * The possible states of a reference.
      *
      * Here's a table relating state values to the values of the object and
-     * fingerprint fields:
+     * unmodifiedBytes fields:
      *
-     *   State		  object    fingerprint
+     *   State		  object    unmodifiedBytes
      *   NEW		  non-null  null
      *   EMPTY		  null      null
      *   NOT_MODIFIED	  non-null  null
@@ -121,8 +122,14 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
      */
     private transient ManagedObject object;
 
-    /** The fingerprint of the object before it was modified, or null. */
-    private transient byte[] fingerprint;
+    /**
+     * The serialized form of the object before it was modified, or null.  Note
+     * that this value could be different from the bytes used to deserialize
+     * the object if the serialized form of the object is not stable.
+     * Unfortunately, the built-in collection types have non-stable serialized
+     * forms.
+     */
+    private transient byte[] unmodifiedBytes;
 
     /** The current state. */
     private transient State state;
@@ -215,7 +222,7 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 	case MAYBE_MODIFIED:
 	    /* Call store before modifying fields, in case the call fails */
 	    context.store.removeObject(context.txn, oid);
-	    fingerprint = null;
+	    unmodifiedBytes = null;
 	    state = State.REMOVED_FETCHED;
 	    break;
 	case NOT_MODIFIED:
@@ -251,7 +258,7 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 	    break;
 	case MAYBE_MODIFIED:
 	    context.store.markForUpdate(context.txn, oid);
-	    fingerprint = null;
+	    unmodifiedBytes = null;
 	    state = State.MODIFIED;
 	    break;
 	case NOT_MODIFIED:
@@ -287,12 +294,13 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 		ManagedObject tempObject = deserialize(
 		    context.store.getObject(context.txn, oid, false));
 		if (context.detectModifications) {
-		    fingerprint = SerialUtil.fingerprint(tempObject);
+		    unmodifiedBytes = SerialUtil.serialize(
+			tempObject, context.classSerial);
 		    state = State.MAYBE_MODIFIED;
 		} else {
 		    state = State.NOT_MODIFIED;
 		}
-		/* Do after creating fingerprint, in case that fails */
+		/* Do after creating unmodified bytes, in case that fails */
 		object = tempObject;
 		context.refs.registerObject(this);
 		break;
@@ -342,7 +350,7 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 		break;
 	    case MAYBE_MODIFIED:
 		context.store.markForUpdate(context.txn, oid);
-		fingerprint = null;
+		unmodifiedBytes = null;
 		state = State.MODIFIED;
 		break;
 	    case NOT_MODIFIED:
@@ -437,8 +445,8 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 	case NEW:
 	    if (object == null) {
 		throw new AssertionError("NEW with no object");
-	    } else if (fingerprint != null) {
-		throw new AssertionError("NEW with fingerprint");
+	    } else if (unmodifiedBytes != null) {
+		throw new AssertionError("NEW with unmodifiedBytes");
 	    }
 	    break;
 	case EMPTY:
@@ -446,8 +454,8 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 	case REMOVED_EMPTY:
 	    if (object != null) {
 		throw new AssertionError(state + " with object");
-	    } else if (fingerprint != null) {
-		throw new AssertionError(state + " with fingerprint");
+	    } else if (unmodifiedBytes != null) {
+		throw new AssertionError(state + " with unmodifiedBytes");
 	    }
 	    break;
 	case NOT_MODIFIED:
@@ -455,17 +463,17 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 	case REMOVED_FETCHED:
 	    if (object == null) {
 		throw new AssertionError(state + " with no object");
-	    } else if (fingerprint != null) {
-		throw new AssertionError(state + " with fingerprint");
+	    } else if (unmodifiedBytes != null) {
+		throw new AssertionError(state + " with unmodifiedBytes");
 	    }
 	    break;
 	case MAYBE_MODIFIED:
 	    if (object == null) {
 		throw new AssertionError(
 		    "MAYBE_MODIFIED with no object");
-	    } else if (fingerprint == null) {
+	    } else if (unmodifiedBytes == null) {
 		throw new AssertionError(
-		    "MAYBE_MODIFIED with no fingerprint");
+		    "MAYBE_MODIFIED with no unmodifiedBytes");
 	    }
 	    break;
 	default:
@@ -495,12 +503,14 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 	    break;
 	case NEW:
 	case MODIFIED:
-	    result = SerialUtil.serialize(object);
+	    result = SerialUtil.serialize(object, context.classSerial);
 	    context.refs.unregisterObject(object);
 	    break;
 	case MAYBE_MODIFIED:
-	    if (!SerialUtil.matchingFingerprint(object, fingerprint)) {
-		result = SerialUtil.serialize(object);
+	    byte[] modified =
+		SerialUtil.serialize(object, context.classSerial);
+	    if (!Arrays.equals(modified, unmodifiedBytes)) {
+		result = modified;
 		debugDetectLogger.log(
 		    Level.FINEST,
 		    "Modified object was not marked for update: {0}", object);
@@ -516,7 +526,7 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
 	    throw new AssertionError();
 	}
 	object = null;
-	fingerprint = null;
+	unmodifiedBytes = null;
 	state = State.FLUSHED;
 	return result;
     }
@@ -549,7 +559,7 @@ final class ManagedReferenceImpl implements ManagedReference, Serializable {
      * the return value is not null.
      */
     private ManagedObject deserialize(byte[] data) {
-	Object obj =  SerialUtil.deserialize(data);
+	Object obj =  SerialUtil.deserialize(data, context.classSerial);
 	if (obj == null) {
 	    throw new ObjectIOException(
 		"Managed object must not deserialize to null", false);

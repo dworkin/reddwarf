@@ -36,6 +36,9 @@ final class Context extends TransactionContext {
     /** Whether to detect modifications. */
     final boolean detectModifications;
 
+    /** Controls serializing classes. */
+    final ClassSerialization classSerial;
+
     /**
      * The number of operations performed -- used to determine when to make
      * checks on the reference table.
@@ -64,15 +67,16 @@ final class Context extends TransactionContext {
     Context(DataStore store,
 	    Transaction txn,
 	    int debugCheckInterval,
-	    boolean detectModifications)
+	    boolean detectModifications,
+	    ClassesTable classesTable)
     {
 	super(txn);
-	assert store != null && txn != null
-	    : "Store, txn, or txnProxy is null";
+	assert store != null && txn != null && classesTable != null;
 	this.store = store;
 	this.txn = new TxnTrampoline(txn);
 	this.debugCheckInterval = debugCheckInterval;
 	this.detectModifications = detectModifications;
+	classSerial = classesTable.createClassSerialization(this.txn);
     }
 
     /**

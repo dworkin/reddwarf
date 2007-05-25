@@ -154,6 +154,9 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
     /** The underlying data store. */
     private final DataStore store;
 
+    /** Table that stores information about classes used in serialization. */
+    private final ClassesTable classesTable;
+
     /**
      * Synchronize on this object before accessing the state,
      * debugCheckInterval, detectModifications, or contextFactory fields.
@@ -226,7 +229,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 		}
 	    }
 	    return new Context(store, txn, debugCheckInterval,
-			       detectModifications);
+			       detectModifications, classesTable);
 	}
 	@Override
 	protected TransactionParticipant createParticipant() {
@@ -292,6 +295,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 		    new Class[] { Properties.class }, properties);
 		logger.log(Level.CONFIG, "Using data store {0}", store);
 	    }
+	    classesTable = new ClassesTable(store);
 	} catch (Exception e) {
 	    logger.logThrow(
 		Level.SEVERE, e, "DataService initialization failed");

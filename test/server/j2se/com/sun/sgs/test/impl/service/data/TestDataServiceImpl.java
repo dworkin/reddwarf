@@ -2913,5 +2913,9 @@ public class TestDataServiceImpl extends TestCase {
 	    return null;
 	}
 	public boolean shutdown() { return false; }
+	public int getClassId(Transaction txn, byte[] classInfo) { return 0; }
+	public byte[] getClassInfo(Transaction txn, int classId) {
+	    return null;
+	}
     }
 }

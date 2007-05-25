@@ -14,8 +14,9 @@ import java.io.OutputStream;
 import java.lang.reflect.Constructor;
 
 /**
- * Defines an experimental network protocol used to transfer DataStoreServer
- * methods over input and output streams, to use instead of RMI.
+ * Defines an experimental network protocol, not currently used, used to
+ * transfer DataStoreServer methods over input and output streams, to use
+ * instead of RMI.
  *
  * RFE: Modify failure() to send the server-side stack trace, and checkResult()
  * to append it to the thrown exception's stack trace.  This would be useful
@@ -35,11 +36,13 @@ class DataStoreProtocol implements DataStoreServer {
     private static final short SET_BINDING = 8;
     private static final short REMOVE_BINDING = 9;
     private static final short NEXT_BOUND_NAME = 10;
-    private static final short CREATE_TRANSACTION = 11;
-    private static final short PREPARE = 12;
-    private static final short COMMIT = 13;
-    private static final short PREPARE_AND_COMMIT = 14;
-    private static final short ABORT = 15;
+    private static final short GET_CLASS_ID = 11;
+    private static final short GET_CLASS_INFO = 12;
+    private static final short CREATE_TRANSACTION = 13;
+    private static final short PREPARE = 14;
+    private static final short COMMIT = 15;
+    private static final short PREPARE_AND_COMMIT = 16;
+    private static final short ABORT = 17;
 
     /** The input stream. */
     private final DataInputStream in;
@@ -86,6 +89,12 @@ class DataStoreProtocol implements DataStoreServer {
 	    break;
 	case NEXT_BOUND_NAME:
 	    handleNextBoundName(server);
+	    break;
+	case GET_CLASS_ID:
+	    handleGetClassId(server);
+	    break;
+	case GET_CLASS_INFO:
+	    handleGetClassInfo(server);
 	    break;
 	case CREATE_TRANSACTION:
 	    handleCreateTransaction(server);
@@ -332,6 +341,52 @@ class DataStoreProtocol implements DataStoreServer {
 	    String result = server.nextBoundName(tid, name);
 	    out.writeBoolean(true);
 	    writeString(result);
+	    out.flush();
+	} catch (Throwable t) {
+	    failure(t);
+	}
+    }
+
+    public int getClassId(long tid, byte[] classInfo) throws IOException {
+	out.writeShort(GET_CLASS_ID);
+	out.writeLong(tid);
+	writeBytes(classInfo);
+	checkResult();
+	return in.readInt();
+    }
+
+    private void handleGetClassId(DataStoreServer server)
+	throws IOException
+    {
+	try {
+	    long tid = in.readLong();
+	    byte[] classInfo = readBytes();
+	    int result = server.getClassId(tid, classInfo);
+	    out.writeBoolean(true);
+	    out.writeInt(result);
+	    out.flush();
+	} catch (Throwable t) {
+	    failure(t);
+	}
+    }
+
+    public byte[] getClassInfo(long tid, int classId) throws IOException {
+	out.writeShort(GET_CLASS_INFO);
+	out.writeLong(tid);
+	out.writeInt(classId);
+	checkResult();
+	return readBytes();
+    }
+
+    private void handleGetClassInfo(DataStoreServer server)
+	throws IOException
+    {
+	try {
+	    long tid = in.readLong();
+	    int classId = in.readInt();
+	    byte[] result = server.getClassInfo(tid, classId);
+	    out.writeBoolean(true);
+	    writeBytes(result);
 	    out.flush();
 	} catch (Throwable t) {
 	    failure(t);
