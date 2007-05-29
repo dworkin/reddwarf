@@ -4,7 +4,7 @@
 
 package com.sun.sgs.impl.kernel.profile;
 
-import com.sun.sgs.impl.util.PropertiesWrapper;
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.ProfileOperation;
@@ -18,7 +18,11 @@ import com.sun.sgs.kernel.TaskScheduler;
 import java.io.IOException;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Properties;
+
+import java.util.concurrent.ConcurrentHashMap;
 
 
 /**
@@ -43,9 +47,9 @@ public class AggregateProfileOpListener implements ProfileOperationListener {
     // registered, but when that changes, so too should this code
     private int maxOp = 0;
     private ProfileOperation [] registeredOps =
-        new ProfileOperation[ProfileCollector.MAX_OPS];
-    private long [] sOpCounts = new long[ProfileCollector.MAX_OPS];
-    private long [] fOpCounts = new long[ProfileCollector.MAX_OPS];
+        new ProfileOperation[ProfileCollectorImpl.MAX_OPS];
+    private long [] sOpCounts = new long[ProfileCollectorImpl.MAX_OPS];
+    private long [] fOpCounts = new long[ProfileCollectorImpl.MAX_OPS];
     
     // the task and time counts for successful and failed tasks
     private volatile long sTaskCount = 0;
@@ -62,6 +66,11 @@ public class AggregateProfileOpListener implements ProfileOperationListener {
     // the count and running time for transactional tasks only
     private volatile long tTaskCount = 0;
     private volatile long tRunTime = 0;
+
+    // the highest values for aggregate counters, and the aggregate counters
+    // for task-local counters
+    private Map<String,Long> aggregateCounters;
+    private Map<String,Long> localCounters;
 
     // the reporter used to publish data
     private NetworkReporter networkReporter;
@@ -97,6 +106,9 @@ public class AggregateProfileOpListener implements ProfileOperationListener {
                                       ResourceCoordinator resourceCoord)
         throws IOException
     {
+	aggregateCounters = new ConcurrentHashMap<String,Long>();
+	localCounters = new ConcurrentHashMap<String,Long>();
+
         PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
 
         int port = wrappedProps.getIntProperty(PORT_PROPERTY, DEFAULT_PORT);
@@ -154,6 +166,31 @@ public class AggregateProfileOpListener implements ProfileOperationListener {
             tTaskCount++;
             tRunTime += profileReport.getRunningTime();
         }
+
+	Map<String,Long> map = profileReport.getUpdatedAggregateCounters();
+	if (map != null) {
+	    for (Entry<String,Long> entry : map.entrySet()) {
+		String key = entry.getKey();
+		Long value = entry.getValue();
+		if (! aggregateCounters.containsKey(key)) {
+		    aggregateCounters.put(key, value);
+		} else {
+		    if (value > aggregateCounters.get(key))
+			aggregateCounters.put(key, value);
+		}
+	    }
+	}
+
+	map = profileReport.getUpdatedTaskCounters();
+	if (map != null) {
+	    for (Entry<String,Long> entry : map.entrySet()) {
+		String key = entry.getKey();
+		long value = 0;
+		if (localCounters.containsKey(key))
+		    value = localCounters.get(key);
+		localCounters.put(key, entry.getValue() + value);
+	    }
+	}
     }
 
     /**
@@ -211,6 +248,20 @@ public class AggregateProfileOpListener implements ProfileOperationListener {
                 if (((i % 3) == 0) || (i == (maxOp + 1)))
                     reportStr += "\n";
             }
+
+	    if (! aggregateCounters.isEmpty()) {
+		reportStr += "AggregateCounters (total):\n";
+		for (Entry<String,Long> entry : aggregateCounters.entrySet())
+		    reportStr += "  " + entry.getKey() + "=" +
+			entry.getValue() + "\n";
+	    }
+	    if (! localCounters.isEmpty()) {
+		reportStr += "LocalCounters (avg per task):\n";
+		for (Entry<String,Long> entry : localCounters.entrySet())
+		    reportStr += "  " + entry.getKey() + "=" +
+			(entry.getValue() / (double)totalTasks) + "\n";
+	    }
+
             reportStr += "\n";
 
             networkReporter.report(reportStr);

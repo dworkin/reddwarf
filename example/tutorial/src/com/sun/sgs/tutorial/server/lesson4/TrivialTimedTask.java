@@ -12,7 +12,8 @@ import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.Task;
 
 /**
- * TODO doc
+ * A simple repeating Task that tracks and prints the time since it was
+ * last run.
  */
 public class TrivialTimedTask
     implements Serializable,  // for persistence, as required by ManagedObject.

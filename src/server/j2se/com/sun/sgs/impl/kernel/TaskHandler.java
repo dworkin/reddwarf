@@ -6,14 +6,12 @@ package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.app.TransactionNotActiveException;
 
-import com.sun.sgs.impl.kernel.profile.ProfileCollector;
-
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionHandle;
-
-import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
 import com.sun.sgs.kernel.KernelRunnable;
+import com.sun.sgs.kernel.ProfileCollector;
 import com.sun.sgs.kernel.TaskOwner;
 
 import com.sun.sgs.service.Transaction;
@@ -117,10 +115,29 @@ public final class TaskHandler {
     public static void runTransactionalTask(KernelRunnable task)
         throws Exception
     {
+	runTransactionalTask(task, false);
+    }
+
+    /**
+     * A package-private method that runs the given task in a transactional
+     * state with an optional bound on the transaction timeout, committing the
+     * transaction on completion of the task.
+     *
+     * @param task the <code>KernelRunnable</code> to run transactionally
+     * @param unbounded <code>true</code> if the transaction timeout is
+     *                  unbounded, <code>false</code> otherwise
+     *
+     * @throws Exception if there is any failure in running the task or
+     *                   committing the transaction
+     */
+    static void runTransactionalTask(KernelRunnable task, boolean unbounded)
+	throws Exception
+    {
         logger.log(Level.FINEST, "starting a new transactional context");
 
         // create a new transaction and set it as currently active
-        TransactionHandle handle = transactionCoordinator.createTransaction();
+        TransactionHandle handle =
+	    transactionCoordinator.createTransaction(unbounded);
         Transaction transaction = handle.getTransaction();
         TransactionalTaskThread thread =
             (TransactionalTaskThread)(Thread.currentThread());

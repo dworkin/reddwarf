@@ -10,6 +10,7 @@ import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.kernel.EmptyKernelAppContext;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.TaskHandler;
+import com.sun.sgs.impl.kernel.TxnTimeoutTestRunnable;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 import com.sun.sgs.impl.service.transaction.TransactionHandle;
@@ -21,6 +22,7 @@ import com.sun.sgs.service.TransactionRunner;
 import com.sun.sgs.test.util.DummyKernelRunnable;
 import com.sun.sgs.test.util.DummyTransactionParticipant;
 import com.sun.sgs.test.util.DummyTransactionProxy;
+import java.util.Properties;
 import junit.framework.TestCase;
 
 /** Test the TaskHandler class. */
@@ -404,6 +406,52 @@ public class TestTaskHandler extends TestCase {
 	}
     }
 
+    /** Bounded transaction times out */
+    public void testRunTransactionalBoundedTimesOut() throws Exception {
+	/* Use a transaction coordinator with specified timeout. */
+	Properties p = new Properties();
+	p.setProperty(TransactionCoordinator.TXN_TIMEOUT_PROPERTY, "50");
+	TransactionCoordinator txnCoordinator =
+	    new TransactionCoordinatorImpl(p, null);
+	MinimalTestKernel.setTransactionCoordinator(txnCoordinator);
+	TxnTimeoutTestRunnable r = new TxnTimeoutTestRunnable(70, false);
+	try {
+	    Thread thread = MinimalTestKernel.createThread(
+		 r, kernelAppContext);
+	    thread.start();
+	    thread.join(60000);
+	} finally {
+	    /* ... and then switch back to the default. */
+	    MinimalTestKernel.setTransactionCoordinator(null);
+	}
+
+	assertTrue(r.timedOut);
+    }
+
+    /** Unbounded transaction does not time out */
+    public void testRunTransactionalUnboundedDoesNotTimeOut()
+	throws Exception
+    {
+	/* Use a transaction coordinator with specified timeout. */
+	Properties p = new Properties();
+	p.setProperty(TransactionCoordinator.TXN_TIMEOUT_PROPERTY, "0");
+	TransactionCoordinator txnCoordinator =
+	    new TransactionCoordinatorImpl(p, null);
+	MinimalTestKernel.setTransactionCoordinator(txnCoordinator);
+	TxnTimeoutTestRunnable r = new TxnTimeoutTestRunnable(70, true);
+	try {
+	    Thread thread = MinimalTestKernel.createThread(
+		 r, kernelAppContext);
+	    thread.start();
+	    thread.join(60000);
+	} finally {
+	    /* ... and then switch back to the default. */
+	    MinimalTestKernel.setTransactionCoordinator(null);
+	}
+
+	assertFalse(r.timedOut);
+    }
+
     /* -- Other methods and classes -- */
 
     /**
@@ -479,11 +527,12 @@ public class TestTaskHandler extends TestCase {
 	implements TransactionCoordinator
     {
 	private final TransactionCoordinator txnCoordinator =
-	    new TransactionCoordinatorImpl(System.getProperties());
+	    new TransactionCoordinatorImpl(System.getProperties(), null);
 	Transaction txn;
 	MyTransactionCoordinator() { }
-	public TransactionHandle createTransaction() {
-	    TransactionHandle handle = txnCoordinator.createTransaction();
+	public TransactionHandle createTransaction(boolean unbounded) {
+	    TransactionHandle handle =
+		txnCoordinator.createTransaction(unbounded);
 	    txn = handle.getTransaction();
 	    return handle;
 	}

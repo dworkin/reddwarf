@@ -4,8 +4,11 @@
 
 package com.sun.sgs.impl.service.data.store;
 
+import com.sleepycat.bind.tuple.IntegerBinding;
 import com.sleepycat.bind.tuple.LongBinding;
 import com.sleepycat.bind.tuple.StringBinding;
+import com.sleepycat.bind.tuple.TupleInput;
+import com.sleepycat.bind.tuple.TupleOutput;
 import com.sleepycat.db.Cursor;
 import com.sleepycat.db.Database;
 import com.sleepycat.db.DatabaseConfig;
@@ -28,9 +31,10 @@ import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionConflictException;
 import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.kernel.StandardProperties;
-import com.sun.sgs.impl.util.LoggerWrapper;
-import com.sun.sgs.impl.util.PropertiesWrapper;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.kernel.ProfileConsumer;
+import com.sun.sgs.kernel.ProfileCounter;
 import com.sun.sgs.kernel.ProfileOperation;
 import com.sun.sgs.kernel.ProfileProducer;
 import com.sun.sgs.kernel.ProfileRegistrar;
@@ -38,6 +42,9 @@ import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.security.DigestException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -88,13 +95,14 @@ import java.util.logging.Logger;
  *	com.sun.sgs.impl.service.data.store.DataStoreImpl.allocation.block.size
  *	</code> <br>
  *	<i>Default:</i> <code>100</code> <br>
- *	The number of object IDs to allocate at a time.  Object IDs are
- *	allocated in an independent transaction, and are discarded if a
- *	transaction aborts, if a managed object is made reachable within the
- *	data store but is removed from the store before the transaction
- *	commits, or if the program exits before it uses the object IDs it has
- *	allocated.  This number limits the maximum number of object IDs that
- *	would be discarded when the program exits. <p>
+ *	The number of object IDs to allocate at a time.  This value must be
+ *	greater than <code>0</code>.  Object IDs are allocated in an
+ *	independent transaction, and are discarded if a transaction aborts, if
+ *	a managed object is made reachable within the data store but is removed
+ *	from the store before the transaction commits, or if the program exits
+ *	before it uses the object IDs it has allocated.  This number limits the
+ *	maximum number of object IDs that would be discarded when the program
+ *	exits. <p>
  *
  * <li> <i>Key:</i>
  *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl.cache.size
@@ -132,9 +140,9 @@ import java.util.logging.Logger;
  * </ul> <p>
  *
  */
-public final class DataStoreImpl implements DataStore, TransactionParticipant,
-                                            ProfileProducer {
-
+public class DataStoreImpl
+    implements DataStore, TransactionParticipant, ProfileProducer
+{
     /** The property that specifies the transaction timeout in milliseconds. */
     private static final String TXN_TIMEOUT_PROPERTY =
 	"com.sun.sgs.txn.timeout";
@@ -192,11 +200,20 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
     /** An empty array returned when Berkeley DB returns null for a value. */
     private static final byte[] NO_BYTES = { };
 
+    /** The number of bytes in a SHA-1 message digest. */
+    private static final int SHA1_SIZE = 20;
+
     /** The directory in which to store database files. */
     private final String directory;
 
     /** The number of object IDs to allocate at one time. */
     private final int allocationBlockSize;
+
+    /** The transaction timeout in milliseconds. */
+    private final long txnTimeout;
+
+    /** Stores information about transactions. */
+    private final TxnInfoTable<TxnInfo> txnInfoTable;
 
     /** The Berkeley DB environment. */
     private final Environment env;
@@ -206,17 +223,16 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
      * information.  This information is stored in a separate database to avoid
      * concurrency conflicts between the object ID and other data.
      */
-    private final Database info;
+    private final Database infoDb;
+
+    /** The Berkeley DB database that stores class information. */
+    private final Database classesDb;
 
     /** The Berkeley DB database that maps object IDs to object bytes. */
-    private final Database oids;
+    private final Database oidsDb;
 
     /** The Berkeley DB database that maps name bindings to object IDs. */
-    private final Database names;
-
-    /** Provides information about the transaction for the current thread. */
-    private final ThreadLocal<TxnInfo> threadTxnInfo =
-	new ThreadLocal<TxnInfo>();
+    private final Database namesDb;
 
     /**
      * Object to synchronize on when accessing nextObjectId and
@@ -242,17 +258,138 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
     /** The number of currently active transactions. */
     private int txnCount = 0;
 
+    /** A message digest for use by the current thread. */
+    private ThreadLocal<MessageDigest> messageDigest =
+	new ThreadLocal<MessageDigest>() {
+	    protected MessageDigest initialValue() {
+		try {
+		    return MessageDigest.getInstance("SHA-1");
+		} catch (NoSuchAlgorithmException e) {
+		    throw new AssertionError(e);
+		}
+	    }
+        };
+
     /* -- The operations -- DataStore API -- */
     private ProfileOperation createObjectOp = null;
     private ProfileOperation markForUpdateOp = null;
     private ProfileOperation getObjectOp = null;
     private ProfileOperation getObjectForUpdateOp = null;
     private ProfileOperation setObjectOp = null;
+    private ProfileOperation setObjectsOp = null;
     private ProfileOperation removeObjectOp = null;
     private ProfileOperation getBindingOp = null;
     private ProfileOperation setBindingOp = null;
     private ProfileOperation removeBindingOp = null;
     private ProfileOperation nextBoundNameOp = null;
+    private ProfileOperation getClassIdOp = null;
+    private ProfileOperation getClassInfoOp = null;
+
+    /**
+     * The counters used for profile reporting, which track the bytes read
+     * and written within a task, and how many objects were read and written
+     */
+    private ProfileCounter readBytesCounter = null;
+    private ProfileCounter readObjectsCounter = null;
+    private ProfileCounter writtenBytesCounter = null;
+    private ProfileCounter writtenObjectsCounter = null;
+
+    /**
+     * Records information about all active transactions.
+     *
+     * @param	<T> the type of information stored for each transaction
+     */
+    protected interface TxnInfoTable<T> {
+
+	/**
+	 * Returns the information associated with the transaction, or null if
+	 * none is found.
+	 *
+	 * @param	txn the transaction
+	 * @return	the associated information, or null if none is found
+	 * @throws	TransactionNotActive if the implementation determines
+	 *		that the transaction is no longer active
+	 * @throws	IllegalStateException if the implementation determines
+	 *		that the specified transaction does not match the
+	 *		current context
+	 */
+	T get(Transaction txn);
+
+	/**
+	 * Removes the information associated with the transaction.
+	 *
+	 * @param	txn the transaction
+	 * @return	the previously associated information
+	 * @throws	IllegalStateException if the transaction is not active,
+	 *		or if the implementation determines that the specified
+	 *		transaction does not match the current context
+	 */
+	T remove(Transaction txn);
+
+	/**
+	 * Sets the information associated with the transaction, which should
+	 * not currently have associated information.
+	 *
+	 * @param	txn the transaction
+	 * @param	info the associated information
+	 */
+	void set(Transaction txn, T info);
+    }
+
+    /**
+     * An implementation of TxnInfoTable that uses a thread local to record
+     * information about transactions, and requires that the same thread always
+     * be used with a given transaction.
+     */
+    private static class ThreadTxnInfoTable<T> implements TxnInfoTable<T> {
+
+	/**
+	 * Provides information about the transaction for the current thread.
+	 */
+	private final ThreadLocal<Entry<T>> threadInfo =
+	    new ThreadLocal<Entry<T>>();
+
+	/** Stores a transaction and the associated information. */
+	private static class Entry<T> {
+	    final Transaction txn;
+	    final T info;
+	    Entry(Transaction txn, T info) {
+		this.txn = txn;
+		this.info = info;
+	    }
+	}
+
+	/** Creates an instance. */
+	ThreadTxnInfoTable() { }
+
+	/* -- Implement TxnInfoTable -- */
+
+	public T get(Transaction txn) {
+	    Entry<T> entry = threadInfo.get();
+	    if (entry == null) {
+		return null;
+	    } else if (!entry.txn.equals(txn)) {
+		throw new IllegalStateException("Wrong transaction");
+	    } else {
+		return entry.info;
+	    }
+	}
+
+	public T remove(Transaction txn) {
+	    Entry<T> entry = threadInfo.get();
+	    if (entry == null) {
+		throw new IllegalStateException("Transaction not active");
+	    } else if (!entry.txn.equals(txn)) {
+		throw new IllegalStateException("Wrong transaction");
+	    }
+	    threadInfo.set(null);
+	    return entry.info;
+	}
+
+	public void set(Transaction txn, T info) {
+	    threadInfo.set(new Entry<T>(txn, info));
+	}
+    }
 
     /** Stores transaction information. */
     private static class TxnInfo {
@@ -323,13 +460,19 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
 	    } else {
 		boolean matchesLast = name.equals(lastCursorKey);
 		if (!matchesLast) {
+		    /*
+		     * The name specified was not the last key returned, so
+		     * search for the specified name
+		     */
 		    StringBinding.stringToEntry(name, key);
 		    OperationStatus status =
 			cursor.getSearchKeyRange(key, value, null);
 		    lastCursorKey = getNextBoundNameResult(name, status, key);
+		    /* Record if we found an exact match */
 		    matchesLast = name.equals(lastCursorKey);
 		}
 		if (matchesLast) {
+		    /* The last key was an exact match, so find the next one */
 		    OperationStatus status = cursor.getNext(key, value, null);
 		    lastCursorKey = getNextBoundNameResult(name, status, key);
 		}
@@ -388,6 +531,14 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
     }
 
     /**
+     * Stores information about the databases that constitute the data
+     * store.
+     */
+    private static class Databases {
+	private Database info, classes, oids, names;
+    }
+
+    /**
      * Creates an instance of this class configured with the specified
      * properties.  See the {@link DataStoreImpl class documentation} for a
      * list of supported properties.
@@ -399,7 +550,11 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
      *		com.sun.sgs.impl.service.data.store.DataStoreImpl.directory
      *		</code> is provided, or the <code>
      *		com.sun.sgs.impl.service.data.store.DataStoreImpl.allocation.block.size
-     *		</code> property is not a valid integer greater than zero
+     *		</code> property is not a valid integer greater than zero, or
+     *		if the value of the <code>
+     *		com.sun.sgs.impl.service.data.store.DataStoreImpl.cache.size
+     *		</code> property is not a valid integer greater than or equal
+     *		to <code>20000</code>
      */
     public DataStoreImpl(Properties properties) {
 	logger.log(
@@ -428,57 +583,19 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
 	    throw new IllegalArgumentException(
 		"The allocation block size must be greater than zero");
 	}
+	txnTimeout = wrappedProps.getLongProperty(
+	    TXN_TIMEOUT_PROPERTY, DEFAULT_TXN_TIMEOUT);
+	txnInfoTable = getTxnInfoTable(TxnInfo.class);
 	com.sleepycat.db.Transaction bdbTxn = null;
 	boolean done = false;
 	try {
 	    env = getEnvironment(properties);
 	    bdbTxn = env.beginTransaction(null, null);
-	    DatabaseConfig createConfig = new DatabaseConfig();
-	    createConfig.setType(DatabaseType.BTREE);
-	    createConfig.setAllowCreate(true);
-	    boolean create = false;
-	    String infoFileName = directory + File.separator + "info";
-	    Database infoTmp;
-	    try {
-		infoTmp = env.openDatabase(bdbTxn, infoFileName, null, null);
-		int minorVersion = DataStoreHeader.verify(infoTmp, bdbTxn);
-		if (logger.isLoggable(Level.CONFIG)) {
-		    logger.log(Level.CONFIG, "Found existing header {0}",
-			       DataStoreHeader.headerString(minorVersion));
-		}
-	    } catch (FileNotFoundException e) {
-		try {
-		    infoTmp = env.openDatabase(
-			bdbTxn, infoFileName, null, createConfig);
-		} catch (FileNotFoundException e2) {
-		    throw new DataStoreException(
-			"Problem creating database: " + e2.getMessage(),
-			e2);
-		}
-		DataStoreHeader.create(infoTmp, bdbTxn);
-		if (logger.isLoggable(Level.CONFIG)) {
-		    logger.log(Level.CONFIG, "Created new header {0}",
-			       DataStoreHeader.headerString());
-		}
-		create = true;
-	    }
-	    info = infoTmp;
-	    try {
-		oids = env.openDatabase(
-		    bdbTxn, directory + File.separator + "oids", null,
-		    create ? createConfig : null);
-	    } catch (FileNotFoundException e) {
-		throw new DataStoreException(
-		    "Oids database not found: " + e.getMessage(), e);
-	    }
-	    try {
-		names = env.openDatabase(
-		    bdbTxn, directory + File.separator + "names", null,
-		    create ? createConfig : null);
-	    } catch (FileNotFoundException e) {
-		throw new DataStoreException(
-		    "Names database not found: " + e.getMessage(), e);
-	    }
+	    Databases dbs = getDatabases(bdbTxn);
+	    infoDb = dbs.info;
+	    classesDb = dbs.classes;
+	    oidsDb = dbs.oids;
+	    namesDb = dbs.names;
 	    done = true;
 	    bdbTxn.commit();
 	} catch (DatabaseException e) {
@@ -503,8 +620,6 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
 	throws DatabaseException
     {
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
-	long timeout = 1000L * wrappedProps.getLongProperty(
-	    TXN_TIMEOUT_PROPERTY, DEFAULT_TXN_TIMEOUT);
 	boolean flushToDisk = wrappedProps.getBooleanProperty(
 	    FLUSH_TO_DISK_PROPERTY, false);
 	long cacheSize = wrappedProps.getLongProperty(
@@ -521,11 +636,11 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
         config.setInitializeLocking(true);
         config.setInitializeLogging(true);
         config.setLockDetectMode(LockDetectMode.YOUNGEST);
-	config.setLockTimeout(timeout);
+	config.setLockTimeout(1000 * txnTimeout);
 	config.setMessageHandler(new LoggingMessageHandler());
         config.setRunRecovery(true);
         config.setTransactional(true);
-	config.setTxnTimeout(timeout);
+	config.setTxnTimeout(1000 * txnTimeout);
 	config.setTxnWriteNoSync(!flushToDisk);
 	try {
 	    return new Environment(new File(directory), config);
@@ -533,6 +648,68 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
 	    throw new DataStoreException(
 		"DataStore directory does not exist: " + directory);
 	}
+    }
+
+    /**
+     * Opens or creates the Berkeley DB databases associated with this data
+     * store.
+     */
+    private Databases getDatabases(com.sleepycat.db.Transaction bdbTxn)
+	throws DatabaseException
+    {
+	Databases dbs = new Databases();
+	DatabaseConfig createConfig = new DatabaseConfig();
+	createConfig.setType(DatabaseType.BTREE);
+	createConfig.setAllowCreate(true);
+	boolean create = false;
+	String infoFileName = directory + File.separator + "info";
+	try {
+	    dbs.info = env.openDatabase(bdbTxn, infoFileName, null, null);
+	    int minorVersion = DataStoreHeader.verify(dbs.info, bdbTxn);
+	    if (logger.isLoggable(Level.CONFIG)) {
+		logger.log(Level.CONFIG, "Found existing header {0}",
+			   DataStoreHeader.headerString(minorVersion));
+	    }
+	} catch (FileNotFoundException e) {
+	    try {
+		dbs.info = env.openDatabase(
+		    bdbTxn, infoFileName, null, createConfig);
+	    } catch (FileNotFoundException e2) {
+		throw new DataStoreException(
+		    "Problem creating database: " + e2.getMessage(), e2);
+	    }
+	    DataStoreHeader.create(dbs.info, bdbTxn);
+	    if (logger.isLoggable(Level.CONFIG)) {
+		logger.log(Level.CONFIG, "Created new header {0}",
+			   DataStoreHeader.headerString());
+	    }
+	    create = true;
+	}
+	try {
+	    dbs.classes = env.openDatabase(
+		bdbTxn, directory + File.separator + "classes", null,
+		create ? createConfig : null);
+	} catch (FileNotFoundException e) {
+	    throw new DataStoreException(
+		"Classes database not found: " + e.getMessage(), e);
+	}
+	try {
+	    dbs.oids = env.openDatabase(
+		bdbTxn, directory + File.separator + "oids", null,
+		create ? createConfig : null);
+	} catch (FileNotFoundException e) {
+	    throw new DataStoreException(
+		"Oids database not found: " + e.getMessage(), e);
+	}
+	try {
+	    dbs.names = env.openDatabase(
+		bdbTxn, directory + File.separator + "names", null,
+		create ? createConfig : null);
+	} catch (FileNotFoundException e) {
+	    throw new DataStoreException(
+		"Names database not found: " + e.getMessage(), e);
+	}
+	return dbs;
     }
 
     /* -- Implement DataStore -- */
@@ -547,20 +724,8 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
 	    synchronized (objectIdLock) {
 		if (nextObjectId > lastObjectId) {
 		    logger.log(Level.FINE, "Allocate more object IDs");
-		    long newNextObjectId;
-		    com.sleepycat.db.Transaction bdbTxn =
-			env.beginTransaction(null, null);
-		    boolean done = false;
-		    try {
-			newNextObjectId = DataStoreHeader.getNextId(
-			    info, bdbTxn, allocationBlockSize);
-			done = true;
-			bdbTxn.commit();
-		    } finally {
-			if (!done) {
-			    bdbTxn.abort();
-			}
-		    }
+		    long newNextObjectId = getNextId(
+			DataStoreHeader.NEXT_OBJ_ID_KEY, allocationBlockSize);
 		    nextObjectId = newNextObjectId;
 		    lastObjectId = newNextObjectId + allocationBlockSize - 1;
 		}
@@ -650,7 +815,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
 	DatabaseEntry key = new DatabaseEntry();
 	LongBinding.longToEntry(oid, key);
 	DatabaseEntry value = new DatabaseEntry();
-	OperationStatus status = oids.get(
+	OperationStatus status = oidsDb.get(
 	    txnInfo.bdbTxn, key, value, forUpdate ? LockMode.RMW : null);
 	if (status == OperationStatus.NOTFOUND) {
 	    throw new ObjectNotFoundException("Object not found: " + oid);
@@ -660,6 +825,11 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
 					 " failed: " + status);
 	}
 	byte[] result = value.getData();
+	if (readBytesCounter != null) {
+	    if (result != null)
+		readBytesCounter.incrementCount(result.length);
+	    readObjectsCounter.incrementCount();
+	}
 	/* Berkeley DB returns null if the data is empty. */
 	return result != null ? result : NO_BYTES;
     }
@@ -680,11 +850,15 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
 	    DatabaseEntry key = new DatabaseEntry();
 	    LongBinding.longToEntry(oid, key);
 	    DatabaseEntry value = new DatabaseEntry(data);
-	    OperationStatus status = oids.put(txnInfo.bdbTxn, key, value);
+	    OperationStatus status = oidsDb.put(txnInfo.bdbTxn, key, value);
 	    if (status != OperationStatus.SUCCESS) {
 		throw new DataStoreException(
 		    "setObject txn: " + txn + ", oid:" + oid + " failed: " +
 		    status);
+	    }
+	    if (writtenBytesCounter != null) {
+		writtenBytesCounter.incrementCount(data.length);
+		writtenObjectsCounter.incrementCount();
 	    }
 	    txnInfo.modified = true;
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -703,6 +877,62 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
     }
 
     /** {@inheritDoc} */
+    public void setObjects(Transaction txn, long[] oids, byte[][] dataArray) {
+	logger.log(Level.FINEST, "setObjects txn:{0}", txn);
+	Exception exception;
+	long oid = -1;
+	boolean oidSet = false;
+	try {
+	    TxnInfo txnInfo = checkTxn(txn, setObjectsOp);
+	    int len = oids.length;
+	    if (len != dataArray.length) {
+		throw new IllegalArgumentException(
+		    "The oids and dataArray must be the same length");
+	    }
+	    DatabaseEntry key = new DatabaseEntry();
+	    DatabaseEntry value = new DatabaseEntry();
+	    for (int i = 0; i < len; i++) {
+		oid = oids[i];
+		oidSet = true;
+		if (logger.isLoggable(Level.FINEST)) {
+		    logger.log(Level.FINEST,
+			       "setObjects txn:{0}, oid:{1,number,#}",
+			       txn, oid);
+		}
+		checkId(oid);
+		byte[] data = dataArray[i];
+		if (data == null) {
+		    throw new NullPointerException(
+			"The data must not be null");
+		}
+		LongBinding.longToEntry(oid, key);
+		value.setData(data);
+		OperationStatus status =
+		    oidsDb.put(txnInfo.bdbTxn, key, value);
+		if (status != OperationStatus.SUCCESS) {
+		    throw new DataStoreException(
+			"setObjects txn: " + txn + ", oid:" + oid +
+			" failed: " + status);
+		}
+		if (writtenBytesCounter != null) {
+		    writtenBytesCounter.incrementCount(data.length);
+		    writtenObjectsCounter.incrementCount();
+		}
+	    }
+	    txnInfo.modified = true;
+	    logger.log(Level.FINEST, "setObjects txn:{0} returns", txn);
+	    return;
+	} catch (DatabaseException e) {
+	    exception = e;
+	} catch (RuntimeException e) {
+	    exception = e;
+	}
+	throw convertException(
+	    txn, Level.FINEST, exception,
+	    "setObject txn:" + txn + (oidSet ? ", oid:" + oid : ""));
+    }
+
+    /** {@inheritDoc} */
     public void removeObject(Transaction txn, long oid) {
 	if (logger.isLoggable(Level.FINEST)) {
 	    logger.log(Level.FINEST, "removeObject txn:{0}, oid:{1,number,#}",
@@ -714,7 +944,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
 	    TxnInfo txnInfo = checkTxn(txn, removeObjectOp);
 	    DatabaseEntry key = new DatabaseEntry();
 	    LongBinding.longToEntry(oid, key);
-	    OperationStatus status = oids.delete(txnInfo.bdbTxn, key);
+	    OperationStatus status = oidsDb.delete(txnInfo.bdbTxn, key);
 	    if (status == OperationStatus.NOTFOUND) {
 		throw new ObjectNotFoundException("Object not found: " + oid);
 	    } else if (status != OperationStatus.SUCCESS) {
@@ -754,7 +984,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
 	    StringBinding.stringToEntry(name, key);
 	    DatabaseEntry value = new DatabaseEntry();
 	    OperationStatus status =
-		names.get(txnInfo.bdbTxn, key, value, null);
+		namesDb.get(txnInfo.bdbTxn, key, value, null);
 	    if (status == OperationStatus.NOTFOUND) {
 		throw new NameNotBoundException("Name not bound: " + name);
 	    } else if (status != OperationStatus.SUCCESS) {
@@ -797,7 +1027,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
 	    StringBinding.stringToEntry(name, key);
 	    DatabaseEntry value = new DatabaseEntry();
 	    LongBinding.longToEntry(oid, value);
-	    OperationStatus status = names.put(txnInfo.bdbTxn, key, value);
+	    OperationStatus status = namesDb.put(txnInfo.bdbTxn, key, value);
 	    if (status != OperationStatus.SUCCESS) {
 		throw new DataStoreException(
 		    "setBinding txn:" + txn + ", name:" + name + " failed: " +
@@ -835,7 +1065,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
 	    TxnInfo txnInfo = checkTxn(txn, removeBindingOp);
 	    DatabaseEntry key = new DatabaseEntry();
 	    StringBinding.stringToEntry(name, key);
-	    OperationStatus status = names.delete(txnInfo.bdbTxn, key);
+	    OperationStatus status = namesDb.delete(txnInfo.bdbTxn, key);
 	    if (status == OperationStatus.NOTFOUND) {
 		throw new NameNotBoundException("Name not bound: " + name);
 	    } else if (status != OperationStatus.SUCCESS) {
@@ -873,7 +1103,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
 	Exception exception;
 	try {
 	    TxnInfo txnInfo = checkTxn(txn, nextBoundNameOp);
-	    String result = txnInfo.nextName(name, names);
+	    String result = txnInfo.nextName(name, namesDb);
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST,
 			   "nextBoundName txn:{0}, name:{1} returns {2}",
@@ -889,6 +1119,175 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
 			       "nextBoundName txn:" + txn + ", name:" + name);
     }
 
+    /** {@inheritDoc} */
+    public boolean shutdown() {
+	logger.log(Level.FINER, "shutdown");
+	Exception exception;
+	try {
+	    synchronized (txnCountLock) {
+		while (txnCount > 0) {
+		    try {
+			logger.log(Level.FINEST,
+				   "shutdown waiting for {0} transactions",
+				   txnCount);
+			txnCountLock.wait();
+		    } catch (InterruptedException e) {
+			logger.log(Level.FINEST, "shutdown interrupted");
+			break;
+		    }
+		}
+		if (txnCount < 0) {
+		    throw new IllegalStateException("DataStore is shut down");
+		}
+		boolean ok = (txnCount == 0);
+		if (ok) {
+		    infoDb.close();
+		    classesDb.close();
+		    oidsDb.close();
+		    namesDb.close();
+		    env.close();
+		    txnCount = -1;
+		}
+		logger.log(Level.FINER, "shutdown returns {0}", ok);
+		return ok;
+	    }
+	} catch (DatabaseException e) {
+	    exception = e;
+	} catch (RuntimeException e) {
+	    exception = e;
+	}
+	throw convertException(null, Level.FINER, exception, "shutdown");
+    }
+
+    /** {@inheritDoc} */
+    public int getClassId(Transaction txn, byte[] classInfo) {
+	logger.log(Level.FINER, "getClassId txn:{0}", txn);
+	String operation = "getClassId txn:" + txn;
+	Exception exception;
+	try {
+	    checkTxn(txn, getClassIdOp);
+	    if (classInfo == null) {
+		throw new NullPointerException(
+		    "The classInfo argument must not be null");
+	    }
+	    DatabaseEntry hashKey = getKeyFromClassInfo(classInfo);
+	    DatabaseEntry hashValue = new DatabaseEntry();
+	    int result;
+	    boolean done = false;
+	    /*
+	     * Use a separate transaction when obtaining the class ID so that
+	     * the ID will be available for other transactions to use right
+	     * away.  This approach means that the class info will be
+	     * registered even if the main transaction fails.  If any
+	     * transaction wants to register a new class, though, it's very
+	     * likely that the class will be needed, even if that transaction
+	     * aborts, so it makes sense to commit this operation separately to
+	     * improve concurrency.  -tjb@sun.com (05/23/2007)
+	     */
+	    com.sleepycat.db.Transaction bdbTxn =
+		env.beginTransaction(null, null);
+	    try {
+		if (get(classesDb, bdbTxn, hashKey, hashValue, operation)) {
+		    result = IntegerBinding.entryToInt(hashValue);
+		} else {
+		    Cursor cursor = classesDb.openCursor(bdbTxn, null);
+		    try {
+			DatabaseEntry idKey = new DatabaseEntry();
+			DatabaseEntry idValue = new DatabaseEntry();
+			OperationStatus status =
+			    cursor.getLast(idKey, idValue, null);
+			result = checkStatusFound(status, operation)
+			    ? getClassIdFromKey(idKey) + 1 : 1;
+			getKeyFromClassId(result, idKey);
+			idValue.setData(classInfo);
+			checkStatus(
+			    cursor.putNoOverwrite(idKey, idValue), operation);
+		    } finally {
+			cursor.close();
+		    }
+		    IntegerBinding.intToEntry(result, hashValue);
+		    putNoOverwrite(
+			classesDb, bdbTxn, hashKey, hashValue, operation);
+		}
+		done = true;
+		bdbTxn.commit();
+	    } finally {
+		if (!done) {
+		    bdbTxn.abort();
+		}
+	    }
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.log(Level.FINER, "getClassId txn:{0} returns {1}",
+			   txn, result);
+	    }
+	    return result;
+	} catch (DatabaseException e) {
+	    exception = e;
+	} catch (RuntimeException e) {
+	    exception = e;
+	}
+	throw convertException(txn, Level.FINER, exception, operation);
+    }
+
+    /** {@inheritDoc} */
+    public byte[] getClassInfo(Transaction txn, int classId)
+	throws ClassInfoNotFoundException
+    {
+	if (logger.isLoggable(Level.FINER)) {
+	    logger.log(Level.FINER,
+		       "getClassInfo txn:{0}, classId:{1,number,#}",
+		       txn, classId);
+	}
+	String operation = "getClassInfo txn:" + txn + ", classId:" + classId;
+	Exception exception;
+	try {
+	    checkTxn(txn, getClassInfoOp);
+	    if (classId < 1) {
+		throw new IllegalArgumentException(
+		    "The classId argument must greater than 0");
+	    }
+	    DatabaseEntry key = new DatabaseEntry();
+	    getKeyFromClassId(classId, key);
+	    DatabaseEntry value = new DatabaseEntry();
+	    boolean found;
+	    boolean done = false;
+	    com.sleepycat.db.Transaction bdbTxn =
+		env.beginTransaction(null, null);
+	    try {
+		found = get(classesDb, bdbTxn, key, value, operation);
+		done = true;
+		bdbTxn.commit();
+	    } finally {
+		if (!done) {
+		    bdbTxn.abort();
+		}
+	    }
+	    if (found) {
+		byte[] result = value.getData();
+		if (result == null) {
+		    result = NO_BYTES;
+		}
+		logger.log(Level.FINER,
+			   "getClassInfo txn:{0} classId:{1,number,#} returns",
+			   txn, classId);
+		return result;
+	    } else {
+		ClassInfoNotFoundException e =
+		    new ClassInfoNotFoundException(
+			"No information found for class ID " + classId);
+		if (logger.isLoggable(Level.FINER)) {
+		    logger.logThrow(Level.FINER, e, operation + " throws");
+		}
+		throw e;
+	    }
+	} catch (DatabaseException e) {
+	    exception = e;
+	} catch (RuntimeException e) {
+	    exception = e;
+	}
+	throw convertException(txn, Level.FINER, exception, operation);
+    }
+
     /* -- Implement TransactionParticipant -- */
 
     /** {@inheritDoc} */
@@ -896,19 +1295,24 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
 	logger.log(Level.FINER, "prepare txn:{0}", txn);
 	Exception exception;
 	try {
-	    TxnInfo txnInfo = checkTxnNoJoin(txn, true);
+	    TxnInfo txnInfo = checkTxnNoJoin(txn);
 	    if (txnInfo.prepared) {
 		throw new IllegalStateException(
 		    "Transaction has already been prepared");
 	    }
 	    if (txnInfo.modified) {
-		byte[] oid = txn.getId();
+		byte[] tid = txn.getId();
 		/*
 		 * Berkeley DB requires transaction IDs to be at least 128
 		 * bytes long.  -tjb@sun.com (11/07/2006)
 		 */
 		byte[] gid = new byte[128];
-		System.arraycopy(oid, 0, gid, 128 - oid.length, oid.length);
+		/*
+		 * The current transaction implementation uses 8 byte
+		 * transaction IDs.  -tjb@sun.com (03/22/2007)
+		 */
+		assert tid.length < 128 : "Transaction ID is too long";
+		System.arraycopy(tid, 0, gid, 128 - tid.length, tid.length);
 		txnInfo.prepare(gid);
 		txnInfo.prepared = true;
 	    } else {
@@ -919,7 +1323,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
 		 * object after commit is called.
 		 */
 		try {
-		    threadTxnInfo.set(null);
+		    txnInfoTable.remove(txn);
 		    txnInfo.commit();
 		} finally {
 		    decrementTxnCount();
@@ -945,7 +1349,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
 	logger.log(Level.FINER, "commit txn:{0}", txn);
 	Exception exception;
 	try {
-	    TxnInfo txnInfo = checkTxnNoJoin(txn, true);
+	    TxnInfo txnInfo = checkTxnNoJoin(txn);
 	    if (!txnInfo.prepared) {
 		throw new IllegalStateException(
 		    "Transaction has not been prepared");
@@ -956,7 +1360,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
 	     * Berkeley DB doesn't permit operating on its transaction object
 	     * after commit is called.
 	     */
-	    threadTxnInfo.set(null);
+	    txnInfoTable.remove(txn);
 	    try {
 		txnInfo.commit();
 		logger.log(Level.FINER, "commit txn:{0} returns", txn);
@@ -978,7 +1382,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
 	logger.log(Level.FINER, "prepareAndCommit txn:{0}", txn);
 	Exception exception;
 	try {
-	    TxnInfo txnInfo = checkTxnNoJoin(txn, true);
+	    TxnInfo txnInfo = checkTxnNoJoin(txn);
 	    if (txnInfo.prepared) {
 		throw new IllegalStateException(
 		    "Transaction has already been prepared");
@@ -989,7 +1393,7 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
 	     * Berkeley DB doesn't permit operating on its transaction object
 	     * after commit is called.
 	     */
-	    threadTxnInfo.set(null);
+	    txnInfoTable.remove(txn);
 	    try {
 		txnInfo.commit();
 		logger.log(
@@ -1012,16 +1416,20 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
 	logger.log(Level.FINER, "abort txn:{0}", txn);
 	Exception exception;
 	try {
-	    TxnInfo txnInfo = checkTxnNoJoin(txn, false);
-	    /*
-	     * Make sure to clear the transaction information, regardless of
-	     * whether the Berkeley DB commit operation succeeds, since
-	     * Berkeley DB doesn't permit operating on its transaction object
-	     * after commit is called.
-	     */
-	    threadTxnInfo.set(null);
+	    if (txn == null) {
+		throw new NullPointerException("Transaction must not be null");
+	    }
+	    TxnInfo txnInfo = txnInfoTable.remove(txn);
+	    if (txnInfo == null) {
+		throw new IllegalStateException("Transaction is not active");
+	    }
 	    try {
 		txnInfo.abort();
+		/*
+		 * Check the timeout after performing the abort to insure that
+		 * the Berkeley DB transaction gets aborted now.
+		 */
+		checkTxnTimeout(txn);
 		logger.log(Level.FINER, "abort txn:{0} returns", txn);
 		return;
 	    } finally {
@@ -1043,61 +1451,29 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
         ProfileConsumer consumer =
             profileRegistrar.registerProfileProducer(this);
 
-	if (consumer != null) {
-	    getBindingOp = consumer.registerOperation("getBinding");
-	    setBindingOp = consumer.registerOperation("setBinding");
-	    removeBindingOp = consumer.registerOperation("removeBinding");
-	    nextBoundNameOp = consumer.registerOperation("nextBoundName");
-	    removeObjectOp = consumer.registerOperation("removeObject");
-	    markForUpdateOp = consumer.registerOperation("markForUpdate");
-	    createObjectOp = consumer.registerOperation("createObject");
-	    getObjectOp = consumer.registerOperation("getObject");
-	    getObjectForUpdateOp =
-		consumer.registerOperation("getObjectForUpdate");
-	    setObjectOp = consumer.registerOperation("setObject");
-	}
+	createObjectOp = consumer.registerOperation("createObject");
+	markForUpdateOp = consumer.registerOperation("markForUpdate");
+	getObjectOp = consumer.registerOperation("getObject");
+	getObjectForUpdateOp =
+	    consumer.registerOperation("getObjectForUpdate");
+	setObjectOp = consumer.registerOperation("setObject");
+	setObjectsOp = consumer.registerOperation("setObjects");
+	removeObjectOp = consumer.registerOperation("removeObject");
+	getBindingOp = consumer.registerOperation("getBinding");
+	setBindingOp = consumer.registerOperation("setBinding");
+	removeBindingOp = consumer.registerOperation("removeBinding");
+	nextBoundNameOp = consumer.registerOperation("nextBoundName");
+	getClassIdOp = consumer.registerOperation("getClassId");
+	getClassInfoOp = consumer.registerOperation("getClassInfo");
+
+	readBytesCounter = consumer.registerCounter("readBytes", true);
+	readObjectsCounter = consumer.registerCounter("readObjects", true);
+	writtenBytesCounter = consumer.registerCounter("writtenBytes", true);
+	writtenObjectsCounter =
+	    consumer.registerCounter("writtenObjects", true);
     }
 
     /* -- Other public methods -- */
-
-    /** {@inheritDoc} */
-    public boolean shutdown() {
-	logger.log(Level.FINER, "shutdown");
-	Exception exception;
-	try {
-	    synchronized (txnCountLock) {
-		while (txnCount > 0) {
-		    try {
-			logger.log(Level.FINEST,
-				   "shutdown waiting for {0} transactions",
-				   txnCount);
-			txnCountLock.wait();
-		    } catch (InterruptedException e) {
-			logger.log(Level.FINEST, "shutdown interrupted");
-			break;
-		    }
-		}
-		if (txnCount < 0) {
-		    throw new IllegalStateException("DataStore is shut down");
-		}
-		boolean ok = (txnCount == 0);
-		if (ok) {
-		    info.close();
-		    oids.close();
-		    names.close();
-		    env.close();
-		    txnCount = -1;
-		}
-		logger.log(Level.FINER, "shutdown returns {0}", ok);
-		return ok;
-	    }
-	} catch (DatabaseException e) {
-	    exception = e;
-	} catch (RuntimeException e) {
-	    exception = e;
-	}
-	throw convertException(null, Level.FINER, exception, "shutdown");
-    }
 
     /**
      * Returns a string representation of this object.
@@ -1106,6 +1482,89 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
      */
     public String toString() {
 	return "DataStoreImpl[directory=\"" + directory + "\"]";
+    }
+
+    /**
+     * Returns the next available object ID, and reserves the specified number
+     * of IDs.
+     *
+     * @param	count the number of IDs to reserve
+     * @return	the next available object ID
+     */
+    public long allocateObjects(int count) {
+	logger.log(Level.FINE, "allocateObjects count:{0,number,#}", count);
+	Exception exception;
+	try {
+	    long result = getNextId(
+		DataStoreHeader.NEXT_OBJ_ID_KEY, count);
+	    if (logger.isLoggable(Level.FINE)) {
+		logger.log(Level.FINE,
+			   "allocateObjects count:{0,number,#} " +
+			   "returns oid:{1,number,#}",
+			   count, result);
+	    }
+	    return result;
+	} catch (DatabaseException e) {
+	    exception = e;
+	} catch (RuntimeException e) {
+	    exception = e;
+	}
+	throw convertException(
+	    null, Level.FINE, exception, "allocateObjects count:" + count);
+    }
+
+    /* -- Protected methods -- */
+
+    /**
+     * Returns the table that will be used to store transaction information.
+     * Note that this method will be called during instance construction.
+     *
+     * @param	<T> the type of the information to be stored
+     * @param	txnInfoType a class representing the type of the information to
+     *		be stored
+     * @return	the table
+     */
+    protected <T> TxnInfoTable<T> getTxnInfoTable(Class<T> txnInfoType) {
+	return new ThreadTxnInfoTable<T>();
+    }
+
+    /**
+     * Returns the next available transaction ID, and reserves the specified
+     * number of IDs.
+     *
+     * @param	count the number of IDs to reserve
+     * @return	the next available transaction ID
+     */
+    protected long getNextTxnId(int count) {
+	Exception exception;
+	try {
+	    return getNextId(DataStoreHeader.NEXT_TXN_ID_KEY, count);
+	} catch (DatabaseException e) {
+	    exception = e;
+	} catch (RuntimeException e) {
+	    exception = e;
+	}
+	throw convertException(
+	    null, Level.FINE, exception, "getNextTxnId count:" + count);
+    }
+
+    /**
+     * Explicitly joins a new transaction.
+     *
+     * @param	txn the transaction to join
+     */
+    protected void joinNewTransaction(Transaction txn) {
+	Exception exception;
+	try {
+	    joinTransaction(txn);
+	    return;
+	} catch (DatabaseException e) {
+	    exception = e;
+	} catch (RuntimeException e) {
+	    exception = e;
+	}
+	throw convertException(
+	    txn, Level.FINER, exception, "joinNewTransaction txn:" + txn);
     }
 
     /* -- Private methods -- */
@@ -1129,55 +1588,63 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
 	if (txn == null) {
 	    throw new NullPointerException("Transaction must not be null");
 	}
-	TxnInfo txnInfo = threadTxnInfo.get();
+	TxnInfo txnInfo = txnInfoTable.get(txn);
 	if (txnInfo == null) {
-	    synchronized (txnCountLock) {
-		if (txnCount < 0) {
-		    throw new IllegalStateException("Service is shut down");
-		}
-		txnCount++;
-	    }
-	    boolean joined = false;
-	    try {
-		txn.join(this);
-		joined = true;
-	    } finally {
-		if (!joined) {
-		    decrementTxnCount();
-		}
-	    }
-	    txnInfo = new TxnInfo(txn, env);
-	    threadTxnInfo.set(txnInfo);
-	} else if (!txnInfo.txn.equals(txn)) {
-	    throw new IllegalStateException("Wrong transaction");
+	    return joinTransaction(txn);
 	} else if (txnInfo.prepared) {
 	    throw new IllegalStateException(
 		"Transaction has been prepared");
+	} else {
+	    checkTxnTimeout(txn);
 	}
-        if (op != null)
+        if (op != null) {
             op.report();
+	}
+	return txnInfo;
+    }
+
+    /**
+     * Joins the specified transaction, checking first to see if the data store
+     * is currently shutting down, and returning the new TxnInfo.
+     */
+    private TxnInfo joinTransaction(Transaction txn) throws DatabaseException {
+	synchronized (txnCountLock) {
+	    if (txnCount < 0) {
+		throw new IllegalStateException("Service is shut down");
+	    }
+	    txnCount++;
+	}
+	boolean joined = false;
+	try {
+	    txn.join(this);
+	    joined = true;
+	} finally {
+	    if (!joined) {
+		decrementTxnCount();
+	    }
+	}
+	TxnInfo txnInfo = new TxnInfo(txn, env);
+	txnInfoTable.set(txn, txnInfo);
 	return txnInfo;
     }
 
     /**
      * Checks that the correct transaction is in progress, throwing an
      * exception if the transaction has not been joined.  Checks if the store
-     * is shutting down if requested.  Does not check the prepared state of the
-     * transaction.
+     * is shutting down, and if the transaction has timed out, but does not
+     * check the prepared state of the transaction.
      */
-    private TxnInfo checkTxnNoJoin(
-	Transaction txn, boolean checkShuttingDown)
-    {
+    private TxnInfo checkTxnNoJoin(Transaction txn) {
 	if (txn == null) {
 	    throw new NullPointerException("Transaction must not be null");
 	}
-	TxnInfo txnInfo = threadTxnInfo.get();
+	TxnInfo txnInfo = txnInfoTable.get(txn);
 	if (txnInfo == null) {
 	    throw new IllegalStateException("Transaction is not active");
-	} else if (!txnInfo.txn.equals(txn)) {
-	    throw new IllegalStateException("Wrong transaction");
-	} else if (checkShuttingDown && getTxnCount() < 0) {
+	} else if (getTxnCount() < 0) {
 	    throw new IllegalStateException("DataStore is shutting down");
+	} else {
+	    checkTxnTimeout(txn);
 	}
 	return txnInfo;
     }
@@ -1197,12 +1664,17 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
 	Transaction txn, Level level, Exception e, String operation)
     {
 	RuntimeException re;
+	/*
+	 * Don't include DatabaseExceptions as the cause because, even though
+	 * that class implements Serializable, the Environment object
+	 * optionally contained within them is not.  -tjb@sun.com (01/19/2007)
+	 */
 	if (e instanceof LockNotGrantedException) {
 	    re = new TransactionTimeoutException(
-		operation + " failed due to timeout: " + e.getMessage(), e);
+		operation + " failed due to timeout: " + e);
 	} else if (e instanceof DeadlockException) {
 	    re = new TransactionConflictException(
-		operation + " failed due to deadlock: " + e.getMessage(), e);
+		operation + " failed due to deadlock: " + e);
 	} else if (e instanceof RunRecoveryException) {
 	    /*
 	     * It is tricky to clean up the data structures in this instance in
@@ -1218,6 +1690,10 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
 		e);
 	    logger.logThrow(Level.SEVERE, error, "{0} throws", operation);
 	    throw error;
+	} else if (e instanceof TransactionTimeoutException) {
+	    /* Include the operation in the message */
+	    re = new TransactionTimeoutException(
+		operation + " failed: " + e.getMessage(), e);
 	} else if (e instanceof DatabaseException) {
 	    re = new DataStoreException(
 		operation + " failed: " + e.getMessage(), e);
@@ -1256,4 +1732,117 @@ public final class DataStoreImpl implements DataStore, TransactionParticipant,
 	    }
 	}
     }
+
+    /**
+     * Returns the next available ID stored under the specified key, and
+     * increments the stored value by the specified amount.
+     */
+    private long getNextId(long key, int blockSize) throws DatabaseException {
+	assert blockSize > 0;
+	com.sleepycat.db.Transaction bdbTxn = env.beginTransaction(null, null);
+	boolean done = false;
+	try {
+	    long id = DataStoreHeader.getNextId(
+		key, infoDb, bdbTxn, blockSize);
+	    done = true;
+	    bdbTxn.commit();
+	    return id;
+	} finally {
+	    if (!done) {
+		bdbTxn.abort();
+	    }
+	}
+    }
+
+    /**
+     * Throws a TransactionTimeoutException if the transaction has timed out.
+     */
+    private void checkTxnTimeout(Transaction txn) {
+	long duration = System.currentTimeMillis() - txn.getCreationTime();
+	if (duration > txnTimeout) {
+	    throw new TransactionTimeoutException(
+		"Transaction timed out after " + duration + " ms");
+	}
+    }
+
+    /** Converts a database entry key to a class ID. */
+    private static int getClassIdFromKey(DatabaseEntry key) {
+	TupleInput in = new TupleInput(key.getData());
+	byte first = in.readByte();
+	assert first == DataStoreHeader.CLASS_ID_PREFIX;
+	return in.readInt();
+    }
+
+    /** Converts a class ID to a database entry key. */
+    private static void getKeyFromClassId(int classId, DatabaseEntry key) {
+	TupleOutput out = new TupleOutput(new byte[5]);
+	out.writeByte(DataStoreHeader.CLASS_ID_PREFIX);
+	out.writeInt(classId);
+	key.setData(out.getBufferBytes());
+    }
+
+    /** Converts class information to a database entry key. */
+    private DatabaseEntry getKeyFromClassInfo(byte[] classInfo) {
+	byte[] keyBytes = new byte[1 + SHA1_SIZE];
+	keyBytes[0] = DataStoreHeader.CLASS_HASH_PREFIX;
+	MessageDigest md = messageDigest.get();
+	try {
+	    md.update(classInfo);
+	    int numBytes = md.digest(keyBytes, 1, SHA1_SIZE);
+	    assert numBytes == SHA1_SIZE;
+	    return new DatabaseEntry(keyBytes);
+	} catch (DigestException e) {
+	    throw new AssertionError(e);
+	}
+    }
+
+    /** Gets a value from the database, returning whether it was found. */
+    private static boolean get(Database db,
+			       com.sleepycat.db.Transaction bdbTxn,
+			       DatabaseEntry key,
+			       DatabaseEntry value,
+			       String operation)
+	throws DatabaseException
+    {
+	return checkStatusFound(
+	    db.get(bdbTxn, key, value, null), operation);
+    }
+
+    /**
+     * Puts a value into the database, throwing an exception if the key was
+     * already present.
+     */
+    private static void putNoOverwrite(Database db,
+				       com.sleepycat.db.Transaction bdbTxn,
+				       DatabaseEntry key,
+				       DatabaseEntry value,
+				       String operation)
+	throws DatabaseException
+    {
+	checkStatus(db.putNoOverwrite(bdbTxn, key, value), operation);
+    }
+
+    /**
+     * Checks that the status was SUCCESS or NOTFOUND, returning true for
+     * SUCCESS.
+     */
+    private static boolean checkStatusFound(OperationStatus status,
+					    String operation)
+    {
+	if (status == OperationStatus.NOTFOUND) {
+	    return false;
+	} else {
+	    checkStatus(status, operation);
+	    return true;
+	}
+    }
+
+    /** Checks that the status was SUCCESS. */
+    private static void checkStatus(OperationStatus status,
+				    String operation)
+    {
+	if (status != OperationStatus.SUCCESS) {
+	    throw new DataStoreException(operation + " failed: " + status);
+	}
+    }	
 }

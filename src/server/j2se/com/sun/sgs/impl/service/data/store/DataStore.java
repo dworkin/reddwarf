@@ -7,8 +7,10 @@ package com.sun.sgs.impl.service.data.store;
 import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionAbortedException;
+import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.service.Transaction;
+import java.io.ObjectStreamClass;
 
 /**
  * Defines the interface to the underlying persistence mechanism that {@link
@@ -30,6 +32,7 @@ public interface DataStore {
      * @return	the new object ID
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the transaction is not active
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
@@ -47,6 +50,7 @@ public interface DataStore {
      * @throws	ObjectNotFoundException if the object is not found
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the transaction is not active
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
@@ -67,6 +71,7 @@ public interface DataStore {
      * @throws	ObjectNotFoundException if the object is not found
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the transaction is not active
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
@@ -78,14 +83,31 @@ public interface DataStore {
      * @param	txn the transaction under which the operation should take place
      * @param	oid the object ID
      * @param	data the data
-     * @throws	IllegalArgumentException if <code>oid</code> is negative, or if
-     *		<code>data</code> is empty
+     * @throws	IllegalArgumentException if <code>oid</code> is negative
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the transaction is not active
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
     void setObject(Transaction txn, long oid, byte[] data);
+
+    /** 
+     * Specifies data to associate with a series of object IDs.
+     *
+     * @param	txn the transaction under which the operation should take place
+     * @param	oids the object IDs
+     * @param	dataArray the associated data values
+     * @throws	IllegalArgumentException if <code>oids</code> and
+     *		<code>data</code> are not the same length, or if
+     *		<code>oids</code> contains a value that is negative
+     * @throws	TransactionAbortedException if the transaction was aborted due
+     *		to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the transaction is not active
+     * @throws	IllegalStateException if the operation failed because of a
+     *		problem with the current transaction
+     */
+    void setObjects(Transaction txn, long[] oids, byte[][] dataArray);
 
     /**
      * Removes the object with the specified object ID.  The implementation
@@ -99,6 +121,7 @@ public interface DataStore {
      * @throws	ObjectNotFoundException if the object is not found
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the transaction is not active
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
@@ -113,6 +136,7 @@ public interface DataStore {
      * @throws	NameNotBoundException if no object ID is bound to the name
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the transaction is not active
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
@@ -127,6 +151,7 @@ public interface DataStore {
      * @throws	IllegalArgumentException if <code>oid</code> is negative
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the transaction is not active
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
@@ -140,6 +165,7 @@ public interface DataStore {
      * @throws	NameNotBoundException if the name is not bound
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the transaction is not active
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
@@ -158,6 +184,7 @@ public interface DataStore {
      *		<code>null</code> if there are no more bound names
      * @throws	TransactionAbortedException if the transaction was aborted due
      *		to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the transaction is not active
      * @throws	IllegalStateException if the operation failed because of a
      *		problem with the current transaction
      */
@@ -173,4 +200,44 @@ public interface DataStore {
      *		already been called and returned <code>true</code>
      */
     boolean shutdown();
+
+    /**
+     * Returns the class ID to represent classes with the specified class
+     * information.  Obtains an existing ID for the class information if
+     * present; otherwise, stores the information and returns the new ID
+     * associated with it.  Class IDs are always greater than {@code 0}.  The
+     * class information is the serialized form of the {@link
+     * ObjectStreamClass} instance that serialization uses to represent the
+     * class.
+     *
+     * @param	txn the transaction under which the operation should take place
+     * @param	classInfo the class information
+     * @return	the associated class ID
+     * @throws	TransactionAbortedException if the transaction was aborted due
+     *		to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the transaction is not active
+     * @throws	IllegalStateException if the operation failed because of a
+     *		problem with the current transaction
+     */
+    int getClassId(Transaction txn, byte[] classInfo);
+
+    /**
+     * Returns the class information associated with the specified class ID.
+     * The class information is the serialized form of the {@link
+     * ObjectStreamClass} instance that serialization uses to represent the
+     * class.
+     *
+     * @param	txn the transaction under which the operation should take place
+     * @param	classId the class ID
+     * @return	the associated class information
+     * @throws	IllegalArgumentException if {@code classId} is not greater than
+     *		{@code 0}
+     * @throws	ClassInfoNotFoundException if the ID is not found
+     * @throws	TransactionAbortedException if the transaction was aborted due
+     *		to a lock conflict or timeout
+     * @throws	IllegalStateException if the operation failed because of a
+     *		problem with the transaction
+     */
+    byte[] getClassInfo(Transaction txn, int classId)
+	throws ClassInfoNotFoundException;
 }

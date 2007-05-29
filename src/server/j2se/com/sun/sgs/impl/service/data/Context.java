@@ -37,6 +37,9 @@ final class Context {
     /** Whether to detect modifications. */
     final boolean detectModifications;
 
+    /** Controls serializing classes. */
+    final ClassSerialization classSerial;
+
     /**
      * The number of operations performed -- used to determine when to make
      * checks on the reference table.
@@ -60,15 +63,18 @@ final class Context {
 	    Transaction txn,
 	    TransactionProxy txnProxy,
 	    int debugCheckInterval,
-	    boolean detectModifications)
+	    boolean detectModifications,
+	    ClassesTable classesTable)
     {
-	assert store != null && txn != null && txnProxy != null
-	    : "Store, txn, or txnProxy is null";
+	assert store != null && txn != null && txnProxy != null &&
+	    classesTable != null
+	    : "Store, txn, txnProxy, or classesTable is null";
 	this.store = store;
 	this.txn = new TxnTrampoline(txn);
 	this.txnProxy = txnProxy;
 	this.debugCheckInterval = debugCheckInterval;
 	this.detectModifications = detectModifications;
+	classSerial = classesTable.createClassSerialization(this.txn);
     }
 
     /**
@@ -98,6 +104,14 @@ final class Context {
 
 	public long getCreationTime() {
 	    return originalTxn.getCreationTime();
+	}
+
+	public long getTimeout() {
+	    return originalTxn.getTimeout();
+	}
+
+	public void checkTimeout() {
+	    originalTxn.checkTimeout();
 	}
 
 	public void join(TransactionParticipant participant) {

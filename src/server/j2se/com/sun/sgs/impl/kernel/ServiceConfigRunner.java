@@ -4,14 +4,13 @@
 
 package com.sun.sgs.impl.kernel;
 
-import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 
 import com.sun.sgs.kernel.KernelRunnable;
 
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.TaskService;
 import com.sun.sgs.service.TransactionProxy;
-import com.sun.sgs.service.TransactionRunner;
 
 import java.util.List;
 import java.util.Properties;
@@ -132,11 +131,11 @@ class ServiceConfigRunner implements KernelRunnable {
         // special KernelRunnable in a new transaction
         AppStartupRunner startupRunner =
             new AppStartupRunner(appContext, appProperties, kernel);
-        TransactionRunner transactionRunner =
-            new TransactionRunner(startupRunner);
+        UnboundedTransactionRunner unboundedTransactionRunner =
+            new UnboundedTransactionRunner(startupRunner);
         try {
             appContext.getService(TaskService.class).
-                scheduleNonDurableTask(transactionRunner);
+                scheduleNonDurableTask(unboundedTransactionRunner);
         } catch (Exception e) {
             if (logger.isLoggable(Level.CONFIG))
                 logger.logThrow(Level.CONFIG, e, "{0}: failed to schedule " +

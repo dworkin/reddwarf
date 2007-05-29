@@ -15,9 +15,11 @@ import com.sun.sgs.auth.Identity;
 import com.sun.sgs.impl.auth.NamePasswordCredentials;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.session.ClientSessionServiceImpl.Context;
-import com.sun.sgs.impl.util.HexDumper;
-import com.sun.sgs.impl.util.LoggerWrapper;
-import com.sun.sgs.impl.util.MessageBuffer;
+import com.sun.sgs.impl.sharedutil.CompactId;
+import com.sun.sgs.impl.sharedutil.HexDumper;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.impl.sharedutil.MessageBuffer;
+import com.sun.sgs.impl.util.AbstractKernelRunnable;
 import com.sun.sgs.impl.util.NonDurableTaskQueue;
 import com.sun.sgs.io.Connection;
 import com.sun.sgs.io.ConnectionListener;
@@ -33,7 +35,6 @@ import java.io.ObjectOutputStream;
 import java.io.ObjectStreamException;
 import java.io.Serializable;
 import java.security.SecureRandom;
-import java.util.Arrays;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
@@ -43,7 +44,7 @@ import javax.security.auth.login.LoginException;
 /**
  * Implements a client session.
  */
-class ClientSessionImpl implements SgsClientSession, Serializable {
+public class ClientSessionImpl implements SgsClientSession, Serializable {
 
     /** The serialVersionUID for this class. */
     private final static long serialVersionUID = 1L;
@@ -64,7 +65,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 
     /** Random number generator for generating session ids. */
     private static final Random random = new Random(getSeed());
-
+    
     /** The logger for this class. */
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(ClientSessionImpl.class.getName()));
@@ -82,10 +83,10 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     private Connection sessionConnection;
 
     /** The session id. */
-    private final byte[] sessionId;
+    private final CompactId sessionId;
 
     /** The reconnection key. */
-    private final byte[] reconnectionKey;
+    private final CompactId reconnectionKey;
 
     /** The ConnectionListener for receiving messages from the client. */
     private final ConnectionListener connectionListener;
@@ -115,17 +116,21 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     private NonDurableTaskQueue taskQueue = null;
 
     /**
-     * Constructs an instance of this class with the specified handle.
+     * Constructs an instance of this class with the specified {@code
+     * sessionService} and session {@code id}.
+     *
+     * @param	sessionService the service that created this instance
+     * @param	id the session ID for this instance
      */
-    ClientSessionImpl(ClientSessionServiceImpl sessionService) {
+    ClientSessionImpl(ClientSessionServiceImpl sessionService, byte[] id) {
 	if (sessionService == null) {
 	    throw new NullPointerException("sessionService is null");
 	}
 	this.sessionService = sessionService;
         this.dataService = sessionService.dataService;
 	this.connectionListener = new Listener();
-	this.sessionId = generateId();
-	this.reconnectionKey = generateId();
+	this.sessionId = new CompactId(id);
+	this.reconnectionKey = sessionId; // not used yet
     }
 
     /**
@@ -139,7 +144,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
      * service of the current app context.
      */
     private ClientSessionImpl(
-	byte[] sessionId,
+	CompactId sessionId,
         Identity identity)
     {
 	this.sessionService =
@@ -147,7 +152,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	this.dataService = sessionService.dataService;
 	this.sessionId = sessionId;
         this.identity = identity;
-	this.reconnectionKey = generateId(); // create bogus one
+	this.reconnectionKey = sessionId; // not used yet
 	this.connectionListener = null;
 	this.state = State.DISCONNECTED;
 	this.disconnectHandled = true;
@@ -158,7 +163,8 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 
     /** {@inheritDoc} */
     public String getName() {
-        String name = (identity == null) ? null : identity.getName();
+	Identity thisIdentity = getIdentity();
+        String name = (thisIdentity == null) ? null : thisIdentity.getName();
 	logger.log(Level.FINEST, "getName returns {0}", name);
 	return name;
     }
@@ -166,10 +172,20 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     /** {@inheritDoc} */
     public ClientSessionId getSessionId() {
 	logger.log(Level.FINEST, "getSessionId returns {0}", sessionId);
-        return new ClientSessionId(sessionId);
+        return new ClientSessionId(sessionId.getId());
     }
 
-    /** {@inheritdoc} */
+    /**
+     * Returns the client session ID for this client session in {@code
+     * CompactId} format.
+     *
+     * @return the client session ID as a {@code CompactId}
+     */
+    public CompactId getCompactSessionId() {
+	return sessionId;
+    }
+
+    /** {@inheritDoc} */
     public boolean isConnected() {
 
 	State currentState = getCurrentState();
@@ -231,8 +247,12 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 
     /** {@inheritDoc} */
     public Identity getIdentity() {
-        logger.log(Level.FINEST, "getIdentity returns {0}", identity);
-        return identity;
+	Identity thisIdentity;
+	synchronized (lock) {
+	    thisIdentity = identity;
+	}
+        logger.log(Level.FINEST, "getIdentity returns {0}", thisIdentity);
+	return thisIdentity;
     }
 
     /** {@inheritDoc} */
@@ -242,12 +262,11 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    if (getCurrentState() != State.DISCONNECTED) {
 		sessionConnection.sendBytes(message);
 	    } else {
-		if (logger.isLoggable(Level.WARNING)) {
+		if (logger.isLoggable(Level.FINER)) {
 		    logger.log(
-		        Level.WARNING,
-			"sendProtocolMessage session:{0} message:{1}, " +
-			"session is disconnected",
-			this, HexDumper.format(message));
+		        Level.FINER,
+			"sendProtocolMessage session:{0} " +
+			"session is disconnected", this);
 		}
 	    }
 		    
@@ -255,8 +274,7 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    if (logger.isLoggable(Level.WARNING)) {
 		logger.logThrow(
 		    Level.WARNING, e,
-		    "sendProtocolMessage session:{0} message:{1} throws",
-		    this, HexDumper.format(message));
+		    "sendProtocolMessage session:{0} throws", this);
 	    }
 	}
 	
@@ -284,27 +302,41 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	} else if (obj.getClass() == this.getClass()) {
 	    ClientSessionImpl session = (ClientSessionImpl) obj;
 	    return
-		identity.equals(session.identity) &&
-		Arrays.equals(sessionId, session.sessionId);
+		areEqualIdentities(getIdentity(), session.getIdentity()) &&
+		sessionId.equals(session.sessionId);
 	}
 	return false;
     }
 
+    /**
+     * Returns {@code true} if the given identities are either both
+     * null, or both non-null and invoking {@code equals} on the first
+     * identity passing the second identity returns {@code true}.
+     */
+    private static boolean areEqualIdentities(Identity id1, Identity id2) {
+	if (id1 == null) {
+	    return id2 == null;
+	} else if (id2 == null) {
+	    return false;
+	} else {
+	    return id1.equals(id2);
+	}
+    }
+    
     /** {@inheritDoc} */
     public int hashCode() {
-	return Arrays.hashCode(sessionId);
+	return sessionId.hashCode();
     }
 
     /** {@inheritDoc} */
     public String toString() {
-	return getClass().getName() + "[" + getName() + "]@" +
-            HexDumper.toHexString(sessionId);
+	return getClass().getName() + "[" + getName() + "]@" + sessionId;
     }
     
     /* -- Serialization methods -- */
 
     private Object writeReplace() {
-	return new External(sessionId, identity);
+	return new External(sessionId, getIdentity());
     }
 
     /**
@@ -315,11 +347,11 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 
 	private final static long serialVersionUID = 1L;
 
-	private final byte[] sessionId;
+	private final byte[] idBytes;
         private final Identity identity;
 
-	External(byte[] sessionId, Identity identity) {
-	    this.sessionId = sessionId;
+	External(CompactId sessionId, Identity identity) {
+	    this.idBytes = sessionId.getId();
             this.identity = identity;
 	}
 
@@ -336,8 +368,9 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	private Object readResolve() throws ObjectStreamException {
 	    ClientSessionService service =
 		ClientSessionServiceImpl.getInstance();
-	    ClientSession session = service.getClientSession(sessionId);
+	    ClientSession session = service.getClientSession(idBytes);
 	    if (session == null) {
+		CompactId sessionId = new CompactId(idBytes);
 		session = new ClientSessionImpl(sessionId, identity);
 	    }
 	    return session;
@@ -369,10 +402,10 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
     }
 
     /**
-     * Handles a disconnect request (if not already handlede) by doing
+     * Handles a disconnect request (if not already handled) by doing
      * the following:
      *
-     * a) sending a disconnect acknowledgement (LOGOUT_SUCCESS)
+     * a) sending a disconnect acknowledgment (LOGOUT_SUCCESS)
      * if 'graceful' is true
      *
      * b) closing this session's connection
@@ -395,8 +428,19 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	}
 
 	sessionService.disconnected(this);
-        
-        // TODO: identity.notifyLoggedOut(); -- is this the right place?
+
+	final Identity thisIdentity = getIdentity();
+	if (thisIdentity != null) {
+	    // TBD: Due to the scheduler's behavior, this notification
+	    // may happen out of order with respect to the
+	    // 'notifyLoggedIn' callback.  Also, this notification may
+	    // also happen even though 'notifyLoggedIn' was not invoked.
+	    // Are these behaviors okay?  -- ann (3/19/07)
+	    sessionService.scheduleTask(new AbstractKernelRunnable() {
+		    public void run() {
+			thisIdentity.notifyLoggedOut();
+		    }}, thisIdentity);
+	}
 
 	if (getCurrentState() != State.DISCONNECTED) {
 	    if (graceful) {
@@ -464,13 +508,6 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    seed += b & 0xff;
 	}
 	return seed;
-    }
-
-    /** Returns an 8-byte random id. */
-    private static byte[] generateId() {
-	byte[] id = new byte[8];
-	random.nextBytes(id);
-	return id;
     }
 
     /* -- ConnectionListener implementation -- */
@@ -591,24 +628,24 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 	    }
 
 	    /*
-	     * Handle service id.
+	     * Dispatch message to service.
 	     */
 	    byte serviceId = msg.getByte();
 
-	    if (serviceId != SimpleSgsProtocol.APPLICATION_SERVICE) {
+	    if (serviceId == SimpleSgsProtocol.APPLICATION_SERVICE) {
+		handleApplicationServiceMessage(msg);
+	    } else {
 		ProtocolMessageListener serviceListener =
 		    sessionService.getProtocolMessageListener(serviceId);
 		if (serviceListener != null) {
-		    synchronized (lock) {
-			if (identity == null) {
-			    if (logger.isLoggable(Level.WARNING)) {
-				logger.log(
-				    Level.WARNING,
-				    "session:{0} received message for " +
-				    "service ID:{1} before successful login",
-				    this, serviceId);
-				return;
-			    }
+		    if (getIdentity() == null) {
+			if (logger.isLoggable(Level.WARNING)) {
+			    logger.log(
+			        Level.WARNING,
+				"session:{0} received message for " +
+				"service ID:{1} before successful login",
+				this, serviceId);
+			    return;
 			}
 		    }
 		    
@@ -623,12 +660,18 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 			    this, serviceId);
 		    }
 		}
-		return;
 	    }
+	}
 
-	    /*
-	     * Handle application service messages.
-	     */
+	/**
+	 * Handles an APPLICATION_SERVICE message received by the
+	 * {@code bytesReceived} method.  When this method is invoked,
+	 * the specified message buffer's current position points to
+	 * the operation code of the protocol message.  The protocol
+	 * version and service ID have already been processed by the
+	 * caller.
+	 */
+	private void handleApplicationServiceMessage(MessageBuffer msg) {
 	    byte opcode = msg.getByte();
 
 	    if (logger.isLoggable(Level.FINEST)) {
@@ -670,13 +713,11 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		break;
 
 	    case SimpleSgsProtocol.SESSION_MESSAGE:
-		synchronized (lock) {
-		    if (identity == null) {
-			logger.log(
-			    Level.WARNING,
-			    "session message received before login:{0}", this);
-			break;
-		    }
+		if (getIdentity() == null) {
+		    logger.log(
+		    	Level.WARNING,
+			"session message received before login:{0}", this);
+		    break;
 		}
                 msg.getLong(); // TODO Check sequence num
 		int size = msg.getUnsignedShort();
@@ -728,14 +769,14 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
      * Schedules a non-durable, transactional task.
      */
     private void scheduleTask(KernelRunnable task) {
-	sessionService.scheduleTask(task, identity);
+	sessionService.scheduleTask(task, getIdentity());
     }
 
     /**
      * Schedules a non-durable, non-transactional task.
      */
     private void scheduleNonTransactionalTask(KernelRunnable task) {
-	sessionService.scheduleNonTransactionalTask(task, identity);
+	sessionService.scheduleNonTransactionalTask(task, getIdentity());
     }
 
     /**
@@ -814,25 +855,25 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
      * This is a transactional task to notify the application's
      * {@code AppListener} that this session has logged in.
      */
-    private class LoginTask implements KernelRunnable {
-
-        /**
-         * {@inheritDoc}
-         */
-        public String getBaseTaskType() {
-            return LoginTask.class.getName();
-        }
+    private class LoginTask extends AbstractKernelRunnable {
 
 	/**
 	 * Invokes the {@code AppListener}'s {@code loggedIn}
-	 * callback, which returns a client session listener, and then
-	 * queues the appropriate acknowledgement to be sent when this
-	 * transaction commits.  If the client session needs to be
-	 * disconnected (if {@code loggedIn} returns a
-	 * non-serializable listener (including{@code null}), or
-	 * throws a non-retryable {@code RuntimeException}, then
-	 * submits a non-transactional task to disconnect the client
-	 * session.  If {@code loggedIn} throws a retryable {@code
+	 * callback, which returns a client session listener.  If the
+	 * returned listener is serializable, then this method does
+	 * the following:
+	 *
+	 * a) queues the appropriate acknowledgment to be
+	 * sent when this transaction commits, and
+	 * b) schedules a task (on transaction commit) to call
+	 * {@code notifyLoggedIn} on the identity.
+	 *
+	 * If the client session needs to be disconnected (if {@code
+	 * loggedIn} returns a non-serializable listener (including
+	 * {@code null}), or throws a non-retryable {@code
+	 * RuntimeException}, then this method submits a
+	 * non-transactional task to disconnect the client session.
+	 * If {@code loggedIn} throws a retryable {@code
 	 * RuntimeException}, then that exception is thrown to the
 	 * caller.
 	 */
@@ -863,19 +904,30 @@ class ClientSessionImpl implements SgsClientSession, Serializable {
 		listener = new SessionListener(returnedListener);
 		MessageBuffer ack =
 		    new MessageBuffer(
-			7 + sessionId.length + reconnectionKey.length);
+			3 + sessionId.getExternalFormByteCount() +
+			reconnectionKey.getExternalFormByteCount());
 		ack.putByte(SimpleSgsProtocol.VERSION).
 		    putByte(SimpleSgsProtocol.APPLICATION_SERVICE).
 		    putByte(SimpleSgsProtocol.LOGIN_SUCCESS).
-		    putShort(sessionId.length). putBytes(sessionId).
-		    putShort(reconnectionKey.length).putBytes(reconnectionKey);
+		    putBytes(sessionId.getExternalForm()).
+		    putBytes(reconnectionKey.getExternalForm());
 		
 		getContext().addMessageFirst(
 		    ClientSessionImpl.this, ack.getBuffer(), Delivery.RELIABLE);
-		
-                // TODO: getContext().notifyLogin();
-                // -- call identity.notifyLoggedIn() on commit.
 
+		final Identity thisIdentity = getIdentity();
+		sessionService.scheduleTaskOnCommit(new AbstractKernelRunnable() {
+		    public void run() {
+			logger.log(
+			    Level.FINE,
+			    "calling notifyLoggedIn on identity:{0}",
+			    thisIdentity);
+			// notify that this identity logged in,
+			// whether or not this session is connected at
+			// the time of notification.
+			thisIdentity.notifyLoggedIn();
+		    }});
+		
 	    } else {
 		if (ex == null) {
 		    logger.log(
