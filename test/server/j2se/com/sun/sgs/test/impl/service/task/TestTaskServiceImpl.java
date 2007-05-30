@@ -443,6 +443,7 @@ public class TestTaskServiceImpl extends TestCase {
         Counter counter = getClearedCounter();
         for (int i = 0; i < 3; i++) {
             taskService.scheduleTask(new NonManagedTask());
+	    dataService.markForUpdate(counter);
             counter.increment();
         }
         txn.commit();
@@ -483,6 +484,7 @@ public class TestTaskServiceImpl extends TestCase {
         Counter counter = getClearedCounter();
         for (long i = 0; i < 3; i++) {
             taskService.scheduleTask(new NonManagedTask(), i * 100L);
+	    dataService.markForUpdate(counter);
             counter.increment();
         }
         txn.commit();
@@ -501,6 +503,7 @@ public class TestTaskServiceImpl extends TestCase {
                                                  0L, 500L);
             dataService.setBinding("runHandle." + i,
                                    new ManagedHandle(handle));
+	    dataService.markForUpdate(counter);
             counter.increment();
             counter.increment();
         }
@@ -562,6 +565,7 @@ public class TestTaskServiceImpl extends TestCase {
         Counter counter = getClearedCounter();
         PeriodicTaskHandle handle =
             taskService.schedulePeriodicTask(new ManagedTask(), 200L, 500L);
+	dataService.markForUpdate(counter);
         counter.increment();
         txn.commit();
         try {
@@ -743,6 +747,7 @@ public class TestTaskServiceImpl extends TestCase {
         for (int i = 0; i < 3; i++) {
             taskService.
                 scheduleNonDurableTask(new KernelRunnableImpl(counter));
+	    dataService.markForUpdate(counter);
             counter.increment();
         }
         txn.commit();
@@ -758,6 +763,7 @@ public class TestTaskServiceImpl extends TestCase {
             taskService.
                 scheduleNonDurableTask(new KernelRunnableImpl(counter),
                                        i * 100L);
+	    dataService.markForUpdate(counter);
             counter.increment();
         }
         txn.commit();
@@ -820,6 +826,7 @@ public class TestTaskServiceImpl extends TestCase {
 
     private Counter getClearedCounter() {
         Counter counter = dataService.getBinding("counter", Counter.class);
+	dataService.markForUpdate(counter);
         counter.clear();
         return counter;
     }
@@ -837,21 +844,9 @@ public class TestTaskServiceImpl extends TestCase {
     public static class Counter implements ManagedObject, Serializable {
         private static final long serialVersionUID = 1;
         private int count = 0;
-        public void clear() {
-	    AppContext.getDataManager().markForUpdate(this);
-	    count = 0;
-	}
-        public void increment() {
-	    AppContext.getDataManager().markForUpdate(this);
-	    count++;
-	}
-        public void decrement() {
-	    try {
-		AppContext.getDataManager().markForUpdate(this);
-	    } catch (TransactionNotActiveException e) {
-	    }
-	    count--;
-	}
+        public void clear() { count = 0; }
+        public void increment() { count++; }
+        public void decrement() { count--; }
         public boolean isZero() { return count == 0; }
     }
 
@@ -859,6 +854,7 @@ public class TestTaskServiceImpl extends TestCase {
         public void run() throws Exception {
             DataManager dataManager = AppContext.getDataManager();
             Counter counter = dataManager.getBinding("counter", Counter.class);
+	    dataManager.markForUpdate(counter);
             counter.decrement();
         }
     }

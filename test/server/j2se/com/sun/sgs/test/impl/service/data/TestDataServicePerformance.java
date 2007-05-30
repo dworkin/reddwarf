@@ -8,8 +8,10 @@ import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.app.ManagedReference;
+import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
+import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.kernel.ProfileProducer;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
@@ -59,7 +61,7 @@ public class TestDataServicePerformance extends TestCase {
 
     /** A transaction proxy. */
     private static DummyTransactionProxy txnProxy =
-	new DummyTransactionProxy();
+	MinimalTestKernel.getTransactionProxy();
 
     /** The number of objects to read in a transaction. */
     protected int items = Integer.getInteger("test.items", 100);
@@ -109,6 +111,11 @@ public class TestDataServicePerformance extends TestCase {
 			   "\n  test.items=" + items +
 			   "\n  test.modify.items=" + modifyItems +
 			   "\n  test.count=" + count);
+	componentRegistry.setComponent(
+	    TaskScheduler.class, 
+	    MinimalTestKernel.getSystemRegistry(
+		MinimalTestKernel.createContext())
+	    .getComponent(TaskScheduler.class));
 	props = createProperties(
 	    DataStoreImplClass + ".directory", createDirectory(),
 	    StandardProperties.APP_NAME, "TestDataServicePerformance");

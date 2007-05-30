@@ -11,13 +11,19 @@ import com.sun.sgs.app.NameNotBoundException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.DataStore;
+import com.sun.sgs.impl.service.data.store.DataStoreImpl.Scheduler;
+import com.sun.sgs.impl.service.data.store.DataStoreImpl.TaskHandle;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.ProfileProducer;
 import com.sun.sgs.kernel.ProfileRegistrar;
+import com.sun.sgs.kernel.RecurringTaskHandle;
+import com.sun.sgs.kernel.TaskOwner;
+import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.Transaction;
@@ -25,7 +31,10 @@ import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.service.TransactionProxy;
 import java.io.Serializable;
 import java.math.BigInteger;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Properties;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -86,12 +95,13 @@ import java.util.logging.Logger;
  * <li> {@link Level#SEVERE SEVERE} - Initialization failures
  * <li> {@link Level#CONFIG CONFIG} - Constructor properties, data service
  *	headers
+ * <li> {@link Level#FINE FINE} - Task scheduling operations
  * <li> {@link Level#FINER FINER} - Transaction operations
  * <li> {@link Level#FINEST FINEST} - Name and object operations
  * </ul> <p>
  *
  * It also uses an additional {@code Logger} named {@code
- * com.sun.sgs.impl.service.DataServiceImpl.detect.modifications} to log
+ * com.sun.sgs.impl.service.data.DataServiceImpl.detect.modifications} to log
  * information about managed objects that are found to be modified but were not
  * marked for update.  Note that this logging output will only be performed if
  * the {@code
@@ -150,6 +160,9 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 
     /** The name of this application. */
     private final String appName;
+
+    /** Scheduler supplied to the data store. */
+    private final DelegatingScheduler scheduler;
 
     /** The underlying data store. */
     private final DataStore store;
@@ -245,6 +258,107 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
     }
 
     /**
+     * Provides an implementation of Scheduler that uses the TaskScheduler, and
+     * waits to schedule tasks until the task owner is supplied in a call to
+     * setTaskOwner.
+     */
+    private static class DelegatingScheduler implements Scheduler {
+
+	/** The task scheduler. */
+	private TaskScheduler taskScheduler;
+
+	/** The task owner, or null if not yet supplied. */
+	private TaskOwner taskOwner;
+
+	/**
+	 * Handles for tasks that were scheduled before the task scheduler was
+	 * supplied.
+	 */
+	private Set<Handle> pending = new HashSet<Handle>();
+
+	DelegatingScheduler(TaskScheduler taskScheduler) {
+	    this.taskScheduler = taskScheduler;
+	}
+
+	public synchronized TaskHandle scheduleRecurringTask(
+	    Runnable task, long period)
+	{
+	    Handle handle = new Handle(task, period);
+	    if (taskOwner != null) {
+		handle.start();
+	    } else {
+		logger.log(Level.FINE, "Adding pending task {0}", handle);
+		pending.add(handle);
+	    }
+	    return handle;
+	}
+
+	/**
+	 * Supplies the task owner that will be used to schedule tasks, and
+	 * schedules any tasks that were already provided.
+	 */
+	public synchronized void setTaskOwner(TaskOwner taskOwner) {
+	    assert taskOwner != null;
+	    this.taskOwner = taskOwner;
+	    for (Iterator<Handle> i = pending.iterator(); i.hasNext(); ) {
+		Handle handle = i.next();
+		i.remove();
+		handle.start();
+	    }
+	}
+
+	/** Implementation of task handle. */
+	private class Handle implements TaskHandle, KernelRunnable {
+	    private final Runnable task;
+	    private final long period;
+
+	    /**
+	     * The associated handle from the task handler, or null if not yet
+	     * scheduled.
+	     */
+	    private RecurringTaskHandle handle;
+
+	    Handle(Runnable task, long period) {
+		this.task = task;
+		this.period = period;
+	    }
+
+	    public String toString() {
+		return "Handle[task:" + task + ", period:" + period + "]";
+	    }
+
+	    public String getBaseTaskType() {
+		return task.getClass().getName();
+	    }
+
+	    public void run() {
+		task.run();
+	    }
+
+	    public void cancel() {
+		logger.log(Level.FINE, "Cancelling task {0}", this);
+		synchronized (DelegatingScheduler.this) {
+		    if (handle != null) {
+			handle.cancel();
+		    } else {
+			pending.remove(this);
+		    }
+		}
+	    }
+
+	    /** Schedules a task using the task scheduler. */
+	    private void start() {
+		logger.log(Level.FINE, "Starting task {0}", this);
+		assert Thread.holdsLock(DelegatingScheduler.this);
+		handle = taskScheduler.scheduleRecurringTask(
+		    this, taskOwner, System.currentTimeMillis() + period,
+		    period);
+		handle.start();
+	    }
+	}
+    }
+
+    /**
      * Creates an instance of this class configured with the specified
      * properties and services.  See the {@link DataServiceImpl class
      * documentation} for the list of supported properties.
@@ -287,8 +401,10 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 		DETECT_MODIFICATIONS_PROPERTY, Boolean.TRUE);
 	    String dataStoreClassName = wrappedProps.getProperty(
 		DATA_STORE_CLASS_PROPERTY);
+	    scheduler = new DelegatingScheduler(
+		componentRegistry.getComponent(TaskScheduler.class));
 	    if (dataStoreClassName == null) {
-		store = new DataStoreImpl(properties);
+		store = new DataStoreImpl(properties, scheduler);
 	    } else {
 		store = wrappedProps.getClassInstanceProperty(
 		    DATA_STORE_CLASS_PROPERTY, DataStore.class,
@@ -344,6 +460,7 @@ public final class DataServiceImpl implements DataService, ProfileProducer {
 		    state = State.UNINITIALIZED;
 		}
 	    }
+	    scheduler.setTaskOwner(proxy.getCurrentOwner());
 	    DataServiceHeader header;
 	    try {
 		header = getServiceBinding(

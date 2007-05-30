@@ -12,11 +12,13 @@ import com.sun.sgs.app.ObjectIOException;
 import com.sun.sgs.app.ObjectNotFoundException;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.test.util.DummyComponentRegistry;
@@ -61,7 +63,7 @@ public class TestDataServiceImpl extends TestCase {
 
     /** The transaction proxy. */
     private static final DummyTransactionProxy txnProxy =
-	new DummyTransactionProxy();
+	MinimalTestKernel.getTransactionProxy();
 
     /** An instance of the data service, to test. */
     static DataServiceImpl service;
@@ -97,6 +99,11 @@ public class TestDataServiceImpl extends TestCase {
      */
     protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
+	componentRegistry.setComponent(
+	    TaskScheduler.class, 
+	    MinimalTestKernel.getSystemRegistry(
+		MinimalTestKernel.createContext())
+	    .getComponent(TaskScheduler.class));
 	props = getProperties();
 	if (service == null) {
 	    service = getDataServiceImpl();

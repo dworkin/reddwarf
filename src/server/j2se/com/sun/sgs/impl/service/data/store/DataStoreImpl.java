@@ -294,8 +294,8 @@ public class DataStoreImpl
     /** The Berkeley DB database that maps name bindings to object IDs. */
     private final Database namesDb;
 
-    /** Used to execute the checkpoint thread. */
-    private final ScheduledExecutorService executor;
+    /** Used to cancel the checkpoint task. */
+    private TaskHandle checkpointTaskHandle = null;
 
     /**
      * Object to synchronize on when accessing nextObjectId and
@@ -593,6 +593,51 @@ public class DataStoreImpl
 	}
     }
 
+    /** An interface for running periodic tasks. */
+    public interface Scheduler {
+    
+	/**
+	 * Runs the task every period milliseconds, and returns a handle to use
+	 * to cancel the task.
+	 *
+	 * @param	task the task
+	 * @param	period the period in milliseconds
+	 * @return	a handle for cancelling future runs
+	 */
+	TaskHandle scheduleRecurringTask(Runnable task, long period);
+    }
+
+    /** An interface for cancelling a periodic task. */
+    public interface TaskHandle {
+
+	/**
+	 * Cancels future runs of the task.
+	 *
+	 * @throws	IllegalStateException if the task has already been
+	 *		cancelled
+	 */
+	void cancel();
+    }
+
+    /** The default implementation of Scheduler. */
+    private static class BasicScheduler implements Scheduler {
+	public TaskHandle scheduleRecurringTask(Runnable task, long period) {
+	    final ScheduledExecutorService executor =
+		Executors.newSingleThreadScheduledExecutor();
+	    executor.scheduleAtFixedRate(
+		task, period, period, TimeUnit.MILLISECONDS);
+	    return new TaskHandle() {
+		public synchronized void cancel() {
+		    if (executor.isShutdown()) {
+			throw new IllegalStateException(
+			    "Task is already cancelled");
+		    }
+		    executor.shutdownNow();
+		}
+	    };
+	}
+    }
+
     /** A runnable that performs a periodic database checkpoint. */
     private static class CheckpointRunnable implements Runnable {
 	private final Environment env;
@@ -620,23 +665,30 @@ public class DataStoreImpl
 
     /**
      * Creates an instance of this class configured with the specified
-     * properties.  See the {@link DataStoreImpl class documentation} for a
-     * list of supported properties.
+     * properties.  See the {@linkplain DataStoreImpl class documentation} for
+     * a list of supported properties.
      *
      * @param	properties the properties for configuring this instance
      * @throws	DataStoreException if there is a problem with the database
-     * @throws	IllegalArgumentException if neither
-     *		<code>com.sun.sgs.app.root</code> nor <code>
-     *		com.sun.sgs.impl.service.data.store.DataStoreImpl.directory
-     *		</code> is provided, or the <code>
-     *		com.sun.sgs.impl.service.data.store.DataStoreImpl.allocation.block.size
-     *		</code> property is not a valid integer greater than zero, or
-     *		if the value of the <code>
-     *		com.sun.sgs.impl.service.data.store.DataStoreImpl.cache.size
-     *		</code> property is not a valid integer greater than or equal
-     *		to <code>20000</code>
+     * @throws	IllegalArgumentException if any of the properties are invalid,
+     *		as specified in the class documentation
      */
     public DataStoreImpl(Properties properties) {
+	this(properties, new BasicScheduler());
+    }
+
+    /**
+     * Creates an instance of this class configured with the specified
+     * properties and using the specified scheduler.  See the {@linkplain
+     * DataStoreImpl class documentation} for a list of supported properties.
+     *
+     * @param	properties the properties for configuring this instance
+     * @param	scheduler the scheduler used to schedule periodic tasks
+     * @throws	DataStoreException if there is a problem with the database
+     * @throws	IllegalArgumentException if any of the properties are invalid,
+     *		as specified in the class documentation}
+     */
+    public DataStoreImpl(Properties properties, Scheduler scheduler) {
 	logger.log(
 	    Level.CONFIG, "Creating DataStoreImpl properties:{0}", properties);
 	PropertiesWrapper wrappedProps = new PropertiesWrapper(properties);
@@ -680,10 +732,9 @@ public class DataStoreImpl
 	    classesDb = dbs.classes;
 	    oidsDb = dbs.oids;
 	    namesDb = dbs.names;
-	    executor = Executors.newSingleThreadScheduledExecutor();
-	    executor.scheduleAtFixedRate(
+	    checkpointTaskHandle = scheduler.scheduleRecurringTask(
 		new CheckpointRunnable(env, checkpointSize),
-		checkpointInterval, checkpointInterval, TimeUnit.MILLISECONDS);
+		checkpointInterval);
 	    done = true;
 	    bdbTxn.commit();
 	} catch (DatabaseException e) {
@@ -1232,7 +1283,7 @@ public class DataStoreImpl
 		}
 		boolean ok = (txnCount == 0);
 		if (ok) {
-		    executor.shutdownNow();
+		    checkpointTaskHandle.cancel();
 		    infoDb.close();
 		    classesDb.close();
 		    oidsDb.close();
@@ -1802,7 +1853,10 @@ public class DataStoreImpl
 	    try {
 		txn.abort(re);
 	    } catch (TransactionAbortedException e2) {
-		/* Throw the original exception, for better error reporting */
+		/*
+		 * Discard this exception and return the original one, for
+		 * better error reporting.
+		 */
 	    }
 	}
 	logger.logThrow(Level.FINEST, re, "{0} throws", operation);

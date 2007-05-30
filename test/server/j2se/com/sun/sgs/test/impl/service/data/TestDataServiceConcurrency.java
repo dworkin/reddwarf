@@ -7,9 +7,11 @@ package com.sun.sgs.test.impl.service.data;
 import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.TransactionAbortedException;
+import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
+import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.kernel.ProfileProducer;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
@@ -39,7 +41,8 @@ public class TestDataServiceConcurrency extends TestCase {
 	"com.sun.sgs.impl.service.data.store.DataStoreImpl";
 
     /** The transaction proxy. */
-    static final DummyTransactionProxy txnProxy = new DummyTransactionProxy();
+    static final DummyTransactionProxy txnProxy =
+	MinimalTestKernel.getTransactionProxy();
 
     /** The component registry. */
     static final DummyComponentRegistry componentRegistry =
@@ -131,6 +134,11 @@ public class TestDataServiceConcurrency extends TestCase {
 	    (maxThreads != threads ?
 	     "\n  test.max.threads=" + maxThreads : "") +
 	    (repeat != 1 ? "\n  test.repeat=" + repeat : ""));
+	componentRegistry.setComponent(
+	    TaskScheduler.class, 
+	    MinimalTestKernel.getSystemRegistry(
+		MinimalTestKernel.createContext())
+	    .getComponent(TaskScheduler.class));
 	props = createProperties(
 	    DataStoreImplClass + ".directory", createDirectory(),
 	    StandardProperties.APP_NAME, "TestDataServiceConcurrency");
