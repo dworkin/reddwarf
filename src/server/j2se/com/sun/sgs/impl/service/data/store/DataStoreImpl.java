@@ -432,7 +432,9 @@ public class DataStoreImpl
 	    if (entry == null) {
 		return null;
 	    } else if (!entry.txn.equals(txn)) {
-		throw new IllegalStateException("Wrong transaction");
+		throw new IllegalStateException(
+		    "Wrong transaction: Got " + txn + ", expected " +
+		    entry.txn);
 	    } else {
 		return entry.info;
 	    }
@@ -1439,6 +1441,7 @@ public class DataStoreImpl
 	Exception exception;
 	try {
 	    TxnInfo txnInfo = checkTxnNoJoin(txn);
+	    checkTxnTimeout(txn);
 	    if (txnInfo.prepared) {
 		throw new IllegalStateException(
 		    "Transaction has already been prepared");
@@ -1526,6 +1529,7 @@ public class DataStoreImpl
 	Exception exception;
 	try {
 	    TxnInfo txnInfo = checkTxnNoJoin(txn);
+	    checkTxnTimeout(txn);
 	    if (txnInfo.prepared) {
 		throw new IllegalStateException(
 		    "Transaction has already been prepared");
@@ -1774,8 +1778,8 @@ public class DataStoreImpl
     /**
      * Checks that the correct transaction is in progress, throwing an
      * exception if the transaction has not been joined.  Checks if the store
-     * is shutting down, and if the transaction has timed out, but does not
-     * check the prepared state of the transaction.
+     * is shutting down, but does not check the prepared state of the
+     * transaction.
      */
     private TxnInfo checkTxnNoJoin(Transaction txn) {
 	if (txn == null) {
@@ -1786,8 +1790,6 @@ public class DataStoreImpl
 	    throw new IllegalStateException("Transaction is not active");
 	} else if (getTxnCount() < 0) {
 	    throw new IllegalStateException("DataStore is shutting down");
-	} else {
-	    checkTxnTimeout(txn);
 	}
 	return txnInfo;
     }
