@@ -15,10 +15,10 @@ import java.math.BigInteger;
 
 /**
  * Encapsulates the layout of meta data stored at the start of the info
- * database.  This class cannot be instantiated.
+ * database, and in the classes database.  This class cannot be instantiated.
  *
- * The value for key 0 stores a magic number common to all DataStoreImpl
- * databases.
+ * In the info database, the value for key 0 stores a magic number common to
+ * all DataStoreImpl databases.
  *
  * Key 1 stores the major version number, which must match the value in the
  * current version of the implementation.
@@ -32,10 +32,38 @@ import java.math.BigInteger;
  * Key 4 stores the ID of the next free transaction ID number for the network
  * version to use in allocating transactions.
  *
+ * In the classes database, keys whose initial byte is 1 map the SHA-1 hash of
+ * the serialized form of a class descriptor (a ObjectStreamClass) to the class
+ * ID, which is 4 byte integer.
+ *
+ * Keys whose initial byte is 2 map a class ID to the bytes making up the
+ * serialized form of the associated class descriptor.  Since these entries
+ * come at the end, we can find the next class ID by using a cursor to find the
+ * last entry.
+ *
+ * In the names database, keys are the UTF8 encoding of binding names, and
+ * values are the object IDs of the associated objects.
+ *
+ * In the oids database, keys are object IDs, and values are the bytes
+ * representing the associated objects.
+ *
+ * As of version 3, the serialized forms used for the object values are
+ * compressed as follows:
+ *
+ * - If the first byte is 1, then the value was created by serialization
+ *   protocol version 2, and the 4 bytes at the start of that format have been
+ *   elided.  Otherwise, the first byte is 2, and is followed by the
+ *   uncompressed data.
+ *
+ * - Class descriptors in the serialized form have been replaced by an integer
+ *   which refers to a class ID stored in the classes database.  The class IDs
+ *   themselves have been compressed using the Int30 class
+ *
  * Version history:
  *
  * Version 1.0: Initial version, 11/3/2006
  * Version 2.0: Add NEXT_TXN_ID, 2/15/2007
+ * Version 3.0: Add classes DB, compress object values, 5/18/2007
  */
 final class DataStoreHeader {
 
@@ -48,8 +76,8 @@ final class DataStoreHeader {
     /** The key for the minor version number. */
     static final long MINOR_KEY = 2;
 
-    /** The key for the value of the next free ID. */
-    static final long NEXT_ID_KEY = 3;
+    /** The key for the value of the next free object ID. */
+    static final long NEXT_OBJ_ID_KEY = 3;
 
     /**
      * The key for the value of the next free transaction ID, used in the
@@ -61,16 +89,26 @@ final class DataStoreHeader {
     static final long MAGIC = 0x4461526b53744172L;
 
     /** The major version number. */
-    static final short MAJOR_VERSION = 2;
+    static final short MAJOR_VERSION = 3;
 
     /** The minor version number. */
     static final short MINOR_VERSION = 0;
 
-    /** The first free ID. */
-    static final long INITIAL_NEXT_ID = 1;
+    /** The first free object ID. */
+    static final long INITIAL_NEXT_OBJ_ID = 1;
 
     /** The first free transaction ID. */
     static final long INITIAL_NEXT_TXN_ID = 1;
+
+    /** The first byte stored in keys for the classes database hash keys. */
+    static final byte CLASS_HASH_PREFIX = 1;
+
+    /**
+     * The first byte value stored in class ID keys.  This value should be
+     * greater than CLASS_HASH, to insure that class ID keys come after class
+     * hash ones.
+     */
+    static final byte CLASS_ID_PREFIX = 2;
 
     /** This class cannot be instantiated. */
     private DataStoreHeader() {
@@ -142,8 +180,8 @@ final class DataStoreHeader {
 	ShortBinding.shortToEntry(MINOR_VERSION, value);
 	putNoOverwrite(db, bdbTxn, key, value);
 
-	LongBinding.longToEntry(NEXT_ID_KEY, key);
-	LongBinding.longToEntry(INITIAL_NEXT_ID, value);
+	LongBinding.longToEntry(NEXT_OBJ_ID_KEY, key);
+	LongBinding.longToEntry(INITIAL_NEXT_OBJ_ID, value);
 	putNoOverwrite(db, bdbTxn, key, value);
 
 	LongBinding.longToEntry(NEXT_TXN_ID_KEY, key);
@@ -152,27 +190,30 @@ final class DataStoreHeader {
     }
 
     /**
-     * Returns the next available ID for storing a newly allocated object, and
+     * Returns the next available ID stored under the specified key, and
      * increments the stored value by the specified amount.  The return value
      * will be a positive number.
      *
+     * @param	key the key under which the ID is stored
      * @param	db the database
      * @param	bdbTxn the Berkeley DB transaction
      * @param	increment the amount to increment the stored amount
      * @return	the next available ID
      * @throws	DatabaseException if a problem occurs accessing the database
      */
-    static long getNextId(
-	Database db, com.sleepycat.db.Transaction bdbTxn, long increment)
+    static long getNextId(long key,
+			  Database db,
+			  com.sleepycat.db.Transaction bdbTxn,
+			  long increment)
 	throws DatabaseException
     {
-	DatabaseEntry key = new DatabaseEntry();
-	LongBinding.longToEntry(NEXT_ID_KEY, key);
-	DatabaseEntry value = new DatabaseEntry();
-	get(db, bdbTxn, key, value, LockMode.RMW);
-	long result = LongBinding.entryToLong(value);
-	LongBinding.longToEntry(result + increment, value);
-	put(db, bdbTxn, key, value);
+	DatabaseEntry keyEntry = new DatabaseEntry();
+	LongBinding.longToEntry(key, keyEntry);
+	DatabaseEntry valueEntry = new DatabaseEntry();
+	get(db, bdbTxn, keyEntry, valueEntry, LockMode.RMW);
+	long result = LongBinding.entryToLong(valueEntry);
+	LongBinding.longToEntry(result + increment, valueEntry);
+	put(db, bdbTxn, keyEntry, valueEntry);
 	return result;
     }
 

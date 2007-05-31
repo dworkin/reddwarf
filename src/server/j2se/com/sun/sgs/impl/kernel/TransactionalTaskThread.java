@@ -5,6 +5,7 @@
 package com.sun.sgs.impl.kernel;
 
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.app.TransactionTimeoutException;
 
 import com.sun.sgs.service.Transaction;
 
@@ -16,9 +17,6 @@ import com.sun.sgs.service.Transaction;
  * so that only select consumers can actually access or change the
  * current transaction. Most users interact with the current transaction
  * through <code>TransactionProxy</code>.
- *
- * @since 1.0
- * @author Seth Proctor
  */
 final class TransactionalTaskThread extends TaskThread {
 
@@ -37,16 +35,21 @@ final class TransactionalTaskThread extends TaskThread {
 
     /**
      * Returns the current <code>Transaction</code>, throwing an exception
-     * if there is no currently active transaction.
+     * if there is no currently active transaction or if the currently
+     * active transaction has timed out.
      *
      * @return the currently active <code>Transaction</code>
      *
      * @throws TransactionNotActiveException if there is no currently active
      *                                       transaction
+     * @throws TransactionTimeoutException if the transaction has timed out
      */
     Transaction getCurrentTransaction() {
         if (currentTransaction == null)
             throw new TransactionNotActiveException("no current transaction");
+
+	currentTransaction.checkTimeout();
+
         return currentTransaction;
     }
 

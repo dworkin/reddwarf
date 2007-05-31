@@ -17,8 +17,7 @@ public interface ProfileRegistrar {
      * @param producer the <code>ProfileProducer</code> being registered
      *
      * @return a <code>ProfileConsumer</code> that will consume profiling
-     *         data from the provided <code>ProfileProducer</code>, or
-     *         <code>null</code> if profiling data is not being collected
+     *         data from the provided <code>ProfileProducer</code>
      */
     public ProfileConsumer registerProfileProducer(ProfileProducer producer);
 

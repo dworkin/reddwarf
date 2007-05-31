@@ -14,7 +14,9 @@ import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
+import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
+import com.sun.sgs.kernel.ComponentRegistry;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.test.util.DummyComponentRegistry;
@@ -35,66 +37,54 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import junit.framework.Test;
 import junit.framework.TestCase;
-import junit.framework.TestSuite;
 
 /** Test the DataServiceImpl class */
 @SuppressWarnings("hiding")
 public class TestDataServiceImpl extends TestCase {
-
-    /** The test suite, to use for adding additional tests. */
-    private static final TestSuite suite =
-	new TestSuite(TestDataServiceImpl.class);
-
-    /** Provides the test suite to the test runner. */
-    public static Test suite() { return suite; }
 
     /** The name of the DataStoreImpl class. */
     private static final String DataStoreImplClassName =
 	DataStoreImpl.class.getName();
 
     /** The name of the DataServiceImpl class. */
-    private static final String DataServiceImplClassName =
+    protected static final String DataServiceImplClassName =
 	DataServiceImpl.class.getName();
 
     /** Directory used for database shared across multiple tests. */
-    private static String dbDirectory =
+    private static final String dbDirectory =
 	System.getProperty("java.io.tmpdir") + File.separator +
 	"TestDataServiceImpl.db";
+
+    /** The component registry. */
+    private static final DummyComponentRegistry componentRegistry =
+	new DummyComponentRegistry();
+
+    /** The transaction proxy. */
+    private static final DummyTransactionProxy txnProxy =
+	new DummyTransactionProxy();
+
+    /** An instance of the data service, to test. */
+    static DataServiceImpl service;
 
     /**
      * Delete the database directory at the start of the test run, but not for
      * each test.
      */
     static {
-	deleteDirectory(dbDirectory);
+	cleanDirectory(dbDirectory);
     }
 
-    /** Properties for creating the shared database. */
-    private static Properties dbProps = createProperties(
-	DataStoreImplClassName + ".directory", dbDirectory,
-	StandardProperties.APP_NAME, "TestDataServiceImpl",
-	DataServiceImplClassName + ".debug.check.interval", "0");
-
     /** Set when the test passes. */
-    private boolean passed;
+    protected boolean passed;
 
-    /** A per-test database directory, or null if not created. */
-    String directory;
-
-    /** A transaction proxy. */
-    DummyTransactionProxy txnProxy = new DummyTransactionProxy();
-
-    /** A component registry. */
-    DummyComponentRegistry componentRegistry = new DummyComponentRegistry();
+    /** Default properties for creating the shared database. */
+    protected Properties props;
 
     /** An initial, open transaction. */
-    DummyTransaction txn;
-
-    /** An instance of the data service, to test. */
-    DataServiceImpl service;
+    private DummyTransaction txn;
 
     /** A managed object. */
-    DummyManagedObject dummy;
+    private DummyManagedObject dummy;
 
     /** Creates the test. */
     public TestDataServiceImpl(String name) {
@@ -102,17 +92,20 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     /**
-     * Prints the test case, initializes the data service, and creates and
-     * binds a managed object.
+     * Prints the test case, initializes the data service if needed, starts a
+     * transaction, and creates and binds a managed object.
      */
     protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
-	createTransaction();
-	service = getDataServiceImpl();
-	service.configure(componentRegistry, txnProxy);
-	componentRegistry.setComponent(DataManager.class, service);
+	props = getProperties();
+	if (service == null) {
+	    service = createDataServiceImpl();
+	    createTransaction();
+	    service.configure(componentRegistry, txnProxy);
+	    txn.commit();
+	    componentRegistry.setComponent(DataManager.class, service);
+	}
 	componentRegistry.registerAppContext();
-	txn.commit();
 	createTransaction();
 	dummy = new DummyManagedObject();
 	service.setBinding("dummy", dummy);
@@ -125,15 +118,15 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     /**
-     * Deletes the directory if the test passes and the directory was
-     * created, and aborts the current transaction.
+     * Aborts the transaction if non-null, and nulls the service field if the
+     * test failed.
      */
     protected void tearDown() throws Exception {
 	try {
 	    if (txn != null) {
 		txn.abort(null);
 	    }
-	    if (service != null) {
+	    if (!passed && service != null) {
 		new ShutdownAction().waitForDone();
 	    }
 	} catch (RuntimeException e) {
@@ -142,25 +135,25 @@ public class TestDataServiceImpl extends TestCase {
 	    } else {
 		e.printStackTrace();
 	    }
-	}
-	txn = null;
-	service = null;
-	if (passed && directory != null) {
-	    deleteDirectory(directory);
+	} finally {
+	    txn = null;
+	    if (!passed) {
+		service = null;
+	    }
 	}
     }
 
     /* -- Test constructor -- */
 
-    public void testConstructorNullArgs() {
+    public void testConstructorNullArgs() throws Exception {
 	try {
-	    new DataServiceImpl(null, componentRegistry);
+	    createDataServiceImpl(null, componentRegistry);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
 	}
 	try {
-	    new DataServiceImpl(dbProps, null);
+	    createDataServiceImpl(props, null);
 	    fail("Expected NullPointerException");
 	} catch (NullPointerException e) {
 	    System.err.println(e);
@@ -168,10 +161,9 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     public void testConstructorNoAppName() throws Exception {
-	Properties props = createProperties(
-	    DataStoreImplClassName + ".directory", createDirectory());
+	props.remove(StandardProperties.APP_NAME);
 	try {
-	    new DataServiceImpl(props, componentRegistry);
+	    createDataServiceImpl(props, componentRegistry);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -179,12 +171,10 @@ public class TestDataServiceImpl extends TestCase {
     }
 
     public void testConstructorBadDebugCheckInterval() throws Exception {
-	Properties props = createProperties(
-	    DataStoreImplClassName + ".directory", createDirectory(),
-	    StandardProperties.APP_NAME, "Foo",
+	props.setProperty(
 	    DataServiceImplClassName + ".debug.check.interval", "gorp");
 	try {
-	    new DataServiceImpl(props, componentRegistry);
+	    createDataServiceImpl(props, componentRegistry);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
@@ -203,21 +193,93 @@ public class TestDataServiceImpl extends TestCase {
         if (!dataDir.mkdir()) {
             throw new RuntimeException("Failed to create sub-dir: " + dataDir);
         }
-        Properties props = createProperties(
-            StandardProperties.APP_NAME, "Foo",
-            StandardProperties.APP_ROOT, rootDir);
-        DataServiceImpl testSvc = new DataServiceImpl(props, componentRegistry);
+	props.remove(DataStoreImplClassName + ".directory");
+	props.setProperty(StandardProperties.APP_ROOT, rootDir);
+	DataServiceImpl testSvc =
+	    createDataServiceImpl(props, componentRegistry);
         testSvc.shutdown();
-        deleteDirectory(dataDir.getPath());
     }
 
     public void testConstructorNoDirectoryNorRoot() throws Exception {
-	Properties props = createProperties(StandardProperties.APP_NAME, "Foo");
+	props.remove(DataStoreImplClassName + ".directory");
 	try {
-	    new DataServiceImpl(props, componentRegistry);
+	    createDataServiceImpl(props, componentRegistry);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
+	}
+    }
+
+    public void testConstructorDataStoreClassNotFound() throws Exception {
+	props.setProperty(
+	    DataServiceImplClassName + ".data.store.class", "AnUnknownClass");
+	try {
+	    createDataServiceImpl(props, componentRegistry);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testConstructorDataStoreClassNotDataStore() throws Exception {
+	props.setProperty(
+	    DataServiceImplClassName + ".data.store.class",
+	    Object.class.getName());
+	try {
+	    createDataServiceImpl(props, componentRegistry);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testConstructorDataStoreClassNoConstructor() throws Exception {
+	props.setProperty(
+	    DataServiceImplClassName + ".data.store.class",
+	    DataStoreNoConstructor.class.getName());
+	try {
+	    createDataServiceImpl(props, componentRegistry);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public static class DataStoreNoConstructor extends DummyDataStore { }
+
+    public void testConstructorDataStoreClassAbstract() throws Exception {
+	props.setProperty(
+	    DataServiceImplClassName + ".data.store.class",
+	    DataStoreAbstract.class.getName());
+	try {
+	    createDataServiceImpl(props, componentRegistry);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public static abstract class DataStoreAbstract extends DummyDataStore {
+	public DataStoreAbstract(Properties props) { }
+    }
+
+    public void testConstructorDataStoreClassConstructorFails()
+	throws Exception
+    {
+	props.setProperty(
+	    DataServiceImplClassName + ".data.store.class",
+	    DataStoreConstructorFails.class.getName());
+	try {
+	    createDataServiceImpl(props, componentRegistry);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public static class DataStoreConstructorFails extends DummyDataStore {
+	public DataStoreConstructorFails(Properties props) {
+	    throw new RuntimeException("Constructor fails");
 	}
     }
 
@@ -230,10 +292,10 @@ public class TestDataServiceImpl extends TestCase {
     /* -- Test configure -- */
 
     public void testConfigureNullArgs() throws Exception {
-	Properties props = createProperties(
-	    DataStoreImplClassName + ".directory", createDirectory(),
-	    StandardProperties.APP_NAME, "Foo");
-	service = new DataServiceImpl(props, componentRegistry);
+	txn.commit();
+	txn = null;
+	service.shutdown();
+	service = createDataServiceImpl();
 	try {
 	    service.configure(null, txnProxy);
 	    fail("Expected NullPointerException");
@@ -246,18 +308,20 @@ public class TestDataServiceImpl extends TestCase {
 	} catch (NullPointerException e) {
 	    System.err.println(e);
 	}
+	service = null;
     }
 
     public void testConfigureNoTxn() throws Exception {
 	txn.commit();
 	txn = null;
-	service = getDataServiceImpl();
+	service = createDataServiceImpl();
 	try {
 	    service.configure(componentRegistry, txnProxy);
 	    fail("Expected TransactionNotActiveException");
 	} catch (TransactionNotActiveException e) {
 	    System.err.println(e);
 	}
+	service = null;
     }
 
     public void testConfigureAgain() throws Exception {
@@ -267,11 +331,12 @@ public class TestDataServiceImpl extends TestCase {
 	} catch (IllegalStateException e) {
 	    System.err.println(e);
 	}
+	service = null;
     }
 
     public void testConfigureAborted() throws Exception {
 	txn.commit();
-	service = getDataServiceImpl();
+	service = createDataServiceImpl();
 	createTransaction();
 	service.configure(componentRegistry, txnProxy);
 	txn.abort(null);
@@ -279,6 +344,7 @@ public class TestDataServiceImpl extends TestCase {
 	service.configure(componentRegistry, txnProxy);
 	txn.commit();
 	txn = null;
+	service = null;
     }
 
     /* -- Test getBinding and getServiceBinding -- */
@@ -450,22 +516,71 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
-    private static class TestGetBindingUnusualState extends UnusualStateTest {
-	private final boolean app;
-	private TestGetBindingUnusualState(boolean app, UnusualState state) {
-	    super(app ? "testGetBinding" : "testGetServiceBinding", state);
-	    this.app = app;
+    /* -- Unusual states -- */
+    private final Action getBinding = new Action() {
+	void run() { service.getBinding("dummy", DummyManagedObject.class); }
+    };
+    private final Action getServiceBinding = new Action() {
+	void setUp() { service.setServiceBinding("dummy", dummy); }
+	void run() {
+	    service.getServiceBinding("dummy", DummyManagedObject.class);
 	}
-	void action() {
-	    getBinding(app, service, "dummy", DummyManagedObject.class);
-	}
+    };
+    public void testGetBindingUninitialized() throws Exception {
+	testUninitialized(getBinding);
     }
-
-    static {
-	for (UnusualState state : UnusualState.values()) {
-	    new TestGetBindingUnusualState(true, state);
-	    new TestGetBindingUnusualState(false, state);
-	}
+    public void testGetServiceBindingUninitialized() throws Exception {
+	testUninitialized(getServiceBinding);
+    }
+    public void testGetBindingAborting() throws Exception {
+	testAborting(getBinding);
+    }
+    public void testGetServiceBindingAborting() throws Exception {
+	testAborting(getServiceBinding);
+    }
+    public void testGetBindingAborted() throws Exception {
+	testAborted(getBinding);
+    }
+    public void testGetServiceBindingAborted() throws Exception {
+	testAborted(getServiceBinding);
+    }
+    public void testGetBindingPreparing() throws Exception {
+	testPreparing(getBinding);
+    }
+    public void testGetServiceBindingPreparing() throws Exception {
+	testPreparing(getServiceBinding);
+    }
+    public void testGetBindingCommitting() throws Exception {
+	testCommitting(getBinding);
+    }
+    public void testGetServiceBindingCommitting() throws Exception {
+	testCommitting(getServiceBinding);
+    }
+    public void testGetBindingCommitted() throws Exception {
+	testCommitted(getBinding);
+    }
+    public void testGetServiceBindingCommitted() throws Exception {
+	testCommitted(getServiceBinding);
+    }
+    public void testGetBindingShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(getBinding);
+    }
+    public void testGetServiceBindingShuttingDownExistingTxn()
+	throws Exception
+    {
+	testShuttingDownExistingTxn(getServiceBinding);
+    }
+    public void testGetBindingShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(getBinding);
+    }
+    public void testGetServiceBindingShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(getServiceBinding);
+    }
+    public void testGetBindingShutdown() throws Exception {
+	testShutdown(getBinding);
+    }
+    public void testGetServiceBindingShutdown() throws Exception {
+	testShutdown(getServiceBinding);
     }
 
     public void testGetBindingDeserializationFails() throws Exception {
@@ -578,22 +693,68 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
-    private static class TestSetBindingUnusualState extends UnusualStateTest {
-	private final boolean app;
-	private TestSetBindingUnusualState(boolean app, UnusualState state) {
-	    super(app ? "testSetBinding" : "testSetServiceBinding", state);
-	    this.app = app;
-	}
-	void action() {
-	    setBinding(app, service, "dummy", dummy);
-	}
+    /* -- Unusual states -- */
+    private final Action setBinding = new Action() {
+	void run() { service.setBinding("dummy", dummy); }
+    };
+    private final Action setServiceBinding = new Action() {
+	void run() { service.setServiceBinding("dummy", dummy); }
+    };
+    public void testSetBindingUninitialized() throws Exception {
+	testUninitialized(setBinding);
     }
-
-    static {
-	for (UnusualState state : UnusualState.values()) {
-	    new TestSetBindingUnusualState(true, state);
-	    new TestSetBindingUnusualState(false, state);
-	}
+    public void testSetServiceBindingUninitialized() throws Exception {
+	testUninitialized(setServiceBinding);
+    }
+    public void testSetBindingAborting() throws Exception {
+	testAborting(setBinding);
+    }
+    public void testSetServiceBindingAborting() throws Exception {
+	testAborting(setServiceBinding);
+    }
+    public void testSetBindingAborted() throws Exception {
+	testAborted(setBinding);
+    }
+    public void testSetServiceBindingAborted() throws Exception {
+	testAborted(setServiceBinding);
+    }
+    public void testSetBindingPreparing() throws Exception {
+	testPreparing(setBinding);
+    }
+    public void testSetServiceBindingPreparing() throws Exception {
+	testPreparing(setServiceBinding);
+    }
+    public void testSetBindingCommitting() throws Exception {
+	testCommitting(setBinding);
+    }
+    public void testSetServiceBindingCommitting() throws Exception {
+	testCommitting(setServiceBinding);
+    }
+    public void testSetBindingCommitted() throws Exception {
+	testCommitted(setBinding);
+    }
+    public void testSetServiceBindingCommitted() throws Exception {
+	testCommitted(setServiceBinding);
+    }
+    public void testSetBindingShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(setBinding);
+    }
+    public void testSetServiceBindingShuttingDownExistingTxn()
+	throws Exception
+    {
+	testShuttingDownExistingTxn(setServiceBinding);
+    }
+    public void testSetBindingShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(setBinding);
+    }
+    public void testSetServiceBindingShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(setServiceBinding);
+    }
+    public void testSetBindingShutdown() throws Exception {
+	testShutdown(setBinding);
+    }
+    public void testSetServiceBindingShutdown() throws Exception {
+	testShutdown(setServiceBinding);
     }
 
     public void testSetBindingSerializationFails() throws Exception {
@@ -729,7 +890,7 @@ public class TestDataServiceImpl extends TestCase {
     public void testSetServiceBindingSuccess() throws Exception {
 	testSetBindingSuccess(false);
     }
-    public void testSetBindingSuccess(boolean app) throws Exception {
+    private void testSetBindingSuccess(boolean app) throws Exception {
 	setBinding(app, service, "dummy", dummy);
 	txn.commit();
 	createTransaction();
@@ -785,27 +946,68 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
-    private static class TestRemoveBindingUnusualState
-	extends UnusualStateTest
-    {
-	private final boolean app;
-	private TestRemoveBindingUnusualState(
-	    boolean app, UnusualState state)
-	{
-	    super(app ? "testRemoveBinding" : "testRemoveServiceBinding",
-		  state);
-	    this.app = app;
-	}
-	void action() {
-	    removeBinding(app, service, "dummy");
-	}
+    /* -- Unusual states -- */
+    private final Action removeBinding = new Action() {
+	void run() { service.removeBinding("dummy"); }
+    };
+    private final Action removeServiceBinding = new Action() {
+	void run() { service.removeServiceBinding("dummy"); }
+    };
+    public void testRemoveBindingUninitialized() throws Exception {
+	testUninitialized(removeBinding);
     }
-
-    static {
-	for (UnusualState state : UnusualState.values()) {
-	    new TestRemoveBindingUnusualState(true, state);
-	    new TestRemoveBindingUnusualState(false, state);
-	}
+    public void testRemoveServiceBindingUninitialized() throws Exception {
+	testUninitialized(removeServiceBinding);
+    }
+    public void testRemoveBindingAborting() throws Exception {
+	testAborting(removeBinding);
+    }
+    public void testRemoveServiceBindingAborting() throws Exception {
+	testAborting(removeServiceBinding);
+    }
+    public void testRemoveBindingAborted() throws Exception {
+	testAborted(removeBinding);
+    }
+    public void testRemoveServiceBindingAborted() throws Exception {
+	testAborted(removeServiceBinding);
+    }
+    public void testRemoveBindingPreparing() throws Exception {
+	testPreparing(removeBinding);
+    }
+    public void testRemoveServiceBindingPreparing() throws Exception {
+	testPreparing(removeServiceBinding);
+    }
+    public void testRemoveBindingCommitting() throws Exception {
+	testCommitting(removeBinding);
+    }
+    public void testRemoveServiceBindingCommitting() throws Exception {
+	testCommitting(removeServiceBinding);
+    }
+    public void testRemoveBindingCommitted() throws Exception {
+	testCommitted(removeBinding);
+    }
+    public void testRemoveServiceBindingCommitted() throws Exception {
+	testCommitted(removeServiceBinding);
+    }
+    public void testRemoveBindingShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(removeBinding);
+    }
+    public void testRemoveServiceBindingShuttingDownExistingTxn()
+	throws Exception
+    {
+	testShuttingDownExistingTxn(removeServiceBinding);
+    }
+    public void testRemoveBindingShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(removeBinding);
+    }
+    public void testRemoveServiceBindingShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(removeServiceBinding);
+    }
+    public void testRemoveBindingShutdown() throws Exception {
+	testShutdown(removeBinding);
+    }
+    public void testRemoveServiceBindingShutdown() throws Exception {
+	testShutdown(removeServiceBinding);
     }
 
     public void testRemoveBindingRemovedObject() throws Exception {
@@ -929,27 +1131,68 @@ public class TestDataServiceImpl extends TestCase {
 	assertEquals(forNull, nextBoundName(app, service, ""));
     }
 
-    private static class TestNextBoundNameUnusualState
-	extends UnusualStateTest
-    {
-	private final boolean app;
-	private TestNextBoundNameUnusualState(
-	    boolean app, UnusualState state)
-	{
-	    super(app ? "testNextBoundName" : "testNextServiceBoundName",
-		  state);
-	    this.app = app;
-	}
-	void action() {
-	    nextBoundName(app, service, null);
-	}
+    /* -- Unusual states -- */
+    private final Action nextBoundName = new Action() {
+	void run() { service.nextBoundName(null); }
+    };
+    private final Action nextServiceBoundName = new Action() {
+	void run() { service.nextServiceBoundName(null); }
+    };
+    public void testNextBoundNameUninitialized() throws Exception {
+	testUninitialized(nextBoundName);
     }
-
-    static {
-	for (UnusualState state : UnusualState.values()) {
-	    new TestNextBoundNameUnusualState(true, state);
-	    new TestNextBoundNameUnusualState(false, state);
-	}
+    public void testNextServiceBoundNameUninitialized() throws Exception {
+	testUninitialized(nextServiceBoundName);
+    }
+    public void testNextBoundNameAborting() throws Exception {
+	testAborting(nextBoundName);
+    }
+    public void testNextServiceBoundNameAborting() throws Exception {
+	testAborting(nextServiceBoundName);
+    }
+    public void testNextBoundNameAborted() throws Exception {
+	testAborted(nextBoundName);
+    }
+    public void testNextServiceBoundNameAborted() throws Exception {
+	testAborted(nextServiceBoundName);
+    }
+    public void testNextBoundNamePreparing() throws Exception {
+	testPreparing(nextBoundName);
+    }
+    public void testNextServiceBoundNamePreparing() throws Exception {
+	testPreparing(nextServiceBoundName);
+    }
+    public void testNextBoundNameCommitting() throws Exception {
+	testCommitting(nextBoundName);
+    }
+    public void testNextServiceBoundNameCommitting() throws Exception {
+	testCommitting(nextServiceBoundName);
+    }
+    public void testNextBoundNameCommitted() throws Exception {
+	testCommitted(nextBoundName);
+    }
+    public void testNextServiceBoundNameCommitted() throws Exception {
+	testCommitted(nextServiceBoundName);
+    }
+    public void testNextBoundNameShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(nextBoundName);
+    }
+    public void testNextServiceBoundNameShuttingDownExistingTxn()
+	throws Exception
+    {
+	testShuttingDownExistingTxn(nextServiceBoundName);
+    }
+    public void testNextBoundNameShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(nextBoundName);
+    }
+    public void testNextServiceBoundNameShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(nextServiceBoundName);
+    }
+    public void testNextBoundNameShutdown() throws Exception {
+	testShutdown(nextBoundName);
+    }
+    public void testNextServiceBoundNameShutdown() throws Exception {
+	testShutdown(nextServiceBoundName);
     }
 
     public void testNextBoundNameSuccess() throws Exception {
@@ -1076,14 +1319,36 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
-    static {
-	for (UnusualState state : UnusualState.values()) {
-	    new UnusualStateTest("testRemoveObject", state) {
-		void action() {
-		    service.removeObject(dummy);
-		}
-	    };
-	}
+    /* -- Unusual states -- */
+    private final Action removeObject = new Action() {
+	void run() { service.removeObject(dummy); }
+    };
+    public void testRemoveObjectUninitialized() throws Exception {
+	testUninitialized(removeObject);
+    }
+    public void testRemoveObjectAborting() throws Exception {
+	testAborting(removeObject);
+    }
+    public void testRemoveObjectAborted() throws Exception {
+	testAborted(removeObject);
+    }
+    public void testRemoveObjectPreparing() throws Exception {
+	testPreparing(removeObject);
+    }
+    public void testRemoveObjectCommitting() throws Exception {
+	testCommitting(removeObject);
+    }
+    public void testRemoveObjectCommitted() throws Exception {
+	testCommitted(removeObject);
+    }
+    public void testRemoveObjectShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(removeObject);
+    }
+    public void testRemoveObjectShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(removeObject);
+    }
+    public void testRemoveObjectShutdown() throws Exception {
+	testShutdown(removeObject);
     }
 
     public void testRemoveObjectSuccess() throws Exception {
@@ -1151,14 +1416,36 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
-    static {
-	for (UnusualState state : UnusualState.values()) {
-	    new UnusualStateTest("testMarkForUpdate", state) {
-		void action() {
-		    service.markForUpdate(dummy);
-		}
-	    };
-	}
+    /* -- Unusual states -- */
+    private final Action markForUpdate = new Action() {
+	void run() { service.markForUpdate(dummy); }
+    };
+    public void testMarkForUpdateUninitialized() throws Exception {
+	testUninitialized(markForUpdate);
+    }
+    public void testMarkForUpdateAborting() throws Exception {
+	testAborting(markForUpdate);
+    }
+    public void testMarkForUpdateAborted() throws Exception {
+	testAborted(markForUpdate);
+    }
+    public void testMarkForUpdatePreparing() throws Exception {
+	testPreparing(markForUpdate);
+    }
+    public void testMarkForUpdateCommitting() throws Exception {
+	testCommitting(markForUpdate);
+    }
+    public void testMarkForUpdateCommitted() throws Exception {
+	testCommitted(markForUpdate);
+    }
+    public void testMarkForUpdateShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(markForUpdate);
+    }
+    public void testMarkForUpdateShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(markForUpdate);
+    }
+    public void testMarkForUpdateShutdown() throws Exception {
+	testShutdown(markForUpdate);
     }
 
     public void testMarkForUpdateSuccess() throws Exception {
@@ -1206,12 +1493,12 @@ public class TestDataServiceImpl extends TestCase {
 	    }
 	};
 	thread.start();
-	assertTrue(threadFlag.tryAcquire(1, TimeUnit.SECONDS));
+	assertTrue(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
 	mainFlag.release();
-	assertFalse(threadFlag.tryAcquire(1, TimeUnit.SECONDS));	
+	assertFalse(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
 	txn.commit();
 	txn = null;
-	assertTrue(threadFlag.tryAcquire(1, TimeUnit.SECONDS));
+	assertTrue(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
     }
 
     /* -- Test createReference -- */
@@ -1235,14 +1522,36 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
-    static {
-	for (UnusualState state : UnusualState.values()) {
-	    new UnusualStateTest("testCreateReference", state) {
-		void action() {
-		    service.createReference(dummy);
-		}
-	    };
-	}
+    /* -- Unusual states -- */
+    private final Action createReference = new Action() {
+	void run() { service.createReference(dummy); }
+    };
+    public void testCreateReferenceUninitialized() throws Exception {
+	testUninitialized(createReference);
+    }
+    public void testCreateReferenceAborting() throws Exception {
+	testAborting(createReference);
+    }
+    public void testCreateReferenceAborted() throws Exception {
+	testAborted(createReference);
+    }
+    public void testCreateReferencePreparing() throws Exception {
+	testPreparing(createReference);
+    }
+    public void testCreateReferenceCommitting() throws Exception {
+	testCommitting(createReference);
+    }
+    public void testCreateReferenceCommitted() throws Exception {
+	testCommitted(createReference);
+    }
+    public void testCreateReferenceShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(createReference);
+    }
+    public void testCreateReferenceShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(createReference);
+    }
+    public void testCreateReferenceShutdown() throws Exception {
+	testShutdown(createReference);
     }
 
     public void testCreateReferenceNew() {
@@ -1297,6 +1606,104 @@ public class TestDataServiceImpl extends TestCase {
 	    service.createReference(x).equals(service.createReference(y)));
     }
 
+    /* -- Test createReferenceForId -- */
+
+    public void testCreateReferenceForIdNullId() throws Exception {
+	try {
+	    service.createReferenceForId(null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testCreateReferenceForIdTooSmallId() throws Exception {
+	BigInteger id = new BigInteger("-1");
+	try {
+	    service.createReferenceForId(id);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+	service.createReferenceForId(BigInteger.ZERO);
+    }
+
+    public void testCreateReferenceForIdTooBigId() throws Exception {
+	BigInteger maxLong = new BigInteger(String.valueOf(Long.MAX_VALUE));
+	BigInteger id = maxLong.add(BigInteger.ONE);
+	try {
+	    service.createReferenceForId(id);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+	service.createReferenceForId(maxLong);
+    }
+
+    /* -- Unusual states -- */
+    private final Action createReferenceForId = new Action() {
+	private BigInteger id;
+	void setUp() { id = service.createReference(dummy).getId(); }
+	void run() { service.createReferenceForId(id); }
+    };
+    public void testCreateReferenceForIdUninitialized() throws Exception {
+	testUninitialized(createReferenceForId);
+    }
+    public void testCreateReferenceForIdAborting() throws Exception {
+	testAborting(createReferenceForId);
+    }
+    public void testCreateReferenceForIdAborted() throws Exception {
+	testAborted(createReferenceForId);
+    }
+    public void testCreateReferenceForIdPreparing() throws Exception {
+	testPreparing(createReferenceForId);
+    }
+    public void testCreateReferenceForIdCommitting() throws Exception {
+	testCommitting(createReferenceForId);
+    }
+    public void testCreateReferenceForIdCommitted() throws Exception {
+	testCommitted(createReferenceForId);
+    }
+    public void testCreateReferenceForIdShuttingDownExistingTxn()
+	throws Exception
+    {
+	testShuttingDownExistingTxn(createReferenceForId);
+    }
+    public void testCreateReferenceForIdShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(createReferenceForId);
+    }
+    public void testCreateReferenceForIdShutdown() throws Exception {
+	testShutdown(createReferenceForId);
+    }
+
+    public void testCreateReferenceForIdSuccess() throws Exception {
+	BigInteger id = service.createReference(dummy).getId();
+	ManagedReference ref = service.createReferenceForId(id);
+	assertSame(dummy, ref.get(DummyManagedObject.class));
+	txn.commit();
+	createTransaction();
+	ref = service.createReferenceForId(id);
+	dummy = ref.get(DummyManagedObject.class);
+	assertSame(
+	    dummy, service.getBinding("dummy", DummyManagedObject.class));
+	service.removeObject(dummy);
+	try {
+	    ref.get(DummyManagedObject.class);
+	    fail("Expected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	    System.err.println(e);
+	}
+	txn.commit();
+	createTransaction();
+	ref = service.createReferenceForId(id);
+	try {
+	    ref.get(DummyManagedObject.class);
+	    fail("Expected ObjectNotFoundException");
+	} catch (ObjectNotFoundException e) {
+	    System.err.println(e);
+	}
+    }
+
     /* -- Test ManagedReference.get -- */
 
     public void testGetReferenceNullType() throws Exception {
@@ -1328,40 +1735,45 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
-    static {
-	for (UnusualState state : UnusualState.values()) {
-	    /*
-	     * Can't get a reference when the service is not initialized, or
-	     * as the first operation in a new transaction.
-	     */
-	    if (state != UnusualState.Uninitialized &&
-		state != UnusualState.ShuttingDownNewTxn)
-	    {
-		new UnusualStateTest("testGetReference", state) {
-		    private ManagedReference ref;
-		    protected void setUp() throws Exception {
-			super.setUp();
-			ref = service.createReference(dummy);
-		    }
-		    void action() {
-			ref.get(DummyManagedObject.class);
-		    }
-		    /* Expect TransactionNotActiveException */
-		    void shutdownTest() throws Exception {
-			txn.abort(null);
-			service.shutdown();
-			try {
-			    action();
-			    fail("Expected TransactionNotActiveException");
-			} catch (TransactionNotActiveException e) {
-			    System.err.println(e);
-			}
-			txn = null;
-			service = null;
-		    }
-		};
-	    }
+    /* -- Unusual states -- */
+    private final Action getReference = new Action() {
+	private ManagedReference ref;
+	void setUp() { ref = service.createReference(dummy); }
+	void run() { ref.get(DummyManagedObject.class); }
+    };
+    /* Can't get a reference when the service is uninitialized */
+    public void testGetReferenceAborting() throws Exception {
+	testAborting(getReference);
+    }
+    public void testGetReferenceAborted() throws Exception {
+	testAborted(getReference);
+    }
+    public void testGetReferencePreparing() throws Exception {
+	testPreparing(getReference);
+    }
+    public void testGetReferenceCommitting() throws Exception {
+	testCommitting(getReference);
+    }
+    public void testGetReferenceCommitted() throws Exception {
+	testCommitted(getReference);
+    }
+    public void testGetReferenceShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(getReference);
+    }
+    /* Can't get a reference as the first operation in a new transaction */
+    public void testGetReferenceShutdown() throws Exception {
+	/* Expect TransactionNotActiveException */
+	getReference.setUp();
+	txn.abort(null);
+	service.shutdown();
+	try {
+	    getReference.run();
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
 	}
+	txn = null;
+	service = null;
     }
 
     public void testGetReferenceDeserializationFails() throws Exception {
@@ -1461,40 +1873,47 @@ public class TestDataServiceImpl extends TestCase {
 	assertEquals("B", dummy2.value);
     }
 
-    static {
-	for (UnusualState state : UnusualState.values()) {
-	    /*
-	     * Can't get a reference when the service is not initialized, or
-	     * as the first operation in a new transaction.
-	     */
-	    if (state != UnusualState.Uninitialized &&
-		state != UnusualState.ShuttingDownNewTxn)
-	    {
-		new UnusualStateTest("testGetReferenceUpdate", state) {
-		    private ManagedReference ref;
-		    protected void setUp() throws Exception {
-			super.setUp();
-			ref = service.createReference(dummy);
-		    }
-		    void action() {
-			ref.getForUpdate(DummyManagedObject.class);
-		    }
-		    /* Expect TransactionNotActiveException */
-		    void shutdownTest() throws Exception {
-			txn.abort(null);
-			service.shutdown();
-			try {
-			    action();
-			    fail("Expected TransactionNotActiveException");
-			} catch (TransactionNotActiveException e) {
-			    System.err.println(e);
-			}
-			txn = null;
-			service = null;
-		    }
-		};
-	    }
+    /* -- Unusual states -- */
+    private final Action getReferenceUpdate = new Action() {
+	private ManagedReference ref;
+	void setUp() { ref = service.createReference(dummy); }
+	void run() { ref.getForUpdate(DummyManagedObject.class); }
+    };
+    /* Can't get a referenceUpdate when the service is uninitialized */
+    public void testGetReferenceUpdateAborting() throws Exception {
+	testAborting(getReferenceUpdate);
+    }
+    public void testGetReferenceUpdateAborted() throws Exception {
+	testAborted(getReferenceUpdate);
+    }
+    public void testGetReferenceUpdatePreparing() throws Exception {
+	testPreparing(getReferenceUpdate);
+    }
+    public void testGetReferenceUpdateCommitting() throws Exception {
+	testCommitting(getReferenceUpdate);
+    }
+    public void testGetReferenceUpdateCommitted() throws Exception {
+	testCommitted(getReferenceUpdate);
+    }
+    public void testGetReferenceUpdateShuttingDownExistingTxn()
+	throws Exception
+    {
+	testShuttingDownExistingTxn(getReferenceUpdate);
+    }
+    /* Can't get a reference as the first operation in a new transaction */
+    public void testGetReferenceUpdateShutdown() throws Exception {
+	/* Expect TransactionNotActiveException */
+	getReferenceUpdate.setUp();
+	txn.abort(null);
+	service.shutdown();
+	try {
+	    getReferenceUpdate.run();
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
 	}
+	txn = null;
+	service = null;
     }
 
     public void testGetReferenceUpdateDeserializationFails() throws Exception {
@@ -1563,12 +1982,12 @@ public class TestDataServiceImpl extends TestCase {
 	    }
 	};
 	thread.start();
-	assertTrue(threadFlag.tryAcquire(1, TimeUnit.SECONDS));
+	assertTrue(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
 	mainFlag.release();
-	assertFalse(threadFlag.tryAcquire(1, TimeUnit.SECONDS));	
+	assertFalse(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
 	txn.commit();
 	txn = null;
-	assertTrue(threadFlag.tryAcquire(1, TimeUnit.SECONDS));
+	assertTrue(threadFlag.tryAcquire(100, TimeUnit.MILLISECONDS));
     }
 
     /* -- Test ManagedReference.getId -- */
@@ -1617,9 +2036,8 @@ public class TestDataServiceImpl extends TestCase {
 	    fail("Expected IllegalStateException");
 	} catch (IllegalStateException e) {
 	    System.err.println(e);
-	} finally {
-	    service = null;
 	}
+	service = null;
     }
 
     public void testShutdownInterrupt() throws Exception {
@@ -1673,7 +2091,7 @@ public class TestDataServiceImpl extends TestCase {
     public void testShutdownRestart() throws Exception {
 	txn.commit();
 	service.shutdown();
-	service = getDataServiceImpl();
+	service = createDataServiceImpl();
 	createTransaction();
 	service.configure(componentRegistry, txnProxy);
 	componentRegistry.setComponent(DataManager.class, service);
@@ -1681,6 +2099,7 @@ public class TestDataServiceImpl extends TestCase {
 	createTransaction();
 	assertEquals(
 	    dummy, service.getBinding("dummy", DummyManagedObject.class));
+	service = null;
     }
 
     /* -- Other tests -- */
@@ -1997,7 +2416,7 @@ public class TestDataServiceImpl extends TestCase {
 
     /* -- Other methods and classes -- */
 
-    /** Creates a per-test directory. */
+    /** Creates a unique directory. */
     String createDirectory() throws IOException {
 	File dir = File.createTempFile(getName(), "dbdir");
 	if (!dir.delete()) {
@@ -2007,12 +2426,11 @@ public class TestDataServiceImpl extends TestCase {
 	    throw new RuntimeException(
 		"Failed to create directory: " + dir);
 	}
-	directory = dir.getPath();
-	return directory;
+	return dir.getPath();
     }
 
-    /** Deletes the specified directory, if it exists. */
-    static void deleteDirectory(String directory) {
+    /** Insures an empty version of the directory exists. */
+    private static void cleanDirectory(String directory) {
 	File dir = new File(directory);
 	if (dir.exists()) {
 	    for (File f : dir.listFiles()) {
@@ -2024,6 +2442,10 @@ public class TestDataServiceImpl extends TestCase {
 		throw new RuntimeException(
 		    "Failed to delete directory: " + dir);
 	    }
+	}
+	if (!dir.mkdir()) {
+	    throw new RuntimeException(
+		"Failed to create directory: " + dir);
 	}
     }
 
@@ -2039,8 +2461,22 @@ public class TestDataServiceImpl extends TestCase {
 	return props;
     }
 
-    /** Returns a DataServiceImpl for the shared database. */
-    DataServiceImpl getDataServiceImpl() {
+    /**
+     * Returns a DataServiceImpl for the shared database using the default
+     * properties and the default component registry.
+     */
+    protected DataServiceImpl createDataServiceImpl() throws Exception {
+	return createDataServiceImpl(props, componentRegistry);
+    }
+
+    /**
+     * Returns a DataServiceImpl for the shared database using the specified
+     * properties and component registry.
+     */
+    protected DataServiceImpl createDataServiceImpl(
+	Properties props, ComponentRegistry componentRegistry)
+	throws Exception
+    {
 	File dir = new File(dbDirectory);
 	if (!dir.exists()) {
 	    if (!dir.mkdir()) {
@@ -2048,7 +2484,15 @@ public class TestDataServiceImpl extends TestCase {
 		    "Problem creating directory: " + dir);
 	    }
 	}
-	return new DataServiceImpl(dbProps, componentRegistry);
+	return new DataServiceImpl(props, componentRegistry);
+    }
+
+    /** Returns the default properties to use for creating data services. */
+    protected Properties getProperties() throws Exception {
+	return createProperties(
+	    DataStoreImplClassName + ".directory", dbDirectory,
+	    StandardProperties.APP_NAME, "TestDataServiceImpl",
+	    DataServiceImplClassName + ".debug.check.interval", "0");
     }
 
     /** Creates a new transaction. */
@@ -2126,225 +2570,180 @@ public class TestDataServiceImpl extends TestCase {
 	}
     }
 
-    /** The set of unusual states */
-    static enum UnusualState {
-	Uninitialized, Aborting, Aborted, Preparing, Committing, Committed,
-	ShuttingDownExistingTxn, ShuttingDownNewTxn, Shutdown
+    /* -- Support for testing unusual states -- */
+
+    /**
+     * An action, with an optional setup step, to be run in the context of an
+     * unusual state.
+     */
+    abstract class Action {
+	void setUp() { };
+	abstract void run();
     }
 
-    /** Defines a abstract class for testing unusual states. */
-    static abstract class UnusualStateTest extends TestDataServiceImpl {
-
-	/** The unusual state to test. */
-	private final UnusualState state;
-
-	/**
-	 * Creates an instance with the specified generic name to test the
-	 * specified unusual state, and adds this test to the test suite.
-	 */
-	UnusualStateTest(String name, UnusualState state) {
-	    super(name + state);
-	    this.state = state;
-	    suite.addTest(this);
+    /** Tests running the action with an uninitialized service. */
+    void testUninitialized(Action action) throws Exception {
+	action.setUp();
+	txn.commit();
+	createTransaction();
+	service = createDataServiceImpl();
+	try {
+	    action.run();
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
 	}
+	service = null;
+    }
 
-	/**
-	 * Subclasses should implement this method to define the action that
-	 * should be tested in a bad transaction state.
-	 */
-	abstract void action();
-
-	/** Runs the test for the bad transaction state. */
-	protected void runTest() throws Exception {
-	    switch (state) {
-	    case Uninitialized:
-		uninitializedTest();
-		break;
-	    case Aborting:
-		abortingTest();
-		break;
-	    case Aborted:
-		abortedTest();
-		break;
-	    case Preparing:
-		preparingTest();
-		break;
-	    case Committing:
-		committingTest();
-		break;
-	    case Committed:
-		committedTest();
-		break;
-	    case ShuttingDownExistingTxn:
-		shuttingDownExistingTxnTest();
-		break;
-	    case ShuttingDownNewTxn:
-		shuttingDownNewTxnTest();
-		break;
-	    case Shutdown:
-		shutdownTest();
-		break;
-	    default:
-		throw new AssertionError();
-	    }
-	}
-
-	/** Runs the test for the uninitialized case. */
-	void uninitializedTest() throws Exception {
-	    txn.commit();
-	    createTransaction();
-	    service = getDataServiceImpl();
-	    try {
-		action();
-		fail("Expected IllegalStateException");
-	    } catch (IllegalStateException e) {
-		System.err.println(e);
-	    }
-	}
-
-	/** Runs the test for the aborting case. */
-	void abortingTest() {
-	    class Participant extends DummyTransactionParticipant {
-		boolean ok;
-		public void abort(Transaction txn) {
-		    try {
-			action();
-		    } catch (TransactionNotActiveException e) {
-			ok = true;
-			throw e;
-		    }
-		}
-	    }
-	    Participant participant = new Participant();
-	    txn.join(participant);
-	    txn.abort(null);
-	    txn = null;
-	    assertTrue("Action should throw", participant.ok);
-	}
-
-	/** Runs the test for the aborted case. */
-	private void abortedTest() {
-	    txn.abort(null);
-	    try {
-		action();
-		fail("Expected TransactionNotActiveException");
-	    } catch (TransactionNotActiveException e) {
-		System.err.println(e);
-	    } finally {
-		txn = null;
-	    }
-	}
-
-	/** Runs the test for the preparing case. */
-	private void preparingTest() throws Exception {
-	    class Participant extends DummyTransactionParticipant {
-		boolean ok;
-		public boolean prepare(Transaction txn) throws Exception {
-		    try {
-			action();
-			return false;
-		    } catch (TransactionNotActiveException e) {
-			ok = true;
-			throw e;
-		    }
-		}
-	    }
-	    Participant participant = new Participant();
-	    txn.join(participant);
-	    try {
-		txn.commit();
-		fail("Expected TransactionNotActiveException");
-	    } catch (TransactionNotActiveException e) {
-		System.err.println(e);
-	    } finally {
-		txn = null;
-	    }
-	    assertTrue("Action should throw", participant.ok);
-	}
-
-	/** Runs the test for the committing case. */
-	private void committingTest() throws Exception {
-	    class Participant extends DummyTransactionParticipant {
-		boolean ok;
-		public void commit(Transaction txn) {
-		    try {
-			action();
-		    } catch (TransactionNotActiveException e) {
-			ok = true;
-			throw e;
-		    }
-		}
-	    }
-	    Participant participant = new Participant();
-	    txn.join(participant);
-	    txn.commit();
-	    txn = null;
-	    assertTrue("Action should throw", participant.ok);
-	}
-
-	/** Runs the test for the committed case. */
-	private void committedTest() throws Exception {
-	    txn.commit();
-	    try {
-		action();
-		fail("Expected TransactionNotActiveException");
-	    } catch (TransactionNotActiveException e) {
-		System.err.println(e);
-	    } finally {
-		txn = null;
-	    }
-	}
-
-	/**
-	 * Runs the test for the existing transaction while shutting down case.
-	 */
-	private void shuttingDownExistingTxnTest() throws Exception {
-	    ShutdownAction shutdownAction = new ShutdownAction();
-	    shutdownAction.assertBlocked();
-	    action();
-	    if (txn != null) {
-		txn.commit();
-		txn = null;
-	    }
-	    shutdownAction.assertResult(true);
-	    service = null;
-	}
-
-	/** Runs the test for the new transaction while shutting down case. */
-	private void shuttingDownNewTxnTest() throws Exception {
-	    try {
-		DummyTransaction originalTxn = txn;
-		ShutdownAction shutdownAction = new ShutdownAction();
-		shutdownAction.assertBlocked();
-		createTransaction();
+    /** Tests running the action while aborting. */
+    void testAborting(final Action action) {
+	action.setUp();
+	class Participant extends DummyTransactionParticipant {
+	    boolean ok;
+	    public void abort(Transaction txn) {
 		try {
-		    action();
-		    fail("Expected IllegalStateException");
-		} catch (IllegalStateException e) {
-		    System.err.println(e);
+		    action.run();
+		} catch (TransactionNotActiveException e) {
+		    ok = true;
+		    throw e;
 		}
-		txn.abort(null);
-		txn = null;
-		originalTxn.abort(null);
-		shutdownAction.assertResult(true);
-	    } finally {
-		service = null;
 	    }
 	}
+	Participant participant = new Participant();
+	txn.join(participant);
+	txn.abort(null);
+	txn = null;
+	assertTrue("Action should throw", participant.ok);
+    }
 
-	/** Runs the test for the shutdown case. */
-	void shutdownTest() throws Exception {
-	    txn.abort(null);
-	    service.shutdown();
-	    try {
-		action();
-		fail("Expected IllegalStateException");
-	    } catch (IllegalStateException e) {
-		System.err.println(e);
-	    }
+    /** Tests running the action after abort. */
+    private void testAborted(Action action) {
+	action.setUp();
+	txn.abort(null);
+	try {
+	    action.run();
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	} finally {
 	    txn = null;
-	    service = null;
 	}
+    }
+
+    /** Tests running the action while preparing. */
+    private void testPreparing(final Action action) throws Exception {
+	action.setUp();
+	class Participant extends DummyTransactionParticipant {
+	    boolean ok;
+	    public boolean prepare(Transaction txn) throws Exception {
+		try {
+		    action.run();
+		    return false;
+		} catch (TransactionNotActiveException e) {
+		    ok = true;
+		    throw e;
+		}
+	    }
+	}
+	Participant participant = new Participant();
+	txn.join(participant);
+	try {
+	    txn.commit();
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	} finally {
+	    txn = null;
+	}
+	assertTrue("Action should throw", participant.ok);
+    }
+
+    /** Tests running the action while committing. */
+    private void testCommitting(final Action action) throws Exception {
+	action.setUp();
+	class Participant extends DummyTransactionParticipant {
+	    boolean ok;
+	    public void commit(Transaction txn) {
+		try {
+		    action.run();
+		} catch (TransactionNotActiveException e) {
+		    ok = true;
+		    throw e;
+		}
+	    }
+	}
+	Participant participant = new Participant();
+	txn.join(participant);
+	txn.commit();
+	txn = null;
+	assertTrue("Action should throw", participant.ok);
+    }
+
+    /** Tests running the action after commit. */
+    private void testCommitted(Action action) throws Exception {
+	action.setUp();
+	txn.commit();
+	try {
+	    action.run();
+	    fail("Expected TransactionNotActiveException");
+	} catch (TransactionNotActiveException e) {
+	    System.err.println(e);
+	} finally {
+	    txn = null;
+	}
+    }
+
+    /**
+     * Tests running the action with an existing transaction while shutting
+     * down.
+     */
+    private void testShuttingDownExistingTxn(Action action) throws Exception {
+	action.setUp();
+	ShutdownAction shutdownAction = new ShutdownAction();
+	shutdownAction.assertBlocked();
+	action.run();
+	if (txn != null) {
+	    txn.commit();
+	    txn = null;
+	}
+	shutdownAction.assertResult(true);
+	service = null;
+    }
+
+    /** Tests running the action with a new transaction while shutting down. */
+    private void testShuttingDownNewTxn(Action action) throws Exception {
+	action.setUp();
+	DummyTransaction originalTxn = txn;
+	ShutdownAction shutdownAction = new ShutdownAction();
+	shutdownAction.assertBlocked();
+	createTransaction();
+	try {
+	    action.run();
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+	txn.abort(null);
+	txn = null;
+	originalTxn.abort(null);
+	shutdownAction.assertResult(true);
+	service = null;
+    }
+
+    /** Tests running the action after shutdown. */
+    void testShutdown(Action action) {
+	action.setUp();
+	txn.abort(null);
+	service.shutdown();
+	try {
+	    action.run();
+	    fail("Expected IllegalStateException");
+	} catch (IllegalStateException e) {
+	    System.err.println(e);
+	}
+	txn = null;
+	service = null;
     }
 
     /** Use this thread to control a call to shutdown that may block. */
@@ -2417,6 +2816,31 @@ public class TestDataServiceImpl extends TestCase {
 		wait -= (now - start);
 		start = now;
 	    }
+	}
+    }
+
+    /** A dummy implementation of DataStore. */
+    static class DummyDataStore implements DataStore {
+	public long createObject(Transaction txn) { return 0; }
+	public void markForUpdate(Transaction txn, long oid) { }
+	public byte[] getObject(Transaction txn, long oid, boolean forUpdate) {
+	    return null;
+	}
+	public void setObject(Transaction txn, long oid, byte[] data) { }
+	public void setObjects(
+	    Transaction txn, long[] oids, byte[][] dataArray)
+	{ }
+	public void removeObject(Transaction txn, long oid) { }
+	public long getBinding(Transaction txn, String name) { return 0; }
+	public void setBinding(Transaction txn, String name, long oid) { }
+	public void removeBinding(Transaction txn, String name) { }
+	public String nextBoundName(Transaction txn, String name) {
+	    return null;
+	}
+	public boolean shutdown() { return false; }
+	public int getClassId(Transaction txn, byte[] classInfo) { return 0; }
+	public byte[] getClassInfo(Transaction txn, int classId) {
+	    return null;
 	}
     }
 }

@@ -31,6 +31,7 @@ import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.TaskService;
 
 import com.sun.sgs.test.util.DummyComponentRegistry;
+import com.sun.sgs.test.util.DummyKernelRunnable;
 import com.sun.sgs.test.util.DummyTaskScheduler;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransactionProxy;
@@ -704,9 +705,7 @@ public class TestTaskServiceImpl extends TestCase {
 
     public void testScheduleNonDurableTaskNegativeTime() {
         txn = createTransaction();
-        KernelRunnable r = new KernelRunnable() {
-                public void run() throws Exception {}
-            };
+        KernelRunnable r = new DummyKernelRunnable();
         try {
             taskService.scheduleNonDurableTask(r, -1L);
             fail("Expected IllegalArgumentException");
@@ -777,7 +776,9 @@ public class TestTaskServiceImpl extends TestCase {
         return txn;
     }
 
-    private DataServiceImpl createDataService(String directory) {
+    private DataServiceImpl createDataService(String directory)
+	throws Exception
+    {
         File dir = new File(directory);
         if (! dir.exists()) {
             if (! dir.mkdir()) {
@@ -889,6 +890,9 @@ public class TestTaskServiceImpl extends TestCase {
         private Counter counter;
         public KernelRunnableImpl(Counter counter) {
             this.counter = counter;
+        }
+        public String getBaseTaskType() {
+            return getClass().getName();
         }
         public void run() throws Exception {
             synchronized (counter) {

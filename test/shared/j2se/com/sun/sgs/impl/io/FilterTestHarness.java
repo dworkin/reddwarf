@@ -44,8 +44,8 @@ public class FilterTestHarness {
     }
 
     /**
-     * Throws the exception set by {@link #setExceptionOnNextOp
-     * setExceptionOnNextOp} and clears it, if one was set.
+     * Throws the exception set by {@link #setExceptionOnNextCompleteMessage
+     * setExceptionOnNextCompleteMessage} and clears it, if one was set.
      *
      * @throws RuntimeException if an exception was set
      */

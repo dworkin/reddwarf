@@ -10,6 +10,7 @@ import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.kernel.EmptyKernelAppContext;
 import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.TaskHandler;
+import com.sun.sgs.impl.kernel.TxnTimeoutTestRunnable;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinator;
 import com.sun.sgs.impl.service.transaction.TransactionCoordinatorImpl;
 import com.sun.sgs.impl.service.transaction.TransactionHandle;
@@ -18,8 +19,10 @@ import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionProxy;
 import com.sun.sgs.service.TransactionRunner;
+import com.sun.sgs.test.util.DummyKernelRunnable;
 import com.sun.sgs.test.util.DummyTransactionParticipant;
 import com.sun.sgs.test.util.DummyTransactionProxy;
+import java.util.Properties;
 import junit.framework.TestCase;
 
 /** Test the TaskHandler class. */
@@ -61,7 +64,7 @@ public class TestTaskHandler extends TestCase {
     /** Task throws an error */
     public void testRunTransactionalTaskThrowsError() throws Exception {
 	final Error error = new Error("Task throws error");
-	KernelRunnable task = new KernelRunnable() {
+	KernelRunnable task = new DummyKernelRunnable() {
 	    public void run() {
 		throw error;
 	    }
@@ -77,7 +80,7 @@ public class TestTaskHandler extends TestCase {
     /** Task throws an exception */
     public void testRunTransactionalTaskThrowsException() throws Exception {
 	final Exception exception = new Exception("Task throws exception");
-	KernelRunnable task = new KernelRunnable() {
+	KernelRunnable task = new DummyKernelRunnable() {
 	    public void run() throws Exception {
 		throw exception;
 	    }
@@ -92,7 +95,7 @@ public class TestTaskHandler extends TestCase {
 
     /** Task aborts the transaction without supplying a cause. */
     public void testRunTransactionalTaskAbortsNoCause() throws Exception {
-	KernelRunnable task = new KernelRunnable() {
+	KernelRunnable task = new DummyKernelRunnable() {
 	    public void run() {
 		txnProxy.getCurrentTransaction().abort(null);
 	    }
@@ -111,7 +114,7 @@ public class TestTaskHandler extends TestCase {
 	throws Exception
     {
 	final Exception cause = new Exception("Abort cause");
-	KernelRunnable task = new KernelRunnable() {
+	KernelRunnable task = new DummyKernelRunnable() {
 	    public void run() {
 		txnProxy.getCurrentTransaction().abort(cause);
 	    }
@@ -130,7 +133,7 @@ public class TestTaskHandler extends TestCase {
 	throws Exception
     {
 	final Exception cause = new TransactionAbortedException("Abort cause");
-	KernelRunnable task = new KernelRunnable() {
+	KernelRunnable task = new DummyKernelRunnable() {
 	    public void run() {
 		txnProxy.getCurrentTransaction().abort(cause);
 	    }
@@ -147,7 +150,7 @@ public class TestTaskHandler extends TestCase {
     /** Task aborts the transaction, providing and throwing a cause. */
     public void testRunTransactionalTaskAbortsThrowCause() throws Exception {
 	final Exception cause = new Exception("Abort cause");
-	KernelRunnable task = new KernelRunnable() {
+	KernelRunnable task = new DummyKernelRunnable() {
 	    public void run() throws Exception {
 		txnProxy.getCurrentTransaction().abort(cause);
 		throw cause;
@@ -169,7 +172,7 @@ public class TestTaskHandler extends TestCase {
 	throws Exception
     {
 	final Exception exception = new Exception("Task throws exception");
-	KernelRunnable task = new KernelRunnable() {
+	KernelRunnable task = new DummyKernelRunnable() {
 	    public void run() throws Exception {
 		txnProxy.getCurrentTransaction().abort(null);
 		throw exception;
@@ -191,7 +194,7 @@ public class TestTaskHandler extends TestCase {
 	throws Exception
     {
 	final Exception exception = new Exception("Task throws exception");
-	KernelRunnable task = new KernelRunnable() {
+	KernelRunnable task = new DummyKernelRunnable() {
 	    public void run() throws Exception {
 		txnProxy.getCurrentTransaction().abort(
 		    new Exception("Abort cause"));
@@ -209,7 +212,7 @@ public class TestTaskHandler extends TestCase {
     /** Task aborts the transaction twice with different causes */
     public void testRunTransactionalTaskAbortsTwice() throws Exception {
 	final Exception cause = new Exception("Abort cause");
-	KernelRunnable task = new KernelRunnable() {
+	KernelRunnable task = new DummyKernelRunnable() {
 	    public void run() throws Exception {
 		txnProxy.getCurrentTransaction().abort(cause);
 		txnProxy.getCurrentTransaction().abort(new Exception());
@@ -228,7 +231,7 @@ public class TestTaskHandler extends TestCase {
 	throws Exception
     {
 	final Exception exception = new Exception();
-	KernelRunnable task = new KernelRunnable() {
+	KernelRunnable task = new DummyKernelRunnable() {
 	    public void run() throws Exception {
 		txnProxy.getCurrentTransaction().join(
 		    new DummyTransactionParticipant() {
@@ -252,7 +255,7 @@ public class TestTaskHandler extends TestCase {
     public void testRunTransactionalTaskPrepareAbortsNoCause()
 	throws Exception
     {
-	KernelRunnable task = new KernelRunnable() {
+	KernelRunnable task = new DummyKernelRunnable() {
 	    public void run() throws Exception {
 		txnProxy.getCurrentTransaction().join(
 		    new DummyTransactionParticipant() {
@@ -276,7 +279,7 @@ public class TestTaskHandler extends TestCase {
 	throws Exception
     {
 	final Exception cause = new Exception("Abort cause");
-	KernelRunnable task = new KernelRunnable() {
+	KernelRunnable task = new DummyKernelRunnable() {
 	    public void run() throws Exception {
 		txnProxy.getCurrentTransaction().join(
 		    new DummyTransactionParticipant() {
@@ -300,7 +303,7 @@ public class TestTaskHandler extends TestCase {
 	throws Exception
     {
 	final Exception cause = new TransactionAbortedException("Abort cause");
-	KernelRunnable task = new KernelRunnable() {
+	KernelRunnable task = new DummyKernelRunnable() {
 	    public void run() throws Exception {
 		txnProxy.getCurrentTransaction().join(
 		    new DummyTransactionParticipant() {
@@ -324,7 +327,7 @@ public class TestTaskHandler extends TestCase {
 	throws Exception
     {
 	final Exception cause = new Exception("Abort cause");
-	KernelRunnable task = new KernelRunnable() {
+	KernelRunnable task = new DummyKernelRunnable() {
 	    public void run() throws Exception {
 		txnProxy.getCurrentTransaction().join(
 		    new DummyTransactionParticipant() {
@@ -353,7 +356,7 @@ public class TestTaskHandler extends TestCase {
 	throws Exception
     {
 	final Exception exception = new Exception("Prepare throws exception");
-	KernelRunnable task = new KernelRunnable() {
+	KernelRunnable task = new DummyKernelRunnable() {
 	    public void run() throws Exception {
 		txnProxy.getCurrentTransaction().join(
 		    new DummyTransactionParticipant() {
@@ -382,7 +385,7 @@ public class TestTaskHandler extends TestCase {
 	throws Exception
     {
 	final Exception exception = new Exception("Prepare throws exception");
-	KernelRunnable task = new KernelRunnable() {
+	KernelRunnable task = new DummyKernelRunnable() {
 	    public void run() throws Exception {
 		txnProxy.getCurrentTransaction().join(
 		    new DummyTransactionParticipant() {
@@ -401,6 +404,52 @@ public class TestTaskHandler extends TestCase {
 	} catch (Exception e) {
 	    assertEquals(exception, e);
 	}
+    }
+
+    /** Bounded transaction times out */
+    public void testRunTransactionalBoundedTimesOut() throws Exception {
+	/* Use a transaction coordinator with specified timeout. */
+	Properties p = new Properties();
+	p.setProperty(TransactionCoordinator.TXN_TIMEOUT_PROPERTY, "50");
+	TransactionCoordinator txnCoordinator =
+	    new TransactionCoordinatorImpl(p, null);
+	MinimalTestKernel.setTransactionCoordinator(txnCoordinator);
+	TxnTimeoutTestRunnable r = new TxnTimeoutTestRunnable(70, false);
+	try {
+	    Thread thread = MinimalTestKernel.createThread(
+		 r, kernelAppContext);
+	    thread.start();
+	    thread.join(60000);
+	} finally {
+	    /* ... and then switch back to the default. */
+	    MinimalTestKernel.setTransactionCoordinator(null);
+	}
+
+	assertTrue(r.timedOut);
+    }
+
+    /** Unbounded transaction does not time out */
+    public void testRunTransactionalUnboundedDoesNotTimeOut()
+	throws Exception
+    {
+	/* Use a transaction coordinator with specified timeout. */
+	Properties p = new Properties();
+	p.setProperty(TransactionCoordinator.TXN_TIMEOUT_PROPERTY, "0");
+	TransactionCoordinator txnCoordinator =
+	    new TransactionCoordinatorImpl(p, null);
+	MinimalTestKernel.setTransactionCoordinator(txnCoordinator);
+	TxnTimeoutTestRunnable r = new TxnTimeoutTestRunnable(70, true);
+	try {
+	    Thread thread = MinimalTestKernel.createThread(
+		 r, kernelAppContext);
+	    thread.start();
+	    thread.join(60000);
+	} finally {
+	    /* ... and then switch back to the default. */
+	    MinimalTestKernel.setTransactionCoordinator(null);
+	}
+
+	assertFalse(r.timedOut);
     }
 
     /* -- Other methods and classes -- */
@@ -478,11 +527,12 @@ public class TestTaskHandler extends TestCase {
 	implements TransactionCoordinator
     {
 	private final TransactionCoordinator txnCoordinator =
-	    new TransactionCoordinatorImpl(System.getProperties());
+	    new TransactionCoordinatorImpl(System.getProperties(), null);
 	Transaction txn;
 	MyTransactionCoordinator() { }
-	public TransactionHandle createTransaction() {
-	    TransactionHandle handle = txnCoordinator.createTransaction();
+	public TransactionHandle createTransaction(boolean unbounded) {
+	    TransactionHandle handle =
+		txnCoordinator.createTransaction(unbounded);
 	    txn = handle.getTransaction();
 	    return handle;
 	}

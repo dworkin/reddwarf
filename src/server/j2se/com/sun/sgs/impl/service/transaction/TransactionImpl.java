@@ -6,13 +6,16 @@ package com.sun.sgs.impl.service.transaction;
 
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
-import com.sun.sgs.impl.util.LoggerWrapper;
+import com.sun.sgs.app.TransactionTimeoutException;
+import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.util.MaybeRetryableTransactionAbortedException;
 import com.sun.sgs.impl.util.MaybeRetryableTransactionNotActiveException;
+import com.sun.sgs.kernel.ProfileCollector;
 import com.sun.sgs.service.NonDurableTransactionParticipant;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.logging.Level;
@@ -47,6 +50,9 @@ final class TransactionImpl implements Transaction {
     /** The time the transaction was created. */
     private final long creationTime;
 
+    /** The length of time that this transaction is allowed to run.*/
+    private final long timeout;
+
     /** The thread associated with this transaction. */
     private final Thread owner;
 
@@ -70,12 +76,28 @@ final class TransactionImpl implements Transaction {
      */
     private Throwable abortCause = null;
 
-    /** Creates an instance with the specified transaction ID. */
-    TransactionImpl(long tid) {
+    /** The optional collector used to report participant detail. */
+    private final ProfileCollector collector;
+
+    /** Collected profiling data on each participant. */
+    private final HashMap<String,ProfileParticipantDetailImpl> detailMap;
+
+    /**
+     * Creates an instance with the specified transaction ID, timeout, and
+     * collector.
+     */
+    TransactionImpl(long tid, long timeout, ProfileCollector collector) {
 	this.tid = tid;
+	this.timeout = timeout;
+	this.collector = collector;
 	creationTime = System.currentTimeMillis();
 	owner = Thread.currentThread();
 	state = State.ACTIVE;
+	if (collector != null) {
+	    detailMap = new HashMap<String,ProfileParticipantDetailImpl>();
+	} else {
+	    detailMap = null;
+	}
 	logger.log(Level.FINER, "create {0}", this);
     }
 
@@ -89,6 +111,19 @@ final class TransactionImpl implements Transaction {
     /** {@inheritDoc} */
     public long getCreationTime() {
 	return creationTime;
+    }
+
+    /** {@inheritDoc} */
+    public long getTimeout() {
+	return timeout;
+    }
+
+    /** {@inheritDoc} */
+    public void checkTimeout() {
+	long runningTime = System.currentTimeMillis() - getCreationTime();
+	if (runningTime > getTimeout())
+	    throw new TransactionTimeoutException("transaction timed out: " +
+						  runningTime + " ms");
     }
 
     /** {@inheritDoc} */
@@ -121,6 +156,10 @@ final class TransactionImpl implements Transaction {
 		throw new UnsupportedOperationException(
 		    "Attempt to add multiple durable participants");
 	    }
+	    if (collector != null) {
+		String name = participant.getClass().getName();
+		detailMap.put(name, new ProfileParticipantDetailImpl(name));
+	    }
 	}
     }
 
@@ -146,10 +185,14 @@ final class TransactionImpl implements Transaction {
 	}
 	state = State.ABORTING;
 	abortCause = cause;
+	long startTime = 0;
 	for (TransactionParticipant participant : participants) {
 	    if (logger.isLoggable(Level.FINEST)) {
 		logger.log(Level.FINEST, "abort {0} participant:{1}",
 			   this, participant);
+	    }
+	    if (collector != null) {
+		startTime = System.currentTimeMillis();
 	    }
 	    try {
 		participant.abort(this);
@@ -159,6 +202,13 @@ final class TransactionImpl implements Transaction {
 			Level.WARNING, e, "abort {0} participant:{1} failed",
 			this, participant);
 		}
+	    }
+	    if (collector != null) {
+		long finishTime = System.currentTimeMillis();
+		ProfileParticipantDetailImpl detail =
+		    detailMap.get(participant.getClass().getName());
+		detail.setAborted(finishTime - startTime);
+		collector.addParticipant(detail);
 	    }
 	}
 	state = State.ABORTED;
@@ -235,15 +285,27 @@ final class TransactionImpl implements Transaction {
 		"Transaction is not active: " + state);
 	}
 	state = State.PREPARING;
+	long startTime = 0;
+	ProfileParticipantDetailImpl detail = null;
 	for (Iterator<TransactionParticipant> iter = participants.iterator();
 	     iter.hasNext(); )
 	{
 	    TransactionParticipant participant = iter.next();
+	    if (collector != null) {
+		detail = detailMap.get(participant.getClass().getName());
+		startTime = System.currentTimeMillis();
+	    }
 	    try {
 		if (iter.hasNext()) {
 		    boolean readOnly = participant.prepare(this);
+		    if (collector != null) {
+			detail.setPrepared(System.currentTimeMillis() -
+					   startTime, readOnly);
+		    }
 		    if (readOnly) {
 			iter.remove();
+			if (collector != null)
+			    collector.addParticipant(detail);
 		    }
 		    if (logger.isLoggable(Level.FINEST)) {
 			logger.log(Level.FINEST,
@@ -252,6 +314,12 @@ final class TransactionImpl implements Transaction {
 		    }
 		} else {
 		    participant.prepareAndCommit(this);
+		    if (collector != null) {
+			detail.
+			    setCommittedDirectly(System.currentTimeMillis() -
+						 startTime);
+			collector.addParticipant(detail);
+		    }
 		    iter.remove();
 		    if (logger.isLoggable(Level.FINEST)) {
 			logger.log(
@@ -283,8 +351,17 @@ final class TransactionImpl implements Transaction {
 		logger.log(Level.FINEST, "commit {0} participant:{1}",
 			   this, participant);
 	    }
+	    if (collector != null) {
+		detail = detailMap.get(participant.getClass().getName());
+		startTime = System.currentTimeMillis();
+	    }
 	    try {
 		participant.commit(this);
+		if (collector != null) {
+		    detail.setCommitted(System.currentTimeMillis() -
+					startTime);
+		    collector.addParticipant(detail);
+		}
 	    } catch (RuntimeException e) {
 		if (logger.isLoggable(Level.WARNING)) {
 		    logger.logThrow(

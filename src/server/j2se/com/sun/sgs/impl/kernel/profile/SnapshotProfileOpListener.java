@@ -4,7 +4,7 @@
 
 package com.sun.sgs.impl.kernel.profile;
 
-import com.sun.sgs.impl.util.PropertiesWrapper;
+import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 
 import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.ProfileOperation;
@@ -155,6 +155,9 @@ public class SnapshotProfileOpListener implements ProfileOperationListener {
         private final long reportPeriod;
         SnapshotRunnable(long reportPeriod) {
             this.reportPeriod = reportPeriod;
+        }
+        public String getBaseTaskType() {
+            return SnapshotRunnable.class.getName();
         }
         public void run() throws Exception {
             while (! flag.compareAndSet(false, true));

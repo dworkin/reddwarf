@@ -6,6 +6,8 @@ package com.sun.sgs.service;
 
 import com.sun.sgs.app.ExceptionRetryStatus;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.app.TransactionTimeoutException;
+
 
 /**
  * This interface represents a single transaction. It is used by
@@ -44,6 +46,22 @@ public interface Transaction {
      * @return the creation time-stamp
      */
     public long getCreationTime();
+
+    /**
+     * Returns the length of time in milliseconds that this
+     * <code>Transaction</code> is allowed to run before it should timeout.
+     *
+     * @return the timeout length
+     */
+    public long getTimeout();
+
+    /**
+     * Checks if this <code>Transaction</code> has timed out, throwing a
+     * <code>TransactionTimeoutException</code> if it has.
+     *
+     * @throws TransactionTimeoutException if the transaction has timed out
+     */
+    public void checkTimeout();
 
     /**
      * Tells the <code>Transaction</code> that the given
