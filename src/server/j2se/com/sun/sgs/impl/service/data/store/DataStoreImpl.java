@@ -74,54 +74,11 @@ import java.util.logging.Logger;
  * so the inability to resolve prepared transactions should have no effect at
  * present. <p>
  *
- * The {@link #DataStoreImpl constructor} supports the following properties:
- * <p>
- *
- * <ul>
- *
- * <li> <i>Key:</i> <code>com.sun.sgs.txn.timeout</code> <br>
- *	<i>Default:</i> <code>1000</code> <br>
- *	The maximum amount of time in milliseconds that a transaction will be
- *	permitted to run before it is a candidate for being aborted. <p>
- *
- * <li> <i>Key:</i>
- *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl.directory
- *	</code> <br>
- *	<i>Default:</i> <code>${com.sun.sgs.app.root}"/dsdb"</code> <br>
- *	The directory in which to store database files.  Each instance of
- *	<code>DataStoreImpl</code> requires its own, unique directory. <p>
- *
- * <li> <i>Key:</i> <code>
- *	com.sun.sgs.impl.service.data.store.DataStoreImpl.allocation.block.size
- *	</code> <br>
- *	<i>Default:</i> <code>100</code> <br>
- *	The number of object IDs to allocate at a time.  This value must be
- *	greater than <code>0</code>.  Object IDs are allocated in an
- *	independent transaction, and are discarded if a transaction aborts, if
- *	a managed object is made reachable within the data store but is removed
- *	from the store before the transaction commits, or if the program exits
- *	before it uses the object IDs it has allocated.  This number limits the
- *	maximum number of object IDs that would be discarded when the program
- *	exits. <p>
- *
- * <li> <i>Key:</i>
- *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl.cache.size
- *	</code> <br>
- *	<i>Default:</i> <code>1000000</code> <br>
- *	The size in bytes of the Berkeley DB cache.  This value must not be
- *	less than 20000. <p>
- *
- * <li> <i>Key:</i>
- *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl.flush.to.disk
- *	</code> <br>
- *	<i>Default:</i> <code>false</code>
- *	Whether to flush changes to disk when a transaction commits.  If
- *	<code>false</code>, the modifications made in some of the most recent
- *	transactions may be lost if the host crashes, although data integrity
- *	will be maintained.  Flushing changes to disk avoids data loss but
- *	introduces a significant reduction in performance. <p>
- *
- * </ul> <p>
+ * The {@link #DataStoreImpl constructor} supports the <a
+ * href="../../../../app/doc-files/config-properties.html#com.sun.sgs.txn.timeout">
+ * <code>com.sun.sgs.txn.timeout</code></a> property, as well as these public
+ * <a href="../../../../app/doc-files/config-properties.html#DataStore">
+ * properties</a>. <p>
  *
  * This class uses the {@link Logger} named
  * <code>com.sun.sgs.impl.service.data.DataStoreImpl</code> to log information

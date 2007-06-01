@@ -48,15 +48,8 @@ import java.util.logging.Logger;
  * for creating and initializing all components of the system and the
  * applications configured to run in this system.
  * <p>
- * By default, profiling is not turned on. To enable profiling, the kernel
- * property <code>com.sun.sgs.impl.kernel.Kernel.profile.level</code> must
- * be given the value "on". If no profile listeners are specified, then the
- * default <code>AggregateProfileOpListener</code> and
- * <code>SnapshotProfileOpListener</code> are enabled. To specify that a
- * different set of <code>ProfileOperationListener</code>s should be used,
- * the <code>com.sun.sgs.impl.kernel.Kernel.profile.listeners</code>
- * property must be specified with a colon-separated list of fully-qualified
- * classes, each of which implements <code>ProfileOperationListener</code>.
+ * The constructor supports the public configuration properties listed in
+ * ../../../app/doc-files/config-properties.html#Kernel.
  */
 class Kernel {
 

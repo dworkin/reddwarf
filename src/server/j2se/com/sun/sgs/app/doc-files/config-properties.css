@@ -1,0 +1,86 @@
+/* config-properties.css */
+
+/*
+ * This file defines the formatting style for the property definitions
+ * in the config-properties.html file.
+ *
+ * The properties should appear in a definition list (<dl>) element.
+ *
+ * For each property, the name and default should appear in a definition
+ * term (<dt>) element.  Properties that have a default should put the
+ * default value in a span element with class "default" (<span
+ * class="default">VALUE</span>).  Required properties should use a span
+ * element with class "required" (<span class="required").
+ *
+ * For example:
+ * <dl>
+ * <dt>foo.property
+ * <span class="default">37
+ * <dd>Controls how big foo is
+ * </dl>
+ */
+
+/* Indent the properties */
+dl {
+  margin-left: 1em;
+}
+
+/* Use monospace bold for the property name */
+dt {
+  font-family: monospace;
+  font-weight: bold;
+}
+
+/* Put <i>Property: </i> before the property name */
+dt:before {
+  font-family: serif;
+  font-style: italic;
+  font-weight: normal;
+  content: "Property: ";
+}
+
+/*
+ * Put a 1/2 blank line before and 1 blank line after the property definition
+ */
+dd {
+  padding-top: .5em;
+  padding-bottom: 1em;
+}
+
+/*
+ * Define a span for a configuration property default.  Use monospace
+ * normal and start on a new line
+ */
+span.default {
+  font-family: monospace;
+  font-weight: normal;
+  display: block;
+}
+
+/* Put <i>Default: </i> in front of each property default */
+span.default:before {
+  font-family: serif;
+  font-style: italic;
+  font-weight: normal;
+  content: "Default: ";
+}
+
+/*
+ * Define a span for a required property.  Use serif italic normal and
+ * start on a new line.
+ */
+span.required {
+  font-family: serif;
+  font-style: italic;
+  font-weight: normal;
+  display: block;
+}
+
+/*
+ * Put <i>Required &emdash; no default</i> for required.  2014 is the
+ * hex value for the Unicode mdash.
+ */
+span.required:before {
+  font-style: italic;
+  content: "Required \2014  no default";
+}
