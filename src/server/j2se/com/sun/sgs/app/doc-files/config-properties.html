@@ -1,0 +1,193 @@
+<html>
+<head>
+<title>Sun Game Server Configuration Properties</title>
+
+<style type="text/css">
+
+/* The wrapper for a configuration property */
+div.item {
+  padding-bottom: 1em;
+  display: list-item;
+}
+
+/* A configuration property name */
+span.key {
+  font-weight: bold;
+  font-family: monospace;
+  display: block;
+}
+
+/* Put <i>Key: </i> in front of each property name */
+span.key:before {
+  font-weight: normal;
+  font-family: serif;
+  font-style: italic;
+  content: "Key: ";
+}
+
+/* A configuration property default */
+span.default {
+  display: block;
+  font-family: monospace;
+}
+
+/* Put <i>Default: </i> in front of each property default */
+span.default:before {
+  font-style: italic;
+  font-family: serif;
+  content: "Default: ";
+}
+
+/* Use this for a property that has no default */
+span.nodefault {
+  display: block;
+}
+
+/* The text for the no-default case */
+span.nodefault:before {
+  font-style: italic;
+  /* \2014 is an em-dash! */
+  content: "No default \2014  required";
+}
+
+</style>
+</head>
+
+<body>
+
+<h1>Sun Game Server Configuration Properties</h1>
+
+<a name="Services">
+<h2>Services</h2>
+</a>
+
+<a name="General">
+<h3>General</h3>
+</a>
+
+<ul>
+
+<div class="item">
+<span class="key">com.sun.sgs.app.name</span>
+<span class="nodefault"></span>
+
+Specifies the application name. </div>
+
+<div class="item">
+<span class="key">com.sun.sgs.txn.timeout</span>
+<span class="default">1000</span>
+
+The maximum amount of time in milliseconds that a transaction will be
+permitted to run before it is a candidate for being aborted. </div>
+
+</ul>
+<p>
+
+<a name="ChannelService">
+<h3>ChannelService</h3>
+</a>
+
+<code>com.sun.sgs.impl.service.channel.ChannelServiceImpl</code>
+
+<ul>
+
+<div class="item">
+<span class="key">com.sun.sgs.app.name</span>
+<span class="nodefault"></span>
+
+Specifies the application name. </div>
+
+</ul>
+</p>
+
+<a name="DataService">
+<h3>DataService</h3>
+</a>
+
+<code>com.sun.sgs.impl.service.data.DataServiceImpl</code>
+
+<ul>
+
+<div class="item">
+<span class="key">
+com.sun.sgs.impl.service.data.DataServiceImpl.debug.check.interval
+</span>
+<span class="default">Integer.MAX_VALUE</span>
+
+Specifies the number of <code>DataService</code> operations to skip
+between checks of the consistency of the managed references table.  Note
+that the number of operations is measured separately for each
+transaction.  This property is intended for use in debugging. </div>
+
+<div class="item">
+<span class="key">
+com.sun.sgs.impl.service.data.DataServiceImpl.detect.modifications</span>
+<span class="default">true</span>
+
+Specifies whether to automatically detect modifications to managed
+objects.  If set to something other than <code>true</code>, then
+applications need to call <a href="../DataManager.html#markForUpdate">
+<code>DataManager.markForUpdate</code></a> or
+<a href="../ManagedReference.html#getForUpdate">
+<code>ManagedReference.getForUpdate</code></a> for any modified objects
+to make sure that the modifications are recorded by
+the <code>DataService</code>. </div>
+
+</ul>
+<p>
+
+<a name="DataStore">
+<h4>DataStore</h4>
+</a>
+
+<ul>
+
+<div class="item">
+<span class="key">
+com.sun.sgs.impl.service.data.store.DataStoreImpl.directory
+</span>
+<span class="default" style="font-family: serif">
+<i>com.sun.sgs.app.root</i><code>/dsdb</code> <br>
+
+The directory in which to store database files.  Each instance of
+<code>DataStoreImpl</code> requires its own, unique directory. </div>
+
+<div class="item">
+<span class="key">
+com.sun.sgs.impl.service.data.store.DataStoreImpl.allocation.block.size</span>
+<span class="default">100</span>
+
+The number of object IDs to allocate at a time.  This value must be
+greater than <code>0</code>.  Object IDs are allocated in an independent
+transaction, and are discarded if a transaction aborts, if a managed
+object is made reachable within the data store but is removed from the
+store before the transaction commits, or if the program exits before it
+uses the object IDs it has allocated.  This number limits the maximum
+number of object IDs that would be discarded when the program exits. </div>
+
+<div class="item">
+<span class="key">
+com.sun.sgs.impl.service.data.store.DataStoreImpl.cache.size
+</span>
+<span class="default">1000000</span>
+
+The size in bytes of the Berkeley DB cache.  This value must not be less
+than <code>20000</code>. </div>
+
+<div class="item">
+<span class="key">
+com.sun.sgs.impl.service.data.store.DataStoreImpl.flush.to.disk
+</span>
+<span class="default">false</span>
+
+Whether to flush changes to disk when a transaction commits.  If
+<code>false</code>, the modifications made in some of the most recent
+transactions may be lost if the host crashes, although data integrity
+will be maintained.  Flushing changes to disk avoids data loss but
+introduces a significant reduction in performance. </div>
+
+</ul>
+<p>
+
+</body>
+</html>
