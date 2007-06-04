@@ -36,10 +36,10 @@ import java.util.logging.Logger;
  *
  * The {@link #DataServiceImpl constructor} requires the <a
  * href="../../../app/doc-files/config-properties.html#com.sun.sgs.app.name">
- * <code>com.sun.sgs.app.name</code></a> property, and supports these public
- * configuration <a
+ * <code>com.sun.sgs.app.name</code></a> property, and also supports these
+ * public configuration <a
  * href="../../../app/doc-files/config-properties.html#DataService">
- * properties</a>, as well as the following additional properties: <p>
+ * properties</a> as well as the following additional properties: <p>
  *
  * <dl style="margin-left: 1em">
  *

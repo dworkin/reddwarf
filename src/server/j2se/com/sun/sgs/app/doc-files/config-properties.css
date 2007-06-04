@@ -1,25 +1,5 @@
 /* config-properties.css */
 
-/*
- * This file defines the formatting style for the property definitions
- * in the config-properties.html file.
- *
- * The properties should appear in a definition list (<dl>) element.
- *
- * For each property, the name and default should appear in a definition
- * term (<dt>) element.  Properties that have a default should put the
- * default value in a span element with class "default" (<span
- * class="default">VALUE</span>).  Required properties should use a span
- * element with class "required" (<span class="required").
- *
- * For example:
- * <dl>
- * <dt>foo.property
- * <span class="default">37
- * <dd>Controls how big foo is
- * </dl>
- */
-
 /* Indent the properties */
 dl {
   margin-left: 1em;
@@ -76,11 +56,25 @@ span.required {
   display: block;
 }
 
-/*
- * Put <i>Required &emdash; no default</i> for required.  2014 is the
- * hex value for the Unicode mdash.
- */
+/* Put <i>Required</i> for required. */
 span.required:before {
   font-style: italic;
-  content: "Required \2014  no default";
+  content: "Required";
+}
+
+/*
+ * Define a span for a property that has no default.  Use serif italic normal
+ * and start on a new line.
+ */
+span.nodefault { 
+  font-family: serif;
+  font-style: italic;
+  font-weight: normal;
+  display: block;
+}
+
+/* Put <i>No default</i> when there is no default. */
+span.nodefault:before { 
+  font-style: italic;
+  content: "No default";
 }

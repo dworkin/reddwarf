@@ -76,9 +76,27 @@ import java.util.logging.Logger;
  *
  * The {@link #DataStoreImpl constructor} supports the <a
  * href="../../../../app/doc-files/config-properties.html#com.sun.sgs.txn.timeout">
- * <code>com.sun.sgs.txn.timeout</code></a> property, as well as these public
- * <a href="../../../../app/doc-files/config-properties.html#DataStore">
- * properties</a>. <p>
+ * <code>com.sun.sgs.txn.timeout</code></a> property, these public <a
+ * href="../../../../app/doc-files/config-properties.html#DataStore">
+ * properties</a>, and the following additional properties: <p>
+ *
+ * <dl style="margin-left: 1em">
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.data.store.DataStoreImpl.allocation.block.size
+ *	</b></code> <br>
+ *	<i>Default:</i> <code>100</code> <br>
+ *
+ * <dd style="padding-top: .5em">>The number of object IDs to allocate at a
+ * time.  This value must be greater than <code>0</code>.  Object IDs are
+ * allocated in an independent transaction, and are discarded if a transaction
+ * aborts, if a managed object is made reachable within the data store but is
+ * removed from the store before the transaction commits, or if the program
+ * exits before it uses the object IDs it has allocated.  This number limits
+ * the maximum number of object IDs that would be discarded when the program
+ * exits. <p>
+ *
+ * </dl> <p>
  *
  * This class uses the {@link Logger} named
  * <code>com.sun.sgs.impl.service.data.DataStoreImpl</code> to log information

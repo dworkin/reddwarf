@@ -1,31 +1,84 @@
-<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
 <html>
 <head>
 <title>Sun Game Server Configuration Properties</title>
 <link type="text/css" rel="stylesheet" href="config-properties.css">
 </head>
 
+<!--
+
+  The properties listed in this file should appear in definition
+  list <dl> elements.
+
+  For each property, the name and information about the default should
+  appear in a definition term (<dt>) element.  Properties that have a
+  default should put the default value in a span element with class
+  "default" (<span class="default">VALUE</span>).  Required properties
+  should use a span element with class "required"
+  (<span class="required"></span>), and properties with no default
+  should use class "nodefault" (<span class="nodefault"></span>).
+
+  For example:
+  
+  <dl>
+  <dt>foo.property
+  <span class="default">37</span>
+  <dd>Controls how big foo is.
+  </dl>
+
+  Or:
+
+  <dl>
+  <dt>goo.property
+  <span class="required"></span>
+  <dd>Controls how big goo is.
+  </dl>
+
+  Since this file will be included in the public application
+  documentation, make sure to not refer to classes that will not be
+  documented there.
+
+-->
+
 <body>
 
 <h1>Sun Game Server Configuration Properties</h1>
 
 This page documents the configuration properties supported by the Sun
-Game Server. <p>
+Game Server.  Configuration properties may be specified by system
+properties (using <code>-D<i>property</i>=<i>value</i></code>) or in the
+application properties files named on the command line.
 
 <h2>General Properties</h2>
 
 These properties control various general facilities in the Sun Game
-Server. <p>
+Server.
 
 <dl>
 
 <dt><a name="com.sun.sgs.app.name">com.sun.sgs.app.name</a>
 <span class="required"></span>
-<dd>Specifies the application name.
+<dd>The name of the application.
+
+<dt>com.sun.sgs.app.root
+<span class="required"></span>
+<dd>The root directory for the application.
+
+<dt>com.sun.sgs.app.listener
+<span class="required"></span>
+<dd>The <a href="../AppListener.html"><code>AppListener</code></a> for
+  the application, specified as a fully qualified class name.
 
 <dt><a name="com.sun.sgs.app.port">com.sun.sgs.app.port</a>
 <span class="required"></span>
-<dd>Specifies the TCP port to listen for client connections.
+<dd>The TCP port on which to listen for client connections.
+
+<dt>com.sun.sgs.app.config.file
+<span class="nodefault"></span>
+<dd>The pathname of a file containing system properties.  If specified,
+  each property within that file is provided to the system and to all
+  applications. Each property may be overridden by a system property
+  provided at startup, or by a property for an individual application.
 
 <dt><a name="com.sun.sgs.txn.timeout">com.sun.sgs.txn.timeout</a>
 <span class="default">100</span>
@@ -34,26 +87,25 @@ Server. <p>
 
 <dt>com.sun.sgs.txn.timeout.unbounded
 <span class="default">Long.MAX_VALUE</span>
-<dd>The maxmum amount of time in milliseconds that
-  an <quote>unbounded</quote> transaction will be permitted to run
-  before it is a candidate for being aborted.
+<dd>The maximum amount of time in milliseconds that an <q>unbounded</q>
+  transaction will be permitted to run before it is a candidate for
+  being aborted.
 
 </dl>
 
-<a name="DataService">
+<a name="DataService"></a>
 <h2>DataService Properties</h2>
-</a>
 
 These properties control the implementation of the
-<code>DataService</code>. <p>
+<code>DataService</code>.
 
 <dl>
 
 <dt>com.sun.sgs.impl.service.data.DataServiceImpl.detect.modifications
 <span class="default">true</span>
-<dd>Specifies whether to automatically detect modifications to managed
-  objects.  If set to something other than <code>true</code>, then
-  applications need to call <a
+<dd>Whether to automatically detect modifications to managed objects.
+  If set to something other than <code>true</code>, then applications
+  need to call <a
   href="../DataManager.html#markForUpdate(com.sun.sgs.app.ManagedObject)">
   <code>DataManager.markForUpdate</code></a> or
   <a href="../ManagedReference.html#getForUpdate(java.lang.Class)">
@@ -63,13 +115,12 @@ These properties control the implementation of the
 
 </dl>
 
-<a name="DataStore">
+<a name="DataStore"></a>
 <h3>DataStore Properties</h3>
-</a>
 
-These properties are a subset of the properties supported by
+These properties are the subset of the properties supported by
 the <code>DataService</code> that control the implementation of the
-underlying <code>DataStore</code>. <p>
+underlying <code>DataStore</code>.
 
 <dl>
 
@@ -78,20 +129,9 @@ underlying <code>DataStore</code>. <p>
 <dd>The directory in which to store database files.  Each instance of
   requires its own, unique directory.
 
-<dt>com.sun.sgs.impl.service.data.store.DataStoreImpl.allocation.block.size
-<span class="default">100</span>
-<dd>The number of object IDs to allocate at a time.  This value must be
-  greater than <code>0</code>.  Object IDs are allocated in an
-  independent transaction, and are discarded if a transaction aborts, if
-  a managed object is made reachable within the data store but is
-  removed from the store before the transaction commits, or if the
-  program exits before it uses the object IDs it has allocated.  This
-  number limits the maximum number of object IDs that would be discarded
-  when the program exits.
-
 <dt>com.sun.sgs.impl.service.data.store.DataStoreImpl.cache.size
 <span class="default">1000000</span>
-<dd>The size in bytes of the Berkeley DB cache.  This value must not be
+<dd>The size in bytes of the Berkeley DB cache.  The value must not be
   less than <code>20000</code>.
 
 <dt>com.sun.sgs.impl.service.data.store.DataStoreImpl.flush.to.disk
@@ -104,47 +144,68 @@ underlying <code>DataStore</code>. <p>
 
 </dl>
 
-<a name="ClientSessionService">
+<a name="ClientSessionService"></a>
 <h2>ClientSessionService Properties</h2>
-</a>
 
 These properties control the implementation of the
-<code>ClientSessionService</code>. <p>
+<code>ClientSessionService</code>.
 
 <dl>
 
 <dt>com.sun.sgs.impl.service.ClientSessionServiceImpl.id.block.size
 <span class="default">256</span>
-<dd>Specifies the block size to use when reserving session IDs.  Must be
+<dd>The block size to use when reserving session IDs.  The value must be
   greater than <code>8</code>.
 
 </dl>
 
-<a name="Kernel">
+<a name="Kernel"></a>
 <h2>Kernel Properties</h2>
-</a>
 
-These properties control the implementation of the <code>Kernel</code>. <p>
+These properties control the implementation of the <code>Kernel</code>,
+which is the part of the system that manages applications and the
+components that make up the system.
 
 <dl>
 
 <dt>com.sun.sgs.impl.kernel.Kernel.profile.level
 <span class="default">off</span>
-<dd>Whether to perform profiling, which is enabled if the value is
+<dd>Whether to perform profiling.  Profiling is enabled if the value is
   <code>on</code>.
 
-<dt>com.sun.sgs.impl.kernel.Kernel.profile.listeners
-<span class="default">
-  <div style="padding-left: 4em">
-    com.sun.sgs.impl.kernel.profile.AggregateProfileOpListener:<br>
-    com.sun.sgs.impl.kernel.profile.SnapshotProfileOpListener:<br>
-    com.sun.sgs.impl.kernel.profile.SnapshotParticipantListener
-  </div>
-</span>
-<dd>The set of <code>ProfileOperationListener</code>s that should be
-  used.  The value should be a colon-separated list of fully-qualified
-  classes, each of which implements
-  <code>com.sun.sgs.kernel.ProfileOperationListener</code>.
+</dl>
+
+<a name="ResourceCoordinator"></a>
+<h3>ResourceCoordinator Properties</h3>
+
+These properties control the implementation
+of <code>ResourceCoordinator</code>, which is the part of
+the <code>Kernel</code> that creates and manages threads.
+
+<dl>
+
+<dt>com.sun.sgs.kernel.CorePoolSize
+<span class="default">8</span>
+<dd>The initial thread pool size.
+
+<dt>com.sun.sgs.kernel.MaximumPoolSize
+<span class="default">16</span>
+<dd>The maximum thread pool size.
+
+</dl>
+
+<a name="TaskScheduler"></a>
+<h3>TaskScheduler Properties</h3>
+
+These properties control the implementation of
+the <code>TaskScheduler</code>, which is the part of
+the <code>Kernel</code> that schedules tasks.
+
+<dl>
+
+<dt>com.sun.sgs.impl.kernel.schedule.InitialConsumerThreads
+<span class="default">4</span>
+<dd>The number of initial consumer threads used to process tasks.
 
 </dl>
 
