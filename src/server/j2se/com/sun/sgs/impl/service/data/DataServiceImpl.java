@@ -48,11 +48,11 @@ import java.util.logging.Logger;
  *	</b></code> <br>
  *	<i>Default:</i> <code>Integer.MAX_VALUE</code>
  *
- * <dd style="padding-top: .5em">Specifies the number of
- *	<code>DataService</code> operations to skip between checks of the
- *	consistency of the managed references table.  Note that the number of
- *	operations is measured separately for each transaction.  This property
- *	is intended for use in debugging. <p>
+ * <dd style="padding-top: .5em">The number of <code>DataService</code>
+ *	operations to skip between checks of the consistency of the managed
+ *	references table.  Note that the number of operations is measured
+ *	separately for each transaction.  This property is intended for use in
+ *	debugging. <p>
  *
  * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class
@@ -60,11 +60,14 @@ import java.util.logging.Logger;
  *	<i>Default:</i>
  *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl</code>
  *
- * <dd style="padding-top: .5em"> The name of the class that implements {@link
+ * <dd style="padding-top: .5em">The name of the class that implements {@link
  *	DataStore}.  The class should be public, not abstract, and should
  *	provide a public constructor with a {@link Properties} parameter. <p>
  *
  * </dl> <p>
+ *
+ * The constructor also passes the properties to the {@link DataStoreImpl}
+ * constructor, which supports additional properties. <p>
  *
  * This class uses the {@link Logger} named
  * <code>com.sun.sgs.impl.service.data.DataServiceImpl</code> to log

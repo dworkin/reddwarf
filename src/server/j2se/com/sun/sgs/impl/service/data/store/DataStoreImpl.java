@@ -87,7 +87,7 @@ import java.util.logging.Logger;
  *	</b></code> <br>
  *	<i>Default:</i> <code>100</code> <br>
  *
- * <dd style="padding-top: .5em">>The number of object IDs to allocate at a
+ * <dd style="padding-top: .5em">The number of object IDs to allocate at a
  * time.  This value must be greater than <code>0</code>.  Object IDs are
  * allocated in an independent transaction, and are discarded if a transaction
  * aborts, if a managed object is made reachable within the data store but is
