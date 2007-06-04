@@ -53,18 +53,22 @@ public abstract class TransactionContextFactory<T extends TransactionContext> {
     }
 
    /**
-     * If this participant has not yet joined the current transaction,
-     * creates a new context by invoking {@link #createContext
-     * createContext} passing the current transaction, sets that context
-     * as the current context for the current thread, and joins the
-     * transaction.  Otherwise, if this participant has already joined
-     * the current transaction, returns the current transaction context.
-     *
-     * @return 	the context for the current transaction
-     * @throws	TransactionNotActiveException if no transaction is active
-     * @throws	IllegalStateException if there is a problem with the
-     *		state of the transaction.
-     */
+    * Makes sure the participant is joined to the current transaction
+    * and returns the associated context.  First, if no participant has
+    * been created for this factory before, calls {@link
+    * #createParticipant createParticipant} to create the participant.
+    * Next, if the participant has not yet joined the current
+    * transaction, creates a new context by invoking {@link
+    * #createContext createContext}, passing the current transaction,
+    * sets that context as the current context for the current thread,
+    * and joins the transaction.  Finally, returns the context for the
+    * current transaction.
+    *
+    * @return 	the context for the current transaction
+    * @throws	TransactionNotActiveException if no transaction is active
+    * @throws	IllegalStateException if there is a problem with the
+    *		state of the transaction.
+    */
     public T joinTransaction() {
         Transaction txn = txnProxy.getCurrentTransaction();
         if (txn == null) {
@@ -76,13 +80,13 @@ public abstract class TransactionContextFactory<T extends TransactionContext> {
             if (logger.isLoggable(Level.FINER)) {
                 logger.log(Level.FINER, "join txn:{0}", txn);
             }
-            context = createContext(txn);
-            currentContext.set(context);
 	    synchronized (lock) {
 		if (participant == null) {
 		    participant = createParticipant();
 		}
 	    }
+            context = createContext(txn);
+            currentContext.set(context);
             txn.join(participant);
         } else if (!txn.equals(context.getTransaction())) {
             currentContext.set(null);
