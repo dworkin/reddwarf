@@ -6,6 +6,7 @@ package com.sun.sgs.impl.service.data.store.net;
 
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
+import com.sun.sgs.impl.service.data.store.ClassInfoNotFoundException;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -774,6 +775,28 @@ public class DataStoreServerImpl implements DataStoreServer {
 	Txn txn = getTxn(tid);
 	try {
 	    return store.nextBoundName(txn, name);
+	} finally {
+	    txnTable.notInUse(txn);
+	}
+    }
+
+    /** {@inheritDoc} */
+    public int getClassId(long tid, byte[] classInfo) {
+	Txn txn = getTxn(tid);
+	try {
+	    return store.getClassId(txn, classInfo);
+	} finally {
+	    txnTable.notInUse(txn);
+	}
+    }
+
+    /** {@inheritDoc} */
+    public byte[] getClassInfo(long tid, int classId)
+	throws ClassInfoNotFoundException
+    {
+	Txn txn = getTxn(tid);
+	try {
+	    return store.getClassInfo(txn, classId);
 	} finally {
 	    txnTable.notInUse(txn);
 	}

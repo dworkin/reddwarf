@@ -147,7 +147,7 @@ public class OperationLoggingProfileOpListener
             if (logger.isLoggable(Level.FINE)) {
                 long now = System.currentTimeMillis();
                 String opCountTally = "";
-                for (int i = 0; i < maxOp; i++) {
+                for (int i = 0; i <= maxOp; i++) {
                     if (i != 0)
                         opCountTally += "\n";
                     opCountTally += "  " + registeredOps[i] + ": " +
@@ -171,7 +171,7 @@ public class OperationLoggingProfileOpListener
                            "[threads=" + threadCount + "]\n" + opCountTally +
 			   "\n" + counterTally);
             } else {
-                for (int i = 0; i < maxOp; i++)
+                for (int i = 0; i <= maxOp; i++)
                     opCounts[i] = 0;
             }
 

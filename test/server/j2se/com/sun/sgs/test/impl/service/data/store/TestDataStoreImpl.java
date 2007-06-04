@@ -10,6 +10,7 @@ import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.kernel.StandardProperties;
+import com.sun.sgs.impl.service.data.store.ClassInfoNotFoundException;
 import com.sun.sgs.impl.service.data.store.DataStoreException;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
@@ -104,6 +105,8 @@ public class TestDataStoreImpl extends TestCase {
 	    }
 	}
     }
+
+    /* -- Tests -- */
 
     /* -- Test constructor -- */
 
@@ -1345,6 +1348,142 @@ public class TestDataStoreImpl extends TestCase {
 	id = store.getBinding(txn, "foo");
 	byte[] value = store.getObject(txn, id, false);
 	assertTrue(Arrays.equals(bytes, value));
+    }
+
+    /* -- Test getClassId -- */
+
+    public void testGetClassIdNullArgs() {
+	byte[] bytes = { 0, 1, 2, 3, 4 };
+	try {
+	    store.getClassId(null, bytes);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+	try {
+	    store.getClassId(txn, null);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testGetClassIdNonStandardBytes() throws Exception {
+	testGetClassIdBytes();
+	testGetClassIdBytes((byte) 1);
+	testGetClassIdBytes((byte) 2);
+	testGetClassIdBytes((byte) 3, (byte) 4);
+	testGetClassIdBytes((byte) 5, (byte) 6, (byte) 0xff);
+	testGetClassIdBytes((byte) 0xac, (byte) 0xed, (byte) 0, (byte) 5);
+	testGetClassIdBytes((byte) 0xac, (byte) 0xed, (byte) 0, (byte) 4);
+    }
+	
+    private void testGetClassIdBytes(byte... bytes) throws Exception {
+	int id = store.getClassId(txn, bytes);
+	assertTrue(id > 0);
+	byte[] storedBytes = store.getClassInfo(txn, id);
+	assertEquals(Arrays.toString(bytes), Arrays.toString(storedBytes));
+    }
+
+    /* -- Unusual states: getClassId -- */
+    private final Action getClassId = new Action() {
+	void run() { store.getClassId(txn, new byte[0]); };
+    };
+    public void testGetClassIdAborted() throws Exception {
+	testAborted(getClassId);
+    }
+    public void testGetClassIdPreparedReadOnly() throws Exception {
+	testPreparedReadOnly(getClassId);
+    }
+    public void testGetClassIdPreparedModified() throws Exception {
+	testPreparedModified(getClassId);
+    }
+    public void testGetClassIdCommitted() throws Exception {
+	testCommitted(getClassId);
+    }
+    public void testGetClassIdWrongTxn() throws Exception {
+	testWrongTxn(getClassId);
+    }
+    public void testGetClassIdShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(getClassId);
+    }
+    public void testGetClassIdShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(getClassId);
+    }
+    public void testGetClassIdShutdown() throws Exception {
+	testShutdown(getClassId);
+    }
+
+    /* -- Test getClassInfo -- */
+
+    public void testGetClassInfoBadArgs() throws Exception {
+	try {
+	    store.getClassInfo(null, 1);
+	    fail("Expected NullPointerException");
+	} catch (NullPointerException e) {
+	    System.err.println(e);
+	}
+	try {
+	    store.getClassInfo(txn, 0);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+	try {
+	    store.getClassInfo(txn, -1);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testGetClassInfoNotFound() {
+	try {
+	    store.getClassInfo(txn, 56789);
+	    fail("Expected ClassInfoNotFoundException");
+	} catch (ClassInfoNotFoundException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testGetClassInfoAfterRestart() throws Exception {
+	byte[] bytes = { 1, 2, 3, 4, 5, 6 };
+	int id = store.getClassId(txn, bytes);
+	txn.commit();
+	store.shutdown();
+	store = createDataStore();
+	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	assertEquals(Arrays.toString(bytes),
+		     Arrays.toString(store.getClassInfo(txn, id)));
+    }
+
+    /* -- Unusual states: getClassInfo -- */
+    private final Action getClassInfo = new Action() {
+	void run() throws Exception { store.getClassInfo(txn, 1); };
+    };
+    public void testGetClassInfoAborted() throws Exception {
+	testAborted(getClassInfo);
+    }
+    public void testGetClassInfoPreparedReadOnly() throws Exception {
+	testPreparedReadOnly(getClassInfo);
+    }
+    public void testGetClassInfoPreparedModified() throws Exception {
+	testPreparedModified(getClassInfo);
+    }
+    public void testGetClassInfoCommitted() throws Exception {
+	testCommitted(getClassInfo);
+    }
+    public void testGetClassInfoWrongTxn() throws Exception {
+	testWrongTxn(getClassInfo);
+    }
+    public void testGetClassInfoShuttingDownExistingTxn() throws Exception {
+	testShuttingDownExistingTxn(getClassInfo);
+    }
+    public void testGetClassInfoShuttingDownNewTxn() throws Exception {
+	testShuttingDownNewTxn(getClassInfo);
+    }
+    public void testGetClassInfoShutdown() throws Exception {
+	testShutdown(getClassInfo);
     }
 
     /* -- Test deadlock -- */

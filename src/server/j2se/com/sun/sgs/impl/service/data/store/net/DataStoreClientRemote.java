@@ -10,8 +10,8 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
- * The client side of an experimental network protocol for implementing
- * DataStoreServer using sockets instead of RMI.
+ * The client side of an experimental network protocol, not currently used, for
+ * implementing DataStoreServer using sockets instead of RMI.
  */
 /*
  * XXX: Limit connections and/or close unused connections?
@@ -154,6 +154,24 @@ class DataStoreClientRemote implements DataStoreServer {
 	DataStoreProtocol h = getHandler();
 	try {
 	    return h.nextBoundName(tid, name);
+	} finally {
+	    returnHandler(h);
+	}
+    }
+
+    public int getClassId(long tid, byte[] classInfo) throws IOException {
+	DataStoreProtocol h = getHandler();
+	try {
+	    return h.getClassId(tid, classInfo);
+	} finally {
+	    returnHandler(h);
+	}
+    }
+
+    public byte[] getClassInfo(long tid, int classId) throws IOException {
+	DataStoreProtocol h = getHandler();
+	try {
+	    return h.getClassInfo(tid, classId);
 	} finally {
 	    returnHandler(h);
 	}
