@@ -85,16 +85,16 @@ import java.util.logging.Logger;
  * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.data.store.DataStoreImpl.allocation.block.size
  *	</b></code> <br>
- *	<i>Default:</i> <code>100</code> <br>
+ *	<i>Default:</i> <code>100</code>
  *
  * <dd style="padding-top: .5em">The number of object IDs to allocate at a
- * time.  This value must be greater than <code>0</code>.  Object IDs are
- * allocated in an independent transaction, and are discarded if a transaction
- * aborts, if a managed object is made reachable within the data store but is
- * removed from the store before the transaction commits, or if the program
- * exits before it uses the object IDs it has allocated.  This number limits
- * the maximum number of object IDs that would be discarded when the program
- * exits. <p>
+ *	time.  This value must be greater than <code>0</code>.  Object IDs are
+ *	allocated in an independent transaction, and are discarded if a
+ *	transaction aborts, if a managed object is made reachable within the
+ *	data store but is removed from the store before the transaction
+ *	commits, or if the program exits before it uses the object IDs it has
+ *	allocated.  This number limits the maximum number of object IDs that
+ *	would be discarded when the program exits. <p>
  *
  * </dl> <p>
  *
