@@ -134,6 +134,19 @@ underlying <code>DataStore</code>.
 <dd>The size in bytes of the Berkeley DB cache.  The value must not be
   less than <code>20000</code>.
 
+ * <li> <i>Key:</i> {@code
+ *	com.sun.sgs.impl.service.data.store.DataStoreImpl.checkpoint.interval}
+ *	<br>
+ *	<i>Default:</i> {@code 60000} <br>
+ *	The interval in milliseconds between checkpoint operations that flush
+ *	changes from the database log to the database. <p>
+ *
+ * <li> <i>Key:</i> {@code
+ *	com.sun.sgs.impl.service.data.store.DataStoreImpl.checkpoint.size} <br>
+ *	<i>Default:</i> {@code 100000} <br>
+ *	The number of bytes that needs to have been written since the last
+ *	checkpoint operation was performed to require another checkpoint. <p>
+
 <dt>com.sun.sgs.impl.service.data.store.DataStoreImpl.flush.to.disk
 <span class="default">false</span>
 <dd>Whether to flush changes to disk when a transaction commits.  If
