@@ -7,6 +7,7 @@ package com.sun.sgs.impl.service.data.store.net;
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.app.TransactionTimeoutException;
+import com.sun.sgs.impl.service.data.store.ClassInfoNotFoundException;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
@@ -526,6 +527,59 @@ public final class DataStoreClient
 	} catch (RuntimeException e) {
 	    throw convertException(null, Level.FINER, e, "shutdown");
 	}
+    }
+
+    /** {@inheritDoc} */
+    public int getClassId(Transaction txn, byte[] classInfo) {
+	logger.log(Level.FINER, "getClassId txn:{0}", txn);
+	TxnInfo txnInfo = null;
+	Exception exception;
+	try {
+	    txnInfo = checkTxn(txn);
+	    int result = server.getClassId(txnInfo.tid, classInfo);
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.log(Level.FINER,
+			   "getClassId txn:{0} returns {1}", txn, result);
+	    }
+	    return result;
+	} catch (IOException e) {
+	    exception = e;
+	} catch (RuntimeException e) {
+	    exception = e;
+	}
+	throw convertException(
+	    txnInfo, Level.FINER, exception, "getClassId txn:" + txn);
+    }
+
+    /** {@inheritDoc} */
+    public byte[] getClassInfo(Transaction txn, int classId)
+	throws ClassInfoNotFoundException
+    {
+	if (logger.isLoggable(Level.FINER)) {
+	    logger.log(Level.FINER,
+		       "getClassInfo txn:{0}, classId:{1,number,#}",
+		       txn, classId);
+	}
+	TxnInfo txnInfo = null;
+	Exception exception;
+	try {
+	    txnInfo = checkTxn(txn);
+	    byte[] result = server.getClassInfo(txnInfo.tid, classId);
+	    if (logger.isLoggable(Level.FINER)) {
+		logger.log(
+		    Level.FINER,
+		    "getClassInfo txn:{0}, classId:{1,number,#} returns",
+		    txn, classId);
+	    }
+	    return result;
+	} catch (IOException e) {
+	    exception = e;
+	} catch (RuntimeException e) {
+	    exception = e;
+	}
+	throw convertException(
+	    txnInfo, Level.FINER, exception,
+	    "getClassInfo txn:" + txn + ", classId:" + classId);
     }
 
     /* -- Implement TransactionParticipant -- */
