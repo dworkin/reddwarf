@@ -112,6 +112,10 @@ public class SimpleClient implements ServerSession {
      * @param listener a listener that will receive events for this client
      */
     public SimpleClient(SimpleClientListener listener) {
+        if (listener == null) {
+            throw new NullPointerException(
+                "The SimpleClientListener argument must not be null");
+        }
         this.clientListener = listener;
     }
 
@@ -274,6 +278,12 @@ public class SimpleClient implements ServerSession {
 
             PasswordAuthentication authentication =
                 clientListener.getPasswordAuthentication();
+
+            if (authentication == null) {
+                logout(true);
+                throw new NullPointerException(
+                    "The returned PasswordAuthentication must not be null");
+            }
 
             String user = authentication.getUserName();
             String pass = new String(authentication.getPassword());
@@ -453,8 +463,8 @@ public class SimpleClient implements ServerSession {
                 if (channels.putIfAbsent(channelId, channel) == null) {
                     channel.joined();
                 } else {
-                    logger.log(Level.FINE,
-                        "Cannot leave channel {0}: already a member",
+                    logger.log(Level.WARNING,
+                        "Cannot join channel {0}: already a member",
                         channelName);
                 }
                 break;
@@ -468,7 +478,7 @@ public class SimpleClient implements ServerSession {
                 if (channel != null) {
                     channel.left();
                 } else {
-                    logger.log(Level.FINE,
+                    logger.log(Level.WARNING,
                         "Cannot leave channel {0}: not a member",
                         channelId);
                 }
@@ -544,8 +554,12 @@ public class SimpleClient implements ServerSession {
 
         private final String channelName;
 	private final CompactId channelId;
-        private volatile boolean joined;
-        private ClientChannelListener listener;
+        
+        /**
+         * The listener for this channel if the client is a member,
+         * or null if the client is no longer a member of this channel.
+         */
+        private volatile ClientChannelListener listener = null;
 
         SimpleClientChannel(String name, CompactId id) {
             this.channelName = name;
@@ -589,42 +603,33 @@ public class SimpleClient implements ServerSession {
         // Implementation details
 
         void joined() {
-            joined = true;            
+            assert (listener == null);
+
             listener = clientListener.joinedChannel(this);
+
+            if (listener == null) {
+                throw new NullPointerException(
+                    "The returned ClientChannelListener must not be null");
+            }
         }
 
         void left() {
-            if (! joined) {
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.log(Level.FINE,
-                        "Cannot leave channel {0}: not a member",
-                        channelName);
-                }
-                return;
-            }
-            joined = false;
-            if (listener != null) {
-                listener.leftChannel(this);
-                listener = null;
-            }
+            assert (listener != null);
+
+            listener.leftChannel(this);
+            listener = null;
        }
         
         void receivedMessage(SessionId sid, byte[] message) {
-            if (! joined) {
-                if (logger.isLoggable(Level.FINE)) {
-                    logger.log(Level.FINE,
-                        "Ignore message on channel {0}: not a member",
-                        channelName);
-                }
-                return;
-            }
+            assert (listener != null);
+
             listener.receivedMessage(this, sid, message);
         }
 
         void sendInternal(Set<SessionId> recipients, byte[] message)
             throws IOException
         {
-            if (! joined) {
+            if (listener == null) {
                 if (logger.isLoggable(Level.FINE)) {
                     logger.log(Level.FINE,
                         "Cannot send on channel {0}: not a member",
@@ -634,9 +639,9 @@ public class SimpleClient implements ServerSession {
             }
             int totalSessionLength = 0;
             if (recipients != null) {
-                for (SessionId sid : recipients) {
-		    totalSessionLength +=
-			((SimpleSessionId) sid).getCompactId().
+                for (SessionId recipientId : recipients) {
+                    totalSessionLength +=
+			((SimpleSessionId) recipientId).getCompactId().
 			    getExternalFormByteCount();
                 }
             }
@@ -656,8 +661,8 @@ public class SimpleClient implements ServerSession {
                 msg.putShort(0);
             } else {
                 msg.putShort(recipients.size());
-                for (SessionId sid : recipients) {
-                    msg.putBytes(((SimpleSessionId) sid).getCompactId().
+                for (SessionId recipientId : recipients) {
+                    msg.putBytes(((SimpleSessionId) recipientId).getCompactId().
 				 getExternalForm());
                 }
             }
