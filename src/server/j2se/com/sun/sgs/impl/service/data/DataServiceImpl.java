@@ -52,6 +52,16 @@ import java.util.logging.Logger;
  * <dl style="margin-left: 1em">
  *
  * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class
+ *	</b></code> <br>
+ *	<i>Default:</i>
+ *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl</code>
+ *
+ * <dd style="padding-top: .5em">The name of the class that implements {@link
+ *	DataStore}.  The class should be public, not abstract, and should
+ *	provide a public constructor with a {@link Properties} parameter. <p>
+ *
+ * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.data.DataServiceImpl.debug.check.interval
  *	</b></code> <br>
  *	<i>Default:</i> <code>Integer.MAX_VALUE</code>
@@ -61,16 +71,6 @@ import java.util.logging.Logger;
  *	references table.  Note that the number of operations is measured
  *	separately for each transaction.  This property is intended for use in
  *	debugging. <p>
- *
- * <dt> <i>Property:</i> <code><b>
- *	com.sun.sgs.impl.service.data.DataServiceImpl.data.store.class
- *	</b></code> <br>
- *	<i>Default:</i>
- *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl</code>
- *
- * <dd style="padding-top: .5em">The name of the class that implements {@link
- *	DataStore}.  The class should be public, not abstract, and should
- *	provide a public constructor with a {@link Properties} parameter. <p>
  *
  * </dl> <p>
  *
