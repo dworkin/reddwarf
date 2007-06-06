@@ -247,11 +247,7 @@ public class ChatClient extends JFrame
 	setButtonsEnabled(false);
         String host = System.getProperty(HOST_PROPERTY, DEFAULT_HOST);
         String port = System.getProperty(PORT_PROPERTY, DEFAULT_PORT);
-	
-	// ITR
-	System.out.println("HOST=" + host);
-	System.out.println("PORT=" + port);
-	
+
         try {
             Properties props = new Properties();
             props.put("host", host);
