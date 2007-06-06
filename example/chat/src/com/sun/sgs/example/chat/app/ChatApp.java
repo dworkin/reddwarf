@@ -32,8 +32,11 @@ public class ChatApp
      */
     public ChatApp() {
         // empty
+	
+	// ITR
+	System.out.println("ChatApp has started (ctor).");
     }
-
+    
     /**
      * {@inheritDoc}
      * <p>
@@ -43,6 +46,9 @@ public class ChatApp
      */
     public void initialize(Properties props) {
         logger.log(Level.CONFIG, "ChatApp starting up");
+	
+	// ITR
+	System.out.println("ChatApp has been initialize()-ed.");
     }
 
     /**

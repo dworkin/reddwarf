@@ -63,6 +63,9 @@ public class ChatClientSessionListener
     public ChatClientSessionListener(ClientSession session) {
         this.session = session;
         addToChannel(GLOBAL_CHANNEL_NAME);
+	
+	// ITR
+	System.out.println("A new ChatClientSessionListener has been created for session " + session);
     }
 
     /**

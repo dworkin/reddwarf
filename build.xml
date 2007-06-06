@@ -22,6 +22,10 @@
   <property name="javac.compilerargs"
 	    value="-Xlint"/>
 
+  <!-- START ITR -->
+  <property name="chatclient.host" value="localhost"/>
+  <!-- END ITR -->
+
   <!-- Version information -->
   <property name="project.release" value="0.9.2"/>
   <!-- Set to true when building an external release -->
@@ -883,6 +887,9 @@
       <jvmarg line="${test.jvm.args}"/>
       <sysproperty key="java.util.logging.config.file"
 		   file="${test.logging}"/>
+      <!-- START ITR -->
+      <sysproperty key="ChatClient.host" value="${chatclient.host}"/>
+      <!-- END ITR -->
       <classpath>
         <pathelement location="${build.dir}/example/classes"/>
         <path refid="client.classpath"/>
