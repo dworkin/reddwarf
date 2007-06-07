@@ -7,12 +7,14 @@ package com.sun.sgs.impl.service.data;
 import com.sun.sgs.app.ManagedObject;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.util.MaybeRetryableTransactionNotActiveException;
+import com.sun.sgs.impl.util.TransactionContext;
 import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
-import com.sun.sgs.service.TransactionProxy;
+import java.util.LinkedList;
+import java.util.List;
 
 /** Stores information for a specific transaction. */
-final class Context {
+final class Context extends TransactionContext {
 
     /** The data store. */
     final DataStore store;
@@ -24,9 +26,6 @@ final class Context {
      * coordinator.
      */
     final TxnTrampoline txn;
-
-    /** The transaction proxy, for obtaining the current active transaction. */
-    final TransactionProxy txnProxy;
 
     /**
      * The number of operations to skip between checks of the consistency of
@@ -58,20 +57,23 @@ final class Context {
      */
     final ReferenceTable refs = new ReferenceTable();
 
+    /**
+     * A list of operations to run after abort, or null if there are no abort
+     * actions.
+     */
+    private List<Runnable> abortActions = null;
+
     /** Creates an instance of this class. */
     Context(DataStore store,
 	    Transaction txn,
-	    TransactionProxy txnProxy,
 	    int debugCheckInterval,
 	    boolean detectModifications,
 	    ClassesTable classesTable)
     {
-	assert store != null && txn != null && txnProxy != null &&
-	    classesTable != null
-	    : "Store, txn, txnProxy, or classesTable is null";
+	super(txn);
+	assert store != null && txn != null && classesTable != null;
 	this.store = store;
 	this.txn = new TxnTrampoline(txn);
-	this.txnProxy = txnProxy;
 	this.debugCheckInterval = debugCheckInterval;
 	this.detectModifications = detectModifications;
 	classSerial = classesTable.createClassSerialization(this.txn);
@@ -160,18 +162,6 @@ final class Context {
 
 	/* -- Other methods -- */
 
-	/**
-	 * Checks that the specified transaction equals the original one, and
-	 * throws IllegalStateException if not.
-	 */
-	void check(Transaction otherTxn) {
-	    if (!originalTxn.equals(otherTxn)) {
-		throw new IllegalStateException(
-		    "Wrong transaction: Expected " + originalTxn +
-		    ", found " + otherTxn);
-	    }
-	}
-
 	/** Notes that this transaction is inactive. */
 	void setInactive() {
 	    inactive = true;
@@ -222,26 +212,33 @@ final class Context {
 	return store.nextBoundName(txn, internalName);
     }
 
-    /* -- Methods for TransactionParticipant -- */
+    /* -- Methods for TransactionContext -- */
 
-    boolean prepare() throws Exception {
+    @Override
+    public boolean prepare() throws Exception {
+	isPrepared = true;
 	txn.setInactive();
 	ManagedReferenceImpl.flushAll(this);
 	if (storeParticipant == null) {
+	    isCommitted = true;
 	    return true;
 	} else {
 	    return storeParticipant.prepare(txn);
 	}
     }
 
-    void commit() {
+    @Override
+    public void commit() {
+	isCommitted = true;
 	txn.setInactive();
 	if (storeParticipant != null) {
 	    storeParticipant.commit(txn);
 	}
     }
 
-    void prepareAndCommit() throws Exception {
+    @Override
+    public void prepareAndCommit() throws Exception {
+	isCommitted = true;
 	txn.setInactive();
 	ManagedReferenceImpl.flushAll(this);
 	if (storeParticipant != null) {
@@ -249,10 +246,16 @@ final class Context {
 	}
     }
 
-    void abort() {
+    @Override
+    public void abort(boolean retryable) {
 	txn.setInactive();
 	if (storeParticipant != null) {
 	    storeParticipant.abort(txn);
+	}
+	if (abortActions != null) {
+	    for (Runnable action : abortActions) {
+		action.run();
+	    }
 	}
     }
 
@@ -271,10 +274,13 @@ final class Context {
     }
 
     /**
-     * Check that the specified transaction equals the original one, and throw
-     * IllegalStateException if not.
+     * Adds an action to be performed on abort, to roll back transient state
+     * changes.
      */
-    void checkTxn(Transaction otherTxn) {
-	txn.check(otherTxn);
+    void addAbortAction(Runnable action) {
+	if (abortActions == null) {
+	    abortActions = new LinkedList<Runnable>();
+	}
+	abortActions.add(action);
     }
 }

@@ -12,11 +12,18 @@ import com.sun.sgs.app.TransactionNotActiveException;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
+import com.sun.sgs.impl.service.data.store.DataStoreImpl.Scheduler;
+import com.sun.sgs.impl.service.data.store.DataStoreImpl.TaskHandle;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
 import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
+import com.sun.sgs.impl.util.TransactionContextFactory;
 import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.KernelRunnable;
 import com.sun.sgs.kernel.ProfileProducer;
 import com.sun.sgs.kernel.ProfileRegistrar;
+import com.sun.sgs.kernel.RecurringTaskHandle;
+import com.sun.sgs.kernel.TaskOwner;
+import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.Transaction;
@@ -24,9 +31,10 @@ import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.service.TransactionProxy;
 import java.io.Serializable;
 import java.math.BigInteger;
-import java.util.LinkedList;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Properties;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -87,8 +95,21 @@ import java.util.logging.Logger;
  * <li> {@link Level#SEVERE SEVERE} - Initialization failures
  * <li> {@link Level#CONFIG CONFIG} - Constructor properties, data service
  *	headers
+ * <li> {@link Level#FINE FINE} - Task scheduling operations
  * <li> {@link Level#FINER FINER} - Transaction operations
  * <li> {@link Level#FINEST FINEST} - Name and object operations
+ * </ul> <p>
+ *
+ * It also uses an additional {@code Logger} named {@code
+ * com.sun.sgs.impl.service.data.DataServiceImpl.detect.modifications} to log
+ * information about managed objects that are found to be modified but were not
+ * marked for update.  Note that this logging output will only be performed if
+ * the {@code
+ * com.sun.sgs.impl.service.data.DataServiceImpl.detect.modifications} property
+ * is {@code true}. <p>
+ *
+ * <ul>
+ * <li> {@code FINEST} - Modified object was not marked for update
  * </ul> <p>
  *
  * Instances of {@link ManagedReference} returned by the {@link
@@ -101,9 +122,7 @@ import java.util.logging.Logger;
  * <li> <code>FINEST</code> - Reference operations
  * </ul>
  */
-public final class DataServiceImpl
-    implements DataService, TransactionParticipant, ProfileProducer
-{
+public final class DataServiceImpl implements DataService, ProfileProducer {
 
     /** The name of this class. */
     private static final String CLASSNAME = DataServiceImpl.class.getName();
@@ -133,21 +152,29 @@ public final class DataServiceImpl
     private static final LoggerWrapper logger =
 	new LoggerWrapper(Logger.getLogger(CLASSNAME));
 
-    /** Provides transaction and other information for the current thread. */
-    private static final ThreadLocal<Context> currentContext =
-	new ThreadLocal<Context>();
+    /** Synchronize on this object when accessing the txnProxy field. */
+    private static final Object txnProxyLock = new Object();
+
+    /** The transaction proxy, or null if configure has not been called. */
+    private static TransactionProxy txnProxy = null;
 
     /** The name of this application. */
     private final String appName;
 
+    /** Scheduler supplied to the data store. */
+    private final DelegatingScheduler scheduler;
+
     /** The underlying data store. */
     private final DataStore store;
 
+    /** Table that stores information about classes used in serialization. */
+    private final ClassesTable classesTable;
+
     /**
-     * Synchronize on this object before accessing the state, txnProxy,
-     * debugCheckInterval, or detectModifications fields.
+     * Synchronize on this object before accessing the state,
+     * debugCheckInterval, detectModifications, or contextFactory fields.
      */
-    private final Object lock = new Object();
+    private final Object stateLock = new Object();
 
     /** The possible states of this instance. */
     enum State {
@@ -164,15 +191,6 @@ public final class DataServiceImpl
     /** The current state of this instance. */
     private State state = State.UNINITIALIZED;
 
-    /** The transaction proxy, or null if configure has not been called. */
-    TransactionProxy txnProxy = null;
-
-    /**
-     * A list of operations to run on abort, and clear on commit, or null if
-     * there are no abort actions.
-     */
-    private List<Runnable> abortActions = null;
-
     /**
      * The number of operations to skip between checks of the consistency of
      * the managed reference table.
@@ -182,8 +200,163 @@ public final class DataServiceImpl
     /** Whether to detect object modifications automatically. */
     private boolean detectModifications;
 
-    /** Table that stores information about classes used in serialization. */
-    private final ClassesTable classesTable;
+    /** The transaction context factory. */
+    private TransactionContextFactory<Context> contextFactory;
+
+    /**
+     * Defines the transaction context factory for this class.  The
+     * customizations create a durable transaction participant, check the
+     * reference table, and check the service state when checking a
+     * transaction.
+     */
+    private final class ContextFactory
+	extends TransactionContextFactory<Context>
+    {
+	ContextFactory(TransactionProxy txnProxy) {
+	    super(txnProxy);
+	}
+	@Override
+	public Context joinTransaction() {
+	    Context context = super.joinTransaction();
+	    context.maybeCheckReferenceTable();
+	    return context;
+	}
+	@Override
+	public Context getContext() {
+	    Context context = super.getContext();
+	    context.maybeCheckReferenceTable();
+	    return context;
+	}
+	@Override
+	public void checkContext(Context context) {
+	    super.checkContext(context);
+	    context.maybeCheckReferenceTable();
+	}
+	@Override
+	protected Context createContext(Transaction txn) {
+	    /* Prevent joining a new transaction during shutdown */
+	    synchronized (stateLock) {
+		if (state == State.SHUTTING_DOWN) {
+		    throw new IllegalStateException(
+			"Service is shutting down");
+		}
+	    }
+	    return new Context(store, txn, debugCheckInterval,
+			       detectModifications, classesTable);
+	}
+	@Override
+	protected TransactionParticipant createParticipant() {
+	    return new Participant();
+	}
+	@Override
+	protected Context checkTransaction(Transaction txn) {
+	    checkState();
+	    Context context = super.checkTransaction(txn);
+	    context.maybeCheckReferenceTable();
+	    return context;
+	}
+    }
+
+    /**
+     * Provides an implementation of Scheduler that uses the TaskScheduler, and
+     * waits to schedule tasks until the task owner is supplied in a call to
+     * setTaskOwner.
+     */
+    private static class DelegatingScheduler implements Scheduler {
+
+	/** The task scheduler. */
+	private TaskScheduler taskScheduler;
+
+	/** The task owner, or null if not yet supplied. */
+	private TaskOwner taskOwner;
+
+	/**
+	 * Handles for tasks that were scheduled before the task scheduler was
+	 * supplied.
+	 */
+	private Set<Handle> pending = new HashSet<Handle>();
+
+	DelegatingScheduler(TaskScheduler taskScheduler) {
+	    this.taskScheduler = taskScheduler;
+	}
+
+	public synchronized TaskHandle scheduleRecurringTask(
+	    Runnable task, long period)
+	{
+	    Handle handle = new Handle(task, period);
+	    if (taskOwner != null) {
+		handle.start();
+	    } else {
+		logger.log(Level.FINE, "Adding pending task {0}", handle);
+		pending.add(handle);
+	    }
+	    return handle;
+	}
+
+	/**
+	 * Supplies the task owner that will be used to schedule tasks, and
+	 * schedules any tasks that were already provided.
+	 */
+	public synchronized void setTaskOwner(TaskOwner taskOwner) {
+	    assert taskOwner != null;
+	    this.taskOwner = taskOwner;
+	    for (Iterator<Handle> i = pending.iterator(); i.hasNext(); ) {
+		Handle handle = i.next();
+		i.remove();
+		handle.start();
+	    }
+	}
+
+	/** Implementation of task handle. */
+	private class Handle implements TaskHandle, KernelRunnable {
+	    private final Runnable task;
+	    private final long period;
+
+	    /**
+	     * The associated handle from the task handler, or null if not yet
+	     * scheduled.
+	     */
+	    private RecurringTaskHandle handle;
+
+	    Handle(Runnable task, long period) {
+		this.task = task;
+		this.period = period;
+	    }
+
+	    public String toString() {
+		return "Handle[task:" + task + ", period:" + period + "]";
+	    }
+
+	    public String getBaseTaskType() {
+		return task.getClass().getName();
+	    }
+
+	    public void run() {
+		task.run();
+	    }
+
+	    public void cancel() {
+		logger.log(Level.FINE, "Cancelling task {0}", this);
+		synchronized (DelegatingScheduler.this) {
+		    if (handle != null) {
+			handle.cancel();
+		    } else {
+			pending.remove(this);
+		    }
+		}
+	    }
+
+	    /** Schedules a task using the task scheduler. */
+	    private void start() {
+		logger.log(Level.FINE, "Starting task {0}", this);
+		assert Thread.holdsLock(DelegatingScheduler.this);
+		handle = taskScheduler.scheduleRecurringTask(
+		    this, taskOwner, System.currentTimeMillis() + period,
+		    period);
+		handle.start();
+	    }
+	}
+    }
 
     /**
      * Creates an instance of this class configured with the specified
@@ -228,8 +401,10 @@ public final class DataServiceImpl
 		DETECT_MODIFICATIONS_PROPERTY, Boolean.TRUE);
 	    String dataStoreClassName = wrappedProps.getProperty(
 		DATA_STORE_CLASS_PROPERTY);
+	    scheduler = new DelegatingScheduler(
+		componentRegistry.getComponent(TaskScheduler.class));
 	    if (dataStoreClassName == null) {
-		store = new DataStoreImpl(properties);
+		store = new DataStoreImpl(properties, scheduler);
 	    } else {
 		store = wrappedProps.getClassInstanceProperty(
 		    DATA_STORE_CLASS_PROPERTY, DataStore.class,
@@ -237,7 +412,7 @@ public final class DataServiceImpl
 		logger.log(Level.CONFIG, "Using data store {0}", store);
 	    }
 	    classesTable = new ClassesTable(store);
-	} catch (Exception e) {
+	} catch (RuntimeException e) {
 	    logger.logThrow(
 		Level.SEVERE, e, "DataService initialization failed");
 	    throw e;
@@ -258,19 +433,34 @@ public final class DataServiceImpl
 	if (registry == null || proxy == null) {
 	    throw new NullPointerException("The arguments must not be null");
 	}
-	synchronized (lock) {
+	synchronized (txnProxyLock) {
+	    if (txnProxy == null) {
+		txnProxy = proxy;
+	    }
+	    assert txnProxy == proxy;
+	}
+	synchronized (stateLock) {
 	    if (state != State.UNINITIALIZED) {
 		throw new IllegalStateException(
 		    "Service is already configured");
 	    }
 	    state = State.RUNNING;
-	    addAbortAction(
-		new Runnable() {
-		    public void run() {
-			state = State.UNINITIALIZED;
-		    }
-		});
-	    txnProxy = proxy;
+	    boolean addedAbortAction = false;
+	    try {
+		contextFactory = new ContextFactory(proxy);
+		contextFactory.joinTransaction().addAbortAction(
+		    new Runnable() {
+			public void run() {
+			    state = State.UNINITIALIZED;
+			}
+		    });
+		addedAbortAction = true;
+	    } finally {
+		if (!addedAbortAction) {
+		    state = State.UNINITIALIZED;
+		}
+	    }
+	    scheduler.setTaskOwner(proxy.getCurrentOwner());
 	    DataServiceHeader header;
 	    try {
 		header = getServiceBinding(
@@ -421,76 +611,6 @@ public final class DataServiceImpl
 	}
     }
 
-    /* -- Implement TransactionParticipant -- */
-
-    /** {@inheritDoc} */
-    public boolean prepare(Transaction txn) throws Exception {
-	try {
-	    Context context = getContext(txn);
-	    boolean result = context.prepare();
-	    if (result) {
-		currentContext.set(null);
-		abortActions = null;
-	    }
-	    if (logger.isLoggable(Level.FINER)) {
-		logger.log(Level.FINER, "prepare txn:{0} returns {1}",
-			   txn, result);
-	    }
-	    return result;
-	} catch (RuntimeException e) {
-	    logger.logThrow(Level.FINER, e, "prepare txn:{0} throws", txn);
-	    throw e;
-	}
-    }
-
-    /** {@inheritDoc} */
-    public void commit(Transaction txn) {
-	try {
-	    Context context = getContext(txn);
-	    currentContext.set(null);
-	    abortActions = null;
-	    context.commit();
-	    logger.log(Level.FINER, "commit txn:{0} returns", txn);
-	} catch (RuntimeException e) {
-	    logger.logThrow(Level.WARNING, e, "commit txn:{0} throws", txn);
-	    throw e;
-	}
-    }
-
-    /** {@inheritDoc} */
-    public void prepareAndCommit(Transaction txn) throws Exception {
-	try {
-	    Context context = getContext(txn);
-	    context.prepareAndCommit();
-	    abortActions = null;
-	    currentContext.set(null);
-	    logger.log(Level.FINER, "prepareAndCommit txn:{0} returns", txn);
-	} catch (RuntimeException e) {
-	    logger.logThrow(
-		Level.FINER, e, "prepareAndCommit txn:{0} throws", txn);
-	    throw e;
-	}
-    }
-
-    /** {@inheritDoc} */
-    public void abort(Transaction txn) {
-	try {
-	    Context context = getContext(txn);
-	    currentContext.set(null);
-	    if (abortActions != null) {
-		for (Runnable action : abortActions) {
-		    action.run();
-		}
-		abortActions = null;
-	    }
-	    context.abort();
-	    logger.log(Level.FINER, "abort txn:{0} returns", txn);
-	} catch (RuntimeException e) {
-	    logger.logThrow(Level.WARNING, e, "abort txn:{0} throws", txn);
-	    throw e;
-	}
-    }
-
     /* -- Generic binding methods -- */
 
     /** Implement getBinding and getServiceBinding. */
@@ -634,7 +754,7 @@ public final class DataServiceImpl
      *		checks of the consistency of the managed references table
      */
     public void setDebugCheckInterval(int debugCheckInterval) {
-	synchronized (lock) {
+	synchronized (stateLock) {
 	    this.debugCheckInterval = debugCheckInterval;
 	}
     }
@@ -645,7 +765,7 @@ public final class DataServiceImpl
      * @param	detectModifications whether to detect modifications
      */
     public void setDetectModifications(boolean detectModifications) {
-	synchronized (lock) {
+	synchronized (stateLock) {
 	    this.detectModifications = detectModifications;
 	}
     }
@@ -682,10 +802,10 @@ public final class DataServiceImpl
      *		already been called and returned <code>true</code>
      */
     public boolean shutdown() {
-	synchronized (lock) {
+	synchronized (stateLock) {
 	    while (state == State.SHUTTING_DOWN) {
 		try {
-		    lock.wait();
+		    stateLock.wait();
 		} catch (InterruptedException e) {
 		    return false;
 		}
@@ -699,9 +819,9 @@ public final class DataServiceImpl
 	boolean done = false;
 	try {
 	    if (store.shutdown()) {
-		synchronized (lock) {
+		synchronized (stateLock) {
 		    state = State.SHUTDOWN;
-		    lock.notifyAll();
+		    stateLock.notifyAll();
 		}
 		done = true;
 		return true;
@@ -710,9 +830,9 @@ public final class DataServiceImpl
 	    }
 	} finally {
 	    if (!done) {
-		synchronized (lock) {
+		synchronized (stateLock) {
 		    state = State.RUNNING;
-		    lock.notifyAll();
+		    stateLock.notifyAll();
 		}
 	    }
 	}
@@ -727,81 +847,55 @@ public final class DataServiceImpl
      * not been done already.
      */
     private Context getContext() {
-	Transaction txn;
-	synchronized (lock) {
-	    checkState();
-	    txn = txnProxy.getCurrentTransaction();
-	}
-	Context context = currentContext.get();
-	if (context == null) {
-	    synchronized (lock) {
-		if (state == State.SHUTTING_DOWN) {
-		    throw new IllegalStateException(
-			"Service is shutting down");
-		}
-	    }
-	    logger.log(Level.FINER, "join txn:{0}", txn);
-	    txn.join(this);
-	    context = new Context(
-		store, txn, txnProxy, debugCheckInterval, detectModifications,
-		classesTable);
-	    currentContext.set(context);
-	} else {
-	    context.checkTxn(txn);
-	}
-	context.maybeCheckReferenceTable();
-	return context;
+	return getContextFactory().joinTransaction();
     }
 
     /**
-     * Checks that the specified transaction matches the current context, and
-     * returns the current context.  Throws NullPointerException if the
-     * transaction is null, and IllegalStateException if another or no
-     * transaction has been joined.
+     * Returns the transaction context factory, first checking the state of the
+     * service.
      */
-    private Context getContext(Transaction txn) {
-	if (txn == null) {
-	    throw new NullPointerException("The transaction must not be null");
-	}
-	Context context = currentContext.get();
-	if (context == null) {
-	    throw new IllegalStateException("Not joined");
-	}
-	synchronized (lock) {
+    private TransactionContextFactory<Context> getContextFactory() {
+	synchronized (stateLock) {
 	    checkState();
+	    return contextFactory;
 	}
-	context.checkTxn(txn);
-	context.maybeCheckReferenceTable();
-	return context;
     }
 
     /** Checks that the current state is RUNNING or SHUTTING_DOWN. */
-    @SuppressWarnings("fallthrough")
-    private void checkState() {
-	assert Thread.holdsLock(lock);
-	switch (state) {
-	case UNINITIALIZED:
-	    throw new IllegalStateException("Service is not configured");
-	case RUNNING:
-	case SHUTTING_DOWN:
-	    break;
-	case SHUTDOWN:
-	    throw new IllegalStateException("Service is shut down");
-	default:
-	    throw new AssertionError();
+    void checkState() {
+	synchronized (stateLock) {
+	    switch (state) {
+	    case UNINITIALIZED:
+		throw new IllegalStateException("Service is not configured");
+	    case RUNNING:
+		break;
+	    case SHUTTING_DOWN:
+		break;
+	    case SHUTDOWN:
+		throw new IllegalStateException("Service is shut down");
+	    default:
+		throw new AssertionError();
+	    }
 	}
     }
 
     /**
      * Checks that the specified context is currently active.  Throws
-     * TransactionNotActiveException if there is no current transaction.
-     * Otherwise, returns true if the current transaction matches the argument.
+     * TransactionNotActiveException if there is no current transaction or if
+     * the current transaction doesn't match the context.
      */
-    static boolean checkContext(Context context) {
-	context.txnProxy.getCurrentTransaction();
-	boolean result = (context == currentContext.get());
-	context.maybeCheckReferenceTable();
-	return result;
+    static void checkContext(Context context) {
+	getInstance().getContextFactory().checkContext(context);
+    }
+
+    /** Returns the current instance of this service. */
+    private static DataServiceImpl getInstance() {
+	synchronized (txnProxyLock) {
+	    if (txnProxy == null) {
+		throw new IllegalStateException("Service is not configured");
+	    }
+	}
+	return txnProxy.getService(DataServiceImpl.class);
     }
 
     /**
@@ -810,13 +904,7 @@ public final class DataServiceImpl
      * transaction.
      */
     static Context getContextNoJoin() {
-	Context context = currentContext.get();
-	if (context == null) {
-	    throw new TransactionNotActiveException(
-		"No transaction is active");
-	}
-	context.maybeCheckReferenceTable();
-	return context;
+	return getInstance().getContextFactory().getContext();
     }
 
     /**
@@ -855,15 +943,4 @@ public final class DataServiceImpl
 	    : "Name has wrong prefix";
 	return name.startsWith(prefix) ? name.substring(2) : null;
     }	    
-
-    /**
-     * Adds an action to be performed on abort, to roll back transient state
-     * changes.
-     */
-    private void addAbortAction(Runnable action) {
-	if (abortActions == null) {
-	    abortActions = new LinkedList<Runnable>();
-	}
-	abortActions.add(action);
-    }
 }

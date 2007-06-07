@@ -14,6 +14,7 @@ import com.sun.sgs.impl.service.data.store.ClassInfoNotFoundException;
 import com.sun.sgs.impl.service.data.store.DataStoreException;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
+import com.sun.sgs.service.Transaction;
 import com.sun.sgs.service.TransactionParticipant;
 import com.sun.sgs.test.util.DummyTransaction;
 import com.sun.sgs.test.util.DummyTransaction.UsePrepareAndCommit;
@@ -1228,6 +1229,39 @@ public class TestDataStoreImpl extends TestCase {
 	} catch (NullPointerException e) {
 	    System.err.println(e);
 	}
+    }
+
+    /** Make sure that commits don't timeout. */
+    public void testCommitNoTimeout() throws Exception {
+	txn.commit();
+	txn = new DummyTransaction(UsePrepareAndCommit.NO) {
+	    public void join(final TransactionParticipant participant) {
+		super.join(new TransactionParticipant() {
+		    public boolean prepare(Transaction txn) throws Exception {
+			return participant.prepare(txn);
+		    }
+		    public void commit(Transaction txn) {
+			try {
+			    Thread.sleep(1100);
+			    participant.commit(txn);
+			} catch (Exception e) {
+			    fail("Unexpected exception: " + e);
+			}
+		    }
+		    public void prepareAndCommit(Transaction txn)
+			throws Exception
+		    {
+			participant.prepareAndCommit(txn);
+		    }
+		    public void abort(Transaction txn) {
+			participant.abort(txn);
+		    }
+		});
+	    }
+	};
+ 	store.setBinding(txn, "foo", id);
+	txn.commit();
+	txn = null;
     }
 
     /* -- Unusual states -- */

@@ -157,12 +157,12 @@ public class TestClientSessionServiceImpl extends TestCase {
 	createTransaction();
 
 	// configure data service
-        dataService.configure(serviceRegistry, txnProxy);
         txnProxy.setComponent(DataService.class, dataService);
         txnProxy.setComponent(DataServiceImpl.class, dataService);
         serviceRegistry.setComponent(DataManager.class, dataService);
         serviceRegistry.setComponent(DataService.class, dataService);
         serviceRegistry.setComponent(DataServiceImpl.class, dataService);
+        dataService.configure(serviceRegistry, txnProxy);
 
 	// configure task service
         taskService.configure(serviceRegistry, txnProxy);
@@ -1303,10 +1303,10 @@ public class TestClientSessionServiceImpl extends TestCase {
 	    } else {
 		DummyClientSessionListener listener =
 		    new DummyClientSessionListener(session);
+		DataManager dataManager = AppContext.getDataManager();
 		ManagedReference listenerRef =
-		    txnProxy.getService(DataService.class).
-		    createReference(listener);
-		AppContext.getDataManager().markForUpdate(this);
+		    dataManager.createReference(listener);
+		dataManager.markForUpdate(this);
 		sessions.put(session, listenerRef);
 		System.err.println(
 		    "DummyAppListener.loggedIn: session:" + session);
@@ -1370,6 +1370,7 @@ public class TestClientSessionServiceImpl extends TestCase {
 	public void disconnected(boolean graceful) {
 	    System.err.println("DummyClientSessionListener[" + name +
 			       "] disconnected invoked with " + graceful);
+	    AppContext.getDataManager().markForUpdate(this);
 	    synchronized (disconnectedCallbackLock) {
 		receivedDisconnectedCallback = true;
 		this.graceful = graceful;

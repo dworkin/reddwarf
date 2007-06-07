@@ -871,6 +871,10 @@ public final class DataStoreClient
 		try {
 		    txn.abort(re);
 		} catch (TransactionAbortedException e2) {
+		    /*
+		     * Discard this exception and return the original one, for
+		     * better error reporting.
+		     */
 		}
 	    }
 	}

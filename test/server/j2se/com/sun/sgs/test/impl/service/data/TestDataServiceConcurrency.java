@@ -4,12 +4,14 @@
 
 package com.sun.sgs.test.impl.service.data;
 
+import com.sun.sgs.app.AppContext;
 import com.sun.sgs.app.DataManager;
 import com.sun.sgs.app.TransactionAbortedException;
+import com.sun.sgs.impl.kernel.MinimalTestKernel;
 import com.sun.sgs.impl.kernel.StandardProperties;
 import com.sun.sgs.impl.service.data.DataServiceImpl;
 import com.sun.sgs.impl.sharedutil.LoggerWrapper;
-import com.sun.sgs.kernel.ComponentRegistry;
+import com.sun.sgs.kernel.TaskScheduler;
 import com.sun.sgs.kernel.ProfileProducer;
 import com.sun.sgs.service.DataService;
 import com.sun.sgs.test.util.DummyComponentRegistry;
@@ -37,6 +39,14 @@ public class TestDataServiceConcurrency extends TestCase {
     /** The name of the DataStoreImpl class. */
     private static final String DataStoreImplClass =
 	"com.sun.sgs.impl.service.data.store.DataStoreImpl";
+
+    /** The transaction proxy. */
+    static final DummyTransactionProxy txnProxy =
+	MinimalTestKernel.getTransactionProxy();
+
+    /** The component registry. */
+    static final DummyComponentRegistry componentRegistry =
+	new DummyComponentRegistry();
 
     /**
      * The types of operations to perform.  Each value includes the operations
@@ -83,9 +93,6 @@ public class TestDataServiceConcurrency extends TestCase {
     /** The number of times to repeat each timing. */
     protected int repeat = Integer.getInteger("test.repeat", 1);
 
-    /** The transaction proxy. */
-    final DummyTransactionProxy txnProxy = new DummyTransactionProxy();
-
     /** Set when the test passes. */
     protected boolean passed;
 
@@ -127,6 +134,11 @@ public class TestDataServiceConcurrency extends TestCase {
 	    (maxThreads != threads ?
 	     "\n  test.max.threads=" + maxThreads : "") +
 	    (repeat != 1 ? "\n  test.repeat=" + repeat : ""));
+	componentRegistry.setComponent(
+	    TaskScheduler.class, 
+	    MinimalTestKernel.getSystemRegistry(
+		MinimalTestKernel.createContext())
+	    .getComponent(TaskScheduler.class));
 	props = createProperties(
 	    DataStoreImplClass + ".directory", createDirectory(),
 	    StandardProperties.APP_NAME, "TestDataServiceConcurrency");
@@ -164,8 +176,6 @@ public class TestDataServiceConcurrency extends TestCase {
     /* -- Tests -- */
 
     public void testConcurrency() throws Throwable {
-	DummyComponentRegistry componentRegistry =
-	    new DummyComponentRegistry();
 	service = getDataService(props, componentRegistry);
 	if (service instanceof ProfileProducer) {
 	    DummyProfileCoordinator.startProfiling(
@@ -174,7 +184,6 @@ public class TestDataServiceConcurrency extends TestCase {
 	DummyTransaction txn = new DummyTransaction();
 	txnProxy.setCurrentTransaction(txn);
 	service.configure(componentRegistry, txnProxy);
-	componentRegistry.setComponent(DataManager.class, service);
 	componentRegistry.registerAppContext();
 	txn.commit();
 	int perThread = objects + objectsBuffer;
@@ -216,7 +225,7 @@ public class TestDataServiceConcurrency extends TestCase {
 	done = 0;
 	long start = System.currentTimeMillis();
 	for (int i = 0; i < threads; i++) {
-	    new OperationThread(i, service, txnProxy);
+	    new OperationThread(i, service);
 	}
 	while (true) {
 	    synchronized (this) {
@@ -262,23 +271,20 @@ public class TestDataServiceConcurrency extends TestCase {
     /** Performs random operations in a separate thread. */
     class OperationThread extends Thread {
 	private final DataService service;
-	private final DummyTransactionProxy txnProxy;
 	private final int id;
 	private final Random random = new Random();
 	private DummyTransaction txn;
 	private int aborts;
 
-	OperationThread(
-	    int id, DataService service, DummyTransactionProxy txnProxy)
-	{
+	OperationThread(int id, DataService service) {
 	    super("OperationThread" + id);
 	    this.service = service;
-	    this.txnProxy = txnProxy;
 	    this.id = id;
 	    start();
 	}
 
 	public void run() {
+	    componentRegistry.registerAppContext();
 	    try {
 		createTxn();
 		for (int i = 0; i < operations; i++) {
@@ -403,10 +409,17 @@ public class TestDataServiceConcurrency extends TestCase {
 
     /** Returns the data service to test. */
     protected DataService getDataService(
-	Properties props, ComponentRegistry componentRegistry)
+	Properties props, DummyComponentRegistry componentRegistry)
 	throws Exception
     {
-	return new DataServiceImpl(props, componentRegistry);
+	DataServiceImpl service =
+	    new DataServiceImpl(props, componentRegistry);
+	componentRegistry.setComponent(DataManager.class, service);
+	componentRegistry.setComponent(DataService.class, service);
+	componentRegistry.setComponent(DataServiceImpl.class, service);
+	txnProxy.setComponent(DataService.class, service);
+	txnProxy.setComponent(DataServiceImpl.class, service);
+	return service;
     }
 
     /** Returns the binding name to use for the i'th object. */
@@ -423,6 +436,7 @@ public class TestDataServiceConcurrency extends TestCase {
 	    return number;
 	}
 	public void incrementNumber() {
+	    AppContext.getDataManager().markForUpdate(this);
 	    number++;
 	}
     }
