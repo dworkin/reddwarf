@@ -38,6 +38,14 @@ import java.util.logging.Logger;
  *	greater than {@code 0}. <p>
  *
  *	<i>Key:</i> {@code
+ *	com.sun.sgs.impl.service.data.store.net.DataStoreClient.max.txn.timeout}
+ *	<br>
+ *	<i>Default:</i> {@code 600000} <br>
+ *	The maximum amount of time in milliseconds that a transaction that uses
+ *	the data store will be permitted to run before it is a candidate for
+ *	being aborted. <p>
+ *
+ *	<i>Key:</i> {@code
  *	com.sun.sgs.impl.service.data.store.net.DataStoreClient.server.host}
  *	<br>
  *	<i>No default &mdash; required</i> <br>
@@ -112,6 +120,13 @@ public final class DataStoreClient
     private static final boolean noRmi = Boolean.getBoolean(
 	CLASSNAME + ".no.rmi");
 
+    /** The property that specifies the maximum transaction timeout. */
+    private static final String MAX_TXN_TIMEOUT_PROPERTY =
+	CLASSNAME + ".max.txn.timeout";
+
+    /** The default maximum transaction timeout. */
+    private static final long DEFAULT_MAX_TXN_TIMEOUT = 600000;
+
     /** The server host name. */
     private final String serverHost;
 
@@ -123,6 +138,9 @@ public final class DataStoreClient
 
     /** The number of object IDs to allocate at one time. */
     private final int allocationBlockSize;
+
+    /** The maximum transaction timeout. */
+    private final long maxTxnTimeout;
 
     /** Provides information about the transaction for the current thread. */
     private final ThreadLocal<TxnInfo> threadTxnInfo =
@@ -205,18 +223,13 @@ public final class DataStoreClient
 		"The " + SERVER_HOST_PROPERTY + " property must be specified");
 	}
 	serverPort = wrappedProps.getIntProperty(
-	    SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT);
-	if (serverPort < 1 || serverPort > 65535) {
-	    throw new IllegalArgumentException(
-		"The " + SERVER_PORT_PROPERTY + " property value must be " +
-		"greater than 0 and less than 65535: " + serverPort);
-	}
+	    SERVER_PORT_PROPERTY, DEFAULT_SERVER_PORT, 1, 65535);
 	allocationBlockSize = wrappedProps.getIntProperty(
-	    ALLOCATION_BLOCK_SIZE_PROPERTY, DEFAULT_ALLOCATION_BLOCK_SIZE);
-	if (allocationBlockSize < 1) {
-	    throw new IllegalArgumentException(
-		"The allocation block size must be greater than zero");
-	}
+	    ALLOCATION_BLOCK_SIZE_PROPERTY, DEFAULT_ALLOCATION_BLOCK_SIZE,
+	    1, Integer.MAX_VALUE);
+	maxTxnTimeout = wrappedProps.getLongProperty(
+	    MAX_TXN_TIMEOUT_PROPERTY, DEFAULT_MAX_TXN_TIMEOUT,
+	    (long) 0, Long.MAX_VALUE);
 	server = getServer();
     }
 
@@ -234,7 +247,7 @@ public final class DataStoreClient
 		if (nextObjectId > lastObjectId) {
 		    logger.log(Level.FINE, "Allocate more object IDs");
 		    long newNextObjectId = server.allocateObjects(
-			allocationBlockSize);
+			txnInfo.tid, allocationBlockSize);
 		    nextObjectId = newNextObjectId;
 		    lastObjectId = newNextObjectId + allocationBlockSize - 1;
 		}
@@ -252,7 +265,7 @@ public final class DataStoreClient
 	    exception = e;
 	}
 	throw convertException(
-	    txnInfo, Level.FINEST, exception, "createObject txn:" + txn);
+	    txn, txnInfo, Level.FINEST, exception, "createObject txn:" + txn);
     }
 
     /** {@inheritDoc} */
@@ -277,7 +290,7 @@ public final class DataStoreClient
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	throw convertException(txnInfo, Level.FINEST, exception,
+	throw convertException(txn, txnInfo, Level.FINEST, exception,
 			       "markForUpdate txn:" + txn + ", oid:" + oid);
     }
 
@@ -306,7 +319,7 @@ public final class DataStoreClient
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	throw convertException(txnInfo, Level.FINEST, exception,
+	throw convertException(txn, txnInfo, Level.FINEST, exception,
 			       "getObject txn:" + txn + ", oid:" + oid +
 			       ", forUpdate:" + forUpdate);
     }
@@ -336,7 +349,7 @@ public final class DataStoreClient
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	throw convertException(txnInfo, Level.FINEST, exception,
+	throw convertException(txn, txnInfo, Level.FINEST, exception,
 			       "setObject txn:" + txn + ", oid:" + oid);
     }
 
@@ -359,7 +372,7 @@ public final class DataStoreClient
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	throw convertException(txnInfo, Level.FINEST, exception,
+	throw convertException(txn, txnInfo, Level.FINEST, exception,
 			       "setObjects txn:" + txn);
     }
 
@@ -385,7 +398,7 @@ public final class DataStoreClient
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	throw convertException(txnInfo, Level.FINEST, exception,
+	throw convertException(txn, txnInfo, Level.FINEST, exception,
 			       "removeObject txn:" + txn + ", oid:" + oid);
     }
 
@@ -412,7 +425,7 @@ public final class DataStoreClient
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	throw convertException(txnInfo, Level.FINEST, exception,
+	throw convertException(txn, txnInfo, Level.FINEST, exception,
 			       "getBinding txn:" + txn + ", name:" + name);
     }
 
@@ -441,7 +454,7 @@ public final class DataStoreClient
 	    exception = e;
 	}
 	throw convertException(
-	    txnInfo, Level.FINEST, exception,
+	    txn, txnInfo, Level.FINEST, exception,
 	    "setBinding txn:" + txn + ", name:" + name + ", oid:" + oid);
     }
 
@@ -467,7 +480,7 @@ public final class DataStoreClient
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	throw convertException(txnInfo, Level.FINEST, exception,
+	throw convertException(txn, txnInfo, Level.FINEST, exception,
 			       "removeBinding txn:" + txn + ", name:" + name);
     }
 
@@ -493,7 +506,7 @@ public final class DataStoreClient
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	throw convertException(txnInfo, Level.FINEST, exception,
+	throw convertException(txn, txnInfo, Level.FINEST, exception,
 			       "nextBoundName txn:" + txn + ", name:" + name);
     }
 
@@ -525,7 +538,7 @@ public final class DataStoreClient
 		return ok;
 	    }
 	} catch (RuntimeException e) {
-	    throw convertException(null, Level.FINER, e, "shutdown");
+	    throw convertException(null, null, Level.FINER, e, "shutdown");
 	}
     }
 
@@ -548,7 +561,7 @@ public final class DataStoreClient
 	    exception = e;
 	}
 	throw convertException(
-	    txnInfo, Level.FINER, exception, "getClassId txn:" + txn);
+	    txn, txnInfo, Level.FINER, exception, "getClassId txn:" + txn);
     }
 
     /** {@inheritDoc} */
@@ -578,19 +591,20 @@ public final class DataStoreClient
 	    exception = e;
 	}
 	throw convertException(
-	    txnInfo, Level.FINER, exception,
+	    txn, txnInfo, Level.FINER, exception,
 	    "getClassInfo txn:" + txn + ", classId:" + classId);
     }
 
     /* -- Implement TransactionParticipant -- */
 
-    /** {@inheritDoc} */
+     /** {@inheritDoc} */
     public boolean prepare(Transaction txn) {
 	logger.log(Level.FINER, "prepare txn:{0}", txn);
 	TxnInfo txnInfo = null;
 	Exception exception;
 	try {
 	    txnInfo = checkTxnNoJoin(txn, true);
+	    txn.checkTimeout();
 	    if (txnInfo.prepared) {
 		throw new IllegalStateException(
 		    "Transaction has already been prepared");
@@ -611,7 +625,7 @@ public final class DataStoreClient
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	throw convertException(txnInfo, Level.FINER, exception,
+	throw convertException(txn, txnInfo, Level.FINER, exception,
 			       "prepare txn:" + txn);
     }
 
@@ -636,7 +650,7 @@ public final class DataStoreClient
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	throw convertException(txnInfo, Level.FINER, exception,
+	throw convertException(txn, txnInfo, Level.FINER, exception,
 			       "commit txn:" + txn);
     }
 
@@ -647,6 +661,7 @@ public final class DataStoreClient
 	Exception exception;
 	try {
 	    txnInfo = checkTxnNoJoin(txn, true);
+	    txn.checkTimeout();
 	    if (txnInfo.prepared) {
 		throw new IllegalStateException(
 		    "Transaction has already been prepared");
@@ -661,7 +676,7 @@ public final class DataStoreClient
 	} catch (RuntimeException e) {
 	    exception = e;
 	}
-	throw convertException(txnInfo, Level.FINER, exception,
+	throw convertException(txn, txnInfo, Level.FINER, exception,
 			       "prepareAndCommit txn:" + txn);
     }
 
@@ -672,11 +687,11 @@ public final class DataStoreClient
 	Exception exception;
 	try {
 	    txnInfo = checkTxnNoJoin(txn, false);
+	    threadTxnInfo.set(null);
+	    decrementTxnCount();
 	    if (!txnInfo.serverAborted) {
 		server.abort(txnInfo.tid);
 	    }
-	    threadTxnInfo.set(null);
-	    decrementTxnCount();
 	    logger.log(Level.FINER, "abort txn:{0} returns", txn);
 	    return;
 	} catch (IOException e) {
@@ -685,7 +700,7 @@ public final class DataStoreClient
 	    exception = e;
 	}
 	throw convertException(
-	    txnInfo, Level.FINER, exception, "abort txn:" + txn);
+	    txn, txnInfo, Level.FINER, exception, "abort txn:" + txn);
     }
 
     /* -- Other public methods -- */
@@ -741,7 +756,7 @@ public final class DataStoreClient
 	}
 	TxnInfo txnInfo = threadTxnInfo.get();
 	if (txnInfo == null) {
-	    return joinTransaction(txn);
+	    txnInfo = joinTransaction(txn);
 	} else if (!txnInfo.txn.equals(txn)) {
 	    throw new IllegalStateException(
 		"Wrong transaction: Found " + txnInfo.txn +
@@ -749,6 +764,7 @@ public final class DataStoreClient
 	} else if (txnInfo.prepared) {
 	    throw new IllegalStateException("Transaction has been prepared");
 	}
+	txn.checkTimeout();
 	return txnInfo;
     }
 
@@ -768,7 +784,7 @@ public final class DataStoreClient
 	try {
 	    txn.join(this);
 	    joined = true;
-	    tid = server.createTransaction();
+	    tid = server.createTransaction(txn.getTimeout());
 	    if (logger.isLoggable(Level.FINER)) {
 		logger.log(Level.FINER,
 			   "Created server transaction stid:{0,number,#} " +
@@ -816,7 +832,8 @@ public final class DataStoreClient
      * logged and returned.
      */
     private RuntimeException convertException(
-	TxnInfo txnInfo, Level level, Exception e, String operation)
+	Transaction txn, TxnInfo txnInfo, Level level, Exception e,
+	String operation)
     {
 	RuntimeException re;
 	if (e instanceof IOException) {
@@ -826,18 +843,19 @@ public final class DataStoreClient
 		e);
 	} else if (e instanceof TransactionAbortedException) {
 	    re = (RuntimeException) e;
-	} else if (e instanceof TransactionNotActiveException &&
-		   txnInfo != null)
-	{
+	} else if (e instanceof TransactionNotActiveException && txn != null) {
 	    /*
-	     * If the transaction is not active on the server, then it must
-	     * have timed out.
+	     * If the transaction is not active on the server, then it may have
+	     * timed out.
 	     */
-	    long duration =
-		System.currentTimeMillis() - txnInfo.txn.getCreationTime();
-	    re = new TransactionTimeoutException(
-		operation + " failed: Transaction timed out after " +
-		duration + " ms");
+	    long duration = System.currentTimeMillis() - txn.getCreationTime();
+	    if (duration > txn.getTimeout()) {
+		re = new TransactionTimeoutException(
+		    operation + " failed: Transaction timed out after " +
+		    duration + " ms");
+	    } else {
+		re = (TransactionNotActiveException) e;
+	    }
 	} else {
 	    re = (RuntimeException) e;
 	}
@@ -845,9 +863,16 @@ public final class DataStoreClient
 	 * If we're throwing an exception saying that the transaction was
 	 * aborted, then make sure to abort the transaction now.
 	 */
-	if (re instanceof TransactionAbortedException && txnInfo != null) {
-	    txnInfo.serverAborted = true;
-	    txnInfo.txn.abort(re);
+	if (re instanceof TransactionAbortedException) {
+	    if (txnInfo != null) {
+		txnInfo.serverAborted = true;
+	    }
+	    if (txn != null) {
+		try {
+		    txn.abort(re);
+		} catch (TransactionAbortedException e2) {
+		}
+	    }
 	}
 	logger.logThrow(level, re, "{0} throws", operation);
 	return re;

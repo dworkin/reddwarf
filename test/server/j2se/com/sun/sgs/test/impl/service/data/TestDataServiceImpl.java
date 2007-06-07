@@ -2313,10 +2313,10 @@ public class TestDataServiceImpl extends TestCase {
 			System.err.println(finalI + " txn2: commit");
 			txn2.commit();
 		    } catch (TransactionAbortedException e) {
-			System.err.println(finalI + " txn2: " + e);
+			System.err.println(finalI + " txn2 (" + txn2 + "): " + e);
 			exception2 = e;
 		    } catch (Exception e) {
-			System.err.println(finalI + " txn2: " + e);
+			System.err.println(finalI + " txn2 (" + txn2 + "): " + e);
 			exception2 = e;
 			if (txn2 != null) {
 			    txn2.abort(null);
@@ -2333,10 +2333,10 @@ public class TestDataServiceImpl extends TestCase {
 	    try {
 		service.getBinding("dummy2", DummyManagedObject.class)
 		    .setValue(i);
-		System.err.println(i + " txn1: commit");
+		System.err.println(i + " txn1 (" + txn + "): commit");
 		txn.commit();
 	    } catch (TransactionAbortedException e) {
-		System.err.println(i + " txn1: " + e);
+		System.err.println(i + " txn1 (" + txn + "): " + e);
 		exception = e;
 	    }
 	    thread.join();

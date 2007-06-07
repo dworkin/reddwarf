@@ -18,13 +18,15 @@ public interface DataStoreServer extends Remote {
      * Reserves a batch of object IDs for allocating new objects.  This
      * operation is performed in its own transaction.
      *
+     * @param	tid the ID of the transaction under which the operation should
+     *		take place
      * @param	count the number of object IDs to reserve
      * @return	the next available object ID
      * @throws	IllegalArgumentException if {@code count} is less than
      *		{@code 1}
      * @throws	IOException if a network problem occurs
      */
-    long allocateObjects(int count) throws IOException;
+    long allocateObjects(long tid, int count) throws IOException;
 
     /**
      * Notifies the server that an object is going to be modified.
@@ -236,10 +238,13 @@ public interface DataStoreServer extends Remote {
     /** 
      * Creates a new transaction and returns the associated ID.
      *
+     * @param	timeout the number of milliseconds the resulting transaction
+     *		should be allowed to run before it times out
      * @return	the ID of the new transaction
+     * @throws	IllegalArgumentException if the argument is negative
      * @throws	IOException if a network problem occurs
      */
-    long createTransaction() throws IOException;
+    long createTransaction(long timeout) throws IOException;
 
     /**
      * Prepares the transaction to commit.  Returns {@code true} when no state

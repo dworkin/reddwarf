@@ -5,6 +5,7 @@
 package com.sun.sgs.test.util;
 
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.kernel.TaskOwner;
 import com.sun.sgs.service.Service;
 import com.sun.sgs.service.Transaction;
@@ -34,12 +35,17 @@ public class DummyTransactionProxy implements TransactionProxy {
 
     public Transaction getCurrentTransaction() {
 	Transaction txn = threadTxn.get();
-	if (txn != null) {
-	    return txn;
-	} else {
+	if (txn == null) {
 	    throw new TransactionNotActiveException(
 		"No transaction is active");
 	}
+	try {
+	    txn.checkTimeout();
+	} catch (TransactionTimeoutException e) {
+	    txn.abort(e);
+	    throw e;
+	}
+	return txn;
     }
 
     public TaskOwner getCurrentOwner() {

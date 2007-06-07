@@ -434,7 +434,7 @@ public class TestTaskHandler extends TestCase {
     {
 	/* Use a transaction coordinator with specified timeout. */
 	Properties p = new Properties();
-	p.setProperty(TransactionCoordinator.TXN_TIMEOUT_PROPERTY, "0");
+	p.setProperty(TransactionCoordinator.TXN_TIMEOUT_PROPERTY, "1");
 	TransactionCoordinator txnCoordinator =
 	    new TransactionCoordinatorImpl(p, null);
 	MinimalTestKernel.setTransactionCoordinator(txnCoordinator);

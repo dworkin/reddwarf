@@ -69,7 +69,8 @@ public class TestDataStoreImpl extends TestCase {
     /** Prints the test case, and creates the data store and an object. */
     protected void setUp() throws Exception {
 	System.err.println("Testcase: " + getName());
-	txn = new DummyTransaction(UsePrepareAndCommit.ARBITRARY);
+	txn = new DummyTransaction(
+	    UsePrepareAndCommit.ARBITRARY, 10000);
 	props = getProperties();
 	if (store == null) {
 	    store = createDataStore();
@@ -1517,6 +1518,7 @@ public class TestDataStoreImpl extends TestCase {
 			txn2.commit();
 		    } catch (TransactionAbortedException e) {
 			System.err.println(finalI + " txn2: " + e);
+			e.printStackTrace();
 			exception2 = e;
 		    } catch (Exception e) {
 			System.err.println(finalI + " txn2: " + e);
