@@ -58,16 +58,16 @@ class SimpleClientConnection implements ClientConnection, ConnectionListener {
     /**
      * {@inheritDoc}
      */
-    public void sendMessage(byte[] message) {
+    public void sendMessage(byte[] message) throws IOException {
         if (logger.isLoggable(Level.FINEST)) {
-            // FIXME comment back in when HexDumper is committed
-            //logger.log(Level.FINEST, "send on {0}: {1}",
-            //    myHandle, HexDumper.format(message));
+            logger.log(Level.FINEST, "send on {0}: {1}",
+                myHandle, HexDumper.format(message));
         }
 	try {
             myHandle.sendBytes(message);
         } catch (IOException e) {
             logger.logThrow(Level.FINE, e, "Send failed:");
+            throw e;
         }
     }
 
@@ -106,8 +106,8 @@ class SimpleClientConnection implements ClientConnection, ConnectionListener {
      * {@inheritDoc}
      */
     public void exceptionThrown(Connection conn, Throwable exception) {
-        if (logger.isLoggable(Level.FINER)) {
-            logger.logThrow(Level.FINER, exception,
+        if (logger.isLoggable(Level.WARNING)) {
+            logger.logThrow(Level.WARNING, exception,
                     "exception on: {0}: ", conn);
         }
         assert conn.equals(this.myHandle);
