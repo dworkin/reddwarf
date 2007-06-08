@@ -24,6 +24,11 @@ public interface DataStoreServer extends Remote {
      * @return	the next available object ID
      * @throws	IllegalArgumentException if {@code count} is less than
      *		{@code 1}
+     * @throws	TransactionAbortedException if the transaction was aborted due
+     *		to a lock conflict or timeout
+     * @throws	TransactionNotActiveException if the transaction is not active
+     * @throws	IllegalStateException if the operation failed because of a
+     *		problem with the current transaction
      * @throws	IOException if a network problem occurs
      */
     long allocateObjects(long tid, int count) throws IOException;

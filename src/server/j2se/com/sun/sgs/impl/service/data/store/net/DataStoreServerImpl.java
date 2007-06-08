@@ -259,9 +259,10 @@ public class DataStoreServerImpl implements DataStoreServer {
 
 	public void checkTimeout() {
 	    long runningTime = System.currentTimeMillis() - getCreationTime();
-	    if (runningTime > getTimeout())
-		throw new TransactionTimeoutException("transaction timed out: "
-						      + runningTime + " ms");
+	    if (runningTime > getTimeout()) {
+		throw new TransactionTimeoutException(
+		    "Transaction timed out: " + runningTime + " ms");
+	    }
 	}
 
 	public void join(TransactionParticipant participant) {

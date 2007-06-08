@@ -108,7 +108,7 @@ public class PropertiesWrapper {
      *		is less than {@code min} or greater than {@code max}, or if
      *		{@code min} is greater than {@code max}
      * @throws	NumberFormatException if the value does not contain a parsable
-     *		<code>long</code>
+     *		<code>int</code>
      */
     public int getIntProperty(
 	String name, int defaultValue, int min, int max)

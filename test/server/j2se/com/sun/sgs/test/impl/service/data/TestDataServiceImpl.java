@@ -2297,10 +2297,12 @@ public class TestDataServiceImpl extends TestCase {
 			System.err.println(finalI + " txn2: commit");
 			txn2.commit();
 		    } catch (TransactionAbortedException e) {
-			System.err.println(finalI + " txn2 (" + txn2 + "): " + e);
+			System.err.println(
+			    finalI + " txn2 (" + txn2 + "): " + e);
 			exception2 = e;
 		    } catch (Exception e) {
-			System.err.println(finalI + " txn2 (" + txn2 + "): " + e);
+			System.err.println(
+			    finalI + " txn2 (" + txn2 + "): " + e);
 			exception2 = e;
 			if (txn2 != null) {
 			    txn2.abort(null);

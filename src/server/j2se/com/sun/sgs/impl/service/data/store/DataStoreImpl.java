@@ -1979,7 +1979,7 @@ public class DataStoreImpl
 	com.sleepycat.db.Transaction bdbTxn = env.beginTransaction(null, null);
 	long timeoutMicros = 1000 * timeout;
 	if (timeoutMicros < 0) {
-	    /* BDB treats a zero timeout as unlimited */
+	    /* Berkeley DB treats a zero timeout as unlimited */
 	    timeoutMicros = 0;
 	}
 	bdbTxn.setLockTimeout(timeoutMicros);

@@ -304,7 +304,7 @@ public class TestDataServiceConcurrency extends TestCase {
 			}
 		    }
 		}
-		txn.commit();
+		txn.abort(null);
 		threadDone(aborts);
 	    } catch (Throwable t) {
 		try {

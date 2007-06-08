@@ -60,18 +60,28 @@ public class TestPropertiesWrapper extends TestCase {
     }
 
     public void testGetIntBoundsFailures() {
+	/* min > max */
 	try {
-	    wrapper.getIntProperty("p", 0, 200, 100);
+	    wrapper.getIntProperty("p", 99, 100, 99);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
 	}
+	/* min > default */
 	try {
-	    wrapper.getIntProperty("p", 200, 0, 100);
+	    wrapper.getIntProperty("p", 99, 100, 200);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
 	}
+	/* default > max */
+	try {
+	    wrapper.getIntProperty("p", 100, 0, 99);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+	/* result > max */
 	props.setProperty("p", "100");
 	try {
 	    wrapper.getIntProperty("p", 0, 0, 99);
@@ -79,7 +89,8 @@ public class TestPropertiesWrapper extends TestCase {
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
 	}
-	props.setProperty("p", "-100");
+	/* min > result */
+	props.setProperty("p", "-1");
 	try {
 	    wrapper.getIntProperty("p", 0, 0, 99);
 	    fail("Expected IllegalArgumentException");
@@ -90,10 +101,14 @@ public class TestPropertiesWrapper extends TestCase {
 
     public void testGetIntSuccess() {
 	assertEquals(10, wrapper.getIntProperty("p", 10));
-	assertEquals(10, wrapper.getIntProperty("p", 10, 0, 100));
+	assertEquals(0, wrapper.getIntProperty("p", 0, 0, 100));
+	assertEquals(100, wrapper.getIntProperty("p", 100, 0, 100));
+	assertEquals(-100, wrapper.getIntProperty("p", -100, -100, -100));
 	props.setProperty("p", "100");
 	assertEquals(100, wrapper.getIntProperty("p", 10));
 	assertEquals(100, wrapper.getIntProperty("p", 10, 0, 100));
+	assertEquals(100, wrapper.getIntProperty("p", 199, 100, 200));
+	assertEquals(100, wrapper.getIntProperty("p", 100, 100, 100));
     }
 
     /* -- Test getLongProperty -- */
@@ -132,18 +147,28 @@ public class TestPropertiesWrapper extends TestCase {
     }
 
     public void testGetLongBoundsFailures() {
+	/* min > max */
 	try {
-	    wrapper.getLongProperty("p", 0, 200, 100);
+	    wrapper.getLongProperty("p", 99, 100, 99);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
 	}
+	/* min > default */
 	try {
-	    wrapper.getLongProperty("p", 200, 0, 100);
+	    wrapper.getLongProperty("p", 99, 100, 200);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
 	}
+	/* default > max */
+	try {
+	    wrapper.getLongProperty("p", 100, 0, 99);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+	/* result > max */
 	props.setProperty("p", "100");
 	try {
 	    wrapper.getLongProperty("p", 0, 0, 99);
@@ -151,7 +176,8 @@ public class TestPropertiesWrapper extends TestCase {
 	} catch (IllegalArgumentException e) {
 	    System.err.println(e);
 	}
-	props.setProperty("p", "-100");
+	/* min > result */
+	props.setProperty("p", "-1");
 	try {
 	    wrapper.getLongProperty("p", 0, 0, 99);
 	    fail("Expected IllegalArgumentException");
@@ -166,10 +192,15 @@ public class TestPropertiesWrapper extends TestCase {
 	assertEquals(1234567890123456L,
 		     wrapper.getLongProperty(
 			 "p", 1234567890123456L, 0, 1234567890123456L));
+	assertEquals(100L, wrapper.getLongProperty("p", 100, 0, 100));
+	assertEquals(-100L, wrapper.getLongProperty("p", -100, -100, -100));
 	props.setProperty("p", "2345678901234567");
 	assertEquals(2345678901234567L, wrapper.getLongProperty("p", 10));
 	assertEquals(2345678901234567L,
 		     wrapper.getLongProperty("p", 10, 0, 2345678901234567L));
+	props.setProperty("p", "100");
+	assertEquals(100L, wrapper.getLongProperty("p", 199, 100, 200));
+	assertEquals(100L, wrapper.getLongProperty("p", 100, 100, 100));
     }
 }
 	

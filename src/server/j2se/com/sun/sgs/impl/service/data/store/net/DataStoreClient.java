@@ -597,14 +597,14 @@ public final class DataStoreClient
 
     /* -- Implement TransactionParticipant -- */
 
-     /** {@inheritDoc} */
+    /** {@inheritDoc} */
     public boolean prepare(Transaction txn) {
 	logger.log(Level.FINER, "prepare txn:{0}", txn);
 	TxnInfo txnInfo = null;
 	Exception exception;
 	try {
 	    txnInfo = checkTxnNoJoin(txn, true);
-	    txn.checkTimeout();
+	    checkTimeout(txn);
 	    if (txnInfo.prepared) {
 		throw new IllegalStateException(
 		    "Transaction has already been prepared");
@@ -661,7 +661,7 @@ public final class DataStoreClient
 	Exception exception;
 	try {
 	    txnInfo = checkTxnNoJoin(txn, true);
-	    txn.checkTimeout();
+	    checkTimeout(txn);
 	    if (txnInfo.prepared) {
 		throw new IllegalStateException(
 		    "Transaction has already been prepared");
@@ -687,11 +687,11 @@ public final class DataStoreClient
 	Exception exception;
 	try {
 	    txnInfo = checkTxnNoJoin(txn, false);
-	    threadTxnInfo.set(null);
-	    decrementTxnCount();
 	    if (!txnInfo.serverAborted) {
 		server.abort(txnInfo.tid);
 	    }
+	    threadTxnInfo.set(null);
+	    decrementTxnCount();
 	    logger.log(Level.FINER, "abort txn:{0} returns", txn);
 	    return;
 	} catch (IOException e) {
@@ -764,7 +764,7 @@ public final class DataStoreClient
 	} else if (txnInfo.prepared) {
 	    throw new IllegalStateException("Transaction has been prepared");
 	}
-	txn.checkTimeout();
+	checkTimeout(txn);
 	return txnInfo;
     }
 
@@ -823,13 +823,14 @@ public final class DataStoreClient
 
     /**
      * Returns the correct SGS exception for a IOException thrown during an
-     * operation.  The txnInfo argument, if non-null, is used to abort the
+     * operation.  The txn argument, if non-null, is used to abort the
      * transaction if a TransactionAbortedException is going to be thrown.  The
-     * level argument is used to log the exception.  The operation argument
-     * will be included in newly created exceptions and the log, and should
-     * describe the operation that was underway when the exception was thrown.
-     * The supplied exception may also be a RuntimeException, which will be
-     * logged and returned.
+     * txnInfo argument, if non-null, is used to mark the transaction as
+     * aborted.  The level argument is used to log the exception.  The
+     * operation argument will be included in newly created exceptions and the
+     * log, and should describe the operation that was underway when the
+     * exception was thrown.  The supplied exception may also be a
+     * RuntimeException, which will be logged and returned.
      */
     private RuntimeException convertException(
 	Transaction txn, TxnInfo txnInfo, Level level, Exception e,
@@ -852,7 +853,8 @@ public final class DataStoreClient
 	    if (duration > txn.getTimeout()) {
 		re = new TransactionTimeoutException(
 		    operation + " failed: Transaction timed out after " +
-		    duration + " ms");
+		    duration + " ms",
+		    e);
 	    } else {
 		re = (TransactionNotActiveException) e;
 	    }
@@ -896,6 +898,19 @@ public final class DataStoreClient
 	    if (txnCount <= 0) {
 		txnCountLock.notifyAll();
 	    }
+	}
+    }
+
+    /**
+     * Checks that the transaction has not timed out, including if it has run
+     * for longer than the maximum timeout.
+     */
+    private void checkTimeout(Transaction txn) {
+	long max = Math.min(txn.getTimeout(), maxTxnTimeout);
+	long runningTime = System.currentTimeMillis() - txn.getCreationTime();
+	if (runningTime > max) {
+	    throw new TransactionTimeoutException(
+		"Transaction timed out: " + runningTime + " ms");
 	}
     }
 }
