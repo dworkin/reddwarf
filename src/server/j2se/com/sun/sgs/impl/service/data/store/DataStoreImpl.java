@@ -78,70 +78,27 @@ import java.util.logging.Logger;
  * so the inability to resolve prepared transactions should have no effect at
  * present. <p>
  *
- * The {@link #DataStoreImpl constructor} supports the following properties:
- * <p>
+ * The {@link #DataStoreImpl constructor} supports these public <a
+ * href="../../../../app/doc-files/config-properties.html#DataStore">
+ * properties</a>, and the following additional properties: <p>
  *
- * <ul>
+ * <dl style="margin-left: 1em">
  *
- * <li> <i>Key:</i> {@code
- *	com.sun.sgs.impl.service.data.store.DataStoreImpl.checkpoint.interval}
- *	<br>
- *	<i>Default:</i> {@code 60000} <br>
- *	The interval in milliseconds between checkpoint operations that flush
- *	changes from the database log to the database. <p>
- *
- * <li> <i>Key:</i> {@code
- *	com.sun.sgs.impl.service.data.store.DataStoreImpl.checkpoint.size} <br>
- *	<i>Default:</i> {@code 100000} <br>
- *	The number of bytes that needs to have been written since the last
- *	checkpoint operation was performed to require another checkpoint. <p>
- *
- * <li> <i>Key:</i>
- *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl.directory
- *	</code> <br>
- *	<i>Default:</i> <code>${com.sun.sgs.app.root}"/dsdb"</code> <br>
- *	The directory in which to store database files.  Each instance of
- *	<code>DataStoreImpl</code> requires its own, unique directory. <p>
- *
- * <li> <i>Key:</i> <code>
+ * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.data.store.DataStoreImpl.allocation.block.size
- *	</code> <br>
- *	<i>Default:</i> <code>100</code> <br>
- *	The number of object IDs to allocate at a time.  This value must be
- *	greater than <code>0</code>.  Object IDs are allocated in an
- *	independent transaction, and are discarded if a transaction aborts, if
- *	a managed object is made reachable within the data store but is removed
- *	from the store before the transaction commits, or if the program exits
- *	before it uses the object IDs it has allocated.  This number limits the
- *	maximum number of object IDs that would be discarded when the program
- *	exits. <p>
+ *	</b></code> <br>
+ *	<i>Default:</i> <code>100</code>
  *
- * <li> <i>Key:</i>
- *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl.cache.size
- *	</code> <br>
- *	<i>Default:</i> <code>1000000</code> <br>
- *	The size in bytes of the Berkeley DB cache.  This value must not be
- *	less than 20000. <p>
+ * <dd style="padding-top: .5em">The number of object IDs to allocate at a
+ *	time.  This value must be greater than <code>0</code>.  Object IDs are
+ *	allocated in an independent transaction, and are discarded if a
+ *	transaction aborts, if a managed object is made reachable within the
+ *	data store but is removed from the store before the transaction
+ *	commits, or if the program exits before it uses the object IDs it has
+ *	allocated.  This number limits the maximum number of object IDs that
+ *	would be discarded when the program exits. <p>
  *
- * <li> <i>Key:</i>
- *	<code>com.sun.sgs.impl.service.data.store.DataStoreImpl.flush.to.disk
- *	</code> <br>
- *	<i>Default:</i> <code>false</code>
- *	Whether to flush changes to disk when a transaction commits.  If
- *	<code>false</code>, the modifications made in some of the most recent
- *	transactions may be lost if the host crashes, although data integrity
- *	will be maintained.  Flushing changes to disk avoids data loss but
- *	introduces a significant reduction in performance. <p>
- *
- * <li> <i>Key:</i> {@code
- *	com.sun.sgs.impl.service.data.store.DataStoreImpl.remove.logs} <br>
- *	<i>Default:</i> <code>false</code> <br>
- *	Whether to automatically remove database log files that are no longer
- *	needed.  Note that automatic log file removal is likely to make
- *	catastrophic recovery of the database impossible, because log files
- *	that may be needed will not have been backed up. <p>
- *
- * </ul> <p>
+ * </dl> <p>
  *
  * This class uses the {@link Logger} named
  * <code>com.sun.sgs.impl.service.data.DataStoreImpl</code> to log information

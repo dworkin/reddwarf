@@ -55,27 +55,14 @@ import java.util.logging.Logger;
 /**
  * Manages client sessions. <p>
  *
- * The {@link #ClientSessionServiceImpl constructor} supports the
- * following properties: <p>
- *
- * <ul>
- *
- * <li> <i>Key:</i> {@code com.sun.sgs.app.name} <br>
- *	<i>No default &mdash; required</i> <br>
- *	Specifies the application name. <p>
- *
- * <li> <i>Key:</i> {@code com.sun.sgs.app.port} <br>
- *	<i>No default &mdash; required</i> <br>
- *	Specifies the TCP port to listen for client connections. <p>
- *
- * <li> <i>Key:</i>
- * 	{@code com.sun.sgs.impl.service.ClientSessionServiceImpl.id.block.size}
- *	<br>
- *	<i>Default:</i> {@code 256} <br>
- *	Specifies the block size to use when reserving session IDs.  Must be
- *	&gt; {@link IdGenerator#MIN_BLOCK_SIZE}. <p>
- *
- * </ul> <p>
+ * The {@link #ClientSessionServiceImpl constructor} requires the <a
+ * href="../../../app/doc-files/config-properties.html#com.sun.sgs.app.name">
+ * <code>com.sun.sgs.app.name</code></a> and <a
+ * href="../../../app/doc-files/config-properties.html#com.sun.sgs.app.port">
+ * <code>com.sun.sgs.app.port</code></a> configuration properties and supports
+ * these public configuration <a
+ * href="../../../app/doc-files/config-properties.html#ClientSessionService">
+ * properties</a>. <p>
  */
 public class ClientSessionServiceImpl implements ClientSessionService {
 

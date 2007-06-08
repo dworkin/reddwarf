@@ -947,7 +947,7 @@
           description="Creates the tutorial distribution">
     <copy todir="${build.dir}/sgs/tutorial">
       <fileset dir="example/tutorial" includes="*.properties"/>
-      <fileset file="build/example/tutorial/tutorial.jar"/>
+      <fileset file="${build.dir}/example/tutorial/tutorial.jar"/>
     </copy>
     <copy todir="${build.dir}/sgs/tutorial/src">
       <fileset dir="example/tutorial/src" includes="**/*.java"/>

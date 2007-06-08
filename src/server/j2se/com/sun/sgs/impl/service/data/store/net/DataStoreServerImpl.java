@@ -43,32 +43,37 @@ import java.util.logging.Logger;
  * {@link #DataStoreServerImpl constructor} supports the following properties:
  * <p>
  *
- * <ul>
+ * <dl style="margin-left: 1em">
  *
- * <li> <i>Key:</i> {@code 
- *	com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl.max.txn.timeout}
- *	<br>
- *      <i>Default:</i> {@code 500} <br>
- *	The maximum amount of time in milliseconds that a transaction will be
- *	permitted to run before it is a candidate for being aborted. <p>
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl.max.txn.timeout
+ *	</b></code>
+ *      <i>Default:</i> {@code 500}
  *
- * <li> <i>Key:</i> {@code 
- *	com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl.reap.delay}
- *	<br>
- *      <i>Default:</i> {@code 500} <br>
- *	The delay in milliseconds between attempts to reap timed out
- *	transactions. <p>
+ * <dd style="padding-top: .5em">The maximum amount of time in milliseconds
+ *	that a transaction will be permitted to run before it is a candidate
+ *	for being aborted. <p>
  *
- * <li> <i>Key:</i> {@code 
- *	com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl.port}
- *	<br>
- *      <i>Default:</i> {@code 44530} <br>
- *	The network port for running the server. This value must be greater
- *	than or equal to {@code 0} and no greater than {@code 65535}.  If the
- *	value specified is {@code 0}, then an anonymous port will be chosen.
- *	The value chosen will be logged, and can also be accessed with the
- *	{@link #getPort getPort} method. <p>
- * </ul> <p>
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl.reap.delay
+ *	</b></code><br>
+ *      <i>Default:</i> {@code 500}
+ *
+ * <dd style="padding-top: .5em">The delay in milliseconds between attempts to
+ *	reap timed out transactions. <p>
+ *
+ * <dt> <i>Property:</i> <code><b>
+ *	com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl.port
+ *	</b></code><br>
+ *      <i>Default:</i> {@code 44530}
+ *
+ * <dd style="padding-top: .5em">The network port for running the server. This
+ *	value must be greater than or equal to {@code 0} and no greater than
+ *	{@code 65535}.  If the value specified is {@code 0}, then an anonymous
+ *	port will be chosen.  The value chosen will be logged, and can also be
+ *	accessed with the {@link #getPort getPort} method. <p>
+ *
+ * </dl> <p>
  *
  * In addition to any logging performed by the {@code DataStoreImpl} class,
  * this class uses the {@link Logger} named {@code
