@@ -6,6 +6,7 @@ package com.sun.sgs.test.impl.service.data.store.net;
 
 import com.sun.sgs.app.TransactionAbortedException;
 import com.sun.sgs.app.TransactionNotActiveException;
+import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.service.data.store.DataStoreImpl;
 import com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl;
 import java.io.File;
@@ -279,6 +280,32 @@ public class TestDataStoreServerImpl extends TestCase {
 		    notifyAll();
 		}
 	    }
+	}
+    }
+
+    /* -- Other tests -- */
+
+    /**
+     * Test that the maximum transaction timeout overrides the standard
+     * timeout.
+     */
+    public void testGetObjectMaxTxnTimeout() throws Exception {
+	server.shutdown();
+	props.setProperty(
+	    DataStoreServerImplClassName + ".max.txn.timeout", "50");
+	server = getDataStoreServer();
+	tid = server.createTransaction(2000);
+	oid = server.allocateObjects(tid, 1);
+	Thread.sleep(1000);
+	try {
+	    server.getObject(tid, oid, false);
+	    fail("Expected TransactionTimeoutException");
+	} catch (TransactionTimeoutException e) {
+	    tid = -1;
+	    System.err.println(e);
+	} catch (TransactionNotActiveException e) {
+	    tid = -1;
+	    System.err.println(e);
 	}
     }
 

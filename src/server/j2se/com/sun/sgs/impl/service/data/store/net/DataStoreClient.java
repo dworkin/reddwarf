@@ -695,7 +695,14 @@ public final class DataStoreClient
 	try {
 	    txnInfo = checkTxnNoJoin(txn, false);
 	    if (!txnInfo.serverAborted) {
-		server.abort(txnInfo.tid);
+		try {
+		    server.abort(txnInfo.tid);
+		} catch (TransactionNotActiveException e) {
+		    logger.logThrow(Level.FINEST, e,
+				    "abort txn:{0} - Transaction already " +
+				    "aborted by server",
+				    txn);
+		}
 	    }
 	    threadTxnInfo.set(null);
 	    decrementTxnCount();
@@ -877,14 +884,7 @@ public final class DataStoreClient
 		txnInfo.serverAborted = true;
 	    }
 	    if (txn != null) {
-		try {
-		    txn.abort(re);
-		} catch (TransactionAbortedException e2) {
-		    /*
-		     * Discard this exception and return the original one, for
-		     * better error reporting.
-		     */
-		}
+		txn.abort(re);
 	    }
 	}
 	logger.logThrow(level, re, "{0} throws", operation);

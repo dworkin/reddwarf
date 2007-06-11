@@ -4,10 +4,12 @@
 
 package com.sun.sgs.test.impl.service.data.store.net;
 
+import com.sun.sgs.app.TransactionTimeoutException;
 import com.sun.sgs.impl.service.data.store.DataStore;
 import com.sun.sgs.impl.service.data.store.net.DataStoreClient;
 import com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl;
 import com.sun.sgs.test.impl.service.data.store.TestDataStoreImpl;
+import com.sun.sgs.test.util.DummyTransaction;
 import java.util.Properties;
 
 /** Test the DataStoreClient class. */
@@ -157,6 +159,51 @@ public class TestDataStoreClient extends TestDataStoreImpl {
 	    createDataStore(props);
 	    fail("Expected IllegalArgumentException");
 	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
+    public void testConstructorBadMaxTimeout() throws Exception {
+	props.setProperty(
+	    DataStoreClientClassName + ".max.txn.timeout", "gorp");
+	try {
+	    createDataStore(props);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+	
+    public void testConstructorNegativeMaxTimeout() throws Exception {
+	props.setProperty(
+	    DataStoreClientClassName + ".max.txn.timeout", "-1");
+	try {
+	    createDataStore(props);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
+    /* -- Other tests -- */
+
+    /**
+     * Test that the maximum transaction timeout overrides the standard
+     * timeout.
+     */
+    public void testGetObjectMaxTxnTimeout() throws Exception {
+	txn.abort(null);
+	store.shutdown();
+	props.setProperty(DataStoreClientClassName + ".max.txn.timeout", "50");
+	props.setProperty("com.sun.sgs.txn.timeout", "2000");
+	store = createDataStore(props);
+	txn = new DummyTransaction();
+	Thread.sleep(1000);
+	try {
+	    store.getObject(txn, id, false);
+	    fail("Expected TransactionTimeoutException");
+	} catch (TransactionTimeoutException e) {
+	    txn = null;
 	    System.err.println(e);
 	}
     }

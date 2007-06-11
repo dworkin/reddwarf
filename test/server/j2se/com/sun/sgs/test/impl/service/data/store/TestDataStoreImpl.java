@@ -44,7 +44,7 @@ public class TestDataStoreImpl extends TestCase {
 	"TestDataStoreImpl.db";
 
     /** An instance of the data store, to test. */
-    static DataStore store;
+    protected static DataStore store;
 
     /** Make sure an empty version of the directory exists. */
     static {
@@ -58,10 +58,10 @@ public class TestDataStoreImpl extends TestCase {
     protected Properties props;
 
     /** An initial, open transaction. */
-    DummyTransaction txn;
+    protected DummyTransaction txn;
 
     /** The object ID of a newly created object. */
-    long id;
+    protected long id;
 
     /** Creates the test. */
     public TestDataStoreImpl(String name) {
