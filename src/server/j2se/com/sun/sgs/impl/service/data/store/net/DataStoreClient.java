@@ -45,7 +45,8 @@ import java.util.logging.Logger;
  *
  * <dd style="padding-top: .5em">The maximum amount of time in milliseconds
  *	that a transaction that uses the data store will be permitted to run
- *	before it is a candidate for being aborted. <p>
+ *	before it is a candidate for being aborted.  This value must be greater
+ *	than {@code 0}. <p>
  *
  * <dt>	<i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.data.store.net.DataStoreClient.server.host
@@ -234,7 +235,7 @@ public final class DataStoreClient
 	    ALLOCATION_BLOCK_SIZE_PROPERTY, DEFAULT_ALLOCATION_BLOCK_SIZE,
 	    1, Integer.MAX_VALUE);
 	maxTxnTimeout = wrappedProps.getLongProperty(
-	    MAX_TXN_TIMEOUT_PROPERTY, DEFAULT_MAX_TXN_TIMEOUT, 0,
+	    MAX_TXN_TIMEOUT_PROPERTY, DEFAULT_MAX_TXN_TIMEOUT, 1,
 	    Long.MAX_VALUE);
 	server = getServer();
     }
