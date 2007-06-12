@@ -48,7 +48,7 @@ import java.util.logging.Logger;
  * <dt> <i>Property:</i> <code><b>
  *	com.sun.sgs.impl.service.data.store.net.DataStoreServerImpl.max.txn.timeout
  *	</b></code>
- *      <i>Default:</i> {@code 500}
+ *      <i>Default:</i> {@code 60000}
  *
  * <dd style="padding-top: .5em">The maximum amount of time in milliseconds
  *	that a transaction will be permitted to run before it is a candidate
@@ -678,7 +678,7 @@ public class DataStoreServerImpl implements DataStoreServer {
 	store = new CustomDataStoreImpl(properties);
 	maxTxnTimeout = wrappedProps.getLongProperty(
 	    MAX_TXN_TIMEOUT_PROPERTY, DEFAULT_MAX_TXN_TIMEOUT,
-	    (long) 1, Long.MAX_VALUE);
+	    1, Long.MAX_VALUE);
 	int requestedPort = wrappedProps.getIntProperty(
 	    PORT_PROPERTY, DEFAULT_PORT, 0, 65535);
 	exporter = noRmi ? new SocketExporter() : new Exporter();
@@ -830,6 +830,10 @@ public class DataStoreServerImpl implements DataStoreServer {
 
     /** {@inheritDoc} */
     public long createTransaction(long timeout) {
+	if (timeout <= 0) {
+	    throw new IllegalArgumentException(
+		"Timeout must be greater than zero: " + timeout);
+	}
 	return store.createTransaction(Math.min(timeout, maxTxnTimeout));
     }
 

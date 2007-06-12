@@ -8,6 +8,7 @@ import com.sun.sgs.impl.sharedutil.PropertiesWrapper;
 import java.util.Properties;
 import junit.framework.TestCase;
 
+/** Tests for the PropertiesWrapper class. */
 public class TestPropertiesWrapper extends TestCase {
     private Properties props;
     private PropertiesWrapper wrapper;

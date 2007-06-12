@@ -246,7 +246,8 @@ public interface DataStoreServer extends Remote {
      * @param	timeout the number of milliseconds the resulting transaction
      *		should be allowed to run before it times out
      * @return	the ID of the new transaction
-     * @throws	IllegalArgumentException if the argument is negative
+     * @throws	IllegalArgumentException if the argument is less than or equal
+     *		to {@code 0}
      * @throws	IOException if a network problem occurs
      */
     long createTransaction(long timeout) throws IOException;

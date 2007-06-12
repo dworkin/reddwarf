@@ -309,6 +309,22 @@ public class TestDataStoreServerImpl extends TestCase {
 	}
     }
 
+    /** Test illegal argument for bad transaction timeout. */
+    public void testCreateTransactionBadTimeout() {
+	try {
+	    server.createTransaction(-3);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+	try {
+	    server.createTransaction(0);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
     /* -- Other methods and classes -- */
 
     /** Creates a per-test directory. */

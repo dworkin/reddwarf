@@ -35,7 +35,6 @@ import java.util.logging.Logger;
  *	</b></code><br>
  *	<i>Default:</i> {@code 100}
  *
- *
  * <dd style="padding-top: .5em">The number of object IDs to allocate at one
  *	time.  This value must be greater than {@code 0}. <p>
  *
@@ -235,8 +234,8 @@ public final class DataStoreClient
 	    ALLOCATION_BLOCK_SIZE_PROPERTY, DEFAULT_ALLOCATION_BLOCK_SIZE,
 	    1, Integer.MAX_VALUE);
 	maxTxnTimeout = wrappedProps.getLongProperty(
-	    MAX_TXN_TIMEOUT_PROPERTY, DEFAULT_MAX_TXN_TIMEOUT,
-	    (long) 0, Long.MAX_VALUE);
+	    MAX_TXN_TIMEOUT_PROPERTY, DEFAULT_MAX_TXN_TIMEOUT, 0,
+	    Long.MAX_VALUE);
 	server = getServer();
     }
 

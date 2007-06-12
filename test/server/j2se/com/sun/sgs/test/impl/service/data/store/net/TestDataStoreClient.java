@@ -185,6 +185,17 @@ public class TestDataStoreClient extends TestDataStoreImpl {
 	}
     }
 
+    public void testConstructorZeroMaxTimeout() throws Exception {
+	props.setProperty(
+	    DataStoreClientClassName + ".max.txn.timeout", "0");
+	try {
+	    createDataStore(props);
+	    fail("Expected IllegalArgumentException");
+	} catch (IllegalArgumentException e) {
+	    System.err.println(e);
+	}
+    }
+
     /* -- Other tests -- */
 
     /**

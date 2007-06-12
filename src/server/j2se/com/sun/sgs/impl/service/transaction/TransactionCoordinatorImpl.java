@@ -106,13 +106,12 @@ public final class TransactionCoordinatorImpl
 	PropertiesWrapper props = new PropertiesWrapper(properties);
 	this.boundedTimeout =
 	    props.getLongProperty(TransactionCoordinator.TXN_TIMEOUT_PROPERTY,
-				  BOUNDED_TIMEOUT_DEFAULT,
-				  (long) 1, Long.MAX_VALUE);
+				  BOUNDED_TIMEOUT_DEFAULT, 1, Long.MAX_VALUE);
 	this.unboundedTimeout =
 	    props.getLongProperty(TransactionCoordinator.
 				  TXN_UNBOUNDED_TIMEOUT_PROPERTY,
-				  UNBOUNDED_TIMEOUT_DEFAULT,
-				  (long) 1, Long.MAX_VALUE);
+				  UNBOUNDED_TIMEOUT_DEFAULT, 1,
+				  Long.MAX_VALUE);
     }
 
     /** {@inheritDoc} */
